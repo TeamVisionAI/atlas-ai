@@ -2,7 +2,8 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-
+const healthRoute = require("./routes/health");
+const recruitRoute = require("./routes/recruit");
 const app = express();
 
 app.use(cors());
@@ -16,7 +17,8 @@ app.get("/", (req, res) => {
     message: "🚀 Atlas AI Backend Running"
   });
 });
-
+app.use("/health", healthRoute);
+app.use("/api/recruit", recruitRoute);
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
