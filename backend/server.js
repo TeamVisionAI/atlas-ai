@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const healthRoute = require("./routes/health");
+const infoRoute = require("./routes/info");
 const recruitRoute = require("./routes/recruit");
 const app = express();
 
@@ -18,6 +19,7 @@ app.get("/", (req, res) => {
   });
 });
 app.use("/health", healthRoute);
+app.use("/api/info", infoRoute);
 app.use("/api/recruit", recruitRoute);
 const PORT = process.env.PORT || 3000;
 
