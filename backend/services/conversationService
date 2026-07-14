@@ -1,0 +1,97 @@
+const {
+  findProspect,
+  createProspect,
+  updateProspect
+} = require("./supabaseService");
+
+async function handleIncomingMessage(phone, name, message) {
+
+  let prospect = await findProspect(phone);
+
+  if (!prospect) {
+    prospect = await createProspect(
+      phone,
+      name,
+      message
+    );
+
+    return "👋 Welcome to Team Vision!\n\nI'm Atlas, your virtual recruiting assistant.\n\nWhat city and state do you currently live in?";
+  }
+
+  switch (prospect.current_step) {
+
+    case "GREETING":
+      return handleGreetingStep(prospect, message);
+  
+    case "WORK_AUTHORIZATION":
+      return handleWorkAuthorizationStep(prospect, message);
+  
+    default:
+      return "Thanks! Atlas is still learning. 😊";
+  }
+}
+
+async function handleGreetingStep(prospect, message) {
+
+  const answer = message.trim();
+
+  const greetings = ["hi", "hello", "hola"];
+
+  if (greetings.includes(answer.toLowerCase())) {
+    return "👋 Welcome to Team Vision!\n\nWhat city and state do you currently live in?";
+  }
+
+  let city = answer;
+  let state = "";
+
+  if (answer.includes(",")) {
+    const parts = answer.split(",");
+    city = parts[0].trim();
+    state = parts[1].trim();
+  }
+
+  await updateProspect(prospect.phone, {
+    city,
+    state,
+    current_step: "WORK_AUTHORIZATION",
+    last_message: answer
+  });
+
+  return "Perfect! ✅\n\nDo you have legal authorization to work in the United States?";
+}
+
+async function handleWorkAuthorizationStep(prospect, message) {
+
+  const answer = message.trim().toLowerCase();
+
+  const yesAnswers = [
+    "yes",
+    "y",
+    "yeah",
+    "yep",
+    "si",
+    "sí",
+    "green card",
+    "citizen",
+    "usc",
+    "work permit",
+    "permit",
+    "tps"
+  ];
+
+  const authorized = yesAnswers.some(value =>
+    answer.includes(value)
+  );
+
+  await updateProspect(prospect.phone, {
+    work_authorized: authorized,
+    current_step: "OCCUPATION",
+    last_message: message
+  });
+
+  return "Great! What do you currently do for work?";
+}
+
+module.exports = {
+  handleIncomingMessage
+};

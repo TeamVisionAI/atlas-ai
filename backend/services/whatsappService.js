@@ -2,7 +2,10 @@ const axios = require("axios");
 
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-
+console.log(
+  "TOKEN PREFIX:",
+  TOKEN ? TOKEN.substring(0, 20) : "MISSING"
+);
 async function sendTextMessage(to, message) {
   try {
     await axios.post(
