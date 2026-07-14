@@ -1,6 +1,11 @@
 const express = require("express");
 const { sendTextMessage } = require("../services/whatsappService");
 
+const {
+  findProspect,
+  createProspect
+} = require("../services/supabaseService");
+
 const router = express.Router();
 
 router.get("/", (req, res) => {
@@ -28,10 +33,32 @@ router.post("/", async (req, res) => {
   if (message && message.type === "text") {
     console.log("💬 User:", message.text.body);
 
-    await sendTextMessage(
-      message.from,
-      "👋 Welcome to Team Vision!\n\nI'm Atlas, your virtual recruiting assistant.\n\nWhat city and state do you currently live in?"
-    );
+const phone = message.from;
+const name = value.contacts?.[0]?.profile?.name || "Unknown";
+
+let prospect = await findProspect(phone);
+
+if (!prospect) {
+  prospect = await createProspect(
+    phone,
+    name,
+    message.text.body
+  );
+
+  console.log("✅ New prospect created:", prospect.phone);
+} else {
+  console.log("👤 Existing prospect:", prospect.phone);
+}
+
+  console.log("✅ New prospect created:", prospect.phone);
+} else {
+  console.log("👤 Existing prospect:", prospect.phone);
+}
+
+await sendTextMessage(
+  phone,
+  "👋 Welcome to Team Vision!\n\nI'm Atlas, your virtual recruiting assistant.\n\nWhat city and state do you currently live in?"
+);
   }
 
   res.sendStatus(200);

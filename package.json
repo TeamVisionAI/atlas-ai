@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/TeamVisionAI/atlas-ai#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.5",
     "axios": "^1.18.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
