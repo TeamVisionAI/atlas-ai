@@ -7,9 +7,11 @@ const infoRoute = require("./routes/info");
 const recruitRoute = require("./routes/recruit");
 const webhookRoute = require("./routes/webhook");
 const app = express();
+const dashboardRoutes = require("./routes/dashboard");
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/dashboard", dashboardRoutes);
 
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
