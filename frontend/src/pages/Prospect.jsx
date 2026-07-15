@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-
 import { getProspect } from "../services/prospectService";
+import { useEffect, useState } from "react";
+import InfoCard from "../components/InfoCard";
+import InterviewCard from "../components/InterviewCard";
+import PipelineCard from "../components/PipelineCard";
+import ConversationCard from "../components/ConversationCard";
+import NotesCard from "../components/NotesCard";
+import AIRecommendationCard from "../components/AIRecommendationCard";
 
 export default function Prospect() {
 
@@ -27,34 +32,30 @@ export default function Prospect() {
 
     return <h2>Loading...</h2>;
 
-  return (
-
-    <div style={{ padding:40 }}>
-
-      <h1>{prospect.name}</h1>
-
-      <h3>{prospect.current_step}</h3>
-
-      <hr />
-
-      <p><b>Phone</b> {prospect.phone}</p>
-
-      <p><b>Language</b> {prospect.language}</p>
-
-      <p><b>City</b> {prospect.city}</p>
-
-      <p><b>Occupation</b> {prospect.occupation}</p>
-
-      <hr />
-
-      <h3>Interview</h3>
-
-      <p>{prospect.interview_time}</p>
-
-      <p>{prospect.interview_type}</p>
-
-    </div>
-
-  );
-
+    return (
+      <div style={{ padding: 30 }}>
+        <h1>{prospect.name}</h1>
+    
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 20
+          }}
+        >
+          <InfoCard />
+          <InterviewCard />
+          <PipelineCard />
+          <ConversationCard />
+        </div>
+    
+        <div style={{ marginTop: 20 }}>
+          <NotesCard />
+        </div>
+    
+        <div style={{ marginTop: 20 }}>
+          <AIRecommendationCard />
+        </div>
+      </div>
+    );
 }
