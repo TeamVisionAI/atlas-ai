@@ -1,0 +1,68 @@
+const { google } = require("googleapis");
+
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
+
+oauth2Client.setCredentials({
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+});
+
+const calendar = google.calendar({
+  version: "v3",
+  auth: oauth2Client,
+});
+
+async function createInterview(interview) {
+  console.log("📅 Creating interview:", interview);
+
+  const start = new Date(interview.startTime);
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+
+  const event = {
+    summary: `Team Vision Interview - ${interview.name}`,
+    description: `
+Prospect: ${interview.name}
+Phone: ${interview.phone}
+Interview Type: ${interview.interviewType}
+`,
+    start: {
+      dateTime: start.toISOString(),
+      timeZone: "America/New_York",
+    },
+    end: {
+      dateTime: end.toISOString(),
+      timeZone: "America/New_York",
+    },
+  };
+
+  const response = await calendar.events.insert({
+    calendarId: "primary",
+    requestBody: event,
+  });
+
+  console.log("✅ Google Calendar Event Created");
+  console.log("📅 Event ID:", response.data.id);
+
+  return response.data;
+}
+
+async function cancelInterview(eventId) {
+  console.log("❌ Cancel interview:", eventId);
+
+  // We will build this later
+}
+
+async function rescheduleInterview(eventId, interview) {
+  console.log("🔄 Reschedule interview:", eventId);
+
+  // We will build this later
+}
+
+module.exports = {
+  createInterview,
+  cancelInterview,
+  rescheduleInterview,
+};

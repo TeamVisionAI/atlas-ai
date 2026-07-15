@@ -4,37 +4,41 @@ const {
   updateProspect
 } = require("./supabaseService");
 
-async function handleIncomingMessage(phone, name, message) {
+const { createInterview } = require("./calendarService");
 
+
+async function handleIncomingMessage(phone, name, message) {
   let prospect = await findProspect(phone);
 
   if (!prospect) {
-    prospect = await createProspect(
-      phone,
-      name,
-      message
-    );
+    prospect = await createProspect(phone, name, message);
 
     return "👋 Welcome to Team Vision!\n\nI'm Atlas, your virtual recruiting assistant.\n\nWhat city and state do you currently live in?";
   }
 
   switch (prospect.current_step) {
-
     case "GREETING":
       return handleGreetingStep(prospect, message);
-  
+
     case "WORK_AUTHORIZATION":
       return handleWorkAuthorizationStep(prospect, message);
-  
+
+    case "OCCUPATION":
+      return handleOccupationStep(prospect, message);
+
+    case "INTERVIEW_TYPE":
+      return handleInterviewTypeStep(prospect, message);
+
+    case "SCHEDULE":
+      return handleScheduleStep(prospect, message);
+
     default:
       return "Thanks! Atlas is still learning. 😊";
   }
 }
 
 async function handleGreetingStep(prospect, message) {
-
   const answer = message.trim();
-
   const greetings = ["hi", "hello", "hola"];
 
   if (greetings.includes(answer.toLowerCase())) {
@@ -61,7 +65,6 @@ async function handleGreetingStep(prospect, message) {
 }
 
 async function handleWorkAuthorizationStep(prospect, message) {
-
   const answer = message.trim().toLowerCase();
 
   const yesAnswers = [
@@ -79,7 +82,7 @@ async function handleWorkAuthorizationStep(prospect, message) {
     "tps"
   ];
 
-  const authorized = yesAnswers.some(value =>
+  const authorized = yesAnswers.some((value) =>
     answer.includes(value)
   );
 
@@ -90,6 +93,94 @@ async function handleWorkAuthorizationStep(prospect, message) {
   });
 
   return "Great! What do you currently do for work?";
+}
+
+async function handleOccupationStep(prospect, message) {
+  const occupation = message.trim();
+
+  await updateProspect(prospect.phone, {
+    occupation,
+    current_step: "INTERVIEW_TYPE",
+    last_message: message
+  });
+
+  return `Awesome! 👍
+
+Would you prefer your interview:
+
+1️⃣ In person
+
+2️⃣ On Zoom`;
+}
+
+async function handleInterviewTypeStep(prospect, message) {
+  const answer = message.trim().toLowerCase();
+
+  let interviewType = "Zoom";
+
+  if (
+    answer.includes("1") ||
+    answer.includes("person") ||
+    answer.includes("office")
+  ) {
+    interviewType = "In Person";
+  }
+
+  await updateProspect(prospect.phone, {
+    interview_type: interviewType,
+    current_step: "SCHEDULE",
+    last_message: message
+  });
+
+  return `Perfect! 🎉
+
+Which interview time works best for you?
+
+1️⃣ 1:00 PM
+
+2️⃣ 5:00 PM`;
+}
+
+async function handleScheduleStep(prospect, message) {
+  const answer = message.trim().toLowerCase();
+
+  let interviewTime = "5:00 PM";
+  let hour = 17;
+
+  if (
+    answer.includes("1") ||
+    answer.includes("1:00") ||
+    answer.includes("1 pm")
+  ) {
+    interviewTime = "1:00 PM";
+    hour = 13;
+  }
+
+  const startTime = new Date();
+  startTime.setDate(startTime.getDate() + 1);
+  startTime.setHours(hour, 0, 0, 0);
+
+  const event = await createInterview({
+    name: prospect.name,
+    phone: prospect.phone,
+    interviewType: prospect.interview_type,
+    startTime: startTime.toISOString()
+  });
+
+  await updateProspect(prospect.phone, {
+    interview_time: interviewTime,
+    calendar_event_id: event.id,
+    current_step: "CONFIRMED",
+    last_message: message
+  });
+
+  return `✅ Excellent!
+
+Your interview has been scheduled for tomorrow at ${interviewTime}.
+
+A Team Vision leader will contact you if any adjustment is needed.
+
+We look forward to meeting you!`;
 }
 
 module.exports = {
