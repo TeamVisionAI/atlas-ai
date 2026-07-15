@@ -43,10 +43,10 @@ export default function Prospect() {
             gap: 20
           }}
         >
-          <InfoCard />
-          <InterviewCard />
-          <PipelineCard />
-          <ConversationCard />
+          <InfoCard prospect={prospect} />
+          <InterviewCard prospect={prospect} />
+          <PipelineCard prospect={prospect} />
+          <ConversationCard prospect={prospect} />
         </div>
     
         <div style={{ marginTop: 20 }}>
