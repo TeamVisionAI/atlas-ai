@@ -1,18 +1,25 @@
-const cardStyle = {
-  background: "#111827",
-  border: "1px solid #374151",
-  borderRadius: 12,
-  padding: 20,
-  color: "#fff",
-  flex: 1,
-  minHeight: 0,
-  display: "flex",
-  flexDirection: "column"
-};
+export default function ConversationPanel({ lastMessage, direction, timestamp }) {
+  const directionLabel =
+    direction === "outgoing"
+      ? "Atlas"
+      : direction === "incoming"
+        ? "Prospect"
+        : "Message";
 
-export default function ConversationPanel({ lastMessage }) {
   return (
-    <div style={cardStyle}>
+    <div
+      style={{
+        background: "#111827",
+        border: "1px solid #374151",
+        borderRadius: 12,
+        padding: 20,
+        color: "#fff",
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column"
+      }}
+    >
       <div
         style={{
           flex: 1,
@@ -25,18 +32,29 @@ export default function ConversationPanel({ lastMessage }) {
       >
         <div
           style={{
-            alignSelf: "flex-start",
+            alignSelf: direction === "outgoing" ? "flex-end" : "flex-start",
             maxWidth: "85%",
-            background: "#1F2937",
+            background: direction === "outgoing" ? "#172554" : "#1F2937",
             padding: "16px 18px",
-            borderRadius: "12px 12px 12px 4px",
+            borderRadius:
+              direction === "outgoing" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
             border: "1px solid #374151"
           }}
         >
-          <div style={{ color: "#94A3B8", fontSize: 12, marginBottom: 8 }}>
-            Prospect
+          <div
+            style={{
+              color: "#94A3B8",
+              fontSize: 12,
+              marginBottom: 8,
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12
+            }}
+          >
+            <span>{directionLabel}</span>
+            {timestamp ? <span>{timestamp}</span> : null}
           </div>
-          <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16 }}>
+          <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
             {lastMessage || "No messages yet."}
           </p>
         </div>

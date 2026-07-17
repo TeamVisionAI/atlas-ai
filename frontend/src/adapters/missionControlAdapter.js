@@ -1,6 +1,11 @@
 import { MILESTONES } from "../types/milestones";
 import { normalizeProspectLanguage } from "../types/language";
 import { formatTextWithDates } from "../utils/dateFormatter";
+import {
+  buildConversationPreview,
+  formatCanonicalMilestoneLabel,
+  formatWorkflowOwnershipLabel
+} from "./conversationPreview";
 
 /**
  * Presentation-only label map from backend engine step to agent milestone copy.
@@ -79,9 +84,14 @@ export function adaptMissionControlResponse(
   dashboardProspect = null,
   options = {}
 ) {
-  const { prospect, brain, businessRules, atlasBrief } = missionControl;
+  const { prospect, brain, businessRules, atlasBrief, workflow, workflowGate, latestConversation } =
+    missionControl;
   const missingFields = brain?.missingFields || [];
-  const milestone = mapStepToMilestoneLabel(brain?.currentStep, missingFields);
+  const milestone =
+    formatCanonicalMilestoneLabel(workflow?.canonicalMilestone) ||
+    mapStepToMilestoneLabel(brain?.currentStep, missingFields);
+  const workflowOwnership = formatWorkflowOwnershipLabel(workflow?.workflowOwnership);
+  const conversationPreview = buildConversationPreview(latestConversation, dashboardProspect);
   const interviewType = normalizeInterviewTypeDisplay(
     brain?.interviewType || businessRules?.interviewType
   );
@@ -100,6 +110,8 @@ export function adaptMissionControlResponse(
       location: formatProspectLocation(prospect?.city, prospect?.state),
       language,
       milestone,
+      workflowOwnership,
+      canonicalMilestone: workflow?.canonicalMilestone || null,
       interviewType
     },
     brain: {
@@ -124,10 +136,14 @@ export function adaptMissionControlResponse(
       aiRecommendation: missionControl.aiRecommendation || null
     },
     conversation: {
-      lastMessage: dashboardProspect?.last_message || null,
+      lastMessage: conversationPreview.text,
+      direction: conversationPreview.direction,
+      timestamp: conversationPreview.timestamp,
+      previewSource: conversationPreview.source,
       interviewTime: dashboardProspect?.interview_time || null,
       appointmentDate: dashboardProspect?.appointment_date || null
     },
+    workflowGate: workflowGate || { active: false },
     availableActions: missionControl.availableActions || [],
     raw: missionControl
   };

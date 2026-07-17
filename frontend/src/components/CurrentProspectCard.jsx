@@ -36,6 +36,9 @@ export default function CurrentProspectCard({ prospect }) {
       <Row icon="📍" label="City / State" value={prospect.location} />
       <Row icon="🌐" label="Language" value={prospect.language} />
       <Row icon="🎯" label="Current Milestone" value={prospect.milestone} />
+      {prospect.workflowOwnership ? (
+        <Row icon="🧭" label="Workflow Owner" value={prospect.workflowOwnership} />
+      ) : null}
       {prospect.interviewType ? (
         <Row icon="🎥" label="Interview Type" value={prospect.interviewType} />
       ) : null}

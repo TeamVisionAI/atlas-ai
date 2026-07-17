@@ -19,6 +19,7 @@ const {
   emitStallEscalationEvents,
   emitStallClearanceEvents
 } = require("./workflowTransitionEvents");
+const { applyTimeBasedReconciliation } = require("./workflowReconciliationEngine");
 const { supabase } = require("../services/supabaseService");
 const { OWNERSHIP } = require("./workflowConstants");
 
@@ -68,7 +69,38 @@ async function fetchMessageHints(phone) {
 }
 
 /**
- * Sprint 8A.2 pipeline: detect → transition → emit → resolve → priority.
+ * Latest conversation log entry for Mission Control preview (Sprint 8A.6).
+ */
+async function fetchLatestConversationEntry(phone) {
+  if (!phone) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("conversation_logs")
+      .select("message, direction, created_at")
+      .eq("prospect_phone", phone)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      text: data.message || "",
+      direction: String(data.direction || "").toLowerCase(),
+      timestamp: data.created_at
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sprint 8A.2/8A.6 pipeline: reconcile → detect → transition → emit → resolve → priority.
  */
 async function evaluateWorkflowState({
   phone,
@@ -98,9 +130,20 @@ async function evaluateWorkflowState({
     mergedAgentState
   );
 
+  const reconciliation = await applyTimeBasedReconciliation({
+    phone,
+    computedMilestone: canonicalMilestone,
+    computedOwnership: workflowOwnership,
+    prospect,
+    agentState: mergedAgentState
+  });
+
+  const effectiveMilestone = reconciliation.milestone;
+  const effectiveOwnership = reconciliation.ownership;
+
   const computed = {
-    canonicalMilestone,
-    workflowOwnership,
+    canonicalMilestone: effectiveMilestone,
+    workflowOwnership: effectiveOwnership,
     needsHumanAttention: false,
     stalledAt: null,
     mappedFrom: {
@@ -112,14 +155,14 @@ async function evaluateWorkflowState({
 
   const stallResult = detectConversationStall({
     messageHints,
-    milestone: canonicalMilestone,
+    milestone: effectiveMilestone,
     prospect,
-    defaultOwnership: workflowOwnership,
+    defaultOwnership: effectiveOwnership,
     agentState: mergedAgentState
   });
 
   const ownershipBefore =
-    persisted.workflowOwnership || workflowOwnership;
+    persisted.workflowOwnership || effectiveOwnership;
 
   const transition = applyStallTransition(
     phone,
@@ -132,14 +175,14 @@ async function evaluateWorkflowState({
     if (transition.transition === "br_034_stall") {
       await emitStallEscalationEvents({
         phone,
-        milestone: canonicalMilestone,
+        milestone: effectiveMilestone,
         ownershipBefore,
         stallResult
       });
     } else if (transition.transition === "stall_cleared_prospect_reply") {
       await emitStallClearanceEvents({
         phone,
-        milestone: canonicalMilestone,
+        milestone: effectiveMilestone,
         ownershipBefore,
         ownershipAfter: transition.next.workflowOwnership
       });
@@ -207,5 +250,6 @@ async function buildWorkflowReadModel({ prospect, brain, agentState }) {
 module.exports = {
   buildWorkflowReadModel,
   evaluateWorkflowState,
-  fetchMessageHints
+  fetchMessageHints,
+  fetchLatestConversationEntry
 };

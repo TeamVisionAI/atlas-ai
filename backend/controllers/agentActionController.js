@@ -28,8 +28,9 @@ const {
   buildAgentActionTimelineMessage
 } = require("../core/agentActionCopy");
 const { getMissionControlState } = require("./conversationController");
-const { buildWorkflowReadModel } = require("../core/workflowReadModel");
+const { buildWorkflowReadModel, fetchLatestConversationEntry } = require("../core/workflowReadModel");
 const { isProductionProspect } = require("../core/productionProspectFilter");
+const { buildWorkflowGateDescriptor } = require("../core/workflowGateEngine");
 
 function buildActionError(action, error, message) {
   return {
@@ -322,9 +323,16 @@ async function getMissionControlWithActions(phone) {
     agentState
   });
 
+  const [latestConversation, workflowGate] = await Promise.all([
+    fetchLatestConversationEntry(resolvedPhone),
+    Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState))
+  ]);
+
   return {
     ...missionControl,
     workflow,
+    workflowGate,
+    latestConversation,
     agentState: {
       flags: agentState.flags,
       outcome: agentState.outcome,

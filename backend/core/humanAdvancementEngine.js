@@ -99,6 +99,20 @@ function buildAgentStatePatch(targetMilestone, capturedFields = {}) {
   return patch;
 }
 
+function applyInterviewRescheduleAgentReset(targetMilestone, capturedFields, patch) {
+  if (
+    targetMilestone === MILESTONES.INTERVIEW_SCHEDULED &&
+    capturedFields.confirmed
+  ) {
+    patch.outcome = null;
+    patch.followUpDate = null;
+    patch.followUpTime = null;
+    patch.closureReason = null;
+  }
+
+  return patch;
+}
+
 function qualificationFieldsChanged(beforeProfile, afterProfile, capturedFields) {
   return Object.keys(capturedFields).some((key) => {
     if (!QUALIFICATION_KEYS.has(key) && key !== "workAuthorized") {
@@ -109,7 +123,7 @@ function qualificationFieldsChanged(beforeProfile, afterProfile, capturedFields)
   });
 }
 
-async function persistProspectAdvancement(prospect, mergedProfile, capturedFields) {
+async function persistProspectAdvancement(prospect, mergedProfile, capturedFields, targetMilestone) {
   const schedulingState = parseSchedulingState(prospect.notes);
   const updates = profileToProspectUpdates(mergedProfile, schedulingState);
 
@@ -121,11 +135,19 @@ async function persistProspectAdvancement(prospect, mergedProfile, capturedField
   }
 
   if (
-    capturedFields.targetMilestone === MILESTONES.INTERVIEW_SCHEDULED ||
+    targetMilestone === MILESTONES.INTERVIEW_SCHEDULED ||
     capturedFields.confirmed === true ||
     mergedProfile.confirmed
   ) {
-    if (mergedProfile.preferredTime && mergedProfile.appointmentDate) {
+    const interviewDateTime =
+      capturedFields.interviewDateTime || mergedProfile.preferredTime || null;
+
+    if (interviewDateTime && !Number.isNaN(Date.parse(interviewDateTime))) {
+      updates.current_step = "CONFIRMED";
+      updates.interview_time = interviewDateTime;
+      updates.appointment_date =
+        mergedProfile.appointmentDate || interviewDateTime.slice(0, 10);
+    } else if (mergedProfile.preferredTime && mergedProfile.appointmentDate) {
       updates.current_step = "CONFIRMED";
       updates.interview_time = mergedProfile.preferredTime;
       updates.appointment_date = mergedProfile.appointmentDate;
@@ -204,12 +226,10 @@ async function advanceProspectWorkflow(phone, payload = {}) {
     persisted.workflowOwnership ||
     deriveDefaultOwnership(currentMilestone, mergedAgentState);
 
-  await persistProspectAdvancement(prospect, mergedProfile, {
-    ...capturedFields,
-    targetMilestone
-  });
+  await persistProspectAdvancement(prospect, mergedProfile, capturedFields, targetMilestone);
 
   const agentPatch = buildAgentStatePatch(targetMilestone, capturedFields);
+  applyInterviewRescheduleAgentReset(targetMilestone, capturedFields, agentPatch);
 
   if (targetMilestone === MILESTONES.DO_NOT_CONTACT) {
     agentPatch.closureReason = capturedFields.doNotContactReason || "Do Not Contact";
@@ -248,6 +268,7 @@ async function advanceProspectWorkflow(phone, payload = {}) {
     needsHumanAttention: false,
     stalledAt: null,
     stallEpisodeKey: null,
+    reconcileEpisodeKey: null,
     manualAgentOwnership: false,
     doNotContact: targetMilestone === MILESTONES.DO_NOT_CONTACT
   });

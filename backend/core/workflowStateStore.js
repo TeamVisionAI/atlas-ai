@@ -23,7 +23,9 @@ function defaultWorkflowRecord() {
     manualAgentOwnership: false,
     doNotContact: false,
     /** Idempotency key for BR-034 stall episode (last Atlas outbound timestamp). */
-    stallEpisodeKey: null
+    stallEpisodeKey: null,
+    /** Sprint 8A.6 — idempotency key for time-based milestone reconciliation. */
+    reconcileEpisodeKey: null
   };
 }
 

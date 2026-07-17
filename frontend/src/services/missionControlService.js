@@ -72,3 +72,26 @@ export async function syncMissionControlWorkflow(phone, workflowState) {
 
   return response.json();
 }
+
+/**
+ * @param {string} phone
+ * @param {Object} body — BR-035 advancement payload
+ */
+export async function advanceMissionControlWorkflow(phone, body) {
+  const response = await fetch(
+    `${API_URL}/api/mission-control/${encodeURIComponent(phone)}/workflow/advance`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok && !result?.message) {
+    throw new MissionControlError("Failed to advance workflow", response.status);
+  }
+
+  return result;
+}

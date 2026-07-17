@@ -74,20 +74,30 @@ export function shouldShowWorkflowGate(workspaceOrMission, dashboardProspect, wo
 }
 
 function isInterviewTimePassed(conversation) {
-  const interviewTime =
-    conversation?.interviewTime || conversation?.appointmentDate;
+  const interviewTime = conversation?.interviewTime;
+  const appointmentDate = conversation?.appointmentDate;
 
-  if (!interviewTime) {
+  if (interviewTime) {
+    const parsedInterview = Date.parse(interviewTime);
+
+    if (!Number.isNaN(parsedInterview)) {
+      return parsedInterview < Date.now();
+    }
+  }
+
+  if (appointmentDate) {
+    const parsedAppointment = Date.parse(appointmentDate);
+
+    if (!Number.isNaN(parsedAppointment)) {
+      return parsedAppointment < Date.now();
+    }
+  }
+
+  if (!interviewTime && !appointmentDate) {
     return true;
   }
 
-  const parsed = Date.parse(interviewTime);
-
-  if (Number.isNaN(parsed)) {
-    return true;
-  }
-
-  return parsed < Date.now();
+  return true;
 }
 
 export function applyOutcome(outcome, formData = {}) {

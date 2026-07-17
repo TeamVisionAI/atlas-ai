@@ -20,7 +20,7 @@ import NextActions from "../components/NextActions";
 import AiBrief from "../components/AiBrief";
 import ConversationPanel from "../components/ConversationPanel";
 import JourneyPackage from "../components/JourneyPackage";
-import { WorkflowGateModal } from "../components/WorkflowGateModal";
+import WorkflowGatePanel from "../components/WorkflowGatePanel";
 import {
   buildAgentMetrics,
   buildWorkspaceContext
@@ -288,6 +288,40 @@ export default function Dashboard() {
     [phone, queue, currentIndex, refreshCurrentWorkspace]
   );
 
+  const handleGateOutcome = useCallback(
+    async (localState) => {
+      if (!phone) {
+        return;
+      }
+
+      const saved = saveWorkflowState(phone, localState);
+      setWorkflowState(saved);
+
+      try {
+        await syncMissionControlWorkflow(phone, saved);
+      } catch (err) {
+        console.error(err);
+      }
+
+      const currentItem = queue[currentIndex];
+
+      if (currentItem) {
+        const adapted = await loadWorkspaceForQueueItem(currentItem, dashboard);
+
+        if (adapted) {
+          setWorkspace(adapted);
+        }
+      }
+
+      if (saved.outcome === "Recruited" && saved.orientationScheduled) {
+        setWorkflowComplete({
+          message: "Orientation scheduled. Ready for the next prospect?"
+        });
+      }
+    },
+    [phone, queue, currentIndex, dashboard]
+  );
+
   const handlePackageSent = useCallback(() => {
     setShowPackageSent(true);
     setWorkflowComplete({
@@ -385,18 +419,13 @@ export default function Dashboard() {
     );
   }
 
-  const showGate = shouldShowWorkflowGate(workspace, null, workflowState);
+  const showGate =
+    workspace?.workflowGate?.active ??
+    shouldShowWorkflowGate(workspace, null, workflowState);
   const metrics = buildAgentMetrics(dashboard);
 
   return (
     <>
-      {showGate ? (
-        <WorkflowGateModal
-          prospectName={workspace.prospect.name}
-          onComplete={handleWorkflowComplete}
-        />
-      ) : null}
-
       <AgentMetricPanel
         type={activeMetricPanel}
         queue={queue}
@@ -464,9 +493,17 @@ export default function Dashboard() {
 
         <section>
           <h3 style={sectionLabelStyle}>Next Actions</h3>
-          {!showGate ? (
+          {showGate ? (
+            <WorkflowGatePanel
+              gate={workspace.workflowGate}
+              workflow={workspace.raw?.workflow}
+              prospectName={workspace.prospect.name}
+              phone={workspace.phone}
+              onComplete={handleGateOutcome}
+            />
+          ) : (
             <NextActions actions={workspaceContext.nextActions} />
-          ) : null}
+          )}
         </section>
 
         {journeyPackages.length ? (
@@ -505,7 +542,11 @@ export default function Dashboard() {
           }}
         >
           <h3 style={sectionLabelStyle}>Conversation</h3>
-          <ConversationPanel lastMessage={workspace.conversation.lastMessage} />
+          <ConversationPanel
+            lastMessage={workspace.conversation.lastMessage}
+            direction={workspace.conversation.direction}
+            timestamp={workspace.conversation.timestamp}
+          />
         </section>
       </div>
     </>

@@ -20,6 +20,11 @@
         "text": "Sprint 8A.3 verification — follow up scheduled",
         "at": "2026-07-17T21:38:21.347Z",
         "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.3 verification — follow up scheduled",
+        "at": "2026-07-17T22:04:11.853Z",
+        "type": "phone"
       }
     ],
     "outcome": "Needs More Time",
@@ -754,6 +759,373 @@
       {
         "text": "Agent reactivation — follow up scheduled",
         "at": "2026-07-17T21:38:45.564Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": "Needs More Time",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": "2026-07-20",
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "developer-test-user": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Sprint 8A.6 verify — No Show",
+        "at": "2026-07-17T22:02:36.393Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — Rescheduled",
+        "at": "2026-07-17T22:02:37.764Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — No Show",
+        "at": "2026-07-17T22:02:55.308Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — Rescheduled",
+        "at": "2026-07-17T22:02:56.529Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — No Show",
+        "at": "2026-07-17T22:03:22.474Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — Rescheduled",
+        "at": "2026-07-17T22:03:23.619Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — No Show",
+        "at": "2026-07-17T22:04:05.682Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — Rescheduled",
+        "at": "2026-07-17T22:04:06.898Z",
+        "type": "phone"
+      },
+      {
+        "text": "Sprint 8A.6 verify — Recruited",
+        "at": "2026-07-17T22:04:08.070Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": "Recruited",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": true,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-01-dcb06c55": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Recruited",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": true,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-02-4f42283b": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-03-9f847eea": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-05-2796c997": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Human call — scheduled interview",
+        "at": "2026-07-17T22:04:24.431Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-06-7cdca2df": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Simulator outcome: No Show",
+        "at": "2026-07-17T22:04:26.932Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": "No Show",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": "2026-07-24",
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-07-84188a67": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Needs More Time",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": "2026-07-24",
+    "followUpTime": "10:00",
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-08-5cf1b816": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Not Interested",
+    "closureReason": "Not interested",
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-09-13953857": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Not Interested",
+    "closureReason": "Requested DNC",
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-10-e5640ac2": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Agent reactivation — follow up scheduled",
+        "at": "2026-07-17T22:04:35.839Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": "Needs More Time",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": "2026-07-20",
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-01-bf4f3896": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Recruited",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": true,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-02-352005c6": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-03-3e231855": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-05-92595dc7": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Human call — scheduled interview",
+        "at": "2026-07-17T22:04:49.312Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-06-3b8b61cc": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Simulator outcome: No Show",
+        "at": "2026-07-17T22:04:51.682Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": "No Show",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": "2026-07-24",
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-07-3abfbee9": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Needs More Time",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": "2026-07-24",
+    "followUpTime": "10:00",
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-08-b7e8fbf6": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Not Interested",
+    "closureReason": "Not interested",
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-09-65949e57": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": "Not Interested",
+    "closureReason": "Requested DNC",
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "sim-golden-10-3f34d013": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Agent reactivation — follow up scheduled",
+        "at": "2026-07-17T22:05:00.618Z",
         "type": "phone"
       }
     ],
