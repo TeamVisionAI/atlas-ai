@@ -3,7 +3,7 @@ const { sendTextMessage } = require("../services/whatsappService");
 
 const {
   handleIncomingMessage
-} = require("../services/conversationService");
+} = require("../core/conversationEngine");
 
 const router = express.Router();
 
@@ -35,13 +35,16 @@ router.post("/", async (req, res) => {
     const phone = message.from;
     const name = value.contacts?.[0]?.profile?.name || "Unknown";
   
-    const reply = await handleIncomingMessage(
+    const result = await handleIncomingMessage(
       phone,
       name,
       message.text.body
     );
-  
-    await sendTextMessage(phone, reply);
+
+    const replyText =
+      typeof result === "string" ? result : result?.reply || "";
+
+    await sendTextMessage(phone, replyText);
   }
 
   res.sendStatus(200);

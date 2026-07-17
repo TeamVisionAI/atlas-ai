@@ -45,9 +45,60 @@ async function updateProspect(phone, updates) {
   
     return data;
   }
+
+async function findLatestActiveProspect() {
+  const { data: prospects, error } = await supabase
+    .from("prospects")
+    .select("*")
+    .neq("current_step", "CONFIRMED");
+
+  if (error) throw error;
+
+  if (!prospects?.length) {
+    return null;
+  }
+
+  const { data: logs, error: logError } = await supabase
+    .from("conversation_logs")
+    .select("prospect_phone, created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!logError && logs?.length) {
+    const activeByPhone = new Map(prospects.map((prospect) => [prospect.phone, prospect]));
+
+    for (const log of logs) {
+      const match = activeByPhone.get(log.prospect_phone);
+      if (match) {
+        return match;
+      }
+    }
+  }
+
+  return prospects[prospects.length - 1];
+}
+
+async function deleteProspect(phone) {
+  const { error: logError } = await supabase
+    .from("conversation_logs")
+    .delete()
+    .eq("prospect_phone", phone);
+
+  if (logError) throw logError;
+
+  const { error } = await supabase
+    .from("prospects")
+    .delete()
+    .eq("phone", phone);
+
+  if (error) throw error;
+}
+
   module.exports = {
     supabase,
     findProspect,
+    findLatestActiveProspect,
     createProspect,
-    updateProspect
+    updateProspect,
+    deleteProspect
   };

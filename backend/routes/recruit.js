@@ -1,5 +1,5 @@
 const express = require("express");
-const { evaluateCandidate } = require("../services/recruitingEngine");
+const { evaluateCandidate } = require("../core/recruitingEngine");
 
 const router = express.Router();
 

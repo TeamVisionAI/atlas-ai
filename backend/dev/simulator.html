@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atlas Mission Control</title>
+  <style>
+    :root {
+      --bg: #0a0e14;
+      --panel: #121a24;
+      --card: #0f1620;
+      --panel-border: #243044;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --user: #22c55e;
+      --atlas: #60a5fa;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --mono: "SF Mono", "Fira Code", "Consolas", monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--panel-border);
+      background: linear-gradient(180deg, #141c28 0%, var(--panel) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    header p { color: var(--muted); font-size: 0.85rem; margin-top: 0.15rem; }
+
+    .badge {
+      background: #1e3a5f;
+      color: #93c5fd;
+      border: 1px solid #2563eb;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.4fr);
+      gap: 1rem;
+      padding: 1rem;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 0.95rem 1.25rem;
+      border-bottom: 1px solid var(--panel-border);
+      font-weight: 700;
+      font-size: 0.88rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .panel-body {
+      padding: 1rem 1.25rem;
+      max-height: calc(100vh - 120px);
+      overflow: auto;
+    }
+
+    .mission-title {
+      grid-column: 2;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: -0.35rem;
+      padding-left: 0.15rem;
+    }
+
+    .mission-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.85rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 0.85rem 1rem;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+
+    .card summary::-webkit-details-marker { display: none; }
+
+    .card summary::after {
+      content: "▾";
+      color: var(--muted);
+      font-size: 0.9rem;
+      transition: transform 0.15s ease;
+    }
+
+    .card[open] summary {
+      border-bottom-color: var(--panel-border);
+    }
+
+    .card[open] summary::after {
+      transform: rotate(180deg);
+    }
+
+    .card-body {
+      padding: 0.9rem 1rem 1rem;
+    }
+
+    .kv-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .kv-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .kv-item label {
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      min-width: 42%;
+    }
+
+    .kv-item span { text-align: right; word-break: break-word; }
+
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill.cold { background: #1e293b; color: #94a3b8; }
+    .pill.warm { background: #422006; color: #fdba74; }
+    .pill.hot { background: #450a0a; color: #fca5a5; }
+
+    .confidence {
+      color: #86efac;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    .rule-item {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.84rem;
+      padding: 0.35rem 0;
+    }
+
+    .rule-dot {
+      width: 0.65rem;
+      height: 0.65rem;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .rule-dot.executed { background: var(--success); box-shadow: 0 0 8px rgba(34, 197, 94, 0.45); }
+    .rule-dot.pending { background: #64748b; }
+    .rule-dot.failed { background: var(--danger); box-shadow: 0 0 8px rgba(239, 68, 68, 0.45); }
+
+    .flow-timeline {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .flow-step {
+      position: relative;
+      padding: 0.45rem 0 0.45rem 1.2rem;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .flow-step.done { color: var(--text); }
+    .flow-step.current { color: #86efac; font-weight: 600; }
+
+    .flow-step::before {
+      content: "";
+      position: absolute;
+      left: 0.15rem;
+      top: 0.85rem;
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 999px;
+      background: #334155;
+    }
+
+    .flow-step.done::before { background: var(--success); }
+    .flow-step.current::before { background: #86efac; box-shadow: 0 0 8px rgba(134, 239, 172, 0.5); }
+
+    .flow-step:not(:last-child)::after {
+      content: "↓";
+      display: block;
+      margin: 0.15rem 0 0.15rem -0.15rem;
+      color: #475569;
+      font-size: 0.75rem;
+    }
+
+    .thinking-block {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .thinking-block:last-child { margin-bottom: 0; }
+
+    .thinking-block label {
+      display: block;
+      color: var(--atlas);
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.35rem;
+    }
+
+    .thinking-block p {
+      font-size: 0.84rem;
+      line-height: 1.45;
+      color: #dbe4f0;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-secondary { background: #243044; color: var(--text); border: 1px solid var(--panel-border); }
+    .btn-danger { background: var(--danger); color: white; }
+
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--panel-border);
+      margin: 1rem 0;
+    }
+
+    .history { display: flex; flex-direction: column; gap: 1rem; }
+
+    .message-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.35rem;
+    }
+
+    .message-label.user { color: var(--user); }
+    .message-label.atlas { color: var(--atlas); }
+    .message-text { white-space: pre-wrap; font-size: 0.95rem; line-height: 1.5; }
+
+    .empty-state {
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-style: italic;
+    }
+
+    .raw-memory {
+      display: none;
+      margin-top: 1rem;
+      background: var(--bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      max-height: 280px;
+      overflow: auto;
+    }
+
+    .raw-memory.visible { display: block; }
+
+    .status-bar {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 0.75rem;
+    }
+
+    @media (max-width: 1200px) {
+      .layout { grid-template-columns: 1fr; }
+      .mission-title { grid-column: 1; }
+      .mission-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .panel-body { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Atlas Mission Control</h1>
+      <p>Developer simulator — same conversation engine as WhatsApp</p>
+    </div>
+    <span class="badge">Dev Only</span>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-header">Live Conversation</div>
+      <div class="panel-body">
+        <div class="input-row">
+          <input id="messageInput" type="text" placeholder="Type a user message..." autocomplete="off" />
+          <button id="sendBtn" class="btn-primary" type="button">Send</button>
+        </div>
+        <div class="actions">
+          <button id="resetBtn" class="btn-danger" type="button">Reset</button>
+          <button id="memoryBtn" class="btn-secondary" type="button">Raw Memory</button>
+        </div>
+        <hr class="divider" />
+        <div id="history" class="history">
+          <p class="empty-state">No messages yet. Send a message to start.</p>
+        </div>
+        <pre id="rawMemory" class="raw-memory"></pre>
+        <p id="statusBar" class="status-bar">Test user: developer-test-user</p>
+      </div>
+    </section>
+
+    <div class="mission-title">Mission Control</div>
+
+    <section class="mission-grid">
+      <details class="card" open>
+        <summary>Atlas Brain</summary>
+        <div class="card-body">
+          <ul id="atlasBrain" class="kv-list"></ul>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Lead Profile</summary>
+        <div class="card-body">
+          <ul id="leadProfile" class="kv-list"></ul>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Conversation Health</summary>
+        <div class="card-body">
+          <ul id="conversationHealth" class="kv-list"></ul>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>Business Rules</summary>
+        <div class="card-body">
+          <ul id="businessRules" class="kv-list"></ul>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary>Memory Timeline</summary>
+        <div class="card-body">
+          <ul id="memoryTimeline" class="flow-timeline"></ul>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary>Atlas Thinking</summary>
+        <div class="card-body" id="atlasThinking"></div>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    const LEAD_NAME = "Developer Test User";
+
+    const STEP_GOALS = {
+      NEW: "Start the conversation and welcome the prospect",
+      GREETING: "Collect the prospect's city and state",
+      WORK_AUTHORIZATION: "Confirm legal work authorization in the United States",
+      OCCUPATION: "Learn what the prospect currently does for work",
+      INTERVIEW_TYPE: "Choose Office or Zoom interview format",
+      SCHEDULE: "Select an available interview time slot",
+      EMAIL: "Collect email for interview confirmation",
+      CONFIRMED: "Confirm the appointment and close the loop"
+    };
+
+    const STEP_QUESTION_REASON = {
+      NEW: "Atlas needs to introduce itself and begin qualification.",
+      GREETING: "Location determines interview format and recruiting eligibility.",
+      WORK_AUTHORIZATION: "Team Vision must confirm legal authorization before proceeding.",
+      OCCUPATION: "Occupation helps Atlas personalize the recruiting conversation.",
+      INTERVIEW_TYPE: "Atlas needs to know how the prospect prefers to meet.",
+      SCHEDULE: "Atlas is ready to offer available interview times.",
+      EMAIL: "Atlas needs an email address to send the interview confirmation.",
+      CONFIRMED: "The interview is already scheduled."
+    };
+
+    const FLOW_STEPS = [
+      { key: "greeting", label: "Greeting" },
+      { key: "city", label: "City saved" },
+      { key: "authorization", label: "Authorization saved" },
+      { key: "occupation", label: "Occupation saved" },
+      { key: "interviewType", label: "Interview Type" },
+      { key: "interviewTime", label: "Interview Time" },
+      { key: "email", label: "Email" },
+      { key: "confirmed", label: "Appointment Confirmed" }
+    ];
+
+    const sessionStats = {
+      validationErrors: 0,
+      responseTimes: [],
+      faqHits: 0,
+      interruptions: 0,
+      businessRulesTriggered: new Set(),
+      memoryWrites: 0,
+      lastMemoryCount: 0
+    };
+
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const memoryBtn = document.getElementById("memoryBtn");
+    const historyEl = document.getElementById("history");
+    const rawMemoryEl = document.getElementById("rawMemory");
+    const statusBar = document.getElementById("statusBar");
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function formatDuration(ms) {
+      if (!ms || ms <= 0) return "0s";
+      const seconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${seconds}s`;
+    }
+
+    function formatValue(value) {
+      if (value === true) return "Yes";
+      if (value === false) return "No";
+      if (value === null || value === undefined || value === "") return "—";
+      return String(value);
+    }
+
+    function getNextStep(pipelineProgress) {
+      if (!pipelineProgress?.length) return "—";
+      const currentIndex = pipelineProgress.findIndex((item) => item.status === "current");
+      if (currentIndex === -1) return "—";
+      const next = pipelineProgress[currentIndex + 1];
+      return next ? next.stage.replace(/_/g, " ") : "Complete";
+    }
+
+    function computeConfidence(debug) {
+      let score = 72;
+      if (debug.validationResult?.valid) score += 12;
+      if (debug.currentIntent && debug.currentIntent !== "UNKNOWN") score += 8;
+      if (debug.faqTriggered) score -= 10;
+      if (debug.routeInterrupt) score -= 8;
+      if (!debug.validationResult?.valid) score -= 20;
+      return Math.max(35, Math.min(98, score));
+    }
+
+    function computeLeadTemperature(debug) {
+      const step = debug.currentStage;
+      const messages = debug.metrics?.messagesSent || 0;
+
+      if (step === "CONFIRMED" || step === "SCHEDULE") return "hot";
+      if (["OCCUPATION", "INTERVIEW_TYPE", "WORK_AUTHORIZATION"].includes(step) || messages >= 4) {
+        return "warm";
+      }
+      return "cold";
+    }
+
+    function deriveRuleStatus(rule, debug) {
+      if (!rule.active) return "failed";
+      if (debug.businessRuleApplied === rule.key) return "executed";
+
+      const step = debug.currentStage;
+      const executedByStep = {
+        COLLECT_CITY_BEFORE_SCHEDULING: ["WORK_AUTHORIZATION", "OCCUPATION", "INTERVIEW_TYPE", "SCHEDULE", "EMAIL", "CONFIRMED"],
+        REQUIRE_WORK_AUTHORIZATION: ["OCCUPATION", "INTERVIEW_TYPE", "SCHEDULE", "EMAIL", "CONFIRMED"],
+        COLLECT_OCCUPATION: ["INTERVIEW_TYPE", "SCHEDULE", "EMAIL", "CONFIRMED"],
+        ALWAYS_CREATE_CALENDAR_EVENT: ["CONFIRMED"],
+        ALWAYS_CONFIRM_APPOINTMENT: ["CONFIRMED"]
+      };
+
+      if (executedByStep[rule.key]?.includes(step)) return "executed";
+      if (["AUTO_DETECT_LANGUAGE", "ALWAYS_ANSWER_INTERRUPTIONS", "LOG_ALL_CONVERSATIONS"].includes(rule.key)) {
+        return "executed";
+      }
+
+      return "pending";
+    }
+
+    function buildFlowTimeline(debug) {
+      const data = debug.collectedData || {};
+      const memory = debug.memory || {};
+      const step = debug.currentStage;
+
+      const flags = {
+        greeting: (debug.metrics?.messagesSent || 0) > 0,
+        city: Boolean(data.city),
+        authorization: data.authorization !== null && data.authorization !== undefined,
+        occupation: Boolean(data.occupation),
+        interviewType: Boolean(data.interviewType || memory.interviewType),
+        interviewTime: Boolean(data.interviewTime || memory.interviewTime),
+        email: Boolean(data.email),
+        confirmed: step === "CONFIRMED"
+      };
+
+      let currentKey = "greeting";
+      if (step === "GREETING" && !flags.city) currentKey = "city";
+      else if (step === "WORK_AUTHORIZATION") currentKey = "authorization";
+      else if (step === "OCCUPATION") currentKey = "occupation";
+      else if (step === "INTERVIEW_TYPE") currentKey = "interviewType";
+      else if (step === "SCHEDULE") currentKey = "interviewTime";
+      else if (step === "EMAIL") currentKey = "email";
+      else if (step === "CONFIRMED") currentKey = "confirmed";
+
+      return FLOW_STEPS.map((item) => {
+        let status = "upcoming";
+        if (flags[item.key]) status = "done";
+        if (item.key === currentKey && step !== "CONFIRMED") status = "current";
+        if (item.key === "confirmed" && step === "CONFIRMED") status = "done";
+        return { ...item, status };
+      });
+    }
+
+    function buildThinking(debug, history) {
+      const step = debug.currentStage || "NEW";
+      const validation = debug.validationResult || {};
+      const lastUser = [...(history || [])].reverse().find((entry) => entry.role === "USER");
+
+      const whyQuestion = STEP_QUESTION_REASON[step] || "Atlas is continuing the recruiting workflow.";
+      const whyAccepted = validation.valid
+        ? `The previous answer matched the expected format for ${step.replace(/_/g, " ").toLowerCase()}.`
+        : `The previous answer did not pass validation${validation.reason ? ` (${validation.reason})` : ""}.`;
+      const whyValidation = validation.valid
+        ? "Validation passed because the message satisfied the current step rules."
+        : "Validation failed because the message did not match the required answer pattern.";
+      const whyNext = debug.routeInterrupt
+        ? "Atlas paused the workflow to address an interruption, then restated the current question."
+        : debug.faqTriggered
+          ? "Atlas answered an FAQ match before returning to the workflow question."
+          : `Atlas advanced the workflow toward ${getNextStep(debug.pipelineProgress)}.`;
+
+      return [
+        {
+          label: "Why Atlas asked the last question",
+          text: whyQuestion
+        },
+        {
+          label: "Why the previous answer was accepted",
+          text: lastUser
+            ? `User said "${lastUser.message}". ${whyAccepted}`
+            : "No previous user message recorded yet."
+        },
+        {
+          label: "Why validation passed",
+          text: whyValidation
+        },
+        {
+          label: "Why the next question was selected",
+          text: whyNext
+        }
+      ];
+    }
+
+    function updateSessionStats(debug) {
+      if (!debug) return;
+
+      if (debug.validationResult && debug.validationResult.valid === false) {
+        sessionStats.validationErrors += 1;
+      }
+
+      if (debug.responseTimeMs) {
+        sessionStats.responseTimes.push(debug.responseTimeMs);
+      }
+
+      if (debug.faqTriggered) sessionStats.faqHits += 1;
+      if (debug.routeInterrupt) sessionStats.interruptions += 1;
+      if (debug.businessRuleApplied) {
+        sessionStats.businessRulesTriggered.add(debug.businessRuleApplied);
+      }
+
+      const memoryCount = debug.memoryTimeline?.length || 0;
+      if (memoryCount > sessionStats.lastMemoryCount) {
+        sessionStats.memoryWrites += memoryCount - sessionStats.lastMemoryCount;
+      }
+      sessionStats.lastMemoryCount = memoryCount;
+    }
+
+    function averageResponseTime() {
+      if (!sessionStats.responseTimes.length) return 0;
+      const total = sessionStats.responseTimes.reduce((sum, value) => sum + value, 0);
+      return Math.round(total / sessionStats.responseTimes.length);
+    }
+
+    function renderKvList(elementId, rows) {
+      const el = document.getElementById(elementId);
+      el.innerHTML = rows.map(([label, value]) => `
+        <li class="kv-item">
+          <label>${escapeHtml(label)}</label>
+          <span>${value}</span>
+        </li>
+      `).join("");
+    }
+
+    function renderMissionControl(debug, history) {
+      if (!debug) return;
+
+      const metrics = debug.metrics || {};
+      const data = debug.collectedData || {};
+      const memory = debug.memory || {};
+      const confidence = computeConfidence(debug);
+      const temperature = computeLeadTemperature(debug);
+
+      renderKvList("atlasBrain", [
+        ["Current Goal", escapeHtml(STEP_GOALS[debug.currentStage] || STEP_GOALS.NEW)],
+        ["Current Step", escapeHtml(formatValue(debug.currentStage))],
+        ["Current Intent", escapeHtml(formatValue(debug.currentIntent))],
+        ["Confidence %", `<span class="confidence">${confidence}%</span>`],
+        ["Reason for current question", escapeHtml(STEP_QUESTION_REASON[debug.currentStage] || "—")],
+        ["Next Expected Step", escapeHtml(getNextStep(debug.pipelineProgress))],
+        ["Current Language", escapeHtml(formatValue(data.language || metrics.currentLanguage))]
+      ]);
+
+      const readiness = debug.readiness || {};
+
+      renderKvList("leadProfile", [
+        ["Lead Name", escapeHtml(memory.name || LEAD_NAME)],
+        ["City", escapeHtml(formatValue(data.city))],
+        ["State", escapeHtml(formatValue(data.state))],
+        ["Occupation", escapeHtml(formatValue(data.occupation))],
+        ["Authorization", escapeHtml(formatValue(data.authorization))],
+        ["Interview Type", escapeHtml(formatValue(data.interviewType || memory.interviewType))],
+        ["Interview Time", escapeHtml(formatValue(data.interviewTime || memory.interviewTime))],
+        ["Email", escapeHtml(formatValue(data.email))],
+        ["Status", escapeHtml(formatValue(debug.leadStatus))],
+        ["Lead Temperature", `<span class="pill ${temperature}">${temperature}</span>`]
+      ]);
+
+      renderKvList("conversationHealth", [
+        ["Conversation Completed", escapeHtml(formatValue(readiness.conversationCompleted))],
+        ["Ready for Handoff", escapeHtml(formatValue(readiness.readyForHandoff))],
+        ["Calendar Ready", escapeHtml(formatValue(readiness.calendarReady))],
+        ["Messages Sent", escapeHtml(metrics.messagesSent ?? 0)],
+        ["Messages Received", escapeHtml(metrics.messagesReceived ?? 0)],
+        ["Conversation Duration", escapeHtml(formatDuration(metrics.conversationDurationMs))],
+        ["Average Response Time", escapeHtml(`${averageResponseTime()} ms`)],
+        ["Validation Errors", escapeHtml(sessionStats.validationErrors)],
+        ["Business Rules Triggered", escapeHtml(sessionStats.businessRulesTriggered.size)],
+        ["Memory Writes", escapeHtml(sessionStats.memoryWrites)],
+        ["FAQ Hits", escapeHtml(sessionStats.faqHits)],
+        ["Interruptions", escapeHtml(sessionStats.interruptions)]
+      ]);
+
+      const rulesEl = document.getElementById("businessRules");
+      const rules = debug.businessRulesPanel || [];
+      rulesEl.innerHTML = rules.length
+        ? rules.map((rule) => {
+            const status = deriveRuleStatus(rule, debug);
+            return `
+              <li class="rule-item">
+                <span class="rule-dot ${status}"></span>
+                <span>${escapeHtml(rule.label)}</span>
+              </li>
+            `;
+          }).join("")
+        : '<li class="empty-state">No active rules yet.</li>';
+
+      const flow = buildFlowTimeline(debug);
+      document.getElementById("memoryTimeline").innerHTML = flow.map((item) => `
+        <li class="flow-step ${item.status}">${escapeHtml(item.label)}</li>
+      `).join("");
+
+      const thinking = buildThinking(debug, history);
+      document.getElementById("atlasThinking").innerHTML = thinking.map((block) => `
+        <div class="thinking-block">
+          <label>${escapeHtml(block.label)}</label>
+          <p>${escapeHtml(block.text)}</p>
+        </div>
+      `).join("");
+    }
+
+    function renderHistory(history) {
+      if (!history?.length) {
+        historyEl.innerHTML = '<p class="empty-state">No messages yet. Send a message to start.</p>';
+        return;
+      }
+
+      historyEl.innerHTML = history.map((entry) => `
+        <div class="message-block">
+          <div class="message-label ${entry.role === "USER" ? "user" : "atlas"}">${entry.role}</div>
+          <div class="message-text">${escapeHtml(entry.message)}</div>
+        </div>
+      `).join("");
+    }
+
+    function resetSessionStats() {
+      sessionStats.validationErrors = 0;
+      sessionStats.responseTimes = [];
+      sessionStats.faqHits = 0;
+      sessionStats.interruptions = 0;
+      sessionStats.businessRulesTriggered = new Set();
+      sessionStats.memoryWrites = 0;
+      sessionStats.lastMemoryCount = 0;
+    }
+
+    function clearMissionControl() {
+      resetSessionStats();
+      renderMissionControl({
+        currentStage: "NEW",
+        currentIntent: "—",
+        leadStatus: "New",
+        collectedData: {},
+        handoff: null,
+        readiness: {
+          conversationCompleted: "NO",
+          readyForHandoff: "NO",
+          calendarReady: "NO"
+        },
+        memory: null,
+        metrics: {
+          messagesSent: 0,
+          messagesReceived: 0,
+          conversationDurationMs: 0,
+          currentResponseTimeMs: 0,
+          currentLanguage: "unknown",
+          currentIntent: "—",
+          currentStep: "NEW"
+        },
+        validationResult: {},
+        pipelineProgress: [],
+        businessRulesPanel: [],
+        memoryTimeline: []
+      }, []);
+    }
+
+    async function loadState() {
+      const response = await fetch("/dev/simulator/state");
+      const data = await response.json();
+      if (!data.success) return;
+
+      renderHistory(data.history);
+      if (data.debug) {
+        sessionStats.lastMemoryCount = data.debug.memoryTimeline?.length || 0;
+        renderMissionControl(data.debug, data.history);
+      }
+    }
+
+    async function sendMessage() {
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      sendBtn.disabled = true;
+      statusBar.textContent = "Sending message...";
+
+      try {
+        const response = await fetch("/dev/simulator/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || "Failed to send message");
+
+        updateSessionStats(data.debug);
+        renderHistory(data.history);
+        renderMissionControl(data.debug, data.history);
+        messageInput.value = "";
+        statusBar.textContent = `Last response: ${data.debug.responseTimeMs} ms`;
+      } catch (error) {
+        statusBar.textContent = `Error: ${error.message}`;
+      } finally {
+        sendBtn.disabled = false;
+        messageInput.focus();
+      }
+    }
+
+    async function resetConversation() {
+      resetBtn.disabled = true;
+      try {
+        const response = await fetch("/dev/simulator/reset", { method: "POST" });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || "Failed to reset");
+
+        renderHistory([]);
+        rawMemoryEl.classList.remove("visible");
+        rawMemoryEl.textContent = "";
+        clearMissionControl();
+        statusBar.textContent = "Conversation reset for developer-test-user";
+      } catch (error) {
+        statusBar.textContent = `Error: ${error.message}`;
+      } finally {
+        resetBtn.disabled = false;
+      }
+    }
+
+    async function showRawMemory() {
+      try {
+        const response = await fetch("/dev/simulator/memory");
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || "Failed to load memory");
+
+        rawMemoryEl.textContent = JSON.stringify(
+          { phone: data.phone, prospect: data.prospect, memory: data.memory },
+          null,
+          2
+        );
+        rawMemoryEl.classList.add("visible");
+        statusBar.textContent = "Raw memory loaded";
+      } catch (error) {
+        statusBar.textContent = `Error: ${error.message}`;
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    resetBtn.addEventListener("click", resetConversation);
+    memoryBtn.addEventListener("click", showRawMemory);
+    messageInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") sendMessage();
+    });
+
+    clearMissionControl();
+    loadState();
+  </script>
+</body>
+</html>

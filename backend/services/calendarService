@@ -1,4 +1,5 @@
 const { google } = require("googleapis");
+const { releaseSlotByIso } = require("../core/capacityEngine");
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -7,52 +8,83 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 oauth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN
 });
 
 const calendar = google.calendar({
   version: "v3",
-  auth: oauth2Client,
+  auth: oauth2Client
 });
+
+function buildEventDescription(interview) {
+  const lines = [
+    `Prospect: ${interview.name}`,
+    `Phone: ${interview.phone}`,
+    `Interview Type: ${interview.interviewType}`
+  ];
+
+  if (interview.email) {
+    lines.push(`Email: ${interview.email}`);
+  }
+
+  if (interview.location) {
+    lines.push(`City: ${interview.location}`);
+  }
+
+  return lines.join("\n");
+}
 
 async function createInterview(interview) {
   console.log("📅 Creating interview:", interview);
 
   const start = new Date(interview.startTime);
   const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const isZoom = interview.interviewType === "Zoom";
 
   const event = {
     summary: `Team Vision Interview - ${interview.name}`,
-    description: `
-Prospect: ${interview.name}
-Phone: ${interview.phone}
-Interview Type: ${interview.interviewType}
-`,
+    description: buildEventDescription(interview),
     start: {
       dateTime: start.toISOString(),
-      timeZone: "America/New_York",
+      timeZone: "America/New_York"
     },
     end: {
       dateTime: end.toISOString(),
-      timeZone: "America/New_York",
-    },
+      timeZone: "America/New_York"
+    }
   };
+
+  if (isZoom) {
+    event.conferenceData = {
+      createRequest: {
+        requestId: `atlas-${Date.now()}`,
+        conferenceSolutionKey: { type: "hangoutsMeet" }
+      }
+    };
+  }
 
   const response = await calendar.events.insert({
     calendarId: "primary",
-    requestBody: event,
+    conferenceDataVersion: isZoom ? 1 : 0,
+    requestBody: event
   });
 
   console.log("✅ Google Calendar Event Created");
   console.log("📅 Event ID:", response.data.id);
 
+  if (response.data.hangoutLink) {
+    console.log("🔗 Meet link:", response.data.hangoutLink);
+  }
+
   return response.data;
 }
 
-async function cancelInterview(eventId) {
+async function cancelInterview(eventId, bookingDetails = null) {
   console.log("❌ Cancel interview:", eventId);
 
-  // We will build this later
+  if (bookingDetails?.startTimeISO && bookingDetails?.interviewType) {
+    releaseSlotByIso(bookingDetails.startTimeISO, bookingDetails.interviewType);
+  }
 }
 
 async function rescheduleInterview(eventId, interview) {
@@ -64,5 +96,5 @@ async function rescheduleInterview(eventId, interview) {
 module.exports = {
   createInterview,
   cancelInterview,
-  rescheduleInterview,
+  rescheduleInterview
 };

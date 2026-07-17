@@ -1,0 +1,131 @@
+{
+  "what_is_the_job": {
+    "keywords": [
+      "job",
+      "work",
+      "position",
+      "trabajo",
+      "empleo",
+      "what is the job",
+      "de que trata",
+      "de qué trata",
+      "what is this about",
+      "more information",
+      "mas informacion",
+      "más información",
+      "info"
+    ],
+    "response_en": "We work in financial services. No experience is required, and during the interview you'll learn all the details so you can decide if it's a good fit for you.",
+    "response_es": "Trabajamos en la asesoría y distribución de servicios financieros. No se requiere experiencia y durante la entrevista te darán todos los detalles para que puedas decidir si es una buena oportunidad para ti."
+  },
+
+  "insurance": {
+    "keywords": [
+      "insurance",
+      "seguro",
+      "is it insurance",
+      "es seguro"
+    ],
+    "response_en": "We work in the financial services industry. No experience is required, and during the interview we'll explain the opportunity in detail and answer all your questions.",
+    "response_es": "Trabajamos en la asesoría y distribución de servicios financieros. No se requiere experiencia y durante la entrevista te darán más detalles."
+  },
+
+  "pay": {
+    "keywords": [
+      "hour",
+      "salary",
+      "pay",
+      "per hour",
+      "hora",
+      "sueldo",
+      "salario",
+      "pagan",
+      "cuanto pagan",
+      "cuánto pagan"
+    ],
+    "response_en": "This isn't an hourly position. During the interview we'll explain how the compensation works, answer your questions, and you can decide if it's a good fit for you.",
+    "response_es": "No es un trabajo por hora. Durante la entrevista te explicarán cómo funciona la compensación, responderán tus preguntas y podrás decidir si es una buena oportunidad para ti."
+  },
+
+  "sales": {
+    "keywords": [
+      "sell",
+      "sales",
+      "selling",
+      "vender",
+      "ventas"
+    ],
+    "response_en": "We help families with financial services, and we provide the training before you begin. During the interview you'll see exactly how everything works.",
+    "response_es": "Ayudamos a las familias con servicios financieros y nosotros te enseñamos paso a paso. Durante la entrevista te mostrarán cómo funciona todo."
+  },
+
+  "clients": {
+    "keywords": [
+      "clients",
+      "customers",
+      "find clients",
+      "buscar clientes",
+      "clientes"
+    ],
+    "response_en": "You'll receive training and work alongside experienced leaders while you learn. During the interview we'll explain how that process works.",
+    "response_es": "Recibirás entrenamiento y trabajarás acompañado por un líder mientras aprendes. Durante la entrevista te explicarán cómo funciona ese proceso."
+  },
+
+  "experience": {
+    "keywords": [
+      "experience",
+      "experiencia"
+    ],
+    "response_en": "No experience is required. Most people who start with us have never worked in financial services before because we provide the training.",
+    "response_es": "No se requiere experiencia. La mayoría de las personas que comienzan con nosotros nunca han trabajado en servicios financieros porque nosotros les enseñamos."
+  },
+
+  "english": {
+    "keywords": [
+      "english",
+      "ingles",
+      "inglés",
+      "speak english"
+    ],
+    "response_en": "Speaking English isn't required to get started. We have Spanish-speaking leaders and training available.",
+    "response_es": "No es necesario hablar inglés para comenzar. Contamos con líderes y entrenamiento completamente en español."
+  },
+
+  "study": {
+    "keywords": [
+      "study",
+      "license",
+      "licensed",
+      "estudiar",
+      "licencia"
+    ],
+    "response_en": "Since it's a licensed profession, everyone completes a licensing course. During the interview we'll explain how the process works and how we'll help you through it.",
+    "response_es": "Como es una profesión licenciada, todos realizan un curso de licencia. Durante la entrevista te explicarán cómo funciona el proceso y cómo te acompañaremos en cada paso."
+  },
+
+  "work_from_home": {
+    "keywords": [
+      "home",
+      "remote",
+      "work from home",
+      "casa",
+      "remoto",
+      "desde casa"
+    ],
+    "response_en": "Depending on your training and responsibilities, there are opportunities to work remotely, in person, or with a hybrid schedule. During the interview we'll explain the options available.",
+    "response_es": "Dependiendo de tu entrenamiento y tus responsabilidades, existen oportunidades presenciales, remotas o híbridas. Durante la entrevista te explicarán las opciones disponibles."
+  },
+
+  "flexible": {
+    "keywords": [
+      "flexible",
+      "schedule",
+      "hours",
+      "horario",
+      "tiempo",
+      "flexibilidad"
+    ],
+    "response_en": "Yes. One of the advantages of this opportunity is the flexibility to build your schedule around your personal and family commitments. During the interview you'll learn how that works.",
+    "response_es": "Sí. Una de las ventajas de esta oportunidad es la flexibilidad para organizar tu horario alrededor de tus compromisos personales y familiares. Durante la entrevista te explicarán cómo funciona."
+  }
+}

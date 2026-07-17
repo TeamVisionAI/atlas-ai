@@ -1,8 +1,12 @@
+import { formatProspectInterviewTime } from "../utils/dateFormatter";
+
 export default function AppointmentCard({ prospect }) {
 
     if (!prospect) {
       return null;
     }
+
+    const interviewDisplay = formatProspectInterviewTime(prospect) || "Not Scheduled";
   
     return (
       <div
@@ -27,7 +31,7 @@ export default function AppointmentCard({ prospect }) {
             marginBottom: 5
           }}
         >
-          {prospect.interview_time}
+          {interviewDisplay}
         </h2>
   
         <h3>{prospect.name}</h3>

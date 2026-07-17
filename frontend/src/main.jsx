@@ -10,12 +10,8 @@ import Prospect from "./pages/Prospect";
 ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <Routes>
-      <Route path="/" element={<App />} />
-
-      <Route
-        path="/prospect/:id"
-        element={<Prospect />}
-      />
+      <Route path="/prospect/:id" element={<Prospect />} />
+      <Route path="/*" element={<App />} />
     </Routes>
   </BrowserRouter>
 );
