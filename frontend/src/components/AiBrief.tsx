@@ -5,10 +5,10 @@ interface AiBriefProps {
   lines: string[];
   expandedContent?: {
     summary: string[];
-    suggestedReply: string;
-    importantNotes: string[];
-    objections: string[];
-    aiRecommendation: string;
+    suggestedReply?: string | null;
+    importantNotes?: string[];
+    objections?: string[];
+    aiRecommendation?: string | null;
   };
 }
 
@@ -78,9 +78,13 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
               color: "#E5E7EB"
             }}
           >
-            {previewLines.map((line) => (
-              <span key={line}>{formatTextWithDates(line)}</span>
-            ))}
+            {previewLines.length ? (
+              previewLines.map((line) => (
+                <span key={line}>{formatTextWithDates(line)}</span>
+              ))
+            ) : (
+              <span style={{ color: "#94A3B8" }}>Brief not yet available.</span>
+            )}
           </span>
         </span>
 
@@ -106,24 +110,26 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
             </DetailSection>
           ) : null}
 
-          <DetailSection label="Suggested Reply">
-            <p
-              style={{
-                margin: 0,
-                padding: "12px 14px",
-                borderRadius: 8,
-                background: "#1F2937",
-                border: "1px solid #374151",
-                fontSize: 14,
-                lineHeight: 1.6,
-                fontStyle: "italic"
-              }}
-            >
-              &ldquo;{expandedContent.suggestedReply}&rdquo;
-            </p>
-          </DetailSection>
+          {expandedContent.suggestedReply ? (
+            <DetailSection label="Suggested Reply">
+              <p
+                style={{
+                  margin: 0,
+                  padding: "12px 14px",
+                  borderRadius: 8,
+                  background: "#1F2937",
+                  border: "1px solid #374151",
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  fontStyle: "italic"
+                }}
+              >
+                &ldquo;{expandedContent.suggestedReply}&rdquo;
+              </p>
+            </DetailSection>
+          ) : null}
 
-          {expandedContent.importantNotes.length ? (
+          {expandedContent.importantNotes?.length ? (
             <DetailSection label="Important Notes">
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {expandedContent.importantNotes.map((item) => (
@@ -133,7 +139,7 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
             </DetailSection>
           ) : null}
 
-          {expandedContent.objections.length ? (
+          {expandedContent.objections?.length ? (
             <DetailSection label="Objections">
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {expandedContent.objections.map((item) => (
@@ -143,11 +149,13 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
             </DetailSection>
           ) : null}
 
-          <DetailSection label="AI Recommendation">
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
-              {expandedContent.aiRecommendation}
-            </p>
-          </DetailSection>
+          {expandedContent.aiRecommendation ? (
+            <DetailSection label="AI Recommendation">
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
+                {expandedContent.aiRecommendation}
+              </p>
+            </DetailSection>
+          ) : null}
         </div>
       ) : null}
     </div>

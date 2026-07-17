@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDashboard } from "../services/api";
-import { getMissionControl } from "../services/missionControlService";
+import {
+  getMissionControl,
+  MissionControlError
+} from "../services/missionControlService";
+import {
+  adaptMissionControlResponse,
+  buildMockMissionControlFromQueueProspect
+} from "../adapters/missionControlAdapter";
 import AgentHeader from "../components/AgentHeader";
 import AgentQueueNavigator from "../components/AgentQueueNavigator";
 import AgentMetricPanel from "../components/AgentMetricPanel";
@@ -17,7 +24,6 @@ import {
 } from "../engines/contextEngine";
 import { getAvailableJourneyPackages } from "../engines/journeyEngine";
 import {
-  buildMockMissionFromProspect,
   buildPrioritizedQueue,
   findQueueIndex,
   getNextPriorityProspect,
@@ -40,40 +46,74 @@ const sectionLabelStyle = {
   textTransform: "uppercase"
 };
 
+function findDashboardProspect(dashboard, phone) {
+  if (!dashboard?.prospects?.length || !phone) {
+    return null;
+  }
+
+  return dashboard.prospects.find((prospect) => prospect.phone === phone) || null;
+}
+
+async function loadWorkspaceForQueueItem(item, dashboardData) {
+  const dashboardProspect = findDashboardProspect(dashboardData, item.phone);
+  const missionControl = isMockQueueProspect(item)
+    ? buildMockMissionControlFromQueueProspect(item)
+    : await getMissionControl(item.phone);
+
+  if (!missionControl) {
+    return null;
+  }
+
+  return adaptMissionControlResponse(missionControl, dashboardProspect || item, {
+    isLive: !isMockQueueProspect(item)
+  });
+}
+
 export default function Dashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [mission, setMission] = useState(null);
+  const [workspace, setWorkspace] = useState(null);
   const [workflowState, setWorkflowState] = useState(null);
   const [showPackageSent, setShowPackageSent] = useState(false);
   const [workflowComplete, setWorkflowComplete] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [prospectLoading, setProspectLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [activeMetricPanel, setActiveMetricPanel] = useState(null);
 
-  const loadProspectAtIndex = useCallback(async (index, queueItems) => {
+  const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
     const item = queueItems[index];
 
     if (!item) {
       return;
     }
 
-    try {
-      const missionData = isMockQueueProspect(item)
-        ? buildMockMissionFromProspect(item)
-        : await getMissionControl(item.phone);
+    setProspectLoading(true);
+    setLoadError(null);
 
-      if (!missionData) {
+    try {
+      const adapted = await loadWorkspaceForQueueItem(item, dashboardData);
+
+      if (!adapted) {
+        setLoadError("No mission control data found for this prospect.");
         return;
       }
 
-      setMission(missionData);
+      setWorkspace(adapted);
       setWorkflowState(loadWorkflowState(item.phone));
       setCurrentIndex(index);
       setShowPackageSent(false);
       setWorkflowComplete(null);
     } catch (err) {
       console.error(err);
+      setLoadError(
+        err instanceof MissionControlError
+          ? "Unable to load mission control data."
+          : "Something went wrong loading this prospect."
+      );
+    } finally {
+      setProspectLoading(false);
     }
   }, []);
 
@@ -82,20 +122,29 @@ export default function Dashboard() {
       try {
         const dashboardData = await getDashboard();
         const sortedQueue = buildPrioritizedQueue(dashboardData.prospects);
-        const missionData = await getMissionControl();
+        const initialItem = sortedQueue[0];
 
         setDashboard(dashboardData);
         setQueue(sortedQueue);
 
-        if (missionData) {
-          setMission(missionData);
-          setCurrentIndex(findQueueIndex(sortedQueue, missionData.prospect?.phone));
-          setWorkflowState(
-            loadWorkflowState(missionData.prospect?.phone) || createDefaultWorkflowState()
-          );
+        if (!initialItem) {
+          setLoadError("No prospects in queue.");
+          return;
         }
+
+        const adapted = await loadWorkspaceForQueueItem(initialItem, dashboardData);
+
+        if (!adapted) {
+          setLoadError("No active conversation found.");
+          return;
+        }
+
+        setWorkspace(adapted);
+        setCurrentIndex(findQueueIndex(sortedQueue, adapted.phone));
+        setWorkflowState(loadWorkflowState(adapted.phone) || createDefaultWorkflowState());
       } catch (err) {
         console.error(err);
+        setLoadError("Unable to load Atlas workspace.");
       } finally {
         setInitialLoading(false);
       }
@@ -104,19 +153,7 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
-  const conversationProspect = useMemo(() => {
-    if (!dashboard?.prospects?.length || !mission?.prospect?.phone) {
-      return queue[currentIndex] || null;
-    }
-
-    return (
-      dashboard.prospects.find(
-        (prospect) => prospect.phone === mission.prospect.phone
-      ) || queue[currentIndex]
-    );
-  }, [dashboard, mission, queue, currentIndex]);
-
-  const phone = mission?.prospect?.phone;
+  const phone = workspace?.phone;
 
   const handleWorkflowComplete = useCallback(
     (nextState) => {
@@ -144,13 +181,12 @@ export default function Dashboard() {
   }, []);
 
   const workspaceContext = useMemo(() => {
-    if (!mission || workflowState === null) {
+    if (!workspace || workflowState === null) {
       return null;
     }
 
     return buildWorkspaceContext({
-      mission,
-      dashboardProspect: conversationProspect,
+      workspace,
       workflowState,
       handlers: {
         onNotes: () => {},
@@ -159,7 +195,7 @@ export default function Dashboard() {
         onSendOnboarding: handlePackageSent
       }
     });
-  }, [mission, conversationProspect, workflowState, handlePackageSent]);
+  }, [workspace, workflowState, handlePackageSent]);
 
   const journeyPackages = useMemo(() => {
     if (!workspaceContext) {
@@ -176,33 +212,41 @@ export default function Dashboard() {
 
   const goToPrevious = useCallback(() => {
     if (currentIndex > 0) {
-      loadProspectAtIndex(currentIndex - 1, queue);
+      loadProspectAtIndex(currentIndex - 1, queue, dashboard);
     }
-  }, [currentIndex, loadProspectAtIndex, queue]);
+  }, [currentIndex, loadProspectAtIndex, queue, dashboard]);
 
   const goToNextPriority = useCallback(() => {
     const next = getNextPriorityProspect(queue, currentIndex);
 
     if (next) {
-      loadProspectAtIndex(next.index, queue);
+      loadProspectAtIndex(next.index, queue, dashboard);
     }
-  }, [currentIndex, loadProspectAtIndex, queue]);
+  }, [currentIndex, loadProspectAtIndex, queue, dashboard]);
 
   const openWorkspaceForPhone = useCallback(
-    (phone) => {
-      const index = findQueueIndex(queue, phone);
+    (targetPhone) => {
+      const index = findQueueIndex(queue, targetPhone);
 
-      loadProspectAtIndex(index, queue);
+      loadProspectAtIndex(index, queue, dashboard);
       setActiveMetricPanel(null);
     },
-    [loadProspectAtIndex, queue]
+    [loadProspectAtIndex, queue, dashboard]
   );
 
-  if (initialLoading || !dashboard || workflowState === null) {
+  if (initialLoading || !dashboard) {
     return <h2>🚀 Loading Atlas...</h2>;
   }
 
-  if (!mission || !workspaceContext) {
+  if (loadError && !workspace) {
+    return (
+      <div>
+        <p>{loadError}</p>
+      </div>
+    );
+  }
+
+  if (!workspace || !workspaceContext) {
     return (
       <div>
         <p>No active conversation found.</p>
@@ -210,11 +254,7 @@ export default function Dashboard() {
     );
   }
 
-  const showGate = shouldShowWorkflowGate(
-    mission,
-    conversationProspect,
-    workflowState
-  );
+  const showGate = shouldShowWorkflowGate(workspace, null, workflowState);
 
   const metrics = buildAgentMetrics(dashboard);
 
@@ -222,7 +262,7 @@ export default function Dashboard() {
     <>
       {showGate ? (
         <WorkflowGateModal
-          prospectName={mission.prospect.name}
+          prospectName={workspace.prospect.name}
           onComplete={handleWorkflowComplete}
         />
       ) : null}
@@ -266,6 +306,14 @@ export default function Dashboard() {
             onNext={goToNextPriority}
           />
         </div>
+
+        {prospectLoading ? (
+          <p style={{ margin: 0, color: "#64748B", fontSize: 14 }}>Loading prospect…</p>
+        ) : null}
+
+        {loadError ? (
+          <p style={{ margin: 0, color: "#B91C1C", fontSize: 14 }}>{loadError}</p>
+        ) : null}
 
         {workflowComplete ? (
           <WorkflowCompleteBanner
@@ -321,7 +369,7 @@ export default function Dashboard() {
           }}
         >
           <h3 style={sectionLabelStyle}>Conversation</h3>
-          <ConversationPanel lastMessage={conversationProspect?.last_message} />
+          <ConversationPanel lastMessage={workspace.conversation.lastMessage} />
         </section>
       </div>
     </>

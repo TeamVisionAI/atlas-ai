@@ -1,55 +1,15 @@
 import { MILESTONES } from "../types/milestones";
-import { normalizeProspectLanguage } from "../types/language";
-import { formatTextWithDates } from "../utils/dateFormatter";
 
 const OFFICE_ADDRESS = "2500 NW 79th Ave, Suite 189, Doral, FL 33122";
 const ZOOM_LINK = "https://zoom.us/j/teamvision-interview";
 
-export function normalizeInterviewType(value) {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = String(value).toLowerCase();
-
-  if (normalized.includes("zoom") || normalized.includes("virtual")) {
-    return "Zoom";
-  }
-
-  if (
-    normalized.includes("office") ||
-    normalized.includes("person") ||
-    normalized.includes("in person")
-  ) {
-    return "Office";
-  }
-
-  return value;
-}
-
-function formatField(field) {
-  if (!field) {
-    return field;
-  }
-
-  return field.charAt(0).toUpperCase() + field.slice(1);
-}
-
-function formatLocation(prospect) {
-  if (!prospect?.city) {
-    return "—";
-  }
-
-  return prospect.state ? `${prospect.city}, ${prospect.state}` : prospect.city;
-}
-
-export function deriveMilestone(mission, workflowState = {}) {
+/**
+ * Agent workflow milestones overlay local UI state on backend-derived milestone labels.
+ */
+export function resolveDisplayMilestone(workspace, workflowState = {}) {
   if (workflowState.milestone) {
     return workflowState.milestone;
   }
-
-  const step = mission?.brain?.currentStep;
-  const missing = mission?.brain?.missingFields || [];
 
   if (workflowState.outcome === "Recruited") {
     return workflowState.orientationScheduled
@@ -65,48 +25,15 @@ export function deriveMilestone(mission, workflowState = {}) {
     return MILESTONES.CLOSED;
   }
 
-  if (step === "CONFIRMED") {
-    return MILESTONES.INTERVIEW_CONFIRMED;
-  }
-
-  if (missing.includes("schedule") || step === "SCHEDULE") {
-    return MILESTONES.INTERVIEW_SCHEDULED;
-  }
-
-  if (missing.length) {
-    return MILESTONES.QUALIFYING;
-  }
-
-  return MILESTONES.NEW_LEAD;
+  return workspace?.prospect?.milestone || MILESTONES.NEW_LEAD;
 }
 
 export function isInterviewComplete(workflowState) {
   return Boolean(workflowState?.outcome);
 }
 
-export function buildAiBriefLines(mission, workflowState) {
-  const summaryItems = Array.isArray(mission?.atlasBrief?.summary)
-    ? mission.atlasBrief.summary
-    : mission?.atlasBrief?.summary
-      ? [mission.atlasBrief.summary]
-      : [];
-
-  const milestone = deriveMilestone(mission, workflowState);
-  const lines = [`Next milestone: ${milestone}`];
-
-  if (summaryItems[0]) {
-    lines.push(formatTextWithDates(summaryItems[0]));
-  }
-
-  if (summaryItems[1]) {
-    lines.push(formatTextWithDates(summaryItems[1]));
-  }
-
-  const missing = mission?.brain?.missingFields || [];
-
-  if (missing.length && !workflowState.outcome) {
-    lines.push(`Still needed: ${formatField(missing[0])}`);
-  }
+function buildAiBriefPreviewLines(workspace, workflowState) {
+  const lines = [...(workspace?.aiBriefLines || [])];
 
   if (workflowState.outcome === "Recruited" && workflowState.onboardingUnlocked) {
     lines.push("Onboarding package is ready to send.");
@@ -115,48 +42,14 @@ export function buildAiBriefLines(mission, workflowState) {
   return lines.slice(0, 5);
 }
 
-export function buildExpandedBrief(mission, workflowState) {
-  const missing = mission?.brain?.missingFields || [];
-
-  const suggestedReply = missing.includes("schedule")
-    ? "What day and time works best for your interview?"
-    : missing.includes("occupation")
-      ? "What do you do for work right now?"
-      : "Thanks for reaching out — happy to help with the next step.";
-
-  const summaryItems = Array.isArray(mission?.atlasBrief?.summary)
-    ? mission.atlasBrief.summary
-    : [];
-
-  return {
-    summary: summaryItems.map((item) => formatTextWithDates(item)),
-    suggestedReply,
-    importantNotes: [
-      mission?.businessRules?.emailRequired
-        ? "Zoom interview requires email before confirmation."
-        : null,
-      !mission?.businessRules?.localProspect
-        ? "Outside local radius — default to Zoom."
-        : null
-    ].filter(Boolean),
-    objections:
-      mission?.brain?.intent === "COST"
-        ? ["Asked about registration cost"]
-        : mission?.brain?.intent === "SALARY"
-          ? ["Asked about income potential"]
-          : [],
-    aiRecommendation: `Focus on reaching the ${deriveMilestone(mission, workflowState)} milestone.`
-  };
-}
-
 /**
- * Context-aware next actions. Only returns relevant actions — never disabled placeholders.
+ * Context-aware next actions. Presentation only — uses backend brain/rules fields.
  */
 export function buildNextActions(context) {
-  const { mission, workflowState, onNotes } = context;
-  const phone = mission?.prospect?.phone || "";
-  const interviewType = normalizeInterviewType(mission?.brain?.interviewType);
-  const milestone = deriveMilestone(mission, workflowState);
+  const { workspace, workflowState, onNotes } = context;
+  const phone = workspace?.phone || "";
+  const interviewType = workspace?.prospect?.interviewType;
+  const milestone = resolveDisplayMilestone(workspace, workflowState);
   const interviewComplete = isInterviewComplete(workflowState);
   const actions = [];
 
@@ -322,35 +215,33 @@ export function buildNextActions(context) {
   return actions.slice(0, 5);
 }
 
+/**
+ * @param {Object} params
+ * @param {import("../types/missionControl").AgentWorkspaceModel} params.workspace
+ * @param {Object} params.workflowState
+ * @param {Object} [params.handlers]
+ */
 export function buildWorkspaceContext({
-  mission,
-  dashboardProspect,
+  workspace,
   workflowState,
   handlers = {}
 }) {
-  const interviewType = normalizeInterviewType(mission?.brain?.interviewType);
-  const language = normalizeProspectLanguage(mission?.brain?.language);
-  const milestone = deriveMilestone(mission, workflowState);
+  const milestone = resolveDisplayMilestone(workspace, workflowState);
   const interviewComplete = isInterviewComplete(workflowState);
 
   const context = {
-    mission,
-    dashboardProspect,
+    workspace,
     workflowState,
-    interviewType,
-    language,
+    interviewType: workspace.prospect.interviewType,
+    language: workspace.prospect.language,
     milestone,
     interviewComplete,
     prospect: {
-      name: mission?.prospect?.name || "—",
-      phone: mission?.prospect?.phone || "—",
-      location: formatLocation(mission?.prospect),
-      language,
-      milestone,
-      interviewType
+      ...workspace.prospect,
+      milestone
     },
-    aiBriefLines: buildAiBriefLines(mission, workflowState),
-    expandedBrief: buildExpandedBrief(mission, workflowState),
+    aiBriefLines: buildAiBriefPreviewLines(workspace, workflowState),
+    expandedBrief: workspace.expandedBrief,
     nextActions: [],
     ...handlers
   };

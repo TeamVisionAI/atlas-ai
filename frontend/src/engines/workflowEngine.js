@@ -49,24 +49,33 @@ export function createDefaultWorkflowState() {
 
 /**
  * Gate: interview time passed AND outcome is null → block workspace.
+ * Accepts adapted workspace model or legacy { brain, conversation } shape.
  */
-export function shouldShowWorkflowGate(mission, dashboardProspect, workflowState) {
+export function shouldShowWorkflowGate(workspaceOrMission, dashboardProspect, workflowState) {
+  const brain = workspaceOrMission?.brain;
+  const conversation =
+    workspaceOrMission?.conversation ||
+    (dashboardProspect
+      ? {
+          interviewTime: dashboardProspect.interview_time,
+          appointmentDate: dashboardProspect.appointment_date
+        }
+      : null);
+
   if (workflowState.outcome) {
     return false;
   }
 
-  if (mission?.brain?.currentStep !== "CONFIRMED") {
+  if (brain?.currentStep !== "CONFIRMED") {
     return false;
   }
 
-  return isInterviewTimePassed(dashboardProspect, mission);
+  return isInterviewTimePassed(conversation);
 }
 
-function isInterviewTimePassed(dashboardProspect, mission) {
+function isInterviewTimePassed(conversation) {
   const interviewTime =
-    dashboardProspect?.interview_time ||
-    dashboardProspect?.appointment_date ||
-    mission?.prospect?.interviewTime;
+    conversation?.interviewTime || conversation?.appointmentDate;
 
   if (!interviewTime) {
     return true;

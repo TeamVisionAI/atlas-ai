@@ -166,44 +166,7 @@ export function getNextPriorityProspect(queue, currentIndex) {
   return null;
 }
 
-/**
- * Placeholder mission payload for mock queue prospects until backend queue API exists.
- */
-export function buildMockMissionFromProspect(prospect) {
-  const interviewType =
-    prospect.interview_type ||
-    (prospect.city === "Doral" ? "In Person" : "Zoom");
-
-  return {
-    prospect: {
-      name: prospect.name,
-      phone: prospect.phone,
-      city: prospect.city || null,
-      state: prospect.state || null,
-      occupation: prospect.occupation || null
-    },
-    brain: {
-      language: "en",
-      intent: "UNKNOWN",
-      currentStep: prospect.current_step || "GREETING",
-      interviewType,
-      missingFields: prospect.current_step === "SCHEDULE" ? ["schedule"] : []
-    },
-    businessRules: {
-      localProspect: prospect.city === "Doral",
-      interviewType,
-      workAuthorization: true,
-      emailRequired: interviewType === "Zoom"
-    },
-    atlasBrief: {
-      summary: [
-        prospect.city
-          ? `Prospect from ${prospect.state ? `${prospect.city}, ${prospect.state}` : prospect.city}`
-          : "New prospect in queue"
-      ]
-    }
-  };
-}
+export { buildMockMissionControlFromQueueProspect as buildMockMissionFromProspect } from "../adapters/missionControlAdapter";
 
 export function isMockQueueProspect(prospect) {
   return String(prospect?.phone || "").startsWith("queue-mock-");
