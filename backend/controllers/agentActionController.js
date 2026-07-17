@@ -28,6 +28,7 @@ const {
   buildAgentActionTimelineMessage
 } = require("../core/agentActionCopy");
 const { getMissionControlState } = require("./conversationController");
+const { buildWorkflowReadModel } = require("../core/workflowReadModel");
 
 function buildActionError(action, error, message) {
   return {
@@ -306,8 +307,15 @@ async function getMissionControlWithActions(phone) {
     organizationSettings
   });
 
+  const workflow = await buildWorkflowReadModel({
+    prospect,
+    brain: missionControl.brain,
+    agentState
+  });
+
   return {
     ...missionControl,
+    workflow,
     agentState: {
       flags: agentState.flags,
       outcome: agentState.outcome,

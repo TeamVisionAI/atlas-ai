@@ -241,6 +241,57 @@ Closed prospects are not a single state. Action visibility depends on closure re
 
 ---
 
+# Workflow Engine
+
+## BR-034 — Conversation Stalled / Intelligent Human Escalation
+
+**Implements:** Sprint 8A principles 4, 9, 11, 12, 13  
+**Engine:** `workflowReadModel.js`, `milestoneMapper.js` (detection in Sprint 8A.2)
+
+### Trigger (all required)
+
+1. No **inbound prospect** response for **24 hours** after Atlas's **last outbound** message.
+2. Workflow is incomplete (not Closed, not Do Not Contact).
+3. Prospect is not awaiting a scheduled event where `SYSTEM_WAITING` applies.
+4. Milestone is not terminal.
+
+### Behavior
+
+- Pause automated progression.
+- Set `workflowOwnership = AGENT`.
+- Set `needsHumanAttention = true`.
+- Create Mission Control priority item **after** Pending Interview Results (rank 2).
+- Recommend appropriate human action (early milestones → phone call).
+- Preserve current milestone and collected data.
+- Resume automatically after agent records interaction and advances milestone (BR-035). No separate "Resume Atlas" button.
+
+### Events
+
+`ConversationStalled`, `WorkflowOwnershipChanged`, `WorkflowPaused`
+
+---
+
+## BR-035 — Human Advancement
+
+**Implements:** Sprint 8A principles 5, 6, 7, 8, 14, 15, 16, 17, 19  
+**Engine:** `workflowStateStore.js`, `eventEngine.js` (API in Sprint 8A.3)
+
+### Behavior
+
+1. Agent records information from call or human interaction.
+2. Agent selects target milestone from valid state machine transitions.
+3. Workflow engine validates required data for target milestone.
+4. On save: persist fields, set milestone, emit events, trigger automated follow-up when interview scheduled.
+5. Return ownership to `ATLAS` when automated path can continue.
+6. Resume from **new milestone**, not last unanswered message.
+7. Do not repeat completed qualification questions (BR-014).
+
+### Events
+
+`HumanCallStarted`, `HumanCallCompleted`, `ProspectAdvanced`, `QualificationUpdated`, `InterviewScheduled`, `WorkflowOwnershipChanged`, `WorkflowResumed`
+
+---
+
 # Design Philosophy
 
 Atlas does not replace recruiters.
@@ -272,3 +323,5 @@ Atlas works around them.
 | Scheduling | `schedulingEngine.js` | Available times and slot logic |
 | Capacity | `capacityEngine.js` | Per-slot capacity (BR-006, BR-007) |
 | Agent Actions | `agentActionEngine.js` | Next Actions visibility and execution (BR-025 – BR-032) |
+| Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js` | Canonical milestones, ownership read model (BR-034, BR-035) |
+| Events | `eventEngine.js`, `workflowEventService.js` | Structured auditable workflow events |

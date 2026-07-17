@@ -1,0 +1,11 @@
+{
+  "br-doral": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "SYSTEM_WAITING",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T20:44:34.629Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false
+  }
+}
