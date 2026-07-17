@@ -128,8 +128,40 @@ export function adaptMissionControlResponse(
       interviewTime: dashboardProspect?.interview_time || null,
       appointmentDate: dashboardProspect?.appointment_date || null
     },
+    availableActions: missionControl.availableActions || [],
     raw: missionControl
   };
+}
+
+function buildMockAvailableActions(queueProspect, interviewType) {
+  const step = queueProspect.current_step || "GREETING";
+  const normalizedType = normalizeInterviewTypeDisplay(interviewType);
+  const actions = [
+    { id: "whatsapp", priority: "primary" },
+    { id: "call", priority: "secondary" },
+    { id: "notes", priority: "secondary" }
+  ];
+
+  if (step === "SCHEDULE") {
+    actions.unshift({ id: "schedule", priority: "primary" });
+  }
+
+  if (step === "CONFIRMED") {
+    if (normalizedType === "Zoom") {
+      actions.unshift({ id: "send_zoom_link", priority: "primary" });
+    }
+
+    if (normalizedType === "Office") {
+      actions.unshift({ id: "send_office_location", priority: "primary" });
+    }
+
+    actions.push({ id: "reschedule", priority: "secondary" });
+  }
+
+  const primary = actions.filter((action) => action.priority === "primary");
+  const secondary = actions.filter((action) => action.priority !== "primary");
+
+  return [...primary, ...secondary].slice(0, 5);
 }
 
 /**
@@ -168,6 +200,7 @@ export function buildMockMissionControlFromQueueProspect(queueProspect) {
           ? `Prospect from ${queueProspect.state ? `${queueProspect.city}, ${queueProspect.state}` : queueProspect.city}`
           : "New prospect in queue"
       ]
-    }
+    },
+    availableActions: buildMockAvailableActions(queueProspect, interviewType)
   };
 }

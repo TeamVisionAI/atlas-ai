@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDashboard } from "../services/api";
+import { getOrganizationSettings } from "../services/organizationService";
 import {
   getMissionControl,
-  MissionControlError
+  MissionControlError,
+  postMissionControlAction,
+  syncMissionControlWorkflow
 } from "../services/missionControlService";
 import {
   adaptMissionControlResponse,
@@ -80,6 +83,8 @@ export default function Dashboard() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [prospectLoading, setProspectLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [organizationSettings, setOrganizationSettings] = useState(null);
   const [activeMetricPanel, setActiveMetricPanel] = useState(null);
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
@@ -91,6 +96,7 @@ export default function Dashboard() {
 
     setProspectLoading(true);
     setLoadError(null);
+    setActionError(null);
 
     try {
       const adapted = await loadWorkspaceForQueueItem(item, dashboardData);
@@ -120,11 +126,15 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const dashboardData = await getDashboard();
+        const [dashboardData, orgSettings] = await Promise.all([
+          getDashboard(),
+          getOrganizationSettings()
+        ]);
         const sortedQueue = buildPrioritizedQueue(dashboardData.prospects);
         const initialItem = sortedQueue[0];
 
         setDashboard(dashboardData);
+        setOrganizationSettings(orgSettings);
         setQueue(sortedQueue);
 
         if (!initialItem) {
@@ -156,7 +166,7 @@ export default function Dashboard() {
   const phone = workspace?.phone;
 
   const handleWorkflowComplete = useCallback(
-    (nextState) => {
+    async (nextState) => {
       if (!phone) {
         return;
       }
@@ -164,13 +174,118 @@ export default function Dashboard() {
       const saved = saveWorkflowState(phone, nextState);
       setWorkflowState(saved);
 
+      const currentItem = queue[currentIndex];
+
+      if (currentItem && !isMockQueueProspect(currentItem)) {
+        try {
+          await syncMissionControlWorkflow(phone, saved);
+          const adapted = await loadWorkspaceForQueueItem(currentItem, dashboard);
+          if (adapted) {
+            setWorkspace(adapted);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
       if (saved.orientationScheduled) {
         setWorkflowComplete({
           message: "Orientation scheduled. Ready for the next prospect?"
         });
       }
     },
-    [phone]
+    [phone, queue, currentIndex, dashboard]
+  );
+
+  const refreshCurrentWorkspace = useCallback(async () => {
+    const currentItem = queue[currentIndex];
+
+    if (!currentItem || !dashboard) {
+      return;
+    }
+
+    const adapted = await loadWorkspaceForQueueItem(currentItem, dashboard);
+
+    if (adapted) {
+      setWorkspace(adapted);
+    }
+  }, [queue, currentIndex, dashboard]);
+
+  const handleMissionAction = useCallback(
+    async (actionId) => {
+      setActionError(null);
+
+      const currentItem = queue[currentIndex];
+      const isMock = currentItem ? isMockQueueProspect(currentItem) : false;
+
+      if (actionId === "call") {
+        if (phone) {
+          window.open(`tel:${phone}`, "_self");
+        }
+
+        if (!isMock && phone) {
+          const result = await postMissionControlAction(phone, "call");
+
+          if (!result.success) {
+            setActionError(result.message);
+          }
+        }
+
+        return;
+      }
+
+      if (actionId === "whatsapp") {
+        if (phone) {
+          window.open(`https://wa.me/${phone.replace(/\D/g, "")}`, "_blank");
+        }
+
+        if (!isMock && phone) {
+          const result = await postMissionControlAction(phone, "log_whatsapp_open");
+
+          if (!result.success) {
+            setActionError(result.message);
+          }
+        }
+
+        return;
+      }
+
+      if (isMock) {
+        setActionError("This action requires a live prospect record.");
+        return;
+      }
+
+      if (!phone) {
+        return;
+      }
+
+      try {
+        let payload = {};
+
+        if (actionId === "notes") {
+          const text = window.prompt("Add agent note:");
+
+          if (!text?.trim()) {
+            return;
+          }
+
+          payload = { text: text.trim() };
+        }
+
+        const result = await postMissionControlAction(phone, actionId, payload);
+
+        if (!result.success) {
+          setActionError(result.message);
+          return;
+        }
+
+        await refreshCurrentWorkspace();
+      } catch (err) {
+        console.error(err);
+        setActionError("Unable to complete action.");
+      }
+    },
+    [phone, queue, currentIndex, refreshCurrentWorkspace]
   );
 
   const handlePackageSent = useCallback(() => {
@@ -180,22 +295,38 @@ export default function Dashboard() {
     });
   }, []);
 
+  const handleOrganizationResourceMissing = useCallback((resourceKey) => {
+    const messages = {
+      zoomInterviewUrl: "Zoom interview URL is not configured on the server.",
+      "office.mapsUrl": "Office location is not configured on the server."
+    };
+
+    setActionError(messages[resourceKey] || "Organization resource is not configured.");
+  }, []);
+
   const workspaceContext = useMemo(() => {
-    if (!workspace || workflowState === null) {
+    if (!workspace || workflowState === null || !organizationSettings) {
       return null;
     }
 
     return buildWorkspaceContext({
       workspace,
+      organizationSettings,
       workflowState,
       handlers: {
-        onNotes: () => {},
-        onSchedule: () => {},
-        onReschedule: () => {},
-        onSendOnboarding: handlePackageSent
+        onAction: handleMissionAction,
+        onSendOnboarding: handlePackageSent,
+        onOrganizationResourceMissing: handleOrganizationResourceMissing
       }
     });
-  }, [workspace, workflowState, handlePackageSent]);
+  }, [
+    workspace,
+    organizationSettings,
+    workflowState,
+    handleMissionAction,
+    handlePackageSent,
+    handleOrganizationResourceMissing
+  ]);
 
   const journeyPackages = useMemo(() => {
     if (!workspaceContext) {
@@ -255,7 +386,6 @@ export default function Dashboard() {
   }
 
   const showGate = shouldShowWorkflowGate(workspace, null, workflowState);
-
   const metrics = buildAgentMetrics(dashboard);
 
   return (
@@ -315,6 +445,10 @@ export default function Dashboard() {
           <p style={{ margin: 0, color: "#B91C1C", fontSize: 14 }}>{loadError}</p>
         ) : null}
 
+        {actionError ? (
+          <p style={{ margin: 0, color: "#B91C1C", fontSize: 14 }}>{actionError}</p>
+        ) : null}
+
         {workflowComplete ? (
           <WorkflowCompleteBanner
             message={workflowComplete.message}
@@ -330,7 +464,9 @@ export default function Dashboard() {
 
         <section>
           <h3 style={sectionLabelStyle}>Next Actions</h3>
-          <NextActions actions={workspaceContext.nextActions} />
+          {!showGate ? (
+            <NextActions actions={workspaceContext.nextActions} />
+          ) : null}
         </section>
 
         {journeyPackages.length ? (

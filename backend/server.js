@@ -11,11 +11,13 @@ const app = express();
 const dashboardRoutes = require("./routes/dashboard");
 const timelineRoutes = require("./routes/timeline");
 const missionControlRoutes = require("./routes/missionControl");
+const organizationRoutes = require("./routes/organization");
 
 app.use(cors());
 app.use(express.json());
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/mission-control", missionControlRoutes);
+app.use("/api/organization", organizationRoutes);
 app.use("/timeline", timelineRoutes);
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);

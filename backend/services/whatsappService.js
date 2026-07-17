@@ -30,12 +30,17 @@ async function sendTextMessage(to, message) {
     );
 
     console.log("✅ Message sent");
+    return { success: true };
   } catch (err) {
     console.error("STATUS:", err.response?.status);
     console.error(
       "DATA:",
       JSON.stringify(err.response?.data, null, 2)
     );
+    return {
+      success: false,
+      error: err.response?.data?.error?.message || err.message
+    };
   }
 }
 

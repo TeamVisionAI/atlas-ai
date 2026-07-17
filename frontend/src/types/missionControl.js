@@ -25,18 +25,6 @@
  */
 
 /**
- * @typedef {Object} MissionControlResponse
- * @property {MissionControlProspect} prospect
- * @property {MissionControlBrain} brain
- * @property {MissionControlBusinessRules} businessRules
- * @property {{ summary: string | string[] }} atlasBrief
- * @property {string} [suggestedReply]
- * @property {string[]} [importantNotes]
- * @property {string[]} [objections]
- * @property {string} [aiRecommendation]
- */
-
-/**
  * @typedef {Object} AgentWorkspaceProspect
  * @property {string} name
  * @property {string} phone
@@ -63,6 +51,48 @@
  */
 
 /**
+ * @typedef {Object} MissionControlResponse
+ * @property {MissionControlProspect} prospect
+ * @property {MissionControlBrain} brain
+ * @property {MissionControlBusinessRules} businessRules
+ * @property {{ summary: string | string[] }} atlasBrief
+ * @property {string} [suggestedReply]
+ * @property {string[]} [importantNotes]
+ * @property {string[]} [objections]
+ * @property {string} [aiRecommendation]
+ * @property {import("./missionControl").AvailableAction[]} [availableActions]
+ * @property {import("./missionControl").AgentActionState} [agentState]
+ */
+
+/**
+ * @typedef {Object} AvailableAction
+ * @property {string} id
+ * @property {"primary" | "secondary"} priority
+ */
+
+/**
+ * @typedef {Object} AgentActionState
+ * @property {Object} flags
+ * @property {string | null} outcome
+ * @property {string | null} closureReason
+ * @property {boolean | null} futureReminder
+ * @property {string | null} followUpDate
+ * @property {string | null} followUpTime
+ * @property {boolean} orientationScheduled
+ * @property {boolean} onboardingUnlocked
+ * @property {string[]} [agentNotes]
+ */
+
+/**
+ * @typedef {Object} MissionControlActionResult
+ * @property {boolean} success
+ * @property {string} action
+ * @property {string} message
+ * @property {string} [error]
+ * @property {Object} [workflowState]
+ */
+
+/**
  * @typedef {Object} AgentWorkspaceModel
  * @property {string} phone
  * @property {AgentWorkspaceProspect} prospect
@@ -71,6 +101,7 @@
  * @property {string[]} aiBriefLines
  * @property {AgentWorkspaceAiBriefExpanded} expandedBrief
  * @property {AgentWorkspaceConversation} conversation
+ * @property {AvailableAction[]} availableActions
  * @property {MissionControlResponse} raw
  * @property {boolean} isLive
  */
