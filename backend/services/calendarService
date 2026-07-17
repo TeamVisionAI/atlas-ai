@@ -35,6 +35,18 @@ function buildEventDescription(interview) {
 }
 
 async function createInterview(interview) {
+  const { shouldMockExternalComms } = require("../dev/simulatorGuard");
+
+  if (shouldMockExternalComms()) {
+    const mockId = `sim-cal-${Date.now()}`;
+    console.log("[simulator] Calendar mocked:", { mockId, interview: interview?.name });
+    return {
+      id: mockId,
+      hangoutLink: "https://simulator.local/zoom/mock",
+      simulated: true
+    };
+  }
+
   console.log("📅 Creating interview:", interview);
 
   const start = new Date(interview.startTime);

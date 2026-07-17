@@ -1,11 +1,672 @@
 {
   "br-doral": {
     "canonicalMilestone": "INTERVIEW_SCHEDULED",
-    "workflowOwnership": "SYSTEM_WAITING",
+    "workflowOwnership": "WAITING_EVENT",
     "needsHumanAttention": false,
     "stalledAt": null,
     "initializedAt": "2026-07-17T20:44:34.629Z",
     "manualAgentOwnership": false,
-    "doNotContact": false
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "developer-test-user": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:07:46.622Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-full12": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:09:29.946Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-test-1": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:12:01.767Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-test-5": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:12:09.025Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "17862347083": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:12:09.029Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-02-60f808c6": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:25:21.028Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-03-7ba84d2b": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:25:23.293Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-04-fe114ee6": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:25:25.881Z",
+    "initializedAt": "2026-07-17T21:25:25.730Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:25:25.881498+00:00"
+  },
+  "sim-golden-05-6436fba8": {
+    "canonicalMilestone": "INTERVIEW_RESULT_PENDING",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:25:27.912Z",
+    "initializedAt": "2026-07-17T21:25:27.762Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:25:29.645482+00:00"
+  },
+  "sim-golden-06-28d11913": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:25:19.087Z",
+    "initializedAt": "2026-07-17T21:25:31.320Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:25:32.305283+00:00"
+  },
+  "sim-golden-07-0cd16e34": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:25:34.117Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-08-f63f220c": {
+    "canonicalMilestone": "CLOSED",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:25:36.263Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-09-b52645c6": {
+    "canonicalMilestone": "DO_NOT_CONTACT",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:25:38.247Z",
+    "manualAgentOwnership": false,
+    "doNotContact": true,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-10-25e63aa0": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:00.708Z",
+    "initializedAt": "2026-07-17T21:25:40.344Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:25:42.068981+00:00"
+  },
+  "sim-golden-02-99f756dc": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:26:48.346Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-03-50334d2e": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:26:50.359Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-05-f13e6e6b": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:26:52.936Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-06-bb0656a8": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:00.708Z",
+    "initializedAt": "2026-07-17T21:26:55.900Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:26:56.792885+00:00"
+  },
+  "sim-golden-07-3d5e1953": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:26:58.161Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-08-d45dfd78": {
+    "canonicalMilestone": "CLOSED",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:00.146Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-09-fc0c3cc8": {
+    "canonicalMilestone": "DO_NOT_CONTACT",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:02.134Z",
+    "manualAgentOwnership": false,
+    "doNotContact": true,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-10-17c66e75": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:00.708Z",
+    "initializedAt": "2026-07-17T21:27:04.069Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:27:05.699676+00:00"
+  },
+  "sim-golden-01-3f84ce60": {
+    "canonicalMilestone": "ORIENTATION",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:00.708Z",
+    "initializedAt": "2026-07-17T21:27:16.123Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:27:16.261595+00:00"
+  },
+  "sim-golden-02-a9b256a3": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:24.208Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-03-cfa8fd77": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:26.553Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-04-d08e4395": {
+    "canonicalMilestone": "GREETING_SENT",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:27:28.958Z",
+    "initializedAt": "2026-07-17T21:27:28.768Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:27:28.95849+00:00"
+  },
+  "sim-golden-05-a1a6fce8": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:30.859Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-06-bfcb912f": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:00.708Z",
+    "initializedAt": "2026-07-17T21:27:35.870Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:27:37.028035+00:00"
+  },
+  "sim-golden-07-f3f8559d": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:38.706Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-08-93a8a693": {
+    "canonicalMilestone": "CLOSED",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:41.035Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-09-6070465a": {
+    "canonicalMilestone": "DO_NOT_CONTACT",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:27:43.342Z",
+    "manualAgentOwnership": false,
+    "doNotContact": true,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-10-83491b8e": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:00.708Z",
+    "initializedAt": "2026-07-17T21:27:45.964Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:27:47.832578+00:00"
+  },
+  "sim-verify-1784323679138": {
+    "canonicalMilestone": "GREETING_SENT",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:00.708Z",
+    "initializedAt": "2026-07-17T21:27:59.810Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:28:00.708929+00:00"
+  },
+  "sim-golden-01-0f918155": {
+    "canonicalMilestone": "QUALIFICATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:02.966Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-01-972b1ab9": {
+    "canonicalMilestone": "QUALIFICATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:03.086Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-04-8b90fa99": {
+    "canonicalMilestone": "QUALIFICATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:03.174Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-01-ecf89857": {
+    "canonicalMilestone": "ORIENTATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:20.143Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-02-200bc9c4": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:24.452Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-03-869fad7c": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:26.544Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-04-7e72dc05": {
+    "canonicalMilestone": "GREETING_SENT",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:28:28.727Z",
+    "initializedAt": "2026-07-17T21:28:28.533Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:28:28.727234+00:00"
+  },
+  "sim-golden-05-7a123a12": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:30.418Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-06-bca44248": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:33.360Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-07-ee3bbd9d": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:35.636Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-08-90f388e2": {
+    "canonicalMilestone": "CLOSED",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:37.610Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-09-c2460e22": {
+    "canonicalMilestone": "DO_NOT_CONTACT",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:39.549Z",
+    "manualAgentOwnership": false,
+    "doNotContact": true,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-10-70b10595": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:28:41.526Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "br-orlando": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.592Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-test-4": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.720Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-test-2": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.723Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-at12": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.724Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "br-tampa": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.725Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-late": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.725Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "developer-test-user-2": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.726Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-miami": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.726Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sched-test-3": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.727Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "br-miami": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:31:43.727Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-01-5b14f885": {
+    "canonicalMilestone": "ORIENTATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:23.053Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-02-cbed7d92": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:27.491Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-03-6d5e97bb": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:29.541Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-04-72a2d23c": {
+    "canonicalMilestone": "GREETING_SENT",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-18T22:38:31.681Z",
+    "initializedAt": "2026-07-17T21:38:31.449Z",
+    "manualAgentOwnership": true,
+    "doNotContact": false,
+    "stallEpisodeKey": "2026-07-17T21:38:31.681957+00:00"
+  },
+  "sim-golden-05-1d53f86b": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:33.314Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-06-4a4cb949": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:36.298Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-07-5eaf836a": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:38.563Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-08-ad5cd63c": {
+    "canonicalMilestone": "CLOSED",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:40.494Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-09-ffa00100": {
+    "canonicalMilestone": "DO_NOT_CONTACT",
+    "workflowOwnership": "CLOSED",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:42.413Z",
+    "manualAgentOwnership": false,
+    "doNotContact": true,
+    "stallEpisodeKey": null
+  },
+  "sim-golden-10-f7a8f372": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-17T21:38:44.397Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null
   }
 }

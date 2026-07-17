@@ -84,10 +84,24 @@ function clearResourceFlags(phone) {
   });
 }
 
+function deleteAgentState(phone) {
+  if (!phone) {
+    return;
+  }
+
+  const store = readStore();
+
+  if (store[phone]) {
+    delete store[phone];
+    writeStore(store);
+  }
+}
+
 module.exports = {
   defaultAgentState,
   loadAgentState,
   saveAgentState,
   mergeAgentState,
-  clearResourceFlags
+  clearResourceFlags,
+  deleteAgentState
 };

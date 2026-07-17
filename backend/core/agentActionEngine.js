@@ -1,3 +1,5 @@
+const { parseInterviewDatetime } = require("./parseInterviewDatetime");
+
 const MILESTONES = {
   NEW_LEAD: "New Lead",
   QUALIFYING: "Qualifying",
@@ -78,15 +80,9 @@ function deriveMilestoneLabel(currentStep, missingFields, agentState) {
 }
 
 function getInterviewTimingPhase(prospect) {
-  const interviewTime = prospect?.interview_time || prospect?.appointment_date;
+  const parsed = parseInterviewDatetime(prospect);
 
-  if (!interviewTime) {
-    return "none";
-  }
-
-  const parsed = Date.parse(interviewTime);
-
-  if (Number.isNaN(parsed)) {
+  if (parsed === null) {
     return "none";
   }
 

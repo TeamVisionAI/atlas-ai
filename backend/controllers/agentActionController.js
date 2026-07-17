@@ -29,6 +29,7 @@ const {
 } = require("../core/agentActionCopy");
 const { getMissionControlState } = require("./conversationController");
 const { buildWorkflowReadModel } = require("../core/workflowReadModel");
+const { isProductionProspect } = require("../core/productionProspectFilter");
 
 function buildActionError(action, error, message) {
   return {
@@ -83,6 +84,10 @@ async function sendWhatsAppOrFail(prospect, message) {
 }
 
 async function executeAgentAction(phone, action, payload = {}) {
+  if (!isProductionProspect(phone)) {
+    return buildActionError(action, "PROSPECT_NOT_FOUND", "Prospect not found.");
+  }
+
   const prospect = await findProspect(phone);
 
   if (!prospect) {
@@ -287,6 +292,10 @@ async function syncAgentWorkflow(phone, workflowPayload = {}) {
 }
 
 async function getMissionControlWithActions(phone) {
+  if (!isProductionProspect(phone) && phone !== "latest") {
+    return null;
+  }
+
   const missionControl = await getMissionControlState(phone);
 
   if (!missionControl) {

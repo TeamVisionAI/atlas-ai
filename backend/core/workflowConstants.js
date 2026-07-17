@@ -26,9 +26,15 @@ const MILESTONES = Object.freeze({
 const OWNERSHIP = Object.freeze({
   ATLAS: "ATLAS",
   AGENT: "AGENT",
-  SYSTEM_WAITING: "SYSTEM_WAITING",
+  WAITING_EVENT: "WAITING_EVENT",
   CLOSED: "CLOSED"
 });
+
+/** @deprecated Renamed to WAITING_EVENT in Sprint 8A.2 — normalized on read. */
+const LEGACY_OWNERSHIP_SYSTEM_WAITING = "SYSTEM_WAITING";
+
+/** BR-034 stall threshold — no prospect reply after Atlas outbound. */
+const STALL_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
 /** Mission Control queue priority tiers (rank 1 = highest). */
 const PRIORITY_TIERS = Object.freeze({
@@ -67,10 +73,24 @@ const EVENT_TYPES = Object.freeze({
 
 const INTERVIEW_SOON_MS = 2 * 60 * 60 * 1000;
 
+/**
+ * Normalizes legacy persisted ownership values (SYSTEM_WAITING → WAITING_EVENT).
+ */
+function normalizeOwnership(value) {
+  if (value === LEGACY_OWNERSHIP_SYSTEM_WAITING) {
+    return OWNERSHIP.WAITING_EVENT;
+  }
+
+  return value;
+}
+
 module.exports = {
   MILESTONES,
   OWNERSHIP,
   PRIORITY_TIERS,
   EVENT_TYPES,
-  INTERVIEW_SOON_MS
+  INTERVIEW_SOON_MS,
+  STALL_THRESHOLD_MS,
+  LEGACY_OWNERSHIP_SYSTEM_WAITING,
+  normalizeOwnership
 };

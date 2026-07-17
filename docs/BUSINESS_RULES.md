@@ -246,13 +246,13 @@ Closed prospects are not a single state. Action visibility depends on closure re
 ## BR-034 — Conversation Stalled / Intelligent Human Escalation
 
 **Implements:** Sprint 8A principles 4, 9, 11, 12, 13  
-**Engine:** `workflowReadModel.js`, `milestoneMapper.js` (detection in Sprint 8A.2)
+**Engine:** `workflowReadModel.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`
 
 ### Trigger (all required)
 
 1. No **inbound prospect** response for **24 hours** after Atlas's **last outbound** message.
 2. Workflow is incomplete (not Closed, not Do Not Contact).
-3. Prospect is not awaiting a scheduled event where `SYSTEM_WAITING` applies.
+3. Prospect is not awaiting a scheduled event where `WAITING_EVENT` applies.
 4. Milestone is not terminal.
 
 ### Behavior
@@ -274,7 +274,7 @@ Closed prospects are not a single state. Action visibility depends on closure re
 ## BR-035 — Human Advancement
 
 **Implements:** Sprint 8A principles 5, 6, 7, 8, 14, 15, 16, 17, 19  
-**Engine:** `workflowStateStore.js`, `eventEngine.js` (API in Sprint 8A.3)
+**Engine:** `humanAdvancementEngine.js`, `milestoneValidationEngine.js`, `eventEngine.js`
 
 ### Behavior
 
@@ -289,6 +289,66 @@ Closed prospects are not a single state. Action visibility depends on closure re
 ### Events
 
 `HumanCallStarted`, `HumanCallCompleted`, `ProspectAdvanced`, `QualificationUpdated`, `InterviewScheduled`, `WorkflowOwnershipChanged`, `WorkflowResumed`
+
+---
+
+## BR-036 — Workflow Ownership Transition
+
+**Implements:** Sprint 8A principle 9  
+**Engine:** `workflowOwnershipEngine.js`, `workflowConstants.js` (detection in `stallDetectionEngine.js`)
+
+### Ownership values
+
+| Value | Meaning |
+|-------|---------|
+| `ATLAS` | Atlas may send messages and advance workflow automatically |
+| `AGENT` | Automated progression paused; human must act |
+| `WAITING_EVENT` | Paused until external trigger (scheduled interview, reminder, prospect reply within SLA) |
+| `CLOSED` | Terminal — no automatic resume |
+
+### Transition rules
+
+| From | To | Trigger |
+|------|-----|---------|
+| `ATLAS` | `AGENT` | BR-034 stall, BR-015 manual takeover, BR-024 coordinator handoff |
+| `ATLAS` | `WAITING_EVENT` | Interview scheduled, reminder scheduled, awaiting scheduled event |
+| `AGENT` | `ATLAS` | BR-035 human save; prospect inbound after stall (8A.2) |
+| `AGENT` | `WAITING_EVENT` | Human schedules interview — automated wait until event |
+| `*` | `CLOSED` | Closed or Do Not Contact milestone |
+| `CLOSED` | `ATLAS` | **Invalid** without explicit reopen rule |
+
+### Requirements
+
+- Every transition must be auditable (`WorkflowOwnershipChanged` event).
+- Persisted ownership overrides computed defaults when stall or manual agent hold is active.
+- Legacy `SYSTEM_WAITING` values normalize to `WAITING_EVENT` on read.
+
+### Events
+
+`WorkflowOwnershipChanged`, `WorkflowPaused`, `WorkflowResumed`
+
+---
+
+## BR-037 — Milestone Validation
+
+**Implements:** Sprint 8A.3 validation gate for human advancement  
+**Engine:** `milestoneValidationEngine.js`
+
+### Requirements
+
+1. Validation rules belong to the Workflow Engine, not the frontend.
+2. Every milestone defines required fields in `MILESTONE_REQUIRED_FIELDS`.
+3. Human Advancement (BR-035) must validate before changing milestones.
+4. Invalid transitions return structured validation errors (`VALIDATION_FAILED`, `INVALID_TRANSITION`).
+5. Valid transitions emit workflow events, update ownership (BR-036), update workflow state, and resume Atlas when appropriate.
+
+### API
+
+`POST /api/mission-control/:phone/workflow/advance`
+
+### Events
+
+Validation failures emit no events. Successful advancement emits the BR-035 event set.
 
 ---
 
@@ -323,5 +383,5 @@ Atlas works around them.
 | Scheduling | `schedulingEngine.js` | Available times and slot logic |
 | Capacity | `capacityEngine.js` | Per-slot capacity (BR-006, BR-007) |
 | Agent Actions | `agentActionEngine.js` | Next Actions visibility and execution (BR-025 – BR-032) |
-| Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js` | Canonical milestones, ownership read model (BR-034, BR-035) |
+| Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`, `milestoneValidationEngine.js`, `humanAdvancementEngine.js` | Milestones, ownership, stall detection, human advancement (BR-034 – BR-037) |
 | Events | `eventEngine.js`, `workflowEventService.js` | Structured auditable workflow events |

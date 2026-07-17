@@ -4,11 +4,26 @@ const {
   executeAgentAction,
   syncAgentWorkflow
 } = require("../controllers/agentActionController");
+const { postWorkflowAdvance } = require("../controllers/workflowAdvanceController");
+const { isProductionProspect } = require("../core/productionProspectFilter");
 
 const router = express.Router();
 
+function rejectSimulatorProspect(phone, res) {
+  if (!isProductionProspect(phone)) {
+    res.status(404).json({ error: "No active conversation found" });
+    return true;
+  }
+
+  return false;
+}
+
 router.get("/:phone", async (req, res) => {
   try {
+    if (rejectSimulatorProspect(req.params.phone, res)) {
+      return;
+    }
+
     const data = await getMissionControlWithActions(req.params.phone);
 
     if (!data) {
@@ -23,6 +38,10 @@ router.get("/:phone", async (req, res) => {
 
 router.post("/:phone/actions", async (req, res) => {
   try {
+    if (rejectSimulatorProspect(req.params.phone, res)) {
+      return;
+    }
+
     const action = req.body?.action || req.body?.type;
 
     if (!action) {
@@ -51,8 +70,31 @@ router.post("/:phone/actions", async (req, res) => {
   }
 });
 
+router.post("/:phone/workflow/advance", async (req, res) => {
+  try {
+    if (rejectSimulatorProspect(req.params.phone, res)) {
+      return;
+    }
+
+    const result = await postWorkflowAdvance(req.params.phone, req.body || {});
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      action: "workflow_advance",
+      error: "SERVER_ERROR",
+      message: error.message
+    });
+  }
+});
+
 router.post("/:phone/workflow", async (req, res) => {
   try {
+    if (rejectSimulatorProspect(req.params.phone, res)) {
+      return;
+    }
+
     const workflowState = await syncAgentWorkflow(req.params.phone, req.body || {});
 
     res.json({

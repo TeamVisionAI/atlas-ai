@@ -471,4 +471,7 @@ router.post("/simulator/reset", async (req, res) => {
   }
 });
 
+const workflowSimulatorRoutes = require("./workflowSimulatorRoutes");
+router.use("/workflow", workflowSimulatorRoutes);
+
 module.exports = router;

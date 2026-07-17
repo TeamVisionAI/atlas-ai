@@ -1,4 +1,5 @@
 const { createClient } = require("@supabase/supabase-js");
+const { isProductionProspect } = require("../core/productionProspectFilter");
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -58,6 +59,14 @@ async function findLatestActiveProspect() {
     return null;
   }
 
+  const productionProspects = prospects.filter((prospect) =>
+    isProductionProspect(prospect.phone)
+  );
+
+  if (!productionProspects.length) {
+    return null;
+  }
+
   const { data: logs, error: logError } = await supabase
     .from("conversation_logs")
     .select("prospect_phone, created_at")
@@ -65,7 +74,9 @@ async function findLatestActiveProspect() {
     .limit(100);
 
   if (!logError && logs?.length) {
-    const activeByPhone = new Map(prospects.map((prospect) => [prospect.phone, prospect]));
+    const activeByPhone = new Map(
+      productionProspects.map((prospect) => [prospect.phone, prospect])
+    );
 
     for (const log of logs) {
       const match = activeByPhone.get(log.prospect_phone);
@@ -75,7 +86,7 @@ async function findLatestActiveProspect() {
     }
   }
 
-  return prospects[prospects.length - 1];
+  return productionProspects[productionProspects.length - 1];
 }
 
 async function deleteProspect(phone) {

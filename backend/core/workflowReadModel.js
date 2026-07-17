@@ -1,6 +1,7 @@
 /**
- * Sprint 8A.1 — Assembles the Mission Control workflow read model.
- * Read-only: maps existing data to canonical milestone + ownership + priority.
+ * Sprint 8A.2 — Assembles the Mission Control workflow read model.
+ * Evaluates stall detection, ownership transitions, and events on read (BR-034).
+ * Does not alter conversation pipeline or UI.
  */
 
 const {
@@ -12,10 +13,17 @@ const {
   resolveWorkflowState,
   loadPersistedWorkflowState
 } = require("./workflowStateStore");
+const { detectConversationStall } = require("./stallDetectionEngine");
+const { applyStallTransition } = require("./workflowOwnershipEngine");
+const {
+  emitStallEscalationEvents,
+  emitStallClearanceEvents
+} = require("./workflowTransitionEvents");
 const { supabase } = require("../services/supabaseService");
+const { OWNERSHIP } = require("./workflowConstants");
 
 /**
- * Optional read-only message hints for GREETING_SENT detection.
+ * Message log hints for GREETING_SENT detection and BR-034 stall clock.
  */
 async function fetchMessageHints(phone) {
   if (!phone) {
@@ -60,15 +68,16 @@ async function fetchMessageHints(phone) {
 }
 
 /**
- * @param {Object} input
- * @param {Object} input.prospect
- * @param {Object} input.brain — { currentStep, missingFields }
- * @param {Object} input.agentState
+ * Sprint 8A.2 pipeline: detect → transition → emit → resolve → priority.
  */
-async function buildWorkflowReadModel({ prospect, brain, agentState }) {
-  const phone = prospect?.phone;
+async function evaluateWorkflowState({
+  phone,
+  prospect,
+  brain,
+  agentState,
+  messageHints
+}) {
   const persisted = loadPersistedWorkflowState(phone);
-  const messageHints = await fetchMessageHints(phone);
 
   const mergedAgentState = {
     ...agentState,
@@ -89,19 +98,10 @@ async function buildWorkflowReadModel({ prospect, brain, agentState }) {
     mergedAgentState
   );
 
-  const needsHumanAttention = false;
-
-  const priority = computeMissionControlPriority({
-    milestone: canonicalMilestone,
-    needsHumanAttention,
-    agentState,
-    prospect
-  });
-
   const computed = {
     canonicalMilestone,
     workflowOwnership,
-    needsHumanAttention,
+    needsHumanAttention: false,
     stalledAt: null,
     mappedFrom: {
       currentStep: brain?.currentStep || null,
@@ -110,9 +110,54 @@ async function buildWorkflowReadModel({ prospect, brain, agentState }) {
     }
   };
 
-  const resolved = resolveWorkflowState(phone, computed);
+  const stallResult = detectConversationStall({
+    messageHints,
+    milestone: canonicalMilestone,
+    prospect,
+    defaultOwnership: workflowOwnership,
+    agentState: mergedAgentState
+  });
 
-  const finalPriority = computeMissionControlPriority({
+  const ownershipBefore =
+    persisted.workflowOwnership || workflowOwnership;
+
+  const transition = applyStallTransition(
+    phone,
+    persisted,
+    stallResult,
+    computed
+  );
+
+  if (transition.applied) {
+    if (transition.transition === "br_034_stall") {
+      await emitStallEscalationEvents({
+        phone,
+        milestone: canonicalMilestone,
+        ownershipBefore,
+        stallResult
+      });
+    } else if (transition.transition === "stall_cleared_prospect_reply") {
+      await emitStallClearanceEvents({
+        phone,
+        milestone: canonicalMilestone,
+        ownershipBefore,
+        ownershipAfter: transition.next.workflowOwnership
+      });
+    }
+  }
+
+  const refreshed = loadPersistedWorkflowState(phone);
+
+  const resolved = resolveWorkflowState(phone, {
+    ...computed,
+    needsHumanAttention: refreshed.needsHumanAttention,
+    stalledAt: refreshed.stalledAt,
+    workflowOwnership: refreshed.needsHumanAttention
+      ? OWNERSHIP.AGENT
+      : refreshed.workflowOwnership || computed.workflowOwnership
+  });
+
+  const priority = computeMissionControlPriority({
     milestone: resolved.canonicalMilestone,
     needsHumanAttention: resolved.needsHumanAttention,
     agentState,
@@ -124,14 +169,43 @@ async function buildWorkflowReadModel({ prospect, brain, agentState }) {
     workflowOwnership: resolved.workflowOwnership,
     needsHumanAttention: resolved.needsHumanAttention,
     stalledAt: resolved.stalledAt,
-    missionControlPriority: finalPriority.rank,
-    missionControlPriorityTier: finalPriority.tier,
+    recommendedHumanAction: resolved.needsHumanAttention
+      ? stallResult.recommendedAction || "call"
+      : null,
+    missionControlPriority: priority.rank,
+    missionControlPriorityTier: priority.tier,
     source: resolved.source,
-    mappedFrom: resolved.mappedFrom
+    mappedFrom: resolved.mappedFrom,
+    stall: {
+      isStalled: stallResult.isStalled,
+      reason: stallResult.reason || null,
+      recommendedAction: stallResult.recommendedAction || null,
+      lastAtlasOutboundAt: stallResult.lastAtlasOutboundAt || null
+    }
   };
+}
+
+/**
+ * @param {Object} input
+ * @param {Object} input.prospect
+ * @param {Object} input.brain — { currentStep, missingFields }
+ * @param {Object} input.agentState
+ */
+async function buildWorkflowReadModel({ prospect, brain, agentState }) {
+  const phone = prospect?.phone;
+  const messageHints = await fetchMessageHints(phone);
+
+  return evaluateWorkflowState({
+    phone,
+    prospect,
+    brain,
+    agentState,
+    messageHints
+  });
 }
 
 module.exports = {
   buildWorkflowReadModel,
+  evaluateWorkflowState,
   fetchMessageHints
 };

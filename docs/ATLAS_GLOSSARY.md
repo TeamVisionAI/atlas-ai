@@ -13,7 +13,7 @@
 | **Agent** | Human recruiter using Mission Control / Agent Workspace. |
 | **Prospect** | A candidate in the recruiting pipeline, identified by phone. |
 | **Milestone** | Canonical progress marker in the workflow (e.g. `QUALIFICATION`). Atlas operates by milestones, not unanswered messages. |
-| **Workflow Ownership** | Who may drive automated progression: `ATLAS`, `AGENT`, `SYSTEM_WAITING`, or `CLOSED`. |
+| **Workflow Ownership** | Who may drive automated progression: `ATLAS`, `AGENT`, `WAITING_EVENT`, or `CLOSED`. |
 | **Mission Control** | Agent-facing command center (Dashboard / Agent Workspace). |
 | **Human Escalation** | BR-034: 24h stall with no prospect reply; ownership transfers to `AGENT`. |
 | **Workflow Gate** | UI block when interview passed and outcome not recorded (`INTERVIEW_RESULT_PENDING`). |
@@ -27,7 +27,8 @@
 |-------|---------|
 | `ATLAS` | Atlas may send messages and advance workflow automatically. |
 | `AGENT` | Automated progression paused; human must act. |
-| `SYSTEM_WAITING` | Waiting on external condition (scheduled interview, reminder, prospect reply within SLA). |
+| `WAITING_EVENT` | Waiting on external condition (scheduled interview, reminder, prospect reply within SLA). |
+| ~~`SYSTEM_WAITING`~~ | **Deprecated** — normalized to `WAITING_EVENT` on read (Sprint 8A.2). |
 | `CLOSED` | Terminal — no automatic resume (Closed, Do Not Contact). |
 
 ---
@@ -95,17 +96,23 @@ See [EVENT_CATALOG.md](./EVENT_CATALOG.md) for payloads.
 |----|------|
 | BR-034 | Conversation Stalled / Intelligent Human Escalation |
 | BR-035 | Human Advancement |
+| BR-036 | Workflow Ownership Transition |
+| BR-037 | Milestone Validation |
 
 See [BUSINESS_RULES.md](./BUSINESS_RULES.md)
 
 ---
 
-## Module Map (Sprint 8A.1)
+## Module Map (Sprint 8A)
 
 | Module | Purpose |
 |--------|---------|
 | `workflowConstants.js` | Enums: milestones, ownership, priorities, events |
 | `milestoneMapper.js` | Read-only mapping from legacy state |
+| `milestoneValidationEngine.js` | BR-037 required fields + transition validation |
+| `humanAdvancementEngine.js` | BR-035 advancement execution |
+| `stallDetectionEngine.js` | BR-034 stall detection |
+| `workflowOwnershipEngine.js` | BR-036 ownership transitions |
 | `workflowStateStore.js` | Ownership persistence (`workflowState.json`) |
 | `workflowReadModel.js` | Mission Control workflow read model |
 | `eventEngine.js` | `emit()` infrastructure |

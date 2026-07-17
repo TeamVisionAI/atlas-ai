@@ -10,21 +10,23 @@ const {
   PRIORITY_TIERS,
   INTERVIEW_SOON_MS
 } = require("./workflowConstants");
+const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 
 function parseInterviewTime(prospect) {
-  const raw = prospect?.interview_time || prospect?.appointment_date;
+  return parseInterviewDatetime(prospect);
+}
 
-  if (!raw) {
-    return null;
+function getNowMs() {
+  try {
+    return require("../dev/simulatorClock").getSimulatedNowMs();
+  } catch {
+    return Date.now();
   }
-
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function isInterviewPast(prospect) {
   const at = parseInterviewTime(prospect);
-  return at !== null && at < Date.now();
+  return at !== null && at < getNowMs();
 }
 
 function isInterviewSoon(prospect) {
@@ -34,7 +36,7 @@ function isInterviewSoon(prospect) {
     return false;
   }
 
-  const delta = at - Date.now();
+  const delta = at - getNowMs();
   return delta >= 0 && delta <= INTERVIEW_SOON_MS;
 }
 
@@ -58,7 +60,7 @@ function isFollowUpDue(agentState) {
     return true;
   }
 
-  return followUpAt <= Date.now();
+  return followUpAt <= getNowMs();
 }
 
 /**
@@ -198,7 +200,17 @@ function deriveDefaultOwnership(milestone, agentState = {}) {
     milestone === MILESTONES.INTERVIEW_DUE ||
     milestone === MILESTONES.GREETING_SENT
   ) {
-    return OWNERSHIP.SYSTEM_WAITING;
+    return OWNERSHIP.WAITING_EVENT;
+  }
+
+  if (milestone === MILESTONES.FOLLOW_UP && agentState.followUpDate) {
+    const followUpAt = Date.parse(
+      `${agentState.followUpDate}T${agentState.followUpTime || "00:00"}`
+    );
+
+    if (!Number.isNaN(followUpAt) && followUpAt > Date.now()) {
+      return OWNERSHIP.WAITING_EVENT;
+    }
   }
 
   if (agentState.manualAgentOwnership) {

@@ -11,6 +11,13 @@ console.log("TOKEN LENGTH:", TOKEN ? TOKEN.length : "MISSING");
 
 async function sendTextMessage(to, message) {
   try {
+    const { shouldMockExternalComms } = require("../dev/simulatorGuard");
+
+    if (shouldMockExternalComms()) {
+      console.log("[simulator] WhatsApp mocked:", { to, preview: String(message).slice(0, 80) });
+      return { success: true, simulated: true };
+    }
+
     await axios.post(
       `https://graph.facebook.com/v25.0/${PHONE_NUMBER_ID}/messages`,
       {

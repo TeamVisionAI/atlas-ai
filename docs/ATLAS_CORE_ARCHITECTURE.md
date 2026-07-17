@@ -24,7 +24,7 @@ It reflects the **current repository** and the **approved Sprint 8A direction** 
 6. Saving a human interaction automatically returns workflow ownership to Atlas when appropriate.
 7. Atlas resumes from the **highest valid completed milestone**.
 8. No separate “Resume Atlas” button should be required.
-9. Workflow ownership must always be explicit: **ATLAS**, **AGENT**, **SYSTEM_WAITING**, or **CLOSED**.
+9. Workflow ownership must always be explicit: **ATLAS**, **AGENT**, **WAITING_EVENT**, or **CLOSED**.
 10. **Pending Interview Results** has higher Mission Control priority than stalled conversations.
 11. A conversation with no prospect response for **24 hours** after Atlas’s last message becomes a **Human Escalation** (BR-034).
 12. Human Escalations appear **after** Pending Interview Results in Mission Control.
@@ -155,7 +155,7 @@ Engine        Engine       Engine (7.2)   Service (future)
 |-------|---------|
 | `ATLAS` | Atlas may send messages and advance workflow automatically |
 | `AGENT` | Automated progression paused; human must act (BR-034, BR-035, manual takeover BR-015) |
-| `SYSTEM_WAITING` | Atlas waiting on external condition (scheduled interview time, reminder fire time, prospect reply within SLA) |
+| `WAITING_EVENT` | Atlas waiting on external condition (scheduled interview time, reminder fire time, prospect reply within SLA) |
 | `CLOSED` | Terminal — no automatic resume (Closed, Do Not Contact) |
 
 ---

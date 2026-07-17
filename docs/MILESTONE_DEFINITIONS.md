@@ -33,7 +33,7 @@ Each milestone uses a consistent template. **Owner** refers to default workflow 
 | Field | Definition |
 |-------|------------|
 | **Purpose** | Atlas has sent initial outreach; awaiting first meaningful prospect response |
-| **Owner** | `ATLAS` → `SYSTEM_WAITING` (awaiting reply) |
+| **Owner** | `ATLAS` → `WAITING_EVENT` (awaiting reply) |
 | **Entry conditions** | At least one Atlas outbound; no prospect reply yet |
 | **Required data** | `phone` |
 | **Automatic Atlas actions** | None until reply or BR-034 stall |
@@ -93,7 +93,7 @@ Each milestone uses a consistent template. **Owner** refers to default workflow 
 | Field | Definition |
 |-------|------------|
 | **Purpose** | Interview datetime captured; confirmation/reminders active |
-| **Owner** | `SYSTEM_WAITING` (until interview window) |
+| **Owner** | `WAITING_EVENT` (until interview window) |
 | **Entry conditions** | `interview_date` / slot set; may or may not be confirmed |
 | **Required data** | Interview datetime, type (virtual/in-person), email when required |
 | **Automatic Atlas actions** | Confirmation message, meeting details, reminders (principle 16) |
@@ -113,7 +113,7 @@ Each milestone uses a consistent template. **Owner** refers to default workflow 
 | Field | Definition |
 |-------|------------|
 | **Purpose** | Interview imminent (within operational window, e.g. 2 hours) |
-| **Owner** | `SYSTEM_WAITING` |
+| **Owner** | `WAITING_EVENT` |
 | **Entry conditions** | Confirmed interview; start time within 2 hours |
 | **Required data** | Confirmed datetime, interview type |
 | **Automatic Atlas actions** | Reminder sends if configured |
@@ -173,7 +173,7 @@ Each milestone uses a consistent template. **Owner** refers to default workflow 
 | Field | Definition |
 |-------|------------|
 | **Purpose** | Deferred engagement — needs more time, no show recovery, nurture |
-| **Owner** | `ATLAS` or `SYSTEM_WAITING` (until follow-up date) |
+| **Owner** | `ATLAS` or `WAITING_EVENT` (until follow-up date) |
 | **Entry conditions** | Outcome or human set follow-up; or no-show / not ready |
 | **Required data** | `followUpDate` (recommended) |
 | **Automatic Atlas actions** | Message on follow-up date; re-enter qualification/scheduling as appropriate |
@@ -293,14 +293,14 @@ Each milestone uses a consistent template. **Owner** refers to default workflow 
 | Milestone | Default ownership |
 |-----------|-------------------|
 | NEW_LEAD | ATLAS |
-| GREETING_SENT | SYSTEM_WAITING |
+| GREETING_SENT | WAITING_EVENT |
 | QUALIFICATION | ATLAS |
 | INTERVIEW_READY | ATLAS |
-| INTERVIEW_SCHEDULED | SYSTEM_WAITING |
-| INTERVIEW_DUE | SYSTEM_WAITING |
+| INTERVIEW_SCHEDULED | WAITING_EVENT |
+| INTERVIEW_DUE | WAITING_EVENT |
 | INTERVIEW_COMPLETED | AGENT |
 | INTERVIEW_RESULT_PENDING | AGENT |
-| FOLLOW_UP | SYSTEM_WAITING / ATLAS |
+| FOLLOW_UP | WAITING_EVENT / ATLAS |
 | ORIENTATION | ATLAS |
 | LICENSING | ATLAS |
 | FAST_START | ATLAS |

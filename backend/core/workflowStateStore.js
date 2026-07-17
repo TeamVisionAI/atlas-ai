@@ -6,7 +6,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { OWNERSHIP } = require("./workflowConstants");
+const { OWNERSHIP, normalizeOwnership } = require("./workflowConstants");
 
 const STATE_FILE = path.join(__dirname, "../data/workflowState.json");
 
@@ -21,7 +21,9 @@ function defaultWorkflowRecord() {
     initializedAt: null,
     /** BR-035 manual agent hold (BR-015 alignment). */
     manualAgentOwnership: false,
-    doNotContact: false
+    doNotContact: false,
+    /** Idempotency key for BR-034 stall episode (last Atlas outbound timestamp). */
+    stallEpisodeKey: null
   };
 }
 
@@ -48,9 +50,17 @@ function loadPersistedWorkflowState(phone) {
   }
 
   const store = readStore();
+  const raw = store[phone] || {};
+  const normalized = {
+    ...raw,
+    workflowOwnership: raw.workflowOwnership
+      ? normalizeOwnership(raw.workflowOwnership)
+      : null
+  };
+
   return {
     ...defaultWorkflowRecord(),
-    ...(store[phone] || {})
+    ...normalized
   };
 }
 
@@ -67,7 +77,10 @@ function savePersistedWorkflowState(phone, patch) {
 
   const next = {
     ...current,
-    ...patch
+    ...patch,
+    workflowOwnership: patch.workflowOwnership
+      ? normalizeOwnership(patch.workflowOwnership)
+      : current.workflowOwnership
   };
 
   store[phone] = next;
@@ -122,10 +135,24 @@ function resolveWorkflowState(phone, computed) {
   };
 }
 
+function deletePersistedWorkflowState(phone) {
+  if (!phone) {
+    return;
+  }
+
+  const store = readStore();
+
+  if (store[phone]) {
+    delete store[phone];
+    writeStore(store);
+  }
+}
+
 module.exports = {
   defaultWorkflowRecord,
   loadPersistedWorkflowState,
   savePersistedWorkflowState,
   resolveWorkflowState,
+  deletePersistedWorkflowState,
   OWNERSHIP
 };

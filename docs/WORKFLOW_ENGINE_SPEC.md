@@ -22,7 +22,7 @@ Every active prospect MUST have exactly one ownership value at all times.
 |-------|---------------------|--------------------------|
 | `ATLAS` | Allowed per milestone rules | Normal queue; Atlas drives next step |
 | `AGENT` | **Paused** | Needs Human Attention; recommended action shown |
-| `SYSTEM_WAITING` | Paused until trigger | Monitoring; lower urgency unless trigger missed |
+| `WAITING_EVENT` | Paused until trigger | Monitoring; lower urgency unless trigger missed |
 | `CLOSED` | **Never** | Excluded from active queue (monitoring tier only) |
 
 ### Ownership transition rules
@@ -30,7 +30,7 @@ Every active prospect MUST have exactly one ownership value at all times.
 | From | To | Trigger |
 |------|-----|---------|
 | `ATLAS` | `AGENT` | BR-034 stall, BR-015 manual takeover, BR-024 coordinator handoff *(conversation)* |
-| `ATLAS` | `SYSTEM_WAITING` | Interview scheduled, reminder scheduled, awaiting scheduled event |
+| `ATLAS` | `WAITING_EVENT` | Interview scheduled, reminder scheduled, awaiting scheduled event |
 | `AGENT` | `ATLAS` | BR-035 human save with valid milestone; no further human gate required |
 | `AGENT` | `ATLAS` | Prospect inbound message after stall *(optional auto-resume — see open questions)* |
 | `*` | `CLOSED` | Closed or Do Not Contact milestone applied |
@@ -128,7 +128,7 @@ stateDiagram-v2
 
 1. No **inbound prospect** response for **24 hours** after Atlas’s **last outbound** message.
 2. Workflow is **incomplete** (not `CLOSED`, not `DO_NOT_CONTACT`).
-3. Prospect is **not** already awaiting a scheduled event where `SYSTEM_WAITING` is appropriate (e.g. confirmed interview in the future — stall clock may pause; see open questions).
+3. Prospect is **not** already awaiting a scheduled event where `WAITING_EVENT` is appropriate (e.g. confirmed interview in the future — stall clock may pause; see open questions).
 4. Milestone is not terminal.
 
 ### Behavior
@@ -182,7 +182,7 @@ stateDiagram-v2
 - `ProspectAdvanced`
 - `QualificationUpdated` *(if fields changed)*
 - `InterviewScheduled` / `InterviewRescheduled` *(if applicable)*
-- `WorkflowOwnershipChanged` (AGENT → ATLAS or SYSTEM_WAITING)
+- `WorkflowOwnershipChanged` (AGENT → ATLAS or WAITING_EVENT)
 - `WorkflowResumed`
 
 ### API shape (proposed)
@@ -242,7 +242,7 @@ Within tier, sort by: urgency timestamp → last activity → phone.
 
 ## Open Questions (Product Owner)
 
-1. Does 24h stall clock **pause** during `SYSTEM_WAITING` (confirmed interview in future)?
+1. Does 24h stall clock **pause** during `WAITING_EVENT` (confirmed interview in future)?
 2. Should inbound prospect message after stall auto-return to `ATLAS` without human save?
 3. Is `GREETING_SENT` a persisted milestone or derived from message timestamps?
 4. Journey packages: are `LICENSING` and `FAST_START` in scope for 8A implementation or documentation-only?
