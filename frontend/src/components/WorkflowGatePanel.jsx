@@ -3,6 +3,7 @@ import { INTERVIEW_OUTCOMES } from "../types/outcomes";
 import OutcomeWizard from "./OutcomeWizard";
 import { mapGateOutcomeToAdvance } from "../utils/workflowGateAdvance";
 import { advanceMissionControlWorkflow } from "../services/missionControlService";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const panelStyle = {
   background: "#111827",
@@ -44,6 +45,7 @@ export default function WorkflowGatePanel({
   phone,
   onComplete
 }) {
+  const { translate } = useLanguage();
   const [selectedOutcome, setSelectedOutcome] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -63,14 +65,14 @@ export default function WorkflowGatePanel({
       const result = await advanceMissionControlWorkflow(phone, payload);
 
       if (!result.success) {
-        throw new Error(result.message || "Unable to save interview outcome.");
+        throw new Error(result.message || translate("workflowGateSaveError"));
       }
 
-      setSuccess("Outcome saved. Workflow updated.");
+      setSuccess(translate("workflowGateSaveSuccess"));
       await onComplete?.(localState, result);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Something went wrong saving the outcome.");
+      setError(err.message || translate("workflowGateSaveUnexpected"));
     } finally {
       setLoading(false);
     }
@@ -83,32 +85,31 @@ export default function WorkflowGatePanel({
   return (
     <div style={panelStyle}>
       <h3 style={{ marginTop: 0, marginBottom: 8 }}>
-        {gate?.title || "Interview Outcome Required"}
+        {gate?.title || translate("workflowGateTitle")}
       </h3>
       <p style={{ color: "#94A3B8", marginTop: 0, lineHeight: 1.6 }}>
-        {gate?.message ||
-          "This interview has already occurred. Record the result so Atlas can continue the workflow."}
+        {gate?.message || translate("workflowGateMessage")}
       </p>
 
       {workflow ? (
         <div style={metaStyle}>
           <span>
-            Milestone:{" "}
+            {translate("workflowGateMilestone")}{" "}
             <strong style={{ color: "#E2E8F0" }}>
               {formatCanonicalMilestone(workflow.canonicalMilestone)}
             </strong>
           </span>
           <span>
-            Owner:{" "}
+            {translate("workflowGateOwner")}{" "}
             <strong style={{ color: "#E2E8F0" }}>
-              {formatOwnership(workflow.workflowOwnership)}
+              {formatOwnership(workflow.workflowOwnership, translate)}
             </strong>
           </span>
         </div>
       ) : null}
 
       {loading ? (
-        <p style={{ color: "#94A3B8", margin: "12px 0" }}>Saving outcome…</p>
+        <p style={{ color: "#94A3B8", margin: "12px 0" }}>{translate("workflowGateSaving")}</p>
       ) : null}
 
       {error ? (
@@ -161,13 +162,13 @@ function formatCanonicalMilestone(value) {
     .join(" ");
 }
 
-function formatOwnership(value) {
+function formatOwnership(value, translate) {
   if (!value) {
     return "—";
   }
 
   if (value === "WAITING_EVENT") {
-    return "Waiting Event";
+    return translate("workflowGateOwnershipWaiting");
   }
 
   return String(value)

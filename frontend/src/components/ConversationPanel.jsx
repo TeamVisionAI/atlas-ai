@@ -1,10 +1,14 @@
+import { useLanguage } from "../i18n/LanguageContext";
+
 export default function ConversationPanel({ lastMessage, direction, timestamp }) {
+  const { translate } = useLanguage();
+
   const directionLabel =
     direction === "outgoing"
-      ? "Atlas"
+      ? translate("missionControlConversationAtlas")
       : direction === "incoming"
-        ? "Prospect"
-        : "Message";
+        ? translate("missionControlConversationProspect")
+        : translate("missionControlConversationMessage");
 
   return (
     <div
@@ -55,7 +59,7 @@ export default function ConversationPanel({ lastMessage, direction, timestamp })
             {timestamp ? <span>{timestamp}</span> : null}
           </div>
           <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
-            {lastMessage || "No messages yet."}
+            {lastMessage || translate("missionControlConversationNoMessages")}
           </p>
         </div>
 
@@ -71,7 +75,7 @@ export default function ConversationPanel({ lastMessage, direction, timestamp })
             textAlign: "center"
           }}
         >
-          Continue in WhatsApp or use Next Actions above.
+          {translate("missionControlConversationFooter")}
         </div>
       </div>
     </div>

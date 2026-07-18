@@ -1,14 +1,18 @@
+import { useLanguage } from "../../i18n/LanguageContext";
+
 export default function MorningBrief({ brief, onReview }) {
+  const { translate } = useLanguage();
+
   return (
     <section className="executive-card executive-brief">
-      <h2 className="executive-section-label">Morning Brief</h2>
+      <h2 className="executive-section-label">{translate("executiveMorningBrief")}</h2>
       {brief.lines.map((line) => (
         <p key={line}>{line}</p>
       ))}
 
       {brief.recommendedAction ? (
         <div className="executive-brief__action">
-          <strong>Recommended first action:</strong>{" "}
+          <strong>{translate("executiveRecommendedFirstAction")}</strong>{" "}
           <button
             type="button"
             onClick={() =>
@@ -32,7 +36,7 @@ export default function MorningBrief({ brief, onReview }) {
 
       {brief.coachingLeader ? (
         <div className="executive-brief__action" style={{ borderTop: "none", paddingTop: 8 }}>
-          <strong>Coaching focus:</strong> {brief.coachingLeader.label}
+          <strong>{translate("executiveCoachingFocus")}</strong> {brief.coachingLeader.label}
         </div>
       ) : null}
     </section>

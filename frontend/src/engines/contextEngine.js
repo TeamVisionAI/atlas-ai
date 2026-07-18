@@ -1,4 +1,5 @@
 import { MILESTONES } from "../types/milestones";
+import { getTimeGreetingKey } from "./executiveDashboardViewModel";
 
 const ACCENT_ACTIONS = new Set([
   "send_zoom_link",
@@ -10,43 +11,43 @@ const ACCENT_ACTIONS = new Set([
 const ACTION_PRESENTATION = {
   call: {
     icon: "📞",
-    title: "Call",
-    subtitle: (context) => context.workspace?.phone || "—"
+    titleKey: "missionControlActionCall",
+    subtitleKey: null
   },
   whatsapp: {
     icon: "💬",
-    title: "WhatsApp",
-    subtitle: "Open conversation"
+    titleKey: "missionControlActionWhatsapp",
+    subtitleKey: "missionControlActionWhatsappSubtitle"
   },
   send_zoom_link: {
     icon: "🎥",
-    title: "Send Zoom Link",
-    subtitle: "Share interview link"
+    titleKey: "missionControlActionSendZoom",
+    subtitleKey: "missionControlActionSendZoomSubtitle"
   },
   send_office_location: {
     icon: "📍",
-    title: "Send Office Location",
-    subtitle: "Team Vision Office, Doral"
+    titleKey: "missionControlActionSendOffice",
+    subtitleKey: "missionControlActionSendOfficeSubtitle"
   },
   schedule: {
     icon: "📅",
-    title: "Schedule Interview",
-    subtitle: "Book the next milestone"
+    titleKey: "missionControlActionSchedule",
+    subtitleKey: "missionControlActionScheduleSubtitle"
   },
   reschedule: {
     icon: "📅",
-    title: "Reschedule",
-    subtitle: "Change interview time"
+    titleKey: "missionControlActionReschedule",
+    subtitleKey: "missionControlActionRescheduleSubtitle"
   },
   notes: {
     icon: "📝",
-    title: "Notes",
-    subtitle: "Add agent notes"
+    titleKey: "missionControlActionNotes",
+    subtitleKey: "missionControlActionNotesSubtitle"
   },
   send_missed_appointment: {
     icon: "📨",
-    title: "Send Missed Appointment",
-    subtitle: "Follow up on no-show"
+    titleKey: "missionControlActionMissedAppointment",
+    subtitleKey: "missionControlActionMissedAppointmentSubtitle"
   }
 };
 
@@ -122,12 +123,12 @@ export function isInterviewComplete(workflowState, workspace) {
   return Boolean(effectiveState?.outcome);
 }
 
-function buildAiBriefPreviewLines(workspace, workflowState) {
+function buildAiBriefPreviewLines(workspace, workflowState, translate) {
   const effectiveState = mergeWorkflowState(workflowState, workspace?.raw?.agentState);
   const lines = [...(workspace?.aiBriefLines || [])];
 
   if (effectiveState.outcome === "Recruited" && effectiveState.onboardingUnlocked) {
-    lines.push("Onboarding package is ready to send.");
+    lines.push(translate("missionControlAiBriefOnboardingReady"));
   }
 
   return lines.slice(0, 5);
@@ -137,25 +138,29 @@ function buildAiBriefPreviewLines(workspace, workflowState) {
  * Maps backend availableActions to existing Next Actions cards. Presentation only.
  */
 export function buildNextActions(context) {
-  const { workspace, availableActions, onAction } = context;
+  const { workspace, availableActions, onAction, translate } = context;
   const actions = availableActions || workspace?.availableActions || [];
 
   return actions
     .map(({ id, priority }) => {
       const presentation = ACTION_PRESENTATION[id];
 
-      if (!presentation) {
+      if (!presentation || !translate) {
         return null;
       }
+
+      const subtitle =
+        id === "call"
+          ? context.workspace?.phone || "—"
+          : presentation.subtitleKey
+            ? translate(presentation.subtitleKey)
+            : "";
 
       return {
         id,
         icon: presentation.icon,
-        title: presentation.title,
-        subtitle:
-          typeof presentation.subtitle === "function"
-            ? presentation.subtitle(context)
-            : presentation.subtitle,
+        title: translate(presentation.titleKey),
+        subtitle,
         variant: resolveVariant(id, priority),
         onClick: () => onAction?.(id)
       };
@@ -169,12 +174,14 @@ export function buildNextActions(context) {
  * @param {import("../types/organization").OrganizationSettings} [params.organizationSettings]
  * @param {Object} params.workflowState
  * @param {Object} [params.handlers]
+ * @param {Function} params.translate
  */
 export function buildWorkspaceContext({
   workspace,
   organizationSettings = null,
   workflowState,
-  handlers = {}
+  handlers = {},
+  translate
 }) {
   const effectiveWorkflowState = mergeWorkflowState(
     workflowState,
@@ -196,9 +203,10 @@ export function buildWorkspaceContext({
       ...workspace.prospect,
       milestone
     },
-    aiBriefLines: buildAiBriefPreviewLines(workspace, workflowState),
+    aiBriefLines: buildAiBriefPreviewLines(workspace, workflowState, translate),
     expandedBrief: workspace.expandedBrief,
     nextActions: [],
+    translate,
     ...handlers
   };
 
@@ -207,7 +215,11 @@ export function buildWorkspaceContext({
   return context;
 }
 
-export function getTimeGreeting() {
+export function getTimeGreeting(translate) {
+  if (typeof translate === "function") {
+    return translate(getTimeGreetingKey());
+  }
+
   const hour = new Date().getHours();
 
   if (hour < 12) {

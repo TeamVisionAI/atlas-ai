@@ -1,3 +1,5 @@
+import { useLanguage } from "../i18n/LanguageContext";
+
 export interface JourneyPackageItem {
   id: string;
   label: string;
@@ -18,6 +20,8 @@ export default function JourneyPackage({
   language,
   onSend
 }: JourneyPackageProps) {
+  const { translate } = useLanguage();
+
   return (
     <div
       style={{
@@ -42,7 +46,7 @@ export default function JourneyPackage({
           <h3 style={{ margin: "0 0 6px", fontSize: 17 }}>📦 {title}</h3>
           {language ? (
             <p style={{ margin: 0, color: "#94A3B8", fontSize: 13 }}>
-              Language: {language}
+              {translate("missionControlJourneyLanguage", { language })}
             </p>
           ) : null}
         </div>

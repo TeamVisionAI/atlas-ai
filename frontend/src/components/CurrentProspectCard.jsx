@@ -1,3 +1,5 @@
+import { useLanguage } from "../i18n/LanguageContext";
+
 const cardStyle = {
   background: "#111827",
   border: "1px solid #374151",
@@ -29,18 +31,28 @@ function Row({ icon, label, value }) {
 }
 
 export default function CurrentProspectCard({ prospect }) {
+  const { translate } = useLanguage();
+
   return (
     <div style={cardStyle}>
-      <Row icon="👤" label="Name" value={prospect.name} />
-      <Row icon="📞" label="Phone" value={prospect.phone} />
-      <Row icon="📍" label="City / State" value={prospect.location} />
-      <Row icon="🌐" label="Language" value={prospect.language} />
-      <Row icon="🎯" label="Current Milestone" value={prospect.milestone} />
+      <Row icon="👤" label={translate("missionControlRowName")} value={prospect.name} />
+      <Row icon="📞" label={translate("missionControlRowPhone")} value={prospect.phone} />
+      <Row icon="📍" label={translate("missionControlRowLocation")} value={prospect.location} />
+      <Row icon="🌐" label={translate("missionControlRowLanguage")} value={prospect.language} />
+      <Row icon="🎯" label={translate("missionControlRowMilestone")} value={prospect.milestone} />
       {prospect.workflowOwnership ? (
-        <Row icon="🧭" label="Workflow Owner" value={prospect.workflowOwnership} />
+        <Row
+          icon="🧭"
+          label={translate("missionControlRowWorkflowOwner")}
+          value={prospect.workflowOwnership}
+        />
       ) : null}
       {prospect.interviewType ? (
-        <Row icon="🎥" label="Interview Type" value={prospect.interviewType} />
+        <Row
+          icon="🎥"
+          label={translate("missionControlRowInterviewType")}
+          value={prospect.interviewType}
+        />
       ) : null}
     </div>
   );

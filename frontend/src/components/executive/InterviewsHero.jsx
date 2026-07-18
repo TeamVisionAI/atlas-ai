@@ -1,32 +1,37 @@
+import { useLanguage } from "../../i18n/LanguageContext";
+
 export default function InterviewsHero({ hero, onOpenMissionControl }) {
+  const { translate } = useLanguage();
+
   return (
     <section className="executive-card executive-hero">
-      <h1 className="executive-hero__title">Today&apos;s Interviews</h1>
+      <h1 className="executive-hero__title">{translate("executiveTodaysInterviews")}</h1>
       <div className="executive-hero__kpi">{hero.total}</div>
 
       <div className="executive-hero__stats">
         <div className="executive-hero__stat">
-          👤 Mine <strong>{hero.mine}</strong>
+          👤 {translate("executiveHeroMine")} <strong>{hero.mine}</strong>
         </div>
         <div className="executive-hero__stat">
-          👥 Team <strong>{hero.team}</strong>
+          👥 {translate("executiveHeroTeam")} <strong>{hero.team}</strong>
         </div>
         <div className="executive-hero__stat">
-          ✅ Confirmed <strong>{hero.confirmed}</strong>
+          ✅ {translate("executiveHeroConfirmed")} <strong>{hero.confirmed}</strong>
         </div>
         <div className="executive-hero__stat">
-          🟡 Waiting Confirmation <strong>{hero.waitingConfirmation}</strong>
+          🟡 {translate("executiveHeroWaitingConfirmation")}{" "}
+          <strong>{hero.waitingConfirmation}</strong>
         </div>
         <div className="executive-hero__stat">
-          🔴 Outcome Pending <strong>{hero.outcomePending}</strong>
+          🔴 {translate("executiveHeroOutcomePending")} <strong>{hero.outcomePending}</strong>
         </div>
         <div className="executive-hero__stat">
-          🔵 Rescheduled <strong>{hero.rescheduled}</strong>
+          🔵 {translate("executiveHeroRescheduled")} <strong>{hero.rescheduled}</strong>
         </div>
       </div>
 
       <button type="button" className="executive-primary-button" onClick={onOpenMissionControl}>
-        Open Mission Control
+        {translate("executiveOpenMissionControl")}
       </button>
     </section>
   );

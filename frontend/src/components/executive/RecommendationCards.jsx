@@ -1,7 +1,11 @@
+import { useLanguage } from "../../i18n/LanguageContext";
+
 export default function RecommendationCards({ items, onOpen }) {
+  const { translate } = useLanguage();
+
   return (
     <section>
-      <h2 className="executive-section-label">Atlas Recommendations</h2>
+      <h2 className="executive-section-label">{translate("executiveRecommendations")}</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {items.length ? (
           items.map((item) => (
@@ -14,16 +18,16 @@ export default function RecommendationCards({ items, onOpen }) {
               <div className="executive-recommendation__name">{item.name}</div>
               <div className="executive-recommendation__reason">{item.reason}</div>
               <div className="executive-recommendation__meta">
-                Recommendation: {item.recommendedAction}
+                {translate("executiveRecommendationLabel")} {item.recommendedAction}
               </div>
               <div className="executive-recommendation__priority">
-                Priority {item.priorityLabel}
+                {translate("executiveRecommendationPriority", { level: item.priorityLabel })}
               </div>
             </button>
           ))
         ) : (
           <div className="executive-card" style={{ padding: 20, color: "#64748B" }}>
-            No recommendations right now.
+            {translate("executiveRecommendationsEmpty")}
           </div>
         )}
       </div>

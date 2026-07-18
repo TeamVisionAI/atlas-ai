@@ -1,14 +1,17 @@
+/* Quick Capture — mobile-first floating card; desktop centered panel */
+
 .quick-capture-page {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   width: 100%;
   min-height: 100%;
-  padding: 0 0 24px;
+  box-sizing: border-box;
 }
 
 .quick-capture-shell {
   width: 100%;
-  max-width: 420px;
+  box-sizing: border-box;
 }
 
 .quick-capture-card {
@@ -17,6 +20,7 @@
   border-radius: 18px;
   box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
   padding: 22px 20px 20px;
+  box-sizing: border-box;
 }
 
 .quick-capture-title {
@@ -67,29 +71,6 @@
   color: #dc2626;
 }
 
-.quick-capture-segmented {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.quick-capture-segment {
-  border: 1px solid #dbe1ea;
-  background: #fff;
-  border-radius: 12px;
-  padding: 11px 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #334155;
-  cursor: pointer;
-}
-
-.quick-capture-segment--active {
-  background: #111827;
-  border-color: #111827;
-  color: #fff;
-}
-
 .quick-capture-submit {
   width: 100%;
   margin-top: 8px;
@@ -121,12 +102,6 @@
   border: 1px solid #fecaca;
 }
 
-.quick-capture-banner--success {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #bbf7d0;
-}
-
 .quick-capture-overlay {
   position: fixed;
   inset: 0;
@@ -135,7 +110,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 50;
+  z-index: 120;
 }
 
 .quick-capture-dialog {
@@ -186,17 +161,51 @@
   color: #334155;
 }
 
-@media (min-width: 768px) {
+/* Phone: floating card, nearly full width, comfortable margins */
+@media (max-width: 767px) {
   .quick-capture-page {
-    padding-top: 12px;
+    padding: 12px 0 24px;
+    min-height: calc(100svh - var(--atlas-header-height, 56px) - 24px);
+  }
+
+  .quick-capture-shell {
+    width: calc(100% - 24px);
+    max-width: none;
+    margin: 0 auto;
+  }
+
+  .quick-capture-card {
+    border: 1px solid #e8eaed;
+    border-radius: 18px;
+    box-shadow:
+      0 4px 6px rgba(15, 23, 42, 0.04),
+      0 16px 40px rgba(15, 23, 42, 0.08);
+    padding: 24px 20px 22px;
+  }
+
+  .quick-capture-title {
+    font-size: 22px;
   }
 }
 
-@media (max-width: 767px) {
-  .quick-capture-card {
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    padding: 8px 0 0;
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .quick-capture-page {
+    padding: 20px 0 32px;
+  }
+
+  .quick-capture-shell {
+    max-width: 480px;
+  }
+}
+
+/* Desktop: compact centered card */
+@media (min-width: 1024px) {
+  .quick-capture-page {
+    padding: 24px 16px 32px;
+  }
+
+  .quick-capture-shell {
+    max-width: 420px;
   }
 }

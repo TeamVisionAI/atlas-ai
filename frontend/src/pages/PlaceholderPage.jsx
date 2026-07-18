@@ -1,4 +1,8 @@
-export default function PlaceholderPage({ title, description }) {
+import { useLanguage } from "../i18n/LanguageContext";
+
+export default function PlaceholderPage({ titleKey, descriptionKey }) {
+  const { translate } = useLanguage();
+
   return (
     <div
       style={{
@@ -8,8 +12,8 @@ export default function PlaceholderPage({ title, description }) {
         boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)"
       }}
     >
-      <h1 style={{ marginTop: 0, marginBottom: 8 }}>{title}</h1>
-      <p style={{ color: "#64748B", marginBottom: 0 }}>{description}</p>
+      <h1 style={{ marginTop: 0, marginBottom: 8 }}>{translate(titleKey)}</h1>
+      <p style={{ color: "#64748B", marginBottom: 0 }}>{translate(descriptionKey)}</p>
     </div>
   );
 }

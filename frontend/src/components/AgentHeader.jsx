@@ -1,4 +1,5 @@
-import { getTimeGreeting } from "../engines/contextEngine";
+import { getTimeGreetingKey } from "../engines/executiveDashboardViewModel";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const metricStyle = {
   textAlign: "center",
@@ -11,7 +12,8 @@ export default function AgentHeader({
   activeMetric,
   onMetricClick
 }) {
-  const greeting = getTimeGreeting();
+  const { translate } = useLanguage();
+  const greeting = translate(getTimeGreetingKey());
 
   return (
     <header
@@ -47,7 +49,7 @@ export default function AgentHeader({
         </div>
 
         <div>
-          <div style={{ color: "#64748B", fontSize: 13 }}>ATLAS AI</div>
+          <div style={{ color: "#64748B", fontSize: 13 }}>{translate("missionControlAgentLabel")}</div>
           <h1 style={{ margin: 0, fontSize: 24 }}>
             {greeting}, {agentName}
           </h1>
@@ -63,25 +65,25 @@ export default function AgentHeader({
         }}
       >
         <Metric
-          label="Interviews"
+          label={translate("missionControlMetricInterviews")}
           value={metrics?.interviews ?? 0}
           active={activeMetric === "interviews"}
           onClick={() => onMetricClick?.("interviews")}
         />
         <Metric
-          label="Follow Ups"
+          label={translate("missionControlMetricFollowUps")}
           value={metrics?.followUps ?? 0}
           active={activeMetric === "followUps"}
           onClick={() => onMetricClick?.("followUps")}
         />
         <Metric
-          label="Tasks"
+          label={translate("missionControlMetricTasks")}
           value={metrics?.tasks ?? 0}
           active={activeMetric === "tasks"}
           onClick={() => onMetricClick?.("tasks")}
         />
 
-        <div style={{ color: "#64748B", fontSize: 14 }}>🟢 Atlas Active</div>
+        <div style={{ color: "#64748B", fontSize: 14 }}>🟢 {translate("missionControlAtlasActive")}</div>
       </div>
     </header>
   );

@@ -150,6 +150,20 @@ export const METRIC_PANEL_TYPES = {
   TASKS: "tasks"
 };
 
+export function getMetricPanelTitleKey(type) {
+  switch (type) {
+    case METRIC_PANEL_TYPES.INTERVIEWS:
+      return "missionControlMetricPanelInterviews";
+    case METRIC_PANEL_TYPES.FOLLOW_UPS:
+      return "missionControlMetricPanelFollowUps";
+    case METRIC_PANEL_TYPES.TASKS:
+      return "missionControlMetricPanelTasks";
+    default:
+      return "";
+  }
+}
+
+/** @deprecated Use getMetricPanelTitleKey with translate() */
 export function getMetricPanelTitle(type) {
   switch (type) {
     case METRIC_PANEL_TYPES.INTERVIEWS:

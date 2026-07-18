@@ -3,10 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getExecutiveDashboard } from "../services/executiveDashboardService";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
-import {
-  buildExecutiveDashboardViewModel,
-  getTimeGreeting
-} from "../engines/executiveDashboardViewModel";
+import { buildExecutiveDashboardViewModel } from "../engines/executiveDashboardViewModel";
+import { useLanguage } from "../i18n/LanguageContext";
 import InterviewsHero from "../components/executive/InterviewsHero";
 import MorningBrief from "../components/executive/MorningBrief";
 import FocusCards from "../components/executive/FocusCards";
@@ -29,6 +27,7 @@ function DashboardSkeleton() {
 
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
+  const { translate } = useLanguage();
   const [executive, setExecutive] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +54,7 @@ export default function ExecutiveDashboard() {
         console.error(err);
 
         if (!cancelled) {
-          setError("Unable to load executive dashboard.");
+          setError("executiveLoadError");
         }
       } finally {
         if (!cancelled) {
@@ -76,8 +75,8 @@ export default function ExecutiveDashboard() {
       return null;
     }
 
-    return buildExecutiveDashboardViewModel(executive, dashboard, getTimeGreeting());
-  }, [executive, dashboard]);
+    return buildExecutiveDashboardViewModel(executive, dashboard, translate);
+  }, [executive, dashboard, translate]);
 
   function openMissionControl(options = {}) {
     navigate(buildMissionControlPath(options));
@@ -90,7 +89,7 @@ export default function ExecutiveDashboard() {
   if (error) {
     return (
       <div className="executive-dashboard">
-        <div className="executive-error">{error}</div>
+        <div className="executive-error">{translate(error)}</div>
       </div>
     );
   }
@@ -98,7 +97,7 @@ export default function ExecutiveDashboard() {
   if (!viewModel) {
     return (
       <div className="executive-dashboard">
-        <p style={{ color: "#64748B" }}>No executive dashboard data available.</p>
+        <p style={{ color: "#64748B" }}>{translate("executiveEmpty")}</p>
       </div>
     );
   }

@@ -1,9 +1,12 @@
 import { formatAtlasDateTime } from "../../utils/dateFormatter";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 export default function ActivityTimeline({ activity }) {
+  const { translate } = useLanguage();
+
   return (
     <section>
-      <h2 className="executive-section-label">Recent Activity</h2>
+      <h2 className="executive-section-label">{translate("executiveRecentActivity")}</h2>
       <div className="executive-card executive-timeline">
         {activity.length ? (
           activity.map((entry) => (
@@ -22,7 +25,7 @@ export default function ActivityTimeline({ activity }) {
           ))
         ) : (
           <div style={{ padding: 20, color: "#64748B", fontSize: 14 }}>
-            No recent workflow events yet.
+            {translate("executiveActivityEmpty")}
           </div>
         )}
       </div>

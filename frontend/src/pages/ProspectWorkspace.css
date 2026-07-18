@@ -1,0 +1,403 @@
+.prospect-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.prospect-workspace__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.prospect-workspace__back {
+  color: #1e3a8a;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.prospect-workspace__title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.prospect-workspace__mission-link {
+  appearance: none;
+  border: 1px solid #1e3a8a;
+  background: white;
+  color: #1e3a8a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prospect-workspace__loading,
+.prospect-workspace__error,
+.prospect-workspace__action-error {
+  margin: 0;
+  font-size: 14px;
+}
+
+.prospect-workspace__error,
+.prospect-workspace__action-error {
+  color: #b91c1c;
+}
+
+.prospect-workspace__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prospect-workspace__columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 960px) {
+  .prospect-workspace__columns {
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+    align-items: start;
+  }
+}
+
+.workspace-eyebrow {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-eyebrow--desktop-only {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .workspace-eyebrow--desktop-only {
+    display: block;
+  }
+}
+
+.prospect-identity {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.prospect-identity__primary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.prospect-identity__name {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.prospect-identity__number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.prospect-identity__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  color: #475569;
+  font-size: 14px;
+}
+
+.prospect-identity__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.journey-progress {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.journey-progress__track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 8px;
+}
+
+@media (min-width: 640px) {
+  .journey-progress__track {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.journey-progress__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.journey-progress__node {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid #cbd5e1;
+  color: #64748b;
+  background: white;
+}
+
+.journey-progress__step--complete .journey-progress__node {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.journey-progress__step--current .journey-progress__node {
+  border-color: #1e3a8a;
+  background: #1e3a8a;
+  color: white;
+}
+
+.journey-progress__step--skipped .journey-progress__node {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.journey-progress__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.journey-progress__step--current .journey-progress__label {
+  color: #1e3a8a;
+}
+
+.journey-progress__terminal {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.workspace-section {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.workspace-section + .workspace-section {
+  margin-top: 12px;
+}
+
+.workspace-section__toggle {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.workspace-section__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workspace-section__title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.workspace-section__summary {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-section__chevron {
+  color: #94a3b8;
+  font-size: 12px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.workspace-section__header {
+  padding: 14px 16px 0;
+}
+
+.workspace-section__body {
+  padding: 0 16px 16px;
+}
+
+.prospect-details__list {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.prospect-details__list div {
+  display: grid;
+  gap: 2px;
+}
+
+.prospect-details__list dt {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.prospect-details__list dd {
+  margin: 0;
+  font-size: 14px;
+  color: #111827;
+}
+
+.prospect-details__segmented {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.prospect-details__segment {
+  appearance: none;
+  border: none;
+  background: white;
+  color: #475569;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prospect-details__segment + .prospect-details__segment {
+  border-left: 1px solid #cbd5e1;
+}
+
+.prospect-details__segment--active {
+  background: #1e3a8a;
+  color: white;
+}
+
+.prospect-details__segment:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.prospect-details__field-error {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #b91c1c;
+}
+
+.prospect-coach-placeholder {
+  padding-top: 4px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.prospect-coach-placeholder__eyebrow {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.activity-feed-placeholder {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.activity-feed-placeholder__summary {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.activity-feed-placeholder__body {
+  padding: 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.activity-feed-placeholder__body p {
+  margin: 0;
+}
+
+@media (min-width: 960px) {
+  .workspace-section__toggle {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .workspace-section__chevron {
+    display: none;
+  }
+
+  .workspace-section__summary {
+    display: none;
+  }
+}

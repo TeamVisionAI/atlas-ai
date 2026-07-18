@@ -1,5 +1,3 @@
-const API_URL = "http://localhost:3000";
-
 export class MissionControlError extends Error {
   constructor(message, status) {
     super(message);
@@ -14,7 +12,7 @@ export class MissionControlError extends Error {
  */
 export async function getMissionControl(phone) {
   const segment = phone ? encodeURIComponent(phone) : "latest";
-  const response = await fetch(`${API_URL}/api/mission-control/${segment}`);
+  const response = await fetch(`/api/mission-control/${segment}`);
 
   if (response.status === 404) {
     return null;
@@ -35,7 +33,7 @@ export async function getMissionControl(phone) {
  */
 export async function postMissionControlAction(phone, action, payload = {}) {
   const response = await fetch(
-    `${API_URL}/api/mission-control/${encodeURIComponent(phone)}/actions`,
+    `/api/mission-control/${encodeURIComponent(phone)}/actions`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,7 +56,7 @@ export async function postMissionControlAction(phone, action, payload = {}) {
  */
 export async function syncMissionControlWorkflow(phone, workflowState) {
   const response = await fetch(
-    `${API_URL}/api/mission-control/${encodeURIComponent(phone)}/workflow`,
+    `/api/mission-control/${encodeURIComponent(phone)}/workflow`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -79,7 +77,7 @@ export async function syncMissionControlWorkflow(phone, workflowState) {
  */
 export async function advanceMissionControlWorkflow(phone, body) {
   const response = await fetch(
-    `${API_URL}/api/mission-control/${encodeURIComponent(phone)}/workflow/advance`,
+    `/api/mission-control/${encodeURIComponent(phone)}/workflow/advance`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

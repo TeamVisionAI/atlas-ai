@@ -1,0 +1,23 @@
+.mission-control-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 20px;
+  width: 100%;
+}
+
+.mission-control-page__header-band {
+  margin: calc(-1 * var(--atlas-main-padding, 16px)) calc(-1 * var(--atlas-main-padding, 16px)) 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mission-control-page__filter-banner {
+  margin: 0 var(--atlas-main-padding, 16px) 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: 14px;
+}

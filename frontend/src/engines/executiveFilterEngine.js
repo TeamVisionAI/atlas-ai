@@ -12,13 +12,14 @@ export const EXECUTIVE_FILTERS = {
   STALLED: "stalled"
 };
 
-export const EXECUTIVE_FILTER_LABELS = {
-  [EXECUTIVE_FILTERS.INTERVIEWS_TODAY]: "Interviews Today",
-  [EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS]: "Tomorrow's Interviews",
-  [EXECUTIVE_FILTERS.PENDING_OUTCOMES]: "Pending Interview Outcomes",
-  [EXECUTIVE_FILTERS.HIGH_PRIORITY]: "High Priority Prospects",
-  [EXECUTIVE_FILTERS.ORIENTATION_READY]: "Recruits Ready for Orientation",
-  [EXECUTIVE_FILTERS.STALLED]: "Stalled Prospects"
+/** i18n translation keys — resolve with translate(key). */
+export const EXECUTIVE_FILTER_LABEL_KEYS = {
+  [EXECUTIVE_FILTERS.INTERVIEWS_TODAY]: "executiveFilterInterviewsToday",
+  [EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS]: "executiveFilterTomorrowsInterviews",
+  [EXECUTIVE_FILTERS.PENDING_OUTCOMES]: "executiveFilterPendingOutcomes",
+  [EXECUTIVE_FILTERS.HIGH_PRIORITY]: "executiveFilterHighPriority",
+  [EXECUTIVE_FILTERS.ORIENTATION_READY]: "executiveFilterOrientationReady",
+  [EXECUTIVE_FILTERS.STALLED]: "executiveFilterStalled"
 };
 
 function parseInterviewTimestamp(prospect) {

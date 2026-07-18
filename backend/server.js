@@ -13,11 +13,13 @@ const timelineRoutes = require("./routes/timeline");
 const missionControlRoutes = require("./routes/missionControl");
 const organizationRoutes = require("./routes/organization");
 const quickCaptureRoutes = require("./routes/quickCapture");
+const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 
 app.use(cors());
 app.use(express.json());
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/mission-control", missionControlRoutes);
+app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/organization", organizationRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);

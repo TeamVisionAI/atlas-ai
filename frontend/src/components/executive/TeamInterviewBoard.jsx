@@ -1,15 +1,19 @@
+import { useLanguage } from "../../i18n/LanguageContext";
+
 export default function TeamInterviewBoard({ rows }) {
+  const { translate } = useLanguage();
+
   return (
     <section>
-      <h2 className="executive-section-label">Team Interview Board</h2>
+      <h2 className="executive-section-label">{translate("executiveTeamBoard")}</h2>
       <div className="executive-card executive-table-wrap">
         <table className="executive-table">
           <thead>
             <tr>
-              <th>Leader</th>
-              <th>Today&apos;s Interviews</th>
-              <th>Completed</th>
-              <th>Pending</th>
+              <th>{translate("executiveTeamLeader")}</th>
+              <th>{translate("executiveTeamTodayInterviews")}</th>
+              <th>{translate("executiveTeamCompleted")}</th>
+              <th>{translate("executiveTeamPending")}</th>
             </tr>
           </thead>
           <tbody>

@@ -43,7 +43,7 @@ function validateQuickCapturePayload(body = {}) {
   const firstName = sanitizeName(body.first_name);
   const lastName = sanitizeName(body.last_name);
   const phone = sanitizeName(body.phone);
-  const communicationLanguage = sanitizeName(body.communication_language).toLowerCase();
+  const communicationLanguage = sanitizeName(body.communication_language).toLowerCase() || "es";
   const manualSource = sanitizeName(body.source || body.manual_source).toUpperCase();
   const requestedEntryMethod = sanitizeName(body.entry_method).toUpperCase();
 
@@ -59,9 +59,7 @@ function validateQuickCapturePayload(body = {}) {
     fields.phone = "Required";
   }
 
-  if (!communicationLanguage) {
-    fields.communication_language = "Required";
-  } else if (!COMMUNICATION_LANGUAGES.includes(communicationLanguage)) {
+  if (!COMMUNICATION_LANGUAGES.includes(communicationLanguage)) {
     fields.communication_language = "Must be es or en";
   }
 

@@ -127,6 +127,15 @@ async function main() {
   assert(automated.valid === false, "Automated entry method rejected");
   console.log("✓ Automated entry methods rejected");
 
+  const defaultLanguage = validateQuickCapturePayload({
+    first_name: "Default",
+    last_name: "Language",
+    phone: "3055550198"
+  });
+  assert(defaultLanguage.valid === true, "Missing communication_language defaults");
+  assert(defaultLanguage.data.communicationLanguage === "es", "Default communication language is es");
+  console.log("✓ Default communication language when omitted");
+
   const app = createTestApp();
   const unauthorized = await postQuickCapture(app, null, {
     first_name: "No",

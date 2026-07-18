@@ -1,4 +1,13 @@
-export default function WorkflowCompleteBanner({ title = "Workflow Complete", message, onNextPriority, hasNextPriority }) {
+import { useLanguage } from "../i18n/LanguageContext";
+
+export default function WorkflowCompleteBanner({
+  titleKey = "missionControlWorkflowComplete",
+  message,
+  onNextPriority,
+  hasNextPriority
+}) {
+  const { translate } = useLanguage();
+
   return (
     <div
       style={{
@@ -15,10 +24,10 @@ export default function WorkflowCompleteBanner({ title = "Workflow Complete", me
     >
       <div>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#065F46", marginBottom: 4 }}>
-          ✅ {title}
+          ✅ {translate(titleKey)}
         </div>
         <div style={{ fontSize: 14, color: "#047857" }}>
-          {message || "Ready for the next prospect?"}
+          {message || translate("missionControlReadyNext")}
         </div>
       </div>
 
@@ -38,7 +47,7 @@ export default function WorkflowCompleteBanner({ title = "Workflow Complete", me
           whiteSpace: "nowrap"
         }}
       >
-        ▶ Next Priority
+        {translate("missionControlNextPriority")}
       </button>
     </div>
   );

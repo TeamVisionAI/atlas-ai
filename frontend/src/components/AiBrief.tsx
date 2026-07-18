@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { formatTextWithDates } from "../utils/dateFormatter";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface AiBriefProps {
   lines: string[];
@@ -33,6 +34,7 @@ function DetailSection({ label, children }: { label: string; children: ReactNode
 }
 
 export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
+  const { translate } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const previewLines = lines.slice(0, 5);
 
@@ -65,7 +67,7 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
       >
         <span style={{ flex: 1 }}>
           <span style={{ display: "block", fontSize: 16, fontWeight: 600, marginBottom: 10 }}>
-            🧠 AI Brief
+            🧠 {translate("missionControlAiBriefTitle")}
           </span>
 
           <span
@@ -83,13 +85,13 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
                 <span key={line}>{formatTextWithDates(line)}</span>
               ))
             ) : (
-              <span style={{ color: "#94A3B8" }}>Brief not yet available.</span>
+              <span style={{ color: "#94A3B8" }}>{translate("missionControlAiBriefEmpty")}</span>
             )}
           </span>
         </span>
 
         <span style={{ color: "#94A3B8", fontSize: 13, whiteSpace: "nowrap" }}>
-          {expanded ? "▲ Hide" : "▼ Expand"}
+          {expanded ? translate("missionControlAiBriefHide") : translate("missionControlAiBriefExpand")}
         </span>
       </button>
 
@@ -101,7 +103,7 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
           }}
         >
           {expandedContent.summary.length ? (
-            <DetailSection label="Summary">
+            <DetailSection label={translate("missionControlAiBriefSummary")}>
               <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
                 {expandedContent.summary.map((item) => (
                   <li key={item}>{formatTextWithDates(item)}</li>
@@ -111,7 +113,7 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
           ) : null}
 
           {expandedContent.suggestedReply ? (
-            <DetailSection label="Suggested Reply">
+            <DetailSection label={translate("missionControlAiBriefSuggestedReply")}>
               <p
                 style={{
                   margin: 0,
@@ -130,7 +132,7 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
           ) : null}
 
           {expandedContent.importantNotes?.length ? (
-            <DetailSection label="Important Notes">
+            <DetailSection label={translate("missionControlAiBriefImportantNotes")}>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {expandedContent.importantNotes.map((item) => (
                   <li key={item}>{item}</li>
@@ -140,7 +142,7 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
           ) : null}
 
           {expandedContent.objections?.length ? (
-            <DetailSection label="Objections">
+            <DetailSection label={translate("missionControlAiBriefObjections")}>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {expandedContent.objections.map((item) => (
                   <li key={item}>{item}</li>
@@ -150,7 +152,7 @@ export default function AiBrief({ lines, expandedContent }: AiBriefProps) {
           ) : null}
 
           {expandedContent.aiRecommendation ? (
-            <DetailSection label="AI Recommendation">
+            <DetailSection label={translate("missionControlAiBriefRecommendation")}>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
                 {expandedContent.aiRecommendation}
               </p>

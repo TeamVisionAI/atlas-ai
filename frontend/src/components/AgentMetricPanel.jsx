@@ -1,8 +1,9 @@
 import SlideOverPanel from "./SlideOverPanel";
+import { useLanguage } from "../i18n/LanguageContext";
 import {
   METRIC_PANEL_TYPES,
   buildMetricPanelData,
-  getMetricPanelTitle
+  getMetricPanelTitleKey
 } from "../engines/metricsEngine";
 
 const rowStyle = {
@@ -23,14 +24,16 @@ const openButtonStyle = {
 };
 
 export default function AgentMetricPanel({ type, queue, onClose, onOpenWorkspace }) {
-  const title = getMetricPanelTitle(type);
+  const { translate } = useLanguage();
+  const titleKey = getMetricPanelTitleKey(type);
+  const title = titleKey ? translate(titleKey) : "";
   const items = buildMetricPanelData(type, queue);
 
   return (
     <SlideOverPanel open={Boolean(type)} title={title} onClose={onClose}>
       {!items.length ? (
         <p style={{ padding: "16px 24px", color: "#64748B", margin: 0 }}>
-          No items for today.
+          {translate("missionControlMetricPanelEmpty")}
         </p>
       ) : null}
 
@@ -46,7 +49,7 @@ export default function AgentMetricPanel({ type, queue, onClose, onOpenWorkspace
                 style={openButtonStyle}
                 onClick={() => onOpenWorkspace(item.phone)}
               >
-                Open Workspace
+                {translate("missionControlMetricPanelOpenWorkspace")}
               </button>
             </div>
           ))
@@ -64,7 +67,7 @@ export default function AgentMetricPanel({ type, queue, onClose, onOpenWorkspace
                 style={openButtonStyle}
                 onClick={() => onOpenWorkspace(item.phone)}
               >
-                Open Workspace
+                {translate("missionControlMetricPanelOpenWorkspace")}
               </button>
             </div>
           ))
@@ -82,7 +85,7 @@ export default function AgentMetricPanel({ type, queue, onClose, onOpenWorkspace
                 style={openButtonStyle}
                 onClick={() => onOpenWorkspace(item.phone)}
               >
-                Open Workspace
+                {translate("missionControlMetricPanelOpenWorkspace")}
               </button>
             </div>
           ))

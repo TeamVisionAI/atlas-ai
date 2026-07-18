@@ -1,16 +1,24 @@
+import { useLanguage } from "../../i18n/LanguageContext";
+
 export default function AgencyHealth({ agencyPulse }) {
+  const { translate } = useLanguage();
+
   if (!agencyPulse) {
     return null;
   }
 
   return (
     <section>
-      <h2 className="executive-section-label">Agency Health</h2>
+      <h2 className="executive-section-label">{translate("executiveAgencyHealth")}</h2>
       <div className="executive-card executive-health">
         <div>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>{agencyPulse.label || "Agency Health"}</div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>
+            {agencyPulse.label || translate("executiveAgencyHealth")}
+          </div>
           <div className="executive-health__meta" style={{ marginTop: 6 }}>
-            Formula {agencyPulse.formulaVersion || "9.0-mvp"}
+            {translate("executiveAgencyHealthFormula", {
+              version: agencyPulse.formulaVersion || "9.0-mvp"
+            })}
           </div>
         </div>
         <div className="executive-health__score">

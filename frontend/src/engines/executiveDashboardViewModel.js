@@ -64,20 +64,20 @@ function findProspect(prospects, phone) {
   return prospects.find((row) => row.phone === phone) || null;
 }
 
-function priorityLabel(priority) {
+function priorityLabelKey(priority) {
   if (priority <= 1) {
-    return "HIGH";
+    return "executivePriorityHigh";
   }
 
   if (priority <= 2) {
-    return "MEDIUM";
+    return "executivePriorityMedium";
   }
 
-  return "LOW";
+  return "executivePriorityLow";
 }
 
-function formatRelativeMinutes(timestamp) {
-  if (!timestamp) {
+function formatRelativeMinutes(timestamp, translate) {
+  if (!timestamp || !translate) {
     return null;
   }
 
@@ -85,11 +85,49 @@ function formatRelativeMinutes(timestamp) {
   const minutes = Math.max(1, Math.round(diffMs / 60000));
 
   if (minutes < 60) {
-    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+    return minutes === 1
+      ? translate("executiveRelativeMinute", { count: minutes })
+      : translate("executiveRelativeMinutes", { count: minutes });
   }
 
   const hours = Math.round(minutes / 60);
-  return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  return hours === 1
+    ? translate("executiveRelativeHour", { count: hours })
+    : translate("executiveRelativeHours", { count: hours });
+}
+
+function mapRecommendationTitle(item, translate) {
+  const tier = item.missionControlPriorityTier;
+  const title = item.title || "";
+
+  if (
+    tier === "PENDING_INTERVIEW_RESULTS" ||
+    title.includes("Outcome")
+  ) {
+    return translate("executiveRecTitleOutcome");
+  }
+
+  if (title.includes("follow-up") || title.includes("Follow-up")) {
+    return translate("executiveRecTitleFollowUp");
+  }
+
+  if (title.includes("Orientation")) {
+    return translate("executiveRecTitleOrientation");
+  }
+
+  if (title.includes("escalation") || title.includes("Escalation")) {
+    return translate("executiveRecTitleEscalation");
+  }
+
+  if (title.includes("imminent") || title.includes("Imminent")) {
+    return translate("executiveRecTitleImminent");
+  }
+
+  if (title.includes("lead") || title.includes("Lead")) {
+    return translate("executiveRecTitleNewLead");
+  }
+
+  return translate("executiveRecTitleDefault");
 }
 
 function buildInterviewHero(queue, prospects, todayFocus) {
@@ -155,20 +193,21 @@ function buildMorningBrief({
   todayFocus,
   recommendations,
   teamBoard,
-  activity = []
+  activity = [],
+  translate
 }) {
   const lines = [];
-  lines.push(`${greeting}.`);
+  lines.push(greeting);
 
   if (hero.total > 0) {
     lines.push(
-      `You have ${hero.mine} interview${hero.mine === 1 ? "" : "s"} today.`
+      hero.mine === 1
+        ? translate("executiveBriefInterviewsMine", { count: hero.mine })
+        : translate("executiveBriefInterviewsMinePlural", { count: hero.mine })
     );
-    lines.push(
-      `Your team has ${hero.team} more.`
-    );
+    lines.push(translate("executiveBriefInterviewsTeam", { count: hero.team }));
   } else {
-    lines.push("You have no interviews scheduled for today.");
+    lines.push(translate("executiveBriefNoInterviewsToday"));
   }
 
   const overnightConfirmed = activity.filter((row) => {
@@ -188,14 +227,20 @@ function buildMorningBrief({
 
   if (overnightConfirmed > 0) {
     lines.push(
-      `Atlas confirmed ${overnightConfirmed} appointment${overnightConfirmed === 1 ? "" : "s"} overnight.`
+      overnightConfirmed === 1
+        ? translate("executiveBriefOvernightConfirmed", { count: overnightConfirmed })
+        : translate("executiveBriefOvernightConfirmedPlural", {
+            count: overnightConfirmed
+          })
     );
   }
 
   const outcomes = todayFocus?.pendingInterviewOutcomes?.count ?? hero.outcomePending;
   if (outcomes > 0) {
     lines.push(
-      `${outcomes} interview outcome${outcomes === 1 ? " requires" : "s require"} attention.`
+      outcomes === 1
+        ? translate("executiveBriefOutcomesAttention", { count: outcomes })
+        : translate("executiveBriefOutcomesAttentionPlural", { count: outcomes })
     );
   }
 
@@ -206,26 +251,35 @@ function buildMorningBrief({
     lines,
     recommendedAction: top
       ? {
-          label: `Review ${top.name}.`,
+          label: translate("executiveBriefReviewProspect", { name: top.name }),
           phone: top.phone,
           filter: top.filter
         }
       : null,
     coachingLeader: coachingLeader
       ? {
-          label: `${coachingLeader.leader} has ${coachingLeader.pending} pending item${coachingLeader.pending === 1 ? "" : "s"}.`,
+          label:
+            coachingLeader.pending === 1
+              ? translate("executiveBriefCoaching", {
+                  leader: coachingLeader.leader,
+                  count: coachingLeader.pending
+                })
+              : translate("executiveBriefCoachingPlural", {
+                  leader: coachingLeader.leader,
+                  count: coachingLeader.pending
+                }),
           leader: coachingLeader.leader
         }
       : null
   };
 }
 
-function buildTeamBoard(queue, prospects) {
+function buildTeamBoard(queue, prospects, translate) {
   const byLeader = new Map();
 
   queue.forEach((summary) => {
     const prospect = findProspect(prospects, summary.phone);
-    const leader = prospect?.city?.trim() || "Unassigned";
+    const leader = prospect?.city?.trim() || translate("executiveTeamUnassigned");
     const at = parseInterviewTimestamp(prospect);
     const isToday = isSameLocalDay(at);
 
@@ -284,7 +338,7 @@ function buildTeamBoard(queue, prospects) {
   if (!rows.length) {
     return [
       {
-        leader: "Team",
+        leader: translate("executiveTeamDefault"),
         todayInterviews: 0,
         completed: 0,
         pending: 0,
@@ -326,7 +380,7 @@ function buildPipelineCounts(queue) {
   };
 }
 
-function buildFocusCards(todayFocus, queue, prospects) {
+function buildFocusCards(todayFocus, queue, prospects, translate) {
   const tomorrowCount = buildTomorrowInterviews(queue, prospects);
   const orientations =
     todayFocus?.recruitsReadyForOrientation?.count ??
@@ -335,71 +389,91 @@ function buildFocusCards(todayFocus, queue, prospects) {
   return [
     {
       key: "outcomes",
-      title: "Interview Outcomes",
+      title: translate("executiveFocusOutcomes"),
       count: todayFocus?.pendingInterviewOutcomes?.count ?? 0,
       filter: EXECUTIVE_FILTERS.PENDING_OUTCOMES,
-      emptyMessage: "No pending interview outcomes. Great job."
+      emptyMessage: translate("executiveFocusOutcomesEmpty")
     },
     {
       key: "priority",
-      title: "High Priority",
+      title: translate("executiveFocusHighPriority"),
       count: todayFocus?.highPriorityProspects?.count ?? 0,
       filter: EXECUTIVE_FILTERS.HIGH_PRIORITY,
-      emptyMessage: "No high-priority items right now."
+      emptyMessage: translate("executiveFocusHighPriorityEmpty")
     },
     {
       key: "orientations",
-      title: "Orientations",
+      title: translate("executiveFocusOrientations"),
       count: orientations,
       filter: EXECUTIVE_FILTERS.ORIENTATION_READY,
-      emptyMessage: "No orientation actions due."
+      emptyMessage: translate("executiveFocusOrientationsEmpty")
     },
     {
       key: "tomorrow",
-      title: "Tomorrow's Interviews",
+      title: translate("executiveFocusTomorrow"),
       count: tomorrowCount,
       filter: EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS,
-      emptyMessage: "No interviews scheduled for tomorrow."
+      emptyMessage: translate("executiveFocusTomorrowEmpty")
     }
   ];
 }
 
-function buildRecommendationCards(recommendations = [], activity = []) {
+function resolveRecommendationAction(item, translate) {
+  const title = item.title || "";
+  const tier = item.missionControlPriorityTier;
+
+  if (tier === "PENDING_INTERVIEW_RESULTS" || title.includes("Outcome")) {
+    return translate("executiveRecommendationRecordOutcome");
+  }
+
+  if (title.includes("follow-up") || title.includes("Follow-up")) {
+    return translate("executiveRecommendationFollowUp");
+  }
+
+  if (title.includes("Orientation")) {
+    return translate("executiveRecommendationOrientation");
+  }
+
+  if (title.includes("escalation") || title.includes("Escalation")) {
+    return translate("executiveRecommendationTakeOwnership");
+  }
+
+  return translate("executiveRecommendationReview");
+}
+
+function buildRecommendationCards(recommendations = [], activity = [], translate) {
   return recommendations.map((item) => {
     const relatedEvent = activity.find((row) => row.phone === item.phone);
+    const localizedTitle = mapRecommendationTitle(item, translate);
+    const relative = relatedEvent?.timestamp
+      ? formatRelativeMinutes(relatedEvent.timestamp, translate)
+      : "";
     const reason = relatedEvent?.summary
-      ? `${relatedEvent.summary} ${formatRelativeMinutes(relatedEvent.timestamp) || ""}`.trim()
-      : item.title;
+      ? `${relatedEvent.summary}${relative ? ` ${relative}` : ""}`.trim()
+      : localizedTitle;
 
-    let action = "Review in Mission Control";
-    if (item.title?.includes("Outcome")) {
-      action = "Record Interview Outcome";
-    } else if (item.title?.includes("follow-up")) {
-      action = "Complete Follow-up";
-    } else if (item.title?.includes("Orientation")) {
-      action = "Schedule Orientation";
-    } else if (item.title?.includes("escalation")) {
-      action = "Take Ownership";
-    }
+    const priorityKey = priorityLabelKey(item.missionControlPriority);
 
     return {
       ...item,
       reason,
-      recommendedAction: action,
-      priorityLabel: priorityLabel(item.missionControlPriority)
+      recommendedAction: resolveRecommendationAction(item, translate),
+      priorityLabel: translate(priorityKey)
     };
   });
 }
 
-export function buildExecutiveDashboardViewModel(executive, dashboard, greeting) {
+export function buildExecutiveDashboardViewModel(executive, dashboard, translate) {
   const queue = executive?.prioritizedWorkflowQueue || [];
   const prospects = dashboard?.prospects || [];
   const todayFocus = executive?.todayFocus || {};
+  const greeting = translate(getTimeGreetingKey());
   const hero = buildInterviewHero(queue, prospects, todayFocus);
-  const teamBoard = buildTeamBoard(queue, prospects);
+  const teamBoard = buildTeamBoard(queue, prospects, translate);
   const recommendations = buildRecommendationCards(
     executive?.recommendations || [],
-    executive?.activity || []
+    executive?.activity || [],
+    translate
   );
   const morningBrief = buildMorningBrief({
     greeting,
@@ -407,13 +481,14 @@ export function buildExecutiveDashboardViewModel(executive, dashboard, greeting)
     todayFocus,
     recommendations,
     teamBoard,
-    activity: executive?.activity || []
+    activity: executive?.activity || [],
+    translate
   });
 
   return {
     hero,
     morningBrief,
-    focusCards: buildFocusCards(todayFocus, queue, prospects),
+    focusCards: buildFocusCards(todayFocus, queue, prospects, translate),
     teamBoard,
     pipeline: buildPipelineCounts(queue),
     recommendations,
@@ -423,16 +498,16 @@ export function buildExecutiveDashboardViewModel(executive, dashboard, greeting)
   };
 }
 
-export function getTimeGreeting() {
+export function getTimeGreetingKey() {
   const hour = new Date().getHours();
 
   if (hour < 12) {
-    return "Good Morning";
+    return "executiveBriefGreetingMorning";
   }
 
   if (hour < 17) {
-    return "Good Afternoon";
+    return "executiveBriefGreetingAfternoon";
   }
 
-  return "Good Evening";
+  return "executiveBriefGreetingEvening";
 }

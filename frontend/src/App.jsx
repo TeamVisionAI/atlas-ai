@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Dashboard from "./pages/Dashboard";
+import ProspectWorkspace from "./pages/ProspectWorkspace";
 import QuickCapture from "./pages/QuickCapture";
 import PlaceholderPage from "./pages/PlaceholderPage";
 
@@ -11,14 +12,14 @@ export default function App() {
       <Route path="/" element={<MainLayout />}>
         <Route index element={<ExecutiveDashboard />} />
         <Route path="mission-control" element={<Dashboard />} />
-        <Route path="prospect-workspace/:phone" element={<Dashboard />} />
+        <Route path="prospect-workspace/:phone" element={<ProspectWorkspace />} />
         <Route path="quick-capture" element={<QuickCapture />} />
         <Route
           path="pipeline"
           element={
             <PlaceholderPage
-              title="Pipeline"
-              description="Prospect pipeline view coming soon."
+              titleKey="placeholderPipelineTitle"
+              descriptionKey="placeholderPipelineDescription"
             />
           }
         />
@@ -26,8 +27,8 @@ export default function App() {
           path="conversations"
           element={
             <PlaceholderPage
-              title="Conversations"
-              description="Live and historical conversations coming soon."
+              titleKey="placeholderConversationsTitle"
+              descriptionKey="placeholderConversationsDescription"
             />
           }
         />
@@ -35,8 +36,8 @@ export default function App() {
           path="appointments"
           element={
             <PlaceholderPage
-              title="Appointments"
-              description="Interview calendar and appointments coming soon."
+              titleKey="placeholderAppointmentsTitle"
+              descriptionKey="placeholderAppointmentsDescription"
             />
           }
         />
@@ -44,8 +45,8 @@ export default function App() {
           path="follow-ups"
           element={
             <PlaceholderPage
-              title="Follow-ups"
-              description="Follow-up queue and reminders coming soon."
+              titleKey="placeholderFollowUpsTitle"
+              descriptionKey="placeholderFollowUpsDescription"
             />
           }
         />
@@ -53,8 +54,8 @@ export default function App() {
           path="analytics"
           element={
             <PlaceholderPage
-              title="Analytics"
-              description="Recruiting metrics and reports coming soon."
+              titleKey="placeholderAnalyticsTitle"
+              descriptionKey="placeholderAnalyticsDescription"
             />
           }
         />
@@ -62,8 +63,8 @@ export default function App() {
           path="settings"
           element={
             <PlaceholderPage
-              title="Settings"
-              description="Team Vision and Atlas configuration coming soon."
+              titleKey="placeholderSettingsTitle"
+              descriptionKey="placeholderSettingsDescription"
             />
           }
         />

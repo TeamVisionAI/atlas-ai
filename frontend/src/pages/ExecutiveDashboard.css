@@ -330,6 +330,26 @@
   color: #b91c1c;
 }
 
+@media (max-width: 767px) {
+  .executive-dashboard {
+    gap: 24px;
+  }
+
+  .executive-hero {
+    padding: 24px 18px;
+  }
+
+  .executive-brief {
+    padding: 20px 18px;
+  }
+
+  .executive-health {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px 18px;
+  }
+}
+
 @media (max-width: 960px) {
   .executive-grid-two,
   .executive-focus-grid {

@@ -1,3 +1,5 @@
+import { useLanguage } from "../i18n/LanguageContext";
+
 export default function AgentQueueNavigator({
   currentIndex,
   totalProspects,
@@ -6,6 +8,7 @@ export default function AgentQueueNavigator({
   onPrevious,
   onNext
 }) {
+  const { translate } = useLanguage();
   const position = totalProspects ? currentIndex + 1 : 0;
 
   return (
@@ -26,7 +29,7 @@ export default function AgentQueueNavigator({
           marginBottom: 12
         }}
       >
-        Today&apos;s Queue
+        {translate("missionControlTodaysQueue")}
       </div>
 
       <div
@@ -55,7 +58,7 @@ export default function AgentQueueNavigator({
             textAlign: "left"
           }}
         >
-          ← Previous
+          {translate("missionControlPrevious")}
           {previousProspect ? (
             <span
               style={{
@@ -79,7 +82,10 @@ export default function AgentQueueNavigator({
             whiteSpace: "nowrap"
           }}
         >
-          Prospect {position} of {totalProspects}
+          {translate("missionControlProspectPosition", {
+            position,
+            total: totalProspects
+          })}
         </div>
 
         <button
@@ -100,7 +106,7 @@ export default function AgentQueueNavigator({
             boxShadow: nextProspect ? "0 8px 20px rgba(30, 58, 138, 0.24)" : "none"
           }}
         >
-          ▶ Next Priority
+          {translate("missionControlNextPriority")}
           {nextProspect ? (
             <span
               style={{

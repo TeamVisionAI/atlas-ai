@@ -1,0 +1,305 @@
+/* Atlas layout — intentional breakpoints (not scaled desktop) */
+
+:root {
+  --atlas-sidebar-width: 250px;
+  --atlas-header-height: 56px;
+  --atlas-layout-bg: #f3f5f9;
+  --atlas-main-padding: 16px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --atlas-main-padding: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --atlas-main-padding: 32px;
+  }
+}
+
+.atlas-layout {
+  display: flex;
+  min-height: 100svh;
+  background: var(--atlas-layout-bg);
+  width: 100%;
+}
+
+.atlas-layout__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+
+/* ——— Sidebar / drawer ——— */
+
+.atlas-layout__sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 100;
+  width: min(var(--atlas-sidebar-width), 88vw);
+  background: #172554;
+  color: #fff;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-105%);
+  transition: transform 0.24s ease;
+  box-shadow: 8px 0 32px rgba(15, 23, 42, 0.18);
+  overflow-y: auto;
+}
+
+.atlas-layout__sidebar.is-open {
+  transform: translateX(0);
+}
+
+.atlas-layout__sidebar-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.atlas-layout__sidebar-close,
+.atlas-layout__sidebar-collapse {
+  appearance: none;
+  border: 1px solid #334155;
+  background: transparent;
+  color: #cbd5e1;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.atlas-layout__sidebar-collapse {
+  display: none;
+}
+
+.atlas-layout__brand-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.atlas-layout__brand-subtitle {
+  color: #94a3b8;
+  margin: 0 0 24px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.atlas-layout__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-layout__nav-link {
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.atlas-layout__nav-link.is-active {
+  background: #1e3a8a;
+  font-weight: 600;
+}
+
+.atlas-layout__language-toggle {
+  margin-top: 16px;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.atlas-layout__sidebar-foot {
+  margin-top: auto;
+  color: #94a3b8;
+  font-size: 14px;
+  padding-top: 32px;
+}
+
+/* ——— Main frame ——— */
+
+.atlas-layout__frame {
+  flex: 1;
+  min-width: 0;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-layout__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--atlas-header-height);
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.atlas-layout__menu-button {
+  appearance: none;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #111827;
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.atlas-layout__header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-layout__main {
+  flex: 1;
+  min-height: 0;
+  padding: var(--atlas-main-padding);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.atlas-layout__content {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ——— Tablet: collapsible sidebar ——— */
+
+@media (min-width: 768px) {
+  .atlas-layout {
+    flex-direction: row;
+  }
+
+  .atlas-layout__sidebar {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    transform: none;
+    box-shadow: none;
+    flex-shrink: 0;
+  }
+
+  .atlas-layout__sidebar.is-collapsed {
+    margin-left: calc(-1 * var(--atlas-sidebar-width));
+    transform: translateX(0);
+  }
+
+  .atlas-layout__sidebar-close {
+    display: none;
+  }
+
+  .atlas-layout__sidebar-collapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .atlas-layout__header {
+    display: none;
+  }
+
+  .atlas-layout__header.is-visible {
+    display: flex;
+  }
+
+  .atlas-layout__backdrop {
+    display: none;
+  }
+}
+
+/* ——— Desktop: persistent nav, centered content card ——— */
+
+@media (min-width: 1024px) {
+  .atlas-layout__sidebar-collapse {
+    display: none;
+  }
+
+  .atlas-layout__sidebar {
+    position: sticky;
+    margin-left: 0 !important;
+  }
+
+  .atlas-layout__sidebar.is-collapsed {
+    margin-left: 0 !important;
+  }
+
+  .atlas-layout__header,
+  .atlas-layout__header.is-visible {
+    display: none;
+  }
+
+  .atlas-layout__main {
+    align-items: center;
+  }
+
+  .atlas-layout__content {
+    max-width: 1200px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    padding: var(--atlas-main-padding);
+    min-height: calc(100svh - var(--atlas-main-padding) * 2);
+    box-sizing: border-box;
+  }
+
+  /* Quick Capture uses its own floating card — no double card */
+  .atlas-layout__content:has(.quick-capture-page) {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    max-width: 100%;
+  }
+
+  /* Full-bleed pages manage their own surfaces */
+  .atlas-layout__content:has(.mission-control-page),
+  .atlas-layout__content:has(.prospect-workspace),
+  .atlas-layout__content:has(.executive-dashboard) {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    max-width: 100%;
+  }
+}

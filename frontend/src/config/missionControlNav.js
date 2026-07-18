@@ -1,11 +1,11 @@
 export const missionControlNav = [
-  { path: "/", label: "Executive Dashboard", end: true },
-  { path: "/quick-capture", label: "Quick Capture" },
-  { path: "/mission-control", label: "Mission Control" },
-  { path: "/pipeline", label: "Pipeline" },
-  { path: "/conversations", label: "Conversations" },
-  { path: "/appointments", label: "Appointments" },
-  { path: "/follow-ups", label: "Follow-ups" },
-  { path: "/analytics", label: "Analytics" },
-  { path: "/settings", label: "Settings" }
+  { path: "/", labelKey: "navExecutiveDashboard", end: true },
+  { path: "/quick-capture", labelKey: "navQuickCapture" },
+  { path: "/mission-control", labelKey: "navMissionControl" },
+  { path: "/pipeline", labelKey: "navPipeline" },
+  { path: "/conversations", labelKey: "navConversations" },
+  { path: "/appointments", labelKey: "navAppointments" },
+  { path: "/follow-ups", labelKey: "navFollowUps" },
+  { path: "/analytics", labelKey: "navAnalytics" },
+  { path: "/settings", labelKey: "navSettings" }
 ];

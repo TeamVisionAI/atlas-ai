@@ -22,7 +22,6 @@ const EMPTY_FORM = {
   first_name: "",
   last_name: "",
   phone: "",
-  communication_language: "es",
   source: "IN_PERSON"
 };
 
@@ -50,7 +49,7 @@ function DuplicateDialog({ duplicate, t, onOpen, onCancel }) {
 }
 
 export default function QuickCapture() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [form, setForm] = useState(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -104,7 +103,10 @@ export default function QuickCapture() {
     setDuplicate(null);
 
     try {
-      const result = await saveQuickCaptureProspect(form);
+      const result = await saveQuickCaptureProspect({
+        ...form,
+        communication_language: language
+      });
       const phone = result?.prospect?.phone;
 
       if (phone) {
@@ -195,28 +197,8 @@ export default function QuickCapture() {
             ) : null}
           </label>
 
-          <div className="quick-capture-field">
-            <span className="quick-capture-label">{t.quickCaptureCommunicationLanguage}</span>
-            <div className="quick-capture-segmented">
-              <button
-                type="button"
-                className={`quick-capture-segment${form.communication_language === "es" ? " quick-capture-segment--active" : ""}`}
-                onClick={() => updateField("communication_language", "es")}
-              >
-                {t.quickCaptureLanguageEs}
-              </button>
-              <button
-                type="button"
-                className={`quick-capture-segment${form.communication_language === "en" ? " quick-capture-segment--active" : ""}`}
-                onClick={() => updateField("communication_language", "en")}
-              >
-                {t.quickCaptureLanguageEn}
-              </button>
-            </div>
-          </div>
-
           <label className="quick-capture-field">
-            <span className="quick-capture-label">{t.quickCaptureManualSource}</span>
+            <span className="quick-capture-label">{t.quickCaptureHowDidYouMeet}</span>
             <select
               className="quick-capture-select"
               value={form.source}

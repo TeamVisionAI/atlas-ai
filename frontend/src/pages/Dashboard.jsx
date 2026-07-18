@@ -41,9 +41,11 @@ import {
   shouldShowWorkflowGate
 } from "../engines/workflowEngine";
 import {
-  EXECUTIVE_FILTER_LABELS,
+  EXECUTIVE_FILTER_LABEL_KEYS,
   filterQueueForExecutiveFilter
 } from "../engines/executiveFilterEngine";
+import { useLanguage } from "../i18n/LanguageContext";
+import "./MissionControl.css";
 
 const sectionLabelStyle = {
   margin: "0 0 12px",
@@ -80,6 +82,7 @@ async function loadWorkspaceForQueueItem(item, dashboardData) {
 export default function Dashboard() {
   const { phone: routePhone } = useParams();
   const [searchParams] = useSearchParams();
+  const { translate } = useLanguage();
   const executiveFilter = searchParams.get("filter");
   const deepLinkPhone = routePhone || searchParams.get("phone");
   const [dashboard, setDashboard] = useState(null);
@@ -111,7 +114,7 @@ export default function Dashboard() {
       const adapted = await loadWorkspaceForQueueItem(item, dashboardData);
 
       if (!adapted) {
-        setLoadError("No mission control data found for this prospect.");
+        setLoadError({ key: "missionControlNoData" });
         return;
       }
 
@@ -124,8 +127,8 @@ export default function Dashboard() {
       console.error(err);
       setLoadError(
         err instanceof MissionControlError
-          ? "Unable to load mission control data."
-          : "Something went wrong loading this prospect."
+          ? { key: "missionControlLoadError" }
+          : { key: "missionControlProspectLoadError" }
       );
     } finally {
       setProspectLoading(false);
@@ -159,10 +162,18 @@ export default function Dashboard() {
         setQueue(sortedQueue);
 
         if (!initialItem) {
+          const filterLabelKey = EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter];
           setLoadError(
             executiveFilter
-              ? `No prospects match filter: ${EXECUTIVE_FILTER_LABELS[executiveFilter] || executiveFilter}.`
-              : "No prospects in queue."
+              ? {
+                  key: "missionControlNoProspectsForFilter",
+                  params: {
+                    filter: filterLabelKey
+                      ? translate(filterLabelKey)
+                      : executiveFilter
+                  }
+                }
+              : { key: "missionControlNoQueue" }
           );
           return;
         }
@@ -170,7 +181,7 @@ export default function Dashboard() {
         const adapted = await loadWorkspaceForQueueItem(initialItem, dashboardData);
 
         if (!adapted) {
-          setLoadError("No active conversation found.");
+          setLoadError({ key: "missionControlNoActive" });
           return;
         }
 
@@ -179,14 +190,14 @@ export default function Dashboard() {
         setWorkflowState(loadWorkflowState(adapted.phone) || createDefaultWorkflowState());
       } catch (err) {
         console.error(err);
-        setLoadError("Unable to load Atlas workspace.");
+        setLoadError({ key: "missionControlWorkspaceError" });
       } finally {
         setInitialLoading(false);
       }
     }
 
     loadDashboard();
-  }, [executiveFilter, deepLinkPhone]);
+  }, [executiveFilter, deepLinkPhone, translate]);
 
   const phone = workspace?.phone;
 
@@ -215,11 +226,11 @@ export default function Dashboard() {
 
       if (saved.orientationScheduled) {
         setWorkflowComplete({
-          message: "Orientation scheduled. Ready for the next prospect?"
+          message: translate("missionControlOrientationReady")
         });
       }
     },
-    [phone, queue, currentIndex, dashboard]
+    [phone, queue, currentIndex, dashboard, translate]
   );
 
   const refreshCurrentWorkspace = useCallback(async () => {
@@ -276,7 +287,7 @@ export default function Dashboard() {
       }
 
       if (isMock) {
-        setActionError("This action requires a live prospect record.");
+        setActionError(translate("missionControlActionRequiresLive"));
         return;
       }
 
@@ -288,7 +299,7 @@ export default function Dashboard() {
         let payload = {};
 
         if (actionId === "notes") {
-          const text = window.prompt("Add agent note:");
+          const text = window.prompt(translate("missionControlAddNotePrompt"));
 
           if (!text?.trim()) {
             return;
@@ -307,10 +318,10 @@ export default function Dashboard() {
         await refreshCurrentWorkspace();
       } catch (err) {
         console.error(err);
-        setActionError("Unable to complete action.");
+        setActionError(translate("missionControlActionFailed"));
       }
     },
-    [phone, queue, currentIndex, refreshCurrentWorkspace]
+    [phone, queue, currentIndex, refreshCurrentWorkspace, translate]
   );
 
   const handleGateOutcome = useCallback(
@@ -340,28 +351,31 @@ export default function Dashboard() {
 
       if (saved.outcome === "Recruited" && saved.orientationScheduled) {
         setWorkflowComplete({
-          message: "Orientation scheduled. Ready for the next prospect?"
+          message: translate("missionControlOrientationReady")
         });
       }
     },
-    [phone, queue, currentIndex, dashboard]
+    [phone, queue, currentIndex, dashboard, translate]
   );
 
   const handlePackageSent = useCallback(() => {
     setShowPackageSent(true);
     setWorkflowComplete({
-      message: "Onboarding package sent. Ready for the next prospect?"
+      message: translate("missionControlPackageSent")
     });
-  }, []);
+  }, [translate]);
 
-  const handleOrganizationResourceMissing = useCallback((resourceKey) => {
-    const messages = {
-      zoomInterviewUrl: "Zoom interview URL is not configured on the server.",
-      "office.mapsUrl": "Office location is not configured on the server."
-    };
+  const handleOrganizationResourceMissing = useCallback(
+    (resourceKey) => {
+      const messages = {
+        zoomInterviewUrl: translate("missionControlZoomNotConfigured"),
+        "office.mapsUrl": translate("missionControlOfficeNotConfigured")
+      };
 
-    setActionError(messages[resourceKey] || "Organization resource is not configured.");
-  }, []);
+      setActionError(messages[resourceKey] || translate("missionControlOrgResourceMissing"));
+    },
+    [translate]
+  );
 
   const workspaceContext = useMemo(() => {
     if (!workspace || workflowState === null || !organizationSettings) {
@@ -372,6 +386,7 @@ export default function Dashboard() {
       workspace,
       organizationSettings,
       workflowState,
+      translate,
       handlers: {
         onAction: handleMissionAction,
         onSendOnboarding: handlePackageSent,
@@ -382,6 +397,7 @@ export default function Dashboard() {
     workspace,
     organizationSettings,
     workflowState,
+    translate,
     handleMissionAction,
     handlePackageSent,
     handleOrganizationResourceMissing
@@ -424,22 +440,38 @@ export default function Dashboard() {
     [loadProspectAtIndex, queue, dashboard]
   );
 
-  if (initialLoading || !dashboard) {
-    return <h2>🚀 Loading Atlas...</h2>;
+  function renderLoadError(error) {
+    if (!error) {
+      return null;
+    }
+
+    if (typeof error === "string") {
+      return error;
+    }
+
+    return translate(error.key, error.params);
+  }
+
+  if (initialLoading) {
+    return <h2>🚀 {translate("missionControlLoading")}</h2>;
   }
 
   if (loadError && !workspace) {
     return (
       <div>
-        <p>{loadError}</p>
+        <p>{renderLoadError(loadError)}</p>
       </div>
     );
+  }
+
+  if (!dashboard) {
+    return <h2>🚀 {translate("missionControlLoading")}</h2>;
   }
 
   if (!workspace || !workspaceContext) {
     return (
       <div>
-        <p>No active conversation found.</p>
+        <p>{translate("missionControlNoActive")}</p>
       </div>
     );
   }
@@ -458,39 +490,20 @@ export default function Dashboard() {
         onOpenWorkspace={openWorkspaceForPhone}
       />
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          minHeight: 0,
-          gap: 20
-        }}
-      >
-        <div
-          style={{
-            margin: "-30px -30px 0",
-            borderBottom: "1px solid #E5E7EB"
-          }}
-        >
+      <div className="mission-control-page">
+        <div className="mission-control-page__header-band">
           {executiveFilter ? (
-            <div
-              style={{
-                margin: "0 30px 12px",
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "#EFF6FF",
-                border: "1px solid #BFDBFE",
-                color: "#1E3A8A",
-                fontSize: 14
-              }}
-            >
-              Filtered view:{" "}
+            <div className="mission-control-page__filter-banner">
+              {translate("missionControlFilteredView")}{" "}
               <strong>
-                {EXECUTIVE_FILTER_LABELS[executiveFilter] || executiveFilter}
+                {EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter]
+                  ? translate(EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter])
+                  : executiveFilter}
               </strong>
               {" · "}
-              {queue.length} prospect{queue.length === 1 ? "" : "s"}
+              {queue.length === 1
+                ? translate("missionControlProspectCount", { count: queue.length })
+                : translate("missionControlProspectCountPlural", { count: queue.length })}
             </div>
           ) : null}
           <AgentHeader
@@ -512,11 +525,13 @@ export default function Dashboard() {
         </div>
 
         {prospectLoading ? (
-          <p style={{ margin: 0, color: "#64748B", fontSize: 14 }}>Loading prospect…</p>
+          <p style={{ margin: 0, color: "#64748B", fontSize: 14 }}>
+            {translate("missionControlLoadingProspect")}
+          </p>
         ) : null}
 
         {loadError ? (
-          <p style={{ margin: 0, color: "#B91C1C", fontSize: 14 }}>{loadError}</p>
+          <p style={{ margin: 0, color: "#B91C1C", fontSize: 14 }}>{renderLoadError(loadError)}</p>
         ) : null}
 
         {actionError ? (
@@ -532,12 +547,12 @@ export default function Dashboard() {
         ) : null}
 
         <section>
-          <h3 style={sectionLabelStyle}>Current Prospect</h3>
+          <h3 style={sectionLabelStyle}>{translate("missionControlCurrentProspect")}</h3>
           <CurrentProspectCard prospect={workspaceContext.prospect} />
         </section>
 
         <section>
-          <h3 style={sectionLabelStyle}>Next Actions</h3>
+          <h3 style={sectionLabelStyle}>{translate("missionControlNextActions")}</h3>
           {showGate ? (
             <WorkflowGatePanel
               gate={workspace.workflowGate}
@@ -565,7 +580,7 @@ export default function Dashboard() {
             ))}
             {showPackageSent ? (
               <p style={{ margin: "10px 0 0", color: "#64748B", fontSize: 14 }}>
-                Onboarding package queued to send (placeholder).
+                {translate("missionControlPackageQueued")}
               </p>
             ) : null}
           </section>
@@ -586,7 +601,7 @@ export default function Dashboard() {
             flexDirection: "column"
           }}
         >
-          <h3 style={sectionLabelStyle}>Conversation</h3>
+          <h3 style={sectionLabelStyle}>{translate("missionControlConversation")}</h3>
           <ConversationPanel
             lastMessage={workspace.conversation.lastMessage}
             direction={workspace.conversation.direction}

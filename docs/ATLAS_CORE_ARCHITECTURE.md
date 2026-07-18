@@ -36,6 +36,41 @@ It reflects the **current repository** and the **approved Sprint 8A direction** 
 18. **Closed** or **Do Not Contact** prospects must not be automatically resumed.
 19. Every state transition must create an **auditable timeline event**.
 20. Business rules must remain separate from UI components and communication-channel integrations.
+21. **The Prospect Workspace is an execution workspace, not a record viewer** — optimized for “what do I do next?”, not passive CRM browsing (Sprint 10.2+).
+
+---
+
+## Prospect Workspace (Sprint 10.2+)
+
+**Spec:** [SPRINT_10_2_PROSPECT_WORKSPACE.md](./SPRINT_10_2_PROSPECT_WORKSPACE.md)
+
+### UX principle
+
+> The Prospect Workspace is an **execution workspace**, not a record viewer.
+
+It is the single-prospect counterpart to Mission Control (queue-first). Both surfaces prioritize workflow action over static profile display.
+
+### Five-question layout (canonical section order)
+
+| # | Question | Section |
+|---|----------|---------|
+| 1 | Who is this person? | Identity |
+| 2 | Where are they in their journey? | Journey Progress |
+| 3 | What should I do next? | Actions (primary CTA, gate, secondary) |
+| 4 | What has happened recently? | **Activity Feed** (unified — replaces separate Notes and Timeline) |
+| 5 | What additional details might I need? | Details (interview facts, status, capture metadata, Atlas Coach placeholder) |
+
+Sections 1–3 above the fold on mobile. Activity Feed is first-class, not an accordion. Details collapses on small viewports.
+
+### Architecture constraints
+
+| Constraint | Detail |
+|------------|--------|
+| Route | `/prospect-workspace/:phone` (Sprint 10.1 — unchanged) |
+| Business logic | Reuse Mission Control engines and APIs; workspace GET is additive compose |
+| Sprint 10.1 lock | Quick Capture behavior and `verifySprint10_1.js` — unchanged |
+| UI | Dedicated `ProspectWorkspace` page; no queue navigator |
+| Read models | Milestone, ownership, priority from backend only — no UI-side business rules |
 
 ---
 
