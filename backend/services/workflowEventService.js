@@ -54,6 +54,34 @@ async function insertWorkflowEvent(event) {
 }
 
 /**
+ * Idempotency lookup for conversation_log dual-write (Sprint 10.2b).
+ */
+async function findWorkflowEventByCorrelationId(correlationId) {
+  if (!correlationId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("workflow_events")
+    .select("*")
+    .eq("correlation_id", correlationId)
+    .maybeSingle();
+
+  if (error) {
+    if (
+      error.code === "42P01" ||
+      error.message?.includes("workflow_events")
+    ) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return data || null;
+}
+
+/**
  * Read workflow events for a prospect (Mission Control / audit).
  */
 async function listWorkflowEvents(phone, limit = 50) {
@@ -108,6 +136,7 @@ async function listRecentWorkflowEvents(limit = 50) {
 
 module.exports = {
   insertWorkflowEvent,
+  findWorkflowEventByCorrelationId,
   listWorkflowEvents,
   listRecentWorkflowEvents
 };

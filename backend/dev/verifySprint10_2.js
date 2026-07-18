@@ -1,5 +1,5 @@
 /**
- * Sprint 10.2a — Prospect Workspace verification.
+ * Sprint 10.2 — Prospect Workspace + Activity Feed verification.
  * Run: node backend/dev/verifySprint10_2.js
  */
 
@@ -8,8 +8,21 @@ require("dotenv").config();
 const express = require("express");
 const { buildJourneyProgress } = require("../core/journeyProgressMapper");
 const { buildProspectWorkspaceReadModel } = require("../core/prospectWorkspaceReadModel");
+const {
+  listProspectActivityFeed,
+  mapEventTypeToActivityType
+} = require("../core/prospectActivityFeedReadModel");
+const {
+  buildConversationLogCorrelationId,
+  emitConversationLogEvent
+} = require("../core/conversationEventBridge");
+const {
+  encodeActivityFeedCursor,
+  decodeActivityFeedCursor,
+  isActivityBeforeCursor
+} = require("../core/activityFeedCursor");
 const prospectWorkspaceRoutes = require("../routes/prospectWorkspace");
-const { MILESTONES } = require("../core/workflowConstants");
+const { MILESTONES, EVENT_TYPES } = require("../core/workflowConstants");
 const { getMissionControlWithActions } = require("../controllers/agentActionController");
 const { runAllGoldenScenarios } = require("./goldenScenarios");
 
@@ -26,13 +39,13 @@ function createWorkspaceApp() {
   return app;
 }
 
-async function fetchWorkspace(app, phone) {
+async function fetchWorkspace(app, phone, pathSuffix = "") {
   const server = app.listen(0);
   const port = server.address().port;
 
   try {
     const response = await fetch(
-      `http://127.0.0.1:${port}/api/prospect-workspace/${encodeURIComponent(phone)}`
+      `http://127.0.0.1:${port}/api/prospect-workspace/${encodeURIComponent(phone)}${pathSuffix}`
     );
     const payload = await response.json().catch(() => ({}));
     return { status: response.status, payload };
@@ -41,8 +54,38 @@ async function fetchWorkspace(app, phone) {
   }
 }
 
+function verifyActivityFeedUnitTests() {
+  assert(
+    buildConversationLogCorrelationId("abc-123") === "conversation_log:abc-123",
+    "Correlation ID format"
+  );
+
+  assert(
+    mapEventTypeToActivityType(EVENT_TYPES.MESSAGE_RECEIVED) === "message_inbound",
+    "MessageReceived maps to message_inbound"
+  );
+  assert(
+    mapEventTypeToActivityType(EVENT_TYPES.AGENT_NOTE_ADDED) === "note",
+    "AgentNoteAdded maps to note"
+  );
+
+  const sampleItem = {
+    id: "event:1",
+    timestamp: "2026-07-18T12:00:00.000Z"
+  };
+  const cursor = encodeActivityFeedCursor(sampleItem);
+  const decoded = decodeActivityFeedCursor(cursor);
+  assert(decoded.t === sampleItem.timestamp && decoded.id === sampleItem.id, "Cursor round-trip");
+
+  const older = { id: "event:0", timestamp: "2026-07-17T12:00:00.000Z" };
+  assert(isActivityBeforeCursor(older, decoded), "Older item is before cursor");
+  console.log("✓ Activity feed unit tests (cursor, mapping, correlation)");
+}
+
 async function main() {
-  console.log("=== Sprint 10.2a Prospect Workspace Verification ===\n");
+  console.log("=== Sprint 10.2 Prospect Workspace + Activity Feed Verification ===\n");
+
+  verifyActivityFeedUnitTests();
 
   const interviewJourney = buildJourneyProgress(MILESTONES.INTERVIEW_DUE);
   assert(interviewJourney.currentStepKey === "interview", "Interview milestone maps to interview step");
@@ -126,6 +169,56 @@ async function main() {
     } finally {
       patchServer.close();
     }
+
+    console.log("\n--- Sprint 10.2b Activity Feed ---");
+
+    const feed = await listProspectActivityFeed(samplePhone, { limit: 5 });
+    assert(Array.isArray(feed.items), "Activity feed returns items array");
+    assert(typeof feed.hasMore === "boolean", "Activity feed has hasMore flag");
+    assert(feed.phone === samplePhone, "Activity feed phone matches");
+
+    if (feed.items.length) {
+      const first = feed.items[0];
+      assert(first.id && first.activityType && first.timestamp, "Activity item shape valid");
+    }
+    console.log(`✓ Activity read model (${feed.items.length} preview items)`);
+
+    const activityHttp = await fetchWorkspace(app, samplePhone, "/activity?limit=5");
+    assert(activityHttp.status === 200, `Activity GET expected 200, got ${activityHttp.status}`);
+    assert(Array.isArray(activityHttp.payload.items), "Activity HTTP returns items");
+    assert(activityHttp.payload.generatedAt, "Activity HTTP includes generatedAt");
+    console.log("✓ Activity HTTP route");
+
+    const verifyLogId = `verify-10-2b-${Date.now()}`;
+    const verifyLogRow = {
+      id: verifyLogId,
+      prospect_phone: samplePhone,
+      direction: "outgoing",
+      message: "[Agent note] Sprint 10.2b idempotency verification",
+      intent: "AGENT_ACTION"
+    };
+
+    const firstEmit = await emitConversationLogEvent(verifyLogRow);
+    assert(firstEmit.success, "First emitConversationLogEvent succeeds");
+
+    const secondEmit = await emitConversationLogEvent(verifyLogRow);
+    assert(secondEmit.success && secondEmit.skipped, "Second emit is idempotent (skipped)");
+
+    if (firstEmit.event?.id && secondEmit.event?.id) {
+      assert(firstEmit.event.id === secondEmit.event.id, "Idempotent emit returns same event");
+    }
+    console.log("✓ Conversation log dual-write idempotency");
+
+    const feedAfterNote = await listProspectActivityFeed(samplePhone, {
+      limit: 10,
+      types: ["note"]
+    });
+    const linkedNote = feedAfterNote.items.find(
+      (item) => item.payload?.conversationLogId === verifyLogId
+    );
+    assert(linkedNote, "Emitted note appears in activity feed");
+    assert(linkedNote.activityType === "note", "Emitted item is activity type note");
+    console.log("✓ Note event in federated feed");
   } else {
     console.log("⚠ Skipping live workspace tests — no production prospect available");
   }
@@ -144,7 +237,7 @@ async function main() {
   console.log(`Golden: ${golden.passed}/${golden.total} passed`);
   assert(golden.failed === 0, `${golden.failed} golden scenario(s) failed`);
 
-  console.log("\n=== All Sprint 10.2a checks passed ===");
+  console.log("\n=== All Sprint 10.2 checks passed ===");
 }
 
 main().catch((error) => {

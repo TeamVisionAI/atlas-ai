@@ -89,6 +89,18 @@ All events share:
 
 ---
 
+### AgentNoteAdded
+
+| Field | Value |
+|-------|-------|
+| **When** | Agent adds a note via Mission Control / workspace composer (Sprint 10.2b) |
+| **Actor** | AGENT |
+| **Payload** | `{ conversationLogId, noteText, bodyPreview, channel }` |
+| **Correlation** | `conversation_log:{conversation_logs.id}` — idempotent dual-write from `logService` |
+| **Notes** | Detected by `[Agent note]` prefix on the originating log row |
+
+---
+
 ### QualificationUpdated
 
 | Field | Value |

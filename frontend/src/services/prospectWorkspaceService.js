@@ -25,6 +25,41 @@ export async function getProspectWorkspace(phone) {
   return response.json();
 }
 
+/**
+ * @param {string} phone
+ * @param {{ limit?: number, cursor?: string, types?: string }} [options]
+ */
+export async function getProspectActivityFeed(phone, options = {}) {
+  const params = new URLSearchParams();
+
+  if (options.limit) {
+    params.set("limit", String(options.limit));
+  }
+
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+  }
+
+  if (options.types) {
+    params.set("types", options.types);
+  }
+
+  const query = params.toString();
+  const response = await fetch(
+    `/api/prospect-workspace/${encodeURIComponent(phone)}/activity${query ? `?${query}` : ""}`
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new ProspectWorkspaceError("Failed to load activity feed", response.status);
+  }
+
+  return response.json();
+}
+
 export async function updateProspectCommunicationLanguage(phone, communicationLanguage) {
   const response = await fetch(
     `/api/prospect-workspace/${encodeURIComponent(phone)}/communication-language`,

@@ -9,6 +9,7 @@ const { findUserById } = require("../services/atlasUserService");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const { buildJourneyProgress } = require("./journeyProgressMapper");
 const { isProductionProspect } = require("./productionProspectFilter");
+const { listProspectActivityPreview } = require("./prospectActivityFeedReadModel");
 
 function buildProspectIdentity(prospect) {
   if (!prospect) {
@@ -100,6 +101,7 @@ async function buildProspectWorkspaceReadModel(phone) {
     missionControl.agentState,
     missionControl.workflowGate
   );
+  const activityPreview = await listProspectActivityPreview(resolvedPhone, 5);
 
   return {
     prospect,
@@ -118,7 +120,7 @@ async function buildProspectWorkspaceReadModel(phone) {
     latestConversation: missionControl.latestConversation,
     journey,
     interview,
-    activityPreview: [],
+    activityPreview,
     atlasCoach: null,
     generatedAt: new Date().toISOString()
   };

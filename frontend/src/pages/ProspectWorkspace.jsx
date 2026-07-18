@@ -23,7 +23,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { normalizeProspectLanguage } from "../types/language";
 import ProspectIdentityStrip from "../components/prospect-workspace/ProspectIdentityStrip";
 import JourneyProgress from "../components/prospect-workspace/JourneyProgress";
-import ActivityFeedPlaceholder from "../components/prospect-workspace/ActivityFeedPlaceholder";
+import ActivityFeed from "../components/prospect-workspace/ActivityFeed";
 import ProspectDetailsPanel from "../components/prospect-workspace/ProspectDetailsPanel";
 import NextActions from "../components/NextActions";
 import WorkflowGatePanel from "../components/WorkflowGatePanel";
@@ -366,7 +366,11 @@ export default function ProspectWorkspace() {
       </section>
 
       <div className="prospect-workspace__columns">
-        <ActivityFeedPlaceholder />
+        <ActivityFeed
+          phone={workspace.phone}
+          previewItems={payload?.activityPreview || []}
+          onNoteAdded={refreshWorkspace}
+        />
         <ProspectDetailsPanel
           interview={workspace.interview}
           status={workspace.status}

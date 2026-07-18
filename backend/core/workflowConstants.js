@@ -52,6 +52,7 @@ const EVENT_TYPES = Object.freeze({
   GREETING_SENT: "GreetingSent",
   MESSAGE_RECEIVED: "MessageReceived",
   MESSAGE_SENT: "MessageSent",
+  AGENT_NOTE_ADDED: "AgentNoteAdded",
   QUALIFICATION_UPDATED: "QualificationUpdated",
   CONVERSATION_STALLED: "ConversationStalled",
   WORKFLOW_OWNERSHIP_CHANGED: "WorkflowOwnershipChanged",
