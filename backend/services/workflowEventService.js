@@ -82,7 +82,32 @@ async function listWorkflowEvents(phone, limit = 50) {
   return data || [];
 }
 
+/**
+ * Recent workflow events across all prospects (Executive Dashboard activity feed).
+ */
+async function listRecentWorkflowEvents(limit = 50) {
+  const { data, error } = await supabase
+    .from("workflow_events")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (
+      error.code === "42P01" ||
+      error.message?.includes("workflow_events")
+    ) {
+      return [];
+    }
+
+    throw error;
+  }
+
+  return data || [];
+}
+
 module.exports = {
   insertWorkflowEvent,
-  listWorkflowEvents
+  listWorkflowEvents,
+  listRecentWorkflowEvents
 };

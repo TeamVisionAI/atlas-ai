@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getOrganizationSettings } from "../services/organizationService";
 import {
@@ -39,6 +40,10 @@ import {
   saveWorkflowState,
   shouldShowWorkflowGate
 } from "../engines/workflowEngine";
+import {
+  EXECUTIVE_FILTER_LABELS,
+  filterQueueForExecutiveFilter
+} from "../engines/executiveFilterEngine";
 
 const sectionLabelStyle = {
   margin: "0 0 12px",
@@ -73,6 +78,10 @@ async function loadWorkspaceForQueueItem(item, dashboardData) {
 }
 
 export default function Dashboard() {
+  const { phone: routePhone } = useParams();
+  const [searchParams] = useSearchParams();
+  const executiveFilter = searchParams.get("filter");
+  const deepLinkPhone = routePhone || searchParams.get("phone");
   const [dashboard, setDashboard] = useState(null);
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -130,15 +139,31 @@ export default function Dashboard() {
           getDashboard(),
           getOrganizationSettings()
         ]);
-        const sortedQueue = buildPrioritizedQueue(dashboardData.prospects);
-        const initialItem = sortedQueue[0];
+        const fullQueue = buildPrioritizedQueue(dashboardData.prospects);
+        const workflowQueue = dashboardData.prioritizedWorkflowQueue || [];
+        const filteredQueue = executiveFilter
+          ? filterQueueForExecutiveFilter(
+              fullQueue,
+              executiveFilter,
+              workflowQueue,
+              dashboardData.prospects
+            )
+          : fullQueue;
+        const sortedQueue = filteredQueue.length ? filteredQueue : fullQueue;
+        const targetPhone = deepLinkPhone || sortedQueue[0]?.phone;
+        const initialIndex = findQueueIndex(sortedQueue, targetPhone);
+        const initialItem = sortedQueue[initialIndex];
 
         setDashboard(dashboardData);
         setOrganizationSettings(orgSettings);
         setQueue(sortedQueue);
 
         if (!initialItem) {
-          setLoadError("No prospects in queue.");
+          setLoadError(
+            executiveFilter
+              ? `No prospects match filter: ${EXECUTIVE_FILTER_LABELS[executiveFilter] || executiveFilter}.`
+              : "No prospects in queue."
+          );
           return;
         }
 
@@ -150,7 +175,7 @@ export default function Dashboard() {
         }
 
         setWorkspace(adapted);
-        setCurrentIndex(findQueueIndex(sortedQueue, adapted.phone));
+        setCurrentIndex(initialIndex);
         setWorkflowState(loadWorkflowState(adapted.phone) || createDefaultWorkflowState());
       } catch (err) {
         console.error(err);
@@ -161,7 +186,7 @@ export default function Dashboard() {
     }
 
     loadDashboard();
-  }, []);
+  }, [executiveFilter, deepLinkPhone]);
 
   const phone = workspace?.phone;
 
@@ -448,6 +473,26 @@ export default function Dashboard() {
             borderBottom: "1px solid #E5E7EB"
           }}
         >
+          {executiveFilter ? (
+            <div
+              style={{
+                margin: "0 30px 12px",
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "#EFF6FF",
+                border: "1px solid #BFDBFE",
+                color: "#1E3A8A",
+                fontSize: 14
+              }}
+            >
+              Filtered view:{" "}
+              <strong>
+                {EXECUTIVE_FILTER_LABELS[executiveFilter] || executiveFilter}
+              </strong>
+              {" · "}
+              {queue.length} prospect{queue.length === 1 ? "" : "s"}
+            </div>
+          ) : null}
           <AgentHeader
             agentName="Ana"
             metrics={metrics}

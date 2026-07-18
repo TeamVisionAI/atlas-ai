@@ -24,3 +24,26 @@ Creates:
 ### After migration
 
 `eventEngine.emit()` writes to `workflow_events`. Event emission is wired in Sprint 8A.2+.
+
+## Sprint 10.1 — Quick Capture
+
+Run in Supabase SQL editor:
+
+```
+backend/database/migrations/002_quick_capture.sql
+```
+
+Creates:
+
+- `atlas_users` — Atlas agent accounts for ownership
+- `atlas_sessions` — bearer session tokens
+- Quick Capture columns on `prospects` (`prospect_number`, `normalized_phone`, `communication_language`, `preferred_communication_channel`, `entry_method`, `source`, `owner_user_id`, `created_by_user_id`, `status`, `first_name`, `last_name`)
+
+### Environment
+
+Set in `.env`:
+
+- `ATLAS_BOOTSTRAP_TOKEN` — bootstrap token for `POST /api/auth/session`
+- `ATLAS_DEFAULT_USER_ID` — optional override (defaults to seeded Ana user)
+- `VITE_ATLAS_BOOTSTRAP_TOKEN` — same token for frontend session bootstrap
+

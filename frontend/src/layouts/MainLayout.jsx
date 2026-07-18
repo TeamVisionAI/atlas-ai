@@ -1,7 +1,18 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useEffect } from "react";
 import { missionControlNav } from "../config/missionControlNav";
+import { useLanguage } from "../i18n/LanguageContext";
+import { bootstrapAtlasSession } from "../services/atlasAuthService";
 
 export default function MainLayout() {
+  const { language, toggleLanguage, t } = useLanguage();
+
+  useEffect(() => {
+    bootstrapAtlasSession().catch(() => {
+      // Session bootstrap is optional until auth is configured.
+    });
+  }, []);
+
   return (
     <div
       style={{
@@ -47,10 +58,28 @@ export default function MainLayout() {
                 fontWeight: isActive ? 600 : 400
               })}
             >
-              {item.label}
+              {item.path === "/quick-capture" ? t.navQuickCapture : item.label}
             </NavLink>
           ))}
         </nav>
+
+        <button
+          type="button"
+          onClick={toggleLanguage}
+          style={{
+            marginTop: 16,
+            alignSelf: "flex-start",
+            background: "transparent",
+            border: "1px solid #334155",
+            color: "#CBD5E1",
+            borderRadius: 8,
+            padding: "8px 12px",
+            cursor: "pointer",
+            fontSize: 13
+          }}
+        >
+          {language === "es" ? "English UI" : "Español UI"}
+        </button>
 
         <div
           style={{

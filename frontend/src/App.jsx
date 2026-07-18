@@ -1,13 +1,18 @@
 import { Routes, Route } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Dashboard from "./pages/Dashboard";
+import QuickCapture from "./pages/QuickCapture";
 import PlaceholderPage from "./pages/PlaceholderPage";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<MainLayout />}>
-        <Route index element={<Dashboard />} />
+        <Route index element={<ExecutiveDashboard />} />
+        <Route path="mission-control" element={<Dashboard />} />
+        <Route path="prospect-workspace/:phone" element={<Dashboard />} />
+        <Route path="quick-capture" element={<QuickCapture />} />
         <Route
           path="pipeline"
           element={

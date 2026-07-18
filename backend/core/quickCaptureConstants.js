@@ -1,0 +1,56 @@
+/**
+ * Sprint 10.1 — Quick Capture allowed values (manual/in-person only).
+ */
+
+const ENTRY_METHOD = Object.freeze({
+  QUICK_CAPTURE: "QUICK_CAPTURE"
+});
+
+const DEFAULT_SOURCE = "MANUAL";
+
+const MANUAL_SOURCES = Object.freeze({
+  MANUAL: "MANUAL",
+  IN_PERSON: "IN_PERSON",
+  REFERRAL: "REFERRAL",
+  CHURCH: "CHURCH",
+  NETWORKING: "NETWORKING",
+  COMMUNITY_EVENT: "COMMUNITY_EVENT",
+  WARM_MARKET: "WARM_MARKET",
+  OTHER: "OTHER"
+});
+
+const COMMUNICATION_LANGUAGES = Object.freeze(["es", "en"]);
+
+const DEFAULT_STATUS = "NEW";
+
+const DEFAULT_PREFERRED_COMMUNICATION_CHANNEL = "WHATSAPP";
+
+const AUTOMATED_ENTRY_METHODS = Object.freeze([
+  "FACEBOOK",
+  "QR",
+  "WEBSITE",
+  "WEBHOOK",
+  "API",
+  "WHATSAPP",
+  "AUTOMATED"
+]);
+
+const AUTOMATED_SOURCES = Object.freeze([
+  "FACEBOOK",
+  "QR",
+  "WEBSITE",
+  "WEBHOOK",
+  "API",
+  "WHATSAPP"
+]);
+
+module.exports = {
+  ENTRY_METHOD,
+  DEFAULT_SOURCE,
+  MANUAL_SOURCES,
+  COMMUNICATION_LANGUAGES,
+  DEFAULT_STATUS,
+  DEFAULT_PREFERRED_COMMUNICATION_CHANNEL,
+  AUTOMATED_ENTRY_METHODS,
+  AUTOMATED_SOURCES
+};

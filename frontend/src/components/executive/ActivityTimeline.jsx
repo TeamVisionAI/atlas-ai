@@ -1,0 +1,31 @@
+import { formatAtlasDateTime } from "../../utils/dateFormatter";
+
+export default function ActivityTimeline({ activity }) {
+  return (
+    <section>
+      <h2 className="executive-section-label">Recent Activity</h2>
+      <div className="executive-card executive-timeline">
+        {activity.length ? (
+          activity.map((entry) => (
+            <div
+              key={entry.id || `${entry.phone}-${entry.timestamp}`}
+              className="executive-timeline__item"
+            >
+              <div className="executive-timeline__dot" />
+              <div>
+                <div className="executive-timeline__summary">{entry.summary}</div>
+                <div className="executive-timeline__meta">
+                  {entry.phone} · {formatAtlasDateTime(new Date(entry.timestamp))}
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div style={{ padding: 20, color: "#64748B", fontSize: 14 }}>
+            No recent workflow events yet.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}

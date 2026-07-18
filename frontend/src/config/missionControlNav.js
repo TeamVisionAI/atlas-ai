@@ -1,5 +1,7 @@
 export const missionControlNav = [
-  { path: "/", label: "Dashboard", end: true },
+  { path: "/", label: "Executive Dashboard", end: true },
+  { path: "/quick-capture", label: "Quick Capture" },
+  { path: "/mission-control", label: "Mission Control" },
   { path: "/pipeline", label: "Pipeline" },
   { path: "/conversations", label: "Conversations" },
   { path: "/appointments", label: "Appointments" },
