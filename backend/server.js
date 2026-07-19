@@ -14,12 +14,15 @@ const missionControlRoutes = require("./routes/missionControl");
 const organizationRoutes = require("./routes/organization");
 const quickCaptureRoutes = require("./routes/quickCapture");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
+const metaOnboardingRoutes = require("./routes/metaOnboarding");
+const { logMetaEnvironmentWarnings } = require("./core/meta/metaEnvironmentValidator");
 
 app.use(cors());
 app.use(express.json());
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/mission-control", missionControlRoutes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
+app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/organization", organizationRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
@@ -47,5 +50,6 @@ app.get("/atlas-test", (req, res) => {
 });
 
 app.listen(PORT, () => {
+  logMetaEnvironmentWarnings();
   console.log(`🚀 Atlas AI running on http://localhost:${PORT}`);
 });
