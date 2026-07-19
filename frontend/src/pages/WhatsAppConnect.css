@@ -1,0 +1,123 @@
+.whatsapp-connect {
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.whatsapp-connect__header {
+  margin-bottom: 16px;
+}
+
+.whatsapp-connect__back {
+  color: #1e3a8a;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.whatsapp-connect__card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.whatsapp-connect__title {
+  margin: 0;
+  font-size: 28px;
+  color: #111827;
+}
+
+.whatsapp-connect__subtitle {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.whatsapp-connect__button {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 16px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.whatsapp-connect__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.whatsapp-connect__status,
+.whatsapp-connect__notice,
+.whatsapp-connect__hint,
+.whatsapp-connect__meta-version {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.whatsapp-connect__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.whatsapp-connect__retry {
+  appearance: none;
+  border: 1px solid #dbe1ea;
+  background: #fff;
+  color: #1e3a8a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.whatsapp-connect__connected-title {
+  margin: 0;
+  font-size: 20px;
+  color: #111827;
+}
+
+.whatsapp-connect__details {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.whatsapp-connect__details dt {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.whatsapp-connect__details dd {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: #111827;
+  word-break: break-word;
+}
+
+@media (max-width: 767px) {
+  .whatsapp-connect__card {
+    padding: 18px;
+  }
+
+  .whatsapp-connect__button,
+  .whatsapp-connect__retry {
+    width: 100%;
+    text-align: center;
+  }
+}

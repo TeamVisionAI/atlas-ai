@@ -4,6 +4,7 @@ import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Dashboard from "./pages/Dashboard";
 import ProspectWorkspace from "./pages/ProspectWorkspace";
 import QuickCapture from "./pages/QuickCapture";
+import WhatsAppConnect from "./pages/WhatsAppConnect";
 import PlaceholderPage from "./pages/PlaceholderPage";
 
 export default function App() {
@@ -65,9 +66,12 @@ export default function App() {
             <PlaceholderPage
               titleKey="placeholderSettingsTitle"
               descriptionKey="placeholderSettingsDescription"
+              actionHref="/settings/whatsapp"
+              actionLabelKey="whatsappConnectOpenFromSettings"
             />
           }
         />
+        <Route path="settings/whatsapp" element={<WhatsAppConnect />} />
       </Route>
     </Routes>
   );

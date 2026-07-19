@@ -10,3 +10,4 @@ node_modules/
 # Logs
 npm-debug.log*
 credentials.json
+backend/data/metaWhatsAppConnection.json

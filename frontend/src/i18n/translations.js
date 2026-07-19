@@ -316,7 +316,38 @@ export const translations = {
     workspaceActivityActorAgent: "Agente",
     workspaceActivityActorAtlas: "Atlas",
     workspaceActivityActorSystem: "Sistema",
-    workspaceActionsSummaryEmpty: "Sin acciones disponibles"
+    workspaceActionsSummaryEmpty: "Sin acciones disponibles",
+
+    whatsappConnectBack: "Configuración",
+    whatsappConnectTitle: "WhatsApp Business",
+    whatsappConnectSubtitle:
+      "Conecta tu WhatsApp Business App existente sin perder acceso a la app móvil.",
+    whatsappConnectButton: "Conectar WhatsApp Business",
+    whatsappConnectButtonLoading: "Conectando…",
+    whatsappConnectConnectedTitle: "Conectado",
+    whatsappConnectPhoneNumberId: "Phone Number ID",
+    whatsappConnectWabaId: "WABA ID",
+    whatsappConnectDisplayPhone: "Número",
+    whatsappConnectConnectionType: "Tipo de conexión",
+    whatsappConnectStatusLabel: "Estado",
+    whatsappConnectStatusHealthy: "Saludable",
+    whatsappConnectStatusDegraded: "Degradado",
+    whatsappConnectStatusUnhealthy: "No saludable",
+    whatsappConnectStatusDisconnected: "Desconectado",
+    whatsappConnectStatusUnknown: "Desconocido",
+    whatsappConnectWaitingQr: "Escanea el código QR en tu WhatsApp Business App…",
+    whatsappConnectFinalizing: "Finalizando conexión con Atlas…",
+    whatsappConnectCancelled: "La autorización de Facebook no se completó.",
+    whatsappConnectAuthIncomplete: "La autorización de Facebook no se completó.",
+    whatsappConnectEmbeddedError: "Meta reportó un error durante el registro embebido.",
+    whatsappConnectExchangeFailed: "No se pudo completar el intercambio de autorización.",
+    whatsappConnectMissingConfig:
+      "Faltan VITE_META_APP_ID o VITE_META_EMBEDDED_SIGNUP_CONFIG_ID en el frontend.",
+    whatsappConnectSdkError: "No se pudo cargar el SDK de Facebook.",
+    whatsappConnectRetry: "Reintentar",
+    whatsappConnectOpenFromSettings: "Conectar WhatsApp Business",
+    whatsappConnectTestNumberHint:
+      "Prueba inicial: WhatsApp Business App de Niovel (+1 786-752-8080)."
   },
 
   en: {
@@ -635,6 +666,37 @@ export const translations = {
     workspaceActivityActorAgent: "Agent",
     workspaceActivityActorAtlas: "Atlas",
     workspaceActivityActorSystem: "System",
-    workspaceActionsSummaryEmpty: "No actions available"
+    workspaceActionsSummaryEmpty: "No actions available",
+
+    whatsappConnectBack: "Settings",
+    whatsappConnectTitle: "WhatsApp Business",
+    whatsappConnectSubtitle:
+      "Connect your existing WhatsApp Business App without losing access to the mobile app.",
+    whatsappConnectButton: "Connect WhatsApp Business",
+    whatsappConnectButtonLoading: "Connecting…",
+    whatsappConnectConnectedTitle: "Connected",
+    whatsappConnectPhoneNumberId: "Phone Number ID",
+    whatsappConnectWabaId: "WABA ID",
+    whatsappConnectDisplayPhone: "Phone number",
+    whatsappConnectConnectionType: "Connection type",
+    whatsappConnectStatusLabel: "Status",
+    whatsappConnectStatusHealthy: "Healthy",
+    whatsappConnectStatusDegraded: "Degraded",
+    whatsappConnectStatusUnhealthy: "Unhealthy",
+    whatsappConnectStatusDisconnected: "Disconnected",
+    whatsappConnectStatusUnknown: "Unknown",
+    whatsappConnectWaitingQr: "Scan the QR code in your WhatsApp Business App…",
+    whatsappConnectFinalizing: "Finalizing Atlas connection…",
+    whatsappConnectCancelled: "Facebook authorization was not completed.",
+    whatsappConnectAuthIncomplete: "Facebook authorization was not completed.",
+    whatsappConnectEmbeddedError: "Meta reported an error during embedded signup.",
+    whatsappConnectExchangeFailed: "Unable to complete authorization exchange.",
+    whatsappConnectMissingConfig:
+      "VITE_META_APP_ID or VITE_META_EMBEDDED_SIGNUP_CONFIG_ID is missing in the frontend env.",
+    whatsappConnectSdkError: "Unable to load the Facebook SDK.",
+    whatsappConnectRetry: "Retry",
+    whatsappConnectOpenFromSettings: "Connect WhatsApp Business",
+    whatsappConnectTestNumberHint:
+      "Initial test target: Niovel’s WhatsApp Business App (+1 786-752-8080)."
   }
 };
