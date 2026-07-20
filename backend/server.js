@@ -1,5 +1,13 @@
 require("dotenv").config();
 
+console.log("=== ENV CHECK ===");
+console.log("SUPABASE_URL:", process.env.SUPABASE_URL || "MISSING");
+console.log(
+  "SUPABASE_ANON_KEY:",
+  process.env.SUPABASE_ANON_KEY ? "SET" : "MISSING"
+);
+console.log("=================");
+
 const express = require("express");
 const cors = require("cors");
 
