@@ -2,6 +2,8 @@
  * Sprint 6 — Meta Embedded Signup API client.
  */
 
+import { apiFetch, apiRequest } from "./apiClient";
+
 export class MetaEmbeddedSignupError extends Error {
   constructor(message, payload = {}) {
     super(message);
@@ -11,31 +13,29 @@ export class MetaEmbeddedSignupError extends Error {
 }
 
 export async function getEmbeddedSignupStatus() {
-  const response = await fetch("/api/meta/embedded-signup/status");
-
-  if (!response.ok) {
+  try {
+    return await apiFetch("/api/meta/embedded-signup/status");
+  } catch (error) {
+    const match = error.message.match(/^API (\d+):/);
     throw new MetaEmbeddedSignupError("Failed to load WhatsApp connection status", {
-      status: response.status
+      status: match ? Number(match[1]) : undefined
     });
   }
-
-  return response.json();
 }
 
 export async function getEmbeddedSignupHealth() {
-  const response = await fetch("/api/meta/embedded-signup/health");
-
-  if (!response.ok) {
+  try {
+    return await apiFetch("/api/meta/embedded-signup/health");
+  } catch (error) {
+    const match = error.message.match(/^API (\d+):/);
     throw new MetaEmbeddedSignupError("Failed to check WhatsApp connection health", {
-      status: response.status
+      status: match ? Number(match[1]) : undefined
     });
   }
-
-  return response.json();
 }
 
 export async function exchangeEmbeddedSignupCode(payload) {
-  const response = await fetch("/api/meta/embedded-signup/exchange", {
+  const response = await apiRequest("/api/meta/embedded-signup/exchange", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)

@@ -1,3 +1,5 @@
+import { apiFetch, apiRequest } from "./apiClient";
+
 export class MissionControlError extends Error {
   constructor(message, status) {
     super(message);
@@ -12,7 +14,7 @@ export class MissionControlError extends Error {
  */
 export async function getMissionControl(phone) {
   const segment = phone ? encodeURIComponent(phone) : "latest";
-  const response = await fetch(`/api/mission-control/${segment}`);
+  const response = await apiRequest(`/api/mission-control/${segment}`);
 
   if (response.status === 404) {
     return null;
@@ -32,7 +34,7 @@ export async function getMissionControl(phone) {
  * @returns {Promise<import("../types/missionControl").MissionControlActionResult>}
  */
 export async function postMissionControlAction(phone, action, payload = {}) {
-  const response = await fetch(
+  const response = await apiRequest(
     `/api/mission-control/${encodeURIComponent(phone)}/actions`,
     {
       method: "POST",
@@ -55,20 +57,11 @@ export async function postMissionControlAction(phone, action, payload = {}) {
  * @param {Object} workflowState
  */
 export async function syncMissionControlWorkflow(phone, workflowState) {
-  const response = await fetch(
-    `/api/mission-control/${encodeURIComponent(phone)}/workflow`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(workflowState)
-    }
-  );
-
-  if (!response.ok) {
-    throw new MissionControlError("Failed to sync workflow state", response.status);
-  }
-
-  return response.json();
+  return apiFetch(`/api/mission-control/${encodeURIComponent(phone)}/workflow`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(workflowState)
+  });
 }
 
 /**
@@ -76,7 +69,7 @@ export async function syncMissionControlWorkflow(phone, workflowState) {
  * @param {Object} body — BR-035 advancement payload
  */
 export async function advanceMissionControlWorkflow(phone, body) {
-  const response = await fetch(
+  const response = await apiRequest(
     `/api/mission-control/${encodeURIComponent(phone)}/workflow/advance`,
     {
       method: "POST",

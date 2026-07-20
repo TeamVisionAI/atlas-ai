@@ -1,5 +1,5 @@
 import { getAuthHeaders } from "./atlasAuthService";
-
+import { apiRequest } from "./apiClient";
 
 export class QuickCaptureError extends Error {
   constructor(message, { status, payload } = {}) {
@@ -16,7 +16,7 @@ export async function saveQuickCaptureProspect(body) {
     ...(await getAuthHeaders())
   };
 
-  const response = await fetch("/api/prospects/quick-capture", {
+  const response = await apiRequest("/api/prospects/quick-capture", {
     method: "POST",
     headers,
     body: JSON.stringify(body)

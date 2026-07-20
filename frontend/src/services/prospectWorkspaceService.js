@@ -1,3 +1,4 @@
+import { apiRequest } from "./apiClient";
 
 export class ProspectWorkspaceError extends Error {
   constructor(message, status) {
@@ -12,7 +13,9 @@ export class ProspectWorkspaceError extends Error {
  * @returns {Promise<Object | null>}
  */
 export async function getProspectWorkspace(phone) {
-  const response = await fetch(`/api/prospect-workspace/${encodeURIComponent(phone)}`);
+  const response = await apiRequest(
+    `/api/prospect-workspace/${encodeURIComponent(phone)}`
+  );
 
   if (response.status === 404) {
     return null;
@@ -45,7 +48,7 @@ export async function getProspectActivityFeed(phone, options = {}) {
   }
 
   const query = params.toString();
-  const response = await fetch(
+  const response = await apiRequest(
     `/api/prospect-workspace/${encodeURIComponent(phone)}/activity${query ? `?${query}` : ""}`
   );
 
@@ -61,7 +64,7 @@ export async function getProspectActivityFeed(phone, options = {}) {
 }
 
 export async function updateProspectCommunicationLanguage(phone, communicationLanguage) {
-  const response = await fetch(
+  const response = await apiRequest(
     `/api/prospect-workspace/${encodeURIComponent(phone)}/communication-language`,
     {
       method: "PATCH",

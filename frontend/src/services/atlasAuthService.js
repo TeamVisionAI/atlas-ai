@@ -1,3 +1,5 @@
+import { apiRequest } from "./apiClient";
+
 const SESSION_KEY = "atlas_session_token";
 
 export function getStoredSessionToken() {
@@ -20,7 +22,7 @@ export async function bootstrapAtlasSession() {
   const existing = getStoredSessionToken();
 
   if (existing) {
-    const me = await fetch("/api/auth/me", {
+    const me = await apiRequest("/api/auth/me", {
       headers: { Authorization: `Bearer ${existing}` }
     });
 
@@ -35,7 +37,7 @@ export async function bootstrapAtlasSession() {
     return null;
   }
 
-  const response = await fetch("/api/auth/session", {
+  const response = await apiRequest("/api/auth/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ bootstrapToken })
