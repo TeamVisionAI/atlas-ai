@@ -1,0 +1,105 @@
+# Atlas AI Changelog
+
+## Document control
+
+| Field | Value |
+|-------|-------|
+| **Document ID** | DOC-0600 |
+| **Title** | Atlas AI Changelog |
+| **Version** | 1.1 |
+| **Status** | Approved |
+| **Owner** | Atlas Development Team |
+| **Last Updated** | 2026-07-20 |
+| **Related Sprint** | — |
+| **Related Release** | Documentation Foundation |
+
+> **Status values:** Draft · Review · Approved
+
+---
+
+## Related documents
+
+| Document ID | Document | Description |
+|-------------|----------|-------------|
+| DOC-0001 | [Current_System_State.md](../00-executive/Current_System_State.md) | Production state reference |
+| DOC-0002 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification portfolio |
+| DOC-0512 | [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md) | Sprint 11.4 engineering blueprint |
+| — | [Roadmap.md](../00-executive/Roadmap.md) | Planned releases and milestones |
+
+---
+
+## Documentation Foundation Completed
+
+| Field | Value |
+|-------|-------|
+| **Milestone** | Documentation Foundation |
+| **Status** | Complete |
+| **Date** | 2026-07-20 |
+
+### Highlights
+
+- Executive documentation established (`00-executive/`)
+- Architecture documentation established (`02-architecture/`)
+- Meta approval package completed (`04-meta/` — DOC-0002 Approved)
+- Sprint documentation established (`05-sprints/`)
+- Release documentation established (`06-releases/`)
+- GitHub confirmed as Atlas project memory (source of truth for docs, code, and sprint history)
+
+### Documentation deliverables
+
+| Area | Key documents |
+|------|---------------|
+| Executive | DOC-0001 Current System State (Approved) |
+| Meta package | DOC-0002 Portfolio (Approved), DOC-0003 Privacy, DOC-0004 Q&A |
+| Architecture | DOC-0010 Communication Hub |
+| Sprint 11.4 | DOC-0511 Specification, DOC-0512 Implementation Plan |
+| Releases | DOC-0600 Changelog |
+
+> **Policy:** Documentation is frozen except for normal sprint updates, release notes, and ADRs.
+
+---
+
+## Sprint 11.3.1
+
+| Field | Value |
+|-------|-------|
+| **Release** | Release-11.3.1 |
+| **Release status** | Production |
+| **Related sprint** | 11.3.1 |
+
+### Highlights
+
+- Public website launched
+- Authentication completed
+- Executive Dashboard completed
+- Mission Control completed
+- Prospect Center completed
+- Prospect Workspace completed
+- Quick Capture completed
+- Contact Form integrated with Resend
+- Railway backend deployed
+- Vercel frontend deployed
+
+### Documentation
+
+- **DOC-0001** — [Current System State](../00-executive/Current_System_State.md) — Approved
+- **DOC-0002** — [Meta Approval Portfolio](../04-meta/Meta_Approval_Portfolio.md) — Approved
+- **DOC-0003** — [Privacy and Data Handling](../04-meta/Privacy_and_Data_Handling.md) — Draft
+- **DOC-0004** — [Meta Review Q&A](../04-meta/Meta_Review_QA.md) — Draft
+
+### Next sprint
+
+| Sprint | Objective |
+|--------|-----------|
+| **Sprint 11.4** | AI Conversation Engine |
+
+See [Sprint-11.4.md](../05-sprints/Sprint-11.4.md), [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md), and [Communication_Hub.md](../02-architecture/Communication_Hub.md) for planning detail.
+
+---
+
+## Document revision history
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.1 | 2026-07-20 | Atlas Development Team | Documentation Foundation milestone; Sprint 11.4 implementation plan indexed |
+| 1.0 | 2026-07-20 | Atlas Development Team | Initial changelog — Sprint 11.3.1 production release |

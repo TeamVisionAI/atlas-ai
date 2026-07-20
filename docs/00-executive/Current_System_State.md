@@ -1,0 +1,275 @@
+# Current System State
+
+## Document control
+
+| Field | Value |
+|-------|-------|
+| **Document ID** | DOC-0001 |
+| **Title** | Current System State |
+| **Version** | 1.0 |
+| **Status** | Approved |
+| **Owner** | Atlas Development Team |
+| **Last Updated** | 2026-07-20 |
+| **Related Sprint** | 11.3.1 |
+| **Related Release** | Release-11.3.1 |
+
+> **Status values:** Draft · Review · Approved
+
+---
+
+## Purpose
+
+This document is the **single executive reference** for the current production state of Atlas AI. It exists so that leadership, product owners, and engineering can answer—without reading sprint specs or source code:
+
+- What is deployed and operational today
+- How the public website and private Atlas application are separated
+- Where production services run (Vercel, Railway, Supabase, Resend)
+- What is locked, in progress, or intentionally deferred
+- What milestone comes next
+
+It is updated at the close of each production-facing release. For architecture depth, business rules, and sprint implementation detail, see the [Related Documents](#related-documents) and [Documentation index](#documentation-index).
+
+---
+
+## Document scope
+
+### Covered in this document
+
+- Production deployment topology and URLs
+- Technology stack summary
+- Public website routes and release status
+- Atlas application (`/app/*`) routes and operational status
+- Core backend capabilities at a glance
+- Production-critical environment variables
+- Local development entry points
+- Locked releases and change policy
+- Known open items affecting production or near-term delivery
+- Next planned milestone (Sprint 11.4)
+
+### Intentionally excluded
+
+- Detailed API contracts and endpoint schemas (see engineering docs)
+- Business rule definitions (see [BUSINESS_RULES.md](../BUSINESS_RULES.md))
+- Sprint implementation tasks and acceptance criteria (see sprint documents)
+- Meta Business Verification submission copy and checklists (see [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md))
+- Conversation engine and Communication Hub design (see Sprint 11.4 documentation)
+- Historical commit-by-commit changelog
+
+---
+
+## Related documents
+
+| Category | Document | Description |
+|----------|----------|-------------|
+| Strategy | [Vision.md](./Vision.md) | Long-term product vision for Atlas AI |
+| Strategy | [Roadmap.md](./Roadmap.md) | Planned releases and milestone sequence |
+| Compliance | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification materials |
+| Compliance | [Privacy_and_Data_Handling.md](../04-meta/Privacy_and_Data_Handling.md) | Privacy and data handling (Meta package) |
+| Compliance | [Meta_Review_QA.md](../04-meta/Meta_Review_QA.md) | Meta reviewer Q&A |
+| Architecture | [Communication_Hub.md](../02-architecture/Communication_Hub.md) | Multi-channel communication architecture (Sprint 11.4+) |
+| Sprint | [Sprint-11.4.md](../05-sprints/Sprint-11.4.md) | Conversation Engine and WhatsApp Business integration |
+| Sprint | Sprint documentation (engineering) | See [Documentation index](#documentation-index) |
+
+---
+
+## Executive summary
+
+Atlas AI is a **live, multi-surface application** — not a placeholder scaffold. It combines:
+
+1. A **public marketing website** for Team Vision Financial (`teamvisionfinancial.com`)
+2. A **private Atlas recruiting platform** for agents and leadership (`/app/*`)
+
+Both surfaces share one codebase. The frontend deploys to **Vercel**; the API deploys to **Railway**. Data persists in **Supabase**.
+
+> **Repository snapshot**  
+> **Product:** Atlas AI — Team Vision Financial  
+> **Branch:** `main`  
+> **Latest commit:** Sprint 11.3.1 — Production API Integration
+
+---
+
+## Deployment topology
+
+| Surface | Host | URL (production) |
+|---------|------|------------------|
+| Public website + Atlas UI | Vercel | `https://atlas-ai-three-ruby.vercel.app` (and custom domain when configured) |
+| Atlas API | Railway | `https://atlas-ai-production-01de.up.railway.app` |
+| Database | Supabase | Configured via `SUPABASE_URL` / `SUPABASE_ANON_KEY` |
+| Contact email delivery | Resend | Server-side only (`RESEND_API_KEY`) |
+
+> **API routing (Sprint 11.3.1):** All frontend services use `frontend/src/services/apiClient.js`, which calls Railway via `VITE_API_BASE_URL` (defaults to production Railway URL when unset).
+
+---
+
+## Technology stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 19, Vite 8, React Router 7 |
+| Backend | Node.js, Express 5 |
+| Database | Supabase (PostgreSQL) |
+| Email (contact form) | Resend |
+| WhatsApp onboarding | Meta Embedded Signup |
+| Auth (Atlas app) | Bootstrap token + bearer sessions (Sprint 10.1) |
+
+> **Docker:** Not used. Vercel + Railway handle deployment.
+
+---
+
+## Public website (approved for release)
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Homepage (Hero, About, Services, Careers, Contact) |
+| `/privacy` | Privacy Policy |
+| `/legal` | Legal disclosures |
+| `/terms` | Terms of Service |
+| `/app` | Atlas Sign In → private application |
+
+**Contact form:** Submits to `POST /api/contact` on Railway. Delivers email via Resend to `CONTACT_FORM_TO_EMAIL` (configured as `info@teamvisionfinancial.com`). Reply-To is the visitor’s email.
+
+**Status:** QA-approved. Production-ready pending Resend/domain and mailbox configuration on the email host.
+
+---
+
+## Atlas application (private `/app/*`)
+
+| Route | Feature | Status |
+|-------|---------|--------|
+| `/app` | Executive Dashboard | Operational |
+| `/app/mission-control` | Mission Control queue | Operational |
+| `/app/prospect-center` | Prospect Center (Sprint 10.3) | Operational |
+| `/app/prospect-workspace/:phone` | Prospect Workspace (Sprint 10.2) | Operational |
+| `/app/quick-capture` | Quick Capture (Sprint 10.1, LOCKED) | Operational |
+| `/app/settings/whatsapp` | WhatsApp Embedded Signup | Operational (Meta config dependent) |
+| `/app/conversations`, `/appointments`, etc. | Placeholder pages | UI shell only |
+
+**Authentication:** Internal tool. Requires `ATLAS_BOOTSTRAP_TOKEN` (backend) and `VITE_ATLAS_BOOTSTRAP_TOKEN` (frontend) for session bootstrap. Not intended for public visitors.
+
+---
+
+## Core backend capabilities
+
+- Recruiting / conversation engines (WhatsApp inbound pipeline)
+- Workflow engine with business rules (BR-001+)
+- Mission Control and Executive Dashboard read models
+- Prospect Workspace profile and activity feed
+- Quick Capture prospect creation with duplicate detection
+- Meta WhatsApp Embedded Signup onboarding
+- Public contact form with validation, honeypot, and rate limiting
+
+---
+
+## Repository facts (corrects common misread)
+
+| Claim | Actual state |
+|-------|--------------|
+| “6 placeholder files only” | **False.** ~297 tracked files; full `backend/` and `frontend/` directories |
+| “No package.json” | **False.** Root and `frontend/` both have `package.json` |
+| “No README” | **False.** `README.md` plus extensive `docs/` |
+| “Cannot run frontend or backend” | **False.** Standard npm dev scripts work |
+
+The repo began as six 1-byte placeholder *files* in early commits; it has since evolved through Sprints 6–11.
+
+---
+
+## Environment variables (production-critical)
+
+### Railway (backend)
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Database |
+| `RESEND_API_KEY` | Contact form email |
+| `CONTACT_FORM_FROM_EMAIL`, `CONTACT_FORM_TO_EMAIL` | Email routing |
+| `ATLAS_BOOTSTRAP_TOKEN` | Atlas session bootstrap |
+| `META_APP_ID`, `META_APP_SECRET`, etc. | WhatsApp onboarding |
+| `WHATSAPP_*` | WhatsApp Cloud API |
+
+### Vercel (frontend)
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_API_BASE_URL` | Railway API base URL |
+| `VITE_ATLAS_BOOTSTRAP_TOKEN` | Atlas auth bootstrap |
+| `VITE_META_APP_ID`, `VITE_META_EMBEDDED_SIGNUP_CONFIG_ID` | WhatsApp SDK (public) |
+
+> Secrets stay server-side except explicit `VITE_*` public vars.
+
+---
+
+## How to run locally
+
+```bash
+# Backend (repo root)
+npm install
+cp .env.example .env   # configure secrets
+npm run dev            # http://localhost:3000
+
+# Frontend
+cd frontend
+npm install
+npm run dev            # https://localhost:5173
+```
+
+For local API calls, set in `frontend/.env`:
+
+```
+VITE_API_BASE_URL=http://localhost:3000
+```
+
+See also: [docs/troubleshooting/local-development.md](../troubleshooting/local-development.md)
+
+---
+
+## Locked releases and change policy
+
+| Sprint | Feature | Policy |
+|--------|---------|--------|
+| 10.1 | Quick Capture | **LOCKED** — changes only with user feedback + verification |
+| 10.2 | Prospect Workspace | Active; verification scripts required |
+| 11.1 | Live WhatsApp | Documented in `SPRINT_11_1_LIVE_WHATSAPP.md` |
+| 11.3 / 11.3.1 | Public site + production API client | Current integration baseline |
+
+Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
+
+---
+
+## Known open items
+
+1. **Contact form delivery** — Resend accepts sends; recipient mailbox/alias configuration on email host must be verified (`info@teamvisionfinancial.com`).
+2. **Atlas auth** — Bootstrap token is interim; full user login not yet implemented.
+3. **Placeholder Atlas pages** — Conversations, Appointments, Analytics, Settings (except WhatsApp) are UI placeholders.
+4. **README.md** — Root README describes older Sprint 2 architecture; executive doc and `docs/` are more current for system state.
+
+---
+
+## Next planned milestone
+
+| Field | Value |
+|-------|-------|
+| **Sprint** | 11.4 |
+| **Primary objective** | Implement the Atlas AI Conversation Engine with WhatsApp Business integration and establish the Communication Hub architecture for future multi-channel support. |
+
+**Related planning documents:**
+
+- [Sprint-11.4.md](../05-sprints/Sprint-11.4.md)
+- [Communication_Hub.md](../02-architecture/Communication_Hub.md)
+
+---
+
+## Documentation index
+
+| Document | Audience |
+|----------|----------|
+| [ATLAS_CORE_ARCHITECTURE.md](../ATLAS_CORE_ARCHITECTURE.md) | Engineering |
+| [BUSINESS_RULES.md](../BUSINESS_RULES.md) | Product + engineering |
+| [ENGINEERING_STANDARDS.md](../ENGINEERING_STANDARDS.md) | Engineering |
+| [BACKLOG.md](../BACKLOG.md) | Product |
+| [DEVELOPMENT_WORKFLOW.md](../DEVELOPMENT_WORKFLOW.md) | Engineering |
+
+---
+
+## One-line status
+
+> **Atlas AI is operational in production with a public Team Vision Financial website, a Railway-hosted API, Supabase persistence, and an internal recruiting platform — past the initial scaffold phase and actively deployed.**
