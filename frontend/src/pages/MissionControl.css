@@ -12,6 +12,19 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+.mission-control-page__header-links {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px var(--atlas-main-padding, 16px) 0;
+}
+
+.mission-control-page__prospect-center-link {
+  color: #1e3a8a;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .mission-control-page__filter-banner {
   margin: 0 var(--atlas-main-padding, 16px) 12px;
   padding: 10px 14px;

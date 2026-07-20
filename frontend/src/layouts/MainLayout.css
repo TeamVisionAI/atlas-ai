@@ -86,15 +86,30 @@
   display: none;
 }
 
+.atlas-layout__public-link {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.atlas-layout__public-link:hover {
+  color: #e2e8f0;
+}
+
 .atlas-layout__brand-title {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
+  color: #ffffff;
 }
 
 .atlas-layout__brand-subtitle {
-  color: #94a3b8;
+  color: #cbd5e1;
   margin: 0 0 24px;
   font-size: 13px;
   line-height: 1.4;

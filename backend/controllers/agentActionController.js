@@ -70,7 +70,10 @@ async function logAgentTimeline(prospect, message, pipeline = "AGENT") {
 }
 
 async function sendWhatsAppOrFail(prospect, message) {
-  const result = await sendTextMessage(normalizeWhatsAppPhone(prospect.phone), message);
+  const result = await sendTextMessage(prospect.phone, message, {
+    intent: "AGENT_ACTION",
+    actor: "AGENT"
+  });
 
   if (!result.success) {
     return buildActionError(
@@ -80,7 +83,6 @@ async function sendWhatsAppOrFail(prospect, message) {
     );
   }
 
-  await logAgentTimeline(prospect, message);
   return null;
 }
 

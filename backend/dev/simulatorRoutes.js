@@ -14,6 +14,7 @@ const {
 } = require("../core/validationEngine");
 const businessRules = require("../core/businessRules");
 
+const { withSimulatorGuard } = require("./simulatorGuard");
 const {
   findProspect,
   deleteProspect
@@ -414,7 +415,9 @@ router.post("/simulator/message", async (req, res) => {
     }
 
     const startedAt = Date.now();
-    const result = await handleIncomingMessage(DEV_PHONE, DEV_NAME, message);
+    const result = await withSimulatorGuard(() =>
+      handleIncomingMessage(DEV_PHONE, DEV_NAME, message)
+    );
     const responseTimeMs = Date.now() - startedAt;
     const reply =
       typeof result === "string" ? result : result?.reply || "";

@@ -29,6 +29,11 @@ function mapEventTypeToActivityType(eventType) {
       return "message_outbound";
     case EVENT_TYPES.AGENT_NOTE_ADDED:
       return "note";
+    case EVENT_TYPES.CONVERSATION_STARTED:
+    case EVENT_TYPES.CONVERSATION_REOPENED:
+    case EVENT_TYPES.CONVERSATION_ASSIGNED:
+    case EVENT_TYPES.CONVERSATION_CLOSED:
+      return "system";
     default:
       if (REMINDER_EVENT_TYPES.has(eventType)) {
         return "reminder";

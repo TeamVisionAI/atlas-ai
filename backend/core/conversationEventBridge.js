@@ -56,7 +56,7 @@ function resolveEventTypeForLog(logRow) {
   return EVENT_TYPES.MESSAGE_SENT;
 }
 
-function buildPayloadForLog(logRow) {
+function buildPayloadForLog(logRow, extras = {}) {
   const message = String(logRow.message || "");
   const isAgentNote = message.startsWith(AGENT_NOTE_PREFIX);
 
@@ -66,6 +66,8 @@ function buildPayloadForLog(logRow) {
     bodyPreview: message.slice(0, 280),
     intent: logRow.intent || null,
     channel: "whatsapp",
+    ...(extras.providerMessageId ? { providerMessageId: extras.providerMessageId } : {}),
+    ...(extras.rawWebhookPayload ? { rawWebhookPayload: extras.rawWebhookPayload } : {}),
     ...(isAgentNote
       ? { noteText: message.slice(AGENT_NOTE_PREFIX.length).trim() }
       : {})
@@ -75,13 +77,19 @@ function buildPayloadForLog(logRow) {
 /**
  * Emit workflow event for a conversation_logs row (idempotent by correlationId).
  * @param {Object} logRow — inserted conversation_logs row with `id`
+ * @param {Object} [options]
+ * @param {string} [options.correlationId] — provider-level idempotency key
+ * @param {string} [options.providerMessageId]
+ * @param {Object} [options.rawWebhookPayload]
+ * @param {string} [options.actorOverride]
  */
-async function emitConversationLogEvent(logRow) {
+async function emitConversationLogEvent(logRow, options = {}) {
   if (!logRow?.id || !logRow?.prospect_phone) {
     return { success: false, error: "INVALID_LOG_ROW" };
   }
 
-  const correlationId = buildConversationLogCorrelationId(logRow.id);
+  const correlationId =
+    options.correlationId || buildConversationLogCorrelationId(logRow.id);
   const existing = await findWorkflowEventByCorrelationId(correlationId);
 
   if (existing) {
@@ -89,12 +97,17 @@ async function emitConversationLogEvent(logRow) {
   }
 
   const eventType = resolveEventTypeForLog(logRow);
+  let actor = resolveMessageActor(logRow);
+
+  if (options.actorOverride) {
+    actor = options.actorOverride;
+  }
 
   return emit(eventType, {
     prospectPhone: logRow.prospect_phone,
-    actor: resolveMessageActor(logRow),
+    actor,
     correlationId,
-    payload: buildPayloadForLog(logRow)
+    payload: buildPayloadForLog(logRow, options)
   });
 }
 

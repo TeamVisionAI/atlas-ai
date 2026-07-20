@@ -101,6 +101,36 @@ All events share:
 
 ---
 
+### ConversationStarted
+
+| Field | Value |
+|-------|-------|
+| **When** | First WhatsApp conversation on a newly created prospect (Sprint 11.1) |
+| **Actor** | prospect |
+| **Payload** | `{ channel, source, entry_method }` |
+| **Correlation** | `whatsapp:inbound:{metaMessageId}:conversation_started` |
+
+---
+
+### ConversationReopened
+
+| Field | Value |
+|-------|-------|
+| **When** | Existing prospect returns after inactivity or closed state (Sprint 11.1) |
+| **Actor** | prospect |
+| **Payload** | `{ channel, source }` |
+
+---
+
+### MessageReceived / MessageSent (WhatsApp)
+
+| Field | Value |
+|-------|-------|
+| **Correlation (live)** | `whatsapp:inbound:{metaMessageId}` or `whatsapp:outbound:{metaMessageId}` |
+| **Payload** | `{ conversationLogId, providerMessageId, bodyPreview, channel, rawWebhookPayload? }` |
+
+---
+
 ### QualificationUpdated
 
 | Field | Value |

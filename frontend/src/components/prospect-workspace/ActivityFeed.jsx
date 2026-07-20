@@ -97,6 +97,26 @@ export default function ActivityFeed({ phone, previewItems = [], onNoteAdded }) 
     };
   }, [phone, filterId, loadFeed, translate]);
 
+  useEffect(() => {
+    const refreshLiveFeed = () => {
+      if (document.visibilityState !== "visible" || loading || loadingMore) {
+        return;
+      }
+
+      loadFeed({ append: false, activeFilter: filterId }).catch((err) => {
+        console.error(err);
+      });
+    };
+
+    const intervalId = window.setInterval(refreshLiveFeed, 15000);
+    window.addEventListener("focus", refreshLiveFeed);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshLiveFeed);
+    };
+  }, [phone, filterId, loadFeed, loading, loadingMore]);
+
   const visibleItems = useMemo(
     () => filterActivityItems(items, filterId),
     [items, filterId]

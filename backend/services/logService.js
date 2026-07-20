@@ -27,7 +27,12 @@ async function logConversation(data) {
   }
 
   try {
-    await emitConversationLogEvent(rows);
+    await emitConversationLogEvent(rows, {
+      correlationId: data.eventCorrelationId,
+      providerMessageId: data.providerMessageId,
+      rawWebhookPayload: data.rawWebhookPayload,
+      actorOverride: data.actorOverride
+    });
   } catch (emitError) {
     console.error("[logService] conversation event emit failed:", emitError.message);
   }

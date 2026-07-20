@@ -3,6 +3,8 @@
  * Presentation-only; counts and rankings come from backend priority engine.
  */
 
+import { appPath } from "../config/appRoutes";
+
 export const EXECUTIVE_FILTERS = {
   INTERVIEWS_TODAY: "interviews-today",
   TOMORROWS_INTERVIEWS: "tomorrows-interviews",
@@ -142,5 +144,5 @@ export function buildMissionControlPath({ filter, phone } = {}) {
   }
 
   const query = params.toString();
-  return query ? `/mission-control?${query}` : "/mission-control";
+  return query ? `${appPath("mission-control")}?${query}` : appPath("mission-control");
 }

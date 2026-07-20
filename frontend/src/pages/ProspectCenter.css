@@ -1,0 +1,260 @@
+.prospect-center {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.prospect-center__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.prospect-center__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.prospect-center__subtitle {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.prospect-center__mission-link {
+  align-self: center;
+  color: #1e3a8a;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #1e3a8a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.prospect-center__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prospect-center__search-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.prospect-center__search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dbe1ea;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 15px;
+}
+
+.prospect-center__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prospect-center__filter {
+  appearance: none;
+  border: 1px solid #dbe1ea;
+  background: #fff;
+  color: #475569;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prospect-center__filter.is-active {
+  background: #1e3a8a;
+  border-color: #1e3a8a;
+  color: #fff;
+}
+
+.prospect-center__filter-count {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.prospect-center__summary,
+.prospect-center__status,
+.prospect-center__error,
+.prospect-center__footer-hint {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.prospect-center__error {
+  color: #b91c1c;
+}
+
+.prospect-center__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prospect-center-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.prospect-center-row__main {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px 10px;
+  cursor: pointer;
+}
+
+.prospect-center-row__main:hover {
+  background: #f8fafc;
+}
+
+.prospect-center-row__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prospect-center-row__name {
+  margin: 0;
+  font-size: 16px;
+  color: #111827;
+}
+
+.prospect-center-row__number {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.prospect-center-row__priority {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  white-space: nowrap;
+}
+
+.prospect-center-row__priority.priority-1 {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.prospect-center-row__priority.priority-2 {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.prospect-center-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.prospect-center-row__milestone {
+  font-weight: 600;
+  color: #334155;
+}
+
+.prospect-center-row__dot {
+  color: #cbd5e1;
+}
+
+.prospect-center-row__stall {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.prospect-center-row__preview {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prospect-center-row__actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 14px;
+  flex-wrap: wrap;
+}
+
+.prospect-center-row__action {
+  appearance: none;
+  border: 1px solid #dbe1ea;
+  background: #fff;
+  color: #1e3a8a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prospect-center-row__action--primary {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}
+
+@media (max-width: 767px) {
+  .prospect-center__title {
+    font-size: 24px;
+  }
+
+  .prospect-center-row__actions {
+    flex-direction: column;
+  }
+
+  .prospect-center-row__action {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (min-width: 960px) {
+  .prospect-center {
+    gap: 18px;
+  }
+}

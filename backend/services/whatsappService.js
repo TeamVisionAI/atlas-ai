@@ -1,56 +1,21 @@
-const axios = require("axios");
+const { sendAndPersistWhatsAppMessage } = require("../core/whatsappOutboundPipeline");
+const { normalizePhoneNumber } = require("../core/phoneNormalizer");
 
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+/**
+ * Sprint 11.1 — WhatsApp send entry point.
+ * All outbound messages persist + emit through the outbound pipeline.
+ */
+async function sendTextMessage(to, message, options = {}) {
+  const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
 
-console.log("TOKEN START:", TOKEN.substring(0, 20));
-console.log("TOKEN END:", TOKEN.slice(-20));
-
-console.log("PHONE NUMBER ID:", PHONE_NUMBER_ID);
-console.log("TOKEN LENGTH:", TOKEN ? TOKEN.length : "MISSING");
-
-async function sendTextMessage(to, message) {
-  try {
-    const { shouldMockExternalComms } = require("../dev/simulatorGuard");
-
-    if (shouldMockExternalComms()) {
-      console.log("[simulator] WhatsApp mocked:", { to, preview: String(message).slice(0, 80) });
-      return { success: true, simulated: true };
-    }
-
-    await axios.post(
-      `https://graph.facebook.com/v25.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: {
-          body: message,
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    console.log("✅ Message sent");
-    return { success: true };
-  } catch (err) {
-    console.error("STATUS:", err.response?.status);
-    console.error(
-      "DATA:",
-      JSON.stringify(err.response?.data, null, 2)
-    );
-    return {
-      success: false,
-      error: err.response?.data?.error?.message || err.message
-    };
-  }
+  return sendAndPersistWhatsAppMessage({
+    to: metaTo,
+    message,
+    actor: options.actor || (options.intent === "AGENT_ACTION" ? "AGENT" : "ATLAS"),
+    intent: options.intent || "WHATSAPP_OUTBOUND"
+  });
 }
 
 module.exports = {
-  sendTextMessage,
+  sendTextMessage
 };

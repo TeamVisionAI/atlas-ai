@@ -21,7 +21,9 @@ Expected output:
 
 Nodemon watches `backend/` and restarts on file changes.
 
-### Terminal 2 — Frontend
+### Terminal 2 — Frontend (HTTPS)
+
+The Vite dev server runs over **HTTPS** so Meta's JavaScript SDK (`FB.login`) works for WhatsApp Embedded Signup. HTTP is rejected by the SDK.
 
 ```bash
 cd ~/Documents/AtlasAi/atlas-ai/frontend
@@ -31,19 +33,52 @@ npm run dev -- --host
 Expected output:
 
 ```
-➜  Local:   http://localhost:5173/
-➜  Network: http://192.168.x.x:5173/
+➜  Local:   https://localhost:5173/
+➜  Network: https://192.168.x.x:5173/
 ```
 
 The `--host` flag exposes the dev server on your LAN for mobile testing.
+
+**Primary local URL:** [https://localhost:5173/](https://localhost:5173/)
+
+**WhatsApp Connect:** [https://localhost:5173/settings/whatsapp](https://localhost:5173/settings/whatsapp)
+
+Add `https://localhost:5173` to your Meta app's **Allowed domains** (Facebook Login / Embedded Signup settings).
+
+## HTTPS certificates
+
+Vite chooses a certificate automatically:
+
+| Setup | Certificate | Browser | Meta SDK |
+|-------|-------------|---------|----------|
+| **Default** (no extra steps) | Self-signed via `@vitejs/plugin-basic-ssl` | You may need to open `https://localhost:5173` once and accept the security warning | Works after the origin is trusted in the browser |
+| **Optional mkcert** (recommended) | Locally trusted cert in `frontend/.certs/` | No warning | Smoothest dev experience |
+
+**Is mkcert required?** No. The default self-signed certificate is enough for local Meta SDK testing once you accept the browser warning. **mkcert is optional** and recommended if you want a trusted certificate without warnings.
+
+### Optional: trusted local certificate with mkcert
+
+```bash
+brew install mkcert
+mkcert -install
+
+mkdir -p frontend/.certs
+mkcert -key-file frontend/.certs/localhost-key.pem \
+       -cert-file frontend/.certs/localhost.pem \
+       localhost 127.0.0.1 ::1
+```
+
+Restart Vite after creating the files. When `frontend/.certs/localhost-key.pem` and `frontend/.certs/localhost.pem` exist, Vite uses them instead of the self-signed fallback.
+
+`frontend/.certs/` is gitignored — do not commit certificate files.
 
 ## Common ports
 
 | Service | Port | URL |
 |---------|------|-----|
 | Backend API | 3000 | `http://localhost:3000` |
-| Frontend (Vite) | 5173 | `http://localhost:5173` |
-| Vite API proxy | 5173 → 3000 | `/api/*` forwarded to backend |
+| Frontend (Vite, HTTPS) | 5173 | `https://localhost:5173` |
+| Vite API proxy | 5173 → 3000 | `/api/*` forwarded to backend (HTTP backend is fine) |
 
 The frontend uses **relative `/api` URLs** and a Vite dev proxy (`frontend/vite.config.js`). Do not hardcode `http://localhost:3000` in frontend services — the proxy handles routing for both desktop and mobile.
 
@@ -64,8 +99,8 @@ curl -s -o /dev/null -w "dashboard: %{http_code}\n" http://localhost:3000/api/da
 # Executive dashboard (requires Supabase)
 curl -s -o /dev/null -w "executive: %{http_code}\n" http://localhost:3000/api/dashboard/executive
 
-# Via Vite proxy (frontend dev server)
-curl -s -o /dev/null -w "proxy: %{http_code}\n" http://localhost:5173/api/dashboard
+# Via Vite HTTPS proxy (frontend dev server; -k skips self-signed cert check)
+curl -sk -o /dev/null -w "proxy: %{http_code}\n" https://localhost:5173/api/dashboard
 ```
 
 Expected: all endpoints return **200** when Supabase is reachable.
@@ -165,7 +200,7 @@ npm run dev
 
 ### Symptom
 
-Quick Capture renders (static form), but Executive Dashboard and Mission Control fail to load when accessing via LAN IP (`http://192.168.x.x:5173`).
+Quick Capture renders (static form), but Executive Dashboard and Mission Control fail to load when accessing via LAN IP (`https://192.168.x.x:5173`).
 
 ### Cause
 

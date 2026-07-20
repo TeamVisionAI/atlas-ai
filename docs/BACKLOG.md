@@ -55,12 +55,16 @@
 ### Prospect Workspace components (Sprint 10.2)
 
 **Priority:** Sprint 10.2  
-**Status:** Specified in [SPRINT_10_2_PROSPECT_WORKSPACE.md](./SPRINT_10_2_PROSPECT_WORKSPACE.md) — **pending final approval**
+**Status:** Complete — see [SPRINT_10_2_PROSPECT_WORKSPACE.md](./SPRINT_10_2_PROSPECT_WORKSPACE.md)
 
-**UX principle:** Execution workspace, not record viewer. Layout follows five-question order (Identity → Journey → Actions → Activity Feed → Details).
+### Prospect Center (Sprint 10.3)
 
-- `ProspectIdentityStrip` — Q1
-- `JourneyProgress` — Q2 visual stepper
-- `ActivityFeed` / `ActivityFeedItem` — Q4 unified chronological activity (replaces Notes + Timeline)
-- `ProspectDetailsPanel` — Q5 collapsible details
-- `AtlasCoachPlaceholder` — Q5 coach panel shell
+**Priority:** Sprint 10.3  
+**Status:** Complete — see [SPRINT_10_3_PROSPECT_CENTER.md](./SPRINT_10_3_PROSPECT_CENTER.md)
+
+### Live WhatsApp Foundation (Sprint 11.1)
+
+**Priority:** Sprint 11.1  
+**Status:** Complete — see [SPRINT_11_1_LIVE_WHATSAPP.md](./SPRINT_11_1_LIVE_WHATSAPP.md)
+
+**Next focus:** Sprint 11.2 — AI conversation and qualification (not started).

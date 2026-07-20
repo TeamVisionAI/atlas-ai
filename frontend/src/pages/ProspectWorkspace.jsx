@@ -21,6 +21,8 @@ import {
 } from "../engines/workflowEngine";
 import { useLanguage } from "../i18n/LanguageContext";
 import { normalizeProspectLanguage } from "../types/language";
+import { buildProspectCenterPath } from "../utils/prospectRoutes";
+import { appPath } from "../config/appRoutes";
 import ProspectIdentityStrip from "../components/prospect-workspace/ProspectIdentityStrip";
 import JourneyProgress from "../components/prospect-workspace/JourneyProgress";
 import ActivityFeed from "../components/prospect-workspace/ActivityFeed";
@@ -119,6 +121,26 @@ export default function ProspectWorkspace() {
       cancelled = true;
     };
   }, [phone, refreshWorkspace]);
+
+  useEffect(() => {
+    const refreshLiveWorkspace = () => {
+      if (document.visibilityState !== "visible" || loading) {
+        return;
+      }
+
+      refreshWorkspace().catch((error) => {
+        console.error(error);
+      });
+    };
+
+    const intervalId = window.setInterval(refreshLiveWorkspace, 20000);
+    window.addEventListener("focus", refreshLiveWorkspace);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshLiveWorkspace);
+    };
+  }, [loading, refreshWorkspace]);
 
   const handleCommunicationLanguageChange = useCallback(
     async (nextLanguage) => {
@@ -321,10 +343,13 @@ export default function ProspectWorkspace() {
   return (
     <div className="prospect-workspace">
       <header className="prospect-workspace__toolbar">
-        <Link to="/" className="prospect-workspace__back">
+        <Link to={appPath()} className="prospect-workspace__back">
           ← {translate("workspaceBack")}
         </Link>
         <span className="prospect-workspace__title">{translate("workspaceTitle")}</span>
+        <Link to={buildProspectCenterPath()} className="prospect-workspace__mission-link">
+          {translate("navProspectCenter")}
+        </Link>
         <button
           type="button"
           className="prospect-workspace__mission-link"

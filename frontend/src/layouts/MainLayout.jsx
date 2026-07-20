@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { missionControlNav } from "../config/missionControlNav";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -56,6 +56,10 @@ function SidebarNav({
 }) {
   return (
     <>
+      <Link to="/" className="atlas-layout__public-link">
+        ← Team Vision Financial
+      </Link>
+
       <div className="atlas-layout__sidebar-head">
         <h2 className="atlas-layout__brand-title">{translate("layoutAppTitle")}</h2>
         <div style={{ display: "flex", gap: 8 }}>

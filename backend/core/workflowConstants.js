@@ -69,7 +69,11 @@ const EVENT_TYPES = Object.freeze({
   WORKFLOW_RESUMED: "WorkflowResumed",
   WORKFLOW_PAUSED: "WorkflowPaused",
   PROSPECT_CLOSED: "ProspectClosed",
-  DO_NOT_CONTACT_APPLIED: "DoNotContactApplied"
+  DO_NOT_CONTACT_APPLIED: "DoNotContactApplied",
+  CONVERSATION_STARTED: "ConversationStarted",
+  CONVERSATION_REOPENED: "ConversationReopened",
+  CONVERSATION_ASSIGNED: "ConversationAssigned",
+  CONVERSATION_CLOSED: "ConversationClosed"
 });
 
 const INTERVIEW_SOON_MS = 2 * 60 * 60 * 1000;

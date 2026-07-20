@@ -1,9 +1,8 @@
 const express = require("express");
-const { sendTextMessage } = require("../services/whatsappService");
-
-const {
-  handleIncomingMessage
-} = require("../core/conversationEngine");
+const { verifyMetaWebhookSignature } = require("../middleware/metaWebhookSignature");
+const { parseWhatsAppWebhookBody } = require("../services/whatsappWebhookParser");
+const { processInboundWhatsAppMessage } = require("../core/whatsappInboundPipeline");
+const { logWhatsAppStage } = require("../core/whatsappStructuredLogger");
 
 const router = express.Router();
 
@@ -12,42 +11,53 @@ router.get("/", (req, res) => {
   const verifyToken = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (
-    mode === "subscribe" &&
-    verifyToken === process.env.VERIFY_TOKEN
-  ) {
+  if (mode === "subscribe" && verifyToken === process.env.VERIFY_TOKEN) {
+    logWhatsAppStage("webhook_verified");
     return res.status(200).send(challenge);
   }
 
   return res.sendStatus(403);
 });
 
-router.post("/", async (req, res) => {
-  console.log("📩 Incoming WhatsApp webhook");
-  console.log(JSON.stringify(req.body, null, 2));
+router.post("/", verifyMetaWebhookSignature, async (req, res) => {
+  res.sendStatus(200);
 
-  const value = req.body.entry?.[0]?.changes?.[0]?.value;
-  const message = value?.messages?.[0];
+  let body;
 
-  if (message && message.type === "text") {
-    console.log("💬 User:", message.text.body);
-  
-    const phone = message.from;
-    const name = value.contacts?.[0]?.profile?.name || "Unknown";
-  
-    const result = await handleIncomingMessage(
-      phone,
-      name,
-      message.text.body
-    );
-
-    const replyText =
-      typeof result === "string" ? result : result?.reply || "";
-
-    await sendTextMessage(phone, replyText);
+  try {
+    body = JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "{}");
+  } catch (error) {
+    logWhatsAppStage("webhook_parse_failed", {
+      level: "error",
+      error: error.message
+    });
+    return;
   }
 
-  res.sendStatus(200);
+  logWhatsAppStage("webhook_received", {
+    object: body.object || null,
+    entryCount: body.entry?.length || 0
+  });
+
+  const messages = parseWhatsAppWebhookBody(body);
+
+  if (!messages.length) {
+    logWhatsAppStage("webhook_ignored", { reason: "no_messages" });
+    return;
+  }
+
+  for (const inbound of messages) {
+    try {
+      await processInboundWhatsAppMessage(inbound);
+    } catch (error) {
+      logWhatsAppStage("message_processing_failed", {
+        phone: inbound.phone,
+        providerMessageId: inbound.providerMessageId,
+        level: "error",
+        error: error.message
+      });
+    }
+  }
 });
 
 module.exports = router;

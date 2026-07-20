@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getExecutiveDashboard } from "../services/executiveDashboardService";
-import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import { buildExecutiveDashboardViewModel } from "../engines/executiveDashboardViewModel";
+import {
+  buildProspectCenterPath,
+  buildProspectWorkspacePath
+} from "../utils/prospectRoutes";
 import { useLanguage } from "../i18n/LanguageContext";
 import InterviewsHero from "../components/executive/InterviewsHero";
 import MorningBrief from "../components/executive/MorningBrief";
@@ -78,8 +81,12 @@ export default function ExecutiveDashboard() {
     return buildExecutiveDashboardViewModel(executive, dashboard, translate);
   }, [executive, dashboard, translate]);
 
-  function openMissionControl(options = {}) {
-    navigate(buildMissionControlPath(options));
+  function openProspectCenter(options = {}) {
+    navigate(buildProspectCenterPath(options));
+  }
+
+  function openProspectWorkspace(phone) {
+    navigate(buildProspectWorkspacePath({ phone }));
   }
 
   if (loading) {
@@ -106,19 +113,17 @@ export default function ExecutiveDashboard() {
     <div className="executive-dashboard">
       <InterviewsHero
         hero={viewModel.hero}
-        onOpenMissionControl={() =>
-          openMissionControl({ filter: "interviews-today" })
-        }
+        onOpenMissionControl={() => openProspectCenter({ filter: "interviews-today" })}
       />
 
       <MorningBrief
         brief={viewModel.morningBrief}
-        onReview={(phone, filter) => openMissionControl({ phone, filter })}
+        onReview={(phone) => openProspectWorkspace(phone)}
       />
 
       <FocusCards
         cards={viewModel.focusCards}
-        onNavigate={(filter) => openMissionControl({ filter })}
+        onNavigate={(filter) => openProspectCenter({ filter })}
       />
 
       <div className="executive-grid-two">
@@ -129,7 +134,7 @@ export default function ExecutiveDashboard() {
       <div className="executive-grid-two">
         <RecommendationCards
           items={viewModel.recommendations}
-          onOpen={(phone, filter) => openMissionControl({ phone, filter })}
+          onOpen={(phone) => openProspectWorkspace(phone)}
         />
         <ActivityTimeline activity={viewModel.activity} />
       </div>

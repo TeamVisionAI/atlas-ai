@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getOrganizationSettings } from "../services/organizationService";
 import {
@@ -45,6 +45,10 @@ import {
   filterQueueForExecutiveFilter
 } from "../engines/executiveFilterEngine";
 import { useLanguage } from "../i18n/LanguageContext";
+import {
+  buildProspectCenterPath,
+  buildProspectWorkspacePath
+} from "../utils/prospectRoutes";
 import "./MissionControl.css";
 
 const sectionLabelStyle = {
@@ -81,6 +85,7 @@ async function loadWorkspaceForQueueItem(item, dashboardData) {
 
 export default function Dashboard() {
   const { phone: routePhone } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { translate } = useLanguage();
   const executiveFilter = searchParams.get("filter");
@@ -432,12 +437,10 @@ export default function Dashboard() {
 
   const openWorkspaceForPhone = useCallback(
     (targetPhone) => {
-      const index = findQueueIndex(queue, targetPhone);
-
-      loadProspectAtIndex(index, queue, dashboard);
+      navigate(buildProspectWorkspacePath({ phone: targetPhone }));
       setActiveMetricPanel(null);
     },
-    [loadProspectAtIndex, queue, dashboard]
+    [navigate]
   );
 
   function renderLoadError(error) {
@@ -492,6 +495,16 @@ export default function Dashboard() {
 
       <div className="mission-control-page">
         <div className="mission-control-page__header-band">
+          <div className="mission-control-page__header-links">
+            <Link
+              to={buildProspectCenterPath({
+                filter: executiveFilter || undefined
+              })}
+              className="mission-control-page__prospect-center-link"
+            >
+              {translate("missionControlOpenProspectCenter")}
+            </Link>
+          </div>
           {executiveFilter ? (
             <div className="mission-control-page__filter-banner">
               {translate("missionControlFilteredView")}{" "}
