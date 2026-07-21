@@ -29,6 +29,14 @@
 
 ---
 
+## Documentation — Sprint 11.4 Meta AI pre-change gate (DOC-0701 v1.6)
+
+**Date:** 2026-07-21
+
+Before WABA reassignment or other Meta configuration changes: consult Meta AI with a precise engineering question about moving the Developer App from the disabled Test WABA to an Approved production WABA; record guidance; compare with official Meta documentation before implementing.
+
+---
+
 ## Documentation — Sprint 11.4 WABA inventory completed (DOC-0701 v1.5)
 
 **Date:** 2026-07-21

@@ -130,6 +130,8 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **WABA migration policy:** Do **not** delete unused WABAs during migration. Inventory complete; perform cleanup only after Atlas is successfully running in the new production environment. See [WABA migration policy](../deployment/sprint-11.4-meta-production.md#waba-migration-policy-do-not-delete-during-migration).
 
+**Pre-change gate (before WABA reassignment):** Consult Meta AI with a precise engineering question about reassigning the Developer App from the disabled Test WABA to an Approved production WABA. Record Meta's guidance and compare with official Meta documentation before implementing any configuration changes. See [pre-change gate](../deployment/sprint-11.4-meta-production.md#pre-change-gate-consult-meta-ai-before-waba-reassignment) (DOC-0701 v1.6).
+
 ---
 
 ## Live production smoke test (required before ads)
