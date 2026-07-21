@@ -29,6 +29,14 @@
 
 ---
 
+## Documentation — Sprint 11.4 WABA migration policy (DOC-0701 v1.4)
+
+**Date:** 2026-07-21
+
+Do not delete unused WhatsApp Business Accounts during migration. Added WABA inventory requirements (ownership, linked apps, phone numbers, production usage) and cleanup timing: only after Atlas is successfully running in the new production environment.
+
+---
+
 ## Documentation — Sprint 11.4 root cause refined (DOC-0701 v1.3)
 
 | Field | Value |

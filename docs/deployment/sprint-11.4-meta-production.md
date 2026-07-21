@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 1.3 |
+| **Version** | 1.4 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -132,6 +132,7 @@ These approved accounts are eligible for production Cloud API connection. Do **n
 - Re-submit Business Verification solely because of this WABA error (portfolio already appears healthy)
 - Assume Facebook/Instagram ad delivery is blocked (portfolio advertising restrictions were not found)
 - Redeploy Atlas or change Railway env vars expecting a portfolio-level fix
+- **Delete unused WhatsApp Business Accounts during migration** — see [WABA migration policy](#waba-migration-policy-do-not-delete-during-migration)
 
 **Do:**
 
@@ -158,6 +159,8 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 
 - [ ] **Business Portfolio healthy** — Business Home loads; Team Vision Financial profile and ad account accessible
 - [ ] **List all WABAs** — Business settings → Accounts → WhatsApp accounts
+- [ ] **Complete WABA inventory** — ownership, linked apps, phone numbers, production usage (see [migration policy](#waba-migration-policy-do-not-delete-during-migration))
+- [ ] **Do not delete unused WABAs** during migration
 - [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using a disabled **Test** WABA
 - [ ] **Confirm target WABA status is Approved** — use **Niovel Perez**, **Ana Perez**, or the WABA for **786-752-8080**
 - [ ] **Reject / switch away from Test WABA** if Meta auto-selects a disabled test account
@@ -166,6 +169,68 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 - [ ] **`GET /health/production`** returns `mvp_ready: true` on Atlas (backend ready independently of Meta UI selection)
 
 > **Rule:** **Explicitly verify the WABA Meta selects before beginning Cloud API onboarding.** A disabled Test WABA will fail even when production WABAs are Approved.
+
+---
+
+## WABA migration policy (do not delete during migration)
+
+During Sprint **11.4** production migration to Atlas, **do not delete unused WhatsApp Business Accounts (WABAs)** until Atlas is fully operational in the new production environment.
+
+### Why
+
+Removing WABAs mid-migration can break:
+
+- Embedded Signup or Cloud API bindings still pointing at the deleted account
+- Webhook subscriptions and `phone_number_id` references on Railway
+- Atlas Meta app permissions and token exchange
+- Phone number **786-752-8080** routing if ownership links are unclear
+- Rollback paths if the new production WABA connection fails
+
+An unused or disabled WABA may still be a **dependency** Meta or Atlas references during migration — especially the **Test WABA** that was auto-selected incorrectly.
+
+### Step 1 — Inventory all WABAs (required before any cleanup)
+
+In **Business settings → Accounts → WhatsApp accounts**, record every WABA:
+
+| Field | What to capture |
+|-------|-----------------|
+| **WABA name** | e.g. Niovel Perez, Ana Perez, Test account |
+| **WABA ID** | Meta account identifier |
+| **Status** | Approved, Disabled, Test, Restricted, etc. |
+| **Ownership** | Business Portfolio, assigned users, admin roles |
+| **Linked Meta apps** | Atlas app and any other apps with WABA access |
+| **Phone numbers** | Display number, **786-752-8080**, test numbers |
+| **Production usage** | Active ads Click-to-WhatsApp, live customer messaging, Atlas webhook traffic |
+| **Atlas binding** | Selected in Developer Console API Setup? Stored in Embedded Signup? |
+
+Maintain this inventory in the resolution log or an internal runbook until migration is complete.
+
+### Step 2 — Select production WABA (do not delete others yet)
+
+1. Choose the **Approved** production WABA for Atlas (**Niovel Perez**, **Ana Perez**, or **786-752-8080** account).
+2. Switch Meta Developer Console and Embedded Signup to that WABA.
+3. Leave **all other WABAs in place** until Step 4 is complete — including disabled Test accounts.
+
+### Step 3 — Run Atlas in new production environment
+
+Complete before any WABA deletion:
+
+- [ ] Correct Approved WABA connected with valid `phone_number_id`
+- [ ] Railway webhook and credentials configured for that WABA
+- [ ] `GET /health/production` → `mvp_ready: true`
+- [ ] **Live end-to-end smoke test passed** — WhatsApp **786-752-8080** → Atlas reply → qualification → calendar booking
+- [ ] Embedded Signup (if used) stores token for the **production** WABA, not the Test WABA
+
+### Step 4 — Cleanup (only after Atlas is stable)
+
+**Only after** Atlas is successfully running in the new production environment:
+
+1. Re-review the WABA inventory — confirm no app, webhook, ad, or token still references a WABA marked for removal.
+2. Archive inventory notes (WABA ID, deletion date, reason).
+3. Delete or disable **unused** WABAs one at a time, starting with clearly orphaned Test accounts — **never** the active production WABA.
+4. Re-run smoke test after each removal to confirm no regression.
+
+> **Rule:** **Inventory first. Migrate second. Clean up last.** Deleting WABAs during migration risks removing dependencies Atlas or Meta still requires.
 
 ---
 
@@ -254,6 +319,7 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 
 ## Atlas production checklist (after correct WABA selected)
 
+- [ ] **WABA inventory complete** — do not delete unused WABAs until live smoke test passes (see [migration policy](#waba-migration-policy-do-not-delete-during-migration))
 - [ ] **Approved production WABA selected** — not disabled Test WABA (Niovel Perez, Ana Perez, or 786-752-8080 WABA)
 - [ ] WABA status **Approved** in Business Settings
 - [ ] Cloud API setup completed with valid `phone_number_id` for production number **786-752-8080**
@@ -272,6 +338,7 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | Verified **Team Vision Financial Business Portfolio** healthy (no ad restrictions, no support cases); concluded restriction is **likely WABA-isolated**, not portfolio-wide |
 | 2026-07-21 | Confirmed **Business Home** operational — Team Vision Financial profile and ad account load normally; **next step:** Business Settings → WhatsApp accounts (WABA assets and permissions) |
 | 2026-07-21 | **Root cause refined:** Meta auto-selected **disabled Test WABA** instead of approved production WABA; **Niovel Perez** and **Ana Perez** WABAs verified **Approved**; deployment checklist must verify WABA selection before Cloud API onboarding |
+| 2026-07-21 | **WABA migration policy:** Do not delete unused WABAs during migration; inventory all WABAs (ownership, linked apps, phone numbers, production usage); cleanup only after Atlas is stable in new production environment |
 
 ---
 

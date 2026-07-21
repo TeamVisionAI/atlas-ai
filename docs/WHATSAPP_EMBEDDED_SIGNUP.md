@@ -36,7 +36,7 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 
 Copy `.env.example` → `.env` and fill values.
 
-> **Production troubleshooting (Sprint 11.4):** If Meta Cloud API initialization fails, see [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md). **Verify Meta selected an Approved production WABA** — not a disabled Test account — before onboarding. This is a Meta WABA selection issue, not an Atlas backend defect.
+> **Production troubleshooting (Sprint 11.4):** If Meta Cloud API initialization fails, see [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md). **Verify Meta selected an Approved production WABA** — not a disabled Test account — before onboarding. **Do not delete unused WABAs during migration** — inventory first; cleanup only after Atlas is stable in production. This is a Meta WABA selection issue, not an Atlas backend defect.
 
 ---
 

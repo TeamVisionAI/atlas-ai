@@ -125,6 +125,8 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **Action:** Follow the [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701) before retrying Cloud API setup.
 
+**WABA migration policy:** Do **not** delete unused WABAs during migration. Inventory all accounts (ownership, linked apps, phone numbers, production usage) first; perform cleanup only after Atlas is successfully running in the new production environment. See [WABA migration policy](../deployment/sprint-11.4-meta-production.md#waba-migration-policy-do-not-delete-during-migration) (DOC-0701 v1.4).
+
 ---
 
 ## Live production smoke test (required before ads)
