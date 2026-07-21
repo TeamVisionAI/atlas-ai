@@ -1,0 +1,400 @@
+{
+  "briefs": {
+    "f4cf58cd-3063-4eb8-9a4f-182459ac874e:2026-07-21": {
+      "id": "5b598462-d03d-4661-b0ac-022ce030f64e",
+      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+      "organization": "Acme Recruiting Group",
+      "version": 5,
+      "date": "2026-07-21",
+      "generatedAt": "2026-07-21T15:29:31.479Z",
+      "executiveSummary": {
+        "lines": [
+          "Good morning. Here is your Atlas Daily Brief for Acme Recruiting Group.",
+          "0 appointment(s) and 0 meeting(s) scheduled today.",
+          "0 open conversation(s) and 0 pending follow-up(s).",
+          "2 high-priority item(s) require attention today."
+        ],
+        "recommendedAction": "Verify connector credentials and reconnect integration",
+        "coachingLeader": "Acme Recruiting Group"
+      },
+      "organizationHealth": {
+        "score": 50,
+        "status": "attention",
+        "connectorsHealthy": 1,
+        "connectorsTotal": 2,
+        "activePackages": 1,
+        "offices": 1,
+        "users": 0
+      },
+      "keyMetrics": {
+        "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+        "date": "2026-07-21",
+        "newProspectsToday": 3,
+        "newConversations": 0,
+        "qualifiedProspects": 12,
+        "interviewRate": 70,
+        "noShowRate": 30,
+        "presentationRate": 71,
+        "joinRate": 60,
+        "licensingRate": 67,
+        "fastStartCompletion": 33,
+        "followUpCompletion": 50,
+        "connectorUptime": 50,
+        "packageActivity": {
+          "candidates": 20,
+          "interviews": 10,
+          "presentations": 5,
+          "joined": 3
+        },
+        "appointmentsToday": 0,
+        "meetingsToday": 0,
+        "pendingFollowUps": 0,
+        "openConversations": 0,
+        "activePackages": 1,
+        "offices": 1,
+        "users": 0
+      },
+      "trends": [
+        {
+          "metric": "newProspectsToday",
+          "current": 3,
+          "previous": 5,
+          "direction": "declining"
+        },
+        {
+          "metric": "newConversations",
+          "current": 0,
+          "previous": 3,
+          "direction": "declining"
+        },
+        {
+          "metric": "qualifiedProspects",
+          "current": 12,
+          "previous": 10,
+          "direction": "improving"
+        },
+        {
+          "metric": "interviewRate",
+          "current": 70,
+          "previous": 85,
+          "direction": "declining"
+        },
+        {
+          "metric": "noShowRate",
+          "current": 30,
+          "previous": 15,
+          "direction": "declining"
+        },
+        {
+          "metric": "presentationRate",
+          "current": 71,
+          "previous": 60,
+          "direction": "improving"
+        },
+        {
+          "metric": "joinRate",
+          "current": 60,
+          "previous": 40,
+          "direction": "improving"
+        },
+        {
+          "metric": "licensingRate",
+          "current": 67,
+          "previous": 50,
+          "direction": "improving"
+        },
+        {
+          "metric": "fastStartCompletion",
+          "current": 33,
+          "previous": 30,
+          "direction": "improving"
+        },
+        {
+          "metric": "followUpCompletion",
+          "current": 50,
+          "previous": 80,
+          "direction": "declining"
+        },
+        {
+          "metric": "connectorUptime",
+          "current": 50,
+          "previous": 100,
+          "direction": "declining"
+        }
+      ],
+      "insights": [
+        {
+          "id": "trend-newProspectsToday",
+          "category": "trend",
+          "observation": "New Prospects Today decreased from 5 to 3.",
+          "metric": "newProspectsToday",
+          "severity": "medium"
+        },
+        {
+          "id": "trend-newConversations",
+          "category": "trend",
+          "observation": "New Conversations decreased from 3 to 0.",
+          "metric": "newConversations",
+          "severity": "medium"
+        },
+        {
+          "id": "trend-qualifiedProspects-up",
+          "category": "trend",
+          "observation": "Qualified Prospects improved from 10 to 12.",
+          "metric": "qualifiedProspects",
+          "severity": "low"
+        },
+        {
+          "id": "trend-interviewRate",
+          "category": "trend",
+          "observation": "Interview Rate decreased from 85 to 70.",
+          "metric": "interviewRate",
+          "severity": "medium"
+        },
+        {
+          "id": "trend-noShowRate",
+          "category": "trend",
+          "observation": "No Show Rate decreased from 15 to 30.",
+          "metric": "noShowRate",
+          "severity": "medium"
+        },
+        {
+          "id": "trend-presentationRate-up",
+          "category": "trend",
+          "observation": "Presentation Rate improved from 60 to 71.",
+          "metric": "presentationRate",
+          "severity": "low"
+        },
+        {
+          "id": "trend-joinRate-up",
+          "category": "trend",
+          "observation": "Join Rate improved from 40 to 60.",
+          "metric": "joinRate",
+          "severity": "low"
+        },
+        {
+          "id": "trend-licensingRate-up",
+          "category": "trend",
+          "observation": "Licensing Rate improved from 50 to 67.",
+          "metric": "licensingRate",
+          "severity": "low"
+        },
+        {
+          "id": "trend-fastStartCompletion-up",
+          "category": "trend",
+          "observation": "Fast Start Completion improved from 30 to 33.",
+          "metric": "fastStartCompletion",
+          "severity": "low"
+        },
+        {
+          "id": "trend-followUpCompletion",
+          "category": "trend",
+          "observation": "Follow Up Completion decreased from 80 to 50.",
+          "metric": "followUpCompletion",
+          "severity": "medium"
+        },
+        {
+          "id": "trend-connectorUptime",
+          "category": "trend",
+          "observation": "Connector Uptime decreased from 100 to 50.",
+          "metric": "connectorUptime",
+          "severity": "high"
+        },
+        {
+          "id": "interview-attendance",
+          "category": "interviews",
+          "observation": "Interview attendance decreased. No-show rate is 30%.",
+          "severity": "high"
+        },
+        {
+          "id": "licensing-improved",
+          "category": "licensing",
+          "observation": "Licensing completion improved compared to prior period.",
+          "severity": "low"
+        },
+        {
+          "id": "connector-zoom",
+          "category": "connectors",
+          "observation": "Connector \"zoom\" is unavailable (failed).",
+          "severity": "high"
+        }
+      ],
+      "priorities": [
+        {
+          "id": "reconnect-zoom",
+          "title": "Reconnect zoom connector",
+          "reason": "Connector health is failed",
+          "level": "high",
+          "category": "connectors"
+        },
+        {
+          "id": "contact-no-shows",
+          "title": "Contact no-show prospects",
+          "reason": "No-show rate is 30%",
+          "level": "high",
+          "category": "interviews"
+        },
+        {
+          "id": "licensing-in-progress",
+          "title": "Finish licensing for new agents",
+          "reason": "1 licensing case(s) in progress",
+          "level": "medium",
+          "category": "licensing"
+        }
+      ],
+      "recommendations": [
+        {
+          "id": "rec-reconnect-zoom",
+          "reason": "Connector health is failed",
+          "priority": "high",
+          "suggestedAction": "Verify connector credentials and reconnect integration",
+          "affectedWorkflow": null,
+          "expectedOutcome": "Restored channel availability",
+          "confidence": "high"
+        },
+        {
+          "id": "rec-contact-no-shows",
+          "reason": "No-show rate is 30%",
+          "priority": "high",
+          "suggestedAction": "Call no-show prospects and offer rescheduling",
+          "affectedWorkflow": "team-vision-recruiting",
+          "expectedOutcome": "Recover missed interview opportunities",
+          "confidence": "high"
+        },
+        {
+          "id": "rec-licensing-in-progress",
+          "reason": "1 licensing case(s) in progress",
+          "priority": "medium",
+          "suggestedAction": "Follow up with agents in licensing pipeline",
+          "affectedWorkflow": "team-vision-recruiting",
+          "expectedOutcome": "Faster licensing completion",
+          "confidence": "medium"
+        },
+        {
+          "id": "rec-insight-trend-newProspectsToday",
+          "reason": "New Prospects Today decreased from 5 to 3.",
+          "priority": "medium",
+          "suggestedAction": "Investigate metric decline and adjust workflow configuration",
+          "affectedWorkflow": "team-vision-recruiting",
+          "expectedOutcome": "Stabilized performance metrics",
+          "confidence": "medium"
+        },
+        {
+          "id": "rec-insight-trend-newConversations",
+          "reason": "New Conversations decreased from 3 to 0.",
+          "priority": "medium",
+          "suggestedAction": "Investigate metric decline and adjust workflow configuration",
+          "affectedWorkflow": "team-vision-recruiting",
+          "expectedOutcome": "Stabilized performance metrics",
+          "confidence": "medium"
+        }
+      ],
+      "todaySchedule": {
+        "appointments": [],
+        "meetings": []
+      },
+      "connectorStatus": [
+        {
+          "id": "messenger",
+          "health": "connected",
+          "defaultOfficeId": null
+        },
+        {
+          "id": "zoom",
+          "health": "failed",
+          "defaultOfficeId": null
+        }
+      ],
+      "packageStatus": [
+        {
+          "enabled": true,
+          "configured": true
+        }
+      ],
+      "generationTimeMs": 1
+    }
+  },
+  "snapshots": [
+    {
+      "id": "8e8c5d81-9cdf-4ce7-8079-0ead8413f00a",
+      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+      "snapshotId": "11167f8d-af5b-47c6-80e4-e1d33508ca73",
+      "capturedAt": "2026-07-21T15:29:31.478Z",
+      "timestamp": "2026-07-21T15:29:31.479Z"
+    }
+  ],
+  "metricsHistory": [
+    {
+      "id": "81ee5332-2853-4170-9654-b1d072e6e812",
+      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+      "date": "2026-07-21",
+      "newProspectsToday": 3,
+      "newConversations": 0,
+      "qualifiedProspects": 12,
+      "interviewRate": 70,
+      "noShowRate": 30,
+      "presentationRate": 71,
+      "joinRate": 60,
+      "licensingRate": 67,
+      "fastStartCompletion": 33,
+      "followUpCompletion": 50,
+      "connectorUptime": 50,
+      "packageActivity": {
+        "candidates": 20,
+        "interviews": 10,
+        "presentations": 5,
+        "joined": 3
+      },
+      "appointmentsToday": 0,
+      "meetingsToday": 0,
+      "pendingFollowUps": 0,
+      "openConversations": 0,
+      "activePackages": 1,
+      "offices": 1,
+      "users": 0,
+      "timestamp": "2026-07-21T15:29:31.479Z"
+    },
+    {
+      "id": "934e2721-bd9e-4757-b5e6-755e650b07b5",
+      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+      "date": "2026-07-20",
+      "interviewRate": 85,
+      "noShowRate": 15,
+      "licensingRate": 50,
+      "followUpCompletion": 80,
+      "connectorUptime": 100,
+      "newProspectsToday": 5,
+      "newConversations": 3,
+      "qualifiedProspects": 10,
+      "presentationRate": 60,
+      "joinRate": 40,
+      "fastStartCompletion": 30,
+      "timestamp": "2026-07-21T15:29:31.478Z"
+    }
+  ],
+  "generationHistory": [
+    {
+      "id": "1378db44-208e-4e59-b06a-d5085232747f",
+      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+      "briefId": "5b598462-d03d-4661-b0ac-022ce030f64e",
+      "date": "2026-07-21",
+      "generatedAt": "2026-07-21T15:29:31.479Z",
+      "version": 5,
+      "generationTimeMs": 1
+    }
+  ],
+  "analytics": {
+    "briefsGenerated": 1,
+    "briefsFailed": 0,
+    "totalGenerationTimeMs": 1,
+    "averageGenerationTimeMs": 1,
+    "totalRecommendations": 5,
+    "totalInsights": 14,
+    "priorityDistribution": {
+      "high": 2,
+      "medium": 1,
+      "low": 0
+    }
+  },
+  "updatedAt": "2026-07-21T15:29:31.479Z"
+}

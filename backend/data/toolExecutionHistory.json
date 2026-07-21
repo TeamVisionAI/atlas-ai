@@ -1,4 +1,160 @@
 {
-  "executions": [],
-  "updatedAt": "2026-07-21T15:07:02.268Z"
+  "executions": [
+    {
+      "id": "c6fb657f-48b5-4583-82bd-e816cacaebc6",
+      "request": {
+        "id": "70040912-b9f8-4e57-bb67-d607d4503d98",
+        "correlationId": "e7091626-e0a9-4c45-82c5-18cc1af6e549",
+        "toolName": "AppointmentService",
+        "operation": "scheduleInterview",
+        "parameters": {
+          "payload": {
+            "interview": {
+              "name": "Maria Lopez",
+              "email": "maria@example.com",
+              "phone": "813-555-0100",
+              "city": null,
+              "state": null,
+              "interviewType": "office",
+              "preferredDate": "tomorrow",
+              "preferredTime": "morning"
+            },
+            "collectedData": {
+              "name": "Maria Lopez",
+              "email": "maria@example.com",
+              "phone": "813-555-0100",
+              "city": null,
+              "state": null,
+              "interviewType": "office",
+              "preferredDate": "tomorrow",
+              "preferredTime": "morning"
+            },
+            "organization": {
+              "id": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+              "name": "Team Vision Autonomous",
+              "officeAddress": "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+            },
+            "prospect": {
+              "atlasId": "ATL-J5-I4-001",
+              "displayName": "Maria Lopez"
+            },
+            "workflow": {
+              "atlasProspectId": "ATL-J5-I4-001",
+              "workflowId": "generic-intake"
+            }
+          },
+          "eventBus": {
+            "_handlers": {}
+          },
+          "previousResult": null
+        },
+        "workflowName": "generic-intake",
+        "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+        "prospectId": "ATL-J5-I4-001",
+        "timestamp": "2026-07-21T15:29:37.212Z"
+      },
+      "result": {
+        "id": "5bc4f86c-c5ce-4373-8abf-55807807a026",
+        "correlationId": "e7091626-e0a9-4c45-82c5-18cc1af6e549",
+        "toolName": "AppointmentService",
+        "operation": "scheduleInterview",
+        "success": true,
+        "status": "success",
+        "resultData": {
+          "appointment": {
+            "id": "424d62b2-8dca-434f-8150-8410313fec06",
+            "prospectName": "Maria Lopez",
+            "atlasProspectId": "ATL-J5-I4-001",
+            "interviewType": "office",
+            "startTime": "2026-07-22T14:00:00.000Z",
+            "endTime": "2026-07-22T14:30:00.000Z",
+            "timeZone": "America/New_York",
+            "locationLabel": "Team Vision Office · 2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+            "status": "confirmed",
+            "confirmation": {
+              "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+              "prospectName": "Maria Lopez",
+              "meetingType": "office",
+              "date": "Wednesday, July 22",
+              "time": "10:00 AM",
+              "timezone": "America/New_York",
+              "locationName": "Team Vision Office",
+              "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+              "meetingUrl": null,
+              "createdAt": "2026-07-21T15:29:37.223Z",
+              "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nLocation:\nTeam Vision Office\n\nAddress:\n2500 NW 79th Ave, Suite 189, Doral, FL 33122\n\n\nWe look forward to meeting you!"
+            }
+          },
+          "confirmation": {
+            "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+            "prospectName": "Maria Lopez",
+            "meetingType": "office",
+            "date": "Wednesday, July 22",
+            "time": "10:00 AM",
+            "timezone": "America/New_York",
+            "locationName": "Team Vision Office",
+            "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+            "meetingUrl": null,
+            "createdAt": "2026-07-21T15:29:37.223Z",
+            "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nLocation:\nTeam Vision Office\n\nAddress:\n2500 NW 79th Ave, Suite 189, Doral, FL 33122\n\n\nWe look forward to meeting you!"
+          },
+          "confirmedPayload": {
+            "appointment": {
+              "id": "424d62b2-8dca-434f-8150-8410313fec06",
+              "prospectName": "Maria Lopez",
+              "atlasProspectId": "ATL-J5-I4-001",
+              "interviewType": "office",
+              "startTime": "2026-07-22T14:00:00.000Z",
+              "endTime": "2026-07-22T14:30:00.000Z",
+              "timeZone": "America/New_York",
+              "locationLabel": "Team Vision Office · 2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+              "status": "confirmed",
+              "confirmation": {
+                "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+                "prospectName": "Maria Lopez",
+                "meetingType": "office",
+                "date": "Wednesday, July 22",
+                "time": "10:00 AM",
+                "timezone": "America/New_York",
+                "locationName": "Team Vision Office",
+                "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+                "meetingUrl": null,
+                "createdAt": "2026-07-21T15:29:37.223Z",
+                "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nLocation:\nTeam Vision Office\n\nAddress:\n2500 NW 79th Ave, Suite 189, Doral, FL 33122\n\n\nWe look forward to meeting you!"
+              }
+            },
+            "confirmation": {
+              "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+              "prospectName": "Maria Lopez",
+              "meetingType": "office",
+              "date": "Wednesday, July 22",
+              "time": "10:00 AM",
+              "timezone": "America/New_York",
+              "locationName": "Team Vision Office",
+              "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+              "meetingUrl": null,
+              "createdAt": "2026-07-21T15:29:37.223Z",
+              "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nLocation:\nTeam Vision Office\n\nAddress:\n2500 NW 79th Ave, Suite 189, Doral, FL 33122\n\n\nWe look forward to meeting you!"
+            },
+            "organization": {
+              "id": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+              "name": "Team Vision Autonomous",
+              "officeAddress": "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+            },
+            "prospect": {
+              "atlasId": "ATL-J5-I4-001",
+              "displayName": "Maria Lopez"
+            }
+          }
+        },
+        "error": null,
+        "executionTimeMs": 11,
+        "timestamp": "2026-07-21T15:29:37.224Z"
+      },
+      "status": "success",
+      "durationMs": 11,
+      "timestamp": "2026-07-21T15:29:37.224Z"
+    }
+  ],
+  "updatedAt": "2026-07-21T15:29:37.224Z"
 }

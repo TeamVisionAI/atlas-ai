@@ -1,51 +1,51 @@
 {
   "appointments": [
     {
-      "id": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
-      "organizationId": "99718c1f-c875-46cf-84cb-1e321a5cc6cc",
-      "atlasProspectId": "ATL-000001",
-      "prospectName": "Carlos Ruiz",
-      "interviewType": "zoom",
+      "id": "424d62b2-8dca-434f-8150-8410313fec06",
+      "organizationId": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+      "atlasProspectId": "ATL-J5-I4-001",
+      "prospectName": "Maria Lopez",
+      "interviewType": "office",
       "startTime": "2026-07-22T14:00:00.000Z",
       "endTime": "2026-07-22T14:30:00.000Z",
       "timeZone": "America/New_York",
-      "locationLabel": "Zoom",
+      "locationLabel": "Team Vision Office · 2500 NW 79th Ave, Suite 189, Doral, FL 33122",
       "status": "confirmed",
-      "calendarEventId": "sim-cal-1784646422167",
-      "workflowId": "b1b052a8-5fb5-40a4-89f8-e0140621e33b",
+      "calendarEventId": null,
+      "workflowId": "generic-intake",
       "confirmation": {
-        "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
-        "prospectName": "Carlos Ruiz",
-        "meetingType": "zoom",
+        "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+        "prospectName": "Maria Lopez",
+        "meetingType": "office",
         "date": "Wednesday, July 22",
         "time": "10:00 AM",
         "timezone": "America/New_York",
-        "locationName": "Zoom",
-        "address": null,
+        "locationName": "Team Vision Office",
+        "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
         "meetingUrl": null,
-        "createdAt": "2026-07-21T15:07:02.166Z",
-        "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nMeeting:\nZoom\n\nWe look forward to meeting you!"
+        "createdAt": "2026-07-21T15:29:37.223Z",
+        "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nLocation:\nTeam Vision Office\n\nAddress:\n2500 NW 79th Ave, Suite 189, Doral, FL 33122\n\n\nWe look forward to meeting you!"
       },
-      "createdAt": "2026-07-21T15:07:02.166Z"
+      "createdAt": "2026-07-21T15:29:37.213Z"
     }
   ],
   "activity": [
     {
-      "id": "0e9a21af-c7ec-46f3-bbae-81bf89ea0dc0",
+      "id": "a52bd1b6-056e-4271-a2f0-8c6eee5fd949",
       "type": "appointment.confirmed",
-      "message": "Appointment confirmed for Carlos Ruiz.",
-      "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
-      "prospectName": "Carlos Ruiz",
-      "createdAt": "2026-07-21T15:07:02.166Z"
+      "message": "Appointment confirmed for Maria Lopez.",
+      "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+      "prospectName": "Maria Lopez",
+      "createdAt": "2026-07-21T15:29:37.223Z"
     },
     {
-      "id": "b5cc4c54-68a5-479f-8bd7-66413bed1555",
+      "id": "344e2423-4022-49a8-8d4f-2a1376354c5b",
       "type": "appointment.scheduled",
-      "message": "First appointment scheduled with Carlos Ruiz",
-      "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
-      "prospectName": "Carlos Ruiz",
-      "createdAt": "2026-07-21T15:07:02.166Z"
+      "message": "First appointment scheduled with Maria Lopez",
+      "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+      "prospectName": "Maria Lopez",
+      "createdAt": "2026-07-21T15:29:37.213Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:07:02.167Z"
+  "updatedAt": "2026-07-21T15:29:37.223Z"
 }

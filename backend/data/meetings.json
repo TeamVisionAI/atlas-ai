@@ -1,9 +1,9 @@
 {
   "meetings": [
     {
-      "id": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-      "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
-      "organizationId": "99718c1f-c875-46cf-84cb-1e321a5cc6cc",
+      "id": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+      "appointmentId": "7ae14b84-e2aa-4660-ba69-bc54b0c7bd1f",
+      "organizationId": "47bbce7a-326c-445b-a685-01f38045b903",
       "atlasProspectId": "ATL-000001",
       "prospectName": "Carlos Ruiz",
       "meetingType": "zoom",
@@ -16,16 +16,16 @@
       "locationLabel": "Zoom",
       "lifecycleStatus": "meeting_ready",
       "calendar": {
-        "calendarEventId": "sim-cal-1784646422167",
+        "calendarEventId": "sim-cal-1784647776993",
         "calendarProvider": "google",
-        "calendarLink": "https://calendar.google.com/calendar/event?eid=sim-cal-1784646422167",
+        "calendarLink": "https://calendar.google.com/calendar/event?eid=sim-cal-1784647776993",
         "status": "created",
         "simulated": true
       },
       "zoom": {
-        "meetingId": "sim-zoom-1784646422167",
-        "joinUrl": "https://zoom.us/j/sim-zoom-1784646422167",
-        "hostUrl": "https://zoom.us/s/sim-zoom-1784646422167?zak=mock",
+        "meetingId": "sim-zoom-1784647776994",
+        "joinUrl": "https://zoom.us/j/sim-zoom-1784647776994",
+        "hostUrl": "https://zoom.us/s/sim-zoom-1784647776994?zak=mock",
         "password": "000000",
         "meetingProvider": "zoom",
         "status": "created",
@@ -33,77 +33,77 @@
       },
       "reminders": [
         {
-          "id": "6fd54a13-9511-4a85-adc0-a1fbe558318e",
-          "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-          "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
+          "id": "accb6bfe-4c86-4e10-aeed-7a3bd67dfdf5",
+          "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+          "appointmentId": "7ae14b84-e2aa-4660-ba69-bc54b0c7bd1f",
           "offsetMinutes": 120,
           "scheduledFor": "2026-07-22T12:00:00.000Z",
           "status": "pending",
-          "message": "Reminder: Your meeting with Carlos Ruiz is in 2 hours. Location: https://zoom.us/j/sim-zoom-1784646422167.",
-          "createdAt": "2026-07-21T15:07:02.168Z"
+          "message": "Reminder: Your meeting with Carlos Ruiz is in 2 hours. Location: https://zoom.us/j/sim-zoom-1784647776994.",
+          "createdAt": "2026-07-21T15:29:36.995Z"
         },
         {
-          "id": "9eb52c72-7bb0-4dca-a208-8fbc26265886",
-          "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-          "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
+          "id": "bdba3aaf-be86-42af-89f8-ddb4fdf7e81f",
+          "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+          "appointmentId": "7ae14b84-e2aa-4660-ba69-bc54b0c7bd1f",
           "offsetMinutes": 30,
           "scheduledFor": "2026-07-22T13:30:00.000Z",
           "status": "pending",
-          "message": "Reminder: Your meeting with Carlos Ruiz is in 30 minutes. Location: https://zoom.us/j/sim-zoom-1784646422167.",
-          "createdAt": "2026-07-21T15:07:02.168Z"
+          "message": "Reminder: Your meeting with Carlos Ruiz is in 30 minutes. Location: https://zoom.us/j/sim-zoom-1784647776994.",
+          "createdAt": "2026-07-21T15:29:36.995Z"
         },
         {
-          "id": "088864f0-b72b-4b18-b4b8-80cd9bc9f9e7",
-          "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-          "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
+          "id": "2c692e52-e280-4a72-9eb0-36230eef864c",
+          "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+          "appointmentId": "7ae14b84-e2aa-4660-ba69-bc54b0c7bd1f",
           "offsetMinutes": 5,
           "scheduledFor": "2026-07-22T13:55:00.000Z",
           "status": "pending",
-          "message": "Reminder: Your meeting with Carlos Ruiz is in 5 minutes. Location: https://zoom.us/j/sim-zoom-1784646422167.",
-          "createdAt": "2026-07-21T15:07:02.168Z"
+          "message": "Reminder: Your meeting with Carlos Ruiz is in 5 minutes. Location: https://zoom.us/j/sim-zoom-1784647776994.",
+          "createdAt": "2026-07-21T15:29:36.995Z"
         }
       ],
-      "createdAt": "2026-07-21T15:07:02.166Z",
-      "updatedAt": "2026-07-21T15:07:02.168Z"
+      "createdAt": "2026-07-21T15:29:36.993Z",
+      "updatedAt": "2026-07-21T15:29:36.995Z"
     }
   ],
   "activity": [
     {
-      "id": "3755217c-60e1-43d5-80e0-2cb19062dc1b",
+      "id": "103b81e5-beb1-4f8f-944c-173f90b6e11a",
       "type": "meeting.ready",
       "message": "Meeting ready for Carlos Ruiz.",
-      "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-      "createdAt": "2026-07-21T15:07:02.168Z"
+      "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+      "createdAt": "2026-07-21T15:29:36.995Z"
     },
     {
-      "id": "09d1e5c0-7b4f-4954-9b9a-29160ac2f0db",
+      "id": "a57ed12d-d1eb-45d5-82f4-121e1ace016f",
       "type": "meeting.reminder.created",
       "message": "3 reminders prepared for Carlos Ruiz.",
-      "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-      "createdAt": "2026-07-21T15:07:02.168Z"
+      "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+      "createdAt": "2026-07-21T15:29:36.995Z"
     },
     {
-      "id": "4df9158b-fb29-416a-a278-39af9f3a5dc6",
+      "id": "1aff541f-aa96-469a-8005-039c46fb448c",
       "type": "meeting.zoom.created",
       "message": "Zoom meeting created for Carlos Ruiz.",
-      "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-      "createdAt": "2026-07-21T15:07:02.168Z"
+      "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+      "createdAt": "2026-07-21T15:29:36.995Z"
     },
     {
-      "id": "b3d21b58-2104-48b2-8fe2-060480d84d46",
+      "id": "752e5c14-3865-45a3-9252-040f10423e5b",
       "type": "meeting.calendar.created",
       "message": "Calendar event created for Carlos Ruiz.",
-      "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-      "createdAt": "2026-07-21T15:07:02.167Z"
+      "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+      "createdAt": "2026-07-21T15:29:36.994Z"
     },
     {
-      "id": "8563ef55-155f-4cb6-b87f-74bbfd330014",
+      "id": "81fd09b5-ae02-46ce-82b0-f3320830ad36",
       "type": "meeting.created",
       "message": "Meeting prepared for Carlos Ruiz.",
-      "meetingId": "a0458ff3-6b29-4d31-a541-6a2bb3e4afc3",
-      "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
-      "createdAt": "2026-07-21T15:07:02.167Z"
+      "meetingId": "f2fd9c73-58f5-4e8c-a9a2-b7ffdbd43eee",
+      "appointmentId": "7ae14b84-e2aa-4660-ba69-bc54b0c7bd1f",
+      "createdAt": "2026-07-21T15:29:36.993Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:07:02.168Z"
+  "updatedAt": "2026-07-21T15:29:36.995Z"
 }

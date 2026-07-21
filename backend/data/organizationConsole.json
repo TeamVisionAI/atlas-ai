@@ -1,9 +1,9 @@
 {
   "organizations": {
-    "f1b4a51c-37b7-4631-8b17-b4148f8f57d7": {
-      "id": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+    "02d3ff01-9727-4c97-ad71-c811b1fdfdbe": {
+      "id": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "profile": {
-        "id": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+        "id": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
         "name": "Acme Recruiting Group",
         "legalName": "Acme Recruiting Group LLC",
         "description": null,
@@ -19,8 +19,8 @@
         "email": "admin@acme.example",
         "businessType": "recruiting",
         "status": "active",
-        "createdAt": "2026-07-21T15:06:58.052Z",
-        "updatedAt": "2026-07-21T15:06:58.052Z"
+        "createdAt": "2026-07-21T15:29:31.527Z",
+        "updatedAt": "2026-07-21T15:29:31.527Z"
       },
       "branding": {
         "logoUrl": null,
@@ -35,7 +35,7 @@
       },
       "locations": [
         {
-          "id": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5",
+          "id": "657ee015-ce48-4276-b973-df606a1f3e2f",
           "name": "Primary Office",
           "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
           "timeZone": "America/New_York",
@@ -51,7 +51,7 @@
           "status": "active"
         },
         {
-          "id": "9d321cd1-7df2-4e7b-8c1b-111b95221bc8",
+          "id": "e601af3b-1782-4562-9a45-f8e04c735d1d",
           "name": "Satellite Office",
           "address": "100 Main St, Orlando, FL 32801",
           "timeZone": "America/New_York",
@@ -69,31 +69,31 @@
       ],
       "users": [
         {
-          "id": "11cd71f4-97e4-407c-8e02-78d1ec262c05",
+          "id": "d7e6e1e4-2d3f-43a6-b7b0-ba7787baca63",
           "name": "Alex Owner",
           "email": "owner@acme.example",
           "role": "owner",
-          "officeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5",
+          "officeId": "657ee015-ce48-4276-b973-df606a1f3e2f",
           "language": "en",
           "status": "active",
           "permissions": [
             "*"
           ],
-          "createdAt": "2026-07-21T15:06:58.059Z"
+          "createdAt": "2026-07-21T15:29:31.530Z"
         },
         {
-          "id": "2fabf388-8832-4adf-a55c-10673ffa1597",
+          "id": "fa6160bd-b58f-44a6-9a41-593e99361b9f",
           "name": "Riley Recruiter",
           "email": "recruiter@acme.example",
           "role": "recruiter",
-          "officeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5",
+          "officeId": "657ee015-ce48-4276-b973-df606a1f3e2f",
           "language": "en",
           "status": "active",
           "permissions": [
             "candidates.manage",
             "interviews.manage"
           ],
-          "createdAt": "2026-07-21T15:06:58.061Z"
+          "createdAt": "2026-07-21T15:29:31.530Z"
         }
       ],
       "packages": [
@@ -105,8 +105,8 @@
           "configuration": {
             "coverageRadiusMiles": 25
           },
-          "installedAt": "2026-07-21T15:06:58.063Z",
-          "updatedAt": "2026-07-21T15:06:58.063Z"
+          "installedAt": "2026-07-21T15:29:31.532Z",
+          "updatedAt": "2026-07-21T15:29:31.532Z"
         }
       ],
       "connectors": {
@@ -115,7 +115,7 @@
           "enabled": true,
           "credentialsRef": "vault://acme/messenger",
           "health": "connected",
-          "defaultOfficeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5"
+          "defaultOfficeId": "657ee015-ce48-4276-b973-df606a1f3e2f"
         },
         "whatsapp": {
           "connectorId": "whatsapp",
@@ -136,14 +136,14 @@
           "enabled": true,
           "credentialsRef": "vault://acme/google-calendar",
           "health": "connected",
-          "defaultOfficeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5"
+          "defaultOfficeId": "657ee015-ce48-4276-b973-df606a1f3e2f"
         },
         "zoom": {
           "connectorId": "zoom",
           "enabled": true,
           "credentialsRef": "vault://acme/zoom",
           "health": "connected",
-          "defaultOfficeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5"
+          "defaultOfficeId": "657ee015-ce48-4276-b973-df606a1f3e2f"
         }
       },
       "policies": {
@@ -191,13 +191,13 @@
         }
       },
       "version": 12,
-      "createdAt": "2026-07-21T15:06:58.052Z",
-      "updatedAt": "2026-07-21T15:06:58.067Z"
+      "createdAt": "2026-07-21T15:29:31.527Z",
+      "updatedAt": "2026-07-21T15:29:31.534Z"
     },
-    "f43d4f69-13d1-4624-8c81-434e2e959fdf": {
-      "id": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+    "b9133c0d-c6a5-47c0-a8ae-edea7879f8c8": {
+      "id": "b9133c0d-c6a5-47c0-a8ae-edea7879f8c8",
       "profile": {
-        "id": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+        "id": "b9133c0d-c6a5-47c0-a8ae-edea7879f8c8",
         "name": "Invalid Org",
         "legalName": null,
         "description": null,
@@ -210,8 +210,8 @@
         "email": null,
         "businessType": null,
         "status": "active",
-        "createdAt": "2026-07-21T15:06:58.069Z",
-        "updatedAt": "2026-07-21T15:06:58.069Z"
+        "createdAt": "2026-07-21T15:29:31.535Z",
+        "updatedAt": "2026-07-21T15:29:31.535Z"
       },
       "branding": {
         "logoUrl": null,
@@ -233,8 +233,8 @@
           "installed": true,
           "enabled": true,
           "configuration": {},
-          "installedAt": "2026-07-21T15:06:58.070Z",
-          "updatedAt": "2026-07-21T15:06:58.070Z"
+          "installedAt": "2026-07-21T15:29:31.536Z",
+          "updatedAt": "2026-07-21T15:29:31.536Z"
         }
       ],
       "connectors": {
@@ -312,14 +312,14 @@
         }
       },
       "version": 3,
-      "createdAt": "2026-07-21T15:06:58.069Z",
-      "updatedAt": "2026-07-21T15:06:58.070Z"
+      "createdAt": "2026-07-21T15:29:31.535Z",
+      "updatedAt": "2026-07-21T15:29:31.536Z"
     }
   },
   "validationHistory": [
     {
-      "id": "aebd44b7-ea69-4ca8-b679-71a0b471d740",
-      "organizationId": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+      "id": "dda463c1-3093-45f7-853f-d582eb9a3418",
+      "organizationId": "b9133c0d-c6a5-47c0-a8ae-edea7879f8c8",
       "valid": false,
       "errors": [
         {
@@ -332,116 +332,116 @@
         }
       ],
       "warnings": [],
-      "timestamp": "2026-07-21T15:06:58.071Z"
+      "timestamp": "2026-07-21T15:29:31.536Z"
     },
     {
-      "id": "34e98d08-a09a-437c-baba-18efda0b7f09",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "e248beab-6d35-41e7-a9ef-4028bd4b0a51",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "valid": true,
       "errors": [],
       "warnings": [],
-      "timestamp": "2026-07-21T15:06:58.068Z"
+      "timestamp": "2026-07-21T15:29:31.535Z"
     },
     {
-      "id": "0364f256-5ac0-4788-8605-a881f741d60c",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "750256fe-85a2-4623-a540-efc2b4c27984",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "valid": true,
       "errors": [],
       "warnings": [],
-      "timestamp": "2026-07-21T15:06:58.064Z"
+      "timestamp": "2026-07-21T15:29:31.533Z"
     }
   ],
   "configurationHistory": [
     {
-      "id": "76a96412-7bfc-4c4f-b4c1-e972b8d96917",
-      "organizationId": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+      "id": "2a27bbe0-ae0d-4404-ba27-14de49511cff",
+      "organizationId": "b9133c0d-c6a5-47c0-a8ae-edea7879f8c8",
       "version": 3,
       "change": "package.installed",
-      "timestamp": "2026-07-21T15:06:58.070Z"
+      "timestamp": "2026-07-21T15:29:31.536Z"
     },
     {
-      "id": "11bdc887-1d81-4f9f-befd-6dfb09a38582",
-      "organizationId": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+      "id": "068371a4-ee51-4d7d-bfb7-249009bd6b61",
+      "organizationId": "b9133c0d-c6a5-47c0-a8ae-edea7879f8c8",
       "version": 2,
       "change": "branding.updated",
-      "timestamp": "2026-07-21T15:06:58.070Z"
+      "timestamp": "2026-07-21T15:29:31.536Z"
     },
     {
-      "id": "ef86e96d-3721-4100-9db3-f1447182b8cf",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "3c4a2d1b-cc76-423c-a93a-54c6a1f48b73",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 12,
       "change": "connector.updated",
-      "timestamp": "2026-07-21T15:06:58.067Z"
+      "timestamp": "2026-07-21T15:29:31.534Z"
     },
     {
-      "id": "da23a6ca-227b-43a8-8bbd-4893b67ff4eb",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "904d3a55-0451-4a53-9533-07bbdec4b480",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 11,
       "change": "connector.updated",
-      "timestamp": "2026-07-21T15:06:58.066Z"
+      "timestamp": "2026-07-21T15:29:31.534Z"
     },
     {
-      "id": "cca82f17-2a5d-449c-b8d0-792752a64ecf",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "792d7815-f05f-4b6d-a725-b4fb0653759d",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 10,
       "change": "connector.updated",
-      "timestamp": "2026-07-21T15:06:58.065Z"
+      "timestamp": "2026-07-21T15:29:31.533Z"
     },
     {
-      "id": "1c5a2a46-d426-4c3f-8b2c-0b54bc05f4a0",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "f732a075-9b61-4fff-b120-39fa60c979bb",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 9,
       "change": "package.installed",
-      "timestamp": "2026-07-21T15:06:58.063Z"
+      "timestamp": "2026-07-21T15:29:31.532Z"
     },
     {
-      "id": "5b6dd492-70ab-4f84-8e95-5c6fd01e2a55",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "640cc2c1-2cbe-45f0-8e3f-f43bf5e96311",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 8,
       "change": "settings.updated",
-      "timestamp": "2026-07-21T15:06:58.062Z"
+      "timestamp": "2026-07-21T15:29:31.532Z"
     },
     {
-      "id": "0f393161-d988-4560-b497-7066292832d2",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "e14b30fd-cffd-46df-ab17-391356822d2f",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 7,
       "change": "policies.updated",
-      "timestamp": "2026-07-21T15:06:58.062Z"
+      "timestamp": "2026-07-21T15:29:31.531Z"
     },
     {
-      "id": "6711bb3f-d7d2-4c02-ae16-144d957628b9",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "b9c3305f-5077-4d64-b07d-75c50f9b9c3d",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 6,
       "change": "user.created",
-      "timestamp": "2026-07-21T15:06:58.061Z"
+      "timestamp": "2026-07-21T15:29:31.531Z"
     },
     {
-      "id": "f2e82dc3-445f-4b0c-b6d7-2874fe6964d7",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "07636574-59d1-4eec-a5ab-7a950acf5b8c",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 5,
       "change": "user.created",
-      "timestamp": "2026-07-21T15:06:58.060Z"
+      "timestamp": "2026-07-21T15:29:31.530Z"
     },
     {
-      "id": "f633f30c-29de-4f40-b4e9-19fc8616ea90",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "37e40ae2-8455-4d6e-b83b-5d78b951501a",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 4,
       "change": "office.created",
-      "timestamp": "2026-07-21T15:06:58.057Z"
+      "timestamp": "2026-07-21T15:29:31.530Z"
     },
     {
-      "id": "9fec06c7-ab94-4a4a-906d-840711b909bf",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "4d3e0331-39b9-452e-91d7-4d59bd25da4a",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 3,
       "change": "office.created",
-      "timestamp": "2026-07-21T15:06:58.057Z"
+      "timestamp": "2026-07-21T15:29:31.529Z"
     },
     {
-      "id": "bb90f879-6007-43a2-a577-bb43d622e1b4",
-      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "id": "2426f7a1-ae67-4509-b7d8-3df6234b4450",
+      "organizationId": "02d3ff01-9727-4c97-ad71-c811b1fdfdbe",
       "version": 2,
       "change": "branding.updated",
-      "timestamp": "2026-07-21T15:06:58.055Z"
+      "timestamp": "2026-07-21T15:29:31.528Z"
     }
   ],
   "analytics": {
@@ -454,5 +454,5 @@
     "configurationVersions": 13,
     "validationResults": 3
   },
-  "updatedAt": "2026-07-21T15:06:58.071Z"
+  "updatedAt": "2026-07-21T15:29:31.536Z"
 }

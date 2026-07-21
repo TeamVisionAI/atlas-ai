@@ -1,40 +1,95 @@
 {
   "sessions": {
-    "23df5f26-b038-4705-8f62-d678d4a2cc1f": {
-      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
-      "prospectId": "ATL-J6-001",
-      "organizationId": "fd2b475b-2670-454f-b2f9-283912d3eced",
+    "dee2e4a7-a350-44ee-8fd9-a279a5f411f6": {
+      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "prospectId": "ATL-J5-I4-001",
+      "organizationId": "30409a86-836a-4837-b3cb-39fe72ef73a4",
       "workflowName": "generic-intake",
-      "currentStep": "collect_email",
-      "currentObjective": "Learn the prospect email",
+      "currentStep": "collect_phone",
+      "currentObjective": "Collect contact information",
       "collectedFacts": {
         "name": {
           "value": "Maria Lopez",
           "source": "prospect",
           "confidence": "high",
-          "collectedAt": "2026-07-21T15:07:02.299Z"
+          "collectedAt": "2026-07-21T15:29:37.207Z"
+        },
+        "email": {
+          "value": "maria@example.com",
+          "source": "prospect",
+          "confidence": "high",
+          "collectedAt": "2026-07-21T15:29:37.210Z"
+        },
+        "phone": {
+          "value": "813-555-0100",
+          "source": "prospect",
+          "confidence": "high",
+          "collectedAt": "2026-07-21T15:29:37.212Z"
         }
       },
-      "pendingQuestions": [
-        "Collect email"
-      ],
+      "pendingQuestions": [],
       "completedActions": [
         "Asked for name",
-        "Asked for email"
+        "Asked for email",
+        "Asked for phone",
+        "Tool execution attempted"
       ],
-      "toolExecutions": [],
-      "status": "active",
-      "outcome": "incomplete",
+      "toolExecutions": [
+        {
+          "toolName": "AppointmentService",
+          "operation": "scheduleInterview",
+          "success": true,
+          "correlationId": "e7091626-e0a9-4c45-82c5-18cc1af6e549",
+          "timestamp": "2026-07-21T15:29:37.224Z"
+        }
+      ],
+      "status": "closed",
+      "outcome": "appointment_scheduled",
       "escalations": [],
-      "openTasks": [
-        "Collect email"
-      ],
-      "lastActivityAt": "2026-07-21T15:07:02.300Z",
-      "startedAt": "2026-07-21T15:07:02.297Z",
-      "completedAt": null,
-      "closedAt": null
+      "openTasks": [],
+      "lastActivityAt": "2026-07-21T15:29:37.224Z",
+      "startedAt": "2026-07-21T15:29:37.207Z",
+      "completedAt": "2026-07-21T15:29:37.225Z",
+      "closedAt": "2026-07-21T15:29:37.225Z"
     }
   },
-  "summaries": [],
-  "updatedAt": "2026-07-21T15:07:02.300Z"
+  "summaries": [
+    {
+      "id": "34698f78-7f3b-47c9-9daf-0fd25b16fa9b",
+      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "prospect": {
+        "id": "ATL-J5-I4-001",
+        "displayName": "Maria Lopez"
+      },
+      "workflow": {
+        "name": "generic-intake",
+        "objective": "Collect contact information"
+      },
+      "objective": "Collect contact information",
+      "collectedFacts": {
+        "name": "Maria Lopez",
+        "email": "maria@example.com",
+        "phone": "813-555-0100"
+      },
+      "actionsTaken": [
+        "Asked for name",
+        "Asked for email",
+        "Asked for phone",
+        "Tool execution attempted"
+      ],
+      "toolsExecuted": [
+        {
+          "toolName": "AppointmentService",
+          "operation": "scheduleInterview",
+          "success": true,
+          "correlationId": "e7091626-e0a9-4c45-82c5-18cc1af6e549"
+        }
+      ],
+      "outcome": "appointment_scheduled",
+      "escalations": [],
+      "openTasks": [],
+      "summaryTimestamp": "2026-07-21T15:29:37.225Z"
+    }
+  ],
+  "updatedAt": "2026-07-21T15:29:37.225Z"
 }
