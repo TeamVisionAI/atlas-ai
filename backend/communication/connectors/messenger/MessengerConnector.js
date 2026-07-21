@@ -11,7 +11,9 @@ const {
   sendTextMessage,
   markMessageSeen,
   sendTypingIndicator,
-  verifyPageToken
+  verifyPageToken,
+  getMessengerSendDiagnostics,
+  getPageAccessToken
 } = require("./messengerGraphClient");
 
 class MessengerConnector extends CommunicationConnector {
@@ -79,18 +81,30 @@ class MessengerConnector extends CommunicationConnector {
       throw new Error("Messenger sendMessage requires recipientId or senderId");
     }
 
-    const result = await sendTextMessage({
-      recipientId,
-      text: message.text || "",
-      pageAccessToken: this.pageAccessToken
-    });
+    try {
+      const result = await sendTextMessage({
+        recipientId,
+        text: message.text || "",
+        pageAccessToken: this.pageAccessToken
+      });
 
-    logCommunication(LOG_COMPONENTS.MESSENGER, "Outgoing message sent", {
-      recipientId,
-      providerMessageId: result.providerMessageId
-    });
+      logCommunication(LOG_COMPONENTS.MESSENGER, "Outgoing message sent", {
+        recipientId,
+        providerMessageId: result.providerMessageId
+      });
 
-    return result;
+      return result;
+    } catch (error) {
+      logCommunication(LOG_COMPONENTS.MESSENGER, "Outgoing message send failed", {
+        level: "error",
+        ...getMessengerSendDiagnostics(error, {
+          recipientId,
+          pageAccessTokenLoaded: Boolean(getPageAccessToken(this.pageAccessToken))
+        })
+      });
+
+      throw error;
+    }
   }
 
   /**

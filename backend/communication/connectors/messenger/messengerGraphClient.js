@@ -12,6 +12,35 @@ function getPageAccessToken(configToken) {
   return configToken || process.env.MESSENGER_PAGE_ACCESS_TOKEN || "";
 }
 
+function getMessagesEndpoint() {
+  return `https://graph.facebook.com/${getGraphApiVersion()}/me/messages`;
+}
+
+/**
+ * Build safe diagnostic fields for a failed Graph API send (no secrets).
+ * @param {unknown} error
+ * @param {Object} context
+ * @param {string} [context.recipientId]
+ * @param {boolean} context.pageAccessTokenLoaded
+ */
+function getMessengerSendDiagnostics(error, { recipientId, pageAccessTokenLoaded }) {
+  const graphError = error?.response?.data?.error || {};
+
+  return {
+    graphApiEndpoint: getMessagesEndpoint(),
+    graphApiVersion: getGraphApiVersion(),
+    recipientPsid: recipientId || null,
+    pageAccessTokenLoaded: Boolean(pageAccessTokenLoaded),
+    httpStatus: error?.response?.status ?? null,
+    error: {
+      message: graphError.message || error?.message || null,
+      code: graphError.code ?? null,
+      error_subcode: graphError.error_subcode ?? null
+    },
+    fbtrace_id: graphError.fbtrace_id ?? null
+  };
+}
+
 /**
  * @param {Object} params
  * @param {string} params.recipientId
@@ -20,7 +49,7 @@ function getPageAccessToken(configToken) {
  */
 async function sendTextMessage({ recipientId, text, pageAccessToken }) {
   const token = getPageAccessToken(pageAccessToken);
-  const url = `https://graph.facebook.com/${getGraphApiVersion()}/me/messages`;
+  const url = getMessagesEndpoint();
 
   const response = await axios.post(
     url,
@@ -122,5 +151,7 @@ module.exports = {
   sendTextMessage,
   markMessageSeen,
   sendTypingIndicator,
-  verifyPageToken
+  verifyPageToken,
+  getMessengerSendDiagnostics,
+  getPageAccessToken
 };

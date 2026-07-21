@@ -67,11 +67,12 @@
         "lastChannel": "messenger",
         "lastMessagePreview": "Hola, quiero información sobre reclutamiento",
         "lastInboundAt": "2018-03-07T00:46:12.000Z",
-        "lastOutboundAt": "2026-07-21T21:14:51.577Z",
+        "lastOutboundAt": "2026-07-21T23:27:28.030Z",
         "lastProviderMessageId": "mid.sprint1201.test",
-        "activeConversationId": "13fed550-7fcd-400e-85d4-2feb4c394561",
+        "activeConversationId": "9ab27c28-e145-4815-ac06-9c71aac328b8",
         "conversationIds": [
-          "13fed550-7fcd-400e-85d4-2feb4c394561"
+          "13fed550-7fcd-400e-85d4-2feb4c394561",
+          "9ab27c28-e145-4815-ac06-9c71aac328b8"
         ],
         "ownershipMode": "ai",
         "language": "es",
@@ -80,7 +81,7 @@
       },
       "conversationHistory": [
         {
-          "conversationId": "13fed550-7fcd-400e-85d4-2feb4c394561",
+          "conversationId": "9ab27c28-e145-4815-ac06-9c71aac328b8",
           "messageId": "mid.sprint1201.test",
           "direction": "inbound",
           "channel": "messenger",
@@ -89,19 +90,19 @@
           "timestamp": "2018-03-07T00:46:12.000Z"
         },
         {
-          "conversationId": "13fed550-7fcd-400e-85d4-2feb4c394561",
-          "messageId": "2b06d3b8-c0fb-45cb-8b17-b0f1eb4590ca",
+          "conversationId": "9ab27c28-e145-4815-ac06-9c71aac328b8",
+          "messageId": "ec7d1021-dd99-4251-8d97-8ba0d6fde8fc",
           "direction": "outbound",
           "channel": "messenger",
           "type": "text",
           "text": "Atlas reply to: Hola, quiero información sobre reclutamiento",
-          "timestamp": "2026-07-21T21:14:51.577Z"
+          "timestamp": "2026-07-21T23:27:28.030Z"
         }
       ],
       "createdAt": "2026-07-21T21:14:51.569Z",
-      "updatedAt": "2026-07-21T21:14:51.580Z",
-      "lastActivityAt": "2026-07-21T21:14:51.580Z"
+      "updatedAt": "2026-07-21T23:27:28.034Z",
+      "lastActivityAt": "2026-07-21T23:27:28.034Z"
     }
   },
-  "updatedAt": "2026-07-21T21:14:58.624Z"
+  "updatedAt": "2026-07-21T23:27:35.078Z"
 }
