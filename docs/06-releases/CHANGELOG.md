@@ -29,6 +29,16 @@
 
 ---
 
+## Documentation — Sprint 11.4 WABA vs portfolio scope (DOC-0701 v1.1)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Verified Team Vision Financial **Business Portfolio** healthy (no advertising restrictions, no support cases). Updated deployment troubleshooting: Cloud API restriction is **likely isolated to the WABA**, not the Business Portfolio.
+
+---
+
 ## Documentation — Sprint 11.4 Meta WABA restriction (DOC-0701)
 
 | Field | Value |

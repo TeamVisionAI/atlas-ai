@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -58,10 +58,36 @@ During **Meta WhatsApp Cloud API initialization** (Sprint 11.4 production onboar
 
 | Layer | Status |
 |-------|--------|
-| **Meta WABA / account policy** | ❌ Blocked — restriction on the WhatsApp Business Account |
-| **Atlas backend / Railway / webhook code** | ✅ Not the root cause — no Atlas code change resolves a Meta account restriction |
+| **Team Vision Financial Business Portfolio** | ✅ Verified healthy — no advertising restrictions, no open support cases, business assets appear healthy (2026-07-21) |
+| **WhatsApp Business Account (WABA)** | ❌ Blocked — restriction reported during Cloud API initialization |
+| **Atlas backend / Railway / webhook code** | ✅ Not the root cause — no Atlas code change resolves a Meta WABA restriction |
 
-This is an **account-level Meta restriction**, not an Atlas backend issue.
+This is a **Meta account-level restriction**, not an Atlas backend issue. Investigation indicates the restriction is **likely isolated to the WABA**, not the Business Portfolio itself.
+
+### Business Portfolio verification (2026-07-21)
+
+The **Team Vision Financial Business Portfolio** was reviewed in Meta Business Suite:
+
+| Check | Result |
+|-------|--------|
+| Advertising restrictions | None observed |
+| Open support cases | None |
+| Business assets (Pages, ad accounts, portfolio health) | Appear healthy |
+| Business Portfolio–level policy holds | None identified |
+
+**Conclusion:** The Cloud API onboarding failure is **not explained by a portfolio-wide Meta restriction**. Focus troubleshooting on the **specific WhatsApp Business Account (WABA)** tied to **+1 786-752-8080**, not on Business Verification or portfolio-level advertising status.
+
+**Do not:**
+
+- Re-submit Business Verification solely because of this WABA error (portfolio already appears healthy)
+- Assume Facebook/Instagram ad delivery is blocked (portfolio advertising restrictions were not found)
+- Redeploy Atlas or change Railway env vars expecting a portfolio-level fix
+
+**Do:**
+
+- Open **Business settings → Accounts → WhatsApp accounts** and inspect the **individual WABA** for restriction banners, quality rating, or policy status
+- Confirm the WABA is linked to the correct Business Portfolio and Atlas Meta app
+- Contact Meta Support referencing the **WABA** (not the portfolio) if the WABA remains restricted with a healthy portfolio
 
 ### Impact on MVP launch
 
@@ -77,13 +103,13 @@ Until Meta clears the WABA restriction and Cloud API setup completes:
 
 Complete these **in Meta** before retrying Cloud API initialization or claiming a test number:
 
-1. **Verify WABA status** in [Meta Business Suite](https://business.facebook.com/) → **Settings** → **WhatsApp Accounts** (or **Business settings** → **Accounts** → **WhatsApp accounts**).
-2. **Confirm Business Verification** status for the Meta Business Portfolio tied to the WABA (if Meta prompts for verification, complete it first).
-3. **Review account quality / restrictions** — look for banners, policy holds, or “restricted” labels on the WABA.
+1. **Confirm Business Portfolio health** (already verified for Team Vision Financial — see above). If portfolio restrictions appear later, resolve at portfolio level first.
+2. **Verify WABA status** in [Meta Business Suite](https://business.facebook.com/) → **Settings** → **WhatsApp Accounts** (or **Business settings** → **Accounts** → **WhatsApp accounts**). Inspect the **specific WABA** for **786-752-8080**, not only the portfolio overview.
+3. **Review WABA-only restrictions** — policy holds, quality rating, “restricted” labels, or messaging limits on the WhatsApp account itself.
 4. In [Meta for Developers](https://developers.facebook.com/) → your Atlas app → **WhatsApp** → **API Setup**, confirm the WABA appears and is not in an error or restricted state.
-5. Only after WABA status is **active / eligible**, retry **Cloud API setup** or **Add phone number** / test number claim.
+5. Only after the **WABA** (not just the portfolio) is **active / eligible**, retry **Cloud API setup** or **Add phone number** / test number claim.
 
-> **Rule:** **WABA status must be verified before continuing Cloud API setup.** Retrying Atlas Embedded Signup or redeploying Railway will not bypass a Meta account restriction.
+> **Rule:** **WABA status must be verified before continuing Cloud API setup.** A healthy Business Portfolio does not guarantee a healthy WABA. Retrying Atlas Embedded Signup or redeploying Railway will not bypass a WABA-level restriction.
 
 ---
 
@@ -91,13 +117,22 @@ Complete these **in Meta** before retrying Cloud API initialization or claiming 
 
 ### Symptom: Onboarding stops with “WhatsApp Business Account restriction”
 
+**First:** Confirm whether the restriction is portfolio-wide or WABA-only.
+
+| Scope | Where to look | Team Vision status (2026-07-21) |
+|-------|---------------|----------------------------------|
+| **Business Portfolio** | Business Suite → Business settings → Business info / Account quality | ✅ Healthy — no ad restrictions, no support cases |
+| **WABA only** | Business settings → Accounts → **WhatsApp accounts** → select the WABA | ❌ Investigate — restriction likely here |
+
 | Check | Action |
 |-------|--------|
-| WABA restricted or disabled | Resolve in Meta Business Suite; contact Meta Support if no self-serve fix |
-| Business not verified | Submit Business Verification in Meta Business Settings |
-| Wrong Business Portfolio | Ensure the WABA belongs to the portfolio used for Team Vision Financial / Atlas app |
+| WABA restricted or disabled | Resolve on the **WhatsApp account** in Business Suite; contact Meta Support citing WABA ID if portfolio is healthy |
+| Business Portfolio restricted | Not observed for Team Vision Financial — if this changes, resolve portfolio issues first |
+| Business not verified | Only if Meta shows verification required at portfolio level (not indicated in 2026-07-21 review) |
+| Wrong Business Portfolio | Ensure the WABA belongs to the Team Vision Financial portfolio used for the Atlas app |
 | App not added to WABA | In Business Settings, grant the Atlas Meta app access to the WABA |
 | Region / eligibility | Confirm the business number **786-752-8080** is eligible for Cloud API in your market |
+| WABA quality rating / messaging limits | Review WABA-specific quality and messaging tier in WhatsApp Manager |
 
 **Atlas-side verification (confirms backend is not the blocker):**
 
@@ -105,7 +140,16 @@ Complete these **in Meta** before retrying Cloud API initialization or claiming 
 curl https://atlas-ai-production-01de.up.railway.app/health/production
 ```
 
-If `mvpReady: true` and `whatsapp_send` is OK, the remaining work is **Meta account / WABA**, not Atlas deployment.
+If `mvpReady: true` and `whatsapp_send` is OK, the remaining work is **Meta WABA setup**, not Atlas deployment or Business Portfolio health.
+
+### Symptom: Portfolio looks healthy but Cloud API still fails
+
+This matches the Sprint 11.4 finding for Team Vision Financial:
+
+1. Portfolio-level checks pass (no ad restrictions, no support cases).
+2. Cloud API initialization still fails with a **WABA restriction**.
+3. **Treat as WABA-isolated** — drill into WhatsApp Manager / WhatsApp accounts for the specific account behind **786-752-8080**.
+4. Escalate to Meta Support with: Business Portfolio ID, WABA ID, phone number, and screenshot of the WABA restriction (not portfolio overview).
 
 ### Symptom: Cannot claim a test number
 
@@ -146,9 +190,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | Date | Event |
 |------|-------|
 | 2026-07-21 | Documented: Meta Cloud API initialization blocked by **WABA account restriction** before test number claim; classified as Meta account issue, not Atlas backend defect |
+| 2026-07-21 | Verified **Team Vision Financial Business Portfolio** healthy (no ad restrictions, no support cases); concluded restriction is **likely WABA-isolated**, not portfolio-wide |
 
 ---
 
 ## One-line summary
 
-> **Sprint 11.4 Atlas code is production-ready; Meta WhatsApp Cloud API onboarding paused on a WABA account restriction — verify and clear WABA status in Meta before continuing Cloud API setup or claiming a test number.**
+> **Sprint 11.4 Atlas code is production-ready; Meta Cloud API onboarding paused on a WABA-level restriction. Team Vision Financial Business Portfolio verified healthy — troubleshoot the specific WhatsApp Business Account for 786-752-8080 before continuing Cloud API setup.**
