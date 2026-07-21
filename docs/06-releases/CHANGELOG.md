@@ -29,6 +29,16 @@
 
 ---
 
+## Documentation — Sprint 11.4 Business Home confirmed (DOC-0701 v1.2)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Confirmed Business Portfolio operational — Business Home loads with Team Vision Financial profile and ad account. Next diagnostic: Business Settings → WhatsApp accounts (WABA assets and permissions). Reinforces WABA-isolated issue, not portfolio failure.
+
+---
+
 ## Documentation — Sprint 11.4 WABA vs portfolio scope (DOC-0701 v1.1)
 
 | Field | Value |

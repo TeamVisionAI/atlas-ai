@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -58,7 +58,7 @@ During **Meta WhatsApp Cloud API initialization** (Sprint 11.4 production onboar
 
 | Layer | Status |
 |-------|--------|
-| **Team Vision Financial Business Portfolio** | ✅ Verified healthy — no advertising restrictions, no open support cases, business assets appear healthy (2026-07-21) |
+| **Team Vision Financial Business Portfolio** | ✅ Operational and accessible — Business Home loads normally; Team Vision Financial profile and ad account visible (2026-07-21) |
 | **WhatsApp Business Account (WABA)** | ❌ Blocked — restriction reported during Cloud API initialization |
 | **Atlas backend / Railway / webhook code** | ✅ Not the root cause — no Atlas code change resolves a Meta WABA restriction |
 
@@ -76,6 +76,31 @@ The **Team Vision Financial Business Portfolio** was reviewed in Meta Business S
 | Business Portfolio–level policy holds | None identified |
 
 **Conclusion:** The Cloud API onboarding failure is **not explained by a portfolio-wide Meta restriction**. Focus troubleshooting on the **specific WhatsApp Business Account (WABA)** tied to **+1 786-752-8080**, not on Business Verification or portfolio-level advertising status.
+
+### Business Home accessibility (2026-07-21)
+
+Confirmed the **Business Portfolio is operational and accessible**:
+
+| Check | Result |
+|-------|--------|
+| Meta Business Home | Loads normally |
+| Team Vision Financial business profile | Visible |
+| Ad account | Accessible from Business Home |
+| Portfolio login / access | No access errors observed |
+
+This reinforces that the issue is **isolated to WhatsApp configuration (WABA)**, not the Business Portfolio or core advertising infrastructure.
+
+### Next diagnostic step
+
+Inspect **Business Settings** (not Business Home alone):
+
+1. Open [Meta Business Suite](https://business.facebook.com/) → **Business settings**
+2. Navigate to **Accounts** → **WhatsApp accounts**
+3. Verify **WABA assets** — account name, phone number **786-752-8080**, connection status
+4. Verify **permissions** — Atlas Meta app access, admin roles, and whether the WABA is shared with the correct portfolio users
+5. Note any restriction banners, quality rating, or messaging limits **on the WABA record**
+
+Until this WABA inspection is complete, do not treat portfolio health as proof that WhatsApp Cloud API setup can proceed.
 
 **Do not:**
 
@@ -121,8 +146,8 @@ Complete these **in Meta** before retrying Cloud API initialization or claiming 
 
 | Scope | Where to look | Team Vision status (2026-07-21) |
 |-------|---------------|----------------------------------|
-| **Business Portfolio** | Business Suite → Business settings → Business info / Account quality | ✅ Healthy — no ad restrictions, no support cases |
-| **WABA only** | Business settings → Accounts → **WhatsApp accounts** → select the WABA | ❌ Investigate — restriction likely here |
+| **Business Portfolio** | Business Suite → Business settings → Business info / Account quality | ✅ Operational — Business Home loads; TVF profile and ad account accessible |
+| **WABA only** | Business settings → Accounts → **WhatsApp accounts** → select the WABA | ❌ **Next diagnostic step** — verify WABA assets and permissions |
 
 | Check | Action |
 |-------|--------|
@@ -191,6 +216,7 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 |------|-------|
 | 2026-07-21 | Documented: Meta Cloud API initialization blocked by **WABA account restriction** before test number claim; classified as Meta account issue, not Atlas backend defect |
 | 2026-07-21 | Verified **Team Vision Financial Business Portfolio** healthy (no ad restrictions, no support cases); concluded restriction is **likely WABA-isolated**, not portfolio-wide |
+| 2026-07-21 | Confirmed **Business Home** operational — Team Vision Financial profile and ad account load normally; **next step:** Business Settings → WhatsApp accounts (WABA assets and permissions) |
 
 ---
 

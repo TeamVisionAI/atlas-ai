@@ -119,7 +119,8 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped with a **W
 |----------------|--------|
 | **Root cause** | Meta **WABA-level** restriction (likely isolated to the WhatsApp Business Account) |
 | **Not caused by** | Atlas backend, Railway, webhook implementation, or Business Portfolio-wide restrictions |
-| **Portfolio status** | Team Vision Financial Business Portfolio verified healthy — no ad restrictions, no support cases (2026-07-21) |
+| **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account (2026-07-21) |
+| **Next diagnostic step** | Business Settings → Accounts → WhatsApp accounts — verify WABA assets and permissions |
 
 **Action:** Inspect the **specific WABA** for **786-752-8080** in Meta Business Suite before retrying Cloud API setup. Full troubleshooting: [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
 

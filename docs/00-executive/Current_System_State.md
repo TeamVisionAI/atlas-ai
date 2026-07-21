@@ -260,7 +260,7 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ## Known open items (production blockers)
 
-1. **Meta WABA restriction (Sprint 11.4)** — Cloud API initialization stopped with a **WABA restriction** before a test number could be claimed. **Team Vision Financial Business Portfolio verified healthy** (no ad restrictions, no support cases); restriction is **likely WABA-isolated**, not portfolio-wide. Not an Atlas backend issue. See [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
+1. **Meta WABA restriction (Sprint 11.4)** — Cloud API initialization stopped with a **WABA restriction** before a test number could be claimed. **Business Portfolio confirmed operational** (Business Home loads; Team Vision Financial profile and ad account accessible). Issue is **isolated to WhatsApp / WABA configuration**, not the portfolio. **Next:** Business Settings → WhatsApp accounts — verify WABA assets and permissions. Not an Atlas backend issue. See [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
 2. **Live end-to-end smoke test** — Send WhatsApp to **+1 786-752-8080**; confirm Atlas reply → qualification → Google Calendar booking → confirmation. Required for production acceptance.
 3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
 4. **META_APP_SECRET on Railway** — Recommended for webhook signature validation (currently skipped with warning when unset).
