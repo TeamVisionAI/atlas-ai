@@ -1,3 +1,5 @@
+import { apiRequest } from "./apiClient";
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateContactFormFields({ name, email, message }) {
@@ -24,7 +26,7 @@ export function validateContactFormFields({ name, email, message }) {
 }
 
 export async function submitContactForm(payload) {
-  const response = await fetch("/api/contact", {
+  const response = await apiRequest("/api/contact", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

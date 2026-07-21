@@ -6,12 +6,12 @@
 |-------|-------|
 | **Document ID** | DOC-0001 |
 | **Title** | Current System State |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Status** | Approved |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-20 |
-| **Related Sprint** | 11.3.1 |
-| **Related Release** | Release-11.3.1 |
+| **Last Updated** | 2026-07-21 |
+| **Related Sprint** | 11.4 Phase A |
+| **Related Release** | Release-11.4-A |
 
 > **Status values:** Draft · Review · Approved
 
@@ -84,7 +84,26 @@ Both surfaces share one codebase. The frontend deploys to **Vercel**; the API de
 > **Repository snapshot**  
 > **Product:** Atlas AI — Team Vision Financial  
 > **Branch:** `main`  
-> **Latest commit:** Sprint 11.3.1 — Production API Integration
+> **Latest commit:** Sprint 11.4 Phase A — Live WhatsApp → AI pipeline + public site Meta readiness
+
+---
+
+## Production MVP pipeline (launch target)
+
+```
+Facebook / Instagram Ads → WhatsApp Business → Atlas AI → Qualification
+  → Google Calendar → Interview Scheduled → Human Follow-up
+```
+
+| Stage | Production status |
+|-------|-------------------|
+| Ads → WhatsApp (Click-to-WhatsApp) | External (Meta Ads); Atlas tags `CLICK_TO_WHATSAPP` on first message |
+| WhatsApp inbound | ✅ Live webhook, persist, events |
+| Atlas AI qualification | ✅ **Sprint 11.4 Phase A** — webhook → Communication Hub → Conversation Engine → outbound |
+| Google Calendar booking | ⚠️ Engine supports `createInterview`; requires `GOOGLE_*` on Railway; cancel/reschedule stubbed |
+| Human follow-up | 🟡 Mission Control + agent actions; reminder engine not yet built |
+
+**Success criterion:** A real prospect completes Ad → WhatsApp → AI qualification → calendar booking → confirmation without manual intervention until the interview is scheduled.
 
 ---
 
@@ -126,9 +145,11 @@ Both surfaces share one codebase. The frontend deploys to **Vercel**; the API de
 | `/terms` | Terms of Service |
 | `/app` | Atlas Sign In → private application |
 
-**Contact form:** Submits to `POST /api/contact` on Railway. Delivers email via Resend to `CONTACT_FORM_TO_EMAIL` (configured as `info@teamvisionfinancial.com`). Reply-To is the visitor’s email.
+**Contact form:** Submits to `POST /api/contact` on Railway. Delivers email via Resend to `CONTACT_FORM_TO_EMAIL`.
 
-**Status:** QA-approved. Production-ready pending Resend/domain and mailbox configuration on the email host.
+**Navigation:** Single-page hash sections on `/` (`#about`, `#services`, `#careers`, `#contact`); legal routes at `/privacy`, `/legal`, `/terms`. Mobile hamburger menu (≤900px).
+
+**Status:** ✅ Production-ready for Meta review (`teamvisionfinancial.com`). Vercel SPA rewrites enabled via `frontend/vercel.json`.
 
 ---
 
@@ -185,6 +206,7 @@ The repo began as six 1-byte placeholder *files* in early commits; it has since 
 | `ATLAS_BOOTSTRAP_TOKEN` | Atlas session bootstrap |
 | `META_APP_ID`, `META_APP_SECRET`, etc. | WhatsApp onboarding |
 | `WHATSAPP_*` | WhatsApp Cloud API |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN` | Google Calendar interview booking |
 
 ### Vercel (frontend)
 
@@ -235,12 +257,13 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ---
 
-## Known open items
+## Known open items (production blockers)
 
-1. **Contact form delivery** — Resend accepts sends; recipient mailbox/alias configuration on email host must be verified (`info@teamvisionfinancial.com`).
-2. **Atlas auth** — Bootstrap token is interim; full user login not yet implemented.
-3. **Placeholder Atlas pages** — Conversations, Appointments, Analytics, Settings (except WhatsApp) are UI placeholders.
-4. **README.md** — Root README describes older Sprint 2 architecture; executive doc and `docs/` are more current for system state.
+1. **Google Calendar on Railway** — Set `GOOGLE_*` env vars; run `backend/scripts/generateRefreshToken.js` once locally. Without these, qualification completes but calendar events are not created in production.
+2. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
+3. **Embedded Signup token vs env token** — Outbound WhatsApp still uses `WHATSAPP_ACCESS_TOKEN` from env; switch to stored Embedded Signup token when ready.
+4. **Contact form inbox** — Verify `contact@teamvisionfinancial.com` receives production submissions.
+5. **Placeholder Atlas pages** — Conversations, Appointments, Analytics remain UI shells (deferred post-launch).
 
 ---
 
@@ -250,8 +273,9 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 |-------|-------|
 | **Sprint** | 11.4 |
 | **Primary objective** | Implement the Atlas AI Conversation Engine with WhatsApp Business integration and establish the Communication Hub architecture for future multi-channel support. |
-| **Phase A status** | ✅ Complete — live WhatsApp → Communication Hub → Conversation Engine → outbound |
-| **Next** | Phase B — Communication Hub adapters; Phase C — WhatsApp UI |
+| **Phase A status** | ✅ Deployed on `main` — live WhatsApp → Communication Hub → Conversation Engine → outbound |
+| **Next (launch-critical)** | Google Calendar production config; end-to-end live ad → interview smoke test |
+| **Deferred post-launch** | Phase B Hub adapters; executive dashboard polish; reminder engine |
 
 **Related planning documents:**
 
@@ -274,4 +298,4 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ## One-line status
 
-> **Atlas AI is operational in production with a public Team Vision Financial website, a Railway-hosted API, Supabase persistence, and an internal recruiting platform — past the initial scaffold phase and actively deployed.**
+> **Atlas AI is operational in production with a Meta-ready public website, live WhatsApp AI qualification (Sprint 11.4 Phase A), and a Railway-hosted API — actively moving toward full Ad → WhatsApp → Calendar → Interview launch.**

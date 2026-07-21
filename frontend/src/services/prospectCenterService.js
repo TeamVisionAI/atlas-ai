@@ -2,6 +2,8 @@
  * Sprint 10.3 — Prospect Center API client.
  */
 
+import { apiFetch } from "./apiClient";
+
 export class ProspectCenterError extends Error {
   constructor(message, status) {
     super(message);
@@ -25,11 +27,14 @@ export async function getProspectCenter(options = {}) {
   }
 
   const query = params.toString();
-  const response = await fetch(`/api/prospect-center${query ? `?${query}` : ""}`);
 
-  if (!response.ok) {
-    throw new ProspectCenterError("Failed to load prospect center", response.status);
+  try {
+    return await apiFetch(`/api/prospect-center${query ? `?${query}` : ""}`);
+  } catch (error) {
+    const match = error.message.match(/^API (\d+):/);
+    throw new ProspectCenterError(
+      "Failed to load prospect center",
+      match ? Number(match[1]) : undefined
+    );
   }
-
-  return response.json();
 }

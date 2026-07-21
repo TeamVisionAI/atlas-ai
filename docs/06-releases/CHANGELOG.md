@@ -6,12 +6,12 @@
 |-------|-------|
 | **Document ID** | DOC-0600 |
 | **Title** | Atlas AI Changelog |
-| **Version** | 1.2 |
+| **Version** | 1.3 |
 | **Status** | Approved |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
-| **Related Sprint** | 11.4 |
-| **Related Release** | Sprint 11.4 Phase A |
+| **Related Sprint** | 11.4 Phase A |
+| **Related Release** | Release-11.4-A (production) |
 
 > **Status values:** Draft · Review · Approved
 
@@ -25,6 +25,32 @@
 | DOC-0002 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification portfolio |
 | DOC-0512 | [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md) | Sprint 11.4 engineering blueprint |
 | — | [Roadmap.md](../00-executive/Roadmap.md) | Planned releases and milestones |
+
+---
+
+## Release 11.4-A — Production WhatsApp AI Pipeline (main)
+
+| Field | Value |
+|-------|-------|
+| **Release** | 11.4-A |
+| **Status** | Deployed to `main` |
+| **Date** | 2026-07-21 |
+
+Merged Sprint 11.4 Phase A onto production branch. Live WhatsApp webhooks now invoke the Conversation Engine and deliver automated replies via the Communication Hub.
+
+### Production changes
+
+- `communicationHub.js` — transport layer between engines and WhatsApp outbound
+- `whatsappInboundPipeline.js` — post-persist AI invocation
+- `channelMessage.js` — normalized message envelope
+- Business-rules gate (BR-034) before automated outbound
+- Verification: `node backend/dev/verifySprint11_4.js`
+- `.env.example` — Google Calendar variables documented
+
+### Launch blockers remaining
+
+- Google Calendar `GOOGLE_*` credentials on Railway
+- End-to-end live smoke test (Ad → WhatsApp → Calendar → Interview)
 
 ---
 
