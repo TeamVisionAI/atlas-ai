@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — Meta AI new-WABA recovery strategy (DOC-0701 v2.8)
+
+**Date:** 2026-07-21
+
+Meta AI proposed preserving Business Portfolio **367219934273986** while creating a brand-new WABA for Atlas AI. Pre-proceed gate: verify **Create a new WhatsApp Business Account** option at Business Settings → Accounts → WhatsApp Accounts → Add before implementing. Recovery path proposed — not approved.
+
+---
+
 ## Documentation — App–portfolio link and Connect assets verified (DOC-0701 v2.7)
 
 **Date:** 2026-07-21

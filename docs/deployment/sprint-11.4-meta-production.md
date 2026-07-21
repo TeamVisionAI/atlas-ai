@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 2.7 |
+| **Version** | 2.8 |
 | **Status** | Approved (final production decision) |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -103,7 +103,7 @@ Atlas ops reached Meta's **Production Setup** page inside **Step 2 (Production s
 | **Phone migration complete?** | ❌ **No** — **786-752-8080** not migrated to Cloud API via this app |
 | **Atlas backend involved?** | ❌ **No** — failure is **Meta-side**, not Atlas or the phone number |
 | **Wrong Business Portfolio?** | ❌ **Ruled out** — app and WABAs share portfolio **`367219934273986`** |
-| **Next action** | Meta Support / retry after WABA explicit selection — portfolio alignment is confirmed |
+| **Next action** | Verify **Create a new WhatsApp Business Account** UI option ([pre-proceed gate](#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21)); then Meta Support or approved recovery path |
 
 > **Rule:** **`wabaID` null with correct portfolio = Meta backend failed to resolve WABA in registration flow — not Atlas env or Railway.**
 
@@ -135,6 +135,48 @@ Verified the **Atlas AI Developer App** is correctly linked to the **Team Vision
 
 **Remaining evidence (unchanged):** Meta **backend failure** resolving the WABA during production phone registration (`wabaID = null`).
 
+#### Meta AI recovery strategy — new WABA (proposed 2026-07-21)
+
+After the `wabaID` failure and ruled-out portfolio / app-asset causes, **Meta AI proposed an alternative recovery path**:
+
+| Aspect | Detail |
+|--------|--------|
+| **Strategy** | **Preserve** the existing Business Portfolio (**`367219934273986`**, Team Vision Financial); create a **brand-new WhatsApp Business Account (WABA)** dedicated to Atlas AI |
+| **Developer App** | Continue using the **existing Atlas AI Developer App** (no new Meta app required per prior guidance) |
+| **Status** | **Proposed — not approved for implementation** |
+| **Primary path unchanged** | [Final production decision](#final-production-decision-approved-2026-07-21) — **786-752-8080** on **Niovel Perez WABA** remains the approved target until this recovery path is **UI-verified**, cross-checked against official Meta docs, and **explicitly approved** by ops |
+
+**Why Meta AI suggested this:** Bypass a potentially broken WABA resolution path in **Use cases → Step 2** by provisioning a fresh WABA under the same portfolio, then binding it to the Atlas app for Cloud API onboarding.
+
+**Constraints (unchanged):**
+
+- **Do not delete** existing WABAs during migration — see [WABA migration policy](#waba-migration-policy-do-not-delete-during-migration)
+- **Do not modify** Ana Perez / **786-296-7254**
+- **Do not implement** until the [pre-proceed gate](#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21) below is complete
+
+#### Pre-proceed gate: verify Create new WABA UI (2026-07-21)
+
+**Before proceeding** with the new-WABA recovery strategy (or any WABA creation), verify the current Meta interface exposes the required option:
+
+| Step | Action | Status |
+|------|--------|--------|
+| 1 | Open [Meta Business Suite](https://business.facebook.com/) → **Business settings** | ☐ |
+| 2 | Navigate to **Accounts** → **WhatsApp accounts** | ☐ |
+| 3 | Click **Add** | ☐ |
+| 4 | Confirm **"Create a new WhatsApp Business Account"** option is **visible and selectable** | ☐ Pending verification |
+| 5 | Capture screenshot to secure ops vault or `docs/deployment/records/` (**do not commit to git**) | ☐ |
+| 6 | Record date, operator, and result in [resolution log](#resolution-log) | ☐ |
+
+**Navigation path:** **Business Settings → Accounts → WhatsApp Accounts → Add → Create a new WhatsApp Business Account**
+
+| If UI shows… | Action |
+|--------------|--------|
+| **Create a new WhatsApp Business Account** visible | Complete [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment) with updated question; compare Meta AI recovery guidance with official Meta docs; obtain **explicit ops approval** before creating WABA |
+| Option **not visible** or **Add** missing | **Do not proceed** with new-WABA strategy; escalate to Meta Support with portfolio ID **`367219934273986`**, screenshot evidence, and `wabaID` null incident details |
+| Only **connect existing** / **request access** options | Document available options; consult Meta AI with UI evidence; do not assume new-WABA path is supported in this account |
+
+> **Rule:** **Verify Create new WABA UI → record evidence → pre-change gate → official docs cross-check → explicit approval → then create WABA.** Do not create a WABA based on Meta AI guidance alone.
+
 #### Incident: `Unexpected null value for wabaID` (2026-07-21)
 
 During **Add phone number** for **786-752-8080** in Step 2 Production Setup, Meta returned an internal error **before SMS verification**:
@@ -157,6 +199,7 @@ During **Add phone number** for **786-752-8080** in Step 2 Production Setup, Met
 3. ~~Confirm Atlas Meta app has **permissions** on the Niovel Perez WABA in Business Settings.~~ **Ruled out (2026-07-21):** App has **administrator access** on portfolio; **Connect assets** does not expose WABA assignment — binding is via **Use cases → Step 2**, not Business Settings asset connection.
 4. Retry **Add phone number** only after WABA shows as selected/bound in Step 2 UI — capture [confirmation screens](#confirmation-screen-log-deployment-record) on retry.
 5. If error persists, contact Meta Support citing **`wabaID` null**, **Business Portfolio ID `367219934273986`**, Niovel Perez **WABA ID**, and Atlas **App ID** — portfolio misalignment is **ruled out**; request Meta backend WABA resolution fix.
+6. **Alternative (proposed):** If Meta Support or Meta AI recommends a fresh WABA, follow [Meta AI recovery strategy](#meta-ai-recovery-strategy--new-waba-proposed-2026-07-21) only after [Create new WABA UI verification](#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21).
 
 **Do not:**
 
@@ -214,7 +257,7 @@ Capture **every** confirmation, warning, and summary screen during **Add phone n
 
 - **Avoid** older Meta documentation, tutorials, and screenshots that show a dedicated **WhatsApp** product entry in the Developer Console left navigation.
 - **Still valid:** Official Meta **API** documentation ([Cloud API Get Started](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started), [Webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks), [Business Management API](https://developers.facebook.com/docs/whatsapp/business-management-api)) — these describe **API behavior and credentials**, not the current console navigation.
-- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.7).
+- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.8).
 - **Do not confuse Step 1 (Testing)** with production migration — Step 1 has no WABA picker; production WABA selection belongs in **Step 2**.
 - If use-case labels differ in your account, consult Meta AI with the [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment) question and confirm against the live UI before changing production bindings.
 
@@ -373,6 +416,8 @@ This reinforces that the issue is **isolated to WhatsApp configuration (WABA)**,
 
 ### Next diagnostic step
 
+**Immediate (2026-07-21):** Verify [Create new WABA UI](#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21) before proceeding with Meta AI's proposed new-WABA recovery strategy.
+
 Inspect **Business Settings** (not Business Home alone):
 
 1. Open [Meta Business Suite](https://business.facebook.com/) → **Business settings**
@@ -448,7 +493,8 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 - [x] **Record Meta AI guidance** — existing Approved WABA associable via **WhatsApp → API Setup**; no new Developer App required
 - [x] **Production Setup page reached** — readiness complete
 - [x] **Add phone number attempted** — **786-752-8080** — **failed** with `Unexpected null value for wabaID` ([incident](#incident-unexpected-null-value-for-wabaid-2026-07-21))
-- [ ] **Resolve WABA binding in Meta** — Niovel Perez WABA must resolve in Step 2 before retry
+- [ ] **Resolve WABA binding in Meta** — Niovel Perez WABA must resolve in Step 2 before retry **OR** approved new-WABA recovery path after [UI verification](#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21)
+- [ ] **Verify Create new WABA UI** — Business Settings → Accounts → WhatsApp accounts → **Add** → confirm **"Create a new WhatsApp Business Account"** option visible ([pre-proceed gate](#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21))
 - [ ] **Retry Add phone number** — after WABA confirmed; capture [confirmation screens](#confirmation-screen-log-deployment-record)
 - [ ] **Explicitly select intended production WABA** — do not rely on Meta auto-selection
 - [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using the disabled **Meta-generated Test WABA**
@@ -494,6 +540,17 @@ Capture the full response in the table below (or linked runbook). Note date, cha
 | **WABA IDs referenced** | Target: **Niovel Perez** (**786-752-8080**); avoid: Meta-generated **Test WABA** (disabled) |
 | **Risks / warnings cited** | Using wrong WABA blocks Cloud API onboarding; verify `phone_number_id` after association |
 | **Meta AI disclaimer** | Verify against official Meta documentation before implementing |
+
+#### Recovery strategy guidance (2026-07-21 — proposed, pending UI verification)
+
+| Field | Record here |
+|-------|-------------|
+| **Date consulted** | 2026-07-21 |
+| **Context** | `wabaID = null` during Add phone number; portfolio and app asset assignment ruled out |
+| **Meta AI response summary** | **Preserve** existing Business Portfolio (**`367219934273986`**); create a **brand-new WABA** for Atlas AI; bind to existing Atlas Developer App for Cloud API |
+| **Pre-proceed requirement** | Verify **Business Settings → Accounts → WhatsApp Accounts → Add** exposes **"Create a new WhatsApp Business Account"** before implementing |
+| **Implementation status** | ☐ **Not started** — pending UI verification and explicit ops approval |
+| **Conflicts with prior decision?** | Supplements (does not replace) Niovel Perez / **786-752-8080** primary path until recovery path is approved |
 
 ### Step 3 — Compare with official Meta documentation
 
@@ -738,9 +795,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **Production Setup failed (v2.5):** Meta internal error **`Unexpected null value for wabaID`** before SMS verification — UI failed to resolve target WABA; **not** Atlas or phone number issue; occurred before phone migration |
 | 2026-07-21 | **Business Portfolio alignment verified (v2.6):** Atlas Developer App and Approved WABAs share portfolio **`367219934273986`** — wrong portfolio **ruled out**; remaining evidence: **Meta backend failure** resolving WABA during registration (`wabaID = null`) |
 | 2026-07-21 | **App–portfolio link verified (v2.7):** Atlas AI app linked to portfolio with **administrator access**; **Connect assets** exposes **Ad Accounts only** — WABA assignment not available; **app asset assignment ruled out** as wabaID cause |
+| 2026-07-21 | **Meta AI recovery strategy proposed (v2.8):** Preserve portfolio **`367219934273986`**; create **new WABA** for Atlas AI — **pending** UI verification of **Create a new WhatsApp Business Account** at Business Settings → Accounts → WhatsApp Accounts → Add |
 
 ---
 
 ## One-line summary
 
-> **wabaID null — portfolio and app link verified; Connect assets has no WABA path. Meta backend WABA resolution failure — not Atlas. Escalate to Meta Support.**
+> **wabaID null — verify Create new WABA UI before Meta AI recovery path. Portfolio preserved; new WABA proposed — not approved yet.**

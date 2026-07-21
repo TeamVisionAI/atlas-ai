@@ -132,6 +132,8 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **App–portfolio link verified (2026-07-21):** Atlas AI app linked to portfolio with **administrator access**. Business Settings **Connect assets** exposes **Ad Accounts only** — no WABA assignment option. **App asset assignment ruled out** as `wabaID` cause. See [Connect assets verified](../deployment/sprint-11.4-meta-production.md#app-portfolio-link-and-connect-assets-verified-2026-07-21) (DOC-0701 v2.7).
 
+**Meta AI recovery strategy (proposed 2026-07-21):** Preserve Business Portfolio **`367219934273986`**; create **brand-new WABA** for Atlas AI. **Pending:** verify **Create a new WhatsApp Business Account** at Business Settings → Accounts → WhatsApp Accounts → Add before proceeding. Not approved for implementation. See [recovery strategy](../deployment/sprint-11.4-meta-production.md#meta-ai-recovery-strategy--new-waba-proposed-2026-07-21) (DOC-0701 v2.8).
+
 **Production Setup failure:** **Add phone number** for **786-752-8080** failed with **`Unexpected null value for wabaID`** — before SMS, before migration. Not Atlas or phone number issue. See [wabaID incident](../deployment/sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21).
 
 **Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through the WhatsApp use case in **Use cases**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only.

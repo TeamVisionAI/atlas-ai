@@ -260,7 +260,7 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ## Known open items (production blockers)
 
-1. **Meta WABA / Cloud API migration (Sprint 11.4)** — Production Setup failed: **`Unexpected null value for wabaID`** before SMS/migration. **Business Portfolio `367219934273986` verified** — Atlas app and Approved WABAs in same portfolio; **wrong portfolio ruled out**. **App linked with admin access** — **Connect assets** exposes Ad Accounts only; **app asset assignment ruled out**. Remaining evidence: **Meta backend failure** resolving WABA during registration. Not Atlas. ([incident](../deployment/sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21), DOC-0701 v2.7).
+1. **Meta WABA / Cloud API migration (Sprint 11.4)** — Production Setup failed: **`Unexpected null value for wabaID`** before SMS/migration. Portfolio and app link verified; app asset assignment ruled out. **Meta AI proposed new-WABA recovery** (preserve portfolio **`367219934273986`**) — **pending UI verification** of Create new WABA option at Business Settings → WhatsApp Accounts → Add. Not approved for implementation. ([recovery strategy](../deployment/sprint-11.4-meta-production.md#meta-ai-recovery-strategy--new-waba-proposed-2026-07-21), DOC-0701 v2.8).
 2. **Live end-to-end smoke test** — Send WhatsApp to **+1 786-752-8080**; confirm Atlas reply → qualification → Google Calendar booking → confirmation. Required for production acceptance.
 3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
 4. **META_APP_SECRET on Railway** — Recommended for webhook signature validation (currently skipped with warning when unset).

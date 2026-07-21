@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0702 |
 | **Title** | WhatsApp Cloud API Migration Checklist |
-| **Version** | 1.8 |
+| **Version** | 1.9 |
 | **Status** | Active |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -56,6 +56,16 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
 - [x] Confirm Business Portfolio **`367219934273986`** — Atlas app and WABAs in same portfolio ([alignment verified](./sprint-11.4-meta-production.md#business-portfolio-alignment-verified-2026-07-21))
 - [x] Confirm Atlas app linked to portfolio with **administrator access** ([Connect assets verified](./sprint-11.4-meta-production.md#app-portfolio-link-and-connect-assets-verified-2026-07-21))
 - [x] Confirm **Connect assets** exposes **Ad Accounts only** — WABA assignment not available; app asset assignment **ruled out** as wabaID cause
+
+#### Phase 1a — Meta AI recovery strategy (proposed — verify before proceeding)
+
+> **Status:** Meta AI proposed creating a **new WABA** under portfolio **`367219934273986`** while preserving the existing Business Portfolio. **Not approved for implementation** until UI verification completes.
+
+- [ ] Open Business Settings → **Accounts** → **WhatsApp accounts** → **Add**
+- [ ] Confirm **"Create a new WhatsApp Business Account"** option is visible ([pre-proceed gate](./sprint-11.4-meta-production.md#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21), DOC-0701 v2.8)
+- [ ] Capture screenshot to secure ops vault (not git)
+- [ ] If option visible: complete pre-change gate + ops approval before creating WABA
+- [ ] If option missing: escalate to Meta Support — do not create WABA
 
 ### Phase 2 — Step 2: Production setup (Use cases UI)
 
@@ -192,10 +202,11 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 | Registration paused at verification | On **retry** only — capture [confirmation screens](./sprint-11.4-meta-production.md#confirmation-screen-log-deployment-record) before entering code |
 | Cannot find phone registration | Use **Add phone number** in Step 2 — after [WABA review](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-add-phone-number) |
 | Cannot find WABA picker | You may be in **Step 1 (Testing)** — proceed to **Step 2 (Production setup)** |
+| Create new WABA option missing | Document UI at Business Settings → WhatsApp accounts → Add; escalate to Meta Support ([pre-proceed gate](./sprint-11.4-meta-production.md#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21)) |
 | Wrong WABA selected | **Step 2 (Production setup)** → switch to **Niovel Perez** only |
 
 ---
 
 ## One-line summary
 
-> **Add phone number failed: wabaID null. Portfolio and app link verified; Connect assets has no WABA path. Meta backend issue — escalate to Meta Support.**
+> **Add phone number failed: wabaID null. Verify Create new WABA UI before Meta AI recovery path — not approved yet.**
