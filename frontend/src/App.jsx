@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
+import SimpleDashboardLayout from "./layouts/SimpleDashboardLayout";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Dashboard from "./pages/Dashboard";
+import HomeDashboard from "./pages/HomeDashboard";
 import ProspectWorkspace from "./pages/ProspectWorkspace";
 import ProspectCenter from "./pages/ProspectCenter";
 import WhatsAppConnect from "./pages/WhatsAppConnect";
@@ -12,6 +14,15 @@ import Home from "./pages/Home";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import Terms from "./pages/Terms";
+import WelcomePage from "./pages/onboarding/WelcomePage";
+import SignupPage from "./pages/onboarding/SignupPage";
+import LoginPage from "./pages/onboarding/LoginPage";
+import OrganizationPage from "./pages/onboarding/OrganizationPage";
+import ConnectMetaPage from "./pages/onboarding/ConnectMetaPage";
+import ConnectCalendarPage from "./pages/onboarding/ConnectCalendarPage";
+import MeetingPreferencesPage from "./pages/onboarding/MeetingPreferencesPage";
+import ActivatePage from "./pages/onboarding/ActivatePage";
+import { AppOutlet, OnboardingOutlet } from "./components/onboarding/OnboardingGuard";
 import { appPath } from "./config/appRoutes";
 
 function LegacyRedirect({ suffix = "" }) {
@@ -49,65 +60,81 @@ export default function App() {
       <Route path="/legal" element={<Legal />} />
       <Route path="/terms" element={<Terms />} />
 
-      <Route path="/app" element={<MainLayout />}>
-        <Route index element={<ExecutiveDashboard />} />
-        <Route path="mission-control" element={<Dashboard />} />
-        <Route path="prospect-workspace/:phone" element={<ProspectWorkspace />} />
-        <Route path="prospect-center" element={<ProspectCenter />} />
-        <Route path="quick-capture" element={<QuickCapture />} />
-        <Route path="prospect/:id" element={<Prospect />} />
-        <Route path="pipeline" element={<Navigate to="/app/prospect-center" replace />} />
-        <Route
-          path="conversations"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderConversationsTitle"
-              descriptionKey="placeholderConversationsDescription"
-            />
-          }
-        />
-        <Route
-          path="appointments"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderAppointmentsTitle"
-              descriptionKey="placeholderAppointmentsDescription"
-            />
-          }
-        />
-        <Route
-          path="follow-ups"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderFollowUpsTitle"
-              descriptionKey="placeholderFollowUpsDescription"
-            />
-          }
-        />
-        <Route
-          path="analytics"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderAnalyticsTitle"
-              descriptionKey="placeholderAnalyticsDescription"
-            />
-          }
-        />
-        <Route
-          path="settings"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderSettingsTitle"
-              descriptionKey="placeholderSettingsDescription"
-              actionHref={appPath("settings/whatsapp")}
-              actionLabelKey="whatsappConnectOpenFromSettings"
-            />
-          }
-        />
-        <Route path="settings/whatsapp" element={<WhatsAppConnect />} />
+      <Route path="/onboarding" element={<OnboardingOutlet />}>
+        <Route index element={<WelcomePage />} />
+        <Route path="signup" element={<SignupPage />} />
+        <Route path="login" element={<LoginPage />} />
+        <Route path="organization" element={<OrganizationPage />} />
+        <Route path="meta" element={<ConnectMetaPage />} />
+        <Route path="calendar" element={<ConnectCalendarPage />} />
+        <Route path="meeting-preferences" element={<MeetingPreferencesPage />} />
+        <Route path="activate" element={<ActivatePage />} />
       </Route>
 
-      {/* Legacy redirects — preserve bookmarks and hardcoded in-app links */}
+      <Route path="/app" element={<AppOutlet />}>
+        <Route element={<SimpleDashboardLayout />}>
+          <Route index element={<HomeDashboard />} />
+        </Route>
+
+        <Route element={<MainLayout />}>
+          <Route path="executive" element={<ExecutiveDashboard />} />
+          <Route path="mission-control" element={<Dashboard />} />
+          <Route path="prospect-workspace/:phone" element={<ProspectWorkspace />} />
+          <Route path="prospect-center" element={<ProspectCenter />} />
+          <Route path="quick-capture" element={<QuickCapture />} />
+          <Route path="prospect/:id" element={<Prospect />} />
+          <Route path="pipeline" element={<Navigate to="/app/prospect-center" replace />} />
+          <Route
+            path="conversations"
+            element={
+              <PlaceholderPage
+                titleKey="placeholderConversationsTitle"
+                descriptionKey="placeholderConversationsDescription"
+              />
+            }
+          />
+          <Route
+            path="appointments"
+            element={
+              <PlaceholderPage
+                titleKey="placeholderAppointmentsTitle"
+                descriptionKey="placeholderAppointmentsDescription"
+              />
+            }
+          />
+          <Route
+            path="follow-ups"
+            element={
+              <PlaceholderPage
+                titleKey="placeholderFollowUpsTitle"
+                descriptionKey="placeholderFollowUpsDescription"
+              />
+            }
+          />
+          <Route
+            path="analytics"
+            element={
+              <PlaceholderPage
+                titleKey="placeholderAnalyticsTitle"
+                descriptionKey="placeholderAnalyticsDescription"
+              />
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <PlaceholderPage
+                titleKey="placeholderSettingsTitle"
+                descriptionKey="placeholderSettingsDescription"
+                actionHref={appPath("settings/whatsapp")}
+                actionLabelKey="whatsappConnectOpenFromSettings"
+              />
+            }
+          />
+          <Route path="settings/whatsapp" element={<WhatsAppConnect />} />
+        </Route>
+      </Route>
+
       <Route path="/mission-control" element={<LegacyRedirect suffix="mission-control" />} />
       <Route path="/prospect-center" element={<LegacyRedirect suffix="prospect-center" />} />
       <Route path="/prospect-workspace/:phone" element={<LegacyProspectWorkspaceRedirect />} />

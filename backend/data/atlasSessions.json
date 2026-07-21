@@ -1,0 +1,12 @@
+{
+  "sessions": [
+    {
+      "id": "f4658ad7-e350-43a2-a9c1-89b3f48e22f5",
+      "user_id": "0f9b996b-9798-46ed-8a8c-eeaf9c082075",
+      "token": "b83bddf64b69883c640db9377298dcdd2dc2c7415296a4f13c0d76402ebe428e",
+      "expires_at": "2026-07-28T14:02:59.613Z",
+      "created_at": "2026-07-21T14:02:59.613Z"
+    }
+  ],
+  "updatedAt": "2026-07-21T14:02:59.613Z"
+}

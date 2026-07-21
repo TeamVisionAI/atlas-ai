@@ -1,0 +1,149 @@
+.home-dashboard {
+  display: grid;
+  gap: 24px;
+}
+
+.home-dashboard__hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  line-height: 1.05;
+}
+
+.home-dashboard__eyebrow {
+  margin: 0 0 8px;
+  color: #0a3d91;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.home-dashboard__subtitle {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 1.05rem;
+}
+
+.home-dashboard__grid {
+  display: grid;
+  gap: 16px;
+}
+
+.home-dashboard-card {
+  background: #ffffff;
+  border: 1px solid #e7ebf3;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+.home-dashboard-card h2 {
+  margin: 0 0 12px;
+  font-size: 1.125rem;
+}
+
+.home-dashboard-empty,
+.home-dashboard-error {
+  margin: 0;
+  color: #64748b;
+}
+
+.home-dashboard-error {
+  color: #b42318;
+}
+
+.home-dashboard-list,
+.home-dashboard-prospects,
+.home-dashboard-activity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.home-dashboard-meeting {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e7ebf3;
+}
+
+.home-dashboard-meeting__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-dashboard-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.home-dashboard-badge.is-virtual {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.home-dashboard-badge.is-in-person {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.home-dashboard-meeting__link {
+  color: #1d4ed8;
+  font-size: 0.875rem;
+}
+
+.home-dashboard-attention-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #b45309;
+  font-size: 0.875rem;
+}
+
+.home-dashboard-attention-list li {
+  margin: 0;
+  padding: 2px 0;
+  border: none;
+}
+
+.home-dashboard-meeting.is-highlight {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.home-dashboard-meeting strong {
+  font-size: 1rem;
+}
+
+.home-dashboard-meeting span {
+  color: #64748b;
+  font-size: 0.9375rem;
+}
+
+.home-dashboard-prospects li,
+.home-dashboard-activity li {
+  padding: 10px 0;
+  border-bottom: 1px solid #eef2f7;
+  color: #334155;
+}
+
+.home-dashboard-prospects li:last-child,
+.home-dashboard-activity li:last-child {
+  border-bottom: none;
+}
+
+@media (min-width: 900px) {
+  .home-dashboard__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

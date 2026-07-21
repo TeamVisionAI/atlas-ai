@@ -2,6 +2,16 @@
 
 ## Locked releases
 
+### Journey #1 — First-Time User Onboarding (`v1.0`)
+
+**Status:** LOCKED — bug fixes and usability improvements only  
+**Docs:** [JOURNEY_1.md](./onboarding/JOURNEY_1.md)
+
+### Journey #2 — First Appointment (`v1.0`)
+
+**Status:** IN PROGRESS  
+**Docs:** [JOURNEY_2.md](./onboarding/JOURNEY_2.md)
+
 ### Sprint 10.1 — Quick Capture (`v0.1.0-alpha`)
 
 **Status:** LOCKED — First Working Prospect Capture  

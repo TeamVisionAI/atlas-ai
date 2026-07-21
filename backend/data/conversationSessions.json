@@ -1,0 +1,40 @@
+{
+  "sessions": {
+    "23df5f26-b038-4705-8f62-d678d4a2cc1f": {
+      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "prospectId": "ATL-J6-001",
+      "organizationId": "fd2b475b-2670-454f-b2f9-283912d3eced",
+      "workflowName": "generic-intake",
+      "currentStep": "collect_email",
+      "currentObjective": "Learn the prospect email",
+      "collectedFacts": {
+        "name": {
+          "value": "Maria Lopez",
+          "source": "prospect",
+          "confidence": "high",
+          "collectedAt": "2026-07-21T15:07:02.299Z"
+        }
+      },
+      "pendingQuestions": [
+        "Collect email"
+      ],
+      "completedActions": [
+        "Asked for name",
+        "Asked for email"
+      ],
+      "toolExecutions": [],
+      "status": "active",
+      "outcome": "incomplete",
+      "escalations": [],
+      "openTasks": [
+        "Collect email"
+      ],
+      "lastActivityAt": "2026-07-21T15:07:02.300Z",
+      "startedAt": "2026-07-21T15:07:02.297Z",
+      "completedAt": null,
+      "closedAt": null
+    }
+  },
+  "summaries": [],
+  "updatedAt": "2026-07-21T15:07:02.300Z"
+}

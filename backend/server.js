@@ -19,6 +19,7 @@ const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
 const contactRoutes = require("./routes/contact");
+const onboardingRoutes = require("./routes/onboarding");
 
 const {
   logMetaEnvironmentWarnings,
@@ -71,6 +72,7 @@ app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/organization", organizationRoutes);
+app.use("/api", onboardingRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
 

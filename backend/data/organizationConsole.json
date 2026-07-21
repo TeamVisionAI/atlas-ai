@@ -1,0 +1,458 @@
+{
+  "organizations": {
+    "f1b4a51c-37b7-4631-8b17-b4148f8f57d7": {
+      "id": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "profile": {
+        "id": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+        "name": "Acme Recruiting Group",
+        "legalName": "Acme Recruiting Group LLC",
+        "description": null,
+        "website": null,
+        "primaryLanguage": "en",
+        "supportedLanguages": [
+          "en",
+          "es"
+        ],
+        "timeZone": "America/New_York",
+        "dateFormat": "MM/DD/YYYY",
+        "phone": null,
+        "email": "admin@acme.example",
+        "businessType": "recruiting",
+        "status": "active",
+        "createdAt": "2026-07-21T15:06:58.052Z",
+        "updatedAt": "2026-07-21T15:06:58.052Z"
+      },
+      "branding": {
+        "logoUrl": null,
+        "primaryColor": "#1a365d",
+        "secondaryColor": "#2b6cb0",
+        "accentColor": "#ed8936",
+        "backgroundColor": null,
+        "typography": null,
+        "emailSignature": "Acme Recruiting Team",
+        "footer": null,
+        "socialLinks": {}
+      },
+      "locations": [
+        {
+          "id": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5",
+          "name": "Primary Office",
+          "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+          "timeZone": "America/New_York",
+          "workingHours": {
+            "start": "09:00",
+            "end": "20:30"
+          },
+          "meetingCapacity": 4,
+          "interviewAvailability": true,
+          "calendarMapping": "primary-calendar",
+          "zoomMapping": "primary-zoom",
+          "defaultLanguage": null,
+          "status": "active"
+        },
+        {
+          "id": "9d321cd1-7df2-4e7b-8c1b-111b95221bc8",
+          "name": "Satellite Office",
+          "address": "100 Main St, Orlando, FL 32801",
+          "timeZone": "America/New_York",
+          "workingHours": {
+            "start": null,
+            "end": null
+          },
+          "meetingCapacity": null,
+          "interviewAvailability": true,
+          "calendarMapping": null,
+          "zoomMapping": null,
+          "defaultLanguage": null,
+          "status": "active"
+        }
+      ],
+      "users": [
+        {
+          "id": "11cd71f4-97e4-407c-8e02-78d1ec262c05",
+          "name": "Alex Owner",
+          "email": "owner@acme.example",
+          "role": "owner",
+          "officeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5",
+          "language": "en",
+          "status": "active",
+          "permissions": [
+            "*"
+          ],
+          "createdAt": "2026-07-21T15:06:58.059Z"
+        },
+        {
+          "id": "2fabf388-8832-4adf-a55c-10673ffa1597",
+          "name": "Riley Recruiter",
+          "email": "recruiter@acme.example",
+          "role": "recruiter",
+          "officeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5",
+          "language": "en",
+          "status": "active",
+          "permissions": [
+            "candidates.manage",
+            "interviews.manage"
+          ],
+          "createdAt": "2026-07-21T15:06:58.061Z"
+        }
+      ],
+      "packages": [
+        {
+          "packageId": "teamvision-recruiting",
+          "label": "Team Vision Recruiting Pack",
+          "installed": true,
+          "enabled": true,
+          "configuration": {
+            "coverageRadiusMiles": 25
+          },
+          "installedAt": "2026-07-21T15:06:58.063Z",
+          "updatedAt": "2026-07-21T15:06:58.063Z"
+        }
+      ],
+      "connectors": {
+        "messenger": {
+          "connectorId": "messenger",
+          "enabled": true,
+          "credentialsRef": "vault://acme/messenger",
+          "health": "connected",
+          "defaultOfficeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5"
+        },
+        "whatsapp": {
+          "connectorId": "whatsapp",
+          "enabled": false,
+          "credentialsRef": null,
+          "health": "disconnected",
+          "defaultOfficeId": null
+        },
+        "instagram": {
+          "connectorId": "instagram",
+          "enabled": false,
+          "credentialsRef": null,
+          "health": "disconnected",
+          "defaultOfficeId": null
+        },
+        "google-calendar": {
+          "connectorId": "google-calendar",
+          "enabled": true,
+          "credentialsRef": "vault://acme/google-calendar",
+          "health": "connected",
+          "defaultOfficeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5"
+        },
+        "zoom": {
+          "connectorId": "zoom",
+          "enabled": true,
+          "credentialsRef": "vault://acme/zoom",
+          "health": "connected",
+          "defaultOfficeId": "4c1cb8b1-7fda-494d-ad98-65173cbbd4b5"
+        }
+      },
+      "policies": {
+        "interviewDurationMinutes": 45,
+        "reminderSchedule": {
+          "offsetsMinutes": [
+            1440,
+            120,
+            30,
+            5
+          ]
+        },
+        "businessHours": {
+          "start": null,
+          "end": null,
+          "timeZone": null
+        },
+        "licensingRequirements": {
+          "examRequired": null,
+          "requiredStates": []
+        },
+        "escalationRules": [],
+        "maximumFollowUps": 5,
+        "allowedChannels": [
+          "messenger",
+          "whatsapp",
+          "instagram"
+        ],
+        "holidaySchedule": []
+      },
+      "settings": {
+        "languages": [
+          "en",
+          "es"
+        ],
+        "timeZone": "America/New_York",
+        "localization": {
+          "numberFormat": "en-US",
+          "dateFormat": "MM/DD/YYYY"
+        },
+        "notificationPreferences": {},
+        "packageDefaults": {},
+        "workflowDefaults": {
+          "defaultWorkflowName": "team-vision-recruiting"
+        }
+      },
+      "version": 12,
+      "createdAt": "2026-07-21T15:06:58.052Z",
+      "updatedAt": "2026-07-21T15:06:58.067Z"
+    },
+    "f43d4f69-13d1-4624-8c81-434e2e959fdf": {
+      "id": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+      "profile": {
+        "id": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+        "name": "Invalid Org",
+        "legalName": null,
+        "description": null,
+        "website": null,
+        "primaryLanguage": "en",
+        "supportedLanguages": [],
+        "timeZone": null,
+        "dateFormat": null,
+        "phone": null,
+        "email": null,
+        "businessType": null,
+        "status": "active",
+        "createdAt": "2026-07-21T15:06:58.069Z",
+        "updatedAt": "2026-07-21T15:06:58.069Z"
+      },
+      "branding": {
+        "logoUrl": null,
+        "primaryColor": "not-a-color",
+        "secondaryColor": null,
+        "accentColor": null,
+        "backgroundColor": null,
+        "typography": null,
+        "emailSignature": null,
+        "footer": null,
+        "socialLinks": {}
+      },
+      "locations": [],
+      "users": [],
+      "packages": [
+        {
+          "packageId": "teamvision-recruiting",
+          "label": "Team Vision Recruiting Pack",
+          "installed": true,
+          "enabled": true,
+          "configuration": {},
+          "installedAt": "2026-07-21T15:06:58.070Z",
+          "updatedAt": "2026-07-21T15:06:58.070Z"
+        }
+      ],
+      "connectors": {
+        "messenger": {
+          "connectorId": "messenger",
+          "enabled": false,
+          "credentialsRef": null,
+          "health": "disconnected",
+          "defaultOfficeId": null
+        },
+        "whatsapp": {
+          "connectorId": "whatsapp",
+          "enabled": false,
+          "credentialsRef": null,
+          "health": "disconnected",
+          "defaultOfficeId": null
+        },
+        "instagram": {
+          "connectorId": "instagram",
+          "enabled": false,
+          "credentialsRef": null,
+          "health": "disconnected",
+          "defaultOfficeId": null
+        },
+        "google-calendar": {
+          "connectorId": "google-calendar",
+          "enabled": false,
+          "credentialsRef": null,
+          "health": "disconnected",
+          "defaultOfficeId": null
+        },
+        "zoom": {
+          "connectorId": "zoom",
+          "enabled": false,
+          "credentialsRef": null,
+          "health": "disconnected",
+          "defaultOfficeId": null
+        }
+      },
+      "policies": {
+        "interviewDurationMinutes": 30,
+        "reminderSchedule": {
+          "offsetsMinutes": [
+            1440,
+            120,
+            30,
+            5
+          ]
+        },
+        "businessHours": {
+          "start": null,
+          "end": null,
+          "timeZone": null
+        },
+        "licensingRequirements": {
+          "examRequired": null,
+          "requiredStates": []
+        },
+        "escalationRules": [],
+        "maximumFollowUps": null,
+        "allowedChannels": [],
+        "holidaySchedule": []
+      },
+      "settings": {
+        "languages": [],
+        "timeZone": null,
+        "localization": {
+          "numberFormat": null,
+          "dateFormat": null
+        },
+        "notificationPreferences": {},
+        "packageDefaults": {},
+        "workflowDefaults": {
+          "defaultWorkflowName": null
+        }
+      },
+      "version": 3,
+      "createdAt": "2026-07-21T15:06:58.069Z",
+      "updatedAt": "2026-07-21T15:06:58.070Z"
+    }
+  },
+  "validationHistory": [
+    {
+      "id": "aebd44b7-ea69-4ca8-b679-71a0b471d740",
+      "organizationId": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+      "valid": false,
+      "errors": [
+        {
+          "field": "branding.primaryColor",
+          "message": "Invalid color value: not-a-color"
+        },
+        {
+          "field": "packages",
+          "message": "Package teamvision-recruiting requires at least one office."
+        }
+      ],
+      "warnings": [],
+      "timestamp": "2026-07-21T15:06:58.071Z"
+    },
+    {
+      "id": "34e98d08-a09a-437c-baba-18efda0b7f09",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "timestamp": "2026-07-21T15:06:58.068Z"
+    },
+    {
+      "id": "0364f256-5ac0-4788-8605-a881f741d60c",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "timestamp": "2026-07-21T15:06:58.064Z"
+    }
+  ],
+  "configurationHistory": [
+    {
+      "id": "76a96412-7bfc-4c4f-b4c1-e972b8d96917",
+      "organizationId": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+      "version": 3,
+      "change": "package.installed",
+      "timestamp": "2026-07-21T15:06:58.070Z"
+    },
+    {
+      "id": "11bdc887-1d81-4f9f-befd-6dfb09a38582",
+      "organizationId": "f43d4f69-13d1-4624-8c81-434e2e959fdf",
+      "version": 2,
+      "change": "branding.updated",
+      "timestamp": "2026-07-21T15:06:58.070Z"
+    },
+    {
+      "id": "ef86e96d-3721-4100-9db3-f1447182b8cf",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 12,
+      "change": "connector.updated",
+      "timestamp": "2026-07-21T15:06:58.067Z"
+    },
+    {
+      "id": "da23a6ca-227b-43a8-8bbd-4893b67ff4eb",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 11,
+      "change": "connector.updated",
+      "timestamp": "2026-07-21T15:06:58.066Z"
+    },
+    {
+      "id": "cca82f17-2a5d-449c-b8d0-792752a64ecf",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 10,
+      "change": "connector.updated",
+      "timestamp": "2026-07-21T15:06:58.065Z"
+    },
+    {
+      "id": "1c5a2a46-d426-4c3f-8b2c-0b54bc05f4a0",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 9,
+      "change": "package.installed",
+      "timestamp": "2026-07-21T15:06:58.063Z"
+    },
+    {
+      "id": "5b6dd492-70ab-4f84-8e95-5c6fd01e2a55",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 8,
+      "change": "settings.updated",
+      "timestamp": "2026-07-21T15:06:58.062Z"
+    },
+    {
+      "id": "0f393161-d988-4560-b497-7066292832d2",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 7,
+      "change": "policies.updated",
+      "timestamp": "2026-07-21T15:06:58.062Z"
+    },
+    {
+      "id": "6711bb3f-d7d2-4c02-ae16-144d957628b9",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 6,
+      "change": "user.created",
+      "timestamp": "2026-07-21T15:06:58.061Z"
+    },
+    {
+      "id": "f2e82dc3-445f-4b0c-b6d7-2874fe6964d7",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 5,
+      "change": "user.created",
+      "timestamp": "2026-07-21T15:06:58.060Z"
+    },
+    {
+      "id": "f633f30c-29de-4f40-b4e9-19fc8616ea90",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 4,
+      "change": "office.created",
+      "timestamp": "2026-07-21T15:06:58.057Z"
+    },
+    {
+      "id": "9fec06c7-ab94-4a4a-906d-840711b909bf",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 3,
+      "change": "office.created",
+      "timestamp": "2026-07-21T15:06:58.057Z"
+    },
+    {
+      "id": "bb90f879-6007-43a2-a577-bb43d622e1b4",
+      "organizationId": "f1b4a51c-37b7-4631-8b17-b4148f8f57d7",
+      "version": 2,
+      "change": "branding.updated",
+      "timestamp": "2026-07-21T15:06:58.055Z"
+    }
+  ],
+  "analytics": {
+    "organizations": 2,
+    "activePackages": 2,
+    "enabledConnectors": 3,
+    "offices": 2,
+    "users": 2,
+    "languages": 2,
+    "configurationVersions": 13,
+    "validationResults": 3
+  },
+  "updatedAt": "2026-07-21T15:06:58.071Z"
+}

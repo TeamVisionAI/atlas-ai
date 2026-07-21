@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { appPath } from "../../config/appRoutes";
 import "./PublicNavbar.css";
 
 const sectionLinks = [
@@ -91,7 +90,7 @@ export default function Navbar() {
 
         <div className="public-navbar__actions">
           <Link
-            to={appPath()}
+            to="/onboarding"
             className="public-site__button public-site__button--secondary public-navbar__sign-in"
           >
             Atlas Sign In
@@ -160,7 +159,7 @@ export default function Navbar() {
           </ul>
 
           <Link
-            to={appPath()}
+            to="/onboarding"
             className="public-site__button public-site__button--secondary public-navbar__mobile-sign-in"
             tabIndex={menuOpen ? 0 : -1}
             onClick={closeMenu}

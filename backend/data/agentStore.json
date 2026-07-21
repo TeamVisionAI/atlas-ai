@@ -1,0 +1,137 @@
+{
+  "conversations": [
+    {
+      "id": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "organizationId": "fd2b475b-2670-454f-b2f9-283912d3eced",
+      "prospectId": "ATL-J6-001",
+      "prospectName": "Maria Lopez",
+      "channel": "atlas",
+      "ownership": "ATLAS",
+      "workflowSnapshot": {
+        "name": "generic-intake",
+        "currentStep": "collect_email",
+        "currentObjective": "Learn the prospect email",
+        "completionPercent": 33
+      },
+      "organizationSnapshot": {
+        "id": "fd2b475b-2670-454f-b2f9-283912d3eced",
+        "name": "Team Vision Gateway",
+        "officeAddress": "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+      },
+      "meetingStateSnapshot": null,
+      "language": "en",
+      "createdAt": "2026-07-21T15:07:02.295Z",
+      "updatedAt": "2026-07-21T15:07:02.299Z"
+    }
+  ],
+  "memories": {
+    "23df5f26-b038-4705-8f62-d678d4a2cc1f": {
+      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "history": [
+        {
+          "id": "877d2640-cc03-4c61-9a22-322d13bd9b8c",
+          "role": "prospect",
+          "text": "Hi there",
+          "timestamp": "2018-03-07T00:46:12.000Z",
+          "messageId": "mid.messenger.1784646422295"
+        },
+        {
+          "id": "7d0c6bfd-5bc3-4723-99f2-fd784e5e6b97",
+          "role": "atlas",
+          "text": "Hi there. I am Atlas with Team Vision Gateway. To get started, what is your full name?",
+          "timestamp": "2026-07-21T15:07:02.297Z",
+          "messageId": "aa053917-09dd-43f4-9292-68b6b5b81850"
+        },
+        {
+          "id": "e070d88f-35b3-4fdd-a57f-a4b2fe9538d0",
+          "role": "prospect",
+          "text": "Maria Lopez",
+          "timestamp": "2018-03-07T00:46:12.000Z",
+          "messageId": "mid.messenger.1784646422298"
+        },
+        {
+          "id": "3fab5871-117d-487f-9d6a-32c99e124f65",
+          "role": "atlas",
+          "text": "Thanks, Maria Lopez. What is the best email address to reach you?",
+          "timestamp": "2026-07-21T15:07:02.299Z",
+          "messageId": "c4cbae96-2b84-4635-b957-407ccdaea6f0"
+        }
+      ],
+      "collectedFacts": {
+        "name": {
+          "value": "Maria Lopez",
+          "source": "prospect",
+          "confidence": "high",
+          "collectedAt": "2026-07-21T15:07:02.299Z"
+        }
+      },
+      "summary": "Prospect name is Maria Lopez. Current objective: Learn the prospect email. Current step: collect_email.",
+      "pendingTasks": [
+        "Collect email"
+      ],
+      "completedTasks": [],
+      "preferences": {},
+      "sentiment": "neutral",
+      "confidence": "medium"
+    }
+  },
+  "decisions": [
+    {
+      "id": "1ffaa96e-2322-4901-bdf7-5972f127ca75",
+      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "messageId": "mid.messenger.1784646422295",
+      "decisionType": "ASK",
+      "reason": "Current step \"collect_name\" requires name.",
+      "currentObjective": "Learn the prospect name",
+      "missingInformation": [
+        "name"
+      ],
+      "recommendedNextAction": "Ask for name.",
+      "confidence": "high",
+      "timestamp": "2026-07-21T15:07:02.297Z",
+      "workflowName": "generic-intake",
+      "currentStep": "collect_name",
+      "nextStep": "collect_email",
+      "completionPercent": 0,
+      "blockingReason": null,
+      "workflowConfidence": "high"
+    },
+    {
+      "id": "41c1c9cb-417c-4b89-9eb8-2684af0ea388",
+      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "messageId": "mid.messenger.1784646422298",
+      "decisionType": "ASK",
+      "reason": "Current step \"collect_email\" requires email.",
+      "currentObjective": "Learn the prospect email",
+      "missingInformation": [
+        "email"
+      ],
+      "recommendedNextAction": "Ask for email.",
+      "confidence": "high",
+      "timestamp": "2026-07-21T15:07:02.299Z",
+      "workflowName": "generic-intake",
+      "currentStep": "collect_email",
+      "nextStep": "collect_phone",
+      "completionPercent": 33,
+      "blockingReason": null,
+      "workflowConfidence": "high"
+    }
+  ],
+  "responses": [
+    {
+      "id": "aa053917-09dd-43f4-9292-68b6b5b81850",
+      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "decisionId": "1ffaa96e-2322-4901-bdf7-5972f127ca75",
+      "text": "Hi there. I am Atlas with Team Vision Gateway. To get started, what is your full name?",
+      "timestamp": "2026-07-21T15:07:02.297Z"
+    },
+    {
+      "id": "c4cbae96-2b84-4635-b957-407ccdaea6f0",
+      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "decisionId": "41c1c9cb-417c-4b89-9eb8-2684af0ea388",
+      "text": "Thanks, Maria Lopez. What is the best email address to reach you?",
+      "timestamp": "2026-07-21T15:07:02.299Z"
+    }
+  ],
+  "updatedAt": "2026-07-21T15:07:02.299Z"
+}

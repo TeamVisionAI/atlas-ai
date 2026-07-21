@@ -1,0 +1,25 @@
+{
+  "states": {
+    "23df5f26-b038-4705-8f62-d678d4a2cc1f": {
+      "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+      "workflowName": "generic-intake",
+      "currentStep": "collect_email",
+      "completedSteps": [
+        "collect_name"
+      ],
+      "pendingSteps": [
+        "collect_email",
+        "collect_phone"
+      ],
+      "missingInformation": [
+        "email"
+      ],
+      "blocked": false,
+      "blockingReason": null,
+      "completionPercent": 33,
+      "currentObjective": "Learn the prospect email",
+      "updatedAt": "2026-07-21T15:07:02.299Z"
+    }
+  },
+  "updatedAt": "2026-07-21T15:07:02.299Z"
+}

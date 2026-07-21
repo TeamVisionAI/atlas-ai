@@ -1,0 +1,41 @@
+{
+  "organizations": [
+    {
+      "id": "fd2b475b-2670-454f-b2f9-283912d3eced",
+      "name": "Team Vision Gateway",
+      "owner_user_id": "8344ab07-3c5b-44c8-85a8-ea0ce71f74bd",
+      "activated_at": "2026-07-21T15:07:02.293Z",
+      "onboarding_step": "complete",
+      "created_at": "2026-07-21T15:07:02.293Z",
+      "updated_at": "2026-07-21T15:07:02.293Z",
+      "settings": {
+        "meeting_locations": {
+          "office": false,
+          "zoom": false,
+          "starbucks": false,
+          "custom": false
+        },
+        "office_address": null,
+        "starbucks_preference": null,
+        "custom_location_name": null,
+        "custom_location_address": null,
+        "zoom_interview_url": null,
+        "meta_connected": false,
+        "meta_connected_at": null,
+        "calendar_connected": false,
+        "calendar_connected_at": null,
+        "calendar_refresh_token_encrypted": null
+      }
+    }
+  ],
+  "memberships": [
+    {
+      "id": "550a3857-280d-488c-a80e-2be14e80df5f",
+      "organization_id": "fd2b475b-2670-454f-b2f9-283912d3eced",
+      "user_id": "8344ab07-3c5b-44c8-85a8-ea0ce71f74bd",
+      "role": "admin",
+      "created_at": "2026-07-21T15:07:02.293Z"
+    }
+  ],
+  "updatedAt": "2026-07-21T15:07:02.293Z"
+}

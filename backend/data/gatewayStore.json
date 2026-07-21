@@ -1,0 +1,200 @@
+{
+  "inbound": [
+    {
+      "id": "74abfdf7-6d5c-4edd-8064-8ff16cad0e26",
+      "channel": "messenger",
+      "rawPayload": {
+        "object": "invalid"
+      },
+      "correlationId": "12e07c0d-5281-47f3-8b88-71c12e0a81b7",
+      "timestamp": "2026-07-21T15:07:02.300Z"
+    },
+    {
+      "id": "2aaf7eaa-2a9e-4966-9598-c74a63bd8186",
+      "channel": "messenger",
+      "rawPayload": {
+        "object": "page",
+        "entry": [
+          {
+            "id": "PAGE_ID",
+            "messaging": [
+              {
+                "sender": {
+                  "id": "USER_J6"
+                },
+                "recipient": {
+                  "id": "PAGE_ID"
+                },
+                "timestamp": 1520383572,
+                "message": {
+                  "mid": "mid.messenger.1784646422298",
+                  "text": "Maria Lopez"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "correlationId": "2a7a6534-aec5-4f14-b3e9-3d304f6ae36e",
+      "timestamp": "2026-07-21T15:07:02.298Z"
+    },
+    {
+      "id": "328c3817-bbe5-4947-a586-d1035ae864bd",
+      "channel": "messenger",
+      "rawPayload": {
+        "object": "page",
+        "entry": [
+          {
+            "id": "PAGE_ID",
+            "messaging": [
+              {
+                "sender": {
+                  "id": "USER_J6"
+                },
+                "recipient": {
+                  "id": "PAGE_ID"
+                },
+                "timestamp": 1520383572,
+                "message": {
+                  "mid": "mid.messenger.1784646422295",
+                  "text": "Hi there"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "correlationId": "59d73aae-e810-4ee0-8642-2fc6d590283f",
+      "timestamp": "2026-07-21T15:07:02.295Z"
+    }
+  ],
+  "envelopes": [
+    {
+      "id": "0f8bf2d5-df2f-4d0f-a10a-7a7ba80384ae",
+      "envelope": {
+        "messageId": "mid.messenger.1784646422298",
+        "channel": "messenger",
+        "organizationId": "fd2b475b-2670-454f-b2f9-283912d3eced",
+        "prospectId": "ATL-J6-001",
+        "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+        "timestamp": "2018-03-07T00:46:12.000Z",
+        "text": "Maria Lopez",
+        "attachments": [],
+        "language": "en",
+        "metadata": {
+          "provider": "messenger",
+          "platformMessageId": "mid.messenger.1784646422298"
+        },
+        "replyTo": null,
+        "deliveryContext": {
+          "senderId": "USER_J6",
+          "recipientId": "PAGE_ID"
+        }
+      },
+      "correlationId": "2a7a6534-aec5-4f14-b3e9-3d304f6ae36e",
+      "timestamp": "2026-07-21T15:07:02.298Z"
+    },
+    {
+      "id": "b3668514-e684-4ccb-859f-ec8d1be302c9",
+      "envelope": {
+        "messageId": "mid.messenger.1784646422295",
+        "channel": "messenger",
+        "organizationId": "fd2b475b-2670-454f-b2f9-283912d3eced",
+        "prospectId": "ATL-J6-001",
+        "conversationId": null,
+        "timestamp": "2018-03-07T00:46:12.000Z",
+        "text": "Hi there",
+        "attachments": [],
+        "language": "en",
+        "metadata": {
+          "provider": "messenger",
+          "platformMessageId": "mid.messenger.1784646422295"
+        },
+        "replyTo": null,
+        "deliveryContext": {
+          "senderId": "USER_J6",
+          "recipientId": "PAGE_ID"
+        }
+      },
+      "correlationId": "59d73aae-e810-4ee0-8642-2fc6d590283f",
+      "timestamp": "2026-07-21T15:07:02.295Z"
+    }
+  ],
+  "outbound": [
+    {
+      "id": "61557fe2-fa8e-437e-ad88-a8755145a21a",
+      "envelope": {
+        "messageId": "mid.messenger.1784646422298",
+        "channel": "messenger",
+        "organizationId": "fd2b475b-2670-454f-b2f9-283912d3eced",
+        "prospectId": "ATL-J6-001",
+        "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+        "timestamp": "2018-03-07T00:46:12.000Z",
+        "text": "Maria Lopez",
+        "attachments": [],
+        "language": "en",
+        "metadata": {
+          "provider": "messenger",
+          "platformMessageId": "mid.messenger.1784646422298"
+        },
+        "replyTo": null,
+        "deliveryContext": {
+          "senderId": "USER_J6",
+          "recipientId": "PAGE_ID"
+        }
+      },
+      "responseText": "Thanks, Maria Lopez. What is the best email address to reach you?",
+      "deliveryStatus": {
+        "success": true,
+        "channel": "messenger",
+        "providerMessageId": "mock.messenger.1784646422300"
+      },
+      "correlationId": "2a7a6534-aec5-4f14-b3e9-3d304f6ae36e",
+      "timestamp": "2026-07-21T15:07:02.300Z"
+    },
+    {
+      "id": "0da4afe1-dcc0-4697-b944-413d92804695",
+      "envelope": {
+        "messageId": "mid.messenger.1784646422295",
+        "channel": "messenger",
+        "organizationId": "fd2b475b-2670-454f-b2f9-283912d3eced",
+        "prospectId": "ATL-J6-001",
+        "conversationId": "23df5f26-b038-4705-8f62-d678d4a2cc1f",
+        "timestamp": "2018-03-07T00:46:12.000Z",
+        "text": "Hi there",
+        "attachments": [],
+        "language": "en",
+        "metadata": {
+          "provider": "messenger",
+          "platformMessageId": "mid.messenger.1784646422295"
+        },
+        "replyTo": null,
+        "deliveryContext": {
+          "senderId": "USER_J6",
+          "recipientId": "PAGE_ID"
+        }
+      },
+      "responseText": "Hi there. I am Atlas with Team Vision Gateway. To get started, what is your full name?",
+      "deliveryStatus": {
+        "success": true,
+        "channel": "messenger",
+        "providerMessageId": "mock.messenger.1784646422298"
+      },
+      "correlationId": "59d73aae-e810-4ee0-8642-2fc6d590283f",
+      "timestamp": "2026-07-21T15:07:02.298Z"
+    }
+  ],
+  "errors": [
+    {
+      "id": "02466005-98f9-471b-9eee-979fb9c89db6",
+      "channel": "messenger",
+      "rawPayload": {
+        "object": "invalid"
+      },
+      "error": "Invalid Messenger webhook payload",
+      "correlationId": "12e07c0d-5281-47f3-8b88-71c12e0a81b7",
+      "timestamp": "2026-07-21T15:07:02.300Z"
+    }
+  ],
+  "updatedAt": "2026-07-21T15:07:02.300Z"
+}

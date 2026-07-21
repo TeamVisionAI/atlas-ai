@@ -1,0 +1,51 @@
+{
+  "appointments": [
+    {
+      "id": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
+      "organizationId": "99718c1f-c875-46cf-84cb-1e321a5cc6cc",
+      "atlasProspectId": "ATL-000001",
+      "prospectName": "Carlos Ruiz",
+      "interviewType": "zoom",
+      "startTime": "2026-07-22T14:00:00.000Z",
+      "endTime": "2026-07-22T14:30:00.000Z",
+      "timeZone": "America/New_York",
+      "locationLabel": "Zoom",
+      "status": "confirmed",
+      "calendarEventId": "sim-cal-1784646422167",
+      "workflowId": "b1b052a8-5fb5-40a4-89f8-e0140621e33b",
+      "confirmation": {
+        "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
+        "prospectName": "Carlos Ruiz",
+        "meetingType": "zoom",
+        "date": "Wednesday, July 22",
+        "time": "10:00 AM",
+        "timezone": "America/New_York",
+        "locationName": "Zoom",
+        "address": null,
+        "meetingUrl": null,
+        "createdAt": "2026-07-21T15:07:02.166Z",
+        "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nMeeting:\nZoom\n\nWe look forward to meeting you!"
+      },
+      "createdAt": "2026-07-21T15:07:02.166Z"
+    }
+  ],
+  "activity": [
+    {
+      "id": "0e9a21af-c7ec-46f3-bbae-81bf89ea0dc0",
+      "type": "appointment.confirmed",
+      "message": "Appointment confirmed for Carlos Ruiz.",
+      "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
+      "prospectName": "Carlos Ruiz",
+      "createdAt": "2026-07-21T15:07:02.166Z"
+    },
+    {
+      "id": "b5cc4c54-68a5-479f-8bd7-66413bed1555",
+      "type": "appointment.scheduled",
+      "message": "First appointment scheduled with Carlos Ruiz",
+      "appointmentId": "9ab74bbe-3e45-4afb-9318-efe05f19ae99",
+      "prospectName": "Carlos Ruiz",
+      "createdAt": "2026-07-21T15:07:02.166Z"
+    }
+  ],
+  "updatedAt": "2026-07-21T15:07:02.167Z"
+}
