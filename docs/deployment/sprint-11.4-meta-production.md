@@ -6,8 +6,8 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 1.8 |
-| **Status** | Draft |
+| **Version** | 1.9 |
+| **Status** | Approved (final production decision) |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
 | **Related Sprint** | 11.4 |
@@ -19,8 +19,7 @@
 
 Record Sprint **11.4** production Meta WhatsApp Cloud API setup status, distinguish Atlas backend readiness from Meta account restrictions, and provide troubleshooting steps before continuing Cloud API onboarding.
 
-**Atlas AI production number:** +1 **786-752-8080** (Niovel Perez WABA) — designated for Cloud API migration  
-**Out of scope:** +1 **786-296-7254** (Ana Perez WABA) — unchanged; protects day-to-day business operations
+**Final decision (2026-07-21):** **Proceed** with Cloud API migration on **Niovel Perez WABA** — **786-752-8080** is the dedicated Atlas AI production number. Chat history preservation **not required**. **786-296-7254** (Ana Perez) remains independent.
 
 ---
 
@@ -136,6 +135,29 @@ If operational needs change, require explicit architecture approval before any c
 
 ---
 
+## Final production decision approved (2026-07-21)
+
+The **final production decision** for Sprint **11.4** WhatsApp Cloud API migration is **approved**. Implementation is **authorized to proceed**.
+
+| Decision | Detail |
+|----------|--------|
+| **Atlas AI production number** | **+1 786-752-8080** — dedicated Atlas channel |
+| **WABA for migration** | **Niovel Perez** (Approved) — proceed with Cloud API migration |
+| **Chat history** | **Not required to preserve** — existing WhatsApp Business App conversation history on **8080** does not block migration |
+| **Ana Perez / 786-296-7254** | **Remains independent** — no Atlas binding; avoids operational risk to day-to-day business |
+| **Authorization** | ✅ **Proceed** with Cloud API migration per [confirmed procedure](#confirmed-procedure-atlas-mvp) |
+
+### Implications for migration
+
+- **No history-preservation constraint** — migration can proceed even if Cloud API onboarding resets or replaces prior WhatsApp Business App messaging context on **8080**.
+- **Single Atlas channel** — all automation, AI conversations, scheduling, ads (Click-to-WhatsApp), and future integrations use **786-752-8080** only.
+- **Operational isolation** — Ana Perez's number continues manual business operations without Atlas webhook, token, or API Setup changes.
+- **Next action** — execute **WhatsApp → API Setup** on the existing Atlas Developer App; select **Niovel Perez WABA**; complete Railway credential and webhook configuration; run live smoke test.
+
+> **Rule:** **Final decision: migrate 8080 via Niovel Perez WABA. History preservation not required. 7254 stays independent. Proceed with Cloud API setup.**
+
+---
+
 ### Classification
 
 | Layer | Status |
@@ -232,7 +254,8 @@ Until Cloud API onboarding completes with the **correct Approved production WABA
 
 Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded Signup for production:
 
-- [ ] **Production architecture confirmed** — **786-752-8080** = Atlas; **786-296-7254** (Ana Perez) unchanged (see [approved architecture](#production-architecture-approved-2026-07-21))
+- [x] **Production architecture confirmed** — **786-752-8080** = Atlas; **786-296-7254** (Ana Perez) unchanged (see [approved architecture](#production-architecture-approved-2026-07-21))
+- [x] **Final production decision approved** — proceed Cloud API migration on **Niovel Perez WABA**; history preservation not required (see [final decision](#final-production-decision-approved-2026-07-21))
 - [x] **List all WABAs** — Business settings → Accounts → WhatsApp accounts
 - [x] **Complete WABA inventory** — ownership, linked apps, phone numbers, production usage (see [completed inventory](#waba-inventory-completed-2026-07-21))
 - [ ] **Do not delete unused WABAs** during migration
@@ -456,8 +479,9 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 
 ---
 
-## Atlas production checklist (after correct WABA selected)
+## Atlas production checklist (authorized — proceed with migration)
 
+- [x] **Final production decision** — **786-752-8080** dedicated Atlas number; history not required; Ana Perez independent ([final decision](#final-production-decision-approved-2026-07-21))
 - [ ] **WABA inventory complete** — do not delete unused WABAs until live smoke test passes (see [migration policy](#waba-migration-policy-do-not-delete-during-migration))
 - [ ] **Associate Approved WABA** — existing Atlas app → **WhatsApp → API Setup** → **Niovel Perez** (**786-752-8080**); no new Developer App
 - [ ] WABA status **Approved** in Business Settings
@@ -482,9 +506,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **Pre-change gate documented:** Before WABA reassignment, consult Meta AI with precise engineering question; record guidance; compare with official Meta documentation before implementing any Developer App / WABA binding changes |
 | 2026-07-21 | **Major discovery (Meta confirmed):** Existing **Approved WABA** can be associated with **existing Atlas Developer App** via **WhatsApp → API Setup** — **no new app required**; deployment workflow must prioritize selecting correct Approved WABA over Meta's auto-created Test WABA |
 | 2026-07-21 | **Production architecture approved:** **786-752-8080** designated Atlas AI production number (Cloud API migration via Niovel Perez WABA); **Ana Perez / 786-296-7254** unchanged to protect day-to-day ops; Atlas owns 8080 for automation, AI, scheduling, future integrations |
+| 2026-07-21 | **Final production decision approved:** **786-752-8080** = dedicated Atlas AI production number; existing WhatsApp Business App history **not required to preserve**; **Ana Perez / 786-296-7254** remains independent (operational risk avoidance); **authorized to proceed** with Cloud API migration on **Niovel Perez WABA** |
 
 ---
 
 ## One-line summary
 
-> **Production architecture approved: 786-752-8080 = Atlas AI (Cloud API via Niovel Perez WABA). Ana Perez / 786-296-7254 unchanged. Select 8080 in WhatsApp → API Setup; do not use Test WABA or modify 7254.**
+> **Final decision approved: 786-752-8080 = dedicated Atlas AI production number via Niovel Perez WABA. History preservation not required. Ana Perez / 786-296-7254 independent. Proceed with Cloud API migration.**

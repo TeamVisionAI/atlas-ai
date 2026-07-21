@@ -36,7 +36,7 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 
 Copy `.env.example` → `.env` and fill values.
 
-> **Production architecture (Sprint 11.4):** **786-752-8080** = Atlas AI production number (Cloud API via Niovel Perez WABA). **786-296-7254** (Ana Perez) unchanged — out of scope. See [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md). Associate via **WhatsApp → API Setup** on existing Atlas app; do not use Test WABA.
+> **Final production decision (Sprint 11.4):** **786-752-8080** = dedicated Atlas AI number — proceed Cloud API migration on **Niovel Perez WABA**. History preservation not required. **786-296-7254** (Ana Perez) independent. See [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md).
 
 ---
 

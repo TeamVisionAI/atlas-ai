@@ -29,6 +29,14 @@
 
 ---
 
+## Documentation — Sprint 11.4 final production decision (DOC-0701 v1.9)
+
+**Date:** 2026-07-21
+
+Final production decision approved: **786-752-8080** dedicated Atlas AI production number; Cloud API migration authorized on **Niovel Perez WABA**. Existing WhatsApp Business App history not required to preserve. **Ana Perez / 786-296-7254** remains independent to avoid operational risk.
+
+---
+
 ## Documentation — Sprint 11.4 production architecture approved (DOC-0701 v1.8)
 
 **Date:** 2026-07-21
