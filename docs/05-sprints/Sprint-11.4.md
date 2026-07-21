@@ -111,18 +111,19 @@ Phase A deliverables: production WhatsApp → Communication Hub → Conversation
 
 ---
 
-## Meta production blocker (account-level)
+## Meta production blocker (refined root cause)
 
-During Meta **WhatsApp Cloud API initialization**, onboarding stopped with a **WhatsApp Business Account (WABA) restriction** before a test number could be claimed.
+During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a test number could be claimed. **Root cause refined:** Meta **auto-selected a disabled Test WABA** instead of an approved production WABA.
 
 | Classification | Detail |
 |----------------|--------|
-| **Root cause** | Meta **WABA-level** restriction (likely isolated to the WhatsApp Business Account) |
-| **Not caused by** | Atlas backend, Railway, webhook implementation, or Business Portfolio-wide restrictions |
-| **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account (2026-07-21) |
-| **Next diagnostic step** | Business Settings → Accounts → WhatsApp accounts — verify WABA assets and permissions |
+| **Root cause** | Disabled **Test WABA** auto-selected by Meta during Cloud API onboarding |
+| **Production WABAs verified** | **Niovel Perez** — Approved; **Ana Perez** — Approved |
+| **Not caused by** | Atlas backend, Railway, webhook implementation, or Business Portfolio restrictions |
+| **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account |
+| **Required before retry** | Explicitly verify and select an **Approved** production WABA — not the Test account |
 
-**Action:** Inspect the **specific WABA** for **786-752-8080** in Meta Business Suite before retrying Cloud API setup. Full troubleshooting: [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
+**Action:** Follow the [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701) before retrying Cloud API setup.
 
 ---
 

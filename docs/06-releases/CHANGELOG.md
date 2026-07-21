@@ -29,6 +29,16 @@
 
 ---
 
+## Documentation — Sprint 11.4 root cause refined (DOC-0701 v1.3)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Root cause refined: Meta auto-selected **disabled Test WABA** instead of approved production WABA. **Niovel Perez** and **Ana Perez** WABAs verified **Approved**. Added deployment checklist to verify WABA selection before Cloud API onboarding.
+
+---
+
 ## Documentation — Sprint 11.4 Business Home confirmed (DOC-0701 v1.2)
 
 | Field | Value |
