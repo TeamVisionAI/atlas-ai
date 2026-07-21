@@ -1,0 +1,58 @@
+{
+  "base": "https://127.0.0.1:4173",
+  "desktop": {
+    "navVisible": true,
+    "menuToggleHidden": true,
+    "signInVisible": true
+  },
+  "devices": [
+    {
+      "device": "iPhone SE",
+      "viewport": "320x568",
+      "checks": {
+        "menuToggleVisible": true,
+        "menuOpens": true,
+        "contactHref": true,
+        "menuClosesAfterLink": true,
+        "contactSectionVisible": true,
+        "noHorizontalOverflow": true,
+        "legalRouteWorks": true,
+        "escClosesMenu": true
+      },
+      "consoleErrors": [],
+      "passed": true
+    },
+    {
+      "device": "iPhone 13",
+      "viewport": "390x664",
+      "checks": {
+        "menuToggleVisible": true,
+        "menuOpens": true,
+        "contactHref": true,
+        "menuClosesAfterLink": true,
+        "contactSectionVisible": true,
+        "noHorizontalOverflow": true,
+        "legalRouteWorks": true,
+        "escClosesMenu": true
+      },
+      "consoleErrors": [],
+      "passed": true
+    },
+    {
+      "device": "Pixel 7",
+      "viewport": "412x839",
+      "checks": {
+        "menuToggleVisible": true,
+        "menuOpens": true,
+        "contactHref": true,
+        "menuClosesAfterLink": true,
+        "contactSectionVisible": true,
+        "noHorizontalOverflow": true,
+        "legalRouteWorks": true,
+        "escClosesMenu": true
+      },
+      "consoleErrors": [],
+      "passed": true
+    }
+  ]
+}

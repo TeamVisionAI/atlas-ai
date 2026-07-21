@@ -7,12 +7,14 @@ const healthRoute = require("./routes/health");
 const infoRoute = require("./routes/info");
 const recruitRoute = require("./routes/recruit");
 const webhookRoute = require("./routes/webhook");
+const messengerWebhookRoute = require("./routes/messengerWebhook");
 
 const simulatorRoutes = require("./dev/simulatorRoutes");
 
 const dashboardRoutes = require("./routes/dashboard");
 const timelineRoutes = require("./routes/timeline");
 const missionControlRoutes = require("./routes/missionControl");
+const executiveDashboardRoutes = require("./routes/executiveDashboard");
 const organizationRoutes = require("./routes/organization");
 const quickCaptureRoutes = require("./routes/quickCapture");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
@@ -42,6 +44,12 @@ app.use(
   webhookRoute
 );
 
+app.use(
+  "/webhook/messenger",
+  express.raw({ type: "application/json" }),
+  messengerWebhookRoute
+);
+
 // JSON parsing for all non-webhook routes.
 app.use(express.json());
 
@@ -67,6 +75,7 @@ app.use("/api/contact", contactRoutes);
 // Atlas application routes
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/mission-control", missionControlRoutes);
+app.use("/api/executive-dashboard", executiveDashboardRoutes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);

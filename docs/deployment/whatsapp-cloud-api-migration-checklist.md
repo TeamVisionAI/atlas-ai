@@ -6,8 +6,8 @@
 |-------|-------|
 | **Document ID** | DOC-0702 |
 | **Title** | WhatsApp Cloud API Migration Checklist |
-| **Version** | 1.9 |
-| **Status** | Active |
+| **Version** | 2.0 |
+| **Status** | Deferred (Meta WhatsApp restriction) |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
 | **Related Sprint** | 11.4 |
@@ -17,7 +17,9 @@
 
 ## Purpose
 
-Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for Atlas AI production using the **Niovel Perez WABA**. Follow after reading [sprint-11.4-meta-production.md](./sprint-11.4-meta-production.md) (DOC-0701) — final production decision approved.
+Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for Atlas AI production using the **Niovel Perez WABA**. Follow after reading [sprint-11.4-meta-production.md](./sprint-11.4-meta-production.md) (DOC-0701).
+
+> **Status (2026-07-21):** **Deferred.** WhatsApp asset layer restricted by Meta. MVP pivots to Messenger + Instagram. See [investigation conclusion](../sprints/sprint-11.4-whatsapp-investigation.md) (DOC-0513). Retain this checklist for when Meta restrictions are resolved.
 
 **Scope:** **786-752-8080** only. **Ana Perez / 786-296-7254** is out of scope — do not modify.
 
@@ -57,15 +59,15 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
 - [x] Confirm Atlas app linked to portfolio with **administrator access** ([Connect assets verified](./sprint-11.4-meta-production.md#app-portfolio-link-and-connect-assets-verified-2026-07-21))
 - [x] Confirm **Connect assets** exposes **Ad Accounts only** — WABA assignment not available; app asset assignment **ruled out** as wabaID cause
 
-#### Phase 1a — Meta AI recovery strategy (proposed — verify before proceeding)
+#### Phase 1a — Meta AI recovery strategy (attempted — blocked by restriction)
 
-> **Status:** Meta AI proposed creating a **new WABA** under portfolio **`367219934273986`** while preserving the existing Business Portfolio. **Not approved for implementation** until UI verification completes.
+> **Status:** UI verified; new WABA creation **failed** with WhatsApp account restricted. Investigation concluded — see [DOC-0513](../sprints/sprint-11.4-whatsapp-investigation.md).
 
-- [ ] Open Business Settings → **Accounts** → **WhatsApp accounts** → **Add**
-- [ ] Confirm **"Create a new WhatsApp Business Account"** option is visible ([pre-proceed gate](./sprint-11.4-meta-production.md#pre-proceed-gate-verify-create-new-waba-ui-2026-07-21), DOC-0701 v2.8)
-- [ ] Capture screenshot to secure ops vault (not git)
-- [ ] If option visible: complete pre-change gate + ops approval before creating WABA
-- [ ] If option missing: escalate to Meta Support — do not create WABA
+- [x] Open Business Settings → **Accounts** → **WhatsApp accounts** → **Add**
+- [x] Confirm **"Create a new WhatsApp Business Account"** option visible
+- [x] Confirm **"Link a WhatsApp Business Account"** option visible
+- [x] Attempt create new WABA — **failed:** *"You cannot proceed with this operation since your WhatsApp Business account is currently restricted."*
+- [x] **Strategic pivot** — defer WhatsApp; proceed with Messenger + Instagram (DOC-0513)
 
 ### Phase 2 — Step 2: Production setup (Use cases UI)
 
@@ -209,4 +211,4 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 
 ## One-line summary
 
-> **Add phone number failed: wabaID null. Verify Create new WABA UI before Meta AI recovery path — not approved yet.**
+> **WhatsApp migration deferred — Meta restriction. Active path: Messenger + Instagram (DOC-0513).**

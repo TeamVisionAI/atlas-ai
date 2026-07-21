@@ -24,9 +24,28 @@
 | DOC-0001 | [Current_System_State.md](../00-executive/Current_System_State.md) | Production state reference |
 | DOC-0002 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification portfolio |
 | DOC-0512 | [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md) | Sprint 11.4 engineering blueprint |
+| DOC-0010 | [Communication_Hub.md](../02-architecture/Communication_Hub.md) | Communication Hub transport layer |
+| DOC-0020 | [atlas-communication-platform.md](../architecture/atlas-communication-platform.md) | Atlas Communication Platform architecture (Sprint 12) |
+| DOC-0513 | [sprint-11.4-whatsapp-investigation.md](../sprints/sprint-11.4-whatsapp-investigation.md) | WhatsApp investigation conclusion & strategic pivot to Messenger/Instagram |
 | DOC-0701 | [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) | Meta WABA / Cloud API production troubleshooting |
 | DOC-0702 | [whatsapp-cloud-api-migration-checklist.md](../deployment/whatsapp-cloud-api-migration-checklist.md) | WhatsApp Cloud API migration checklist (786-752-8080) |
 | — | [Roadmap.md](../00-executive/Roadmap.md) | Planned releases and milestones |
+
+---
+
+## Documentation — Atlas Communication Platform architecture (DOC-0020)
+
+**Date:** 2026-07-21
+
+Sprint 12 architecture: channel-independent platform with Communication Gateway, single prospect identity, Human Takeover, and connector model (Messenger + Instagram MVP; WhatsApp deferred).
+
+---
+
+## Documentation — Sprint 11.4 WhatsApp investigation & strategic pivot (DOC-0513)
+
+**Date:** 2026-07-21
+
+WhatsApp Cloud API onboarding blocked: `wabaID` null on existing WABA path; new WABA creation failed with WhatsApp account restricted. Portfolio healthy; WhatsApp asset layer restricted. **Strategic pivot:** MVP to Facebook Messenger + Instagram DM; Atlas becomes multichannel platform. WhatsApp deferred to future connector.
 
 ---
 

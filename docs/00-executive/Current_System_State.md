@@ -66,7 +66,8 @@ It is updated at the close of each production-facing release. For architecture d
 | Compliance | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification materials |
 | Compliance | [Privacy_and_Data_Handling.md](../04-meta/Privacy_and_Data_Handling.md) | Privacy and data handling (Meta package) |
 | Compliance | [Meta_Review_QA.md](../04-meta/Meta_Review_QA.md) | Meta reviewer Q&A |
-| Architecture | [Communication_Hub.md](../02-architecture/Communication_Hub.md) | Multi-channel communication architecture (Sprint 11.4+) |
+| Architecture | [atlas-communication-platform.md](../architecture/atlas-communication-platform.md) | Channel-independent communication platform (Sprint 12, DOC-0020) |
+| Architecture | [Communication_Hub.md](../02-architecture/Communication_Hub.md) | Communication Gateway transport layer (Sprint 11.4+, DOC-0010) |
 | Sprint | [Sprint-11.4.md](../05-sprints/Sprint-11.4.md) | Conversation Engine and WhatsApp Business integration |
 | Sprint | Sprint documentation (engineering) | See [Documentation index](#documentation-index) |
 
@@ -260,8 +261,8 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ## Known open items (production blockers)
 
-1. **Meta WABA / Cloud API migration (Sprint 11.4)** — Production Setup failed: **`Unexpected null value for wabaID`** before SMS/migration. Portfolio and app link verified; app asset assignment ruled out. **Meta AI proposed new-WABA recovery** (preserve portfolio **`367219934273986`**) — **pending UI verification** of Create new WABA option at Business Settings → WhatsApp Accounts → Add. Not approved for implementation. ([recovery strategy](../deployment/sprint-11.4-meta-production.md#meta-ai-recovery-strategy--new-waba-proposed-2026-07-21), DOC-0701 v2.8).
-2. **Live end-to-end smoke test** — Send WhatsApp to **+1 786-752-8080**; confirm Atlas reply → qualification → Google Calendar booking → confirmation. Required for production acceptance.
+1. **Meta WhatsApp Cloud API (Sprint 11.4)** — **Deferred.** WhatsApp asset layer **restricted** — `wabaID` null on existing WABA path; new WABA creation blocked (*"WhatsApp Business account is currently restricted"*). Portfolio and app verified healthy. **Strategic pivot:** MVP moves to **Facebook Messenger** + **Instagram DM** (Sprint 12). ([investigation](../sprints/sprint-11.4-whatsapp-investigation.md), DOC-0513)
+2. **Live end-to-end smoke test (Messenger / Instagram)** — Send message via primary channel; confirm Atlas reply → qualification → Google Calendar booking → confirmation. WhatsApp smoke test deferred until Meta restrictions resolved.
 3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
 4. **META_APP_SECRET on Railway** — Recommended for webhook signature validation (currently skipped with warning when unset).
 5. **Placeholder Atlas pages** — Conversations, Appointments, Analytics remain UI shells (deferred post-launch).
@@ -274,15 +275,17 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 | Field | Value |
 |-------|-------|
-| **Sprint** | 11.4 |
-| **Primary objective** | Implement the Atlas AI Conversation Engine with WhatsApp Business integration and establish the Communication Hub architecture for future multi-channel support. |
-| **Phase A status** | ✅ Deployed on `main` — live WhatsApp → Communication Hub → Conversation Engine → outbound |
-| **Next (launch-critical)** | Google Calendar production config; end-to-end live ad → interview smoke test |
-| **Deferred post-launch** | Phase B Hub adapters; executive dashboard polish; reminder engine |
+| **Sprint** | 12 (planned) |
+| **Primary objective** | Multichannel MVP — **Facebook Messenger** and **Instagram DM** integrated with Atlas AI Core, Prospect Center, and Human Takeover. WhatsApp deferred until Meta restrictions resolved. |
+| **Phase A status (Sprint 11.4)** | ✅ Deployed on `main` — WhatsApp pipeline → Communication Hub → Conversation Engine (connector pattern established) |
+| **Next (launch-critical)** | Messenger + Instagram connectors; Google Calendar production config; end-to-end live smoke test on primary channels |
+| **Deferred** | WhatsApp Cloud API (Meta restriction); Phase B Hub adapters polish; reminder engine |
 
 **Related planning documents:**
 
+- [sprint-11.4-whatsapp-investigation.md](../sprints/sprint-11.4-whatsapp-investigation.md) — strategic pivot (DOC-0513)
 - [Sprint-11.4.md](../05-sprints/Sprint-11.4.md)
+- [atlas-communication-platform.md](../architecture/atlas-communication-platform.md)
 - [Communication_Hub.md](../02-architecture/Communication_Hub.md)
 
 ---

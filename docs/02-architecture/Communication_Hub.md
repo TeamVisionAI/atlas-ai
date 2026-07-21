@@ -21,13 +21,14 @@
 - [Sprint-11.4.md](../05-sprints/Sprint-11.4.md)
 - [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md)
 - [README.md](./README.md)
+- [../architecture/atlas-communication-platform.md](../architecture/atlas-communication-platform.md) — platform vision & Communication Gateway (DOC-0020)
 - [../04-meta/Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md)
 
 ---
 
 ## Purpose
 
-Define the **Communication Hub** — the unified architecture for inbound and outbound agency communication across channels, starting with WhatsApp Business in Sprint 11.4.
+Define the **Communication Hub** — the unified transport layer for inbound and outbound agency communication across channels. Platform vision and gateway responsibilities: [Atlas Communication Platform](../architecture/atlas-communication-platform.md) (DOC-0020).
 
 > **Note:** Phase A implements the transport layer and WhatsApp routing. Full multi-channel adapter interface is Phase B.
 

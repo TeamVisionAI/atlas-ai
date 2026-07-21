@@ -6,8 +6,18 @@ const {
 } = require("../controllers/agentActionController");
 const { postWorkflowAdvance } = require("../controllers/workflowAdvanceController");
 const { isProductionProspect } = require("../core/productionProspectFilter");
+const { getCommunicationGateway } = require("../communication/gateway/createCommunicationGateway");
 
 const router = express.Router();
+
+router.get("/live/snapshot", (req, res) => {
+  try {
+    const { missionControlService } = getCommunicationGateway();
+    res.json(missionControlService.getSnapshot());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 function rejectSimulatorProspect(phone, res) {
   if (!isProductionProspect(phone)) {

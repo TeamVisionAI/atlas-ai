@@ -21,6 +21,8 @@ Record Sprint **11.4** production Meta WhatsApp Cloud API setup status, distingu
 
 **Final decision (2026-07-21):** **Proceed** with Cloud API migration on **Niovel Perez WABA** — **786-752-8080** is the dedicated Atlas AI production number. Chat history preservation **not required**. **786-296-7254** (Ana Perez) remains independent.
 
+**Strategic pivot (2026-07-21):** WhatsApp Cloud API onboarding **blocked** by Meta WhatsApp asset-layer restriction. MVP pivots to **Facebook Messenger** and **Instagram DM**. See [Sprint 11.4 WhatsApp Investigation & Strategic Pivot](../sprints/sprint-11.4-whatsapp-investigation.md) (DOC-0513). This document remains the operational record for WhatsApp troubleshooting when restrictions are resolved.
+
 ---
 
 ## Related documents
@@ -32,7 +34,8 @@ Record Sprint **11.4** production Meta WhatsApp Cloud API setup status, distingu
 | [SPRINT_11_1_LIVE_WHATSAPP.md](../SPRINT_11_1_LIVE_WHATSAPP.md) | Live webhook inbound/outbound pipeline |
 | [Current_System_State.md](../00-executive/Current_System_State.md) | Production system state |
 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification materials |
-| [whatsapp-cloud-api-migration-checklist.md](./whatsapp-cloud-api-migration-checklist.md) | Step-by-step Cloud API migration checklist (DOC-0702) |
+| [whatsapp-cloud-api-migration-checklist.md](./whatsapp-cloud-api-migration-checklist.md) | Step-by-step Cloud API migration checklist (DOC-0702) — **deferred** |
+| [../sprints/sprint-11.4-whatsapp-investigation.md](../sprints/sprint-11.4-whatsapp-investigation.md) | Investigation conclusion & strategic pivot (DOC-0513) |
 
 ---
 
@@ -796,9 +799,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **Business Portfolio alignment verified (v2.6):** Atlas Developer App and Approved WABAs share portfolio **`367219934273986`** — wrong portfolio **ruled out**; remaining evidence: **Meta backend failure** resolving WABA during registration (`wabaID = null`) |
 | 2026-07-21 | **App–portfolio link verified (v2.7):** Atlas AI app linked to portfolio with **administrator access**; **Connect assets** exposes **Ad Accounts only** — WABA assignment not available; **app asset assignment ruled out** as wabaID cause |
 | 2026-07-21 | **Meta AI recovery strategy proposed (v2.8):** Preserve portfolio **`367219934273986`**; create **new WABA** for Atlas AI — **pending** UI verification of **Create a new WhatsApp Business Account** at Business Settings → Accounts → WhatsApp Accounts → Add |
+| 2026-07-21 | **Investigation concluded (DOC-0513):** UI verified (Create + Link options visible); new WABA creation **failed** — *WhatsApp Business account is currently restricted*; **strategic pivot** to Messenger + Instagram; WhatsApp deferred |
 
 ---
 
 ## One-line summary
 
-> **wabaID null — verify Create new WABA UI before Meta AI recovery path. Portfolio preserved; new WABA proposed — not approved yet.**
+> **WhatsApp restricted — pivot to Messenger/Instagram. See DOC-0513. This doc retained for WhatsApp recovery when Meta lifts restriction.**
