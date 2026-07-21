@@ -1,6 +1,6 @@
 /**
- * Sprint 11.1 — Inbound WhatsApp message pipeline.
- * Webhook → prospect resolve → persist → event engine. No AI replies in 11.1.
+ * Sprint 11.1 + 11.4 Phase A — Inbound WhatsApp message pipeline.
+ * Webhook → prospect resolve → persist → event engine → Conversation Engine → outbound.
  */
 
 const { findWorkflowEventByCorrelationId } = require("../services/workflowEventService");
@@ -8,6 +8,7 @@ const { logConversation } = require("../services/logService");
 const { locateOrCreateWhatsAppProspect } = require("./whatsappProspectResolver");
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
+const { processConversationAfterInbound } = require("./communicationHub");
 
 function buildInboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.INBOUND}${providerMessageId}`;
@@ -96,13 +97,39 @@ async function processInboundWhatsAppMessage(inbound) {
     created
   });
 
+  let conversation = null;
+
+  try {
+    conversation = await processConversationAfterInbound({
+      inbound,
+      storagePhone,
+      prospect,
+      contactName: prospect.name || inbound.contactName
+    });
+  } catch (error) {
+    logWhatsAppStage("conversation_engine_failed", {
+      phone: storagePhone,
+      providerMessageId: inbound.providerMessageId,
+      level: "error",
+      error: error.message
+    });
+
+    conversation = {
+      success: false,
+      replied: false,
+      reason: "CONVERSATION_ENGINE_ERROR",
+      error: error.message
+    };
+  }
+
   return {
     success: true,
     skipped: false,
     phone: storagePhone,
     created,
     conversationLogId: logResult.log?.id || null,
-    correlationId
+    correlationId,
+    conversation
   };
 }
 

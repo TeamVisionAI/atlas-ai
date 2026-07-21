@@ -2,7 +2,8 @@ console.log("✅ simulatorRoutes.js LOADED");
 const express = require("express");
 const path = require("path");
 
-const { handleIncomingMessage, buildHandoff, extractEmail } = require("../core/conversationEngine");
+const { buildHandoff, extractEmail } = require("../core/conversationEngine");
+const { processNormalizedInboundMessage } = require("../core/communicationHub");
 const { parseSchedulingState } = require("../core/schedulingState");
 const { releaseSlotByIso } = require("../core/capacityEngine");
 const { detectIntent } = require("../core/intentEngine");
@@ -415,16 +416,24 @@ router.post("/simulator/message", async (req, res) => {
     }
 
     const startedAt = Date.now();
-    const result = await withSimulatorGuard(() =>
-      handleIncomingMessage(DEV_PHONE, DEV_NAME, message)
+    const prospect = await findProspect(DEV_PHONE);
+    const hubResult = await withSimulatorGuard(() =>
+      processNormalizedInboundMessage(
+        {
+          channel: "simulator",
+          providerMessageId: `sim-route-${Date.now()}`,
+          phone: DEV_PHONE,
+          contactName: DEV_NAME,
+          text: message,
+          messageType: "text",
+          timestamp: new Date().toISOString()
+        },
+        { prospect, contactName: DEV_NAME }
+      )
     );
     const responseTimeMs = Date.now() - startedAt;
-    const reply =
-      typeof result === "string" ? result : result?.reply || "";
-    const handoff =
-      typeof result === "object" && result !== null ? result.handoff : null;
-
-    const prospect = await findProspect(DEV_PHONE);
+    const reply = hubResult.replyText || "";
+    const handoff = hubResult.engineResult?.handoff || null;
     const debug = await buildDebugSnapshot(prospect, message, responseTimeMs);
     if (handoff) {
       debug.handoff = handoff;

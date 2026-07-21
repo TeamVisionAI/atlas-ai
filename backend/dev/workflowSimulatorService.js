@@ -11,7 +11,7 @@ const {
   supabase
 } = require("../services/supabaseService");
 const { logConversation } = require("../services/logService");
-const { handleIncomingMessage } = require("../core/conversationEngine");
+const { processNormalizedInboundMessage } = require("../core/communicationHub");
 const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
 const { buildWorkflowReadModel } = require("../core/workflowReadModel");
 const { getMissionControlState } = require("../controllers/conversationController");
@@ -174,15 +174,33 @@ async function simulateMessage(payload = {}) {
     let reply = null;
 
     if (direction === "incoming") {
-      const result = await handleIncomingMessage(phone, prospect.name, body, {
-        channel: "simulator"
-      });
-      reply = typeof result === "string" ? result : result?.reply || null;
+      const hubResult = await processNormalizedInboundMessage(
+        {
+          channel: "simulator",
+          providerMessageId: `sim-in-${Date.now()}`,
+          phone,
+          contactName: prospect.name,
+          text: body,
+          messageType: "text",
+          timestamp: new Date().toISOString()
+        },
+        { prospect, contactName: prospect.name }
+      );
+      reply = hubResult.replyText || null;
     } else if (payload.asAtlas) {
-      const result = await handleIncomingMessage(phone, prospect.name, body, {
-        channel: "simulator"
-      });
-      reply = typeof result === "string" ? result : result?.reply || null;
+      const hubResult = await processNormalizedInboundMessage(
+        {
+          channel: "simulator",
+          providerMessageId: `sim-atlas-${Date.now()}`,
+          phone,
+          contactName: prospect.name,
+          text: body,
+          messageType: "text",
+          timestamp: new Date().toISOString()
+        },
+        { prospect, contactName: prospect.name }
+      );
+      reply = hubResult.replyText || null;
     } else {
       await logConversation({
         phone,
