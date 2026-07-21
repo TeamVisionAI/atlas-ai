@@ -29,6 +29,14 @@
 
 ---
 
+## Documentation — Sprint 11.4 major discovery: API Setup WABA association (DOC-0701 v1.7)
+
+**Date:** 2026-07-21
+
+Meta confirmed: existing **Approved WABA** can be associated with the **existing Atlas Developer App** via **WhatsApp → API Setup**. No new Meta Developer App required. Deployment workflow prioritizes selecting the correct Approved WABA (**Niovel Perez** / **786-752-8080**) over Meta's auto-created Test WABA.
+
+---
+
 ## Documentation — Sprint 11.4 Meta AI pre-change gate (DOC-0701 v1.6)
 
 **Date:** 2026-07-21

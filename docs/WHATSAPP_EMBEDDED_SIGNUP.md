@@ -36,7 +36,7 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 
 Copy `.env.example` → `.env` and fill values.
 
-> **Production troubleshooting (Sprint 11.4):** If Meta Cloud API initialization fails, see [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md). **WABA inventory complete:** **Niovel Perez** → **786-752-8080**, **Ana Perez** → **786-296-7254** (Approved). Meta-generated Test WABA is disabled — explicitly select production WABA; do not rely on Meta auto-selection. **Before WABA reassignment:** consult Meta AI, record guidance, compare with official Meta docs ([pre-change gate](./deployment/sprint-11.4-meta-production.md#pre-change-gate-consult-meta-ai-before-waba-reassignment)). **Do not delete unused WABAs during migration.**
+> **Production troubleshooting (Sprint 11.4):** See [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md). **Major discovery:** Associate existing **Approved WABA** with **existing Atlas app** via **WhatsApp → API Setup** — no new Developer App. Select **Niovel Perez** (**786-752-8080**); do not use Meta's auto-created Test WABA. **Do not delete unused WABAs during migration.**
 
 ---
 

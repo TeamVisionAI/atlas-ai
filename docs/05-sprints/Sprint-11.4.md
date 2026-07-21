@@ -122,15 +122,17 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 | **Meta-generated Test WABA** | **Disabled** — do not use for Cloud API onboarding |
 | **Not caused by** | Atlas backend, Railway, webhook implementation, or Business Portfolio restrictions |
 | **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account |
-| **Required before retry** | **Explicitly select** intended production WABA — do not rely on Meta auto-selection |
+| **Required before retry** | **WhatsApp → API Setup** on existing Atlas app — select Approved production WABA; **no new Developer App** |
 
-**Action:** Follow the [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701) before retrying Cloud API setup.
+**Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through **WhatsApp → API Setup**. No new Meta Developer App is required. Deployment must **prioritize selecting the correct Approved WABA** (**Niovel Perez** / **786-752-8080** for MVP) instead of Meta's automatically created Test WABA. See [major discovery](../deployment/sprint-11.4-meta-production.md#major-discovery--associate-existing-waba-via-api-setup-meta-confirmed-2026-07-21) (DOC-0701 v1.7).
+
+**Action:** Follow the [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) and [confirmed procedure](../deployment/sprint-11.4-meta-production.md#confirmed-procedure-atlas-mvp) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
 
 **WABA inventory (completed):** **Niovel Perez** → **786-752-8080**; **Ana Perez** → **786-296-7254** (both Approved). Meta-generated Test WABA is disabled. See [completed inventory](../deployment/sprint-11.4-meta-production.md#waba-inventory-completed-2026-07-21) (DOC-0701 v1.5).
 
 **WABA migration policy:** Do **not** delete unused WABAs during migration. Inventory complete; perform cleanup only after Atlas is successfully running in the new production environment. See [WABA migration policy](../deployment/sprint-11.4-meta-production.md#waba-migration-policy-do-not-delete-during-migration).
 
-**Pre-change gate (before WABA reassignment):** Consult Meta AI with a precise engineering question about reassigning the Developer App from the disabled Test WABA to an Approved production WABA. Record Meta's guidance and compare with official Meta documentation before implementing any configuration changes. See [pre-change gate](../deployment/sprint-11.4-meta-production.md#pre-change-gate-consult-meta-ai-before-waba-reassignment) (DOC-0701 v1.6).
+**Pre-change gate (Meta AI guidance received):** Existing Approved WABA associable via **WhatsApp → API Setup** on existing app — no new Developer App. See [pre-change gate](../deployment/sprint-11.4-meta-production.md#pre-change-gate-consult-meta-ai-before-waba-reassignment) (DOC-0701 v1.7).
 
 ---
 

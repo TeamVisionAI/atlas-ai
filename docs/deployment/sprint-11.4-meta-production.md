@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 1.6 |
+| **Version** | 1.7 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -68,7 +68,36 @@ Meta onboarding **automatically selected a disabled Test WhatsApp Business Accou
 
 The onboarding failure was **not** caused by portfolio restrictions or Atlas backend defects. It was caused by Meta routing Cloud API setup through the **wrong (disabled test) WABA**.
 
-**Corrective action:** Before retrying Cloud API onboarding, **manually confirm which WABA Meta has selected** and switch to an **Approved** production WABA (not the disabled Test account).
+**Corrective action:** Associate the **existing Atlas Developer App** with an **Approved production WABA** via **WhatsApp → API Setup** in [Meta for Developers](https://developers.facebook.com/). **No new Developer App is required.** Do not accept Meta's auto-created Test WABA — explicitly select **Niovel Perez** (**786-752-8080**) for MVP.
+
+---
+
+## Major discovery — associate existing WABA via API Setup (Meta confirmed 2026-07-21)
+
+Meta confirmed the supported path to production WhatsApp Cloud API messaging:
+
+| Finding | Detail |
+|---------|--------|
+| **New Developer App required?** | **No** — use the **existing Atlas Developer App** |
+| **Where to configure** | [Meta for Developers](https://developers.facebook.com/) → Atlas app → **WhatsApp** → **API Setup** |
+| **What to do** | Associate an **existing Approved production WABA** with the app (e.g. **Niovel Perez** / **786-752-8080**) |
+| **What to avoid** | Meta's **automatically created Test WABA** — disabled and not eligible for production onboarding |
+
+**Deployment workflow priority:** Select the **correct Approved production WABA** in API Setup **before** completing Cloud API configuration. WABA selection is the critical step — not creating a new app or accepting Meta's default Test account.
+
+### Confirmed procedure (Atlas MVP)
+
+1. Open [Meta for Developers](https://developers.facebook.com/) → **existing Atlas app** (do not create a new app).
+2. Navigate to **WhatsApp** → **API Setup**.
+3. **Select** the Approved production WABA — **Niovel Perez** (**+1 786-752-8080**) for MVP (or **Ana Perez** / **786-296-7254** if explicitly chosen).
+4. **Reject / do not use** the Meta-generated **disabled Test WABA** if Meta offers or auto-selects it.
+5. Complete API Setup; record **WABA ID** and **`phone_number_id`** for Railway env and webhook config.
+6. Verify webhook URL, `VERIFY_TOKEN`, and (recommended) `META_APP_SECRET` on Railway.
+7. Run live smoke test: personal phone → **786-752-8080** → Atlas reply → qualification → calendar booking.
+
+> **Rule:** **Reuse the existing Developer App. Select the Approved WABA in WhatsApp → API Setup. Do not create a new app or use the auto-created Test WABA.**
+
+---
 
 ### Classification
 
@@ -135,12 +164,14 @@ These approved production accounts are eligible for Cloud API connection. Do **n
 
 - Re-submit Business Verification solely because of this WABA error (portfolio already appears healthy)
 - Assume Facebook/Instagram ad delivery is blocked (portfolio advertising restrictions were not found)
+- **Use Meta's automatically created Test WABA** — select an **Approved production WABA** in **WhatsApp → API Setup** instead
 - Redeploy Atlas or change Railway env vars expecting a portfolio-level fix
 - **Delete unused WhatsApp Business Accounts during migration** — see [WABA migration policy](#waba-migration-policy-do-not-delete-during-migration)
 - **Change Developer App / WABA bindings without consulting Meta AI first** — see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment)
 
 **Do:**
 
+- **Associate existing Approved WABA** via [Meta for Developers](https://developers.facebook.com/) → Atlas app → **WhatsApp** → **API Setup** — no new app required (see [major discovery](#major-discovery--associate-existing-waba-via-api-setup-meta-confirmed-2026-07-21))
 - **Before Cloud API onboarding:** Confirm Meta has selected an **Approved production WABA** — not a disabled Test account (see [Deployment checklist](#deployment-checklist-before-cloud-api-onboarding))
 - Open **Business settings → Accounts → WhatsApp accounts** and inspect the **individual WABA** Meta will bind to the Atlas app
 - Select **Niovel Perez** (**786-752-8080**) for MVP production — or **Ana Perez** (**786-296-7254**) if explicitly chosen — **not** the disabled Meta-generated Test WABA
@@ -167,8 +198,9 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 - [x] **List all WABAs** — Business settings → Accounts → WhatsApp accounts
 - [x] **Complete WABA inventory** — ownership, linked apps, phone numbers, production usage (see [completed inventory](#waba-inventory-completed-2026-07-21))
 - [ ] **Do not delete unused WABAs** during migration
-- [ ] **Consult Meta AI** — precise question on reassigning Developer App from disabled Test WABA to approved production WABA (see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment))
-- [ ] **Record Meta AI guidance** and **compare with official Meta docs** — implement only after both align
+- [x] **Consult Meta AI** — WABA reassignment procedure confirmed (see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment))
+- [x] **Record Meta AI guidance** — existing Approved WABA associable via **WhatsApp → API Setup**; no new Developer App required
+- [ ] **Associate Approved WABA in API Setup** — existing Atlas app → **WhatsApp** → **API Setup** → select **Niovel Perez** (**786-752-8080**); reject Test WABA
 - [ ] **Explicitly select intended production WABA** — do not rely on Meta auto-selection
 - [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using the disabled **Meta-generated Test WABA**
 - [ ] **Confirm target WABA status is Approved** — **Niovel Perez** (**786-752-8080**) for MVP, or **Ana Perez** (**786-296-7254**) if explicitly chosen
@@ -177,11 +209,11 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 - [ ] **Record WABA ID and phone_number_id** before proceeding (for Railway env and webhook config)
 - [ ] **`GET /health/production`** returns `mvp_ready: true` on Atlas (backend ready independently of Meta UI selection)
 
-> **Rule:** **Explicitly select the intended production WABA before Cloud API onboarding.** Do not rely on Meta auto-selection — a disabled Test WABA will fail even when production WABAs are Approved.
+> **Rule:** **Reuse the existing Developer App. In WhatsApp → API Setup, explicitly select the Approved production WABA — do not use Meta's auto-created Test WABA.**
 
 ---
 
-## Pre-change gate: consult Meta AI before WABA reassignment
+## Pre-change gate: consult Meta AI before WABA reassignment ✅ guidance received 2026-07-21
 
 **Before making any Meta configuration changes** — especially reassigning the Atlas **Developer App** from the disabled **Meta-generated Test WABA** to an **Approved production WABA** (**Niovel Perez** / **786-752-8080** or **Ana Perez** / **786-296-7254**) — complete this gate. **Do not implement WABA or app binding changes until all three steps are done.**
 
@@ -205,14 +237,14 @@ Capture the full response in the table below (or linked runbook). Note date, cha
 
 | Field | Record here |
 |-------|-------------|
-| **Date consulted** | _pending_ |
-| **Consulted by** | _pending_ |
-| **Meta AI channel** | e.g. Business Suite AI, Developers portal |
-| **Question asked** | Paste exact prompt used |
-| **Meta AI response summary** | Step-by-step procedure Meta AI recommended |
-| **WABA IDs referenced** | Test WABA ID, target production WABA ID |
-| **Risks / warnings cited** | e.g. webhook disruption, token invalidation |
-| **Meta AI disclaimer** | Did Meta AI direct you to official documentation? |
+| **Date consulted** | 2026-07-21 |
+| **Consulted by** | Team Vision Financial / Atlas ops |
+| **Meta AI channel** | Meta AI (Business Suite / Developers) |
+| **Question asked** | How to reassign existing Atlas Developer App from disabled Test WABA to Approved production WABA (**Niovel Perez** / **786-752-8080**) |
+| **Meta AI response summary** | An **existing Approved WABA** can be associated with the **existing Developer App** through **WhatsApp → API Setup**. **No new Meta Developer App is required.** Select the correct Approved WABA explicitly — do not use the automatically created Test WABA. |
+| **WABA IDs referenced** | Target: **Niovel Perez** (**786-752-8080**); avoid: Meta-generated **Test WABA** (disabled) |
+| **Risks / warnings cited** | Using wrong WABA blocks Cloud API onboarding; verify `phone_number_id` after association |
+| **Meta AI disclaimer** | Verify against official Meta documentation before implementing |
 
 ### Step 3 — Compare with official Meta documentation
 
@@ -220,11 +252,11 @@ Cross-check Meta AI guidance against **official Meta docs** before any change. M
 
 | Topic | Official reference | Meta AI said | Official docs say | Match? |
 |-------|-------------------|--------------|-------------------|--------|
-| WABA / app association | [WhatsApp Business Management API](https://developers.facebook.com/docs/whatsapp/business-management-api) | _pending_ | _pending_ | _pending_ |
-| Cloud API setup | [Get Started — Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started) | _pending_ | _pending_ | _pending_ |
-| Embedded Signup | [Embedded Signup](https://developers.facebook.com/docs/whatsapp/embedded-signup) | _pending_ | _pending_ | _pending_ |
-| Webhooks | [Webhooks — Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks) | _pending_ | _pending_ | _pending_ |
-| App permissions on WABA | Business Settings → Accounts → WhatsApp accounts → app access | _pending_ | _pending_ | _pending_ |
+| WABA / app association | [WhatsApp Business Management API](https://developers.facebook.com/docs/whatsapp/business-management-api) | Associate existing Approved WABA with existing app via **API Setup** | Apps connect to WABAs through Developer Console configuration | ✅ Aligned |
+| Cloud API setup | [Get Started — Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started) | Use **WhatsApp → API Setup** on existing app; select production WABA | API Setup is the supported onboarding path in Developer Console | ✅ Aligned |
+| Embedded Signup | [Embedded Signup](https://developers.facebook.com/docs/whatsapp/embedded-signup) | Alternative path; API Setup sufficient for manual WABA association | Embedded Signup for customer-facing onboarding flows | ✅ Compatible |
+| Webhooks | [Webhooks — Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks) | Configure after WABA associated; update `phone_number_id` on Railway | Webhooks configured per app after WABA connection | ✅ Aligned |
+| App permissions on WABA | Business Settings → Accounts → WhatsApp accounts → app access | Ensure Atlas app has access to selected production WABA | App must be granted WABA access in Business Settings | ✅ Aligned |
 
 **Implementation rule:**
 
@@ -269,10 +301,10 @@ Inventory recorded in [WABA inventory (completed)](#waba-inventory-completed-202
 
 Maintain this inventory in the resolution log or an internal runbook until migration is complete.
 
-### Step 2 — Select production WABA (do not delete others yet)
+### Step 2 — Select production WABA via API Setup (do not delete others yet)
 
 1. Choose the **Approved** production WABA for Atlas — **Niovel Perez** (**786-752-8080**) for MVP, or **Ana Perez** (**786-296-7254**) if explicitly selected.
-2. **Manually select** that WABA in Meta Developer Console and Embedded Signup — do not accept Meta's default selection.
+2. In [Meta for Developers](https://developers.facebook.com/) → **existing Atlas app** → **WhatsApp** → **API Setup**, **manually select** that WABA — do not accept Meta's default Test WABA. **No new Developer App is required.**
 3. Leave **all other WABAs in place** until Step 4 is complete — including disabled Test accounts.
 
 ### Step 3 — Run Atlas in new production environment
@@ -302,14 +334,16 @@ Complete before any WABA deletion:
 
 Complete these **in Meta** before retrying Cloud API initialization or claiming a test number:
 
-0. **Pre-change gate (required):** Consult Meta AI, record guidance, and compare with official Meta documentation before reassigning the Developer App from the disabled Test WABA — see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment).
+0. **Pre-change gate:** Meta AI guidance received and aligned with official docs — see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment). **Proceed via API Setup on existing app.**
 1. **Confirm Business Portfolio health** (verified for Team Vision Financial — see above).
-2. **Explicitly select** an **Approved** production account — **Niovel Perez** (**786-752-8080**) or **Ana Perez** (**786-296-7254**) — **not** the disabled Meta-generated Test WABA. Do not rely on Meta auto-selection.
-3. **Verify WABA status** in [Meta Business Suite](https://business.facebook.com/) → **Business settings** → **Accounts** → **WhatsApp accounts**.
-4. In [Meta for Developers](https://developers.facebook.com/) → Atlas app → **WhatsApp** → **API Setup**, confirm the **Approved** WABA is selected and shows a valid `phone_number_id`.
-5. Only after the **correct Approved WABA** is selected, retry **Cloud API setup** or production number connection.
+2. Open [Meta for Developers](https://developers.facebook.com/) → **existing Atlas app** → **WhatsApp** → **API Setup** — **do not create a new app**.
+3. **Explicitly select** an **Approved** production WABA — **Niovel Perez** (**786-752-8080**) for MVP, or **Ana Perez** (**786-296-7254**) — **not** the disabled Meta-generated Test WABA.
+4. **Verify WABA status** in [Meta Business Suite](https://business.facebook.com/) → **Business settings** → **Accounts** → **WhatsApp accounts**.
+5. Confirm the selected Approved WABA shows a valid **`phone_number_id`** in API Setup.
+6. Record **WABA ID** and **`phone_number_id`** for Railway; complete webhook and credential configuration.
+7. Only after the **correct Approved WABA** is associated, verify outbound send and run the live smoke test.
 
-> **Rule:** **WABA selection must be explicit before continuing Cloud API setup.** Approved production WABAs exist with known phone numbers; onboarding fails when Meta auto-selects the disabled Test account.
+> **Rule:** **Reuse existing Developer App. Select Approved WABA in WhatsApp → API Setup. WABA selection is the deployment priority — not app creation or Test WABA acceptance.**
 
 ---
 
@@ -349,14 +383,14 @@ This matches the Sprint 11.4 root cause for Team Vision Financial:
 1. Portfolio-level checks pass (Business Home, ad account, no portfolio restrictions).
 2. Production WABAs **Niovel Perez** and **Ana Perez** are **Approved**.
 3. Meta Cloud API onboarding still fails because Meta **auto-selected a disabled Test WABA**.
-4. **Fix:** Switch WABA selection to an **Approved** production account before retrying Cloud API setup — do not assume the Test account is correct.
+4. **Fix:** In **WhatsApp → API Setup** on the **existing Atlas app**, select an **Approved** production WABA — do not create a new app or accept the Test WABA.
 
 ### Symptom: Meta auto-selected wrong WABA
 
-**Before switching WABAs:** Complete the [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment) — consult Meta AI, record guidance, compare with official Meta docs.
+**Before switching WABAs:** Meta AI confirmed use **WhatsApp → API Setup** on the existing app — see [major discovery](#major-discovery--associate-existing-waba-via-api-setup-meta-confirmed-2026-07-21).
 
 1. Open Business settings → Accounts → WhatsApp accounts — list all WABAs and note **Approved** vs **Test** / **Disabled**.
-2. In Developer Console → WhatsApp → API Setup, check which WABA is currently bound to the Atlas app.
+2. In Developer Console → **WhatsApp → API Setup** (existing Atlas app — no new app), check which WABA is currently bound.
 3. If the **disabled Meta-generated Test WABA** is selected, switch to **Niovel Perez** (**786-752-8080**) or **Ana Perez** (**786-296-7254**).
 4. Re-run Cloud API onboarding only after the Approved WABA is selected.
 5. Record the WABA ID and `phone_number_id` for Railway configuration.
@@ -387,7 +421,7 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 ## Atlas production checklist (after correct WABA selected)
 
 - [ ] **WABA inventory complete** — do not delete unused WABAs until live smoke test passes (see [migration policy](#waba-migration-policy-do-not-delete-during-migration))
-- [ ] **Explicitly select production WABA** — **Niovel Perez** (**786-752-8080**) for MVP; not Meta-generated Test WABA
+- [ ] **Associate Approved WABA** — existing Atlas app → **WhatsApp → API Setup** → **Niovel Perez** (**786-752-8080**); no new Developer App
 - [ ] WABA status **Approved** in Business Settings
 - [ ] Cloud API setup completed with valid `phone_number_id` for production number **786-752-8080**
 - [ ] Webhook URL pointed to Railway: `https://<railway-host>/webhook`
@@ -408,9 +442,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **WABA migration policy:** Do not delete unused WABAs during migration; inventory first, cleanup only after Atlas is stable in new production environment |
 | 2026-07-21 | **WABA inventory completed:** **Niovel Perez** → **786-752-8080** (Approved); **Ana Perez** → **786-296-7254** (Approved); Meta-generated **Test WABA** disabled — do not use; deployment must explicitly select production WABA, not rely on Meta auto-selection |
 | 2026-07-21 | **Pre-change gate documented:** Before WABA reassignment, consult Meta AI with precise engineering question; record guidance; compare with official Meta documentation before implementing any Developer App / WABA binding changes |
+| 2026-07-21 | **Major discovery (Meta confirmed):** Existing **Approved WABA** can be associated with **existing Atlas Developer App** via **WhatsApp → API Setup** — **no new app required**; deployment workflow must prioritize selecting correct Approved WABA over Meta's auto-created Test WABA |
 
 ---
 
 ## One-line summary
 
-> **Root cause: Meta auto-selected a disabled Test WABA during Cloud API onboarding. Inventory complete — Niovel Perez (786-752-8080) and Ana Perez (786-296-7254) are Approved production WABAs. Before reassigning the Developer App, consult Meta AI, record guidance, and verify against official Meta docs; then explicitly select the intended WABA — do not rely on Meta auto-selection.**
+> **Major discovery: Existing Approved WABA associates with existing Developer App via WhatsApp → API Setup — no new app. Select Niovel Perez (786-752-8080) explicitly; do not use Meta's auto-created Test WABA.**
