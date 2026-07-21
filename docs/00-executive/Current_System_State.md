@@ -100,7 +100,7 @@ Facebook / Instagram Ads → WhatsApp Business → Atlas AI → Qualification
 | Ads → WhatsApp (Click-to-WhatsApp) | External (Meta Ads); Atlas tags `CLICK_TO_WHATSAPP` on first message |
 | WhatsApp inbound | ✅ Live webhook, persist, events |
 | Atlas AI qualification | ✅ **Sprint 11.4 Phase A** — webhook → Communication Hub → Conversation Engine → outbound |
-| Google Calendar booking | ⚠️ Engine supports `createInterview`; requires `GOOGLE_*` on Railway; cancel/reschedule stubbed |
+| Google Calendar booking | ⚠️ Engine supports `createInterview`; requires `GOOGLE_*` on Railway; `cancelInterview` deletes Google events when configured |
 | Human follow-up | 🟡 Mission Control + agent actions; reminder engine not yet built |
 
 **Success criterion:** A real prospect completes Ad → WhatsApp → AI qualification → calendar booking → confirmation without manual intervention until the interview is scheduled.
@@ -113,6 +113,7 @@ Facebook / Instagram Ads → WhatsApp Business → Atlas AI → Qualification
 |---------|------|------------------|
 | Public website + Atlas UI | Vercel | `https://atlas-ai-three-ruby.vercel.app` (and custom domain when configured) |
 | Atlas API | Railway | `https://atlas-ai-production-01de.up.railway.app` |
+| MVP readiness probe | Railway | `GET /health/production` — returns `mvp_ready` or lists blockers |
 | Database | Supabase | Configured via `SUPABASE_URL` / `SUPABASE_ANON_KEY` |
 | Contact email delivery | Resend | Server-side only (`RESEND_API_KEY`) |
 
@@ -261,9 +262,11 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 1. **Google Calendar on Railway** — Set `GOOGLE_*` env vars; run `backend/scripts/generateRefreshToken.js` once locally. Without these, qualification completes but calendar events are not created in production.
 2. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
-3. **Embedded Signup token vs env token** — Outbound WhatsApp still uses `WHATSAPP_ACCESS_TOKEN` from env; switch to stored Embedded Signup token when ready.
+3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
 4. **Contact form inbox** — Verify `contact@teamvisionfinancial.com` receives production submissions.
 5. **Placeholder Atlas pages** — Conversations, Appointments, Analytics remain UI shells (deferred post-launch).
+
+**Check readiness anytime:** `curl https://atlas-ai-production-01de.up.railway.app/health/production`
 
 ---
 

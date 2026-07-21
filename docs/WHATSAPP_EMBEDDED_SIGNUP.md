@@ -19,8 +19,10 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 | `META_TOKEN_ENCRYPTION_KEY` | **Sprint 6.1** — 32+ byte secret or 64-char hex for AES-256-GCM at rest (recommended) |
 | `FRONTEND_URL` | Allowed frontend origin (local dev: `http://localhost:5173`) |
 | `VERIFY_TOKEN` | Existing webhook verify token (unchanged) |
-| `WHATSAPP_ACCESS_TOKEN` | Existing test-number token (unchanged until you switch send path) |
-| `WHATSAPP_PHONE_NUMBER_ID` | Existing test-number ID (unchanged) |
+| `WHATSAPP_ACCESS_TOKEN` | Fallback when no Embedded Signup connection is stored |
+| `WHATSAPP_PHONE_NUMBER_ID` | Fallback phone number ID when no Embedded Signup connection is stored |
+
+**Outbound send path (production):** `whatsappSendCredentials.js` prefers the encrypted token from Embedded Signup (`metaWhatsAppConnection.json` / future Supabase). Env vars are used only when no stored connection exists.
 
 ### Frontend (`.env` or `frontend/.env` — public only)
 

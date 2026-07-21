@@ -12,9 +12,7 @@ const { normalizePhoneNumber } = require("./phoneNormalizer");
 const { resolveStoragePhone } = require("./whatsappProspectResolver");
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
-
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+const { resolveWhatsAppSendCredentials } = require("./whatsappSendCredentials");
 
 function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
@@ -47,9 +45,24 @@ async function sendAndPersistWhatsAppMessage({
     logWhatsAppStage("outbound_delivery_mocked", { to, preview: text.slice(0, 80) });
     sendResult = { success: true, simulated: true, providerMessageId: null };
   } else {
+    const credentials = await resolveWhatsAppSendCredentials();
+
+    if (!credentials?.accessToken || !credentials?.phoneNumberId) {
+      logWhatsAppStage("outbound_delivery_failed", {
+        to,
+        level: "error",
+        error: "WHATSAPP_SEND_CREDENTIALS_MISSING"
+      });
+
+      return {
+        success: false,
+        error: "WhatsApp send credentials not configured (Embedded Signup or WHATSAPP_* env)."
+      };
+    }
+
     try {
       const response = await axios.post(
-        `https://graph.facebook.com/v25.0/${PHONE_NUMBER_ID}/messages`,
+        `https://graph.facebook.com/${credentials.graphApiVersion}/${credentials.phoneNumberId}/messages`,
         {
           messaging_product: "whatsapp",
           to: metaTo,
@@ -58,7 +71,7 @@ async function sendAndPersistWhatsAppMessage({
         },
         {
           headers: {
-            Authorization: `Bearer ${TOKEN}`,
+            Authorization: `Bearer ${credentials.accessToken}`,
             "Content-Type": "application/json"
           }
         }
@@ -67,12 +80,14 @@ async function sendAndPersistWhatsAppMessage({
       sendResult = {
         success: true,
         simulated: false,
-        providerMessageId: response.data?.messages?.[0]?.id || providerMessageId
+        providerMessageId: response.data?.messages?.[0]?.id || providerMessageId,
+        credentialSource: credentials.source
       };
 
       logWhatsAppStage("outbound_delivery_sent", {
         to,
-        providerMessageId: sendResult.providerMessageId
+        providerMessageId: sendResult.providerMessageId,
+        credentialSource: credentials.source
       });
     } catch (error) {
       logWhatsAppStage("outbound_delivery_failed", {
