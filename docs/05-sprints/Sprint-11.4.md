@@ -118,14 +118,17 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 | Classification | Detail |
 |----------------|--------|
 | **Root cause** | Disabled **Test WABA** auto-selected by Meta during Cloud API onboarding |
-| **Production WABAs verified** | **Niovel Perez** — Approved; **Ana Perez** — Approved |
+| **Production WABAs verified** | **Niovel Perez** — Approved → **786-752-8080**; **Ana Perez** — Approved → **786-296-7254** |
+| **Meta-generated Test WABA** | **Disabled** — do not use for Cloud API onboarding |
 | **Not caused by** | Atlas backend, Railway, webhook implementation, or Business Portfolio restrictions |
 | **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account |
-| **Required before retry** | Explicitly verify and select an **Approved** production WABA — not the Test account |
+| **Required before retry** | **Explicitly select** intended production WABA — do not rely on Meta auto-selection |
 
 **Action:** Follow the [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701) before retrying Cloud API setup.
 
-**WABA migration policy:** Do **not** delete unused WABAs during migration. Inventory all accounts (ownership, linked apps, phone numbers, production usage) first; perform cleanup only after Atlas is successfully running in the new production environment. See [WABA migration policy](../deployment/sprint-11.4-meta-production.md#waba-migration-policy-do-not-delete-during-migration) (DOC-0701 v1.4).
+**WABA inventory (completed):** **Niovel Perez** → **786-752-8080**; **Ana Perez** → **786-296-7254** (both Approved). Meta-generated Test WABA is disabled. See [completed inventory](../deployment/sprint-11.4-meta-production.md#waba-inventory-completed-2026-07-21) (DOC-0701 v1.5).
+
+**WABA migration policy:** Do **not** delete unused WABAs during migration. Inventory complete; perform cleanup only after Atlas is successfully running in the new production environment. See [WABA migration policy](../deployment/sprint-11.4-meta-production.md#waba-migration-policy-do-not-delete-during-migration).
 
 ---
 

@@ -29,6 +29,14 @@
 
 ---
 
+## Documentation — Sprint 11.4 WABA inventory completed (DOC-0701 v1.5)
+
+**Date:** 2026-07-21
+
+Completed WhatsApp Business Account inventory. **Niovel Perez** → **786-752-8080** (Approved); **Ana Perez** → **786-296-7254** (Approved). Meta-generated Test WABA disabled — do not use. Future deployment must explicitly select intended production WABA; do not rely on Meta auto-selection.
+
+---
+
 ## Documentation — Sprint 11.4 WABA migration policy (DOC-0701 v1.4)
 
 **Date:** 2026-07-21

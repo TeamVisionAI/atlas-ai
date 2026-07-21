@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 1.4 |
+| **Version** | 1.5 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -62,8 +62,9 @@ Meta onboarding **automatically selected a disabled Test WhatsApp Business Accou
 |---------|--------|
 | **Selected by Meta** | Disabled **Test** WABA (auto-selected during Cloud API onboarding) |
 | **Expected for production** | Approved production WABA associated with **+1 786-752-8080** |
-| **Production WABAs verified** | **Niovel Perez** WABA — **Approved** |
-| | **Ana Perez** WABA — **Approved** |
+| **Production WABAs verified** | **Niovel Perez** WABA — **Approved** → **+1 786-752-8080** |
+| | **Ana Perez** WABA — **Approved** → **+1 786-296-7254** |
+| **Meta-generated Test WABA** | **Disabled** — do not use for Cloud API onboarding |
 
 The onboarding failure was **not** caused by portfolio restrictions or Atlas backend defects. It was caused by Meta routing Cloud API setup through the **wrong (disabled test) WABA**.
 
@@ -116,16 +117,19 @@ Inspect **Business Settings** (not Business Home alone):
 
 Until this WABA inspection is complete, do not treat portfolio health as proof that WhatsApp Cloud API setup can proceed.
 
-### Approved production WABAs (2026-07-21)
+### WABA inventory (completed 2026-07-21)
 
-Verified in **Business settings → Accounts → WhatsApp accounts**:
+Inventory completed in **Business settings → Accounts → WhatsApp accounts**. All WhatsApp Business App accounts in the Team Vision Financial portfolio:
 
-| WABA name | Status |
-|-----------|--------|
-| **Niovel Perez** | Approved |
-| **Ana Perez** | Approved |
+| WABA name | Phone number | Status | Use for Atlas production |
+|-----------|--------------|--------|--------------------------|
+| **Niovel Perez** | **+1 786-752-8080** | **Approved** | ✅ **Primary MVP target** — ad → WhatsApp → Atlas pipeline |
+| **Ana Perez** | **+1 786-296-7254** | **Approved** | ✅ Approved production account — select explicitly if used |
+| **Meta-generated Test WABA** | (test / none) | **Disabled** | ❌ **Do not use** — not eligible for Cloud API onboarding |
 
-These approved accounts are eligible for production Cloud API connection. Do **not** proceed with onboarding while Meta has the **disabled Test WABA** selected.
+**Deployment rule:** Future Cloud API onboarding, Embedded Signup, and webhook configuration must **explicitly select the intended production WABA** (typically **Niovel Perez** / **786-752-8080** for MVP). **Do not rely on Meta's automatic WABA selection** — Meta previously auto-selected the disabled Test WABA and blocked onboarding.
+
+These approved production accounts are eligible for Cloud API connection. Do **not** proceed with onboarding while Meta has the **disabled Test WABA** selected.
 
 **Do not:**
 
@@ -138,7 +142,7 @@ These approved accounts are eligible for production Cloud API connection. Do **n
 
 - **Before Cloud API onboarding:** Confirm Meta has selected an **Approved production WABA** — not a disabled Test account (see [Deployment checklist](#deployment-checklist-before-cloud-api-onboarding))
 - Open **Business settings → Accounts → WhatsApp accounts** and inspect the **individual WABA** Meta will bind to the Atlas app
-- Select **Niovel Perez** or **Ana Perez** (Approved) or the WABA tied to **786-752-8080** — not the disabled Test WABA
+- Select **Niovel Perez** (**786-752-8080**) for MVP production — or **Ana Perez** (**786-296-7254**) if explicitly chosen — **not** the disabled Meta-generated Test WABA
 - Confirm the WABA is linked to the correct Business Portfolio and Atlas Meta app
 - Contact Meta Support referencing the **WABA ID** if Meta continues to auto-select the disabled Test account
 
@@ -158,17 +162,18 @@ Until Cloud API onboarding completes with the **correct Approved production WABA
 Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded Signup for production:
 
 - [ ] **Business Portfolio healthy** — Business Home loads; Team Vision Financial profile and ad account accessible
-- [ ] **List all WABAs** — Business settings → Accounts → WhatsApp accounts
-- [ ] **Complete WABA inventory** — ownership, linked apps, phone numbers, production usage (see [migration policy](#waba-migration-policy-do-not-delete-during-migration))
+- [x] **List all WABAs** — Business settings → Accounts → WhatsApp accounts
+- [x] **Complete WABA inventory** — ownership, linked apps, phone numbers, production usage (see [completed inventory](#waba-inventory-completed-2026-07-21))
 - [ ] **Do not delete unused WABAs** during migration
-- [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using a disabled **Test** WABA
-- [ ] **Confirm target WABA status is Approved** — use **Niovel Perez**, **Ana Perez**, or the WABA for **786-752-8080**
+- [ ] **Explicitly select intended production WABA** — do not rely on Meta auto-selection
+- [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using the disabled **Meta-generated Test WABA**
+- [ ] **Confirm target WABA status is Approved** — **Niovel Perez** (**786-752-8080**) for MVP, or **Ana Perez** (**786-296-7254**) if explicitly chosen
 - [ ] **Reject / switch away from Test WABA** if Meta auto-selects a disabled test account
 - [ ] **Atlas Meta app has access** to the chosen production WABA
 - [ ] **Record WABA ID and phone_number_id** before proceeding (for Railway env and webhook config)
 - [ ] **`GET /health/production`** returns `mvp_ready: true` on Atlas (backend ready independently of Meta UI selection)
 
-> **Rule:** **Explicitly verify the WABA Meta selects before beginning Cloud API onboarding.** A disabled Test WABA will fail even when production WABAs are Approved.
+> **Rule:** **Explicitly select the intended production WABA before Cloud API onboarding.** Do not rely on Meta auto-selection — a disabled Test WABA will fail even when production WABAs are Approved.
 
 ---
 
@@ -188,9 +193,9 @@ Removing WABAs mid-migration can break:
 
 An unused or disabled WABA may still be a **dependency** Meta or Atlas references during migration — especially the **Test WABA** that was auto-selected incorrectly.
 
-### Step 1 — Inventory all WABAs (required before any cleanup)
+### Step 1 — Inventory all WABAs ✅ completed 2026-07-21
 
-In **Business settings → Accounts → WhatsApp accounts**, record every WABA:
+Inventory recorded in [WABA inventory (completed)](#waba-inventory-completed-2026-07-21). For any future WABA changes, re-run in **Business settings → Accounts → WhatsApp accounts** and capture:
 
 | Field | What to capture |
 |-------|-----------------|
@@ -199,7 +204,7 @@ In **Business settings → Accounts → WhatsApp accounts**, record every WABA:
 | **Status** | Approved, Disabled, Test, Restricted, etc. |
 | **Ownership** | Business Portfolio, assigned users, admin roles |
 | **Linked Meta apps** | Atlas app and any other apps with WABA access |
-| **Phone numbers** | Display number, **786-752-8080**, test numbers |
+| **Phone numbers** | **786-752-8080** (Niovel Perez), **786-296-7254** (Ana Perez), test numbers |
 | **Production usage** | Active ads Click-to-WhatsApp, live customer messaging, Atlas webhook traffic |
 | **Atlas binding** | Selected in Developer Console API Setup? Stored in Embedded Signup? |
 
@@ -207,8 +212,8 @@ Maintain this inventory in the resolution log or an internal runbook until migra
 
 ### Step 2 — Select production WABA (do not delete others yet)
 
-1. Choose the **Approved** production WABA for Atlas (**Niovel Perez**, **Ana Perez**, or **786-752-8080** account).
-2. Switch Meta Developer Console and Embedded Signup to that WABA.
+1. Choose the **Approved** production WABA for Atlas — **Niovel Perez** (**786-752-8080**) for MVP, or **Ana Perez** (**786-296-7254**) if explicitly selected.
+2. **Manually select** that WABA in Meta Developer Console and Embedded Signup — do not accept Meta's default selection.
 3. Leave **all other WABAs in place** until Step 4 is complete — including disabled Test accounts.
 
 ### Step 3 — Run Atlas in new production environment
@@ -239,12 +244,12 @@ Complete before any WABA deletion:
 Complete these **in Meta** before retrying Cloud API initialization or claiming a test number:
 
 1. **Confirm Business Portfolio health** (verified for Team Vision Financial — see above).
-2. **Verify which WABA Meta will use** — must be an **Approved** production account (**Niovel Perez**, **Ana Perez**, or **786-752-8080** WABA), **not** the disabled Test WABA.
+2. **Explicitly select** an **Approved** production account — **Niovel Perez** (**786-752-8080**) or **Ana Perez** (**786-296-7254**) — **not** the disabled Meta-generated Test WABA. Do not rely on Meta auto-selection.
 3. **Verify WABA status** in [Meta Business Suite](https://business.facebook.com/) → **Business settings** → **Accounts** → **WhatsApp accounts**.
 4. In [Meta for Developers](https://developers.facebook.com/) → Atlas app → **WhatsApp** → **API Setup**, confirm the **Approved** WABA is selected and shows a valid `phone_number_id`.
 5. Only after the **correct Approved WABA** is selected, retry **Cloud API setup** or production number connection.
 
-> **Rule:** **WABA selection must be verified before continuing Cloud API setup.** Approved production WABAs exist; onboarding fails when Meta auto-selects a disabled Test account.
+> **Rule:** **WABA selection must be explicit before continuing Cloud API setup.** Approved production WABAs exist with known phone numbers; onboarding fails when Meta auto-selects the disabled Test account.
 
 ---
 
@@ -290,7 +295,7 @@ This matches the Sprint 11.4 root cause for Team Vision Financial:
 
 1. Open Business settings → Accounts → WhatsApp accounts — list all WABAs and note **Approved** vs **Test** / **Disabled**.
 2. In Developer Console → WhatsApp → API Setup, check which WABA is currently bound to the Atlas app.
-3. If a **disabled Test WABA** is selected, switch to **Niovel Perez**, **Ana Perez**, or the **786-752-8080** production WABA.
+3. If the **disabled Meta-generated Test WABA** is selected, switch to **Niovel Perez** (**786-752-8080**) or **Ana Perez** (**786-296-7254**).
 4. Re-run Cloud API onboarding only after the Approved WABA is selected.
 5. Record the WABA ID and `phone_number_id` for Railway configuration.
 
@@ -320,7 +325,7 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 ## Atlas production checklist (after correct WABA selected)
 
 - [ ] **WABA inventory complete** — do not delete unused WABAs until live smoke test passes (see [migration policy](#waba-migration-policy-do-not-delete-during-migration))
-- [ ] **Approved production WABA selected** — not disabled Test WABA (Niovel Perez, Ana Perez, or 786-752-8080 WABA)
+- [ ] **Explicitly select production WABA** — **Niovel Perez** (**786-752-8080**) for MVP; not Meta-generated Test WABA
 - [ ] WABA status **Approved** in Business Settings
 - [ ] Cloud API setup completed with valid `phone_number_id` for production number **786-752-8080**
 - [ ] Webhook URL pointed to Railway: `https://<railway-host>/webhook`
@@ -338,10 +343,11 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | Verified **Team Vision Financial Business Portfolio** healthy (no ad restrictions, no support cases); concluded restriction is **likely WABA-isolated**, not portfolio-wide |
 | 2026-07-21 | Confirmed **Business Home** operational — Team Vision Financial profile and ad account load normally; **next step:** Business Settings → WhatsApp accounts (WABA assets and permissions) |
 | 2026-07-21 | **Root cause refined:** Meta auto-selected **disabled Test WABA** instead of approved production WABA; **Niovel Perez** and **Ana Perez** WABAs verified **Approved**; deployment checklist must verify WABA selection before Cloud API onboarding |
-| 2026-07-21 | **WABA migration policy:** Do not delete unused WABAs during migration; inventory all WABAs (ownership, linked apps, phone numbers, production usage); cleanup only after Atlas is stable in new production environment |
+| 2026-07-21 | **WABA migration policy:** Do not delete unused WABAs during migration; inventory first, cleanup only after Atlas is stable in new production environment |
+| 2026-07-21 | **WABA inventory completed:** **Niovel Perez** → **786-752-8080** (Approved); **Ana Perez** → **786-296-7254** (Approved); Meta-generated **Test WABA** disabled — do not use; deployment must explicitly select production WABA, not rely on Meta auto-selection |
 
 ---
 
 ## One-line summary
 
-> **Root cause: Meta auto-selected a disabled Test WABA during Cloud API onboarding. Production WABAs (Niovel Perez, Ana Perez) are Approved — verify and select the correct WABA before retrying Cloud API setup for 786-752-8080.**
+> **Root cause: Meta auto-selected a disabled Test WABA during Cloud API onboarding. Inventory complete — Niovel Perez (786-752-8080) and Ana Perez (786-296-7254) are Approved production WABAs. Explicitly select the intended WABA before retrying Cloud API setup; do not rely on Meta auto-selection.**
