@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 2.1 |
+| **Version** | 2.2 |
 | **Status** | Approved (final production decision) |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -85,7 +85,37 @@ The Use Cases WhatsApp interface **separates testing from production**. Do **not
 
 > **Rule:** **All Sprint 11.4 production steps target Step 2 (Production setup). Step 1 (Testing) is not the WABA selection path.**
 
-### Documentation caveat — do not rely on legacy Meta UI docs
+### Step 2 — Production Setup workflow (reached 2026-07-21)
+
+Atlas ops reached Meta's **Production Setup** workflow inside **Step 2 (Production setup)**. Before registering a production phone number, complete WABA review — **do not register until documented**.
+
+| UI element | Location | Notes |
+|------------|----------|-------|
+| **WABA selection / migration options** | Step 2 (Production setup) — upper sections of the workflow | Review **before** phone registration — select **Niovel Perez**, reject Test WABA |
+| **Register your WhatsApp phone number** | Step 2 — **collapsed section** (expand to register) | Production phone registration for **786-752-8080** lives here — **blocked until WABA review complete** |
+
+**Gate — do not register yet:** Do **not** expand or submit **Register your WhatsApp phone number** until:
+
+1. **WABA selection options** in Step 2 are reviewed (Approved vs Test vs other accounts visible in UI).
+2. **Migration options** are reviewed (e.g. connect existing number vs new registration, impact on current WhatsApp Business App).
+3. Findings are **documented** in the review table below and resolution log.
+
+#### WABA and migration review (complete before phone registration)
+
+| Field | Record before registering |
+|-------|---------------------------|
+| **WABA options shown in Step 2** | e.g. Niovel Perez, Ana Perez, Test WABA — list all visible |
+| **WABA selected / intended** | **Niovel Perez** → **786-752-8080** |
+| **WABAs rejected** | Test WABA (disabled); Ana Perez (**786-296-7254** — out of scope) |
+| **Migration options shown** | _document Meta UI choices before proceeding_ |
+| **Migration option chosen** | _pending — record after review_ |
+| **Chat history impact** | Not required to preserve (per [final decision](#final-production-decision-approved-2026-07-21)) |
+| **Reviewed by / date** | _pending_ |
+| **Approved to register phone** | ☐ **No** — complete review first |
+
+> **Rule:** **Review and document WABA selection and migration options in Step 2 before expanding "Register your WhatsApp phone number".**
+
+---
 
 - **Avoid** older Meta documentation, tutorials, and screenshots that show a dedicated **WhatsApp** product entry in the Developer Console left navigation.
 - **Still valid:** Official Meta **API** documentation ([Cloud API Get Started](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started), [Webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks), [Business Management API](https://developers.facebook.com/docs/whatsapp/business-management-api)) — these describe **API behavior and credentials**, not the current console navigation.
@@ -137,13 +167,14 @@ Meta confirmed the supported path to production WhatsApp Cloud API messaging:
 1. Open [Meta for Developers](https://developers.facebook.com/) → **existing Atlas app** (do not create a new app).
 2. Navigate to **Use cases** → WhatsApp use case ([current UI path](#meta-developer-console--use-cases-ui-2026-07-21)).
 3. **Skip Step 1 (Testing)** for production — optional for sandbox only; **no WABA selection available**.
-4. Open **Step 2 (Production setup)** — **expected location** for existing Approved WABA and production phone migration.
-5. **Select** the **Niovel Perez** WABA (**+1 786-752-8080**) — reject disabled Test WABA if offered.
-6. Complete production configuration; record **WABA ID** and **`phone_number_id`** for Railway env and webhook config.
-7. Verify webhook URL, `VERIFY_TOKEN`, and (recommended) `META_APP_SECRET` on Railway.
-8. Run live smoke test: personal phone → **786-752-8080** → Atlas reply → qualification → calendar booking.
+4. Open **Step 2 (Production setup)** — review WABA selection and migration options; **document before registering phone** ([Production Setup workflow](#step-2--production-setup-workflow-reached-2026-07-21)).
+5. **Select** the **Niovel Perez** WABA (**+1 786-752-8080**) — reject disabled Test WABA and do not select Ana Perez (**786-296-7254**).
+6. **After WABA review documented:** expand **Register your WhatsApp phone number** and register **786-752-8080**.
+7. Complete production configuration; record **WABA ID** and **`phone_number_id`** for Railway env and webhook config.
+8. Verify webhook URL, `VERIFY_TOKEN`, and (recommended) `META_APP_SECRET` on Railway.
+9. Run live smoke test: personal phone → **786-752-8080** → Atlas reply → qualification → calendar booking.
 
-> **Rule:** **Production = Step 2. Testing = Step 1. Do not hunt for WABA selection in Step 1.**
+> **Rule:** **Document WABA/migration review first. Register phone second. Production = Step 2.**
 
 ---
 
@@ -272,6 +303,7 @@ These approved production accounts are eligible for Cloud API connection. Do **n
 - Re-submit Business Verification solely because of this WABA error (portfolio already appears healthy)
 - Assume Facebook/Instagram ad delivery is blocked (portfolio advertising restrictions were not found)
 - **Modify Ana Perez WABA or 786-296-7254** — protected day-to-day business channel; out of scope for Atlas (see [production architecture](#production-architecture-approved-2026-07-21))
+- **Register production phone before WABA review** — complete [Step 2 WABA/migration review](#waba-and-migration-review-complete-before-phone-registration) first; phone registration is under collapsed **Register your WhatsApp phone number**
 - **Use Step 1 (Testing) for production WABA selection** — Step 1 has no WABA picker; use **Step 2 (Production setup)** instead
 - **Use Meta's automatically created Test WABA** — select **Niovel Perez** (**786-752-8080**) in **Step 2 (Production setup)** instead
 - **Follow legacy Meta docs** showing a standalone **WhatsApp** product menu — use [Use Cases UI](#meta-developer-console--use-cases-ui-2026-07-21) path instead
@@ -313,7 +345,9 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 - [ ] **Do not delete unused WABAs** during migration
 - [x] **Consult Meta AI** — WABA reassignment procedure confirmed (see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment))
 - [x] **Record Meta AI guidance** — existing Approved WABA associable via **WhatsApp → API Setup**; no new Developer App required
-- [ ] **Complete Step 2 (Production setup)** — **Use cases** → WhatsApp use case → **Production setup** → select **Niovel Perez** (**786-752-8080**); do not use Step 1 (Testing) for WABA selection
+- [ ] **Review WABA and migration options in Step 2** — document before phone registration ([review table](#waba-and-migration-review-complete-before-phone-registration))
+- [ ] **Complete Step 2 (Production setup)** — select **Niovel Perez** (**786-752-8080**); do not use Step 1 (Testing)
+- [ ] **Register phone (after review)** — expand **Register your WhatsApp phone number** in Step 2 only after WABA review documented
 - [ ] **Explicitly select intended production WABA** — do not rely on Meta auto-selection
 - [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using the disabled **Meta-generated Test WABA**
 - [ ] **Confirm target WABA is Niovel Perez** — **786-752-8080** only; do not select Ana Perez (**786-296-7254**) or Test WABA
@@ -498,6 +532,10 @@ This matches the Sprint 11.4 root cause for Team Vision Financial:
 3. Meta Cloud API onboarding still fails because Meta **auto-selected a disabled Test WABA**.
 4. **Fix:** In **Use cases → Step 2 (Production setup)** on the **existing Atlas app**, select **Niovel Perez** / **786-752-8080** — do not use Step 1 (Testing) for WABA selection.
 
+### Symptom: Cannot find phone registration in Step 2
+
+Production phone registration is inside Step 2 under the **collapsed** section **Register your WhatsApp phone number**. Expand that section after [WABA and migration review](#waba-and-migration-review-complete-before-phone-registration) is complete — do not register until documented.
+
 ### Symptom: Cannot find WABA selection in Use cases
 
 Meta's Use Cases UI separates **Testing** from **Production setup**:
@@ -569,9 +607,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **Final production decision approved:** **786-752-8080** = dedicated Atlas AI production number; existing WhatsApp Business App history **not required to preserve**; **Ana Perez / 786-296-7254** remains independent (operational risk avoidance); **authorized to proceed** with Cloud API migration on **Niovel Perez WABA** |
 | 2026-07-21 | **Meta Use Cases UI (v2.0):** WhatsApp Cloud API configuration no longer in standalone **WhatsApp** product menu — use **Use cases** flow; updated deployment docs; avoid legacy Meta navigation documentation |
 | 2026-07-21 | **Use Cases Step 1 vs Step 2 (v2.1):** Step 1 (Testing) = auto test environment, **no WABA selection**; Step 2 (Production setup) = **expected path** for Niovel Perez WABA and **786-752-8080** migration |
+| 2026-07-21 | **Production Setup workflow reached (v2.2):** Phone registration under collapsed **Register your WhatsApp phone number** in Step 2; **do not register** until WABA selection and migration options reviewed and documented |
 
 ---
 
 ## One-line summary
 
-> **Use cases Step 2 (Production setup) — not Step 1 (Testing) — is where Niovel Perez WABA and 786-752-8080 are selected. Step 1 has no WABA picker.**
+> **Step 2 Production Setup reached. Document WABA/migration review before expanding "Register your WhatsApp phone number". Do not register until approved.**

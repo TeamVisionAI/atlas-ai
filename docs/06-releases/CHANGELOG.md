@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — Production Setup workflow gate (DOC-0701 v2.2, DOC-0702 v1.3)
+
+**Date:** 2026-07-21
+
+Reached Meta Step 2 Production Setup. Phone registration is under collapsed **Register your WhatsApp phone number**. Do not register until WABA selection and migration options are reviewed and documented.
+
+---
+
 ## Documentation — Use Cases Step 1 vs Step 2 (DOC-0701 v2.1, DOC-0702 v1.2)
 
 **Date:** 2026-07-21

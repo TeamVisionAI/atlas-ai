@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0702 |
 | **Title** | WhatsApp Cloud API Migration Checklist |
-| **Version** | 1.2 |
+| **Version** | 1.3 |
 | **Status** | Active |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -58,15 +58,29 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
 ### Phase 2 — Step 2: Production setup (Use cases UI)
 
 > **Navigation:** App → **Use cases** → WhatsApp use case → **Step 2: Production setup**.  
-> **Do not use Step 1 (Testing)** for production — Step 1 is Meta's auto-generated test environment with **no WABA selection**. See [Use Cases UI — Testing vs production](./sprint-11.4-meta-production.md#testing-vs-production--two-step-use-cases-flow).
+> **Do not use Step 1 (Testing)** for production — Step 1 has **no WABA selection**.  
+> **Phone registration:** collapsed section **Register your WhatsApp phone number** — see [Production Setup workflow](./sprint-11.4-meta-production.md#step-2--production-setup-workflow-reached-2026-07-21).
 
 - [ ] Open [Meta for Developers](https://developers.facebook.com/) → **existing Atlas app**
 - [ ] Navigate to **Use cases** → WhatsApp / WhatsApp Business Platform use case
-- [ ] **Skip Step 1 (Testing)** for Atlas production migration (optional sandbox only)
-- [ ] Open **Step 2 (Production setup)** — expected location for WABA and phone migration
-- [ ] **Select Niovel Perez WABA** (786-752-8080) — reject Test WABA if auto-selected
-- [ ] Complete production Cloud API configuration for **786-752-8080**
-- [ ] Confirm valid **`phone_number_id`** appears for **8080** in Step 2 settings
+- [ ] **Skip Step 1 (Testing)** for Atlas production migration
+
+#### Phase 2a — WABA and migration review (required before phone registration)
+
+> **Gate:** Do **not** expand **Register your WhatsApp phone number** until this subsection is complete and documented.
+
+- [ ] Open **Step 2 (Production setup)** — review all visible WABA options
+- [ ] Confirm **Niovel Perez** (**786-752-8080**) is available and intended selection
+- [ ] Confirm **Ana Perez** (**786-296-7254**) and **Test WABA** are **not** selected
+- [ ] Review and document **migration options** shown in Step 2 UI
+- [ ] Record findings in [WABA review table](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-phone-registration) (DOC-0701)
+- [ ] **Approved to register phone** — only after review documented
+
+#### Phase 2b — Register production phone (after review approved)
+
+- [ ] Expand **Register your WhatsApp phone number** (collapsed section in Step 2)
+- [ ] Register **786-752-8080** under **Niovel Perez WABA**
+- [ ] Confirm valid **`phone_number_id`** appears for **8080**
 - [ ] Grant Atlas app access to Niovel Perez WABA in Business Settings if prompted
 
 ### Phase 3 — Migrate 786-752-8080 to Cloud API
@@ -170,11 +184,12 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 | Webhook verify fails | Confirm `VERIFY_TOKEN` matches Meta; Railway URL is HTTPS and reachable |
 | Inbound works, no Atlas reply | Confirm Sprint 11.4 Phase A on `main`; check `conversation_engine_invoked` logs |
 | `mvp_ready: false` | Run `GET /health/production`; fix Supabase, WhatsApp credentials, or Google Calendar gaps |
-| Cannot find WABA picker | You may be in **Step 1 (Testing)** — proceed to **Step 2 (Production setup)** ([DOC-0701](./sprint-11.4-meta-production.md#testing-vs-production--two-step-use-cases-flow)) |
+| Cannot find phone registration | Expand collapsed **Register your WhatsApp phone number** in Step 2 — only after [WABA review](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-phone-registration) |
+| Cannot find WABA picker | You may be in **Step 1 (Testing)** — proceed to **Step 2 (Production setup)** |
 | Wrong WABA selected | **Step 2 (Production setup)** → switch to **Niovel Perez** only |
 
 ---
 
 ## One-line summary
 
-> **Step 2 (Production setup) — not Step 1 (Testing) — is where 786-752-8080 and Niovel Perez WABA are configured for Atlas production.**
+> **Step 2 reached: document WABA/migration review before expanding "Register your WhatsApp phone number".**
