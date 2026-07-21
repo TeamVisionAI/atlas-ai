@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0702 |
 | **Title** | WhatsApp Cloud API Migration Checklist |
-| **Version** | 1.6 |
+| **Version** | 1.7 |
 | **Status** | Active |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -53,7 +53,7 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
   - [ ] **Niovel Perez** → **+1 786-752-8080** — status **Approved**
   - [ ] **Ana Perez** → **+1 786-296-7254** — **unchanged** (out of scope)
   - [ ] Meta-generated **Test WABA** — **disabled** — do not use
-- [ ] Confirm Team Vision Financial Business Portfolio is healthy (Business Home loads)
+- [x] Confirm Business Portfolio **`367219934273986`** — Atlas app and WABAs in same portfolio ([alignment verified](./sprint-11.4-meta-production.md#business-portfolio-alignment-verified-2026-07-21))
 
 ### Phase 2 — Step 2: Production setup (Use cases UI)
 
@@ -156,7 +156,7 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 | **Access Token** | _stored in Railway only_ | | Maps to `WHATSAPP_ACCESS_TOKEN`; rotate per Meta policy |
 | **App ID** | _Atlas Developer App ID_ | | Maps to `META_APP_ID` / `VITE_META_APP_ID` |
 | **App Secret** | _stored in Railway only_ | | Maps to `META_APP_SECRET` |
-| **Business Portfolio ID** | _optional_ | | Team Vision Financial |
+| **Business Portfolio ID** | **`367219934273986`** | | Team Vision Financial — verified same as Atlas app and WABAs |
 | **Webhook URL** | `https://<railway-host>/webhook` | | |
 | **Verify Token** | _reference only — secret in Railway_ | | |
 
@@ -186,7 +186,7 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 | Webhook verify fails | Confirm `VERIFY_TOKEN` matches Meta; Railway URL is HTTPS and reachable |
 | Inbound works, no Atlas reply | Confirm Sprint 11.4 Phase A on `main`; check `conversation_engine_invoked` logs |
 | `mvp_ready: false` | Run `GET /health/production`; fix Supabase, WhatsApp credentials, or Google Calendar gaps |
-| `Unexpected null value for wabaID` | Meta UI failed to resolve WABA — fix Niovel Perez WABA binding in Step 2 before retry ([incident](./sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21)) |
+| `Unexpected null value for wabaID` | Portfolio **`367219934273986`** verified — likely **Meta backend** WABA resolution failure; escalate to Meta Support ([incident](./sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21)) |
 | Registration paused at verification | On **retry** only — capture [confirmation screens](./sprint-11.4-meta-production.md#confirmation-screen-log-deployment-record) before entering code |
 | Cannot find phone registration | Use **Add phone number** in Step 2 — after [WABA review](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-add-phone-number) |
 | Cannot find WABA picker | You may be in **Step 1 (Testing)** — proceed to **Step 2 (Production setup)** |

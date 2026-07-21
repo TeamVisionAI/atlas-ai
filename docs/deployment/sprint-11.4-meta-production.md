@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 2.5 |
+| **Version** | 2.6 |
 | **Status** | Approved (final production decision) |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -95,13 +95,29 @@ Atlas ops reached Meta's **Production Setup** page inside **Step 2 (Production s
 |-------|--------|
 | **Production phone registration** | ❌ **Failed** — before SMS verification |
 | **Meta error** | **`Unexpected null value for wabaID`** (internal Meta UI error) |
-| **Root cause (UI)** | Meta Production Setup **failed to resolve** the target **WhatsApp Business Account (WABA)** for phone registration |
+| **Root cause (refined)** | **Meta backend failure** resolving WABA during production phone registration (`wabaID = null`) — **not** wrong Business Portfolio |
+| **Business Portfolio verified** | ✅ Atlas Developer App and Approved WABAs share portfolio **`367219934273986`** (Team Vision Financial) |
+| **Next action** | Meta Support / retry after WABA explicit selection — portfolio alignment is confirmed |
+
 | **SMS verification reached?** | ❌ **No** — error occurred **before** verification code step |
 | **Phone migration complete?** | ❌ **No** — **786-752-8080** not migrated to Cloud API via this app |
-| **Atlas backend involved?** | ❌ **No** — failure is **Meta configuration / UI**, not Atlas or the phone number |
-| **Next action** | Resolve WABA binding in Meta (Step 2 / Business Settings) before retrying **Add phone number** |
+| **Atlas backend involved?** | ❌ **No** — failure is **Meta-side**, not Atlas or the phone number |
+| **Wrong Business Portfolio?** | ❌ **Ruled out** — app and WABAs share portfolio **`367219934273986`** |
 
-> **Rule:** **`wabaID` null = Meta did not attach a WABA to the registration flow. Fix WABA selection in Meta — not Atlas env or Railway.**
+> **Rule:** **`wabaID` null with correct portfolio = Meta backend failed to resolve WABA in registration flow — not Atlas env or Railway.**
+
+#### Business Portfolio alignment verified (2026-07-21)
+
+Verified the Atlas AI Developer App operates under the **same Business Portfolio** that owns the Approved production WABAs:
+
+| Asset | Business Portfolio ID | Status |
+|-------|----------------------|--------|
+| **Atlas AI Developer App** | **`367219934273986`** | ✅ Verified |
+| **Approved WABAs** (Niovel Perez, Ana Perez) | **`367219934273986`** (Team Vision Financial) | ✅ Same portfolio |
+
+**Conclusion:** **Incorrect Business Portfolio selection is ruled out** as the root cause of the `wabaID = null` error. The Atlas app and target WABAs are in the same portfolio.
+
+**Remaining evidence:** Meta **backend failure** resolving the WABA during production phone registration — the UI/API returned **`wabaID = null`** despite portfolio alignment and Approved WABA status.
 
 #### Incident: `Unexpected null value for wabaID` (2026-07-21)
 
@@ -112,8 +128,9 @@ During **Add phone number** for **786-752-8080** in Step 2 Production Setup, Met
 | **Error message** | `Unexpected null value for wabaID` |
 | **When** | Production Setup — after registration initiated, **before** verification code / SMS step |
 | **Meaning** | Meta UI could not resolve the **target WABA** for phone registration — `wabaID` was **null** in Meta's internal flow |
-| **Not caused by** | Atlas backend, Railway, webhook code, **786-752-8080** number validity, or SMS delivery |
-| **Classification** | **Meta configuration / UI problem** — WABA not bound or not passed to registration API |
+| **Not caused by** | Atlas backend, Railway, webhook code, **786-752-8080** number validity, SMS delivery, or **wrong Business Portfolio** |
+| **Business Portfolio** | ✅ **Ruled out** — Atlas app and WABAs share **`367219934273986`** |
+| **Classification (refined)** | **Meta backend failure** — WABA not resolved in production phone registration API (`wabaID = null`) |
 | **Expected WABA** | **Niovel Perez** → **786-752-8080** (Approved) |
 
 **Corrective action (Meta-side):**
@@ -122,7 +139,7 @@ During **Add phone number** for **786-752-8080** in Step 2 Production Setup, Met
 2. In **Use cases → Step 2 (Production setup)**, verify WABA is **explicitly selected** before **Add phone number** — UI may have skipped WABA resolution (related to [Step 1 vs Step 2](#testing-vs-production--two-step-use-cases-flow) and disabled Test WABA auto-selection issues).
 3. Confirm Atlas Meta app has **permissions** on the Niovel Perez WABA in Business Settings.
 4. Retry **Add phone number** only after WABA shows as selected/bound in Step 2 UI — capture [confirmation screens](#confirmation-screen-log-deployment-record) on retry.
-5. If error persists, contact Meta Support citing **`wabaID` null**, WABA ID for **Niovel Perez**, and Atlas App ID.
+5. If error persists, contact Meta Support citing **`wabaID` null**, **Business Portfolio ID `367219934273986`**, Niovel Perez **WABA ID**, and Atlas **App ID** — portfolio misalignment is **ruled out**; request Meta backend WABA resolution fix.
 
 **Do not:**
 
@@ -180,7 +197,7 @@ Capture **every** confirmation, warning, and summary screen during **Add phone n
 
 - **Avoid** older Meta documentation, tutorials, and screenshots that show a dedicated **WhatsApp** product entry in the Developer Console left navigation.
 - **Still valid:** Official Meta **API** documentation ([Cloud API Get Started](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started), [Webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks), [Business Management API](https://developers.facebook.com/docs/whatsapp/business-management-api)) — these describe **API behavior and credentials**, not the current console navigation.
-- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.5).
+- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.6).
 - **Do not confuse Step 1 (Testing)** with production migration — Step 1 has no WABA picker; production WABA selection belongs in **Step 2**.
 - If use-case labels differ in your account, consult Meta AI with the [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment) question and confirm against the live UI before changing production bindings.
 
@@ -313,10 +330,12 @@ The **Team Vision Financial Business Portfolio** was reviewed in Meta Business S
 
 | Check | Result |
 |-------|--------|
+| **Business Portfolio ID** | **`367219934273986`** — Atlas Developer App and Approved WABAs verified in **same portfolio** (2026-07-21) |
 | Advertising restrictions | None observed |
 | Open support cases | None |
 | Business assets (Pages, ad accounts, portfolio health) | Appear healthy |
 | Business Portfolio–level policy holds | None identified |
+| **Portfolio misalignment as wabaID cause** | ❌ **Ruled out** |
 
 **Conclusion:** The Cloud API onboarding failure is **not explained by a portfolio-wide Meta restriction**. Focus troubleshooting on the **specific WhatsApp Business Account (WABA)** tied to **+1 786-752-8080**, not on Business Verification or portfolio-level advertising status.
 
@@ -574,7 +593,7 @@ Complete these **in Meta** before retrying Cloud API initialization or claiming 
 | WABA restricted or disabled | Resolve on the **WhatsApp account** in Business Suite; contact Meta Support citing WABA ID if portfolio is healthy |
 | Business Portfolio restricted | Not observed for Team Vision Financial — if this changes, resolve portfolio issues first |
 | Business not verified | Only if Meta shows verification required at portfolio level (not indicated in 2026-07-21 review) |
-| Wrong Business Portfolio | Ensure the WABA belongs to the Team Vision Financial portfolio used for the Atlas app |
+| Wrong Business Portfolio | ❌ **Ruled out** — Atlas app and WABAs share portfolio **`367219934273986`** (2026-07-21) |
 | App not added to WABA | In Business Settings, grant the Atlas Meta app access to the WABA |
 | Region / eligibility | Confirm the business number **786-752-8080** is eligible for Cloud API in your market |
 | WABA quality rating / messaging limits | Review WABA-specific quality and messaging tier in WhatsApp Manager |
@@ -605,7 +624,7 @@ Meta Production Setup failed **before SMS verification** with internal error **`
 | WABA not selected in Step 2 | Explicitly select **Niovel Perez** WABA before **Add phone number** |
 | App lacks WABA access | Business Settings → WhatsApp accounts → grant Atlas app access to Niovel Perez WABA |
 | Test WABA auto-selected | Reject disabled Test WABA; confirm **Niovel Perez** WABA ID is non-null in UI |
-| Error persists | Meta Support — cite `wabaID` null, Niovel Perez WABA ID, Atlas App ID |
+| Error persists | Meta Support — cite `wabaID` null, **Portfolio ID `367219934273986`**, Niovel Perez WABA ID, Atlas App ID — portfolio ruled out; likely Meta backend WABA resolution failure |
 
 **Not the fix:** Atlas Railway redeploy, `WHATSAPP_*` env rotation, or phone number format changes — no `phone_number_id` exists yet; this is **Meta-side WABA resolution**.
 
@@ -698,9 +717,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **Production Setup status confirmed (v2.3):** **No production phone** on Atlas Developer App; completed Step 2 task = **readiness for registration only** — not migration complete; **next:** **Add phone number** (select Niovel Perez WABA + **786-752-8080**) |
 | 2026-07-21 | **Phone registration initiated (v2.4):** **786-752-8080** registration started for Atlas AI; **paused before verification code** — review migration warnings and capture all confirmation screens before entering code |
 | 2026-07-21 | **Production Setup failed (v2.5):** Meta internal error **`Unexpected null value for wabaID`** before SMS verification — UI failed to resolve target WABA; **not** Atlas or phone number issue; occurred before phone migration |
+| 2026-07-21 | **Business Portfolio alignment verified (v2.6):** Atlas Developer App and Approved WABAs share portfolio **`367219934273986`** — wrong portfolio **ruled out**; remaining evidence: **Meta backend failure** resolving WABA during registration (`wabaID = null`) |
 
 ---
 
 ## One-line summary
 
-> **Production Setup failed: Unexpected null value for wabaID — Meta UI did not resolve Niovel Perez WABA before SMS. Not Atlas. Fix WABA binding in Meta, then retry Add phone number.**
+> **wabaID null — portfolio 367219934273986 verified correct. Meta backend WABA resolution failure — not Atlas. Escalate to Meta Support.**

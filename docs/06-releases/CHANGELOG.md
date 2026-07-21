@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — Business Portfolio alignment verified (DOC-0701 v2.6)
+
+**Date:** 2026-07-21
+
+Verified Atlas Developer App and Approved WABAs share Business Portfolio **`367219934273986`**. Wrong portfolio ruled out as wabaID cause. Remaining evidence: Meta backend failure resolving WABA during production phone registration.
+
+---
+
 ## Documentation — Meta wabaID null error (DOC-0701 v2.5, DOC-0702 v1.6)
 
 **Date:** 2026-07-21
