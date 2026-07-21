@@ -32,6 +32,7 @@ Record Sprint **11.4** production Meta WhatsApp Cloud API setup status, distingu
 | [SPRINT_11_1_LIVE_WHATSAPP.md](../SPRINT_11_1_LIVE_WHATSAPP.md) | Live webhook inbound/outbound pipeline |
 | [Current_System_State.md](../00-executive/Current_System_State.md) | Production system state |
 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification materials |
+| [whatsapp-cloud-api-migration-checklist.md](./whatsapp-cloud-api-migration-checklist.md) | Step-by-step Cloud API migration checklist (DOC-0702) |
 
 ---
 
@@ -251,6 +252,8 @@ Until Cloud API onboarding completes with the **correct Approved production WABA
 ---
 
 ## Deployment checklist (before Cloud API onboarding)
+
+> **Operational checklist:** For step-by-step migration execution (env, webhook, messaging tests, ID registry), use [whatsapp-cloud-api-migration-checklist.md](./whatsapp-cloud-api-migration-checklist.md) (DOC-0702).
 
 Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded Signup for production:
 

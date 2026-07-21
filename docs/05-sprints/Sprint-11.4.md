@@ -130,7 +130,7 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through **WhatsApp → API Setup**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only. See [major discovery](../deployment/sprint-11.4-meta-production.md#major-discovery--associate-existing-waba-via-api-setup-meta-confirmed-2026-07-21) (DOC-0701 v1.7).
 
-**Action:** Follow the [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) and [confirmed procedure](../deployment/sprint-11.4-meta-production.md#confirmed-procedure-atlas-mvp) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
+**Action:** Follow the [migration checklist](../deployment/whatsapp-cloud-api-migration-checklist.md) (DOC-0702) and [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
 
 **WABA inventory (completed):** **Niovel Perez** → **786-752-8080**; **Ana Perez** → **786-296-7254** (both Approved). Meta-generated Test WABA is disabled. See [completed inventory](../deployment/sprint-11.4-meta-production.md#waba-inventory-completed-2026-07-21) (DOC-0701 v1.5).
 

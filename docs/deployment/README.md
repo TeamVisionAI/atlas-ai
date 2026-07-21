@@ -5,6 +5,7 @@ Production deployment records, environment configuration, and launch troubleshoo
 | Document | ID | Description |
 |----------|-----|-------------|
 | [sprint-11.4-meta-production.md](./sprint-11.4-meta-production.md) | DOC-0701 | Sprint 11.4 Meta WhatsApp Cloud API production setup and WABA troubleshooting |
+| [whatsapp-cloud-api-migration-checklist.md](./whatsapp-cloud-api-migration-checklist.md) | DOC-0702 | Step-by-step Cloud API migration checklist for 786-752-8080 |
 
 ## Related
 

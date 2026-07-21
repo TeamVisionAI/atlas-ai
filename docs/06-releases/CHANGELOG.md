@@ -25,7 +25,16 @@
 | DOC-0002 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification portfolio |
 | DOC-0512 | [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md) | Sprint 11.4 engineering blueprint |
 | DOC-0701 | [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) | Meta WABA / Cloud API production troubleshooting |
+| DOC-0702 | [whatsapp-cloud-api-migration-checklist.md](../deployment/whatsapp-cloud-api-migration-checklist.md) | WhatsApp Cloud API migration checklist (786-752-8080) |
 | — | [Roadmap.md](../00-executive/Roadmap.md) | Planned releases and milestones |
+
+---
+
+## Documentation — WhatsApp Cloud API migration checklist (DOC-0702)
+
+**Date:** 2026-07-21
+
+Added step-by-step migration checklist: verify approved WABA, select Niovel Perez WABA, migrate 786-752-8080 to Cloud API, update Atlas env, verify webhook, test inbound/outbound messaging, record Phone Number ID, WABA ID, Access Token, and App ID.
 
 ---
 
