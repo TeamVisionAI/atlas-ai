@@ -11,7 +11,6 @@ const navLinks = [
 
 export default function Navbar() {
   const location = useLocation();
-  const onHome = location.pathname === "/";
 
   function handleBrandClick(event) {
     if (location.pathname === "/") {
@@ -39,7 +38,7 @@ export default function Navbar() {
 
         <nav className="public-navbar__nav" aria-label="Primary">
           {navLinks.map((link) => (
-            <a key={link.href} href={onHome ? link.href : `/${link.href.slice(2)}`} className="public-navbar__link">
+            <a key={link.href} href={link.href} className="public-navbar__link">
               {link.label}
             </a>
           ))}
