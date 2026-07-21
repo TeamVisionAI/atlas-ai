@@ -1,0 +1,1014 @@
+{
+  "states": {
+    "ed772117-0bfe-4edc-a68c-a27bd2213559": {
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "updatedAt": "2026-07-21T15:51:41.742Z",
+      "activeConversations": {
+        "conv-001": {
+          "conversationId": "conv-001",
+          "channel": "messenger",
+          "prospectName": "Jordan Lee",
+          "status": "active",
+          "waiting": false,
+          "updatedAt": "2026-07-21T15:51:41.709Z",
+          "workflowName": "team-vision-recruiting"
+        }
+      },
+      "waitingCustomers": [],
+      "runningWorkflows": {
+        "conv-001": {
+          "workflowId": "conv-001",
+          "step": "qualification",
+          "status": "running",
+          "updatedAt": "2026-07-21T15:51:41.709Z"
+        }
+      },
+      "appointmentsToday": 1,
+      "meetingsToday": {
+        "scheduled": 1,
+        "running": 0,
+        "completed": 0
+      },
+      "pendingFollowUps": 1,
+      "licensingPipeline": {
+        "started": 1,
+        "completed": 0
+      },
+      "orientationPipeline": {
+        "completed": 1
+      },
+      "fastStartProgress": {
+        "completed": 1
+      },
+      "packageActivity": {
+        "teamvision-recruiting": {
+          "events": 4,
+          "lastEvent": "package.faststart.completed"
+        }
+      },
+      "organizationActivity": {
+        "lastEventAt": "2026-07-21T15:51:41.742Z",
+        "lastEventType": "agent.tool.failed"
+      },
+      "connectorStatus": {
+        "zoom": {
+          "connectorId": "zoom",
+          "health": "unavailable",
+          "available": false,
+          "updatedAt": "2026-07-21T15:51:41.742Z"
+        }
+      },
+      "agentStatus": {
+        "available": true,
+        "lastActivityAt": "2026-07-21T15:51:41.731Z"
+      },
+      "packages": [
+        {
+          "packageId": "teamvision-recruiting",
+          "installedAt": "2026-07-21T15:51:41.706Z"
+        },
+        {
+          "packageId": "teamvision-recruiting",
+          "installedAt": "2026-07-21T15:51:41.708Z"
+        }
+      ],
+      "activeUsers": [
+        {
+          "userId": "452c0c72-7758-4810-835a-9cd5fb2d146e",
+          "name": "Alex Owner",
+          "role": "owner"
+        }
+      ],
+      "pendingTasks": 1,
+      "workflowFailures": 1,
+      "responseSamples": [
+        850
+      ],
+      "eventTimestamps": [
+        "2026-07-21T15:51:41.742Z",
+        "2026-07-21T15:51:41.742Z",
+        "2026-07-21T15:51:41.731Z",
+        "2026-07-21T15:51:41.721Z",
+        "2026-07-21T15:51:41.720Z",
+        "2026-07-21T15:51:41.720Z",
+        "2026-07-21T15:51:41.720Z",
+        "2026-07-21T15:51:41.720Z",
+        "2026-07-21T15:51:41.720Z",
+        "2026-07-21T15:51:41.720Z",
+        "2026-07-21T15:51:41.709Z",
+        "2026-07-21T15:51:41.709Z",
+        "2026-07-21T15:51:41.708Z",
+        "2026-07-21T15:51:41.708Z",
+        "2026-07-21T15:51:41.708Z",
+        "2026-07-21T15:51:41.706Z"
+      ]
+    }
+  },
+  "snapshots": [
+    {
+      "id": "c5ebe69a-e8a9-49b4-8140-b682a00140eb",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "organization": "Acme Recruiting Group",
+      "timestamp": "2026-07-21T15:51:41.753Z",
+      "conversationSummary": {
+        "active": 1,
+        "waiting": 0
+      },
+      "workflowSummary": {
+        "running": 1,
+        "failures": 1
+      },
+      "connectorSummary": {
+        "zoom": {
+          "connectorId": "zoom",
+          "health": "unavailable",
+          "available": false,
+          "updatedAt": "2026-07-21T15:51:41.742Z"
+        }
+      },
+      "healthSummary": {
+        "atlas": "critical",
+        "agent": "healthy",
+        "gateway": "healthy",
+        "packages": "healthy",
+        "connectors": "unavailable",
+        "organization": "healthy",
+        "businessServices": "healthy",
+        "workflowEngine": "critical"
+      },
+      "alerts": [
+        {
+          "id": "88ac04f4-b6dd-4d40-aa16-a2efb7b5b8c3",
+          "severity": "critical",
+          "reason": "Connector zoom is offline",
+          "affectedComponent": "zoom",
+          "suggestedAction": "Verify connector credentials and reconnect",
+          "timestamp": "2026-07-21T15:51:41.753Z",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559"
+        },
+        {
+          "id": "cd0c80e5-460f-469d-baf4-011cae0511da",
+          "severity": "high",
+          "reason": "Workflow failures detected",
+          "affectedComponent": "workflow-engine",
+          "suggestedAction": "Review failed workflow executions",
+          "timestamp": "2026-07-21T15:51:41.753Z",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559"
+        }
+      ],
+      "currentMetrics": {
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "activeConversations": 1,
+        "averageResponseTimeMs": 850,
+        "appointmentsScheduled": 1,
+        "meetingsRunning": 0,
+        "meetingsCompleted": 0,
+        "workflowCompletion": 1,
+        "packageActivity": 4,
+        "connectorAvailability": 0,
+        "agentAvailability": 100,
+        "eventsPerMinute": 16,
+        "pendingTasks": 1,
+        "waitingCustomers": 0,
+        "licensingInProgress": 1
+      },
+      "activeUsers": [
+        {
+          "userId": "452c0c72-7758-4810-835a-9cd5fb2d146e",
+          "name": "Alex Owner",
+          "role": "owner"
+        }
+      ],
+      "packages": [
+        {
+          "packageId": "teamvision-recruiting",
+          "installedAt": "2026-07-21T15:51:41.706Z"
+        },
+        {
+          "packageId": "teamvision-recruiting",
+          "installedAt": "2026-07-21T15:51:41.708Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "d44e4c51-08d1-4209-8bef-aee2d4d40693",
+          "type": "workflow.failed",
+          "summary": "Tool execution failed",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "agent.tool.failed",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "toolName": "scheduleInterview",
+            "emittedAt": "2026-07-21T15:51:41.742Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.742Z"
+        },
+        {
+          "id": "323a8d57-2d0e-4674-9d3c-b0c1299bca29",
+          "type": "connector.disconnected",
+          "summary": "Connector zoom disconnected",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": "zoom",
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.742Z"
+        },
+        {
+          "id": "5c9e9c59-42b2-4504-bc59-0920a5b998a8",
+          "type": "conversation.updated",
+          "summary": "Agent response generated",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": "conv-001",
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.731Z"
+        },
+        {
+          "id": "8cd072f2-7dfb-435b-a988-c48c4ff3442c",
+          "type": "brief.generated",
+          "summary": "Daily Brief generated",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "brief.generated",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "briefId": "brief-001",
+            "emittedAt": "2026-07-21T15:51:41.720Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.721Z"
+        },
+        {
+          "id": "4982e54f-a837-409a-9676-c00cd471ed6a",
+          "type": "faststart.completed",
+          "summary": "Fast Start milestone completed",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.720Z"
+        },
+        {
+          "id": "1d766bb7-0431-4d14-9f74-6231fe70deb5",
+          "type": "orientation.completed",
+          "summary": "Orientation completed",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.720Z"
+        },
+        {
+          "id": "ce1b6e72-7c30-43ac-b1f4-d4d016a01f72",
+          "type": "license.started",
+          "summary": "Licensing started",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.720Z"
+        },
+        {
+          "id": "e5d06a82-b5b3-43bc-98de-64b0ead06554",
+          "type": "followup.started",
+          "summary": "Follow-up started",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.720Z"
+        },
+        {
+          "id": "c4bdc91f-f18f-4807-8fc9-c68962fe4720",
+          "type": "meeting.created",
+          "summary": "Meeting created",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "meeting.created",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "emittedAt": "2026-07-21T15:51:41.720Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.720Z"
+        },
+        {
+          "id": "9984cd83-11e0-472d-bb4a-89e21f3cfc1b",
+          "type": "interview.scheduled",
+          "summary": "Interview scheduled",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "appointment.scheduled",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "emittedAt": "2026-07-21T15:51:41.720Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.720Z"
+        },
+        {
+          "id": "36ee6330-b18a-40cc-9ccf-56f792319628",
+          "type": "workflow.step.completed",
+          "summary": "Workflow step completed",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": "conv-001",
+          "connectorId": null,
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.709Z"
+        },
+        {
+          "id": "4043438c-ec89-4707-8aa8-9c7deee70f02",
+          "type": "conversation.started",
+          "summary": "Conversation started",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": "conv-001",
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {},
+          "timestamp": "2026-07-21T15:51:41.709Z"
+        },
+        {
+          "id": "d8760bfc-5782-4d32-90f6-3895517ea521",
+          "type": "conversation.started",
+          "summary": "Conversation activity received",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": "conv-001",
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "gateway.message.received",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "conversationId": "conv-001",
+            "channel": "messenger",
+            "prospectName": "Jordan Lee",
+            "emittedAt": "2026-07-21T15:51:41.708Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.708Z"
+        },
+        {
+          "id": "db0c5e4d-4659-49e7-8d8b-7be112277aeb",
+          "type": "package.installed",
+          "summary": "Package installed",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "organization.package.installed",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "packageId": "teamvision-recruiting",
+            "emittedAt": "2026-07-21T15:51:41.708Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.708Z"
+        },
+        {
+          "id": "27ba1648-e1ec-425e-a734-c2db9bb59d77",
+          "type": "organization.user.created",
+          "summary": "Organization user created",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "organization.user.created",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "user": {
+              "id": "452c0c72-7758-4810-835a-9cd5fb2d146e",
+              "name": "Alex Owner",
+              "email": "owner@acme.example",
+              "role": "owner",
+              "officeId": null,
+              "language": null,
+              "status": "active",
+              "permissions": [
+                "*"
+              ],
+              "createdAt": "2026-07-21T15:51:41.707Z"
+            },
+            "emittedAt": "2026-07-21T15:51:41.708Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.708Z"
+        },
+        {
+          "id": "247de2e3-a5bd-4010-9d81-6a394c32acfb",
+          "type": "package.installed",
+          "summary": "Package installed",
+          "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+          "conversationId": null,
+          "workflowId": null,
+          "connectorId": null,
+          "metadata": {
+            "eventName": "organization.package.installed",
+            "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+            "packageId": "teamvision-recruiting",
+            "emittedAt": "2026-07-21T15:51:41.705Z"
+          },
+          "timestamp": "2026-07-21T15:51:41.706Z"
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "id": "d44e4c51-08d1-4209-8bef-aee2d4d40693",
+      "type": "workflow.failed",
+      "summary": "Tool execution failed",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "agent.tool.failed",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "toolName": "scheduleInterview",
+        "emittedAt": "2026-07-21T15:51:41.742Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.742Z"
+    },
+    {
+      "id": "323a8d57-2d0e-4674-9d3c-b0c1299bca29",
+      "type": "connector.disconnected",
+      "summary": "Connector zoom disconnected",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": "zoom",
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.742Z"
+    },
+    {
+      "id": "5c9e9c59-42b2-4504-bc59-0920a5b998a8",
+      "type": "conversation.updated",
+      "summary": "Agent response generated",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": "conv-001",
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.731Z"
+    },
+    {
+      "id": "8cd072f2-7dfb-435b-a988-c48c4ff3442c",
+      "type": "brief.generated",
+      "summary": "Daily Brief generated",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "brief.generated",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "briefId": "brief-001",
+        "emittedAt": "2026-07-21T15:51:41.720Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.721Z"
+    },
+    {
+      "id": "4982e54f-a837-409a-9676-c00cd471ed6a",
+      "type": "faststart.completed",
+      "summary": "Fast Start milestone completed",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.720Z"
+    },
+    {
+      "id": "1d766bb7-0431-4d14-9f74-6231fe70deb5",
+      "type": "orientation.completed",
+      "summary": "Orientation completed",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.720Z"
+    },
+    {
+      "id": "ce1b6e72-7c30-43ac-b1f4-d4d016a01f72",
+      "type": "license.started",
+      "summary": "Licensing started",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.720Z"
+    },
+    {
+      "id": "e5d06a82-b5b3-43bc-98de-64b0ead06554",
+      "type": "followup.started",
+      "summary": "Follow-up started",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.720Z"
+    },
+    {
+      "id": "c4bdc91f-f18f-4807-8fc9-c68962fe4720",
+      "type": "meeting.created",
+      "summary": "Meeting created",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "meeting.created",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "emittedAt": "2026-07-21T15:51:41.720Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.720Z"
+    },
+    {
+      "id": "9984cd83-11e0-472d-bb4a-89e21f3cfc1b",
+      "type": "interview.scheduled",
+      "summary": "Interview scheduled",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "appointment.scheduled",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "emittedAt": "2026-07-21T15:51:41.720Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.720Z"
+    },
+    {
+      "id": "36ee6330-b18a-40cc-9ccf-56f792319628",
+      "type": "workflow.step.completed",
+      "summary": "Workflow step completed",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": "conv-001",
+      "connectorId": null,
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.709Z"
+    },
+    {
+      "id": "4043438c-ec89-4707-8aa8-9c7deee70f02",
+      "type": "conversation.started",
+      "summary": "Conversation started",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": "conv-001",
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {},
+      "timestamp": "2026-07-21T15:51:41.709Z"
+    },
+    {
+      "id": "d8760bfc-5782-4d32-90f6-3895517ea521",
+      "type": "conversation.started",
+      "summary": "Conversation activity received",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": "conv-001",
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "gateway.message.received",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "conversationId": "conv-001",
+        "channel": "messenger",
+        "prospectName": "Jordan Lee",
+        "emittedAt": "2026-07-21T15:51:41.708Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.708Z"
+    },
+    {
+      "id": "db0c5e4d-4659-49e7-8d8b-7be112277aeb",
+      "type": "package.installed",
+      "summary": "Package installed",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "organization.package.installed",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "packageId": "teamvision-recruiting",
+        "emittedAt": "2026-07-21T15:51:41.708Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.708Z"
+    },
+    {
+      "id": "27ba1648-e1ec-425e-a734-c2db9bb59d77",
+      "type": "organization.user.created",
+      "summary": "Organization user created",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "organization.user.created",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "user": {
+          "id": "452c0c72-7758-4810-835a-9cd5fb2d146e",
+          "name": "Alex Owner",
+          "email": "owner@acme.example",
+          "role": "owner",
+          "officeId": null,
+          "language": null,
+          "status": "active",
+          "permissions": [
+            "*"
+          ],
+          "createdAt": "2026-07-21T15:51:41.707Z"
+        },
+        "emittedAt": "2026-07-21T15:51:41.708Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.708Z"
+    },
+    {
+      "id": "247de2e3-a5bd-4010-9d81-6a394c32acfb",
+      "type": "package.installed",
+      "summary": "Package installed",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "conversationId": null,
+      "workflowId": null,
+      "connectorId": null,
+      "metadata": {
+        "eventName": "organization.package.installed",
+        "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+        "packageId": "teamvision-recruiting",
+        "emittedAt": "2026-07-21T15:51:41.705Z"
+      },
+      "timestamp": "2026-07-21T15:51:41.706Z"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "137b0362-4808-4c50-ac26-59cbf78a8520",
+      "severity": "high",
+      "reason": "Workflow failures detected",
+      "affectedComponent": "workflow-engine",
+      "suggestedAction": "Review failed workflow executions",
+      "timestamp": "2026-07-21T15:51:41.743Z",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "createdAt": "2026-07-21T15:51:41.743Z",
+      "resolved": true,
+      "resolvedAt": "2026-07-21T15:51:41.754Z"
+    },
+    {
+      "id": "0b95a4a9-47e6-4a5d-b396-e222aa08e133",
+      "severity": "critical",
+      "reason": "Connector zoom is offline",
+      "affectedComponent": "zoom",
+      "suggestedAction": "Verify connector credentials and reconnect",
+      "timestamp": "2026-07-21T15:51:41.743Z",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "createdAt": "2026-07-21T15:51:41.743Z",
+      "resolved": false
+    }
+  ],
+  "healthHistory": [
+    {
+      "id": "784feaaf-b594-40ae-959b-9a876fe4218b",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "health": {
+        "atlas": "critical",
+        "agent": "healthy",
+        "gateway": "healthy",
+        "packages": "healthy",
+        "connectors": "unavailable",
+        "organization": "healthy",
+        "businessServices": "healthy",
+        "workflowEngine": "critical"
+      },
+      "timestamp": "2026-07-21T15:51:41.743Z"
+    },
+    {
+      "id": "f6895f2b-9264-42de-83ce-26eb117c02bc",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "health": {
+        "atlas": "healthy",
+        "agent": "healthy",
+        "gateway": "healthy",
+        "packages": "healthy",
+        "connectors": "healthy",
+        "organization": "healthy",
+        "businessServices": "healthy",
+        "workflowEngine": "healthy"
+      },
+      "timestamp": "2026-07-21T15:51:41.707Z"
+    }
+  ],
+  "metricsHistory": [
+    {
+      "id": "0e1920f7-26b3-49d8-9f7d-01d8e638304e",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 850,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 0,
+      "agentAvailability": 100,
+      "eventsPerMinute": 16,
+      "pendingTasks": 1,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.743Z"
+    },
+    {
+      "id": "d9d583dc-392e-4b1b-b875-2a0efe9a6b6a",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 850,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 0,
+      "agentAvailability": 100,
+      "eventsPerMinute": 16,
+      "pendingTasks": 1,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.743Z"
+    },
+    {
+      "id": "79110d1e-e47c-4656-92df-5babf73f1f38",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 850,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 14,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.732Z"
+    },
+    {
+      "id": "a6846f07-07b2-438e-96cb-c563c38ddf5b",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 13,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.723Z"
+    },
+    {
+      "id": "afb81467-ddb7-4e87-8fb6-b921b60fabaa",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 13,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.723Z"
+    },
+    {
+      "id": "67efb82a-1792-4d8f-8945-aa4490a69298",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 13,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.723Z"
+    },
+    {
+      "id": "b76b6c68-8e54-49be-99ce-ca6313b7df38",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 13,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.722Z"
+    },
+    {
+      "id": "13783011-42c2-43b1-849c-eeef171e6db6",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 13,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.722Z"
+    },
+    {
+      "id": "3da38cdb-7d73-4d6c-91c7-e17be2efa514",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 13,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.722Z"
+    },
+    {
+      "id": "c408c9bc-8031-4b61-9e22-d90252cf8e0c",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 1,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 4,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 13,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 1,
+      "timestamp": "2026-07-21T15:51:41.722Z"
+    },
+    {
+      "id": "bfdc1df7-377d-4262-adf4-dd0b17696335",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 0,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 0,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 6,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 0,
+      "timestamp": "2026-07-21T15:51:41.710Z"
+    },
+    {
+      "id": "cb2052ac-9428-4982-8861-61da05365b33",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 0,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 0,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 6,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 0,
+      "timestamp": "2026-07-21T15:51:41.710Z"
+    },
+    {
+      "id": "0eec47e3-ced4-4bb8-9bd4-f09c26ffea8f",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 0,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 0,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 6,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 0,
+      "timestamp": "2026-07-21T15:51:41.710Z"
+    },
+    {
+      "id": "de54505c-6595-422b-be41-cd801b40f0a1",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 0,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 0,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 6,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 0,
+      "timestamp": "2026-07-21T15:51:41.710Z"
+    },
+    {
+      "id": "4db000c2-25ad-4d24-9c46-aca12415b13c",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 1,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 0,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 1,
+      "packageActivity": 0,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 6,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 0,
+      "timestamp": "2026-07-21T15:51:41.709Z"
+    },
+    {
+      "id": "26895108-60e5-4d03-b5ba-c0670b44703e",
+      "organizationId": "ed772117-0bfe-4edc-a68c-a27bd2213559",
+      "activeConversations": 0,
+      "averageResponseTimeMs": 0,
+      "appointmentsScheduled": 0,
+      "meetingsRunning": 0,
+      "meetingsCompleted": 0,
+      "workflowCompletion": 0,
+      "packageActivity": 0,
+      "connectorAvailability": 100,
+      "agentAvailability": 100,
+      "eventsPerMinute": 1,
+      "pendingTasks": 0,
+      "waitingCustomers": 0,
+      "licensingInProgress": 0,
+      "timestamp": "2026-07-21T15:51:41.707Z"
+    }
+  ],
+  "analytics": {
+    "alertsCreated": 2,
+    "alertsResolved": 1,
+    "conversationVolume": 1,
+    "workflowVolume": 1,
+    "connectorEvents": 1,
+    "packageEvents": 4,
+    "snapshotsCreated": 1,
+    "averageResponseLatencyMs": 850,
+    "responseSamples": 1,
+    "totalResponseLatencyMs": 850
+  },
+  "updatedAt": "2026-07-21T15:51:41.754Z"
+}

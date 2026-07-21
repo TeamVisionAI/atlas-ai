@@ -1,12 +1,12 @@
 {
   "briefs": {
-    "f4cf58cd-3063-4eb8-9a4f-182459ac874e:2026-07-21": {
-      "id": "5b598462-d03d-4661-b0ac-022ce030f64e",
-      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+    "6b7c61e1-6735-457a-823e-728fbba4dfa0:2026-07-21": {
+      "id": "48b53ece-d836-4f22-bd2f-48f4288de037",
+      "organizationId": "6b7c61e1-6735-457a-823e-728fbba4dfa0",
       "organization": "Acme Recruiting Group",
       "version": 5,
       "date": "2026-07-21",
-      "generatedAt": "2026-07-21T15:29:31.479Z",
+      "generatedAt": "2026-07-21T15:51:41.809Z",
       "executiveSummary": {
         "lines": [
           "Good morning. Here is your Atlas Daily Brief for Acme Recruiting Group.",
@@ -27,7 +27,7 @@
         "users": 0
       },
       "keyMetrics": {
-        "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+        "organizationId": "6b7c61e1-6735-457a-823e-728fbba4dfa0",
         "date": "2026-07-21",
         "newProspectsToday": 3,
         "newConversations": 0,
@@ -316,17 +316,17 @@
   },
   "snapshots": [
     {
-      "id": "8e8c5d81-9cdf-4ce7-8079-0ead8413f00a",
-      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
-      "snapshotId": "11167f8d-af5b-47c6-80e4-e1d33508ca73",
-      "capturedAt": "2026-07-21T15:29:31.478Z",
-      "timestamp": "2026-07-21T15:29:31.479Z"
+      "id": "c74a28cd-5eaa-4726-9924-3e729e0b48cc",
+      "organizationId": "6b7c61e1-6735-457a-823e-728fbba4dfa0",
+      "snapshotId": "257c90b1-1a78-4069-92c8-de08be4f5def",
+      "capturedAt": "2026-07-21T15:51:41.808Z",
+      "timestamp": "2026-07-21T15:51:41.808Z"
     }
   ],
   "metricsHistory": [
     {
-      "id": "81ee5332-2853-4170-9654-b1d072e6e812",
-      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+      "id": "de3d6f1d-9fe5-4193-a8e5-7903e517d7d6",
+      "organizationId": "6b7c61e1-6735-457a-823e-728fbba4dfa0",
       "date": "2026-07-21",
       "newProspectsToday": 3,
       "newConversations": 0,
@@ -352,11 +352,11 @@
       "activePackages": 1,
       "offices": 1,
       "users": 0,
-      "timestamp": "2026-07-21T15:29:31.479Z"
+      "timestamp": "2026-07-21T15:51:41.809Z"
     },
     {
-      "id": "934e2721-bd9e-4757-b5e6-755e650b07b5",
-      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
+      "id": "77efe021-08a6-41f9-be62-87ca95de9513",
+      "organizationId": "6b7c61e1-6735-457a-823e-728fbba4dfa0",
       "date": "2026-07-20",
       "interviewRate": 85,
       "noShowRate": 15,
@@ -369,16 +369,16 @@
       "presentationRate": 60,
       "joinRate": 40,
       "fastStartCompletion": 30,
-      "timestamp": "2026-07-21T15:29:31.478Z"
+      "timestamp": "2026-07-21T15:51:41.807Z"
     }
   ],
   "generationHistory": [
     {
-      "id": "1378db44-208e-4e59-b06a-d5085232747f",
-      "organizationId": "f4cf58cd-3063-4eb8-9a4f-182459ac874e",
-      "briefId": "5b598462-d03d-4661-b0ac-022ce030f64e",
+      "id": "f0a0a849-f511-4a3a-8443-365950210b7f",
+      "organizationId": "6b7c61e1-6735-457a-823e-728fbba4dfa0",
+      "briefId": "48b53ece-d836-4f22-bd2f-48f4288de037",
       "date": "2026-07-21",
-      "generatedAt": "2026-07-21T15:29:31.479Z",
+      "generatedAt": "2026-07-21T15:51:41.809Z",
       "version": 5,
       "generationTimeMs": 1
     }
@@ -396,5 +396,5 @@
       "low": 0
     }
   },
-  "updatedAt": "2026-07-21T15:29:31.479Z"
+  "updatedAt": "2026-07-21T15:51:41.809Z"
 }

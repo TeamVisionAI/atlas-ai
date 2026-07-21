@@ -1,8 +1,8 @@
 {
   "conversations": [
     {
-      "id": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
-      "organizationId": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+      "id": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
+      "organizationId": "c8552a23-49e8-4b3d-b237-7bede944412d",
       "prospectId": "ATL-J5-I4-001",
       "prospectName": "Maria Lopez",
       "channel": "messenger",
@@ -14,89 +14,89 @@
         "completionPercent": 100
       },
       "organizationSnapshot": {
-        "id": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+        "id": "c8552a23-49e8-4b3d-b237-7bede944412d",
         "name": "Team Vision Autonomous",
         "officeAddress": "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
       },
       "meetingStateSnapshot": null,
       "language": "en",
-      "createdAt": "2026-07-21T15:29:37.204Z",
-      "updatedAt": "2026-07-21T15:29:37.224Z"
+      "createdAt": "2026-07-21T15:51:47.986Z",
+      "updatedAt": "2026-07-21T15:51:48.005Z"
     }
   ],
   "memories": {
-    "dee2e4a7-a350-44ee-8fd9-a279a5f411f6": {
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+    "d06dabec-090a-4fda-9d81-64bfd9a82c33": {
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "history": [
         {
-          "id": "7bfcd73e-1eec-4654-a0b5-466f19989c80",
+          "id": "e0164777-40c9-4345-b9c2-d66f3c225d03",
           "role": "prospect",
           "text": "Hi there",
-          "timestamp": "2026-07-21T15:29:37.205Z",
+          "timestamp": "2026-07-21T15:51:47.987Z",
           "messageId": "i4-1"
         },
         {
-          "id": "57541540-34a2-4c7e-95fc-47440ee6ade9",
+          "id": "17e4e434-989d-4fcd-8051-761c5a94e30e",
           "role": "atlas",
           "text": "Hi there. I am Atlas with Team Vision Autonomous. To get started, what is your full name?",
-          "timestamp": "2026-07-21T15:29:37.206Z",
-          "messageId": "09962668-4b1b-49f8-bd4a-856c20c1ce86"
+          "timestamp": "2026-07-21T15:51:47.988Z",
+          "messageId": "f3f830d8-bdc4-4e1f-82b7-c36936d47537"
         },
         {
-          "id": "74b1de5f-d193-4969-99f0-9a67130f740d",
+          "id": "2d279ba2-a507-40c4-a93c-81ba8541d895",
           "role": "prospect",
           "text": "Maria Lopez",
-          "timestamp": "2026-07-21T15:29:37.207Z",
+          "timestamp": "2026-07-21T15:51:47.989Z",
           "messageId": "i4-2"
         },
         {
-          "id": "4f600409-e192-4c1f-8cb7-d14fce5625d8",
+          "id": "a71d159c-ad3c-40e1-8c54-f6ad78c98803",
           "role": "atlas",
           "text": "Thanks, Maria Lopez. What is the best email address to reach you?",
-          "timestamp": "2026-07-21T15:29:37.208Z",
-          "messageId": "03c746e1-e6c0-4ce4-9ade-dc59124defec"
+          "timestamp": "2026-07-21T15:51:47.990Z",
+          "messageId": "c9f79405-893d-4744-bb2c-dd302e41adfc"
         },
         {
-          "id": "3e225a74-de45-4b4d-90b0-55e80d346205",
+          "id": "6af334c3-171a-4a67-b92e-cccd55974a5f",
           "role": "prospect",
           "text": "By the way, what is the job about?",
-          "timestamp": "2026-07-21T15:29:37.209Z",
+          "timestamp": "2026-07-21T15:51:47.990Z",
           "messageId": "i4-int"
         },
         {
-          "id": "7843368b-1dfa-4017-a985-1f2ba93a7a89",
+          "id": "5285cd98-d794-4c4c-b1ed-0b54583c0dcf",
           "role": "atlas",
           "text": "Team Vision Autonomous helps people explore new career opportunities. We were scheduling Collect contact information. May I have your email address?",
-          "timestamp": "2026-07-21T15:29:37.210Z",
-          "messageId": "0f6ab9be-2627-4371-9e2a-321f8ba43f9c"
+          "timestamp": "2026-07-21T15:51:47.991Z",
+          "messageId": "5086418e-7bd2-429f-b90a-a7592b34ca84"
         },
         {
-          "id": "cd9cc820-2cfa-43ba-96f6-67e198d5303f",
+          "id": "05a0ba36-3333-46c4-bd86-617b3ca25b24",
           "role": "prospect",
           "text": "maria@example.com",
-          "timestamp": "2026-07-21T15:29:37.210Z",
+          "timestamp": "2026-07-21T15:51:47.992Z",
           "messageId": "i4-3"
         },
         {
-          "id": "0916f217-f05c-420c-86af-147c2917c99f",
+          "id": "0395cac9-7d4e-4be2-b28d-9e7e0c4a518d",
           "role": "atlas",
           "text": "Great. What is the best phone number for you?",
-          "timestamp": "2026-07-21T15:29:37.211Z",
-          "messageId": "f65f8c31-cdf1-479b-89d8-076fa8b034d1"
+          "timestamp": "2026-07-21T15:51:47.992Z",
+          "messageId": "9e22933c-48a6-4fd1-886c-cdb8866b1e75"
         },
         {
-          "id": "8499b213-5a55-4794-a70f-46dff02b69c4",
+          "id": "42e30123-074f-464d-9381-c3a199450681",
           "role": "prospect",
           "text": "813-555-0100",
-          "timestamp": "2026-07-21T15:29:37.212Z",
+          "timestamp": "2026-07-21T15:51:47.993Z",
           "messageId": "i4-4"
         },
         {
-          "id": "76c995d5-0699-452f-8ce1-6124697134bc",
+          "id": "fccc1a65-06f2-4d86-ae80-e25788dde188",
           "role": "atlas",
           "text": "Thanks Maria Lopez. You have completed the generic intake steps. I will prepare the next action for you.",
-          "timestamp": "2026-07-21T15:29:37.224Z",
-          "messageId": "00dc2ea7-153d-43e6-a618-1e4aae50efda"
+          "timestamp": "2026-07-21T15:51:48.005Z",
+          "messageId": "d3a39fa5-57ee-4212-bda9-b04a1303db78"
         }
       ],
       "collectedFacts": {
@@ -104,19 +104,19 @@
           "value": "Maria Lopez",
           "source": "prospect",
           "confidence": "high",
-          "collectedAt": "2026-07-21T15:29:37.207Z"
+          "collectedAt": "2026-07-21T15:51:47.989Z"
         },
         "email": {
           "value": "maria@example.com",
           "source": "prospect",
           "confidence": "high",
-          "collectedAt": "2026-07-21T15:29:37.210Z"
+          "collectedAt": "2026-07-21T15:51:47.992Z"
         },
         "phone": {
           "value": "813-555-0100",
           "source": "prospect",
           "confidence": "high",
-          "collectedAt": "2026-07-21T15:29:37.212Z"
+          "collectedAt": "2026-07-21T15:51:47.993Z"
         }
       },
       "summary": "Prospect name is Maria Lopez. Current objective: Collect contact information. Current step: collect_phone.",
@@ -132,8 +132,8 @@
   },
   "decisions": [
     {
-      "id": "e165c4c7-502a-49f6-95a7-7f725e20e55c",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "id": "f4a29af5-f9cc-401f-85dd-bbf73717dde6",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "messageId": "i4-1",
       "decisionType": "ASK",
       "reason": "Current step \"collect_name\" requires name.",
@@ -143,7 +143,7 @@
       ],
       "recommendedNextAction": "Ask for name.",
       "confidence": "high",
-      "timestamp": "2026-07-21T15:29:37.206Z",
+      "timestamp": "2026-07-21T15:51:47.988Z",
       "workflowName": "generic-intake",
       "currentStep": "collect_name",
       "nextStep": "collect_email",
@@ -152,8 +152,8 @@
       "workflowConfidence": "high"
     },
     {
-      "id": "dfdf0d49-ea3a-4d68-904a-d330da38b5b9",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "id": "e73a84d3-3e14-4c15-a11b-84974ec1bd37",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "messageId": "i4-2",
       "decisionType": "ASK",
       "reason": "Current step \"collect_email\" requires email.",
@@ -163,7 +163,7 @@
       ],
       "recommendedNextAction": "Ask for email.",
       "confidence": "high",
-      "timestamp": "2026-07-21T15:29:37.208Z",
+      "timestamp": "2026-07-21T15:51:47.989Z",
       "workflowName": "generic-intake",
       "currentStep": "collect_email",
       "nextStep": "collect_phone",
@@ -172,8 +172,8 @@
       "workflowConfidence": "high"
     },
     {
-      "id": "40db0b1d-3267-4e9a-8d85-3d937ec35812",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "id": "3e885bff-d07a-4247-b9bd-7aa6501f5baa",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "messageId": "i4-int",
       "decisionType": "ANSWER",
       "reason": "Prospect asked a question during the current workflow step.",
@@ -183,7 +183,7 @@
       ],
       "recommendedNextAction": "Answer the question, then ask for email address.",
       "confidence": "medium",
-      "timestamp": "2026-07-21T15:29:37.209Z",
+      "timestamp": "2026-07-21T15:51:47.991Z",
       "workflowName": "generic-intake",
       "currentStep": "collect_email",
       "nextStep": "collect_phone",
@@ -192,8 +192,8 @@
       "workflowConfidence": "high"
     },
     {
-      "id": "d200570a-e6bc-4524-b665-6d1361af392f",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "id": "5ae2d906-c6e9-44bf-80e4-3da57e548d75",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "messageId": "i4-3",
       "decisionType": "ASK",
       "reason": "Current step \"collect_phone\" requires phone.",
@@ -203,7 +203,7 @@
       ],
       "recommendedNextAction": "Ask for phone.",
       "confidence": "high",
-      "timestamp": "2026-07-21T15:29:37.211Z",
+      "timestamp": "2026-07-21T15:51:47.992Z",
       "workflowName": "generic-intake",
       "currentStep": "collect_phone",
       "nextStep": null,
@@ -212,8 +212,8 @@
       "workflowConfidence": "high"
     },
     {
-      "id": "391a8d74-ebb2-48da-9ce9-471f7492c018",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "id": "bc7b0303-f8fd-4f55-873e-4d8abbad725b",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "messageId": "i4-4",
       "decisionType": "TOOL_REQUEST",
       "reason": "Workflow complete. All required steps satisfied.",
@@ -221,7 +221,7 @@
       "missingInformation": [],
       "recommendedNextAction": "Workflow complete. Future increment may invoke tools.",
       "confidence": "high",
-      "timestamp": "2026-07-21T15:29:37.212Z",
+      "timestamp": "2026-07-21T15:51:47.993Z",
       "workflowName": "generic-intake",
       "currentStep": "collect_phone",
       "nextStep": null,
@@ -232,40 +232,40 @@
   ],
   "responses": [
     {
-      "id": "09962668-4b1b-49f8-bd4a-856c20c1ce86",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
-      "decisionId": "e165c4c7-502a-49f6-95a7-7f725e20e55c",
+      "id": "f3f830d8-bdc4-4e1f-82b7-c36936d47537",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
+      "decisionId": "f4a29af5-f9cc-401f-85dd-bbf73717dde6",
       "text": "Hi there. I am Atlas with Team Vision Autonomous. To get started, what is your full name?",
-      "timestamp": "2026-07-21T15:29:37.206Z"
+      "timestamp": "2026-07-21T15:51:47.988Z"
     },
     {
-      "id": "03c746e1-e6c0-4ce4-9ade-dc59124defec",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
-      "decisionId": "dfdf0d49-ea3a-4d68-904a-d330da38b5b9",
+      "id": "c9f79405-893d-4744-bb2c-dd302e41adfc",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
+      "decisionId": "e73a84d3-3e14-4c15-a11b-84974ec1bd37",
       "text": "Thanks, Maria Lopez. What is the best email address to reach you?",
-      "timestamp": "2026-07-21T15:29:37.208Z"
+      "timestamp": "2026-07-21T15:51:47.989Z"
     },
     {
-      "id": "0f6ab9be-2627-4371-9e2a-321f8ba43f9c",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
-      "decisionId": "40db0b1d-3267-4e9a-8d85-3d937ec35812",
+      "id": "5086418e-7bd2-429f-b90a-a7592b34ca84",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
+      "decisionId": "3e885bff-d07a-4247-b9bd-7aa6501f5baa",
       "text": "Team Vision Autonomous helps people explore new career opportunities. We were scheduling Collect contact information. May I have your email address?",
-      "timestamp": "2026-07-21T15:29:37.209Z"
+      "timestamp": "2026-07-21T15:51:47.991Z"
     },
     {
-      "id": "f65f8c31-cdf1-479b-89d8-076fa8b034d1",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
-      "decisionId": "d200570a-e6bc-4524-b665-6d1361af392f",
+      "id": "9e22933c-48a6-4fd1-886c-cdb8866b1e75",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
+      "decisionId": "5ae2d906-c6e9-44bf-80e4-3da57e548d75",
       "text": "Great. What is the best phone number for you?",
-      "timestamp": "2026-07-21T15:29:37.211Z"
+      "timestamp": "2026-07-21T15:51:47.992Z"
     },
     {
-      "id": "00dc2ea7-153d-43e6-a618-1e4aae50efda",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
-      "decisionId": "391a8d74-ebb2-48da-9ce9-471f7492c018",
+      "id": "d3a39fa5-57ee-4212-bda9-b04a1303db78",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
+      "decisionId": "bc7b0303-f8fd-4f55-873e-4d8abbad725b",
       "text": "Thanks Maria Lopez. You have completed the generic intake steps. I will prepare the next action for you.",
-      "timestamp": "2026-07-21T15:29:37.224Z"
+      "timestamp": "2026-07-21T15:51:48.005Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:29:37.224Z"
+  "updatedAt": "2026-07-21T15:51:48.005Z"
 }

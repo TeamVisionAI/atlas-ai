@@ -1,13 +1,13 @@
 {
   "organizations": [
     {
-      "id": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+      "id": "c8552a23-49e8-4b3d-b237-7bede944412d",
       "name": "Team Vision Autonomous",
-      "owner_user_id": "c76182c0-d98b-48ff-bbe2-af6ac9d43754",
-      "activated_at": "2026-07-21T15:29:37.204Z",
+      "owner_user_id": "c177c5f6-797b-4ff9-9082-8e44c8612b42",
+      "activated_at": "2026-07-21T15:51:47.986Z",
       "onboarding_step": "complete",
-      "created_at": "2026-07-21T15:29:37.203Z",
-      "updated_at": "2026-07-21T15:29:37.204Z",
+      "created_at": "2026-07-21T15:51:47.986Z",
+      "updated_at": "2026-07-21T15:51:47.986Z",
       "settings": {
         "meeting_locations": {
           "office": false,
@@ -30,12 +30,12 @@
   ],
   "memberships": [
     {
-      "id": "694fe072-32d1-4af2-994d-f41a331daedc",
-      "organization_id": "30409a86-836a-4837-b3cb-39fe72ef73a4",
-      "user_id": "c76182c0-d98b-48ff-bbe2-af6ac9d43754",
+      "id": "aa3af4c4-3de5-4e79-908a-601282be53d3",
+      "organization_id": "c8552a23-49e8-4b3d-b237-7bede944412d",
+      "user_id": "c177c5f6-797b-4ff9-9082-8e44c8612b42",
       "role": "admin",
-      "created_at": "2026-07-21T15:29:37.203Z"
+      "created_at": "2026-07-21T15:51:47.986Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:29:37.204Z"
+  "updatedAt": "2026-07-21T15:51:47.986Z"
 }

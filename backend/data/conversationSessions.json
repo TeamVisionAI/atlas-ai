@@ -1,9 +1,9 @@
 {
   "sessions": {
-    "dee2e4a7-a350-44ee-8fd9-a279a5f411f6": {
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+    "d06dabec-090a-4fda-9d81-64bfd9a82c33": {
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "prospectId": "ATL-J5-I4-001",
-      "organizationId": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+      "organizationId": "c8552a23-49e8-4b3d-b237-7bede944412d",
       "workflowName": "generic-intake",
       "currentStep": "collect_phone",
       "currentObjective": "Collect contact information",
@@ -12,19 +12,19 @@
           "value": "Maria Lopez",
           "source": "prospect",
           "confidence": "high",
-          "collectedAt": "2026-07-21T15:29:37.207Z"
+          "collectedAt": "2026-07-21T15:51:47.989Z"
         },
         "email": {
           "value": "maria@example.com",
           "source": "prospect",
           "confidence": "high",
-          "collectedAt": "2026-07-21T15:29:37.210Z"
+          "collectedAt": "2026-07-21T15:51:47.992Z"
         },
         "phone": {
           "value": "813-555-0100",
           "source": "prospect",
           "confidence": "high",
-          "collectedAt": "2026-07-21T15:29:37.212Z"
+          "collectedAt": "2026-07-21T15:51:47.993Z"
         }
       },
       "pendingQuestions": [],
@@ -39,24 +39,24 @@
           "toolName": "AppointmentService",
           "operation": "scheduleInterview",
           "success": true,
-          "correlationId": "e7091626-e0a9-4c45-82c5-18cc1af6e549",
-          "timestamp": "2026-07-21T15:29:37.224Z"
+          "correlationId": "07705448-95a4-4af4-a714-f87cd1e8e3c9",
+          "timestamp": "2026-07-21T15:51:48.004Z"
         }
       ],
       "status": "closed",
       "outcome": "appointment_scheduled",
       "escalations": [],
       "openTasks": [],
-      "lastActivityAt": "2026-07-21T15:29:37.224Z",
-      "startedAt": "2026-07-21T15:29:37.207Z",
-      "completedAt": "2026-07-21T15:29:37.225Z",
-      "closedAt": "2026-07-21T15:29:37.225Z"
+      "lastActivityAt": "2026-07-21T15:51:48.005Z",
+      "startedAt": "2026-07-21T15:51:47.988Z",
+      "completedAt": "2026-07-21T15:51:48.005Z",
+      "closedAt": "2026-07-21T15:51:48.005Z"
     }
   },
   "summaries": [
     {
-      "id": "34698f78-7f3b-47c9-9daf-0fd25b16fa9b",
-      "conversationId": "dee2e4a7-a350-44ee-8fd9-a279a5f411f6",
+      "id": "627d36ad-532b-4cf4-934b-ce66d6e4096f",
+      "conversationId": "d06dabec-090a-4fda-9d81-64bfd9a82c33",
       "prospect": {
         "id": "ATL-J5-I4-001",
         "displayName": "Maria Lopez"
@@ -82,14 +82,14 @@
           "toolName": "AppointmentService",
           "operation": "scheduleInterview",
           "success": true,
-          "correlationId": "e7091626-e0a9-4c45-82c5-18cc1af6e549"
+          "correlationId": "07705448-95a4-4af4-a714-f87cd1e8e3c9"
         }
       ],
       "outcome": "appointment_scheduled",
       "escalations": [],
       "openTasks": [],
-      "summaryTimestamp": "2026-07-21T15:29:37.225Z"
+      "summaryTimestamp": "2026-07-21T15:51:48.005Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:29:37.225Z"
+  "updatedAt": "2026-07-21T15:51:48.005Z"
 }

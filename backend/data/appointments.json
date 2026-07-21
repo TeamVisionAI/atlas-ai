@@ -1,8 +1,8 @@
 {
   "appointments": [
     {
-      "id": "424d62b2-8dca-434f-8150-8410313fec06",
-      "organizationId": "30409a86-836a-4837-b3cb-39fe72ef73a4",
+      "id": "391196ad-aff8-4a6f-911a-1586f4d4f923",
+      "organizationId": "c8552a23-49e8-4b3d-b237-7bede944412d",
       "atlasProspectId": "ATL-J5-I4-001",
       "prospectName": "Maria Lopez",
       "interviewType": "office",
@@ -14,7 +14,7 @@
       "calendarEventId": null,
       "workflowId": "generic-intake",
       "confirmation": {
-        "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+        "appointmentId": "391196ad-aff8-4a6f-911a-1586f4d4f923",
         "prospectName": "Maria Lopez",
         "meetingType": "office",
         "date": "Wednesday, July 22",
@@ -23,29 +23,29 @@
         "locationName": "Team Vision Office",
         "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
         "meetingUrl": null,
-        "createdAt": "2026-07-21T15:29:37.223Z",
+        "createdAt": "2026-07-21T15:51:48.004Z",
         "confirmationMessage": "You're all set!\n\nYour interview has been scheduled.\n\nDate:\nWednesday, July 22\n\nTime:\n10:00 AM\n\nLocation:\nTeam Vision Office\n\nAddress:\n2500 NW 79th Ave, Suite 189, Doral, FL 33122\n\n\nWe look forward to meeting you!"
       },
-      "createdAt": "2026-07-21T15:29:37.213Z"
+      "createdAt": "2026-07-21T15:51:47.994Z"
     }
   ],
   "activity": [
     {
-      "id": "a52bd1b6-056e-4271-a2f0-8c6eee5fd949",
+      "id": "14701468-77ef-410b-bd66-1744701a238a",
       "type": "appointment.confirmed",
       "message": "Appointment confirmed for Maria Lopez.",
-      "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+      "appointmentId": "391196ad-aff8-4a6f-911a-1586f4d4f923",
       "prospectName": "Maria Lopez",
-      "createdAt": "2026-07-21T15:29:37.223Z"
+      "createdAt": "2026-07-21T15:51:48.004Z"
     },
     {
-      "id": "344e2423-4022-49a8-8d4f-2a1376354c5b",
+      "id": "ca0e972a-ed9d-4552-8c32-d1c724e5625e",
       "type": "appointment.scheduled",
       "message": "First appointment scheduled with Maria Lopez",
-      "appointmentId": "424d62b2-8dca-434f-8150-8410313fec06",
+      "appointmentId": "391196ad-aff8-4a6f-911a-1586f4d4f923",
       "prospectName": "Maria Lopez",
-      "createdAt": "2026-07-21T15:29:37.213Z"
+      "createdAt": "2026-07-21T15:51:47.994Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:29:37.223Z"
+  "updatedAt": "2026-07-21T15:51:48.004Z"
 }
