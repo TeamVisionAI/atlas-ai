@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0702 |
 | **Title** | WhatsApp Cloud API Migration Checklist |
-| **Version** | 1.7 |
+| **Version** | 1.8 |
 | **Status** | Active |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -54,6 +54,8 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
   - [ ] **Ana Perez** → **+1 786-296-7254** — **unchanged** (out of scope)
   - [ ] Meta-generated **Test WABA** — **disabled** — do not use
 - [x] Confirm Business Portfolio **`367219934273986`** — Atlas app and WABAs in same portfolio ([alignment verified](./sprint-11.4-meta-production.md#business-portfolio-alignment-verified-2026-07-21))
+- [x] Confirm Atlas app linked to portfolio with **administrator access** ([Connect assets verified](./sprint-11.4-meta-production.md#app-portfolio-link-and-connect-assets-verified-2026-07-21))
+- [x] Confirm **Connect assets** exposes **Ad Accounts only** — WABA assignment not available; app asset assignment **ruled out** as wabaID cause
 
 ### Phase 2 — Step 2: Production setup (Use cases UI)
 
@@ -68,7 +70,7 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
 #### Phase 2a — WABA and migration review
 
 - [ ] Confirm **Niovel Perez WABA ID** is visible and non-null in Business Settings
-- [ ] Confirm Atlas app has permissions on Niovel Perez WABA
+- [x] Confirm Atlas app linked to portfolio with admin access — **Connect assets** has no WABA option ([verified](./sprint-11.4-meta-production.md#app-portfolio-link-and-connect-assets-verified-2026-07-21))
 - [ ] Record findings in [WABA review table](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-add-phone-number) (DOC-0701)
 
 #### Phase 2b — Add phone number (failed — retry after WABA fix)
@@ -186,7 +188,7 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 | Webhook verify fails | Confirm `VERIFY_TOKEN` matches Meta; Railway URL is HTTPS and reachable |
 | Inbound works, no Atlas reply | Confirm Sprint 11.4 Phase A on `main`; check `conversation_engine_invoked` logs |
 | `mvp_ready: false` | Run `GET /health/production`; fix Supabase, WhatsApp credentials, or Google Calendar gaps |
-| `Unexpected null value for wabaID` | Portfolio **`367219934273986`** verified — likely **Meta backend** WABA resolution failure; escalate to Meta Support ([incident](./sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21)) |
+| `Unexpected null value for wabaID` | Portfolio and app link verified — **Connect assets** has no WABA path; likely **Meta backend** WABA resolution failure; escalate to Meta Support ([incident](./sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21)) |
 | Registration paused at verification | On **retry** only — capture [confirmation screens](./sprint-11.4-meta-production.md#confirmation-screen-log-deployment-record) before entering code |
 | Cannot find phone registration | Use **Add phone number** in Step 2 — after [WABA review](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-add-phone-number) |
 | Cannot find WABA picker | You may be in **Step 1 (Testing)** — proceed to **Step 2 (Production setup)** |
@@ -196,4 +198,4 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 
 ## One-line summary
 
-> **Add phone number failed: wabaID null. Meta WABA resolution issue — not Atlas. Fix WABA in Meta Step 2, then retry.**
+> **Add phone number failed: wabaID null. Portfolio and app link verified; Connect assets has no WABA path. Meta backend issue — escalate to Meta Support.**

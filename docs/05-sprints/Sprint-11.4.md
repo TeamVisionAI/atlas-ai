@@ -128,7 +128,9 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **Production architecture approved (2026-07-21):** **+1 786-752-8080** (Niovel Perez WABA) is the **Atlas AI production number** — designated for WhatsApp Cloud API migration. Atlas owns this channel for automation, AI conversations, interview scheduling, and future integrations. **Ana Perez / 786-296-7254** remains **unchanged** to protect day-to-day business operations — out of scope for Atlas. See [production architecture](../deployment/sprint-11.4-meta-production.md#production-architecture-approved-2026-07-21) (DOC-0701 v1.8).
 
-**Business Portfolio verified (2026-07-21):** Atlas Developer App and Approved WABAs share portfolio **`367219934273986`** — wrong portfolio **ruled out** as `wabaID` cause. Remaining evidence: **Meta backend failure** resolving WABA during registration. See [alignment verified](../deployment/sprint-11.4-meta-production.md#business-portfolio-alignment-verified-2026-07-21) (DOC-0701 v2.6).
+**Business Portfolio verified (2026-07-21):** Atlas Developer App and Approved WABAs share portfolio **`367219934273986`** — wrong portfolio **ruled out** as `wabaID` cause. See [alignment verified](../deployment/sprint-11.4-meta-production.md#business-portfolio-alignment-verified-2026-07-21) (DOC-0701 v2.6).
+
+**App–portfolio link verified (2026-07-21):** Atlas AI app linked to portfolio with **administrator access**. Business Settings **Connect assets** exposes **Ad Accounts only** — no WABA assignment option. **App asset assignment ruled out** as `wabaID` cause. See [Connect assets verified](../deployment/sprint-11.4-meta-production.md#app-portfolio-link-and-connect-assets-verified-2026-07-21) (DOC-0701 v2.7).
 
 **Production Setup failure:** **Add phone number** for **786-752-8080** failed with **`Unexpected null value for wabaID`** — before SMS, before migration. Not Atlas or phone number issue. See [wabaID incident](../deployment/sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21).
 

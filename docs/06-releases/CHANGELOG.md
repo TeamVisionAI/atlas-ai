@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — App–portfolio link and Connect assets verified (DOC-0701 v2.7)
+
+**Date:** 2026-07-21
+
+Verified Atlas AI app is linked to Business Portfolio **`367219934273986`** with administrator access. Business Settings **Connect assets** dialog exposes Ad Accounts only — no WABA assignment option. App asset assignment ruled out as wabaID cause. Remaining evidence: Meta backend failure resolving WABA during production phone registration.
+
+---
+
 ## Documentation — Business Portfolio alignment verified (DOC-0701 v2.6)
 
 **Date:** 2026-07-21
