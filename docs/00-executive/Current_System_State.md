@@ -260,10 +260,11 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ## Known open items (production blockers)
 
-1. **Google Calendar on Railway** — Set `GOOGLE_*` env vars; run `backend/scripts/generateRefreshToken.js` once locally. Without these, qualification completes but calendar events are not created in production.
-2. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
-3. **Contact form inbox** — Verify `contact@teamvisionfinancial.com` receives production submissions.
-4. **Placeholder Atlas pages** — Conversations, Appointments, Analytics remain UI shells (deferred post-launch).
+1. **Meta WABA restriction (Sprint 11.4)** — WhatsApp Cloud API initialization stopped with a **WhatsApp Business Account restriction** before a test number could be claimed. **Account-level Meta issue, not Atlas backend.** Verify WABA status in Meta Business Suite before continuing Cloud API setup. See [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
+2. **Live end-to-end smoke test** — Send WhatsApp to **+1 786-752-8080**; confirm Atlas reply → qualification → Google Calendar booking → confirmation. Required for production acceptance.
+3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
+4. **META_APP_SECRET on Railway** — Recommended for webhook signature validation (currently skipped with warning when unset).
+5. **Placeholder Atlas pages** — Conversations, Appointments, Analytics remain UI shells (deferred post-launch).
 
 **Check readiness anytime:** `curl https://atlas-ai-production-01de.up.railway.app/health/production`
 

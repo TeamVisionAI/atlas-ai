@@ -10,8 +10,8 @@
 | **Status** | Approved |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
-| **Related Sprint** | 11.4 Phase A |
-| **Related Release** | Release-11.4-A (production) |
+| **Related Sprint** | 11.4 |
+| **Related Release** | Release-11.4-B |
 
 > **Status values:** Draft · Review · Approved
 
@@ -24,7 +24,18 @@
 | DOC-0001 | [Current_System_State.md](../00-executive/Current_System_State.md) | Production state reference |
 | DOC-0002 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification portfolio |
 | DOC-0512 | [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md) | Sprint 11.4 engineering blueprint |
+| DOC-0701 | [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) | Meta WABA / Cloud API production troubleshooting |
 | — | [Roadmap.md](../00-executive/Roadmap.md) | Planned releases and milestones |
+
+---
+
+## Documentation — Sprint 11.4 Meta WABA restriction (DOC-0701)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Recorded Meta WhatsApp Cloud API initialization blocked by **WABA account restriction** before test number claim. Documented as Meta account-level issue (not Atlas backend). Added `docs/deployment/sprint-11.4-meta-production.md` troubleshooting: verify WABA status before continuing Cloud API setup.
 
 ---
 

@@ -9,7 +9,7 @@
 | **Version** | 0.1 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-20 |
+| **Last Updated** | 2026-07-21 |
 | **Related Sprint** | 11.4 |
 | **Related Release** | Release-11.4 (planned) |
 
@@ -21,6 +21,7 @@
 - [Roadmap.md](../00-executive/Roadmap.md)
 - [Communication_Hub.md](../02-architecture/Communication_Hub.md)
 - [Sprint-11.4-Implementation-Plan.md](./Sprint-11.4-Implementation-Plan.md)
+- [../deployment/sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md)
 - [../BUSINESS_RULES.md](../BUSINESS_RULES.md)
 - [../SPRINT_11_1_LIVE_WHATSAPP.md](../SPRINT_11_1_LIVE_WHATSAPP.md)
 
@@ -107,6 +108,19 @@ node backend/dev/verifySprint11_4.js
 | Phases D–F | Planned |
 
 Phase A deliverables: production WhatsApp → Communication Hub → Conversation Engine → outbound pipeline. Verification: `node backend/dev/verifySprint11_4.js`.
+
+---
+
+## Meta production blocker (account-level)
+
+During Meta **WhatsApp Cloud API initialization**, onboarding stopped with a **WhatsApp Business Account (WABA) restriction** before a test number could be claimed.
+
+| Classification | Detail |
+|----------------|--------|
+| **Root cause** | Meta account / WABA policy restriction |
+| **Not caused by** | Atlas backend, Railway, or webhook implementation |
+
+**Action:** Verify WABA status in Meta Business Suite before retrying Cloud API setup. Full troubleshooting: [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
 
 ---
 
