@@ -92,11 +92,29 @@ async function createInterview(interview) {
 }
 
 async function cancelInterview(eventId, bookingDetails = null) {
+  const { shouldMockExternalComms } = require("../dev/simulatorGuard");
+
   console.log("❌ Cancel interview:", eventId);
 
   if (bookingDetails?.startTimeISO && bookingDetails?.interviewType) {
     releaseSlotByIso(bookingDetails.startTimeISO, bookingDetails.interviewType);
   }
+
+  if (!eventId || shouldMockExternalComms()) {
+    return { cancelled: true, simulated: shouldMockExternalComms() };
+  }
+
+  if (!process.env.GOOGLE_REFRESH_TOKEN) {
+    console.warn("[calendar] GOOGLE_REFRESH_TOKEN missing — skipping Google event delete");
+    return { cancelled: false, reason: "GOOGLE_NOT_CONFIGURED" };
+  }
+
+  await calendar.events.delete({
+    calendarId: "primary",
+    eventId
+  });
+
+  return { cancelled: true };
 }
 
 async function rescheduleInterview(eventId, interview) {

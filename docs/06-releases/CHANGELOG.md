@@ -28,6 +28,26 @@
 
 ---
 
+## Release 11.4-B — WhatsApp credentials + MVP readiness probe
+
+| Field | Value |
+|-------|-------|
+| **Release** | 11.4-B |
+| **Status** | Deployed to `main` |
+| **Date** | 2026-07-21 |
+
+Production outbound WhatsApp now prefers Embedded Signup stored credentials with env fallback. Added `/health/production` MVP readiness endpoint.
+
+### Changes
+
+- `whatsappSendCredentials.js` — Embedded Signup token + phone_number_id, env fallback
+- `whatsappOutboundPipeline.js` — dynamic credentials, unified Graph API version
+- `productionReadiness.js` + `GET /health/production` — Supabase, webhook, WhatsApp send, Google Calendar checks
+- `calendarService` — `cancelInterview` deletes Google Calendar events when configured
+- Verification: `node backend/dev/verifyProductionPipeline.js`
+
+---
+
 ## Release 11.4-A — Production WhatsApp AI Pipeline (main)
 
 | Field | Value |
