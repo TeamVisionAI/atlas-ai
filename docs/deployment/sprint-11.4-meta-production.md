@@ -97,12 +97,11 @@ Atlas ops reached Meta's **Production Setup** page inside **Step 2 (Production s
 | **Meta error** | **`Unexpected null value for wabaID`** (internal Meta UI error) |
 | **Root cause (refined)** | **Meta backend failure** resolving WABA during production phone registration (`wabaID = null`) — **not** wrong Business Portfolio |
 | **Business Portfolio verified** | ✅ Atlas Developer App and Approved WABAs share portfolio **`367219934273986`** (Team Vision Financial) |
-| **Next action** | Meta Support / retry after WABA explicit selection — portfolio alignment is confirmed |
-
 | **SMS verification reached?** | ❌ **No** — error occurred **before** verification code step |
 | **Phone migration complete?** | ❌ **No** — **786-752-8080** not migrated to Cloud API via this app |
 | **Atlas backend involved?** | ❌ **No** — failure is **Meta-side**, not Atlas or the phone number |
 | **Wrong Business Portfolio?** | ❌ **Ruled out** — app and WABAs share portfolio **`367219934273986`** |
+| **Next action** | Meta Support / retry after WABA explicit selection — portfolio alignment is confirmed |
 
 > **Rule:** **`wabaID` null with correct portfolio = Meta backend failed to resolve WABA in registration flow — not Atlas env or Railway.**
 
