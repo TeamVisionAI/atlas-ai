@@ -50,6 +50,51 @@ assert.ok(
   "Navbar section links must use href={link.href}"
 );
 
+// --- Mobile menu (≤900px) ---
+
+assert.match(
+  navbarSource,
+  /public-navbar__menu-toggle/,
+  "Navbar must include a mobile menu toggle"
+);
+assert.match(
+  navbarSource,
+  /aria-expanded=\{menuOpen\}/,
+  "Mobile menu toggle must expose aria-expanded"
+);
+assert.match(
+  navbarSource,
+  /aria-controls=\{menuId\}/,
+  "Mobile menu toggle must reference controlled menu"
+);
+assert.match(navbarSource, /Escape/, "Mobile menu must close on Escape");
+
+for (const route of LEGAL_ROUTES) {
+  assert.match(
+    navbarSource,
+    new RegExp(`to: "${route.replace("/", "\\/")}"`),
+    `Mobile menu must link to ${route}`
+  );
+}
+
+assert.match(
+  navbarSource,
+  /to=\{appPath\(\)\}/,
+  "Mobile menu must link to Atlas app"
+);
+
+const navbarCss = read("frontend/src/components/public/PublicNavbar.css");
+assert.match(
+  navbarCss,
+  /@media \(max-width: 900px\)/,
+  "Mobile menu styles must use the 900px breakpoint"
+);
+assert.match(
+  navbarCss,
+  /\.public-navbar__nav \{\s*display: none;/,
+  "Desktop nav must remain hidden only within mobile breakpoint"
+);
+
 // Resolved hrefs from any page (including legal) must be /#section, never /section.
 
 for (const section of HOME_SECTIONS) {
