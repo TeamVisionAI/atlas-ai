@@ -19,6 +19,10 @@ function getSharedProspectRepository() {
 }
 
 function resetSharedProspectRepository() {
+  if (sharedRepository?.reset) {
+    sharedRepository.reset();
+  }
+
   sharedRepository = null;
 }
 

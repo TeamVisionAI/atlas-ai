@@ -124,7 +124,26 @@ async function run() {
   );
   console.log("✓ Workflow events emitted on start and step change");
 
-  const secondPass = await gateway.receive(CHANNEL.MESSENGER, SAMPLE_WEBHOOK);
+  const secondPass = await gateway.receive(
+    CHANNEL.MESSENGER,
+    {
+      ...SAMPLE_WEBHOOK,
+      entry: [
+        {
+          ...SAMPLE_WEBHOOK.entry[0],
+          messaging: [
+            {
+              ...SAMPLE_WEBHOOK.entry[0].messaging[0],
+              message: {
+                mid: "mid.$sprint130.followup",
+                text: "Workflow engine follow-up"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  );
   const workflowAfterSecondMessage = workflowEngine.getWorkflow(started.workflowId);
 
   assert.strictEqual(workflowAfterSecondMessage.workflowId, started.workflowId);

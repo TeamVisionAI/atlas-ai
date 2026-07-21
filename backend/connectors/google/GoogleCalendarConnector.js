@@ -75,6 +75,14 @@ class GoogleCalendarConnector extends BaseConnector {
           simulated: true
         };
       }
+
+      if (operation === "queryFreeBusy") {
+        return {
+          status: "ok",
+          busy: [],
+          simulated: true
+        };
+      }
     }
 
     const authClient = await this.oauth.getAuthorizedClient(outbound.organizationId);
@@ -146,6 +154,44 @@ class GoogleCalendarConnector extends BaseConnector {
         calendarProvider: "google",
         calendarLink: result.data.htmlLink || null,
         status: "created"
+      };
+    }
+
+    if (operation === "queryFreeBusy") {
+      const { result, retries } = await executeWithRetry(
+        () =>
+          calendar.freebusy.query({
+            requestBody: {
+              timeMin: outbound.timeMin,
+              timeMax: outbound.timeMax,
+              timeZone: outbound.timeZone || "America/New_York",
+              items: [{ id: "primary" }]
+            }
+          }),
+        {
+          onRetry: ({ retries, error }) => {
+            this.eventBus?.emit(ConnectorEvent.RETRY, {
+              connector: CONNECTOR_ID,
+              correlationId,
+              retries,
+              error: error.message
+            });
+          }
+        }
+      );
+
+      logConnectorOperation({
+        correlationId,
+        connector: CONNECTOR_ID,
+        operation,
+        latencyMs: Date.now() - startedAt,
+        retries,
+        status: "ok"
+      });
+
+      return {
+        status: "ok",
+        busy: result.data.calendars?.primary?.busy || []
       };
     }
 

@@ -65,9 +65,103 @@
       ],
       "createdAt": "2026-07-21T15:51:47.776Z",
       "updatedAt": "2026-07-21T15:51:47.777Z"
+    },
+    {
+      "id": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+      "appointmentId": "20d3b199-229f-4a91-ba00-676c3df4c527",
+      "organizationId": "c8552a23-49e8-4b3d-b237-7bede944412d",
+      "atlasProspectId": "ATL-000001",
+      "prospectName": "Maria Lopez",
+      "meetingType": "office",
+      "interviewType": "office",
+      "startTime": "2026-07-22T14:00:00.000Z",
+      "endTime": "2026-07-22T14:30:00.000Z",
+      "timeZone": "America/New_York",
+      "locationName": "Team Vision Office",
+      "address": "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+      "locationLabel": "Team Vision Office · 2500 NW 79th Ave, Suite 189, Doral, FL 33122",
+      "lifecycleStatus": "meeting_ready",
+      "calendar": {
+        "calendarEventId": null,
+        "calendarProvider": "google",
+        "calendarLink": null,
+        "status": "failed",
+        "reason": "CALENDAR_NOT_CONFIGURED"
+      },
+      "zoom": {
+        "meetingId": null,
+        "joinUrl": null,
+        "hostUrl": null,
+        "password": null,
+        "meetingProvider": null,
+        "status": "skipped"
+      },
+      "reminders": [
+        {
+          "id": "5517c592-239f-424f-82ec-f696d6076062",
+          "meetingId": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+          "appointmentId": "20d3b199-229f-4a91-ba00-676c3df4c527",
+          "offsetMinutes": 120,
+          "scheduledFor": "2026-07-22T12:00:00.000Z",
+          "status": "pending",
+          "message": "Reminder: Your meeting with Maria Lopez is in 2 hours. Location: Team Vision Office · 2500 NW 79th Ave, Suite 189, Doral, FL 33122.",
+          "createdAt": "2026-07-21T20:59:57.721Z"
+        },
+        {
+          "id": "2493edbc-ae7e-450b-a63c-5827d51ced59",
+          "meetingId": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+          "appointmentId": "20d3b199-229f-4a91-ba00-676c3df4c527",
+          "offsetMinutes": 30,
+          "scheduledFor": "2026-07-22T13:30:00.000Z",
+          "status": "pending",
+          "message": "Reminder: Your meeting with Maria Lopez is in 30 minutes. Location: Team Vision Office · 2500 NW 79th Ave, Suite 189, Doral, FL 33122.",
+          "createdAt": "2026-07-21T20:59:57.721Z"
+        },
+        {
+          "id": "a43a5909-6db8-4b0f-9c07-4f423c663f10",
+          "meetingId": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+          "appointmentId": "20d3b199-229f-4a91-ba00-676c3df4c527",
+          "offsetMinutes": 5,
+          "scheduledFor": "2026-07-22T13:55:00.000Z",
+          "status": "pending",
+          "message": "Reminder: Your meeting with Maria Lopez is in 5 minutes. Location: Team Vision Office · 2500 NW 79th Ave, Suite 189, Doral, FL 33122.",
+          "createdAt": "2026-07-21T20:59:57.721Z"
+        }
+      ],
+      "createdAt": "2026-07-21T20:59:57.709Z",
+      "updatedAt": "2026-07-21T20:59:57.722Z"
     }
   ],
   "activity": [
+    {
+      "id": "ad4079d3-fb86-4b14-96d9-f9d434724d5b",
+      "type": "meeting.ready",
+      "message": "Meeting ready for Maria Lopez.",
+      "meetingId": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+      "createdAt": "2026-07-21T20:59:57.722Z"
+    },
+    {
+      "id": "846abcbc-4f25-40dc-8759-e4c66494af67",
+      "type": "meeting.reminder.created",
+      "message": "3 reminders prepared for Maria Lopez.",
+      "meetingId": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+      "createdAt": "2026-07-21T20:59:57.721Z"
+    },
+    {
+      "id": "5bc4e7fc-3281-4cd5-8acd-dc8cc09a9269",
+      "type": "meeting.calendar.created",
+      "message": "Calendar event created for Maria Lopez.",
+      "meetingId": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+      "createdAt": "2026-07-21T20:59:57.721Z"
+    },
+    {
+      "id": "d1effd42-b720-4dd4-bc2f-8d76dbf96f63",
+      "type": "meeting.created",
+      "message": "Meeting prepared for Maria Lopez.",
+      "meetingId": "96a66dd3-0e1e-4bb2-b58c-ff484c5d15d0",
+      "appointmentId": "20d3b199-229f-4a91-ba00-676c3df4c527",
+      "createdAt": "2026-07-21T20:59:57.710Z"
+    },
     {
       "id": "d2ed2cbc-4e73-421d-88ae-a2ee257122e5",
       "type": "meeting.ready",
@@ -105,5 +199,5 @@
       "createdAt": "2026-07-21T15:51:47.777Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:51:47.777Z"
+  "updatedAt": "2026-07-21T20:59:57.722Z"
 }

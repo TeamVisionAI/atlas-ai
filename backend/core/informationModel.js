@@ -53,7 +53,9 @@ function buildProfileFromProspect(prospect, channel = "whatsapp") {
     email: extractEmailFromNotes(prospect.notes),
     appointmentDate: prospect.appointment_date || null,
     calendarEventId: prospect.calendar_event_id || null,
-    confirmed: prospect.current_step === "CONFIRMED",
+    confirmed:
+      prospect.current_step === "CONFIRMED" ||
+      prospect.current_step === "APPOINTMENT_BOOKED",
     channel,
     schedulingPhase: prospect.appointment_type || null
   };
@@ -180,7 +182,11 @@ function getNextMissingField(profile) {
   )[0] || null;
 }
 
-function deriveCurrentStep(profile, schedulingState) {
+function deriveCurrentStep(profile, schedulingState, prospect = null) {
+  if (prospect?.current_step === "APPOINTMENT_BOOKED") {
+    return "APPOINTMENT_BOOKED";
+  }
+
   if (profile.confirmed || profile.calendarEventId) {
     return "CONFIRMED";
   }

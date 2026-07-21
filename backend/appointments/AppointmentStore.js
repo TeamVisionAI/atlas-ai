@@ -32,6 +32,7 @@ function normalizeAppointment(record) {
     id: record.id,
     organizationId: record.organizationId || null,
     atlasProspectId: record.atlasProspectId || null,
+    prospectPhone: record.prospectPhone || null,
     prospectName: record.prospectName || "Prospect",
     interviewType: record.interviewType || "office",
     startTime: record.startTime,
@@ -40,6 +41,7 @@ function normalizeAppointment(record) {
     locationLabel: record.locationLabel || null,
     status: record.status || "scheduled",
     calendarEventId: record.calendarEventId || null,
+    channel: record.channel || null,
     workflowId: record.workflowId || null,
     confirmation: record.confirmation || null,
     createdAt: record.createdAt || new Date().toISOString()

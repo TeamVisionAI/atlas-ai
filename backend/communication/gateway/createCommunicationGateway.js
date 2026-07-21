@@ -8,6 +8,7 @@ const { ConversationManager } = require("./ConversationManager");
 const { MessageRouter } = require("./MessageRouter");
 const { EventBus } = require("../events/EventBus");
 const { AIAdapter } = require("../ai/AIAdapter");
+const { SemanticAIAdapter } = require("../ai/SemanticAIAdapter");
 const { MessengerConnector } = require("../connectors/messenger/MessengerConnector");
 const { CHANNEL } = require("../models/Channel");
 const { createProspectService } = require("../../prospects");
@@ -63,7 +64,9 @@ function createCommunicationGateway(options = {}) {
   const meetingLifecycle =
     options.meetingLifecycle ||
     createMeetingLifecycle({ eventBus });
-  const aiAdapter = options.aiAdapter || new AIAdapter();
+  const aiAdapter =
+    options.aiAdapter ||
+    (options.useOpenAiAdapter ? new AIAdapter() : new SemanticAIAdapter());
   const messageRouter = new MessageRouter({
     connectorRegistry,
     conversationManager,
@@ -118,6 +121,8 @@ function resetCommunicationGateway() {
   resetMeetingLifecycle();
   const { resetSharedProspectRepository } = require("../../prospects");
   resetSharedProspectRepository();
+  const { resetInboundMessageIdempotency } = require("../idempotency/messageIdempotency");
+  resetInboundMessageIdempotency();
   singleton = null;
 }
 

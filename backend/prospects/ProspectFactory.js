@@ -2,6 +2,35 @@
  * Sprint 12.3 — Prospect entity factory.
  */
 
+const { buildMessengerStorageKey } = require("../core/messengerConstants");
+
+const QUALIFICATION_FIELD_COUNT = 7;
+
+function buildStorageKey(channel, channelUserId) {
+  if (channel === "messenger") {
+    return buildMessengerStorageKey(channelUserId);
+  }
+
+  return `${channel}:${channelUserId}`;
+}
+
+function createEmptyQualificationProgress() {
+  return {
+    profile: {},
+    missingFields: [
+      "city",
+      "state",
+      "authorization",
+      "occupation",
+      "interviewType",
+      "schedule",
+      "email"
+    ],
+    nextField: "city",
+    percentComplete: 0
+  };
+}
+
 class ProspectFactory {
   /**
    * @param {Object} params
@@ -12,10 +41,15 @@ class ProspectFactory {
    */
   create({ atlasId, channel, channelUserId, displayName = null }) {
     const now = new Date().toISOString();
+    const storageKey = buildStorageKey(channel, channelUserId);
 
     return {
       atlasId,
       displayName,
+      storageKey,
+      recruitingStage: "NEW",
+      qualificationProgress: createEmptyQualificationProgress(),
+      assignedOwnerId: null,
       channelIdentities: [
         {
           channel,
@@ -23,6 +57,19 @@ class ProspectFactory {
           linkedAt: now
         }
       ],
+      communication: {
+        primaryChannel: channel,
+        lastChannel: channel,
+        lastMessagePreview: null,
+        lastInboundAt: null,
+        lastOutboundAt: null,
+        lastProviderMessageId: null,
+        activeConversationId: null,
+        conversationIds: [],
+        ownershipMode: "ai",
+        language: "es"
+      },
+      conversationHistory: [],
       createdAt: now,
       updatedAt: now,
       lastActivityAt: now
@@ -54,5 +101,8 @@ class ProspectFactory {
 }
 
 module.exports = {
-  ProspectFactory
+  ProspectFactory,
+  QUALIFICATION_FIELD_COUNT,
+  buildStorageKey,
+  createEmptyQualificationProgress
 };

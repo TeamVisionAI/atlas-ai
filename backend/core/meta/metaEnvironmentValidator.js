@@ -12,7 +12,9 @@ const SERVER_ENV_RULES = Object.freeze([
   { key: "META_TOKEN_ENCRYPTION_KEY", required: false, recommended: true },
   { key: "VERIFY_TOKEN", required: false, recommended: true },
   { key: "WHATSAPP_ACCESS_TOKEN", required: false, recommended: true },
-  { key: "WHATSAPP_PHONE_NUMBER_ID", required: false, recommended: true }
+  { key: "WHATSAPP_PHONE_NUMBER_ID", required: false, recommended: true },
+  { key: "MESSENGER_PAGE_ACCESS_TOKEN", required: false, recommended: true },
+  { key: "MESSENGER_PAGE_ID", required: false, recommended: true }
 ]);
 
 function isPresent(value) {

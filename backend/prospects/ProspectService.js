@@ -4,9 +4,49 @@
  */
 
 const { AtlasIdGenerator } = require("./AtlasIdGenerator");
-const { ProspectFactory } = require("./ProspectFactory");
+const { ProspectFactory, QUALIFICATION_FIELD_COUNT, buildStorageKey } = require("./ProspectFactory");
 const { ProspectRepository } = require("./ProspectRepository");
 const { ProspectEvent } = require("./prospectEvents");
+const { findProspect } = require("../services/supabaseService");
+const {
+  buildProfileFromProspect,
+  getMissingFields,
+  getNextMissingField,
+  deriveCurrentStep
+} = require("../core/informationModel");
+const { parseSchedulingState } = require("../core/schedulingState");
+
+const MAX_STORED_HISTORY = 100;
+
+function buildQualificationProgress(supabaseProspect, channel) {
+  const profile = buildProfileFromProspect(supabaseProspect, channel);
+  const schedulingState = parseSchedulingState(supabaseProspect?.notes);
+  const missingFields = getMissingFields(profile);
+  const collectedCount = QUALIFICATION_FIELD_COUNT - missingFields.length;
+
+  return {
+    profile,
+    missingFields,
+    nextField: getNextMissingField(profile),
+    percentComplete: Math.max(
+      0,
+      Math.min(100, Math.round((collectedCount / QUALIFICATION_FIELD_COUNT) * 100))
+    ),
+    schedulingPhase: schedulingState?.phase || null
+  };
+}
+
+function summarizeHistory(conversationId, history = []) {
+  return history.slice(-MAX_STORED_HISTORY).map((entry) => ({
+    conversationId,
+    messageId: entry.id || null,
+    direction: entry.direction,
+    channel: entry.channel,
+    type: entry.type,
+    text: entry.text || "",
+    timestamp: entry.timestamp
+  }));
+}
 
 class ProspectService {
   /**
@@ -153,6 +193,108 @@ class ProspectService {
    */
   async listProspects() {
     return this.repository.listAll();
+  }
+
+  /**
+   * Persist and enrich an Atlas prospect after a channel conversation turn.
+   * @param {Object} params
+   * @param {string} params.atlasId
+   * @param {import('../communication/models/Conversation').Conversation} params.conversation
+   * @param {import('../communication/gateway/ConversationManager').ConversationManager} params.conversationManager
+   * @param {import('../communication/models/GatewayMessage').GatewayMessage} params.inboundMessage
+   * @param {string} params.providerMessageId
+   * @param {import('../communication/models/GatewayMessage').GatewayMessage|null} [params.outboundMessage]
+   * @param {{ handoff?: Object|null, fallback?: boolean }|null} [params.aiResult]
+   */
+  async enrichFromChannelTurn({
+    atlasId,
+    conversation,
+    conversationManager,
+    inboundMessage,
+    providerMessageId,
+    outboundMessage = null,
+    aiResult = null
+  }) {
+    const prospect = await this.repository.findByAtlasId(atlasId);
+
+    if (!prospect) {
+      throw new Error(`Prospect not found: ${atlasId}`);
+    }
+
+    const now = new Date().toISOString();
+    const channel = inboundMessage.channel;
+    const storageKey =
+      prospect.storageKey ||
+      buildStorageKey(channel, inboundMessage.senderId);
+    const conversationIds = Array.from(
+      new Set([...(prospect.communication?.conversationIds || []), conversation.id])
+    );
+    const history = await conversationManager.getHistory(conversation.id);
+
+    let supabaseProspect = null;
+
+    try {
+      supabaseProspect = await findProspect(storageKey);
+    } catch {
+      supabaseProspect = null;
+    }
+
+    const qualificationProgress = supabaseProspect
+      ? buildQualificationProgress(supabaseProspect, channel)
+      : prospect.qualificationProgress;
+
+    const recruitingStage =
+      supabaseProspect?.current_step ||
+      (qualificationProgress.nextField
+        ? deriveCurrentStep(
+            qualificationProgress.profile,
+            parseSchedulingState(supabaseProspect?.notes)
+          )
+        : prospect.recruitingStage);
+
+    const updated = {
+      ...prospect,
+      storageKey,
+      displayName:
+        prospect.displayName ||
+        supabaseProspect?.name ||
+        inboundMessage.metadata?.displayName ||
+        null,
+      recruitingStage,
+      qualificationProgress,
+      assignedOwnerId: conversation.assignedOperatorId || prospect.assignedOwnerId || null,
+      communication: {
+        ...(prospect.communication || {}),
+        primaryChannel: prospect.communication?.primaryChannel || channel,
+        lastChannel: channel,
+        lastMessagePreview: String(inboundMessage.text || "").slice(0, 240) || null,
+        lastInboundAt: inboundMessage.timestamp || now,
+        lastOutboundAt: outboundMessage?.timestamp || prospect.communication?.lastOutboundAt || null,
+        lastProviderMessageId: providerMessageId,
+        activeConversationId: conversation.id,
+        conversationIds,
+        ownershipMode: conversation.ownershipMode,
+        language:
+          supabaseProspect?.language ||
+          supabaseProspect?.communication_language ||
+          prospect.communication?.language ||
+          "es",
+        lastEngineProvider: aiResult?.provider || prospect.communication?.lastEngineProvider || null,
+        handoffReady: Boolean(aiResult?.handoff?.handoffReady)
+      },
+      conversationHistory: summarizeHistory(conversation.id, history),
+      updatedAt: now,
+      lastActivityAt: now
+    };
+
+    await this.repository.save(updated);
+
+    this.eventBus?.emit(ProspectEvent.UPDATED, {
+      prospect: updated,
+      reason: "channel_turn_enriched"
+    });
+
+    return updated;
   }
 }
 

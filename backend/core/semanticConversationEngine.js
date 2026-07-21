@@ -3,7 +3,7 @@ const {
   createProspect,
   updateProspect
 } = require("../services/supabaseService");
-const { createInterview } = require("../services/calendarService");
+const { bookProductionAppointment } = require("../appointments/AppointmentEngine");
 const { logConversation } = require("../services/logService");
 const { detectIntent } = require("./intentEngine");
 const { routeConversation } = require("./conversationRouter");
@@ -230,46 +230,16 @@ async function handleScheduleMessage(prospect, message, language, personality) {
   return result;
 }
 
-async function completeInterview(prospect, profile, language) {
-  const email = profile.email || null;
-
-  if (!prospect.appointment_date) {
-    throw new Error("Interview slot must be selected before confirming.");
-  }
-
-  const event = await createInterview({
-    name: prospect.name,
-    phone: prospect.phone,
-    email,
-    interviewType: profile.interviewType,
-    startTime: prospect.appointment_date,
-    location: profile.city
+async function completeInterview(prospect, profile, language, options = {}) {
+  const result = await bookProductionAppointment({
+    prospect,
+    profile,
+    language,
+    channel: options.channel || "whatsapp",
+    atlasProspectId: options.atlasProspectId || null
   });
 
-  await updateProspect(prospect.phone, {
-    notes: email ? `EMAIL:${email}` : null,
-    calendar_event_id: event.id,
-    current_step: "CONFIRMED",
-    last_message: prospect.last_message
-  });
-
-  const confirmation = buildConfirmationDetails({
-    interviewType: profile.interviewType,
-    slotLabel: profile.preferredTime || prospect.interview_time,
-    email: email || prospect.phone,
-    language
-  });
-
-  const response = responseBuilder({
-    tone: "celebratory",
-    acknowledgement: confirmation.acknowledgement,
-    transition: confirmation.transition,
-    question: confirmation.question,
-    typingDelay: 1500,
-    responseStyle: "professional"
-  });
-
-  return response.text;
+  return result.reply;
 }
 
 async function buildSemanticReply({
@@ -278,13 +248,14 @@ async function buildSemanticReply({
   extracted,
   language,
   isNew,
-  informationalReply
+  informationalReply,
+  channel = "whatsapp"
 }) {
   const missing = getMissingFields(profile);
   const nextField = getNextMissingField(profile);
 
   if (!missing.length) {
-    return completeInterview(prospect, profile, language);
+    return completeInterview(prospect, profile, language, { channel });
   }
 
   if (nextField === "schedule" && getEffectiveInterviewType(profile)) {
@@ -610,7 +581,7 @@ async function handleSemanticMessage({
     profile = buildProfileFromProspect(prospect, channel);
 
     if (isScheduleComplete(profile) && !emailRequired(profile)) {
-      const completionReply = await completeInterview(prospect, profile, language);
+      const completionReply = await completeInterview(prospect, profile, language, { channel });
 
       await recordLog({
         phone,
@@ -680,7 +651,7 @@ async function handleSemanticMessage({
       prospect = await findProspect(phone);
       profile = buildProfileFromProspect(prospect, channel);
 
-      const completionReply = await completeInterview(prospect, profile, language);
+      const completionReply = await completeInterview(prospect, profile, language, { channel });
 
       await recordLog({
         phone,
@@ -705,7 +676,8 @@ async function handleSemanticMessage({
     extracted,
     language,
     isNew,
-    informationalReply
+    informationalReply,
+    channel
   });
 
   await syncProfileToProspect(prospect, profile);

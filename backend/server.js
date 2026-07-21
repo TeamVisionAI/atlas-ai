@@ -7,6 +7,7 @@ const healthRoute = require("./routes/health");
 const infoRoute = require("./routes/info");
 const recruitRoute = require("./routes/recruit");
 const webhookRoute = require("./routes/webhook");
+const messengerWebhookRoute = require("./routes/messengerWebhook");
 
 const simulatorRoutes = require("./dev/simulatorRoutes");
 
@@ -24,6 +25,7 @@ const onboardingRoutes = require("./routes/onboarding");
 const {
   logMetaEnvironmentWarnings,
 } = require("./core/meta/metaEnvironmentValidator");
+const { getCommunicationGateway } = require("./communication/gateway/createCommunicationGateway");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,11 +38,17 @@ app.use((req, res, next) => {
   next();
 });
 
-// Meta webhook must receive the raw body before express.json().
+// Meta webhooks must receive the raw body before express.json().
 app.use(
   "/webhook",
   express.raw({ type: "application/json" }),
   webhookRoute
+);
+
+app.use(
+  "/webhook/messenger",
+  express.raw({ type: "application/json" }),
+  messengerWebhookRoute
 );
 
 // JSON parsing for all non-webhook routes.
@@ -103,8 +111,18 @@ app.use((error, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logMetaEnvironmentWarnings();
+
+  if (process.env.MESSENGER_PAGE_ACCESS_TOKEN) {
+    try {
+      const { messengerConnector } = getCommunicationGateway();
+      await messengerConnector.connect();
+      console.log("✅ Messenger connector connected");
+    } catch (error) {
+      console.warn("⚠️ Messenger connector failed to connect:", error.message);
+    }
+  }
 
   console.log(`🚀 Atlas AI running on http://localhost:${PORT}`);
   console.log(`🌎 Environment: ${process.env.NODE_ENV || "development"}`);

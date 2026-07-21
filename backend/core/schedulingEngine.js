@@ -64,7 +64,7 @@ async function getSchedulingOptions({ prospect, interviewType, currentDate = new
   const defaultPeriod = working ? "afterFive" : "morning";
 
   if (offeredDayDates.length >= 1) {
-    return {
+    const schedule = {
       strategy: "CAPACITY",
       days: offeredDayDates.slice(0, 2).map((date, index) => {
         const dateKey = toDateKey(date);
@@ -74,10 +74,17 @@ async function getSchedulingOptions({ prospect, interviewType, currentDate = new
         return {
           label: formatDayLabel(date, language, index),
           dateKey,
+          interviewType,
+          openSlots,
           times: openSlots.map((slot) => formatTimeLabel(slot.timeKey, language))
         };
       })
     };
+
+    const { filterScheduleDaysByGoogleCalendar } = require("../appointments/AppointmentEngine");
+    const organization = await require("../repositories/jsonOrganizationRepository").findFirstActivatedOrganization();
+
+    return filterScheduleDaysByGoogleCalendar(schedule, organization?.id || null);
   }
 
   return {

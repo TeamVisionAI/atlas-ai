@@ -10,6 +10,12 @@ const {
   createAppointmentBookingService,
   resetAppointmentBookingService
 } = require("./AppointmentBookingService");
+const {
+  PROSPECT_STATUS,
+  bookProductionAppointment,
+  filterSlotsByGoogleCalendar,
+  filterScheduleDaysByGoogleCalendar
+} = require("./AppointmentEngine");
 
 module.exports = {
   AppointmentEvent,
@@ -18,5 +24,9 @@ module.exports = {
   buildConfirmation,
   AppointmentBookingService,
   createAppointmentBookingService,
-  resetAppointmentBookingService
+  resetAppointmentBookingService,
+  PROSPECT_STATUS,
+  bookProductionAppointment,
+  filterSlotsByGoogleCalendar,
+  filterScheduleDaysByGoogleCalendar
 };

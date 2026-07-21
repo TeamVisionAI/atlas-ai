@@ -1,0 +1,107 @@
+{
+  "sequence": 1,
+  "prospects": {
+    "ATL-000099": {
+      "atlasId": "ATL-000099",
+      "displayName": "Maria Test",
+      "storageKey": "messenger:USER_CLICKIT",
+      "recruitingStage": "APPOINTMENT_BOOKED",
+      "qualificationProgress": {
+        "missingFields": []
+      },
+      "assignedOwnerId": null,
+      "channelIdentities": [
+        {
+          "channel": "messenger",
+          "channelUserId": "USER_CLICKIT",
+          "linkedAt": "2026-07-21T21:14:43.864Z"
+        }
+      ],
+      "communication": {
+        "primaryChannel": "messenger",
+        "conversationIds": []
+      },
+      "conversationHistory": [],
+      "createdAt": "2026-07-21T21:14:43.864Z",
+      "updatedAt": "2026-07-21T21:14:43.992Z",
+      "lastActivityAt": "2026-07-21T21:14:43.992Z",
+      "appointment": {
+        "appointmentId": "987fa391-f728-491e-9854-de84e12d2570",
+        "calendarEventId": "sim-cal-1784668483866",
+        "startTime": "2026-07-22T14:00:00.000Z",
+        "endTime": "2026-07-22T14:30:00.000Z",
+        "interviewType": "office",
+        "status": "confirmed",
+        "bookedAt": "2026-07-21T21:14:43.992Z"
+      }
+    },
+    "ATL-000001": {
+      "atlasId": "ATL-000001",
+      "displayName": null,
+      "storageKey": "messenger:USER_PSID_1201",
+      "recruitingStage": "GREETING",
+      "qualificationProgress": {
+        "profile": {},
+        "missingFields": [
+          "city",
+          "state",
+          "authorization",
+          "occupation",
+          "interviewType",
+          "schedule",
+          "email"
+        ],
+        "nextField": "city",
+        "percentComplete": 0
+      },
+      "assignedOwnerId": null,
+      "channelIdentities": [
+        {
+          "channel": "messenger",
+          "channelUserId": "USER_PSID_1201",
+          "linkedAt": "2026-07-21T21:14:51.569Z"
+        }
+      ],
+      "communication": {
+        "primaryChannel": "messenger",
+        "lastChannel": "messenger",
+        "lastMessagePreview": "Hola, quiero información sobre reclutamiento",
+        "lastInboundAt": "2018-03-07T00:46:12.000Z",
+        "lastOutboundAt": "2026-07-21T21:14:51.577Z",
+        "lastProviderMessageId": "mid.sprint1201.test",
+        "activeConversationId": "13fed550-7fcd-400e-85d4-2feb4c394561",
+        "conversationIds": [
+          "13fed550-7fcd-400e-85d4-2feb4c394561"
+        ],
+        "ownershipMode": "ai",
+        "language": "es",
+        "lastEngineProvider": "mock",
+        "handoffReady": false
+      },
+      "conversationHistory": [
+        {
+          "conversationId": "13fed550-7fcd-400e-85d4-2feb4c394561",
+          "messageId": "mid.sprint1201.test",
+          "direction": "inbound",
+          "channel": "messenger",
+          "type": "text",
+          "text": "Hola, quiero información sobre reclutamiento",
+          "timestamp": "2018-03-07T00:46:12.000Z"
+        },
+        {
+          "conversationId": "13fed550-7fcd-400e-85d4-2feb4c394561",
+          "messageId": "2b06d3b8-c0fb-45cb-8b17-b0f1eb4590ca",
+          "direction": "outbound",
+          "channel": "messenger",
+          "type": "text",
+          "text": "Atlas reply to: Hola, quiero información sobre reclutamiento",
+          "timestamp": "2026-07-21T21:14:51.577Z"
+        }
+      ],
+      "createdAt": "2026-07-21T21:14:51.569Z",
+      "updatedAt": "2026-07-21T21:14:51.580Z",
+      "lastActivityAt": "2026-07-21T21:14:51.580Z"
+    }
+  },
+  "updatedAt": "2026-07-21T21:14:58.624Z"
+}

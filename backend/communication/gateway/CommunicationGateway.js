@@ -12,6 +12,13 @@ const { Participant } = require("../models/Participant");
 const { ParticipantRole } = require("../constants/ParticipantRole");
 const { OwnershipMode } = require("../constants/OwnershipMode");
 const { LOG_COMPONENTS, logCommunication } = require("../logging/communicationLogger");
+const {
+  resolveProviderMessageId,
+  isDuplicateInboundMessage,
+  markInboundMessageProcessed
+} = require("../idempotency/messageIdempotency");
+const { buildMessengerInboundCorrelationId, buildMessengerStorageKey } = require("../../core/messengerConstants");
+const { insertWorkflowEvent } = require("../../services/workflowEventService");
 
 class CommunicationGateway {
   /**
@@ -67,11 +74,34 @@ class CommunicationGateway {
     const results = [];
 
     for (const message of messages) {
+      const providerMessageId = resolveProviderMessageId(message);
+      const correlationId =
+        message.channel === "messenger"
+          ? buildMessengerInboundCorrelationId(providerMessageId)
+          : `${message.channel}:inbound:${providerMessageId}`;
+
+      if (await isDuplicateInboundMessage(message.channel, providerMessageId, correlationId)) {
+        logCommunication(LOG_COMPONENTS.GATEWAY, "Duplicate inbound skipped", {
+          channel: message.channel,
+          senderId: message.senderId,
+          messageId: providerMessageId,
+          correlationId
+        });
+
+        results.push({
+          skipped: true,
+          reason: "DUPLICATE_PROVIDER_MESSAGE",
+          providerMessageId,
+          correlationId
+        });
+        continue;
+      }
+
       logCommunication(LOG_COMPONENTS.GATEWAY, "Normalized message received", {
         channel: message.channel,
         senderId: message.senderId,
         type: message.type,
-        messageId: message.id
+        messageId: providerMessageId
       });
 
       let prospect = null;
@@ -112,6 +142,24 @@ class CommunicationGateway {
 
       await this.conversationManager.appendMessage(conversation.id, message);
 
+      await insertWorkflowEvent({
+        prospectPhone:
+          message.channel === "messenger"
+            ? buildMessengerStorageKey(message.senderId)
+            : atlasProspectId,
+        eventType: "MessageReceived",
+        actor: "PROSPECT",
+        correlationId,
+        payload: {
+          channel: message.channel,
+          providerMessageId,
+          conversationId: conversation.id,
+          atlasProspectId,
+          messageType: message.type,
+          text: message.text || null
+        }
+      });
+
       if (created) {
         this.eventBus.emit(CommunicationEvent.CONVERSATION_CREATED, {
           conversation,
@@ -149,6 +197,18 @@ class CommunicationGateway {
       const updatedConversation =
         this.conversationManager.getConversation(conversation.id) || conversation;
 
+      if (prospect && this.prospectService) {
+        prospect = await this.prospectService.enrichFromChannelTurn({
+          atlasId: prospect.atlasId,
+          conversation: updatedConversation,
+          conversationManager: this.conversationManager,
+          inboundMessage: message,
+          providerMessageId,
+          outboundMessage: routeResult.outboundMessage || null,
+          aiResult: routeResult.aiResult || null
+        });
+      }
+
       if (!created) {
         this.eventBus.emit(CommunicationEvent.CONVERSATION_UPDATED, {
           conversation: updatedConversation,
@@ -166,8 +226,12 @@ class CommunicationGateway {
         created,
         routeResult,
         sendResult,
-        workflowResult
+        workflowResult,
+        providerMessageId,
+        correlationId
       });
+
+      markInboundMessageProcessed(message.channel, providerMessageId);
     }
 
     return results;
