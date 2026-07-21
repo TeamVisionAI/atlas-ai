@@ -300,4 +300,4 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ## One-line status
 
-> **Atlas AI is operational in production with a Meta-ready public website, live WhatsApp AI qualification (Sprint 11.4 Phase A), and a Railway-hosted API — actively moving toward full Ad → WhatsApp → Calendar → Interview launch.**
+> **Atlas AI reports `mvp_ready` on production health probe — live WhatsApp AI qualification and Google Calendar are configured; next step is one real end-to-end smoke test before turning on ads.**

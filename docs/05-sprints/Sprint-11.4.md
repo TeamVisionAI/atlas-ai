@@ -108,4 +108,21 @@ node backend/dev/verifySprint11_4.js
 
 Phase A deliverables: production WhatsApp → Communication Hub → Conversation Engine → outbound pipeline. Verification: `node backend/dev/verifySprint11_4.js`.
 
+---
+
+## Live production smoke test (required before ads)
+
+**Readiness probe:** `GET https://atlas-ai-production-01de.up.railway.app/health/production`  
+When `mvpReady: true`, infrastructure is configured. Confirm with one real conversation:
+
+1. From a personal phone, send a WhatsApp message to the Team Vision business number.
+2. Confirm Atlas replies automatically within ~30 seconds.
+3. Complete qualification through to interview scheduling (Google Calendar event created).
+4. Verify confirmation message and calendar invite.
+5. Check Railway logs for `conversation_engine_reply_sent`.
+
+**Advisory:** Set `META_APP_SECRET` on Railway so webhook signatures are validated (currently skipped with warning).
+
+See [Current_System_State.md](../00-executive/Current_System_State.md) for open post-launch items.
+
 See [Sprint-11.4-Implementation-Plan.md](./Sprint-11.4-Implementation-Plan.md) and [Roadmap.md](../00-executive/Roadmap.md).
