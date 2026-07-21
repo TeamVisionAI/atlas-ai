@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — Use Cases Step 1 vs Step 2 (DOC-0701 v2.1, DOC-0702 v1.2)
+
+**Date:** 2026-07-21
+
+Meta Use Cases UI separates **Step 1 (Testing)** — auto test environment, no WABA selection — from **Step 2 (Production setup)** — expected location for Niovel Perez WABA and **786-752-8080** migration.
+
+---
+
 ## Documentation — Meta Use Cases Developer UI (DOC-0701 v2.0, DOC-0702 v1.1)
 
 **Date:** 2026-07-21

@@ -122,13 +122,13 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 | **Meta-generated Test WABA** | **Disabled** — do not use for Cloud API onboarding |
 | **Not caused by** | Atlas backend, Railway, webhook implementation, or Business Portfolio restrictions |
 | **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account |
-| **Required before retry** | **Use cases** → WhatsApp configuration on existing Atlas app — select Niovel Perez WABA; **no new Developer App** |
+| **Required before retry** | **Use cases → Step 2 (Production setup)** — not Step 1 (Testing); select Niovel Perez WABA |
 
 **Final production decision approved (2026-07-21):** **786-752-8080** is the **dedicated Atlas AI production number**. Existing WhatsApp Business App history on **8080** does **not** need to be preserved. **Ana Perez / 786-296-7254** remains **independent** to avoid operational risk. **Authorized to proceed** with Cloud API migration on the **Niovel Perez WABA**. See [final decision](../deployment/sprint-11.4-meta-production.md#final-production-decision-approved-2026-07-21) (DOC-0701 v1.9).
 
 **Production architecture approved (2026-07-21):** **+1 786-752-8080** (Niovel Perez WABA) is the **Atlas AI production number** — designated for WhatsApp Cloud API migration. Atlas owns this channel for automation, AI conversations, interview scheduling, and future integrations. **Ana Perez / 786-296-7254** remains **unchanged** to protect day-to-day business operations — out of scope for Atlas. See [production architecture](../deployment/sprint-11.4-meta-production.md#production-architecture-approved-2026-07-21) (DOC-0701 v1.8).
 
-**Meta Developer UI (2026-07-21):** WhatsApp Cloud API is configured through **Use cases** — not the legacy standalone **WhatsApp** product menu. See [Use Cases UI](../deployment/sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21) (DOC-0701 v2.0).
+**Meta Developer UI (2026-07-21):** Use Cases separates **Step 1 (Testing)** — auto test environment, **no WABA picker** — from **Step 2 (Production setup)** — expected path for **Niovel Perez** / **786-752-8080**. See [Testing vs production](../deployment/sprint-11.4-meta-production.md#testing-vs-production--two-step-use-cases-flow) (DOC-0701 v2.1).
 
 **Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through the WhatsApp use case in **Use cases**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only.
 

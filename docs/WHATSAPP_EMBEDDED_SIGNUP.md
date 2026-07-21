@@ -43,7 +43,7 @@ Copy `.env.example` → `.env` and fill values.
 ## 2. Where to obtain the Configuration ID
 
 1. Open [Meta for Developers](https://developers.facebook.com/) → your Atlas app.
-2. **WhatsApp Cloud API (Use cases):** Configure via **Use cases** → WhatsApp use case — **not** the legacy standalone **WhatsApp** product menu. See [Use Cases UI](./deployment/sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21).
+2. **WhatsApp Cloud API (Use cases):** Production migration via **Step 2 (Production setup)** — **not Step 1 (Testing)** (no WABA picker). See [Testing vs production](./deployment/sprint-11.4-meta-production.md#testing-vs-production--two-step-use-cases-flow).
 3. **Embedded Signup Configuration ID:** Go to **Facebook Login for Business** → **Configurations** (Embedded Signup Builder).
 4. Create or select a configuration for **WhatsApp Business App onboarding**.
 5. Set feature type: **`whatsapp_business_app_onboarding`** (do **not** pass `extras.version`).

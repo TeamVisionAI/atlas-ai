@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0702 |
 | **Title** | WhatsApp Cloud API Migration Checklist |
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Status** | Active |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -55,15 +55,18 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
   - [ ] Meta-generated **Test WABA** — **disabled** — do not use
 - [ ] Confirm Team Vision Financial Business Portfolio is healthy (Business Home loads)
 
-### Phase 2 — Associate WABA in Developer Console (Use cases UI)
+### Phase 2 — Step 2: Production setup (Use cases UI)
 
-> **Navigation:** App → **Use cases** → WhatsApp use case — **not** the deprecated standalone **WhatsApp** product menu. See [Use Cases UI](./sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21).
+> **Navigation:** App → **Use cases** → WhatsApp use case → **Step 2: Production setup**.  
+> **Do not use Step 1 (Testing)** for production — Step 1 is Meta's auto-generated test environment with **no WABA selection**. See [Use Cases UI — Testing vs production](./sprint-11.4-meta-production.md#testing-vs-production--two-step-use-cases-flow).
 
 - [ ] Open [Meta for Developers](https://developers.facebook.com/) → **existing Atlas app**
 - [ ] Navigate to **Use cases** → WhatsApp / WhatsApp Business Platform use case
+- [ ] **Skip Step 1 (Testing)** for Atlas production migration (optional sandbox only)
+- [ ] Open **Step 2 (Production setup)** — expected location for WABA and phone migration
 - [ ] **Select Niovel Perez WABA** (786-752-8080) — reject Test WABA if auto-selected
-- [ ] Complete Cloud API configuration for **786-752-8080**
-- [ ] Confirm valid **`phone_number_id`** appears for **8080** in the use case settings
+- [ ] Complete production Cloud API configuration for **786-752-8080**
+- [ ] Confirm valid **`phone_number_id`** appears for **8080** in Step 2 settings
 - [ ] Grant Atlas app access to Niovel Perez WABA in Business Settings if prompted
 
 ### Phase 3 — Migrate 786-752-8080 to Cloud API
@@ -167,11 +170,11 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 | Webhook verify fails | Confirm `VERIFY_TOKEN` matches Meta; Railway URL is HTTPS and reachable |
 | Inbound works, no Atlas reply | Confirm Sprint 11.4 Phase A on `main`; check `conversation_engine_invoked` logs |
 | `mvp_ready: false` | Run `GET /health/production`; fix Supabase, WhatsApp credentials, or Google Calendar gaps |
-| Wrong WABA selected | **Use cases** → WhatsApp config → switch to **Niovel Perez** only |
-| Legacy Meta doc shows WhatsApp product menu | Use [Use Cases UI](./sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21) path instead |
+| Cannot find WABA picker | You may be in **Step 1 (Testing)** — proceed to **Step 2 (Production setup)** ([DOC-0701](./sprint-11.4-meta-production.md#testing-vs-production--two-step-use-cases-flow)) |
+| Wrong WABA selected | **Step 2 (Production setup)** → switch to **Niovel Perez** only |
 
 ---
 
 ## One-line summary
 
-> **Migrate 786-752-8080 via Niovel Perez WABA using Meta Use cases UI: verify WABA → configure use case → update Atlas env → verify webhook → test inbound/outbound → record all IDs.**
+> **Step 2 (Production setup) — not Step 1 (Testing) — is where 786-752-8080 and Niovel Perez WABA are configured for Atlas production.**
