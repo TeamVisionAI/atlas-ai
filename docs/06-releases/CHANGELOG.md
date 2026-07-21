@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — Meta wabaID null error (DOC-0701 v2.5, DOC-0702 v1.6)
+
+**Date:** 2026-07-21
+
+Production Setup failed before SMS verification with **`Unexpected null value for wabaID`**. Meta UI failed to resolve target WABA for **786-752-8080** registration. Not Atlas or phone number issue — Meta configuration/UI problem before phone migration.
+
+---
+
 ## Documentation — Phone registration pause gate (DOC-0701 v2.4, DOC-0702 v1.5)
 
 **Date:** 2026-07-21

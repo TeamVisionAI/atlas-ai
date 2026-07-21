@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 2.4 |
+| **Version** | 2.5 |
 | **Status** | Approved (final production decision) |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -89,27 +89,50 @@ The Use Cases WhatsApp interface **separates testing from production**. Do **not
 
 Atlas ops reached Meta's **Production Setup** page inside **Step 2 (Production setup)**.
 
-#### Current status (Production Setup — registration initiated 2026-07-21)
+#### Current status (Production Setup — wabaID error 2026-07-21)
 
 | Field | Status |
 |-------|--------|
-| **Production phone registration** | 🟡 **Initiated** — **786-752-8080** (Atlas AI production number) |
-| **Production phone on Atlas Developer App** | 🟡 **Pending verification** — not fully attached until code entered and registration completes |
-| **Phone migration complete?** | ❌ **No** — awaiting verification code and `phone_number_id` |
-| **Current pause point** | **Before verification code entry** — review all migration warnings first |
-| **Next action after review** | Enter verification code → complete registration → record IDs |
+| **Production phone registration** | ❌ **Failed** — before SMS verification |
+| **Meta error** | **`Unexpected null value for wabaID`** (internal Meta UI error) |
+| **Root cause (UI)** | Meta Production Setup **failed to resolve** the target **WhatsApp Business Account (WABA)** for phone registration |
+| **SMS verification reached?** | ❌ **No** — error occurred **before** verification code step |
+| **Phone migration complete?** | ❌ **No** — **786-752-8080** not migrated to Cloud API via this app |
+| **Atlas backend involved?** | ❌ **No** — failure is **Meta configuration / UI**, not Atlas or the phone number |
+| **Next action** | Resolve WABA binding in Meta (Step 2 / Business Settings) before retrying **Add phone number** |
 
-> **Rule:** **Registration initiated ≠ migration complete. Pause at verification code until warnings reviewed and confirmation screens captured.**
+> **Rule:** **`wabaID` null = Meta did not attach a WABA to the registration flow. Fix WABA selection in Meta — not Atlas env or Railway.**
 
-| UI element | Location | Notes |
-|------------|----------|-------|
-| **Add phone number flow** | Step 2 (Production setup) | Registration **initiated** for **786-752-8080** |
-| **Migration warnings / confirmations** | Screens before verification code | **Review and capture** — do not skip |
-| **Verification code entry** | Final step of phone registration | ⏸️ **PAUSED** — do not enter until review complete |
+#### Incident: `Unexpected null value for wabaID` (2026-07-21)
 
-#### Verification code pause gate
+During **Add phone number** for **786-752-8080** in Step 2 Production Setup, Meta returned an internal error **before SMS verification**:
 
-**Do not enter the verification code** until:
+| Finding | Detail |
+|---------|--------|
+| **Error message** | `Unexpected null value for wabaID` |
+| **When** | Production Setup — after registration initiated, **before** verification code / SMS step |
+| **Meaning** | Meta UI could not resolve the **target WABA** for phone registration — `wabaID` was **null** in Meta's internal flow |
+| **Not caused by** | Atlas backend, Railway, webhook code, **786-752-8080** number validity, or SMS delivery |
+| **Classification** | **Meta configuration / UI problem** — WABA not bound or not passed to registration API |
+| **Expected WABA** | **Niovel Perez** → **786-752-8080** (Approved) |
+
+**Corrective action (Meta-side):**
+
+1. Confirm **Niovel Perez WABA ID** in Business settings → Accounts → WhatsApp accounts.
+2. In **Use cases → Step 2 (Production setup)**, verify WABA is **explicitly selected** before **Add phone number** — UI may have skipped WABA resolution (related to [Step 1 vs Step 2](#testing-vs-production--two-step-use-cases-flow) and disabled Test WABA auto-selection issues).
+3. Confirm Atlas Meta app has **permissions** on the Niovel Perez WABA in Business Settings.
+4. Retry **Add phone number** only after WABA shows as selected/bound in Step 2 UI — capture [confirmation screens](#confirmation-screen-log-deployment-record) on retry.
+5. If error persists, contact Meta Support citing **`wabaID` null**, WABA ID for **Niovel Perez**, and Atlas App ID.
+
+**Do not:**
+
+- Change Atlas `WHATSAPP_*` env vars expecting a fix (no `phone_number_id` exists yet)
+- Redeploy Railway or rerun Atlas verification scripts as the primary fix
+- Assume **786-752-8080** or the phone number format caused the error
+
+#### Verification code pause gate (superseded by wabaID failure — retain for retry)
+
+When registration reaches the verification code step on **retry**, apply this gate before entering SMS code:
 
 1. **All migration warnings** shown by Meta are read and understood (e.g. number transfer, WhatsApp Business App impact, messaging downtime).
 2. **All implications** are reviewed against [approved architecture](#production-architecture-approved-2026-07-21) and [final decision](#final-production-decision-approved-2026-07-21) (8080 = Atlas; 7254 independent; history not required).
@@ -128,8 +151,8 @@ Capture **every** confirmation, warning, and summary screen during **Add phone n
 | 2 | Phone number entry | **786-752-8080** entered | ☐ | | |
 | 3 | Migration warning(s) | _paste or summarize Meta warnings_ | ☐ | | Review before proceeding |
 | 4 | Confirmation / accept terms | _record user confirmations required_ | ☐ | | |
-| 5 | Verification code prompt | Code **not yet entered** (paused) | ☐ | | ⏸️ **STOP HERE until rows 1–4 complete** |
-| 6 | Registration complete | `phone_number_id` visible | ☐ | | _after code entered_ |
+| 5 | Verification code prompt | _not reached — failed with wabaID null_ | ☐ | 2026-07-21 | Error before SMS step |
+| 6 | Registration complete | `phone_number_id` visible | ☐ | | _blocked by wabaID error_ |
 
 **Before starting Add phone number:** Complete WABA and migration option review — **document before submitting registration**.
 
@@ -137,8 +160,8 @@ Capture **every** confirmation, warning, and summary screen during **Add phone n
 
 | Field | Record before registering |
 |-------|---------------------------|
-| **Production phone currently on app** | 🟡 **Registration initiated** — **786-752-8080** pending verification (2026-07-21) |
-| **Readiness vs migration** | Registration **in progress** — **not complete** until verification + `phone_number_id` |
+| **Production phone currently on app** | ❌ **Not attached** — registration **failed** (`wabaID` null) before verification |
+| **Readiness vs migration** | Registration **attempted** — **failed** at Meta WABA resolution; migration **not started** |
 | **WABA options shown in Step 2** | e.g. Niovel Perez, Ana Perez, Test WABA — list all visible at **Add phone number** |
 | **WABA selected / intended** | **Niovel Perez** → **786-752-8080** |
 | **WABAs rejected** | Test WABA (disabled); Ana Perez (**786-296-7254** — out of scope) |
@@ -146,8 +169,8 @@ Capture **every** confirmation, warning, and summary screen during **Add phone n
 | **Migration option chosen** | _pending — record after review_ |
 | **Chat history impact** | Not required to preserve (per [final decision](#final-production-decision-approved-2026-07-21)) |
 | **Reviewed by / date** | _pending_ |
-| **Approved to Add phone number** | ✅ **Initiated** (2026-07-21) — **786-752-8080** |
-| **Approved to enter verification code** | ☐ **No** — pause until warnings reviewed and [confirmation screens captured](#confirmation-screen-log-deployment-record) |
+| **Approved to Add phone number** | ❌ **Failed** (2026-07-21) — `Unexpected null value for wabaID` |
+| **Approved to enter verification code** | ☐ **N/A** — verification step **not reached** |
 
 > **Rule:** **Review and document WABA selection and migration options before clicking Add phone number. Pause before verification code.**
 
@@ -157,7 +180,7 @@ Capture **every** confirmation, warning, and summary screen during **Add phone n
 
 - **Avoid** older Meta documentation, tutorials, and screenshots that show a dedicated **WhatsApp** product entry in the Developer Console left navigation.
 - **Still valid:** Official Meta **API** documentation ([Cloud API Get Started](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started), [Webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks), [Business Management API](https://developers.facebook.com/docs/whatsapp/business-management-api)) — these describe **API behavior and credentials**, not the current console navigation.
-- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.4).
+- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.5).
 - **Do not confuse Step 1 (Testing)** with production migration — Step 1 has no WABA picker; production WABA selection belongs in **Step 2**.
 - If use-case labels differ in your account, consult Meta AI with the [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment) question and confirm against the live UI before changing production bindings.
 
@@ -385,11 +408,10 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 - [ ] **Do not delete unused WABAs** during migration
 - [x] **Consult Meta AI** — WABA reassignment procedure confirmed (see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment))
 - [x] **Record Meta AI guidance** — existing Approved WABA associable via **WhatsApp → API Setup**; no new Developer App required
-- [x] **Production Setup page reached** — readiness complete ([status](#current-status-production-setup--registration-initiated-2026-07-21))
-- [x] **Add phone number initiated** — **786-752-8080** registration started; **paused before verification code**
-- [ ] **Migration warnings reviewed** — all implications documented; [confirmation screens captured](#confirmation-screen-log-deployment-record)
-- [ ] **Enter verification code** — only after review and screen capture approved
-- [ ] **Registration complete** — `phone_number_id` recorded for **786-752-8080**
+- [x] **Production Setup page reached** — readiness complete
+- [x] **Add phone number attempted** — **786-752-8080** — **failed** with `Unexpected null value for wabaID` ([incident](#incident-unexpected-null-value-for-wabaid-2026-07-21))
+- [ ] **Resolve WABA binding in Meta** — Niovel Perez WABA must resolve in Step 2 before retry
+- [ ] **Retry Add phone number** — after WABA confirmed; capture [confirmation screens](#confirmation-screen-log-deployment-record)
 - [ ] **Explicitly select intended production WABA** — do not rely on Meta auto-selection
 - [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using the disabled **Meta-generated Test WABA**
 - [ ] **Confirm target WABA is Niovel Perez** — **786-752-8080** only; do not select Ana Perez (**786-296-7254**) or Test WABA
@@ -574,6 +596,21 @@ This matches the Sprint 11.4 root cause for Team Vision Financial:
 3. Meta Cloud API onboarding still fails because Meta **auto-selected a disabled Test WABA**.
 4. **Fix:** In **Use cases → Step 2 (Production setup)** on the **existing Atlas app**, select **Niovel Perez** / **786-752-8080** — do not use Step 1 (Testing) for WABA selection.
 
+### Symptom: `Unexpected null value for wabaID`
+
+Meta Production Setup failed **before SMS verification** with internal error **`Unexpected null value for wabaID`**. The UI did not resolve the target WABA for phone registration.
+
+| Check | Action |
+|-------|--------|
+| WABA not selected in Step 2 | Explicitly select **Niovel Perez** WABA before **Add phone number** |
+| App lacks WABA access | Business Settings → WhatsApp accounts → grant Atlas app access to Niovel Perez WABA |
+| Test WABA auto-selected | Reject disabled Test WABA; confirm **Niovel Perez** WABA ID is non-null in UI |
+| Error persists | Meta Support — cite `wabaID` null, Niovel Perez WABA ID, Atlas App ID |
+
+**Not the fix:** Atlas Railway redeploy, `WHATSAPP_*` env rotation, or phone number format changes — no `phone_number_id` exists yet; this is **Meta-side WABA resolution**.
+
+See [incident: wabaID null](#incident-unexpected-null-value-for-wabaid-2026-07-21).
+
 ### Symptom: Registration initiated but migration not live
 
 Phone registration for **786-752-8080** may be **in progress** — Meta shows a **verification code** prompt. **Do not enter the code** until [migration warnings are reviewed](#verification-code-pause-gate) and [confirmation screens are captured](#confirmation-screen-log-deployment-record). Migration is complete only when `phone_number_id` is recorded.
@@ -660,9 +697,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **Production Setup workflow reached (v2.2):** Phone registration under collapsed **Register your WhatsApp phone number** in Step 2; **do not register** until WABA selection and migration options reviewed and documented |
 | 2026-07-21 | **Production Setup status confirmed (v2.3):** **No production phone** on Atlas Developer App; completed Step 2 task = **readiness for registration only** — not migration complete; **next:** **Add phone number** (select Niovel Perez WABA + **786-752-8080**) |
 | 2026-07-21 | **Phone registration initiated (v2.4):** **786-752-8080** registration started for Atlas AI; **paused before verification code** — review migration warnings and capture all confirmation screens before entering code |
+| 2026-07-21 | **Production Setup failed (v2.5):** Meta internal error **`Unexpected null value for wabaID`** before SMS verification — UI failed to resolve target WABA; **not** Atlas or phone number issue; occurred before phone migration |
 
 ---
 
 ## One-line summary
 
-> **786-752-8080 registration initiated — PAUSED before verification code. Review warnings, capture confirmation screens, then enter code.**
+> **Production Setup failed: Unexpected null value for wabaID — Meta UI did not resolve Niovel Perez WABA before SMS. Not Atlas. Fix WABA binding in Meta, then retry Add phone number.**

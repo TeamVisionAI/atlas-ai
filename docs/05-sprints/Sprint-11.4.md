@@ -128,7 +128,7 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **Production architecture approved (2026-07-21):** **+1 786-752-8080** (Niovel Perez WABA) is the **Atlas AI production number** — designated for WhatsApp Cloud API migration. Atlas owns this channel for automation, AI conversations, interview scheduling, and future integrations. **Ana Perez / 786-296-7254** remains **unchanged** to protect day-to-day business operations — out of scope for Atlas. See [production architecture](../deployment/sprint-11.4-meta-production.md#production-architecture-approved-2026-07-21) (DOC-0701 v1.8).
 
-**Phone registration (2026-07-21):** **786-752-8080** registration **initiated** — **PAUSED before verification code**. Review migration warnings; capture all [confirmation screens](../deployment/sprint-11.4-meta-production.md#confirmation-screen-log-deployment-record). See [status](../deployment/sprint-11.4-meta-production.md#current-status-production-setup--registration-initiated-2026-07-21) (DOC-0701 v2.4).
+**Production Setup failure (2026-07-21):** **Add phone number** for **786-752-8080** failed with Meta error **`Unexpected null value for wabaID`** — before SMS verification, before migration. Meta UI did not resolve **Niovel Perez WABA** — **not** an Atlas or phone number issue. See [wabaID incident](../deployment/sprint-11.4-meta-production.md#incident-unexpected-null-value-for-wabaid-2026-07-21) (DOC-0701 v2.5).
 
 **Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through the WhatsApp use case in **Use cases**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only.
 
