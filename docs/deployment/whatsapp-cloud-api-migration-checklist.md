@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0702 |
 | **Title** | WhatsApp Cloud API Migration Checklist |
-| **Version** | 1.4 |
+| **Version** | 1.5 |
 | **Status** | Active |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -59,31 +59,34 @@ Step-by-step checklist to migrate **+1 786-752-8080** to WhatsApp Cloud API for 
 
 > **Navigation:** App → **Use cases** → WhatsApp use case → **Step 2: Production setup**.  
 > **Do not use Step 1 (Testing)** for production — Step 1 has **no WABA selection**.  
-> **Status (2026-07-21):** Production Setup confirms **no production phone** on Atlas app — completed task = **readiness only**. Next: **Add phone number**. See [current status](./sprint-11.4-meta-production.md#current-status-production-setup-page-confirmed).
+> **Status (2026-07-21):** Registration **initiated** for **786-752-8080** — **PAUSED before verification code**. See [registration status](./sprint-11.4-meta-production.md#current-status-production-setup--registration-initiated-2026-07-21).
 
 - [x] Open [Meta for Developers](https://developers.facebook.com/) → **existing Atlas app**
 - [x] Navigate to **Use cases** → WhatsApp use case → **Step 2 (Production setup)**
-- [x] Confirm **no production phone number** attached to app (readiness ≠ migration)
-- [ ] **Skip Step 1 (Testing)** for Atlas production migration
+- [x] Confirm readiness complete; **Add phone number** initiated for **786-752-8080**
 
-#### Phase 2a — WABA and migration review (required before Add phone number)
+#### Phase 2a — WABA and migration review
 
-> **Gate:** Do **not** click **Add phone number** until this subsection is complete and documented.
-
-- [ ] Review all WABA options that will appear in **Add phone number** flow
-- [ ] Confirm **Niovel Perez** (**786-752-8080**) is intended selection
-- [ ] Confirm **Ana Perez** (**786-296-7254**) and **Test WABA** are **not** selected
-- [ ] Review and document **migration options** in Add phone number UI
+- [ ] Review WABA and migration options shown during registration flow
 - [ ] Record findings in [WABA review table](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-add-phone-number) (DOC-0701)
-- [ ] **Approved to Add phone number** — only after review documented
 
-#### Phase 2b — Add phone number (migration starts — not complete until IDs recorded)
+#### Phase 2b — Add phone number (initiated)
 
-- [ ] Click **Add phone number** in Step 2 Production Setup
-- [ ] Select **Niovel Perez WABA** and business phone **786-752-8080**
-- [ ] Complete registration (may include **Register your WhatsApp phone number** sub-flow)
-- [ ] Confirm valid **`phone_number_id`** appears for **8080**
-- [ ] Grant Atlas app access to Niovel Perez WABA in Business Settings if prompted
+- [x] Click **Add phone number** — **786-752-8080** registration **started**
+- [ ] Select **Niovel Perez WABA** confirmed in flow
+- [ ] All pre-verification steps completed up to code prompt
+
+#### Phase 2c — Verification code pause gate ⏸️
+
+> **STOP:** Do **not** enter verification code until migration warnings reviewed and every confirmation screen captured.
+
+- [ ] Read and document **all migration warnings** and implications
+- [ ] Capture **every confirmation screen** — [confirmation screen log](./sprint-11.4-meta-production.md#confirmation-screen-log-deployment-record)
+- [ ] Confirm WABA = **Niovel Perez** (not Test WABA or Ana Perez **786-296-7254**)
+- [ ] **Approved to enter verification code**
+- [ ] Enter verification code and complete registration
+- [ ] Confirm valid **`phone_number_id`** for **8080**
+- [ ] Grant Atlas app WABA access in Business Settings if prompted
 
 ### Phase 3 — Migrate 786-752-8080 to Cloud API
 
@@ -186,7 +189,7 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 | Webhook verify fails | Confirm `VERIFY_TOKEN` matches Meta; Railway URL is HTTPS and reachable |
 | Inbound works, no Atlas reply | Confirm Sprint 11.4 Phase A on `main`; check `conversation_engine_invoked` logs |
 | `mvp_ready: false` | Run `GET /health/production`; fix Supabase, WhatsApp credentials, or Google Calendar gaps |
-| Readiness complete but no phone | **Expected** — migration starts at **Add phone number** ([status](./sprint-11.4-meta-production.md#current-status-production-setup-page-confirmed)) |
+| Registration paused at verification | **Expected** — review warnings and [capture screens](./sprint-11.4-meta-production.md#confirmation-screen-log-deployment-record) before entering code |
 | Cannot find phone registration | Use **Add phone number** in Step 2 — after [WABA review](./sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-add-phone-number) |
 | Cannot find WABA picker | You may be in **Step 1 (Testing)** — proceed to **Step 2 (Production setup)** |
 | Wrong WABA selected | **Step 2 (Production setup)** → switch to **Niovel Perez** only |
@@ -195,4 +198,4 @@ Record all IDs in a secure internal vault (1Password, Railway env notes, or ops 
 
 ## One-line summary
 
-> **No phone on app. Readiness done. Next: Add phone number (Niovel Perez + 786-752-8080) after WABA review.**
+> **786-752-8080 registration initiated — PAUSED at verification code. Capture confirmation screens before proceeding.**

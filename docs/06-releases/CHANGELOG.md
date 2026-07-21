@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — Phone registration pause gate (DOC-0701 v2.4, DOC-0702 v1.5)
+
+**Date:** 2026-07-21
+
+Initiated production phone registration for **786-752-8080**. Paused before verification code until migration warnings reviewed. Added confirmation screen capture log for deployment record.
+
+---
+
 ## Documentation — Production Setup status: readiness not migration (DOC-0701 v2.3, DOC-0702 v1.4)
 
 **Date:** 2026-07-21

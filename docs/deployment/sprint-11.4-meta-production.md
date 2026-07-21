@@ -6,7 +6,7 @@
 |-------|-------|
 | **Document ID** | DOC-0701 |
 | **Title** | Sprint 11.4 Meta WhatsApp Cloud API Production |
-| **Version** | 2.3 |
+| **Version** | 2.4 |
 | **Status** | Approved (final production decision) |
 | **Owner** | Atlas Development Team |
 | **Last Updated** | 2026-07-21 |
@@ -89,22 +89,47 @@ The Use Cases WhatsApp interface **separates testing from production**. Do **not
 
 Atlas ops reached Meta's **Production Setup** page inside **Step 2 (Production setup)**.
 
-#### Current status (Production Setup page confirmed)
+#### Current status (Production Setup — registration initiated 2026-07-21)
 
 | Field | Status |
 |-------|--------|
-| **Production phone on Atlas Developer App** | ❌ **None attached** — no production number currently bound to the app |
-| **Completed Meta task(s) in Step 2** | ✅ **Readiness for registration** — **not** phone migration complete |
-| **Phone migration complete?** | ❌ **No** — **786-752-8080** not yet registered on Cloud API via this app |
-| **Next workflow action** | **Add phone number** — select production **WABA** and business phone (**Niovel Perez** / **786-752-8080**) |
+| **Production phone registration** | 🟡 **Initiated** — **786-752-8080** (Atlas AI production number) |
+| **Production phone on Atlas Developer App** | 🟡 **Pending verification** — not fully attached until code entered and registration completes |
+| **Phone migration complete?** | ❌ **No** — awaiting verification code and `phone_number_id` |
+| **Current pause point** | **Before verification code entry** — review all migration warnings first |
+| **Next action after review** | Enter verification code → complete registration → record IDs |
 
-> **Rule:** **Completing Production Setup readiness tasks ≠ migrating 786-752-8080. Migration completes only after "Add phone number" succeeds and `phone_number_id` is recorded.**
+> **Rule:** **Registration initiated ≠ migration complete. Pause at verification code until warnings reviewed and confirmation screens captured.**
 
 | UI element | Location | Notes |
 |------------|----------|-------|
-| **Completed readiness tasks** | Step 2 (Production setup) | Prepare app for production — **does not attach a phone** |
-| **Add phone number** | Step 2 — **next workflow entry point** | Select production **WABA** + business phone (**786-752-8080**) |
-| **Register your WhatsApp phone number** | Step 2 — may appear as collapsed section or within **Add phone number** flow | Production registration for **786-752-8080** |
+| **Add phone number flow** | Step 2 (Production setup) | Registration **initiated** for **786-752-8080** |
+| **Migration warnings / confirmations** | Screens before verification code | **Review and capture** — do not skip |
+| **Verification code entry** | Final step of phone registration | ⏸️ **PAUSED** — do not enter until review complete |
+
+#### Verification code pause gate
+
+**Do not enter the verification code** until:
+
+1. **All migration warnings** shown by Meta are read and understood (e.g. number transfer, WhatsApp Business App impact, messaging downtime).
+2. **All implications** are reviewed against [approved architecture](#production-architecture-approved-2026-07-21) and [final decision](#final-production-decision-approved-2026-07-21) (8080 = Atlas; 7254 independent; history not required).
+3. **Every confirmation screen** is captured for the deployment record (see [confirmation screen log](#confirmation-screen-log-deployment-record) below).
+4. WABA selection in the flow is confirmed as **Niovel Perez** — not Test WABA or Ana Perez.
+
+> **Rule:** **Pause before verification code. Capture every confirmation screen. Then enter code.**
+
+#### Confirmation screen log (deployment record)
+
+Capture **every** confirmation, warning, and summary screen during **Add phone number** for **786-752-8080**. Store in secure ops vault or `docs/deployment/records/` (screenshots — **do not commit secrets or verification codes to git**).
+
+| # | Screen / step | Warnings or confirmations shown | Screenshot captured | Date | Notes |
+|---|---------------|--------------------------------|---------------------|------|-------|
+| 1 | WABA selection | _record WABA chosen_ | ☐ | | Must show **Niovel Perez** |
+| 2 | Phone number entry | **786-752-8080** entered | ☐ | | |
+| 3 | Migration warning(s) | _paste or summarize Meta warnings_ | ☐ | | Review before proceeding |
+| 4 | Confirmation / accept terms | _record user confirmations required_ | ☐ | | |
+| 5 | Verification code prompt | Code **not yet entered** (paused) | ☐ | | ⏸️ **STOP HERE until rows 1–4 complete** |
+| 6 | Registration complete | `phone_number_id` visible | ☐ | | _after code entered_ |
 
 **Before starting Add phone number:** Complete WABA and migration option review — **document before submitting registration**.
 
@@ -112,8 +137,8 @@ Atlas ops reached Meta's **Production Setup** page inside **Step 2 (Production s
 
 | Field | Record before registering |
 |-------|---------------------------|
-| **Production phone currently on app** | ✅ **Confirmed none** (2026-07-21) |
-| **Readiness vs migration** | Readiness complete; **migration not started** |
+| **Production phone currently on app** | 🟡 **Registration initiated** — **786-752-8080** pending verification (2026-07-21) |
+| **Readiness vs migration** | Registration **in progress** — **not complete** until verification + `phone_number_id` |
 | **WABA options shown in Step 2** | e.g. Niovel Perez, Ana Perez, Test WABA — list all visible at **Add phone number** |
 | **WABA selected / intended** | **Niovel Perez** → **786-752-8080** |
 | **WABAs rejected** | Test WABA (disabled); Ana Perez (**786-296-7254** — out of scope) |
@@ -121,15 +146,18 @@ Atlas ops reached Meta's **Production Setup** page inside **Step 2 (Production s
 | **Migration option chosen** | _pending — record after review_ |
 | **Chat history impact** | Not required to preserve (per [final decision](#final-production-decision-approved-2026-07-21)) |
 | **Reviewed by / date** | _pending_ |
-| **Approved to Add phone number** | ☐ **No** — complete review first |
+| **Approved to Add phone number** | ✅ **Initiated** (2026-07-21) — **786-752-8080** |
+| **Approved to enter verification code** | ☐ **No** — pause until warnings reviewed and [confirmation screens captured](#confirmation-screen-log-deployment-record) |
 
-> **Rule:** **Review and document WABA selection and migration options before clicking Add phone number.**
+> **Rule:** **Review and document WABA selection and migration options before clicking Add phone number. Pause before verification code.**
 
 ---
 
-### Documentation caveat — do not rely on legacy Meta UI docs, tutorials, and screenshots that show a dedicated **WhatsApp** product entry in the Developer Console left navigation.
+### Documentation caveat — do not rely on legacy Meta UI docs
+
+- **Avoid** older Meta documentation, tutorials, and screenshots that show a dedicated **WhatsApp** product entry in the Developer Console left navigation.
 - **Still valid:** Official Meta **API** documentation ([Cloud API Get Started](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started), [Webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks), [Business Management API](https://developers.facebook.com/docs/whatsapp/business-management-api)) — these describe **API behavior and credentials**, not the current console navigation.
-- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.3).
+- **Authoritative for navigation:** Live Meta Developer Console **Use cases** UI (Step 1 Testing vs **Step 2 Production setup**), Meta AI in the Developers portal, and this document (DOC-0701 v2.4).
 - **Do not confuse Step 1 (Testing)** with production migration — Step 1 has no WABA picker; production WABA selection belongs in **Step 2**.
 - If use-case labels differ in your account, consult Meta AI with the [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment) question and confirm against the live UI before changing production bindings.
 
@@ -313,7 +341,8 @@ These approved production accounts are eligible for Cloud API connection. Do **n
 - Re-submit Business Verification solely because of this WABA error (portfolio already appears healthy)
 - Assume Facebook/Instagram ad delivery is blocked (portfolio advertising restrictions were not found)
 - **Modify Ana Perez WABA or 786-296-7254** — protected day-to-day business channel; out of scope for Atlas (see [production architecture](#production-architecture-approved-2026-07-21))
-- **Treat Production Setup readiness as migration complete** — readiness tasks do **not** attach **786-752-8080**; migration starts at **Add phone number**
+- **Enter verification code before reviewing migration warnings** — pause at verification prompt; capture all [confirmation screens](#confirmation-screen-log-deployment-record) first
+- **Treat Production Setup readiness as migration complete** — readiness tasks do **not** attach **786-752-8080**; migration completes after verification + `phone_number_id`
 - **Add phone number before WABA review** — complete [WABA/migration review](#waba-and-migration-review-complete-before-add-phone-number) first
 - **Use Step 1 (Testing) for production WABA selection** — Step 1 has no WABA picker; use **Step 2 (Production setup)** instead
 - **Use Meta's automatically created Test WABA** — select **Niovel Perez** (**786-752-8080**) in **Step 2 (Production setup)** instead
@@ -356,9 +385,11 @@ Complete **before** starting Meta WhatsApp Cloud API initialization or Embedded 
 - [ ] **Do not delete unused WABAs** during migration
 - [x] **Consult Meta AI** — WABA reassignment procedure confirmed (see [pre-change gate](#pre-change-gate-consult-meta-ai-before-waba-reassignment))
 - [x] **Record Meta AI guidance** — existing Approved WABA associable via **WhatsApp → API Setup**; no new Developer App required
-- [x] **Production Setup page reached** — **no production phone** currently on Atlas Developer App ([status](#current-status-production-setup-page-confirmed))
-- [ ] **Review WABA and migration options** — document before **Add phone number** ([review table](#waba-and-migration-review-complete-before-add-phone-number))
-- [ ] **Add phone number** — select **Niovel Perez** WABA and **786-752-8080** (migration starts here — not complete until `phone_number_id` recorded)
+- [x] **Production Setup page reached** — readiness complete ([status](#current-status-production-setup--registration-initiated-2026-07-21))
+- [x] **Add phone number initiated** — **786-752-8080** registration started; **paused before verification code**
+- [ ] **Migration warnings reviewed** — all implications documented; [confirmation screens captured](#confirmation-screen-log-deployment-record)
+- [ ] **Enter verification code** — only after review and screen capture approved
+- [ ] **Registration complete** — `phone_number_id` recorded for **786-752-8080**
 - [ ] **Explicitly select intended production WABA** — do not rely on Meta auto-selection
 - [ ] **Verify WABA selected by Meta** — confirm Meta is **not** using the disabled **Meta-generated Test WABA**
 - [ ] **Confirm target WABA is Niovel Perez** — **786-752-8080** only; do not select Ana Perez (**786-296-7254**) or Test WABA
@@ -543,6 +574,10 @@ This matches the Sprint 11.4 root cause for Team Vision Financial:
 3. Meta Cloud API onboarding still fails because Meta **auto-selected a disabled Test WABA**.
 4. **Fix:** In **Use cases → Step 2 (Production setup)** on the **existing Atlas app**, select **Niovel Perez** / **786-752-8080** — do not use Step 1 (Testing) for WABA selection.
 
+### Symptom: Registration initiated but migration not live
+
+Phone registration for **786-752-8080** may be **in progress** — Meta shows a **verification code** prompt. **Do not enter the code** until [migration warnings are reviewed](#verification-code-pause-gate) and [confirmation screens are captured](#confirmation-screen-log-deployment-record). Migration is complete only when `phone_number_id` is recorded.
+
 ### Symptom: Production Setup shows completed tasks but no messaging
 
 The Production Setup page may show **completed readiness tasks** while **no production phone is attached** to the Atlas Developer App. This is **expected** — readiness ≠ migration. Next step: **Add phone number** after [WABA review](#waba-and-migration-review-complete-before-add-phone-number).
@@ -624,9 +659,10 @@ This is an **Atlas pipeline** issue (distinct from WABA restriction):
 | 2026-07-21 | **Use Cases Step 1 vs Step 2 (v2.1):** Step 1 (Testing) = auto test environment, **no WABA selection**; Step 2 (Production setup) = **expected path** for Niovel Perez WABA and **786-752-8080** migration |
 | 2026-07-21 | **Production Setup workflow reached (v2.2):** Phone registration under collapsed **Register your WhatsApp phone number** in Step 2; **do not register** until WABA selection and migration options reviewed and documented |
 | 2026-07-21 | **Production Setup status confirmed (v2.3):** **No production phone** on Atlas Developer App; completed Step 2 task = **readiness for registration only** — not migration complete; **next:** **Add phone number** (select Niovel Perez WABA + **786-752-8080**) |
+| 2026-07-21 | **Phone registration initiated (v2.4):** **786-752-8080** registration started for Atlas AI; **paused before verification code** — review migration warnings and capture all confirmation screens before entering code |
 
 ---
 
 ## One-line summary
 
-> **No production phone on Atlas app yet. Readiness complete ≠ migration. Next: Add phone number (Niovel Perez WABA + 786-752-8080) after WABA review documented.**
+> **786-752-8080 registration initiated — PAUSED before verification code. Review warnings, capture confirmation screens, then enter code.**
