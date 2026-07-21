@@ -260,7 +260,7 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 ## Known open items (production blockers)
 
-1. **Meta WABA / Cloud API migration (Sprint 11.4)** — **Production Setup workflow reached** in Step 2. Phone registration under collapsed **Register your WhatsApp phone number**. **Blocked:** do not register until WABA/migration options reviewed and documented ([review gate](../deployment/sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-phone-registration), DOC-0701 v2.2). Follow [migration checklist](../deployment/whatsapp-cloud-api-migration-checklist.md) Phase 2a–2b.
+1. **Meta WABA / Cloud API migration (Sprint 11.4)** — Production Setup confirms **no production phone** on Atlas Developer App. Completed task = **readiness only** — **migration not started**. **Next:** **Add phone number** (Niovel Perez WABA + **786-752-8080**) after [WABA review](../deployment/sprint-11.4-meta-production.md#waba-and-migration-review-complete-before-add-phone-number) (DOC-0701 v2.3). Follow [migration checklist](../deployment/whatsapp-cloud-api-migration-checklist.md) Phase 2a–2b.
 2. **Live end-to-end smoke test** — Send WhatsApp to **+1 786-752-8080**; confirm Atlas reply → qualification → Google Calendar booking → confirmation. Required for production acceptance.
 3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
 4. **META_APP_SECRET on Railway** — Recommended for webhook signature validation (currently skipped with warning when unset).

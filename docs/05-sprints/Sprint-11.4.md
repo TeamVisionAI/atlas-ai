@@ -128,9 +128,7 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **Production architecture approved (2026-07-21):** **+1 786-752-8080** (Niovel Perez WABA) is the **Atlas AI production number** — designated for WhatsApp Cloud API migration. Atlas owns this channel for automation, AI conversations, interview scheduling, and future integrations. **Ana Perez / 786-296-7254** remains **unchanged** to protect day-to-day business operations — out of scope for Atlas. See [production architecture](../deployment/sprint-11.4-meta-production.md#production-architecture-approved-2026-07-21) (DOC-0701 v1.8).
 
-**Production Setup workflow (2026-07-21):** Reached Step 2. Phone registration is under collapsed **Register your WhatsApp phone number**. **Do not register** until WABA selection and migration options are reviewed and documented. See [Production Setup workflow](../deployment/sprint-11.4-meta-production.md#step-2--production-setup-workflow-reached-2026-07-21) (DOC-0701 v2.2).
-
-**Meta Developer UI:** Use Cases **Step 2 (Production setup)** — not Step 1 (Testing). See [Testing vs production](../deployment/sprint-11.4-meta-production.md#testing-vs-production--two-step-use-cases-flow).
+**Production Setup status (2026-07-21):** **No production phone** on Atlas Developer App. Completed Step 2 task = **readiness for registration only** — **not migration complete**. **Next:** **Add phone number** (Niovel Perez WABA + **786-752-8080**). See [current status](../deployment/sprint-11.4-meta-production.md#current-status-production-setup-page-confirmed) (DOC-0701 v2.3).
 
 **Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through the WhatsApp use case in **Use cases**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only.
 
