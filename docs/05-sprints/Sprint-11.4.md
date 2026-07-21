@@ -124,7 +124,9 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 | **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account |
 | **Required before retry** | **WhatsApp → API Setup** on existing Atlas app — select Approved production WABA; **no new Developer App** |
 
-**Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through **WhatsApp → API Setup**. No new Meta Developer App is required. Deployment must **prioritize selecting the correct Approved WABA** (**Niovel Perez** / **786-752-8080** for MVP) instead of Meta's automatically created Test WABA. See [major discovery](../deployment/sprint-11.4-meta-production.md#major-discovery--associate-existing-waba-via-api-setup-meta-confirmed-2026-07-21) (DOC-0701 v1.7).
+**Production architecture approved (2026-07-21):** **+1 786-752-8080** (Niovel Perez WABA) is the **Atlas AI production number** — designated for WhatsApp Cloud API migration. Atlas owns this channel for automation, AI conversations, interview scheduling, and future integrations. **Ana Perez / 786-296-7254** remains **unchanged** to protect day-to-day business operations — out of scope for Atlas. See [production architecture](../deployment/sprint-11.4-meta-production.md#production-architecture-approved-2026-07-21) (DOC-0701 v1.8).
+
+**Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through **WhatsApp → API Setup**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only. See [major discovery](../deployment/sprint-11.4-meta-production.md#major-discovery--associate-existing-waba-via-api-setup-meta-confirmed-2026-07-21) (DOC-0701 v1.7).
 
 **Action:** Follow the [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) and [confirmed procedure](../deployment/sprint-11.4-meta-production.md#confirmed-procedure-atlas-mvp) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
 
@@ -141,7 +143,7 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 **Readiness probe:** `GET https://atlas-ai-production-01de.up.railway.app/health/production`  
 When `mvpReady: true`, infrastructure is configured. Confirm with one real conversation:
 
-1. From a personal phone, send a WhatsApp message to the Team Vision business number.
+1. From a personal phone, send a WhatsApp message to **+1 786-752-8080** (Atlas AI production number).
 2. Confirm Atlas replies automatically within ~30 seconds.
 3. Complete qualification through to interview scheduling (Google Calendar event created).
 4. Verify confirmation message and calendar invite.

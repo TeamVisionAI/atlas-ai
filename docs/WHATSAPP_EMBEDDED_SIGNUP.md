@@ -36,7 +36,7 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 
 Copy `.env.example` → `.env` and fill values.
 
-> **Production troubleshooting (Sprint 11.4):** See [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md). **Major discovery:** Associate existing **Approved WABA** with **existing Atlas app** via **WhatsApp → API Setup** — no new Developer App. Select **Niovel Perez** (**786-752-8080**); do not use Meta's auto-created Test WABA. **Do not delete unused WABAs during migration.**
+> **Production architecture (Sprint 11.4):** **786-752-8080** = Atlas AI production number (Cloud API via Niovel Perez WABA). **786-296-7254** (Ana Perez) unchanged — out of scope. See [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md). Associate via **WhatsApp → API Setup** on existing Atlas app; do not use Test WABA.
 
 ---
 

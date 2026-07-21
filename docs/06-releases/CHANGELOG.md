@@ -29,6 +29,14 @@
 
 ---
 
+## Documentation — Sprint 11.4 production architecture approved (DOC-0701 v1.8)
+
+**Date:** 2026-07-21
+
+**786-752-8080** designated Atlas AI production number (Cloud API migration via Niovel Perez WABA). Atlas owns 8080 for automation, AI conversations, scheduling, and future integrations. **Ana Perez / 786-296-7254** unchanged to protect day-to-day business operations.
+
+---
+
 ## Documentation — Sprint 11.4 major discovery: API Setup WABA association (DOC-0701 v1.7)
 
 **Date:** 2026-07-21
