@@ -262,9 +262,8 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 1. **Google Calendar on Railway** — Set `GOOGLE_*` env vars; run `backend/scripts/generateRefreshToken.js` once locally. Without these, qualification completes but calendar events are not created in production.
 2. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
-3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
-4. **Contact form inbox** — Verify `contact@teamvisionfinancial.com` receives production submissions.
-5. **Placeholder Atlas pages** — Conversations, Appointments, Analytics remain UI shells (deferred post-launch).
+3. **Contact form inbox** — Verify `contact@teamvisionfinancial.com` receives production submissions.
+4. **Placeholder Atlas pages** — Conversations, Appointments, Analytics remain UI shells (deferred post-launch).
 
 **Check readiness anytime:** `curl https://atlas-ai-production-01de.up.railway.app/health/production`
 
