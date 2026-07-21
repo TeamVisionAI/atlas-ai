@@ -122,13 +122,15 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 | **Meta-generated Test WABA** | **Disabled** — do not use for Cloud API onboarding |
 | **Not caused by** | Atlas backend, Railway, webhook implementation, or Business Portfolio restrictions |
 | **Portfolio status** | Operational — Business Home loads with Team Vision Financial profile and ad account |
-| **Required before retry** | **WhatsApp → API Setup** on existing Atlas app — select Approved production WABA; **no new Developer App** |
+| **Required before retry** | **Use cases** → WhatsApp configuration on existing Atlas app — select Niovel Perez WABA; **no new Developer App** |
 
 **Final production decision approved (2026-07-21):** **786-752-8080** is the **dedicated Atlas AI production number**. Existing WhatsApp Business App history on **8080** does **not** need to be preserved. **Ana Perez / 786-296-7254** remains **independent** to avoid operational risk. **Authorized to proceed** with Cloud API migration on the **Niovel Perez WABA**. See [final decision](../deployment/sprint-11.4-meta-production.md#final-production-decision-approved-2026-07-21) (DOC-0701 v1.9).
 
 **Production architecture approved (2026-07-21):** **+1 786-752-8080** (Niovel Perez WABA) is the **Atlas AI production number** — designated for WhatsApp Cloud API migration. Atlas owns this channel for automation, AI conversations, interview scheduling, and future integrations. **Ana Perez / 786-296-7254** remains **unchanged** to protect day-to-day business operations — out of scope for Atlas. See [production architecture](../deployment/sprint-11.4-meta-production.md#production-architecture-approved-2026-07-21) (DOC-0701 v1.8).
 
-**Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through **WhatsApp → API Setup**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only. See [major discovery](../deployment/sprint-11.4-meta-production.md#major-discovery--associate-existing-waba-via-api-setup-meta-confirmed-2026-07-21) (DOC-0701 v1.7).
+**Meta Developer UI (2026-07-21):** WhatsApp Cloud API is configured through **Use cases** — not the legacy standalone **WhatsApp** product menu. See [Use Cases UI](../deployment/sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21) (DOC-0701 v2.0).
+
+**Major discovery (Meta confirmed 2026-07-21):** An existing **Approved WABA** can be associated with the **existing Atlas Developer App** through the WhatsApp use case in **Use cases**. No new Meta Developer App is required. Select **Niovel Perez** / **786-752-8080** only.
 
 **Action:** Follow the [migration checklist](../deployment/whatsapp-cloud-api-migration-checklist.md) (DOC-0702) and [deployment checklist](../deployment/sprint-11.4-meta-production.md#deployment-checklist-before-cloud-api-onboarding) in [sprint-11.4-meta-production.md](../deployment/sprint-11.4-meta-production.md) (DOC-0701).
 
@@ -136,7 +138,7 @@ During Meta **WhatsApp Cloud API initialization**, onboarding stopped before a t
 
 **WABA migration policy:** Do **not** delete unused WABAs during migration. Inventory complete; perform cleanup only after Atlas is successfully running in the new production environment. See [WABA migration policy](../deployment/sprint-11.4-meta-production.md#waba-migration-policy-do-not-delete-during-migration).
 
-**Pre-change gate (Meta AI guidance received):** Existing Approved WABA associable via **WhatsApp → API Setup** on existing app — no new Developer App. See [pre-change gate](../deployment/sprint-11.4-meta-production.md#pre-change-gate-consult-meta-ai-before-waba-reassignment) (DOC-0701 v1.7).
+**Pre-change gate (Meta AI guidance received):** Existing Approved WABA associable via **Use cases → WhatsApp configuration** on existing app — no new Developer App. Avoid legacy Meta docs with standalone WhatsApp product navigation. See [Use Cases UI](../deployment/sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21) (DOC-0701 v2.0).
 
 ---
 

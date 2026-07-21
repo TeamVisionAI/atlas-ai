@@ -36,17 +36,18 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 
 Copy `.env.example` → `.env` and fill values.
 
-> **Final production decision (Sprint 11.4):** **786-752-8080** = dedicated Atlas AI number — proceed Cloud API migration on **Niovel Perez WABA**. History preservation not required. **786-296-7254** (Ana Perez) independent. See [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md).
+> **Final production decision (Sprint 11.4):** **786-752-8080** = dedicated Atlas AI number — proceed Cloud API migration on **Niovel Perez WABA** via **Use cases** UI. **786-296-7254** (Ana Perez) independent. See [deployment/sprint-11.4-meta-production.md](./deployment/sprint-11.4-meta-production.md) — [Use Cases UI](./deployment/sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21).
 
 ---
 
 ## 2. Where to obtain the Configuration ID
 
 1. Open [Meta for Developers](https://developers.facebook.com/) → your Atlas app.
-2. Go to **Facebook Login for Business** → **Configurations** (Embedded Signup Builder).
-3. Create or select a configuration for **WhatsApp Business App onboarding**.
-4. Set feature type: **`whatsapp_business_app_onboarding`** (do **not** pass `extras.version`).
-5. Copy the **Configuration ID** into:
+2. **WhatsApp Cloud API (Use cases):** Configure via **Use cases** → WhatsApp use case — **not** the legacy standalone **WhatsApp** product menu. See [Use Cases UI](./deployment/sprint-11.4-meta-production.md#meta-developer-console--use-cases-ui-2026-07-21).
+3. **Embedded Signup Configuration ID:** Go to **Facebook Login for Business** → **Configurations** (Embedded Signup Builder).
+4. Create or select a configuration for **WhatsApp Business App onboarding**.
+5. Set feature type: **`whatsapp_business_app_onboarding`** (do **not** pass `extras.version`).
+6. Copy the **Configuration ID** into:
    - `META_EMBEDDED_SIGNUP_CONFIG_ID` (backend)
    - `VITE_META_EMBEDDED_SIGNUP_CONFIG_ID` (frontend)
 

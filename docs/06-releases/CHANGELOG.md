@@ -30,6 +30,14 @@
 
 ---
 
+## Documentation — Meta Use Cases Developer UI (DOC-0701 v2.0, DOC-0702 v1.1)
+
+**Date:** 2026-07-21
+
+Meta Developer Console now uses **Use cases** for WhatsApp Cloud API configuration — no longer a standalone **WhatsApp** product in navigation. Updated deployment docs to reference current UI and warn against legacy Meta documentation with separate WhatsApp product menu.
+
+---
+
 ## Documentation — WhatsApp Cloud API migration checklist (DOC-0702)
 
 **Date:** 2026-07-21
