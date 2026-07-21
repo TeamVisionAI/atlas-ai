@@ -9,9 +9,9 @@
 | **Version** | 0.1 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-20 |
+| **Last Updated** | 2026-07-21 |
 | **Related Sprint** | 11.4 |
-| **Related Release** | Release-11.4 (planned) |
+| **Related Release** | Sprint 11.4 Phase A |
 
 ---
 
@@ -29,7 +29,7 @@
 
 Define the **Communication Hub** — the unified architecture for inbound and outbound agency communication across channels, starting with WhatsApp Business in Sprint 11.4.
 
-> **Note:** Placeholder for Sprint 11.4 planning. Implementation details will be added when the Conversation Engine sprint begins.
+> **Note:** Phase A implements the transport layer and WhatsApp routing. Full multi-channel adapter interface is Phase B.
 
 ---
 
@@ -42,15 +42,16 @@ Define the **Communication Hub** — the unified architecture for inbound and ou
 
 ---
 
-## Current state (Release-11.3.1)
+## Current state (Sprint 11.4 Phase A)
 
 | Capability | Status |
 |------------|--------|
 | WhatsApp webhook ingest | Implemented |
 | Outbound WhatsApp send | Implemented |
+| Communication Hub (transport) | **Implemented — Phase A** |
+| Conversation Engine (live WhatsApp) | **Implemented — Phase A** |
 | Unified conversation UI | Partial (Prospect Workspace) |
-| Conversation Engine | **Planned — Sprint 11.4** |
-| Multi-channel hub | **Architecture only** |
+| Multi-channel adapters (email, SMS, etc.) | Planned — Phase B+ |
 
 ---
 

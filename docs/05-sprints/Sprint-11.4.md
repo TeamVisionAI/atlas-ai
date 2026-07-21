@@ -99,4 +99,13 @@ node backend/dev/verifySprint11_4.js
 
 ## Status
 
-**Planned** — not started. See [Roadmap.md](../00-executive/Roadmap.md) for sequence.
+| Phase | Status |
+|-------|--------|
+| **Phase A** — Live Conversation Engine wiring | ✅ **Complete** |
+| Phase B — Communication Hub adapters | Planned |
+| Phase C — WhatsApp UI | Planned |
+| Phases D–F | Planned |
+
+Phase A deliverables: production WhatsApp → Communication Hub → Conversation Engine → outbound pipeline. Verification: `node backend/dev/verifySprint11_4.js`.
+
+See [Sprint-11.4-Implementation-Plan.md](./Sprint-11.4-Implementation-Plan.md) and [Roadmap.md](../00-executive/Roadmap.md).

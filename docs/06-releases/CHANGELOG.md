@@ -6,12 +6,12 @@
 |-------|-------|
 | **Document ID** | DOC-0600 |
 | **Title** | Atlas AI Changelog |
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Status** | Approved |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-20 |
-| **Related Sprint** | — |
-| **Related Release** | Documentation Foundation |
+| **Last Updated** | 2026-07-21 |
+| **Related Sprint** | 11.4 |
+| **Related Release** | Sprint 11.4 Phase A |
 
 > **Status values:** Draft · Review · Approved
 
@@ -25,6 +25,45 @@
 | DOC-0002 | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification portfolio |
 | DOC-0512 | [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md) | Sprint 11.4 engineering blueprint |
 | — | [Roadmap.md](../00-executive/Roadmap.md) | Planned releases and milestones |
+
+---
+
+## Sprint 11.4 — Phase A Completed
+
+| Field | Value |
+|-------|-------|
+| **Sprint** | 11.4 (Phase A) |
+| **Status** | Complete |
+| **Date** | 2026-07-21 |
+
+Atlas now processes production WhatsApp conversations through a channel-agnostic **Communication Hub** and **AI Conversation Engine**, establishing the core architecture for future multi-channel communications.
+
+### Highlights
+
+- Production WhatsApp inbound pipeline wired to Conversation Engine
+- Channel-agnostic normalized message envelope (`channelMessage.js`)
+- Communication Hub transport layer (`communicationHub.js`)
+- Automated replies delivered via WhatsApp outbound pipeline
+- Business-rules gate before automated outbound (human ownership, workflow gate, closed prospects)
+- Simulator and dev routes unified through Communication Hub
+- Verification: `backend/dev/verifySprint11_4.js`
+
+### Production flow
+
+```
+Meta Webhook → whatsappInboundPipeline → Communication Hub
+  → Conversation Engine → Business Rules → whatsappOutboundPipeline
+```
+
+### Remaining (Sprint 11.4 Phases B–F)
+
+- Full Communication Hub adapter interface
+- WhatsApp UI integration (Mission Control / Prospect Workspace)
+- Google Calendar integration
+- Prospect Memory persistence
+- Executive Intelligence hooks
+
+See [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md) (DOC-0512).
 
 ---
 
@@ -101,5 +140,6 @@ See [Sprint-11.4.md](../05-sprints/Sprint-11.4.md), [Sprint-11.4-Implementation-
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.2 | 2026-07-21 | Atlas Development Team | Sprint 11.4 Phase A — live Conversation Engine + Communication Hub wiring |
 | 1.1 | 2026-07-20 | Atlas Development Team | Documentation Foundation milestone; Sprint 11.4 implementation plan indexed |
 | 1.0 | 2026-07-20 | Atlas Development Team | Initial changelog — Sprint 11.3.1 production release |

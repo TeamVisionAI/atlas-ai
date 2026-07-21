@@ -345,8 +345,8 @@ Build in priority order below.
 
 | Phase | Features | Duration guidance | Exit gate |
 |-------|----------|-------------------|-----------|
-| **Phase A — Core loop** | Feature 1 | First | `verifySprint11_4.js` green; live reply on test number |
-| **Phase B — Architecture** | Feature 2 | After Phase A | All WhatsApp traffic through hub |
+| **Phase A — Core loop** | Feature 1 | ✅ **Complete** | `verifySprint11_4.js` green; live reply on test number |
+| **Phase B — Architecture** | Feature 2 | Planned | Full adapter interface |
 | **Phase C — Agent UI** | Feature 3 | Parallel after Phase A | Thread visible in Mission Control + Workspace |
 | **Phase D — Scheduling** | Feature 4 | After Phase A | Calendar event on confirmed interview |
 | **Phase E — Memory** | Feature 5 | After Phase A | Multi-turn context persists |

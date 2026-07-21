@@ -150,7 +150,7 @@ Both surfaces share one codebase. The frontend deploys to **Vercel**; the API de
 
 ## Core backend capabilities
 
-- Recruiting / conversation engines (WhatsApp inbound pipeline)
+- Recruiting / conversation engines (WhatsApp inbound pipeline + live Conversation Engine — Sprint 11.4 Phase A)
 - Workflow engine with business rules (BR-001+)
 - Mission Control and Executive Dashboard read models
 - Prospect Workspace profile and activity feed
@@ -250,6 +250,8 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 |-------|-------|
 | **Sprint** | 11.4 |
 | **Primary objective** | Implement the Atlas AI Conversation Engine with WhatsApp Business integration and establish the Communication Hub architecture for future multi-channel support. |
+| **Phase A status** | ✅ Complete — live WhatsApp → Communication Hub → Conversation Engine → outbound |
+| **Next** | Phase B — Communication Hub adapters; Phase C — WhatsApp UI |
 
 **Related planning documents:**
 

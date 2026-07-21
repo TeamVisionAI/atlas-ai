@@ -407,8 +407,13 @@ async function handleSemanticMessage({
   phone,
   name,
   message,
-  channel = "whatsapp"
+  channel = "whatsapp",
+  skipConversationLogging = false
 }) {
+  const recordLog = skipConversationLogging
+    ? async () => ({ success: true, skipped: true })
+    : logConversation;
+
   const cleanMessage = String(message || "").trim();
   const intent = detectIntent(cleanMessage);
   let prospect = await findProspect(phone);
@@ -445,7 +450,7 @@ async function handleSemanticMessage({
     await syncProfileToProspect(prospect, profile);
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
-    await logConversation({
+    await recordLog({
       phone,
       name,
       direction: "incoming",
@@ -458,7 +463,7 @@ async function handleSemanticMessage({
       state: profile.state
     });
 
-    await logConversation({
+    await recordLog({
       phone,
       name,
       direction: "outgoing",
@@ -474,7 +479,7 @@ async function handleSemanticMessage({
     return coordinatorReply;
   }
 
-  await logConversation({
+  await recordLog({
     phone,
     name,
     direction: "incoming",
@@ -493,7 +498,7 @@ async function handleSemanticMessage({
         ? "✅ Tu entrevista ya está confirmada. Un agente de Team Vision se comunicará contigo si es necesario realizar algún ajuste."
         : "✅ Your interview is already confirmed. A Team Vision agent will contact you if any adjustment is needed.";
 
-    await logConversation({
+    await recordLog({
       phone,
       name,
       direction: "outgoing",
@@ -532,7 +537,7 @@ async function handleSemanticMessage({
     await syncProfileToProspect(prospect, profile);
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
-    await logConversation({
+    await recordLog({
       phone,
       name,
       direction: "outgoing",
@@ -585,7 +590,7 @@ async function handleSemanticMessage({
         language
       );
 
-      await logConversation({
+      await recordLog({
         phone,
         name,
         direction: "outgoing",
@@ -607,7 +612,7 @@ async function handleSemanticMessage({
     if (isScheduleComplete(profile) && !emailRequired(profile)) {
       const completionReply = await completeInterview(prospect, profile, language);
 
-      await logConversation({
+      await recordLog({
         phone,
         name,
         direction: "outgoing",
@@ -633,7 +638,7 @@ async function handleSemanticMessage({
       );
       const combined = `${informationalReply}\n\n${followUp}`;
 
-      await logConversation({
+      await recordLog({
         phone,
         name,
         direction: "outgoing",
@@ -649,7 +654,7 @@ async function handleSemanticMessage({
       return combined;
     }
 
-    await logConversation({
+    await recordLog({
       phone,
       name,
       direction: "outgoing",
@@ -677,7 +682,7 @@ async function handleSemanticMessage({
 
       const completionReply = await completeInterview(prospect, profile, language);
 
-      await logConversation({
+      await recordLog({
         phone,
         name,
         direction: "outgoing",
@@ -706,7 +711,7 @@ async function handleSemanticMessage({
   await syncProfileToProspect(prospect, profile);
   prospect = await findProspect(phone);
 
-  await logConversation({
+  await recordLog({
     phone,
     name,
     direction: "outgoing",
