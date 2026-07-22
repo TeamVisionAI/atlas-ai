@@ -3,6 +3,7 @@ const {
   createProspect,
   updateProspect
 } = require("../services/supabaseService");
+const crypto = require("crypto");
 const { bookProductionAppointment } = require("../appointments/AppointmentEngine");
 const { logConversation } = require("../services/logService");
 const { detectIntent } = require("./intentEngine");
@@ -44,6 +45,104 @@ const {
 const { extractInformation } = require("./informationExtractor");
 
 const CONVERSATION_GOAL = "Schedule Interview";
+
+function atlasTrace(prefix, details = {}) {
+  console.log(`[ATLAS ${prefix}]`, JSON.stringify({ ts: new Date().toISOString(), ...details }));
+}
+
+function sanitizePersistencePayload(updates) {
+  const payload = { ...updates };
+
+  if (typeof payload.notes === "string" && /^EMAIL:/i.test(payload.notes)) {
+    payload.notes = "EMAIL:[redacted]";
+  }
+
+  return payload;
+}
+
+function createAtlasTrace(storageKey, message) {
+  return {
+    traceId: crypto.randomUUID(),
+    storageKey,
+    message: String(message || "").trim()
+  };
+}
+
+function logStateLoaded(trace, prospect, context) {
+  trace.lastKnownStep = prospect?.current_step ?? null;
+
+  atlasTrace("STATE LOADED", {
+    traceId: trace.traceId,
+    storageKey: trace.storageKey,
+    context,
+    currentStep: prospect?.current_step ?? null,
+    prospectExists: Boolean(prospect)
+  });
+}
+
+async function tracedUpdateProspect(trace, phone, updates, context) {
+  const fromStep = trace.lastKnownStep ?? null;
+  const toStep = updates.current_step ?? null;
+
+  if (toStep !== undefined && toStep !== null && fromStep !== toStep) {
+    atlasTrace("TRANSITION", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      from: fromStep,
+      to: toStep,
+      context
+    });
+  }
+
+  atlasTrace("PERSISTENCE", {
+    traceId: trace.traceId,
+    storageKey: phone,
+    context,
+    action: "updateProspect",
+    payload: sanitizePersistencePayload(updates)
+  });
+
+  try {
+    await updateProspect(phone, updates);
+    const reloaded = await findProspect(phone);
+
+    atlasTrace("PERSISTENCE", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      context,
+      action: "updateProspect",
+      status: "success",
+      persistedCurrentStep: reloaded?.current_step ?? null
+    });
+
+    if (reloaded?.current_step) {
+      trace.lastKnownStep = reloaded.current_step;
+    }
+
+    return reloaded;
+  } catch (error) {
+    atlasTrace("PERSISTENCE", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      context,
+      action: "updateProspect",
+      status: "error",
+      error: error.message
+    });
+
+    throw error;
+  }
+}
+
+function finishAtlasTrace(trace, response, handler) {
+  atlasTrace("TRACE END", {
+    traceId: trace.traceId,
+    storageKey: trace.storageKey,
+    handler,
+    finalCurrentStep: trace.lastKnownStep ?? null,
+    responsePreview: String(response || "").slice(0, 160)
+  });
+}
 
 function isLikelyQuestion(message) {
   const text = String(message || "").trim();
@@ -177,7 +276,7 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
   }
 }
 
-async function initializeScheduleIfNeeded(prospect, profile) {
+async function initializeScheduleIfNeeded(prospect, profile, trace = null) {
   const interviewType = getEffectiveInterviewType(profile);
 
   if (!interviewType || isScheduleComplete(profile)) {
@@ -202,11 +301,17 @@ async function initializeScheduleIfNeeded(prospect, profile) {
     interviewType
   );
 
-  await updateProspect(prospect.phone, {
+  const updates = {
     current_step: "SCHEDULE",
     appointment_type: PHASES.DAY,
     notes: mergeNotesWithSchedulingState(prospect.notes, nextState)
-  });
+  };
+
+  if (trace) {
+    return tracedUpdateProspect(trace, prospect.phone, updates, "initializeScheduleIfNeeded");
+  }
+
+  await updateProspect(prospect.phone, updates);
 
   return findProspect(prospect.phone);
 }
@@ -217,7 +322,7 @@ function isActiveScheduleStep(prospect) {
   return Boolean(prospect?.appointment_type && schedulingState?.phase);
 }
 
-async function handleScheduleMessage(prospect, message, language, personality) {
+async function handleScheduleMessage(prospect, message, language, personality, trace = null) {
   const result = handleScheduleTurn({
     prospect,
     message,
@@ -225,7 +330,11 @@ async function handleScheduleMessage(prospect, message, language, personality) {
     personality
   });
 
-  await updateProspect(prospect.phone, result.prospectUpdates);
+  if (trace) {
+    await tracedUpdateProspect(trace, prospect.phone, result.prospectUpdates, "handleScheduleMessage");
+  } else {
+    await updateProspect(prospect.phone, result.prospectUpdates);
+  }
 
   return result;
 }
@@ -249,7 +358,8 @@ async function buildSemanticReply({
   language,
   isNew,
   informationalReply,
-  channel = "whatsapp"
+  channel = "whatsapp",
+  trace = null
 }) {
   const missing = getMissingFields(profile);
   const nextField = getNextMissingField(profile);
@@ -259,7 +369,7 @@ async function buildSemanticReply({
   }
 
   if (nextField === "schedule" && getEffectiveInterviewType(profile)) {
-    prospect = await initializeScheduleIfNeeded(prospect, profile);
+    prospect = await initializeScheduleIfNeeded(prospect, profile, trace);
   }
 
   const question = buildQuestionForMissingField(
@@ -326,7 +436,7 @@ async function buildSemanticReply({
   return response.text;
 }
 
-async function syncProfileToProspect(prospect, profile) {
+async function syncProfileToProspect(prospect, profile, trace = null) {
   const updates = {
     last_message: prospect.last_message
   };
@@ -371,6 +481,11 @@ async function syncProfileToProspect(prospect, profile) {
   const schedulingState = parseSchedulingState(prospect.notes);
   updates.current_step = deriveCurrentStep(profile, schedulingState);
 
+  if (trace) {
+    await tracedUpdateProspect(trace, prospect.phone, updates, "syncProfileToProspect");
+    return;
+  }
+
   await updateProspect(prospect.phone, updates);
 }
 
@@ -386,13 +501,59 @@ async function handleSemanticMessage({
     : logConversation;
 
   const cleanMessage = String(message || "").trim();
+  const trace = createAtlasTrace(phone, cleanMessage);
+
+  atlasTrace("TRACE START", {
+    traceId: trace.traceId,
+    storageKey: phone,
+    channel,
+    message: cleanMessage
+  });
+
   const intent = detectIntent(cleanMessage);
   let prospect = await findProspect(phone);
   const isNew = !prospect;
 
+  logStateLoaded(trace, prospect, isNew ? "initial_findProspect:new" : "initial_findProspect");
+
   if (isNew) {
-    await createProspect(phone, name, cleanMessage);
-    prospect = await findProspect(phone);
+    atlasTrace("PERSISTENCE", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      context: "createProspect",
+      action: "createProspect",
+      payload: {
+        name: name || "Unknown",
+        lastMessagePreview: cleanMessage.slice(0, 80)
+      }
+    });
+
+    try {
+      await createProspect(phone, name, cleanMessage);
+      prospect = await findProspect(phone);
+
+      atlasTrace("PERSISTENCE", {
+        traceId: trace.traceId,
+        storageKey: phone,
+        context: "createProspect",
+        action: "createProspect",
+        status: "success",
+        persistedCurrentStep: prospect?.current_step ?? null
+      });
+
+      logStateLoaded(trace, prospect, "after_createProspect");
+    } catch (error) {
+      atlasTrace("PERSISTENCE", {
+        traceId: trace.traceId,
+        storageKey: phone,
+        context: "createProspect",
+        action: "createProspect",
+        status: "error",
+        error: error.message
+      });
+
+      throw error;
+    }
   }
 
   const language = detectLanguage(prospect, cleanMessage);
@@ -416,9 +577,29 @@ async function handleSemanticMessage({
   const rulesResult = applyBusinessRulesToProfile(profile, cleanMessage, extracted.interviewType);
   profile = rulesResult.profile;
 
+  atlasTrace("DECISION", {
+    traceId: trace.traceId,
+    storageKey: phone,
+    intent,
+    nextField,
+    inSchedule,
+    isNew,
+    language,
+    extractedFields: Object.keys(extracted || {}).filter((key) => extracted[key] !== undefined)
+  });
+
   if (rulesResult.escalation?.needsHumanCoordinator) {
+    atlasTrace("DECISION", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      handler: "humanCoordinator:preSync",
+      reason: "SPECIAL_MEETING_REQUEST"
+    });
+
     prospect.last_message = cleanMessage;
-    await syncProfileToProspect(prospect, profile);
+    await syncProfileToProspect(prospect, profile, trace);
+    prospect = await findProspect(phone);
+    logStateLoaded(trace, prospect, "after_syncProfileToProspect:preSyncEscalation");
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     await recordLog({
@@ -447,6 +628,7 @@ async function handleSemanticMessage({
       state: profile.state
     });
 
+    finishAtlasTrace(trace, coordinatorReply, "humanCoordinator:preSync");
     return coordinatorReply;
   }
 
@@ -464,6 +646,12 @@ async function handleSemanticMessage({
   });
 
   if (prospect.current_step === "CONFIRMED") {
+    atlasTrace("DECISION", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      handler: "confirmedGuard"
+    });
+
     const confirmedReply =
       language === "es"
         ? "✅ Tu entrevista ya está confirmada. Un agente de Team Vision se comunicará contigo si es necesario realizar algún ajuste."
@@ -482,6 +670,7 @@ async function handleSemanticMessage({
       state: profile.state
     });
 
+    finishAtlasTrace(trace, confirmedReply, "confirmedGuard");
     return confirmedReply;
   }
 
@@ -496,16 +685,35 @@ async function handleSemanticMessage({
   const interruptionReply = route.interrupt ? getResponse(intent, language) : null;
   const informationalReply = faqReply || interruptionReply;
 
+  atlasTrace("DECISION", {
+    traceId: trace.traceId,
+    storageKey: phone,
+    handler: "routeConversation",
+    routeInterrupt: Boolean(route.interrupt),
+    hasFaqReply: Boolean(faqReply),
+    hasInformationalReply: Boolean(informationalReply)
+  });
+
   prospect.last_message = cleanMessage;
-  await syncProfileToProspect(prospect, profile);
+  await syncProfileToProspect(prospect, profile, trace);
   prospect = await findProspect(phone);
+  logStateLoaded(trace, prospect, "after_syncProfileToProspect:main");
   profile = buildProfileFromProspect(prospect, channel);
 
   const postSyncRules = applyBusinessRulesToProfile(profile, cleanMessage, extracted.interviewType);
   profile = postSyncRules.profile;
 
   if (postSyncRules.escalation?.needsHumanCoordinator) {
-    await syncProfileToProspect(prospect, profile);
+    atlasTrace("DECISION", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      handler: "humanCoordinator:postSync",
+      reason: "SPECIAL_MEETING_REQUEST"
+    });
+
+    await syncProfileToProspect(prospect, profile, trace);
+    prospect = await findProspect(phone);
+    logStateLoaded(trace, prospect, "after_syncProfileToProspect:postSyncEscalation");
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     await recordLog({
@@ -521,12 +729,21 @@ async function handleSemanticMessage({
       state: profile.state
     });
 
+    finishAtlasTrace(trace, coordinatorReply, "humanCoordinator:postSync");
     return coordinatorReply;
   }
 
   if (postSyncRules.profile.interviewType !== prospect.interview_type) {
-    await syncProfileToProspect(prospect, profile);
+    atlasTrace("DECISION", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      handler: "interviewTypeResync",
+      interviewType: postSyncRules.profile.interviewType
+    });
+
+    await syncProfileToProspect(prospect, profile, trace);
     prospect = await findProspect(phone);
+    logStateLoaded(trace, prospect, "after_syncProfileToProspect:interviewTypeResync");
     profile = buildProfileFromProspect(prospect, channel);
   }
 
@@ -535,6 +752,12 @@ async function handleSemanticMessage({
     getEffectiveInterviewType(profile) &&
     !isScheduleComplete(profile)
   ) {
+    atlasTrace("DECISION", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      handler: "handleScheduleMessage"
+    });
+
     const personality = getPersonality({
       currentStep: "SCHEDULE",
       intent,
@@ -551,11 +774,19 @@ async function handleSemanticMessage({
       prospect,
       cleanMessage,
       language,
-      personality
+      personality,
+      trace
     );
     const scheduleReply = scheduleResult.replyText;
 
     if (scheduleResult.humanHandoff) {
+      atlasTrace("DECISION", {
+        traceId: trace.traceId,
+        storageKey: phone,
+        handler: "humanCoordinator:scheduleHandoff",
+        reason: scheduleResult.handoffReason || "OUTSIDE_SCHEDULING_WINDOW"
+      });
+
       const coordinatorReply = buildHumanCoordinatorReply(
         scheduleResult.handoffReason || "OUTSIDE_SCHEDULING_WINDOW",
         language
@@ -574,13 +805,21 @@ async function handleSemanticMessage({
         state: profile.state
       });
 
+      finishAtlasTrace(trace, coordinatorReply, "humanCoordinator:scheduleHandoff");
       return coordinatorReply;
     }
 
     prospect = await findProspect(phone);
+    logStateLoaded(trace, prospect, "after_handleScheduleMessage");
     profile = buildProfileFromProspect(prospect, channel);
 
     if (isScheduleComplete(profile) && !emailRequired(profile)) {
+      atlasTrace("DECISION", {
+        traceId: trace.traceId,
+        storageKey: phone,
+        handler: "completeInterview:scheduleComplete"
+      });
+
       const completionReply = await completeInterview(prospect, profile, language, { channel });
 
       await recordLog({
@@ -596,13 +835,20 @@ async function handleSemanticMessage({
         state: profile.state
       });
 
+      finishAtlasTrace(trace, completionReply, "completeInterview:scheduleComplete");
       return completionReply;
     }
 
     if (informationalReply && prospect.current_step !== "EMAIL") {
-      const nextField = getNextMissingField(buildProfileFromProspect(prospect, channel));
+      atlasTrace("DECISION", {
+        traceId: trace.traceId,
+        storageKey: phone,
+        handler: "scheduleInformationalCombined"
+      });
+
+      const nextFieldAfterSchedule = getNextMissingField(buildProfileFromProspect(prospect, channel));
       const followUp = buildQuestionForMissingField(
-        nextField,
+        nextFieldAfterSchedule,
         profile,
         language,
         prospect
@@ -622,6 +868,7 @@ async function handleSemanticMessage({
         state: profile.state
       });
 
+      finishAtlasTrace(trace, combined, "scheduleInformationalCombined");
       return combined;
     }
 
@@ -638,18 +885,34 @@ async function handleSemanticMessage({
       state: profile.state
     });
 
+    finishAtlasTrace(trace, scheduleReply, "handleScheduleMessage");
     return scheduleReply;
   }
 
   if (prospect.current_step === "EMAIL" || getNextMissingField(profile) === "email") {
+    atlasTrace("DECISION", {
+      traceId: trace.traceId,
+      storageKey: phone,
+      handler: "emailCapture",
+      currentStep: prospect.current_step,
+      nextField: getNextMissingField(profile)
+    });
+
     const email = extracted.email || cleanMessage.trim();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (emailPattern.test(email)) {
       profile.email = email;
-      await syncProfileToProspect(prospect, profile);
+      await syncProfileToProspect(prospect, profile, trace);
       prospect = await findProspect(phone);
+      logStateLoaded(trace, prospect, "after_syncProfileToProspect:emailCapture");
       profile = buildProfileFromProspect(prospect, channel);
+
+      atlasTrace("DECISION", {
+        traceId: trace.traceId,
+        storageKey: phone,
+        handler: "completeInterview:emailCapture"
+      });
 
       const completionReply = await completeInterview(prospect, profile, language, { channel });
 
@@ -666,9 +929,16 @@ async function handleSemanticMessage({
         state: profile.state
       });
 
+      finishAtlasTrace(trace, completionReply, "completeInterview:emailCapture");
       return completionReply;
     }
   }
+
+  atlasTrace("DECISION", {
+    traceId: trace.traceId,
+    storageKey: phone,
+    handler: "buildSemanticReply"
+  });
 
   const replyText = await buildSemanticReply({
     prospect,
@@ -677,11 +947,13 @@ async function handleSemanticMessage({
     language,
     isNew,
     informationalReply,
-    channel
+    channel,
+    trace
   });
 
-  await syncProfileToProspect(prospect, profile);
+  await syncProfileToProspect(prospect, profile, trace);
   prospect = await findProspect(phone);
+  logStateLoaded(trace, prospect, "after_syncProfileToProspect:final");
 
   await recordLog({
     phone,
@@ -696,6 +968,7 @@ async function handleSemanticMessage({
     state: profile.state
   });
 
+  finishAtlasTrace(trace, replyText, "buildSemanticReply");
   return replyText;
 }
 
