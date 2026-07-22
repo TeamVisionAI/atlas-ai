@@ -7,6 +7,10 @@ const crypto = require("crypto");
 const { logWhatsAppStage } = require("../core/whatsappStructuredLogger");
 
 function verifyMetaWebhookSignature(req, res, next) {
+  console.log(">>> Signature middleware reached");
+  console.log("Header:", req.get("x-hub-signature-256"));
+  console.log("Has META_APP_SECRET:", !!process.env.META_APP_SECRET);
+
   const appSecret = process.env.META_APP_SECRET;
 
   if (!appSecret) {
