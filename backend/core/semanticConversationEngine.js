@@ -316,6 +316,52 @@ async function initializeScheduleIfNeeded(prospect, profile, trace = null) {
   return findProspect(prospect.phone);
 }
 
+function hasActiveSchedulingNotes(notes) {
+  return Boolean(notes && String(notes).includes("SCHEDULING:"));
+}
+
+/**
+ * Temporary production recovery: restore appointment_type when SCHEDULE step
+ * has active scheduling notes but appointment_type was cleared inconsistently.
+ */
+async function maybeSelfHealScheduleAppointmentType(prospect, trace = null) {
+  if (!prospect) {
+    return prospect;
+  }
+
+  if (prospect.current_step !== "SCHEDULE" || prospect.appointment_type) {
+    return prospect;
+  }
+
+  if (!hasActiveSchedulingNotes(prospect.notes)) {
+    return prospect;
+  }
+
+  const schedulingState = parseSchedulingState(prospect.notes);
+  const phase = schedulingState?.phase;
+
+  if (!phase) {
+    return prospect;
+  }
+
+  const updates = { appointment_type: phase };
+
+  atlasTrace("SELF HEAL", {
+    traceId: trace?.traceId,
+    storageKey: prospect.phone,
+    action: "restore_appointment_type",
+    restoredAppointmentType: phase,
+    currentStep: prospect.current_step
+  });
+
+  if (trace) {
+    return tracedUpdateProspect(trace, prospect.phone, updates, "selfHealScheduleAppointmentType");
+  }
+
+  await updateProspect(prospect.phone, updates);
+  return findProspect(prospect.phone);
+}
+
 function isActiveScheduleStep(prospect) {
   const schedulingState = parseSchedulingState(prospect?.notes);
 
@@ -555,6 +601,8 @@ async function handleSemanticMessage({
       throw error;
     }
   }
+
+  prospect = await maybeSelfHealScheduleAppointmentType(prospect, trace);
 
   const language = detectLanguage(prospect, cleanMessage);
   let profile = buildProfileFromProspect(prospect, channel);
