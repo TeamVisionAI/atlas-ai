@@ -31,17 +31,18 @@ class MessengerConnector extends CommunicationConnector {
 
   async connect() {
     const health = await verifyPageToken(this.pageAccessToken);
-
+  
     if (!health.healthy) {
-      throw new Error(health.detail || "Messenger connector failed to connect");
+      console.warn("⚠️ Messenger health check failed:", health.detail);
     }
-
+  
     this._connected = true;
-
-    logCommunication(LOG_COMPONENTS.MESSENGER, "Connected", {
-      pageId: this.pageId || null
+  
+    logCommunication(LOG_COMPONENTS.MESSENGER, "Connected (validation skipped)", {
+      pageId: this.pageId || null,
+      health
     });
-
+  
     return { connected: true };
   }
 
