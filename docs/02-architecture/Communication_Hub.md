@@ -17,18 +17,18 @@
 
 ## Related documents
 
-- [Current_System_State.md](../00-executive/Current_System_State.md)
-- [Sprint-11.4.md](../05-sprints/Sprint-11.4.md)
-- [Sprint-11.4-Implementation-Plan.md](../05-sprints/Sprint-11.4-Implementation-Plan.md)
+- [00-executive/Current_System_State.md](../00-executive/Current_System_State.md)
+- [09-releases/sprints/Sprint-11.4.md](../09-releases/sprints/Sprint-11.4.md)
+- [09-releases/sprints/Sprint-11.4-Implementation-Plan.md](../09-releases/sprints/Sprint-11.4-Implementation-Plan.md)
 - [README.md](./README.md)
-- [../architecture/atlas-communication-platform.md](../architecture/atlas-communication-platform.md) — platform vision & Communication Gateway (DOC-0020)
-- [../04-meta/Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md)
+- [../02-architecture/atlas-communication-platform.md](./atlas-communication-platform.md) — platform vision & Communication Gateway (DOC-0020)
+- [../05-integrations/meta/Meta_Approval_Portfolio.md](../05-integrations/meta/Meta_Approval_Portfolio.md)
 
 ---
 
 ## Purpose
 
-Define the **Communication Hub** — the unified transport layer for inbound and outbound agency communication across channels. Platform vision and gateway responsibilities: [Atlas Communication Platform](../architecture/atlas-communication-platform.md) (DOC-0020).
+Define the **Communication Hub** — the unified transport layer for inbound and outbound agency communication across channels. Platform vision and gateway responsibilities: [Atlas Communication Platform](./atlas-communication-platform.md) (DOC-0020).
 
 > **Note:** Phase A implements the transport layer and WhatsApp routing. Full multi-channel adapter interface is Phase B.
 
@@ -90,5 +90,5 @@ flowchart LR
 
 ## Out of scope (this document)
 
-- Meta submission copy → [../04-meta/Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md)
-- Sprint task breakdown → [Sprint-11.4.md](../05-sprints/Sprint-11.4.md)
+- Meta submission copy → [../05-integrations/meta/Meta_Approval_Portfolio.md](../05-integrations/meta/Meta_Approval_Portfolio.md)
+- Sprint task breakdown → [09-releases/sprints/Sprint-11.4.md](../09-releases/sprints/Sprint-11.4.md)

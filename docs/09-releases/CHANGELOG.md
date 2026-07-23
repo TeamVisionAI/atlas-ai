@@ -1,0 +1,388 @@
+# Atlas AI Changelog
+
+## Document control
+
+| Field | Value |
+|-------|-------|
+| **Document ID** | DOC-0600 |
+| **Title** | Atlas AI Changelog |
+| **Version** | 1.3 |
+| **Status** | Approved |
+| **Owner** | Atlas Development Team |
+| **Last Updated** | 2026-07-23 |
+| **Related Release** | Documentation Foundation v1.0 |
+
+> **Status values:** Draft · Review · Approved
+
+---
+
+## Documentation Foundation v1.0
+
+**Date:** 2026-07-23
+
+Consolidated all documentation from `main` and `sprint-7-engine-integration` into canonical structure under `docs/00-executive` through `docs/10-rfcs`. Recovered Meta package, RFCs, V1 platform docs, frontend audits. Merged duplicate Roadmap and Vision documents. See [README.md](../README.md) (DOC-0999).
+
+---
+
+## Related documents
+
+| Document ID | Document | Description |
+|-------------|----------|-------------|
+| DOC-0999 | [README.md](../README.md) | Documentation Hub index |
+| DOC-0001 | [Current_System_State.md](../00-executive/Current_System_State.md) | Production state reference |
+| DOC-0002 | [Meta_Approval_Portfolio.md](../05-integrations/meta/Meta_Approval_Portfolio.md) | Meta Business Verification portfolio |
+| DOC-0512 | [Sprint-11.4-Implementation-Plan.md](./sprints/Sprint-11.4-Implementation-Plan.md) | Sprint 11.4 engineering blueprint |
+| DOC-0010 | [Communication_Hub.md](../02-architecture/Communication_Hub.md) | Communication Hub transport layer |
+| DOC-0020 | [atlas-communication-platform.md](../02-architecture/atlas-communication-platform.md) | Atlas Communication Platform architecture (Sprint 12) |
+| DOC-0513 | [sprint-11.4-whatsapp-investigation.md](../08-operations/sprint-11.4-whatsapp-investigation.md) | WhatsApp investigation & strategic pivot |
+| DOC-0701 | [sprint-11.4-meta-production.md](../08-operations/deployment/sprint-11.4-meta-production.md) | Meta WABA production troubleshooting |
+| DOC-0702 | [whatsapp-cloud-api-migration-checklist.md](../08-operations/deployment/archive/whatsapp-cloud-api-migration-checklist.md) | WhatsApp migration checklist (deferred) |
+| — | [Roadmap.md](../00-executive/Roadmap.md) | Planned releases and milestones |
+
+---
+
+## Documentation — Atlas Communication Platform architecture (DOC-0020)
+
+**Date:** 2026-07-21
+
+Sprint 12 architecture: channel-independent platform with Communication Gateway, single prospect identity, Human Takeover, and connector model (Messenger + Instagram MVP; WhatsApp deferred).
+
+---
+
+## Documentation — Sprint 11.4 WhatsApp investigation & strategic pivot (DOC-0513)
+
+**Date:** 2026-07-21
+
+WhatsApp Cloud API onboarding blocked: `wabaID` null on existing WABA path; new WABA creation failed with WhatsApp account restricted. Portfolio healthy; WhatsApp asset layer restricted. **Strategic pivot:** MVP to Facebook Messenger + Instagram DM; Atlas becomes multichannel platform. WhatsApp deferred to future connector.
+
+---
+
+## Documentation — Meta AI new-WABA recovery strategy (DOC-0701 v2.8)
+
+**Date:** 2026-07-21
+
+Meta AI proposed preserving Business Portfolio **367219934273986** while creating a brand-new WABA for Atlas AI. Pre-proceed gate: verify **Create a new WhatsApp Business Account** option at Business Settings → Accounts → WhatsApp Accounts → Add before implementing. Recovery path proposed — not approved.
+
+---
+
+## Documentation — App–portfolio link and Connect assets verified (DOC-0701 v2.7)
+
+**Date:** 2026-07-21
+
+Verified Atlas AI app is linked to Business Portfolio **`367219934273986`** with administrator access. Business Settings **Connect assets** dialog exposes Ad Accounts only — no WABA assignment option. App asset assignment ruled out as wabaID cause. Remaining evidence: Meta backend failure resolving WABA during production phone registration.
+
+---
+
+## Documentation — Business Portfolio alignment verified (DOC-0701 v2.6)
+
+**Date:** 2026-07-21
+
+Verified Atlas Developer App and Approved WABAs share Business Portfolio **`367219934273986`**. Wrong portfolio ruled out as wabaID cause. Remaining evidence: Meta backend failure resolving WABA during production phone registration.
+
+---
+
+## Documentation — Meta wabaID null error (DOC-0701 v2.5, DOC-0702 v1.6)
+
+**Date:** 2026-07-21
+
+Production Setup failed before SMS verification with **`Unexpected null value for wabaID`**. Meta UI failed to resolve target WABA for **786-752-8080** registration. Not Atlas or phone number issue — Meta configuration/UI problem before phone migration.
+
+---
+
+## Documentation — Phone registration pause gate (DOC-0701 v2.4, DOC-0702 v1.5)
+
+**Date:** 2026-07-21
+
+Initiated production phone registration for **786-752-8080**. Paused before verification code until migration warnings reviewed. Added confirmation screen capture log for deployment record.
+
+---
+
+## Documentation — Production Setup status: readiness not migration (DOC-0701 v2.3, DOC-0702 v1.4)
+
+**Date:** 2026-07-21
+
+Production Setup page confirmed **no production phone** on Atlas Developer App. Completed task = readiness for registration, not phone migration. Next workflow: **Add phone number** (select production WABA + **786-752-8080**).
+
+---
+
+## Documentation — Production Setup workflow gate (DOC-0701 v2.2, DOC-0702 v1.3)
+
+**Date:** 2026-07-21
+
+Reached Meta Step 2 Production Setup. Phone registration is under collapsed **Register your WhatsApp phone number**. Do not register until WABA selection and migration options are reviewed and documented.
+
+---
+
+## Documentation — Use Cases Step 1 vs Step 2 (DOC-0701 v2.1, DOC-0702 v1.2)
+
+**Date:** 2026-07-21
+
+Meta Use Cases UI separates **Step 1 (Testing)** — auto test environment, no WABA selection — from **Step 2 (Production setup)** — expected location for Niovel Perez WABA and **786-752-8080** migration.
+
+---
+
+## Documentation — Meta Use Cases Developer UI (DOC-0701 v2.0, DOC-0702 v1.1)
+
+**Date:** 2026-07-21
+
+Meta Developer Console now uses **Use cases** for WhatsApp Cloud API configuration — no longer a standalone **WhatsApp** product in navigation. Updated deployment docs to reference current UI and warn against legacy Meta documentation with separate WhatsApp product menu.
+
+---
+
+## Documentation — WhatsApp Cloud API migration checklist (DOC-0702)
+
+**Date:** 2026-07-21
+
+Added step-by-step migration checklist: verify approved WABA, select Niovel Perez WABA, migrate 786-752-8080 to Cloud API, update Atlas env, verify webhook, test inbound/outbound messaging, record Phone Number ID, WABA ID, Access Token, and App ID.
+
+---
+
+## Documentation — Sprint 11.4 final production decision (DOC-0701 v1.9)
+
+**Date:** 2026-07-21
+
+Final production decision approved: **786-752-8080** dedicated Atlas AI production number; Cloud API migration authorized on **Niovel Perez WABA**. Existing WhatsApp Business App history not required to preserve. **Ana Perez / 786-296-7254** remains independent to avoid operational risk.
+
+---
+
+## Documentation — Sprint 11.4 production architecture approved (DOC-0701 v1.8)
+
+**Date:** 2026-07-21
+
+**786-752-8080** designated Atlas AI production number (Cloud API migration via Niovel Perez WABA). Atlas owns 8080 for automation, AI conversations, scheduling, and future integrations. **Ana Perez / 786-296-7254** unchanged to protect day-to-day business operations.
+
+---
+
+## Documentation — Sprint 11.4 major discovery: API Setup WABA association (DOC-0701 v1.7)
+
+**Date:** 2026-07-21
+
+Meta confirmed: existing **Approved WABA** can be associated with the **existing Atlas Developer App** via **WhatsApp → API Setup**. No new Meta Developer App required. Deployment workflow prioritizes selecting the correct Approved WABA (**Niovel Perez** / **786-752-8080**) over Meta's auto-created Test WABA.
+
+---
+
+## Documentation — Sprint 11.4 Meta AI pre-change gate (DOC-0701 v1.6)
+
+**Date:** 2026-07-21
+
+Before WABA reassignment or other Meta configuration changes: consult Meta AI with a precise engineering question about moving the Developer App from the disabled Test WABA to an Approved production WABA; record guidance; compare with official Meta documentation before implementing.
+
+---
+
+## Documentation — Sprint 11.4 WABA inventory completed (DOC-0701 v1.5)
+
+**Date:** 2026-07-21
+
+Completed WhatsApp Business Account inventory. **Niovel Perez** → **786-752-8080** (Approved); **Ana Perez** → **786-296-7254** (Approved). Meta-generated Test WABA disabled — do not use. Future deployment must explicitly select intended production WABA; do not rely on Meta auto-selection.
+
+---
+
+## Documentation — Sprint 11.4 WABA migration policy (DOC-0701 v1.4)
+
+**Date:** 2026-07-21
+
+Do not delete unused WhatsApp Business Accounts during migration. Added WABA inventory requirements (ownership, linked apps, phone numbers, production usage) and cleanup timing: only after Atlas is successfully running in the new production environment.
+
+---
+
+## Documentation — Sprint 11.4 root cause refined (DOC-0701 v1.3)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Root cause refined: Meta auto-selected **disabled Test WABA** instead of approved production WABA. **Niovel Perez** and **Ana Perez** WABAs verified **Approved**. Added deployment checklist to verify WABA selection before Cloud API onboarding.
+
+---
+
+## Documentation — Sprint 11.4 Business Home confirmed (DOC-0701 v1.2)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Confirmed Business Portfolio operational — Business Home loads with Team Vision Financial profile and ad account. Next diagnostic: Business Settings → WhatsApp accounts (WABA assets and permissions). Reinforces WABA-isolated issue, not portfolio failure.
+
+---
+
+## Documentation — Sprint 11.4 WABA vs portfolio scope (DOC-0701 v1.1)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Verified Team Vision Financial **Business Portfolio** healthy (no advertising restrictions, no support cases). Updated deployment troubleshooting: Cloud API restriction is **likely isolated to the WABA**, not the Business Portfolio.
+
+---
+
+## Documentation — Sprint 11.4 Meta WABA restriction (DOC-0701)
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-07-21 |
+
+Recorded Meta WhatsApp Cloud API initialization blocked by **WABA account restriction** before test number claim. Documented as Meta account-level issue (not Atlas backend). Added `08-operations/deployment/sprint-11.4-meta-production.md` troubleshooting: verify WABA status before continuing Cloud API setup.
+
+---
+
+## Release 11.4-B — WhatsApp credentials + MVP readiness probe
+
+| Field | Value |
+|-------|-------|
+| **Release** | 11.4-B |
+| **Status** | Deployed to `main` |
+| **Date** | 2026-07-21 |
+
+Production outbound WhatsApp now prefers Embedded Signup stored credentials with env fallback. Added `/health/production` MVP readiness endpoint.
+
+### Changes
+
+- `whatsappSendCredentials.js` — Embedded Signup token + phone_number_id, env fallback
+- `whatsappOutboundPipeline.js` — dynamic credentials, unified Graph API version
+- `productionReadiness.js` + `GET /health/production` — Supabase, webhook, WhatsApp send, Google Calendar checks
+- `calendarService` — `cancelInterview` deletes Google Calendar events when configured
+- Verification: `node backend/dev/verifyProductionPipeline.js`
+
+---
+
+## Release 11.4-A — Production WhatsApp AI Pipeline (main)
+
+| Field | Value |
+|-------|-------|
+| **Release** | 11.4-A |
+| **Status** | Deployed to `main` |
+| **Date** | 2026-07-21 |
+
+Merged Sprint 11.4 Phase A onto production branch. Live WhatsApp webhooks now invoke the Conversation Engine and deliver automated replies via the Communication Hub.
+
+### Production changes
+
+- `communicationHub.js` — transport layer between engines and WhatsApp outbound
+- `whatsappInboundPipeline.js` — post-persist AI invocation
+- `channelMessage.js` — normalized message envelope
+- Business-rules gate (BR-034) before automated outbound
+- Verification: `node backend/dev/verifySprint11_4.js`
+- `.env.example` — Google Calendar variables documented
+
+### Launch blockers remaining
+
+- Google Calendar `GOOGLE_*` credentials on Railway
+- End-to-end live smoke test (Ad → WhatsApp → Calendar → Interview)
+
+---
+
+## Sprint 11.4 — Phase A Completed
+
+| Field | Value |
+|-------|-------|
+| **Sprint** | 11.4 (Phase A) |
+| **Status** | Complete |
+| **Date** | 2026-07-21 |
+
+Atlas now processes production WhatsApp conversations through a channel-agnostic **Communication Hub** and **AI Conversation Engine**, establishing the core architecture for future multi-channel communications.
+
+### Highlights
+
+- Production WhatsApp inbound pipeline wired to Conversation Engine
+- Channel-agnostic normalized message envelope (`channelMessage.js`)
+- Communication Hub transport layer (`communicationHub.js`)
+- Automated replies delivered via WhatsApp outbound pipeline
+- Business-rules gate before automated outbound (human ownership, workflow gate, closed prospects)
+- Simulator and dev routes unified through Communication Hub
+- Verification: `backend/dev/verifySprint11_4.js`
+
+### Production flow
+
+```
+Meta Webhook → whatsappInboundPipeline → Communication Hub
+  → Conversation Engine → Business Rules → whatsappOutboundPipeline
+```
+
+### Remaining (Sprint 11.4 Phases B–F)
+
+- Full Communication Hub adapter interface
+- WhatsApp UI integration (Mission Control / Prospect Workspace)
+- Google Calendar integration
+- Prospect Memory persistence
+- Executive Intelligence hooks
+
+See [09-releases/sprints/Sprint-11.4-Implementation-Plan.md](../09-releases/sprints/Sprint-11.4-Implementation-Plan.md) (DOC-0512).
+
+---
+
+## Documentation Foundation Completed
+
+| Field | Value |
+|-------|-------|
+| **Milestone** | Documentation Foundation |
+| **Status** | Complete |
+| **Date** | 2026-07-20 |
+
+### Highlights
+
+- Executive documentation established (`00-executive/`)
+- Architecture documentation established (`02-architecture/`)
+- Meta approval package completed (`04-meta/` — DOC-0002 Approved)
+- Sprint documentation established (`05-sprints/`)
+- Release documentation established (`06-releases/`)
+- GitHub confirmed as Atlas project memory (source of truth for docs, code, and sprint history)
+
+### Documentation deliverables
+
+| Area | Key documents |
+|------|---------------|
+| Executive | DOC-0001 Current System State (Approved) |
+| Meta package | DOC-0002 Portfolio (Approved), DOC-0003 Privacy, DOC-0004 Q&A |
+| Architecture | DOC-0010 Communication Hub |
+| Sprint 11.4 | DOC-0511 Specification, DOC-0512 Implementation Plan |
+| Releases | DOC-0600 Changelog |
+
+> **Policy:** Documentation is frozen except for normal sprint updates, release notes, and ADRs.
+
+---
+
+## Sprint 11.3.1
+
+| Field | Value |
+|-------|-------|
+| **Release** | Release-11.3.1 |
+| **Release status** | Production |
+| **Related sprint** | 11.3.1 |
+
+### Highlights
+
+- Public website launched
+- Authentication completed
+- Executive Dashboard completed
+- Mission Control completed
+- Prospect Center completed
+- Prospect Workspace completed
+- Quick Capture completed
+- Contact Form integrated with Resend
+- Railway backend deployed
+- Vercel frontend deployed
+
+### Documentation
+
+- **DOC-0001** — [Current System State](../00-executive/Current_System_State.md) — Approved
+- **DOC-0002** — [Meta Approval Portfolio](../05-integrations/meta/Meta_Approval_Portfolio.md) — Approved
+- **DOC-0003** — [Privacy and Data Handling](../07-security/Privacy_and_Data_Handling.md) — Draft
+- **DOC-0004** — [Meta Review Q&A](../07-security/Meta_Review_QA.md) — Draft
+
+### Next sprint
+
+| Sprint | Objective |
+|--------|-----------|
+| **Sprint 11.4** | AI Conversation Engine |
+
+See [09-releases/sprints/Sprint-11.4.md](../09-releases/sprints/Sprint-11.4.md), [09-releases/sprints/Sprint-11.4-Implementation-Plan.md](../09-releases/sprints/Sprint-11.4-Implementation-Plan.md), and [Communication_Hub.md](../02-architecture/Communication_Hub.md) for planning detail.
+
+---
+
+## Document revision history
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.2 | 2026-07-21 | Atlas Development Team | Sprint 11.4 Phase A — live Conversation Engine + Communication Hub wiring |
+| 1.1 | 2026-07-20 | Atlas Development Team | Documentation Foundation milestone; Sprint 11.4 implementation plan indexed |
+| 1.0 | 2026-07-20 | Atlas Development Team | Initial changelog — Sprint 11.3.1 production release |

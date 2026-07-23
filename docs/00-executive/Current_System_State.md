@@ -49,9 +49,9 @@ It is updated at the close of each production-facing release. For architecture d
 ### Intentionally excluded
 
 - Detailed API contracts and endpoint schemas (see engineering docs)
-- Business rule definitions (see [BUSINESS_RULES.md](../BUSINESS_RULES.md))
+- Business rule definitions (see [BUSINESS_RULES.md](../06-business/BUSINESS_RULES.md))
 - Sprint implementation tasks and acceptance criteria (see sprint documents)
-- Meta Business Verification submission copy and checklists (see [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md))
+- Meta Business Verification submission copy and checklists (see [Meta_Approval_Portfolio.md](../05-integrations/meta/Meta_Approval_Portfolio.md))
 - Conversation engine and Communication Hub design (see Sprint 11.4 documentation)
 - Historical commit-by-commit changelog
 
@@ -61,14 +61,14 @@ It is updated at the close of each production-facing release. For architecture d
 
 | Category | Document | Description |
 |----------|----------|-------------|
-| Strategy | [Vision.md](./Vision.md) | Long-term product vision for Atlas AI |
+| Strategy | [Product_Vision.md](../01-product/Product_Vision.md) | Product vision (DOC-0006) |
 | Strategy | [Roadmap.md](./Roadmap.md) | Planned releases and milestone sequence |
-| Compliance | [Meta_Approval_Portfolio.md](../04-meta/Meta_Approval_Portfolio.md) | Meta Business Verification materials |
-| Compliance | [Privacy_and_Data_Handling.md](../04-meta/Privacy_and_Data_Handling.md) | Privacy and data handling (Meta package) |
-| Compliance | [Meta_Review_QA.md](../04-meta/Meta_Review_QA.md) | Meta reviewer Q&A |
-| Architecture | [atlas-communication-platform.md](../architecture/atlas-communication-platform.md) | Channel-independent communication platform (Sprint 12, DOC-0020) |
+| Compliance | [Meta_Approval_Portfolio.md](../05-integrations/meta/Meta_Approval_Portfolio.md) | Meta Business Verification materials |
+| Compliance | [Privacy_and_Data_Handling.md](../07-security/Privacy_and_Data_Handling.md) | Privacy and data handling (DOC-0003) |
+| Compliance | [Meta_Review_QA.md](../07-security/Meta_Review_QA.md) | Meta reviewer Q&A (DOC-0004) |
+| Architecture | [02-architecture/atlas-communication-platform.md](../02-architecture/atlas-communication-platform.md) | Channel-independent communication platform (Sprint 12, DOC-0020) |
 | Architecture | [Communication_Hub.md](../02-architecture/Communication_Hub.md) | Communication Gateway transport layer (Sprint 11.4+, DOC-0010) |
-| Sprint | [Sprint-11.4.md](../05-sprints/Sprint-11.4.md) | Conversation Engine and WhatsApp Business integration |
+| Sprint | [09-releases/sprints/Sprint-11.4.md](../09-releases/sprints/Sprint-11.4.md) | Conversation Engine and WhatsApp Business integration |
 | Sprint | Sprint documentation (engineering) | See [Documentation index](#documentation-index) |
 
 ---
@@ -242,7 +242,7 @@ For local API calls, set in `frontend/.env`:
 VITE_API_BASE_URL=http://localhost:3000
 ```
 
-See also: [docs/troubleshooting/local-development.md](../troubleshooting/local-development.md)
+See also: [local-development.md](../08-operations/local-development.md)
 
 ---
 
@@ -252,16 +252,16 @@ See also: [docs/troubleshooting/local-development.md](../troubleshooting/local-d
 |--------|---------|--------|
 | 10.1 | Quick Capture | **LOCKED** — changes only with user feedback + verification |
 | 10.2 | Prospect Workspace | Active; verification scripts required |
-| 11.1 | Live WhatsApp | Documented in `SPRINT_11_1_LIVE_WHATSAPP.md` |
+| 11.1 | Live WhatsApp | Documented in `09-releases/sprints/SPRINT_11_1_LIVE_WHATSAPP.md` |
 | 11.3 / 11.3.1 | Public site + production API client | Current integration baseline |
 
-Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
+Business rules source of truth: [BUSINESS_RULES.md](../06-business/BUSINESS_RULES.md)
 
 ---
 
 ## Known open items (production blockers)
 
-1. **Meta WhatsApp Cloud API (Sprint 11.4)** — **Deferred.** WhatsApp asset layer **restricted** — `wabaID` null on existing WABA path; new WABA creation blocked (*"WhatsApp Business account is currently restricted"*). Portfolio and app verified healthy. **Strategic pivot:** MVP moves to **Facebook Messenger** + **Instagram DM** (Sprint 12). ([investigation](../sprints/sprint-11.4-whatsapp-investigation.md), DOC-0513)
+1. **Meta WhatsApp Cloud API (Sprint 11.4)** — **Deferred.** WhatsApp asset layer **restricted** — `wabaID` null on existing WABA path; new WABA creation blocked (*"WhatsApp Business account is currently restricted"*). Portfolio and app verified healthy. **Strategic pivot:** MVP moves to **Facebook Messenger** + **Instagram DM** (Sprint 12). ([investigation](../08-operations/sprint-11.4-whatsapp-investigation.md), DOC-0513)
 2. **Live end-to-end smoke test (Messenger / Instagram)** — Send message via primary channel; confirm Atlas reply → qualification → Google Calendar booking → confirmation. WhatsApp smoke test deferred until Meta restrictions resolved.
 3. **Workflow state persistence** — `workflowState.json` / `agentActionState.json` are file-based; migrate to Supabase for Railway durability.
 4. **META_APP_SECRET on Railway** — Recommended for webhook signature validation (currently skipped with warning when unset).
@@ -283,9 +283,9 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 **Related planning documents:**
 
-- [sprint-11.4-whatsapp-investigation.md](../sprints/sprint-11.4-whatsapp-investigation.md) — strategic pivot (DOC-0513)
-- [Sprint-11.4.md](../05-sprints/Sprint-11.4.md)
-- [atlas-communication-platform.md](../architecture/atlas-communication-platform.md)
+- [sprint-11.4-whatsapp-investigation.md](../08-operations/sprint-11.4-whatsapp-investigation.md) — strategic pivot (DOC-0513)
+- [09-releases/sprints/Sprint-11.4.md](../09-releases/sprints/Sprint-11.4.md)
+- [02-architecture/atlas-communication-platform.md](../02-architecture/atlas-communication-platform.md)
 - [Communication_Hub.md](../02-architecture/Communication_Hub.md)
 
 ---
@@ -294,11 +294,12 @@ Business rules source of truth: [BUSINESS_RULES.md](../BUSINESS_RULES.md)
 
 | Document | Audience |
 |----------|----------|
-| [ATLAS_CORE_ARCHITECTURE.md](../ATLAS_CORE_ARCHITECTURE.md) | Engineering |
-| [BUSINESS_RULES.md](../BUSINESS_RULES.md) | Product + engineering |
-| [ENGINEERING_STANDARDS.md](../ENGINEERING_STANDARDS.md) | Engineering |
-| [BACKLOG.md](../BACKLOG.md) | Product |
-| [DEVELOPMENT_WORKFLOW.md](../DEVELOPMENT_WORKFLOW.md) | Engineering |
+| [README.md](../README.md) | Everyone — Documentation Hub |
+| [ATLAS_CORE_ARCHITECTURE.md](../02-architecture/ATLAS_CORE_ARCHITECTURE.md) | Engineering |
+| [BUSINESS_RULES.md](../06-business/BUSINESS_RULES.md) | Product + engineering |
+| [ENGINEERING_STANDARDS.md](../03-engineering/ENGINEERING_STANDARDS.md) | Engineering |
+| [BACKLOG.md](../01-product/BACKLOG.md) | Product |
+| [DEVELOPMENT_WORKFLOW.md](../03-engineering/DEVELOPMENT_WORKFLOW.md) | Engineering |
 
 ---
 

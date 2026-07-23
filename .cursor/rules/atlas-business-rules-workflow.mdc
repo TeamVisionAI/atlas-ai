@@ -1,17 +1,17 @@
 ---
-description: Atlas Business Rules workflow — read docs/BUSINESS_RULES.md before architectural decisions
+description: Atlas Business Rules workflow — read docs/06-business/BUSINESS_RULES.md before architectural decisions
 alwaysApply: true
 ---
 
 # Atlas Business Rules Workflow
 
-**Source of truth:** `docs/BUSINESS_RULES.md` (BR-001 … BR-024+). Treat it as part of Atlas architecture.
+**Source of truth:** `docs/06-business/BUSINESS_RULES.md` (BR-001 … BR-024+). Treat it as part of Atlas architecture.
 
 **Decision engine:** `backend/core/businessRulesEngine.js` — business rules only, no conversation wording.
 
 ## Before coding
 
-1. Read `docs/BUSINESS_RULES.md` before architectural or behavioral decisions.
+1. Read `docs/06-business/BUSINESS_RULES.md` before architectural or behavioral decisions.
 2. Check whether an existing BR-XXX already covers the feature. Follow it if yes.
 3. If no rule exists, recommend a new BR-XXX instead of inventing behavior.
 4. If a request conflicts with a rule, **stop and name the conflict** (e.g. "Conflicts with BR-008") before implementing.
@@ -26,4 +26,4 @@ alwaysApply: true
 
 Include a brief summary: files modified, engines affected, BRs implemented, new BRs recommended, technical debt (if any).
 
-Full workflow: `docs/DEVELOPMENT_WORKFLOW.md`
+Full workflow: `docs/03-engineering/DEVELOPMENT_WORKFLOW.md`

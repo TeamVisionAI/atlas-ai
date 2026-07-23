@@ -16,7 +16,14 @@ import {
 import "./WhatsAppConnect.css";
 
 const CONNECTION_TYPE_LABEL = "WhatsApp Business App";
-const FINISH_EVENTS = new Set(["FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING", "FINISH"]);
+const FINISH_EVENTS = new Set([
+  "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
+  "FINISH",
+  "FINISH_ONLY_WABA",
+  "FINISH_GRANT_ONLY_API_ACCESS"
+]);
+const COMPLETION_TIMEOUT_MS = 60_000;
+const FACEBOOK_POST_MESSAGE_VERBOSE_MS = 30_000;
 const WA_EMBEDDED_SIGNUP_DEBUG = "[WA_EMBEDDED_SIGNUP_DEBUG]";
 
 function debugPretty(value) {
@@ -58,8 +65,6 @@ function logFacebookPostMessageTrace(messageNumber, data) {
   }
 }
 
-const FACEBOOK_POST_MESSAGE_VERBOSE_MS = 30_000;
-
 export default function WhatsAppConnect() {
   const { translate } = useLanguage();
   const { ready, error: sdkError, appId, configId, version } = useFacebookSdk();
@@ -74,6 +79,8 @@ export default function WhatsAppConnect() {
   const onboardingAssetsRef = useRef({ wabaId: null, phoneNumberId: null });
   const onboardingFinishedRef = useRef(false);
   const exchangeSubmittedRef = useRef(false);
+  const exchangeInFlightRef = useRef(false);
+  const completionTimeoutRef = useRef(null);
   const prevStatusRef = useRef(status);
   const facebookPostMessageCountRef = useRef(0);
   const facebookPostMessageVerboseUntilRef = useRef(0);
@@ -86,85 +93,137 @@ export default function WhatsAppConnect() {
       onboardingFinished: onboardingFinishedRef.current,
       onboardingAssets: { ...onboardingAssetsRef.current },
       exchangeSubmitted: exchangeSubmittedRef.current,
+      exchangeInFlight: exchangeInFlightRef.current,
       completionGate: {
         hasAuthorizationCode: Boolean(authorizationCodeRef.current),
-        hasOnboardingFinished: onboardingFinishedRef.current,
         notExchangeSubmitted: !exchangeSubmittedRef.current,
+        notExchangeInFlight: !exchangeInFlightRef.current,
         wouldAttemptCompletion:
           Boolean(authorizationCodeRef.current) &&
-          onboardingFinishedRef.current &&
-          !exchangeSubmittedRef.current
+          !exchangeSubmittedRef.current &&
+          !exchangeInFlightRef.current
       }
     });
   }, [status]);
 
-  useEffect(() => {
-    if (prevStatusRef.current !== status) {
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "State transition", {
-        from: prevStatusRef.current,
-        to: status
-      });
-      prevStatusRef.current = status;
+  const clearCompletionTimeout = useCallback(() => {
+    if (completionTimeoutRef.current != null) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
     }
-  }, [status]);
+  }, []);
 
   const resetAttempt = useCallback(() => {
+    clearCompletionTimeout();
     authorizationCodeRef.current = null;
     onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null };
     onboardingFinishedRef.current = false;
     exchangeSubmittedRef.current = false;
+    exchangeInFlightRef.current = false;
     setErrorMessage(null);
     setLaunching(false);
     setStatus("disconnected");
-  }, []);
+  }, [clearCompletionTimeout]);
+
+  const failAttempt = useCallback(
+    (nextStatus, message) => {
+      clearCompletionTimeout();
+      exchangeInFlightRef.current = false;
+      exchangeSubmittedRef.current = false;
+      authorizationCodeRef.current = null;
+      setLaunching(false);
+      setStatus(nextStatus);
+      setErrorMessage(message);
+      logCoordinatorState(`failAttempt:${nextStatus}`);
+    },
+    [clearCompletionTimeout, logCoordinatorState]
+  );
+
+  const armCompletionTimeout = useCallback(() => {
+    clearCompletionTimeout();
+    completionTimeoutRef.current = setTimeout(() => {
+      if (exchangeSubmittedRef.current || exchangeInFlightRef.current) {
+        console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Completion timeout ignored — exchange already in flight");
+        return;
+      }
+
+      console.warn(WA_EMBEDDED_SIGNUP_DEBUG, "Completion timeout — resetting UI after 60s", {
+        authorizationCodePresent: Boolean(authorizationCodeRef.current),
+        onboardingFinished: onboardingFinishedRef.current,
+        onboardingAssets: { ...onboardingAssetsRef.current }
+      });
+      failAttempt("error", translate("whatsappConnectTimeout"));
+    }, COMPLETION_TIMEOUT_MS);
+  }, [clearCompletionTimeout, failAttempt, translate]);
 
   const attemptCompletion = useCallback(async () => {
     const code = authorizationCodeRef.current;
 
-    if (!code || !onboardingFinishedRef.current || exchangeSubmittedRef.current) {
+    if (!code || exchangeSubmittedRef.current || exchangeInFlightRef.current) {
       console.log(WA_EMBEDDED_SIGNUP_DEBUG, "attemptCompletion skipped (gate not satisfied)", {
         hasAuthorizationCode: Boolean(code),
-        onboardingFinished: onboardingFinishedRef.current,
-        exchangeSubmitted: exchangeSubmittedRef.current
+        exchangeSubmitted: exchangeSubmittedRef.current,
+        exchangeInFlight: exchangeInFlightRef.current
       });
       logCoordinatorState("attemptCompletion skipped");
       return;
     }
 
-    console.log(WA_EMBEDDED_SIGNUP_DEBUG, "attemptCompletion proceeding");
-    logCoordinatorState("attemptCompletion start");
-
     exchangeSubmittedRef.current = true;
+    exchangeInFlightRef.current = true;
+    clearCompletionTimeout();
     setStatus("finalizing");
+    setLaunching(true);
     setErrorMessage(null);
 
+    const payload = {
+      code,
+      wabaId: onboardingAssetsRef.current.wabaId || undefined,
+      phoneNumberId: onboardingAssetsRef.current.phoneNumberId || undefined,
+      onboardingType: "whatsapp_business_app"
+    };
+
+    console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Backend exchange request starting", {
+      endpoint: "POST /api/meta/embedded-signup/exchange",
+      codeLength: code.length,
+      sessionInfo: {
+        wabaId: payload.wabaId ?? null,
+        phoneNumberId: payload.phoneNumberId ?? null,
+        onboardingFinished: onboardingFinishedRef.current
+      }
+    });
+    logCoordinatorState("attemptCompletion start");
+
     try {
-      const result = await exchangeEmbeddedSignupCode({
-        code,
-        wabaId: onboardingAssetsRef.current.wabaId || undefined,
-        phoneNumberId: onboardingAssetsRef.current.phoneNumberId || undefined,
-        onboardingType: "whatsapp_business_app"
+      const result = await exchangeEmbeddedSignupCode(payload);
+
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Backend exchange request succeeded", {
+        connected: Boolean(result.connection),
+        phoneNumberId: result.connection?.phoneNumberId ?? null,
+        wabaId: result.connection?.wabaId ?? null
       });
 
       authorizationCodeRef.current = null;
       onboardingFinishedRef.current = false;
       onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null };
+      exchangeInFlightRef.current = false;
       setConnection(result.connection || null);
       setHealthStatus(result.connection?.healthStatus || "healthy");
       setStatus("connected");
+      setLaunching(false);
     } catch (error) {
-      console.error(WA_EMBEDDED_SIGNUP_DEBUG, "attemptCompletion catch block", error);
+      console.error(WA_EMBEDDED_SIGNUP_DEBUG, "Backend exchange request failed", error);
       exchangeSubmittedRef.current = false;
+      exchangeInFlightRef.current = false;
+      setLaunching(false);
       setStatus("error");
       setErrorMessage(
         error instanceof MetaEmbeddedSignupError
           ? error.message
           : translate("whatsappConnectExchangeFailed")
       );
-    } finally {
-      setLaunching(false);
     }
-  }, [translate, logCoordinatorState]);
+  }, [clearCompletionTimeout, translate, logCoordinatorState]);
 
   const handleEmbeddedSignupEvent = useCallback(
     (parsed, rawData) => {
@@ -175,10 +234,13 @@ export default function WhatsAppConnect() {
         return;
       }
 
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "handleEmbeddedSignupEvent", {
-        event: parsed.event,
+      const sessionInfo = parsed.raw?.data ?? null;
+
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Embedded Signup postMessage event", {
+        eventType: parsed.event,
         wabaId: parsed.wabaId,
         phoneNumberId: parsed.phoneNumberId,
+        sessionInfo,
         rawPretty: debugPretty(parsed.raw)
       });
 
@@ -191,29 +253,37 @@ export default function WhatsAppConnect() {
         if (authorizationCodeRef.current) {
           attemptCompletion();
         } else {
-          console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FINISH received but authorization code not yet stored");
-          setStatus("finalizing");
+          console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FINISH received — waiting for authorization code from FB.login");
+          setLaunching(true);
+          setStatus("waiting_for_qr");
         }
 
         return;
       }
 
       if (parsed.event === "CANCEL") {
-        console.log(WA_EMBEDDED_SIGNUP_DEBUG, "CANCEL event received");
-        setLaunching(false);
-        setStatus("cancelled");
-        setErrorMessage(translate("whatsappConnectCancelled"));
+        console.log(WA_EMBEDDED_SIGNUP_DEBUG, "CANCEL event received", {
+          sessionInfo,
+          errorMessage: parsed.errorMessage ?? null
+        });
+        const message =
+          parsed.errorMessage ||
+          parsed.raw?.data?.error_message ||
+          translate("whatsappConnectCancelled");
+        failAttempt("cancelled", message);
         return;
       }
 
       if (parsed.event === "ERROR") {
         console.log(WA_EMBEDDED_SIGNUP_DEBUG, "ERROR event received", {
           errorMessage: parsed.errorMessage,
+          sessionInfo,
           rawPretty: debugPretty(parsed.raw)
         });
-        setLaunching(false);
-        setStatus("error");
-        setErrorMessage(parsed.errorMessage || translate("whatsappConnectEmbeddedError"));
+        failAttempt(
+          "error",
+          parsed.errorMessage || translate("whatsappConnectEmbeddedError")
+        );
 
         if (import.meta.env.DEV) {
           console.error("[WA_EMBEDDED_SIGNUP]", parsed.raw);
@@ -223,8 +293,30 @@ export default function WhatsAppConnect() {
 
       console.log(WA_EMBEDDED_SIGNUP_DEBUG, "handleEmbeddedSignupEvent unhandled event type", parsed.event);
     },
-    [attemptCompletion, translate, logCoordinatorState]
+    [attemptCompletion, failAttempt, translate, logCoordinatorState]
   );
+
+  useEffect(() => {
+    if (prevStatusRef.current !== status) {
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "State transition", {
+        from: prevStatusRef.current,
+        to: status
+      });
+      prevStatusRef.current = status;
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (ready) {
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Meta SDK ready", { appId, configId, version });
+    }
+  }, [ready, appId, configId, version]);
+
+  useEffect(() => {
+    return () => {
+      clearCompletionTimeout();
+    };
+  }, [clearCompletionTimeout]);
 
   useEffect(() => {
     let cancelled = false;
@@ -301,65 +393,68 @@ export default function WhatsAppConnect() {
 
   const fbLoginCallback = useCallback(
     (response) => {
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login callback (full response)", response);
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login callback payload", {
+        status: response?.status ?? null,
+        authResponse: response?.authResponse ?? null
+      });
       console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login callback (pretty)", debugPretty(response));
       debugStringify("response", response);
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login authResponse (full)", response?.authResponse ?? null);
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login authResponse (pretty)", debugPretty(response?.authResponse ?? null));
-      debugStringify("authResponse", response?.authResponse ?? null);
-      console.log(
-        WA_EMBEDDED_SIGNUP_DEBUG,
-        "FB.login authResponse keys",
-        response?.authResponse ? Object.keys(response.authResponse) : null
-      );
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login authResponse keys", response?.authResponse
+        ? Object.keys(response.authResponse)
+        : null);
 
       const code = response?.authResponse?.code;
 
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Authorization code extracted from authResponse", {
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Authorization code presence", {
         codePresent: Boolean(code),
         codeLength: code?.length ?? 0,
         fbLoginStatus: response?.status ?? null
       });
 
       if (!code) {
-        console.log(WA_EMBEDDED_SIGNUP_DEBUG, "No authorization code in authResponse — treating as auth incomplete");
+        console.log(WA_EMBEDDED_SIGNUP_DEBUG, "No authorization code in authResponse — auth incomplete");
         logCoordinatorState("FB.login without code");
-        setLaunching(false);
-        setStatus("cancelled");
-        setErrorMessage(translate("whatsappConnectAuthIncomplete"));
+
+        if (response?.status === "unknown") {
+          failAttempt("cancelled", translate("whatsappConnectCancelled"));
+          return;
+        }
+
+        failAttempt("cancelled", translate("whatsappConnectAuthIncomplete"));
         return;
       }
 
       authorizationCodeRef.current = code;
       logCoordinatorState("after authorization code stored");
 
-      if (onboardingFinishedRef.current) {
-        console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Authorization code stored and FINISH already received — calling attemptCompletion");
-        attemptCompletion();
-      } else {
-        console.log(
-          WA_EMBEDDED_SIGNUP_DEBUG,
-          "Authorization code stored — waiting for FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING or FINISH postMessage"
-        );
-        setStatus("waiting_for_qr");
-        logCoordinatorState("waiting for FINISH event");
-      }
+      console.log(
+        WA_EMBEDDED_SIGNUP_DEBUG,
+        "Authorization code stored — starting backend exchange (FINISH event optional)"
+      );
+      attemptCompletion();
     },
-    [attemptCompletion, translate, logCoordinatorState]
+    [attemptCompletion, failAttempt, translate, logCoordinatorState]
   );
 
   const launchWhatsAppSignup = useCallback(() => {
     if (launching || !ready || !window.FB || !configId) {
+      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Connect button ignored", {
+        launching,
+        ready,
+        hasFb: Boolean(window.FB),
+        configIdPresent: Boolean(configId)
+      });
       return;
     }
 
-    setLaunching(true);
-    setStatus("connecting");
+    console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Connect WhatsApp button clicked");
+
     setErrorMessage(null);
     authorizationCodeRef.current = null;
     onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null };
     onboardingFinishedRef.current = false;
     exchangeSubmittedRef.current = false;
+    exchangeInFlightRef.current = false;
 
     console.log(WA_EMBEDDED_SIGNUP_DEBUG, "launchWhatsAppSignup reset coordinator state");
     logCoordinatorState("launchWhatsAppSignup start");
@@ -375,6 +470,10 @@ export default function WhatsAppConnect() {
       }
     };
 
+    setLaunching(true);
+    setStatus("connecting");
+    armCompletionTimeout();
+
     console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Immediately before FB.login()", loginOptions);
 
     facebookPostMessageCountRef.current = 0;
@@ -384,7 +483,7 @@ export default function WhatsAppConnect() {
     });
 
     window.FB.login(fbLoginCallback, loginOptions);
-  }, [configId, fbLoginCallback, launching, ready, logCoordinatorState]);
+  }, [armCompletionTimeout, configId, fbLoginCallback, launching, ready, logCoordinatorState]);
 
   const healthLabelKey = (() => {
     switch (healthStatus || connection?.healthStatus) {

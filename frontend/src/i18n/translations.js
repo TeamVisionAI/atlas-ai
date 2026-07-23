@@ -378,6 +378,8 @@ export const translations = {
     whatsappConnectAuthIncomplete: "La autorización de Facebook no se completó.",
     whatsappConnectEmbeddedError: "Meta reportó un error durante el registro embebido.",
     whatsappConnectExchangeFailed: "No se pudo completar el intercambio de autorización.",
+    whatsappConnectTimeout:
+      "La conexión tardó demasiado. Cierra el diálogo de Facebook e inténtalo de nuevo.",
     whatsappConnectMissingConfig:
       "Faltan VITE_META_APP_ID o VITE_META_EMBEDDED_SIGNUP_CONFIG_ID en el frontend.",
     whatsappConnectSdkError: "No se pudo cargar el SDK de Facebook.",
@@ -765,6 +767,8 @@ export const translations = {
     whatsappConnectAuthIncomplete: "Facebook authorization was not completed.",
     whatsappConnectEmbeddedError: "Meta reported an error during embedded signup.",
     whatsappConnectExchangeFailed: "Unable to complete authorization exchange.",
+    whatsappConnectTimeout:
+      "The connection took too long. Close the Facebook dialog and try again.",
     whatsappConnectMissingConfig:
       "VITE_META_APP_ID or VITE_META_EMBEDDED_SIGNUP_CONFIG_ID is missing in the frontend env.",
     whatsappConnectSdkError: "Unable to load the Facebook SDK.",

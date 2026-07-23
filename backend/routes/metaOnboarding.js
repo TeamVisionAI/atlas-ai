@@ -6,7 +6,8 @@ const express = require("express");
 const {
   completeEmbeddedSignupExchange,
   getEmbeddedSignupStatus,
-  sanitizeMetaError
+  sanitizeMetaError,
+  extractGraphErrorDetails
 } = require("../core/metaEmbeddedSignupService");
 const { isRateLimited } = require("../core/metaEmbeddedSignupRateLimit");
 const { checkMetaConnectionHealth } = require("../core/meta/metaConnectionHealthService");
@@ -92,11 +93,16 @@ router.post("/embedded-signup/exchange", async (req, res) => {
     }
 
     if (error.stage) {
+      const graphDetails = extractGraphErrorDetails(error);
+
       return res.status(error.statusCode || 500).json({
         error: error.publicCode || error.stage,
         stage: error.stage,
         recoverable: Boolean(error.recoverable),
-        message: error.message
+        message: error.message,
+        metaGraphStatus: error.metaGraphStatus ?? graphDetails.graphStatus ?? null,
+        metaGraphError: error.metaGraphError ?? graphDetails.graphError ?? null,
+        metaGraphResponse: error.metaGraphResponse ?? graphDetails.graphResponseBody ?? null
       });
     }
 

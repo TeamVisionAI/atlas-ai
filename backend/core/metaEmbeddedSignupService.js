@@ -25,6 +25,33 @@ function getMetaAppSecret() {
   return process.env.META_APP_SECRET;
 }
 
+function getMetaExchangeEnvSnapshot() {
+  return {
+    graphVersion: getGraphVersion(),
+    appId: getMetaAppId() || null,
+    appSecretPresent: Boolean(getMetaAppSecret()),
+    configIdPresent: Boolean(process.env.META_EMBEDDED_SIGNUP_CONFIG_ID),
+    appAccessTokenPresent: Boolean(process.env.META_APP_ACCESS_TOKEN),
+    graphApiVersionEnv: process.env.META_GRAPH_API_VERSION || null
+  };
+}
+
+function extractGraphErrorDetails(error) {
+  const graphResponseBody = error?.response?.data ?? null;
+  const graphError = graphResponseBody?.error ?? null;
+
+  return {
+    graphResponseBody,
+    graphError,
+    graphStatus: error?.response?.status ?? null,
+    graphErrorCode: graphError?.code ?? null,
+    graphErrorSubcode: graphError?.error_subcode ?? null,
+    graphErrorMessage: graphError?.message ?? null,
+    graphErrorType: graphError?.type ?? null,
+    graphErrorUserMsg: graphError?.error_user_msg ?? null
+  };
+}
+
 const COMPLETION_STAGES = Object.freeze({
   OAUTH_EXCHANGE_FAILED: "OAUTH_EXCHANGE_FAILED",
   ASSET_DISCOVERY_FAILED: "ASSET_DISCOVERY_FAILED",
@@ -50,13 +77,22 @@ const STAGE_STATUS_CODES = Object.freeze({
 });
 
 function createCompletionStageError(stage, cause) {
-  const message = STAGE_MESSAGES[stage] || cause?.message || "Embedded signup failed.";
+  const graphDetails = extractGraphErrorDetails(cause);
+  const graphError = graphDetails.graphError;
+  const defaultMessage = STAGE_MESSAGES[stage] || cause?.message || "Embedded signup failed.";
+  const message =
+    stage === COMPLETION_STAGES.OAUTH_EXCHANGE_FAILED && graphError
+      ? graphError.error_user_msg || graphError.message || defaultMessage
+      : defaultMessage;
 
   return Object.assign(new Error(message), {
-    statusCode: STAGE_STATUS_CODES[stage] || 500,
+    statusCode: STAGE_STATUS_CODES[stage] || cause?.statusCode || 500,
     publicCode: stage,
     stage,
-    recoverable: true
+    recoverable: true,
+    metaGraphStatus: graphDetails.graphStatus,
+    metaGraphError: graphError,
+    metaGraphResponse: graphDetails.graphResponseBody
   });
 }
 
@@ -69,19 +105,25 @@ function logCompletionStageFailure(stage, details = {}) {
 
 function sanitizeMetaError(error) {
   const graphError = error?.response?.data?.error;
+  const graphResponseBody = error?.response?.data ?? null;
 
   if (graphError) {
     return {
       error: "META_API_ERROR",
       message: graphError.error_user_msg || graphError.message || "Meta API request failed.",
-      code: graphError.code || null,
-      type: graphError.type || null
+      code: graphError.code ?? null,
+      errorSubcode: graphError.error_subcode ?? null,
+      type: graphError.type ?? null,
+      fbtraceId: graphError.fbtrace_id ?? null,
+      metaGraphError: graphError,
+      metaGraphResponse: graphResponseBody
     };
   }
 
   return {
     error: "META_EXCHANGE_FAILED",
-    message: error?.message || "Meta embedded signup exchange failed."
+    message: error?.message || "Meta embedded signup exchange failed.",
+    metaGraphResponse: graphResponseBody
   };
 }
 
@@ -91,27 +133,73 @@ async function exchangeAuthorizationCodeForToken(code) {
   const appId = getMetaAppId();
   const appSecret = getMetaAppSecret();
   const version = getGraphVersion();
+  const graphUrl = `https://graph.facebook.com/${version}/oauth/access_token`;
+  const envSnapshot = getMetaExchangeEnvSnapshot();
 
-  const response = await axios.get(`https://graph.facebook.com/${version}/oauth/access_token`, {
-    params: {
-      client_id: appId,
-      client_secret: appSecret,
-      code
-    },
-    timeout: 15000
+  metaLogger.info("oauth_access_token_exchange_request", {
+    graphEndpoint: graphUrl,
+    graphVersion: version,
+    httpMethod: "GET",
+    appId: envSnapshot.appId,
+    appSecretPresent: envSnapshot.appSecretPresent,
+    configIdPresent: envSnapshot.configIdPresent,
+    appAccessTokenPresent: envSnapshot.appAccessTokenPresent,
+    codeLength: String(code || "").length,
+    requestParams: ["client_id", "client_secret", "code"]
   });
+
+  let response;
+
+  try {
+    response = await axios.get(graphUrl, {
+      params: {
+        client_id: appId,
+        client_secret: appSecret,
+        code
+      },
+      timeout: 15000
+    });
+  } catch (error) {
+    const graphDetails = extractGraphErrorDetails(error);
+
+    metaLogger.error("oauth_access_token_exchange_failed", {
+      graphEndpoint: graphUrl,
+      graphVersion: version,
+      appId: envSnapshot.appId,
+      appSecretPresent: envSnapshot.appSecretPresent,
+      configIdPresent: envSnapshot.configIdPresent,
+      appAccessTokenPresent: envSnapshot.appAccessTokenPresent,
+      responseStatus: graphDetails.graphStatus,
+      graphResponseBody: graphDetails.graphResponseBody,
+      graphErrorCode: graphDetails.graphErrorCode,
+      graphErrorSubcode: graphDetails.graphErrorSubcode,
+      graphErrorMessage: graphDetails.graphErrorMessage,
+      graphErrorType: graphDetails.graphErrorType,
+      graphErrorUserMsg: graphDetails.graphErrorUserMsg
+    });
+    throw error;
+  }
 
   const accessToken = response.data?.access_token;
 
   if (!accessToken) {
+    metaLogger.error("oauth_access_token_exchange_missing_token", {
+      graphEndpoint: graphUrl,
+      graphVersion: version,
+      appId: envSnapshot.appId,
+      graphResponseBody: response.data ?? null
+    });
+
     throw Object.assign(new Error("Meta did not return an access token."), {
       statusCode: 502,
-      publicCode: "META_TOKEN_MISSING"
+      publicCode: "META_TOKEN_MISSING",
+      metaGraphResponse: response.data ?? null
     });
   }
 
   metaLogger.info("authorization_code_exchanged", {
-    graphVersion: version
+    graphVersion: version,
+    appId: envSnapshot.appId
   });
 
   return accessToken;
@@ -274,7 +362,9 @@ async function completeEmbeddedSignupExchange(input) {
   }
 
   metaLogger.info("embedded_signup_exchange_started", {
-    onboardingType: input.onboardingType || "whatsapp_business_app"
+    onboardingType: input.onboardingType || "whatsapp_business_app",
+    ...getMetaExchangeEnvSnapshot(),
+    codeLength: code.length
   });
 
   let accessToken;
@@ -282,8 +372,15 @@ async function completeEmbeddedSignupExchange(input) {
   try {
     accessToken = await exchangeAuthorizationCodeForToken(code);
   } catch (error) {
+    const graphDetails = extractGraphErrorDetails(error);
+
     logCompletionStageFailure(COMPLETION_STAGES.OAUTH_EXCHANGE_FAILED, {
-      message: error.response?.data?.error?.message || error.message
+      message: graphDetails.graphErrorMessage || error.message,
+      graphErrorCode: graphDetails.graphErrorCode,
+      graphErrorSubcode: graphDetails.graphErrorSubcode,
+      graphResponseBody: graphDetails.graphResponseBody,
+      responseStatus: graphDetails.graphStatus,
+      ...getMetaExchangeEnvSnapshot()
     });
     throw createCompletionStageError(COMPLETION_STAGES.OAUTH_EXCHANGE_FAILED, error);
   }
@@ -358,6 +455,8 @@ module.exports = {
   completeEmbeddedSignupExchange,
   getEmbeddedSignupStatus,
   sanitizeMetaError,
+  extractGraphErrorDetails,
+  getMetaExchangeEnvSnapshot,
   exchangeAuthorizationCodeForToken,
   resolveConnectionAssets,
   subscribeWabaToApp

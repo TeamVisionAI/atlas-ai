@@ -1,19 +1,7 @@
-# Sprint 8A.4a — Backend Workflow Simulator
+# Document moved
 
-**Status:** Implemented (backend only — no UI)  
-**Spec:** [WORKFLOW_SIMULATOR_SPEC.md](./WORKFLOW_SIMULATOR_SPEC.md)
+This file moved as part of **Atlas Documentation Foundation v1.0**.
 
-## Base path
+**New location:** [04-api/workflow-simulator-dev-api.md](04-api/workflow-simulator-dev-api.md)
 
-`/dev/workflow`
-
-## Run verification
-
-```bash
-node backend/dev/verifySprint8A4.js
-node backend/dev/goldenScenarios.js  # via POST /dev/workflow/scenarios/run
-```
-
-## Golden scenarios
-
-`POST /dev/workflow/scenarios/run` executes all 10 golden scenarios and returns structured reports with scenario recorder fields.
+See [Documentation Hub](README.md) for the full index.
