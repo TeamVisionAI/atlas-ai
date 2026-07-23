@@ -19,6 +19,7 @@ export default function Footer() {
           <Link to="/privacy">Privacy Policy</Link>
           <Link to="/legal">Legal</Link>
           <Link to="/terms">Terms of Service</Link>
+          <Link to="/data-deletion">Privacy & Data Deletion</Link>
         </nav>
       </div>
 
