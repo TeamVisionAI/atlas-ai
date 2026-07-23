@@ -111,7 +111,20 @@ app.use((error, req, res, next) => {
   });
 });
 
-app.listen(PORT, async () => {
+const server = app.listen(PORT);
+
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`❌ Port ${PORT} is already in use.`);
+    console.error(`   Run: lsof -nP -iTCP:${PORT} -sTCP:LISTEN`);
+  } else {
+    console.error("❌ Server failed to start:", error.message);
+  }
+
+  process.exit(1);
+});
+
+server.on("listening", async () => {
   logMetaEnvironmentWarnings();
 
   if (process.env.MESSENGER_PAGE_ACCESS_TOKEN) {

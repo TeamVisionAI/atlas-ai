@@ -34,12 +34,16 @@ export async function createOrganization(name) {
   return payload;
 }
 
-export async function completeMetaOnboarding() {
+export async function completeMetaOnboarding({ whatsappStatus } = {}) {
   const response = await apiRequest("/api/onboarding/meta/complete", {
     method: "POST",
     headers: {
+      "Content-Type": "application/json",
       ...(await getAuthHeaders())
-    }
+    },
+    body: JSON.stringify({
+      ...(whatsappStatus ? { whatsappStatus } : {})
+    })
   });
 
   const payload = await response.json();

@@ -26,6 +26,60 @@
         "calendar_connected_at": null,
         "calendar_refresh_token_encrypted": null
       }
+    },
+    {
+      "id": "66f1028e-7290-42e5-b530-266741001da0",
+      "name": "Calendar Test Org",
+      "owner_user_id": "82332ca3-05b0-4531-be7c-388a79412f40",
+      "activated_at": null,
+      "onboarding_step": "meta",
+      "created_at": "2026-07-22T14:40:13.550Z",
+      "updated_at": "2026-07-22T14:40:13.550Z",
+      "settings": {
+        "meeting_locations": {
+          "office": false,
+          "zoom": false,
+          "starbucks": false,
+          "custom": false
+        },
+        "office_address": null,
+        "starbucks_preference": null,
+        "custom_location_name": null,
+        "custom_location_address": null,
+        "zoom_interview_url": null,
+        "meta_connected": false,
+        "meta_connected_at": null,
+        "calendar_connected": false,
+        "calendar_connected_at": null,
+        "calendar_refresh_token_encrypted": null
+      }
+    },
+    {
+      "id": "2e4bf291-9331-491b-86c1-06f67d9a9759",
+      "name": "Team Vision",
+      "owner_user_id": "7accea8b-5a64-47fb-8ae1-f86c86ffc979",
+      "activated_at": null,
+      "onboarding_step": "meta",
+      "created_at": "2026-07-22T15:09:07.351Z",
+      "updated_at": "2026-07-22T15:09:07.351Z",
+      "settings": {
+        "meeting_locations": {
+          "office": false,
+          "zoom": false,
+          "starbucks": false,
+          "custom": false
+        },
+        "office_address": null,
+        "starbucks_preference": null,
+        "custom_location_name": null,
+        "custom_location_address": null,
+        "zoom_interview_url": null,
+        "meta_connected": false,
+        "meta_connected_at": null,
+        "calendar_connected": false,
+        "calendar_connected_at": null,
+        "calendar_refresh_token_encrypted": null
+      }
     }
   ],
   "memberships": [
@@ -35,7 +89,21 @@
       "user_id": "c177c5f6-797b-4ff9-9082-8e44c8612b42",
       "role": "admin",
       "created_at": "2026-07-21T15:51:47.986Z"
+    },
+    {
+      "id": "07d0cc6b-bcbd-4a32-9dec-3b19224dd917",
+      "organization_id": "66f1028e-7290-42e5-b530-266741001da0",
+      "user_id": "82332ca3-05b0-4531-be7c-388a79412f40",
+      "role": "admin",
+      "created_at": "2026-07-22T14:40:13.550Z"
+    },
+    {
+      "id": "71123c20-3259-4a1c-b772-a7b62ffa82eb",
+      "organization_id": "2e4bf291-9331-491b-86c1-06f67d9a9759",
+      "user_id": "7accea8b-5a64-47fb-8ae1-f86c86ffc979",
+      "role": "admin",
+      "created_at": "2026-07-22T15:09:07.351Z"
     }
   ],
-  "updatedAt": "2026-07-21T15:51:47.986Z"
+  "updatedAt": "2026-07-22T15:09:07.352Z"
 }

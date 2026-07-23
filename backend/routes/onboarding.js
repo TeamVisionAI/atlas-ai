@@ -177,7 +177,11 @@ router.post("/onboarding/meta/complete", requireAtlasUser, async (req, res) => {
       return res.status(400).json({ error: "NO_ORGANIZATION" });
     }
 
-    const updated = await markMetaConnected(organization.id);
+    const whatsappStatus = req.body?.whatsappStatus
+      ? String(req.body.whatsappStatus).trim()
+      : undefined;
+
+    const updated = await markMetaConnected(organization.id, { whatsappStatus });
 
     return res.json({
       organization: serializeOrganization(updated)

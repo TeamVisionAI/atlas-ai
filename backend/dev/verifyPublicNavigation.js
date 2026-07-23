@@ -18,8 +18,8 @@ const footerSource = read("frontend/src/components/public/Footer.jsx");
 const scrollToTopSource = read("frontend/src/components/ScrollToTop.jsx");
 
 const HOME_SECTIONS = ["about", "services", "careers", "contact"];
-const LEGAL_ROUTES = ["/privacy", "/legal", "/terms"];
-const LEGAL_PAGES = ["Privacy.jsx", "Legal.jsx", "Terms.jsx"];
+const LEGAL_ROUTES = ["/privacy", "/legal", "/terms", "/data-deletion"];
+const LEGAL_PAGES = ["Privacy.jsx", "Legal.jsx", "Terms.jsx", "DataDeletion.jsx"];
 
 // --- Navbar: always /#section, no onHome conditional ---
 

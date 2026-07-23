@@ -6,6 +6,10 @@
 const axios = require("axios");
 const { repository, toSafeConnection } = require("../repositories/metaWhatsAppConnectionRepository");
 const {
+  createJsonMetaPlatformConnectionRepository,
+  toSafePlatformConnection
+} = require("../repositories/jsonMetaPlatformConnectionRepository");
+const {
   isAuthorizationCodeUsed,
   markAuthorizationCodeUsed
 } = require("./metaEmbeddedSignupRateLimit");
@@ -13,8 +17,105 @@ const { metaLogger } = require("./meta/metaLogger");
 const { validateMetaEmbeddedSignupEnvironment } = require("./meta/metaEnvironmentValidator");
 const { getCachedConnectionStatus } = require("./meta/metaConnectionHealthService");
 
+const platformRepository = createJsonMetaPlatformConnectionRepository();
+
+function buildChannelStatus(whatsappStatus) {
+  return {
+    facebook: "connected",
+    messenger: "connected",
+    whatsapp: whatsappStatus
+  };
+}
+
+async function discoverPlatformIdentity(accessToken) {
+  const version = getGraphVersion();
+
+  const meResponse = await axios.get(`https://graph.facebook.com/${version}/me`, {
+    params: {
+      fields: "id,name",
+      access_token: accessToken
+    },
+    timeout: 15000
+  });
+
+  let pageId = process.env.MESSENGER_PAGE_ID || null;
+
+  try {
+    const accountsResponse = await axios.get(`https://graph.facebook.com/${version}/me/accounts`, {
+      params: {
+        fields: "id,name",
+        access_token: accessToken
+      },
+      timeout: 15000
+    });
+
+    const pages = accountsResponse.data?.data || [];
+
+    if (pages.length) {
+      pageId = pageId || pages[0].id;
+    }
+  } catch (error) {
+    metaLogger.warn("platform_page_discovery_skipped", {
+      message: error.response?.data?.error?.message || error.message
+    });
+  }
+
+  return {
+    userId: meResponse.data?.id || null,
+    userName: meResponse.data?.name || null,
+    pageId
+  };
+}
+
+async function tryResolveWhatsAppAssets({ accessToken, wabaId, phoneNumberId }) {
+  try {
+    return await resolveConnectionAssets({
+      accessToken,
+      wabaId,
+      phoneNumberId
+    });
+  } catch (error) {
+    if (error.stage === COMPLETION_STAGES.ASSET_DISCOVERY_FAILED) {
+      metaLogger.info("whatsapp_assets_unavailable", {
+        message: error.message
+      });
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+async function saveWhatsAppConnectionFromAssets({
+  accessToken,
+  assets,
+  onboardingType
+}) {
+  try {
+    await subscribeWabaToApp(assets.wabaId, accessToken);
+  } catch (error) {
+    throw createCompletionStageError(COMPLETION_STAGES.SUBSCRIBE_FAILED, error);
+  }
+
+  try {
+    return await repository.saveConnection({
+      waba_id: assets.wabaId,
+      phone_number_id: assets.phoneNumberId,
+      connection_type: onboardingType || "whatsapp_business_app",
+      status: "connected",
+      access_token: accessToken,
+      display_phone_number: assets.displayPhoneNumber,
+      verified_name: assets.verifiedName,
+      last_health_status: "healthy",
+      last_health_checked_at: new Date().toISOString()
+    });
+  } catch (error) {
+    throw createCompletionStageError(COMPLETION_STAGES.SAVE_FAILED, error);
+  }
+}
+
 function getGraphVersion() {
-  return process.env.META_GRAPH_API_VERSION || "v21.0";
+  return process.env.META_GRAPH_API_VERSION || "v25.0";
 }
 
 function getMetaAppId() {
@@ -91,15 +192,37 @@ async function exchangeAuthorizationCodeForToken(code) {
   const appId = getMetaAppId();
   const appSecret = getMetaAppSecret();
   const version = getGraphVersion();
+  const graphUrl = `https://graph.facebook.com/${version}/oauth/access_token`;
+  const requestParams = {
+    client_id: appId,
+    client_secret: appSecret,
+    code
+  };
 
-  const response = await axios.get(`https://graph.facebook.com/${version}/oauth/access_token`, {
-    params: {
-      client_id: appId,
-      client_secret: appSecret,
-      code
-    },
-    timeout: 15000
-  });
+  let response;
+
+  try {
+    response = await axios.get(graphUrl, {
+      params: requestParams,
+      timeout: 15000
+    });
+  } catch (error) {
+    metaLogger.error("oauth_access_token_exchange_failed", {
+      graphRequest: {
+        method: "GET",
+        url: graphUrl,
+        params: {
+          client_id: appId,
+          client_secret: "[REDACTED]",
+          code
+        }
+      },
+      responseStatus: error.response?.status ?? null,
+      responseData: error.response?.data ?? null,
+      responseHeaders: error.response?.headers ?? null
+    });
+    throw error;
+  }
 
   const accessToken = response.data?.access_token;
 
@@ -254,6 +377,7 @@ async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId }) {
 }
 
 /**
+ * Sprint 11.3 — Exchange OAuth code for platform connection; WhatsApp optional until configured.
  * @param {{ code: string, wabaId?: string, phoneNumberId?: string, onboardingType?: string }} input
  */
 async function completeEmbeddedSignupExchange(input) {
@@ -288,13 +412,109 @@ async function completeEmbeddedSignupExchange(input) {
     throw createCompletionStageError(COMPLETION_STAGES.OAUTH_EXCHANGE_FAILED, error);
   }
 
+  const platformIdentity = await discoverPlatformIdentity(accessToken);
+  let whatsappStatus = "pending";
+  let savedWhatsApp = null;
+
+  const assets = await tryResolveWhatsAppAssets({
+    accessToken,
+    wabaId: input.wabaId || null,
+    phoneNumberId: input.phoneNumberId || null
+  });
+
+  if (assets?.wabaId && assets?.phoneNumberId) {
+    try {
+      savedWhatsApp = await saveWhatsAppConnectionFromAssets({
+        accessToken,
+        assets,
+        onboardingType: input.onboardingType || "whatsapp_business_app"
+      });
+      whatsappStatus = "connected";
+      metaLogger.info("meta_channel_connected", { channel: "whatsapp" });
+    } catch (error) {
+      logCompletionStageFailure(error.stage || COMPLETION_STAGES.SUBSCRIBE_FAILED, {
+        wabaId: assets.wabaId,
+        message: error.response?.data?.error?.message || error.message
+      });
+
+      if (error.stage === COMPLETION_STAGES.SUBSCRIBE_FAILED || error.stage === COMPLETION_STAGES.SAVE_FAILED) {
+        metaLogger.warn("whatsapp_connection_deferred", {
+          message: error.message
+        });
+      } else {
+        throw error;
+      }
+    }
+  } else {
+    metaLogger.info("meta_channel_pending", { channel: "whatsapp" });
+  }
+
+  try {
+    await platformRepository.savePlatformConnection({
+      access_token: accessToken,
+      facebook_user_id: platformIdentity.userId,
+      facebook_user_name: platformIdentity.userName,
+      messenger_page_id: platformIdentity.pageId,
+      facebook_status: "connected",
+      messenger_status: "connected",
+      whatsapp_status: whatsappStatus
+    });
+  } catch (error) {
+    logCompletionStageFailure(COMPLETION_STAGES.SAVE_FAILED, {
+      message: error.message
+    });
+    throw createCompletionStageError(COMPLETION_STAGES.SAVE_FAILED, error);
+  }
+
+  markAuthorizationCodeUsed(code);
+
+  metaLogger.info("meta_channel_connected", { channel: "facebook" });
+  metaLogger.info("meta_channel_connected", { channel: "messenger" });
+  metaLogger.info("embedded_signup_exchange_completed", {
+    whatsappStatus,
+    wabaId: savedWhatsApp?.waba_id || null,
+    phoneNumberId: savedWhatsApp?.phone_number_id || null
+  });
+
+  return {
+    success: true,
+    channels: buildChannelStatus(whatsappStatus),
+    platform: toSafePlatformConnection(await platformRepository.getPlatformConnection()),
+    connection: savedWhatsApp ? toSafeConnection(savedWhatsApp) : null
+  };
+}
+
+/**
+ * Sprint 11.3 — Attach WhatsApp assets after platform OAuth when FINISH arrives late.
+ * @param {{ wabaId: string, phoneNumberId: string, onboardingType?: string }} input
+ */
+async function attachWhatsAppFromEmbeddedSignup(input) {
+  const wabaId = String(input.wabaId || "").trim();
+  const phoneNumberId = String(input.phoneNumberId || "").trim();
+
+  if (!wabaId || !phoneNumberId) {
+    throw Object.assign(new Error("WhatsApp Business assets are required."), {
+      statusCode: 400,
+      publicCode: "WHATSAPP_ASSETS_REQUIRED"
+    });
+  }
+
+  const accessToken = await platformRepository.getDecryptedAccessToken();
+
+  if (!accessToken) {
+    throw Object.assign(new Error("Meta platform connection is not available."), {
+      statusCode: 409,
+      publicCode: "PLATFORM_CONNECTION_REQUIRED"
+    });
+  }
+
   let assets;
 
   try {
     assets = await resolveConnectionAssets({
       accessToken,
-      wabaId: input.wabaId || null,
-      phoneNumberId: input.phoneNumberId || null
+      wabaId,
+      phoneNumberId
     });
   } catch (error) {
     logCompletionStageFailure(COMPLETION_STAGES.ASSET_DISCOVERY_FAILED, {
@@ -303,59 +523,56 @@ async function completeEmbeddedSignupExchange(input) {
     throw createCompletionStageError(COMPLETION_STAGES.ASSET_DISCOVERY_FAILED, error);
   }
 
-  try {
-    await subscribeWabaToApp(assets.wabaId, accessToken);
-  } catch (error) {
-    logCompletionStageFailure(COMPLETION_STAGES.SUBSCRIBE_FAILED, {
-      wabaId: assets.wabaId,
-      message: error.response?.data?.error?.message || error.message
-    });
-    throw createCompletionStageError(COMPLETION_STAGES.SUBSCRIBE_FAILED, error);
-  }
-
   let saved;
 
   try {
-    saved = await repository.saveConnection({
-      waba_id: assets.wabaId,
-      phone_number_id: assets.phoneNumberId,
-      connection_type: input.onboardingType || "whatsapp_business_app",
-      status: "connected",
-      access_token: accessToken,
-      display_phone_number: assets.displayPhoneNumber,
-      verified_name: assets.verifiedName,
-      last_health_status: "healthy",
-      last_health_checked_at: new Date().toISOString()
+    saved = await saveWhatsAppConnectionFromAssets({
+      accessToken,
+      assets,
+      onboardingType: input.onboardingType || "whatsapp_business_app"
     });
   } catch (error) {
-    logCompletionStageFailure(COMPLETION_STAGES.SAVE_FAILED, {
+    logCompletionStageFailure(error.stage || COMPLETION_STAGES.SUBSCRIBE_FAILED, {
       wabaId: assets.wabaId,
-      phoneNumberId: assets.phoneNumberId,
-      message: error.message
+      message: error.response?.data?.error?.message || error.message
     });
-    throw createCompletionStageError(COMPLETION_STAGES.SAVE_FAILED, error);
+    throw createCompletionStageError(error.stage || COMPLETION_STAGES.SUBSCRIBE_FAILED, error);
   }
 
-  markAuthorizationCodeUsed(code);
-
-  metaLogger.info("embedded_signup_exchange_completed", {
-    wabaId: saved.waba_id,
-    phoneNumberId: saved.phone_number_id
+  await platformRepository.updatePlatformConnection({
+    whatsapp_status: "connected"
   });
+
+  metaLogger.info("meta_channel_connected", { channel: "whatsapp" });
 
   return {
     success: true,
+    channels: buildChannelStatus("connected"),
     connection: toSafeConnection(saved)
   };
 }
 
 async function getEmbeddedSignupStatus() {
-  return getCachedConnectionStatus();
+  const whatsappStatus = await getCachedConnectionStatus();
+  const platform = toSafePlatformConnection(await platformRepository.getPlatformConnection());
+
+  return {
+    ...whatsappStatus,
+    platform,
+    channels: platform
+      ? {
+          facebook: platform.facebookStatus,
+          messenger: platform.messengerStatus,
+          whatsapp: platform.whatsappStatus
+        }
+      : null
+  };
 }
 
 module.exports = {
   COMPLETION_STAGES,
   completeEmbeddedSignupExchange,
+  attachWhatsAppFromEmbeddedSignup,
   getEmbeddedSignupStatus,
   sanitizeMetaError,
   exchangeAuthorizationCodeForToken,

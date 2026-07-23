@@ -51,19 +51,24 @@ async function setOnboardingStep(organizationId, step) {
   });
 }
 
-async function markMetaConnected(organizationId) {
+async function markMetaConnected(organizationId, options = {}) {
   const organization = await jsonOrganizationRepository.findById(organizationId);
 
   if (!organization) {
     throw new Error("Organization not found");
   }
 
+  const whatsappStatus = options.whatsappStatus || "pending";
+
   return jsonOrganizationRepository.updateOrganization(organizationId, {
     onboarding_step: organization.onboarding_step === "meta" ? "calendar" : organization.onboarding_step,
     settings: {
       ...organization.settings,
       meta_connected: true,
-      meta_connected_at: new Date().toISOString()
+      meta_connected_at: new Date().toISOString(),
+      facebook_connected: true,
+      messenger_connected: true,
+      whatsapp_status: whatsappStatus
     }
   });
 }
@@ -159,6 +164,9 @@ function serializeOrganization(organization) {
       customLocationAddress: organization.settings.custom_location_address,
       zoomInterviewUrl: organization.settings.zoom_interview_url,
       metaConnected: organization.settings.meta_connected,
+      facebookConnected: organization.settings.facebook_connected,
+      messengerConnected: organization.settings.messenger_connected,
+      whatsappStatus: organization.settings.whatsapp_status,
       calendarConnected: organization.settings.calendar_connected
     }
   };

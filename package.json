@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "nodemon backend/server.js",
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "validate:google-oauth": "node backend/scripts/validateGoogleRefreshToken.js"
   },
   "repository": {
     "type": "git",

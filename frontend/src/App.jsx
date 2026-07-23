@@ -14,6 +14,7 @@ import Home from "./pages/Home";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import Terms from "./pages/Terms";
+import DataDeletion from "./pages/DataDeletion";
 import WelcomePage from "./pages/onboarding/WelcomePage";
 import SignupPage from "./pages/onboarding/SignupPage";
 import LoginPage from "./pages/onboarding/LoginPage";
@@ -59,6 +60,7 @@ export default function App() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/legal" element={<Legal />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/data-deletion" element={<DataDeletion />} />
 
       <Route path="/onboarding" element={<OnboardingOutlet />}>
         <Route index element={<WelcomePage />} />

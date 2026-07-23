@@ -50,6 +50,9 @@ function defaultSettings() {
     zoom_interview_url: null,
     meta_connected: false,
     meta_connected_at: null,
+    facebook_connected: false,
+    messenger_connected: false,
+    whatsapp_status: "pending",
     calendar_connected: false,
     calendar_connected_at: null,
     calendar_refresh_token_encrypted: null

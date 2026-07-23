@@ -53,3 +53,23 @@ export async function exchangeEmbeddedSignupCode(payload) {
 
   return body;
 }
+
+export async function attachWhatsAppEmbeddedSignupAssets(payload) {
+  const response = await apiRequest("/api/meta/embedded-signup/whatsapp-attach", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const body = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new MetaEmbeddedSignupError(body.message || "WhatsApp attach failed", body);
+  }
+
+  if (body.access_token || body.accessToken) {
+    throw new MetaEmbeddedSignupError("Unexpected credential field in API response.");
+  }
+
+  return body;
+}

@@ -13,6 +13,7 @@ const legalLinks = [
   { to: "/privacy", label: "Privacy Policy" },
   { to: "/legal", label: "Legal" },
   { to: "/terms", label: "Terms of Service" },
+  { to: "/data-deletion", label: "Privacy & Data Deletion" },
 ];
 
 export default function Navbar() {
