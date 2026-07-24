@@ -2,6 +2,15 @@ import MarkdownViewer from "./MarkdownViewer";
 import { KNOWLEDGE_QUICK_LINKS } from "../../config/knowledgeQuickLinks";
 import "./KnowledgeHubHome.css";
 
+const SYSTEM_HEALTH_ITEMS = [
+  { labelKey: "knowledgeHubHealthDatabase", statusKey: "knowledgeHubHealthStatusConnected" },
+  { labelKey: "knowledgeHubHealthAtlasCore", statusKey: "knowledgeHubHealthStatusCertified" },
+  { labelKey: "knowledgeHubHealthBusinessEvents", statusKey: "knowledgeHubHealthStatusRunning" },
+  { labelKey: "knowledgeHubHealthMissionControl", statusKey: "knowledgeHubHealthStatusRunning" },
+  { labelKey: "knowledgeHubHealthExecutiveDashboard", statusKey: "knowledgeHubHealthStatusRunning" },
+  { labelKey: "knowledgeHubHealthProjectionReplay", statusKey: "knowledgeHubHealthStatusHealthy" }
+];
+
 function DashboardCard({ label, children, className = "" }) {
   return (
     <section className={`knowledge-home__card ${className}`.trim()}>
@@ -46,10 +55,24 @@ export default function KnowledgeHubHome({
 }) {
   return (
     <div className="knowledge-home">
+      <section className="knowledge-home__rc1-banner" aria-label={t.knowledgeHubRc1BannerTitle}>
+        <div className="knowledge-home__rc1-banner-content">
+          <span className="knowledge-home__rc1-badge">{t.knowledgeHubRc1Badge}</span>
+          <h2 className="knowledge-home__rc1-title">{t.knowledgeHubRc1BannerTitle}</h2>
+          <p className="knowledge-home__rc1-description">{t.knowledgeHubRc1BannerDescription}</p>
+        </div>
+      </section>
+
       <div className="knowledge-home__hero">
         <div>
           <p className="knowledge-home__eyebrow">{t.knowledgeHubHomeEyebrow}</p>
           <h2>{t.knowledgeHubHomeTitle}</h2>
+          <div className="knowledge-home__version">
+            <p>{t.knowledgeHubVersionPlatform}</p>
+            <p>{t.knowledgeHubVersionRelease}</p>
+            <p className="knowledge-home__version-certified">{t.knowledgeHubVersionCertified}</p>
+            <p className="knowledge-home__version-date">{t.knowledgeHubVersionDate}</p>
+          </div>
           {dashboard.lastUpdated ? (
             <p className="knowledge-home__meta">
               {t.knowledgeHubLastUpdated}: {dashboard.lastUpdated}
@@ -70,7 +93,9 @@ export default function KnowledgeHubHome({
         </DashboardCard>
 
         <DashboardCard label={t.knowledgeHubDashOverallStatus}>
-          <p className="knowledge-home__status">{dashboard.overallStatus || "—"}</p>
+          <p className="knowledge-home__status knowledge-home__status--certified">
+            {dashboard.overallStatus || "—"}
+          </p>
         </DashboardCard>
 
         <DashboardCard label={t.knowledgeHubDashObjective} className="knowledge-home__card--wide">
@@ -79,6 +104,17 @@ export default function KnowledgeHubHome({
           ) : (
             <p className="knowledge-home__empty">{t.knowledgeHubDashEmpty}</p>
           )}
+        </DashboardCard>
+
+        <DashboardCard label={t.knowledgeHubSystemHealthTitle} className="knowledge-home__card--wide">
+          <ul className="knowledge-home__health-list">
+            {SYSTEM_HEALTH_ITEMS.map((item) => (
+              <li key={item.labelKey} className="knowledge-home__health-row">
+                <span className="knowledge-home__health-label">{t[item.labelKey]}</span>
+                <span className="knowledge-home__health-status">{t[item.statusKey]}</span>
+              </li>
+            ))}
+          </ul>
         </DashboardCard>
 
         <DashboardCard label={t.knowledgeHubRecentlyOpened}>

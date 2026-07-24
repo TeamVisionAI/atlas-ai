@@ -1,3 +1,90 @@
+.knowledge-home__rc1-banner {
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+  background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%);
+}
+
+.knowledge-home__rc1-banner-content {
+  max-width: 720px;
+}
+
+.knowledge-home__rc1-badge {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #166534;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.knowledge-home__rc1-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  color: #111827;
+}
+
+.knowledge-home__rc1-description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.knowledge-home__version {
+  margin-top: 12px;
+}
+
+.knowledge-home__version p {
+  margin: 0 0 2px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.knowledge-home__version-certified {
+  font-weight: 700;
+  color: #166534;
+}
+
+.knowledge-home__version-date {
+  font-size: 13px !important;
+  color: #64748b !important;
+}
+
+.knowledge-home__status--certified {
+  color: #166534;
+}
+
+.knowledge-home__health-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+}
+
+.knowledge-home__health-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.knowledge-home__health-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.knowledge-home__health-status {
+  font-size: 13px;
+  color: #166534;
+}
+
 .knowledge-home__hero {
   display: flex;
   flex-wrap: wrap;
@@ -182,6 +269,10 @@
 
 @media (max-width: 960px) {
   .knowledge-home__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-home__health-list {
     grid-template-columns: 1fr;
   }
 }
