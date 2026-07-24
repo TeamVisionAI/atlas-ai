@@ -140,9 +140,13 @@ export function adaptMissionControlResponse(
       direction: conversationPreview.direction,
       timestamp: conversationPreview.timestamp,
       previewSource: conversationPreview.source,
+      messages: missionControl.conversationMessages || [],
       interviewTime: dashboardProspect?.interview_time || null,
       appointmentDate: dashboardProspect?.appointment_date || null
     },
+    aiActionCenter: missionControl.aiActionCenter || null,
+    recruitingStatus: missionControl.recruitingStatus || null,
+    liveRevision: missionControl.liveRevision || null,
     workflowGate: workflowGate || { active: false },
     availableActions: missionControl.availableActions || [],
     raw: missionControl

@@ -33,7 +33,7 @@ async function resolveProspect(phone) {
   return findLatestActiveProspect();
 }
 
-async function getMissionControlState(phone) {
+async function getMissionControlState(phone, options = {}) {
   const prospect = await resolveProspect(phone);
 
   if (!prospect) {
@@ -43,7 +43,8 @@ async function getMissionControlState(phone) {
   const channel = "whatsapp";
   const profile = buildProfileFromProspect(prospect, channel);
   const schedulingState = parseSchedulingState(prospect.notes);
-  const lastMessage = prospect.last_message || "";
+  const lastMessage =
+    options.latestMessage?.text || prospect.last_message || "";
   const { profile: ruledProfile } = applyBusinessRulesToProfile(
     { ...profile },
     lastMessage

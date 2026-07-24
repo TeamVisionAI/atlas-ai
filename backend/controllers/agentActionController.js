@@ -28,9 +28,16 @@ const {
   buildAgentActionTimelineMessage
 } = require("../core/agentActionCopy");
 const { getMissionControlState } = require("./conversationController");
-const { buildWorkflowReadModel, fetchLatestConversationEntry } = require("../core/workflowReadModel");
+const { buildWorkflowReadModel } = require("../core/workflowReadModel");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { buildWorkflowGateDescriptor } = require("../core/workflowGateEngine");
+const {
+  fetchConversationThread,
+  buildRecruitingFunnelStatus,
+  buildAiActionCenter,
+  enrichAtlasBriefSummary,
+  buildLiveRevision
+} = require("../core/missionControlLiveReadModel");
 
 function buildActionError(action, error, message) {
   return {
@@ -299,13 +306,20 @@ async function getMissionControlWithActions(phone) {
     return null;
   }
 
-  const missionControl = await getMissionControlState(phone);
+  const initialState = await getMissionControlState(phone);
 
-  if (!missionControl) {
+  if (!initialState) {
     return null;
   }
 
-  const resolvedPhone = missionControl.prospect.phone;
+  const resolvedPhone = initialState.prospect.phone;
+  const conversationMessages = await fetchConversationThread(resolvedPhone);
+  const latestMessage = conversationMessages[conversationMessages.length - 1] || null;
+
+  const missionControl = latestMessage
+    ? await getMissionControlState(resolvedPhone, { latestMessage })
+    : initialState;
+
   const prospect = await findProspect(resolvedPhone);
   const agentState = loadAgentState(resolvedPhone);
   const organizationSettings = getOrganizationSettings();
@@ -325,16 +339,44 @@ async function getMissionControlWithActions(phone) {
     agentState
   });
 
+  const enrichedSummary = enrichAtlasBriefSummary(
+    missionControl.atlasBrief.summary,
+    conversationMessages
+  );
+
+  const aiActionCenter = buildAiActionCenter({
+    workflow,
+    availableActions,
+    brain: missionControl.brain,
+    conversationMessages
+  });
+
+  const recruitingStatus = buildRecruitingFunnelStatus(workflow, missionControl.brain);
+  const liveRevision = buildLiveRevision(conversationMessages, workflow);
+
   const [latestConversation, workflowGate] = await Promise.all([
-    fetchLatestConversationEntry(resolvedPhone),
+    Promise.resolve(
+      latestMessage || {
+        text: "",
+        direction: "unknown",
+        timestamp: null
+      }
+    ),
     Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState))
   ]);
 
   return {
     ...missionControl,
+    atlasBrief: {
+      summary: enrichedSummary
+    },
     workflow,
     workflowGate,
     latestConversation,
+    conversationMessages,
+    aiActionCenter,
+    recruitingStatus,
+    liveRevision,
     agentState: {
       flags: agentState.flags,
       outcome: agentState.outcome,

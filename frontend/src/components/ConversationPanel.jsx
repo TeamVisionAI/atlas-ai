@@ -1,14 +1,55 @@
 import { useLanguage } from "../i18n/LanguageContext";
+import { formatTextWithDates } from "../utils/dateFormatter";
 
-export default function ConversationPanel({ lastMessage, direction, timestamp }) {
-  const { translate } = useLanguage();
+function formatMessageTime(timestamp, language) {
+  if (!timestamp) {
+    return "";
+  }
 
-  const directionLabel =
-    direction === "outgoing"
-      ? translate("missionControlConversationAtlas")
-      : direction === "incoming"
-        ? translate("missionControlConversationProspect")
-        : translate("missionControlConversationMessage");
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  const locale = language === "es" ? "es-PR" : "en-US";
+
+  return date.toLocaleString(locale, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function resolveDirectionLabel(direction, translate) {
+  if (direction === "outgoing") {
+    return translate("missionControlConversationAtlas");
+  }
+
+  if (direction === "incoming") {
+    return translate("missionControlConversationProspect");
+  }
+
+  return translate("missionControlConversationMessage");
+}
+
+export default function ConversationPanel({ messages = [], lastMessage, direction, timestamp }) {
+  const { translate, language } = useLanguage();
+
+  const thread =
+    messages.length > 0
+      ? messages
+      : lastMessage
+        ? [
+            {
+              id: "latest",
+              text: lastMessage,
+              direction: direction || "unknown",
+              timestamp
+            }
+          ]
+        : [];
 
   return (
     <div
@@ -30,38 +71,53 @@ export default function ConversationPanel({ lastMessage, direction, timestamp })
           display: "flex",
           flexDirection: "column",
           gap: 16,
-          minHeight: 0,
+          minHeight: 280,
+          maxHeight: 420,
           overflowY: "auto"
         }}
       >
-        <div
-          style={{
-            alignSelf: direction === "outgoing" ? "flex-end" : "flex-start",
-            maxWidth: "85%",
-            background: direction === "outgoing" ? "#172554" : "#1F2937",
-            padding: "16px 18px",
-            borderRadius:
-              direction === "outgoing" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-            border: "1px solid #374151"
-          }}
-        >
-          <div
-            style={{
-              color: "#94A3B8",
-              fontSize: 12,
-              marginBottom: 8,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12
-            }}
-          >
-            <span>{directionLabel}</span>
-            {timestamp ? <span>{timestamp}</span> : null}
-          </div>
-          <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
-            {lastMessage || translate("missionControlConversationNoMessages")}
+        {thread.length ? (
+          thread.map((message) => {
+            const outgoing = message.direction === "outgoing";
+
+            return (
+              <div
+                key={message.id}
+                style={{
+                  alignSelf: outgoing ? "flex-end" : "flex-start",
+                  maxWidth: "85%",
+                  background: outgoing ? "#172554" : "#1F2937",
+                  padding: "16px 18px",
+                  borderRadius: outgoing ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                  border: "1px solid #374151"
+                }}
+              >
+                <div
+                  style={{
+                    color: "#94A3B8",
+                    fontSize: 12,
+                    marginBottom: 8,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12
+                  }}
+                >
+                  <span>{resolveDirectionLabel(message.direction, translate)}</span>
+                  {message.timestamp ? (
+                    <span>{formatMessageTime(message.timestamp, language)}</span>
+                  ) : null}
+                </div>
+                <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
+                  {formatTextWithDates(message.text)}
+                </p>
+              </div>
+            );
+          })
+        ) : (
+          <p style={{ margin: 0, color: "#94A3B8", fontSize: 14 }}>
+            {translate("missionControlConversationNoMessages")}
           </p>
-        </div>
+        )}
 
         <div
           style={{

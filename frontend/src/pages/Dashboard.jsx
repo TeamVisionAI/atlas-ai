@@ -19,7 +19,9 @@ import WorkflowCompleteBanner from "../components/WorkflowCompleteBanner";
 import CurrentProspectCard from "../components/CurrentProspectCard";
 import NextActions from "../components/NextActions";
 import AiBrief from "../components/AiBrief";
+import AiActionCenter from "../components/AiActionCenter";
 import ConversationPanel from "../components/ConversationPanel";
+import RecruitingFunnelStatus from "../components/RecruitingFunnelStatus";
 import JourneyPackage from "../components/JourneyPackage";
 import WorkflowGatePanel from "../components/WorkflowGatePanel";
 import {
@@ -50,6 +52,8 @@ import {
   buildProspectWorkspacePath
 } from "../utils/prospectRoutes";
 import "./MissionControl.css";
+
+const MISSION_CONTROL_LIVE_POLL_MS = 5000;
 
 const sectionLabelStyle = {
   margin: "0 0 12px",
@@ -251,6 +255,18 @@ export default function Dashboard() {
       setWorkspace(adapted);
     }
   }, [queue, currentIndex, dashboard]);
+
+  useEffect(() => {
+    if (!phone || !workspace?.isLive || prospectLoading) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      refreshCurrentWorkspace();
+    }, MISSION_CONTROL_LIVE_POLL_MS);
+
+    return () => window.clearInterval(timer);
+  }, [phone, workspace?.isLive, prospectLoading, refreshCurrentWorkspace]);
 
   const handleMissionAction = useCallback(
     async (actionId) => {
@@ -565,6 +581,19 @@ export default function Dashboard() {
         </section>
 
         <section>
+          <h3 style={sectionLabelStyle}>{translate("missionControlRecruitingStatus")}</h3>
+          <RecruitingFunnelStatus recruitingStatus={workspace.recruitingStatus} />
+        </section>
+
+        <section>
+          <h3 style={sectionLabelStyle}>{translate("missionControlAiActionCenterTitle")}</h3>
+          <AiActionCenter
+            actionCenter={workspace.aiActionCenter}
+            onExecuteAction={handleMissionAction}
+          />
+        </section>
+
+        <section>
           <h3 style={sectionLabelStyle}>{translate("missionControlNextActions")}</h3>
           {showGate ? (
             <WorkflowGatePanel
@@ -616,6 +645,7 @@ export default function Dashboard() {
         >
           <h3 style={sectionLabelStyle}>{translate("missionControlConversation")}</h3>
           <ConversationPanel
+            messages={workspace.conversation.messages}
             lastMessage={workspace.conversation.lastMessage}
             direction={workspace.conversation.direction}
             timestamp={workspace.conversation.timestamp}
