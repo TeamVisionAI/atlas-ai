@@ -1,0 +1,238 @@
+.atlas-ui-skeleton {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background-size: 200% 100%;
+  animation: atlas-ui-shimmer 1.4s ease-in-out infinite;
+}
+
+.atlas-ui-skeleton--text {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.atlas-ui-skeleton--title {
+  height: 28px;
+  width: 60%;
+  margin-bottom: 12px;
+}
+
+.atlas-ui-skeleton--button {
+  height: 40px;
+}
+
+.atlas-ui-skeleton--card {
+  height: 120px;
+}
+
+@keyframes atlas-ui-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.atlas-ui-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #1e3a8a;
+  border-radius: 50%;
+  animation: atlas-ui-spin 0.8s linear infinite;
+}
+
+.atlas-ui-spinner--inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@keyframes atlas-ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.atlas-ui-empty,
+.atlas-ui-error {
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.atlas-ui-empty__title,
+.atlas-ui-error__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.atlas-ui-empty__body,
+.atlas-ui-error__body {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.atlas-ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.atlas-ui-badge--neutral {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.atlas-ui-badge--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.atlas-ui-badge--warning {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.atlas-ui-badge--danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.atlas-ui-badge--info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.atlas-ui-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.atlas-ui-button:focus-visible {
+  outline: 2px solid #1e3a8a;
+  outline-offset: 2px;
+}
+
+.atlas-ui-button--primary {
+  border: 1px solid #1e3a8a;
+  background: #1e3a8a;
+  color: #fff;
+}
+
+.atlas-ui-button--secondary {
+  border: 1px solid #1e3a8a;
+  background: #fff;
+  color: #1e3a8a;
+}
+
+.atlas-ui-button--ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #1e3a8a;
+}
+
+.atlas-ui-button:disabled,
+.atlas-ui-button[aria-busy="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.atlas-ui-toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+
+.atlas-ui-toast {
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  font-size: 14px;
+  color: #0f172a;
+  background: #fff;
+  border-left: 4px solid #1e3a8a;
+}
+
+.atlas-ui-toast--success {
+  border-left-color: #16a34a;
+}
+
+.atlas-ui-toast--error {
+  border-left-color: #dc2626;
+}
+
+.atlas-ui-toast--warning {
+  border-left-color: #ca8a04;
+}
+
+.atlas-ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1100;
+}
+
+.atlas-ui-dialog {
+  width: min(420px, 100%);
+  border-radius: 12px;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+}
+
+.atlas-ui-dialog__title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.atlas-ui-dialog__body {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.atlas-ui-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 767px) {
+  .atlas-ui-toast-stack {
+    left: 16px;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+}

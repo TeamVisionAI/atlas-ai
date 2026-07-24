@@ -134,3 +134,25 @@ Creates:
 
 Read-only REST API at `/api/mission-control`, `/api/mission-control/summary`, `/api/mission-control/metrics`.
 
+## Sprint 15.1 — Executive Dashboard projection
+
+Run in Supabase SQL editor:
+
+```
+backend/database/migrations/007_atlas_executive_dashboard_read_model.sql
+```
+
+Creates:
+
+- `atlas_executive_dashboard_state` — org-level analytical aggregate
+- `atlas_executive_dashboard_processed_events` — idempotency ledger
+
+### Runtime without migration
+
+- Executive Dashboard API falls back to in-memory storage for dev/verify
+- `ExecutiveDashboardProjection` receives Business Events via `ProjectionEngine`
+
+### After migration
+
+Read-only REST API at `/api/executive-dashboard`, `/api/executive-dashboard/summary`, `/api/executive-dashboard/trends`, `/api/executive-dashboard/kpis`.
+

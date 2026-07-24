@@ -27,6 +27,7 @@ const { createProjectionModule } = require("./modules/projections");
 const { createProspectModule } = require("./modules/prospects");
 const { createTimelineModule } = require("./modules/timeline");
 const { createMissionControlModule } = require("./modules/mission-control");
+const { createExecutiveDashboardModule } = require("./modules/executive-dashboard");
 const { requireAtlasUser } = require("./middleware/requireAtlasUser");
 
 const {
@@ -48,6 +49,11 @@ const timelineModule = createTimelineModule({
 });
 
 const missionControlModule = createMissionControlModule({
+  projectionEngine: projectionModule.engine,
+  businessEventRepository: businessEventModule.repository
+});
+
+const executiveDashboardModule = createExecutiveDashboardModule({
   projectionEngine: projectionModule.engine,
   businessEventRepository: businessEventModule.repository
 });
@@ -107,6 +113,7 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/mission-control", missionControlModule.routes);
 app.use("/api/mission-control", missionControlRoutes);
+app.use("/api/executive-dashboard", executiveDashboardModule.routes);
 app.use("/api/executive-dashboard", executiveDashboardRoutes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
@@ -154,6 +161,7 @@ app.use((error, req, res, next) => {
 async function bootstrap() {
   await projectionModule.engine.register(timelineModule.timelineProjection);
   await projectionModule.engine.register(missionControlModule.missionControlProjection);
+  await projectionModule.engine.register(executiveDashboardModule.executiveDashboardProjection);
   projectionModule.engine.start();
 
   app.listen(PORT, () => {

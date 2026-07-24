@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getExecutiveDashboard } from "../services/executiveDashboardService";
 import { buildExecutiveDashboardViewModel } from "../engines/executiveDashboardViewModel";
@@ -28,8 +28,16 @@ function DashboardSkeleton() {
   );
 }
 
+const FOCUS_LABEL_KEYS = {
+  conversion: "executiveFocusConversion",
+  funnel: "executiveFocusFunnel",
+  trends: "executiveFocusTrends",
+  kpis: "executiveFocusKpis"
+};
+
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { translate } = useLanguage();
   const [executive, setExecutive] = useState(null);
   const [dashboard, setDashboard] = useState(null);
@@ -89,6 +97,10 @@ export default function ExecutiveDashboard() {
     navigate(buildProspectWorkspacePath({ phone }));
   }
 
+  const focusKey = searchParams.get("focus");
+  const fromWorkspace = searchParams.get("from") === "workspace";
+  const focusLabelKey = FOCUS_LABEL_KEYS[focusKey];
+
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -111,6 +123,13 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="executive-dashboard">
+      {fromWorkspace && focusLabelKey ? (
+        <div className="executive-dashboard__focus-banner" role="status">
+          <p>{translate("executiveFocusFromWorkspace")}</p>
+          <strong>{translate(focusLabelKey)}</strong>
+        </div>
+      ) : null}
+
       <InterviewsHero
         hero={viewModel.hero}
         onOpenMissionControl={() => openProspectCenter({ filter: "interviews-today" })}

@@ -76,6 +76,13 @@ class FailingProjection extends Projection {
 async function run() {
   console.log("Sprint 15.0 — Mission Control projection verification\n");
 
+  let eventSequence = 0;
+
+  function nextTimestamp() {
+    eventSequence += 1;
+    return new Date(Date.UTC(2026, 6, 24, 12, 0, eventSequence)).toISOString();
+  }
+
   const eventStore = new InMemoryBusinessEventStore();
   const timelineStore = new InMemoryTimelineStore();
   const missionControlStore = new InMemoryMissionControlStore();
@@ -109,20 +116,36 @@ async function run() {
   const agentId = "00000000-0000-4000-8000-000000000001";
 
   const createdEvent = await businessEventService.record(
-    EventFactory.prospectCreated({
+    EventFactory.create({
+      eventType: LEAD_EVENTS.PROSPECT_CREATED,
       prospectId,
       actor: "AGENT:test",
-      leadSource: { sourceType: "manual" },
-      createdBy: "AGENT:test",
-      lifecycleStateAtEvent: LIFECYCLE_STATES.NEW_LEAD
+      timestamp: nextTimestamp(),
+      channel: "api",
+      payload: {
+        leadSource: { sourceType: "manual" },
+        createdBy: "AGENT:test"
+      },
+      metadata: {
+        lifecycleStateAtEvent: LIFECYCLE_STATES.NEW_LEAD,
+        summary: "Lead created"
+      }
     })
   );
 
   await businessEventService.record(
-    EventFactory.prospectAssigned({
+    EventFactory.create({
+      eventType: LEAD_EVENTS.PROSPECT_ASSIGNED,
       prospectId,
       actor: "AGENT:test",
-      assignedAgentId: agentId
+      timestamp: nextTimestamp(),
+      channel: "api",
+      payload: {
+        assignedAgentId: agentId
+      },
+      metadata: {
+        summary: "Prospect assigned"
+      }
     })
   );
 
@@ -131,6 +154,7 @@ async function run() {
       eventType: COMMUNICATION_EVENTS.MESSAGE_SENT,
       prospectId,
       actor: "ATLAS",
+      timestamp: nextTimestamp(),
       channel: "whatsapp",
       payload: { direction: "outbound" },
       metadata: {
@@ -145,6 +169,7 @@ async function run() {
       eventType: APPOINTMENT_EVENTS.APPOINTMENT_CREATED,
       prospectId,
       actor: "ATLAS",
+      timestamp: nextTimestamp(),
       payload: { appointmentId: "appt-1", scheduledStart: new Date().toISOString() },
       metadata: {
         lifecycleStateAtEvent: LIFECYCLE_STATES.INTERVIEW_SCHEDULED,
@@ -158,6 +183,7 @@ async function run() {
       eventType: APPOINTMENT_EVENTS.INTERVIEW_COMPLETED,
       prospectId,
       actor: "AGENT:test",
+      timestamp: nextTimestamp(),
       payload: { outcome: "pending" },
       metadata: {
         lifecycleStateAtEvent: LIFECYCLE_STATES.INTERVIEW_COMPLETED,
@@ -181,28 +207,52 @@ async function run() {
   assert(duplicate.status === PROJECTION_STATUS.SKIPPED, "idempotent replay skips processed event");
 
   await businessEventService.record(
-    EventFactory.prospectMerged({
+    EventFactory.create({
+      eventType: LEAD_EVENTS.PROSPECT_MERGED,
       prospectId,
       actor: "AGENT:test",
-      survivorId: prospectId,
-      mergedId
+      timestamp: nextTimestamp(),
+      channel: "api",
+      payload: {
+        survivorId: prospectId,
+        mergedId
+      },
+      metadata: {
+        summary: "Prospect merged"
+      }
     })
   );
 
   await businessEventService.record(
-    EventFactory.prospectCreated({
+    EventFactory.create({
+      eventType: LEAD_EVENTS.PROSPECT_CREATED,
       prospectId: mergedId,
       actor: "AGENT:test",
-      leadSource: { sourceType: "manual" },
-      createdBy: "AGENT:test"
+      timestamp: nextTimestamp(),
+      channel: "api",
+      payload: {
+        leadSource: { sourceType: "manual" },
+        createdBy: "AGENT:test"
+      },
+      metadata: {
+        summary: "Lead created"
+      }
     })
   );
 
   await businessEventService.record(
-    EventFactory.prospectArchived({
+    EventFactory.create({
+      eventType: LEAD_EVENTS.PROSPECT_ARCHIVED,
       prospectId,
       actor: "AGENT:test",
-      archivedBy: "AGENT:test"
+      timestamp: nextTimestamp(),
+      channel: "api",
+      payload: {
+        archivedBy: "AGENT:test"
+      },
+      metadata: {
+        summary: "Prospect archived"
+      }
     })
   );
 

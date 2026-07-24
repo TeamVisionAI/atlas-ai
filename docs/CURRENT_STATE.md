@@ -2,11 +2,11 @@
 
 ## AI Summary
 
-Atlas Core Platform v1.0 is complete. Prospect Engine, Business Event Engine, Projection Framework, and Timeline Engine are architecture-frozen. Mission Control is now a projection-backed read model built exclusively from Business Events.
+Atlas Core Platform and Prospect Workspace are complete. Sprint 15.3 delivered shared UI primitives and workspace UX polish for user testing readiness — no new backend business logic.
 
 ## Current Sprint
 
-Sprint 15.0 — Mission Control Read Model
+Sprint 15.3 — UX Polish & Application Readiness
 
 ## Product Stage
 
@@ -14,20 +14,25 @@ Internal MVP — Atlas Core Platform v1.0
 
 ## Overall Status
 
-🟢 On Track
+🟢 On Track — ready for user testing
 
 ## Current Objective
 
-Deliver operational dashboard state from Business Events without querying the Prospect write model.
+Improve usability, responsiveness, and consistency across Atlas without modifying frozen backend modules.
 
 ## Working
 
-- **Mission Control projection** — `MissionControlProjection` registered via `ProjectionEngine`
-- **Read-only API** — `/api/mission-control`, `/summary`, `/metrics`
+- **Shared UI kit** — skeletons, spinners, empty/error states, toasts, buttons, badges, confirm dialog
+- **Prospect Workspace UX** — lazy timeline, keyboard shortcuts, action feedback, responsive layout
+- **Executive Dashboard navigation** — focus banner from workspace deep links
+- **Prospect Workspace feature** — `frontend/src/features/prospect-workspace/`
+- **Timeline integration** — lazy-loaded from `/api/prospects/:id/timeline`
+- **Mission Control context** — operational metrics from projection read model
+- **Executive Dashboard links** — navigation to analytical read model views
+- **Lifecycle quick actions** — assign, archive, restore, merge, update via Prospect Engine
+- **Mission Control projection** — operational metrics from Business Events
+- **Executive Dashboard projection** — funnel, conversion, trends, KPIs
 - **Projection Framework** — central dispatch, replay, failure isolation
-- **Timeline projection** — event-derived prospect history
-- **Business Event Engine (frozen)** — authoritative append-only event store
-- **Prospect Engine (frozen)** — publishes lead lifecycle events
 
 ## Architecture freeze (v1.0)
 
@@ -35,27 +40,30 @@ Deliver operational dashboard state from Business Events without querying the Pr
 - Business Event Engine — bug fixes only
 - Projection Framework — bug fixes only
 - Timeline Engine — bug fixes only
+- Mission Control — bug fixes only
+- Executive Dashboard — bug fixes only
 
-Future work extends the platform via new projections — not redesigns.
+Future work extends the platform via composition and new projections — not redesigns.
 
 ## In Progress
 
-- Apply Supabase migration 006 (Mission Control read model)
-- Bridge legacy Mission Control UI to projection-backed metrics
+- Bridge legacy activity feed with Timeline Engine long-term
+- Broader application of shared UI kit beyond Prospect Workspace
 
 ## Recent Decisions
 
-- **2026-07-24:** Mission Control derives state from Business Events only — no Prospect repository queries
-- **2026-07-24:** Atlas Core Platform v1.0 declared complete; core modules frozen
-- **2026-07-24:** All projections register through `ProjectionEngine`
+- **2026-07-24:** Sprint 15.3 is frontend-only — no backend architecture changes
+- **2026-07-24:** Shared UI components live under `frontend/src/components/ui/`
+- **2026-07-24:** Prospect Workspace is a composition layer — no new backend business logic
+- **2026-07-24:** Timeline loads lazily to keep workspace fast
 
 ## Recently Updated Documents
 
 | Document | Path |
 |----------|------|
-| Sprint 15.0 | [09-releases/sprints/SPRINT_15_0_MISSION_CONTROL.md](./09-releases/sprints/SPRINT_15_0_MISSION_CONTROL.md) |
-| Mission Control module | [backend/modules/mission-control/README.md](../backend/modules/mission-control/README.md) |
-| Projection Framework | [backend/modules/projections/README.md](../backend/modules/projections/README.md) |
+| Sprint 15.3 | [09-releases/sprints/SPRINT_15_3_UX_POLISH.md](./09-releases/sprints/SPRINT_15_3_UX_POLISH.md) |
+| Sprint 15.2 | [09-releases/sprints/SPRINT_15_2_PROSPECT_WORKSPACE.md](./09-releases/sprints/SPRINT_15_2_PROSPECT_WORKSPACE.md) |
+| Shared UI kit | [frontend/src/components/ui/](../frontend/src/components/ui/) |
 
 ## Environment Status
 
@@ -63,8 +71,9 @@ Future work extends the platform via new projections — not redesigns.
 
 | Component | Status |
 |-----------|--------|
+| Frontend lint/build | ✅ `npm run lint && npm run build` |
+| Executive Dashboard verify | ✅ `verifyExecutiveDashboardProjection.js` |
 | Mission Control verify | ✅ `verifyMissionControlProjection.js` |
-| Projection verify | ✅ `verifyProjectionFramework.js` |
 | Timeline verify | ✅ `verifyTimelineEngine.js` |
 | Business Event verify | ✅ `verifyBusinessEventEngine.js` |
 | Prospect verify | ✅ `verifyProspectEngine.js` |

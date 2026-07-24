@@ -386,3 +386,21 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.executive-dashboard__focus-banner {
+  border: 1px solid var(--exec-border);
+  border-radius: var(--exec-radius);
+  background: #eff6ff;
+  padding: 14px 16px;
+}
+
+.executive-dashboard__focus-banner p {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--exec-muted);
+}
+
+.executive-dashboard__focus-banner strong {
+  font-size: 14px;
+  color: var(--exec-text);
+}
