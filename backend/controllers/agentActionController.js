@@ -38,6 +38,7 @@ const {
   enrichAtlasBriefSummary,
   buildLiveRevision
 } = require("../core/missionControlLiveReadModel");
+const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
 
 function buildActionError(action, error, message) {
   return {
@@ -351,6 +352,24 @@ async function getMissionControlWithActions(phone) {
     conversationMessages
   });
 
+  const autonomousProgress = await onConversationProgress({
+    phone: resolvedPhone
+  }).catch(() => null);
+
+  const mergedActionCenter = autonomousProgress?.aiActionCenter
+    ? {
+        ...aiActionCenter,
+        nextBestAction:
+          autonomousProgress.aiActionCenter.nextBestAction || aiActionCenter.nextBestAction,
+        reason: autonomousProgress.aiActionCenter.reason || aiActionCenter.reason,
+        confidence:
+          autonomousProgress.aiActionCenter.confidence ?? aiActionCenter.confidence,
+        priority: autonomousProgress.aiActionCenter.priority || aiActionCenter.priority,
+        actionId: autonomousProgress.aiActionCenter.actionId || aiActionCenter.actionId,
+        autonomous: true
+      }
+    : aiActionCenter;
+
   const recruitingStatus = buildRecruitingFunnelStatus(workflow, missionControl.brain);
   const liveRevision = buildLiveRevision(conversationMessages, workflow);
 
@@ -374,7 +393,7 @@ async function getMissionControlWithActions(phone) {
     workflowGate,
     latestConversation,
     conversationMessages,
-    aiActionCenter,
+    aiActionCenter: mergedActionCenter,
     recruitingStatus,
     liveRevision,
     agentState: {

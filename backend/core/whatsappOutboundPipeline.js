@@ -13,6 +13,7 @@ const { resolveStoragePhone } = require("./whatsappProspectResolver");
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { resolveWhatsAppSendCredentials } = require("./whatsappSendCredentials");
+const { onMessageSent } = require("./recruitingWorkflowHooks");
 
 function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
@@ -139,6 +140,14 @@ async function sendAndPersistWhatsAppMessage({
     logWhatsAppStage("event_emitted", {
       phone: to,
       eventType: "MessageSent"
+    });
+
+    await onMessageSent({
+      phone: prospect?.phone || storagePhone,
+      message: text,
+      summary: intent === "FACEBOOK_LEAD_WELCOME" ? "Initial outreach" : "Message sent"
+    }).catch((error) => {
+      console.warn("[whatsappOutboundPipeline] recruiting workflow hook failed:", error.message);
     });
   }
 

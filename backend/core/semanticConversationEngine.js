@@ -4,6 +4,7 @@ const {
   updateProspect
 } = require("../services/supabaseService");
 const { createInterview } = require("../services/calendarService");
+const { onInterviewScheduled, onConversationProgress } = require("./recruitingWorkflowHooks");
 const { logConversation } = require("../services/logService");
 const { detectIntent } = require("./intentEngine");
 const { routeConversation } = require("./conversationRouter");
@@ -251,6 +252,15 @@ async function completeInterview(prospect, profile, language) {
     calendar_event_id: event.id,
     current_step: "CONFIRMED",
     last_message: prospect.last_message
+  });
+
+  await onInterviewScheduled({
+    phone: prospect.phone,
+    prospect,
+    profile,
+    calendarEvent: event
+  }).catch((error) => {
+    console.warn("[semanticConversationEngine] interview scheduling hook failed:", error.message);
   });
 
   const confirmation = buildConfirmationDetails({
@@ -722,6 +732,10 @@ async function handleSemanticMessage({
     language,
     city: profile.city,
     state: profile.state
+  });
+
+  await onConversationProgress({ phone }).catch((error) => {
+    console.warn("[semanticConversationEngine] recruiting progress hook failed:", error.message);
   });
 
   return replyText;

@@ -18,6 +18,7 @@ const {
   REOPENED_INACTIVITY_MS
 } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
+const { onLegacyProspectCreated } = require("./recruitingWorkflowHooks");
 
 function resolveStoragePhone(rawPhone) {
   const normalized = normalizePhoneNumber(rawPhone);
@@ -147,6 +148,14 @@ async function emitProspectLifecycleEvents(prospect, { created, reopened, correl
     });
 
     logWhatsAppStage("prospect_created", { phone: prospect.phone });
+
+    await onLegacyProspectCreated({
+      prospect,
+      source: WHATSAPP_SOURCE.FACEBOOK
+    }).catch((error) => {
+      console.warn("[whatsappProspectResolver] core prospect bridge failed:", error.message);
+    });
+
     return;
   }
 

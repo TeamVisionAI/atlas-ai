@@ -9,6 +9,7 @@ const { locateOrCreateWhatsAppProspect } = require("./whatsappProspectResolver")
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { processConversationAfterInbound } = require("./communicationHub");
+const { onMessageReceived } = require("./recruitingWorkflowHooks");
 
 function buildInboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.INBOUND}${providerMessageId}`;
@@ -84,6 +85,13 @@ async function processInboundWhatsAppMessage(inbound) {
     phone: storagePhone,
     providerMessageId: inbound.providerMessageId,
     conversationLogId: logResult.log?.id || null
+  });
+
+  await onMessageReceived({
+    phone: storagePhone,
+    message: body
+  }).catch((error) => {
+    console.warn("[whatsappInboundPipeline] recruiting workflow hook failed:", error.message);
   });
 
   logWhatsAppStage("event_emitted", {

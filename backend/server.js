@@ -21,7 +21,8 @@ const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
 const knowledgeRoutes = require("./routes/knowledge");
-const contactRoutes = require("./routes/contact");
+const recruitingWorkflowRoutes = require("./routes/recruitingWorkflow");
+const facebookLeadWebhookRoute = require("./routes/facebookLeadWebhook");
 const { createBusinessEventModule } = require("./modules/business-events");
 const { createProjectionModule } = require("./modules/projections");
 const { createProspectModule } = require("./modules/prospects");
@@ -31,8 +32,9 @@ const { createExecutiveDashboardModule } = require("./modules/executive-dashboar
 const { requireAtlasUser } = require("./middleware/requireAtlasUser");
 
 const {
-  logMetaEnvironmentWarnings,
+  logMetaEnvironmentWarnings
 } = require("./core/meta/metaEnvironmentValidator");
+const { registerRecruitingWorkflow } = require("./core/recruitingWorkflowRegistry");
 
 const businessEventModule = createBusinessEventModule({
   registerTimelineSubscriber: false
@@ -87,6 +89,23 @@ app.use(
   messengerWebhookRoute
 );
 
+app.use(
+  "/webhook/facebook-leads",
+  express.raw({ type: "application/json" }),
+  (req, res, next) => {
+    if (Buffer.isBuffer(req.body)) {
+      try {
+        req.body = JSON.parse(req.body.toString("utf8"));
+      } catch {
+        req.body = {};
+      }
+    }
+
+    next();
+  },
+  facebookLeadWebhookRoute
+);
+
 // JSON parsing for all non-webhook routes.
 app.use(express.json());
 
@@ -108,6 +127,7 @@ app.use("/health", healthRoute);
 app.use("/api/info", infoRoute);
 app.use("/api/recruit", recruitRoute);
 app.use("/api/contact", contactRoutes);
+app.use("/api/recruiting", recruitingWorkflowRoutes);
 
 // Atlas application routes
 app.use("/api/dashboard", dashboardRoutes);
@@ -159,6 +179,12 @@ app.use((error, req, res, next) => {
 });
 
 async function bootstrap() {
+  registerRecruitingWorkflow({
+    prospectService: prospectModule.service,
+    businessEventService: businessEventModule.service,
+    prospectRepository: prospectModule.repository
+  });
+
   await projectionModule.engine.register(timelineModule.timelineProjection);
   await projectionModule.engine.register(missionControlModule.missionControlProjection);
   await projectionModule.engine.register(executiveDashboardModule.executiveDashboardProjection);
