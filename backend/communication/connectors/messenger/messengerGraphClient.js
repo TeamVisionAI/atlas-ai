@@ -3,9 +3,10 @@
  */
 
 const axios = require("axios");
+const { getMetaGraphApiVersion } = require("../../../core/meta/metaGraphApiVersion");
 
 function getGraphApiVersion() {
-  return process.env.META_GRAPH_API_VERSION || "v21.0";
+  return getMetaGraphApiVersion();
 }
 
 function getPageAccessToken(configToken) {

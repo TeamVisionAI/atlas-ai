@@ -22,7 +22,7 @@
 |----------|------------|
 | **Executive / stakeholder** | [00-executive/Current_System_State.md](./00-executive/Current_System_State.md) |
 | **Product owner** | [01-product/](./01-product/README.md) · [Product_Vision.md](./01-product/Product_Vision.md) |
-| **Meta reviewer** | [05-integrations/meta/Meta_Approval_Portfolio.md](./05-integrations/meta/Meta_Approval_Portfolio.md) |
+| **Meta reviewer** | [11-meta-tech-provider/](./11-meta-tech-provider/README.md) · [05-integrations/meta/Meta_Approval_Portfolio.md](./05-integrations/meta/Meta_Approval_Portfolio.md) |
 | **Engineer (new)** | [03-engineering/DEVELOPMENT_WORKFLOW.md](./03-engineering/DEVELOPMENT_WORKFLOW.md) · [08-operations/local-development.md](./08-operations/local-development.md) |
 | **Engineer (architecture)** | [02-architecture/ATLAS_CORE_ARCHITECTURE.md](./02-architecture/ATLAS_CORE_ARCHITECTURE.md) · [06-business/BUSINESS_RULES.md](./06-business/BUSINESS_RULES.md) |
 | **Operations / deploy** | [08-operations/deployment/](./08-operations/deployment/) |
@@ -44,6 +44,7 @@
 | [08-operations/](./08-operations/README.md) | Deployment & troubleshooting |
 | [09-releases/](./09-releases/README.md) | Changelog & sprints |
 | [10-rfcs/](./10-rfcs/README.md) | Version 1 RFCs |
+| [11-meta-tech-provider/](./11-meta-tech-provider/README.md) | Meta Tech Provider approval portfolio |
 | [Health Report](./DOCUMENTATION_HEALTH_REPORT.md) | Documentation audit results |
 
 ---
@@ -64,6 +65,7 @@ docs/
 ├── 08-operations/                    Deployment, troubleshooting, investigations
 ├── 09-releases/                      Changelog, sprint specs, release history
 ├── 10-rfcs/                          Version 1 permanent contracts
+├── 11-meta-tech-provider/            Meta Tech Provider approval portfolio
 └── [legacy stubs]                    Root-level redirects (BUSINESS_RULES.md, etc.)
 ```
 
@@ -161,6 +163,21 @@ docs/
 | Document | Scope |
 |----------|-------|
 | [RFC-001](./10-rfcs/RFC-001-message-envelope.md) – [RFC-010](./10-rfcs/RFC-010-event-bus-principles.md) | V1 permanent contracts (FROZEN) |
+
+### 11-meta-tech-provider
+
+| ID | Document | Status |
+|----|----------|--------|
+| MTP-001 | [01_Executive_Summary.md](./11-meta-tech-provider/01_Executive_Summary.md) | Draft for Meta Tech Provider Review |
+| MTP-002 | [02_Platform_Overview.md](./11-meta-tech-provider/02_Platform_Overview.md) | Draft for Meta Tech Provider Review |
+| MTP-003 | [03_System_Architecture.md](./11-meta-tech-provider/03_System_Architecture.md) | Draft for Meta Tech Provider Review |
+| MTP-004 | [04_WhatsApp_Business_Integration.md](./11-meta-tech-provider/04_WhatsApp_Business_Integration.md) | Draft for Meta Tech Provider Review |
+| MTP-005 | [05_Data_Flow.md](./11-meta-tech-provider/05_Data_Flow.md) | Draft for Meta Tech Provider Review |
+| MTP-006 | [06_Security_and_Privacy.md](./11-meta-tech-provider/06_Security_and_Privacy.md) | Draft for Meta Tech Provider Review |
+| MTP-007 | [07_User_Journey.md](./11-meta-tech-provider/07_User_Journey.md) | Draft for Meta Tech Provider Review |
+| MTP-008 | [08_Permissions_Justification.md](./11-meta-tech-provider/08_Permissions_Justification.md) | Draft for Meta Tech Provider Review |
+| MTP-009 | [09_Demo_Script.md](./11-meta-tech-provider/09_Demo_Script.md) | Draft for Meta Tech Provider Review |
+| MTP-010 | [10_Reviewer_FAQ.md](./11-meta-tech-provider/10_Reviewer_FAQ.md) | Draft for Meta Tech Provider Review |
 
 ---
 

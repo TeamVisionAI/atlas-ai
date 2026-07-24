@@ -24,7 +24,7 @@
 - [../08-operations/deployment/sprint-11.4-meta-production.md](../../08-operations/deployment/sprint-11.4-meta-production.md)
 - [../08-operations/sprint-11.4-whatsapp-investigation.md](../../08-operations/sprint-11.4-whatsapp-investigation.md) — investigation conclusion & strategic pivot (DOC-0513)
 - [../02-architecture/atlas-communication-platform.md](../../02-architecture/atlas-communication-platform.md) — Sprint 12 platform architecture (DOC-0020)
-- [.../06-business/BUSINESS_RULES.md](../../06-business/BUSINESS_RULES.md)
+- [BUSINESS_RULES.md](../../06-business/BUSINESS_RULES.md)
 - [../09-releases/sprints/SPRINT_11_1_LIVE_WHATSAPP.md](SPRINT_11_1_LIVE_WHATSAPP.md)
 
 ---

@@ -3,6 +3,7 @@
  */
 
 import { apiFetch, apiRequest } from "./apiClient";
+import { logAuthorizationCodeTrace } from "../utils/authorizationCodeTrace";
 
 export class MetaEmbeddedSignupError extends Error {
   constructor(message, payload = {}) {
@@ -34,7 +35,11 @@ export async function getEmbeddedSignupHealth() {
   }
 }
 
-export async function exchangeEmbeddedSignupCode(payload) {
+export async function exchangeEmbeddedSignupCode(payload, debugLabel = "[META_EMBEDDED_SIGNUP]") {
+  await logAuthorizationCodeTrace(debugLabel, "http_post_body", payload.code, {
+    endpoint: "POST /api/meta/embedded-signup/exchange"
+  });
+
   const response = await apiRequest("/api/meta/embedded-signup/exchange", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

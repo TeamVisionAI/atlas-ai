@@ -16,7 +16,7 @@ FIX_LINKS = ROOT / "scripts" / "fix-doc-links.py"
 
 LINK_RE = re.compile(r"\]\(([^)]+)\)")
 DOC_CONTROL_RE = re.compile(r"## Document control", re.I)
-CANONICAL_PREFIXES = tuple(f"{i:02d}-" for i in range(11))
+CANONICAL_PREFIXES = tuple(f"{i:02d}-" for i in range(12))
 
 # Folders that should have README.md
 REQUIRED_README_DIRS = [
@@ -42,6 +42,7 @@ REQUIRED_README_DIRS = [
     DOCS / "09-releases" / "archive" / "v1-platform",
     DOCS / "09-releases" / "sprints",
     DOCS / "10-rfcs",
+    DOCS / "11-meta-tech-provider",
 ]
 
 README_TEMPLATES = {
@@ -208,7 +209,7 @@ def resolve_link(source: Path, target: str) -> Path | None:
 
 
 def orphan_markdown_outside_canonical() -> list[str]:
-    """Markdown under docs/ outside 00–10 folders (excluding allowed root files)."""
+    """Markdown under docs/ outside 00–11 folders (excluding allowed root files)."""
     allowed_root = set(STUB_REDIRECTS) | {"README.md", "DOCUMENTATION_HEALTH_REPORT.md"}
     orphans = []
     for path in sorted(DOCS.rglob("*.md")):
@@ -438,7 +439,7 @@ def validate_numbering() -> list[str]:
     expected = [f"{i:02d}-" for i in range(11)]
     for p in top_dirs:
         prefix = p.name[:3]
-        if prefix not in [f"{i:02d}-" for i in range(11)]:
+        if prefix not in [f"{i:02d}-" for i in range(12)]:
             issues.append(f"Invalid prefix: {p.name}")
     return issues
 
@@ -500,7 +501,7 @@ def main() -> None:
         f"| 5 | No orphan markdown outside canonical structure | {'PASS' if not orphans else 'FAIL'} |",
         f"| 6 | Cross-references validated | {'PASS' if not broken else 'FAIL'} |",
         f"| 7 | Document naming consistency | {'PASS' if not naming else 'WARN'} |",
-        f"| 8 | Folder numbering 00–10 | {'PASS' if not numbering else 'FAIL'} |",
+        f"| 8 | Folder numbering 00–11 | {'PASS' if not numbering else 'FAIL'} |",
         "",
         "## Summary",
         "",
@@ -542,7 +543,7 @@ def main() -> None:
         for o in orphans:
             lines.append(f"- `{o}`")
     else:
-        lines.append("None — all files under canonical 00–10 structure or allowed root stubs.")
+        lines.append("None — all files under canonical 00–11 structure or allowed root stubs.")
     lines.extend(["", "## Markdown outside docs/ (informational)", ""])
     if external_md:
         for o in external_md:
@@ -579,7 +580,7 @@ def main() -> None:
         "",
         "## Cross-reference validation",
         "",
-        f"Scanned all `{total}` markdown files for internal `](...)` links. "
+        f"Scanned all `{total}` markdown files for internal hyperlinks. "
         + ("All resolved targets exist." if not broken else f"{len(broken)} broken links remain."),
         "",
         "## Document naming conventions (informational)",
@@ -596,7 +597,7 @@ def main() -> None:
         for n in numbering:
             lines.append(f"- {n}")
     else:
-        lines.append("Folders 00–10 validated.")
+        lines.append("Folders 00–11 validated.")
 
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"TOTAL={total}")

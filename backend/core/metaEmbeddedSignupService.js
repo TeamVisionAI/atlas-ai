@@ -12,9 +12,14 @@ const {
 const { metaLogger } = require("./meta/metaLogger");
 const { validateMetaEmbeddedSignupEnvironment } = require("./meta/metaEnvironmentValidator");
 const { getCachedConnectionStatus } = require("./meta/metaConnectionHealthService");
+const { getMetaGraphApiVersion } = require("./meta/metaGraphApiVersion");
+const {
+  compareAuthorizationCodes,
+  traceAuthorizationCode
+} = require("./meta/authorizationCodeTrace");
 
 function getGraphVersion() {
-  return process.env.META_GRAPH_API_VERSION || "v21.0";
+  return getMetaGraphApiVersion();
 }
 
 function getMetaAppId() {
@@ -135,6 +140,15 @@ async function exchangeAuthorizationCodeForToken(code) {
   const version = getGraphVersion();
   const graphUrl = `https://graph.facebook.com/${version}/oauth/access_token`;
   const envSnapshot = getMetaExchangeEnvSnapshot();
+
+  metaLogger.info(
+    "authorization_code_trace",
+    traceAuthorizationCode("graph_api_request", code, {
+      graphEndpoint: graphUrl,
+      httpMethod: "GET",
+      requestParams: ["client_id", "client_secret", "code"]
+    })
+  );
 
   metaLogger.info("oauth_access_token_exchange_request", {
     graphEndpoint: graphUrl,
@@ -345,7 +359,11 @@ async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId }) {
  * @param {{ code: string, wabaId?: string, phoneNumberId?: string, onboardingType?: string }} input
  */
 async function completeEmbeddedSignupExchange(input) {
-  const code = String(input.code || "").trim();
+  const rawCode = String(input.code || "");
+  const code = rawCode.trim();
+  const trimComparison = compareAuthorizationCodes(rawCode, code, "service_trim");
+
+  metaLogger.info("authorization_code_trace", trimComparison);
 
   if (!code) {
     throw Object.assign(new Error("Authorization code is required."), {
@@ -353,6 +371,13 @@ async function completeEmbeddedSignupExchange(input) {
       publicCode: "CODE_REQUIRED"
     });
   }
+
+  metaLogger.info(
+    "authorization_code_trace",
+    traceAuthorizationCode("service_exchange", code, {
+      onboardingType: input.onboardingType || "whatsapp_business_app"
+    })
+  );
 
   if (isAuthorizationCodeUsed(code)) {
     throw Object.assign(new Error("Authorization code was already exchanged."), {

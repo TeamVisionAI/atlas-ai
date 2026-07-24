@@ -1,0 +1,3 @@
+# Local review operator values — never commit real phone numbers
+review-phone.local.txt
+review-phone.local.*

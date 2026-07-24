@@ -13,6 +13,7 @@ import {
   mergeEmbeddedSignupIds,
   parseEmbeddedSignupPostMessage
 } from "../utils/metaEmbeddedSignupEvents";
+import { logAuthorizationCodeTrace } from "../utils/authorizationCodeTrace";
 import "./WhatsAppConnect.css";
 
 const CONNECTION_TYPE_LABEL = "WhatsApp Business App";
@@ -183,19 +184,24 @@ export default function WhatsAppConnect() {
       onboardingType: "whatsapp_business_app"
     };
 
-    console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Backend exchange request starting", {
-      endpoint: "POST /api/meta/embedded-signup/exchange",
-      codeLength: code.length,
-      sessionInfo: {
-        wabaId: payload.wabaId ?? null,
-        phoneNumberId: payload.phoneNumberId ?? null,
-        onboardingFinished: onboardingFinishedRef.current
+    await logAuthorizationCodeTrace(
+      WA_EMBEDDED_SIGNUP_DEBUG,
+      "attempt_completion_payload",
+      payload.code,
+      {
+        endpoint: "POST /api/meta/embedded-signup/exchange",
+        payloadMatchesRef: payload.code === authorizationCodeRef.current,
+        sessionInfo: {
+          wabaId: payload.wabaId ?? null,
+          phoneNumberId: payload.phoneNumberId ?? null,
+          onboardingFinished: onboardingFinishedRef.current
+        }
       }
-    });
+    );
     logCoordinatorState("attemptCompletion start");
 
     try {
-      const result = await exchangeEmbeddedSignupCode(payload);
+      const result = await exchangeEmbeddedSignupCode(payload, WA_EMBEDDED_SIGNUP_DEBUG);
 
       console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Backend exchange request succeeded", {
         connected: Boolean(result.connection),
@@ -395,21 +401,12 @@ export default function WhatsAppConnect() {
     (response) => {
       console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login callback payload", {
         status: response?.status ?? null,
-        authResponse: response?.authResponse ?? null
+        authResponseKeys: response?.authResponse ? Object.keys(response.authResponse) : null,
+        codePresent: Boolean(response?.authResponse?.code),
+        accessTokenPresent: Boolean(response?.authResponse?.accessToken)
       });
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login callback (pretty)", debugPretty(response));
-      debugStringify("response", response);
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "FB.login authResponse keys", response?.authResponse
-        ? Object.keys(response.authResponse)
-        : null);
 
       const code = response?.authResponse?.code;
-
-      console.log(WA_EMBEDDED_SIGNUP_DEBUG, "Authorization code presence", {
-        codePresent: Boolean(code),
-        codeLength: code?.length ?? 0,
-        fbLoginStatus: response?.status ?? null
-      });
 
       if (!code) {
         console.log(WA_EMBEDDED_SIGNUP_DEBUG, "No authorization code in authResponse — auth incomplete");
@@ -427,11 +424,15 @@ export default function WhatsAppConnect() {
       authorizationCodeRef.current = code;
       logCoordinatorState("after authorization code stored");
 
-      console.log(
-        WA_EMBEDDED_SIGNUP_DEBUG,
-        "Authorization code stored — starting backend exchange (FINISH event optional)"
-      );
-      attemptCompletion();
+      void logAuthorizationCodeTrace(WA_EMBEDDED_SIGNUP_DEBUG, "fb_login_callback", code, {
+        fbLoginStatus: response?.status ?? null
+      }).then(() => {
+        console.log(
+          WA_EMBEDDED_SIGNUP_DEBUG,
+          "Authorization code stored — starting backend exchange (FINISH event optional)"
+        );
+        attemptCompletion();
+      });
     },
     [attemptCompletion, failAttempt, translate, logCoordinatorState]
   );

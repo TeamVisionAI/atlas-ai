@@ -57,11 +57,23 @@ For Meta Business Verification and WhatsApp Platform review, read documents in t
 | 1 | [Meta_Approval_Portfolio.md](./Meta_Approval_Portfolio.md) (DOC-0002) | Complete platform and policy overview |
 | 2 | [../07-security/Privacy_and_Data_Handling.md](../../07-security/Privacy_and_Data_Handling.md) (DOC-0003) | Data collection, storage, and protection detail |
 | 3 | [Meta_Review_QA.md](../../07-security/Meta_Review_QA.md) (DOC-0004) | Concise answers to common reviewer questions |
+| 4 | [11-meta-tech-provider/10_Reviewer_FAQ.md](../../11-meta-tech-provider/10_Reviewer_FAQ.md) (MTP-010) | Production-aligned Meta Tech Provider FAQ |
+| 5 | [11-meta-tech-provider/09_Demo_Script.md](../../11-meta-tech-provider/09_Demo_Script.md) (MTP-009) | Step-by-step reviewer walkthrough |
 
 ### Supporting documents (outside this folder)
 
 | Document ID | Document | Status | Role |
 |-------------|----------|--------|------|
+| MTP-001 | [11-meta-tech-provider/01_Executive_Summary.md](../../11-meta-tech-provider/01_Executive_Summary.md) | Draft | Meta Tech Provider portfolio introduction |
+| MTP-002 | [11-meta-tech-provider/02_Platform_Overview.md](../../11-meta-tech-provider/02_Platform_Overview.md) | Draft | Meta Tech Provider platform overview |
+| MTP-003 | [11-meta-tech-provider/03_System_Architecture.md](../../11-meta-tech-provider/03_System_Architecture.md) | Draft | Meta Tech Provider system architecture |
+| MTP-004 | [11-meta-tech-provider/04_WhatsApp_Business_Integration.md](../../11-meta-tech-provider/04_WhatsApp_Business_Integration.md) | Draft | Meta Tech Provider WhatsApp integration |
+| MTP-005 | [11-meta-tech-provider/05_Data_Flow.md](../../11-meta-tech-provider/05_Data_Flow.md) | Draft | Meta Tech Provider data flow |
+| MTP-006 | [11-meta-tech-provider/06_Security_and_Privacy.md](../../11-meta-tech-provider/06_Security_and_Privacy.md) | Draft | Meta Tech Provider security and privacy |
+| MTP-007 | [11-meta-tech-provider/07_User_Journey.md](../../11-meta-tech-provider/07_User_Journey.md) | Draft | Meta Tech Provider user journey |
+| MTP-008 | [11-meta-tech-provider/08_Permissions_Justification.md](../../11-meta-tech-provider/08_Permissions_Justification.md) | Draft | Meta Tech Provider permissions justification |
+| MTP-009 | [11-meta-tech-provider/09_Demo_Script.md](../../11-meta-tech-provider/09_Demo_Script.md) | Draft | Meta Tech Provider demo script |
+| MTP-010 | [11-meta-tech-provider/10_Reviewer_FAQ.md](../../11-meta-tech-provider/10_Reviewer_FAQ.md) | Draft | Meta Tech Provider reviewer FAQ (production-aligned) |
 | DOC-0001 | [Current_System_State.md](../../00-executive/Current_System_State.md) | Approved | Authoritative production state — technical baseline |
 | — | [WHATSAPP_EMBEDDED_SIGNUP.md](../WHATSAPP_EMBEDDED_SIGNUP.md) | Engineering | Technical Embedded Signup implementation |
 | — | [09-releases/sprints/SPRINT_11_1_LIVE_WHATSAPP.md](../../09-releases/sprints/SPRINT_11_1_LIVE_WHATSAPP.md) | Engineering | Live WhatsApp pipeline specification |

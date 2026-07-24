@@ -5,9 +5,10 @@
 
 const { repository } = require("../repositories/metaWhatsAppConnectionRepository");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
+const { getMetaGraphApiVersion } = require("./meta/metaGraphApiVersion");
 
 function graphApiVersion() {
-  return process.env.META_GRAPH_API_VERSION || "v21.0";
+  return getMetaGraphApiVersion();
 }
 
 function envCredentials() {

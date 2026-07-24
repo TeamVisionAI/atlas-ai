@@ -3,12 +3,13 @@
  */
 
 const { metaLogger } = require("./metaLogger");
+const { DEFAULT_META_GRAPH_API_VERSION } = require("./metaGraphApiVersion");
 
 const SERVER_ENV_RULES = Object.freeze([
   { key: "META_APP_ID", required: true },
   { key: "META_APP_SECRET", required: true, secret: true },
   { key: "META_EMBEDDED_SIGNUP_CONFIG_ID", required: false, recommended: true },
-  { key: "META_GRAPH_API_VERSION", required: false, defaultValue: "v21.0" },
+  { key: "META_GRAPH_API_VERSION", required: false, defaultValue: DEFAULT_META_GRAPH_API_VERSION },
   { key: "META_TOKEN_ENCRYPTION_KEY", required: false, recommended: true },
   { key: "VERIFY_TOKEN", required: false, recommended: true },
   { key: "WHATSAPP_ACCESS_TOKEN", required: false, recommended: true },

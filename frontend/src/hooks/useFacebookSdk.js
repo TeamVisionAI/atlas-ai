@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getMetaGraphApiVersion } from "../config/metaGraphApiVersion";
 
 const SDK_SCRIPT_ID = "facebook-jssdk";
 const SDK_SRC = "https://connect.facebook.net/en_US/sdk.js";
@@ -63,7 +64,7 @@ function loadFacebookSdk(appId, version) {
 
 export function useFacebookSdk() {
   const appId = import.meta.env.VITE_META_APP_ID;
-  const version = import.meta.env.VITE_META_GRAPH_API_VERSION || "v21.0";
+  const version = getMetaGraphApiVersion();
   const configId = import.meta.env.VITE_META_EMBEDDED_SIGNUP_CONFIG_ID;
 
   const [ready, setReady] = useState(false);

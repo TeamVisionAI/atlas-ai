@@ -12,6 +12,10 @@ const {
 const { isRateLimited } = require("../core/metaEmbeddedSignupRateLimit");
 const { checkMetaConnectionHealth } = require("../core/meta/metaConnectionHealthService");
 const { metaLogger } = require("../core/meta/metaLogger");
+const {
+  compareAuthorizationCodes,
+  traceAuthorizationCode
+} = require("../core/meta/authorizationCodeTrace");
 
 const router = express.Router();
 
@@ -44,14 +48,24 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       });
     }
 
-    const code = req.body?.code;
+    const rawCode = req.body?.code;
 
-    if (!code || typeof code !== "string" || !code.trim()) {
+    if (!rawCode || typeof rawCode !== "string" || !rawCode.trim()) {
       return res.status(400).json({
         error: "CODE_REQUIRED",
         message: "Authorization code is required."
       });
     }
+
+    metaLogger.info(
+      "authorization_code_trace",
+      traceAuthorizationCode("route_body_received", rawCode)
+    );
+
+    const code = rawCode.trim();
+    const trimComparison = compareAuthorizationCodes(rawCode, code, "route_trim");
+
+    metaLogger.info("authorization_code_trace", trimComparison);
 
     const wabaId = req.body?.wabaId ? String(req.body.wabaId).trim() : undefined;
     const phoneNumberId = req.body?.phoneNumberId
@@ -71,7 +85,7 @@ router.post("/embedded-signup/exchange", async (req, res) => {
     }
 
     const result = await completeEmbeddedSignupExchange({
-      code: code.trim(),
+      code,
       wabaId,
       phoneNumberId,
       onboardingType

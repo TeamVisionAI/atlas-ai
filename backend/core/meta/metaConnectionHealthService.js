@@ -6,9 +6,10 @@ const axios = require("axios");
 const { repository, toSafeConnection } = require("../../repositories/metaWhatsAppConnectionRepository");
 const { metaLogger } = require("./metaLogger");
 const { getReconnectFlowPlan } = require("./metaReconnectFlow");
+const { getMetaGraphApiVersion } = require("./metaGraphApiVersion");
 
 function getGraphVersion() {
-  return process.env.META_GRAPH_API_VERSION || "v21.0";
+  return getMetaGraphApiVersion();
 }
 
 function buildHealthResult(base) {

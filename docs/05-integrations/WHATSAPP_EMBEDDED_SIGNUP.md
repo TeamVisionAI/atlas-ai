@@ -15,7 +15,7 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 | `META_APP_ID` | Meta app ID (backend only — do not rely on `VITE_META_APP_ID` server-side) |
 | `META_APP_SECRET` | Server-side only — OAuth code exchange + signature validation |
 | `META_EMBEDDED_SIGNUP_CONFIG_ID` | Embedded Signup configuration ID from Meta |
-| `META_GRAPH_API_VERSION` | e.g. `v21.0` |
+| `META_GRAPH_API_VERSION` | `v25.0` (default; see `backend/core/meta/metaGraphApiVersion.js`) |
 | `META_TOKEN_ENCRYPTION_KEY` | **Sprint 6.1** — 32+ byte secret or 64-char hex for AES-256-GCM at rest (recommended) |
 | `FRONTEND_URL` | Allowed frontend origin (local dev: `http://localhost:5173`) |
 | `VERIFY_TOKEN` | Existing webhook verify token (unchanged) |
@@ -30,7 +30,7 @@ This sprint **does not** change `/webhook` verification behavior for the existin
 |----------|---------|
 | `VITE_META_APP_ID` | Same Meta app ID (safe in browser) |
 | `VITE_META_EMBEDDED_SIGNUP_CONFIG_ID` | Same configuration ID |
-| `VITE_META_GRAPH_API_VERSION` | e.g. `v21.0` |
+| `VITE_META_GRAPH_API_VERSION` | `v25.0` (must match backend; see `frontend/src/config/metaGraphApiVersion.js`) |
 
 **Never** put `META_APP_SECRET` or access tokens in frontend env vars.
 

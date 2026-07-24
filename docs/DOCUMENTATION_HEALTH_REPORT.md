@@ -1,7 +1,7 @@
 # Documentation Health Report
 
 **Generated:** Atlas Documentation Foundation v1.0 audit
-**Total documents:** 113
+**Total documents:** 128
 
 ## Audit checklist
 
@@ -14,20 +14,20 @@
 | 5 | No orphan markdown outside canonical structure | PASS |
 | 6 | Cross-references validated | PASS |
 | 7 | Document naming consistency | PASS |
-| 8 | Folder numbering 00–10 | PASS |
+| 8 | Folder numbering 00–11 | PASS |
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total markdown files | 113 |
+| Total markdown files | 128 |
 | Broken internal links | 0 |
 | Unreachable from hub | 0 |
 | Duplicate content groups | 0 |
 | Orphan files in docs/ | 0 |
 | Markdown outside docs/ | 4 |
 | Missing README folders | 0 |
-| Missing metadata | 12 |
+| Missing metadata | 13 |
 | Naming inconsistencies | 0 |
 | Numbering issues | 0 |
 | Auto-fixes applied | 0 |
@@ -46,7 +46,7 @@ All documents reachable.
 
 ## Orphan markdown in docs/
 
-None — all files under canonical 00–10 structure or allowed root stubs.
+None — all files under canonical 00–11 structure or allowed root stubs.
 
 ## Markdown outside docs/ (informational)
 
@@ -77,6 +77,7 @@ All required folders have README.md.
 - `docs/05-integrations/WHATSAPP_EMBEDDED_SIGNUP.md`
 - `docs/06-business/BUSINESS_RULES.md`
 - `docs/08-operations/local-development.md`
+- `docs/11-meta-tech-provider/evidence/demo-prospect.md`
 
 ## Naming inconsistencies
 
@@ -84,7 +85,7 @@ None flagged.
 
 ## Cross-reference validation
 
-Scanned all `113` markdown files for internal `](...)` links. All resolved targets exist.
+Scanned all `128` markdown files for internal hyperlinks. All resolved targets exist.
 
 ## Document naming conventions (informational)
 
@@ -95,4 +96,4 @@ Intentional mixed conventions retained for backward compatibility:
 
 ## Numbering validation
 
-Folders 00–10 validated.
+Folders 00–11 validated.
