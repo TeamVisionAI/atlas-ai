@@ -12,3 +12,8 @@ export const missionControlNav = [
   { path: appPath("knowledge"), labelKey: "navKnowledge" },
   { path: appPath("settings"), labelKey: "navSettings" }
 ];
+
+export const operationsCenterNavItem = {
+  path: appPath("operations-center"),
+  labelKey: "navOperationsCenter"
+};

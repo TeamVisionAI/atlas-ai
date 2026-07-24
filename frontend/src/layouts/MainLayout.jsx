@@ -1,8 +1,9 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { useCallback, useEffect, useState } from "react";
-import { missionControlNav } from "../config/missionControlNav";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { missionControlNav, operationsCenterNavItem } from "../config/missionControlNav";
 import { useLanguage } from "../i18n/LanguageContext";
 import { bootstrapAtlasSession } from "../services/atlasAuthService";
+import { fetchOperationsAccess } from "../services/operationsCenterService";
 import "./MainLayout.css";
 
 function useLayoutMode() {
@@ -52,7 +53,8 @@ function SidebarNav({
   showClose,
   onClose,
   showCollapse,
-  onCollapse
+  onCollapse,
+  navItems
 }) {
   return (
     <>
@@ -89,7 +91,7 @@ function SidebarNav({
       <p className="atlas-layout__brand-subtitle">{translate("teamVisionRecruiting")}</p>
 
       <nav className="atlas-layout__nav" aria-label={translate("layoutNavLabel")}>
-        {missionControlNav.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
@@ -119,11 +121,40 @@ export default function MainLayout() {
   const layoutMode = useLayoutMode();
   const [phoneNavOpen, setPhoneNavOpen] = useState(false);
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
+  const [showOperationsCenter, setShowOperationsCenter] = useState(import.meta.env.DEV);
+
+  const navItems = useMemo(() => {
+    if (!showOperationsCenter) {
+      return missionControlNav;
+    }
+
+    return [...missionControlNav, operationsCenterNavItem];
+  }, [showOperationsCenter]);
 
   useEffect(() => {
     bootstrapAtlasSession().catch(() => {
       // Session bootstrap is optional until auth is configured.
     });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchOperationsAccess()
+      .then((profile) => {
+        if (!cancelled) {
+          setShowOperationsCenter(Boolean(profile.allowed));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setShowOperationsCenter(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -205,6 +236,7 @@ export default function MainLayout() {
           onClose={closePhoneNav}
           showCollapse={showSidebarCollapse}
           onCollapse={collapseTabletNav}
+          navItems={navItems}
         />
       </aside>
 

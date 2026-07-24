@@ -7,6 +7,7 @@ import ProspectCenter from "./pages/ProspectCenter";
 import WhatsAppConnect from "./pages/WhatsAppConnect";
 import QuickCapture from "./pages/QuickCapture";
 import KnowledgeHub from "./pages/KnowledgeHub";
+import OperationsCenter from "./pages/OperationsCenter";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Prospect from "./pages/Prospect";
 import Home from "./pages/Home";
@@ -109,6 +110,7 @@ export default function App() {
         />
         <Route path="settings/whatsapp" element={<WhatsAppConnect />} />
         <Route path="knowledge" element={<KnowledgeHub />} />
+        <Route path="operations-center/*" element={<OperationsCenter />} />
       </Route>
 
       {/* Legacy redirects — preserve bookmarks and hardcoded in-app links */}

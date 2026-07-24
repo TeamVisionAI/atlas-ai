@@ -10,6 +10,7 @@ const webhookRoute = require("./routes/webhook");
 const messengerWebhookRoute = require("./routes/messengerWebhook");
 
 const simulatorRoutes = require("./dev/simulatorRoutes");
+const createOperationsRoutes = require("./dev/operationsRoutes");
 
 const dashboardRoutes = require("./routes/dashboard");
 const timelineRoutes = require("./routes/timeline");
@@ -30,6 +31,7 @@ const { createTimelineModule } = require("./modules/timeline");
 const { createMissionControlModule } = require("./modules/mission-control");
 const { createExecutiveDashboardModule } = require("./modules/executive-dashboard");
 const { requireAtlasUser } = require("./middleware/requireAtlasUser");
+const contactRoutes = require("./routes/contact");
 
 const {
   logMetaEnvironmentWarnings
@@ -141,6 +143,10 @@ app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/organization", organizationRoutes);
 app.use("/api/business-events", businessEventModule.routes);
+app.use(
+  "/api/operations",
+  createOperationsRoutes({ businessEventService: businessEventModule.service })
+);
 app.use("/api/timeline", timelineModule.routes);
 app.get(
   "/api/prospects/:id/timeline",
