@@ -35,7 +35,7 @@ backend/database/migrations/002_quick_capture.sql
 
 Creates:
 
-- `atlas_users` — Atlas agent accounts for ownership
+- `atlas_users` — Atlas agent accounts for ownership (Ana + Niovel default seeds)
 - `atlas_sessions` — bearer session tokens
 - Quick Capture columns on `prospects` (`prospect_number`, `normalized_phone`, `communication_language`, `preferred_communication_channel`, `entry_method`, `source`, `owner_user_id`, `created_by_user_id`, `status`, `first_name`, `last_name`)
 

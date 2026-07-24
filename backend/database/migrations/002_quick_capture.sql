@@ -21,13 +21,21 @@ CREATE INDEX IF NOT EXISTS idx_atlas_sessions_token ON atlas_sessions(token);
 CREATE INDEX IF NOT EXISTS idx_atlas_sessions_user_id ON atlas_sessions(user_id);
 
 INSERT INTO atlas_users (id, email, first_name, last_name, display_name)
-VALUES (
-  '00000000-0000-4000-8000-000000000001',
-  'ana@teamvision.ai',
-  'Ana',
-  'Recruiter',
-  'Ana'
-)
+VALUES
+  (
+    '00000000-0000-4000-8000-000000000001',
+    'ana@teamvision.ai',
+    'Ana',
+    'Recruiter',
+    'Ana'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000002',
+    'niovel@teamvision.ai',
+    'Niovel',
+    'Perez',
+    'Niovel'
+  )
 ON CONFLICT (id) DO NOTHING;
 
 ALTER TABLE prospects ADD COLUMN IF NOT EXISTS first_name TEXT;

@@ -17,6 +17,18 @@ function buildMetadata(input = {}) {
   };
 }
 
+/**
+ * Prospect Engine emit() passes eventType as summary when none is provided.
+ * Ignore that placeholder so factory defaults apply (e.g. "Lead created").
+ */
+function normalizeProspectEmitSummary(event = {}) {
+  if (!event.summary || event.summary === event.eventType) {
+    return undefined;
+  }
+
+  return event.summary;
+}
+
 function buildBase(input) {
   return {
     eventId: input.eventId,
@@ -207,7 +219,7 @@ class EventFactory {
       causationId: event.causationId,
       organizationId: event.organizationId,
       lifecycleStateAtEvent: event.lifecycleStateAtEvent,
-      summary: event.summary,
+      summary: normalizeProspectEmitSummary(event),
       parentEventId: event.parentEventId,
       permissionContext: event.permissionContext
     };

@@ -24,13 +24,32 @@ function actorFromRequest(user) {
 }
 
 function toApplicationError(error) {
+  if (error == null) {
+    const wrapped = new Error("Unexpected prospect error.");
+    wrapped.statusCode = 500;
+    wrapped.publicCode = "PROSPECT_ERROR";
+    wrapped.cause = error;
+    return wrapped;
+  }
+
   if (error instanceof ProspectDomainError || error.statusCode) {
     return error;
   }
 
-  const wrapped = new Error(error.message || "Unexpected prospect error.");
+  let message = "Unexpected prospect error.";
+
+  if (error instanceof Error) {
+    message = error.message || message;
+  } else if (typeof error === "string") {
+    message = error;
+  } else if (typeof error.message === "string") {
+    message = error.message;
+  }
+
+  const wrapped = new Error(message);
   wrapped.statusCode = 500;
   wrapped.publicCode = "PROSPECT_ERROR";
+  wrapped.cause = error;
   return wrapped;
 }
 
@@ -253,7 +272,25 @@ class ProspectApplicationService {
       }
 
       existing.assign(assignment, actor);
+
+      console.log("[ProspectApplicationService.assignProspect] prospectId:", prospectId);
+      console.log(
+        "[ProspectApplicationService.assignProspect] assignedAgentId:",
+        assignment?.assignedAgentId ?? null
+      );
+      console.log(
+        "[ProspectApplicationService.assignProspect] assignment payload:",
+        JSON.stringify(assignment, null, 2)
+      );
+
       const saved = await this.repository.save(existing);
+
+      if (!saved) {
+        throw new ProspectDomainError("Prospect could not be saved after assignment.", {
+          statusCode: 500,
+          publicCode: "PROSPECT_SAVE_FAILED"
+        });
+      }
 
       await this.emitBusinessEvent(LEAD_EVENTS.PROSPECT_ASSIGNED, saved, actor, {
         assignedAgentId: assignment.assignedAgentId,

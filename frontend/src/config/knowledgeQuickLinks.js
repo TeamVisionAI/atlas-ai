@@ -1,7 +1,7 @@
 export const KNOWLEDGE_QUICK_LINKS = [
   {
     labelKey: "knowledgeHubQuickCurrentSprint",
-    path: "09-releases/sprints/SPRINT_15_3_UX_POLISH.md"
+    path: "10-release-candidate/RC1_CERTIFICATION.md"
   },
   {
     labelKey: "knowledgeHubQuickAtlasCore",

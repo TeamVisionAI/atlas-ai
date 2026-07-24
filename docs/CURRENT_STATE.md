@@ -2,37 +2,45 @@
 
 ## AI Summary
 
-Atlas Core Platform and Prospect Workspace are complete. Sprint 15.3 delivered shared UI primitives and workspace UX polish for user testing readiness — no new backend business logic.
+Atlas Core Platform v1.0 is feature-complete. Sprint 15.5 delivers RC1 certification tooling and documents the Supabase database baseline required before Team Vision UAT.
 
 ## Current Sprint
 
-Sprint 15.3 — UX Polish & Application Readiness
+Sprint 15.5 — Database Baseline & RC1 Certification
 
 ## Product Stage
 
-Internal MVP — Atlas Core Platform v1.0
+Release Candidate 1 — Atlas Core Platform v1.0
 
 ## Overall Status
 
-🟢 On Track — ready for user testing
+🟡 Conditional — RC1 certification pending Supabase migrations 002–007
 
 ## Current Objective
 
-Improve usability, responsiveness, and consistency across Atlas without modifying frozen backend modules.
+Synchronize Supabase with Atlas Core migrations, seed RC1 demo data, and certify the release candidate for user acceptance testing.
 
 ## Working
 
-- **Shared UI kit** — skeletons, spinners, empty/error states, toasts, buttons, badges, confirm dialog
-- **Prospect Workspace UX** — lazy timeline, keyboard shortcuts, action feedback, responsive layout
-- **Executive Dashboard navigation** — focus banner from workspace deep links
-- **Prospect Workspace feature** — `frontend/src/features/prospect-workspace/`
-- **Timeline integration** — lazy-loaded from `/api/prospects/:id/timeline`
-- **Mission Control context** — operational metrics from projection read model
-- **Executive Dashboard links** — navigation to analytical read model views
-- **Lifecycle quick actions** — assign, archive, restore, merge, update via Prospect Engine
+- **RC1 environment tooling** — `backend/dev/environment/` (reset, seed, replay, verify, certify)
+- **Migration apply script** — `applyAtlasCoreMigrations.js` (002 prerequisite + 003–007)
+- **Database baseline verify** — `verifyDatabaseBaseline.js`
+- **Combined SQL baseline** — `atlas-core-baseline.sql` for Supabase SQL editor
+- **Shared UI kit** — skeletons, toasts, empty/error states, confirm dialog
+- **Prospect Workspace UX** — lazy timeline, keyboard shortcuts, action feedback
+- **Prospect Workspace feature** — composition layer over read models + Prospect Engine
 - **Mission Control projection** — operational metrics from Business Events
 - **Executive Dashboard projection** — funnel, conversion, trends, KPIs
 - **Projection Framework** — central dispatch, replay, failure isolation
+- **Engine unit verification** — all core verify scripts pass
+
+## Pending (RC1 blockers)
+
+- Apply Supabase migrations **002–007** (Atlas Core tables not yet present)
+- Configure `DATABASE_URL` or `SUPABASE_DB_PASSWORD` in `.env`
+- Run `node backend/dev/environment/certifyRC1.js` after baseline
+
+See [RC1_CERTIFICATION.md](./10-release-candidate/RC1_CERTIFICATION.md).
 
 ## Architecture freeze (v1.0)
 
@@ -43,27 +51,19 @@ Improve usability, responsiveness, and consistency across Atlas without modifyin
 - Mission Control — bug fixes only
 - Executive Dashboard — bug fixes only
 
-Future work extends the platform via composition and new projections — not redesigns.
-
-## In Progress
-
-- Bridge legacy activity feed with Timeline Engine long-term
-- Broader application of shared UI kit beyond Prospect Workspace
-
 ## Recent Decisions
 
-- **2026-07-24:** Sprint 15.3 is frontend-only — no backend architecture changes
-- **2026-07-24:** Shared UI components live under `frontend/src/components/ui/`
-- **2026-07-24:** Prospect Workspace is a composition layer — no new backend business logic
-- **2026-07-24:** Timeline loads lazily to keep workspace fast
+- **2026-07-24:** RC1 certification uses Prospect Engine + Business Events only — no direct projection inserts
+- **2026-07-24:** Migration 002 is a prerequisite for 003 (`atlas_users` FK)
+- **2026-07-24:** Dev tooling fails fast when Atlas Core tables are missing (no silent in-memory fallback for RC1)
 
 ## Recently Updated Documents
 
 | Document | Path |
 |----------|------|
+| RC1 Certification | [10-release-candidate/RC1_CERTIFICATION.md](./10-release-candidate/RC1_CERTIFICATION.md) |
+| Environment tooling | [backend/dev/environment/](../backend/dev/environment/) |
 | Sprint 15.3 | [09-releases/sprints/SPRINT_15_3_UX_POLISH.md](./09-releases/sprints/SPRINT_15_3_UX_POLISH.md) |
-| Sprint 15.2 | [09-releases/sprints/SPRINT_15_2_PROSPECT_WORKSPACE.md](./09-releases/sprints/SPRINT_15_2_PROSPECT_WORKSPACE.md) |
-| Shared UI kit | [frontend/src/components/ui/](../frontend/src/components/ui/) |
 
 ## Environment Status
 
@@ -71,12 +71,11 @@ Future work extends the platform via composition and new projections — not red
 
 | Component | Status |
 |-----------|--------|
-| Frontend lint/build | ✅ `npm run lint && npm run build` |
-| Executive Dashboard verify | ✅ `verifyExecutiveDashboardProjection.js` |
-| Mission Control verify | ✅ `verifyMissionControlProjection.js` |
-| Timeline verify | ✅ `verifyTimelineEngine.js` |
-| Business Event verify | ✅ `verifyBusinessEventEngine.js` |
-| Prospect verify | ✅ `verifyProspectEngine.js` |
+| Engine unit verifies | ✅ All pass |
+| Contact Form verify | ✅ Pass |
+| Supabase Atlas Core tables | ⏳ Pending migrations 002–007 |
+| RC1 seed/verify | ⏳ Pending baseline |
+| Frontend lint/build | ✅ (Sprint 15.3) |
 
 ## Last Updated
 

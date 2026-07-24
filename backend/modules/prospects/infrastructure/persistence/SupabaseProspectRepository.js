@@ -54,29 +54,70 @@ class ProspectRepository {
 
   async save(prospect) {
     const row = toUpdateRow(prospect);
+    const prospectId = prospect.prospectId;
+
+    console.log("[ProspectRepository.save] prospectId:", prospectId);
+    console.log("[ProspectRepository.save] assigned_agent_id:", row.assigned_agent_id ?? null);
+    console.log("[ProspectRepository.save] update payload:", JSON.stringify(row, null, 2));
 
     if (this.useMemory) {
       return this.memory.save(prospect);
     }
 
-    const { data, error } = await supabase
+    const response = await supabase
       .from(TABLE_NAME)
       .update(row)
-      .eq("id", prospect.prospectId)
+      .eq("id", prospectId)
       .is("deleted_at", null)
       .select("*")
       .maybeSingle();
 
-    if (error) {
-      if (isMissingProspectTable(error)) {
+    console.log(
+      "[ProspectRepository.save] Supabase response:",
+      JSON.stringify(
+        {
+          data: response.data,
+          error: response.error,
+          status: response.status,
+          statusText: response.statusText,
+          count: response.count
+        },
+        null,
+        2
+      )
+    );
+
+    if (response.error) {
+      if (isMissingProspectTable(response.error)) {
         this.useMemory = true;
         return this.memory.save(prospect);
       }
 
-      throw error;
+      console.error(
+        "[ProspectRepository.save] Supabase error:",
+        response.error.code,
+        response.error.message,
+        response.error.details,
+        response.error.hint
+      );
+      throw response.error;
     }
 
-    return fromRow(data);
+    if (!response.data) {
+      const noRowError = new Error(
+        `Prospect save returned no row for id=${prospectId}. The UPDATE matched 0 rows or the post-update SELECT returned nothing. assigned_agent_id=${row.assigned_agent_id ?? "null"}. This is not a suppressed repository error — inspect payload and Supabase response above.`
+      );
+      noRowError.code = "PROSPECT_SAVE_NO_ROW";
+      noRowError.details = {
+        prospectId,
+        assignedAgentId: row.assigned_agent_id ?? null,
+        payload: row,
+        supabaseStatus: response.status
+      };
+      throw noRowError;
+    }
+
+    return fromRow(response.data);
   }
 
   async findById(id, { includeDeleted = false } = {}) {

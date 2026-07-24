@@ -1,0 +1,64 @@
+{
+  "tag": "rc1",
+  "emailDomain": "rc1.atlas.dev",
+  "organizationId": "00000000-0000-4000-8000-000000000001",
+  "agentIds": {
+    "ana": "00000000-0000-4000-8000-000000000001",
+    "niovel": "00000000-0000-4000-8000-000000000002"
+  },
+  "seededAt": "2026-07-24T19:26:22.159Z",
+  "prospects": [
+    {
+      "key": "maria",
+      "prospectId": "7f303682-76fb-45d6-8b82-565b68a953ae",
+      "displayName": "Maria Gonzalez",
+      "email": "maria.gonzalez@rc1.atlas.dev",
+      "phone": "7875552001",
+      "timelineSummaries": [
+        "Lead Created",
+        "Initial Contact"
+      ]
+    },
+    {
+      "key": "carlos",
+      "prospectId": "cd242f2c-02be-4096-aebd-3b91703edcb9",
+      "displayName": "Carlos Rodriguez",
+      "email": "carlos.rodriguez@rc1.atlas.dev",
+      "phone": "7875552002",
+      "assignedAgentId": "00000000-0000-4000-8000-000000000002",
+      "timelineSummaries": [
+        "Lead Created",
+        "Qualified",
+        "Prospect assigned",
+        "Interview Scheduled",
+        "Reminder Sent"
+      ]
+    },
+    {
+      "key": "andrea",
+      "prospectId": "8e337f42-1f34-4526-ae26-54efb356b80d",
+      "displayName": "Andrea Morales",
+      "email": "andrea.morales@rc1.atlas.dev",
+      "phone": "7875552003",
+      "assignedAgentId": "00000000-0000-4000-8000-000000000001",
+      "timelineSummaries": [
+        "Lead Created",
+        "Qualified",
+        "Prospect assigned",
+        "Interview Scheduled",
+        "Interview Completed",
+        "Prospect archived"
+      ]
+    }
+  ],
+  "expected": {
+    "prospectCount": 3,
+    "activeProspects": 2,
+    "archivedProspects": 1,
+    "newLeads": 3,
+    "contactAttempts": 1,
+    "qualifiedProspects": 2,
+    "scheduledInterviews": 2,
+    "completedInterviews": 1
+  }
+}
