@@ -1,18 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { bootstrapAtlasSession } from "../services/atlasAuthService";
 import {
-  operationsCenterSections,
+  operationsCenterNavGroups,
   operationsCenterPath
 } from "../config/operationsCenterNav";
 import { appPath } from "../config/appRoutes";
+import {
+  OpsEmptyState,
+  OpsErrorState,
+  OpsLoadingState,
+  OpsPlatformCard,
+  OpsRecentActivityList,
+  OpsRunningTasks,
+  OpsStatusBadge,
+  useRunningTasks
+} from "../components/operations/OpsShared";
+import OpsDashboard from "./operations/OpsDashboard";
 import {
   advanceWorkflowSimulator,
   fetchBusinessEventById,
   fetchBusinessEvents,
   fetchDiagnostics,
   fetchOperationsAccess,
+  fetchOperationsDashboard,
   fetchProspectTimeline,
   fetchSimulatorScenarios,
   fetchSmokeTests,
@@ -32,22 +44,17 @@ import {
 } from "../services/operationsCenterService";
 import "./OperationsCenter.css";
 
-function StatusBadge({ status }) {
-  const normalized = String(status || "unknown").toLowerCase();
-  return <span className={`ops-status ops-status--${normalized}`}>{status}</span>;
-}
-
 function ActionResult({ result }) {
   if (!result) {
     return null;
   }
 
+  const failed = result.success === false || result.result === "FAIL";
+
   return (
-    <div className={`ops-result${result.success === false || result.result === "FAIL" ? " ops-result--error" : ""}`}>
+    <div className={`ops-result${failed ? " ops-result--error" : ""}`} role="status">
       {result.result ? <p className="ops-result__headline">{result.result}</p> : null}
-      {result.eventsReplayed !== undefined ? (
-        <p>Events replayed: {result.eventsReplayed}</p>
-      ) : null}
+      {result.eventsReplayed !== undefined ? <p>Events replayed: {result.eventsReplayed}</p> : null}
       {result.durationMs !== undefined ? <p>Duration: {result.durationMs}ms</p> : null}
       {result.failureDetails ? <pre>{result.failureDetails}</pre> : null}
       {result.message ? <p>{result.message}</p> : null}
@@ -92,28 +99,58 @@ function SystemHealthSection({ t }) {
         </button>
       </header>
 
-      {loading && !health ? <p className="ops-muted">{t.loading}</p> : null}
-      {error ? <p className="ops-error">{error}</p> : null}
+      {loading && !health ? <OpsLoadingState label={t.loading} /> : null}
+      {error ? <OpsErrorState message={error} /> : null}
 
       <div className="ops-card-grid">
         {(health?.cards || []).map((card) => (
-          <article key={card.id} className="ops-card">
-            <h3>{card.label}</h3>
-            <StatusBadge status={card.status} />
-            <dl className="ops-meta">
-              <div>
-                <dt>{t.opsVersion}</dt>
-                <dd>{card.version}</dd>
-              </div>
-              <div>
-                <dt>{t.opsLastCheck}</dt>
-                <dd>{card.lastCheck}</dd>
-              </div>
-            </dl>
-            {card.detail ? <p className="ops-muted">{card.detail}</p> : null}
-          </article>
+          <OpsPlatformCard key={card.id} card={card} t={t} />
         ))}
       </div>
+    </section>
+  );
+}
+
+function LiveActivitySection({ t }) {
+  const [activity, setActivity] = useState([]);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setError(null);
+
+    try {
+      const data = await fetchOperationsDashboard();
+      setActivity(data.recentActivity || []);
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  return (
+    <section className="ops-section">
+      <header className="ops-section__header">
+        <div>
+          <p className="ops-section__eyebrow">{t.opsSectionInternal}</p>
+          <h2>{t.opsNavLiveActivity}</h2>
+          <p className="ops-muted">{t.opsLiveActivityDescription}</p>
+        </div>
+        <button type="button" className="ops-button ops-button--secondary" onClick={load}>
+          {t.opsRefresh}
+        </button>
+      </header>
+
+      {loading && !activity.length ? <OpsLoadingState label={t.loading} /> : null}
+      {error ? <OpsErrorState message={error} /> : null}
+      <OpsRecentActivityList items={activity} emptyLabel={t.opsRecentActivityEmpty} />
     </section>
   );
 }
@@ -123,8 +160,8 @@ function WorkflowSimulatorSection({ t }) {
   const [activePhone, setActivePhone] = useState("");
   const [workflowState, setWorkflowState] = useState(null);
   const [result, setResult] = useState(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const { tasks, runTask } = useRunningTasks();
 
   useEffect(() => {
     fetchSimulatorScenarios()
@@ -132,13 +169,12 @@ function WorkflowSimulatorSection({ t }) {
       .catch(() => {});
   }, []);
 
-  async function runAction(action) {
-    setBusy(true);
+  async function runAction(id, label, action) {
     setError(null);
     setResult(null);
 
     try {
-      const payload = await action();
+      const payload = await runTask(id, label, action);
       setResult(payload);
 
       if (payload.phone) {
@@ -150,8 +186,6 @@ function WorkflowSimulatorSection({ t }) {
       }
     } catch (actionError) {
       setError(actionError.message);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -165,29 +199,28 @@ function WorkflowSimulatorSection({ t }) {
         </div>
       </header>
 
+      <OpsRunningTasks tasks={tasks} t={t} />
+
       <div className="ops-action-row">
         <button
           type="button"
           className="ops-button"
-          disabled={busy}
-          onClick={() => runAction(simulateFacebookLead)}
+          onClick={() => runAction("sim-facebook", t.opsGenerateFacebookLead, simulateFacebookLead)}
         >
           {t.opsGenerateFacebookLead}
         </button>
         <button
           type="button"
           className="ops-button"
-          disabled={busy}
-          onClick={() => runAction(simulateWebsiteLead)}
+          onClick={() => runAction("sim-website", t.opsGenerateWebsiteLead, simulateWebsiteLead)}
         >
           {t.opsGenerateWebsiteLead}
         </button>
         <button
           type="button"
           className="ops-button"
-          disabled={busy}
           onClick={() =>
-            runAction(() =>
+            runAction("sim-whatsapp", t.opsGenerateWhatsApp, () =>
               simulateWhatsAppConversation({
                 message: "Hola, quiero información sobre Team Vision."
               })
@@ -199,8 +232,7 @@ function WorkflowSimulatorSection({ t }) {
         <button
           type="button"
           className="ops-button ops-button--secondary"
-          disabled={busy}
-          onClick={() => runAction(runAllSimulatorScenarios)}
+          onClick={() => runAction("sim-scenarios", t.opsRunAllScenarios, runAllSimulatorScenarios)}
         >
           {t.opsRunAllScenarios}
         </button>
@@ -215,8 +247,11 @@ function WorkflowSimulatorSection({ t }) {
                 key={scenario.id}
                 type="button"
                 className="ops-button ops-button--secondary"
-                disabled={busy}
-                onClick={() => runAction(() => runSimulatorScenario(scenario.id))}
+                onClick={() =>
+                  runAction(`scenario-${scenario.id}`, scenario.name, () =>
+                    runSimulatorScenario(scenario.id)
+                  )
+                }
               >
                 {scenario.name}
               </button>
@@ -234,9 +269,8 @@ function WorkflowSimulatorSection({ t }) {
           <button
             type="button"
             className="ops-button ops-button--secondary"
-            disabled={busy || !activePhone}
             onClick={() =>
-              runAction(() =>
+              runAction("advance-workflow", t.opsAdvanceWorkflow, () =>
                 advanceWorkflowSimulator({
                   phone: activePhone,
                   targetMilestone: "INTERVIEW_READY"
@@ -265,8 +299,8 @@ function WorkflowSimulatorSection({ t }) {
 function SmokeTestsSection({ t }) {
   const [tests, setTests] = useState([]);
   const [results, setResults] = useState({});
-  const [busyId, setBusyId] = useState("");
   const [error, setError] = useState(null);
+  const { tasks, runTask } = useRunningTasks();
 
   useEffect(() => {
     fetchSmokeTests()
@@ -275,16 +309,13 @@ function SmokeTestsSection({ t }) {
   }, []);
 
   async function handleRun(testId) {
-    setBusyId(testId);
     setError(null);
 
     try {
-      const result = await runSmokeTest(testId);
+      const result = await runTask(`smoke-${testId}`, testId, () => runSmokeTest(testId));
       setResults((current) => ({ ...current, [testId]: result }));
     } catch (runError) {
       setError(runError.message);
-    } finally {
-      setBusyId("");
     }
   }
 
@@ -298,18 +329,20 @@ function SmokeTestsSection({ t }) {
         </div>
       </header>
 
-      {error ? <p className="ops-error">{error}</p> : null}
+      <OpsRunningTasks tasks={tasks} t={t} />
+      {error ? <OpsErrorState message={error} /> : null}
 
       <div className="ops-stack">
         {tests.map((test) => {
           const result = results[test.id];
+          const running = tasks[`smoke-${test.id}`]?.status === "running";
           return (
             <article key={test.id} className="ops-panel ops-panel--row">
               <div>
                 <h3>{test.label}</h3>
                 {result ? (
                   <div className="ops-inline-meta">
-                    <StatusBadge status={result.result === "PASS" ? "healthy" : "degraded"} />
+                    <OpsStatusBadge status={result.result === "PASS" ? "healthy" : "failure"} label={result.result} />
                     <span>{result.durationMs}ms</span>
                   </div>
                 ) : null}
@@ -318,10 +351,10 @@ function SmokeTestsSection({ t }) {
               <button
                 type="button"
                 className="ops-button"
-                disabled={busyId === test.id}
+                disabled={running}
                 onClick={() => handleRun(test.id)}
               >
-                {busyId === test.id ? t.loading : t.opsRunTest}
+                {running ? t.opsRunning : t.opsRunTest}
               </button>
             </article>
           );
@@ -334,20 +367,17 @@ function SmokeTestsSection({ t }) {
 function ProjectionReplaySection({ t }) {
   const [result, setResult] = useState(null);
   const [prospectId, setProspectId] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const { tasks, runTask } = useRunningTasks();
 
-  async function runAction(action) {
-    setBusy(true);
+  async function runAction(id, label, action) {
     setError(null);
 
     try {
-      const payload = await action();
+      const payload = await runTask(id, label, action);
       setResult(payload);
     } catch (actionError) {
       setError(actionError.message);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -361,36 +391,36 @@ function ProjectionReplaySection({ t }) {
         </div>
       </header>
 
+      <OpsRunningTasks tasks={tasks} t={t} />
+
       <div className="ops-action-row">
         <button
           type="button"
           className="ops-button"
-          disabled={busy}
-          onClick={() => runAction(replayAllProjections)}
+          onClick={() => runAction("replay-all", t.opsReplayAll, replayAllProjections)}
         >
           {t.opsReplayAll}
         </button>
         <button
           type="button"
           className="ops-button ops-button--secondary"
-          disabled={busy}
-          onClick={() => runAction(resetProjectionState)}
+          onClick={() => runAction("replay-reset", t.opsResetProjection, resetProjectionState)}
         >
           {t.opsResetProjection}
         </button>
         <button
           type="button"
           className="ops-button ops-button--secondary"
-          disabled={busy}
-          onClick={() => runAction(rebuildMissionControl)}
+          onClick={() => runAction("replay-mc", t.opsRebuildMissionControl, rebuildMissionControl)}
         >
           {t.opsRebuildMissionControl}
         </button>
         <button
           type="button"
           className="ops-button ops-button--secondary"
-          disabled={busy}
-          onClick={() => runAction(rebuildExecutiveDashboard)}
+          onClick={() =>
+            runAction("replay-ed", t.opsRebuildExecutiveDashboard, rebuildExecutiveDashboard)
+          }
         >
           {t.opsRebuildExecutiveDashboard}
         </button>
@@ -408,14 +438,18 @@ function ProjectionReplaySection({ t }) {
         <button
           type="button"
           className="ops-button"
-          disabled={busy || !prospectId.trim()}
-          onClick={() => runAction(() => replaySingleProspect(prospectId.trim()))}
+          disabled={!prospectId.trim()}
+          onClick={() =>
+            runAction("replay-prospect", t.opsReplaySingleProspect, () =>
+              replaySingleProspect(prospectId.trim())
+            )
+          }
         >
           {t.opsReplaySingleProspect}
         </button>
       </div>
 
-      {error ? <p className="ops-error">{error}</p> : null}
+      {error ? <OpsErrorState message={error} /> : null}
       <ActionResult result={result} />
     </section>
   );
@@ -494,8 +528,10 @@ function BusinessEventsSection({ t }) {
         </label>
       </div>
 
-      {loading ? <p className="ops-muted">{t.loading}</p> : null}
-      {error ? <p className="ops-error">{error}</p> : null}
+      {loading ? <OpsLoadingState label={t.loading} /> : null}
+      {error ? <OpsErrorState message={error} /> : null}
+
+      {!loading && !events.length ? <OpsEmptyState title={t.opsBusinessEventsEmpty} /> : null}
 
       <div className="ops-split">
         <div className="ops-table-wrap">
@@ -584,7 +620,11 @@ function TimelineInspectorSection({ t }) {
         </button>
       </form>
 
-      {error ? <p className="ops-error">{error}</p> : null}
+      {error ? <OpsErrorState message={error} /> : null}
+
+      {!timeline && !loading ? (
+        <OpsEmptyState title={t.opsTimelineEmptyTitle} description={t.opsTimelineEmptyDescription} />
+      ) : null}
 
       {timeline ? (
         <pre className="ops-code">{JSON.stringify(timeline, null, 2)}</pre>
@@ -626,7 +666,7 @@ function LogsDiagnosticsSection({ t }) {
         </button>
       </header>
 
-      {error ? <p className="ops-error">{error}</p> : null}
+      {error ? <OpsErrorState message={error} /> : null}
 
       {diagnostics ? (
         <div className="ops-stack">
@@ -667,31 +707,37 @@ function OperationsCenterLayout({ t }) {
         </div>
 
         <nav className="operations-center__nav">
-          {operationsCenterSections.map((section) => (
-            <NavLink
-              key={section.id}
-              to={operationsCenterPath(section.id)}
-              className={({ isActive }) =>
-                `operations-center__nav-link${isActive ? " is-active" : ""}`
-              }
-            >
-              {t[section.labelKey]}
-            </NavLink>
+          {operationsCenterNavGroups.map((group) => (
+            <div key={group.id} className="operations-center__nav-group">
+              <p className="operations-center__nav-group-label">{t[group.labelKey]}</p>
+              {group.items.map((section) => (
+                <NavLink
+                  key={section.id}
+                  to={operationsCenterPath(section.id)}
+                  end={section.end}
+                  className={({ isActive }) =>
+                    `operations-center__nav-link${isActive ? " is-active" : ""}`
+                  }
+                >
+                  {t[section.labelKey]}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
       </aside>
 
       <div className="operations-center__content">
         <Routes>
-          <Route index element={<Navigate to="system-health" replace />} />
+          <Route index element={<OpsDashboard t={t} />} />
           <Route path="system-health" element={<SystemHealthSection t={t} />} />
+          <Route path="live-activity" element={<LiveActivitySection t={t} />} />
           <Route path="workflow-simulator" element={<WorkflowSimulatorSection t={t} />} />
           <Route path="smoke-tests" element={<SmokeTestsSection t={t} />} />
           <Route path="projection-replay" element={<ProjectionReplaySection t={t} />} />
           <Route path="business-events" element={<BusinessEventsSection t={t} />} />
           <Route path="timeline-inspector" element={<TimelineInspectorSection t={t} />} />
           <Route path="logs" element={<LogsDiagnosticsSection t={t} />} />
-          <Route path="*" element={<Navigate to="system-health" replace />} />
         </Routes>
       </div>
     </div>
@@ -741,7 +787,7 @@ export default function OperationsCenter() {
   const allowed = useMemo(() => Boolean(access?.allowed), [access]);
 
   if (loading) {
-    return <p className="ops-muted">{t.loading}</p>;
+    return <OpsLoadingState label={t.loading} />;
   }
 
   if (!allowed) {

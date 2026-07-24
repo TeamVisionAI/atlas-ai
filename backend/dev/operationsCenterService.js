@@ -31,7 +31,7 @@ const {
 const { runAllGoldenScenarios, GOLDEN_SCENARIOS } = require("./goldenScenarios");
 
 const BACKEND_VERSION = "0.4.0";
-const SPRINT_LABEL = "Sprint 17.0";
+const SPRINT_LABEL = "Sprint 17.1";
 
 const SMOKE_TESTS = Object.freeze({
   autonomous_recruiting: {
@@ -99,31 +99,367 @@ function runVerifyScript(scriptName) {
 }
 
 async function probeTable(tableName) {
+  const startedAt = Date.now();
   const { error } = await supabase.from(tableName).select("*").limit(1);
+  const responseTimeMs = Date.now() - startedAt;
 
   if (error) {
     return {
       ok: false,
-      detail: error.message
+      detail: error.message,
+      responseTimeMs
     };
   }
 
   return {
     ok: true,
-    detail: "reachable"
+    detail: "reachable",
+    responseTimeMs
   };
 }
 
-function statusFromCheck(ok, detail) {
+function resolveCardStatus({ ok, critical = true }) {
+  if (ok) {
+    return "healthy";
+  }
+
+  return critical ? "failure" : "warning";
+}
+
+function statusFromCheck(ok, detail, options = {}) {
   return {
-    status: ok ? "healthy" : "degraded",
+    status: resolveCardStatus({ ok, critical: options.critical !== false }),
     detail: detail || (ok ? "ok" : "unavailable")
+  };
+}
+
+function startOfTodayIso() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start.toISOString();
+}
+
+function eventTimestamp(event) {
+  return event.timestamp || event.created_at || event.createdAt || null;
+}
+
+function eventType(event) {
+  return event.event_type || event.eventType || "";
+}
+
+function eventCorrelation(event) {
+  return String(event.correlation_id || event.correlationId || "").toLowerCase();
+}
+
+function eventPayload(event) {
+  return event.payload || {};
+}
+
+function mapEventActivityTitle(event) {
+  const type = eventType(event);
+  const correlation = eventCorrelation(event);
+  const payload = eventPayload(event);
+  const sourceDetail = String(
+    payload.leadSource?.sourceDetail || payload.sourceDetail || payload.source || ""
+  ).toLowerCase();
+
+  if (correlation.includes("facebook-lead") || sourceDetail.includes("facebook")) {
+    if (type === "prospect_created" || type === "message_received") {
+      return "Facebook Lead Received";
+    }
+  }
+
+  if (correlation.includes("quick-capture") || sourceDetail.includes("website")) {
+    if (type === "prospect_created") {
+      return "Website Lead Received";
+    }
+  }
+
+  const titles = {
+    prospect_created: "Prospect Created",
+    prospect_updated: "Prospect Updated",
+    message_sent: "WhatsApp Sent",
+    message_received: "WhatsApp Received",
+    appointment_created: "Interview Scheduled",
+    error_logged: "Error Logged"
+  };
+
+  if (payload.qualificationStatus || payload.qualified === true) {
+    return "Prospect Qualified";
+  }
+
+  return titles[type] || type.replace(/_/g, " ");
+}
+
+async function fetchRecentBusinessEvents(limit = 40) {
+  const { data, error } = await supabase
+    .from(DEV_TABLES.businessEvents)
+    .select("id, event_type, timestamp, created_at, prospect_id, correlation_id, payload")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    return [];
+  }
+
+  return data || [];
+}
+
+async function fetchTodayBusinessEvents() {
+  const { data, error } = await supabase
+    .from(DEV_TABLES.businessEvents)
+    .select("id, event_type, timestamp, created_at, prospect_id, correlation_id, payload")
+    .gte("created_at", startOfTodayIso())
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    return [];
+  }
+
+  return data || [];
+}
+
+function countTodayActivity(events) {
+  let facebookLeads = 0;
+  let websiteLeads = 0;
+  let whatsappConversations = 0;
+  let interviewsScheduled = 0;
+  let errors = 0;
+
+  for (const event of events) {
+    const type = eventType(event);
+    const correlation = eventCorrelation(event);
+    const payload = eventPayload(event);
+    const sourceDetail = String(
+      payload.leadSource?.sourceDetail || payload.sourceDetail || payload.source || ""
+    ).toLowerCase();
+
+    if (correlation.includes("facebook-lead") || sourceDetail.includes("facebook")) {
+      if (type === "prospect_created" || type === "message_received") {
+        facebookLeads += 1;
+      }
+    }
+
+    if (correlation.includes("quick-capture") || sourceDetail.includes("website")) {
+      if (type === "prospect_created") {
+        websiteLeads += 1;
+      }
+    }
+
+    if (type === "message_received" || type === "message_sent") {
+      whatsappConversations += 1;
+    }
+
+    if (type === "appointment_created") {
+      interviewsScheduled += 1;
+    }
+
+    if (type === "error_logged") {
+      errors += 1;
+    }
+  }
+
+  const projectionReplays = activityLog.filter((entry) => {
+    const sameDay = entry.timestamp >= startOfTodayIso();
+    return sameDay && entry.category === "projection_replay";
+  }).length;
+
+  const opsErrors = activityLog.filter((entry) => {
+    const sameDay = entry.timestamp >= startOfTodayIso();
+    return sameDay && entry.level === "error";
+  }).length;
+
+  return {
+    facebookLeads,
+    websiteLeads,
+    whatsappConversations,
+    interviewsScheduled,
+    businessEventsProcessed: events.length,
+    projectionReplays,
+    errors: errors + opsErrors
+  };
+}
+
+function computeWorkflowMetrics(events) {
+  const byProspect = new Map();
+
+  for (const event of events) {
+    const prospectId = event.prospect_id || event.prospectId;
+    if (!prospectId) {
+      continue;
+    }
+
+    if (!byProspect.has(prospectId)) {
+      byProspect.set(prospectId, []);
+    }
+
+    byProspect.get(prospectId).push(event);
+  }
+
+  const workflowDurations = [];
+  const qualificationDurations = [];
+  const schedulingDurations = [];
+  let completedWorkflows = 0;
+  let failedWorkflows = 0;
+
+  for (const prospectEvents of byProspect.values()) {
+    prospectEvents.sort(
+      (a, b) => new Date(eventTimestamp(a)).getTime() - new Date(eventTimestamp(b)).getTime()
+    );
+
+    const created = prospectEvents.find((row) => eventType(row) === "prospect_created");
+    const appointment = prospectEvents.find((row) => eventType(row) === "appointment_created");
+    const qualified = prospectEvents.find((row) => {
+      const payload = eventPayload(row);
+      return (
+        eventType(row) === "prospect_updated" &&
+        (payload.qualificationStatus || payload.qualified === true)
+      );
+    });
+    const errorEvent = prospectEvents.find((row) => eventType(row) === "error_logged");
+
+    if (created && appointment) {
+      completedWorkflows += 1;
+      workflowDurations.push(
+        new Date(eventTimestamp(appointment)).getTime() - new Date(eventTimestamp(created)).getTime()
+      );
+      schedulingDurations.push(
+        new Date(eventTimestamp(appointment)).getTime() - new Date(eventTimestamp(created)).getTime()
+      );
+    }
+
+    if (created && qualified) {
+      qualificationDurations.push(
+        new Date(eventTimestamp(qualified)).getTime() - new Date(eventTimestamp(created)).getTime()
+      );
+    }
+
+    if (errorEvent) {
+      failedWorkflows += 1;
+    }
+  }
+
+  const average = (values) =>
+    values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+
+  const smokeRuns = activityLog.filter((entry) => entry.category === "smoke_test");
+  const smokePassed = smokeRuns.filter((entry) => !String(entry.message || "").includes("FAIL")).length;
+  const successRate =
+    smokeRuns.length > 0 ? Math.round((smokePassed / smokeRuns.length) * 100) : completedWorkflows > 0 ? 100 : 0;
+
+  return {
+    averageWorkflowDurationMs: average(workflowDurations),
+    successRate,
+    failedWorkflows,
+    averageQualificationTimeMs: average(qualificationDurations),
+    averageInterviewSchedulingTimeMs: average(schedulingDurations)
+  };
+}
+
+function buildRecentActivityFeed(events) {
+  const businessFeed = events.map((event) => ({
+    id: event.id,
+    timestamp: eventTimestamp(event),
+    title: mapEventActivityTitle(event),
+    detail: event.prospect_id || event.prospectId || null,
+    source: "business_event"
+  }));
+
+  const opsFeed = activityLog.slice(0, 20).map((entry) => ({
+    id: entry.id,
+    timestamp: entry.timestamp,
+    title: entry.message,
+    detail: entry.detail || entry.category,
+    source: "operations"
+  }));
+
+  return [...businessFeed, ...opsFeed]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 25);
+}
+
+function buildProductionReadinessWidget(readiness) {
+  const byId = Object.fromEntries((readiness.checks || []).map((check) => [check.id, check]));
+
+  function requirement(id, label, options = {}) {
+    const check = byId[id];
+
+    if (!check) {
+      return { id, label, state: "disabled", detail: "Not evaluated" };
+    }
+
+    if (check.ok) {
+      return { id, label, state: "healthy", detail: check.detail };
+    }
+
+    if (options.warningOnly || !check.blocker) {
+      return { id, label, state: "warning", detail: check.detail };
+    }
+
+    return { id, label, state: "failure", detail: check.detail };
+  }
+
+  const whatsappReady = byId.whatsapp_webhook?.ok && byId.whatsapp_send?.ok;
+  const whatsappState = whatsappReady
+    ? "healthy"
+    : byId.whatsapp_webhook?.ok || byId.whatsapp_send?.ok
+      ? "warning"
+      : "failure";
+
+  const requirements = [
+    requirement("meta_embedded_signup", "Meta", { warningOnly: true }),
+    {
+      id: "whatsapp",
+      label: "WhatsApp",
+      state: whatsappState,
+      detail: [byId.whatsapp_webhook?.detail, byId.whatsapp_send?.detail].filter(Boolean).join("; ")
+    },
+    requirement("google_calendar", "Google Calendar"),
+    requirement("supabase", "Supabase"),
+    requirement("contact_form", "Resend", { warningOnly: true }),
+    requirement("whatsapp_webhook", "Webhook Verification"),
+    {
+      id: "environment_variables",
+      label: "Environment Variables",
+      state: readiness.blockers?.length ? "failure" : readiness.checks?.some((check) => !check.ok) ? "warning" : "healthy",
+      detail: readiness.blockers?.length
+        ? `Missing blockers: ${readiness.blockers.join(", ")}`
+        : "Core variables configured"
+    }
+  ];
+
+  return {
+    productionReady: Boolean(readiness.mvpReady),
+    requirements
+  };
+}
+
+async function getOperationsDashboard() {
+  const healthStartedAt = Date.now();
+  const [health, todayEvents, recentEvents] = await Promise.all([
+    getSystemHealth(),
+    fetchTodayBusinessEvents(),
+    fetchRecentBusinessEvents(30)
+  ]);
+
+  return {
+    sprint: SPRINT_LABEL,
+    generatedAt: new Date().toISOString(),
+    responseTimeMs: Date.now() - healthStartedAt,
+    platformStatus: health.cards,
+    todaysActivity: countTodayActivity(todayEvents),
+    recentActivity: buildRecentActivityFeed(recentEvents),
+    metrics: computeWorkflowMetrics(todayEvents),
+    productionReadiness: buildProductionReadinessWidget(health.readiness)
   };
 }
 
 async function getSystemHealth() {
   const lastCheck = new Date().toISOString();
+  const readinessStartedAt = Date.now();
   const readiness = await evaluateProductionReadiness();
+  const readinessResponseTimeMs = Date.now() - readinessStartedAt;
 
   const supabaseCheck = readiness.checks.find((check) => check.id === "supabase");
   const whatsappWebhook = readiness.checks.find((check) => check.id === "whatsapp_webhook");
@@ -138,6 +474,7 @@ async function getSystemHealth() {
 
   const projectionOk =
     businessEventsProbe.ok && timelineProbe.ok && missionControlProbe.ok && executiveProbe.ok;
+  const whatsappOk = Boolean(whatsappWebhook?.ok && whatsappSend?.ok);
 
   return {
     sprint: SPRINT_LABEL,
@@ -149,6 +486,7 @@ async function getSystemHealth() {
         status: "healthy",
         version: BACKEND_VERSION,
         lastCheck,
+        responseTimeMs: readinessResponseTimeMs,
         detail: "Atlas API responding"
       },
       {
@@ -156,50 +494,56 @@ async function getSystemHealth() {
         label: "Database",
         ...statusFromCheck(supabaseCheck?.ok, supabaseCheck?.detail),
         version: "Supabase",
-        lastCheck
+        lastCheck,
+        responseTimeMs: businessEventsProbe.responseTimeMs
       },
       {
         id: "business_events",
         label: "Business Events",
         ...statusFromCheck(businessEventsProbe.ok, businessEventsProbe.detail),
         version: "Atlas Core",
-        lastCheck
+        lastCheck,
+        responseTimeMs: businessEventsProbe.responseTimeMs
       },
       {
         id: "projection_engine",
         label: "Projection Engine",
-        ...statusFromCheck(projectionOk, projectionOk ? "projections registered" : "projection tables unavailable"),
+        ...statusFromCheck(
+          projectionOk,
+          projectionOk ? "projections registered" : "projection tables unavailable"
+        ),
         version: "v1",
-        lastCheck
+        lastCheck,
+        responseTimeMs: timelineProbe.responseTimeMs
       },
       {
         id: "mission_control",
         label: "Mission Control",
         ...statusFromCheck(missionControlProbe.ok, missionControlProbe.detail),
         version: "live",
-        lastCheck
+        lastCheck,
+        responseTimeMs: missionControlProbe.responseTimeMs
       },
       {
         id: "executive_dashboard",
         label: "Executive Dashboard",
         ...statusFromCheck(executiveProbe.ok, executiveProbe.detail),
         version: "live",
-        lastCheck
+        lastCheck,
+        responseTimeMs: executiveProbe.responseTimeMs
       },
       {
         id: "whatsapp",
         label: "WhatsApp",
-        ...statusFromCheck(
-          Boolean(whatsappWebhook?.ok && whatsappSend?.ok),
-          [whatsappWebhook?.detail, whatsappSend?.detail].filter(Boolean).join("; ")
-        ),
+        status: whatsappOk ? "healthy" : whatsappWebhook?.ok || whatsappSend?.ok ? "warning" : "failure",
+        detail: [whatsappWebhook?.detail, whatsappSend?.detail].filter(Boolean).join("; "),
         version: whatsappSend?.ok ? "configured" : "missing credentials",
         lastCheck
       },
       {
         id: "meta",
         label: "Meta",
-        ...statusFromCheck(metaEmbedded?.ok, metaEmbedded?.detail),
+        ...statusFromCheck(metaEmbedded?.ok, metaEmbedded?.detail, { critical: false }),
         version: metaEmbedded?.ok ? "Embedded Signup" : "not configured",
         lastCheck
       },
@@ -623,6 +967,7 @@ module.exports = {
   SMOKE_TESTS,
   recordActivity,
   getSystemHealth,
+  getOperationsDashboard,
   listSmokeTests,
   runSmokeTest,
   replayAllProjections,

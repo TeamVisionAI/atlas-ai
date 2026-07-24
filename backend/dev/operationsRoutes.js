@@ -35,6 +35,19 @@ function createOperationsRoutes(deps = {}) {
     });
   });
 
+  router.get("/dashboard", async (req, res) => {
+    try {
+      const dashboard = await operationsCenterService.getOperationsDashboard();
+      res.json({ success: true, ...dashboard });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "DASHBOARD_FAILED",
+        message: error.message
+      });
+    }
+  });
+
   router.get("/health/system", async (req, res) => {
     try {
       const health = await operationsCenterService.getSystemHealth();

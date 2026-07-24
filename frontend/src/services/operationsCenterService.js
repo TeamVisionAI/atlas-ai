@@ -26,6 +26,10 @@ export async function fetchOperationsAccess() {
   return operationsFetch("/access");
 }
 
+export async function fetchOperationsDashboard() {
+  return operationsFetch("/dashboard");
+}
+
 export async function fetchSystemHealth() {
   return operationsFetch("/health/system");
 }
