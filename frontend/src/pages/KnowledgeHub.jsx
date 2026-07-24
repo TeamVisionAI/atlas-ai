@@ -151,8 +151,6 @@ export default function KnowledgeHub() {
   const [loadingDocument, setLoadingDocument] = useState(false);
   const [pageError, setPageError] = useState(null);
   const initialPathRef = useRef(searchParams.get("path"));
-  const loadDocumentRef = useRef(loadDocument);
-  loadDocumentRef.current = loadDocument;
 
   const dashboard = useMemo(() => {
     if (!homeDocument?.content) {
@@ -226,6 +224,9 @@ export default function KnowledgeHub() {
       setLoadingDocument(false);
     }
   }, [files, setSearchParams, t.knowledgeHubDocumentError]);
+
+  const loadDocumentRef = useRef(loadDocument);
+  loadDocumentRef.current = loadDocument;
 
   useEffect(() => {
     let cancelled = false;
