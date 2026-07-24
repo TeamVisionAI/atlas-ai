@@ -27,8 +27,8 @@ This index is the entry point to Atlas documentation under `/docs`. Use [CURRENT
 | **Executive / stakeholder** | [00-executive/Current_System_State.md](./00-executive/Current_System_State.md) |
 | **Product owner** | [01-product/](./01-product/README.md) · [Product_Vision.md](./01-product/Product_Vision.md) |
 | **Meta reviewer** | [11-meta-tech-provider/](./11-meta-tech-provider/README.md) · [05-integrations/meta/Meta_Approval_Portfolio.md](./05-integrations/meta/Meta_Approval_Portfolio.md) |
-| **Engineer (new)** | [03-engineering/DEVELOPMENT_WORKFLOW.md](./03-engineering/DEVELOPMENT_WORKFLOW.md) · [CURRENT_STATE.md](./CURRENT_STATE.md) · [08-operations/local-development.md](./08-operations/local-development.md) |
-| **Engineer (architecture)** | [02-architecture/ATLAS_CORE_ARCHITECTURE.md](./02-architecture/ATLAS_CORE_ARCHITECTURE.md) · [06-business/BUSINESS_RULES.md](./06-business/BUSINESS_RULES.md) |
+| **Engineer (new)** | [04-architecture/ATLAS_CORE_v1.md](./04-architecture/ATLAS_CORE_v1.md) · [CURRENT_STATE.md](./CURRENT_STATE.md) · [03-engineering/DAILY_WORKFLOW.md](./03-engineering/DAILY_WORKFLOW.md) |
+| **Engineer (architecture)** | [04-architecture/ATLAS_CORE_v1.md](./04-architecture/ATLAS_CORE_v1.md) · [04-architecture/prospect-engine/](./04-architecture/prospect-engine/PROSPECT_ENGINE.md) · [06-business/BUSINESS_RULES.md](./06-business/BUSINESS_RULES.md) |
 | **Operations / deploy** | [08-operations/deployment/](./08-operations/deployment/) |
 
 ---
@@ -41,6 +41,7 @@ This index is the entry point to Atlas documentation under `/docs`. Use [CURRENT
 | [01-product/](./01-product/README.md) | Vision, backlog, archives |
 | [02-architecture/](./02-architecture/README.md) | System architecture |
 | [03-engineering/](./03-engineering/README.md) | Dev workflow & frontend audits |
+| [04-architecture/](./04-architecture/README.md) | Atlas Core v1.0 & Prospect Engine |
 | [04-api/](./04-api/README.md) | API specifications |
 | [05-integrations/](./05-integrations/README.md) | Meta & WhatsApp |
 | [06-business/](./06-business/README.md) | Business rules & domain model |

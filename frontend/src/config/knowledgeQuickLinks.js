@@ -1,11 +1,19 @@
 export const KNOWLEDGE_QUICK_LINKS = [
   {
     labelKey: "knowledgeHubQuickCurrentSprint",
-    path: "09-releases/sprints/README.md"
+    path: "09-releases/sprints/SPRINT_15_0_MISSION_CONTROL.md"
   },
   {
-    labelKey: "knowledgeHubQuickArchitecture",
-    path: "02-architecture/ATLAS_CORE_ARCHITECTURE.md"
+    labelKey: "knowledgeHubQuickAtlasCore",
+    path: "04-architecture/ATLAS_CORE_v1.md"
+  },
+  {
+    labelKey: "knowledgeHubQuickProspectEngine",
+    path: "04-architecture/prospect-engine/PROSPECT_ENGINE.md"
+  },
+  {
+    labelKey: "knowledgeHubQuickBusinessEvents",
+    path: "04-architecture/prospect-engine/BUSINESS_EVENTS.md"
   },
   {
     labelKey: "knowledgeHubQuickBacklog",

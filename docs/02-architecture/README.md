@@ -2,6 +2,7 @@
 
 | Document | Purpose |
 |----------|---------|
+| [../04-architecture/ATLAS_CORE_v1.md](../04-architecture/ATLAS_CORE_v1.md) | Atlas Core v1.0 — start here |
 | [ATLAS_CORE_ARCHITECTURE.md](./ATLAS_CORE_ARCHITECTURE.md) | Workflow engine (Team Vision production path) |
 | [ATLAS_PLATFORM_V1.md](./ATLAS_PLATFORM_V1.md) | Version 1 platform freeze |
 | [ATLAS_AGENT_ARCHITECTURE.md](./ATLAS_AGENT_ARCHITECTURE.md) | Agent intelligence layer |

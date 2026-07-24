@@ -9,5 +9,6 @@
 | [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md) | Canonical doc template |
 | [ENVIRONMENT_CONFIGURATION.md](./ENVIRONMENT_CONFIGURATION.md) | Dev vs prod API routing |
 | [ENVIRONMENT_STRATEGY.md](./ENVIRONMENT_STRATEGY.md) | Local / production / future staging |
+| [DAILY_WORKFLOW.md](./DAILY_WORKFLOW.md) | Daily session operating procedure |
 | [WORKFLOW_SIMULATOR_SPEC.md](./WORKFLOW_SIMULATOR_SPEC.md) | Dev workflow simulator |
 | [frontend/](./frontend/) | Frontend audits and UX debt |

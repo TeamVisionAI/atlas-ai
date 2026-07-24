@@ -22,10 +22,40 @@ const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
 const knowledgeRoutes = require("./routes/knowledge");
 const contactRoutes = require("./routes/contact");
+const { createBusinessEventModule } = require("./modules/business-events");
+const { createProjectionModule } = require("./modules/projections");
+const { createProspectModule } = require("./modules/prospects");
+const { createTimelineModule } = require("./modules/timeline");
+const { createMissionControlModule } = require("./modules/mission-control");
+const { requireAtlasUser } = require("./middleware/requireAtlasUser");
 
 const {
   logMetaEnvironmentWarnings,
 } = require("./core/meta/metaEnvironmentValidator");
+
+const businessEventModule = createBusinessEventModule({
+  registerTimelineSubscriber: false
+});
+
+const projectionModule = createProjectionModule({
+  publisher: businessEventModule.publisher,
+  businessEventRepository: businessEventModule.repository
+});
+
+const timelineModule = createTimelineModule({
+  projectionEngine: projectionModule.engine,
+  businessEventRepository: businessEventModule.repository
+});
+
+const missionControlModule = createMissionControlModule({
+  projectionEngine: projectionModule.engine,
+  businessEventRepository: businessEventModule.repository
+});
+
+const prospectModule = createProspectModule({
+  businessEventEngine: businessEventModule.prospectAdapter,
+  prospectEventsHandler: businessEventModule.prospectEventsHandler
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -75,6 +105,7 @@ app.use("/api/contact", contactRoutes);
 
 // Atlas application routes
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/mission-control", missionControlModule.routes);
 app.use("/api/mission-control", missionControlRoutes);
 app.use("/api/executive-dashboard", executiveDashboardRoutes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
@@ -82,6 +113,14 @@ app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/organization", organizationRoutes);
+app.use("/api/business-events", businessEventModule.routes);
+app.use("/api/timeline", timelineModule.routes);
+app.get(
+  "/api/prospects/:id/timeline",
+  requireAtlasUser,
+  timelineModule.prospectTimelineHandler
+);
+app.use("/api/prospects", prospectModule.routes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
 
@@ -112,9 +151,20 @@ app.use((error, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  logMetaEnvironmentWarnings();
+async function bootstrap() {
+  await projectionModule.engine.register(timelineModule.timelineProjection);
+  await projectionModule.engine.register(missionControlModule.missionControlProjection);
+  projectionModule.engine.start();
 
-  console.log(`🚀 Atlas AI running on http://localhost:${PORT}`);
-  console.log(`🌎 Environment: ${process.env.NODE_ENV || "development"}`);
+  app.listen(PORT, () => {
+    logMetaEnvironmentWarnings();
+
+    console.log(`🚀 Atlas AI running on http://localhost:${PORT}`);
+    console.log(`🌎 Environment: ${process.env.NODE_ENV || "development"}`);
+  });
+}
+
+bootstrap().catch((error) => {
+  console.error("Atlas server bootstrap failed:", error);
+  process.exit(1);
 });

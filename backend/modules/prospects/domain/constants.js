@@ -1,0 +1,93 @@
+/**
+ * Sprint 14.1 — Prospect bounded context constants (architecture contract).
+ * Implements PROSPECT_MODEL.md · PROSPECT_LIFECYCLE.md
+ */
+
+const DEFAULT_ORGANIZATION_ID =
+  process.env.ATLAS_DEFAULT_ORGANIZATION_ID || "00000000-0000-4000-8000-000000000001";
+
+const LIFECYCLE_STATES = Object.freeze({
+  NEW_LEAD: "new_lead",
+  CONTACT_ATTEMPTED: "contact_attempted",
+  CONVERSATION_STARTED: "conversation_started",
+  QUALIFIED: "qualified",
+  INTERVIEW_SCHEDULED: "interview_scheduled",
+  INTERVIEW_COMPLETED: "interview_completed",
+  CLIENT: "client",
+  RECRUIT: "recruit",
+  FOLLOW_UP: "follow_up",
+  LOST: "lost"
+});
+
+const ALLOWED_LIFECYCLE_TRANSITIONS = Object.freeze({
+  [LIFECYCLE_STATES.NEW_LEAD]: [LIFECYCLE_STATES.CONTACT_ATTEMPTED],
+  [LIFECYCLE_STATES.CONTACT_ATTEMPTED]: [
+    LIFECYCLE_STATES.CONVERSATION_STARTED,
+    LIFECYCLE_STATES.FOLLOW_UP,
+    LIFECYCLE_STATES.LOST
+  ],
+  [LIFECYCLE_STATES.CONVERSATION_STARTED]: [
+    LIFECYCLE_STATES.QUALIFIED,
+    LIFECYCLE_STATES.FOLLOW_UP,
+    LIFECYCLE_STATES.LOST
+  ],
+  [LIFECYCLE_STATES.QUALIFIED]: [
+    LIFECYCLE_STATES.INTERVIEW_SCHEDULED,
+    LIFECYCLE_STATES.FOLLOW_UP
+  ],
+  [LIFECYCLE_STATES.INTERVIEW_SCHEDULED]: [
+    LIFECYCLE_STATES.INTERVIEW_COMPLETED,
+    LIFECYCLE_STATES.FOLLOW_UP,
+    LIFECYCLE_STATES.LOST
+  ],
+  [LIFECYCLE_STATES.INTERVIEW_COMPLETED]: [
+    LIFECYCLE_STATES.CLIENT,
+    LIFECYCLE_STATES.RECRUIT,
+    LIFECYCLE_STATES.FOLLOW_UP,
+    LIFECYCLE_STATES.LOST
+  ],
+  [LIFECYCLE_STATES.FOLLOW_UP]: [
+    LIFECYCLE_STATES.CONTACT_ATTEMPTED,
+    LIFECYCLE_STATES.CONVERSATION_STARTED
+  ],
+  [LIFECYCLE_STATES.CLIENT]: [],
+  [LIFECYCLE_STATES.RECRUIT]: [],
+  [LIFECYCLE_STATES.LOST]: []
+});
+
+const LEAD_SOURCE_TYPES = Object.freeze([
+  "referral",
+  "website",
+  "social",
+  "event",
+  "csv_import",
+  "manual",
+  "api",
+  "unknown"
+]);
+
+const CHANNEL_TYPES = Object.freeze([
+  "whatsapp",
+  "messenger",
+  "instagram",
+  "email",
+  "sms",
+  "phone",
+  "web_chat",
+  "api",
+  "manual"
+]);
+
+const OWNERSHIP_VALUES = Object.freeze(["ATLAS", "AGENT", "SYSTEM"]);
+
+const TABLE_NAME = "atlas_core_prospects";
+
+module.exports = {
+  DEFAULT_ORGANIZATION_ID,
+  LIFECYCLE_STATES,
+  ALLOWED_LIFECYCLE_TRANSITIONS,
+  LEAD_SOURCE_TYPES,
+  CHANNEL_TYPES,
+  OWNERSHIP_VALUES,
+  TABLE_NAME
+};
