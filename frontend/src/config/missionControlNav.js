@@ -9,5 +9,6 @@ export const missionControlNav = [
   { path: appPath("appointments"), labelKey: "navAppointments" },
   { path: appPath("follow-ups"), labelKey: "navFollowUps" },
   { path: appPath("analytics"), labelKey: "navAnalytics" },
+  { path: appPath("knowledge"), labelKey: "navKnowledge" },
   { path: appPath("settings"), labelKey: "navSettings" }
 ];

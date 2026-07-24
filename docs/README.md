@@ -23,7 +23,7 @@
 | **Executive / stakeholder** | [00-executive/Current_System_State.md](./00-executive/Current_System_State.md) |
 | **Product owner** | [01-product/](./01-product/README.md) · [Product_Vision.md](./01-product/Product_Vision.md) |
 | **Meta reviewer** | [11-meta-tech-provider/](./11-meta-tech-provider/README.md) · [05-integrations/meta/Meta_Approval_Portfolio.md](./05-integrations/meta/Meta_Approval_Portfolio.md) |
-| **Engineer (new)** | [03-engineering/DEVELOPMENT_WORKFLOW.md](./03-engineering/DEVELOPMENT_WORKFLOW.md) · [08-operations/local-development.md](./08-operations/local-development.md) |
+| **Engineer (new)** | [03-engineering/DEVELOPMENT_WORKFLOW.md](./03-engineering/DEVELOPMENT_WORKFLOW.md) · [CURRENT_STATE.md](./CURRENT_STATE.md) · [08-operations/local-development.md](./08-operations/local-development.md) |
 | **Engineer (architecture)** | [02-architecture/ATLAS_CORE_ARCHITECTURE.md](./02-architecture/ATLAS_CORE_ARCHITECTURE.md) · [06-business/BUSINESS_RULES.md](./06-business/BUSINESS_RULES.md) |
 | **Operations / deploy** | [08-operations/deployment/](./08-operations/deployment/) |
 

@@ -6,6 +6,7 @@ import ProspectWorkspace from "./pages/ProspectWorkspace";
 import ProspectCenter from "./pages/ProspectCenter";
 import WhatsAppConnect from "./pages/WhatsAppConnect";
 import QuickCapture from "./pages/QuickCapture";
+import KnowledgeHub from "./pages/KnowledgeHub";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Prospect from "./pages/Prospect";
 import Home from "./pages/Home";
@@ -107,6 +108,7 @@ export default function App() {
           }
         />
         <Route path="settings/whatsapp" element={<WhatsAppConnect />} />
+        <Route path="knowledge" element={<KnowledgeHub />} />
       </Route>
 
       {/* Legacy redirects — preserve bookmarks and hardcoded in-app links */}
@@ -120,6 +122,7 @@ export default function App() {
       <Route path="/analytics" element={<Navigate to="/app/analytics" replace />} />
       <Route path="/settings/whatsapp" element={<Navigate to="/app/settings/whatsapp" replace />} />
       <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+      <Route path="/knowledge" element={<Navigate to="/app/knowledge" replace />} />
       <Route path="/pipeline" element={<Navigate to="/app/prospect-center" replace />} />
       <Route path="/prospect/:id" element={<LegacyProspectRedirect />} />
     </Routes>

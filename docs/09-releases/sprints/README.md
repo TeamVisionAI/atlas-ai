@@ -12,5 +12,6 @@ Implementation specifications for Team Vision production sprints on `main`.
 | [SPRINT_11_1_LIVE_WHATSAPP.md](./SPRINT_11_1_LIVE_WHATSAPP.md) | 11.1 Live WhatsApp |
 | [Sprint-11.4.md](./Sprint-11.4.md) | 11.4 Conversation Engine |
 | [Sprint-11.4-Implementation-Plan.md](./Sprint-11.4-Implementation-Plan.md) | 11.4 Implementation plan |
+| [SPRINT_KNOWLEDGE_HUB_PHASE_1.md](./SPRINT_KNOWLEDGE_HUB_PHASE_1.md) | Knowledge Hub Phase 1 |
 | [../04-api/mission-control-workflow-advance.md](../../04-api/mission-control-workflow-advance.md) | 8A.3 Advance API |
 | [../04-api/workflow-simulator-dev-api.md](../../04-api/workflow-simulator-dev-api.md) | 8A.4a Dev simulator |

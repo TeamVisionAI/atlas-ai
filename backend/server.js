@@ -20,6 +20,7 @@ const quickCaptureRoutes = require("./routes/quickCapture");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
+const knowledgeRoutes = require("./routes/knowledge");
 const contactRoutes = require("./routes/contact");
 
 const {
@@ -79,6 +80,7 @@ app.use("/api/executive-dashboard", executiveDashboardRoutes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
+app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/organization", organizationRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
