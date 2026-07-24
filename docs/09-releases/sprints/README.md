@@ -13,5 +13,6 @@ Implementation specifications for Team Vision production sprints on `main`.
 | [Sprint-11.4.md](./Sprint-11.4.md) | 11.4 Conversation Engine |
 | [Sprint-11.4-Implementation-Plan.md](./Sprint-11.4-Implementation-Plan.md) | 11.4 Implementation plan |
 | [SPRINT_KNOWLEDGE_HUB_PHASE_1.md](./SPRINT_KNOWLEDGE_HUB_PHASE_1.md) | Knowledge Hub Phase 1 |
+| [SPRINT_13_1_KNOWLEDGE_HUB_ENHANCEMENTS.md](./SPRINT_13_1_KNOWLEDGE_HUB_ENHANCEMENTS.md) | Sprint 13.1 Knowledge Hub |
 | [../04-api/mission-control-workflow-advance.md](../../04-api/mission-control-workflow-advance.md) | 8A.3 Advance API |
 | [../04-api/workflow-simulator-dev-api.md](../../04-api/workflow-simulator-dev-api.md) | 8A.4a Dev simulator |

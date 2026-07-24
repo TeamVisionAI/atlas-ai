@@ -1,5 +1,9 @@
 # Atlas Documentation Hub
 
+## AI Summary
+
+This index is the entry point to Atlas documentation under `/docs`. Use [CURRENT_STATE.md](./CURRENT_STATE.md) for the live operational snapshot, [06-business/BUSINESS_RULES.md](./06-business/BUSINESS_RULES.md) for behavior contracts, and the in-app Knowledge Hub at `/app/knowledge` for browsing. GitHub is authoritative; do not duplicate docs elsewhere.
+
 ## Document control
 
 | Field | Value |
@@ -45,6 +49,7 @@
 | [09-releases/](./09-releases/README.md) | Changelog & sprints |
 | [10-rfcs/](./10-rfcs/README.md) | Version 1 RFCs |
 | [11-meta-tech-provider/](./11-meta-tech-provider/README.md) | Meta Tech Provider approval portfolio |
+| [12-ai/](./12-ai/README.md) | AI guidelines, prompts, Knowledge Hub usage |
 | [Health Report](./DOCUMENTATION_HEALTH_REPORT.md) | Documentation audit results |
 
 ---

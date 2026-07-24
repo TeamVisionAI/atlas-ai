@@ -1,5 +1,9 @@
 # Atlas Business Rules
 
+## AI Summary
+
+These rules encode Team Vision recruiting operations as testable BR-XXX statements. They override ad-hoc code behavior: read before implementing features, cite rules in code, and propose new BR entries when behavior changes. Decision logic lives in `businessRulesEngine.js`; user-facing copy lives in `conversationCopy.js`.
+
 Atlas is built from real Team Vision recruiting experience.
 
 These business rules represent how Team Vision operates in the real world.

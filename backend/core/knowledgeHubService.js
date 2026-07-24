@@ -98,11 +98,14 @@ function buildDirectoryNode(relativeDir = "") {
       const absoluteFile = path.join(absoluteDir, entry.name);
       const stats = fs.statSync(absoluteFile);
       const content = fs.readFileSync(absoluteFile, "utf8");
+      const folderDir = path.posix.dirname(posixPath);
+      const folder = folderDir === "." ? "" : folderDir;
 
       return {
         type: "file",
         name: entry.name,
         path: posixPath,
+        folder,
         title: extractTitle(content, entry.name),
         updatedAt: stats.mtime.toISOString()
       };
@@ -130,9 +133,13 @@ function buildDirectoryNode(relativeDir = "") {
 
 function flattenFiles(node, accumulator = []) {
   if (node.type === "file") {
+    const folderDir = path.posix.dirname(node.path);
+    const folder = folderDir === "." ? "" : folderDir;
+
     accumulator.push({
       path: node.path,
       name: node.name,
+      folder,
       title: node.title,
       updatedAt: node.updatedAt
     });
@@ -163,13 +170,17 @@ function getKnowledgeDocument(relativePath) {
   const content = fs.readFileSync(absolutePath, "utf8");
   const stats = fs.statSync(absolutePath);
 
-  return {
-    path: safePath,
-    name: path.basename(safePath),
-    title: extractTitle(content, path.basename(safePath)),
-    content,
-    updatedAt: stats.mtime.toISOString()
-  };
+      return {
+        path: safePath,
+        name: path.basename(safePath),
+        folder: (() => {
+          const dir = path.posix.dirname(safePath);
+          return dir === "." ? "" : dir;
+        })(),
+        title: extractTitle(content, path.basename(safePath)),
+        content,
+        updatedAt: stats.mtime.toISOString()
+      };
 }
 
 module.exports = {

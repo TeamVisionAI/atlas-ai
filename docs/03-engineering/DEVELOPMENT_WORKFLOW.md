@@ -1,6 +1,42 @@
 # Atlas Development Workflow
 
+## AI Summary
+
+Atlas evolves through documented Business Rules and a fixed engineering pipeline: Idea → Discussion → Approval → Implementation → Documentation → Knowledge Hub → Release. Read `BUSINESS_RULES.md` before behavioral changes, reuse core engines, cite BR-XXX in code, and update `CURRENT_STATE.md` after each sprint.
+
 This document defines how Atlas should evolve. The official behavior contract lives in **[BUSINESS_RULES.md](../06-business/BUSINESS_RULES.md)**. Code should reflect those rules; when they diverge, **the business rule wins**.
+
+---
+
+## Official engineering process
+
+Every feature or significant change follows this pipeline:
+
+```
+Idea
+  ↓
+Discussion
+  ↓
+Approval
+  ↓
+Implementation
+  ↓
+Documentation
+  ↓
+Knowledge Hub
+  ↓
+Release
+```
+
+| Stage | Output |
+|-------|--------|
+| **Idea** | Problem statement, optional backlog entry |
+| **Discussion** | Trade-offs, BR alignment, sprint scope |
+| **Approval** | Sprint spec or explicit sign-off |
+| **Implementation** | Code in `backend/` / `frontend/` |
+| **Documentation** | Markdown in `/docs` per [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md) |
+| **Knowledge Hub** | Verify in `/app/knowledge`; update [CURRENT_STATE.md](../CURRENT_STATE.md) |
+| **Release** | Changelog, deploy, sprint record in `docs/09-releases/` |
 
 ---
 

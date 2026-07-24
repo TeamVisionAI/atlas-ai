@@ -1,5 +1,9 @@
 # Atlas Core Architecture
 
+## AI Summary
+
+Atlas Core is a milestone-driven workflow engine: Atlas automates safe process execution while humans provide judgment. This document defines the target architecture (Sprint 8A) aligned with existing repo code—workflow engine, event catalog, business rules integration—without removing working production features.
+
 **Sprint:** 8A — Atlas Core Workflow Engine  
 **Status:** Documentation only — no implementation until review  
 **Related:** [BUSINESS_RULES.md](../06-business/BUSINESS_RULES.md), [WORKFLOW_ENGINE_SPEC.md](./WORKFLOW_ENGINE_SPEC.md), [MILESTONE_DEFINITIONS.md](../06-business/MILESTONE_DEFINITIONS.md), [EVENT_CATALOG.md](../06-business/EVENT_CATALOG.md)

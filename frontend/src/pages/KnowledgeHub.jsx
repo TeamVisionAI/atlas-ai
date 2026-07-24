@@ -8,33 +8,19 @@ import {
   KnowledgeHubError
 } from "../services/knowledgeService";
 import MarkdownViewer from "../components/knowledge/MarkdownViewer";
+import KnowledgeHubHome from "../components/knowledge/KnowledgeHubHome";
+import { parseCurrentStateSections, getDashboardFields } from "../utils/currentStateParser";
+import {
+  readKnowledgeActivity,
+  recordRecentlyOpened,
+  recordRecentlyViewed,
+  toggleFavorite,
+  togglePinned,
+  isFavorite,
+  isPinned
+} from "../utils/knowledgeStorage";
+import { searchKnowledgeFiles } from "../utils/knowledgeSearch";
 import "./KnowledgeHub.css";
-
-const RECENT_STORAGE_KEY = "atlas_knowledge_recent_v1";
-const MAX_RECENT = 8;
-
-function readRecentDocuments() {
-  try {
-    const raw = localStorage.getItem(RECENT_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeRecentDocument(entry) {
-  const current = readRecentDocuments().filter((item) => item.path !== entry.path);
-  const next = [entry, ...current].slice(0, MAX_RECENT);
-
-  try {
-    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // ignore storage failures
-  }
-
-  return next;
-}
 
 function flattenTree(node, files = []) {
   if (!node) {
@@ -53,17 +39,75 @@ function flattenTree(node, files = []) {
   return files;
 }
 
-function DocTreeNode({ node, selectedPath, depth, onSelect }) {
-  if (node.type === "file") {
+function ActivitySection({ title, items, emptyLabel, selectedPath, onSelect, onTogglePin, activity }) {
+  if (!items.length) {
     return (
-      <button
-        type="button"
-        className={`knowledge-hub__tree-file${selectedPath === node.path ? " is-active" : ""}`}
-        style={{ paddingLeft: `${12 + depth * 14}px` }}
-        onClick={() => onSelect(node)}
-      >
-        {node.title || node.name}
-      </button>
+      <section className="knowledge-hub__activity">
+        <h2>{title}</h2>
+        <p className="knowledge-hub__empty">{emptyLabel}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="knowledge-hub__activity">
+      <h2>{title}</h2>
+      {items.map((item) => (
+        <div key={item.path} className="knowledge-hub__activity-row">
+          <button
+            type="button"
+            className={`knowledge-hub__recent-item${selectedPath === item.path ? " is-active" : ""}`}
+            onClick={() => onSelect(item)}
+          >
+            <span className="knowledge-hub__recent-title">{item.title}</span>
+            <span className="knowledge-hub__recent-path">{item.path}</span>
+          </button>
+          {onTogglePin ? (
+            <button
+              type="button"
+              className={`knowledge-hub__icon-button${isPinned(item.path, activity) ? " is-active" : ""}`}
+              aria-label="Pin"
+              onClick={() => onTogglePin(item)}
+            >
+              📌
+            </button>
+          ) : null}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function DocTreeNode({
+  node,
+  selectedPath,
+  depth,
+  onSelect,
+  activity,
+  onToggleFavorite
+}) {
+  if (node.type === "file") {
+    const starred = isFavorite(node.path, activity);
+
+    return (
+      <div className="knowledge-hub__tree-file-row">
+        <button
+          type="button"
+          className={`knowledge-hub__tree-file${selectedPath === node.path ? " is-active" : ""}`}
+          style={{ paddingLeft: `${12 + depth * 14}px` }}
+          onClick={() => onSelect(node)}
+        >
+          {node.title || node.name}
+        </button>
+        <button
+          type="button"
+          className={`knowledge-hub__icon-button${starred ? " is-active" : ""}`}
+          aria-label="Favorite"
+          onClick={() => onToggleFavorite(node)}
+        >
+          {starred ? "★" : "☆"}
+        </button>
+      </div>
     );
   }
 
@@ -82,6 +126,8 @@ function DocTreeNode({ node, selectedPath, depth, onSelect }) {
           selectedPath={selectedPath}
           depth={depth + 1}
           onSelect={onSelect}
+          activity={activity}
+          onToggleFavorite={onToggleFavorite}
         />
       ))}
     </div>
@@ -95,33 +141,41 @@ export default function KnowledgeHub() {
   const [tree, setTree] = useState(null);
   const [files, setFiles] = useState([]);
   const [defaultPath, setDefaultPath] = useState("CURRENT_STATE.md");
+  const [viewMode, setViewMode] = useState("home");
   const [selectedPath, setSelectedPath] = useState("");
   const [document, setDocument] = useState(null);
+  const [homeDocument, setHomeDocument] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [recentDocuments, setRecentDocuments] = useState(() => readRecentDocuments());
+  const [activity, setActivity] = useState(() => readKnowledgeActivity());
   const [loadingTree, setLoadingTree] = useState(true);
   const [loadingDocument, setLoadingDocument] = useState(false);
   const [pageError, setPageError] = useState(null);
   const initialPathRef = useRef(searchParams.get("path"));
+  const loadDocumentRef = useRef(loadDocument);
+  loadDocumentRef.current = loadDocument;
 
-  const loadDocument = useCallback(async (documentPath) => {
+  const dashboard = useMemo(() => {
+    if (!homeDocument?.content) {
+      return getDashboardFields({});
+    }
+
+    const sections = parseCurrentStateSections(homeDocument.content);
+    return getDashboardFields(sections);
+  }, [homeDocument]);
+
+  const loadHomeDocument = useCallback(async () => {
     setLoadingDocument(true);
     setPageError(null);
 
     try {
-      const payload = await fetchKnowledgeDocument(documentPath);
-      setDocument(payload);
-      setSelectedPath(payload.path);
-      setSearchParams({ path: payload.path }, { replace: true });
-
-      const recentEntry = {
-        path: payload.path,
-        title: payload.title,
-        updatedAt: payload.updatedAt
-      };
-      setRecentDocuments(writeRecentDocument(recentEntry));
+      const payload = await fetchKnowledgeDocument(defaultPath);
+      setHomeDocument(payload);
+      setDocument(null);
+      setSelectedPath("");
+      setViewMode("home");
+      setSearchParams({}, { replace: true });
     } catch (error) {
-      console.error("[KnowledgeHub] document load failed", error);
+      console.error("[KnowledgeHub] home document load failed", error);
       setPageError(
         error instanceof KnowledgeHubError
           ? error.message
@@ -130,7 +184,48 @@ export default function KnowledgeHub() {
     } finally {
       setLoadingDocument(false);
     }
-  }, [setSearchParams, t.knowledgeHubDocumentError]);
+  }, [defaultPath, setSearchParams, t.knowledgeHubDocumentError]);
+
+  const loadDocument = useCallback(async (documentPath, { openedFrom = "tree" } = {}) => {
+    if (!documentPath) {
+      return;
+    }
+
+    const fileMeta = files.find((file) => file.path === documentPath);
+    const openedEntry = {
+      path: documentPath,
+      title: fileMeta?.title || documentPath,
+      updatedAt: fileMeta?.updatedAt || null
+    };
+
+    setActivity(recordRecentlyOpened(openedEntry));
+    setLoadingDocument(true);
+    setPageError(null);
+    setViewMode("document");
+
+    try {
+      const payload = await fetchKnowledgeDocument(documentPath);
+      setDocument(payload);
+      setSelectedPath(payload.path);
+      setSearchParams({ path: payload.path }, { replace: true });
+
+      const viewedEntry = {
+        path: payload.path,
+        title: payload.title,
+        updatedAt: payload.updatedAt
+      };
+      setActivity(recordRecentlyViewed(viewedEntry));
+    } catch (error) {
+      console.error("[KnowledgeHub] document load failed", { documentPath, openedFrom }, error);
+      setPageError(
+        error instanceof KnowledgeHubError
+          ? error.message
+          : t.knowledgeHubDocumentError
+      );
+    } finally {
+      setLoadingDocument(false);
+    }
+  }, [files, setSearchParams, t.knowledgeHubDocumentError]);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,13 +242,39 @@ export default function KnowledgeHub() {
           return;
         }
 
+        const resolvedDefault = payload.defaultPath || "CURRENT_STATE.md";
         setTree(payload.root);
         setFiles(payload.files || flattenTree(payload.root));
-        setDefaultPath(payload.defaultPath || "CURRENT_STATE.md");
+        setDefaultPath(resolvedDefault);
 
-        const requestedPath =
-          initialPathRef.current || payload.defaultPath || "CURRENT_STATE.md";
-        await loadDocument(requestedPath);
+        const requestedPath = initialPathRef.current;
+
+        if (requestedPath) {
+          await loadDocumentRef.current(requestedPath, { openedFrom: "url" });
+        } else {
+          setViewMode("home");
+          setLoadingDocument(true);
+
+          try {
+            const homePayload = await fetchKnowledgeDocument(resolvedDefault);
+            if (!cancelled) {
+              setHomeDocument(homePayload);
+            }
+          } catch (error) {
+            if (!cancelled) {
+              console.error("[KnowledgeHub] home initialization failed", error);
+              setPageError(
+                error instanceof KnowledgeHubError
+                  ? error.message
+                  : t.knowledgeHubDocumentError
+              );
+            }
+          } finally {
+            if (!cancelled) {
+              setLoadingDocument(false);
+            }
+          }
+        }
       } catch (error) {
         if (cancelled) {
           return;
@@ -181,28 +302,43 @@ export default function KnowledgeHub() {
     return () => {
       cancelled = true;
     };
-  }, [loadDocument, t.knowledgeHubAuthRequired, t.knowledgeHubLoadError]);
+  }, [t.knowledgeHubAuthRequired, t.knowledgeHubDocumentError, t.knowledgeHubLoadError]);
 
   const searchResults = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    if (!query) {
-      return [];
-    }
-
-    return files.filter((file) => {
-      const haystack = `${file.title || ""} ${file.name || ""} ${file.path || ""}`.toLowerCase();
-      return haystack.includes(query);
-    });
+    return searchKnowledgeFiles(files, searchQuery);
   }, [files, searchQuery]);
 
   function handleSelectFile(file) {
-    if (!file?.path || file.path === selectedPath) {
+    if (!file?.path) {
+      return;
+    }
+
+    if (file.path === defaultPath && !searchParams.get("path")) {
+      loadHomeDocument();
+      return;
+    }
+
+    if (file.path === selectedPath && viewMode === "document") {
       return;
     }
 
     loadDocument(file.path);
   }
+
+  function handleToggleFavorite(entry) {
+    setActivity(toggleFavorite(entry));
+  }
+
+  function handleTogglePinned(entry) {
+    setActivity(togglePinned(entry));
+  }
+
+  function handleGoHome() {
+    loadHomeDocument();
+  }
+
+  const documentIsFavorite = document ? isFavorite(document.path, activity) : false;
+  const documentIsPinned = document ? isPinned(document.path, activity) : false;
 
   if (authError) {
     return (
@@ -222,9 +358,12 @@ export default function KnowledgeHub() {
           <h1 className="knowledge-hub__title">{t.knowledgeHubTitle}</h1>
           <p className="knowledge-hub__subtitle">{t.knowledgeHubSubtitle}</p>
         </div>
-        {selectedPath ? (
-          <p className="knowledge-hub__path">{selectedPath}</p>
-        ) : null}
+        <div className="knowledge-hub__header-actions">
+          <button type="button" className="knowledge-hub__home-button" onClick={handleGoHome}>
+            {t.knowledgeHubHomeButton}
+          </button>
+          {selectedPath ? <p className="knowledge-hub__path">{selectedPath}</p> : null}
+        </div>
       </header>
 
       <div className="knowledge-hub__layout">
@@ -252,7 +391,9 @@ export default function KnowledgeHub() {
                     onClick={() => handleSelectFile(file)}
                   >
                     <span className="knowledge-hub__recent-title">{file.title || file.name}</span>
-                    <span className="knowledge-hub__recent-path">{file.path}</span>
+                    <span className="knowledge-hub__recent-path">
+                      {file.folder ? `${file.folder}/` : ""}{file.name}
+                    </span>
                   </button>
                 ))
               ) : (
@@ -261,24 +402,42 @@ export default function KnowledgeHub() {
             </div>
           ) : (
             <>
-              <section className="knowledge-hub__recent">
-                <h2>{t.knowledgeHubRecentTitle}</h2>
-                {recentDocuments.length ? (
-                  recentDocuments.map((item) => (
-                    <button
-                      key={item.path}
-                      type="button"
-                      className={`knowledge-hub__recent-item${selectedPath === item.path ? " is-active" : ""}`}
-                      onClick={() => handleSelectFile(item)}
-                    >
-                      <span className="knowledge-hub__recent-title">{item.title}</span>
-                      <span className="knowledge-hub__recent-path">{item.path}</span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="knowledge-hub__empty">{t.knowledgeHubRecentEmpty}</p>
-                )}
-              </section>
+              <ActivitySection
+                title={t.knowledgeHubPinnedTitle}
+                items={activity.pinned}
+                emptyLabel={t.knowledgeHubPinnedEmpty}
+                selectedPath={selectedPath}
+                onSelect={handleSelectFile}
+                onTogglePin={handleTogglePinned}
+                activity={activity}
+              />
+
+              <ActivitySection
+                title={t.knowledgeHubFavoritesTitle}
+                items={activity.favorites}
+                emptyLabel={t.knowledgeHubFavoritesEmpty}
+                selectedPath={selectedPath}
+                onSelect={handleSelectFile}
+                activity={activity}
+              />
+
+              <ActivitySection
+                title={t.knowledgeHubRecentlyOpened}
+                items={activity.recentlyOpened}
+                emptyLabel={t.knowledgeHubRecentEmpty}
+                selectedPath={selectedPath}
+                onSelect={handleSelectFile}
+                activity={activity}
+              />
+
+              <ActivitySection
+                title={t.knowledgeHubRecentlyViewed}
+                items={activity.recentlyViewed}
+                emptyLabel={t.knowledgeHubRecentEmpty}
+                selectedPath={selectedPath}
+                onSelect={handleSelectFile}
+                activity={activity}
+              />
 
               <section className="knowledge-hub__tree">
                 <h2>{t.knowledgeHubTreeTitle}</h2>
@@ -290,6 +449,8 @@ export default function KnowledgeHub() {
                     selectedPath={selectedPath}
                     depth={0}
                     onSelect={handleSelectFile}
+                    activity={activity}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 ) : null}
               </section>
@@ -299,28 +460,70 @@ export default function KnowledgeHub() {
 
         <main className="knowledge-hub__main">
           {pageError ? <p className="knowledge-hub__error">{pageError}</p> : null}
-          {loadingDocument && !document ? (
+          {loadingDocument && viewMode === "document" && !document ? (
             <p className="knowledge-hub__empty">{t.loading}</p>
           ) : null}
-          {document ? (
+
+          {viewMode === "home" ? (
+            loadingDocument && !homeDocument ? (
+              <p className="knowledge-hub__empty">{t.loading}</p>
+            ) : (
+              <KnowledgeHubHome
+                t={t}
+                dashboard={dashboard}
+                homeDocument={homeDocument}
+                recentlyOpened={activity.recentlyOpened}
+                recentlyViewed={activity.recentlyViewed}
+                selectedPath={selectedPath}
+                onSelectDocument={handleSelectFile}
+                onGoHome={handleGoHome}
+              />
+            )
+          ) : null}
+
+          {viewMode === "document" && document ? (
             <>
               <div className="knowledge-hub__doc-meta">
-                <h2>{document.title}</h2>
+                <div className="knowledge-hub__doc-meta-row">
+                  <h2>{document.title}</h2>
+                  <div className="knowledge-hub__doc-actions">
+                    <button
+                      type="button"
+                      className={`knowledge-hub__icon-button${documentIsFavorite ? " is-active" : ""}`}
+                      onClick={() =>
+                        handleToggleFavorite({
+                          path: document.path,
+                          title: document.title,
+                          updatedAt: document.updatedAt
+                        })
+                      }
+                    >
+                      {documentIsFavorite ? "★" : "☆"} {t.knowledgeHubFavoriteAction}
+                    </button>
+                    <button
+                      type="button"
+                      className={`knowledge-hub__icon-button${documentIsPinned ? " is-active" : ""}`}
+                      onClick={() =>
+                        handleTogglePinned({
+                          path: document.path,
+                          title: document.title,
+                          updatedAt: document.updatedAt
+                        })
+                      }
+                    >
+                      📌 {t.knowledgeHubPinAction}
+                    </button>
+                  </div>
+                </div>
                 {document.updatedAt ? (
                   <p>{t.knowledgeHubUpdatedAt}: {new Date(document.updatedAt).toLocaleString()}</p>
+                ) : null}
+                {document.folder ? (
+                  <p>{t.knowledgeHubFolderLabel}: {document.folder}</p>
                 ) : null}
               </div>
               <MarkdownViewer content={document.content} />
             </>
-          ) : null}
-          {!document && !loadingDocument && !pageError ? (
-            <button
-              type="button"
-              className="knowledge-hub__home-button"
-              onClick={() => loadDocument(defaultPath)}
-            >
-              {t.knowledgeHubOpenDefault}
-            </button>
           ) : null}
         </main>
       </div>
