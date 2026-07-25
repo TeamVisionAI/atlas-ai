@@ -1,5 +1,8 @@
 const express = require("express");
+const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const router = express.Router();
+
+router.use(requireAtlasUser);
 
 const { supabase } = require("../services/supabaseService");
 const {

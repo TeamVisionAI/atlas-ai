@@ -227,6 +227,16 @@ class ProspectRepository {
       query = query.eq("organization_id", filters.organizationId);
     }
 
+    if (filters.divisionId) {
+      query = query.eq("assigned_division_id", filters.divisionId);
+    }
+
+    if (filters.ownerUserId) {
+      query = query.or(
+        `owner_user_id.eq.${filters.ownerUserId},assigned_agent_id.eq.${filters.ownerUserId}`
+      );
+    }
+
     if (filters.lifecycleState) {
       query = query.eq("lifecycle_state", filters.lifecycleState);
     }

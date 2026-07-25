@@ -1,11 +1,24 @@
 /**
- * Sprint 14.1 — Prospect REST controller (API layer).
+ * Sprint 14.1 / LC1 — Prospect REST controller (API layer).
  */
 
 const {
   ProspectApplicationService,
   actorFromRequest
 } = require("../application/ProspectApplicationService");
+const {
+  canAccessProspect,
+  getProspectListScope,
+  hasPermission,
+  resolveOrganizationId
+} = require("../../../security/authorizationService");
+const { auditFromRequest } = require("../../../security/auditLogService");
+const {
+  sanitizeProspectResponse,
+  sanitizeProspectList
+} = require("../../../security/piiFilter");
+const { PERMISSIONS } = require("../../../security/permissions");
+const { loadCoreProspectById } = require("../../../security/prospectAccessService");
 
 function createProspectController(service = new ProspectApplicationService()) {
   function handleError(res, error, context) {
@@ -17,12 +30,59 @@ function createProspectController(service = new ProspectApplicationService()) {
     });
   }
 
+  function deny(res) {
+    return res.status(403).json({
+      error: "FORBIDDEN",
+      message: "You do not have permission to perform this action."
+    });
+  }
+
+  async function authorizeProspectAccess(req, res, prospectId, { write = false } = {}) {
+    const permission = write ? PERMISSIONS.PROSPECT_WRITE : PERMISSIONS.PROSPECT_READ;
+
+    if (!hasPermission(req.authContext, permission)) {
+      deny(res);
+      return null;
+    }
+
+    const prospect = await loadCoreProspectById(prospectId);
+
+    if (!prospect) {
+      res.status(404).json({
+        error: "PROSPECT_NOT_FOUND",
+        message: "Prospect not found."
+      });
+      return null;
+    }
+
+    if (!canAccessProspect(req.authContext, prospect)) {
+      deny(res);
+      return null;
+    }
+
+    return prospect;
+  }
+
   return {
     async create(req, res) {
       try {
+        if (!hasPermission(req.authContext, PERMISSIONS.PROSPECT_WRITE)) {
+          return deny(res);
+        }
+
         const actor = actorFromRequest(req.atlasUser);
         const prospect = await service.createProspect(req.body, actor);
-        return res.status(201).json({ prospect });
+
+        auditFromRequest(req, {
+          action: "prospect.updated",
+          targetType: "core_prospect",
+          targetId: prospect.prospectId,
+          metadata: { operation: "create" }
+        }).catch(() => {});
+
+        return res.status(201).json({
+          prospect: sanitizeProspectResponse(prospect, req.authContext.role)
+        });
       } catch (error) {
         return handleError(res, error, "create");
       }
@@ -30,15 +90,30 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async list(req, res) {
       try {
+        if (!hasPermission(req.authContext, PERMISSIONS.PROSPECT_READ)) {
+          return deny(res);
+        }
+
+        const scope = getProspectListScope(req.authContext);
+
+        if (scope.denied) {
+          return deny(res);
+        }
+
         const result = await service.listProspects({
           q: req.query.q,
           lifecycleState: req.query.lifecycleState,
           limit: req.query.limit,
           offset: req.query.offset,
-          organizationId: req.query.organizationId
+          organizationId: resolveOrganizationId(req.authContext, req.query.organizationId),
+          ownerUserId: scope.ownerUserId,
+          divisionId: scope.divisionId
         });
 
-        return res.json(result);
+        return res.json({
+          items: sanitizeProspectList(result.items, req.authContext.role),
+          total: result.total
+        });
       } catch (error) {
         return handleError(res, error, "list");
       }
@@ -46,8 +121,23 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async getById(req, res) {
       try {
+        const prospectRow = await authorizeProspectAccess(req, res, req.params.id);
+
+        if (!prospectRow) {
+          return;
+        }
+
         const prospect = await service.getProspect(req.params.id);
-        return res.json({ prospect });
+
+        auditFromRequest(req, {
+          action: "prospect.viewed",
+          targetType: "core_prospect",
+          targetId: req.params.id
+        }).catch(() => {});
+
+        return res.json({
+          prospect: sanitizeProspectResponse(prospect, req.authContext.role)
+        });
       } catch (error) {
         return handleError(res, error, "getById");
       }
@@ -55,9 +145,26 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async update(req, res) {
       try {
+        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+          write: true
+        });
+
+        if (!prospectRow) {
+          return;
+        }
+
         const actor = actorFromRequest(req.atlasUser);
         const prospect = await service.updateProspect(req.params.id, req.body, actor);
-        return res.json({ prospect });
+
+        auditFromRequest(req, {
+          action: "prospect.updated",
+          targetType: "core_prospect",
+          targetId: req.params.id
+        }).catch(() => {});
+
+        return res.json({
+          prospect: sanitizeProspectResponse(prospect, req.authContext.role)
+        });
       } catch (error) {
         return handleError(res, error, "update");
       }
@@ -65,9 +172,27 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async archive(req, res) {
       try {
+        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+          write: true
+        });
+
+        if (!prospectRow) {
+          return;
+        }
+
         const actor = actorFromRequest(req.atlasUser);
         const prospect = await service.archiveProspect(req.params.id, actor);
-        return res.json({ prospect });
+
+        auditFromRequest(req, {
+          action: "prospect.updated",
+          targetType: "core_prospect",
+          targetId: req.params.id,
+          metadata: { operation: "archive" }
+        }).catch(() => {});
+
+        return res.json({
+          prospect: sanitizeProspectResponse(prospect, req.authContext.role)
+        });
       } catch (error) {
         return handleError(res, error, "archive");
       }
@@ -75,9 +200,20 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async restore(req, res) {
       try {
+        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+          write: true
+        });
+
+        if (!prospectRow) {
+          return;
+        }
+
         const actor = actorFromRequest(req.atlasUser);
         const prospect = await service.restoreProspect(req.params.id, actor);
-        return res.json({ prospect });
+
+        return res.json({
+          prospect: sanitizeProspectResponse(prospect, req.authContext.role)
+        });
       } catch (error) {
         return handleError(res, error, "restore");
       }
@@ -85,9 +221,33 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async assign(req, res) {
       try {
+        if (!hasPermission(req.authContext, PERMISSIONS.PROSPECT_ASSIGN)) {
+          return deny(res);
+        }
+
+        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+          write: true
+        });
+
+        if (!prospectRow) {
+          return;
+        }
+
         const actor = actorFromRequest(req.atlasUser);
         const prospect = await service.assignProspect(req.params.id, req.body, actor);
-        return res.json({ prospect });
+
+        auditFromRequest(req, {
+          action: "lead.assigned",
+          targetType: "core_prospect",
+          targetId: req.params.id,
+          metadata: {
+            assignedAgentId: req.body?.assignedAgentId || null
+          }
+        }).catch(() => {});
+
+        return res.json({
+          prospect: sanitizeProspectResponse(prospect, req.authContext.role)
+        });
       } catch (error) {
         return handleError(res, error, "assign");
       }
@@ -95,9 +255,17 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async merge(req, res) {
       try {
+        if (!hasPermission(req.authContext, PERMISSIONS.PROSPECT_ASSIGN)) {
+          return deny(res);
+        }
+
         const actor = actorFromRequest(req.atlasUser);
         const result = await service.mergeProspects(req.body, actor);
-        return res.json(result);
+
+        return res.json({
+          survivor: sanitizeProspectResponse(result.survivor, req.authContext.role),
+          merged: sanitizeProspectResponse(result.merged, req.authContext.role)
+        });
       } catch (error) {
         return handleError(res, error, "merge");
       }

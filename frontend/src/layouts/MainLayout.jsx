@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { missionControlNav, operationsCenterNavItem } from "../config/missionControlNav";
 import { useLanguage } from "../i18n/LanguageContext";
-import { bootstrapAtlasSession } from "../services/atlasAuthService";
+import { ensureAtlasSession } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
 import "./MainLayout.css";
 
@@ -132,9 +132,7 @@ export default function MainLayout() {
   }, [showOperationsCenter]);
 
   useEffect(() => {
-    bootstrapAtlasSession().catch(() => {
-      // Session bootstrap is optional until auth is configured.
-    });
+    ensureAtlasSession().catch(() => {});
   }, []);
 
   useEffect(() => {

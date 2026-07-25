@@ -18,6 +18,7 @@ const missionControlRoutes = require("./routes/missionControl");
 const executiveDashboardRoutes = require("./routes/executiveDashboard");
 const organizationRoutes = require("./routes/organization");
 const quickCaptureRoutes = require("./routes/quickCapture");
+const authRoutes = require("./routes/auth");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
@@ -31,6 +32,8 @@ const { createTimelineModule } = require("./modules/timeline");
 const { createMissionControlModule } = require("./modules/mission-control");
 const { createExecutiveDashboardModule } = require("./modules/executive-dashboard");
 const { requireAtlasUser } = require("./middleware/requireAtlasUser");
+const { verifyMetaWebhookSignature } = require("./middleware/metaWebhookSignature");
+const { safeRequestLogger } = require("./middleware/safeRequestLogger");
 const contactRoutes = require("./routes/contact");
 
 const {
@@ -71,12 +74,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // General middleware
-app.use(cors());
+const corsOptions =
+  process.env.NODE_ENV === "production"
+    ? {
+        origin: String(process.env.ATLAS_CORS_ORIGINS || "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        credentials: true
+      }
+    : {};
 
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  next();
-});
+app.use(cors(corsOptions));
+app.use(safeRequestLogger);
 
 // Meta webhook must receive the raw body before express.json().
 app.use(
@@ -94,6 +104,7 @@ app.use(
 app.use(
   "/webhook/facebook-leads",
   express.raw({ type: "application/json" }),
+  verifyMetaWebhookSignature,
   (req, res, next) => {
     if (Buffer.isBuffer(req.body)) {
       try {
@@ -154,6 +165,7 @@ app.get(
   timelineModule.prospectTimelineHandler
 );
 app.use("/api/prospects", prospectModule.routes);
+app.use("/api", authRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
 

@@ -1,36 +1,12 @@
 /**
- * Sprint 17.0 — Operations Center access control.
- * Visible when NODE_ENV !== production OR user is Developer/Admin.
+ * Sprint 17.0 / LC1 — Operations Center access control (RBAC).
  */
 
-const DEFAULT_ADMIN_EMAILS = Object.freeze([
-  "ana@teamvision.ai",
-  "niovel@teamvision.ai"
-]);
-
-function parseAdminEmails() {
-  const configured = String(process.env.ATLAS_OPS_ADMIN_EMAILS || "").trim();
-
-  if (!configured) {
-    return [...DEFAULT_ADMIN_EMAILS];
-  }
-
-  return configured
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
+const { buildAuthContext, canAccessOperationsCenter } = require("../security/authorizationService");
+const { ROLES } = require("../security/roles");
 
 function isNonProductionEnvironment() {
   return process.env.NODE_ENV !== "production";
-}
-
-function isAdminUser(user) {
-  if (!user?.email) {
-    return false;
-  }
-
-  return parseAdminEmails().includes(String(user.email).toLowerCase());
 }
 
 function isOperationsCenterEnabled() {
@@ -40,31 +16,33 @@ function isOperationsCenterEnabled() {
   );
 }
 
-function canAccessOperationsCenter(user) {
+function canAccessOperationsCenterForUser(user) {
   if (!isOperationsCenterEnabled()) {
     return false;
   }
 
-  return isNonProductionEnvironment() || isAdminUser(user);
+  const context = buildAuthContext(user);
+  return canAccessOperationsCenter(context);
 }
 
 function getOperationsAccessProfile(user) {
   const enabled = isOperationsCenterEnabled();
-  const allowed = enabled && canAccessOperationsCenter(user);
+  const context = buildAuthContext(user);
+  const allowed = enabled && canAccessOperationsCenter(context);
 
   return {
     enabled,
     allowed,
     environment: process.env.NODE_ENV || "development",
-    role: isAdminUser(user) ? "admin" : isNonProductionEnvironment() ? "developer" : null
+    role: context?.role || null,
+    permissions: context?.permissions || []
   };
 }
 
 module.exports = {
-  parseAdminEmails,
   isNonProductionEnvironment,
-  isAdminUser,
   isOperationsCenterEnabled,
-  canAccessOperationsCenter,
-  getOperationsAccessProfile
+  canAccessOperationsCenter: canAccessOperationsCenterForUser,
+  getOperationsAccessProfile,
+  ROLES
 };

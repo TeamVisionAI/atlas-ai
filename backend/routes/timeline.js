@@ -1,7 +1,10 @@
 const express = require("express");
 const { getConversationTimeline } = require("../services/timelineService");
+const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 
 const router = express.Router();
+
+router.use(requireAtlasUser);
 
 router.get("/:phone", async (req, res) => {
 

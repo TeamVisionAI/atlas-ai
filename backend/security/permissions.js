@@ -1,0 +1,68 @@
+/**
+ * LC1 — Permission matrix by role.
+ */
+
+const { ROLES } = require("./roles");
+
+const PERMISSIONS = Object.freeze({
+  PROSPECT_READ: "prospect:read",
+  PROSPECT_WRITE: "prospect:write",
+  PROSPECT_ASSIGN: "prospect:assign",
+  PROSPECT_COMMUNICATE: "prospect:communicate",
+  DASHBOARD_EXECUTIVE: "dashboard:executive",
+  ORG_READ: "org:read",
+  ORG_WRITE: "org:write",
+  OPERATIONS_ACCESS: "operations:access",
+  ADMIN_USERS: "admin:users",
+  ADMIN_ROLES: "admin:roles",
+  AUDIT_READ: "audit:read"
+});
+
+const ROLE_PERMISSIONS = Object.freeze({
+  [ROLES.ADMINISTRATOR]: Object.values(PERMISSIONS),
+  [ROLES.OPERATIONS]: [PERMISSIONS.OPERATIONS_ACCESS, PERMISSIONS.AUDIT_READ],
+  [ROLES.RVP]: [
+    PERMISSIONS.PROSPECT_READ,
+    PERMISSIONS.PROSPECT_WRITE,
+    PERMISSIONS.PROSPECT_ASSIGN,
+    PERMISSIONS.PROSPECT_COMMUNICATE,
+    PERMISSIONS.DASHBOARD_EXECUTIVE,
+    PERMISSIONS.ORG_READ,
+    PERMISSIONS.AUDIT_READ
+  ],
+  [ROLES.DIVISION_LEADER]: [
+    PERMISSIONS.PROSPECT_READ,
+    PERMISSIONS.PROSPECT_WRITE,
+    PERMISSIONS.PROSPECT_ASSIGN,
+    PERMISSIONS.PROSPECT_COMMUNICATE,
+    PERMISSIONS.DASHBOARD_EXECUTIVE,
+    PERMISSIONS.ORG_READ
+  ],
+  [ROLES.AGENT]: [
+    PERMISSIONS.PROSPECT_READ,
+    PERMISSIONS.PROSPECT_WRITE,
+    PERMISSIONS.PROSPECT_COMMUNICATE
+  ],
+  [ROLES.RECRUITER]: [
+    PERMISSIONS.PROSPECT_READ,
+    PERMISSIONS.PROSPECT_WRITE,
+    PERMISSIONS.PROSPECT_COMMUNICATE
+  ],
+  [ROLES.SUPPORT]: [PERMISSIONS.PROSPECT_READ, PERMISSIONS.AUDIT_READ]
+});
+
+function permissionsForRole(role) {
+  return ROLE_PERMISSIONS[role] || [];
+}
+
+function roleHasPermission(role, permission) {
+  const granted = permissionsForRole(role);
+  return granted.includes(permission);
+}
+
+module.exports = {
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
+  permissionsForRole,
+  roleHasPermission
+};

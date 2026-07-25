@@ -1,9 +1,10 @@
 const express = require("express");
 const { intakeFacebookLead } = require("../core/facebookLeadIntakeService");
+const { requireInternalServiceSecret } = require("../middleware/requireInternalServiceSecret");
 
 const router = express.Router();
 
-router.post("/facebook-lead", async (req, res) => {
+router.post("/facebook-lead", requireInternalServiceSecret, async (req, res) => {
   try {
     const result = await intakeFacebookLead(req.body || {});
 

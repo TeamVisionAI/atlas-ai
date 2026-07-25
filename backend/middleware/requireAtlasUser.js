@@ -1,8 +1,9 @@
 /**
- * Sprint 10.1 — Require authenticated Atlas user for protected routes.
+ * Sprint 10.1 / LC1 — Require authenticated Atlas user and attach auth context.
  */
 
-const { findUserBySessionToken } = require("../services/atlasUserService");
+const { findUserBySessionToken, sanitizeUser } = require("../services/atlasUserService");
+const { buildAuthContext, isActiveContext } = require("../security/authorizationService");
 
 function extractBearerToken(req) {
   const header = req.headers.authorization || "";
@@ -34,8 +35,19 @@ async function requireAtlasUser(req, res, next) {
       });
     }
 
+    const authContext = buildAuthContext(user);
+
+    if (!isActiveContext(authContext)) {
+      return res.status(403).json({
+        error: "FORBIDDEN",
+        message: "Account is disabled."
+      });
+    }
+
     req.atlasUser = user;
     req.atlasSessionToken = token;
+    req.authContext = authContext;
+    req.sanitizedUser = sanitizeUser(user);
     return next();
   } catch (error) {
     console.error("[requireAtlasUser]", error.message);

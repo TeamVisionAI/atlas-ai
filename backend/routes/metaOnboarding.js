@@ -16,8 +16,11 @@ const {
   compareAuthorizationCodes,
   traceAuthorizationCode
 } = require("../core/meta/authorizationCodeTrace");
+const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 
 const router = express.Router();
+
+router.use(requireAtlasUser);
 
 router.get("/embedded-signup/status", async (req, res) => {
   try {

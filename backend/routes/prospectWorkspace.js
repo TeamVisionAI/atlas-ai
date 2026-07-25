@@ -13,8 +13,12 @@ const {
   updateProspectCommunicationLanguage
 } = require("../core/prospectWorkspaceProfileEngine");
 const { isProductionProspect } = require("../core/productionProspectFilter");
+const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { requireLegacyProspectAccess } = require("../middleware/requireProspectAccess");
 
 const router = express.Router();
+
+router.use(requireAtlasUser);
 
 function rejectSimulatorProspect(phone, res) {
   if (!isProductionProspect(phone)) {
@@ -25,7 +29,7 @@ function rejectSimulatorProspect(phone, res) {
   return false;
 }
 
-router.get("/:phone/activity", async (req, res) => {
+router.get("/:phone/activity", requireLegacyProspectAccess(), async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;
@@ -51,7 +55,7 @@ router.get("/:phone/activity", async (req, res) => {
   }
 });
 
-router.get("/:phone", async (req, res) => {
+router.get("/:phone", requireLegacyProspectAccess(), async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;
@@ -70,7 +74,10 @@ router.get("/:phone", async (req, res) => {
   }
 });
 
-router.patch("/:phone/communication-language", async (req, res) => {
+router.patch(
+  "/:phone/communication-language",
+  requireLegacyProspectAccess({ write: true }),
+  async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;

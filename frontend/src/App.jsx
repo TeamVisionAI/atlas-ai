@@ -8,6 +8,8 @@ import WhatsAppConnect from "./pages/WhatsAppConnect";
 import QuickCapture from "./pages/QuickCapture";
 import KnowledgeHub from "./pages/KnowledgeHub";
 import OperationsCenter from "./pages/OperationsCenter";
+import Login from "./pages/Login";
+import RequireAuth from "./components/RequireAuth";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Prospect from "./pages/Prospect";
 import Home from "./pages/Home";
@@ -52,8 +54,16 @@ export default function App() {
       <Route path="/legal" element={<Legal />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/data-deletion" element={<DataDeletion />} />
+      <Route path="/app/login" element={<Login />} />
 
-      <Route path="/app" element={<MainLayout />}>
+      <Route
+        path="/app"
+        element={
+          <RequireAuth>
+            <MainLayout />
+          </RequireAuth>
+        }
+      >
         <Route index element={<ExecutiveDashboard />} />
         <Route path="mission-control" element={<Dashboard />} />
         <Route path="prospect-workspace/:phone" element={<ProspectWorkspace />} />

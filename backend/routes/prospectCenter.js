@@ -4,8 +4,11 @@
 
 const express = require("express");
 const { buildProspectCenterReadModel } = require("../core/prospectCenterReadModel");
+const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 
 const router = express.Router();
+
+router.use(requireAtlasUser);
 
 router.get("/", async (req, res) => {
   try {

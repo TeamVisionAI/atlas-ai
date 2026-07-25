@@ -7,8 +7,14 @@ const {
 const { postWorkflowAdvance } = require("../controllers/workflowAdvanceController");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { getCommunicationGateway } = require("../communication/gateway/createCommunicationGateway");
+const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { requireLegacyProspectAccess } = require("../middleware/requireProspectAccess");
+const { requirePermission } = require("../middleware/requirePermission");
+const { PERMISSIONS } = require("../security/permissions");
 
 const router = express.Router();
+
+router.use(requireAtlasUser);
 
 router.get("/live/snapshot", (req, res) => {
   try {
@@ -28,7 +34,7 @@ function rejectSimulatorProspect(phone, res) {
   return false;
 }
 
-router.get("/:phone", async (req, res) => {
+router.get("/:phone", requireLegacyProspectAccess(), async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;
@@ -46,7 +52,11 @@ router.get("/:phone", async (req, res) => {
   }
 });
 
-router.post("/:phone/actions", async (req, res) => {
+router.post(
+  "/:phone/actions",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_COMMUNICATE),
+  async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;
@@ -80,7 +90,11 @@ router.post("/:phone/actions", async (req, res) => {
   }
 });
 
-router.post("/:phone/workflow/advance", async (req, res) => {
+router.post(
+  "/:phone/workflow/advance",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;
@@ -99,7 +113,11 @@ router.post("/:phone/workflow/advance", async (req, res) => {
   }
 });
 
-router.post("/:phone/workflow", async (req, res) => {
+router.post(
+  "/:phone/workflow",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;

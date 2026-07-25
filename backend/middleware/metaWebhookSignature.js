@@ -10,6 +10,17 @@ function verifyMetaWebhookSignature(req, res, next) {
   const appSecret = process.env.META_APP_SECRET;
 
   if (!appSecret) {
+    if (process.env.NODE_ENV === "production") {
+      logWhatsAppStage("signature_rejected", {
+        reason: "missing_app_secret",
+        level: "error"
+      });
+      return res.status(503).json({
+        error: "WEBHOOK_MISCONFIGURED",
+        message: "META_APP_SECRET is required in production."
+      });
+    }
+
     logWhatsAppStage("signature_skipped", {
       reason: "META_APP_SECRET not configured"
     });
