@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { loginAtlasSession, getStoredSessionToken } from "../services/atlasAuthService";
+import { fetchSetupStatus } from "../services/setupService";
 import { appPath } from "../config/appRoutes";
 import "./Login.css";
 
@@ -12,6 +14,22 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSetup, setCheckingSetup] = useState(true);
+  const [setupRequired, setSetupRequired] = useState(false);
+
+  useEffect(() => {
+    fetchSetupStatus()
+      .then((status) => setSetupRequired(Boolean(status.setupRequired)))
+      .finally(() => setCheckingSetup(false));
+  }, []);
+
+  if (checkingSetup) {
+    return null;
+  }
+
+  if (setupRequired) {
+    return <Navigate to={appPath("setup")} replace />;
+  }
 
   if (getStoredSessionToken()) {
     return <Navigate to={appPath()} replace />;

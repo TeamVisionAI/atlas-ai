@@ -14,6 +14,8 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import AcceptInvitation from "./pages/auth/AcceptInvitation";
 import AdminUsers from "./pages/identity/AdminUsers";
 import MyAccount from "./pages/identity/MyAccount";
+import SetupWizard from "./pages/identity/SetupWizard";
+import RequireSetupComplete from "./components/RequireSetupComplete";
 import RequireAuth from "./components/RequireAuth";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Prospect from "./pages/Prospect";
@@ -60,6 +62,7 @@ export default function App() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/data-deletion" element={<DataDeletion />} />
       <Route path="/app/login" element={<Login />} />
+      <Route path="/app/setup" element={<SetupWizard />} />
       <Route path="/app/forgot-password" element={<ForgotPassword />} />
       <Route path="/app/reset-password" element={<ResetPassword />} />
       <Route path="/app/accept-invitation" element={<AcceptInvitation />} />
@@ -67,9 +70,11 @@ export default function App() {
       <Route
         path="/app"
         element={
-          <RequireAuth>
-            <MainLayout />
-          </RequireAuth>
+          <RequireSetupComplete>
+            <RequireAuth>
+              <MainLayout />
+            </RequireAuth>
+          </RequireSetupComplete>
         }
       >
         <Route index element={<ExecutiveDashboard />} />

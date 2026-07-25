@@ -26,7 +26,8 @@ const MIGRATION_FILES = [
   { version: "006", file: "006_atlas_mission_control_read_model.sql" },
   { version: "007", file: "007_atlas_executive_dashboard_read_model.sql" },
   { version: "008", file: "008_lc1_security_foundation.sql", note: "LC1 security foundation" },
-  { version: "009", file: "009_identity_management.sql", note: "LC1.1 identity management" }
+  { version: "009", file: "009_identity_management.sql", note: "LC1.1 identity management" },
+  { version: "010", file: "010_platform_bootstrap.sql", note: "LC1.1 platform bootstrap wizard" }
 ];
 
 function loadMigrationSql(fileName) {
@@ -78,9 +79,13 @@ async function applyAtlasCoreMigrations({ includePrerequisite = true } = {}) {
     }
   });
 
-  console.log("Ensuring Atlas default users (Ana + Niovel)...");
-  await seedAtlasUsers();
-  console.log("Atlas default users verified.");
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Ensuring Atlas development users (dev only)...");
+    await seedAtlasUsers();
+    console.log("Atlas development users verified.");
+  } else {
+    console.log("Skipping user seed in production — use the setup wizard for first administrator.");
+  }
 
   return applied;
 }

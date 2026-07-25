@@ -20,6 +20,7 @@ const organizationRoutes = require("./routes/organization");
 const quickCaptureRoutes = require("./routes/quickCapture");
 const authRoutes = require("./routes/auth");
 const adminUsersRoutes = require("./routes/adminUsers");
+const setupRoutes = require("./routes/setup");
 const accountRoutes = require("./routes/account");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
@@ -167,6 +168,7 @@ app.get(
   timelineModule.prospectTimelineHandler
 );
 app.use("/api/prospects", prospectModule.routes);
+app.use("/api", setupRoutes);
 app.use("/api", authRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/account", accountRoutes);

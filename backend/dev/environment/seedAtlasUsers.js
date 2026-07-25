@@ -47,6 +47,10 @@ const LC1_USERS = [
 ];
 
 async function seedAtlasUsers() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("seedAtlasUsers is disabled in production. Use the Atlas setup wizard.");
+  }
+
   const passwordHash = hashPassword(DEFAULT_DEV_PASSWORD);
 
   await withPostgresTransaction(async (client) => {

@@ -201,3 +201,22 @@ Scoped to administrator's organization. Appointments/tasks in JSONB fields follo
 - Administrator: create, invite, assign roles, suspend, archive, transfer ownership, force reset/logout
 - Users: create password (invite), login, logout, forgot/change password, manage profile, view sessions
 - LC1 security architecture unchanged (RBAC, RLS, audit foundation intact)
+
+---
+
+## Part 0 — Platform bootstrap
+
+First-time installation when no users exist:
+
+| Step | Behavior |
+|------|----------|
+| Detection | `GET /api/setup/status` → `{ setupRequired: true }` when no users and setup not completed |
+| Wizard | `/app/setup` — organization name, owner name/email, password |
+| Result | Creates organization owner + administrator, marks `atlas_platform_settings.setup_completed_at`, logs in |
+| Disable | Wizard permanently unavailable after first administrator (`POST /api/setup/complete` returns 403) |
+
+**Migration:** `010_platform_bootstrap.sql` — platform settings, org owner, removes unactivated placeholder users.
+
+**Production:** `seedAtlasUsers` disabled in production; `applyAtlasCoreMigrations` skips user seed when `NODE_ENV=production`.
+
+**Development:** Seed users (`ana@`, `niovel@`, etc.) only via `seedAtlasUsers.js` in non-production environments.
