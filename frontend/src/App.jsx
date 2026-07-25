@@ -20,6 +20,7 @@ import RequireAuth from "./components/RequireAuth";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Prospect from "./pages/Prospect";
 import Home from "./pages/Home";
+import AtlasLanding from "./pages/AtlasLanding";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import Terms from "./pages/Terms";
@@ -57,6 +58,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/atlas" element={<AtlasLanding />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/legal" element={<Legal />} />
       <Route path="/terms" element={<Terms />} />

@@ -16,6 +16,7 @@ export default function Footer() {
         </div>
 
         <nav className="public-footer__nav" aria-label="Footer">
+          <Link to="/atlas">Atlas</Link>
           <Link to="/privacy">Privacy Policy</Link>
           <Link to="/legal">Legal</Link>
           <Link to="/terms">Terms of Service</Link>

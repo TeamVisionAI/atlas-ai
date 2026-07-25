@@ -8,6 +8,7 @@ const sectionLinks = [
   { href: "/#services", label: "Services" },
   { href: "/#careers", label: "Careers" },
   { href: "/#contact", label: "Contact" },
+  { to: "/atlas", label: "Atlas", isRoute: true }
 ];
 
 const legalLinks = [
@@ -82,11 +83,21 @@ export default function Navbar() {
         </Link>
 
         <nav className="public-navbar__nav" aria-label="Primary">
-          {sectionLinks.map((link) => (
-            <a key={link.href} href={link.href} className="public-navbar__link">
-              {link.label}
-            </a>
-          ))}
+          {sectionLinks.map((link) =>
+            link.isRoute ? (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={`public-navbar__link${location.pathname === link.to ? " is-active" : ""}`}
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a key={link.href} href={link.href} className="public-navbar__link">
+                {link.label}
+              </a>
+            )
+          )}
         </nav>
 
         <div className="public-navbar__actions">
@@ -131,15 +142,26 @@ export default function Navbar() {
         <div className="public-navbar__mobile-nav-inner public-site__container">
           <ul className="public-navbar__mobile-list">
             {sectionLinks.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  className="public-navbar__mobile-link"
-                  tabIndex={menuOpen ? 0 : -1}
-                  onClick={closeMenu}
-                >
-                  {link.label}
-                </a>
+              <li key={link.href || link.to}>
+                {link.isRoute ? (
+                  <Link
+                    to={link.to}
+                    className={`public-navbar__mobile-link${location.pathname === link.to ? " is-active" : ""}`}
+                    tabIndex={menuOpen ? 0 : -1}
+                    onClick={closeMenu}
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    href={link.href}
+                    className="public-navbar__mobile-link"
+                    tabIndex={menuOpen ? 0 : -1}
+                    onClick={closeMenu}
+                  >
+                    {link.label}
+                  </a>
+                )}
               </li>
             ))}
           </ul>
