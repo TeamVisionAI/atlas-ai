@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "techProviderAccessVerification": {
+      "status": "in_review",
+      "submittedAt": "2026-07-25",
+      "note": "Waiting for Meta review"
+    },
+    "advancedAccess": {
+      "status": "not_submitted"
+    }
+  }
+}

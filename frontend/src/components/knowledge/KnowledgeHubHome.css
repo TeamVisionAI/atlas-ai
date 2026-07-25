@@ -85,6 +85,77 @@
   color: #166534;
 }
 
+.knowledge-home__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 12px;
+  color: #475569;
+}
+
+.knowledge-home__freshness {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.knowledge-home__freshness--live {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.knowledge-home__freshness--cached {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.knowledge-home__freshness--unknown {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.knowledge-home__status-item--commit {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-home__status-external {
+  color: #94a3b8;
+}
+
+.knowledge-home__refresh-warning {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+}
+
+.knowledge-home__objective {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.knowledge-home__refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .knowledge-home__hero {
   display: flex;
   flex-wrap: wrap;

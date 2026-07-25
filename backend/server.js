@@ -29,6 +29,7 @@ const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
 const knowledgeRoutes = require("./routes/knowledge");
+const platformStatusRoutes = require("./routes/platformStatus");
 const recruitingWorkflowRoutes = require("./routes/recruitingWorkflow");
 const facebookLeadWebhookRoute = require("./routes/facebookLeadWebhook");
 const { createBusinessEventModule } = require("./modules/business-events");
@@ -158,6 +159,7 @@ app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
+app.use("/api/platform-status", platformStatusRoutes);
 app.use("/api/organization", organizationRoutes);
 app.use("/api/business-events", businessEventModule.routes);
 app.use(

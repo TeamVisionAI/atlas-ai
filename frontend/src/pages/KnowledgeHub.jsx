@@ -9,7 +9,7 @@ import {
 } from "../services/knowledgeService";
 import MarkdownViewer from "../components/knowledge/MarkdownViewer";
 import KnowledgeHubHome from "../components/knowledge/KnowledgeHubHome";
-import { parseCurrentStateSections, getDashboardFields } from "../utils/currentStateParser";
+import { usePlatformStatus } from "../hooks/usePlatformStatus";
 import {
   readKnowledgeActivity,
   recordRecentlyOpened,
@@ -135,7 +135,7 @@ function DocTreeNode({
 }
 
 export default function KnowledgeHub() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [authError, setAuthError] = useState(null);
   const [tree, setTree] = useState(null);
@@ -150,16 +150,9 @@ export default function KnowledgeHub() {
   const [loadingTree, setLoadingTree] = useState(true);
   const [loadingDocument, setLoadingDocument] = useState(false);
   const [pageError, setPageError] = useState(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const initialPathRef = useRef(searchParams.get("path"));
-
-  const dashboard = useMemo(() => {
-    if (!homeDocument?.content) {
-      return getDashboardFields({});
-    }
-
-    const sections = parseCurrentStateSections(homeDocument.content);
-    return getDashboardFields(sections);
-  }, [homeDocument]);
+  const platformStatusState = usePlatformStatus({ enabled: sessionReady });
 
   const loadHomeDocument = useCallback(async () => {
     setLoadingDocument(true);
@@ -237,6 +230,9 @@ export default function KnowledgeHub() {
 
       try {
         await bootstrapAtlasSession();
+        if (!cancelled) {
+          setSessionReady(true);
+        }
         const payload = await fetchKnowledgeTree();
 
         if (cancelled) {
@@ -334,8 +330,11 @@ export default function KnowledgeHub() {
     setActivity(togglePinned(entry));
   }
 
-  function handleGoHome() {
-    loadHomeDocument();
+  async function handleGoHome() {
+    await Promise.all([
+      loadHomeDocument(),
+      platformStatusState.refresh({ force: true })
+    ]);
   }
 
   const documentIsFavorite = document ? isFavorite(document.path, activity) : false;
@@ -471,13 +470,17 @@ export default function KnowledgeHub() {
             ) : (
               <KnowledgeHubHome
                 t={t}
-                dashboard={dashboard}
+                locale={language === "es" ? "es-ES" : "en-US"}
                 homeDocument={homeDocument}
                 recentlyOpened={activity.recentlyOpened}
                 recentlyViewed={activity.recentlyViewed}
                 selectedPath={selectedPath}
                 onSelectDocument={handleSelectFile}
-                onGoHome={handleGoHome}
+                onRefreshHome={handleGoHome}
+                platformStatus={platformStatusState.data}
+                platformStatusLoading={loadingDocument || platformStatusState.loading}
+                platformStatusRefreshError={platformStatusState.refreshError}
+                platformStatusFreshness={platformStatusState.freshness}
               />
             )
           ) : null}

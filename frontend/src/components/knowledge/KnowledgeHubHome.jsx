@@ -1,15 +1,14 @@
 import MarkdownViewer from "./MarkdownViewer";
 import { KNOWLEDGE_QUICK_LINKS } from "../../config/knowledgeQuickLinks";
+import {
+  formatBannerDescription,
+  formatGeneratedTimestamp,
+  formatMetaReviewStatus,
+  formatPlatformTitle,
+  formatReleaseBadge,
+  formatSprintLabel
+} from "../../utils/platformStatusDisplay";
 import "./KnowledgeHubHome.css";
-
-const SYSTEM_HEALTH_ITEMS = [
-  { labelKey: "knowledgeHubHealthDatabase", statusKey: "knowledgeHubHealthStatusConnected" },
-  { labelKey: "knowledgeHubHealthAtlasCore", statusKey: "knowledgeHubHealthStatusCertified" },
-  { labelKey: "knowledgeHubHealthBusinessEvents", statusKey: "knowledgeHubHealthStatusRunning" },
-  { labelKey: "knowledgeHubHealthMissionControl", statusKey: "knowledgeHubHealthStatusRunning" },
-  { labelKey: "knowledgeHubHealthExecutiveDashboard", statusKey: "knowledgeHubHealthStatusRunning" },
-  { labelKey: "knowledgeHubHealthProjectionReplay", statusKey: "knowledgeHubHealthStatusHealthy" }
-];
 
 function DashboardCard({ label, children, className = "" }) {
   return (
@@ -43,78 +42,169 @@ function ActivityList({ items, emptyLabel, onSelect, selectedPath }) {
   );
 }
 
+function FreshnessBadge({ freshness, t }) {
+  const label =
+    freshness === "live"
+      ? t.knowledgeHubPlatformStatusLive
+      : freshness === "cached"
+        ? t.knowledgeHubPlatformStatusCached
+        : t.knowledgeHubPlatformStatusUnknown;
+
+  return (
+    <span className={`knowledge-home__freshness knowledge-home__freshness--${freshness}`}>
+      {label}
+    </span>
+  );
+}
+
 export default function KnowledgeHubHome({
   t,
-  dashboard,
+  locale,
   homeDocument,
   recentlyOpened,
   recentlyViewed,
   selectedPath,
   onSelectDocument,
-  onGoHome
+  onRefreshHome,
+  platformStatus,
+  platformStatusLoading,
+  platformStatusRefreshError,
+  platformStatusFreshness
 }) {
+  const platform = platformStatus?.platform;
+  const sprint = platformStatus?.sprint;
+  const git = platformStatus?.git;
+  const external = platformStatus?.external;
+  const environmentHealth = platformStatus?.environmentHealth || [];
+
+  const sprintLabel = formatSprintLabel(sprint) || t.knowledgeHubSprintUnknown;
+  const releaseBadge = formatReleaseBadge(platform);
+  const bannerTitle = formatPlatformTitle(platform);
+  const bannerDescription = formatBannerDescription(platform, sprint);
+  const lastUpdated =
+    platformStatus?.documentation?.lastUpdated || platformStatus?.generatedAt || null;
+  const generatedLabel = formatGeneratedTimestamp(platformStatus?.generatedAt, locale);
+
   return (
     <div className="knowledge-home">
-      <section className="knowledge-home__rc1-banner" aria-label={t.knowledgeHubRc1BannerTitle}>
-        <div className="knowledge-home__rc1-banner-content">
-          <span className="knowledge-home__rc1-badge">{t.knowledgeHubRc1Badge}</span>
-          <h2 className="knowledge-home__rc1-title">{t.knowledgeHubRc1BannerTitle}</h2>
-          <p className="knowledge-home__rc1-description">{t.knowledgeHubRc1BannerDescription}</p>
-        </div>
-      </section>
+      {releaseBadge ? (
+        <section className="knowledge-home__rc1-banner" aria-label={bannerTitle}>
+          <div className="knowledge-home__rc1-banner-content">
+            <span className="knowledge-home__rc1-badge">{releaseBadge}</span>
+            <h2 className="knowledge-home__rc1-title">{bannerTitle}</h2>
+            {bannerDescription ? (
+              <p className="knowledge-home__rc1-description">{bannerDescription}</p>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <div className="knowledge-home__hero">
         <div>
           <p className="knowledge-home__eyebrow">{t.knowledgeHubHomeEyebrow}</p>
           <h2>{t.knowledgeHubHomeTitle}</h2>
           <div className="knowledge-home__version">
-            <p>{t.knowledgeHubVersionPlatform}</p>
-            <p>{t.knowledgeHubVersionRelease}</p>
-            <p className="knowledge-home__version-certified">{t.knowledgeHubVersionCertified}</p>
-            <p className="knowledge-home__version-date">{t.knowledgeHubVersionDate}</p>
+            <p>{formatPlatformTitle(platform)}</p>
+            {platform?.releaseLabel && platform.releaseLabel !== "Unknown" ? (
+              <p>
+                {t.knowledgeHubVersionReleasePrefix} {platform.releaseLabel}
+              </p>
+            ) : null}
+            {platform?.certification && platform.certification !== "Unknown" ? (
+              <p className="knowledge-home__version-certified">{platform.certification}</p>
+            ) : null}
+            {platform?.certificationDate ? (
+              <p className="knowledge-home__version-date">{platform.certificationDate}</p>
+            ) : null}
           </div>
-          {dashboard.lastUpdated ? (
+          {lastUpdated ? (
             <p className="knowledge-home__meta">
-              {t.knowledgeHubLastUpdated}: {dashboard.lastUpdated}
+              {t.knowledgeHubLastUpdated}: {formatGeneratedTimestamp(lastUpdated, locale)}
+            </p>
+          ) : null}
+          {generatedLabel ? (
+            <p className="knowledge-home__meta">
+              {t.knowledgeHubGeneratedAt}: {generatedLabel}
             </p>
           ) : null}
         </div>
-        <button type="button" className="knowledge-home__refresh" onClick={onGoHome}>
-          {t.knowledgeHubRefreshHome}
+        <button
+          type="button"
+          className="knowledge-home__refresh"
+          onClick={onRefreshHome}
+          disabled={platformStatusLoading}
+        >
+          {platformStatusLoading ? t.loading : t.knowledgeHubRefreshHome}
         </button>
       </div>
 
+      <section className="knowledge-home__status-row" aria-label={t.knowledgeHubPlatformStatusLabel}>
+        <FreshnessBadge freshness={platformStatusFreshness} t={t} />
+        {git?.branch ? (
+          <span className="knowledge-home__status-item">
+            {t.knowledgeHubGitBranch}: {git.branch}
+            {git.shortCommit ? ` @ ${git.shortCommit}` : ""}
+          </span>
+        ) : null}
+        {git?.commitMessage ? (
+          <span className="knowledge-home__status-item knowledge-home__status-item--commit">
+            {t.knowledgeHubGitCommit}: {git.commitMessage}
+          </span>
+        ) : null}
+        <span className="knowledge-home__status-item">
+          {t.knowledgeHubMetaReviewStatus}:{" "}
+          {formatMetaReviewStatus(external?.metaTechProviderStatus, t)}
+          <span className="knowledge-home__status-external"> ({t.knowledgeHubMetaReviewExternal})</span>
+        </span>
+      </section>
+
+      {platformStatusRefreshError ? (
+        <p className="knowledge-home__refresh-warning" role="status">
+          {t.knowledgeHubRefreshWarning}
+        </p>
+      ) : null}
+
       <div className="knowledge-home__grid">
         <DashboardCard label={t.knowledgeHubDashCurrentSprint}>
-          <p className="knowledge-home__highlight">{dashboard.currentSprint || "—"}</p>
-          {dashboard.productStage ? (
-            <p className="knowledge-home__muted">{dashboard.productStage}</p>
-          ) : null}
+          <p className="knowledge-home__highlight">{sprintLabel}</p>
+          {sprint?.phase ? <p className="knowledge-home__muted">{sprint.phase}</p> : null}
         </DashboardCard>
 
         <DashboardCard label={t.knowledgeHubDashOverallStatus}>
           <p className="knowledge-home__status knowledge-home__status--certified">
-            {dashboard.overallStatus || "—"}
+            {platform?.overallStatus && platform.overallStatus !== "Unknown"
+              ? platform.overallStatus
+              : "—"}
+          </p>
+        </DashboardCard>
+
+        <DashboardCard label={t.knowledgeHubDashPhase}>
+          <p className="knowledge-home__highlight">
+            {sprint?.phase || "—"}
           </p>
         </DashboardCard>
 
         <DashboardCard label={t.knowledgeHubDashObjective} className="knowledge-home__card--wide">
-          {dashboard.currentObjective ? (
-            <MarkdownViewer content={dashboard.currentObjective} />
+          {sprint?.objective ? (
+            <p className="knowledge-home__objective">{sprint.objective}</p>
           ) : (
             <p className="knowledge-home__empty">{t.knowledgeHubDashEmpty}</p>
           )}
         </DashboardCard>
 
         <DashboardCard label={t.knowledgeHubSystemHealthTitle} className="knowledge-home__card--wide">
-          <ul className="knowledge-home__health-list">
-            {SYSTEM_HEALTH_ITEMS.map((item) => (
-              <li key={item.labelKey} className="knowledge-home__health-row">
-                <span className="knowledge-home__health-label">{t[item.labelKey]}</span>
-                <span className="knowledge-home__health-status">{t[item.statusKey]}</span>
-              </li>
-            ))}
-          </ul>
+          {environmentHealth.length ? (
+            <ul className="knowledge-home__health-list">
+              {environmentHealth.map((item) => (
+                <li key={item.component} className="knowledge-home__health-row">
+                  <span className="knowledge-home__health-label">{item.component}</span>
+                  <span className="knowledge-home__health-status">{item.status}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="knowledge-home__empty">{t.knowledgeHubDashEmpty}</p>
+          )}
         </DashboardCard>
 
         <DashboardCard label={t.knowledgeHubRecentlyOpened}>
@@ -159,7 +249,7 @@ export default function KnowledgeHubHome({
             {homeDocument.updatedAt ? (
               <p>
                 {t.knowledgeHubUpdatedAt}:{" "}
-                {new Date(homeDocument.updatedAt).toLocaleString()}
+                {new Date(homeDocument.updatedAt).toLocaleString(locale)}
               </p>
             ) : null}
           </header>
