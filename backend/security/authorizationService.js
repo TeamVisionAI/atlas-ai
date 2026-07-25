@@ -2,7 +2,7 @@
  * LC1 — Centralized authorization decisions.
  */
 
-const { ROLES } = require("./roles");
+const { ROLES, canUserLogin } = require("./roles");
 const { permissionsForRole, roleHasPermission } = require("./permissions");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 
@@ -25,7 +25,7 @@ function buildAuthContext(user) {
 }
 
 function isActiveContext(context) {
-  return Boolean(context && context.status !== "disabled");
+  return Boolean(context && canUserLogin(context.status));
 }
 
 function hasPermission(context, permission) {

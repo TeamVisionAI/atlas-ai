@@ -10,8 +10,14 @@ export const missionControlNav = [
   { path: appPath("follow-ups"), labelKey: "navFollowUps" },
   { path: appPath("analytics"), labelKey: "navAnalytics" },
   { path: appPath("knowledge"), labelKey: "navKnowledge" },
+  { path: appPath("my-account"), labelKey: "navMyAccount" },
   { path: appPath("settings"), labelKey: "navSettings" }
 ];
+
+export const adminNavItem = {
+  path: appPath("admin/users"),
+  labelKey: "navAdminUsers"
+};
 
 export const operationsCenterNavItem = {
   path: appPath("operations-center"),

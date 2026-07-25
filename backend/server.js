@@ -19,6 +19,8 @@ const executiveDashboardRoutes = require("./routes/executiveDashboard");
 const organizationRoutes = require("./routes/organization");
 const quickCaptureRoutes = require("./routes/quickCapture");
 const authRoutes = require("./routes/auth");
+const adminUsersRoutes = require("./routes/adminUsers");
+const accountRoutes = require("./routes/account");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
@@ -166,6 +168,8 @@ app.get(
 );
 app.use("/api/prospects", prospectModule.routes);
 app.use("/api", authRoutes);
+app.use("/api/admin", adminUsersRoutes);
+app.use("/api/account", accountRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
 

@@ -9,6 +9,11 @@ import QuickCapture from "./pages/QuickCapture";
 import KnowledgeHub from "./pages/KnowledgeHub";
 import OperationsCenter from "./pages/OperationsCenter";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
+import AcceptInvitation from "./pages/auth/AcceptInvitation";
+import AdminUsers from "./pages/identity/AdminUsers";
+import MyAccount from "./pages/identity/MyAccount";
 import RequireAuth from "./components/RequireAuth";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Prospect from "./pages/Prospect";
@@ -55,6 +60,9 @@ export default function App() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/data-deletion" element={<DataDeletion />} />
       <Route path="/app/login" element={<Login />} />
+      <Route path="/app/forgot-password" element={<ForgotPassword />} />
+      <Route path="/app/reset-password" element={<ResetPassword />} />
+      <Route path="/app/accept-invitation" element={<AcceptInvitation />} />
 
       <Route
         path="/app"
@@ -120,6 +128,8 @@ export default function App() {
         />
         <Route path="settings/whatsapp" element={<WhatsAppConnect />} />
         <Route path="knowledge" element={<KnowledgeHub />} />
+        <Route path="my-account" element={<MyAccount />} />
+        <Route path="admin/users" element={<AdminUsers />} />
         <Route path="operations-center/*" element={<OperationsCenter />} />
       </Route>
 

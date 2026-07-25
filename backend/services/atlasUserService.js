@@ -4,6 +4,7 @@
 
 const crypto = require("crypto");
 const { supabase } = require("./supabaseService");
+const { canUserLogin } = require("../security/roles");
 
 const DEFAULT_USER_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -36,6 +37,13 @@ function sanitizeUser(user) {
     status: user.status,
     organization_id: user.organization_id,
     division_id: user.division_id,
+    phone: user.phone || null,
+    photo_url: user.photo_url || null,
+    timezone: user.timezone || "America/New_York",
+    preferred_language: user.preferred_language || "en",
+    notification_preferences: user.notification_preferences || {},
+    reports_to_user_id: user.reports_to_user_id || null,
+    last_login_at: user.last_login_at || null,
     created_at: user.created_at,
     updated_at: user.updated_at
   };
@@ -108,7 +116,7 @@ async function findUserBySessionToken(token) {
     return null;
   }
 
-  if (data.user.status === "disabled") {
+  if (!canUserLogin(data.user.status)) {
     return null;
   }
 
@@ -138,7 +146,7 @@ function resolveBootstrapUser(token) {
   };
 }
 
-async function createSessionForUser(userId, { rememberMe = false } = {}) {
+async function createSessionForUser(userId, { rememberMe = false, ipAddress, userAgent } = {}) {
   const token = crypto.randomBytes(32).toString("hex");
   const ttl = rememberMe ? REMEMBER_ME_TTL_MS : SESSION_TTL_MS;
   const expiresAt = new Date(Date.now() + ttl).toISOString();
@@ -149,7 +157,9 @@ async function createSessionForUser(userId, { rememberMe = false } = {}) {
       user_id: userId,
       token,
       expires_at: expiresAt,
-      remember_me: Boolean(rememberMe)
+      remember_me: Boolean(rememberMe),
+      ip_address: ipAddress || null,
+      user_agent: userAgent || null
     })
     .select("token, expires_at, remember_me")
     .single();
@@ -206,6 +216,17 @@ async function revokeAllSessionsForUser(userId) {
   }
 }
 
+async function updateLastLogin(userId) {
+  const { error } = await supabase
+    .from("atlas_users")
+    .update({ last_login_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", userId);
+
+  if (error && !isMissingAtlasAuthTable(error)) {
+    throw error;
+  }
+}
+
 async function bootstrapSession() {
   if (process.env.NODE_ENV === "production") {
     return null;
@@ -234,6 +255,7 @@ module.exports = {
   createSessionForUser,
   revokeSessionByToken,
   revokeAllSessionsForUser,
+  updateLastLogin,
   bootstrapSession,
   resolveBootstrapUser,
   sanitizeUser

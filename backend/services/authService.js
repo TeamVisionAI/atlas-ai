@@ -1,5 +1,5 @@
 /**
- * LC1 — Individual authentication service.
+ * LC1 / LC1.1 — Individual authentication service.
  */
 
 const crypto = require("crypto");
@@ -8,25 +8,50 @@ const {
   findUserBySessionToken,
   createSessionForUser,
   revokeSessionByToken,
-  sanitizeUser
+  sanitizeUser,
+  updateLastLogin
 } = require("../services/atlasUserService");
-const { verifyPassword } = require("../security/passwordService");
+const { hashPassword, verifyPassword } = require("../security/passwordService");
+const { hashToken } = require("../security/tokenService");
 const { writeAuditLog } = require("../security/auditLogService");
+const { writeLoginHistory } = require("../services/loginHistoryService");
+const { sendPasswordResetEmail } = require("../services/emailService");
 const { supabase } = require("../services/supabaseService");
-const { USER_STATUSES } = require("../security/roles");
+const { USER_STATUSES, canUserLogin } = require("../security/roles");
 
 const RESET_TTL_MS = 60 * 60 * 1000;
+
+async function recordAuthFailure({ email, user, reason, ipAddress, userAgent }) {
+  await writeAuditLog({
+    organizationId: user?.organization_id,
+    userId: user?.id,
+    userEmail: email,
+    action: "auth.login_failed",
+    result: "failure",
+    metadata: { reason },
+    ipAddress,
+    userAgent
+  });
+
+  await writeLoginHistory({
+    userId: user?.id,
+    userEmail: email,
+    eventType: "login_failed",
+    result: "failure",
+    ipAddress,
+    userAgent,
+    metadata: { reason }
+  });
+}
 
 async function loginWithPassword({ email, password, rememberMe = false, ipAddress, userAgent }) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const user = await findUserByEmail(normalizedEmail);
 
-  if (!user || user.status === USER_STATUSES.DISABLED) {
-    await writeAuditLog({
-      userEmail: normalizedEmail,
-      action: "auth.login_failed",
-      result: "failure",
-      metadata: { reason: "invalid_credentials" },
+  if (!user) {
+    await recordAuthFailure({
+      email: normalizedEmail,
+      reason: "invalid_credentials",
       ipAddress,
       userAgent
     });
@@ -34,17 +59,29 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
     const error = new Error("Invalid email or password.");
     error.statusCode = 401;
     error.publicCode = "INVALID_CREDENTIALS";
+    throw error;
+  }
+
+  if (!canUserLogin(user.status)) {
+    await recordAuthFailure({
+      email: normalizedEmail,
+      user,
+      reason: `status_${user.status}`,
+      ipAddress,
+      userAgent
+    });
+
+    const error = new Error("This account is not active.");
+    error.statusCode = 403;
+    error.publicCode = "ACCOUNT_INACTIVE";
     throw error;
   }
 
   if (!user.password_hash || !verifyPassword(password, user.password_hash)) {
-    await writeAuditLog({
-      organizationId: user.organization_id,
-      userId: user.id,
-      userEmail: user.email,
-      action: "auth.login_failed",
-      result: "failure",
-      metadata: { reason: "invalid_credentials" },
+    await recordAuthFailure({
+      email: normalizedEmail,
+      user,
+      reason: "invalid_credentials",
       ipAddress,
       userAgent
     });
@@ -55,7 +92,13 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
     throw error;
   }
 
-  const session = await createSessionForUser(user.id, { rememberMe });
+  const session = await createSessionForUser(user.id, {
+    rememberMe,
+    ipAddress,
+    userAgent
+  });
+
+  await updateLastLogin(user.id);
 
   await writeAuditLog({
     organizationId: user.organization_id,
@@ -64,6 +107,15 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
     action: "auth.login",
     result: "success",
     metadata: { rememberMe: Boolean(rememberMe) },
+    ipAddress,
+    userAgent
+  });
+
+  await writeLoginHistory({
+    userId: user.id,
+    userEmail: user.email,
+    eventType: "login_success",
+    result: "success",
     ipAddress,
     userAgent
   });
@@ -97,9 +149,9 @@ async function requestPasswordReset(email, { ipAddress, userAgent } = {}) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const user = await findUserByEmail(normalizedEmail);
 
-  if (user) {
+  if (user && canUserLogin(user.status)) {
     const rawToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const tokenHash = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + RESET_TTL_MS).toISOString();
 
     await supabase.from("atlas_password_reset_tokens").insert({
@@ -108,16 +160,30 @@ async function requestPasswordReset(email, { ipAddress, userAgent } = {}) {
       expires_at: expiresAt
     });
 
+    await sendPasswordResetEmail({
+      email: user.email,
+      firstName: user.first_name,
+      token: rawToken,
+      expiresAt
+    }).catch((emailError) => {
+      console.error("[password-reset-email]", emailError.message);
+    });
+
     await writeAuditLog({
       organizationId: user.organization_id,
       userId: user.id,
       userEmail: user.email,
       action: "auth.password_reset_requested",
       result: "success",
-      metadata: {
-        delivery: "architecture_only",
-        resetTokenPreview: `${rawToken.slice(0, 6)}…`
-      },
+      ipAddress,
+      userAgent
+    });
+
+    await writeLoginHistory({
+      userId: user.id,
+      userEmail: user.email,
+      eventType: "password_reset_requested",
+      result: "success",
       ipAddress,
       userAgent
     });
@@ -129,8 +195,155 @@ async function requestPasswordReset(email, { ipAddress, userAgent } = {}) {
   };
 }
 
+async function confirmPasswordReset({ token, newPassword, ipAddress, userAgent }) {
+  const tokenHash = hashToken(token);
+
+  const { data: resetRow, error } = await supabase
+    .from("atlas_password_reset_tokens")
+    .select("*, user:atlas_users(*)")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!resetRow || resetRow.used_at || Date.parse(resetRow.expires_at) < Date.now()) {
+    const resetError = new Error("Invalid or expired reset token.");
+    resetError.statusCode = 400;
+    throw resetError;
+  }
+
+  const passwordHash = hashPassword(newPassword);
+  const user = resetRow.user;
+
+  await supabase
+    .from("atlas_users")
+    .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  await supabase
+    .from("atlas_password_reset_tokens")
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", resetRow.id);
+
+  await writeAuditLog({
+    organizationId: user.organization_id,
+    userId: user.id,
+    userEmail: user.email,
+    action: "auth.password_reset_completed",
+    result: "success",
+    ipAddress,
+    userAgent
+  });
+
+  await writeLoginHistory({
+    userId: user.id,
+    userEmail: user.email,
+    eventType: "password_reset_completed",
+    result: "success",
+    ipAddress,
+    userAgent
+  });
+
+  return { success: true };
+}
+
+async function validateInvitationToken(token) {
+  const tokenHash = hashToken(token);
+
+  const { data, error } = await supabase
+    .from("atlas_invitation_tokens")
+    .select("expires_at, used_at, user:atlas_users(email, first_name, status)")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data || data.used_at || Date.parse(data.expires_at) < Date.now()) {
+    return { valid: false };
+  }
+
+  return {
+    valid: true,
+    email: data.user?.email,
+    firstName: data.user?.first_name,
+    status: data.user?.status
+  };
+}
+
+async function acceptInvitation({ token, password, ipAddress, userAgent }) {
+  const tokenHash = hashToken(token);
+
+  const { data: inviteRow, error } = await supabase
+    .from("atlas_invitation_tokens")
+    .select("*, user:atlas_users(*)")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!inviteRow || inviteRow.used_at || Date.parse(inviteRow.expires_at) < Date.now()) {
+    const inviteError = new Error("Invalid or expired invitation.");
+    inviteError.statusCode = 400;
+    throw inviteError;
+  }
+
+  const user = inviteRow.user;
+  const passwordHash = hashPassword(password);
+
+  await supabase
+    .from("atlas_users")
+    .update({
+      password_hash: passwordHash,
+      status: USER_STATUSES.ACTIVE,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", user.id);
+
+  await supabase
+    .from("atlas_invitation_tokens")
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", inviteRow.id);
+
+  await writeAuditLog({
+    organizationId: user.organization_id,
+    userId: user.id,
+    userEmail: user.email,
+    action: "user.invitation_accepted",
+    targetType: "atlas_user",
+    targetId: user.id,
+    ipAddress,
+    userAgent
+  });
+
+  await writeLoginHistory({
+    userId: user.id,
+    userEmail: user.email,
+    eventType: "invitation_accepted",
+    result: "success",
+    ipAddress,
+    userAgent
+  });
+
+  const session = await createSessionForUser(user.id, { ipAddress, userAgent });
+  await updateLastLogin(user.id);
+
+  return {
+    user: sanitizeUser({ ...user, status: USER_STATUSES.ACTIVE }),
+    session
+  };
+}
+
 module.exports = {
   loginWithPassword,
   logoutSession,
-  requestPasswordReset
+  requestPasswordReset,
+  confirmPasswordReset,
+  validateInvitationToken,
+  acceptInvitation
 };

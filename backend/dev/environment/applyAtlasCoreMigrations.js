@@ -25,7 +25,8 @@ const MIGRATION_FILES = [
   { version: "005", file: "005_atlas_timeline_entries.sql" },
   { version: "006", file: "006_atlas_mission_control_read_model.sql" },
   { version: "007", file: "007_atlas_executive_dashboard_read_model.sql" },
-  { version: "008", file: "008_lc1_security_foundation.sql", note: "LC1 security foundation" }
+  { version: "008", file: "008_lc1_security_foundation.sql", note: "LC1 security foundation" },
+  { version: "009", file: "009_identity_management.sql", note: "LC1.1 identity management" }
 ];
 
 function loadMigrationSql(fileName) {

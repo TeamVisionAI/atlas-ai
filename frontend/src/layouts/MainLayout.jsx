@@ -1,8 +1,8 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { missionControlNav, operationsCenterNavItem } from "../config/missionControlNav";
+import { missionControlNav, operationsCenterNavItem, adminNavItem } from "../config/missionControlNav";
 import { useLanguage } from "../i18n/LanguageContext";
-import { ensureAtlasSession } from "../services/atlasAuthService";
+import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
 import "./MainLayout.css";
 
@@ -122,17 +122,27 @@ export default function MainLayout() {
   const [phoneNavOpen, setPhoneNavOpen] = useState(false);
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
   const [showOperationsCenter, setShowOperationsCenter] = useState(import.meta.env.DEV);
+  const [isAdministrator, setIsAdministrator] = useState(false);
 
   const navItems = useMemo(() => {
-    if (!showOperationsCenter) {
-      return missionControlNav;
+    let items = [...missionControlNav];
+
+    if (isAdministrator) {
+      items = [...items, adminNavItem];
     }
 
-    return [...missionControlNav, operationsCenterNavItem];
-  }, [showOperationsCenter]);
+    if (showOperationsCenter) {
+      items = [...items, operationsCenterNavItem];
+    }
+
+    return items;
+  }, [showOperationsCenter, isAdministrator]);
 
   useEffect(() => {
     ensureAtlasSession().catch(() => {});
+    fetchCurrentUser()
+      .then((user) => setIsAdministrator(user?.role === "administrator"))
+      .catch(() => setIsAdministrator(false));
   }, []);
 
   useEffect(() => {

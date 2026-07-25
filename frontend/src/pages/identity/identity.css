@@ -1,0 +1,127 @@
+.identity-page {
+  padding: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.identity-card {
+  background: #fff;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.identity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.identity-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.identity-table th,
+.identity-table td {
+  text-align: left;
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.9rem;
+}
+
+.identity-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 32rem;
+}
+
+.identity-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.identity-form input,
+.identity-form select,
+.identity-form textarea {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.identity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.identity-button,
+.identity-button-secondary {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.identity-button {
+  background: #2563eb;
+  color: #fff;
+}
+
+.identity-button-secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.identity-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.identity-tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.identity-tab.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.identity-error {
+  color: #dc2626;
+  margin: 0;
+}
+
+.identity-success {
+  color: #15803d;
+  margin: 0;
+}
+
+.identity-status {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: #e2e8f0;
+}
+
+.identity-status.active {
+  background: #dcfce7;
+}
+
+.identity-status.pending_invitation,
+.identity-status.suspended,
+.identity-status.archived {
+  background: #fee2e2;
+}

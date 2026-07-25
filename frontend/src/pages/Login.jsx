@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { loginAtlasSession, getStoredSessionToken } from "../services/atlasAuthService";
 import { appPath } from "../config/appRoutes";
 import "./Login.css";
@@ -69,6 +69,10 @@ export default function Login() {
         </label>
 
         {error ? <p className="login-error">{error}</p> : null}
+
+        <p>
+          <Link to={appPath("forgot-password")}>Forgot password?</Link>
+        </p>
 
         <button type="submit" disabled={loading}>
           {loading ? "Signing in…" : "Sign in"}

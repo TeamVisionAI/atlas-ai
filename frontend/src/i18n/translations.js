@@ -25,6 +25,8 @@ export const translations = {
     navAnalytics: "Análisis",
     navKnowledge: "Centro de Conocimiento",
     navSettings: "Configuración",
+    navMyAccount: "Mi Cuenta",
+    navAdminUsers: "Administración — Usuarios",
     navOperationsCenter: "Centro de Operaciones",
 
     opsTitle: "Centro de Operaciones",
@@ -651,6 +653,8 @@ export const translations = {
     navAnalytics: "Analytics",
     navKnowledge: "Knowledge Hub",
     navSettings: "Settings",
+    navMyAccount: "My Account",
+    navAdminUsers: "Administration — Users",
     navOperationsCenter: "Operations Center",
 
     opsTitle: "Operations Center",
