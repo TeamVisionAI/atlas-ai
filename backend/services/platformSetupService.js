@@ -13,6 +13,8 @@ const {
   findUserByEmail
 } = require("./atlasUserService");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+const { isPgFallbackEnabled, pgQueryOne } = require("./pgFallback");
+const { performBootstrapInstall } = require("../dev/tools/performBootstrapInstall");
 
 const SETUP_KEY = "setup_completed_at";
 
@@ -60,6 +62,29 @@ async function countUsers() {
 }
 
 async function getSetupStatus() {
+  if (isPgFallbackEnabled()) {
+    const userRow = await pgQueryOne("SELECT COUNT(*)::int AS count FROM atlas_users");
+    let settingRow = null;
+
+    try {
+      settingRow = await pgQueryOne(
+        "SELECT value FROM atlas_platform_settings WHERE key = $1",
+        [SETUP_KEY]
+      );
+    } catch {
+      settingRow = null;
+    }
+
+    const completedAt = settingRow?.value?.completedAt || null;
+    const userCount = userRow?.count || 0;
+
+    return {
+      setupRequired: !completedAt && userCount === 0,
+      setupCompletedAt: completedAt,
+      userCount
+    };
+  }
+
   const [completedAt, userCount] = await Promise.all([getSetupCompletedAt(), countUsers()]);
   const setupRequired = !completedAt && userCount === 0;
 
@@ -123,6 +148,28 @@ async function completePlatformSetup(input = {}, auditMeta = {}) {
     const error = new Error("A user with this email already exists.");
     error.statusCode = 409;
     throw error;
+  }
+
+  if (isPgFallbackEnabled()) {
+    const result = await performBootstrapInstall({
+      organizationName,
+      ownerFirstName: firstName,
+      ownerLastName: lastName,
+      ownerEmail: email,
+      password
+    });
+
+    return {
+      setupCompletedAt: new Date().toISOString(),
+      organization: result.organization,
+      user: sanitizeUser(result.user),
+      session: {
+        token: result.token,
+        expiresAt: result.expiresAt,
+        rememberMe: false,
+        bootstrap: false
+      }
+    };
   }
 
   const passwordHash = hashPassword(password);

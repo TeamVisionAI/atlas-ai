@@ -1,5 +1,8 @@
 require("dotenv").config();
 
+const { assertProductionPlatformConfig } = require("./core/platformProductionGuard");
+assertProductionPlatformConfig();
+
 const express = require("express");
 const cors = require("cors");
 

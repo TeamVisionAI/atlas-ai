@@ -10,15 +10,26 @@ function isPresent(value) {
 }
 
 function checkSupabase() {
-  const ok =
-    isPresent(process.env.SUPABASE_URL) && isPresent(process.env.SUPABASE_ANON_KEY);
+  const hasUrl = isPresent(process.env.SUPABASE_URL);
+  const hasAnon = isPresent(process.env.SUPABASE_ANON_KEY);
+  const isProduction = process.env.NODE_ENV === "production";
+  const hasServiceRole = isPresent(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const ok = hasUrl && hasAnon && (!isProduction || hasServiceRole);
+
+  let detail = "configured";
+
+  if (!hasUrl || !hasAnon) {
+    detail = "SUPABASE_URL and SUPABASE_ANON_KEY required";
+  } else if (isProduction && !hasServiceRole) {
+    detail = "SUPABASE_SERVICE_ROLE_KEY required in production";
+  }
 
   return {
     id: "supabase",
     label: "Supabase database",
     ok,
     blocker: true,
-    detail: ok ? "configured" : "SUPABASE_URL and SUPABASE_ANON_KEY required"
+    detail
   };
 }
 

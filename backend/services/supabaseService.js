@@ -1,17 +1,11 @@
 const { createClient } = require("@supabase/supabase-js");
 const { isProductionProspect } = require("../core/productionProspectFilter");
+const { assertProductionPlatformConfig } = require("../core/platformProductionGuard");
+
+assertProductionPlatformConfig();
 
 const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-
-if (
-  process.env.NODE_ENV === "production" &&
-  !process.env.SUPABASE_SERVICE_ROLE_KEY
-) {
-  console.warn(
-    "[supabase] SUPABASE_SERVICE_ROLE_KEY is not set — backend is using anon key with RLS."
-  );
-}
 
 const supabase = createClient(process.env.SUPABASE_URL, supabaseKey);
 

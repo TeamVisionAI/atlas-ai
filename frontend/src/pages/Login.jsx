@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { loginAtlasSession, getStoredSessionToken } from "../services/atlasAuthService";
 import { fetchSetupStatus } from "../services/setupService";
 import { appPath } from "../config/appRoutes";

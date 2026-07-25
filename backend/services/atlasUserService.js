@@ -5,6 +5,7 @@
 const crypto = require("crypto");
 const { supabase } = require("./supabaseService");
 const { canUserLogin } = require("../security/roles");
+const { isPgFallbackEnabled, pgQueryOne } = require("./pgFallback");
 
 const DEFAULT_USER_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -72,6 +73,12 @@ async function findUserByEmail(email) {
     return null;
   }
 
+  if (isPgFallbackEnabled()) {
+    return pgQueryOne("SELECT * FROM atlas_users WHERE lower(email) = $1 LIMIT 1", [
+      String(email).trim().toLowerCase()
+    ]);
+  }
+
   const { data, error } = await supabase
     .from("atlas_users")
     .select("*")
@@ -92,6 +99,33 @@ async function findUserByEmail(email) {
 async function findUserBySessionToken(token) {
   if (!token) {
     return null;
+  }
+
+  if (isPgFallbackEnabled()) {
+    const session = await pgQueryOne(
+      `
+        SELECT s.token, s.expires_at, s.revoked_at, u.*
+        FROM atlas_sessions s
+        JOIN atlas_users u ON u.id = s.user_id
+        WHERE s.token = $1
+        LIMIT 1
+      `,
+      [token]
+    );
+
+    if (!session || session.revoked_at) {
+      return null;
+    }
+
+    if (session.expires_at && Date.parse(session.expires_at) < Date.now()) {
+      return null;
+    }
+
+    if (!canUserLogin(session.status)) {
+      return null;
+    }
+
+    return session;
   }
 
   const { data, error } = await supabase

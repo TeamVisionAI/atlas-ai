@@ -8,7 +8,23 @@ CREATE TABLE IF NOT EXISTS atlas_platform_settings (
 
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS owner_user_id UUID REFERENCES atlas_users(id);
 
--- Remove unactivated placeholder users from migration 002 (production bootstrap path).
+-- Clear FK references before removing unactivated placeholder users from migration 002.
+UPDATE atlas_core_prospects
+SET assigned_agent_id = NULL,
+    owner_user_id = NULL
+WHERE assigned_agent_id IN (SELECT id FROM atlas_users WHERE password_hash IS NULL)
+   OR owner_user_id IN (SELECT id FROM atlas_users WHERE password_hash IS NULL);
+
+UPDATE prospects
+SET owner_user_id = NULL,
+    created_by_user_id = NULL
+WHERE owner_user_id IN (SELECT id FROM atlas_users WHERE password_hash IS NULL)
+   OR created_by_user_id IN (SELECT id FROM atlas_users WHERE password_hash IS NULL);
+
+UPDATE organizations
+SET owner_user_id = NULL
+WHERE owner_user_id IN (SELECT id FROM atlas_users WHERE password_hash IS NULL);
+
 DELETE FROM atlas_users
 WHERE password_hash IS NULL;
 
