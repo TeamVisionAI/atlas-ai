@@ -3,6 +3,7 @@
  */
 
 const { ExecutiveDashboardService } = require("../application/ExecutiveDashboardService");
+const { resolveTenantOrganizationId } = require("../../../services/tenantContextService");
 
 function createExecutiveDashboardController(service = new ExecutiveDashboardService()) {
   function handleError(res, error, context) {
@@ -18,7 +19,7 @@ function createExecutiveDashboardController(service = new ExecutiveDashboardServ
     async getReadModel(req, res) {
       try {
         const result = await service.getReadModel({
-          organizationId: req.query.organizationId
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId)
         });
 
         return res.json(result);
@@ -30,7 +31,7 @@ function createExecutiveDashboardController(service = new ExecutiveDashboardServ
     async getSummary(req, res) {
       try {
         const result = await service.getSummary({
-          organizationId: req.query.organizationId
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId)
         });
 
         return res.json(result);
@@ -42,7 +43,7 @@ function createExecutiveDashboardController(service = new ExecutiveDashboardServ
     async getTrends(req, res) {
       try {
         const result = await service.getTrends({
-          organizationId: req.query.organizationId
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId)
         });
 
         return res.json(result);
@@ -54,7 +55,7 @@ function createExecutiveDashboardController(service = new ExecutiveDashboardServ
     async getKpis(req, res) {
       try {
         const result = await service.getKpis({
-          organizationId: req.query.organizationId
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId)
         });
 
         return res.json(result);

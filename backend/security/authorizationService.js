@@ -2,26 +2,43 @@
  * LC1 — Centralized authorization decisions.
  */
 
-const { ROLES, canUserLogin } = require("./roles");
+const { ROLES, canUserLogin, normalizeRole } = require("./roles");
 const { permissionsForRole, roleHasPermission } = require("./permissions");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+const { normalizeSaasRole, toLegacyRole, isSuperAdmin } = require("./saasRoles");
+const { resolvePermissionsForUser } = require("./permissionService");
 
-function buildAuthContext(user) {
+function resolveUserStatus(user) {
+  if (typeof user.is_active === "boolean") {
+    return user.is_active ? "active" : "suspended";
+  }
+
+  return user.status || "active";
+}
+
+function buildAuthContext(user, { jwtPayload = null, permissions = null } = {}) {
   if (!user) {
     return null;
   }
 
-  const role = String(user.role || ROLES.RECRUITER).toLowerCase();
+  const saasRole = normalizeSaasRole(user.role) || String(user.role || ROLES.RECRUITER).toUpperCase();
+  const legacyRole = normalizeRole(user.role) || toLegacyRole(saasRole);
 
   return {
     userId: user.id,
     email: user.email,
-    role,
+    role: legacyRole,
+    saasRole,
     organizationId: user.organization_id || user.organizationId || DEFAULT_ORGANIZATION_ID,
     divisionId: user.division_id || user.divisionId || null,
-    permissions: permissionsForRole(role),
-    status: user.status || "active"
+    permissions: permissions || jwtPayload?.permissions || permissionsForRole(legacyRole),
+    status: resolveUserStatus(user)
   };
+}
+
+async function buildAuthContextAsync(user, options = {}) {
+  const permissions = user ? await resolvePermissionsForUser(user) : null;
+  return buildAuthContext(user, { ...options, permissions });
 }
 
 function isActiveContext(context) {
@@ -34,6 +51,10 @@ function hasPermission(context, permission) {
   }
 
   if (context.role === ROLES.ADMINISTRATOR) {
+    return true;
+  }
+
+  if (Array.isArray(context.permissions) && context.permissions.includes(permission)) {
     return true;
   }
 
@@ -141,15 +162,20 @@ function canAccessOperationsCenter(context) {
 }
 
 function resolveOrganizationId(context, requestedOrganizationId) {
-  if (context.role === ROLES.ADMINISTRATOR && requestedOrganizationId) {
+  if (!context) {
+    return DEFAULT_ORGANIZATION_ID;
+  }
+
+  if (isSuperAdmin(context.saasRole) && requestedOrganizationId) {
     return requestedOrganizationId;
   }
 
-  return context.organizationId;
+  return context.organizationId || DEFAULT_ORGANIZATION_ID;
 }
 
 module.exports = {
   buildAuthContext,
+  buildAuthContextAsync,
   isActiveContext,
   hasPermission,
   canAccessProspect,

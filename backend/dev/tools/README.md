@@ -45,6 +45,26 @@ ATLAS_SETUP_PASSWORD="YourSecurePassword!" \
 node backend/dev/tools/performBootstrapInstall.js
 ```
 
+### `seedTeamVisionSaaS.js`
+
+Seeds Team Vision organization and SUPER_ADMIN from environment variables. Uses bcrypt — never hardcodes passwords.
+
+**When to use:** New SaaS environments after migration 011, or to create/update the platform super admin in development.
+
+Required environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `ATLAS_SUPER_ADMIN_EMAIL` | Super admin email |
+| `ATLAS_SUPER_ADMIN_PASSWORD` | Super admin password (min 8 chars) |
+| `ATLAS_SUPER_ADMIN_NAME` | Display name (optional) |
+
+```bash
+ATLAS_SUPER_ADMIN_EMAIL="admin@example.com" \
+ATLAS_SUPER_ADMIN_PASSWORD="YourSecurePassword!" \
+node backend/dev/tools/seedTeamVisionSaaS.js
+```
+
 ## Related scripts (environment folder)
 
 | Script | Purpose |

@@ -28,25 +28,28 @@ function sanitizeUser(user) {
     return null;
   }
 
+  const { normalizeUserRecord } = require("../security/normalizeUserRecord");
+  const normalized = normalizeUserRecord(user);
+
   return {
-    id: user.id,
-    email: user.email,
-    first_name: user.first_name,
-    last_name: user.last_name,
-    display_name: user.display_name,
-    role: user.role,
-    status: user.status,
-    organization_id: user.organization_id,
-    division_id: user.division_id,
-    phone: user.phone || null,
-    photo_url: user.photo_url || null,
-    timezone: user.timezone || "America/New_York",
-    preferred_language: user.preferred_language || "en",
-    notification_preferences: user.notification_preferences || {},
-    reports_to_user_id: user.reports_to_user_id || null,
-    last_login_at: user.last_login_at || null,
-    created_at: user.created_at,
-    updated_at: user.updated_at
+    id: normalized.id,
+    email: normalized.email,
+    first_name: normalized.first_name,
+    last_name: normalized.last_name,
+    display_name: normalized.display_name,
+    role: normalized.role,
+    status: normalized.status,
+    organization_id: normalized.organization_id,
+    division_id: normalized.division_id,
+    phone: normalized.phone || null,
+    photo_url: normalized.photo_url || null,
+    timezone: normalized.timezone || "America/New_York",
+    preferred_language: normalized.preferred_language || "en",
+    notification_preferences: normalized.notification_preferences || {},
+    reports_to_user_id: normalized.reports_to_user_id || null,
+    last_login_at: normalized.last_login_at || null,
+    created_at: normalized.created_at,
+    updated_at: normalized.updated_at
   };
 }
 
@@ -136,6 +139,10 @@ async function findUserBySessionToken(token) {
 
   if (error) {
     if (isMissingAtlasAuthTable(error)) {
+      if (process.env.NODE_ENV === "production") {
+        return null;
+      }
+
       return resolveBootstrapUser(token);
     }
 
@@ -180,8 +187,11 @@ function resolveBootstrapUser(token) {
   };
 }
 
-async function createSessionForUser(userId, { rememberMe = false, ipAddress, userAgent } = {}) {
-  const token = crypto.randomBytes(32).toString("hex");
+async function createSessionForUser(
+  userId,
+  { rememberMe = false, ipAddress, userAgent, jwtJti = null, tokenType = "opaque", sessionToken = null } = {}
+) {
+  const token = sessionToken || crypto.randomBytes(32).toString("hex");
   const ttl = rememberMe ? REMEMBER_ME_TTL_MS : SESSION_TTL_MS;
   const expiresAt = new Date(Date.now() + ttl).toISOString();
 
@@ -189,11 +199,13 @@ async function createSessionForUser(userId, { rememberMe = false, ipAddress, use
     .from("atlas_sessions")
     .insert({
       user_id: userId,
-      token,
+      token: tokenType === "jwt" ? jwtJti || token.slice(0, 64) : token,
       expires_at: expiresAt,
       remember_me: Boolean(rememberMe),
       ip_address: ipAddress || null,
-      user_agent: userAgent || null
+      user_agent: userAgent || null,
+      jwt_jti: jwtJti,
+      token_type: tokenType
     })
     .select("token, expires_at, remember_me")
     .single();
@@ -216,7 +228,7 @@ async function createSessionForUser(userId, { rememberMe = false, ipAddress, use
   }
 
   return {
-    token: data.token,
+    token: tokenType === "jwt" ? sessionToken || token : data.token,
     expiresAt: data.expires_at,
     rememberMe: data.remember_me,
     bootstrap: false
@@ -226,6 +238,26 @@ async function createSessionForUser(userId, { rememberMe = false, ipAddress, use
 async function revokeSessionByToken(token) {
   if (!token) {
     return;
+  }
+
+  const { isJwtFormat } = require("../security/jwtService");
+  const { verifyAccessToken } = require("../security/jwtService");
+
+  if (isJwtFormat(token)) {
+    const { valid, payload } = verifyAccessToken(token);
+
+    if (valid && payload?.jti) {
+      const { error } = await supabase
+        .from("atlas_sessions")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("jwt_jti", payload.jti);
+
+      if (error && !isMissingAtlasAuthTable(error)) {
+        throw error;
+      }
+
+      return;
+    }
   }
 
   const { error } = await supabase

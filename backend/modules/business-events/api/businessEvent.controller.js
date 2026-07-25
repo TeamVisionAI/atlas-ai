@@ -3,6 +3,7 @@
  */
 
 const { BusinessEventService } = require("../application/BusinessEventService");
+const { resolveTenantOrganizationId } = require("../../../services/tenantContextService");
 
 function createBusinessEventController(service = new BusinessEventService()) {
   function handleError(res, error, context) {
@@ -23,7 +24,7 @@ function createBusinessEventController(service = new BusinessEventService()) {
           correlationId: req.query.correlationId,
           from: req.query.from,
           to: req.query.to,
-          organizationId: req.query.organizationId,
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId),
           limit: req.query.limit,
           offset: req.query.offset
         });

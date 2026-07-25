@@ -11,6 +11,7 @@ const {
   sanitizeUser,
   updateLastLogin
 } = require("../services/atlasUserService");
+const { signAccessToken } = require("../security/jwtService");
 const { hashPassword, verifyPassword } = require("../security/passwordService");
 const { hashToken } = require("../security/tokenService");
 const { writeAuditLog } = require("../security/auditLogService");
@@ -92,11 +93,30 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
     throw error;
   }
 
-  const session = await createSessionForUser(user.id, {
-    rememberMe,
-    ipAddress,
-    userAgent
-  });
+  let accessToken;
+  let session;
+
+  try {
+    const jwtResult = await signAccessToken(user, { rememberMe });
+    accessToken = jwtResult.token;
+
+    session = await createSessionForUser(user.id, {
+      rememberMe,
+      ipAddress,
+      userAgent,
+      jwtJti: jwtResult.jti,
+      tokenType: "jwt",
+      sessionToken: jwtResult.token
+    });
+  } catch (jwtError) {
+    console.warn("[auth/login] JWT issuance fallback to opaque session:", jwtError.message);
+    session = await createSessionForUser(user.id, {
+      rememberMe,
+      ipAddress,
+      userAgent
+    });
+    accessToken = session.token;
+  }
 
   await updateLastLogin(user.id);
 
@@ -122,7 +142,10 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
 
   return {
     user: sanitizeUser(user),
-    session
+    session: {
+      ...session,
+      token: accessToken
+    }
   };
 }
 

@@ -3,6 +3,7 @@
  */
 
 const { TimelineService } = require("../application/TimelineService");
+const { resolveTenantOrganizationId } = require("../../../services/tenantContextService");
 
 function createTimelineController(service = new TimelineService()) {
   function handleError(res, error, context) {
@@ -21,7 +22,7 @@ function createTimelineController(service = new TimelineService()) {
           prospectId: req.query.prospectId,
           entryType: req.query.entryType,
           eventType: req.query.eventType,
-          organizationId: req.query.organizationId,
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId),
           q: req.query.q,
           limit: req.query.limit,
           offset: req.query.offset

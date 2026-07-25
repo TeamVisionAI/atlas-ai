@@ -3,6 +3,7 @@
  */
 
 const { MissionControlService } = require("../application/MissionControlService");
+const { resolveTenantOrganizationId } = require("../../../services/tenantContextService");
 
 function createMissionControlController(service = new MissionControlService()) {
   function handleError(res, error, context) {
@@ -18,7 +19,7 @@ function createMissionControlController(service = new MissionControlService()) {
     async getReadModel(req, res) {
       try {
         const result = await service.getReadModel({
-          organizationId: req.query.organizationId
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId)
         });
 
         return res.json(result);
@@ -30,7 +31,7 @@ function createMissionControlController(service = new MissionControlService()) {
     async getSummary(req, res) {
       try {
         const result = await service.getSummary({
-          organizationId: req.query.organizationId
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId)
         });
 
         return res.json(result);
@@ -42,7 +43,7 @@ function createMissionControlController(service = new MissionControlService()) {
     async getMetrics(req, res) {
       try {
         const result = await service.getMetrics({
-          organizationId: req.query.organizationId
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId)
         });
 
         return res.json(result);

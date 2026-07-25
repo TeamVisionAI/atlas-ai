@@ -1,8 +1,9 @@
 /**
- * LC1 — Password hashing (Node crypto scrypt).
+ * LC1 / Sprint 16.9 — Password hashing (scrypt + bcrypt).
  */
 
 const crypto = require("crypto");
+const bcrypt = require("bcrypt");
 
 const SCRYPT_PARAMS = {
   N: 16384,
@@ -12,8 +13,9 @@ const SCRYPT_PARAMS = {
 };
 
 const KEY_LENGTH = 64;
+const BCRYPT_ROUNDS = 12;
 
-function hashPassword(plainText) {
+function hashPassword(plainText, { algorithm = "bcrypt" } = {}) {
   const password = String(plainText || "");
 
   if (password.length < 8) {
@@ -22,10 +24,13 @@ function hashPassword(plainText) {
     throw error;
   }
 
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derived = crypto.scryptSync(password, salt, KEY_LENGTH, SCRYPT_PARAMS).toString("hex");
+  if (algorithm === "scrypt") {
+    const salt = crypto.randomBytes(16).toString("hex");
+    const derived = crypto.scryptSync(password, salt, KEY_LENGTH, SCRYPT_PARAMS).toString("hex");
+    return `scrypt$${salt}$${derived}`;
+  }
 
-  return `scrypt$${salt}$${derived}`;
+  return bcrypt.hashSync(password, BCRYPT_ROUNDS);
 }
 
 function verifyPassword(plainText, storedHash) {
@@ -33,22 +38,27 @@ function verifyPassword(plainText, storedHash) {
     return false;
   }
 
-  const parts = String(storedHash).split("$");
+  const hash = String(storedHash);
 
-  if (parts.length !== 3 || parts[0] !== "scrypt") {
-    return false;
+  if (hash.startsWith("scrypt$")) {
+    const parts = hash.split("$");
+
+    if (parts.length !== 3) {
+      return false;
+    }
+
+    const [, salt, expectedHex] = parts;
+    const derived = crypto.scryptSync(String(plainText), salt, KEY_LENGTH, SCRYPT_PARAMS);
+    const expected = Buffer.from(expectedHex, "hex");
+
+    if (expected.length !== derived.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expected, derived);
   }
 
-  const [, salt, expectedHex] = parts;
-  const derived = crypto.scryptSync(String(plainText), salt, KEY_LENGTH, SCRYPT_PARAMS);
-
-  const expected = Buffer.from(expectedHex, "hex");
-
-  if (expected.length !== derived.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(expected, derived);
+  return bcrypt.compareSync(String(plainText), hash);
 }
 
 module.exports = {

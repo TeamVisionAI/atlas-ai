@@ -108,13 +108,90 @@ UPDATE atlas_users
 SET role = 'recruiter', status = 'active', updated_at = now()
 WHERE email = 'ana@teamvision.ai';
 
+-- Ensure seed users exist before prospect ownership backfill (migration 002 may have been skipped).
+INSERT INTO atlas_users (id, email, first_name, last_name, display_name)
+VALUES
+  (
+    '00000000-0000-4000-8000-000000000001',
+    'ana@teamvision.ai',
+    'Ana',
+    'Recruiter',
+    'Ana'
+  ),
+  (
+    '00000000-0000-4000-8000-000000000002',
+    'niovel@teamvision.ai',
+    'Niovel',
+    'Perez',
+    'Niovel'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- Drop orphan ownership references before backfill (invalid FK targets must not be copied forward).
 UPDATE prospects
-SET owner_user_id = COALESCE(owner_user_id, created_by_user_id, '00000000-0000-4000-8000-000000000001')
-WHERE owner_user_id IS NULL;
+SET owner_user_id = NULL
+WHERE owner_user_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = prospects.owner_user_id);
+
+UPDATE prospects
+SET created_by_user_id = NULL
+WHERE created_by_user_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = prospects.created_by_user_id);
+
+UPDATE prospects
+SET assigned_rvp_id = NULL
+WHERE assigned_rvp_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = prospects.assigned_rvp_id);
 
 UPDATE atlas_core_prospects
-SET owner_user_id = COALESCE(owner_user_id, assigned_agent_id, '00000000-0000-4000-8000-000000000001')
-WHERE owner_user_id IS NULL;
+SET owner_user_id = NULL
+WHERE owner_user_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = atlas_core_prospects.owner_user_id);
+
+UPDATE atlas_core_prospects
+SET assigned_agent_id = NULL
+WHERE assigned_agent_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = atlas_core_prospects.assigned_agent_id);
+
+UPDATE atlas_core_prospects
+SET assigned_rvp_id = NULL
+WHERE assigned_rvp_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = atlas_core_prospects.assigned_rvp_id);
+
+-- Backfill ownership only with user IDs that exist in atlas_users.
+UPDATE prospects p
+SET owner_user_id = COALESCE(
+  CASE
+    WHEN p.created_by_user_id IS NOT NULL
+      AND EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = p.created_by_user_id)
+    THEN p.created_by_user_id
+  END,
+  (
+    SELECT u.id
+    FROM atlas_users u
+    ORDER BY u.created_at ASC NULLS LAST, u.id ASC
+    LIMIT 1
+  )
+)
+WHERE p.owner_user_id IS NULL
+  AND EXISTS (SELECT 1 FROM atlas_users u LIMIT 1);
+
+UPDATE atlas_core_prospects acp
+SET owner_user_id = COALESCE(
+  CASE
+    WHEN acp.assigned_agent_id IS NOT NULL
+      AND EXISTS (SELECT 1 FROM atlas_users u WHERE u.id = acp.assigned_agent_id)
+    THEN acp.assigned_agent_id
+  END,
+  (
+    SELECT u.id
+    FROM atlas_users u
+    ORDER BY u.created_at ASC NULLS LAST, u.id ASC
+    LIMIT 1
+  )
+)
+WHERE acp.owner_user_id IS NULL
+  AND EXISTS (SELECT 1 FROM atlas_users u LIMIT 1);
 
 -- Row Level Security (defense in depth — backend uses service role; anon direct access denied)
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;

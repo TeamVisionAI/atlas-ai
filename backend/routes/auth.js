@@ -4,7 +4,7 @@
 
 const express = require("express");
 const router = express.Router();
-const { requireAtlasUser, extractBearerToken } = require("../middleware/requireAtlasUser");
+const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const {
   loginWithPassword,
   logoutSession,
@@ -13,7 +13,6 @@ const {
   validateInvitationToken,
   acceptInvitation
 } = require("../services/authService");
-const { findUserBySessionToken, sanitizeUser } = require("../services/atlasUserService");
 
 router.post("/auth/login", async (req, res) => {
   try {
@@ -59,25 +58,8 @@ router.post("/auth/logout", requireAtlasUser, async (req, res) => {
   }
 });
 
-router.get("/auth/me", async (req, res) => {
-  try {
-    const token = extractBearerToken(req);
-
-    if (!token) {
-      return res.status(401).json({ error: "UNAUTHORIZED" });
-    }
-
-    const user = await findUserBySessionToken(token);
-
-    if (!user) {
-      return res.status(401).json({ error: "UNAUTHORIZED" });
-    }
-
-    return res.json(sanitizeUser(user));
-  } catch (error) {
-    console.error("[auth/me]", error.message);
-    return res.status(500).json({ error: "AUTH_ERROR" });
-  }
+router.get("/auth/me", requireAtlasUser, async (req, res) => {
+  return res.json(req.sanitizedUser);
 });
 
 router.post("/auth/password-reset/request", async (req, res) => {

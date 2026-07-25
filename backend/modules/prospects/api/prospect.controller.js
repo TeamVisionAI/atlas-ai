@@ -9,9 +9,9 @@ const {
 const {
   canAccessProspect,
   getProspectListScope,
-  hasPermission,
-  resolveOrganizationId
+  hasPermission
 } = require("../../../security/authorizationService");
+const { resolveTenantOrganizationId } = require("../../../services/tenantContextService");
 const { auditFromRequest } = require("../../../security/auditLogService");
 const {
   sanitizeProspectResponse,
@@ -105,7 +105,7 @@ function createProspectController(service = new ProspectApplicationService()) {
           lifecycleState: req.query.lifecycleState,
           limit: req.query.limit,
           offset: req.query.offset,
-          organizationId: resolveOrganizationId(req.authContext, req.query.organizationId),
+          organizationId: resolveTenantOrganizationId(req, req.query.organizationId),
           ownerUserId: scope.ownerUserId,
           divisionId: scope.divisionId
         });

@@ -1,5 +1,6 @@
 const express = require("express");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { resolveTenantOrganizationId } = require("../services/tenantContextService");
 const router = express.Router();
 
 router.use(requireAtlasUser);
@@ -17,9 +18,12 @@ const {
 } = require("../core/executiveDashboardReadModel");
 
 router.get("/", async (req, res) => {
+  const organizationId = resolveTenantOrganizationId(req);
+
   const { data, error } = await supabase
     .from("prospects")
-    .select("*");
+    .select("*")
+    .eq("organization_id", organizationId);
 
   if (error) {
     return res.status(500).json(error);
@@ -83,7 +87,11 @@ router.get("/recommendations", async (req, res) => {
 router.get("/activity", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const { data } = await supabase.from("prospects").select("phone");
+    const organizationId = resolveTenantOrganizationId(req);
+    const { data } = await supabase
+      .from("prospects")
+      .select("phone")
+      .eq("organization_id", organizationId);
     const phones = filterProductionProspects(data || []).map((row) => row.phone);
     const activity = await buildRecentActivity(phones, limit);
 

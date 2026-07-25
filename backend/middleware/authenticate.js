@@ -1,0 +1,126 @@
+/**
+ * Sprint 16.9 — Unified authentication middleware.
+ * Supports JWT tokens and legacy opaque session tokens (dual-auth).
+ */
+
+const { findUserBySessionToken, sanitizeUser } = require("../services/atlasUserService");
+const { findUserById } = require("../services/userService");
+const { verifyAccessToken, isJwtFormat } = require("../security/jwtService");
+const { buildAuthContextAsync, isActiveContext } = require("../security/authorizationService");
+const { normalizeUserRecord } = require("../security/normalizeUserRecord");
+const { isSuperAdmin } = require("../security/saasRoles");
+const { supabase } = require("../services/supabaseService");
+const { extractBearerToken } = require("./extractBearerToken");
+
+async function resolveUserFromJwt(token) {
+  const { valid, payload, error } = verifyAccessToken(token);
+
+  if (!valid) {
+    return { user: null, reason: error || "invalid_jwt" };
+  }
+
+  if (payload.jti) {
+    const { data: session } = await supabase
+      .from("atlas_sessions")
+      .select("revoked_at, expires_at")
+      .eq("jwt_jti", payload.jti)
+      .maybeSingle();
+
+    if (session?.revoked_at || (session?.expires_at && Date.parse(session.expires_at) < Date.now())) {
+      return { user: null, reason: "revoked_jwt" };
+    }
+  }
+
+  const user = normalizeUserRecord(await findUserById(payload.sub || payload.user_id));
+
+  if (!user) {
+    return { user: null, reason: "user_not_found" };
+  }
+
+  const tokenOrgId = payload.organization_id;
+  const userOrgId = user.organization_id;
+
+  if (
+    tokenOrgId &&
+    userOrgId &&
+    String(tokenOrgId) !== String(userOrgId) &&
+    !isSuperAdmin(payload.role)
+  ) {
+    return { user: null, reason: "organization_mismatch" };
+  }
+
+  return { user, jwtPayload: payload };
+}
+
+async function authenticate(req, res, next) {
+  try {
+    const token = extractBearerToken(req);
+
+    if (!token) {
+      return res.status(401).json({
+        error: "UNAUTHORIZED",
+        message: "Authentication required."
+      });
+    }
+
+    let user = null;
+    let jwtPayload = null;
+
+    if (isJwtFormat(token)) {
+      const result = await resolveUserFromJwt(token);
+      user = result.user;
+      jwtPayload = result.jwtPayload;
+
+      if (!user) {
+        return res.status(401).json({
+          error: "UNAUTHORIZED",
+          message: "Invalid or expired token."
+        });
+      }
+    } else {
+      user = normalizeUserRecord(await findUserBySessionToken(token));
+
+      if (!user) {
+        return res.status(401).json({
+          error: "UNAUTHORIZED",
+          message: "Invalid or expired session."
+        });
+      }
+    }
+
+    const authContext = await buildAuthContextAsync(user, { jwtPayload });
+
+    if (!isActiveContext(authContext)) {
+      return res.status(403).json({
+        error: "FORBIDDEN",
+        message: "Account is disabled."
+      });
+    }
+
+    req.atlasUser = user;
+    req.atlasSessionToken = token;
+    req.authContext = authContext;
+    req.sanitizedUser = sanitizeUser(user);
+    req.jwtPayload = jwtPayload;
+    req.tenantContext = {
+      organizationId: authContext.organizationId,
+      userId: authContext.userId,
+      role: authContext.role,
+      saasRole: authContext.saasRole,
+      permissions: authContext.permissions || [],
+      isSuperAdmin: isSuperAdmin(authContext.saasRole)
+    };
+    return next();
+  } catch (error) {
+    console.error("[authenticate]", error.message);
+    return res.status(500).json({
+      error: "AUTH_ERROR",
+      message: "Unable to validate credentials."
+    });
+  }
+}
+
+module.exports = {
+  authenticate,
+  resolveUserFromJwt
+};

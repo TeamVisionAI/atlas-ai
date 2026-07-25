@@ -27,7 +27,8 @@ const MIGRATION_FILES = [
   { version: "007", file: "007_atlas_executive_dashboard_read_model.sql" },
   { version: "008", file: "008_lc1_security_foundation.sql", note: "LC1 security foundation" },
   { version: "009", file: "009_identity_management.sql", note: "LC1.1 identity management" },
-  { version: "010", file: "010_platform_bootstrap.sql", note: "LC1.1 platform bootstrap wizard" }
+  { version: "010", file: "010_platform_bootstrap.sql", note: "LC1.1 platform bootstrap wizard" },
+  { version: "011", file: "011_saas_multi_tenant_foundation.sql", note: "Sprint 16.9 SaaS multi-tenant foundation" }
 ];
 
 function loadMigrationSql(fileName) {
@@ -38,6 +39,36 @@ function loadMigrationSql(fileName) {
   }
 
   return fs.readFileSync(filePath, "utf8");
+}
+
+const ENSURE_ATLAS_SEED_USERS_SQL = `
+  INSERT INTO atlas_users (id, email, first_name, last_name, display_name)
+  VALUES
+    (
+      '00000000-0000-4000-8000-000000000001',
+      'ana@teamvision.ai',
+      'Ana',
+      'Recruiter',
+      'Ana'
+    ),
+    (
+      '00000000-0000-4000-8000-000000000002',
+      'niovel@teamvision.ai',
+      'Niovel',
+      'Perez',
+      'Niovel'
+    )
+  ON CONFLICT (id) DO NOTHING;
+`;
+
+async function ensureAtlasSeedUsers(client) {
+  const hasUsers = await tableExists(client, "atlas_users");
+
+  if (!hasUsers) {
+    return;
+  }
+
+  await client.query(ENSURE_ATLAS_SEED_USERS_SQL);
 }
 
 async function tableExists(client, tableName) {
@@ -68,8 +99,13 @@ async function applyAtlasCoreMigrations({ includePrerequisite = true } = {}) {
 
         if (hasUsers) {
           console.log(`Skipping ${migration.version} DDL — atlas_users already exists`);
+          await ensureAtlasSeedUsers(client);
           continue;
         }
+      }
+
+      if (migration.version === "008") {
+        await ensureAtlasSeedUsers(client);
       }
 
       const sql = loadMigrationSql(migration.file);
