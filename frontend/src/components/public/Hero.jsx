@@ -1,5 +1,5 @@
 import "./PublicHero.css";
-import PrimaryButton from "./PrimaryButton";
+import ContactLink from "./ContactLink";
 
 const heroServices = [
   {
@@ -34,9 +34,7 @@ export default function Hero() {
             retirement, and education—with personalized support every step of the way.
           </p>
           <div className="public-hero__actions">
-            <PrimaryButton as="a" href="#contact">
-              Schedule Your Consultation
-            </PrimaryButton>
+            <ContactLink primary>Schedule Your Consultation</ContactLink>
           </div>
         </div>
 

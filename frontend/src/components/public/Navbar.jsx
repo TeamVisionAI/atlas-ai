@@ -1,13 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
+import { useContactNavigation } from "../../hooks/useContactNavigation";
 import "./PublicNavbar.css";
 
 const sectionLinks = [
   { href: "/#about", label: "About" },
   { href: "/#services", label: "Services" },
   { href: "/#careers", label: "Careers" },
-  { href: "/#contact", label: "Contact" },
+  { href: "/#contact", label: "Contact", isContact: true },
   { to: "/atlas", label: "Atlas", isRoute: true }
 ];
 
@@ -19,6 +20,7 @@ const legalLinks = [
 
 export default function Navbar() {
   const location = useLocation();
+  const goToContact = useContactNavigation();
   const menuId = useId();
   const menuToggleRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -92,6 +94,15 @@ export default function Navbar() {
               >
                 {link.label}
               </Link>
+            ) : link.isContact ? (
+              <a
+                key={link.href}
+                href={link.href}
+                className="public-navbar__link"
+                onClick={goToContact}
+              >
+                {link.label}
+              </a>
             ) : (
               <a key={link.href} href={link.href} className="public-navbar__link">
                 {link.label}
@@ -152,6 +163,18 @@ export default function Navbar() {
                   >
                     {link.label}
                   </Link>
+                ) : link.isContact ? (
+                  <a
+                    href={link.href}
+                    className="public-navbar__mobile-link"
+                    tabIndex={menuOpen ? 0 : -1}
+                    onClick={(event) => {
+                      closeMenu();
+                      goToContact(event);
+                    }}
+                  >
+                    {link.label}
+                  </a>
                 ) : (
                   <a
                     href={link.href}
