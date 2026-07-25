@@ -19,6 +19,7 @@ const { writeLoginHistory } = require("../services/loginHistoryService");
 const { sendPasswordResetEmail } = require("../services/emailService");
 const { supabase } = require("../services/supabaseService");
 const { USER_STATUSES, canUserLogin } = require("../security/roles");
+const { isPgFallbackEnabled } = require("./pgFallback");
 
 const RESET_TTL_MS = 60 * 60 * 1000;
 
@@ -50,6 +51,17 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
   const user = await findUserByEmail(normalizedEmail);
 
   if (!user) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[auth/login/dev]", {
+        email: normalizedEmail,
+        userFound: false,
+        tableQueried: "atlas_users",
+        accessPath: isPgFallbackEnabled() ? "pg_fallback" : "supabase",
+        passwordHashPresent: false,
+        verifyPassword: false
+      });
+    }
+
     await recordAuthFailure({
       email: normalizedEmail,
       reason: "invalid_credentials",
@@ -78,7 +90,21 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
     throw error;
   }
 
-  if (!user.password_hash || !verifyPassword(password, user.password_hash)) {
+  const passwordHashPresent = Boolean(user.password_hash);
+  const passwordValid = passwordHashPresent && verifyPassword(password, user.password_hash);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[auth/login/dev]", {
+      email: normalizedEmail,
+      userFound: true,
+      tableQueried: "atlas_users",
+      accessPath: isPgFallbackEnabled() ? "pg_fallback" : "supabase",
+      passwordHashPresent,
+      verifyPassword: passwordValid
+    });
+  }
+
+  if (!passwordValid) {
     await recordAuthFailure({
       email: normalizedEmail,
       user,

@@ -2,7 +2,7 @@
  * LC1 — Durable audit logging.
  */
 
-const { supabase } = require("../services/supabaseService");
+const { insertBackendRow } = require("../services/backendDbService");
 
 async function writeAuditLog(entry = {}) {
   const payload = {
@@ -18,18 +18,12 @@ async function writeAuditLog(entry = {}) {
     user_agent: entry.userAgent || null
   };
 
-  const { data, error } = await supabase
-    .from("atlas_audit_log")
-    .insert(payload)
-    .select("id, created_at")
-    .single();
-
-  if (error) {
+  try {
+    return await insertBackendRow("atlas_audit_log", payload);
+  } catch (error) {
     console.error("[audit-log]", error.message, payload.action);
     return null;
   }
-
-  return data;
 }
 
 function auditFromRequest(req, entry = {}) {

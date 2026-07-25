@@ -2,7 +2,7 @@
  * LC1.1 — Login history persistence.
  */
 
-const { supabase } = require("../services/supabaseService");
+const { insertBackendRow } = require("./backendDbService");
 
 async function writeLoginHistory(entry = {}) {
   const payload = {
@@ -15,18 +15,12 @@ async function writeLoginHistory(entry = {}) {
     metadata: entry.metadata || {}
   };
 
-  const { data, error } = await supabase
-    .from("atlas_login_history")
-    .insert(payload)
-    .select("id, created_at")
-    .single();
-
-  if (error) {
+  try {
+    return await insertBackendRow("atlas_login_history", payload);
+  } catch (error) {
     console.error("[login-history]", error.message, payload.event_type);
     return null;
   }
-
-  return data;
 }
 
 module.exports = {
