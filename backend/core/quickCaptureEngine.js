@@ -5,7 +5,7 @@
 
 const {
   supabase,
-  findProspect
+  findProspectByNormalizedPhoneInOrganization
 } = require("../services/supabaseService");
 const {
   normalizePhoneNumber,
@@ -119,39 +119,12 @@ function validateQuickCapturePayload(body = {}) {
   };
 }
 
-async function findProspectByNormalizedPhone(normalizedPhone) {
-  const { data: byNormalized, error: normalizedError } = await supabase
-    .from("prospects")
-    .select("*")
-    .eq("normalized_phone", normalizedPhone)
-    .maybeSingle();
-
-  if (normalizedError && normalizedError.code !== "42703") {
-    throw normalizedError;
+async function findProspectByNormalizedPhone(normalizedPhone, organizationId) {
+  if (!organizationId) {
+    return null;
   }
 
-  if (byNormalized) {
-    return byNormalized;
-  }
-
-  const storagePhone = formatPhoneForStorage(normalizedPhone);
-  const legacy = await findProspect(storagePhone);
-
-  if (legacy) {
-    return legacy;
-  }
-
-  const { data: legacyDigits, error: legacyError } = await supabase
-    .from("prospects")
-    .select("*")
-    .eq("phone", normalizedPhone)
-    .maybeSingle();
-
-  if (legacyError) {
-    throw legacyError;
-  }
-
-  return legacyDigits;
+  return findProspectByNormalizedPhoneInOrganization(normalizedPhone, organizationId);
 }
 
 function buildPersistedLanguageFields(languageFields, { includePreferredColumn = true } = {}) {
@@ -277,7 +250,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
 
   const { organizationId } = organizationResolution;
   const { data } = validation;
-  const existing = await findProspectByNormalizedPhone(data.normalizedPhone);
+  const existing = await findProspectByNormalizedPhone(data.normalizedPhone, organizationId);
 
   if (existing) {
     return {
@@ -322,7 +295,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
 
   if (error) {
     if (error.code === "23505") {
-      const duplicate = await findProspectByNormalizedPhone(data.normalizedPhone);
+      const duplicate = await findProspectByNormalizedPhone(data.normalizedPhone, organizationId);
       return {
         ok: false,
         status: 409,

@@ -26,6 +26,7 @@ const adminUsersRoutes = require("./routes/adminUsers");
 const setupRoutes = require("./routes/setup");
 const accountRoutes = require("./routes/account");
 const configurationRoutes = require("./routes/configuration");
+const missionRoutes = require("./routes/missions");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
@@ -47,6 +48,7 @@ const contactRoutes = require("./routes/contact");
 const {
   logMetaEnvironmentWarnings
 } = require("./core/meta/metaEnvironmentValidator");
+const { assertProductionReadinessAsync } = require("./core/productionReadinessValidator");
 const { registerRecruitingWorkflow } = require("./core/recruitingWorkflowRegistry");
 
 const businessEventModule = createBusinessEventModule({
@@ -179,6 +181,7 @@ app.use("/api", authRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/configuration", configurationRoutes);
+app.use("/api/missions", missionRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
 
@@ -210,6 +213,10 @@ app.use((error, req, res, next) => {
 });
 
 async function bootstrap() {
+  const { assertProductionReadinessSync } = require("./core/productionReadinessValidator");
+  assertProductionReadinessSync();
+  await assertProductionReadinessAsync();
+
   registerRecruitingWorkflow({
     prospectService: prospectModule.service,
     businessEventService: businessEventModule.service,

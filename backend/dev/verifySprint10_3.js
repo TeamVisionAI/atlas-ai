@@ -14,7 +14,7 @@ const {
   resolveExecutiveFilterPhones,
   buildExecutiveFilterCounts
 } = require("../core/executiveFilterResolver");
-const prospectCenterRoutes = require("../routes/prospectCenter");
+const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 
 function assert(condition, message) {
   if (!condition) {
@@ -64,7 +64,9 @@ async function main() {
 
   verifyUnitTests();
 
-  const readModel = await buildProspectCenterReadModel();
+  const readModel = await buildProspectCenterReadModel({
+    organizationId: DEFAULT_ORGANIZATION_ID
+  });
   assert(Array.isArray(readModel.items), "Read model returns items array");
   assert(typeof readModel.totalCount === "number", "Read model includes totalCount");
   assert(Array.isArray(readModel.filters), "Read model includes filter counts");
@@ -81,7 +83,8 @@ async function main() {
   console.log(`✓ Prospect Center read model (${readModel.items.length} items)`);
 
   const filtered = await buildProspectCenterReadModel({
-    filter: "high-priority"
+    filter: "high-priority",
+    organizationId: DEFAULT_ORGANIZATION_ID
   });
   const allowedPhones = new Set(
     resolveExecutiveFilterPhones(

@@ -157,6 +157,39 @@ Mission Control may request `AvailabilityService` for suggested time slots. No s
 
 Mission Control does **not** own configuration — it consumes organization scheduling settings.
 
+### Mission Engine (Sprint 18.3)
+
+Mission Control is an **orchestration UI**. Mission Engine (`backend/core/missionEngine.js`) decides what the recruiter should do next.
+
+See [Mission Engine v1](./Mission-Engine-v1.md) for lifecycle, API, and business rules.
+
+### Platform Consolidation (Sprint 19)
+
+Sprint 19 hardened production readiness without changing the approved architecture:
+
+- **Tenant isolation** — all dashboard, mission, and prospect-center reads scoped by session organization
+- **Backend authority** — Mission Control queue from `prioritizedWorkflowQueue`; gate from backend `workflowGate`
+- **Dependency direction** — `missionControlReadModel.js` and `agentActionApplicationService.js` extracted; core engines no longer import controllers
+- **Production validation** — startup fails on missing secrets/tables; no silent in-memory fallback in production
+
+See [Platform Consolidation Sprint 19](./Platform-Consolidation-Sprint-19.md).
+
+### Tenant Isolation Completion (Sprint 19.1)
+
+Sprint 19.1 closes authenticated tenant-isolation gaps identified by independent audit:
+
+- Mission Control live route wired through organization-aware request handler
+- Unscoped `findProspect(phone)` removed from authenticated route chains
+- Prospect Workspace workflow gate reads backend `workspace.workflowGate.active` only
+- Quick Capture duplicate detection scoped per organization
+- Negative cross-organization access tests added
+
+See [Platform Consolidation Sprint 19.1](./Platform-Consolidation-Sprint-19.1.md).
+
+**WhatsApp exception:** `findProspectForSystemIngress(phone)` remains for inbound system paths until WhatsApp multi-tenant routing migrates.
+
+**Workflow source of truth:** Backend workflow/agent state (JSON legacy, tenant-scoped at query layer) is authoritative. Frontend `localStorage` is not authoritative for gate, queue, or milestone decisions. Missions remain derived projections.
+
 ---
 
 ## Conversation Responsibilities

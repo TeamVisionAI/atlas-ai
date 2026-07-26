@@ -1,14 +1,12 @@
 /**
  * Sprint 10.2a — Prospect Workspace aggregated read model.
- * Composes existing Mission Control engines; no duplicated business logic.
+ * Sprint 19.1 — Pure composition; orchestration lives in application service.
  */
 
-const { getMissionControlWithActions } = require("../controllers/agentActionController");
-const { findProspect } = require("../services/supabaseService");
+const { findProspectInOrganization } = require("../services/supabaseService");
 const { findUserById } = require("../services/atlasUserService");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const { buildJourneyProgress } = require("./journeyProgressMapper");
-const { isProductionProspect } = require("./productionProspectFilter");
 const { listProspectActivityPreview } = require("./prospectActivityFeedReadModel");
 
 function buildProspectIdentity(prospect) {
@@ -75,23 +73,9 @@ async function resolveOwner(ownerUserId) {
   }
 }
 
-async function buildProspectWorkspaceReadModel(phone) {
-  if (!phone) {
-    return null;
-  }
-
-  if (!isProductionProspect(phone) && phone !== "latest") {
-    return null;
-  }
-
-  const missionControl = await getMissionControlWithActions(phone);
-
-  if (!missionControl) {
-    return null;
-  }
-
+async function composeProspectWorkspaceFromMissionControl(phone, missionControl, organizationId) {
   const resolvedPhone = missionControl.prospect?.phone || phone;
-  const prospectRow = await findProspect(resolvedPhone);
+  const prospectRow = await findProspectInOrganization(resolvedPhone, organizationId);
   const prospect = buildProspectIdentity(prospectRow || missionControl.prospect);
   const owner = await resolveOwner(prospect?.owner_user_id);
   const canonicalMilestone = missionControl.workflow?.canonicalMilestone || null;
@@ -127,7 +111,7 @@ async function buildProspectWorkspaceReadModel(phone) {
 }
 
 module.exports = {
-  buildProspectWorkspaceReadModel,
+  composeProspectWorkspaceFromMissionControl,
   buildProspectIdentity,
   buildInterviewBlock
 };

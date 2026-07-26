@@ -8,7 +8,8 @@ export default function ConversationOutcomePanel({
   phone,
   conversationOutcome,
   disabled = false,
-  onSaved
+  onSaved,
+  showKnownInformation = true
 }) {
   const { translate } = useLanguage();
 
@@ -25,7 +26,7 @@ export default function ConversationOutcomePanel({
 
   return (
     <div className="conversation-outcome-stack">
-      {hasKnownInformation ? (
+      {showKnownInformation && hasKnownInformation ? (
         <section className="conversation-outcome">
           <KnownInformationSection items={conversationOutcome.knownInformation} />
         </section>

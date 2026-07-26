@@ -8,8 +8,7 @@ import { buildWorkspaceContext } from "../../../engines/contextEngine";
 import {
   createDefaultWorkflowState,
   loadWorkflowState,
-  saveWorkflowState,
-  shouldShowWorkflowGate
+  saveWorkflowState
 } from "../../../engines/workflowEngine";
 import JourneyProgress from "../../../components/prospect-workspace/JourneyProgress";
 import ActivityFeed from "../../../components/prospect-workspace/ActivityFeed";
@@ -158,11 +157,7 @@ export default function ProspectWorkspacePage() {
     });
   }, [workspace, organizationSettings, workflowState, translate, actions]);
 
-  const showGate =
-    workspace?.workflowGate?.active ??
-    (workspace && workflowState
-      ? shouldShowWorkflowGate(workspace, null, workflowState)
-      : false);
+  const showGate = Boolean(workspace?.workflowGate?.active);
 
   if (loading) {
     return <WorkspaceSkeleton />;

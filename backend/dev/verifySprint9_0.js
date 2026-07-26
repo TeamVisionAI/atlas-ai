@@ -11,6 +11,7 @@ const { getMissionControlWithActions } = require("../controllers/agentActionCont
 const { buildPrioritizedWorkflowQueue } = require("../core/missionControlPriorityEngine");
 const { loadProductionProspects } = require("../core/executiveDashboardReadModel");
 const { runAllGoldenScenarios } = require("./goldenScenarios");
+const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 
 function assert(condition, message) {
   if (!condition) {
@@ -21,7 +22,7 @@ function assert(condition, message) {
 async function main() {
   console.log("=== Sprint 9.0 Verification ===\n");
 
-  const executive = await buildExecutiveDashboard();
+  const executive = await buildExecutiveDashboard(DEFAULT_ORGANIZATION_ID);
   assert(executive.todayFocus, "todayFocus required");
   assert(executive.agencyPulse?.score >= 0, "Agency pulse score required");
   assert(Array.isArray(executive.recommendations), "recommendations required");
@@ -33,7 +34,7 @@ async function main() {
   );
   console.log("✓ Executive dashboard read model");
 
-  const prospects = await loadProductionProspects();
+  const prospects = await loadProductionProspects(DEFAULT_ORGANIZATION_ID);
   const queue = await buildPrioritizedWorkflowQueue(prospects);
   const pendingFromQueue = queue.filter(
     (row) => row.missionControlPriorityTier === "PENDING_INTERVIEW_RESULTS"

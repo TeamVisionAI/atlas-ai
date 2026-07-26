@@ -1,24 +1,35 @@
 const express = require("express");
 const {
-  getMissionControlWithActions,
-  executeAgentAction,
-  syncAgentWorkflow
+  getMissionControlWithActionsForRequest,
+  executeAgentActionForRequest,
+  syncAgentWorkflowForRequest
 } = require("../controllers/agentActionController");
 const { postWorkflowAdvance } = require("../controllers/workflowAdvanceController");
 const { postConversationOutcome } = require("../controllers/conversationOutcomeController");
 const { postRequiredInformation } = require("../controllers/requiredInformationController");
 const { postInterviewOutcome } = require("../controllers/interviewOutcomeController");
 const { getMissionControlAvailability } = require("../controllers/availabilityController");
+const { postMissionExecution } = require("../controllers/missionExecutionController");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { getCommunicationGateway } = require("../communication/gateway/createCommunicationGateway");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireLegacyProspectAccess } = require("../middleware/requireProspectAccess");
 const { requirePermission } = require("../middleware/requirePermission");
+const { getTenantOrganizationId } = require("../services/tenantContextService");
 const { PERMISSIONS } = require("../security/permissions");
+
+function tenantMissionControlOptions(req) {
+  return {
+    organizationId: getTenantOrganizationId(req),
+    tenantScoped: true
+  };
+}
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
+router.use(organizationGuard());
 
 router.get("/live/snapshot", (req, res) => {
   try {
@@ -40,13 +51,41 @@ function rejectSimulatorProspect(phone, res) {
 
 router.get("/:phone/availability", requireLegacyProspectAccess(), getMissionControlAvailability);
 
+router.post(
+  "/:phone/execute",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      if (rejectSimulatorProspect(req.params.phone, res)) {
+        return;
+      }
+
+      const result = await postMissionExecution(
+        req.params.phone,
+        req.body || {},
+        tenantMissionControlOptions(req)
+      );
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        action: "execute_mission",
+        error: "SERVER_ERROR",
+        message: error.message
+      });
+    }
+  }
+);
+
 router.get("/:phone", requireLegacyProspectAccess(), async (req, res) => {
   try {
     if (rejectSimulatorProspect(req.params.phone, res)) {
       return;
     }
 
-    const data = await getMissionControlWithActions(req.params.phone);
+    const data = await getMissionControlWithActionsForRequest(req, req.params.phone);
 
     if (!data) {
       return res.status(404).json({ error: "No active conversation found" });
@@ -79,7 +118,8 @@ router.post(
       });
     }
 
-    const result = await executeAgentAction(
+    const result = await executeAgentActionForRequest(
+      req,
       req.params.phone,
       action,
       req.body?.payload || {}
@@ -106,7 +146,11 @@ router.post(
         return;
       }
 
-      const result = await postInterviewOutcome(req.params.phone, req.body || {});
+      const result = await postInterviewOutcome(
+        req.params.phone,
+        req.body || {},
+        tenantMissionControlOptions(req)
+      );
 
       res.status(result.success ? 200 : result.status || 400).json(result);
     } catch (error) {
@@ -129,7 +173,11 @@ router.post(
         return;
       }
 
-      const result = await postRequiredInformation(req.params.phone, req.body || {});
+      const result = await postRequiredInformation(
+        req.params.phone,
+        req.body || {},
+        tenantMissionControlOptions(req)
+      );
 
       res.status(result.success ? 200 : result.status || 400).json(result);
     } catch (error) {
@@ -152,7 +200,11 @@ router.post(
         return;
       }
 
-      const result = await postConversationOutcome(req.params.phone, req.body || {});
+      const result = await postConversationOutcome(
+        req.params.phone,
+        req.body || {},
+        tenantMissionControlOptions(req)
+      );
 
       res.status(result.success ? 200 : result.status || 400).json(result);
     } catch (error) {
@@ -198,7 +250,11 @@ router.post(
       return;
     }
 
-    const workflowState = await syncAgentWorkflow(req.params.phone, req.body || {});
+    const workflowState = await syncAgentWorkflowForRequest(
+      req,
+      req.params.phone,
+      req.body || {}
+    );
 
     res.json({
       success: true,

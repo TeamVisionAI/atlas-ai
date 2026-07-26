@@ -1,9 +1,11 @@
 const express = require("express");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
-const { resolveTenantOrganizationId } = require("../services/tenantContextService");
+const { organizationGuard } = require("../middleware/organizationGuard");
+const { getTenantOrganizationId } = require("../services/tenantContextService");
 const router = express.Router();
 
 router.use(requireAtlasUser);
+router.use(organizationGuard());
 
 const { supabase } = require("../services/supabaseService");
 const {
@@ -18,7 +20,7 @@ const {
 } = require("../core/executiveDashboardReadModel");
 
 router.get("/", async (req, res) => {
-  const organizationId = resolveTenantOrganizationId(req);
+  const organizationId = getTenantOrganizationId(req);
 
   const { data, error } = await supabase
     .from("prospects")
@@ -58,7 +60,8 @@ router.get("/", async (req, res) => {
 /** Sprint 9.0 — Executive Dashboard aggregate read model. */
 router.get("/executive", async (req, res) => {
   try {
-    const payload = await buildExecutiveDashboard();
+    const organizationId = getTenantOrganizationId(req);
+    const payload = await buildExecutiveDashboard(organizationId);
     res.json(payload);
   } catch (error) {
     console.error("[dashboard/executive] error:", error.message);
@@ -70,7 +73,8 @@ router.get("/executive", async (req, res) => {
 router.get("/recommendations", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 5, 20);
-    const prospects = await loadProductionProspects();
+    const organizationId = getTenantOrganizationId(req);
+    const prospects = await loadProductionProspects(organizationId);
     const queue = await buildPrioritizedWorkflowQueue(prospects);
 
     res.json({
@@ -87,7 +91,7 @@ router.get("/recommendations", async (req, res) => {
 router.get("/activity", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const organizationId = resolveTenantOrganizationId(req);
+    const organizationId = getTenantOrganizationId(req);
     const { data } = await supabase
       .from("prospects")
       .select("phone")

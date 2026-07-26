@@ -5,6 +5,12 @@
 const { supabase } = require("../../../../services/supabaseService");
 const { TABLE_NAME, fromRow, toInsertRow } = require("./BusinessEventMapper");
 const { InMemoryBusinessEventStore } = require("./InMemoryBusinessEventRepository");
+const { forbidProductionInMemoryFallback } = require("../../../../core/productionReadinessValidator");
+
+function activateMemoryFallback(repository) {
+  forbidProductionInMemoryFallback("SupabaseBusinessEventRepository");
+  repository.useMemory = true;
+}
 
 function isMissingEventTable(error) {
   if (!error) {
@@ -39,7 +45,7 @@ class SupabaseBusinessEventRepository {
 
     if (error) {
       if (isMissingEventTable(error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.memory.append(event);
       }
 
@@ -62,7 +68,7 @@ class SupabaseBusinessEventRepository {
 
     if (error) {
       if (isMissingEventTable(error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.findById(id);
       }
 
@@ -130,7 +136,7 @@ class SupabaseBusinessEventRepository {
 
     if (error) {
       if (isMissingEventTable(error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.search(filters);
       }
 

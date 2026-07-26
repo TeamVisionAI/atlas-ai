@@ -1,0 +1,30 @@
+.executive-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.executive-badge--critical {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.executive-badge--high {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.executive-badge--medium {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.executive-badge--low {
+  background: #f8fafc;
+  color: #64748b;
+}

@@ -33,12 +33,28 @@ function createOAuthClient() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-function signOAuthState(payload) {
-  const secret =
-    process.env.GOOGLE_OAUTH_STATE_SECRET ||
+const { isProduction } = require("../core/platformProductionGuard");
+
+function resolveOAuthStateSecret() {
+  if (process.env.GOOGLE_OAUTH_STATE_SECRET?.trim()) {
+    return process.env.GOOGLE_OAUTH_STATE_SECRET.trim();
+  }
+
+  if (isProduction()) {
+    throw new Error(
+      "GOOGLE_OAUTH_STATE_SECRET is required in production when Google OAuth is enabled."
+    );
+  }
+
+  return (
     process.env.JWT_SECRET ||
     process.env.META_APP_SECRET ||
-    "atlas-dev-oauth-state";
+    "atlas-dev-oauth-state"
+  );
+}
+
+function signOAuthState(payload) {
+  const secret = resolveOAuthStateSecret();
 
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto.createHmac("sha256", secret).update(body).digest("base64url");
@@ -51,11 +67,7 @@ function verifyOAuthState(state) {
   }
 
   const [body, signature] = state.split(".");
-  const secret =
-    process.env.GOOGLE_OAUTH_STATE_SECRET ||
-    process.env.JWT_SECRET ||
-    process.env.META_APP_SECRET ||
-    "atlas-dev-oauth-state";
+  const secret = resolveOAuthStateSecret();
   const expected = crypto.createHmac("sha256", secret).update(body).digest("base64url");
 
   if (signature !== expected) {
@@ -290,6 +302,7 @@ async function createCalendarEvent(organizationId, event) {
   if (shouldMockExternalComms()) {
     return {
       id: `sim-gcal-${Date.now()}`,
+      hangoutLink: event.createMeetLink ? "https://simulator.local/meet/mock" : null,
       simulated: true
     };
   }
@@ -303,20 +316,39 @@ async function createCalendarEvent(organizationId, event) {
   const calendarId = integration?.config?.calendarId || "primary";
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
+  const requestBody = {
+    summary: event.summary,
+    description: event.description,
+    start: {
+      dateTime: event.startTimeISO,
+      timeZone: event.timezone || "America/New_York"
+    },
+    end: {
+      dateTime: event.endTimeISO,
+      timeZone: event.timezone || "America/New_York"
+    }
+  };
+
+  if (event.location) {
+    requestBody.location = event.location;
+  }
+
+  let conferenceDataVersion = 0;
+
+  if (event.createMeetLink) {
+    requestBody.conferenceData = {
+      createRequest: {
+        requestId: `atlas-${Date.now()}`,
+        conferenceSolutionKey: { type: "hangoutsMeet" }
+      }
+    };
+    conferenceDataVersion = 1;
+  }
+
   const response = await calendar.events.insert({
     calendarId,
-    requestBody: {
-      summary: event.summary,
-      description: event.description,
-      start: {
-        dateTime: event.startTimeISO,
-        timeZone: event.timezone || "America/New_York"
-      },
-      end: {
-        dateTime: event.endTimeISO,
-        timeZone: event.timezone || "America/New_York"
-      }
-    }
+    conferenceDataVersion,
+    requestBody
   });
 
   await supabase

@@ -1,11 +1,12 @@
 /**
  * Sprint 10.2a — Prospect Workspace routes.
+ * Sprint 19.1 — Organization-scoped tenant isolation.
  */
 
 const express = require("express");
 const {
-  buildProspectWorkspaceReadModel
-} = require("../core/prospectWorkspaceReadModel");
+  buildProspectWorkspaceForRequest
+} = require("../application/prospectWorkspaceApplicationService");
 const {
   listProspectActivityFeed
 } = require("../core/prospectActivityFeedReadModel");
@@ -14,11 +15,13 @@ const {
 } = require("../core/prospectWorkspaceProfileEngine");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireLegacyProspectAccess } = require("../middleware/requireProspectAccess");
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
+router.use(organizationGuard());
 
 function rejectSimulatorProspect(phone, res) {
   if (!isProductionProspect(phone)) {
@@ -61,7 +64,7 @@ router.get("/:phone", requireLegacyProspectAccess(), async (req, res) => {
       return;
     }
 
-    const data = await buildProspectWorkspaceReadModel(req.params.phone);
+    const data = await buildProspectWorkspaceForRequest(req, req.params.phone);
 
     if (!data) {
       return res.status(404).json({ error: "Prospect workspace not found" });

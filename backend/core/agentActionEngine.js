@@ -1,4 +1,5 @@
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
+const { ACTION_IDS, buildAvailableAction } = require("./agentActionRegistry");
 
 const MILESTONES = {
   NEW_LEAD: "New Lead",
@@ -12,20 +13,17 @@ const MILESTONES = {
   CLOSED: "Closed"
 };
 
-const ACTION_IDS = {
-  CALL: "call",
-  WHATSAPP: "whatsapp",
-  SEND_ZOOM_LINK: "send_zoom_link",
-  SEND_OFFICE_LOCATION: "send_office_location",
-  SCHEDULE: "schedule",
-  RESCHEDULE: "reschedule",
-  NOTES: "notes",
-  SEND_MISSED_APPOINTMENT: "send_missed_appointment",
-  LOG_WHATSAPP_OPEN: "log_whatsapp_open"
-};
-
 const MAX_VISIBLE_ACTIONS = 5;
 const SOON_MS = 2 * 60 * 60 * 1000;
+
+/** Interview outcomes that close the post-interview workflow gate. */
+const RECORDED_INTERVIEW_OUTCOMES = new Set([
+  "Recruited",
+  "No Show",
+  "Needs More Time",
+  "Not Interested",
+  "Rescheduled"
+]);
 
 function normalizeInterviewType(value) {
   if (!value) {
@@ -100,7 +98,7 @@ function getInterviewTimingPhase(prospect) {
 }
 
 function isWorkflowGateActive(prospect, agentState) {
-  if (agentState.outcome) {
+  if (agentState.outcome && RECORDED_INTERVIEW_OUTCOMES.has(agentState.outcome)) {
     return false;
   }
 
@@ -137,7 +135,7 @@ function isFollowUpDue(agentState) {
 
 function pushAction(actions, id, priority) {
   if (!actions.some((action) => action.id === id)) {
-    actions.push({ id, priority });
+    actions.push(buildAvailableAction(id, priority));
   }
 }
 

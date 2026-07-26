@@ -8,6 +8,12 @@ const { TABLE_NAME } = require("../../domain/constants");
 const { PhoneNumber } = require("../../domain/value-objects/PhoneNumber");
 const { fromRow, toInsertRow, toUpdateRow } = require("./ProspectMapper");
 const { InMemoryProspectStore } = require("./InMemoryProspectStore");
+const { forbidProductionInMemoryFallback } = require("../../../../core/productionReadinessValidator");
+
+function activateMemoryFallback(repository) {
+  forbidProductionInMemoryFallback("ProspectRepository");
+  repository.useMemory = true;
+}
 
 function isMissingProspectTable(error) {
   if (!error) {
@@ -42,7 +48,8 @@ class ProspectRepository {
 
     if (error) {
       if (isMissingProspectTable(error)) {
-        this.useMemory = true;
+        forbidProductionInMemoryFallback("ProspectRepository");
+        activateMemoryFallback(this);
         return this.memory.insert(prospect);
       }
 
@@ -89,7 +96,7 @@ class ProspectRepository {
 
     if (response.error) {
       if (isMissingProspectTable(response.error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.memory.save(prospect);
       }
 
@@ -136,7 +143,7 @@ class ProspectRepository {
 
     if (error) {
       if (isMissingProspectTable(error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.findById(id, { includeDeleted });
       }
 
@@ -167,7 +174,7 @@ class ProspectRepository {
 
     if (error) {
       if (isMissingProspectTable(error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.findByEmail(email);
       }
 
@@ -198,7 +205,7 @@ class ProspectRepository {
 
     if (error) {
       if (isMissingProspectTable(error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.findByPhone(phone);
       }
 
@@ -252,7 +259,7 @@ class ProspectRepository {
 
     if (error) {
       if (isMissingProspectTable(error)) {
-        this.useMemory = true;
+        activateMemoryFallback(this);
         return this.search(filters);
       }
 

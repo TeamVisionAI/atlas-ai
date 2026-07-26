@@ -1,0 +1,98 @@
+.atlas-brief__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.atlas-brief__heading {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.atlas-brief__expand-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.atlas-brief__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-brief__item {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #0f172a;
+}
+
+.atlas-brief__item--empty {
+  color: #64748b;
+  list-style: none;
+  margin-left: -1.1rem;
+}
+
+.atlas-brief__expanded {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.atlas-brief__detail-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.atlas-brief__quote,
+.atlas-brief__detail-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.atlas-brief__quote {
+  font-style: italic;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .atlas-brief__item {
+    color: #f1f5f9;
+  }
+
+  .atlas-brief__expanded {
+    border-top-color: #334155;
+  }
+
+  .atlas-brief__quote {
+    background: #334155;
+    color: #e2e8f0;
+  }
+
+  .atlas-brief__detail-text {
+    color: #cbd5e1;
+  }
+}

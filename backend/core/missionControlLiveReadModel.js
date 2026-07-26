@@ -4,7 +4,7 @@
  */
 
 const { MILESTONES } = require("./workflowConstants");
-const { ACTION_IDS } = require("./agentActionEngine");
+const { getAgentActionLabel } = require("./agentActionRegistry");
 
 const WORKFLOW_ONLY_MISSING_FIELDS = new Set(["schedule", "email", "interviewType"]);
 const TERMINAL_WORKFLOW_MILESTONES = new Set([
@@ -18,17 +18,6 @@ const RECRUITING_FUNNEL_STEPS = Object.freeze([
   { key: "qualified", label: "Qualified" },
   { key: "interview_scheduled", label: "Interview Scheduled" }
 ]);
-
-const ACTION_LABELS = Object.freeze({
-  [ACTION_IDS.CALL]: "Call prospect",
-  [ACTION_IDS.WHATSAPP]: "Continue on WhatsApp",
-  [ACTION_IDS.SEND_ZOOM_LINK]: "Send Zoom interview link",
-  [ACTION_IDS.SEND_OFFICE_LOCATION]: "Send office location",
-  [ACTION_IDS.SCHEDULE]: "Schedule interview",
-  [ACTION_IDS.RESCHEDULE]: "Reschedule interview",
-  [ACTION_IDS.NOTES]: "Add agent notes",
-  [ACTION_IDS.SEND_MISSED_APPOINTMENT]: "Send missed appointment follow-up"
-});
 
 const PRIORITY_TIER_LABELS = Object.freeze({
   PENDING_INTERVIEW_RESULTS: "Pending interview results",
@@ -147,11 +136,7 @@ function buildRecruitingFunnelStatus(workflow = {}, brain = {}) {
 }
 
 function formatActionLabel(actionId) {
-  if (!actionId) {
-    return "Review conversation";
-  }
-
-  return ACTION_LABELS[actionId] || actionId.replace(/_/g, " ");
+  return getAgentActionLabel(actionId);
 }
 
 function buildActionReason({ workflow, brain, conversationMessages }) {

@@ -23,7 +23,7 @@ const {
 const { loadAgentState, mergeAgentState } = require("../core/agentActionState");
 const { buildWorkflowReadModel, fetchMessageHints } = require("../core/workflowReadModel");
 const { emitHumanAdvancementEvents } = require("../core/humanAdvancementEvents");
-const { getMissionControlState } = require("../controllers/conversationController");
+const { getMissionControlState } = require("./missionControlReadModel");
 const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
 const QUALIFICATION_KEYS = new Set([

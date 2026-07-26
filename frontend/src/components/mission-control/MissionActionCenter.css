@@ -1,0 +1,101 @@
+.mission-action-center {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mission-action-center__featured .action-card {
+  width: 100%;
+}
+
+.mission-action-center__run-mission {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
+}
+
+.mission-action-center__run-mission:hover,
+.mission-action-center__run-mission:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.34);
+  outline: none;
+}
+
+.mission-action-center__run-mission:focus-visible {
+  box-shadow:
+    0 12px 28px rgba(37, 99, 235, 0.34),
+    0 0 0 2px #93c5fd;
+}
+
+.mission-action-center__run-mission:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.mission-action-center__run-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.mission-action-center__supporting {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.mission-action-center__supporting-label {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mission-action-center__supporting-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mission-action-center__supporting-grid .action-card {
+  min-height: 108px;
+  padding: 16px 18px;
+}
+
+.mission-action-center__supporting-grid .action-card__icon {
+  font-size: 26px;
+}
+
+.mission-action-center__supporting-grid .action-card__title {
+  font-size: 15px;
+}
+
+.mission-action-center__supporting-grid .action-card__subtitle {
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .mission-action-center__supporting-grid {
+    grid-template-columns: 1fr;
+  }
+}

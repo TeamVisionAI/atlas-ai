@@ -1,0 +1,126 @@
+.mission-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mission-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mission-card__eyebrow {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mission-card__hero {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #0f172a;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.mission-card__hero-icon {
+  font-size: clamp(1.75rem, 3vw, 2.1rem);
+  line-height: 1;
+}
+
+.mission-card__prospect-context {
+  margin: -4px 0 0;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.mission-card__recommendation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+  border: 1px solid #dbeafe;
+}
+
+.mission-card__recommendation-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+}
+
+.mission-card__recommendation-text {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.mission-card__meta-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.mission-card__meta-row dt {
+  margin: 0 0 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mission-card__meta-row dd {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mission-card__actions {
+  margin-top: 4px;
+}
+
+.mission-card__empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 15px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mission-card__hero,
+  .mission-card__recommendation-text,
+  .mission-card__meta-row dd {
+    color: #f1f5f9;
+  }
+
+  .mission-card__recommendation {
+    background: linear-gradient(135deg, #1e293b 0%, #172554 100%);
+    border-color: #334155;
+  }
+
+  .mission-card__recommendation-label {
+    color: #93c5fd;
+  }
+}
+
+@media (max-width: 768px) {
+  .mission-card__meta-row {
+    grid-template-columns: 1fr;
+  }
+}

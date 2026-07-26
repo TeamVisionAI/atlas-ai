@@ -61,8 +61,15 @@ function isThisLocalWeek(timestampMs, reference = new Date()) {
   return timestampMs >= weekStartDate.getTime() && timestampMs <= weekEndDate.getTime();
 }
 
-async function loadProductionProspects() {
-  const { data, error } = await supabase.from("prospects").select("*");
+async function loadProductionProspects(organizationId) {
+  if (!organizationId) {
+    throw new Error("organizationId is required to load production prospects");
+  }
+
+  const { data, error } = await supabase
+    .from("prospects")
+    .select("*")
+    .eq("organization_id", organizationId);
 
   if (error) {
     throw error;
@@ -364,8 +371,12 @@ function buildAgencyPulse(prospects, queue, todayFocus) {
   });
 }
 
-async function buildExecutiveDashboard() {
-  const prospects = await loadProductionProspects();
+async function buildExecutiveDashboard(organizationId) {
+  if (!organizationId) {
+    throw new Error("organizationId is required to build executive dashboard");
+  }
+
+  const prospects = await loadProductionProspects(organizationId);
   const queue = await buildPrioritizedWorkflowQueue(prospects);
   const todayFocus = buildTodayFocus(prospects, queue);
   const productionSnapshot = buildProductionSnapshot(prospects, queue);

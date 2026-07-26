@@ -1,3 +1,8 @@
+/**
+ * @deprecated Sprint 19 — Frontend localStorage is never authoritative for workflow state.
+ * Backend agentActionState + workflow read models are the source of truth.
+ * This module remains for backward-compatible UI sync only.
+ */
 import { INTERVIEW_OUTCOMES } from "../types/outcomes";
 import { MILESTONES } from "../types/milestones";
 
@@ -48,56 +53,15 @@ export function createDefaultWorkflowState() {
 }
 
 /**
- * Gate: interview time passed AND outcome is null → block workspace.
- * Accepts adapted workspace model or legacy { brain, conversation } shape.
+ * @deprecated Use workspace.workflowGate from backend Mission Control API.
+ * Gate visibility must not be decided from localStorage.
  */
-export function shouldShowWorkflowGate(workspaceOrMission, dashboardProspect, workflowState) {
-  const brain = workspaceOrMission?.brain;
-  const conversation =
-    workspaceOrMission?.conversation ||
-    (dashboardProspect
-      ? {
-          interviewTime: dashboardProspect.interview_time,
-          appointmentDate: dashboardProspect.appointment_date
-        }
-      : null);
-
-  if (workflowState.outcome) {
-    return false;
+export function shouldShowWorkflowGate(workspaceOrMission) {
+  if (workspaceOrMission?.workflowGate?.active !== undefined) {
+    return workspaceOrMission.workflowGate.active;
   }
 
-  if (brain?.currentStep !== "CONFIRMED") {
-    return false;
-  }
-
-  return isInterviewTimePassed(conversation);
-}
-
-function isInterviewTimePassed(conversation) {
-  const interviewTime = conversation?.interviewTime;
-  const appointmentDate = conversation?.appointmentDate;
-
-  if (interviewTime) {
-    const parsedInterview = Date.parse(interviewTime);
-
-    if (!Number.isNaN(parsedInterview)) {
-      return parsedInterview < Date.now();
-    }
-  }
-
-  if (appointmentDate) {
-    const parsedAppointment = Date.parse(appointmentDate);
-
-    if (!Number.isNaN(parsedAppointment)) {
-      return parsedAppointment < Date.now();
-    }
-  }
-
-  if (!interviewTime && !appointmentDate) {
-    return true;
-  }
-
-  return true;
+  return Boolean(workspaceOrMission?.workflowGate?.active);
 }
 
 export function applyOutcome(outcome, formData = {}) {

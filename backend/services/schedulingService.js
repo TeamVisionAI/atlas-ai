@@ -89,18 +89,30 @@ async function scheduleAppointment({
 
   if (organizationId) {
     try {
+      const isZoomInterview =
+        metadata.interviewType === "Zoom" ||
+        String(metadata.interviewType || "").toLowerCase().includes("zoom");
+
       googleEvent = await googleCalendarIntegrationService.createCalendarEvent(organizationId, {
         summary: formatAppointmentTitle(appointmentType, metadata),
         description: buildEventDescription(appointmentType, metadata),
         startTimeISO,
         endTimeISO,
-        timezone
+        timezone,
+        location: metadata.location || null,
+        createMeetLink: Boolean(metadata.createMeetLink ?? isZoomInterview)
       });
     } catch (calendarError) {
       releaseSlotByIso(startTimeISO, appointmentType);
       throw calendarError;
     }
   }
+
+  const meetLink =
+    googleEvent?.hangoutLink ||
+    googleEvent?.conferenceData?.entryPoints?.find((entry) => entry.entryPointType === "video")
+      ?.uri ||
+    null;
 
   return {
     success: true,
@@ -112,7 +124,9 @@ async function scheduleAppointment({
     durationMinutes,
     capacity: booking.availability,
     googleCalendarEventId: googleEvent?.id || null,
-    googleCalendarSynced: Boolean(googleEvent?.id)
+    googleCalendarSynced: Boolean(googleEvent?.id),
+    meetLink,
+    googleCalendarLink: googleEvent?.htmlLink || null
   };
 }
 

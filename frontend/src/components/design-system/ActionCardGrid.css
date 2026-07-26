@@ -1,0 +1,27 @@
+.action-card-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.action-card-grid__primary {
+  display: grid;
+  gap: 14px;
+}
+
+.action-card-grid__secondary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+@media (min-width: 900px) {
+  .action-card-grid__secondary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .action-card-grid__secondary {
+    grid-template-columns: 1fr;
+  }
+}

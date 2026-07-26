@@ -11,6 +11,7 @@ const {
   loadLegacyProspectByPhone,
   loadCoreProspectById
 } = require("../security/prospectAccessService");
+const { getTenantOrganizationId } = require("../services/tenantContextService");
 const { PERMISSIONS } = require("../security/permissions");
 
 function requireLegacyProspectAccess(options = {}) {
@@ -27,7 +28,8 @@ function requireLegacyProspectAccess(options = {}) {
         });
       }
 
-      const prospect = await loadLegacyProspectByPhone(phone);
+      const organizationId = getTenantOrganizationId(req);
+      const prospect = await loadLegacyProspectByPhone(phone, organizationId);
 
       if (!prospect) {
         return res.status(404).json({
@@ -87,7 +89,8 @@ function requireCoreProspectAccess(options = {}) {
         });
       }
 
-      const prospect = await loadCoreProspectById(prospectId);
+      const organizationId = getTenantOrganizationId(req);
+      const prospect = await loadCoreProspectById(prospectId, organizationId);
 
       if (!prospect) {
         return res.status(404).json({

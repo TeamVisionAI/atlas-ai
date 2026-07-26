@@ -5,14 +5,14 @@
 const { getMissionControlWithActions } = require("./agentActionController");
 const { saveConversationOutcome } = require("../core/conversationOutcomeEngine");
 
-async function postConversationOutcome(phone, body = {}) {
+async function postConversationOutcome(phone, body = {}, options = {}) {
   const result = await saveConversationOutcome(phone, body);
 
   if (!result.success) {
     return result;
   }
 
-  const missionControl = await getMissionControlWithActions(phone);
+  const missionControl = await getMissionControlWithActions(phone, options);
 
   return {
     success: true,

@@ -1,7 +1,8 @@
-import {
-  loadWorkflowState,
-  shouldShowWorkflowGate
-} from "./workflowEngine";
+/**
+ * Sprint 19 — Mission Control queue helpers.
+ * Navigation order is authoritative from backend prioritizedWorkflowQueue only.
+ * @deprecated Local priority calculation removed — do not reintroduce client-side queue authority.
+ */
 
 export const QUEUE_PRIORITY = {
   WORKFLOW_GATE: 1,
@@ -11,124 +12,40 @@ export const QUEUE_PRIORITY = {
   REMAINING: 5
 };
 
-const MOCK_QUEUE_EXTRAS = [
-  { phone: "queue-mock-01", name: "Maria Lopez", current_step: "CONFIRMED", interview_time: new Date(Date.now() + 3600000).toISOString(), city: "Miami", state: "FL" },
-  { phone: "queue-mock-02", name: "Carlos Ruiz", current_step: "GREETING", city: "Hialeah", state: "FL" },
-  { phone: "queue-mock-03", name: "Sofia Mendez", current_step: "SCHEDULE", city: "Doral", state: "FL" },
-  { phone: "queue-mock-04", name: "James Carter", current_step: "CONFIRMED", interview_time: new Date(Date.now() - 3600000).toISOString(), city: "Kendall", state: "FL" },
-  { phone: "queue-mock-05", name: "Elena Torres", current_step: "OCCUPATION", city: "Miramar", state: "FL" }
-];
-
-function isInterviewStartingSoon(prospect) {
-  if (prospect.current_step !== "CONFIRMED" || !prospect.interview_time) {
-    return false;
-  }
-
-  const interviewAt = Date.parse(prospect.interview_time);
-
-  if (Number.isNaN(interviewAt)) {
-    return false;
-  }
-
-  const twoHours = 2 * 60 * 60 * 1000;
-  const now = Date.now();
-
-  return interviewAt >= now && interviewAt - now <= twoHours;
-}
-
-function isFollowUpDue(prospect, workflowState) {
-  if (workflowState.outcome !== "Needs More Time" && workflowState.milestone !== "Follow Up") {
-    return false;
-  }
-
-  if (!workflowState.followUpDate) {
-    return true;
-  }
-
-  const followUpAt = Date.parse(`${workflowState.followUpDate}T${workflowState.followUpTime || "00:00"}`);
-
-  if (Number.isNaN(followUpAt)) {
-    return true;
-  }
-
-  return followUpAt <= Date.now();
-}
-
-function isNewLead(prospect) {
-  const step = prospect.current_step;
-
-  return !step || step === "NEW" || step === "GREETING";
-}
-
-function hasUnresolvedWorkflowGate(prospect) {
-  const workflowState = loadWorkflowState(prospect.phone);
-  const missionStub = {
-    brain: { currentStep: prospect.current_step || "CONFIRMED" }
-  };
-
-  return shouldShowWorkflowGate(missionStub, prospect, workflowState);
-}
-
-function getProspectPriority(prospect) {
-  const workflowState = loadWorkflowState(prospect.phone);
-
-  if (hasUnresolvedWorkflowGate(prospect)) {
-    return QUEUE_PRIORITY.WORKFLOW_GATE;
-  }
-
-  if (isInterviewStartingSoon(prospect)) {
-    return QUEUE_PRIORITY.INTERVIEW_SOON;
-  }
-
-  if (isFollowUpDue(prospect, workflowState)) {
-    return QUEUE_PRIORITY.FOLLOW_UP_DUE;
-  }
-
-  if (isNewLead(prospect)) {
-    return QUEUE_PRIORITY.NEW_LEAD;
-  }
-
-  return QUEUE_PRIORITY.REMAINING;
-}
-
-function normalizeProspect(prospect) {
+function normalizeProspect(prospect, summary = {}) {
   return {
-    phone: prospect.phone,
-    name: prospect.name || "Unknown Prospect",
-    current_step: prospect.current_step,
+    phone: prospect.phone || summary.phone,
+    name: summary.name || prospect.name || "Unknown Prospect",
+    current_step: summary.currentStep || prospect.current_step,
     interview_time: prospect.interview_time,
+    appointment_date: prospect.appointment_date,
     city: prospect.city,
-    state: prospect.state
+    state: prospect.state,
+    missionControlPriority: summary.missionControlPriority,
+    missionControlPriorityTier: summary.missionControlPriorityTier,
+    canonicalMilestone: summary.canonicalMilestone
   };
 }
 
 /**
- * Builds today's prioritized queue from dashboard prospects plus mock placeholders.
- * Replace with Workflow Engine data when backend is ready.
+ * Builds Mission Control navigation queue from backend prioritizedWorkflowQueue.
+ * Sprint 19 — sole authoritative queue source for production Mission Control.
  */
-export function buildPrioritizedQueue(prospects = []) {
-  const normalized = prospects.map(normalizeProspect);
-  const seenPhones = new Set(normalized.map((prospect) => prospect.phone));
+export function buildQueueFromBackendWorkflowQueue(workflowQueue = [], prospects = []) {
+  const prospectByPhone = new Map(prospects.map((row) => [row.phone, row]));
 
-  MOCK_QUEUE_EXTRAS.forEach((mockProspect) => {
-    if (!seenPhones.has(mockProspect.phone)) {
-      normalized.push(normalizeProspect(mockProspect));
-      seenPhones.add(mockProspect.phone);
-    }
-  });
+  return workflowQueue.map((summary) =>
+    normalizeProspect(prospectByPhone.get(summary.phone) || { phone: summary.phone }, summary)
+  );
+}
 
-  return normalized
-    .map((prospect) => ({
-      ...prospect,
-      priority: getProspectPriority(prospect)
-    }))
-    .sort((left, right) => {
-      if (left.priority !== right.priority) {
-        return left.priority - right.priority;
-      }
+/** @deprecated Use buildQueueFromBackendWorkflowQueue — retained for compatibility. */
+export function buildPrioritizedQueue(prospects = [], workflowQueue = []) {
+  if (workflowQueue.length) {
+    return buildQueueFromBackendWorkflowQueue(workflowQueue, prospects);
+  }
 
-      return left.name.localeCompare(right.name);
-    });
+  return prospects.map((prospect) => normalizeProspect(prospect));
 }
 
 export function findQueueIndex(queue, phone) {
@@ -168,6 +85,7 @@ export function getNextPriorityProspect(queue, currentIndex) {
 
 export { buildMockMissionControlFromQueueProspect as buildMockMissionFromProspect } from "../adapters/missionControlAdapter";
 
-export function isMockQueueProspect(prospect) {
-  return String(prospect?.phone || "").startsWith("queue-mock-");
+/** @deprecated Mock queue prospects removed in Sprint 19. */
+export function isMockQueueProspect() {
+  return false;
 }
