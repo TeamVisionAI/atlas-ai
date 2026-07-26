@@ -290,8 +290,8 @@ function buildAutonomousActionCenter(assessment, legacyProspect) {
   if (assessment.readyForScheduling) {
     return {
       priority: "Interview immediate",
-      nextBestAction: "Complete interview scheduling",
-      reason: "Prospect is qualified and ready to choose an interview slot.",
+      nextBestAction: "Schedule interview",
+      reason: "Prospect is qualified and ready to schedule an interview.",
       confidence: assessment.confidence,
       actionId: "schedule"
     };
@@ -299,9 +299,9 @@ function buildAutonomousActionCenter(assessment, legacyProspect) {
 
   if (assessment.isQualified) {
     return {
-      priority: "Atlas active",
-      nextBestAction: "Collect scheduling preference",
-      reason: "Qualification complete — move to interview scheduling.",
+      priority: "Interview immediate",
+      nextBestAction: "Schedule interview",
+      reason: "Prospect is qualified and ready to schedule an interview.",
       confidence: assessment.confidence,
       actionId: "schedule"
     };

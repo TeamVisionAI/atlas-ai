@@ -86,3 +86,75 @@ export async function advanceMissionControlWorkflow(phone, body) {
 
   return result;
 }
+
+/**
+ * Save required prospect information without a conversation outcome.
+ * @param {string} phone
+ * @param {{ fields: Object }} body
+ */
+export async function saveRequiredInformation(phone, body) {
+  const response = await apiRequest(
+    `/api/mission-control/${encodeURIComponent(phone)}/required-information`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok && !result?.message) {
+    throw new MissionControlError("Failed to save required information", response.status);
+  }
+
+  return result;
+}
+
+/**
+ * W-006 — Save conversation outcome and refresh Mission Control payload.
+ * @param {string} phone
+ * @param {{ outcome: string, fields?: Object, interactionNotes?: string }} body
+ */
+export async function saveConversationOutcome(phone, body) {
+  const response = await apiRequest(
+    `/api/mission-control/${encodeURIComponent(phone)}/conversation-outcome`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok && !result?.message) {
+    throw new MissionControlError("Failed to save conversation outcome", response.status);
+  }
+
+  return result;
+}
+
+/**
+ * Interview Outcome Engine — save outcome, advance workflow, refresh Mission Control.
+ * @param {string} phone
+ * @param {{ outcome: string, fields?: Object, followUpRecommendation?: Object, interactionNotes?: string }} body
+ */
+export async function saveInterviewOutcome(phone, body) {
+  const response = await apiRequest(
+    `/api/mission-control/${encodeURIComponent(phone)}/interview-outcome`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok && !result?.message) {
+    throw new MissionControlError("Failed to save interview outcome", response.status);
+  }
+
+  return result;
+}

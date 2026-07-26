@@ -838,7 +838,7 @@
         "type": "phone"
       }
     ],
-    "outcome": "Recruited",
+    "outcome": null,
     "closureReason": null,
     "futureReminder": null,
     "followUpDate": null,
@@ -5891,6 +5891,143 @@
     "closureReason": null,
     "futureReminder": null,
     "followUpDate": "2026-07-27",
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17867528080": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: city, state, occupation, email, authorization.",
+        "at": "2026-07-26T01:06:37.824Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: city, state, occupation, authorization.",
+        "at": "2026-07-26T02:04:16.927Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: city, occupation.",
+        "at": "2026-07-26T02:04:33.274Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: city, state, occupation, authorization.",
+        "at": "2026-07-26T02:11:06.330Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: city.",
+        "at": "2026-07-26T02:11:09.616Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: city.",
+        "at": "2026-07-26T02:54:18.445Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Interested.",
+        "at": "2026-07-26T02:54:23.773Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected.",
+        "at": "2026-07-26T02:54:33.262Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: email, city, state, occupation, work_authorization_status.",
+        "at": "2026-07-26T02:54:35.231Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": "Information Collected",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17862347083": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Conversation outcome recorded: Needs Follow-up. Updated: first_name, last_name, name, city, occupation, followUpDate.",
+        "at": "2026-07-26T01:52:55.531Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected. Updated: city, occupation, authorization.",
+        "at": "2026-07-26T02:43:02.142Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: City, Occupation, Work Authorization.",
+        "at": "2026-07-26T02:54:15.069Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: State.",
+        "at": "2026-07-26T02:54:17.839Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected.",
+        "at": "2026-07-26T02:54:20.559Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: City, Occupation, Work Authorization.",
+        "at": "2026-07-26T02:54:53.841Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: State.",
+        "at": "2026-07-26T02:54:56.468Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: City, Occupation, Work Authorization.",
+        "at": "2026-07-26T02:55:05.958Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: State.",
+        "at": "2026-07-26T02:55:08.525Z",
+        "type": "phone"
+      },
+      {
+        "text": "Conversation outcome recorded: Information Collected.",
+        "at": "2026-07-26T02:55:11.403Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: City, Work Authorization, Occupation.",
+        "at": "2026-07-26T02:56:21.394Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: State.",
+        "at": "2026-07-26T02:56:29.847Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": "Information Collected",
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": "2026-07-26",
     "followUpTime": null,
     "orientationScheduled": false,
     "onboardingUnlocked": false

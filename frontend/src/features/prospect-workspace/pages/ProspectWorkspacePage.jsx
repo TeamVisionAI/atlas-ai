@@ -11,7 +11,6 @@ import {
   saveWorkflowState,
   shouldShowWorkflowGate
 } from "../../../engines/workflowEngine";
-import { syncMissionControlWorkflow } from "../../../services/missionControlService";
 import JourneyProgress from "../../../components/prospect-workspace/JourneyProgress";
 import ActivityFeed from "../../../components/prospect-workspace/ActivityFeed";
 import ProspectDetailsPanel from "../../../components/prospect-workspace/ProspectDetailsPanel";
@@ -109,23 +108,29 @@ export default function ProspectWorkspacePage() {
   });
 
   const handleGateOutcome = useCallback(
-    async (localState) => {
+    async (formState, result) => {
       if (!workspace?.phone) {
         return;
       }
 
-      const saved = saveWorkflowState(workspace.phone, localState);
+      const agentOutcome = result?.missionControl?.brain?.outcome ?? result?.outcome ?? null;
+      const saved = saveWorkflowState(workspace.phone, {
+        ...loadWorkflowState(workspace.phone),
+        outcome: agentOutcome,
+        orientationDate: formState?.orientationDate || null,
+        orientationTime: formState?.orientationTime || null,
+        orientationScheduled: Boolean(formState?.orientationDate && formState?.orientationTime),
+        followUpDate: formState?.followUpDate || null,
+        followUpTime: formState?.followUpTime || null
+      });
       setWorkflowState(saved);
-
-      try {
-        await syncMissionControlWorkflow(workspace.phone, saved);
-      } catch (error) {
-        console.error(error);
-      }
 
       await refreshWorkspace();
 
-      if (saved.outcome === "Recruited" && saved.orientationScheduled) {
+      if (
+        (result?.outcome === "Recruited" || result?.outcome === "Orientation Scheduled") &&
+        saved.orientationScheduled
+      ) {
         setWorkflowComplete({
           message: translate("missionControlOrientationReady")
         });

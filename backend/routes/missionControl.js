@@ -5,6 +5,9 @@ const {
   syncAgentWorkflow
 } = require("../controllers/agentActionController");
 const { postWorkflowAdvance } = require("../controllers/workflowAdvanceController");
+const { postConversationOutcome } = require("../controllers/conversationOutcomeController");
+const { postRequiredInformation } = require("../controllers/requiredInformationController");
+const { postInterviewOutcome } = require("../controllers/interviewOutcomeController");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { getCommunicationGateway } = require("../communication/gateway/createCommunicationGateway");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
@@ -89,6 +92,75 @@ router.post(
     });
   }
 });
+
+router.post(
+  "/:phone/interview-outcome",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      if (rejectSimulatorProspect(req.params.phone, res)) {
+        return;
+      }
+
+      const result = await postInterviewOutcome(req.params.phone, req.body || {});
+
+      res.status(result.success ? 200 : result.status || 400).json(result);
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "SERVER_ERROR",
+        message: error.message
+      });
+    }
+  }
+);
+
+router.post(
+  "/:phone/required-information",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      if (rejectSimulatorProspect(req.params.phone, res)) {
+        return;
+      }
+
+      const result = await postRequiredInformation(req.params.phone, req.body || {});
+
+      res.status(result.success ? 200 : result.status || 400).json(result);
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "SERVER_ERROR",
+        message: error.message
+      });
+    }
+  }
+);
+
+router.post(
+  "/:phone/conversation-outcome",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      if (rejectSimulatorProspect(req.params.phone, res)) {
+        return;
+      }
+
+      const result = await postConversationOutcome(req.params.phone, req.body || {});
+
+      res.status(result.success ? 200 : result.status || 400).json(result);
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "SERVER_ERROR",
+        message: error.message
+      });
+    }
+  }
+);
 
 router.post(
   "/:phone/workflow/advance",

@@ -77,7 +77,8 @@ function createEmptyProfile(channel = "whatsapp") {
   };
 }
 
-function mergeProfile(existing, extracted) {
+function mergeProfile(existing, extracted, options = {}) {
+  const overwriteKeys = new Set(options.overwriteKeys || []);
   const merged = { ...existing };
 
   Object.entries(extracted || {}).forEach(([key, value]) => {
@@ -85,7 +86,12 @@ function mergeProfile(existing, extracted) {
       return;
     }
 
-    if (merged[key] === null || merged[key] === undefined || merged[key] === "") {
+    if (
+      overwriteKeys.has(key) ||
+      merged[key] === null ||
+      merged[key] === undefined ||
+      merged[key] === ""
+    ) {
       merged[key] = value;
     }
   });

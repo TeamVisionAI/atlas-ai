@@ -147,6 +147,8 @@ export function adaptMissionControlResponse(
     aiActionCenter: missionControl.aiActionCenter || null,
     recruitingStatus: missionControl.recruitingStatus || null,
     liveRevision: missionControl.liveRevision || null,
+    conversationOutcome: missionControl.conversationOutcome || null,
+    workflowRequirements: missionControl.workflowRequirements || missionControl.conversationOutcome?.workflowRequirements || [],
     workflowGate: workflowGate || { active: false },
     availableActions: missionControl.availableActions || [],
     raw: missionControl

@@ -11,15 +11,15 @@
     "reconcileEpisodeKey": null
   },
   "developer-test-user": {
-    "canonicalMilestone": "ORIENTATION",
+    "canonicalMilestone": "INTERVIEW_RESULT_PENDING",
     "workflowOwnership": "AGENT",
-    "needsHumanAttention": true,
+    "needsHumanAttention": false,
     "stalledAt": "2026-07-18T22:05:47.158Z",
     "initializedAt": "2026-07-17T21:07:46.622Z",
-    "manualAgentOwnership": true,
+    "manualAgentOwnership": false,
     "doNotContact": false,
     "stallEpisodeKey": "2026-07-17T22:04:08.546029+00:00",
-    "reconcileEpisodeKey": null
+    "reconcileEpisodeKey": "verify-interview-outcome:1785029897240"
   },
   "sched-full12": {
     "canonicalMilestone": "FOLLOW_UP",
@@ -4727,6 +4727,50 @@
     "needsHumanAttention": false,
     "stalledAt": null,
     "initializedAt": "2026-07-24T01:51:15.786Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
+  },
+  "sim-ops-00ca4c78": {
+    "canonicalMilestone": "QUALIFICATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-25T22:37:45.785Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
+  },
+  "+17867528080": {
+    "canonicalMilestone": "FOLLOW_UP",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-25T22:51:32.595Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
+  },
+  "+17862347083": {
+    "canonicalMilestone": "QUALIFICATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-25T23:14:35.932Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
+  },
+  "+13055576859": {
+    "canonicalMilestone": "NEW_LEAD",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": null,
     "manualAgentOwnership": false,
     "doNotContact": false,
     "stallEpisodeKey": null,

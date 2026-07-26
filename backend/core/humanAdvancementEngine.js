@@ -9,7 +9,8 @@ const { logConversation } = require("../services/logService");
 const { parseSchedulingState, mergeNotesWithSchedulingState } = require("../core/schedulingState");
 const {
   buildProfileFromProspect,
-  profileToProspectUpdates
+  profileToProspectUpdates,
+  getEffectiveInterviewType
 } = require("../core/informationModel");
 const { mapToCanonicalMilestone, deriveDefaultOwnership } = require("../core/milestoneMapper");
 const {
@@ -125,7 +126,17 @@ function qualificationFieldsChanged(beforeProfile, afterProfile, capturedFields)
 
 async function persistProspectAdvancement(prospect, mergedProfile, capturedFields, targetMilestone) {
   const schedulingState = parseSchedulingState(prospect.notes);
-  const updates = profileToProspectUpdates(mergedProfile, schedulingState);
+  const profileForPersist = { ...mergedProfile };
+
+  if (!profileForPersist.interviewType) {
+    const effectiveType = getEffectiveInterviewType(profileForPersist);
+
+    if (effectiveType) {
+      profileForPersist.interviewType = effectiveType;
+    }
+  }
+
+  const updates = profileToProspectUpdates(profileForPersist, schedulingState);
 
   if (mergedProfile.email) {
     updates.notes = mergeNotesWithSchedulingState(
@@ -213,7 +224,8 @@ async function advanceProspectWorkflow(phone, payload = {}) {
     currentMilestone,
     targetMilestone,
     prospect,
-    capturedFields
+    capturedFields,
+    explicitProfileFields: payload.explicitProfileFields || []
   });
 
   if (!validation.valid) {

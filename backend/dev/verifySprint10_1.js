@@ -222,6 +222,13 @@ async function main() {
     assert(stored.entry_method === "QUICK_CAPTURE", "entry_method QUICK_CAPTURE");
   }
 
+  if (stored?.organization_id) {
+    assert(
+      stored.organization_id === "00000000-0000-4000-8000-000000000001",
+      "organization_id should match authenticated user organization"
+    );
+  }
+
   if (stored?.prospect_number) {
     assert(/^TV-\d{6}$/.test(stored.prospect_number), "Prospect number format TV-000001");
   }

@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { INTERVIEW_OUTCOMES } from "../types/outcomes";
+import { useMemo, useState } from "react";
 import OutcomeWizard from "./OutcomeWizard";
-import { mapGateOutcomeToAdvance } from "../utils/workflowGateAdvance";
-import { advanceMissionControlWorkflow } from "../services/missionControlService";
+import { saveInterviewOutcome } from "../services/missionControlService";
 import { useLanguage } from "../i18n/LanguageContext";
 
 const panelStyle = {
@@ -26,6 +24,15 @@ const buttonStyle = {
   fontSize: 15
 };
 
+const categoryTitleStyle = {
+  margin: "16px 0 8px",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "#94A3B8"
+};
+
 const metaStyle = {
   display: "flex",
   gap: 16,
@@ -35,8 +42,20 @@ const metaStyle = {
   color: "#94A3B8"
 };
 
+function findOutcomeConfig(categories, outcomeId) {
+  for (const category of categories || []) {
+    const match = category.outcomes?.find((outcome) => outcome.id === outcomeId);
+
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
 /**
- * Inline Workflow Gate panel (Sprint 8A.6) — replaces empty Next Actions when gate is active.
+ * Inline Workflow Gate panel — grouped interview outcomes from server config.
  */
 export default function WorkflowGatePanel({
   gate,
@@ -51,7 +70,13 @@ export default function WorkflowGatePanel({
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  async function handleOutcomeComplete(localState) {
+  const categories = gate?.outcomeCategories || [];
+  const selectedOutcomeConfig = useMemo(
+    () => findOutcomeConfig(categories, selectedOutcome),
+    [categories, selectedOutcome]
+  );
+
+  async function handleOutcomeComplete(formState) {
     if (!phone || !selectedOutcome) {
       return;
     }
@@ -61,15 +86,19 @@ export default function WorkflowGatePanel({
     setSuccess(null);
 
     try {
-      const payload = mapGateOutcomeToAdvance(selectedOutcome, localState);
-      const result = await advanceMissionControlWorkflow(phone, payload);
+      const result = await saveInterviewOutcome(phone, {
+        outcome: selectedOutcome,
+        fields: formState,
+        followUpRecommendation: selectedOutcomeConfig?.followUpRecommendation,
+        interactionNotes: formState.notes || undefined
+      });
 
       if (!result.success) {
         throw new Error(result.message || translate("workflowGateSaveError"));
       }
 
       setSuccess(translate("workflowGateSaveSuccess"));
-      await onComplete?.(localState, result);
+      await onComplete?.(formState, result);
     } catch (err) {
       console.error(err);
       setError(err.message || translate("workflowGateSaveUnexpected"));
@@ -77,10 +106,6 @@ export default function WorkflowGatePanel({
       setLoading(false);
     }
   }
-
-  const outcomes =
-    gate?.outcomes ||
-    Object.values(INTERVIEW_OUTCOMES).map((outcome) => ({ id: outcome, label: outcome }));
 
   return (
     <div style={panelStyle}>
@@ -121,24 +146,30 @@ export default function WorkflowGatePanel({
       ) : null}
 
       {!selectedOutcome ? (
-        outcomes.map((outcome) => (
-          <button
-            key={outcome.id}
-            type="button"
-            style={{
-              ...buttonStyle,
-              opacity: loading ? 0.6 : 1,
-              pointerEvents: loading ? "none" : "auto"
-            }}
-            disabled={loading}
-            onClick={() => setSelectedOutcome(outcome.id)}
-          >
-            {outcome.label}
-          </button>
+        categories.map((category) => (
+          <div key={category.id}>
+            <h4 style={categoryTitleStyle}>{category.label}</h4>
+            {category.outcomes.map((outcome) => (
+              <button
+                key={outcome.id}
+                type="button"
+                style={{
+                  ...buttonStyle,
+                  opacity: loading ? 0.6 : 1,
+                  pointerEvents: loading ? "none" : "auto"
+                }}
+                disabled={loading}
+                onClick={() => setSelectedOutcome(outcome.id)}
+              >
+                {outcome.label}
+              </button>
+            ))}
+          </div>
         ))
       ) : (
         <OutcomeWizard
           outcome={selectedOutcome}
+          outcomeConfig={selectedOutcomeConfig}
           prospectName={prospectName}
           onBack={() => {
             setSelectedOutcome(null);

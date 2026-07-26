@@ -1,19 +1,4 @@
-import { useState } from "react";
-import { INTERVIEW_OUTCOMES } from "../types/outcomes";
-import { applyOutcome } from "../engines/workflowEngine";
-
-const buttonStyle = {
-  width: "100%",
-  textAlign: "left",
-  padding: "14px 16px",
-  marginBottom: 10,
-  borderRadius: 8,
-  border: "1px solid #374151",
-  background: "#1F2937",
-  color: "#fff",
-  cursor: "pointer",
-  fontSize: 15
-};
+import { useState, useEffect } from "react";
 
 const fieldStyle = {
   width: "100%",
@@ -26,180 +11,154 @@ const fieldStyle = {
   boxSizing: "border-box"
 };
 
-export default function OutcomeWizard({ outcome, prospectName, onComplete, onBack }) {
-  const [form, setForm] = useState({});
+function defaultFollowUpDate(days = 7) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function buildInitialForm(outcomeConfig) {
+  const initial = {};
+
+  for (const field of outcomeConfig?.fields || []) {
+    if (field.type === "date" && field.defaultDays !== undefined) {
+      initial[field.key] = defaultFollowUpDate(field.defaultDays);
+    } else if (field.defaultValue) {
+      initial[field.key] = field.defaultValue;
+    } else {
+      initial[field.key] = "";
+    }
+  }
+
+  return initial;
+}
+
+function FollowUpRecommendation({ recommendation }) {
+  if (!recommendation) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        marginBottom: 16,
+        padding: 12,
+        borderRadius: 8,
+        background: "#0F172A",
+        border: "1px solid #334155",
+        color: "#CBD5E1",
+        fontSize: 13,
+        lineHeight: 1.5
+      }}
+    >
+      <strong style={{ color: "#E2E8F0" }}>Atlas Recommendation</strong>
+      {recommendation.workflowLabel ? (
+        <p style={{ margin: "8px 0 4px" }}>Workflow: {recommendation.workflowLabel}</p>
+      ) : null}
+      {recommendation.recommendedFollowUpDate ? (
+        <p style={{ margin: "4px 0" }}>
+          Follow-up date: {recommendation.recommendedFollowUpDate}
+        </p>
+      ) : null}
+      {recommendation.reminderSchedule ? (
+        <p style={{ margin: "4px 0" }}>Reminder: {recommendation.reminderSchedule}</p>
+      ) : null}
+      {recommendation.preferredChannel ? (
+        <p style={{ margin: "4px 0" }}>Channel: {recommendation.preferredChannel}</p>
+      ) : null}
+      {recommendation.suggestedScript ? (
+        <p style={{ margin: "8px 0 0", fontStyle: "italic" }}>
+          “{recommendation.suggestedScript}”
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export default function OutcomeWizard({
+  outcome,
+  outcomeConfig,
+  prospectName,
+  onComplete,
+  onBack
+}) {
+  const [form, setForm] = useState(() => buildInitialForm(outcomeConfig));
+
+  const title = outcomeConfig?.label || outcome;
+
+  useEffect(() => {
+    setForm(buildInitialForm(outcomeConfig));
+  }, [outcome, outcomeConfig]);
 
   function updateField(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function handleSave(extra = {}) {
-    onComplete(applyOutcome(outcome, { ...form, ...extra }));
+  function renderField(field) {
+    const commonProps = {
+      value: form[field.key] || "",
+      onChange: (event) => updateField(field.key, event.target.value),
+      style: field.type === "textarea" ? { ...fieldStyle, resize: "vertical" } : fieldStyle
+    };
+
+    if (field.type === "textarea") {
+      return (
+        <label key={field.key} style={{ display: "block", marginBottom: 12 }}>
+          <span style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
+            {field.label}
+          </span>
+          <textarea rows={3} {...commonProps} />
+        </label>
+      );
+    }
+
+    if (field.type === "select") {
+      return (
+        <label key={field.key} style={{ display: "block", marginBottom: 12 }}>
+          <span style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
+            {field.label}
+          </span>
+          <select {...commonProps}>
+            {(field.options || []).map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    return (
+      <label key={field.key} style={{ display: "block", marginBottom: 12 }}>
+        <span style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
+          {field.label}
+        </span>
+        <input type={field.type || "text"} {...commonProps} />
+      </label>
+    );
   }
 
-  if (outcome === INTERVIEW_OUTCOMES.RECRUITED) {
-    return (
-      <div>
-        <h3 style={{ marginTop: 0 }}>Orientation Details</h3>
+  return (
+    <div>
+      <h3 style={{ marginTop: 0 }}>{title}</h3>
+      {prospectName ? (
         <p style={{ color: "#94A3B8", marginTop: 0 }}>
-          {prospectName} was recruited. Schedule orientation now (optional).
+          Record the interview outcome for {prospectName}.
         </p>
+      ) : null}
 
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Orientation Date
-        </label>
-        <input
-          type="date"
-          value={form.orientationDate || ""}
-          onChange={(event) => updateField("orientationDate", event.target.value)}
-          style={fieldStyle}
-        />
+      <FollowUpRecommendation recommendation={outcomeConfig?.followUpRecommendation} />
 
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Orientation Time
-        </label>
-        <input
-          type="time"
-          value={form.orientationTime || ""}
-          onChange={(event) => updateField("orientationTime", event.target.value)}
-          style={fieldStyle}
-        />
+      {(outcomeConfig?.fields || []).map((field) => renderField(field))}
 
-        <ActionRow onBack={onBack} onSave={() => handleSave()} saveLabel="Save Recruited" />
-      </div>
-    );
-  }
-
-  if (outcome === INTERVIEW_OUTCOMES.NO_SHOW) {
-    const defaultDate = defaultFollowUpDate();
-
-    return (
-      <div>
-        <h3 style={{ marginTop: 0 }}>No Show Follow Up</h3>
-        <p style={{ color: "#94A3B8" }}>Set when to follow up with this prospect.</p>
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Follow Up Date
-        </label>
-        <input
-          type="date"
-          value={form.followUpDate || defaultDate}
-          onChange={(event) => updateField("followUpDate", event.target.value)}
-          style={fieldStyle}
-        />
-
-        <ActionRow
-          onBack={onBack}
-          onSave={() => handleSave({ followUpDate: form.followUpDate || defaultDate })}
-          saveLabel="Save No Show"
-        />
-      </div>
-    );
-  }
-
-  if (outcome === INTERVIEW_OUTCOMES.RESCHEDULED) {
-    return (
-      <div>
-        <h3 style={{ marginTop: 0 }}>Reschedule Interview</h3>
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Date
-        </label>
-        <input
-          type="date"
-          value={form.rescheduleDate || ""}
-          onChange={(event) => updateField("rescheduleDate", event.target.value)}
-          style={fieldStyle}
-        />
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Time
-        </label>
-        <input
-          type="time"
-          value={form.rescheduleTime || ""}
-          onChange={(event) => updateField("rescheduleTime", event.target.value)}
-          style={fieldStyle}
-        />
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Interview Type
-        </label>
-        <select
-          value={form.rescheduleInterviewType || "Zoom"}
-          onChange={(event) => updateField("rescheduleInterviewType", event.target.value)}
-          style={fieldStyle}
-        >
-          <option value="Zoom">Zoom</option>
-          <option value="Office">Office</option>
-        </select>
-
-        <ActionRow onBack={onBack} onSave={() => handleSave()} saveLabel="Save Reschedule" />
-      </div>
-    );
-  }
-
-  if (outcome === INTERVIEW_OUTCOMES.NEEDS_MORE_TIME) {
-    return (
-      <div>
-        <h3 style={{ marginTop: 0 }}>Follow Up</h3>
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Follow Up Date
-        </label>
-        <input
-          type="date"
-          value={form.followUpDate || ""}
-          onChange={(event) => updateField("followUpDate", event.target.value)}
-          style={fieldStyle}
-        />
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Follow Up Time
-        </label>
-        <input
-          type="time"
-          value={form.followUpTime || ""}
-          onChange={(event) => updateField("followUpTime", event.target.value)}
-          style={fieldStyle}
-        />
-
-        <ActionRow onBack={onBack} onSave={() => handleSave()} saveLabel="Save Follow Up" />
-      </div>
-    );
-  }
-
-  if (outcome === INTERVIEW_OUTCOMES.NOT_INTERESTED) {
-    return (
-      <div>
-        <h3 style={{ marginTop: 0 }}>Not Interested</h3>
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Reason
-        </label>
-        <textarea
-          value={form.notInterestedReason || ""}
-          onChange={(event) => updateField("notInterestedReason", event.target.value)}
-          rows={3}
-          style={{ ...fieldStyle, resize: "vertical" }}
-        />
-
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          Optional Future Reminder
-        </label>
-        <input
-          type="date"
-          value={form.futureReminder || ""}
-          onChange={(event) => updateField("futureReminder", event.target.value)}
-          style={fieldStyle}
-        />
-
-        <ActionRow onBack={onBack} onSave={() => handleSave()} saveLabel="Save Closed" />
-      </div>
-    );
-  }
-
-  return null;
+      <ActionRow
+        onBack={onBack}
+        onSave={() => onComplete(form)}
+        saveLabel={`Save ${title}`}
+      />
+    </div>
+  );
 }
 
 function ActionRow({ onBack, onSave, saveLabel }) {
@@ -238,10 +197,4 @@ function ActionRow({ onBack, onSave, saveLabel }) {
       </button>
     </div>
   );
-}
-
-function defaultFollowUpDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 7);
-  return date.toISOString().slice(0, 10);
 }

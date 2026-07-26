@@ -15,6 +15,7 @@ const {
   emailRequired,
   isScheduleComplete
 } = require("./informationModel");
+const { isOrientationEligibleOutcome } = require("./interviewOutcomeMappings");
 
 /**
  * Fields that must be satisfied (directly or via capturedFields merge) to enter a milestone.
@@ -171,10 +172,12 @@ function capturedFieldsToProfilePatch(capturedFields = {}) {
   return patch;
 }
 
-function buildMergedContext(prospect, capturedFields = {}) {
+function buildMergedContext(prospect, capturedFields = {}, options = {}) {
   const profile = buildProfileFromProspect(prospect);
   const patch = capturedFieldsToProfilePatch(capturedFields);
-  const mergedProfile = mergeProfile(profile, patch);
+  const mergedProfile = mergeProfile(profile, patch, {
+    overwriteKeys: options.overwriteKeys || []
+  });
 
   return {
     profile: mergedProfile,
@@ -296,11 +299,15 @@ function validateRequiredFields(targetMilestone, context) {
     }
   }
 
-  if (targetMilestone === MILESTONES.ORIENTATION && fields.outcome && fields.outcome !== "Recruited") {
+  if (
+    targetMilestone === MILESTONES.ORIENTATION &&
+    fields.outcome &&
+    !isOrientationEligibleOutcome(fields.outcome)
+  ) {
     errors.push({
       code: "INVALID_OUTCOME",
       field: "outcome",
-      message: 'Outcome must be "Recruited" for ORIENTATION milestone.'
+      message: `Outcome "${fields.outcome}" is not valid for ORIENTATION milestone.`
     });
   }
 
@@ -326,7 +333,8 @@ function validateMilestoneAdvancement({
   currentMilestone,
   targetMilestone,
   prospect,
-  capturedFields = {}
+  capturedFields = {},
+  explicitProfileFields = []
 }) {
   if (!targetMilestone) {
     return {
@@ -375,7 +383,9 @@ function validateMilestoneAdvancement({
     };
   }
 
-  const context = buildMergedContext(prospect, capturedFields);
+  const context = buildMergedContext(prospect, capturedFields, {
+    overwriteKeys: explicitProfileFields
+  });
   const { errors, missingFields } = validateRequiredFields(targetMilestone, context);
 
   return {

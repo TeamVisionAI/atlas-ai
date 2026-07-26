@@ -6,6 +6,12 @@
 const { MILESTONES } = require("./workflowConstants");
 const { ACTION_IDS } = require("./agentActionEngine");
 
+const WORKFLOW_ONLY_MISSING_FIELDS = new Set(["schedule", "email", "interviewType"]);
+const TERMINAL_WORKFLOW_MILESTONES = new Set([
+  MILESTONES.CLOSED,
+  MILESTONES.DO_NOT_CONTACT
+]);
+
 const RECRUITING_FUNNEL_STEPS = Object.freeze([
   { key: "new_lead", label: "New Lead" },
   { key: "contacted", label: "Contacted" },
@@ -158,13 +164,27 @@ function buildActionReason({ workflow, brain, conversationMessages }) {
   }
 
   const missingFields = brain?.missingFields || [];
+  const workflowOnlyMissing = missingFields.filter((field) =>
+    WORKFLOW_ONLY_MISSING_FIELDS.has(field)
+  );
 
-  if (missingFields.includes("schedule") || brain?.currentStep === "SCHEDULE") {
-    return "Prospect is ready to schedule an interview.";
+  if (
+    workflowOnlyMissing.includes("schedule") &&
+    missingFields.every((field) => WORKFLOW_ONLY_MISSING_FIELDS.has(field))
+  ) {
+    return "Prospect is qualified and ready to schedule an interview.";
   }
 
-  if (missingFields.length) {
-    return `Qualification in progress — waiting for: ${missingFields.join(", ")}.`;
+  if (missingFields.includes("schedule") || brain?.currentStep === "SCHEDULE") {
+    return "Prospect is qualified and ready to schedule an interview.";
+  }
+
+  const missingProspectFacts = missingFields.filter(
+    (field) => !WORKFLOW_ONLY_MISSING_FIELDS.has(field)
+  );
+
+  if (missingProspectFacts.length) {
+    return `Qualification in progress — waiting for: ${missingProspectFacts.join(", ")}.`;
   }
 
   const lastInbound = [...conversationMessages].reverse().find((entry) => entry.direction === "incoming");
@@ -232,6 +252,83 @@ function enrichAtlasBriefSummary(summary, conversationMessages = []) {
   return lines.filter(Boolean).slice(0, 6);
 }
 
+function isCollectPhrase(value) {
+  return /^Collect\s/i.test(String(value || ""));
+}
+
+function mergeMissionControlActionCenters(gateCenter, autonomousCenter, context = {}) {
+  if (!autonomousCenter) {
+    return gateCenter;
+  }
+
+  if (!gateCenter) {
+    return {
+      ...autonomousCenter,
+      autonomous: true
+    };
+  }
+
+  const brain = context.brain || {};
+  const workflow = context.workflow || {};
+  const missingFields = brain.missingFields || [];
+  const missingProspectFacts = missingFields.filter(
+    (field) => !WORKFLOW_ONLY_MISSING_FIELDS.has(field)
+  );
+
+  if (TERMINAL_WORKFLOW_MILESTONES.has(workflow.canonicalMilestone)) {
+    return gateCenter;
+  }
+
+  if (missingProspectFacts.length > 0) {
+    return {
+      ...autonomousCenter,
+      confidence: autonomousCenter.confidence ?? gateCenter.confidence,
+      autonomous: true
+    };
+  }
+
+  if (
+    gateCenter.actionId === "schedule" &&
+    (isCollectPhrase(autonomousCenter.nextBestAction) ||
+      autonomousCenter.nextBestAction === "Complete interview scheduling" ||
+      autonomousCenter.nextBestAction === "Collect scheduling preference")
+  ) {
+    return {
+      ...gateCenter,
+      reason: gateCenter.reason || autonomousCenter.reason,
+      confidence: Math.max(gateCenter.confidence || 0, autonomousCenter.confidence || 0),
+      autonomous: true
+    };
+  }
+
+  if (gateCenter.actionId === "schedule") {
+    return {
+      ...gateCenter,
+      confidence: autonomousCenter.confidence ?? gateCenter.confidence,
+      autonomous: true
+    };
+  }
+
+  if (autonomousCenter.actionId && !gateCenter.actionId) {
+    return {
+      ...autonomousCenter,
+      reason: autonomousCenter.reason || gateCenter.reason,
+      confidence: autonomousCenter.confidence ?? gateCenter.confidence,
+      autonomous: true
+    };
+  }
+
+  return {
+    ...gateCenter,
+    nextBestAction: gateCenter.nextBestAction || autonomousCenter.nextBestAction,
+    reason: gateCenter.reason || autonomousCenter.reason,
+    confidence: gateCenter.confidence ?? autonomousCenter.confidence,
+    priority: gateCenter.priority || autonomousCenter.priority,
+    actionId: gateCenter.actionId ?? autonomousCenter.actionId,
+    autonomous: Boolean(autonomousCenter)
+  };
+}
+
 function buildLiveRevision(conversationMessages = [], workflow = {}) {
   const lastMessage = conversationMessages[conversationMessages.length - 1];
 
@@ -245,9 +342,11 @@ function buildLiveRevision(conversationMessages = [], workflow = {}) {
 
 module.exports = {
   RECRUITING_FUNNEL_STEPS,
+  WORKFLOW_ONLY_MISSING_FIELDS,
   fetchConversationThread,
   buildRecruitingFunnelStatus,
   buildAiActionCenter,
+  mergeMissionControlActionCenters,
   enrichAtlasBriefSummary,
   buildLiveRevision
 };

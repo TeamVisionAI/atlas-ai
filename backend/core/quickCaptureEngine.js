@@ -203,6 +203,27 @@ function buildProspectSummary(prospect, overrides = {}) {
   };
 }
 
+function resolveQuickCaptureOrganizationId(atlasUser) {
+  const organizationId = atlasUser?.organization_id || atlasUser?.organizationId || null;
+
+  if (!organizationId) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: "MISSING_ORGANIZATION_ID",
+        message:
+          "Authenticated Atlas user has no organization_id. Prospect cannot be created."
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    organizationId
+  };
+}
+
 async function createQuickCaptureProspect(payload, atlasUser) {
   const validation = validateQuickCapturePayload(payload);
 
@@ -214,6 +235,13 @@ async function createQuickCaptureProspect(payload, atlasUser) {
     };
   }
 
+  const organizationResolution = resolveQuickCaptureOrganizationId(atlasUser);
+
+  if (!organizationResolution.ok) {
+    return organizationResolution;
+  }
+
+  const { organizationId } = organizationResolution;
   const { data } = validation;
   const existing = await findProspectByNormalizedPhone(data.normalizedPhone);
 
@@ -245,6 +273,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
     source: data.source,
     owner_user_id: userId,
     created_by_user_id: userId,
+    organization_id: organizationId,
     status: data.status,
     current_step: data.status,
     prospect_number: prospectNumber,
@@ -281,6 +310,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
         name: fullName,
         current_step: data.status,
         language: data.communicationLanguage,
+        organization_id: organizationId,
         last_message: "",
         notes: buildLegacyNotes(data, atlasUser)
       };
@@ -366,6 +396,7 @@ async function finalizeQuickCaptureProspect(prospect, context) {
 module.exports = {
   validateQuickCapturePayload,
   createQuickCaptureProspect,
+  resolveQuickCaptureOrganizationId,
   findProspectByNormalizedPhone,
   buildProspectSummary
 };

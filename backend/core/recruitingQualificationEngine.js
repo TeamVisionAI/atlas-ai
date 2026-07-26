@@ -6,20 +6,49 @@ const {
   buildProfileFromProspect,
   getMissingFields,
   isScheduleComplete,
-  emailRequired
+  emailRequired,
+  getEffectiveInterviewType
 } = require("./informationModel");
 
+const WORKFLOW_REQUIREMENT_FIELDS = new Set(["schedule", "email", "interviewType"]);
+
+function profileWithEffectiveInterviewType(profile) {
+  if (!profile) {
+    return profile;
+  }
+
+  if (profile.interviewType) {
+    return profile;
+  }
+
+  const effectiveType = getEffectiveInterviewType(profile);
+
+  if (!effectiveType) {
+    return profile;
+  }
+
+  return {
+    ...profile,
+    interviewType: effectiveType
+  };
+}
+
 function assessQualificationFromProfile(profile) {
-  const missingFields = getMissingFields(profile || {});
+  const normalizedProfile = profileWithEffectiveInterviewType(profile || {});
+  const missingFields = getMissingFields(normalizedProfile);
   const preScheduleFields = missingFields.filter(
-    (field) => field !== "schedule" && field !== "email"
+    (field) => !WORKFLOW_REQUIREMENT_FIELDS.has(field)
   );
-  const isQualified = preScheduleFields.length === 0 && Boolean(profile?.interviewType);
+  const resolvedInterviewType = getEffectiveInterviewType(normalizedProfile);
+  const isQualified =
+    preScheduleFields.length === 0 && Boolean(resolvedInterviewType);
   const readyForScheduling =
     isQualified &&
-    (missingFields.includes("schedule") || isScheduleComplete(profile || {}));
+    (missingFields.includes("schedule") || isScheduleComplete(normalizedProfile));
   const isInterviewScheduled = Boolean(
-    profile?.confirmed || profile?.calendarEventId || isScheduleComplete(profile || {})
+    normalizedProfile?.confirmed ||
+      normalizedProfile?.calendarEventId ||
+      isScheduleComplete(normalizedProfile || {})
   );
 
   let confidence = 0.62;
@@ -41,7 +70,8 @@ function assessQualificationFromProfile(profile) {
     missingFields,
     preScheduleFields,
     confidence,
-    nextFocus: preScheduleFields[0] || (missingFields.includes("schedule") ? "schedule" : null)
+    nextFocus:
+      preScheduleFields[0] || (missingFields.includes("email") ? "email" : null)
   };
 }
 
@@ -49,7 +79,7 @@ function assessQualificationFromProspect(prospect, channel = "whatsapp") {
   const profile = buildProfileFromProspect(prospect, channel);
   const assessment = assessQualificationFromProfile(profile);
 
-  if (emailRequired(profile) && !profile.email && assessment.isQualified) {
+  if (emailRequired(profileWithEffectiveInterviewType(profile)) && !profile.email && assessment.isQualified) {
     return {
       ...assessment,
       readyForScheduling: false,
@@ -62,5 +92,7 @@ function assessQualificationFromProspect(prospect, channel = "whatsapp") {
 
 module.exports = {
   assessQualificationFromProfile,
-  assessQualificationFromProspect
+  assessQualificationFromProspect,
+  profileWithEffectiveInterviewType,
+  WORKFLOW_REQUIREMENT_FIELDS
 };

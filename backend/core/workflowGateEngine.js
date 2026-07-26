@@ -4,14 +4,7 @@
  */
 
 const { isWorkflowGateActive } = require("./agentActionEngine");
-
-const GATE_OUTCOMES = Object.freeze([
-  { id: "Recruited", label: "Recruited" },
-  { id: "No Show", label: "No Show" },
-  { id: "Needs More Time", label: "Follow Up" },
-  { id: "Not Interested", label: "Not Interested" },
-  { id: "Rescheduled", label: "Rescheduled" }
-]);
+const { buildInterviewOutcomeReadModel } = require("./interviewOutcomeMappings");
 
 function buildWorkflowGateDescriptor(prospect, agentState) {
   const active = isWorkflowGateActive(prospect, agentState);
@@ -20,16 +13,19 @@ function buildWorkflowGateDescriptor(prospect, agentState) {
     return { active: false };
   }
 
+  const interviewOutcome = buildInterviewOutcomeReadModel(prospect);
+
   return {
     active: true,
     title: "Interview Outcome Required",
     message:
       "This interview has already occurred. Record the result so Atlas can continue the workflow.",
-    outcomes: GATE_OUTCOMES.map((row) => ({ ...row }))
+    outcomeCategories: interviewOutcome.categories,
+    legacyAliases: interviewOutcome.legacyAliases,
+    outcomes: interviewOutcome.categories.flatMap((category) => category.outcomes)
   };
 }
 
 module.exports = {
-  buildWorkflowGateDescriptor,
-  GATE_OUTCOMES
+  buildWorkflowGateDescriptor
 };

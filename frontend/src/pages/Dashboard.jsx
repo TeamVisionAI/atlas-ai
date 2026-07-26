@@ -21,6 +21,7 @@ import NextActions from "../components/NextActions";
 import AiBrief from "../components/AiBrief";
 import AiActionCenter from "../components/AiActionCenter";
 import ConversationPanel from "../components/ConversationPanel";
+import ConversationOutcomePanel from "../components/ConversationOutcomePanel";
 import RecruitingFunnelStatus from "../components/RecruitingFunnelStatus";
 import JourneyPackage from "../components/JourneyPackage";
 import WorkflowGatePanel from "../components/WorkflowGatePanel";
@@ -70,6 +71,29 @@ function findDashboardProspect(dashboard, phone) {
   }
 
   return dashboard.prospects.find((prospect) => prospect.phone === phone) || null;
+}
+
+function buildProspectPatchFromMissionControl(missionControl) {
+  const prospect = missionControl?.prospect;
+
+  if (!prospect) {
+    return null;
+  }
+
+  return {
+    name: prospect.name || undefined,
+    city: prospect.city ?? null,
+    state: prospect.state ?? null,
+    occupation: prospect.occupation ?? null
+  };
+}
+
+function patchProspectInCollection(collection, phone, patch) {
+  if (!collection?.length || !phone || !patch) {
+    return collection;
+  }
+
+  return collection.map((item) => (item.phone === phone ? { ...item, ...patch } : item));
 }
 
 async function loadWorkspaceForQueueItem(item, dashboardData) {
@@ -256,6 +280,48 @@ export default function Dashboard() {
     }
   }, [queue, currentIndex, dashboard]);
 
+  const handleConversationOutcomeSaved = useCallback(
+    async (result) => {
+      const currentItem = queue[currentIndex];
+
+      if (result?.missionControl && currentItem) {
+        const prospectPatch = buildProspectPatchFromMissionControl(result.missionControl);
+        const patchedItem = prospectPatch
+          ? { ...currentItem, ...prospectPatch }
+          : currentItem;
+
+        if (prospectPatch) {
+          setDashboard((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  prospects: patchProspectInCollection(
+                    previous.prospects,
+                    currentItem.phone,
+                    prospectPatch
+                  )
+                }
+              : previous
+          );
+          setQueue((previous) =>
+            patchProspectInCollection(previous, currentItem.phone, prospectPatch)
+          );
+        }
+
+        const adapted = adaptMissionControlResponse(
+          result.missionControl,
+          findDashboardProspect(dashboard, currentItem.phone) || patchedItem,
+          { isLive: !isMockQueueProspect(currentItem) }
+        );
+        setWorkspace(adapted);
+        return;
+      }
+
+      await refreshCurrentWorkspace();
+    },
+    [queue, currentIndex, dashboard, refreshCurrentWorkspace]
+  );
+
   useEffect(() => {
     if (!phone || !workspace?.isLive || prospectLoading) {
       return undefined;
@@ -346,37 +412,48 @@ export default function Dashboard() {
   );
 
   const handleGateOutcome = useCallback(
-    async (localState) => {
+    async (formState, result) => {
       if (!phone) {
         return;
       }
 
-      const saved = saveWorkflowState(phone, localState);
-      setWorkflowState(saved);
-
-      try {
-        await syncMissionControlWorkflow(phone, saved);
-      } catch (err) {
-        console.error(err);
-      }
-
       const currentItem = queue[currentIndex];
 
-      if (currentItem) {
-        const adapted = await loadWorkspaceForQueueItem(currentItem, dashboard);
+      if (result?.missionControl && currentItem) {
+        const adapted = adaptMissionControlResponse(
+          result.missionControl,
+          findDashboardProspect(dashboard, currentItem.phone) || currentItem,
+          { isLive: !isMockQueueProspect(currentItem) }
+        );
+        setWorkspace(adapted);
 
-        if (adapted) {
-          setWorkspace(adapted);
-        }
-      }
-
-      if (saved.outcome === "Recruited" && saved.orientationScheduled) {
-        setWorkflowComplete({
-          message: translate("missionControlOrientationReady")
+        const agentOutcome = result.missionControl.brain?.outcome ?? result.outcome ?? null;
+        const saved = saveWorkflowState(phone, {
+          ...loadWorkflowState(phone),
+          outcome: agentOutcome,
+          orientationDate: formState?.orientationDate || null,
+          orientationTime: formState?.orientationTime || null,
+          orientationScheduled: Boolean(formState?.orientationDate && formState?.orientationTime),
+          followUpDate: formState?.followUpDate || null,
+          followUpTime: formState?.followUpTime || null
         });
+        setWorkflowState(saved);
+
+        if (
+          (result.outcome === "Recruited" || result.outcome === "Orientation Scheduled") &&
+          saved.orientationScheduled
+        ) {
+          setWorkflowComplete({
+            message: translate("missionControlOrientationReady")
+          });
+        }
+
+        return;
       }
+
+      await refreshCurrentWorkspace();
     },
-    [phone, queue, currentIndex, dashboard, translate]
+    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, translate]
   );
 
   const handlePackageSent = useCallback(() => {
@@ -634,6 +711,17 @@ export default function Dashboard() {
             expandedContent={workspaceContext.expandedBrief}
           />
         </section>
+
+        {!isMockQueueProspect(queue[currentIndex]) ? (
+          <section>
+            <ConversationOutcomePanel
+              phone={phone}
+              conversationOutcome={workspace.conversationOutcome}
+              disabled={prospectLoading}
+              onSaved={handleConversationOutcomeSaved}
+            />
+          </section>
+        ) : null}
 
         <section
           style={{

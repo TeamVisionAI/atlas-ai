@@ -35,9 +35,13 @@ const {
   fetchConversationThread,
   buildRecruitingFunnelStatus,
   buildAiActionCenter,
+  mergeMissionControlActionCenters,
   enrichAtlasBriefSummary,
   buildLiveRevision
 } = require("../core/missionControlLiveReadModel");
+const {
+  buildConversationOutcomeReadModel
+} = require("../core/conversationOutcomeEngine");
 const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
 
 function buildActionError(action, error, message) {
@@ -356,22 +360,22 @@ async function getMissionControlWithActions(phone) {
     phone: resolvedPhone
   }).catch(() => null);
 
-  const mergedActionCenter = autonomousProgress?.aiActionCenter
-    ? {
-        ...aiActionCenter,
-        nextBestAction:
-          autonomousProgress.aiActionCenter.nextBestAction || aiActionCenter.nextBestAction,
-        reason: autonomousProgress.aiActionCenter.reason || aiActionCenter.reason,
-        confidence:
-          autonomousProgress.aiActionCenter.confidence ?? aiActionCenter.confidence,
-        priority: autonomousProgress.aiActionCenter.priority || aiActionCenter.priority,
-        actionId: autonomousProgress.aiActionCenter.actionId || aiActionCenter.actionId,
-        autonomous: true
-      }
-    : aiActionCenter;
+  const mergedActionCenter = mergeMissionControlActionCenters(
+    aiActionCenter,
+    autonomousProgress?.aiActionCenter,
+    {
+      brain: missionControl.brain,
+      workflow
+    }
+  );
 
   const recruitingStatus = buildRecruitingFunnelStatus(workflow, missionControl.brain);
   const liveRevision = buildLiveRevision(conversationMessages, workflow);
+  const conversationOutcome = buildConversationOutcomeReadModel({
+    prospect,
+    brain: missionControl.brain,
+    conversationMessages
+  });
 
   const [latestConversation, workflowGate] = await Promise.all([
     Promise.resolve(
@@ -396,6 +400,8 @@ async function getMissionControlWithActions(phone) {
     aiActionCenter: mergedActionCenter,
     recruitingStatus,
     liveRevision,
+    conversationOutcome,
+    workflowRequirements: conversationOutcome?.workflowRequirements || [],
     agentState: {
       flags: agentState.flags,
       outcome: agentState.outcome,
