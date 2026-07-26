@@ -90,6 +90,8 @@ async function main() {
   assert(!gapKeys.includes("city"), "city removed from knowledge gaps");
   assert(!gapKeys.includes("state"), "state removed from knowledge gaps");
   assert(!gapKeys.includes("occupation"), "occupation removed from knowledge gaps");
+  assert(refreshed.conversationOutcome?.recordedOutcome, "recordedOutcome returned after save");
+  assert(refreshed.conversationOutcome?.canRecordOutcome === false, "canRecordOutcome false after save");
   console.log("✓ Mission Control knowledge gaps refresh after save");
 
   const activity = await listProspectActivityFeed(TEST_PHONE, { limit: 10 });

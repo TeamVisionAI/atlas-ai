@@ -136,6 +136,20 @@
   cursor: not-allowed;
 }
 
+.conversation-outcome__recorded {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #166534;
+}
+
+.conversation-outcome--recorded {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  border-radius: 14px;
+  padding: 16px;
+}
+
 .conversation-outcome__error {
   margin: 0;
   color: #b91c1c;

@@ -9,8 +9,8 @@ export const FIELD_INPUT_CONFIG = Object.freeze({
   preferred_language: {
     type: "select",
     options: [
-      { value: "en", labelKey: "quickCaptureLanguageEn" },
-      { value: "es", labelKey: "quickCaptureLanguageEs" }
+      { value: "english", labelKey: "quickCaptureLanguageEn" },
+      { value: "spanish", labelKey: "quickCaptureLanguageEs" }
     ],
     placeholderKey: "conversationOutcomeSelectLanguage"
   },

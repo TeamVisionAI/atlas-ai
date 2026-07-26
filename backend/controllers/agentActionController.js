@@ -42,6 +42,7 @@ const {
 const {
   buildConversationOutcomeReadModel
 } = require("../core/conversationOutcomeEngine");
+const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
 const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
 
 function buildActionError(action, error, message) {
@@ -111,7 +112,7 @@ async function executeAgentAction(phone, action, payload = {}) {
 
   const agentState = loadAgentState(phone);
   const organizationSettings = getOrganizationSettings();
-  const language = prospect.language === "es" ? "es" : "en";
+  const language = resolveProspectCommunicationCode(prospect);
 
   switch (action) {
     case ACTION_IDS.SEND_ZOOM_LINK: {

@@ -158,3 +158,27 @@ export async function saveInterviewOutcome(phone, body) {
 
   return result;
 }
+
+/**
+ * Sprint 18.2 — Request suggested availability slots from Mission Control.
+ * @param {string} phone
+ * @param {{ date?: string, duration?: number, appointmentType?: string }} [params]
+ */
+export async function fetchMissionControlAvailability(phone, params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.date) {
+    query.set("date", params.date);
+  }
+
+  if (params.duration) {
+    query.set("duration", String(params.duration));
+  }
+
+  if (params.appointmentType) {
+    query.set("appointmentType", params.appointmentType);
+  }
+
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch(`/api/mission-control/${encodeURIComponent(phone)}/availability${suffix}`);
+}

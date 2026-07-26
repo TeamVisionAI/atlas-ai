@@ -11,7 +11,14 @@ const {
 } = require("./informationModel");
 const { extractInformation } = require("./informationExtractor");
 const { COMMUNICATION_LANGUAGES } = require("./quickCaptureConstants");
+const {
+  normalizePreferredLanguage,
+  resolveProspectPreferredLanguage,
+  formatPreferredLanguageLabel,
+  syncProspectLanguageFields
+} = require("./prospectLanguage");
 const { advanceProspectWorkflow } = require("./humanAdvancementEngine");
+const { loadAgentState } = require("./agentActionState");
 const { MILESTONES } = require("./workflowConstants");
 const { isProductionProspect } = require("./productionProspectFilter");
 
@@ -24,6 +31,18 @@ const CONVERSATION_OUTCOMES = Object.freeze([
   "No Answer",
   "Left Voicemail"
 ]);
+
+const AGENT_OUTCOME_TO_LABEL = Object.freeze({
+  "Information Collected": "Information Collected",
+  Interested: "Interested",
+  "Needs More Time": "Needs Follow-up",
+  "No Answer": "No Answer",
+  "Left Voicemail": "Left Voicemail",
+  "Appointment Scheduled": "Appointment Scheduled",
+  "Not Interested": "Not Interested"
+});
+
+const RECORDED_AGENT_OUTCOMES = new Set(Object.keys(AGENT_OUTCOME_TO_LABEL));
 
 const INTENT_LABELS = Object.freeze({
   GREETING: "Greeting",
@@ -42,7 +61,7 @@ const FIELD_LABELS = Object.freeze({
   city: "City",
   state: "State",
   occupation: "Occupation",
-  preferred_language: "Language",
+  preferred_language: "Preferred Language",
   work_authorization_status: "Work Authorization"
 });
 
@@ -116,6 +135,12 @@ function formatWorkAuthorization(value) {
 }
 
 function normalizeLanguage(value) {
+  const preferred = normalizePreferredLanguage(value);
+
+  if (preferred) {
+    return preferred === "spanish" ? "es" : "en";
+  }
+
   const normalized = String(value || "").trim().toLowerCase();
   return COMMUNICATION_LANGUAGES.includes(normalized) ? normalized : null;
 }
@@ -241,10 +266,6 @@ function buildKnowledgeGaps(prospect, profile, missingFields) {
     gaps.push("occupation");
   }
 
-  if (!normalizeLanguage(prospect.communication_language || prospect.language)) {
-    gaps.push("preferred_language");
-  }
-
   if (profile.authorization === null || profile.authorization === undefined) {
     gaps.push("work_authorization_status");
   }
@@ -329,18 +350,6 @@ function buildRequiredInputs(prospect, profile, missingFields = []) {
     });
   }
 
-  if (
-    !missingFields.includes("schedule") &&
-    !normalizeLanguage(prospect.communication_language || prospect.language) &&
-    !inputs.some((row) => row.key === "preferred_language")
-  ) {
-    inputs.push({
-      key: "preferred_language",
-      label: FIELD_LABELS.preferred_language,
-      source: "identity_gap"
-    });
-  }
-
   return inputs;
 }
 
@@ -352,18 +361,19 @@ function resolveExplicitProfileFields(rawFields = {}) {
 
 function buildKnownInformation(prospect, profile, brain, latestMessageText, entryMethod) {
   const known = [];
-  const language = normalizeLanguage(
-    prospect.communication_language || prospect.language || brain?.language
-  );
+  const preferredLanguage = resolveProspectPreferredLanguage(prospect);
 
-  if (language) {
-    known.push({
-      key: "preferred_language",
-      label: FIELD_LABELS.preferred_language,
-      value: language === "es" ? "Spanish" : "English",
-      source: prospect.communication_language || prospect.language ? "stored" : "ai_detected"
-    });
-  }
+  known.push({
+    key: "preferred_language",
+    label: FIELD_LABELS.preferred_language,
+    value: formatPreferredLanguageLabel(preferredLanguage),
+    source:
+      prospect.preferred_language ||
+      prospect.communication_language ||
+      prospect.language
+        ? "stored"
+        : "stored"
+  });
 
   const authorizationLabel = formatWorkAuthorization(profile.authorization);
 
@@ -444,6 +454,19 @@ function buildKnownInformation(prospect, profile, brain, latestMessageText, entr
   return known;
 }
 
+function resolveRecordedConversationOutcome(prospect) {
+  const agentOutcome = sanitizeText(loadAgentState(prospect.phone)?.outcome);
+
+  if (!agentOutcome || !RECORDED_AGENT_OUTCOMES.has(agentOutcome)) {
+    return null;
+  }
+
+  return {
+    key: agentOutcome,
+    label: AGENT_OUTCOME_TO_LABEL[agentOutcome] || agentOutcome
+  };
+}
+
 function buildConversationOutcomeReadModel({
   prospect,
   brain,
@@ -464,6 +487,7 @@ function buildConversationOutcomeReadModel({
   }));
   const workflowRequirements = buildWorkflowRequirements(profile, missingFields);
   const requiredInputs = buildRequiredInputs(prospect, profile, missingFields);
+  const recordedOutcome = resolveRecordedConversationOutcome(prospect);
   const knownInformation = buildKnownInformation(
     prospect,
     profile,
@@ -478,6 +502,8 @@ function buildConversationOutcomeReadModel({
     knowledgeGaps,
     requiredInputs,
     workflowRequirements,
+    recordedOutcome,
+    canRecordOutcome: requiredInputs.length === 0 && !recordedOutcome,
     draft,
     fields: {
       first_name: prospect.first_name || "",
@@ -486,8 +512,7 @@ function buildConversationOutcomeReadModel({
       city: profile.city || "",
       state: profile.state || "",
       occupation: profile.occupation || "",
-      preferred_language:
-        normalizeLanguage(prospect.communication_language || prospect.language) || "",
+      preferred_language: resolveProspectPreferredLanguage(prospect),
       work_authorization_status:
         profile.authorization === true
           ? "work_permit"
@@ -534,10 +559,10 @@ function normalizeSubmittedFields(rawFields = {}, prospect) {
   }
 
   if (rawFields.preferred_language !== undefined) {
-    const language = normalizeLanguage(rawFields.preferred_language);
+    const language = normalizePreferredLanguage(rawFields.preferred_language);
 
     if (rawFields.preferred_language && !language) {
-      errors.preferred_language = "Must be es or en";
+      errors.preferred_language = "Must be english or spanish";
     } else if (language) {
       fields.preferred_language = language;
     }
@@ -746,13 +771,11 @@ async function persistIdentityAndLanguageFields(prospect, fields) {
   }
 
   if (fields.preferred_language) {
-    const existingLanguage = normalizeLanguage(
-      prospect.communication_language || prospect.language
-    );
+    const synced = syncProspectLanguageFields(fields.preferred_language);
+    const existingPreferred = resolveProspectPreferredLanguage(prospect);
 
-    if (!existingLanguage || fields.preferred_language !== existingLanguage) {
-      updates.communication_language = fields.preferred_language;
-      updates.language = fields.preferred_language;
+    if (synced.preferred_language !== existingPreferred) {
+      Object.assign(updates, synced);
       changed.push("preferred_language");
     }
   }

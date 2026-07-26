@@ -8,6 +8,7 @@ const { postWorkflowAdvance } = require("../controllers/workflowAdvanceControlle
 const { postConversationOutcome } = require("../controllers/conversationOutcomeController");
 const { postRequiredInformation } = require("../controllers/requiredInformationController");
 const { postInterviewOutcome } = require("../controllers/interviewOutcomeController");
+const { getMissionControlAvailability } = require("../controllers/availabilityController");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { getCommunicationGateway } = require("../communication/gateway/createCommunicationGateway");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
@@ -36,6 +37,8 @@ function rejectSimulatorProspect(phone, res) {
 
   return false;
 }
+
+router.get("/:phone/availability", requireLegacyProspectAccess(), getMissionControlAvailability);
 
 router.get("/:phone", requireLegacyProspectAccess(), async (req, res) => {
   try {

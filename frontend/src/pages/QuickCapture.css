@@ -161,6 +161,95 @@
   color: #334155;
 }
 
+.quick-capture-success {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quick-capture-success__icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.quick-capture-success__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.quick-capture-success__message {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.quick-capture-recommendation {
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.quick-capture-recommendation__title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.quick-capture-recommendation__intro,
+.quick-capture-recommendation__time {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.quick-capture-recommendation__step {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #0f172a;
+}
+
+.quick-capture-recommendation__time {
+  margin-bottom: 0;
+}
+
+.quick-capture-success__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.quick-capture-success__primary,
+.quick-capture-success__secondary {
+  width: 100%;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quick-capture-success__primary {
+  border: none;
+  background: #111827;
+  color: #fff;
+}
+
+.quick-capture-success__secondary {
+  border: 1px solid #dbe1ea;
+  background: #fff;
+  color: #334155;
+}
+
 /* Phone: floating card, nearly full width, comfortable margins */
 @media (max-width: 767px) {
   .quick-capture-page {

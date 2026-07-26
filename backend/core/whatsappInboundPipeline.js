@@ -10,6 +10,7 @@ const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { processConversationAfterInbound } = require("./communicationHub");
 const { onMessageReceived } = require("./recruitingWorkflowHooks");
+const { resolveProspectCommunicationCode } = require("./prospectLanguage");
 
 function buildInboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.INBOUND}${providerMessageId}`;
@@ -53,7 +54,7 @@ async function processInboundWhatsAppMessage(inbound) {
     intent: "WHATSAPP_INBOUND",
     pipeline: prospect.current_step || "NEW",
     currentStep: prospect.current_step || "NEW",
-    language: prospect.language || prospect.communication_language || "es",
+    language: resolveProspectCommunicationCode(prospect),
     city: prospect.city || null,
     state: prospect.state || null,
     eventCorrelationId: correlationId,

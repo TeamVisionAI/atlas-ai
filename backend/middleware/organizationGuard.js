@@ -4,6 +4,7 @@
  */
 
 const { isSuperAdmin } = require("../security/saasRoles");
+const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 
 function resolveRequestedOrganizationId(req) {
   return (

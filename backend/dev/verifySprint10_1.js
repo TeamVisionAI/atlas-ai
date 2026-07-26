@@ -121,27 +121,27 @@ async function main() {
     first_name: "Auto",
     last_name: "Lead",
     phone: "3055550100",
-    communication_language: "en",
+    preferred_language: "english",
     entry_method: "FACEBOOK"
   });
   assert(automated.valid === false, "Automated entry method rejected");
   console.log("✓ Automated entry methods rejected");
 
-  const defaultLanguage = validateQuickCapturePayload({
+  const missingLanguage = validateQuickCapturePayload({
     first_name: "Default",
     last_name: "Language",
     phone: "3055550198"
   });
-  assert(defaultLanguage.valid === true, "Missing communication_language defaults");
-  assert(defaultLanguage.data.communicationLanguage === "es", "Default communication language is es");
-  console.log("✓ Default communication language when omitted");
+  assert(missingLanguage.valid === false, "Missing preferred_language rejected");
+  assert(missingLanguage.errors.fields.preferred_language, "preferred_language required");
+  console.log("✓ Preferred language required when omitted");
 
   const app = createTestApp();
   const unauthorized = await postQuickCapture(app, null, {
     first_name: "No",
     last_name: "Auth",
     phone: "3055550101",
-    communication_language: "en"
+    preferred_language: "english"
   });
   assert(unauthorized.status === 401, `Unauthorized expected 401, got ${unauthorized.status}`);
   console.log("✓ Unauthorized request");
@@ -155,7 +155,7 @@ async function main() {
     first_name: "Maria",
     last_name: "Gonzalez",
     phone: rawPhone,
-    communication_language: "es",
+    preferred_language: "spanish",
     source: "IN_PERSON"
   });
 
@@ -172,8 +172,12 @@ async function main() {
     "Created by should be authenticated user"
   );
   assert(
+    createdEs.payload.prospect.preferred_language === "spanish",
+    "Spanish preferred language stored"
+  );
+  assert(
     createdEs.payload.prospect.communication_language === "es",
-    "Spanish communication language stored"
+    "Spanish communication code synced"
   );
   assert(
     createdEs.payload.prospect.preferred_communication_channel === "WHATSAPP",
@@ -185,7 +189,7 @@ async function main() {
     first_name: "Maria",
     last_name: "Duplicate",
     phone: `(305) 555-${suffix}`,
-    communication_language: "es",
+    preferred_language: "spanish",
     source: "REFERRAL"
   });
   assert(duplicate.status === 409, `Duplicate expected 409, got ${duplicate.status}`);
@@ -197,14 +201,18 @@ async function main() {
     first_name: "James",
     last_name: "Carter",
     phone: createdEnPhone,
-    communication_language: "en",
+    preferred_language: "english",
     source: "NETWORKING"
   });
   assert(createdEn.status === 201, `Create EN expected 201, got ${createdEn.status}`);
   createdPhones.push(createdEn.payload.prospect.phone);
   assert(
+    createdEn.payload.prospect.preferred_language === "english",
+    "English preferred language stored"
+  );
+  assert(
     createdEn.payload.prospect.communication_language === "en",
-    "English communication language stored"
+    "English communication code synced"
   );
   console.log("✓ English prospect creation");
 

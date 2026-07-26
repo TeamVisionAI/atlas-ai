@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import { appPath } from "../config/appRoutes";
 import { useFacebookSdk } from "../hooks/useFacebookSdk";
 import {
   exchangeEmbeddedSignupCode,
@@ -506,7 +507,7 @@ export default function WhatsAppConnect() {
   return (
     <div className="whatsapp-connect">
       <header className="whatsapp-connect__header">
-        <Link to="/settings" className="whatsapp-connect__back">
+        <Link to={appPath("settings")} className="whatsapp-connect__back">
           ← {translate("whatsappConnectBack")}
         </Link>
       </header>

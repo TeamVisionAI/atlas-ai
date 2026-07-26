@@ -6,7 +6,13 @@ import {
   saveQuickCaptureProspect
 } from "../services/quickCaptureService";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
+import QuickCaptureSuccess from "../components/quick-capture/QuickCaptureSuccess";
 import "./QuickCapture.css";
+
+const LANGUAGE_OPTIONS = [
+  { value: "english", labelKey: "quickCaptureLanguageEn" },
+  { value: "spanish", labelKey: "quickCaptureLanguageEs" }
+];
 
 const MANUAL_SOURCES = [
   { value: "IN_PERSON", labelKey: "quickCaptureSourceInPerson" },
@@ -22,6 +28,7 @@ const EMPTY_FORM = {
   first_name: "",
   last_name: "",
   phone: "",
+  preferred_language: "english",
   source: "IN_PERSON"
 };
 
@@ -49,13 +56,14 @@ function DuplicateDialog({ duplicate, t, onOpen, onCancel }) {
 }
 
 export default function QuickCapture() {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [form, setForm] = useState(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [duplicate, setDuplicate] = useState(null);
+  const [completion, setCompletion] = useState(null);
 
   const sourceOptions = useMemo(
     () =>
@@ -87,6 +95,10 @@ export default function QuickCapture() {
       errors.phone = t.quickCaptureRequired;
     }
 
+    if (!form.preferred_language) {
+      errors.preferred_language = t.quickCaptureRequired;
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -103,14 +115,14 @@ export default function QuickCapture() {
     setDuplicate(null);
 
     try {
-      const result = await saveQuickCaptureProspect({
-        ...form,
-        communication_language: language
-      });
-      const phone = result?.prospect?.phone;
+      const result = await saveQuickCaptureProspect(form);
 
-      if (phone) {
-        navigate(buildProspectWorkspacePath({ phone }));
+      if (result?.prospect?.phone) {
+        setCompletion({
+          prospect: result.prospect,
+          recommendedAction: result.recommendedAction,
+          estimatedMinutes: result.estimatedMinutes
+        });
         return;
       }
 
@@ -137,6 +149,14 @@ export default function QuickCapture() {
     }
   }
 
+  function handleCaptureAnother() {
+    setCompletion(null);
+    setForm({ ...EMPTY_FORM });
+    setFieldErrors({});
+    setSubmitError(null);
+    setDuplicate(null);
+  }
+
   function openExistingProspect() {
     if (!duplicate?.phone) {
       setDuplicate(null);
@@ -144,6 +164,23 @@ export default function QuickCapture() {
     }
 
     navigate(buildProspectWorkspacePath({ phone: duplicate.phone }));
+  }
+
+  if (completion) {
+    return (
+      <div className="quick-capture-page">
+        <div className="quick-capture-shell">
+          <div className="quick-capture-card">
+            <QuickCaptureSuccess
+              prospect={completion.prospect}
+              recommendedAction={completion.recommendedAction}
+              estimatedMinutes={completion.estimatedMinutes}
+              onCaptureAnother={handleCaptureAnother}
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -194,6 +231,24 @@ export default function QuickCapture() {
             />
             {fieldErrors.phone ? (
               <span className="quick-capture-error-text">{fieldErrors.phone}</span>
+            ) : null}
+          </label>
+
+          <label className="quick-capture-field">
+            <span className="quick-capture-label">{t.quickCapturePreferredLanguage}</span>
+            <select
+              className={`quick-capture-select${fieldErrors.preferred_language ? " quick-capture-input--error" : ""}`}
+              value={form.preferred_language}
+              onChange={(event) => updateField("preferred_language", event.target.value)}
+            >
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {t[option.labelKey]}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.preferred_language ? (
+              <span className="quick-capture-error-text">{fieldErrors.preferred_language}</span>
             ) : null}
           </label>
 

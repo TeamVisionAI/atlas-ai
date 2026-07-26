@@ -1,9 +1,12 @@
+import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Dashboard from "./pages/Dashboard";
 import ProspectWorkspace from "./pages/ProspectWorkspace";
 import ProspectCenter from "./pages/ProspectCenter";
+import ConfigurationLayout from "./pages/configuration/ConfigurationLayout";
+import ConfigurationHub from "./pages/configuration/ConfigurationHub";
 import WhatsAppConnect from "./pages/WhatsAppConnect";
 import QuickCapture from "./pages/QuickCapture";
 import KnowledgeHub from "./pages/KnowledgeHub";
@@ -26,6 +29,10 @@ import Legal from "./pages/Legal";
 import Terms from "./pages/Terms";
 import DataDeletion from "./pages/DataDeletion";
 import { appPath } from "./config/appRoutes";
+
+const ProfileConfiguration = lazy(() => import("./pages/configuration/ProfileConfiguration"));
+const OrganizationConfiguration = lazy(() => import("./pages/configuration/OrganizationConfiguration"));
+const SchedulingConfiguration = lazy(() => import("./pages/configuration/SchedulingConfiguration"));
 
 function LegacyRedirect({ suffix = "" }) {
   const location = useLocation();
@@ -122,18 +129,13 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="settings"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderSettingsTitle"
-              descriptionKey="placeholderSettingsDescription"
-              actionHref={appPath("settings/whatsapp")}
-              actionLabelKey="whatsappConnectOpenFromSettings"
-            />
-          }
-        />
-        <Route path="settings/whatsapp" element={<WhatsAppConnect />} />
+        <Route path="settings" element={<ConfigurationLayout />}>
+          <Route index element={<ConfigurationHub />} />
+          <Route path="profile" element={<ProfileConfiguration />} />
+          <Route path="organization" element={<OrganizationConfiguration />} />
+          <Route path="whatsapp" element={<WhatsAppConnect />} />
+          <Route path="scheduling" element={<SchedulingConfiguration />} />
+        </Route>
         <Route path="knowledge" element={<KnowledgeHub />} />
         <Route path="my-account" element={<MyAccount />} />
         <Route path="admin/users" element={<AdminUsers />} />

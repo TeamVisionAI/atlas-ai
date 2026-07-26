@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import basicSsl from '@vitejs/plugin-basic-ssl'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,12 +10,15 @@ const mkcertKeyPath = path.join(certDir, 'localhost-key.pem')
 const mkcertCertPath = path.join(certDir, 'localhost.pem')
 const hasMkcert =
   fs.existsSync(mkcertKeyPath) && fs.existsSync(mkcertCertPath)
+const enableHttps =
+  process.env.ATLAS_DEV_HTTPS === '1' ||
+  process.env.ATLAS_DEV_HTTPS === 'true'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), ...(hasMkcert ? [] : [basicSsl()])],
+  plugins: [react()],
   server: {
-    ...(hasMkcert
+    ...(enableHttps && hasMkcert
       ? {
           https: {
             key: fs.readFileSync(mkcertKeyPath),

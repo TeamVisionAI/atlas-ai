@@ -314,6 +314,9 @@ export default function Dashboard() {
           { isLive: !isMockQueueProspect(currentItem) }
         );
         setWorkspace(adapted);
+        setWorkflowState(
+          loadWorkflowState(currentItem.phone) || createDefaultWorkflowState()
+        );
         return;
       }
 

@@ -14,6 +14,7 @@ const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { resolveWhatsAppSendCredentials } = require("./whatsappSendCredentials");
 const { onMessageSent } = require("./recruitingWorkflowHooks");
+const { resolveProspectCommunicationCode } = require("./prospectLanguage");
 
 function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
@@ -117,7 +118,7 @@ async function sendAndPersistWhatsAppMessage({
     intent,
     pipeline: prospect?.current_step || "NEW",
     currentStep: prospect?.current_step || "NEW",
-    language: prospect?.language || prospect?.communication_language || "es",
+    language: resolveProspectCommunicationCode(prospect),
     city: prospect?.city || null,
     state: prospect?.state || null,
     eventCorrelationId: outboundCorrelationId,

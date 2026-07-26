@@ -2,6 +2,7 @@ import KnownInformationSection from "./mission-control/KnownInformationSection";
 import WorkflowRequirementsSection from "./mission-control/WorkflowRequirementsSection";
 import RequiredInformationPanel from "./mission-control/RequiredInformationPanel";
 import ConversationOutcomeSection from "./mission-control/ConversationOutcomeSection";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function ConversationOutcomePanel({
   phone,
@@ -9,6 +10,8 @@ export default function ConversationOutcomePanel({
   disabled = false,
   onSaved
 }) {
+  const { translate } = useLanguage();
+
   if (!conversationOutcome) {
     return null;
   }
@@ -16,6 +19,7 @@ export default function ConversationOutcomePanel({
   const requiredInputs = conversationOutcome.requiredInputs || [];
   const workflowRequirements = conversationOutcome.workflowRequirements || [];
   const hasRequiredInputs = requiredInputs.length > 0;
+  const canRecordOutcome = conversationOutcome.canRecordOutcome !== false;
   const hasKnownInformation = (conversationOutcome.knownInformation || []).length > 0;
   const hasWorkflowRequirements = workflowRequirements.length > 0;
 
@@ -41,13 +45,24 @@ export default function ConversationOutcomePanel({
         </section>
       ) : null}
 
-      {!hasRequiredInputs ? (
+      {!hasRequiredInputs && canRecordOutcome ? (
         <ConversationOutcomeSection
           phone={phone}
           conversationOutcome={conversationOutcome}
           disabled={disabled}
           onSaved={onSaved}
         />
+      ) : null}
+
+      {!hasRequiredInputs && conversationOutcome.recordedOutcome ? (
+        <section className="conversation-outcome conversation-outcome--recorded">
+          <h3 className="conversation-outcome__title">{translate("conversationOutcomeTitle")}</h3>
+          <p className="conversation-outcome__recorded">
+            {translate("conversationOutcomeRecorded", {
+              outcome: conversationOutcome.recordedOutcome.label
+            })}
+          </p>
+        </section>
       ) : null}
     </div>
   );

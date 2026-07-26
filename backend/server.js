@@ -25,6 +25,7 @@ const authRoutes = require("./routes/auth");
 const adminUsersRoutes = require("./routes/adminUsers");
 const setupRoutes = require("./routes/setup");
 const accountRoutes = require("./routes/account");
+const configurationRoutes = require("./routes/configuration");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
@@ -177,6 +178,7 @@ app.use("/api", setupRoutes);
 app.use("/api", authRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/account", accountRoutes);
+app.use("/api/configuration", configurationRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
 

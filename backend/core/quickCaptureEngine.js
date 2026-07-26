@@ -15,16 +15,23 @@ const {
   ENTRY_METHOD,
   DEFAULT_SOURCE,
   MANUAL_SOURCES,
-  COMMUNICATION_LANGUAGES,
+  PREFERRED_LANGUAGES,
+  DEFAULT_PREFERRED_LANGUAGE,
   DEFAULT_STATUS,
   AUTOMATED_ENTRY_METHODS,
   AUTOMATED_SOURCES,
   DEFAULT_PREFERRED_COMMUNICATION_CHANNEL
 } = require("../core/quickCaptureConstants");
+const {
+  normalizePreferredLanguage,
+  syncProspectLanguageFields,
+  formatPreferredLanguageLabel
+} = require("../core/prospectLanguage");
 const { generateNextProspectNumber } = require("../services/prospectNumberService");
 const { emit, EVENT_TYPES } = require("./eventEngine");
 const { savePersistedWorkflowState } = require("./workflowStateStore");
 const { MILESTONES, OWNERSHIP } = require("./workflowConstants");
+const { buildQuickCaptureGuidance } = require("./quickCaptureRecommendationEngine");
 
 function buildValidationErrors(fields) {
   return {
@@ -43,7 +50,9 @@ function validateQuickCapturePayload(body = {}) {
   const firstName = sanitizeName(body.first_name);
   const lastName = sanitizeName(body.last_name);
   const phone = sanitizeName(body.phone);
-  const communicationLanguage = sanitizeName(body.communication_language).toLowerCase() || "es";
+  const preferredLanguageRaw =
+    body.preferred_language ?? body.preferredLanguage ?? body.communication_language;
+  const preferredLanguage = normalizePreferredLanguage(preferredLanguageRaw);
   const manualSource = sanitizeName(body.source || body.manual_source).toUpperCase();
   const requestedEntryMethod = sanitizeName(body.entry_method).toUpperCase();
 
@@ -59,8 +68,10 @@ function validateQuickCapturePayload(body = {}) {
     fields.phone = "Required";
   }
 
-  if (!COMMUNICATION_LANGUAGES.includes(communicationLanguage)) {
-    fields.communication_language = "Must be es or en";
+  if (!preferredLanguage) {
+    fields.preferred_language = "Required";
+  } else if (!PREFERRED_LANGUAGES.includes(preferredLanguage)) {
+    fields.preferred_language = "Must be english or spanish";
   }
 
   if (requestedEntryMethod && AUTOMATED_ENTRY_METHODS.includes(requestedEntryMethod)) {
@@ -98,7 +109,8 @@ function validateQuickCapturePayload(body = {}) {
       lastName,
       phone: formatPhoneForStorage(normalizedPhone),
       normalizedPhone,
-      communicationLanguage,
+      preferredLanguage,
+      languageFields: syncProspectLanguageFields(preferredLanguage),
       source,
       entryMethod: ENTRY_METHOD.QUICK_CAPTURE,
       status: DEFAULT_STATUS,
@@ -142,6 +154,19 @@ async function findProspectByNormalizedPhone(normalizedPhone) {
   return legacyDigits;
 }
 
+function buildPersistedLanguageFields(languageFields, { includePreferredColumn = true } = {}) {
+  const row = {
+    communication_language: languageFields.communication_language,
+    language: languageFields.language
+  };
+
+  if (includePreferredColumn) {
+    row.preferred_language = languageFields.preferred_language;
+  }
+
+  return row;
+}
+
 function isMissingQuickCaptureColumn(error) {
   if (!error) {
     return false;
@@ -154,6 +179,7 @@ function isMissingQuickCaptureColumn(error) {
     error.code === "PGRST204" ||
     message.includes("schema cache") ||
     message.includes("communication_language") ||
+    message.includes("preferred_language") ||
     message.includes("normalized_phone") ||
     message.includes("prospect_number") ||
     message.includes("entry_method") ||
@@ -165,7 +191,8 @@ function buildLegacyNotes(data, atlasUser) {
   return [
     "QUICK_CAPTURE",
     JSON.stringify({
-      communication_language: data.communicationLanguage,
+      preferred_language: data.preferredLanguage,
+      communication_language: data.languageFields.communication_language,
       source: data.source,
       entry_method: data.entryMethod,
       owner_user_id: atlasUser.id,
@@ -179,6 +206,12 @@ function buildLegacyNotes(data, atlasUser) {
 }
 
 function buildProspectSummary(prospect, overrides = {}) {
+  const preferredLanguage =
+    prospect.preferred_language ||
+    overrides.preferred_language ||
+    normalizePreferredLanguage(prospect.communication_language || prospect.language) ||
+    DEFAULT_PREFERRED_LANGUAGE;
+
   return {
     id: prospect.id || null,
     phone: prospect.phone,
@@ -187,11 +220,12 @@ function buildProspectSummary(prospect, overrides = {}) {
     last_name: prospect.last_name || overrides.last_name || null,
     name: prospect.name || null,
     status: prospect.status || prospect.current_step || overrides.status || null,
+    preferred_language: preferredLanguage,
+    preferred_language_label: formatPreferredLanguageLabel(preferredLanguage),
     communication_language:
       prospect.communication_language ||
-      prospect.language ||
       overrides.communication_language ||
-      null,
+      syncProspectLanguageFields(preferredLanguage).communication_language,
     source: prospect.source || overrides.source || null,
     entry_method: prospect.entry_method || overrides.entry_method || null,
     preferred_communication_channel:
@@ -267,8 +301,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
     name: fullName,
     first_name: data.firstName,
     last_name: data.lastName,
-    communication_language: data.communicationLanguage,
-    language: data.communicationLanguage,
+    ...buildPersistedLanguageFields(data.languageFields),
     entry_method: data.entryMethod,
     source: data.source,
     owner_user_id: userId,
@@ -308,9 +341,17 @@ async function createQuickCaptureProspect(payload, atlasUser) {
       const fallbackRow = {
         phone: data.phone,
         name: fullName,
+        first_name: data.firstName,
+        last_name: data.lastName,
         current_step: data.status,
-        language: data.communicationLanguage,
+        status: data.status,
+        ...buildPersistedLanguageFields(data.languageFields, { includePreferredColumn: false }),
+        entry_method: data.entryMethod,
+        source: data.source,
+        owner_user_id: userId,
+        created_by_user_id: userId,
         organization_id: organizationId,
+        preferred_communication_channel: data.preferredCommunicationChannel,
         last_message: "",
         notes: buildLegacyNotes(data, atlasUser)
       };
@@ -331,7 +372,8 @@ async function createQuickCaptureProspect(payload, atlasUser) {
         summaryOverrides: {
           first_name: data.firstName,
           last_name: data.lastName,
-          communication_language: data.communicationLanguage,
+          preferred_language: data.preferredLanguage,
+          communication_language: data.languageFields.communication_language,
           source: data.source,
           entry_method: data.entryMethod,
           preferred_communication_channel: data.preferredCommunicationChannel,
@@ -372,7 +414,7 @@ async function finalizeQuickCaptureProspect(prospect, context) {
       source: data.source,
       entry_method: data.entryMethod,
       prospect_number: prospectNumber,
-      communication_language: data.communicationLanguage,
+      communication_language: data.languageFields.communication_language,
       created_by_user_id: atlasUser.id,
       owner_user_id: atlasUser.id,
       preferred_communication_channel: data.preferredCommunicationChannel,
@@ -382,13 +424,16 @@ async function finalizeQuickCaptureProspect(prospect, context) {
   });
 
   const summary = buildProspectSummary(prospect, summaryOverrides);
+  const guidance = buildQuickCaptureGuidance(prospect);
 
   return {
     ok: true,
     status: 201,
     body: {
       success: true,
-      prospect: summary
+      prospect: summary,
+      recommendedAction: guidance.recommendedAction,
+      estimatedMinutes: guidance.estimatedMinutes
     }
   };
 }

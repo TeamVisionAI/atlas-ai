@@ -16,7 +16,7 @@ export default function ConversationOutcomeSection({
   useEffect(() => {
     setOutcome("");
     setError(null);
-  }, [phone, conversationOutcome]);
+  }, [phone, conversationOutcome?.canRecordOutcome]);
 
   async function handleSubmit(event) {
     event.preventDefault();

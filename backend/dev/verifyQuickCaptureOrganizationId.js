@@ -62,7 +62,7 @@ async function main() {
       first_name: "No",
       last_name: "Organization",
       phone: "3055559901",
-      communication_language: "en"
+      preferred_language: "english"
     },
     { id: "00000000-0000-4000-8000-000000000099" }
   );
@@ -95,7 +95,7 @@ async function main() {
       first_name: "Org",
       last_name: "Scoped",
       phone: rawPhone,
-      communication_language: "en",
+      preferred_language: "english",
       source: "REFERRAL"
     },
     atlasUser
