@@ -102,15 +102,30 @@ function evaluateCoverage({ city, state = null }) {
 
   return {
     coverage: isLocal ? COVERAGE.LOCAL : COVERAGE.OUTSIDE,
-    defaultInterviewType: isLocal ? INTERVIEW_TYPES.IN_PERSON : INTERVIEW_TYPES.ZOOM,
+    defaultInterviewType: INTERVIEW_TYPES.ZOOM,
     officeLocation: isLocal ? getOfficeLocation() : null,
-    messageKey: isLocal ? "LOCAL_DEFAULT" : "OUTSIDE_DEFAULT",
+    messageKey: "ZOOM_DEFAULT",
     localRadiusMiles: LOCAL_RADIUS_MILES
   };
 }
 
+const UNUSUAL_MEETING_PATTERNS = [
+  "google meet",
+  "whatsapp video",
+  "whatsapp llamada",
+  "teams",
+  "microsoft teams",
+  "facetime",
+  "skype",
+  "webex"
+];
+
 function detectRequestedInterviewType(message = "") {
   const text = normalize(message);
+
+  if (UNUSUAL_MEETING_PATTERNS.some((pattern) => text.includes(pattern))) {
+    return "UNUSUAL_METHOD";
+  }
 
   if (ZOOM_REQUEST_PATTERNS.some((pattern) => text.includes(pattern))) {
     return INTERVIEW_TYPES.ZOOM;
@@ -120,12 +135,12 @@ function detectRequestedInterviewType(message = "") {
     return INTERVIEW_TYPES.IN_PERSON;
   }
 
-  if (text === "1") {
-    return INTERVIEW_TYPES.IN_PERSON;
-  }
-
   if (text === "2") {
     return INTERVIEW_TYPES.ZOOM;
+  }
+
+  if (text === "1") {
+    return INTERVIEW_TYPES.IN_PERSON;
   }
 
   return null;
@@ -141,6 +156,28 @@ function evaluateInterviewTypeDecision({
   const coverageDecision = evaluateCoverage({ city, state });
   const explicitRequest = requestedType || detectRequestedInterviewType(message);
 
+  if (explicitRequest === "UNUSUAL_METHOD") {
+    return {
+      interviewType: INTERVIEW_TYPES.ZOOM,
+      allowed: false,
+      needsHumanCoordinator: true,
+      autoApplied: false,
+      coverage: coverageDecision.coverage,
+      reason: "Unusual meeting method requested"
+    };
+  }
+
+  if (explicitRequest === INTERVIEW_TYPES.IN_PERSON) {
+    return {
+      interviewType: INTERVIEW_TYPES.ZOOM,
+      allowed: false,
+      needsHumanCoordinator: true,
+      autoApplied: false,
+      coverage: coverageDecision.coverage,
+      reason: "In-person interview requested"
+    };
+  }
+
   if (explicitRequest === INTERVIEW_TYPES.ZOOM && coverageDecision.coverage === COVERAGE.LOCAL) {
     return {
       interviewType: INTERVIEW_TYPES.ZOOM,
@@ -149,20 +186,6 @@ function evaluateInterviewTypeDecision({
       autoApplied: false,
       coverage: coverageDecision.coverage,
       reason: null
-    };
-  }
-
-  if (
-    explicitRequest === INTERVIEW_TYPES.IN_PERSON &&
-    coverageDecision.coverage === COVERAGE.OUTSIDE
-  ) {
-    return {
-      interviewType: coverageDecision.defaultInterviewType,
-      allowed: false,
-      needsHumanCoordinator: true,
-      autoApplied: false,
-      coverage: coverageDecision.coverage,
-      reason: "Special meeting request"
     };
   }
 
@@ -200,12 +223,12 @@ function evaluateInterviewTypeDecision({
   }
 
   return {
-    interviewType: coverageDecision.defaultInterviewType,
+    interviewType: INTERVIEW_TYPES.ZOOM,
     allowed: true,
     needsHumanCoordinator: false,
     autoApplied: true,
     coverage: coverageDecision.coverage,
-    messageKey: coverageDecision.messageKey,
+    messageKey: "ZOOM_DEFAULT",
     reason: null
   };
 }

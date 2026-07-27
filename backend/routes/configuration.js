@@ -5,7 +5,9 @@
 const express = require("express");
 const profileService = require("../services/profileService");
 const organizationService = require("../services/organizationService");
+const organizationIntegrationService = require("../services/organizationIntegrationService");
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
+const meetingManagementService = require("../services/meetingManagementService");
 const { getEmbeddedSignupStatus } = require("../core/metaEmbeddedSignupService");
 const { checkMetaConnectionHealth } = require("../core/meta/metaConnectionHealthService");
 const { protectedRoute } = require("../middleware/protectedRoute");
@@ -27,7 +29,7 @@ function auditMeta(req) {
 
 router.get("/scheduling/google/callback", async (req, res) => {
   const frontendBase = process.env.ATLAS_FRONTEND_URL || "http://localhost:5173";
-  const redirectTarget = `${frontendBase}${appPath("settings/scheduling")}`;
+  let redirectTarget = `${frontendBase}${appPath("settings/scheduling")}`;
 
   try {
     const code = req.query.code;
@@ -35,6 +37,11 @@ router.get("/scheduling/google/callback", async (req, res) => {
 
     if (!code || !state) {
       return res.redirect(`${redirectTarget}?google=error&reason=missing_code`);
+    }
+
+    const verifiedState = googleCalendarIntegrationService.verifyOAuthState(state);
+    if (verifiedState?.returnPath) {
+      redirectTarget = `${frontendBase}${appPath(verifiedState.returnPath)}`;
     }
 
     await googleCalendarIntegrationService.handleOAuthCallback(code, state);
@@ -157,11 +164,50 @@ router.patch(
   }
 );
 
+router.get("/organization/integrations", async (req, res) => {
+  try {
+    const integrations = await organizationIntegrationService.getIntegrationsStatus(
+      req.tenantContext.organizationId
+    );
+    res.json({ integrations });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
+
+router.get("/organization/meeting-management", async (req, res) => {
+  try {
+    const meetingManagement = await meetingManagementService.getMeetingManagement(
+      req.tenantContext.organizationId
+    );
+    res.json({ meetingManagement });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
+
+router.patch(
+  "/organization/meeting-management",
+  requirePermission(PERMISSIONS.ORG_WRITE),
+  async (req, res) => {
+    try {
+      const meetingManagement = await meetingManagementService.updateMeetingManagement(
+        req.tenantContext.organizationId,
+        req.body
+      );
+      res.json({ meetingManagement });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({ error: error.message });
+    }
+  }
+);
+
 router.get("/scheduling/google/auth-url", async (req, res) => {
   try {
     const payload = googleCalendarIntegrationService.getAuthUrl(
       req.tenantContext.organizationId,
-      req.tenantContext.userId
+      req.tenantContext.userId,
+      { returnPath: req.query.returnPath || "settings/scheduling" }
     );
     res.json(payload);
   } catch (error) {

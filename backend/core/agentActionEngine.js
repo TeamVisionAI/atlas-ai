@@ -326,7 +326,7 @@ function resolveAvailableActions({
     }
 
     if (timing !== "soon") {
-      if (normalizedType === "Zoom" && !flags.zoom_link_sent && organizationSettings?.zoomInterviewUrl) {
+      if (normalizedType === "Zoom" && !flags.zoom_link_sent) {
         pushAction(actions, ACTION_IDS.SEND_ZOOM_LINK, "secondary");
       }
 

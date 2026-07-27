@@ -44,8 +44,9 @@ export async function updateSchedulingConfiguration(payload) {
   });
 }
 
-export async function fetchGoogleCalendarAuthUrl() {
-  return apiFetch("/api/configuration/scheduling/google/auth-url");
+export async function fetchGoogleCalendarAuthUrl(returnPath = "settings/scheduling") {
+  const query = new URLSearchParams({ returnPath });
+  return apiFetch(`/api/configuration/scheduling/google/auth-url?${query.toString()}`);
 }
 
 export async function fetchGoogleCalendars() {
@@ -63,5 +64,21 @@ export async function selectGoogleCalendar(calendarId) {
 export async function disconnectGoogleCalendar() {
   return apiFetch("/api/configuration/scheduling/google/disconnect", {
     method: "POST"
+  });
+}
+
+export async function fetchOrganizationIntegrations() {
+  return apiFetch("/api/configuration/organization/integrations");
+}
+
+export async function fetchMeetingManagement() {
+  return apiFetch("/api/configuration/organization/meeting-management");
+}
+
+export async function updateMeetingManagement(payload) {
+  return apiFetch("/api/configuration/organization/meeting-management", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
   });
 }

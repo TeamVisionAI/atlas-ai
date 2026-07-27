@@ -273,23 +273,6 @@ function validateRequiredFields(targetMilestone, context) {
   }
 
   if (
-    [MILESTONES.INTERVIEW_SCHEDULED, MILESTONES.INTERVIEW_DUE].includes(
-      targetMilestone
-    ) &&
-    emailRequired(profile) &&
-    !fields.email
-  ) {
-    if (!missingFields.includes("email")) {
-      missingFields.push("email");
-      errors.push({
-        code: "EMAIL_REQUIRED",
-        field: "email",
-        message: "Email is required for Zoom interviews."
-      });
-    }
-  }
-
-  if (
     targetMilestone === MILESTONES.INTERVIEW_SCHEDULED &&
     !isScheduleComplete(profile) &&
     !fields.interviewDateTime

@@ -25,7 +25,6 @@ function getOrganizationSettings() {
   const office = getOfficeLocation();
 
   return {
-    zoomInterviewUrl: normalizeUrl(process.env.TEAM_VISION_ZOOM_INTERVIEW_URL),
     office: {
       name: office.name,
       street: office.street,

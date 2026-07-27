@@ -196,6 +196,26 @@
   opacity: 0.92;
 }
 
+.configuration-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.configuration-subsection + .configuration-subsection {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.configuration-subsection__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .configuration-content {
   display: grid;
   gap: 1.25rem;
@@ -411,4 +431,37 @@
 
 .configuration-page .whatsapp-connect__subtitle {
   color: var(--config-text-muted);
+}
+
+.appointment-day-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--config-border);
+}
+
+.appointment-day-row__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.appointment-day-row__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.appointment-day-row__block {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.appointment-day-row__unavailable {
+  color: var(--config-text-muted);
+  font-size: 0.875rem;
 }

@@ -1,20 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import AtlasButton from "../ui/AtlasButton";
 import SchedulingForm, {
   createInitialSchedulingForm,
   isSchedulingFormValid
 } from "./SchedulingForm";
-import { fetchMissionControlAvailability } from "../../services/missionControlService";
+import {
+  fetchAppointmentAvailability,
+  fetchAppointmentProfile
+} from "../../services/appointmentService";
+import {
+  buildSelectableDayOptions,
+  loadDaySchedulingSlots,
+  loadInitialSchedulingSlots,
+  loadWeekSchedulingSlots,
+  pickRecommendedSlots,
+  resolveNextWeekStart
+} from "../../utils/schedulingSlotLoader";
 import "../../styles/atlas-ui.css";
 import "./MissionExecutionDialog.css";
+
+function resolveInterviewDuration(profile) {
+  return (
+    profile?.appointmentProfile?.defaults?.recruitingInterviewDurationMinutes ||
+    profile?.appointmentProfile?.defaults?.defaultDurationMinutes ||
+    30
+  );
+}
 
 export default function MissionExecutionDialog({
   open,
   phone,
   mission,
   prospect,
-  organizationSettings,
+  recruiterName = "",
   submitting = false,
   error = null,
   onClose,
@@ -22,12 +41,31 @@ export default function MissionExecutionDialog({
 }) {
   const { translate } = useLanguage();
   const [form, setForm] = useState(() => createInitialSchedulingForm());
-  const [suggestedSlots, setSuggestedSlots] = useState([]);
+  const [displaySlots, setDisplaySlots] = useState([]);
+  const [windowSlots, setWindowSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [loadingExpansion, setLoadingExpansion] = useState(false);
+  const [slotsError, setSlotsError] = useState(null);
+  const [durationMinutes, setDurationMinutes] = useState(30);
+  const [displayMode, setDisplayMode] = useState("recommended");
+  const [viewMode, setViewMode] = useState("48h");
+  const [hasMoreInWindow, setHasMoreInWindow] = useState(false);
+  const [activeDayKey, setActiveDayKey] = useState(null);
+
+  const slotCacheRef = useRef(new Map());
+  const durationRef = useRef(30);
 
   const defaultInterviewType = useMemo(() => {
-    return prospect?.interviewType || mission?.prospect?.interviewType || "Zoom";
+    return prospect?.interviewType || mission?.prospect?.interviewType || "";
   }, [prospect, mission]);
+
+  const selectableDays = useMemo(() => buildSelectableDayOptions(new Date(), 8), [open]);
+  const nextWeekStartDateKey = useMemo(() => resolveNextWeekStart(new Date()), [open]);
+
+  const fetchAvailability = useCallback(
+    (params) => fetchAppointmentAvailability(params),
+    []
+  );
 
   useEffect(() => {
     if (!open) {
@@ -37,56 +75,159 @@ export default function MissionExecutionDialog({
     setForm(
       createInitialSchedulingForm({
         defaultInterviewType,
-        defaultOfficeLocation: organizationSettings?.office?.fullAddress || "",
+        defaultRecruiter: recruiterName,
         defaultDuration: 30
       })
     );
-    setSuggestedSlots([]);
-  }, [open, defaultInterviewType, organizationSettings]);
+    setDisplaySlots([]);
+    setWindowSlots([]);
+    setSlotsError(null);
+    setDisplayMode("recommended");
+    setViewMode("48h");
+    setHasMoreInWindow(false);
+    setActiveDayKey(null);
+    slotCacheRef.current = new Map();
+  }, [open, defaultInterviewType, recruiterName]);
+
+  const loadSlotsForInterviewType = useCallback(
+    async (interviewType) => {
+      if (!interviewType) {
+        setDisplaySlots([]);
+        setWindowSlots([]);
+        setSlotsError(null);
+        return;
+      }
+
+      setLoadingSlots(true);
+      setSlotsError(null);
+
+      try {
+        const profileResult = await fetchAppointmentProfile().catch(() => null);
+        const duration = resolveInterviewDuration(profileResult);
+        durationRef.current = duration;
+        setDurationMinutes(duration);
+        setForm((current) => ({
+          ...current,
+          duration,
+          recruiter: recruiterName || current.recruiter,
+          interviewType
+        }));
+
+        const result = await loadInitialSchedulingSlots(fetchAvailability, duration);
+
+        slotCacheRef.current = result.cacheByDay;
+        setWindowSlots(result.windowSlots);
+        setViewMode(result.viewMode);
+        setHasMoreInWindow(result.hasMoreInWindow);
+        setDisplayMode("recommended");
+        setActiveDayKey(null);
+        setDisplaySlots(result.recommendedSlots);
+
+        if (!result.recommendedSlots.length) {
+          setSlotsError(translate("missionExecutionNoSlots"));
+        }
+      } catch (requestError) {
+        setDisplaySlots([]);
+        setWindowSlots([]);
+        setSlotsError(requestError?.message || translate("missionExecutionSlotsFailed"));
+      } finally {
+        setLoadingSlots(false);
+      }
+    },
+    [fetchAvailability, recruiterName, translate]
+  );
 
   useEffect(() => {
-    if (!open || !phone || !form.dateKey) {
+    if (!open || !form.interviewType) {
       return;
     }
 
-    let cancelled = false;
+    loadSlotsForInterviewType(form.interviewType);
+  }, [open, form.interviewType, loadSlotsForInterviewType]);
 
-    async function loadSlots() {
-      setLoadingSlots(true);
+  const handleInterviewTypeChange = useCallback(() => {
+    setDisplaySlots([]);
+    setWindowSlots([]);
+    setDisplayMode("recommended");
+    setActiveDayKey(null);
+    setHasMoreInWindow(false);
+    slotCacheRef.current = new Map();
+  }, []);
+
+  const handleShowMoreTimes = useCallback(() => {
+    setDisplayMode("window");
+    setActiveDayKey(null);
+    setDisplaySlots(windowSlots);
+  }, [windowSlots]);
+
+  const handleBackToRecommended = useCallback(() => {
+    setDisplayMode("recommended");
+    setActiveDayKey(null);
+    setDisplaySlots(pickRecommendedSlots(windowSlots));
+  }, [windowSlots]);
+
+  const handleSelectDay = useCallback(
+    async (dateKey) => {
+      setLoadingExpansion(true);
+      setSlotsError(null);
 
       try {
-        const result = await fetchMissionControlAvailability(phone, {
-          date: form.dateKey,
-          duration: form.duration,
-          appointmentType: "interview"
-        });
+        const daySlots = await loadDaySchedulingSlots(
+          fetchAvailability,
+          dateKey,
+          durationRef.current,
+          slotCacheRef.current
+        );
 
-        if (!cancelled) {
-          setSuggestedSlots(result?.slots || []);
+        setDisplayMode("day");
+        setActiveDayKey(dateKey);
+        setDisplaySlots(daySlots);
+
+        if (!daySlots.length) {
+          setSlotsError(translate("missionExecutionNoSlotsDay"));
         }
-      } catch {
-        if (!cancelled) {
-          setSuggestedSlots([]);
-        }
+      } catch (requestError) {
+        setSlotsError(requestError?.message || translate("missionExecutionSlotsFailed"));
       } finally {
-        if (!cancelled) {
-          setLoadingSlots(false);
-        }
+        setLoadingExpansion(false);
       }
+    },
+    [fetchAvailability, translate]
+  );
+
+  const handleNextWeek = useCallback(async () => {
+    setLoadingExpansion(true);
+    setSlotsError(null);
+
+    try {
+      const weekStart = resolveNextWeekStart(new Date());
+      const weekSlots = await loadWeekSchedulingSlots(
+        fetchAvailability,
+        weekStart,
+        durationRef.current,
+        slotCacheRef.current
+      );
+
+      setDisplayMode("week");
+      setActiveDayKey(null);
+      setDisplaySlots(weekSlots);
+
+      if (!weekSlots.length) {
+        setSlotsError(translate("missionExecutionNoSlotsWeek"));
+      }
+    } catch (requestError) {
+      setSlotsError(requestError?.message || translate("missionExecutionSlotsFailed"));
+    } finally {
+      setLoadingExpansion(false);
     }
-
-    loadSlots();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, phone, form.dateKey, form.duration]);
+  }, [fetchAvailability, translate]);
 
   if (!open) {
     return null;
   }
 
-  const canSubmit = isSchedulingFormValid(form) && !submitting;
+  const canSubmit =
+    isSchedulingFormValid(form) && !submitting && !loadingSlots && !loadingExpansion;
 
   return (
     <div className="mission-execution-dialog__backdrop" role="presentation" onClick={onClose}>
@@ -110,9 +251,24 @@ export default function MissionExecutionDialog({
         <SchedulingForm
           form={form}
           onChange={setForm}
-          suggestedSlots={suggestedSlots}
+          slots={displaySlots}
           loadingSlots={loadingSlots}
+          loadingExpansion={loadingExpansion}
+          slotsError={slotsError}
           disabled={submitting}
+          recruiterName={recruiterName || form.recruiter}
+          durationMinutes={durationMinutes}
+          displayMode={displayMode}
+          viewMode={viewMode}
+          hasMoreInWindow={hasMoreInWindow}
+          activeDayKey={activeDayKey}
+          selectableDays={selectableDays}
+          nextWeekStartDateKey={nextWeekStartDateKey}
+          onShowMoreTimes={handleShowMoreTimes}
+          onBackToRecommended={handleBackToRecommended}
+          onSelectDay={handleSelectDay}
+          onNextWeek={handleNextWeek}
+          onInterviewTypeChange={handleInterviewTypeChange}
         />
 
         {error ? <p className="mission-execution-dialog__error">{error}</p> : null}

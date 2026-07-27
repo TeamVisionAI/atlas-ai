@@ -12,7 +12,6 @@ const {
 } = require("../services/schedulingService");
 const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
 const { onInterviewScheduled } = require("../core/recruitingWorkflowOrchestrator");
-const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { buildAgentActionTimelineMessage } = require("../core/agentActionCopy");
 const { ACTION_IDS } = require("../core/agentActionEngine");
 const { MISSION_TYPES } = require("../core/configuration/missionTypes");
@@ -28,6 +27,12 @@ const {
 } = require("../services/supabaseService");
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
 const { shouldMockExternalComms } = require("../dev/simulatorGuard");
+const { buildIsoTimestamp } = require("../services/availabilityService");
+const meetingManagementService = require("../services/meetingManagementService");
+const appointmentApplicationService = require("./appointmentApplicationService");
+const { APPOINTMENT_SOURCES } = require("../core/configuration/appointmentDomain");
+const { extractEmailFromNotes } = require("../core/informationModel");
+const { normalizeEmail, validateEmailFormat } = require("../core/emailNormalization");
 const {
   buildActionError,
   buildActionSuccess
@@ -36,12 +41,12 @@ const {
 function normalizeInterviewType(value) {
   const normalized = String(value || "").toLowerCase();
 
-  if (
-    normalized.includes("zoom") ||
-    normalized.includes("meet") ||
-    normalized.includes("virtual")
-  ) {
+  if (normalized.includes("zoom") || normalized.includes("virtual") || normalized.includes("google meet")) {
     return "Zoom";
+  }
+
+  if (normalized.includes("public")) {
+    return "Public Location";
   }
 
   return "In Person";
@@ -95,6 +100,33 @@ function validateSchedulePayload(payload = {}) {
   return missing;
 }
 
+function resolveProspectEmail(prospect, payload = {}) {
+  const payloadEmail = normalizeEmail(payload.email);
+  if (payloadEmail && validateEmailFormat(payloadEmail)) {
+    return payloadEmail;
+  }
+
+  const storedEmail = normalizeEmail(extractEmailFromNotes(prospect?.notes));
+  if (storedEmail && validateEmailFormat(storedEmail)) {
+    return storedEmail;
+  }
+
+  return null;
+}
+
+function buildProspectNotesWithEmail(existingNotes, email) {
+  if (!email) {
+    return existingNotes || null;
+  }
+
+  const base = String(existingNotes || "")
+    .replace(/\|?EMAIL:[^|]*/gi, "")
+    .trim();
+
+  const emailToken = `EMAIL:${email}`;
+  return base ? `${base}|${emailToken}` : emailToken;
+}
+
 async function rollbackScheduleBooking(bookingResult, organizationId, prospect) {
   if (!bookingResult?.startTimeISO) {
     return;
@@ -144,18 +176,34 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
 
   const interviewType = normalizeInterviewType(payload.interviewType);
   const duration = Number(payload.duration) || 30;
-  const orgSettings = getOrganizationSettings();
   const isZoom = interviewType === "Zoom";
-  const officeLocation =
-    payload.officeLocation || orgSettings.office?.fullAddress || orgSettings.office?.name || null;
+  const isPublicLocation = interviewType === "Public Location";
+  const attendeeEmail = resolveProspectEmail(prospect, payload);
 
-  if (!isZoom && !officeLocation) {
-    return buildActionError(
-      ACTION_IDS.SCHEDULE,
-      "OFFICE_LOCATION_REQUIRED",
-      "Office location is required for in-person interviews."
-    );
+  const locationResult = await meetingManagementService.resolveInterviewLocation(
+    organizationId,
+    interviewType,
+    {
+      publicLocation: payload.publicLocation,
+      officeLocation: payload.officeLocation
+    }
+  );
+
+  if (!locationResult.configured) {
+    const errorCode =
+      locationResult.errorCode === "MEETING_URL_NOT_CONFIGURED"
+        ? "MEETING_URL_NOT_CONFIGURED"
+        : "OFFICE_LOCATION_REQUIRED";
+    const message =
+      locationResult.errorCode === "MEETING_URL_NOT_CONFIGURED"
+        ? "Personal meeting URL is not configured. Add it under Organization → Meeting Management."
+        : "Office address is not configured. Add it under Organization → Meeting Management.";
+
+    return buildActionError(ACTION_IDS.SCHEDULE, errorCode, message);
   }
+
+  const location = locationResult.location;
+  const meetingUrl = locationResult.meetingUrl;
 
   let bookingResult;
 
@@ -173,8 +221,10 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
         notes: payload.notes || null,
         interviewType,
         recruiter: payload.recruiter || null,
-        location: isZoom ? null : officeLocation,
-        createMeetLink: isZoom
+        location: isZoom ? meetingUrl : location,
+        meetingUrl: isZoom ? meetingUrl : null,
+        zoomUrl: isZoom ? meetingUrl : null,
+        attendeeEmail
       },
       timezone: payload.timezone || "America/New_York"
     });
@@ -210,13 +260,19 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     );
   }
 
-  await updateProspect(prospect.phone, {
+  const prospectUpdates = {
     calendar_event_id: bookingResult.googleCalendarEventId,
     appointment_date: bookingResult.startTimeISO,
     interview_time: bookingResult.startTimeISO,
     interview_type: interviewType,
     current_step: "CONFIRMED"
-  });
+  };
+
+  if (attendeeEmail) {
+    prospectUpdates.notes = buildProspectNotesWithEmail(prospect.notes, attendeeEmail);
+  }
+
+  await updateProspect(prospect.phone, prospectUpdates);
 
   const advanceResult = await advanceProspectWorkflow(phone, {
     targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
@@ -225,7 +281,8 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
       interviewType,
       confirmed: true,
       appointmentDate: payload.dateKey,
-      preferredTime: payload.timeKey
+      preferredTime: payload.timeKey,
+      email: attendeeEmail || undefined
     },
     interactionNotes: payload.notes || null,
     interactionType: "agent_schedule"
@@ -249,11 +306,13 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     profile: {
       appointmentDate: payload.dateKey,
       interviewType,
-      preferredTime: payload.timeKey
+      preferredTime: payload.timeKey,
+      email: attendeeEmail || null
     },
     calendarEvent: {
       id: bookingResult.googleCalendarEventId,
-      hangoutLink: bookingResult.meetLink
+      zoomLink: bookingResult.zoomLink || bookingResult.meetingUrl || meetingUrl,
+      meetingUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl
     }
   }).catch((error) => {
     console.warn("[missionExecution] onInterviewScheduled failed:", error.message);
@@ -266,15 +325,45 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     )
   );
 
+  let appointmentRecord = null;
+
+  try {
+    appointmentRecord = await appointmentApplicationService.createAppointment(
+      {
+        organizationId,
+        agentId: options.userId || options.agentId,
+        prospectPhone: phone,
+        purpose: "recruiting_interview",
+        dateKey: payload.dateKey,
+        timeKey: payload.timeKey,
+        source: APPOINTMENT_SOURCES.MISSION_CONTROL,
+        meetingType: isZoom ? "virtual" : "in_person",
+        meetingProvider: isZoom ? "zoom" : undefined,
+        meetingLocationType: isPublicLocation ? "public_location" : "office",
+        meetingAddress: isZoom ? null : location,
+        notes: payload.notes,
+        contact: attendeeEmail ? { email: attendeeEmail } : {},
+        existingBooking: bookingResult,
+        skipWorkflowSideEffects: true
+      },
+      { organizationId }
+    );
+  } catch (appointmentError) {
+    console.warn("[missionExecution] appointment record failed:", appointmentError.message);
+  }
+
   return {
     ...buildActionSuccess(
       ACTION_IDS.SCHEDULE,
       "Interview scheduled successfully. Meeting invitation created."
     ),
     completedMissionType: MISSION_TYPES.SCHEDULE_INTERVIEW,
-    meetLink: bookingResult.meetLink || null,
+    zoomLink: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
+    meetLink: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
+    meetingUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
     calendarEventId: bookingResult.googleCalendarEventId || null,
     booking: bookingResult,
+    appointment: appointmentRecord,
     workflow: advanceResult.workflow || null
   };
 }

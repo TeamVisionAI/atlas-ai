@@ -8,8 +8,8 @@ export function useMissionExecutionSuccessToast() {
   return function showMissionExecutionSuccess(result) {
     const lines = [translate("missionExecutionSuccessTitle")];
 
-    if (result?.meetLink) {
-      lines.push(translate("missionExecutionSuccessMeetLink"));
+    if (result?.zoomLink || result?.meetLink) {
+      lines.push(translate("missionExecutionSuccessZoomLink"));
     } else {
       lines.push(translate("missionExecutionSuccessInvitation"));
     }

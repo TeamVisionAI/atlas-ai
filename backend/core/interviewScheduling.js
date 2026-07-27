@@ -201,26 +201,18 @@ function getInterviewTypeLabel(interviewType, language) {
 
 function parseInterviewType(message) {
   const text = normalize(message);
-  const officePatterns = ["1", "office", "in person", "in-person", "person", "presencial", "oficina"];
-  const zoomPatterns = ["2", "zoom", "virtual", "online", "remoto"];
+  const officePatterns = ["office", "in person", "in-person", "person", "presencial", "oficina", "en persona"];
 
   if (officePatterns.some((pattern) => text.includes(pattern))) {
-    return INTERVIEW_TYPES.OFFICE;
+    return null;
   }
 
-  if (zoomPatterns.some((pattern) => text.includes(pattern))) {
-    return INTERVIEW_TYPES.ZOOM;
-  }
-
-  return null;
+  return INTERVIEW_TYPES.ZOOM;
 }
 
 function getInterviewPreferenceQuestion(language) {
-  if (language === "es") {
-    return "¿Cómo te gustaría asistir a tu entrevista?\n\n1️⃣ Oficina (presencial)\n\n2️⃣ Zoom (virtual)";
-  }
-
-  return "How would you like to attend your interview?\n\n1️⃣ Office (in person)\n\n2️⃣ Zoom (virtual)";
+  const { getPeriodPreferenceQuestion } = require("./teamVisionAppointmentRules");
+  return getPeriodPreferenceQuestion(language);
 }
 
 function buildInitialSchedulingState(interviewType, occupation) {
@@ -805,6 +797,23 @@ function buildScheduleReply({ acknowledgement, transition, question, language, p
 }
 
 function handleScheduleTurn({ prospect, message, language, personality }) {
+  const { detectSchedulingEscalation } = require("./teamVisionAppointmentRules");
+  const escalation = detectSchedulingEscalation(message);
+
+  if (escalation.escalate) {
+    const state = parseSchedulingState(prospect.notes);
+
+    return {
+      prospectUpdates: {
+        notes: mergeNotesWithSchedulingState(prospect.notes, state),
+        current_step: "HANDOFF",
+        last_message: message
+      },
+      humanHandoff: true,
+      handoffReason: escalation.reason?.toUpperCase() || "ZOOM_ACCESS_FAILED"
+    };
+  }
+
   const interviewType = prospect.interview_type || INTERVIEW_TYPES.ZOOM;
   let state = parseSchedulingState(prospect.notes);
   const override = detectScheduleOverride(message, {
@@ -873,21 +882,11 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
         };
       }
 
-      const emailQuestion =
-        language === "es"
-          ? "¿Cuál es el mejor correo electrónico para enviarte la confirmación?"
-          : "What is the best email address to send your interview confirmation?";
-
       return {
         replyText: buildScheduleReply({
           acknowledgement: overrideResult.reply || (language === "es" ? "Perfecto." : "Perfect."),
-          transition:
-            interviewType === INTERVIEW_TYPES.ZOOM
-              ? language === "es"
-                ? "Solo necesito un último dato."
-                : "I just need one last detail."
-              : "",
-          question: interviewType === INTERVIEW_TYPES.ZOOM ? emailQuestion : "",
+          transition: "",
+          question: "",
           personality
         }),
         prospectUpdates: {
@@ -895,7 +894,7 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
           appointment_date: finalized.slot.startTimeISO,
           appointment_type: null,
           notes: null,
-          current_step: interviewType === INTERVIEW_TYPES.ZOOM ? "EMAIL" : "CONFIRMED",
+          current_step: "CONFIRMED",
           last_message: message
         },
         complete: true
@@ -1053,11 +1052,11 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
 
   return {
     replyText: buildScheduleReply({
-      acknowledgement: language === "es" ? "Gracias." : "Thanks.",
-      question:
+      acknowledgement:
         language === "es"
-          ? "¿Cuál es el mejor correo electrónico para enviarte la confirmación?"
-          : "What is the best email address to send your interview confirmation?",
+          ? "✅ Excelente. Tu entrevista quedó confirmada."
+          : "✅ Great. Your interview is confirmed.",
+      question: language === "es" ? "¡Esperamos conocerte!" : "We look forward to meeting you!",
       personality: {
         ...personality,
         tone: "professional"
@@ -1068,7 +1067,7 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
       appointment_date: finalized.slot.startTimeISO,
       appointment_type: null,
       notes: null,
-      current_step: "EMAIL",
+      current_step: "CONFIRMED",
       last_message: message
     },
     complete: true

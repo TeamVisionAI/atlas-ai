@@ -12,7 +12,6 @@
 
 /**
  * @typedef {Object} OrganizationSettings
- * @property {string | null} zoomInterviewUrl
  * @property {OrganizationOfficeSettings} office
  * @property {Object | null} businessHours
  * @property {Record<string, string>} templates

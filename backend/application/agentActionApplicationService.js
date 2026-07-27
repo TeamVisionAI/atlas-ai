@@ -10,7 +10,7 @@ const {
 } = require("../services/supabaseService");
 const { sendTextMessage } = require("../services/whatsappService");
 const { logConversation } = require("../services/logService");
-const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
+const meetingManagementService = require("../services/meetingManagementService");
 const { cancelInterview } = require("../services/calendarService");
 const { releaseSlotByIso } = require("../core/capacityEngine");
 const {
@@ -133,18 +133,21 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
   }
 
   const agentState = loadAgentState(phone);
-  const organizationSettings = getOrganizationSettings();
   const language = resolveProspectCommunicationCode(prospect);
+  const organizationId = requireTenantOrganizationId(options.organizationId);
 
   switch (action) {
     case ACTION_IDS.SEND_ZOOM_LINK: {
-      const url = organizationSettings.zoomInterviewUrl;
+      const url = await meetingManagementService.resolveJoinUrlForProspect(
+        organizationId,
+        phone
+      );
 
       if (!url) {
         return buildActionError(
           action,
-          "ZOOM_URL_NOT_CONFIGURED",
-          "Zoom interview URL is not configured."
+          "MEETING_URL_NOT_CONFIGURED",
+          "No meeting link is available. Configure a personal meeting URL under Organization settings."
         );
       }
 

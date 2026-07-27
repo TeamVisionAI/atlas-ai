@@ -57,7 +57,7 @@ const INTENT_LABELS = Object.freeze({
 const FIELD_LABELS = Object.freeze({
   first_name: "First Name",
   last_name: "Last Name",
-  email: "Email",
+  email: "Email Address (Optional)",
   city: "City",
   state: "State",
   occupation: "Occupation",
@@ -75,7 +75,7 @@ const EXPLICIT_FIELD_TO_PROFILE_KEY = Object.freeze({
 
 const WORKFLOW_REQUIREMENT_LABELS = Object.freeze({
   schedule: "Interview not scheduled",
-  email: "Email required for Zoom interview",
+  email: "Email address (optional)",
   interviewType: "Interview type not confirmed"
 });
 

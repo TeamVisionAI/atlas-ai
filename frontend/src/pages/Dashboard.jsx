@@ -317,13 +317,14 @@ export default function Dashboard() {
           { isLive: true }
         );
         setWorkspace(adapted);
+        await refreshMissions(phone);
         return;
       }
 
       await refreshCurrentWorkspace();
       await refreshMissions(phone);
     },
-    [queue, currentIndex, dashboard, refreshCurrentWorkspace, refreshMissions]
+    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, refreshMissions]
   );
 
   useEffect(() => {
@@ -438,7 +439,12 @@ export default function Dashboard() {
       setActionError(null);
 
       try {
-        const interviewType = form.interviewType === "zoom" ? "Zoom" : "Office";
+        const interviewTypeMap = {
+          zoom: "Zoom",
+          office: "In Person",
+          public_location: "Public Location"
+        };
+        const interviewType = interviewTypeMap[form.interviewType] || "In Person";
         const result = await executeScheduleInterview(phone, {
           dateKey: form.dateKey,
           timeKey: form.timeKey,
@@ -906,7 +912,7 @@ export default function Dashboard() {
         phone={phone}
         mission={primaryMission}
         prospect={workspaceContext.prospect}
-        organizationSettings={organizationSettings}
+        recruiterName="Ana"
         submitting={executionSubmitting}
         error={executionError}
         onClose={() => {

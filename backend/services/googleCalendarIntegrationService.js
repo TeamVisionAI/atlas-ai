@@ -141,7 +141,7 @@ async function getIntegrationStatus(organizationId) {
   return presentIntegrationStatus(integration);
 }
 
-function getAuthUrl(organizationId, userId) {
+function getAuthUrl(organizationId, userId, options = {}) {
   const oauth2Client = createOAuthClient();
 
   if (!oauth2Client) {
@@ -153,6 +153,7 @@ function getAuthUrl(organizationId, userId) {
   const state = signOAuthState({
     organizationId,
     userId,
+    returnPath: options.returnPath || "settings/scheduling",
     exp: Date.now() + 15 * 60 * 1000
   });
 
@@ -302,7 +303,7 @@ async function createCalendarEvent(organizationId, event) {
   if (shouldMockExternalComms()) {
     return {
       id: `sim-gcal-${Date.now()}`,
-      hangoutLink: event.createMeetLink ? "https://simulator.local/meet/mock" : null,
+      htmlLink: event.zoomUrl || null,
       simulated: true
     };
   }
@@ -333,21 +334,14 @@ async function createCalendarEvent(organizationId, event) {
     requestBody.location = event.location;
   }
 
-  let conferenceDataVersion = 0;
-
-  if (event.createMeetLink) {
-    requestBody.conferenceData = {
-      createRequest: {
-        requestId: `atlas-${Date.now()}`,
-        conferenceSolutionKey: { type: "hangoutsMeet" }
-      }
-    };
-    conferenceDataVersion = 1;
+  if (event.attendeeEmail) {
+    requestBody.attendees = [{ email: event.attendeeEmail }];
   }
 
   const response = await calendar.events.insert({
     calendarId,
-    conferenceDataVersion,
+    conferenceDataVersion: 0,
+    sendUpdates: event.attendeeEmail ? "all" : "none",
     requestBody
   });
 
@@ -389,6 +383,89 @@ async function deleteCalendarEvent(organizationId, eventId) {
   return { deleted: true };
 }
 
+async function updateCalendarEvent(organizationId, eventId, event) {
+  if (!eventId || shouldMockExternalComms()) {
+    return {
+      id: eventId || `sim-gcal-${Date.now()}`,
+      htmlLink: event.zoomUrl || null,
+      simulated: true
+    };
+  }
+
+  const { oauth2Client, integration } = await getAuthorizedClient(organizationId);
+
+  if (!oauth2Client) {
+    return null;
+  }
+
+  const calendarId = integration?.config?.calendarId || "primary";
+  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+  const requestBody = {
+    summary: event.summary,
+    description: event.description,
+    start: {
+      dateTime: event.startTimeISO,
+      timeZone: event.timezone || "America/New_York"
+    },
+    end: {
+      dateTime: event.endTimeISO,
+      timeZone: event.timezone || "America/New_York"
+    }
+  };
+
+  if (event.location) {
+    requestBody.location = event.location;
+  }
+
+  if (event.attendeeEmail) {
+    requestBody.attendees = [{ email: event.attendeeEmail }];
+  }
+
+  const response = await calendar.events.patch({
+    calendarId,
+    eventId,
+    requestBody
+  });
+
+  return response.data;
+}
+
+/**
+ * Query Google Calendar FreeBusy for connected org calendar.
+ * Returns [] when not connected — graceful fallback for scheduling engine.
+ */
+async function queryFreeBusy(organizationId, timeMin, timeMax, timezone = "America/New_York") {
+  if (shouldMockExternalComms()) {
+    return [];
+  }
+
+  const { oauth2Client, integration } = await getAuthorizedClient(organizationId);
+
+  if (!oauth2Client) {
+    return [];
+  }
+
+  const calendarId = integration?.config?.calendarId || "primary";
+  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+  const response = await calendar.freebusy.query({
+    requestBody: {
+      timeMin,
+      timeMax,
+      timeZone: timezone,
+      items: [{ id: calendarId }]
+    }
+  });
+
+  const busy = response.data?.calendars?.[calendarId]?.busy || [];
+
+  return busy.map((period) => ({
+    start: period.start,
+    end: period.end
+  }));
+}
+
 module.exports = {
   getAuthUrl,
   handleOAuthCallback,
@@ -397,7 +474,9 @@ module.exports = {
   setCalendar,
   disconnect,
   createCalendarEvent,
+  updateCalendarEvent,
   deleteCalendarEvent,
+  queryFreeBusy,
   presentIntegrationStatus,
   signOAuthState,
   verifyOAuthState

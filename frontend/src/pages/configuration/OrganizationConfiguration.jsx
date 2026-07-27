@@ -9,6 +9,8 @@ import {
   fetchOrganizationLevels,
   updateOrganizationConfiguration
 } from "../../services/configurationService";
+import OrganizationIntegrations from "../../components/settings/OrganizationIntegrations";
+import MeetingManagement from "../../components/settings/MeetingManagement";
 
 export default function OrganizationConfiguration() {
   const { translate } = useLanguage();
@@ -68,8 +70,9 @@ export default function OrganizationConfiguration() {
   }
 
   return (
-    <ConfigurationSection title={SETTINGS_SECTIONS.organization}>
-      <form className="configuration-form" onSubmit={saveOrganization}>
+    <>
+      <ConfigurationSection title={SETTINGS_SECTIONS.organization}>
+        <form className="configuration-form" onSubmit={saveOrganization}>
         <label>
           {translate("configurationOrganizationName")}
           <input
@@ -164,7 +167,11 @@ export default function OrganizationConfiguration() {
         <p className="configuration-message configuration-message--error" role="alert">
           {error}
         </p>
-      ) : null}
-    </ConfigurationSection>
+        ) : null}
+      </ConfigurationSection>
+
+      <MeetingManagement />
+      <OrganizationIntegrations />
+    </>
   );
 }

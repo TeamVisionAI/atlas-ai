@@ -156,3 +156,28 @@ Creates:
 
 Read-only REST API at `/api/executive-dashboard`, `/api/executive-dashboard/summary`, `/api/executive-dashboard/trends`, `/api/executive-dashboard/kpis`.
 
+## Sprint 22 — Appointment Engine
+
+Run in Supabase SQL editor:
+
+```
+backend/database/migrations/013_atlas_appointments.sql
+```
+
+Creates:
+
+- `atlas_appointments` — org-scoped appointment records with lifecycle history JSONB
+
+Agent appointment profile is stored in existing `atlas_users.profile_settings.appointmentProfile` (no new column).
+
+### Runtime without migration
+
+- Development falls back to `backend/data/appointments.json`
+- Production requires the table (startup/read paths throw if missing)
+
+### After migration
+
+REST API at `/api/appointments` and `/api/appointments/profile`.
+
+Reminder delivery runs via `appointmentReminderEngine.js` (60s poll, WhatsApp send, `reminder_sent` events).
+

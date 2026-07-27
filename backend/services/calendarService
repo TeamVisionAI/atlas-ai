@@ -52,6 +52,7 @@ async function createInterview(interview) {
   const start = new Date(interview.startTime);
   const end = new Date(start.getTime() + 30 * 60 * 1000);
   const isZoom = interview.interviewType === "Zoom";
+  const zoomUrl = interview.zoomUrl || null;
 
   const event = {
     summary: `Team Vision Interview - ${interview.name}`,
@@ -66,26 +67,27 @@ async function createInterview(interview) {
     }
   };
 
-  if (isZoom) {
-    event.conferenceData = {
-      createRequest: {
-        requestId: `atlas-${Date.now()}`,
-        conferenceSolutionKey: { type: "hangoutsMeet" }
-      }
-    };
+  if (isZoom && zoomUrl) {
+    event.location = zoomUrl;
+    event.description = `${event.description}\nZoom: ${zoomUrl}`;
+  }
+
+  if (interview.email) {
+    event.attendees = [{ email: interview.email }];
   }
 
   const response = await calendar.events.insert({
     calendarId: "primary",
-    conferenceDataVersion: isZoom ? 1 : 0,
+    conferenceDataVersion: 0,
+    sendUpdates: interview.email ? "all" : "none",
     requestBody: event
   });
 
   console.log("✅ Google Calendar Event Created");
   console.log("📅 Event ID:", response.data.id);
 
-  if (response.data.hangoutLink) {
-    console.log("🔗 Meet link:", response.data.hangoutLink);
+  if (zoomUrl) {
+    console.log("🔗 Zoom link:", zoomUrl);
   }
 
   return response.data;

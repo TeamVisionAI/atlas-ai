@@ -142,6 +142,38 @@ scheduleAppointment({ organizationId, appointmentType, dateKey, timeKey, duratio
 
 Books capacity slot and pushes event to Google Calendar when connected.
 
+### Appointment Engine (Sprint 22)
+
+**Application service:** `backend/application/appointmentApplicationService.js`  
+**Scheduling authority:** `backend/services/appointmentSchedulingEngine.js`  
+**Reminder delivery:** `backend/services/appointmentReminderEngine.js` (confirmation, 24h, 1h, 15m via WhatsApp)  
+**Persistence:** `atlas_appointments` (migration `013`) with JSON fallback in development  
+**Agent profile:** `atlas_users.profile_settings.appointmentProfile` via `appointmentProfileService.js`
+
+Sprint 22.1 production polish:
+
+- **Team Vision Zoom-first** — no provider choice in conversation; in-person/unusual methods escalate to Human Assist
+- **Structured history** — lifecycle events with actor, reason, old/new values
+- **Human Assist UX** — Mission Control-style panel in Appointments tab
+- **Modal workflows** — reschedule/cancel/complete/resolve without browser prompts
+- **Favorite locations CRUD** — in appointment settings profile
+
+```
+GET/PATCH /api/appointments/profile
+GET     /api/appointments/availability
+GET     /api/appointments?view=today|upcoming|...
+POST    /api/appointments
+POST    /api/appointments/:id/reschedule|cancel|complete|human-assist
+```
+
+The scheduling engine is the **sole authority** for suggested slots. Inputs: agent recurring working schedule, duration, buffers, existing appointments, optional Google Calendar FreeBusy. Mission Execution (Sprint 21) persists appointment rows after booking via `createAppointment({ existingBooking, skipWorkflowSideEffects: true })`.
+
+**Team Vision default:** Zoom-first virtual interviews; Human Assist escalates to Mission Control when Zoom or scheduling exceptions cannot be resolved automatically.
+
+**UI:** `/app/appointments` (list views), `/app/settings/appointments` (agent appointment profile).
+
+See `backend/test/sprint22.test.js` and `backend/dev/verifySprint22.js`.
+
 ---
 
 ## Mission Control Responsibilities
@@ -219,25 +251,39 @@ backend/
   core/configuration/
     organizationLevels.js
     appointmentTypes.js
+    appointmentDomain.js
     userRoles.js
   services/
     profileService.js
+    appointmentProfileService.js
+    appointmentSchedulingEngine.js
     organizationService.js
     availabilityService.js
     schedulingService.js
     googleCalendarIntegrationService.js
+    reminderAdapterService.js
+    zoomMeetingAdapter.js
+  application/
+    appointmentApplicationService.js
+  repositories/
+    appointmentRepository.js
   routes/
     configuration.js
+    appointments.js
 
 frontend/src/
+  pages/
+    AppointmentsPage.jsx
   pages/configuration/
     ConfigurationLayout.jsx
     ConfigurationHub.jsx
     ProfileConfiguration.jsx
     OrganizationConfiguration.jsx
     SchedulingConfiguration.jsx
+    AppointmentSettings.jsx
   services/
     configurationService.js
+    appointmentService.js
 ```
 
 ---
@@ -251,6 +297,11 @@ Migration `012_configuration_scheduling.sql`:
 - Default scheduling + policy placeholders in `organization_settings`
 
 Google credentials stored in `organization_integrations.credentials_encrypted`.
+
+Migration `013_atlas_appointments.sql`:
+
+- `atlas_appointments` — first-class appointment entity (org-scoped, history JSONB)
+- Agent appointment profile in `atlas_users.profile_settings.appointmentProfile`
 
 ---
 

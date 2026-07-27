@@ -21,6 +21,7 @@ import SetupWizard from "./pages/identity/SetupWizard";
 import RequireSetupComplete from "./components/RequireSetupComplete";
 import RequireAuth from "./components/RequireAuth";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import AppointmentsPage from "./pages/AppointmentsPage";
 import Prospect from "./pages/Prospect";
 import Home from "./pages/Home";
 import AtlasLanding from "./pages/AtlasLanding";
@@ -33,6 +34,7 @@ import { appPath } from "./config/appRoutes";
 const ProfileConfiguration = lazy(() => import("./pages/configuration/ProfileConfiguration"));
 const OrganizationConfiguration = lazy(() => import("./pages/configuration/OrganizationConfiguration"));
 const SchedulingConfiguration = lazy(() => import("./pages/configuration/SchedulingConfiguration"));
+const AppointmentSettings = lazy(() => import("./pages/configuration/AppointmentSettings"));
 
 function LegacyRedirect({ suffix = "" }) {
   const location = useLocation();
@@ -102,15 +104,7 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="appointments"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderAppointmentsTitle"
-              descriptionKey="placeholderAppointmentsDescription"
-            />
-          }
-        />
+        <Route path="appointments" element={<AppointmentsPage />} />
         <Route
           path="follow-ups"
           element={
@@ -135,6 +129,7 @@ export default function App() {
           <Route path="organization" element={<OrganizationConfiguration />} />
           <Route path="whatsapp" element={<WhatsAppConnect />} />
           <Route path="scheduling" element={<SchedulingConfiguration />} />
+          <Route path="appointments" element={<AppointmentSettings />} />
         </Route>
         <Route path="knowledge" element={<KnowledgeHub />} />
         <Route path="my-account" element={<MyAccount />} />

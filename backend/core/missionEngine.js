@@ -23,6 +23,14 @@ const { isProductionProspect, filterProductionProspects } = require("./productio
 
 const INTERESTED_OUTCOMES = new Set(["Interested", "Information Collected"]);
 
+const SCHEDULE_MISSION_BLOCKING_OUTCOMES = new Set([
+  "Not Interested",
+  "No Answer",
+  "Left Voicemail",
+  "Needs More Time",
+  "Appointment Scheduled"
+]);
+
 function startOfDayIso(date = new Date()) {
   const copy = new Date(date);
   copy.setHours(0, 0, 0, 0);
@@ -69,20 +77,60 @@ function buildMissionPrimaryAction(actionId) {
   };
 }
 
-function isInterestedAndAwaitingSchedule({ conversationOutcome, agentState, brain }) {
-  const recordedKey =
-    conversationOutcome?.recordedOutcome?.key || agentState?.outcome || null;
+function needsInterviewSchedule({ conversationOutcome, brain }) {
+  const workflowRequirements = conversationOutcome?.workflowRequirements || [];
 
-  if (!INTERESTED_OUTCOMES.has(recordedKey)) {
+  return (
+    workflowRequirements.some((requirement) => requirement.key === "schedule") ||
+    brain?.missingFields?.includes("schedule")
+  );
+}
+
+function hasPendingRequiredInformation(conversationOutcome) {
+  return (conversationOutcome?.requiredInputs || []).length > 0;
+}
+
+function isQualifiedWithoutConversationOutcome(conversationOutcome) {
+  if (hasPendingRequiredInformation(conversationOutcome)) {
     return false;
   }
 
   const workflowRequirements = conversationOutcome?.workflowRequirements || [];
-  const needsSchedule =
-    workflowRequirements.some((requirement) => requirement.key === "schedule") ||
-    brain?.missingFields?.includes("schedule");
+  return workflowRequirements.some((requirement) => requirement.key === "schedule");
+}
 
-  return needsSchedule;
+function shouldGenerateScheduleInterviewMission({ conversationOutcome, agentState, brain }) {
+  if (!needsInterviewSchedule({ conversationOutcome, brain })) {
+    return false;
+  }
+
+  const recordedKey =
+    conversationOutcome?.recordedOutcome?.key || agentState?.outcome || null;
+
+  if (recordedKey && SCHEDULE_MISSION_BLOCKING_OUTCOMES.has(recordedKey)) {
+    return false;
+  }
+
+  if (INTERESTED_OUTCOMES.has(recordedKey)) {
+    return true;
+  }
+
+  return isQualifiedWithoutConversationOutcome(conversationOutcome);
+}
+
+function resolveScheduleInterviewReason({ conversationOutcome, agentState }) {
+  const recordedKey =
+    conversationOutcome?.recordedOutcome?.key || agentState?.outcome || null;
+
+  if (INTERESTED_OUTCOMES.has(recordedKey)) {
+    return "Prospect is interested and waiting.";
+  }
+
+  return "Prospect is qualified and ready to schedule.";
+}
+
+function isInterestedAndAwaitingSchedule(context) {
+  return shouldGenerateScheduleInterviewMission(context);
 }
 
 function shouldEnterInterviewOutcome({ workflow, prospect, agentState }) {
@@ -111,7 +159,7 @@ function buildScheduleInterviewMission(context, createdAt) {
     priority: MISSION_PRIORITIES.HIGH,
     title: "Schedule Interview",
     description: "Book an interview time for this interested prospect.",
-    reason: "Prospect is interested and waiting.",
+    reason: resolveScheduleInterviewReason({ conversationOutcome, agentState }),
     estimatedMinutes: 2,
     dueDate: startOfDayIso(),
     primaryAction: buildMissionPrimaryAction(primaryActionId),
@@ -273,5 +321,6 @@ module.exports = {
   generateMissionsForOrganization,
   getMissionById,
   recalculateMissions,
-  buildMissionContext
+  buildMissionContext,
+  shouldGenerateScheduleInterviewMission
 };

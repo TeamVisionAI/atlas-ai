@@ -4756,13 +4756,13 @@
   },
   "+17862347083": {
     "canonicalMilestone": "QUALIFICATION",
-    "workflowOwnership": "ATLAS",
-    "needsHumanAttention": false,
-    "stalledAt": null,
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": true,
+    "stalledAt": "2026-07-27T15:24:45.125Z",
     "initializedAt": "2026-07-25T23:14:35.932Z",
-    "manualAgentOwnership": false,
+    "manualAgentOwnership": true,
     "doNotContact": false,
-    "stallEpisodeKey": null,
+    "stallEpisodeKey": "2026-07-26T13:35:06.478596+00:00",
     "reconcileEpisodeKey": null
   },
   "+13055576859": {
@@ -4865,11 +4865,33 @@
     "reconcileEpisodeKey": null
   },
   "+17862347080": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-26T13:29:53.340Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
+  },
+  "+17865557070": {
     "canonicalMilestone": "QUALIFICATION",
     "workflowOwnership": "ATLAS",
     "needsHumanAttention": false,
     "stalledAt": null,
-    "initializedAt": "2026-07-26T13:29:53.340Z",
+    "initializedAt": "2026-07-27T02:37:39.057Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
+  },
+  "+17865557088": {
+    "canonicalMilestone": "QUALIFICATION",
+    "workflowOwnership": "ATLAS",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-27T03:12:58.696Z",
     "manualAgentOwnership": false,
     "doNotContact": false,
     "stallEpisodeKey": null,

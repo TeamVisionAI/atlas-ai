@@ -125,7 +125,7 @@ export function adaptMissionControlResponse(
       localProspect: Boolean(businessRules?.localProspect),
       interviewType: businessRules?.interviewType || null,
       workAuthorization: businessRules?.workAuthorization ?? null,
-      emailRequired: Boolean(businessRules?.emailRequired)
+      emailRequired: false
     },
     aiBriefLines,
     expandedBrief: {
@@ -214,7 +214,7 @@ export function buildMockMissionControlFromQueueProspect(queueProspect) {
       localProspect: queueProspect.city === "Doral",
       interviewType,
       workAuthorization: true,
-      emailRequired: interviewType === "Zoom"
+      emailRequired: false
     },
     atlasBrief: {
       summary: [

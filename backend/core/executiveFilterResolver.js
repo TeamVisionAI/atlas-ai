@@ -3,7 +3,11 @@
  * Business rules stay in workflow engines; this module only maps filters → phones.
  */
 
-const { parseInterviewDatetime } = require("./parseInterviewDatetime");
+const {
+  parseInterviewDatetime,
+  isTomorrow,
+  isSameLocalDay
+} = require("./appointmentListQuery");
 const { loadAgentState } = require("./agentActionState");
 const { MILESTONES, PRIORITY_TIERS } = require("./workflowConstants");
 
@@ -15,38 +19,6 @@ const EXECUTIVE_FILTERS = Object.freeze({
   ORIENTATION_READY: "orientation-ready",
   STALLED: "stalled"
 });
-
-function startOfLocalDay(date = new Date()) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy.getTime();
-}
-
-function endOfLocalDay(date = new Date()) {
-  const copy = new Date(date);
-  copy.setHours(23, 59, 59, 999);
-  return copy.getTime();
-}
-
-function isSameLocalDay(timestampMs, reference = new Date()) {
-  if (!timestampMs) {
-    return false;
-  }
-
-  const dayStart = startOfLocalDay(reference);
-  const dayEnd = endOfLocalDay(reference);
-  return timestampMs >= dayStart && timestampMs <= dayEnd;
-}
-
-function isTomorrow(timestampMs, reference = new Date()) {
-  if (!timestampMs) {
-    return false;
-  }
-
-  const tomorrow = new Date(reference);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return isSameLocalDay(timestampMs, tomorrow);
-}
 
 function findProspectByPhone(prospects, phone) {
   return prospects.find((row) => row.phone === phone) || null;

@@ -79,14 +79,6 @@ function assessQualificationFromProspect(prospect, channel = "whatsapp") {
   const profile = buildProfileFromProspect(prospect, channel);
   const assessment = assessQualificationFromProfile(profile);
 
-  if (emailRequired(profileWithEffectiveInterviewType(profile)) && !profile.email && assessment.isQualified) {
-    return {
-      ...assessment,
-      readyForScheduling: false,
-      nextFocus: "email"
-    };
-  }
-
   return assessment;
 }
 

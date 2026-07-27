@@ -121,7 +121,7 @@ function getEffectiveInterviewType(profile, message = "") {
     message
   });
 
-  return decision.interviewType;
+  return decision.interviewType || "Zoom";
 }
 
 function isInterviewTypeRequired(profile) {
@@ -131,8 +131,9 @@ function isInterviewTypeRequired(profile) {
   });
 }
 
-function emailRequired(profile) {
-  return getEffectiveInterviewType(profile) === "Zoom";
+function emailRequired(_profile) {
+  // Sprint 11.4 MVP — email never blocks scheduling; used only for calendar invites when provided.
+  return false;
 }
 
 function isScheduleComplete(profile) {

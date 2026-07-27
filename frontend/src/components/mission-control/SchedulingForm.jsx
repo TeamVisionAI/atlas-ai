@@ -2,204 +2,347 @@ import { useMemo } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import ExecutivePanel from "../design-system/ExecutivePanel";
 import AtlasButton from "../ui/AtlasButton";
+import {
+  formatNextWeekLabel,
+  formatSchedulingDayLabel,
+  formatSlotButtonLabel,
+  groupSlotsByDay,
+  isSameSlot
+} from "../../utils/schedulingSlotGroups";
 import "./SchedulingForm.css";
 
-const DURATION_OPTIONS = [30, 45, 60];
+export const INTERVIEW_TYPE_OPTIONS = Object.freeze([
+  { id: "office", icon: "🏢", labelKey: "missionExecutionInterviewTypeOffice" },
+  { id: "public_location", icon: "☕", labelKey: "missionExecutionInterviewTypePublicLocation" },
+  { id: "zoom", icon: "💻", labelKey: "missionExecutionInterviewTypeZoom" }
+]);
 
 function normalizeInterviewType(value) {
   const normalized = String(value || "").toLowerCase();
 
-  if (normalized.includes("zoom") || normalized.includes("meet")) {
+  if (normalized.includes("zoom") || normalized.includes("virtual")) {
     return "zoom";
+  }
+
+  if (normalized.includes("public")) {
+    return "public_location";
   }
 
   return "office";
 }
 
 export function createInitialSchedulingForm({
-  defaultInterviewType = "zoom",
+  defaultInterviewType = "",
   defaultRecruiter = "",
-  defaultOfficeLocation = "",
   defaultDuration = 30
 } = {}) {
-  const today = new Date();
-  const dateKey = today.toISOString().slice(0, 10);
-
   return {
-    dateKey,
+    dateKey: "",
     timeKey: "",
     duration: defaultDuration,
-    interviewType: normalizeInterviewType(defaultInterviewType),
+    interviewType: defaultInterviewType ? normalizeInterviewType(defaultInterviewType) : "",
     recruiter: defaultRecruiter,
-    officeLocation: defaultOfficeLocation,
+    officeLocation: "",
     notes: ""
   };
 }
 
 export function isSchedulingFormValid(form) {
-  if (!form?.dateKey || !form?.timeKey || !form?.interviewType) {
-    return false;
+  return Boolean(form?.interviewType && form?.dateKey && form?.timeKey);
+}
+
+export function resolveInterviewTypeLabel(interviewType, translate) {
+  const option = INTERVIEW_TYPE_OPTIONS.find((item) => item.id === interviewType);
+  return option ? `${option.icon} ${translate(option.labelKey)}` : "";
+}
+
+function SummaryCard({ label, value }) {
+  return (
+    <div className="scheduling-form__summary-card">
+      <span className="scheduling-form__summary-label">{label}</span>
+      <span className="scheduling-form__summary-value">{value}</span>
+    </div>
+  );
+}
+
+function resolveSlotsHeading(displayMode, translate, nextWeekStartDateKey, locale) {
+  if (displayMode === "recommended") {
+    return translate("missionExecutionRecommendedTimes");
   }
 
-  if (form.interviewType === "office" && !String(form.officeLocation || "").trim()) {
-    return false;
+  if (displayMode === "day") {
+    return translate("missionExecutionDayTimes");
   }
 
-  return true;
+  if (displayMode === "week") {
+    return formatNextWeekLabel(nextWeekStartDateKey, { translate, locale });
+  }
+
+  return translate("missionExecutionSelectSlot");
 }
 
 export default function SchedulingForm({
   form,
   onChange,
-  suggestedSlots = [],
+  slots = [],
   loadingSlots = false,
-  disabled = false
+  loadingExpansion = false,
+  slotsError = null,
+  disabled = false,
+  recruiterName = "",
+  durationMinutes = 30,
+  displayMode = "recommended",
+  viewMode = "48h",
+  hasMoreInWindow = false,
+  activeDayKey = null,
+  selectableDays = [],
+  nextWeekStartDateKey = "",
+  onShowMoreTimes,
+  onBackToRecommended,
+  onSelectDay,
+  onNextWeek,
+  onInterviewTypeChange
 }) {
-  const { translate } = useLanguage();
+  const { translate, language } = useLanguage();
+  const locale = language === "es" ? "es-ES" : "en-US";
+  const interviewTypeSelected = Boolean(form.interviewType);
 
-  const interviewTypeLabel = useMemo(
-    () => ({
-      office: translate("missionExecutionInterviewTypeOffice"),
-      zoom: translate("missionExecutionInterviewTypeZoom")
-    }),
-    [translate]
+  const groupedDays = useMemo(
+    () =>
+      groupSlotsByDay(slots, {
+        translate,
+        locale
+      }),
+    [slots, translate, locale]
   );
+
+  const selectedSlot = useMemo(
+    () =>
+      slots.find(
+        (slot) => slot.dateKey === form.dateKey && slot.timeKey === form.timeKey
+      ) || null,
+    [slots, form.dateKey, form.timeKey]
+  );
+
+  const isLoading = loadingSlots || loadingExpansion;
+  const selectedInterviewTypeLabel = resolveInterviewTypeLabel(form.interviewType, translate);
 
   function updateField(field, value) {
     onChange({ ...form, [field]: value });
   }
 
-  function applySuggestedSlot(slot) {
+  function selectInterviewType(nextType) {
+    onInterviewTypeChange?.(nextType);
     onChange({
       ...form,
-      dateKey: slot.dateKey || form.dateKey,
-      timeKey: slot.timeKey || slot.time || form.timeKey
+      interviewType: nextType,
+      dateKey: "",
+      timeKey: ""
+    });
+  }
+
+  function selectSlot(slot) {
+    onChange({
+      ...form,
+      dateKey: slot.dateKey,
+      timeKey: slot.timeKey,
+      duration: slot.durationMinutes || form.duration || durationMinutes
     });
   }
 
   return (
     <ExecutivePanel className="scheduling-form">
-      <div className="scheduling-form__grid">
-        <label className="scheduling-form__field">
-          <span>{translate("missionExecutionInterviewDate")}</span>
-          <input
-            type="date"
-            value={form.dateKey}
-            onChange={(event) => updateField("dateKey", event.target.value)}
-            disabled={disabled}
-            required
-          />
-        </label>
+      <section className="scheduling-form__interview-type" aria-labelledby="scheduling-type-heading">
+        <h3 id="scheduling-type-heading" className="scheduling-form__slots-title">
+          {translate("missionExecutionInterviewType")}
+        </h3>
+        <div className="scheduling-form__type-grid" role="radiogroup" aria-labelledby="scheduling-type-heading">
+          {INTERVIEW_TYPE_OPTIONS.map((option) => {
+            const selected = form.interviewType === option.id;
 
-        <label className="scheduling-form__field">
-          <span>{translate("missionExecutionInterviewTime")}</span>
-          <input
-            type="time"
-            value={form.timeKey}
-            onChange={(event) => updateField("timeKey", event.target.value)}
-            disabled={disabled}
-            required
-          />
-        </label>
-
-        <label className="scheduling-form__field">
-          <span>{translate("missionExecutionDuration")}</span>
-          <select
-            value={form.duration}
-            onChange={(event) => updateField("duration", Number(event.target.value))}
-            disabled={disabled}
-          >
-            {DURATION_OPTIONS.map((minutes) => (
-              <option key={minutes} value={minutes}>
-                {translate("missionEstimatedMinutes", { minutes })}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="scheduling-form__field scheduling-form__field--full">
-          <span>{translate("missionExecutionRecruiter")}</span>
-          <input
-            type="text"
-            value={form.recruiter}
-            onChange={(event) => updateField("recruiter", event.target.value)}
-            placeholder={translate("missionExecutionRecruiterPlaceholder")}
-            disabled={disabled}
-          />
-        </label>
-      </div>
-
-      <fieldset className="scheduling-form__fieldset">
-        <legend>{translate("missionExecutionInterviewType")}</legend>
-        <div className="scheduling-form__radio-row">
-          {["office", "zoom"].map((type) => (
-            <label key={type} className="scheduling-form__radio">
-              <input
-                type="radio"
-                name="interviewType"
-                value={type}
-                checked={form.interviewType === type}
-                onChange={() => updateField("interviewType", type)}
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                className={`scheduling-form__type-option${selected ? " scheduling-form__type-option--selected" : ""}`}
                 disabled={disabled}
-              />
-              <span>{interviewTypeLabel[type]}</span>
-            </label>
-          ))}
+                onClick={() => selectInterviewType(option.id)}
+              >
+                <span className="scheduling-form__type-icon" aria-hidden="true">
+                  {option.icon}
+                </span>
+                <span>{translate(option.labelKey)}</span>
+              </button>
+            );
+          })}
         </div>
-      </fieldset>
+      </section>
 
-      {form.interviewType === "office" ? (
-        <label className="scheduling-form__field scheduling-form__field--full">
-          <span>{translate("missionExecutionOfficeLocation")}</span>
-          <input
-            type="text"
-            value={form.officeLocation}
-            onChange={(event) => updateField("officeLocation", event.target.value)}
-            disabled={disabled}
-            required
-          />
-        </label>
-      ) : null}
+      {interviewTypeSelected ? (
+        <>
+          <div className="scheduling-form__summary-grid">
+            <SummaryCard
+              label={translate("missionExecutionDuration")}
+              value={translate("missionEstimatedMinutes", {
+                minutes: durationMinutes || form.duration
+              })}
+            />
+            <SummaryCard
+              label={translate("missionExecutionInterviewType")}
+              value={selectedInterviewTypeLabel}
+            />
+            <SummaryCard
+              label={translate("missionExecutionRecruiter")}
+              value={recruiterName || form.recruiter || translate("missionExecutionRecruiterPlaceholder")}
+            />
+          </div>
 
-      <label className="scheduling-form__field scheduling-form__field--full">
-        <span>{translate("missionExecutionNotes")}</span>
-        <textarea
-          rows={3}
-          value={form.notes}
-          onChange={(event) => updateField("notes", event.target.value)}
-          placeholder={translate("missionExecutionNotesPlaceholder")}
-          disabled={disabled}
-        />
-      </label>
+          <section className="scheduling-form__slots" aria-labelledby="scheduling-slots-heading">
+            <div className="scheduling-form__slots-header">
+              <h3 id="scheduling-slots-heading" className="scheduling-form__slots-title">
+                {resolveSlotsHeading(displayMode, translate, nextWeekStartDateKey, locale)}
+              </h3>
+              {loadingSlots ? (
+                <p className="scheduling-form__hint">{translate("missionExecutionLoadingSlots")}</p>
+              ) : null}
+              {!loadingSlots && loadingExpansion ? (
+                <p className="scheduling-form__hint">{translate("missionExecutionLoadingDay")}</p>
+              ) : null}
+              {!isLoading && viewMode === "next_available" && displayMode === "recommended" ? (
+                <p className="scheduling-form__hint">{translate("missionExecutionNextAvailableHint")}</p>
+              ) : null}
+            </div>
 
-      {loadingSlots ? (
-        <p className="scheduling-form__hint">{translate("missionExecutionLoadingSlots")}</p>
-      ) : null}
+            {slotsError ? (
+              <p className="scheduling-form__error" role="alert">
+                {slotsError}
+              </p>
+            ) : null}
 
-      {suggestedSlots.length ? (
-        <div className="scheduling-form__suggestions">
-          <p className="scheduling-form__hint">{translate("missionExecutionSuggestedSlots")}</p>
-          <div className="scheduling-form__slot-row">
-            {suggestedSlots.map((slot) => {
-              const slotKey = `${slot.dateKey}-${slot.timeKey || slot.time}`;
-              const label = slot.label || `${slot.dateKey} ${slot.timeKey || slot.time}`;
+            {!isLoading && !slotsError && groupedDays.length ? (
+              <div className="scheduling-form__day-groups">
+                {groupedDays.map((day) => (
+                  <div key={day.dateKey} className="scheduling-form__day-group">
+                    <h4 className="scheduling-form__day-label">{day.label}</h4>
+                    <div
+                      className="scheduling-form__slot-grid"
+                      role="listbox"
+                      aria-label={`${day.label} ${translate("appointmentsAvailableSlots")}`}
+                    >
+                      {day.slots.map((slot) => {
+                        const selected = isSameSlot(slot, selectedSlot);
 
-              return (
+                        return (
+                          <button
+                            key={`${slot.dateKey}-${slot.timeKey}`}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            className={`scheduling-form__slot${selected ? " scheduling-form__slot--selected" : ""}`}
+                            disabled={disabled}
+                            onClick={() => selectSlot(slot)}
+                          >
+                            {formatSlotButtonLabel(slot, locale)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {!isLoading && !slotsError && !groupedDays.length ? (
+              <p className="scheduling-form__hint">{translate("missionExecutionNoSlots")}</p>
+            ) : null}
+
+            {!isLoading && groupedDays.length ? (
+              <div className="scheduling-form__expansion">
+                {displayMode === "recommended" && hasMoreInWindow ? (
+                  <AtlasButton
+                    type="button"
+                    variant="secondary"
+                    className="scheduling-form__expansion-button"
+                    disabled={disabled}
+                    onClick={onShowMoreTimes}
+                  >
+                    {translate("missionExecutionShowMoreTimes")}
+                  </AtlasButton>
+                ) : null}
+
+                {displayMode !== "recommended" ? (
+                  <AtlasButton
+                    type="button"
+                    variant="ghost"
+                    className="scheduling-form__expansion-button"
+                    disabled={disabled}
+                    onClick={onBackToRecommended}
+                  >
+                    {translate("missionExecutionBackToRecommended")}
+                  </AtlasButton>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          {!loadingSlots ? (
+            <section className="scheduling-form__choose-day" aria-labelledby="scheduling-choose-day-heading">
+              <h3 id="scheduling-choose-day-heading" className="scheduling-form__slots-title">
+                {translate("missionExecutionChooseDay")}
+              </h3>
+              <div className="scheduling-form__day-picker">
+                {selectableDays.map((option) => {
+                  const label = formatSchedulingDayLabel(option.dateKey, new Date(), {
+                    translate,
+                    locale
+                  });
+                  const isActive = displayMode === "day" && activeDayKey === option.dateKey;
+
+                  return (
+                    <AtlasButton
+                      key={option.dateKey}
+                      type="button"
+                      variant={isActive ? "primary" : "secondary"}
+                      className="scheduling-form__day-pill"
+                      disabled={disabled || loadingExpansion}
+                      onClick={() => onSelectDay?.(option.dateKey)}
+                    >
+                      {label}
+                    </AtlasButton>
+                  );
+                })}
                 <AtlasButton
-                  key={slotKey}
                   type="button"
                   variant="secondary"
-                  className="scheduling-form__slot-button"
-                  disabled={disabled}
-                  onClick={() => applySuggestedSlot(slot)}
+                  className="scheduling-form__day-pill"
+                  disabled={disabled || loadingExpansion}
+                  onClick={onNextWeek}
                 >
-                  {label}
+                  {formatNextWeekLabel(nextWeekStartDateKey, { translate, locale })}
                 </AtlasButton>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </section>
+          ) : null}
+        </>
+      ) : (
+        <p className="scheduling-form__hint">{translate("missionExecutionSelectInterviewTypeFirst")}</p>
+      )}
+
+      <details className="scheduling-form__advanced">
+        <summary>{translate("missionExecutionAdvanced")}</summary>
+        <label className="scheduling-form__field scheduling-form__field--full">
+          <span>{translate("missionExecutionNotes")}</span>
+          <textarea
+            rows={3}
+            value={form.notes}
+            onChange={(event) => updateField("notes", event.target.value)}
+            placeholder={translate("missionExecutionNotesPlaceholder")}
+            disabled={disabled}
+          />
+        </label>
+      </details>
     </ExecutivePanel>
   );
 }

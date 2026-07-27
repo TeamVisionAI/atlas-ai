@@ -34,6 +34,9 @@ const COMMUNICATION_EVENTS = Object.freeze({
 const APPOINTMENT_EVENTS = Object.freeze({
   APPOINTMENT_CREATED: "appointment_created",
   APPOINTMENT_RESCHEDULED: "appointment_rescheduled",
+  APPOINTMENT_CANCELLED: "appointment_cancelled",
+  APPOINTMENT_COMPLETED: "appointment_completed",
+  APPOINTMENT_HUMAN_ASSIST: "appointment_human_assist",
   REMINDER_SENT: "reminder_sent",
   INTERVIEW_COMPLETED: "interview_completed"
 });

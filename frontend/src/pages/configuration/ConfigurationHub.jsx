@@ -27,6 +27,12 @@ const HUB_SECTIONS = [
     title: SETTINGS_SECTIONS.scheduling,
     descriptionKey: "configurationHubSchedulingDescription",
     icon: "scheduling"
+  },
+  {
+    to: appPath("settings/appointments"),
+    title: SETTINGS_SECTIONS.appointments,
+    descriptionKey: "configurationHubAppointmentsDescription",
+    icon: "scheduling"
   }
 ];
 

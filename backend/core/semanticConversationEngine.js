@@ -142,7 +142,11 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
         : "What do you currently do for work?";
 
     case "interviewType":
-      return getInterviewPreferenceQuestion(language);
+      return getScheduleQuestion(
+        { phase: PHASES.DAY, offeredDays: schedulingState.offeredDays || [] },
+        "Zoom",
+        language
+      );
 
     case "schedule": {
       const scheduleQuestion =
@@ -166,10 +170,10 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
       return scheduleQuestion;
     }
 
-    case "email":
-      return language === "es"
-        ? "¿Cuál es el mejor correo electrónico para enviarte la confirmación?"
-        : "What is the best email address to send your interview confirmation?";
+    case "email": {
+      const { getEmailCollectionQuestion } = require("./teamVisionAppointmentRules");
+      return getEmailCollectionQuestion(language);
+    }
 
     default:
       return language === "es"
@@ -460,6 +464,14 @@ async function handleSemanticMessage({
     await syncProfileToProspect(prospect, profile);
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
+    const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
+    await escalateConversationToHumanAssist({
+      phone,
+      organizationId: prospect.organization_id,
+      reason: "unusual_meeting_method",
+      summary: rulesResult.escalation?.reason || "Meeting exception"
+    }).catch(() => {});
+
     await recordLog({
       phone,
       name,
@@ -599,6 +611,14 @@ async function handleSemanticMessage({
         scheduleResult.handoffReason || "OUTSIDE_SCHEDULING_WINDOW",
         language
       );
+
+      const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
+      await escalateConversationToHumanAssist({
+        phone,
+        organizationId: prospect.organization_id,
+        reason: (scheduleResult.handoffReason || "zoom_access_failed").toLowerCase(),
+        summary: coordinatorReply
+      }).catch(() => {});
 
       await recordLog({
         phone,

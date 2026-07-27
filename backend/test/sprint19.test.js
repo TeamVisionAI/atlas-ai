@@ -36,6 +36,43 @@ describe("Mission Engine rules", () => {
     assert.equal(missions[0].priority, MISSION_PRIORITIES.HIGH);
   });
 
+  it("generates Schedule Interview when qualification is complete without conversation outcome", () => {
+    const missions = generateMissionsFromContext({
+      prospect: { phone: "+15559876543", current_step: "SCHEDULE" },
+      brain: { currentStep: "SCHEDULE", missingFields: ["schedule"] },
+      agentState: { outcome: null },
+      conversationOutcome: {
+        recordedOutcome: null,
+        requiredInputs: [],
+        workflowRequirements: [{ key: "schedule", label: "Interview not scheduled" }]
+      },
+      workflow: { canonicalMilestone: "QUALIFICATION" },
+      availableActions: [{ id: "schedule", label: "Schedule Interview" }]
+    });
+
+    assert.equal(missions.length, 1);
+    assert.equal(missions[0].missionType, MISSION_TYPES.SCHEDULE_INTERVIEW);
+    assert.equal(missions[0].reason, "Prospect is qualified and ready to schedule.");
+    assert.equal(missions[0].primaryAction.id, "schedule");
+  });
+
+  it("does not generate Schedule Interview while required information is still pending", () => {
+    const missions = generateMissionsFromContext({
+      prospect: { phone: "+15559876543", current_step: "GREETING" },
+      brain: { currentStep: "GREETING", missingFields: ["city", "schedule"] },
+      agentState: { outcome: null },
+      conversationOutcome: {
+        recordedOutcome: null,
+        requiredInputs: [{ key: "city", label: "City" }],
+        workflowRequirements: []
+      },
+      workflow: { canonicalMilestone: "QUALIFICATION" },
+      availableActions: []
+    });
+
+    assert.equal(missions.length, 0);
+  });
+
   it("keeps workflow gate active when conversation outcome is Information Collected", () => {
     const prospect = {
       current_step: "CONFIRMED",

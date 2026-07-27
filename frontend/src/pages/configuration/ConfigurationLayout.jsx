@@ -21,6 +21,12 @@ const NAV_ITEMS = [
     label: SETTINGS_SECTIONS.scheduling,
     icon: "scheduling",
     end: false
+  },
+  {
+    to: appPath("settings/appointments"),
+    label: SETTINGS_SECTIONS.appointments,
+    icon: "scheduling",
+    end: false
   }
 ];
 

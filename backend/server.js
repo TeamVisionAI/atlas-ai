@@ -26,6 +26,7 @@ const adminUsersRoutes = require("./routes/adminUsers");
 const setupRoutes = require("./routes/setup");
 const accountRoutes = require("./routes/account");
 const configurationRoutes = require("./routes/configuration");
+const appointmentRoutes = require("./routes/appointments");
 const missionRoutes = require("./routes/missions");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const prospectCenterRoutes = require("./routes/prospectCenter");
@@ -181,6 +182,7 @@ app.use("/api", authRoutes);
 app.use("/api/admin", adminUsersRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/configuration", configurationRoutes);
+app.use("/api/appointments", appointmentRoutes);
 app.use("/api/missions", missionRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
@@ -236,7 +238,13 @@ async function bootstrap() {
   });
 }
 
-bootstrap().catch((error) => {
+async function main() {
+  await bootstrap();
+  const { startReminderPoller } = require("./services/appointmentReminderEngine");
+  startReminderPoller(60_000);
+}
+
+main().catch((error) => {
   console.error("Atlas server bootstrap failed:", error);
   process.exit(1);
 });

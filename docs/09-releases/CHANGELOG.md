@@ -16,7 +16,33 @@
 
 ---
 
-## Documentation Foundation v1.0
+## Sprint 22.1 — Appointment Engine Production Polish
+
+**Date:** 2026-07-26
+
+- Team Vision Zoom-first conversation flow (no Office/Meet/WhatsApp choice unless exception)
+- Human Assist bridge from WhatsApp scheduling escalations
+- Reminder delivery engine (confirmation, 24h, 1h, 15m) via existing WhatsApp pipeline
+- Appointment modals for reschedule/cancel/complete/resolve
+- Structured appointment history + details panel
+- Favorite public locations CRUD in settings
+
+---
+
+**Date:** 2026-07-26
+
+- First-class `atlas_appointments` table and JSON dev fallback
+- Agent appointment profile (recurring working schedule, defaults, virtual/in-person preferences)
+- Appointment scheduling engine with buffers, morning/afternoon filtering, Google FreeBusy
+- REST API under `/api/appointments`
+- Appointments operations page at `/app/appointments`
+- Appointment settings at `/app/settings/appointments`
+- Mission Execution persists appointment records after schedule
+- Human Assist, reschedule history, cancellation, completion with outcomes
+- Reminder adapter (schedules intent; full delivery engine deferred)
+- Zoom adapter (env URL or pending link status)
+
+---
 
 **Date:** 2026-07-23
 

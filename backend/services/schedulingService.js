@@ -29,8 +29,16 @@ function buildEventDescription(appointmentType, metadata = {}) {
     lines.push(`Phone: ${metadata.phone}`);
   }
 
+  if (metadata.interviewType) {
+    lines.push(`Interview Type: ${metadata.interviewType}`);
+  }
+
   if (metadata.notes) {
     lines.push(`Notes: ${metadata.notes}`);
+  }
+
+  if (metadata.meetingUrl || metadata.zoomUrl) {
+    lines.push(`Meeting link: ${metadata.meetingUrl || metadata.zoomUrl}`);
   }
 
   return lines.join("\n");
@@ -89,18 +97,14 @@ async function scheduleAppointment({
 
   if (organizationId) {
     try {
-      const isZoomInterview =
-        metadata.interviewType === "Zoom" ||
-        String(metadata.interviewType || "").toLowerCase().includes("zoom");
-
       googleEvent = await googleCalendarIntegrationService.createCalendarEvent(organizationId, {
         summary: formatAppointmentTitle(appointmentType, metadata),
         description: buildEventDescription(appointmentType, metadata),
         startTimeISO,
         endTimeISO,
         timezone,
-        location: metadata.location || null,
-        createMeetLink: Boolean(metadata.createMeetLink ?? isZoomInterview)
+        location: metadata.meetingUrl || metadata.zoomUrl || metadata.location || null,
+        attendeeEmail: metadata.attendeeEmail || null
       });
     } catch (calendarError) {
       releaseSlotByIso(startTimeISO, appointmentType);
@@ -108,11 +112,7 @@ async function scheduleAppointment({
     }
   }
 
-  const meetLink =
-    googleEvent?.hangoutLink ||
-    googleEvent?.conferenceData?.entryPoints?.find((entry) => entry.entryPointType === "video")
-      ?.uri ||
-    null;
+  const meetingUrl = metadata.meetingUrl || metadata.zoomUrl || null;
 
   return {
     success: true,
@@ -125,7 +125,9 @@ async function scheduleAppointment({
     capacity: booking.availability,
     googleCalendarEventId: googleEvent?.id || null,
     googleCalendarSynced: Boolean(googleEvent?.id),
-    meetLink,
+    meetLink: meetingUrl,
+    zoomLink: meetingUrl,
+    meetingUrl,
     googleCalendarLink: googleEvent?.htmlLink || null
   };
 }

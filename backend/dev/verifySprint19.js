@@ -73,6 +73,25 @@ function verifyMissionRules() {
   assert(scheduleMissions[0]?.missionType === MISSION_TYPES.SCHEDULE_INTERVIEW, "Rule 1 mission type");
   assert(scheduleMissions[0]?.priority === MISSION_PRIORITIES.HIGH, "Rule 1 priority");
 
+  const qualifiedContext = {
+    prospect: { phone: "+15550000099", name: "Juan", current_step: "SCHEDULE" },
+    brain: { currentStep: "SCHEDULE", missingFields: ["schedule"] },
+    agentState: { outcome: null },
+    conversationOutcome: {
+      recordedOutcome: null,
+      requiredInputs: [],
+      workflowRequirements: [{ key: "schedule", label: "Interview not scheduled" }]
+    },
+    workflow: { canonicalMilestone: "QUALIFICATION" },
+    availableActions: [{ id: "schedule", label: "Schedule Interview" }]
+  };
+
+  const qualifiedMissions = generateMissionsFromContext(qualifiedContext);
+  assert(
+    qualifiedMissions.some((mission) => mission.missionType === MISSION_TYPES.SCHEDULE_INTERVIEW),
+    "Rule 1 generates Schedule Interview for qualified prospect without conversation outcome"
+  );
+
   const gateContext = {
     prospect: {
       phone: "+15550000002",

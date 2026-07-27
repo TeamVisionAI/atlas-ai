@@ -3,10 +3,15 @@ const { isScheduleComplete } = require("./informationModel");
 const { PHASES } = require("./schedulingEngine");
 
 function buildHumanCoordinatorReply(reason, language) {
-  if (reason === "SPECIAL_MEETING_REQUEST") {
-    return language === "es"
-      ? "Entendido. Un agente de Team Vision se comunicará contigo para coordinar una entrevista presencial."
-      : "Understood. A Team Vision agent will contact you to coordinate an in-person interview.";
+  const { getHumanAssistReply } = require("./teamVisionAppointmentRules");
+
+  if (
+    reason === "SPECIAL_MEETING_REQUEST" ||
+    reason === "ZOOM_ACCESS_FAILED" ||
+    reason === "UNUSUAL_MEETING_METHOD" ||
+    reason === "PROSPECT_REQUESTS_AGENT"
+  ) {
+    return getHumanAssistReply(language);
   }
 
   if (reason === "OUTSIDE_SCHEDULING_WINDOW") {
@@ -21,25 +26,8 @@ function buildHumanCoordinatorReply(reason, language) {
 }
 
 function buildCoverageScheduleIntro(profile, language) {
-  const approach = evaluateSchedulingApproach({
-    city: profile.city,
-    state: profile.state,
-    occupation: profile.occupation
-  });
-
-  if (language === "es") {
-    if (approach.messageKey === "LOCAL_DEFAULT") {
-      return "Perfecto. Estamos realizando las entrevistas en nuestras oficinas en Doral.";
-    }
-
-    return "Perfecto. Estamos realizando las entrevistas por Zoom.";
-  }
-
-  if (approach.messageKey === "LOCAL_DEFAULT") {
-    return "Perfect. We're conducting interviews at our Doral office.";
-  }
-
-  return "Perfect. We're conducting interviews via Zoom.";
+  const { getZoomIntro } = require("./teamVisionAppointmentRules");
+  return getZoomIntro(language);
 }
 
 function buildAtlasBriefSummary({

@@ -6115,7 +6115,59 @@
         "type": "phone"
       }
     ],
-    "outcome": "Interested",
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17865557070": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Required information updated: City, Work Authorization, Occupation.",
+        "at": "2026-07-27T02:38:15.559Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: State.",
+        "at": "2026-07-27T02:38:22.868Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17865557088": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Required information updated: City, Work Authorization, Occupation.",
+        "at": "2026-07-27T03:13:46.228Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: State.",
+        "at": "2026-07-27T03:13:54.751Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
     "closureReason": null,
     "futureReminder": null,
     "followUpDate": null,
