@@ -5,6 +5,7 @@ assertProductionPlatformConfig();
 
 const express = require("express");
 const cors = require("cors");
+const { buildCorsOptions } = require("./config/corsOptions");
 
 const healthRoute = require("./routes/health");
 const infoRoute = require("./routes/info");
@@ -84,19 +85,8 @@ const prospectModule = createProspectModule({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// General middleware
-const corsOptions =
-  process.env.NODE_ENV === "production"
-    ? {
-        origin: String(process.env.ATLAS_CORS_ORIGINS || "")
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
-        credentials: true
-      }
-    : {};
-
-app.use(cors(corsOptions));
+// General middleware — production allowlist includes teamvisionfinancial.com (+ www, localhost dev)
+app.use(cors(buildCorsOptions()));
 app.use(safeRequestLogger);
 
 // Meta webhook must receive the raw body before express.json().

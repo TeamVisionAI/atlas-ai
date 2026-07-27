@@ -5,10 +5,9 @@
  */
 
 import { getAuthHeaders } from "./atlasAuthService";
+import { resolveApiBaseUrl } from "../config/apiBaseUrl";
 
-const API_BASE = import.meta.env.DEV
-  ? ""
-  : String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const API_BASE = resolveApiBaseUrl();
 
 async function withAuthHeaders(options = {}) {
   const authHeaders = await getAuthHeaders();

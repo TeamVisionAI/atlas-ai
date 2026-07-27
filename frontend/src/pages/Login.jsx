@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { loginAtlasSession, getStoredSessionToken } from "../services/atlasAuthService";
+import { loginAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchSetupStatus } from "../services/setupService";
 import { appPath } from "../config/appRoutes";
 import "./Login.css";
@@ -16,13 +16,44 @@ export default function Login() {
   const [checkingSetup, setCheckingSetup] = useState(true);
   const [setupRequired, setSetupRequired] = useState(false);
 
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [hasValidSession, setHasValidSession] = useState(false);
+
   useEffect(() => {
-    fetchSetupStatus()
-      .then((status) => setSetupRequired(Boolean(status.setupRequired)))
-      .finally(() => setCheckingSetup(false));
+    let cancelled = false;
+
+    async function initialize() {
+      try {
+        const [status, user] = await Promise.all([
+          fetchSetupStatus(),
+          fetchCurrentUser()
+        ]);
+
+        if (!cancelled) {
+          setSetupRequired(Boolean(status.setupRequired));
+          setHasValidSession(Boolean(user));
+        }
+      } catch {
+        if (!cancelled) {
+          setSetupRequired(false);
+          setHasValidSession(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingSetup(false);
+          setCheckingSession(false);
+        }
+      }
+    }
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (checkingSetup) {
+  if (checkingSetup || checkingSession) {
     return null;
   }
 
@@ -30,7 +61,7 @@ export default function Login() {
     return <Navigate to={appPath("setup")} replace />;
   }
 
-  if (getStoredSessionToken()) {
+  if (hasValidSession) {
     return <Navigate to={appPath()} replace />;
   }
 
