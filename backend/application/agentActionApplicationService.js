@@ -50,6 +50,7 @@ const {
   buildConversationOutcomeReadModel
 } = require("../core/conversationOutcomeEngine");
 const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
+const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
 const {
   requireTenantOrganizationId,
@@ -177,7 +178,7 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
       }
 
       const message = buildOfficeLocationMessage({
-        office: organizationSettings.office,
+        office: getOrganizationSettings().office,
         language
       });
       const sendError = await sendWhatsAppOrFail(prospect, message);
