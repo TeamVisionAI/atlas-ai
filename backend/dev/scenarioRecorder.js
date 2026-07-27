@@ -20,6 +20,7 @@ function createScenarioRecorder(scenarioName) {
     actualResult: null,
     pass: null,
     timestamps: [],
+    phone: null,
 
     setInitialState(state) {
       this.initialState = state;
@@ -47,6 +48,10 @@ function createScenarioRecorder(scenarioName) {
       this.expectedResult = expected;
     },
 
+    setPhone(phone) {
+      this.phone = phone;
+    },
+
     finalize(finalState, actualResult) {
       this.finalState = finalState;
       this.actualResult = actualResult;
@@ -64,6 +69,7 @@ function createScenarioRecorder(scenarioName) {
       return {
         scenarioName: this.scenarioName,
         correlationId: this.correlationId,
+        phone: this.phone,
         startedAt: this.startedAt,
         completedAt: this.completedAt,
         initialState: this.initialState,

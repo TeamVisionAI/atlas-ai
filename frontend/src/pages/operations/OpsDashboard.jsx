@@ -8,6 +8,7 @@ import {
   OpsReadinessWidget,
   OpsRecentActivityList,
   OpsRunningTasks,
+  OpsStatusBadge,
   formatDuration,
   useRunningTasks
 } from "../../components/operations/OpsShared";
@@ -16,6 +17,7 @@ import {
   fetchOperationsDashboard,
   fetchSmokeTests,
   replayAllProjections,
+  runCompleteValidation,
   runSmokeTest,
   simulateFacebookLead
 } from "../../services/operationsCenterService";
@@ -41,8 +43,102 @@ function ActivityStat({ label, value }) {
   );
 }
 
+function ValidationReportPanel({ report, t }) {
+  if (!report) {
+    return null;
+  }
+
+  const failed = report.overall !== "PASS";
+
+  return (
+    <section className="ops-panel ops-validation-report" aria-labelledby="ops-validation-report">
+      <div className="ops-section__subhead">
+        <h3 id="ops-validation-report">{t.opsValidationReportTitle}</h3>
+        <OpsStatusBadge status={failed ? "failure" : "healthy"} label={report.overall} />
+      </div>
+
+      <div className="ops-inline-meta">
+        <span>
+          {t.opsValidationDuration}: {report.durationSeconds}s
+        </span>
+        <span>
+          {t.opsValidationStepsPassed}: {report.stepsPassed}
+        </span>
+        <span>
+          {t.opsValidationStepsFailed}: {report.stepsFailed}
+        </span>
+      </div>
+
+      <div className="ops-validation-lines">
+        {(report.displayLines || []).map((line) => (
+          <p key={line} className="ops-validation-line">
+            {line}
+          </p>
+        ))}
+      </div>
+
+      <p className="ops-validation-overall">
+        {t.opsValidationOverall}: {report.passRate === 100 ? "100% PASS" : "FAILED"}
+      </p>
+
+      {report.remainingIssues?.length ? (
+        <article className="ops-validation-failures">
+          <h4>{t.opsValidationRemainingIssues}</h4>
+          <ul>
+            {report.remainingIssues.map((issue) => (
+              <li key={`${issue.section}-${issue.step}`}>
+                <strong>
+                  [{issue.section}] {issue.step}
+                </strong>
+                {issue.reason ? (
+                  <p>
+                    {t.opsValidationFailedReason}: {issue.reason}
+                  </p>
+                ) : null}
+                {issue.location ? (
+                  <p>
+                    {t.opsValidationFailedLocation}: {issue.location}
+                  </p>
+                ) : null}
+                {issue.suggestedFix ? (
+                  <p>
+                    {t.opsValidationSuggestedFix}: {issue.suggestedFix}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+
+      {report.regressionRisks?.length ? (
+        <article>
+          <h4>{t.opsValidationRegressionRisks}</h4>
+          <ul>
+            {report.regressionRisks.map((risk) => (
+              <li key={risk}>{risk}</li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+
+      {report.recommendations?.length ? (
+        <article>
+          <h4>{t.opsValidationRecommendations}</h4>
+          <ul>
+            {report.recommendations.map((rec) => (
+              <li key={rec}>{rec}</li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+    </section>
+  );
+}
+
 export default function OpsDashboard({ t }) {
   const [dashboard, setDashboard] = useState(null);
+  const [validationReport, setValidationReport] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const { tasks, runTask } = useRunningTasks();
@@ -65,6 +161,20 @@ export default function OpsDashboard({ t }) {
     const timer = window.setInterval(load, 15000);
     return () => window.clearInterval(timer);
   }, [load]);
+
+  async function handleRunCompleteValidation() {
+    setValidationReport(null);
+
+    try {
+      const report = await runTask("complete-validation", t.opsQuickRunCompleteValidation, () =>
+        runCompleteValidation()
+      );
+      setValidationReport(report);
+      await load();
+    } catch (validationError) {
+      setError(validationError.message);
+    }
+  }
 
   async function handleRunSmokeTests() {
     await runTask("smoke-all", t.opsQuickRunSmokeTests, async () => {
@@ -181,7 +291,10 @@ export default function OpsDashboard({ t }) {
             <section className="ops-panel" aria-labelledby="ops-quick-actions">
               <h3 id="ops-quick-actions">{t.opsQuickActions}</h3>
               <div className="ops-quick-actions">
-                <button type="button" className="ops-button" onClick={handleRunSmokeTests}>
+                <button type="button" className="ops-button" onClick={handleRunCompleteValidation}>
+                  {t.opsQuickRunCompleteValidation}
+                </button>
+                <button type="button" className="ops-button ops-button--secondary" onClick={handleRunSmokeTests}>
                   {t.opsQuickRunSmokeTests}
                 </button>
                 <button
@@ -211,6 +324,8 @@ export default function OpsDashboard({ t }) {
               </div>
             </section>
           </div>
+
+          <ValidationReportPanel report={validationReport} t={t} />
         </>
       ) : null}
 

@@ -218,6 +218,21 @@ function createOperationsRoutes(deps = {}) {
     }
   });
 
+
+  router.post("/validation/run-complete", async (req, res) => {
+    try {
+      const report = await operationsCenterService.runCompleteWorkflowValidation();
+      res.status(report.success ? 200 : 422).json({ success: report.success, ...report });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "VALIDATION_FAILED",
+        message: error.message,
+        stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+      });
+    }
+  });
+
   router.get("/simulator/scenarios", (req, res) => {
     res.json({
       success: true,

@@ -29,6 +29,7 @@ const {
   cleanupSimulatorProspect
 } = require("./workflowSimulatorService");
 const { runAllGoldenScenarios, GOLDEN_SCENARIOS } = require("./goldenScenarios");
+const { runCompleteValidation } = require("./autonomousValidationEngine");
 
 const BACKEND_VERSION = "0.4.0";
 const SPRINT_LABEL = "Sprint 17.1";
@@ -961,6 +962,34 @@ async function getWorkflowSimulatorTimeline(phone) {
   return getSimulatorTimeline(phone);
 }
 
+
+async function runCompleteWorkflowValidation() {
+  const startedAt = Date.now();
+
+  recordActivity({
+    level: "info",
+    category: "validation",
+    message: "Running Sprint 11.5 complete validation"
+  });
+
+  const report = await runCompleteValidation();
+
+  recordActivity({
+    level: report.overall === "PASS" ? "info" : "error",
+    category: "validation",
+    message: `Sprint 11.5 validation: ${report.overall} (${report.passRate}%)`,
+    detail: report.remainingIssues.length
+      ? report.remainingIssues.map((row) => `${row.section}: ${row.step}`).join("; ")
+      : null
+  });
+
+  return {
+    success: report.overall === "PASS",
+    durationMs: Date.now() - startedAt,
+    ...report
+  };
+}
+
 module.exports = {
   BACKEND_VERSION,
   SPRINT_LABEL,
@@ -988,5 +1017,6 @@ module.exports = {
   getWorkflowSimulatorState,
   advanceWorkflowSimulator,
   getWorkflowSimulatorEvents,
-  getWorkflowSimulatorTimeline
+  getWorkflowSimulatorTimeline,
+  runCompleteWorkflowValidation
 };

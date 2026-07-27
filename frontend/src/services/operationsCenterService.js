@@ -150,3 +150,7 @@ export async function fetchWorkflowSimulatorEvents(phone) {
 export async function fetchWorkflowSimulatorTimeline(phone) {
   return operationsFetch(`/simulator/workflow/timeline/${encodeURIComponent(phone)}`);
 }
+
+export async function runCompleteValidation() {
+  return operationsFetch("/validation/run-complete", { method: "POST" });
+}

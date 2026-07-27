@@ -45,6 +45,7 @@ async function runScenario(definition) {
       correlationId: recorder.correlationId
     });
 
+    recorder.setPhone(phone);
     recorder.setInitialState(initial.workflow);
     recorder.setExpected(definition.expected);
 
