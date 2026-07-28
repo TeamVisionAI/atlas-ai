@@ -790,7 +790,12 @@ async function simulateWhatsAppConversation(payload = {}) {
     phone,
     name: payload.name || "Ops WhatsApp Lead",
     preset: payload.preset || "NEW_LEAD",
-    seedFields: payload.seedFields
+    seedFields: {
+      preferred_communication_channel: "WHATSAPP",
+      source: "SIMULATED_WHATSAPP",
+      entry_method: "SIMULATED_APP_REVIEW",
+      ...(payload.seedFields || {})
+    }
   });
 
   let messageResult = null;
@@ -919,6 +924,16 @@ async function getGoldenPathTrace(phone, options = {}) {
   });
 }
 
+async function getSimulatorReviewExperience(phone, user) {
+  const { getSimulatorReviewExperience: loadReview } = require("./simulatorReviewService");
+  return loadReview(phone, user);
+}
+
+async function sendSimulatorReviewMessage(phone, body, user) {
+  const { sendSimulatorReviewMessage: sendReview } = require("./simulatorReviewService");
+  return sendReview(phone, body, user);
+}
+
 module.exports = {
   BACKEND_VERSION,
   SPRINT_LABEL,
@@ -949,5 +964,7 @@ module.exports = {
   getWorkflowSimulatorTimeline,
   runCompleteWorkflowValidation,
   getAlphaAcceptanceChecklist,
-  getGoldenPathTrace
+  getGoldenPathTrace,
+  getSimulatorReviewExperience,
+  sendSimulatorReviewMessage
 };

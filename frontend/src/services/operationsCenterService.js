@@ -181,3 +181,15 @@ export async function runAlphaChecklist({ phone, runValidation = false } = {}) {
 export async function fetchGoldenPathTrace(phone) {
   return operationsFetch(`/golden-path-trace/${encodeURIComponent(phone)}`);
 }
+
+export async function fetchSimulatorReviewExperience(phone) {
+  return operationsFetch(`/review/${encodeURIComponent(phone)}`);
+}
+
+export async function sendSimulatorReviewMessage(phone, message) {
+  return operationsFetch(`/review/${encodeURIComponent(phone)}/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message })
+  });
+}

@@ -419,6 +419,39 @@ function createOperationsRoutes(deps = {}) {
     }
   });
 
+  router.get("/review/:phone", async (req, res) => {
+    try {
+      const data = await operationsCenterService.getSimulatorReviewExperience(
+        req.params.phone,
+        req.atlasUser
+      );
+      res.json(data);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: error.code || "REVIEW_LOAD_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.post("/review/:phone/message", async (req, res) => {
+    try {
+      const data = await operationsCenterService.sendSimulatorReviewMessage(
+        req.params.phone,
+        req.body?.message || req.body?.body,
+        req.atlasUser
+      );
+      res.status(201).json(data);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: error.code || "REVIEW_MESSAGE_FAILED",
+        message: error.message
+      });
+    }
+  });
+
   return router;
 }
 

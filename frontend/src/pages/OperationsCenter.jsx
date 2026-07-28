@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Route, Routes, useNavigate, Link } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { bootstrapAtlasSession } from "../services/atlasAuthService";
 import {
@@ -21,6 +21,7 @@ import {
 import OpsDashboard from "./operations/OpsDashboard";
 import OpsAlphaChecklist from "./operations/OpsAlphaChecklist";
 import OpsGoldenPathTrace from "./operations/OpsGoldenPathTrace";
+import SimulatorReviewExperience from "./operations/SimulatorReviewExperience";
 import {
   advanceWorkflowSimulator,
   fetchBusinessEventById,
@@ -269,29 +270,45 @@ function WorkflowSimulatorSection({ t }) {
           <p className="ops-muted">
             {t.opsActivePhone}: {activePhone}
           </p>
-          <button
-            type="button"
-            className="ops-button ops-button--secondary"
-            onClick={() =>
-              runAction("advance-workflow", t.opsAdvanceWorkflow, () =>
-                advanceWorkflowSimulator({
-                  phone: activePhone,
-                  targetMilestone: "INTERVIEW_READY"
-                })
-              )
-            }
-          >
-            {t.opsAdvanceWorkflow}
-          </button>
+          <div className="ops-action-row">
+            <Link
+              className="ops-button"
+              to={operationsCenterPath(`review/${encodeURIComponent(activePhone)}`)}
+            >
+              {t.opsOpenReviewExperience}
+            </Link>
+            <button
+              type="button"
+              className="ops-button ops-button--secondary"
+              onClick={() =>
+                runAction("advance-workflow", t.opsAdvanceWorkflow, () =>
+                  advanceWorkflowSimulator({
+                    phone: activePhone,
+                    targetMilestone: "INTERVIEW_READY"
+                  })
+                )
+              }
+            >
+              {t.opsAdvanceWorkflow}
+            </button>
+          </div>
         </div>
       ) : null}
 
       {error ? <p className="ops-error">{error}</p> : null}
       <ActionResult result={result} />
 
-      {workflowState?.workflow ? (
-        <pre className="ops-code">{JSON.stringify(workflowState.workflow, null, 2)}</pre>
+      {result?.phone ? (
+        <div className="ops-action-row">
+          <Link
+            className="ops-button"
+            to={operationsCenterPath(`review/${encodeURIComponent(result.phone)}`)}
+          >
+            {t.opsOpenReviewExperience}
+          </Link>
+        </div>
       ) : null}
+
       {workflowState?.scenarios ? (
         <pre className="ops-code">{JSON.stringify(workflowState.scenarios, null, 2)}</pre>
       ) : null}
@@ -738,6 +755,7 @@ function OperationsCenterLayout({ t }) {
           <Route path="system-health" element={<SystemHealthSection t={t} />} />
           <Route path="live-activity" element={<LiveActivitySection t={t} />} />
           <Route path="workflow-simulator" element={<WorkflowSimulatorSection t={t} />} />
+          <Route path="review/:phone" element={<SimulatorReviewExperience t={t} />} />
           <Route path="smoke-tests" element={<SmokeTestsSection t={t} />} />
           <Route path="projection-replay" element={<ProjectionReplaySection t={t} />} />
           <Route path="business-events" element={<BusinessEventsSection t={t} />} />

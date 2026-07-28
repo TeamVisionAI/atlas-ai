@@ -36,7 +36,11 @@ const {
 } = require("../core/agentActionCopy");
 const { getMissionControlState } = require("../core/missionControlReadModel");
 const { buildWorkflowReadModel } = require("../core/workflowReadModel");
-const { isProductionProspect } = require("../core/productionProspectFilter");
+const {
+  isProductionProspect,
+  isSimulatorProspect
+} = require("../core/productionProspectFilter");
+const { assertSimulatorPhone } = require("../dev/simulatorSafety");
 const { buildWorkflowGateDescriptor } = require("../core/workflowGateEngine");
 const { enrichActionCenterWithConfidence } = require("../core/alphaConfidenceEngine");
 const {
@@ -372,7 +376,13 @@ async function getMissionControlWithActions(phone, options = {}) {
     ? requireTenantOrganizationId(options.organizationId)
     : options.organizationId || null;
 
-  if (!isProductionProspect(phone) && phone !== "latest") {
+  if (options.reviewMode) {
+    if (!isSimulatorProspect(phone)) {
+      return null;
+    }
+
+    assertSimulatorPhone(phone);
+  } else if (!isProductionProspect(phone) && phone !== "latest") {
     return null;
   }
 
