@@ -20,6 +20,7 @@ const { processSimulatedWhatsAppInbound } = require("./simulatedWhatsAppInboundP
 const { withSimulatorGuard } = require("./simulatorGuard");
 const { findProspect, updateProspect } = require("../services/supabaseService");
 const { toDateKey } = require("../core/capacityEngine");
+const { buildOfferedTimes } = require("../core/interviewScheduling");
 
 function assert(condition, message) {
   if (!condition) {
@@ -265,7 +266,24 @@ async function main() {
   });
 
   await seedScheduleTimePhase(phoneSchedule);
-  const timeReply = await send(phoneSchedule, "I prefer 9 am, is it possible?");
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateKey = toDateKey(tomorrow);
+  const openSlots = buildOfferedTimes(dateKey, "Zoom", "morning");
+  assert(openSlots.length > 0, "Need an open morning slot for schedule verification");
+  const [hourText, minuteText] = openSlots[0].timeKey.split(":");
+  const hourNum = Number(hourText);
+  const meridiem = hourNum >= 12 ? "pm" : "am";
+  const displayHour = hourNum % 12 === 0 ? 12 : hourNum % 12;
+  const requestedTime =
+    Number(minuteText) > 0
+      ? `${displayHour}:${minuteText} ${meridiem}`
+      : `${displayHour} ${meridiem}`;
+
+  const timeReply = await send(
+    phoneSchedule,
+    `I prefer ${requestedTime}, is it possible?`
+  );
   const scheduleProspect = await findProspect(phoneSchedule);
   assert(
     scheduleProspect.current_step !== "CONFIRMED",
@@ -273,10 +291,10 @@ async function main() {
   );
   assert(!scheduleProspect.calendar_event_id, "No calendar event before explicit confirmation");
   assert(
-    /does that work|availability|9/i.test(timeReply.reply),
+    /does that work|availability|work for you|funciona/i.test(timeReply.reply),
     `Asks for confirmation when available: ${timeReply.reply}`
   );
-  console.log("✓ H. Time request parses 9 AM and asks confirmation");
+  console.log("✓ H. Time request parses time and asks confirmation");
 
   const confirmReply = await send(phoneSchedule, "Yes, that works");
   const confirmedProspect = await findProspect(phoneSchedule);

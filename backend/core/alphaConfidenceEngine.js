@@ -57,6 +57,8 @@ function buildConfidenceProfile({
     reason = "Prospect is qualified and ready for interview scheduling.";
   } else if (assessment.isQualified) {
     reason = "Core qualification fields are complete.";
+  } else if (assessment.nextField || assessment.nextFocus) {
+    reason = `Collect next field: ${assessment.nextField || assessment.nextFocus}.`;
   } else if (assessment.preScheduleFields?.length) {
     reason = `Collect remaining fields: ${assessment.preScheduleFields.join(", ")}.`;
   }

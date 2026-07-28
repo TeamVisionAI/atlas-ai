@@ -214,7 +214,7 @@ function parseCityStateTokens(locationText) {
 
   return {
     city: location,
-    state: inferStateFromCity(location)
+    state: null
   };
 }
 
@@ -468,6 +468,30 @@ function extractPreferredPeriod(message) {
   return null;
 }
 
+function extractState(message, nextField = null, existingCity = null) {
+  if (nextField !== "state" || !existingCity) {
+    return null;
+  }
+
+  const text = trimAtClause(String(message || "").trim());
+
+  if (!text || isLikelyQuestion(text) || isGreetingOrSmallTalk(text)) {
+    return null;
+  }
+
+  const normalized = normalizeState(text);
+
+  if (/^[A-Z]{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  if (US_STATE_NAMES[normalize(text)]) {
+    return US_STATE_NAMES[normalize(text)];
+  }
+
+  return null;
+}
+
 function extractInformation(message, profile = {}, options = {}) {
   const extracted = {};
   const nextField = options.nextField || null;
@@ -482,8 +506,9 @@ function extractInformation(message, profile = {}, options = {}) {
     extracted.state = location.state;
   }
 
-  if (extracted.city && !extracted.state) {
-    extracted.state = inferStateFromCity(extracted.city);
+  const explicitState = extractState(message, nextField, profile.city || extracted.city);
+  if (explicitState && !profile.state) {
+    extracted.state = explicitState;
   }
 
   if (extracted.city && !isValidCityName(extracted.city)) {

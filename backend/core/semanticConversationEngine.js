@@ -35,7 +35,10 @@ const {
   profileToProspectUpdates,
   emailRequired,
   isScheduleComplete,
-  getEffectiveInterviewType
+  getEffectiveInterviewType,
+  buildQualificationBrain,
+  canBeginScheduling,
+  isPreScheduleQualificationComplete
 } = require("./informationModel");
 const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
 const {
@@ -178,7 +181,35 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
   }
 }
 
+function buildInformationalWorkflowReply(informationalReply, nextField, profile, language, prospect) {
+  const question = buildQuestionForMissingField(nextField, profile, language, prospect);
+
+  if (language === "es") {
+    return `Gracias por preguntar.\n\n${informationalReply}\n\nAhora que te lo expliqué...\n\n${question}`;
+  }
+
+  return `That's a great question.\n\n${informationalReply}\n\nNow that I've explained it...\n\n${question}`;
+}
+
+function hasWorkflowAdvancement(extracted) {
+  if (!extracted || !Object.keys(extracted).length) {
+    return false;
+  }
+
+  return Object.entries(extracted).some(([key, value]) => {
+    if (key === "preferredPeriod" || key === "scheduleOverride") {
+      return false;
+    }
+
+    return value !== null && value !== undefined && value !== "";
+  });
+}
+
 async function initializeScheduleIfNeeded(prospect, profile) {
+  if (!isPreScheduleQualificationComplete(profile)) {
+    return prospect;
+  }
+
   const interviewType = getEffectiveInterviewType(profile);
 
   if (!interviewType || isScheduleComplete(profile)) {
@@ -297,7 +328,7 @@ async function buildSemanticReply({
     return completeInterview(prospect, profile, language);
   }
 
-  if (nextField === "schedule" && getEffectiveInterviewType(profile)) {
+  if (nextField === "schedule" && canBeginScheduling(profile)) {
     prospect = await initializeScheduleIfNeeded(prospect, profile);
   }
 
@@ -309,7 +340,13 @@ async function buildSemanticReply({
   );
 
   if (informationalReply) {
-    return `${informationalReply}\n\n${question}`;
+    return buildInformationalWorkflowReply(
+      informationalReply,
+      nextField,
+      profile,
+      language,
+      prospect
+    );
   }
 
   if (isNew && !Object.keys(extracted).length) {
@@ -454,13 +491,62 @@ async function handleSemanticMessage({
   }
 
   const language = activeLanguage;
-  let profile = buildProfileFromProspect(prospect, channel);
-  const nextField = getNextMissingField(profile);
-  const inSchedule = isActiveScheduleStep(prospect);
+  const preTurnBrain = buildQualificationBrain(prospect, {
+    channel,
+    message: cleanMessage,
+    applyRules: false
+  });
+  let profile = preTurnBrain.profile;
+  const nextField = preTurnBrain.nextField;
+  const inSchedule = isActiveScheduleStep(prospect) && preTurnBrain.canBeginScheduling;
   const extracted = extractInformation(cleanMessage, profile, {
     nextField,
     inSchedule
   });
+
+  const faqReply =
+    shouldAnswerFAQ(cleanMessage) && !hasWorkflowAdvancement(extracted)
+      ? findFAQ(cleanMessage, language)
+      : null;
+  const isInformationalOnly = Boolean(faqReply);
+
+  if (isInformationalOnly) {
+    await recordLog({
+      phone,
+      name,
+      direction: "incoming",
+      message: cleanMessage,
+      intent,
+      pipeline: preTurnBrain.currentStep,
+      currentStep: preTurnBrain.currentStep,
+      language,
+      city: prospect.city,
+      state: prospect.state
+    });
+
+    const informationalReplyText = buildInformationalWorkflowReply(
+      faqReply,
+      nextField,
+      profile,
+      language,
+      prospect
+    );
+
+    await recordLog({
+      phone,
+      name,
+      direction: "outgoing",
+      message: informationalReplyText,
+      intent,
+      pipeline: preTurnBrain.currentStep,
+      currentStep: preTurnBrain.currentStep,
+      language,
+      city: prospect.city,
+      state: prospect.state
+    });
+
+    return informationalReplyText;
+  }
 
   profile = mergeProfile(profile, {
     city: extracted.city,
@@ -551,16 +637,13 @@ async function handleSemanticMessage({
     return confirmedReply;
   }
 
-  const faqReply = shouldAnswerFAQ(cleanMessage)
-    ? findFAQ(cleanMessage, language)
-    : null;
   const route = routeConversation({
     prospect: { ...prospect, ...profileToProspectUpdates(profile) },
     message: cleanMessage,
     intent
   });
   const interruptionReply = route.interrupt ? getResponse(intent, language) : null;
-  const informationalReply = faqReply || interruptionReply;
+  const informationalReply = interruptionReply;
 
   prospect.last_message = cleanMessage;
   await syncProfileToProspect(prospect, profile, { language });
@@ -598,6 +681,7 @@ async function handleSemanticMessage({
 
   if (
     isActiveScheduleStep(prospect) &&
+    canBeginScheduling(profile) &&
     getEffectiveInterviewType(profile) &&
     !isScheduleComplete(profile)
   ) {
@@ -674,14 +758,15 @@ async function handleSemanticMessage({
     }
 
     if (informationalReply && prospect.current_step !== "EMAIL") {
-      const nextField = getNextMissingField(buildProfileFromProspect(prospect, channel));
-      const followUp = buildQuestionForMissingField(
-        nextField,
-        profile,
+      const currentBrain = buildQualificationBrain(prospect, { channel, message: cleanMessage });
+      const followUp = buildInformationalWorkflowReply(
+        informationalReply,
+        currentBrain.nextField,
+        currentBrain.profile,
         language,
         prospect
       );
-      const combined = `${informationalReply}\n\n${followUp}`;
+      const combined = followUp;
 
       await recordLog({
         phone,

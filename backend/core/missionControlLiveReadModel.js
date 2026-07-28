@@ -168,6 +168,10 @@ function buildActionReason({ workflow, brain, conversationMessages }) {
     (field) => !WORKFLOW_ONLY_MISSING_FIELDS.has(field)
   );
 
+  if (brain?.nextField) {
+    return `Qualification in progress — waiting for ${brain.nextField}.`;
+  }
+
   if (missingProspectFacts.length) {
     return `Qualification in progress — waiting for: ${missingProspectFacts.join(", ")}.`;
   }

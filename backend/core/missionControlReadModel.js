@@ -14,16 +14,9 @@ const {
 } = require("./tenantProspectLookup");
 const { buildHandoff } = require("./conversationEngine");
 const { detectIntent } = require("./intentEngine");
-const { parseSchedulingState } = require("./schedulingState");
 const { detectLanguage } = require("./semanticConversationEngine");
-const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
-const { evaluateCoverage } = require("./businessRulesEngine");
 const {
-  buildProfileFromProspect,
-  getMissingFields,
-  deriveCurrentStep,
-  getEffectiveInterviewType,
-  emailRequired
+  buildQualificationBrain
 } = require("./informationModel");
 const { buildAtlasBriefSummary } = require("./conversationCopy");
 
@@ -60,20 +53,18 @@ async function getMissionControlState(phone, options = {}) {
   }
 
   const channel = "whatsapp";
-  const profile = buildProfileFromProspect(prospect, channel);
-  const schedulingState = parseSchedulingState(prospect.notes);
   const lastMessage =
     options.latestMessage?.text || prospect.last_message || "";
-  const { profile: ruledProfile } = applyBusinessRulesToProfile(
-    { ...profile },
-    lastMessage
-  );
-
-  const currentStep = deriveCurrentStep(ruledProfile, schedulingState);
-  const missingFields = getMissingFields(ruledProfile);
-  const interviewType = getEffectiveInterviewType(ruledProfile, lastMessage);
+  const qualification = buildQualificationBrain(prospect, {
+    channel,
+    message: lastMessage
+  });
+  const { profile: ruledProfile, missingFields, nextField, currentStep, interviewType } =
+    qualification;
   const intent = detectIntent(lastMessage);
   const language = detectLanguage(prospect, lastMessage);
+  const { evaluateCoverage } = require("./businessRulesEngine");
+  const { emailRequired } = require("./informationModel");
   const coverage = evaluateCoverage({
     city: ruledProfile.city,
     state: ruledProfile.state
@@ -96,8 +87,11 @@ async function getMissionControlState(phone, options = {}) {
       language,
       intent,
       currentStep,
+      nextField,
+      missingFields,
       interviewType,
-      missingFields
+      canBeginScheduling: qualification.canBeginScheduling,
+      isPreScheduleQualificationComplete: qualification.isPreScheduleQualificationComplete
     },
     businessRules: {
       localProspect: coverage.coverage === "LOCAL",
@@ -109,9 +103,10 @@ async function getMissionControlState(phone, options = {}) {
       summary: buildAtlasBriefSummary({
         profile: ruledProfile,
         prospect,
-        schedulingState,
+        schedulingState: qualification.schedulingState,
         handoff,
         missingFields,
+        nextField,
         currentStep
       })
     }

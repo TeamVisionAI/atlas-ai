@@ -307,12 +307,14 @@ function buildAutonomousActionCenter(assessment, legacyProspect) {
     };
   }
 
-  const nextField = assessment.nextFocus || "city";
+  const nextField = assessment.nextField || assessment.nextFocus || null;
 
   return {
     priority: "Atlas active",
-    nextBestAction: `Collect ${nextField}`,
-    reason: `Qualification in progress — waiting for ${nextField}.`,
+    nextBestAction: nextField ? `Collect ${nextField}` : "Continue qualification",
+    reason: nextField
+      ? `Qualification in progress — waiting for ${nextField}.`
+      : "Qualification in progress.",
     confidence: assessment.confidence,
     actionId: "whatsapp"
   };

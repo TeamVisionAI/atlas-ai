@@ -3,13 +3,7 @@
  * Builds a sorted workflow queue from dashboard prospects (additive API field).
  */
 
-const { parseSchedulingState } = require("./schedulingState");
-const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
-const {
-  buildProfileFromProspect,
-  getMissingFields,
-  deriveCurrentStep
-} = require("./informationModel");
+const { buildQualificationBrain } = require("./informationModel");
 const { loadAgentState } = require("./agentActionState");
 const { evaluateWorkflowState, fetchMessageHints } = require("./workflowReadModel");
 
@@ -19,17 +13,16 @@ async function buildWorkflowSummaryForProspect(prospect) {
   }
 
   const channel = "whatsapp";
-  const profile = buildProfileFromProspect(prospect, channel);
-  const schedulingState = parseSchedulingState(prospect.notes);
   const lastMessage = prospect.last_message || "";
-  const { profile: ruledProfile } = applyBusinessRulesToProfile(
-    { ...profile },
-    lastMessage
-  );
+  const qualification = buildQualificationBrain(prospect, {
+    channel,
+    message: lastMessage
+  });
 
   const brain = {
-    currentStep: deriveCurrentStep(ruledProfile, schedulingState),
-    missingFields: getMissingFields(ruledProfile)
+    currentStep: qualification.currentStep,
+    nextField: qualification.nextField,
+    missingFields: qualification.missingFields
   };
 
   const agentState = loadAgentState(prospect.phone);

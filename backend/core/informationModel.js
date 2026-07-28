@@ -1,8 +1,17 @@
-const { PHASES } = require("./schedulingState");
+const { PHASES, parseSchedulingState } = require("./schedulingState");
 const {
   evaluateInterviewTypeDecision,
   isInterviewTypeChoiceRequired
 } = require("./businessRulesEngine");
+const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
+
+const PRE_SCHEDULE_FIELDS = new Set([
+  "authorization",
+  "occupation",
+  "city",
+  "state",
+  "interviewType"
+]);
 
 const FIELD_ORDER = [
   "authorization",
@@ -127,6 +136,7 @@ function getEffectiveInterviewType(profile, message = "") {
 function isInterviewTypeRequired(profile) {
   return isInterviewTypeChoiceRequired({
     city: profile.city,
+    state: profile.state,
     interviewType: profile.interviewType
   });
 }
@@ -140,6 +150,12 @@ function isScheduleComplete(profile) {
   return Boolean(profile.appointmentDate && profile.preferredTime);
 }
 
+function sortMissingFields(missing) {
+  return missing
+    .filter((field, index, list) => list.indexOf(field) === index)
+    .sort((left, right) => FIELD_ORDER.indexOf(left) - FIELD_ORDER.indexOf(right));
+}
+
 function getMissingFields(profile) {
   if (profile.confirmed || profile.calendarEventId) {
     return [];
@@ -147,20 +163,20 @@ function getMissingFields(profile) {
 
   const missing = [];
 
+  if (profile.authorization === null || profile.authorization === undefined) {
+    missing.push("authorization");
+  }
+
+  if (!profile.occupation) {
+    missing.push("occupation");
+  }
+
   if (!profile.city) {
     missing.push("city");
   }
 
   if (profile.city && !profile.state) {
     missing.push("state");
-  }
-
-  if (profile.authorization === null) {
-    missing.push("authorization");
-  }
-
-  if (!profile.occupation) {
-    missing.push("occupation");
   }
 
   if (isInterviewTypeRequired(profile)) {
@@ -173,18 +189,71 @@ function getMissingFields(profile) {
     missing.push("schedule");
   }
 
-  if (emailRequired({ ...profile, interviewType: effectiveInterviewType }) && isScheduleComplete(profile) && !profile.email) {
+  if (
+    emailRequired({ ...profile, interviewType: effectiveInterviewType }) &&
+    isScheduleComplete(profile) &&
+    !profile.email
+  ) {
     missing.push("email");
   }
 
-  return missing.filter((field, index, list) => list.indexOf(field) === index);
+  return sortMissingFields(missing);
 }
 
 function getNextMissingField(profile) {
   const missing = getMissingFields(profile);
-  return missing.sort(
-    (left, right) => FIELD_ORDER.indexOf(left) - FIELD_ORDER.indexOf(right)
-  )[0] || null;
+  return missing[0] || null;
+}
+
+function getPreScheduleMissingFields(profile) {
+  return getMissingFields(profile).filter((field) => PRE_SCHEDULE_FIELDS.has(field));
+}
+
+function isPreScheduleQualificationComplete(profile) {
+  return getPreScheduleMissingFields(profile).length === 0 && Boolean(getEffectiveInterviewType(profile));
+}
+
+function canBeginScheduling(profile) {
+  return isPreScheduleQualificationComplete(profile) && !isScheduleComplete(profile);
+}
+
+function buildQualificationBrain(prospect, options = {}) {
+  const channel = options.channel || "whatsapp";
+  const schedulingState =
+    options.schedulingState !== undefined
+      ? options.schedulingState
+      : parseSchedulingState(prospect?.notes);
+  const message = options.message || "";
+
+  let profile = buildProfileFromProspect(prospect, channel);
+
+  if (options.applyRules !== false && profile.city) {
+    const rules = applyBusinessRulesToProfile(
+      { ...profile },
+      message,
+      options.extractedType || null
+    );
+    profile = rules.profile;
+  }
+
+  const missingFields = getMissingFields(profile);
+  const nextField = getNextMissingField(profile);
+  const currentStep = deriveCurrentStep(profile, schedulingState);
+  const interviewType = getEffectiveInterviewType(profile, message);
+  const preScheduleFields = getPreScheduleMissingFields(profile);
+
+  return {
+    profile,
+    missingFields,
+    nextField,
+    currentStep,
+    interviewType,
+    preScheduleFields,
+    schedulingState,
+    isPreScheduleQualificationComplete: isPreScheduleQualificationComplete(profile),
+    canBeginScheduling: canBeginScheduling(profile),
+    isScheduleComplete: isScheduleComplete(profile)
+  };
 }
 
 function deriveCurrentStep(profile, schedulingState) {
@@ -246,11 +315,16 @@ function profileToProspectUpdates(profile, schedulingState = null) {
 
 module.exports = {
   FIELD_ORDER,
+  PRE_SCHEDULE_FIELDS,
   buildProfileFromProspect,
   createEmptyProfile,
   mergeProfile,
   getMissingFields,
   getNextMissingField,
+  getPreScheduleMissingFields,
+  isPreScheduleQualificationComplete,
+  canBeginScheduling,
+  buildQualificationBrain,
   deriveCurrentStep,
   profileToProspectUpdates,
   extractEmailFromNotes,

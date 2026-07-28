@@ -40,6 +40,7 @@ function buildAtlasBriefSummary({
   schedulingState,
   handoff,
   missingFields,
+  nextField,
   currentStep
 }) {
   const lines = [];
@@ -59,8 +60,10 @@ function buildAtlasBriefSummary({
     lines.push("Interview confirmed");
   }
 
-  if (missingFields.length) {
-    lines.push(`Waiting for: ${missingFields.join(", ")}`);
+  if (nextField) {
+    lines.push(`Next field: ${nextField}`);
+  } else if (missingFields.length) {
+    lines.push(`Remaining: ${missingFields.join(", ")}`);
   }
 
   if (isScheduleComplete(profile)) {

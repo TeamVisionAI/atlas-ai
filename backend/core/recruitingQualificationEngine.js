@@ -5,6 +5,7 @@
 const {
   buildProfileFromProspect,
   getMissingFields,
+  getNextMissingField,
   isScheduleComplete,
   emailRequired,
   getEffectiveInterviewType
@@ -70,8 +71,8 @@ function assessQualificationFromProfile(profile) {
     missingFields,
     preScheduleFields,
     confidence,
-    nextFocus:
-      preScheduleFields[0] || (missingFields.includes("email") ? "email" : null)
+    nextFocus: getNextMissingField(normalizedProfile) || (missingFields.includes("email") ? "email" : null),
+    nextField: getNextMissingField(normalizedProfile)
   };
 }
 
