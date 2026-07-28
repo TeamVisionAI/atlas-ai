@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { SETTINGS_SECTIONS } from "../../config/settingsProductNames";
+import { PERMISSIONS, roleHasPermission } from "../../security/workspacePermissions";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
 import AtlasButton from "../../components/ui/AtlasButton";
@@ -13,6 +15,8 @@ import MeetingManagement from "../../components/settings/MeetingManagement";
 
 export default function OrganizationConfiguration() {
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
+  const canEditOrganization = roleHasPermission(user?.role, PERMISSIONS.ORG_WRITE);
   const [organization, setOrganization] = useState(null);
   const [levels, setLevels] = useState([]);
   const [message, setMessage] = useState("");
@@ -25,7 +29,7 @@ export default function OrganizationConfiguration() {
         setOrganization(orgResult.organization);
         setLevels(levelsResult.levels || []);
       })
-      .catch((loadError) => setError(loadError.message));
+      .catch(() => setError(translate("configurationLoadFailed")));
   }, []);
 
   function updateField(field, value) {
@@ -151,9 +155,11 @@ export default function OrganizationConfiguration() {
         </div>
 
         <div className="configuration-actions">
-          <AtlasButton type="submit" variant="primary" busy={saving}>
-            {translate("configurationSave")}
-          </AtlasButton>
+          {canEditOrganization ? (
+            <AtlasButton type="submit" variant="primary" busy={saving}>
+              {translate("configurationSave")}
+            </AtlasButton>
+          ) : null}
         </div>
       </form>
 

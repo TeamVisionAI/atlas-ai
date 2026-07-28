@@ -41,7 +41,7 @@ export default function OrganizationIntegrations() {
   }, []);
 
   useEffect(() => {
-    load().catch(() => setError(translate("configurationLoadFailed")));
+    load().catch(() => setError(translate("configurationIntegrationsLoadFailed")));
   }, [load, translate]);
 
   useEffect(() => {

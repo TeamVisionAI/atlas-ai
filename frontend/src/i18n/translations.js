@@ -1151,6 +1151,8 @@ export const translations = {
       "Sincroniza citas con el Google Calendar de tu equipo.",
     configurationLoadFailed:
       "No se pudieron cargar los ajustes. Actualiza la página e inténtalo de nuevo.",
+    configurationIntegrationsLoadFailed:
+      "No se pudieron cargar las integraciones. Actualiza la página e inténtalo de nuevo.",
   },
 
   en: {
@@ -2296,6 +2298,8 @@ export const translations = {
     configurationIntegrationsComingSoonDescription:
       "Additional services will be available to connect from this page.",
     configurationGoogleCalendarIntro: "Sync appointments with your team's Google Calendar.",
-    configurationLoadFailed: "Unable to load settings. Please refresh and try again."
+    configurationLoadFailed: "Unable to load settings. Please refresh and try again.",
+    configurationIntegrationsLoadFailed:
+      "Unable to load integrations. Please refresh the page and try again."
   }
 };

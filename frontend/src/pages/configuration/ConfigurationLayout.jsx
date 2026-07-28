@@ -1,43 +1,19 @@
 import { Suspense } from "react";
 import { NavLink, Outlet, useMatch } from "react-router-dom";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { appPath } from "../../config/appRoutes";
+import { buildSettingsNavItems } from "../../config/workspaceExperience";
 import { SETTINGS_SECTIONS, SETTINGS_TITLE } from "../../config/settingsProductNames";
 import SettingsIcon from "../../components/icons/SettingsIcons";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
 import "./Configuration.css";
 
-const NAV_ITEMS = [
-  { to: appPath("settings/profile"), label: SETTINGS_SECTIONS.profile, icon: "profile", end: false },
-  {
-    to: appPath("settings/organization"),
-    label: SETTINGS_SECTIONS.organization,
-    icon: "organization",
-    end: false
-  },
-  {
-    to: appPath("settings/integrations"),
-    label: SETTINGS_SECTIONS.integrations,
-    icon: "integrations",
-    end: false
-  },
-  {
-    to: appPath("settings/scheduling"),
-    label: SETTINGS_SECTIONS.scheduling,
-    icon: "scheduling",
-    end: false
-  },
-  {
-    to: appPath("settings/appointments"),
-    label: SETTINGS_SECTIONS.appointments,
-    icon: "scheduling",
-    end: false
-  }
-];
-
 export default function ConfigurationLayout() {
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
   const isHubIndex = Boolean(useMatch({ path: appPath("settings"), end: true }));
+  const navItems = buildSettingsNavItems(user, SETTINGS_SECTIONS);
 
   return (
     <div className="configuration-page">
@@ -46,9 +22,9 @@ export default function ConfigurationLayout() {
         <p className="configuration-header__subtitle">{translate("configurationSubtitle")}</p>
       </header>
 
-      {!isHubIndex ? (
+      {!isHubIndex && navItems.length > 0 ? (
         <nav className="configuration-nav" aria-label={SETTINGS_TITLE}>
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

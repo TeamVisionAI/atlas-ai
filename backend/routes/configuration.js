@@ -76,7 +76,7 @@ router.patch("/profile", async (req, res) => {
   }
 });
 
-router.get("/organization", async (req, res) => {
+router.get("/organization", requirePermission(PERMISSIONS.ORG_READ), async (req, res) => {
   try {
     const organization = await organizationService.getOrganizationConfiguration(
       req.tenantContext.organizationId
@@ -170,7 +170,7 @@ router.patch(
   }
 );
 
-router.get("/organization/integrations", async (req, res) => {
+router.get("/organization/integrations", requirePermission(PERMISSIONS.ORG_READ), async (req, res) => {
   try {
     const integrations = await organizationIntegrationService.getIntegrationsStatus(
       req.tenantContext.organizationId

@@ -172,7 +172,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "settings",
     path: appPath("settings"),
     labelKey: "navSettings",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
   },
   adminUsers: {
@@ -225,7 +225,8 @@ const NAV_ORDER = Object.freeze({
     "followUps",
     "production",
     "recruiting",
-    "analytics"
+    "analytics",
+    "settings"
   ]
 });
 
@@ -265,7 +266,36 @@ export const ROUTE_ACCESS = Object.freeze({
   },
   knowledge: { permission: PERMISSIONS.PROSPECT_READ },
   settings: {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.ORG_READ
+  },
+  "settings/profile": {},
+  "settings/integrations": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.ORG_READ
+  },
+  "settings/organization": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.ORG_READ
+  },
+  "settings/scheduling": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ORG_READ
+  },
+  "settings/appointments": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ORG_READ
+  },
+  "settings/whatsapp": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.ORG_READ
+  },
+  "settings/whatsapp/success": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.ORG_READ
+  },
+  "settings/whatsapp/error": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
   },
   "admin/users": {
@@ -366,8 +396,126 @@ export function resolveRouteKey(pathname) {
   }
 
   if (normalized[0] === "settings") {
-    return "settings";
+    if (normalized.length === 1) {
+      return "settings";
+    }
+
+    if (normalized[1] === "whatsapp") {
+      if (normalized[2] === "success") {
+        return "settings/whatsapp/success";
+      }
+
+      if (normalized[2] === "error") {
+        return "settings/whatsapp/error";
+      }
+
+      return "settings/whatsapp";
+    }
+
+    return `settings/${normalized[1]}`;
   }
 
   return normalized[0];
+}
+
+const SETTINGS_HUB_SECTIONS = Object.freeze([
+  {
+    id: "profile",
+    routeKey: "settings/profile",
+    path: appPath("settings/profile"),
+    titleKey: "profile",
+    descriptionKey: "configurationHubProfileDescription",
+    icon: "profile",
+    workspaceTypes: null
+  },
+  {
+    id: "organization",
+    routeKey: "settings/organization",
+    path: appPath("settings/organization"),
+    titleKey: "organization",
+    descriptionKey: "configurationHubOrganizationDescription",
+    icon: "organization",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.ORG_READ
+  },
+  {
+    id: "integrations",
+    routeKey: "settings/integrations",
+    path: appPath("settings/integrations"),
+    titleKey: "integrations",
+    descriptionKey: "configurationHubIntegrationsDescription",
+    icon: "integrations",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.ORG_READ
+  },
+  {
+    id: "scheduling",
+    routeKey: "settings/scheduling",
+    path: appPath("settings/scheduling"),
+    titleKey: "scheduling",
+    descriptionKey: "configurationHubSchedulingDescription",
+    icon: "scheduling",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ORG_READ
+  },
+  {
+    id: "appointments",
+    routeKey: "settings/appointments",
+    path: appPath("settings/appointments"),
+    titleKey: "appointments",
+    descriptionKey: "configurationHubAppointmentsDescription",
+    icon: "scheduling",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ORG_READ
+  }
+]);
+
+function canAccessSettingsSection(def, user, workspaceType) {
+  if (def.workspaceTypes && !def.workspaceTypes.includes(workspaceType)) {
+    return false;
+  }
+
+  if (def.permission && !roleHasPermission(user?.role, def.permission)) {
+    return false;
+  }
+
+  return true;
+}
+
+export function buildSettingsHubSections(user, settingsSections) {
+  if (!user) {
+    return [];
+  }
+
+  const workspaceType = resolveWorkspaceType(user.role);
+
+  return SETTINGS_HUB_SECTIONS.filter((def) => canAccessSettingsSection(def, user, workspaceType)).map(
+    (def) => ({
+      to: def.path,
+      title: settingsSections[def.titleKey] || def.titleKey,
+      descriptionKey: def.descriptionKey,
+      icon: def.icon
+    })
+  );
+}
+
+export function buildSettingsNavItems(user, settingsSections) {
+  return buildSettingsHubSections(user, settingsSections).map((section) => ({
+    to: section.to,
+    label: section.title,
+    icon: section.icon,
+    end: false
+  }));
+}
+
+export function getSettingsPathForUser(user) {
+  if (!user) {
+    return appPath("settings");
+  }
+
+  if (canAccessRoute("settings", user)) {
+    return appPath("settings");
+  }
+
+  return appPath("settings/profile");
 }

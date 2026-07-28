@@ -5,6 +5,7 @@ import { appPath } from "../../config/appRoutes";
 import { logoutAtlasSession } from "../../services/atlasAuthService";
 import {
   getRoleLabelKey,
+  getSettingsPathForUser,
   getWorkspaceLabelKey,
   resolveWorkspaceType
 } from "../../config/workspaceExperience";
@@ -113,7 +114,7 @@ export default function SidebarUserFooter({
             {translate("navMyAccount")}
           </Link>
           <Link
-            to={appPath("settings")}
+            to={getSettingsPathForUser(user)}
             className="sidebar-user-footer__menu-item"
             role="menuitem"
             onClick={closeMenu}
