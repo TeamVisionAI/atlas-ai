@@ -5,10 +5,10 @@ const {
 } = require("./businessRulesEngine");
 
 const FIELD_ORDER = [
-  "city",
-  "state",
   "authorization",
   "occupation",
+  "city",
+  "state",
   "interviewType",
   "schedule",
   "email"
@@ -121,7 +121,7 @@ function getEffectiveInterviewType(profile, message = "") {
     message
   });
 
-  return decision.interviewType || "Zoom";
+  return decision.interviewType || null;
 }
 
 function isInterviewTypeRequired(profile) {
@@ -192,34 +192,24 @@ function deriveCurrentStep(profile, schedulingState) {
     return "CONFIRMED";
   }
 
-  const missing = getMissingFields(profile);
+  const nextField = getNextMissingField(profile);
 
-  if (missing.includes("city") || missing.includes("state")) {
-    return "GREETING";
-  }
-
-  if (missing.includes("authorization")) {
-    return "WORK_AUTHORIZATION";
-  }
-
-  if (missing.includes("occupation")) {
-    return "OCCUPATION";
-  }
-
-  if (missing.includes("interviewType")) {
-    return "INTERVIEW_TYPE";
-  }
-
-  if (missing.includes("schedule")) {
-    if (schedulingState?.phase) {
-      return "SCHEDULE";
-    }
-
-    return "INTERVIEW_TYPE";
-  }
-
-  if (missing.includes("email")) {
-    return "EMAIL";
+  switch (nextField) {
+    case "authorization":
+      return "WORK_AUTHORIZATION";
+    case "occupation":
+      return "OCCUPATION";
+    case "city":
+    case "state":
+      return "GREETING";
+    case "interviewType":
+      return "INTERVIEW_TYPE";
+    case "schedule":
+      return schedulingState?.phase ? "SCHEDULE" : "INTERVIEW_TYPE";
+    case "email":
+      return "EMAIL";
+    default:
+      break;
   }
 
   if (isScheduleComplete(profile) && !emailRequired(profile)) {

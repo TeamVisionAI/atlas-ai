@@ -563,10 +563,73 @@ function buildExactTimeReply(timeKey, language) {
   const label = formatTimeLabel(timeKey, language);
 
   if (language === "es") {
-    return `Perfecto. Tengo disponible a las ${label}.`;
+    return `Entendido. Tengo disponible a las ${label}.`;
   }
 
-  return `Perfect. I have ${label} available.`;
+  return `Got it. I have ${label} available.`;
+}
+
+function buildPendingConfirmationQuestion(pending, language) {
+  if (!pending?.dateKey || !pending?.timeKey) {
+    return language === "es" ? "¿Te funciona ese horario?" : "Does that time work for you?";
+  }
+
+  const dayDate = buildSlotDateTime(pending.dateKey, pending.timeKey);
+  const dayLabel = formatDayLabel(dayDate, language);
+  const timeLabel = formatTimeLabel(pending.timeKey, language);
+
+  if (language === "es") {
+    return `Tenemos disponibilidad ${dayLabel.toLowerCase()} a las ${timeLabel}. ¿Te funciona?`;
+  }
+
+  return `We have availability ${dayLabel} at ${timeLabel}. Does that work for you?`;
+}
+
+function buildPendingConfirmationState(state, selectedTime, language) {
+  if (!selectedTime?.dateKey || !selectedTime?.timeKey || !selectedTime?.interviewType) {
+    return { success: false, reason: "INVALID" };
+  }
+
+  const availability = getSlotAvailability(
+    selectedTime.dateKey,
+    selectedTime.timeKey,
+    selectedTime.interviewType
+  );
+
+  if (!availability.isOpen) {
+    return { success: false, reason: "FULL" };
+  }
+
+  const slot = buildSlotRecord({
+    dateKey: selectedTime.dateKey,
+    timeKey: selectedTime.timeKey,
+    interviewType: selectedTime.interviewType,
+    language
+  });
+
+  return {
+    success: true,
+    slot,
+    state: {
+      ...state,
+      phase: PHASES.CONFIRM,
+      selectedDay: selectedTime.dateKey,
+      pendingConfirmation: {
+        dateKey: selectedTime.dateKey,
+        timeKey: selectedTime.timeKey,
+        interviewType: selectedTime.interviewType,
+        label: slot.label
+      }
+    }
+  };
+}
+
+function buildPendingConfirmationReply(state, language, personality) {
+  return buildScheduleReply({
+    acknowledgement: language === "es" ? "Entendido." : "Got it.",
+    question: buildPendingConfirmationQuestion(state.pendingConfirmation, language),
+    personality
+  });
 }
 
 function buildOverrideClosestQuestion(requestedTimeKey, offeredTimes, language) {
@@ -636,10 +699,17 @@ function buildOverrideResponse({ override, interviewType, language, state }) {
   if (closest.exact && closest.slots.length === 1) {
     return {
       handled: true,
-      autoBook: true,
+      autoBook: false,
       selectedTime: offeredTimes[0],
       state: nextState,
-      reply: buildExactTimeReply(closest.requestedTimeKey, language)
+      reply: buildPendingConfirmationQuestion(
+        {
+          dateKey: offeredTimes[0].dateKey,
+          timeKey: offeredTimes[0].timeKey,
+          interviewType: offeredTimes[0].interviewType
+        },
+        language
+      )
     };
   }
 
@@ -798,6 +868,7 @@ function buildScheduleReply({ acknowledgement, transition, question, language, p
 
 function handleScheduleTurn({ prospect, message, language, personality }) {
   const { detectSchedulingEscalation } = require("./teamVisionAppointmentRules");
+  const { extractScheduleConfirmation } = require("./informationExtractor");
   const escalation = detectSchedulingEscalation(message);
 
   if (escalation.escalate) {
@@ -816,6 +887,83 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
 
   const interviewType = prospect.interview_type || INTERVIEW_TYPES.ZOOM;
   let state = parseSchedulingState(prospect.notes);
+
+  if (state.phase === PHASES.CONFIRM) {
+    if (extractScheduleConfirmation(message, { awaitingConfirmation: true })) {
+      const pending = state.pendingConfirmation || state.selectedTime;
+
+      if (!pending) {
+        return {
+          replyText: buildScheduleReply({
+            acknowledgement: language === "es" ? "Entendido." : "Got it.",
+            question: buildDayQuestion(defaultState(), language),
+            personality
+          }),
+          prospectUpdates: {
+            notes: mergeNotesWithSchedulingState(prospect.notes, defaultState()),
+            appointment_type: PHASES.DAY,
+            last_message: message
+          }
+        };
+      }
+
+      const finalized = finalizeSlotSelection(state, pending, language);
+
+      if (!finalized.success) {
+        return {
+          replyText: buildScheduleReply({
+            acknowledgement:
+              language === "es"
+                ? "Ese horario acaba de llenarse."
+                : "That appointment just filled up.",
+            question: buildTimeQuestion(state, language),
+            personality
+          }),
+          prospectUpdates: {
+            notes: mergeNotesWithSchedulingState(prospect.notes, {
+              ...state,
+              phase: PHASES.TIME,
+              pendingConfirmation: null
+            }),
+            appointment_type: PHASES.TIME,
+            last_message: message
+          }
+        };
+      }
+
+      return {
+        replyText: buildScheduleReply({
+          acknowledgement:
+            language === "es"
+              ? "Tu entrevista quedó confirmada."
+              : "Your interview is confirmed.",
+          question: language === "es" ? "¡Esperamos conocerte!" : "We look forward to meeting you!",
+          personality: {
+            ...personality,
+            tone: "professional"
+          }
+        }),
+        prospectUpdates: {
+          interview_time: finalized.slot.label,
+          appointment_date: finalized.slot.startTimeISO,
+          appointment_type: null,
+          notes: null,
+          current_step: "CONFIRMED",
+          last_message: message
+        },
+        complete: true
+      };
+    }
+
+    return {
+      replyText: buildPendingConfirmationReply(state, language, personality),
+      prospectUpdates: {
+        appointment_type: PHASES.CONFIRM,
+        last_message: message
+      }
+    };
+  }
+
   const override = detectScheduleOverride(message, {
     phase: state.phase,
     selectedDay: state.selectedDay
@@ -847,9 +995,13 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
     }
 
     if (overrideResult.handled && overrideResult.autoBook) {
-      const finalized = finalizeSlotSelection(state, overrideResult.selectedTime, language);
+      const pending = buildPendingConfirmationState(
+        overrideResult.state,
+        overrideResult.selectedTime,
+        language
+      );
 
-      if (!finalized.success) {
+      if (!pending.success) {
         const fallback = findClosestOpenSlots({
           dateKey: overrideResult.selectedTime.dateKey,
           hour: timeKeyToMinutes(overrideResult.selectedTime.timeKey) / 60,
@@ -883,22 +1035,32 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
       }
 
       return {
-        replyText: buildScheduleReply({
-          acknowledgement: overrideResult.reply || (language === "es" ? "Perfecto." : "Perfect."),
-          transition: "",
-          question: "",
-          personality
-        }),
+        replyText: buildPendingConfirmationReply(pending.state, language, personality),
         prospectUpdates: {
-          interview_time: finalized.slot.label,
-          appointment_date: finalized.slot.startTimeISO,
-          appointment_type: null,
-          notes: null,
-          current_step: "CONFIRMED",
+          notes: mergeNotesWithSchedulingState(prospect.notes, pending.state),
+          appointment_type: PHASES.CONFIRM,
           last_message: message
-        },
-        complete: true
+        }
       };
+    }
+
+    if (overrideResult.handled && overrideResult.selectedTime && overrideResult.reply) {
+      const pending = buildPendingConfirmationState(
+        overrideResult.state,
+        overrideResult.selectedTime,
+        language
+      );
+
+      if (pending.success) {
+        return {
+          replyText: buildPendingConfirmationReply(pending.state, language, personality),
+          prospectUpdates: {
+            notes: mergeNotesWithSchedulingState(prospect.notes, pending.state),
+            appointment_type: PHASES.CONFIRM,
+            last_message: message
+          }
+        };
+      }
     }
 
     if (overrideResult.handled) {
@@ -1020,9 +1182,9 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
     };
   }
 
-  const finalized = finalizeSlotSelection(state, selectedTime, language);
+  const pending = buildPendingConfirmationState(state, selectedTime, language);
 
-  if (!finalized.success) {
+  if (!pending.success) {
     const refreshedTimes = buildOfferedTimes(
       state.selectedDay,
       interviewType,
@@ -1051,26 +1213,12 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
   }
 
   return {
-    replyText: buildScheduleReply({
-      acknowledgement:
-        language === "es"
-          ? "✅ Excelente. Tu entrevista quedó confirmada."
-          : "✅ Great. Your interview is confirmed.",
-      question: language === "es" ? "¡Esperamos conocerte!" : "We look forward to meeting you!",
-      personality: {
-        ...personality,
-        tone: "professional"
-      }
-    }),
+    replyText: buildPendingConfirmationReply(pending.state, language, personality),
     prospectUpdates: {
-      interview_time: finalized.slot.label,
-      appointment_date: finalized.slot.startTimeISO,
-      appointment_type: null,
-      notes: null,
-      current_step: "CONFIRMED",
+      notes: mergeNotesWithSchedulingState(prospect.notes, pending.state),
+      appointment_type: PHASES.CONFIRM,
       last_message: message
-    },
-    complete: true
+    }
   };
 }
 

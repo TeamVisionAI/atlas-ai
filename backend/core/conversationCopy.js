@@ -25,9 +25,13 @@ function buildHumanCoordinatorReply(reason, language) {
     : "A Team Vision agent will contact you to help with the next steps.";
 }
 
+const {
+  buildCoverageScheduleIntro: buildCoverageScheduleIntroFromProfile,
+  buildInterviewPreferenceQuestion
+} = require("./conversationInterviewCopy");
+
 function buildCoverageScheduleIntro(profile, language) {
-  const { getZoomIntro } = require("./teamVisionAppointmentRules");
-  return getZoomIntro(language);
+  return buildCoverageScheduleIntroFromProfile(profile, language);
 }
 
 function buildAtlasBriefSummary({
@@ -74,5 +78,6 @@ function buildAtlasBriefSummary({
 module.exports = {
   buildHumanCoordinatorReply,
   buildCoverageScheduleIntro,
+  buildInterviewPreferenceQuestion,
   buildAtlasBriefSummary
 };

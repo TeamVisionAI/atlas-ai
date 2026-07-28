@@ -10,6 +10,14 @@ const TEAM_VISION_PROMPTS = Object.freeze({
     "Estamos realizando las entrevistas por Zoom. ¿Prefieres en la mañana o en la tarde?",
   SCHEDULING_PREFERENCE_EN:
     "We're conducting interviews via Zoom. Do you prefer morning or afternoon?",
+  LOCAL_INTERVIEW_CHOICE_ES:
+    "Como estás en nuestra área local, podemos realizar la entrevista en nuestra oficina o por Zoom. ¿Cuál prefieres?",
+  LOCAL_INTERVIEW_CHOICE_EN:
+    "Since you are in our local area, we can conduct the interview in our office or by Zoom. Which do you prefer?",
+  OUTSIDE_AREA_ZOOM_ES:
+    "Como estás fuera de nuestra área local, realizaremos la entrevista por Zoom.",
+  OUTSIDE_AREA_ZOOM_EN:
+    "Since you are outside our local area, we will conduct the interview via Zoom.",
   ZOOM_EXPLAIN_ES:
     "Zoom es gratis y funciona en tu teléfono o computadora. Te envío las instrucciones para descargarlo.",
   ZOOM_EXPLAIN_EN:
@@ -149,6 +157,18 @@ function buildHumanAssistSummary(reason, context = {}) {
   return base;
 }
 
+function getOutsideAreaZoomIntro(language) {
+  return language === "es"
+    ? TEAM_VISION_PROMPTS.OUTSIDE_AREA_ZOOM_ES
+    : TEAM_VISION_PROMPTS.OUTSIDE_AREA_ZOOM_EN;
+}
+
+function getLocalInterviewChoiceQuestion(language) {
+  return language === "es"
+    ? TEAM_VISION_PROMPTS.LOCAL_INTERVIEW_CHOICE_ES
+    : TEAM_VISION_PROMPTS.LOCAL_INTERVIEW_CHOICE_EN;
+}
+
 function getZoomIntro(language) {
   return language === "es" ? TEAM_VISION_PROMPTS.ZOOM_INTRO_ES : TEAM_VISION_PROMPTS.ZOOM_INTRO_EN;
 }
@@ -181,6 +201,8 @@ module.exports = {
   detectAgentRequest,
   detectSchedulingEscalation,
   getZoomIntro,
+  getOutsideAreaZoomIntro,
+  getLocalInterviewChoiceQuestion,
   getPeriodPreferenceQuestion,
   getEmailCollectionQuestion,
   getHumanAssistReply

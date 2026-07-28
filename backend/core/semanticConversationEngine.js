@@ -40,11 +40,13 @@ const {
 const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
 const {
   buildHumanCoordinatorReply,
-  buildCoverageScheduleIntro
+  buildCoverageScheduleIntro,
+  buildInterviewPreferenceQuestion
 } = require("./conversationCopy");
 const { extractInformation } = require("./informationExtractor");
 const {
-  resolveConversationLanguage
+  resolveConversationLanguage,
+  detectMessageLanguage
 } = require("./conversationLanguage");
 
 const CONVERSATION_GOAL = "Schedule Interview";
@@ -121,8 +123,8 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
   switch (field) {
     case "city":
       return language === "es"
-        ? "¿En qué ciudad y estado vives?"
-        : "What city and state do you live in?";
+        ? "¿En qué ciudad y estado vives actualmente?"
+        : "What city and state do you currently live in?";
 
     case "state":
       return language === "es"
@@ -140,11 +142,7 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
         : "What do you currently do for work?";
 
     case "interviewType":
-      return getScheduleQuestion(
-        { phase: PHASES.DAY, offeredDays: schedulingState.offeredDays || [] },
-        "Zoom",
-        language
-      );
+      return buildInterviewPreferenceQuestion(profile, language);
 
     case "schedule": {
       const scheduleQuestion =
@@ -441,7 +439,21 @@ async function handleSemanticMessage({
     prospect = await findProspect(phone);
   }
 
-  const language = detectLanguage(prospect, cleanMessage);
+  const activeLanguage = resolveConversationLanguage(prospect, cleanMessage);
+
+  if (detectMessageLanguage(cleanMessage)) {
+    await updateProspect(prospect.phone, {
+      language: activeLanguage,
+      communication_language: activeLanguage
+    });
+    prospect = {
+      ...prospect,
+      language: activeLanguage,
+      communication_language: activeLanguage
+    };
+  }
+
+  const language = activeLanguage;
   let profile = buildProfileFromProspect(prospect, channel);
   const nextField = getNextMissingField(profile);
   const inSchedule = isActiveScheduleStep(prospect);

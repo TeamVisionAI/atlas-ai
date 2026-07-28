@@ -125,10 +125,13 @@ async function createSimulatorProspect(payload = {}) {
     const preset = payload.preset || "NEW_LEAD";
     const seed = { ...PRESET_SEEDS[preset], ...(payload.seedFields || {}) };
 
-    const prospect = await createProspect(phone, name, seed.last_message || "");
+    const prospect = await createProspect(phone, name, "");
 
-    if (Object.keys(seed).length > 0) {
-      await updateProspect(phone, seed);
+    const sanitizedSeed = { ...seed };
+    delete sanitizedSeed.last_message;
+
+    if (Object.keys(sanitizedSeed).length > 0) {
+      await updateProspect(phone, sanitizedSeed);
     }
 
     await emit(EVENT_TYPES.PROSPECT_CREATED, {

@@ -25,41 +25,9 @@ const OFFICE_LOCATION = {
   fullAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
 };
 
-const LOCAL_RADIUS_MILES = 25;
+const { isLocalTeamVisionCity, LOCAL_CITIES } = require("./localAreaConfig");
 
-const LOCAL_CITIES = [
-  "doral",
-  "miami",
-  "hialeah",
-  "miami lakes",
-  "miami springs",
-  "sweetwater",
-  "westchester",
-  "kendall",
-  "coral gables",
-  "south miami",
-  "pinecrest",
-  "palmetto bay",
-  "cutler bay",
-  "homestead",
-  "aventura",
-  "sunny isles beach",
-  "north miami",
-  "north miami beach",
-  "miami beach",
-  "miramar",
-  "pembroke pines",
-  "hollywood",
-  "fort lauderdale",
-  "davie",
-  "weston",
-  "plantation",
-  "sunrise",
-  "tamiami",
-  "west miami",
-  "medley",
-  "virginia gardens"
-];
+const LOCAL_RADIUS_MILES = 25;
 
 const IN_PERSON_REQUEST_PATTERNS = [
   "in person",
@@ -92,7 +60,7 @@ function getOfficeLocation() {
 }
 
 function isLocalCity(city = "") {
-  return LOCAL_CITIES.includes(normalize(city));
+  return isLocalTeamVisionCity(city);
 }
 
 function evaluateCoverage({ city, state = null }) {
@@ -168,6 +136,17 @@ function evaluateInterviewTypeDecision({
   }
 
   if (explicitRequest === INTERVIEW_TYPES.IN_PERSON) {
+    if (coverageDecision.coverage === COVERAGE.LOCAL) {
+      return {
+        interviewType: INTERVIEW_TYPES.IN_PERSON,
+        allowed: true,
+        needsHumanCoordinator: false,
+        autoApplied: false,
+        coverage: coverageDecision.coverage,
+        reason: null
+      };
+    }
+
     return {
       interviewType: INTERVIEW_TYPES.ZOOM,
       allowed: false,
@@ -222,6 +201,17 @@ function evaluateInterviewTypeDecision({
     };
   }
 
+  if (coverageDecision.coverage === COVERAGE.LOCAL && !explicitRequest && !currentType) {
+    return {
+      interviewType: null,
+      allowed: true,
+      needsHumanCoordinator: false,
+      autoApplied: false,
+      coverage: coverageDecision.coverage,
+      reason: null
+    };
+  }
+
   return {
     interviewType: INTERVIEW_TYPES.ZOOM,
     allowed: true,
@@ -233,12 +223,12 @@ function evaluateInterviewTypeDecision({
   };
 }
 
-function isInterviewTypeChoiceRequired({ city, interviewType }) {
+function isInterviewTypeChoiceRequired({ city, state = null, interviewType }) {
   if (!city || interviewType) {
     return false;
   }
 
-  return false;
+  return evaluateCoverage({ city, state }).coverage === COVERAGE.LOCAL;
 }
 
 function evaluateSchedulingWindow({ hour, minute = 0 }) {

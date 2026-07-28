@@ -4,6 +4,7 @@ const PHASES = {
   DAY: "DAY",
   PERIOD: "PERIOD",
   TIME: "TIME",
+  CONFIRM: "CONFIRM",
   OVERRIDE: "OVERRIDE"
 };
 
@@ -15,6 +16,7 @@ function defaultState() {
     period: null,
     offeredTimes: [],
     selectedTime: null,
+    pendingConfirmation: null,
     isWorking: true,
     overrideRequest: null
   };

@@ -94,12 +94,43 @@ function isUnemployed(text) {
   return matchesAny(text, UNEMPLOYED_PATTERNS);
 }
 
+const SCHEDULE_CONFIRMATION_PATTERNS = [
+  "yes",
+  "yeah",
+  "yep",
+  "that works",
+  "works for me",
+  "works for me",
+  "confirm it",
+  "confirm",
+  "confirmed",
+  "sounds good",
+  "perfect",
+  "si",
+  "sí",
+  "me funciona",
+  "perfecto",
+  "confirmala",
+  "confírmala",
+  "esta bien",
+  "está bien",
+  "de acuerdo",
+  "ok",
+  "okay"
+];
+
+function isScheduleConfirmation(text) {
+  return matchesAny(text, SCHEDULE_CONFIRMATION_PATTERNS);
+}
+
 module.exports = {
   YES_PATTERNS,
   NO_PATTERNS,
   UNEMPLOYED_PATTERNS,
+  SCHEDULE_CONFIRMATION_PATTERNS,
   isYes,
   isNo,
   isUnemployed,
+  isScheduleConfirmation,
   matchesAny
 };

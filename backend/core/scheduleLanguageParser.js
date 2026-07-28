@@ -105,7 +105,7 @@ function parsePeriodHint(text) {
 
 function parseTimeHint(text, context = {}) {
   const timePatterns = [
-    /(?:at|around|about|for|a las|como a las|can it be at|could it be at|puede ser a las|podria ser a las|seria a las|sería a las)\s+(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)?/i,
+    /(?:prefer(?:ring)?|at|around|about|for|a las|como a las|can it be at|could it be at|puede ser a las|podria ser a las|seria a las|sería a las)\s+(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)?/i,
     /(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)\s*(?:mas o menos|más o menos|or so|ish)\b/i,
     /(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)/i,
     /^(\d{1,2})$/i

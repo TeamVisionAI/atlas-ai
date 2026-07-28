@@ -75,7 +75,16 @@ const ENGLISH_WORDS = [
   "about",
   "team vision",
   "amazon",
-  "employed"
+  "employed",
+  "office",
+  "zoom",
+  "virtual",
+  "prefer",
+  "possible",
+  "morning",
+  "afternoon",
+  "confirm",
+  "works"
 ];
 
 function normalize(text) {
@@ -120,7 +129,7 @@ function detectMessageLanguage(message) {
   esScore += countWordHits(text, SPANISH_WORDS);
   enScore += countWordHits(text, ENGLISH_WORDS);
 
-  if (/\b(i'm|i am|don't|can't|what's|it's)\b/i.test(text)) {
+  if (/\b(in office|by zoom|that works|yes, that works)\b/i.test(text)) {
     enScore += 2;
   }
 

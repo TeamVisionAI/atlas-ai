@@ -1,4 +1,4 @@
-const { isYes, isNo, matchesAny } = require("./languageLibrary");
+const { isYes, isNo, matchesAny, isScheduleConfirmation } = require("./languageLibrary");
 const { detectScheduleOverride } = require("./scheduleLanguageParser");
 const { INTERVIEW_TYPES } = require("./interviewScheduling");
 
@@ -59,6 +59,7 @@ const CITY_TO_STATE = {
   tampa: "FL",
   miami: "FL",
   orlando: "FL",
+  doral: "FL",
   jacksonville: "FL",
   "fort lauderdale": "FL",
   tallahassee: "FL",
@@ -138,31 +139,135 @@ function inferStateFromCity(city) {
   return CITY_TO_STATE[normalize(city)] || null;
 }
 
-function extractLocation(message) {
+function isGreetingOrSmallTalk(text) {
+  const normalized = normalize(text);
+
+  return (
+    /^(hola|hello|hi|hey|buenos dias|buenas|good morning|good afternoon)\b/i.test(normalized) ||
+    /\b(información|informacion|information|team vision|quisiera|want to know|tell me about|quiero información|quiero informacion)\b/i.test(
+      normalized
+    )
+  );
+}
+
+function isValidCityName(value) {
+  if (!value) {
+    return false;
+  }
+
+  const text = String(value).trim();
+
+  if (text.length > 40) {
+    return false;
+  }
+
+  if (isGreetingOrSmallTalk(text) || isLikelyQuestion(text)) {
+    return false;
+  }
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+  if (wordCount > 4) {
+    return false;
+  }
+
+  if (/[?!]/.test(text)) {
+    return false;
+  }
+
+  return /^[A-Za-zÀ-ÿ'.\-\s]+$/.test(text);
+}
+
+function parseCityStateTokens(locationText) {
+  const location = trimAtClause(String(locationText || "").trim());
+  const commaParts = location.match(/^([^,]+),\s*(.+)$/);
+
+  if (commaParts) {
+    const city = trimAtClause(commaParts[1].trim());
+    const state = normalizeState(trimAtClause(commaParts[2].trim()));
+
+    if (city && state) {
+      return { city, state };
+    }
+  }
+
+  const parts = location.split(/\s+/).filter(Boolean);
+
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1];
+    const stateFromLast = US_STATE_NAMES[normalize(last)];
+
+    if (/^[a-z]{2}$/i.test(last)) {
+      return {
+        city: parts.slice(0, -1).join(" "),
+        state: normalizeState(last)
+      };
+    }
+
+    if (stateFromLast) {
+      return {
+        city: parts.slice(0, -1).join(" "),
+        state: stateFromLast
+      };
+    }
+  }
+
+  return {
+    city: location,
+    state: inferStateFromCity(location)
+  };
+}
+
+function extractLocation(message, options = {}) {
   const text = String(message || "").trim();
   const result = { city: null, state: null };
+  const nextField = options.nextField || null;
+  const allowLocation =
+    nextField === "city" ||
+    nextField === "state" ||
+    options.forceLocation === true;
 
-  const commaMatch = text.match(/^([^,]+),\s*(.+)$/);
-  if (commaMatch) {
-    result.city = trimAtClause(commaMatch[1].trim());
-    result.state = normalizeState(trimAtClause(commaMatch[2].trim()));
+  if (!text || isGreetingOrSmallTalk(text)) {
     return result;
   }
 
   const liveInMatch = text.match(
-    /\b(?:live in|living in|i live in|vivo en|estoy en|based in|located in|from)\s+([^,.!?]+)/i
+    /\b(?:live in|living in|i live in|vivo en|estoy en|based in|located in)\s+([^?.!]+)/i
   );
 
   if (liveInMatch) {
-    const location = trimAtClause(liveInMatch[1].trim());
-    const parts = location.split(/\s+/);
+    const parsed = parseCityStateTokens(liveInMatch[1]);
 
-    if (parts.length >= 2 && /^[a-z]{2}$/i.test(parts[parts.length - 1])) {
-      result.state = parts[parts.length - 1].toUpperCase();
-      result.city = parts.slice(0, -1).join(" ");
-    } else {
-      result.city = location;
-      result.state = inferStateFromCity(location);
+    if (isValidCityName(parsed.city)) {
+      result.city = parsed.city;
+      result.state = parsed.state;
+      return result;
+    }
+  }
+
+  const commaMatch = text.match(/^([^,]+),\s*(.+)$/);
+
+  if (commaMatch) {
+    const cityCandidate = trimAtClause(commaMatch[1].trim());
+    const stateCandidate = normalizeState(trimAtClause(commaMatch[2].trim()));
+
+    if (isValidCityName(cityCandidate) && stateCandidate) {
+      result.city = cityCandidate;
+      result.state = stateCandidate;
+      return result;
+    }
+
+    if (!allowLocation) {
+      return result;
+    }
+  }
+
+  if (allowLocation && !isLikelyQuestion(text)) {
+    const parsed = parseCityStateTokens(text);
+
+    if (isValidCityName(parsed.city)) {
+      result.city = parsed.city;
+      result.state = parsed.state;
     }
   }
 
@@ -243,17 +348,6 @@ function normalizeOccupationStatus(text) {
   return null;
 }
 
-function isGreetingOrSmallTalk(text) {
-  const normalized = normalize(text);
-
-  return (
-    /^(hola|hello|hi|hey|buenos dias|buenas|good morning|good afternoon)\b/i.test(normalized) ||
-    /\b(información|informacion|information|team vision|quisiera|want to know|tell me about)\b/i.test(
-      normalized
-    )
-  );
-}
-
 function extractOccupation(message, existingOccupation, nextField = null) {
   if (existingOccupation) {
     return null;
@@ -295,9 +389,22 @@ function extractOccupation(message, existingOccupation, nextField = null) {
 }
 
 function extractInterviewType(message, nextField = null) {
+  if (nextField !== "interviewType") {
+    return null;
+  }
+
   const text = normalize(message);
-  const officePatterns = ["office", "in person", "in-person", "person", "presencial", "oficina"];
-  const zoomPatterns = ["zoom", "virtual", "online", "remoto"];
+  const officePatterns = [
+    "office",
+    "in office",
+    "in person",
+    "in-person",
+    "person",
+    "presencial",
+    "oficina",
+    "en persona"
+  ];
+  const zoomPatterns = ["zoom", "virtual", "online", "remoto", "por zoom"];
 
   if (officePatterns.some((pattern) => text.includes(pattern))) {
     return INTERVIEW_TYPES.OFFICE;
@@ -307,17 +414,23 @@ function extractInterviewType(message, nextField = null) {
     return INTERVIEW_TYPES.ZOOM;
   }
 
-  if (nextField === "interviewType") {
-    if (text === "1" || /^1[\s.)-]/.test(text)) {
-      return INTERVIEW_TYPES.OFFICE;
-    }
+  if (text === "1" || /^1[\s.)-]/.test(text)) {
+    return INTERVIEW_TYPES.OFFICE;
+  }
 
-    if (text === "2" || /^2[\s.)-]/.test(text)) {
-      return INTERVIEW_TYPES.ZOOM;
-    }
+  if (text === "2" || /^2[\s.)-]/.test(text)) {
+    return INTERVIEW_TYPES.ZOOM;
   }
 
   return null;
+}
+
+function extractScheduleConfirmation(message, options = {}) {
+  if (!options.awaitingConfirmation) {
+    return false;
+  }
+
+  return isScheduleConfirmation(message);
 }
 
 function extractEmail(message) {
@@ -359,14 +472,23 @@ function extractInformation(message, profile = {}, options = {}) {
   const extracted = {};
   const nextField = options.nextField || null;
   const inSchedule = options.inSchedule || false;
-  const location = extractLocation(message);
+  const location = extractLocation(message, { nextField });
 
-  if (location.city && !profile.city) {
+  if (location.city && !profile.city && isValidCityName(location.city)) {
     extracted.city = location.city;
   }
 
   if (location.state && !profile.state) {
     extracted.state = location.state;
+  }
+
+  if (extracted.city && !extracted.state) {
+    extracted.state = inferStateFromCity(extracted.city);
+  }
+
+  if (extracted.city && !isValidCityName(extracted.city)) {
+    delete extracted.city;
+    delete extracted.state;
   }
 
   const authorization = extractAuthorization(message, nextField);
@@ -408,5 +530,8 @@ module.exports = {
   extractLocation,
   extractAuthorization,
   extractOccupation,
-  extractEmail
+  extractInterviewType,
+  extractScheduleConfirmation,
+  extractEmail,
+  isValidCityName
 };

@@ -32,7 +32,9 @@ function applyBusinessRulesToProfile(profile, message = "", extractedType = null
     };
   }
 
-  if (typeDecision.interviewType) {
+  if (typeDecision.autoApplied && typeDecision.interviewType) {
+    profile.interviewType = typeDecision.interviewType;
+  } else if (typeDecision.interviewType && explicitRequest) {
     profile.interviewType = typeDecision.interviewType;
   }
 
