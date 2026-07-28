@@ -249,7 +249,7 @@ async function confirmPasswordReset({ token, newPassword, ipAddress, userAgent }
 
   const { data: resetRow, error } = await supabase
     .from("atlas_password_reset_tokens")
-    .select("*, user:atlas_users(*)")
+    .select("*, user:atlas_users!user_id(*)")
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
@@ -298,16 +298,31 @@ async function confirmPasswordReset({ token, newPassword, ipAddress, userAgent }
   return { success: true };
 }
 
+const INVITATION_USER_EMBED =
+  "expires_at, used_at, user:atlas_users!user_id(email, first_name, status)";
+
+const INVITATION_ACCEPT_EMBED = "*, user:atlas_users!user_id(*)";
+
 async function validateInvitationToken(token) {
-  const tokenHash = hashToken(token);
+  const rawToken = String(token || "").trim();
+
+  if (!rawToken) {
+    return { valid: false };
+  }
+
+  const tokenHash = hashToken(rawToken);
 
   const { data, error } = await supabase
     .from("atlas_invitation_tokens")
-    .select("expires_at, used_at, user:atlas_users(email, first_name, status)")
+    .select(INVITATION_USER_EMBED)
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
   if (error) {
+    console.error("[auth/invitation/validate] token lookup failed", {
+      code: error.code,
+      message: error.message
+    });
     throw error;
   }
 
@@ -328,11 +343,15 @@ async function acceptInvitation({ token, password, ipAddress, userAgent }) {
 
   const { data: inviteRow, error } = await supabase
     .from("atlas_invitation_tokens")
-    .select("*, user:atlas_users(*)")
+    .select(INVITATION_ACCEPT_EMBED)
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
   if (error) {
+    console.error("[auth/invitation/accept] token lookup failed", {
+      code: error.code,
+      message: error.message
+    });
     throw error;
   }
 

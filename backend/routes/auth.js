@@ -99,6 +99,10 @@ router.get("/auth/invitation/validate", async (req, res) => {
     const result = await validateInvitationToken(req.query.token);
     return res.json(result);
   } catch (error) {
+    console.error("[auth/invitation/validate] unhandled failure", {
+      message: error.message,
+      code: error.code
+    });
     return res.status(500).json({ error: "INVITATION_VALIDATION_FAILED" });
   }
 });

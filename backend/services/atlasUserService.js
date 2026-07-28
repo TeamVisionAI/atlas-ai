@@ -133,7 +133,7 @@ async function findUserBySessionToken(token) {
 
   const { data, error } = await supabase
     .from("atlas_sessions")
-    .select("token, expires_at, revoked_at, user:atlas_users(*)")
+    .select("token, expires_at, revoked_at, user:atlas_users!user_id(*)")
     .eq("token", token)
     .maybeSingle();
 
