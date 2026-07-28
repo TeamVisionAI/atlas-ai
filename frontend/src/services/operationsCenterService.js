@@ -154,3 +154,30 @@ export async function fetchWorkflowSimulatorTimeline(phone) {
 export async function runCompleteValidation() {
   return operationsFetch("/validation/run-complete", { method: "POST" });
 }
+
+export async function fetchAlphaChecklist({ phone, runValidation = false } = {}) {
+  const params = new URLSearchParams();
+
+  if (phone) {
+    params.set("phone", phone);
+  }
+
+  if (runValidation) {
+    params.set("runValidation", "true");
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return operationsFetch(`/alpha-checklist${suffix}`);
+}
+
+export async function runAlphaChecklist({ phone, runValidation = false } = {}) {
+  return operationsFetch("/alpha-checklist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, runValidation })
+  });
+}
+
+export async function fetchGoldenPathTrace(phone) {
+  return operationsFetch(`/golden-path-trace/${encodeURIComponent(phone)}`);
+}

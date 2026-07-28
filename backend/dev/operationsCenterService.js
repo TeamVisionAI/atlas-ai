@@ -904,6 +904,21 @@ async function runCompleteWorkflowValidation() {
   };
 }
 
+
+async function getAlphaAcceptanceChecklist(options = {}) {
+  const { evaluateAlphaAcceptance } = require("../core/alphaAcceptanceService");
+  return evaluateAlphaAcceptance(options);
+}
+
+async function getGoldenPathTrace(phone, options = {}) {
+  const { buildGoldenPathTrace } = require("../core/alphaGoldenPathTraceService");
+  const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+
+  return buildGoldenPathTrace(phone, {
+    organizationId: options.organizationId || DEFAULT_ORGANIZATION_ID
+  });
+}
+
 module.exports = {
   BACKEND_VERSION,
   SPRINT_LABEL,
@@ -932,5 +947,7 @@ module.exports = {
   advanceWorkflowSimulator,
   getWorkflowSimulatorEvents,
   getWorkflowSimulatorTimeline,
-  runCompleteWorkflowValidation
+  runCompleteWorkflowValidation,
+  getAlphaAcceptanceChecklist,
+  getGoldenPathTrace
 };

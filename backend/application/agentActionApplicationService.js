@@ -38,6 +38,7 @@ const { getMissionControlState } = require("../core/missionControlReadModel");
 const { buildWorkflowReadModel } = require("../core/workflowReadModel");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { buildWorkflowGateDescriptor } = require("../core/workflowGateEngine");
+const { enrichActionCenterWithConfidence } = require("../core/alphaConfidenceEngine");
 const {
   fetchConversationThread,
   buildRecruitingFunnelStatus,
@@ -315,6 +316,33 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
       return buildActionSuccess(action, "WhatsApp open logged.");
     }
 
+    case ACTION_IDS.ESCALATE_TO_RECRUITER: {
+      const { savePersistedWorkflowState } = require("../core/workflowStateStore");
+      const { OWNERSHIP } = require("../core/workflowConstants");
+      const { escalateConversationToHumanAssist } = require("../core/appointmentHumanAssistBridge");
+
+      savePersistedWorkflowState(phone, {
+        needsHumanAttention: true,
+        workflowOwnership: OWNERSHIP.AGENT
+      });
+
+      await escalateConversationToHumanAssist({
+        phone,
+        organizationId,
+        reason: "recruiter_escalation",
+        summary:
+          payload.summary ||
+          "Recruiter escalation requested from Mission Control AI Action Center."
+      }).catch(() => null);
+
+      await logAgentTimeline(
+        prospect,
+        buildAgentActionTimelineMessage("Escalated to recruiter for human assist")
+      );
+
+      return buildActionSuccess(action, "Escalated to recruiter.");
+    }
+
     default:
       return buildActionError(action, "UNKNOWN_ACTION", "Unknown agent action.");
   }
@@ -418,6 +446,12 @@ async function getMissionControlWithActions(phone, options = {}) {
     }
   );
 
+  const enrichedActionCenter = enrichActionCenterWithConfidence(mergedActionCenter, {
+    workflow,
+    brain: missionControl.brain,
+    prospect
+  });
+
   const recruitingStatus = buildRecruitingFunnelStatus(workflow, missionControl.brain);
   const liveRevision = buildLiveRevision(conversationMessages, workflow);
   const conversationOutcome = buildConversationOutcomeReadModel({
@@ -446,7 +480,7 @@ async function getMissionControlWithActions(phone, options = {}) {
     workflowGate,
     latestConversation,
     conversationMessages,
-    aiActionCenter: mergedActionCenter,
+    aiActionCenter: enrichedActionCenter,
     recruitingStatus,
     liveRevision,
     conversationOutcome,

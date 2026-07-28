@@ -13,7 +13,8 @@ const ACTION_IDS = Object.freeze({
   NOTES: "notes",
   SEND_MISSED_APPOINTMENT: "send_missed_appointment",
   LOG_WHATSAPP_OPEN: "log_whatsapp_open",
-  ENTER_INTERVIEW_OUTCOME: "enter_interview_outcome"
+  ENTER_INTERVIEW_OUTCOME: "enter_interview_outcome",
+  ESCALATE_TO_RECRUITER: "escalate_to_recruiter"
 });
 
 const AGENT_ACTION_METADATA = Object.freeze({
@@ -26,7 +27,8 @@ const AGENT_ACTION_METADATA = Object.freeze({
   [ACTION_IDS.NOTES]: { label: "Add agent notes" },
   [ACTION_IDS.SEND_MISSED_APPOINTMENT]: { label: "Send missed appointment follow-up" },
   [ACTION_IDS.LOG_WHATSAPP_OPEN]: { label: "Continue on WhatsApp" },
-  [ACTION_IDS.ENTER_INTERVIEW_OUTCOME]: { label: "Record outcome" }
+  [ACTION_IDS.ENTER_INTERVIEW_OUTCOME]: { label: "Record outcome" },
+  [ACTION_IDS.ESCALATE_TO_RECRUITER]: { label: "Escalate to recruiter" }
 });
 
 function getAgentActionLabel(actionId) {

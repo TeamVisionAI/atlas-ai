@@ -6,6 +6,8 @@ export const operationsCenterNavGroups = [
     labelKey: "opsNavGroupMonitoring",
     items: [
       { id: "dashboard", labelKey: "opsNavDashboard", end: true },
+      { id: "alpha-checklist", labelKey: "opsNavAlphaChecklist" },
+      { id: "golden-path-trace", labelKey: "opsNavGoldenPathTrace" },
       { id: "system-health", labelKey: "opsNavSystemHealth" },
       { id: "live-activity", labelKey: "opsNavLiveActivity" },
       { id: "business-events", labelKey: "opsNavBusinessEvents" }

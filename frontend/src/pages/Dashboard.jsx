@@ -428,6 +428,73 @@ export default function Dashboard() {
     [handleMissionAction]
   );
 
+  const handleHumanOverride = useCallback(
+    async (overrideType) => {
+      if (!phone) {
+        return;
+      }
+
+      const actionId = workspace?.aiActionCenter?.actionId;
+
+      if (overrideType === "approve") {
+        if (actionId) {
+          await handleMissionPrimaryAction(actionId);
+        }
+
+        return;
+      }
+
+      if (overrideType === "edit") {
+        const text = window.prompt(translate("missionControlAddNotePrompt"));
+
+        if (!text?.trim()) {
+          return;
+        }
+
+        const result = await postMissionControlAction(phone, "notes", {
+          text: text.trim()
+        });
+
+        if (!result.success) {
+          setActionError(result.message);
+          return;
+        }
+
+        await refreshCurrentWorkspace();
+        return;
+      }
+
+      if (overrideType === "retry") {
+        if (!actionId) {
+          setActionError(translate("missionControlActionFailed"));
+          return;
+        }
+
+        await handleMissionAction(actionId);
+        return;
+      }
+
+      if (overrideType === "escalate") {
+        const result = await postMissionControlAction(phone, "escalate_to_recruiter");
+
+        if (!result.success) {
+          setActionError(result.message);
+          return;
+        }
+
+        await refreshCurrentWorkspace();
+      }
+    },
+    [
+      phone,
+      workspace?.aiActionCenter?.actionId,
+      handleMissionPrimaryAction,
+      handleMissionAction,
+      refreshCurrentWorkspace,
+      translate
+    ]
+  );
+
   const handleScheduleMissionSubmit = useCallback(
     async (form) => {
       if (!phone) {
@@ -869,6 +936,7 @@ export default function Dashboard() {
               <AiActionCenter
                 actionCenter={workspace.aiActionCenter}
                 onExecuteAction={handleMissionAction}
+                onHumanOverride={handleHumanOverride}
               />
             </ExecutiveSection>
           ) : null}

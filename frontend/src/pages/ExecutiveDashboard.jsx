@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getDashboard } from "../services/api";
-import { getExecutiveDashboard } from "../services/executiveDashboardService";
+import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executiveDashboardService";
 import { buildExecutiveDashboardViewModel } from "../engines/executiveDashboardViewModel";
 import {
   buildProspectCenterPath,
@@ -41,6 +41,7 @@ export default function ExecutiveDashboard() {
   const { translate } = useLanguage();
   const [executive, setExecutive] = useState(null);
   const [dashboard, setDashboard] = useState(null);
+  const [alphaBrief, setAlphaBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -52,14 +53,16 @@ export default function ExecutiveDashboard() {
       setError(null);
 
       try {
-        const [executivePayload, dashboardPayload] = await Promise.all([
+        const [executivePayload, dashboardPayload, alphaBriefPayload] = await Promise.all([
           getExecutiveDashboard(),
-          getDashboard()
+          getDashboard(),
+          getAlphaMorningBrief().catch(() => null)
         ]);
 
         if (!cancelled) {
           setExecutive(executivePayload);
           setDashboard(dashboardPayload);
+          setAlphaBrief(alphaBriefPayload);
         }
       } catch (err) {
         console.error(err);
@@ -136,7 +139,7 @@ export default function ExecutiveDashboard() {
       />
 
       <MorningBrief
-        brief={viewModel.morningBrief}
+        brief={alphaBrief || viewModel.morningBrief}
         onReview={(phone) => openProspectWorkspace(phone)}
       />
 

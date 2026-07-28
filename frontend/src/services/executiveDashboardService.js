@@ -15,3 +15,7 @@ export async function getExecutiveActivity(limit = 20) {
     `/api/dashboard/activity?limit=${encodeURIComponent(limit)}`
   );
 }
+
+export async function getAlphaMorningBrief() {
+  return apiFetch("/api/dashboard/alpha-brief");
+}

@@ -18,6 +18,8 @@ import {
   useRunningTasks
 } from "../components/operations/OpsShared";
 import OpsDashboard from "./operations/OpsDashboard";
+import OpsAlphaChecklist from "./operations/OpsAlphaChecklist";
+import OpsGoldenPathTrace from "./operations/OpsGoldenPathTrace";
 import {
   advanceWorkflowSimulator,
   fetchBusinessEventById,
@@ -730,6 +732,8 @@ function OperationsCenterLayout({ t }) {
       <div className="operations-center__content">
         <Routes>
           <Route index element={<OpsDashboard t={t} />} />
+          <Route path="alpha-checklist" element={<OpsAlphaChecklist t={t} />} />
+          <Route path="golden-path-trace" element={<OpsGoldenPathTrace t={t} />} />
           <Route path="system-health" element={<SystemHealthSection t={t} />} />
           <Route path="live-activity" element={<LiveActivitySection t={t} />} />
           <Route path="workflow-simulator" element={<WorkflowSimulatorSection t={t} />} />

@@ -109,4 +109,17 @@ router.get("/activity", async (req, res) => {
   }
 });
 
+/** Sprint 12 — Alpha executive morning brief. */
+router.get("/alpha-brief", async (req, res) => {
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const { buildAlphaMorningBrief } = require("../core/alphaMorningBriefEngine");
+    const brief = await buildAlphaMorningBrief({ organizationId });
+    res.json(brief);
+  } catch (error) {
+    console.error("[dashboard/alpha-brief] error:", error.message);
+    res.status(500).json({ error: "Failed to load alpha morning brief" });
+  }
+});
+
 module.exports = router;

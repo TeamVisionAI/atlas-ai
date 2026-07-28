@@ -233,6 +233,52 @@ function createOperationsRoutes(deps = {}) {
     }
   });
 
+
+  router.get("/alpha-checklist", async (req, res) => {
+    try {
+      const report = await operationsCenterService.getAlphaAcceptanceChecklist({
+        phone: req.query.phone || null,
+        runValidation: req.query.runValidation === "true"
+      });
+      res.status(report.alphaReady ? 200 : 422).json({ success: report.alphaReady, ...report });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "ALPHA_CHECKLIST_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.post("/alpha-checklist", async (req, res) => {
+    try {
+      const report = await operationsCenterService.getAlphaAcceptanceChecklist({
+        phone: req.body?.phone || null,
+        runValidation: req.body?.runValidation === true
+      });
+      res.status(report.alphaReady ? 200 : 422).json({ success: report.alphaReady, ...report });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "ALPHA_CHECKLIST_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.get("/golden-path-trace/:phone", async (req, res) => {
+    try {
+      const trace = await operationsCenterService.getGoldenPathTrace(req.params.phone);
+      res.json({ success: true, trace });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: "GOLDEN_PATH_TRACE_FAILED",
+        message: error.message
+      });
+    }
+  });
+
   router.get("/simulator/scenarios", (req, res) => {
     res.json({
       success: true,

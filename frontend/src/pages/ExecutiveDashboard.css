@@ -116,6 +116,38 @@
   color: var(--exec-text);
 }
 
+.executive-brief__greeting {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--exec-text);
+}
+
+.executive-brief__section {
+  margin-top: 16px;
+}
+
+.executive-brief__section-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.executive-brief__list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.executive-brief__list li {
+  font-size: 16px;
+}
+
 .executive-focus-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
