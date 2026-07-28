@@ -60,9 +60,47 @@ const ROLE_PERMISSIONS = Object.freeze({
   [ROLES.SUPPORT]: [PERMISSIONS.PROSPECT_READ, PERMISSIONS.AUDIT_READ]
 });
 
+const ROLE_ALIASES = Object.freeze({
+  admin: ROLES.ADMINISTRATOR,
+  super_admin: ROLES.ADMINISTRATOR,
+  representative: ROLES.RECRUITER,
+  field_trainer: ROLES.AGENT,
+  regional_leader: ROLES.DIVISION_LEADER
+});
+
+const SAAS_ROLE_ALIASES = Object.freeze({
+  ADMIN: ROLES.ADMINISTRATOR,
+  SUPER_ADMIN: ROLES.ADMINISTRATOR,
+  RVP: ROLES.RVP,
+  DIVISION_LEADER: ROLES.DIVISION_LEADER,
+  REGIONAL_LEADER: ROLES.DIVISION_LEADER,
+  FIELD_TRAINER: ROLES.AGENT,
+  REPRESENTATIVE: ROLES.RECRUITER,
+  OPERATIONS: ROLES.OPERATIONS,
+  SUPPORT: ROLES.SUPPORT
+});
+
 export function normalizeRole(value) {
   const role = String(value || "").trim().toLowerCase();
-  return Object.values(ROLES).includes(role) ? role : ROLES.RECRUITER;
+
+  if (Object.values(ROLES).includes(role)) {
+    return role;
+  }
+
+  if (ROLE_ALIASES[role]) {
+    return ROLE_ALIASES[role];
+  }
+
+  const saasRole = String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+
+  if (SAAS_ROLE_ALIASES[saasRole]) {
+    return SAAS_ROLE_ALIASES[saasRole];
+  }
+
+  return ROLES.RECRUITER;
 }
 
 export function permissionsForRole(role) {

@@ -31,7 +31,16 @@ const LOGIN_BLOCKED_STATUSES = Object.freeze([
 
 function normalizeRole(value) {
   const role = String(value || "").trim().toLowerCase();
-  return ALL_ROLES.includes(role) ? role : null;
+
+  if (ALL_ROLES.includes(role)) {
+    return role;
+  }
+
+  if (role === "regional_leader" || role === "field_trainer") {
+    return role === "regional_leader" ? ROLES.DIVISION_LEADER : ROLES.AGENT;
+  }
+
+  return null;
 }
 
 function normalizeStatus(value) {

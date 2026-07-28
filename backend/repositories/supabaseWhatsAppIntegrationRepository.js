@@ -7,6 +7,18 @@ const { createTokenEncryption } = require("../core/meta/tokenEncryption");
 const { metaLogger } = require("../core/meta/metaLogger");
 const { assertRepositoryImplementation } = require("./metaConnectionRepositoryInterface");
 
+function isMissingWhatsAppIntegrationsTable(error) {
+  if (!error) {
+    return false;
+  }
+
+  return (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    String(error.message || "").includes("whatsapp_integrations")
+  );
+}
+
 function rowToRecord(row) {
   if (!row) {
     return null;
@@ -43,6 +55,10 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
       .maybeSingle();
 
     if (error) {
+      if (isMissingWhatsAppIntegrationsTable(error)) {
+        return null;
+      }
+
       throw error;
     }
 

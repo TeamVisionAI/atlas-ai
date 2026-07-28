@@ -66,38 +66,40 @@ function SidebarNav({
   currentUser
 }) {
   return (
-    <div className="atlas-layout__sidebar-inner">
-      <Link to="/" className="atlas-layout__public-link">
-        ← Team Vision Financial
-      </Link>
+    <>
+      <div className="atlas-layout__sidebar-header">
+        <Link to="/" className="atlas-layout__public-link">
+          ← Team Vision Financial
+        </Link>
 
-      <div className="atlas-layout__sidebar-head">
-        <h2 className="atlas-layout__brand-title">{translate("layoutAppTitle")}</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          {showCollapse ? (
-            <button
-              type="button"
-              className="atlas-layout__sidebar-collapse"
-              onClick={onCollapse}
-              aria-label={translate("layoutCollapseMenu")}
-            >
-              ←
-            </button>
-          ) : null}
-          {showClose ? (
-            <button
-              type="button"
-              className="atlas-layout__sidebar-close"
-              onClick={onClose}
-              aria-label={translate("layoutCloseMenu")}
-            >
-              ×
-            </button>
-          ) : null}
+        <div className="atlas-layout__sidebar-head">
+          <h2 className="atlas-layout__brand-title">{translate("layoutAppTitle")}</h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            {showCollapse ? (
+              <button
+                type="button"
+                className="atlas-layout__sidebar-collapse"
+                onClick={onCollapse}
+                aria-label={translate("layoutCollapseMenu")}
+              >
+                ←
+              </button>
+            ) : null}
+            {showClose ? (
+              <button
+                type="button"
+                className="atlas-layout__sidebar-close"
+                onClick={onClose}
+                aria-label={translate("layoutCloseMenu")}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <p className="atlas-layout__brand-subtitle">{translate("teamVisionRecruiting")}</p>
+        <p className="atlas-layout__brand-subtitle">{translate("teamVisionRecruiting")}</p>
+      </div>
 
       <nav className="atlas-layout__nav" aria-label={translate("layoutNavLabel")}>
         {navItems.map((item) => (
@@ -115,18 +117,20 @@ function SidebarNav({
         ))}
       </nav>
 
-      {currentUser ? (
-        <SidebarUserFooter
-          user={currentUser}
-          translate={translate}
-          language={language}
-          onToggleLanguage={toggleLanguage}
-          onNavigate={onNavigate}
-        />
-      ) : (
-        <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
-      )}
-    </div>
+      <div className="atlas-layout__sidebar-footer">
+        {currentUser ? (
+          <SidebarUserFooter
+            user={currentUser}
+            translate={translate}
+            language={language}
+            onToggleLanguage={toggleLanguage}
+            onNavigate={onNavigate}
+          />
+        ) : (
+          <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
+        )}
+      </div>
+    </>
   );
 }
 
