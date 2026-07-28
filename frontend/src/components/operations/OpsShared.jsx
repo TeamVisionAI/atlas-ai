@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 const STATUS_LABELS = {
   healthy: "Healthy",
   warning: "Warning",
-  failure: "Failure",
+  failure: "Error",
   running: "Running",
   disabled: "Disabled"
 };

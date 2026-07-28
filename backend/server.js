@@ -209,6 +209,20 @@ async function bootstrap() {
   assertProductionReadinessSync();
   await assertProductionReadinessAsync();
 
+  const { runStartupValidation } = require("./core/engineeringGuardrails");
+  const guardrailReport = await runStartupValidation({ failFast: true });
+
+  if (guardrailReport.warnings?.length) {
+    console.warn(
+      `[guardrails] Startup completed with ${guardrailReport.warnings.length} warning(s).`
+    );
+    guardrailReport.warnings.forEach((warning) => {
+      console.warn(`  - ${warning.code}: ${warning.message}`);
+    });
+  }
+
+  console.log(`✅ Engineering guardrails passed (${guardrailReport.sprint})`);
+
   registerRecruitingWorkflow({
     prospectService: prospectModule.service,
     businessEventService: businessEventModule.service,

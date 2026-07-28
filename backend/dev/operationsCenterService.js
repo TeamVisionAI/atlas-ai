@@ -457,105 +457,19 @@ async function getOperationsDashboard() {
 }
 
 async function getSystemHealth() {
+  const { evaluateGuardrailHealthCards } = require("../core/engineeringGuardrails");
   const lastCheck = new Date().toISOString();
   const readinessStartedAt = Date.now();
   const readiness = await evaluateProductionReadiness();
-  const readinessResponseTimeMs = Date.now() - readinessStartedAt;
-
-  const supabaseCheck = readiness.checks.find((check) => check.id === "supabase");
-  const whatsappWebhook = readiness.checks.find((check) => check.id === "whatsapp_webhook");
-  const whatsappSend = readiness.checks.find((check) => check.id === "whatsapp_send");
-  const googleCalendar = readiness.checks.find((check) => check.id === "google_calendar");
-  const metaEmbedded = readiness.checks.find((check) => check.id === "meta_embedded_signup");
-
-  const businessEventsProbe = await probeTable(DEV_TABLES.businessEvents);
-  const timelineProbe = await probeTable(DEV_TABLES.timelineEntries);
-  const missionControlProbe = await probeTable(DEV_TABLES.missionControlState);
-  const executiveProbe = await probeTable(DEV_TABLES.executiveState);
-
-  const projectionOk =
-    businessEventsProbe.ok && timelineProbe.ok && missionControlProbe.ok && executiveProbe.ok;
-  const whatsappOk = Boolean(whatsappWebhook?.ok && whatsappSend?.ok);
+  const cards = await evaluateGuardrailHealthCards();
 
   return {
     sprint: SPRINT_LABEL,
     lastCheck,
-    cards: [
-      {
-        id: "backend",
-        label: "Backend",
-        status: "healthy",
-        version: BACKEND_VERSION,
-        lastCheck,
-        responseTimeMs: readinessResponseTimeMs,
-        detail: "Atlas API responding"
-      },
-      {
-        id: "database",
-        label: "Database",
-        ...statusFromCheck(supabaseCheck?.ok, supabaseCheck?.detail),
-        version: "Supabase",
-        lastCheck,
-        responseTimeMs: businessEventsProbe.responseTimeMs
-      },
-      {
-        id: "business_events",
-        label: "Business Events",
-        ...statusFromCheck(businessEventsProbe.ok, businessEventsProbe.detail),
-        version: "Atlas Core",
-        lastCheck,
-        responseTimeMs: businessEventsProbe.responseTimeMs
-      },
-      {
-        id: "projection_engine",
-        label: "Projection Engine",
-        ...statusFromCheck(
-          projectionOk,
-          projectionOk ? "projections registered" : "projection tables unavailable"
-        ),
-        version: "v1",
-        lastCheck,
-        responseTimeMs: timelineProbe.responseTimeMs
-      },
-      {
-        id: "mission_control",
-        label: "Mission Control",
-        ...statusFromCheck(missionControlProbe.ok, missionControlProbe.detail),
-        version: "live",
-        lastCheck,
-        responseTimeMs: missionControlProbe.responseTimeMs
-      },
-      {
-        id: "executive_dashboard",
-        label: "Executive Dashboard",
-        ...statusFromCheck(executiveProbe.ok, executiveProbe.detail),
-        version: "live",
-        lastCheck,
-        responseTimeMs: executiveProbe.responseTimeMs
-      },
-      {
-        id: "whatsapp",
-        label: "WhatsApp",
-        status: whatsappOk ? "healthy" : whatsappWebhook?.ok || whatsappSend?.ok ? "warning" : "failure",
-        detail: [whatsappWebhook?.detail, whatsappSend?.detail].filter(Boolean).join("; "),
-        version: whatsappSend?.ok ? "configured" : "missing credentials",
-        lastCheck
-      },
-      {
-        id: "meta",
-        label: "Meta",
-        ...statusFromCheck(metaEmbedded?.ok, metaEmbedded?.detail, { critical: false }),
-        version: metaEmbedded?.ok ? "Embedded Signup" : "not configured",
-        lastCheck
-      },
-      {
-        id: "google_calendar",
-        label: "Google Calendar",
-        ...statusFromCheck(googleCalendar?.ok, googleCalendar?.detail),
-        version: googleCalendar?.ok ? "OAuth configured" : "missing vars",
-        lastCheck
-      }
-    ],
+    cards: cards.map((card) => ({
+      ...card,
+      responseTimeMs: card.id === "backend" ? Date.now() - readinessStartedAt : card.responseTimeMs
+    })),
     readiness
   };
 }
