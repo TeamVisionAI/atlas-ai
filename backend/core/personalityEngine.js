@@ -53,7 +53,9 @@ function hasPreviousPrimerica({ intent, memory, message }) {
 
 function buildOccupationAcknowledgement(occupation, language) {
   void occupation;
-  return language === "es" ? "Excelente." : "Great.";
+  return language === "es"
+    ? "Gracias por compartirlo."
+    : "Thank you for sharing that.";
 }
 
 function getPersonality({
@@ -134,7 +136,7 @@ function getPersonality({
   if (currentStep === "INTERVIEW_TYPE") {
     return {
       tone: "encouraging",
-      acknowledgement: lang === "es" ? "Perfecto." : "Great.",
+      acknowledgement: lang === "es" ? "Entendido." : "Got it.",
       transition: "",
       typingDelay: 1600,
       responseStyle: "friendly",
@@ -145,7 +147,7 @@ function getPersonality({
   if (currentStep === "SCHEDULE") {
     return {
       tone: "professional",
-      acknowledgement: lang === "es" ? "Perfecto." : "Great.",
+      acknowledgement: lang === "es" ? "Entendido." : "Got it.",
       transition: "",
       typingDelay: 1500,
       responseStyle: "professional",
@@ -167,7 +169,7 @@ function getPersonality({
   if (currentStep === "WORK_AUTHORIZATION") {
     return {
       tone: "professional",
-      acknowledgement: lang === "es" ? "Perfecto." : "Perfect.",
+      acknowledgement: lang === "es" ? "Gracias." : "Thanks.",
       transition: "",
       typingDelay: 1500,
       responseStyle: "professional",

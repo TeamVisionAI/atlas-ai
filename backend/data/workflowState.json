@@ -4896,5 +4896,16 @@
     "doNotContact": false,
     "stallEpisodeKey": "2026-07-27T03:13:55.929545+00:00",
     "reconcileEpisodeKey": null
+  },
+  "sim-ops-eceffda7": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-28T21:53:02.459Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
   }
 }

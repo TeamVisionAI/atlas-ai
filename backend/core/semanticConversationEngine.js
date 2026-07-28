@@ -43,6 +43,9 @@ const {
   buildCoverageScheduleIntro
 } = require("./conversationCopy");
 const { extractInformation } = require("./informationExtractor");
+const {
+  resolveConversationLanguage
+} = require("./conversationLanguage");
 
 const CONVERSATION_GOAL = "Schedule Interview";
 
@@ -75,18 +78,7 @@ function shouldAnswerFAQ(message) {
 }
 
 function detectLanguage(prospect, message) {
-  if (prospect?.language === "es") {
-    return "es";
-  }
-
-  const text = String(message || "").toLowerCase();
-  const spanishHints = ["hola", "gracias", "si", "sí", "vivo", "trabajo", "entrevista"];
-
-  if (spanishHints.some((hint) => text.includes(hint))) {
-    return "es";
-  }
-
-  return "en";
+  return resolveConversationLanguage(prospect, message);
 }
 
 function buildShortAcknowledgement(extracted, language) {
@@ -94,20 +86,26 @@ function buildShortAcknowledgement(extracted, language) {
     return language === "es" ? "Entendido." : "Got it.";
   }
 
+  if (extracted.occupation) {
+    return language === "es"
+      ? "Gracias por compartirlo."
+      : "Thank you for sharing that.";
+  }
+
+  if (extracted.authorization !== undefined) {
+    if (extracted.authorization === false) {
+      return language === "es" ? "Entendido." : "Got it.";
+    }
+
+    return language === "es" ? "Gracias." : "Thanks.";
+  }
+
   if (extracted.city || extracted.state) {
     return language === "es" ? "Gracias." : "Thanks.";
   }
 
-  if (extracted.authorization !== undefined) {
-    return language === "es" ? "Perfecto." : "Perfect.";
-  }
-
-  if (extracted.occupation) {
-    return language === "es" ? "Excelente." : "Great.";
-  }
-
   if (extracted.interviewType) {
-    return language === "es" ? "Perfecto." : "Great.";
+    return language === "es" ? "Entendido." : "Got it.";
   }
 
   if (extracted.email) {
@@ -369,10 +367,15 @@ async function buildSemanticReply({
   return response.text;
 }
 
-async function syncProfileToProspect(prospect, profile) {
+async function syncProfileToProspect(prospect, profile, options = {}) {
   const updates = {
     last_message: prospect.last_message
   };
+
+  if (options.language === "es" || options.language === "en") {
+    updates.language = options.language;
+    updates.communication_language = options.language;
+  }
 
   if (profile.city) {
     updates.city = profile.city;
@@ -461,7 +464,7 @@ async function handleSemanticMessage({
 
   if (rulesResult.escalation?.needsHumanCoordinator) {
     prospect.last_message = cleanMessage;
-    await syncProfileToProspect(prospect, profile);
+    await syncProfileToProspect(prospect, profile, { language });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
@@ -548,7 +551,7 @@ async function handleSemanticMessage({
   const informationalReply = faqReply || interruptionReply;
 
   prospect.last_message = cleanMessage;
-  await syncProfileToProspect(prospect, profile);
+  await syncProfileToProspect(prospect, profile, { language });
   prospect = await findProspect(phone);
   profile = buildProfileFromProspect(prospect, channel);
 
@@ -556,7 +559,7 @@ async function handleSemanticMessage({
   profile = postSyncRules.profile;
 
   if (postSyncRules.escalation?.needsHumanCoordinator) {
-    await syncProfileToProspect(prospect, profile);
+    await syncProfileToProspect(prospect, profile, { language });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     await recordLog({
@@ -576,7 +579,7 @@ async function handleSemanticMessage({
   }
 
   if (postSyncRules.profile.interviewType !== prospect.interview_type) {
-    await syncProfileToProspect(prospect, profile);
+    await syncProfileToProspect(prospect, profile, { language });
     prospect = await findProspect(phone);
     profile = buildProfileFromProspect(prospect, channel);
   }
@@ -706,7 +709,7 @@ async function handleSemanticMessage({
 
     if (emailPattern.test(email)) {
       profile.email = email;
-      await syncProfileToProspect(prospect, profile);
+      await syncProfileToProspect(prospect, profile, { language });
       prospect = await findProspect(phone);
       profile = buildProfileFromProspect(prospect, channel);
 
@@ -738,7 +741,7 @@ async function handleSemanticMessage({
     informationalReply
   });
 
-  await syncProfileToProspect(prospect, profile);
+  await syncProfileToProspect(prospect, profile, { language });
   prospect = await findProspect(phone);
 
   await recordLog({

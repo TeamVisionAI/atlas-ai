@@ -1,4 +1,4 @@
-const { isYes, isNo } = require("./languageLibrary");
+const { isYes, isNo, matchesAny } = require("./languageLibrary");
 const { detectScheduleOverride } = require("./scheduleLanguageParser");
 const { INTERVIEW_TYPES } = require("./interviewScheduling");
 
@@ -169,15 +169,33 @@ function extractLocation(message) {
   return result;
 }
 
-function extractAuthorization(message) {
-  const text = normalize(message);
+function isLikelyQuestion(message) {
+  const text = String(message || "").trim();
 
-  if (isYes(text)) {
+  if (!text) {
+    return false;
+  }
+
+  if (text.includes("?")) {
     return true;
   }
 
-  if (isNo(text)) {
-    return false;
+  return /^(what|how|when|where|why|who|is|are|can|do|does|could|would|will|cuanto|cuánto|como|cómo|que|qué)\b/i.test(
+    text
+  );
+}
+
+function extractAuthorization(message, nextField = null) {
+  const text = normalize(message);
+
+  if (nextField === "authorization") {
+    if (isYes(text)) {
+      return true;
+    }
+
+    if (isNo(text)) {
+      return false;
+    }
   }
 
   if (AUTHORIZATION_PATTERNS.some((pattern) => text.includes(pattern))) {
@@ -187,12 +205,67 @@ function extractAuthorization(message) {
   return null;
 }
 
+const UNEMPLOYED_OCCUPATION_PATTERNS = [
+  "unemployed",
+  "desempleado",
+  "desempleada",
+  "sin trabajo",
+  "sin empleo",
+  "looking for work",
+  "between jobs",
+  "out of work",
+  "not working",
+  "i'm not working",
+  "im not working",
+  "i am not working",
+  "don't work",
+  "do not work",
+  "no trabajo",
+  "no estoy trabajando",
+  "buscando empleo"
+];
+
+function normalizeOccupationStatus(text) {
+  const normalized = normalize(text);
+
+  if (matchesAny(normalized, UNEMPLOYED_OCCUPATION_PATTERNS)) {
+    return "unemployed";
+  }
+
+  if (matchesAny(normalized, ["student", "estudiante", "estudiando"])) {
+    return "Student";
+  }
+
+  if (matchesAny(normalized, ["retired", "retiree", "retirado", "retirada", "jubilado", "jubilada"])) {
+    return "Retired";
+  }
+
+  return null;
+}
+
+function isGreetingOrSmallTalk(text) {
+  const normalized = normalize(text);
+
+  return (
+    /^(hola|hello|hi|hey|buenos dias|buenas|good morning|good afternoon)\b/i.test(normalized) ||
+    /\b(información|informacion|information|team vision|quisiera|want to know|tell me about)\b/i.test(
+      normalized
+    )
+  );
+}
+
 function extractOccupation(message, existingOccupation, nextField = null) {
   if (existingOccupation) {
     return null;
   }
 
   const text = String(message || "").trim();
+  const normalized = normalize(text);
+
+  const status = normalizeOccupationStatus(text);
+  if (status) {
+    return status;
+  }
 
   for (const pattern of OCCUPATION_PATTERNS) {
     const match = text.match(pattern);
@@ -202,20 +275,20 @@ function extractOccupation(message, existingOccupation, nextField = null) {
     }
   }
 
-  const unemployedPatterns = [
-    "unemployed",
-    "desempleado",
-    "sin trabajo",
-    "looking for work",
-    "between jobs"
-  ];
-
-  if (unemployedPatterns.some((pattern) => normalize(text).includes(pattern))) {
-    return "unemployed";
-  }
-
   if (nextField === "occupation" && text && !/^(1|2)$/.test(text)) {
-    return text;
+    if (isYes(text) || isNo(text)) {
+      return null;
+    }
+
+    if (isLikelyQuestion(text) || isGreetingOrSmallTalk(text)) {
+      return null;
+    }
+
+    const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+    if (wordCount <= 4 && text.length <= 40) {
+      return trimAtClause(text);
+    }
   }
 
   return null;
@@ -296,7 +369,7 @@ function extractInformation(message, profile = {}, options = {}) {
     extracted.state = location.state;
   }
 
-  const authorization = extractAuthorization(message);
+  const authorization = extractAuthorization(message, nextField);
   if (authorization !== null && (profile.authorization === null || profile.authorization === undefined)) {
     extracted.authorization = authorization;
   }
