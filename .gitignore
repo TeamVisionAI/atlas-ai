@@ -11,6 +11,9 @@ node_modules/
 npm-debug.log*
 credentials.json
 backend/data/metaWhatsAppConnection.json
+backend/data/agentActionState.json
+backend/data/workflowState.json
+.staging-*/
 
 # Local HTTPS certificates (mkcert)
 frontend/.certs/
