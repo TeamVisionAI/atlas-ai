@@ -13,12 +13,14 @@ import {
 } from "../../services/accountService";
 import { logoutAtlasSession, storeSessionToken } from "../../services/atlasAuthService";
 import ProfilePhotoEditor from "../../components/ui/ProfilePhotoEditor";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import "./identity.css";
 
 const TABS = ["profile", "security", "sessions"];
 
 export default function MyAccount() {
   const navigate = useNavigate();
+  const { refreshUser } = useWorkspace();
   const [tab, setTab] = useState("profile");
   const [profile, setProfile] = useState(null);
   const [sessions, setSessions] = useState([]);
@@ -79,6 +81,7 @@ export default function MyAccount() {
     try {
       const result = await uploadAccountPhoto(file);
       setProfile(result.profile);
+      await refreshUser();
       setMessage("Profile photo updated.");
     } catch (uploadError) {
       setError(uploadError.message);
@@ -96,6 +99,7 @@ export default function MyAccount() {
     try {
       const result = await removeAccountPhoto();
       setProfile(result.profile);
+      await refreshUser();
       setMessage("Profile photo removed.");
     } catch (removeError) {
       setError(removeError.message);

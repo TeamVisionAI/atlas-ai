@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import UserAvatar from "./UserAvatar";
+import ProfilePhotoCropDialog from "./ProfilePhotoCropDialog";
 import "./ProfilePhotoEditor.css";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -12,6 +13,8 @@ export default function ProfilePhotoEditor({
 }) {
   const inputRef = useRef(null);
   const [localError, setLocalError] = useState("");
+  const [pendingFile, setPendingFile] = useState(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   const displayName =
     profile?.display_name ||
@@ -24,7 +27,7 @@ export default function ProfilePhotoEditor({
     inputRef.current?.click();
   }
 
-  async function handleFileChange(event) {
+  function handleFileChange(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
 
@@ -42,11 +45,29 @@ export default function ProfilePhotoEditor({
       return;
     }
 
+    setLocalError("");
+    setPendingFile(file);
+    setCropOpen(true);
+  }
+
+  function closeCropDialog() {
+    if (uploading) {
+      return;
+    }
+
+    setCropOpen(false);
+    setPendingFile(null);
+  }
+
+  async function handleCropSave(croppedFile) {
     try {
       setLocalError("");
-      await onUpload(file);
+      await onUpload(croppedFile);
+      setCropOpen(false);
+      setPendingFile(null);
     } catch (uploadError) {
       setLocalError(uploadError.message);
+      throw uploadError;
     }
   }
 
@@ -62,47 +83,57 @@ export default function ProfilePhotoEditor({
   const hasPhoto = Boolean(profile?.photo_url);
 
   return (
-    <div className="profile-photo-editor">
-      <UserAvatar
-        photoUrl={profile?.photo_url}
-        name={displayName}
-        email={profile?.email}
-        size="xl"
-      />
+    <>
+      <div className="profile-photo-editor">
+        <UserAvatar
+          photoUrl={profile?.photo_url}
+          name={displayName}
+          email={profile?.email}
+          size="xl"
+        />
 
-      <div className="profile-photo-editor__actions">
-        <button
-          type="button"
-          className="identity-button-secondary"
-          onClick={openFilePicker}
-          disabled={uploading}
-        >
-          {hasPhoto ? "Change Photo" : "Upload Photo"}
-        </button>
-
-        {hasPhoto ? (
+        <div className="profile-photo-editor__actions">
           <button
             type="button"
             className="identity-button-secondary"
-            onClick={handleRemove}
+            onClick={openFilePicker}
             disabled={uploading}
           >
-            Remove Photo
+            {hasPhoto ? "Change Photo" : "Upload Photo"}
           </button>
-        ) : null}
+
+          {hasPhoto ? (
+            <button
+              type="button"
+              className="identity-button-secondary"
+              onClick={handleRemove}
+              disabled={uploading}
+            >
+              Remove Photo
+            </button>
+          ) : null}
+        </div>
+
+        <p className="profile-photo-editor__hint">JPG, PNG, or WebP up to 5 MB.</p>
+
+        {localError ? <p className="identity-error">{localError}</p> : null}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPTED_TYPES.join(",")}
+          hidden
+          onChange={handleFileChange}
+        />
       </div>
 
-      <p className="profile-photo-editor__hint">JPG, PNG, or WebP up to 5 MB.</p>
-
-      {localError ? <p className="identity-error">{localError}</p> : null}
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED_TYPES.join(",")}
-        hidden
-        onChange={handleFileChange}
+      <ProfilePhotoCropDialog
+        file={pendingFile}
+        open={cropOpen}
+        saving={uploading}
+        onCancel={closeCropDialog}
+        onSave={handleCropSave}
       />
-    </div>
+    </>
   );
 }

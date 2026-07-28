@@ -16,6 +16,7 @@ const {
   removeProfilePhoto
 } = require("./profilePhotoService");
 const identityWriteService = require("./identityWriteService");
+const { normalizeUiLanguage } = require("../core/uiLanguage");
 
 function presentProfile(user) {
   return {
@@ -71,7 +72,13 @@ async function updateProfile(userId, input, auditMeta = {}) {
   }
 
   if (input.preferredLanguage !== undefined || input.preferred_language !== undefined) {
-    patch.preferred_language = input.preferredLanguage || input.preferred_language;
+    const normalized = normalizeUiLanguage(
+      input.preferredLanguage || input.preferred_language
+    );
+
+    if (normalized) {
+      patch.preferred_language = normalized;
+    }
   }
 
   if (input.notificationPreferences !== undefined || input.notification_preferences !== undefined) {

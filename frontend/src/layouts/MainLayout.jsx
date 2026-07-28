@@ -1,12 +1,17 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { missionControlNav, operationsCenterNavItem, adminNavItem } from "../config/missionControlNav";
 import { appPath } from "../config/appRoutes";
+import {
+  buildNavItemsForUser,
+  getDefaultLandingPath,
+  resolveWorkspaceType
+} from "../config/workspaceExperience";
+import { WorkspaceContext } from "../contexts/WorkspaceContext";
+import RequireWorkspaceAccess from "../components/RequireWorkspaceAccess";
+import SidebarUserFooter from "../components/layout/SidebarUserFooter";
 import { useLanguage } from "../i18n/LanguageContext";
 import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
-import UserAvatar from "../components/ui/UserAvatar";
-import "../components/ui/ProfilePhotoEditor.css";
 import "./MainLayout.css";
 
 function useLayoutMode() {
@@ -115,23 +120,7 @@ function SidebarNav({
       </button>
 
       {currentUser ? (
-        <Link to={appPath("my-account")} className="sidebar-user-link">
-          <UserAvatar
-            photoUrl={currentUser.photo_url}
-            name={currentUser.display_name || currentUser.first_name}
-            email={currentUser.email}
-            size="md"
-            className="user-avatar--on-dark"
-          />
-          <span className="sidebar-user-link__meta">
-            <span className="sidebar-user-link__name">
-              {currentUser.display_name ||
-                [currentUser.first_name, currentUser.last_name].filter(Boolean).join(" ") ||
-                currentUser.email}
-            </span>
-            <span className="sidebar-user-link__email">{currentUser.email}</span>
-          </span>
-        </Link>
+        <SidebarUserFooter user={currentUser} translate={translate} onNavigate={onNavigate} />
       ) : (
         <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
       )}
@@ -140,41 +129,52 @@ function SidebarNav({
 }
 
 export default function MainLayout() {
-  const { language, toggleLanguage, translate } = useLanguage();
+  const { language, toggleLanguage, translate, syncFromUser } = useLanguage();
   const location = useLocation();
   const layoutMode = useLayoutMode();
   const [phoneNavOpen, setPhoneNavOpen] = useState(false);
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
-  const [showOperationsCenter, setShowOperationsCenter] = useState(import.meta.env.DEV);
-  const [isAdministrator, setIsAdministrator] = useState(false);
+  const [operationsAllowed, setOperationsAllowed] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  const navItems = useMemo(() => {
-    let items = [...missionControlNav];
+  const navItems = useMemo(
+    () => buildNavItemsForUser(currentUser, { operationsAllowed }),
+    [currentUser, operationsAllowed]
+  );
 
-    if (isAdministrator) {
-      items = [...items, adminNavItem];
+  const refreshUser = useCallback(async () => {
+    try {
+      const user = await fetchCurrentUser();
+      setCurrentUser(user);
+      return user;
+    } catch {
+      setCurrentUser(null);
+      return null;
     }
+  }, []);
 
-    if (showOperationsCenter) {
-      items = [...items, operationsCenterNavItem];
-    }
-
-    return items;
-  }, [showOperationsCenter, isAdministrator]);
+  const workspaceValue = useMemo(
+    () => ({
+      user: currentUser,
+      operationsAllowed,
+      workspaceType: resolveWorkspaceType(currentUser?.role),
+      navItems,
+      landingPath: currentUser ? getDefaultLandingPath(currentUser.role) : appPath("login"),
+      refreshUser
+    }),
+    [currentUser, operationsAllowed, navItems, refreshUser]
+  );
 
   useEffect(() => {
     ensureAtlasSession().catch(() => {});
-    fetchCurrentUser()
-      .then((user) => {
-        setCurrentUser(user);
-        setIsAdministrator(user?.role === "administrator");
-      })
-      .catch(() => {
-        setCurrentUser(null);
-        setIsAdministrator(false);
-      });
-  }, [location.pathname]);
+    refreshUser();
+  }, [location.pathname, refreshUser]);
+
+  useEffect(() => {
+    if (currentUser) {
+      syncFromUser(currentUser);
+    }
+  }, [currentUser, syncFromUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,12 +182,12 @@ export default function MainLayout() {
     fetchOperationsAccess()
       .then((profile) => {
         if (!cancelled) {
-          setShowOperationsCenter(Boolean(profile.allowed));
+          setOperationsAllowed(Boolean(profile.allowed));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setShowOperationsCenter(false);
+          setOperationsAllowed(false);
         }
       });
 
@@ -255,51 +255,55 @@ export default function MainLayout() {
   }, []);
 
   return (
-    <div className="atlas-layout">
-      {layoutMode === "phone" && phoneNavOpen ? (
-        <button
-          type="button"
-          className="atlas-layout__backdrop"
-          aria-label={translate("layoutCloseMenu")}
-          onClick={closePhoneNav}
-        />
-      ) : null}
-
-      <aside className={sidebarClassName}>
-        <SidebarNav
-          translate={translate}
-          language={language}
-          toggleLanguage={toggleLanguage}
-          onNavigate={layoutMode === "phone" ? closePhoneNav : undefined}
-          showClose={showSidebarClose}
-          onClose={closePhoneNav}
-          showCollapse={showSidebarCollapse}
-          onCollapse={collapseTabletNav}
-          navItems={navItems}
-          currentUser={currentUser}
-        />
-      </aside>
-
-      <div className="atlas-layout__frame">
-        <header className={`atlas-layout__header${showMobileHeader ? " is-visible" : ""}`}>
+    <WorkspaceContext.Provider value={workspaceValue}>
+      <div className="atlas-layout">
+        {layoutMode === "phone" && phoneNavOpen ? (
           <button
             type="button"
-            className="atlas-layout__menu-button"
-            aria-label={translate("layoutOpenMenu")}
-            aria-expanded={layoutMode === "phone" ? phoneNavOpen : !tabletNavCollapsed}
-            onClick={openNav}
-          >
-            ☰
-          </button>
-          <span className="atlas-layout__header-title">{translate("layoutAppTitle")}</span>
-        </header>
+            className="atlas-layout__backdrop"
+            aria-label={translate("layoutCloseMenu")}
+            onClick={closePhoneNav}
+          />
+        ) : null}
 
-        <main className="atlas-layout__main">
-          <div className="atlas-layout__content">
-            <Outlet />
-          </div>
-        </main>
+        <aside className={sidebarClassName}>
+          <SidebarNav
+            translate={translate}
+            language={language}
+            toggleLanguage={toggleLanguage}
+            onNavigate={layoutMode === "phone" ? closePhoneNav : undefined}
+            showClose={showSidebarClose}
+            onClose={closePhoneNav}
+            showCollapse={showSidebarCollapse}
+            onCollapse={collapseTabletNav}
+            navItems={navItems}
+            currentUser={currentUser}
+          />
+        </aside>
+
+        <div className="atlas-layout__frame">
+          <header className={`atlas-layout__header${showMobileHeader ? " is-visible" : ""}`}>
+            <button
+              type="button"
+              className="atlas-layout__menu-button"
+              aria-label={translate("layoutOpenMenu")}
+              aria-expanded={layoutMode === "phone" ? phoneNavOpen : !tabletNavCollapsed}
+              onClick={openNav}
+            >
+              ☰
+            </button>
+            <span className="atlas-layout__header-title">{translate("layoutAppTitle")}</span>
+          </header>
+
+          <main className="atlas-layout__main">
+            <div className="atlas-layout__content">
+              <RequireWorkspaceAccess>
+                <Outlet />
+              </RequireWorkspaceAccess>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </WorkspaceContext.Provider>
   );
 }

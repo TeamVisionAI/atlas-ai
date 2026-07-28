@@ -15,7 +15,6 @@ const NAV_ITEMS = [
     icon: "organization",
     end: false
   },
-  { to: appPath("settings/whatsapp"), label: SETTINGS_SECTIONS.whatsapp, icon: "whatsapp", end: false },
   {
     to: appPath("settings/scheduling"),
     label: SETTINGS_SECTIONS.scheduling,

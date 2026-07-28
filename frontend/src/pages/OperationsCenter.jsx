@@ -7,6 +7,7 @@ import {
   operationsCenterPath
 } from "../config/operationsCenterNav";
 import { appPath } from "../config/appRoutes";
+import ForbiddenPage from "./ForbiddenPage";
 import {
   OpsEmptyState,
   OpsErrorState,
@@ -795,7 +796,7 @@ export default function OperationsCenter() {
   }
 
   if (!allowed) {
-    return null;
+    return <ForbiddenPage routeKey="operations-center" />;
   }
 
   return <OperationsCenterLayout t={t} />;

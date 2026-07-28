@@ -1,26 +1,42 @@
 /**
- * Sprint 6.1 — Meta WhatsApp connection repository facade.
- * Swap implementation here when moving to Supabase (production).
+ * Sprint 20.1 — WhatsApp integration repository facade.
+ * Uses Supabase when service role is configured; JSON file fallback for local dev.
  */
 
-const { createJsonMetaWhatsAppConnectionRepository, STORE_FILE } = require("./jsonMetaWhatsAppConnectionRepository");
+const {
+  createJsonMetaWhatsAppConnectionRepository,
+  STORE_FILE
+} = require("./jsonMetaWhatsAppConnectionRepository");
+const {
+  createSupabaseWhatsAppIntegrationRepository
+} = require("./supabaseWhatsAppIntegrationRepository");
 const {
   toSafeConnection,
   assertRepositoryImplementation
 } = require("./metaConnectionRepositoryInterface");
 
-const repository = createJsonMetaWhatsAppConnectionRepository();
+function createWhatsAppIntegrationRepository() {
+  if (process.env.WHATSAPP_REPOSITORY === "json") {
+    return createJsonMetaWhatsAppConnectionRepository();
+  }
+
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createSupabaseWhatsAppIntegrationRepository();
+  }
+
+  return createJsonMetaWhatsAppConnectionRepository();
+}
+
+const repository = createWhatsAppIntegrationRepository();
 
 assertRepositoryImplementation(repository);
 
-/** @deprecated Use repository.saveConnection */
-async function saveWhatsAppConnection(record) {
-  return repository.saveConnection(record);
+async function saveWhatsAppConnection(organizationId, record) {
+  return repository.saveConnection(organizationId, record);
 }
 
-/** @deprecated Use repository.getConnection */
-async function getWhatsAppConnection() {
-  return repository.getConnection();
+async function getWhatsAppConnection(organizationId) {
+  return repository.getConnection(organizationId);
 }
 
 module.exports = {

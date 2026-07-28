@@ -310,7 +310,8 @@
   /* Full-bleed pages manage their own surfaces */
   .atlas-layout__content:has(.mission-control-page),
   .atlas-layout__content:has(.prospect-workspace),
-  .atlas-layout__content:has(.executive-dashboard) {
+  .atlas-layout__content:has(.executive-dashboard),
+  .atlas-layout__content:has(.workspace-dashboard) {
     background: transparent;
     border: none;
     box-shadow: none;

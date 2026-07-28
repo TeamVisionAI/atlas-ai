@@ -8,6 +8,8 @@ import ProspectCenter from "./pages/ProspectCenter";
 import ConfigurationLayout from "./pages/configuration/ConfigurationLayout";
 import ConfigurationHub from "./pages/configuration/ConfigurationHub";
 import WhatsAppConnect from "./pages/WhatsAppConnect";
+import WhatsAppConnectSuccess from "./pages/WhatsAppConnectSuccess";
+import WhatsAppConnectError from "./pages/WhatsAppConnectError";
 import QuickCapture from "./pages/QuickCapture";
 import KnowledgeHub from "./pages/KnowledgeHub";
 import OperationsCenter from "./pages/OperationsCenter";
@@ -20,6 +22,9 @@ import MyAccount from "./pages/identity/MyAccount";
 import SetupWizard from "./pages/identity/SetupWizard";
 import RequireSetupComplete from "./components/RequireSetupComplete";
 import RequireAuth from "./components/RequireAuth";
+import { WorkspaceLandingRedirect } from "./components/RequireWorkspaceAccess";
+import MyDashboard from "./pages/MyDashboard";
+import TeamDashboard from "./pages/TeamDashboard";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import Prospect from "./pages/Prospect";
@@ -88,7 +93,10 @@ export default function App() {
           </RequireSetupComplete>
         }
       >
-        <Route index element={<ExecutiveDashboard />} />
+        <Route index element={<WorkspaceLandingRedirect />} />
+        <Route path="executive-dashboard" element={<ExecutiveDashboard />} />
+        <Route path="my-dashboard" element={<MyDashboard />} />
+        <Route path="team-dashboard" element={<TeamDashboard />} />
         <Route path="mission-control" element={<Dashboard />} />
         <Route path="prospect-workspace/:phone" element={<ProspectWorkspace />} />
         <Route path="prospect-center" element={<ProspectCenter />} />
@@ -123,11 +131,31 @@ export default function App() {
             />
           }
         />
+        <Route
+          path="production"
+          element={
+            <PlaceholderPage
+              titleKey="placeholderProductionTitle"
+              descriptionKey="placeholderProductionDescription"
+            />
+          }
+        />
+        <Route
+          path="recruiting"
+          element={
+            <PlaceholderPage
+              titleKey="placeholderRecruitingTitle"
+              descriptionKey="placeholderRecruitingDescription"
+            />
+          }
+        />
         <Route path="settings" element={<ConfigurationLayout />}>
           <Route index element={<ConfigurationHub />} />
           <Route path="profile" element={<ProfileConfiguration />} />
           <Route path="organization" element={<OrganizationConfiguration />} />
           <Route path="whatsapp" element={<WhatsAppConnect />} />
+          <Route path="whatsapp/success" element={<WhatsAppConnectSuccess />} />
+          <Route path="whatsapp/error" element={<WhatsAppConnectError />} />
           <Route path="scheduling" element={<SchedulingConfiguration />} />
           <Route path="appointments" element={<AppointmentSettings />} />
         </Route>

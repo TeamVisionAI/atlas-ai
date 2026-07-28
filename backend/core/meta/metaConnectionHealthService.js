@@ -1,5 +1,5 @@
 /**
- * Sprint 6.1 — Live health checks for stored Meta WhatsApp connection.
+ * Sprint 20.1 — Live health checks for org-scoped WhatsApp integration.
  */
 
 const axios = require("axios");
@@ -54,24 +54,25 @@ async function verifyWabaSubscription(wabaId, accessToken) {
 }
 
 /**
+ * @param {string} organizationId
  * @param {{ persist?: boolean }} [options]
  */
-async function checkMetaConnectionHealth(options = {}) {
-  const connection = await repository.getConnection();
+async function checkMetaConnectionHealth(organizationId, options = {}) {
+  const connection = await repository.getConnection(organizationId);
 
-  if (!connection) {
+  if (!connection || connection.status !== "connected") {
     return buildHealthResult({
       status: "disconnected",
       healthy: false,
-      connection: null,
+      connection: toSafeConnection(connection),
       checks: {
-        repository: "missing"
+        repository: connection ? "not_connected" : "missing"
       },
-      message: "No WhatsApp Business App connection stored."
+      message: "No connected WhatsApp Business account for this organization."
     });
   }
 
-  const accessToken = await repository.getDecryptedAccessToken();
+  const accessToken = await repository.getDecryptedAccessToken(organizationId);
 
   if (!accessToken) {
     return buildHealthResult({
@@ -91,17 +92,19 @@ async function checkMetaConnectionHealth(options = {}) {
 
     const healthy = Boolean(phone?.id && subscription.subscribed);
     const status = healthy ? "healthy" : "degraded";
+    const now = new Date().toISOString();
 
     if (options.persist !== false) {
-      await repository.updateConnection({
+      await repository.updateConnection(organizationId, {
         last_health_status: status,
-        last_health_checked_at: new Date().toISOString(),
+        last_health_checked_at: now,
         display_phone_number: phone.display_phone_number || connection.display_phone_number,
-        verified_name: phone.verified_name || connection.verified_name
+        business_name: phone.verified_name || connection.business_name
       });
     }
 
     metaLogger.info("connection_health_checked", {
+      organizationId,
       wabaId: connection.waba_id,
       phoneNumberId: connection.phone_number_id,
       status,
@@ -114,9 +117,9 @@ async function checkMetaConnectionHealth(options = {}) {
       connection: toSafeConnection({
         ...connection,
         last_health_status: status,
-        last_health_checked_at: new Date().toISOString(),
+        last_health_checked_at: now,
         display_phone_number: phone.display_phone_number || connection.display_phone_number,
-        verified_name: phone.verified_name || connection.verified_name
+        business_name: phone.verified_name || connection.business_name
       }),
       checks: {
         phoneNumberReachable: Boolean(phone?.id),
@@ -124,22 +127,24 @@ async function checkMetaConnectionHealth(options = {}) {
         subscribedAppCount: subscription.appCount
       },
       message: healthy
-        ? "WhatsApp Business App connection is healthy."
+        ? "WhatsApp Business connection is healthy."
         : "Connection stored but Meta health checks reported degradation."
     });
   } catch (error) {
     metaLogger.error("connection_health_failed", {
+      organizationId,
       wabaId: connection.waba_id,
       phoneNumberId: connection.phone_number_id,
       message: error.response?.data?.error?.message || error.message
     });
 
     const status = "unhealthy";
+    const now = new Date().toISOString();
 
     if (options.persist !== false) {
-      await repository.updateConnection({
+      await repository.updateConnection(organizationId, {
         last_health_status: status,
-        last_health_checked_at: new Date().toISOString()
+        last_health_checked_at: now
       });
     }
 
@@ -149,7 +154,7 @@ async function checkMetaConnectionHealth(options = {}) {
       connection: toSafeConnection({
         ...connection,
         last_health_status: status,
-        last_health_checked_at: new Date().toISOString()
+        last_health_checked_at: now
       }),
       checks: {
         phoneNumberReachable: false,
@@ -160,8 +165,8 @@ async function checkMetaConnectionHealth(options = {}) {
   }
 }
 
-async function getCachedConnectionStatus() {
-  const connection = await repository.getConnection();
+async function getCachedConnectionStatus(organizationId) {
+  const connection = await repository.getConnection(organizationId);
 
   return {
     connected: Boolean(connection && connection.status === "connected"),

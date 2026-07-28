@@ -1,0 +1,151 @@
+.profile-photo-crop-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.profile-photo-crop-dialog__panel {
+  width: min(520px, 100%);
+  max-height: min(92svh, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+
+.profile-photo-crop-dialog__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.profile-photo-crop-dialog__header h2 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+.profile-photo-crop-dialog__header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.profile-photo-crop-dialog__close {
+  appearance: none;
+  border: none;
+  background: #f1f5f9;
+  color: #334155;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.profile-photo-crop-dialog__close:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-photo-crop-dialog__crop-area {
+  position: relative;
+  width: 100%;
+  height: min(62vw, 360px);
+  min-height: 280px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.profile-photo-crop-dialog__controls {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.profile-photo-crop-dialog__zoom-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.profile-photo-crop-dialog__zoom {
+  width: 100%;
+  accent-color: #172554;
+}
+
+.profile-photo-crop-dialog__reset {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.profile-photo-crop-dialog__reset:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-photo-crop-dialog__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+.profile-photo-crop-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .profile-photo-crop-dialog {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .profile-photo-crop-dialog__panel {
+    width: 100%;
+    max-height: 100svh;
+    min-height: 100svh;
+    border-radius: 0;
+    padding: 16px;
+  }
+
+  .profile-photo-crop-dialog__crop-area {
+    min-height: 320px;
+    height: 48svh;
+  }
+
+  .profile-photo-crop-dialog__actions {
+    margin-top: auto;
+  }
+
+  .profile-photo-crop-dialog__actions .identity-button,
+  .profile-photo-crop-dialog__actions .identity-button-secondary {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
+}

@@ -465,3 +465,151 @@
   color: var(--config-text-muted);
   font-size: 0.875rem;
 }
+
+.configuration-integrations-intro {
+  margin: 0 0 1.25rem;
+  color: var(--config-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  max-width: 42rem;
+}
+
+.configuration-content--integrations {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 960px) {
+  .configuration-content--integrations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+.integration-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--config-surface);
+  border: 1px solid var(--config-border);
+  border-radius: var(--config-radius);
+  box-shadow: var(--config-shadow);
+}
+
+.integration-card__header {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+}
+
+.integration-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(30, 58, 138, 0.08);
+  color: var(--config-accent);
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
+
+.integration-card__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--config-text);
+}
+
+.integration-card__subtitle {
+  margin: 0;
+  color: var(--config-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.integration-card__meta {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.integration-card__meta-row dt,
+.integration-card__technical-panel dt {
+  margin: 0 0 0.15rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--config-text-muted);
+}
+
+.integration-card__meta-row dd,
+.integration-card__technical-panel dd {
+  margin: 0;
+  color: var(--config-text);
+  font-size: 0.9375rem;
+  word-break: break-word;
+}
+
+.integration-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.integration-status-badge--connected {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.integration-status-badge--connected::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.integration-status-badge--disconnected {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.integration-card__technical-toggle {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--config-accent);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.integration-card__technical-panel {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.5rem 0 0;
+  padding: 0.875rem;
+  border-radius: var(--config-radius-sm);
+  background: var(--config-surface-muted);
+  border: 1px solid var(--config-border);
+}
+
+.integration-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 0.25rem;
+}
+
+.integration-card__calendar-select {
+  margin-top: 0.25rem;
+  max-width: none;
+}

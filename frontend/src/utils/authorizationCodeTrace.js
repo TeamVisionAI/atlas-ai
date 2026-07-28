@@ -32,11 +32,13 @@ export async function fingerprintAuthorizationCode(code) {
 export async function logAuthorizationCodeTrace(debugLabel, stage, code, extra = {}) {
   const trace = await fingerprintAuthorizationCode(code);
 
-  console.log(debugLabel, "authorization_code_trace", {
-    stage,
-    ...trace,
-    ...extra
-  });
+  if (import.meta.env.DEV) {
+    console.log(debugLabel, "authorization_code_trace", {
+      stage,
+      ...trace,
+      ...extra
+    });
+  }
 
   return trace;
 }

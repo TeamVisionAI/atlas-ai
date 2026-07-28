@@ -1,5 +1,5 @@
 /**
- * Sprint 6 / 6.1 — Meta Embedded Signup API routes (thin layer).
+ * Sprint 20.1 — Meta Embedded Signup API routes (org-scoped).
  */
 
 const express = require("express");
@@ -17,14 +17,26 @@ const {
   traceAuthorizationCode
 } = require("../core/meta/authorizationCodeTrace");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const whatsappIntegrationService = require("../services/whatsappIntegrationService");
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
 
+function auditMeta(req) {
+  return {
+    userId: req.authContext?.userId,
+    userEmail: req.authContext?.email,
+    organizationId: req.authContext?.organizationId,
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent")
+  };
+}
+
 router.get("/embedded-signup/status", async (req, res) => {
   try {
-    const payload = await getEmbeddedSignupStatus();
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
+    const payload = await getEmbeddedSignupStatus(organizationId);
     res.json(payload);
   } catch (error) {
     metaLogger.error("embedded_signup_status_failed", { message: error.message });
@@ -34,11 +46,27 @@ router.get("/embedded-signup/status", async (req, res) => {
 
 router.get("/embedded-signup/health", async (req, res) => {
   try {
-    const payload = await checkMetaConnectionHealth();
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
+    const payload = await checkMetaConnectionHealth(organizationId);
     res.json(payload);
   } catch (error) {
     metaLogger.error("embedded_signup_health_failed", { message: error.message });
     res.status(500).json({ error: "Failed to check WhatsApp connection health." });
+  }
+});
+
+router.post("/embedded-signup/disconnect", async (req, res) => {
+  try {
+    const result = await whatsappIntegrationService.disconnectIntegration(
+      req.authContext,
+      auditMeta(req)
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "DISCONNECT_FAILED",
+      message: error.message || "Unable to disconnect WhatsApp integration."
+    });
   }
 });
 
@@ -87,7 +115,10 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       });
     }
 
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
+
     const result = await completeEmbeddedSignupExchange({
+      organizationId,
       code,
       wabaId,
       phoneNumberId,

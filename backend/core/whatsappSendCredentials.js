@@ -1,9 +1,10 @@
 /**
  * Resolves WhatsApp Cloud API send credentials for production.
- * Prefers Embedded Signup stored connection; falls back to WHATSAPP_* env vars.
+ * Prefers org-scoped Embedded Signup connection; falls back to WHATSAPP_* env vars.
  */
 
 const { repository } = require("../repositories/metaWhatsAppConnectionRepository");
+const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { getMetaGraphApiVersion } = require("./meta/metaGraphApiVersion");
 
@@ -28,26 +29,31 @@ function envCredentials() {
 }
 
 /**
+ * @param {string|null} [organizationId]
  * @returns {Promise<{ accessToken: string, phoneNumberId: string, graphApiVersion: string, source: string }|null>}
  */
-async function resolveWhatsAppSendCredentials() {
-  try {
-    const connection = await repository.getConnection();
-    const accessToken = await repository.getDecryptedAccessToken();
+async function resolveWhatsAppSendCredentials(organizationId = null) {
+  const orgId = organizationId || process.env.DEFAULT_ORGANIZATION_ID || DEFAULT_ORGANIZATION_ID;
 
-    if (accessToken && connection?.phone_number_id) {
+  try {
+    const connection = await repository.getConnection(orgId);
+    const accessToken = await repository.getDecryptedAccessToken(orgId);
+
+    if (accessToken && connection?.phone_number_id && connection.status === "connected") {
       return {
         accessToken,
         phoneNumberId: connection.phone_number_id,
         graphApiVersion: graphApiVersion(),
         source: "embedded_signup",
-        wabaId: connection.waba_id || null
+        wabaId: connection.waba_id || null,
+        organizationId: orgId
       };
     }
   } catch (error) {
     logWhatsAppStage("send_credentials_repository_error", {
       level: "error",
-      error: error.message
+      error: error.message,
+      organizationId: orgId
     });
   }
 

@@ -17,12 +17,6 @@ const HUB_SECTIONS = [
     icon: "organization"
   },
   {
-    to: appPath("settings/whatsapp"),
-    title: SETTINGS_SECTIONS.whatsapp,
-    descriptionKey: "configurationHubWhatsAppDescription",
-    icon: "whatsapp"
-  },
-  {
     to: appPath("settings/scheduling"),
     title: SETTINGS_SECTIONS.scheduling,
     descriptionKey: "configurationHubSchedulingDescription",

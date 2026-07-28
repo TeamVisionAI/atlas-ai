@@ -43,6 +43,13 @@ const ICONS = {
       <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
       <path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
+  ),
+  calendar: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M8 14h2v2H8v-2Zm4 0h2v2h-2v-2Z" fill="currentColor" />
+    </svg>
   )
 };
 

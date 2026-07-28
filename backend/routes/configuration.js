@@ -8,7 +8,7 @@ const organizationService = require("../services/organizationService");
 const organizationIntegrationService = require("../services/organizationIntegrationService");
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
 const meetingManagementService = require("../services/meetingManagementService");
-const { getEmbeddedSignupStatus } = require("../core/metaEmbeddedSignupService");
+const whatsappIntegrationService = require("../services/whatsappIntegrationService");
 const { checkMetaConnectionHealth } = require("../core/meta/metaConnectionHealthService");
 const { protectedRoute } = require("../middleware/protectedRoute");
 const { requirePermission } = require("../middleware/requirePermission");
@@ -108,20 +108,26 @@ router.get("/organization/levels", (_req, res) => {
   res.json({ levels: ORGANIZATION_LEVEL_VALUES });
 });
 
-router.get("/whatsapp", async (_req, res) => {
+router.get("/whatsapp", protectedRoute, async (req, res) => {
   try {
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
     const [status, health] = await Promise.all([
-      getEmbeddedSignupStatus(),
-      checkMetaConnectionHealth()
+      whatsappIntegrationService.getIntegrationStatusForOrganization(organizationId),
+      checkMetaConnectionHealth(organizationId, { persist: false })
     ]);
 
+    const connection = status.connection;
+
     res.json({
-      connectionStatus: health?.status || status?.status || "disconnected",
-      businessPhone: status?.displayPhoneNumber || status?.phoneNumber || null,
-      phoneNumberId: status?.phoneNumberId || null,
-      wabaId: status?.wabaId || null,
-      lastSync: status?.lastSync || health?.checkedAt || null,
-      connected: Boolean(status?.connected || status?.phoneNumberId)
+      connected: status.connected,
+      connectionStatus: health?.status || connection?.healthStatus || status.status,
+      businessPhone: connection?.displayPhoneNumber || null,
+      businessName: connection?.businessName || null,
+      businessId: connection?.businessId || null,
+      phoneNumberId: connection?.phoneNumberId || null,
+      wabaId: connection?.wabaId || null,
+      connectedAt: connection?.connectedAt || null,
+      lastSync: connection?.lastSyncAt || health?.checkedAt || null
     });
   } catch (error) {
     res.status(500).json({ error: error.message || "WHATSAPP_STATUS_UNAVAILABLE" });

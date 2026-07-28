@@ -1,14 +1,74 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { updateAccountProfile } from "../services/accountService";
+import { getStoredSessionToken } from "../services/atlasAuthService";
+import {
+  normalizeUiLanguage,
+  resolveUiLanguage,
+  SYSTEM_DEFAULT_LANGUAGE
+} from "./languagePreference";
 import { translations } from "./translations";
 import { interpolate } from "./translate";
 
 const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState("es");
+  const [language, setLanguageState] = useState(SYSTEM_DEFAULT_LANGUAGE);
+  const organizationDefaultRef = useRef(null);
+
+  const applyLanguage = useCallback((code) => {
+    const normalized = normalizeUiLanguage(code) || SYSTEM_DEFAULT_LANGUAGE;
+    setLanguageState(normalized);
+    return normalized;
+  }, []);
+
+  const syncFromUser = useCallback(
+    (user, { organizationDefault } = {}) => {
+      if (organizationDefault !== undefined) {
+        organizationDefaultRef.current = organizationDefault;
+      }
+
+      const resolved = resolveUiLanguage({
+        userPreference: user?.preferred_language,
+        organizationDefault: organizationDefaultRef.current
+      });
+
+      applyLanguage(resolved);
+      return resolved;
+    },
+    [applyLanguage]
+  );
+
+  const persistLanguagePreference = useCallback(async (code) => {
+    const normalized = normalizeUiLanguage(code);
+
+    if (!normalized || !getStoredSessionToken()) {
+      return normalized;
+    }
+
+    try {
+      await updateAccountProfile({ preferred_language: normalized });
+    } catch (error) {
+      console.warn("[language] Unable to persist user preference", error);
+    }
+
+    return normalized;
+  }, []);
+
+  const setLanguagePreference = useCallback(
+    async (code, { persist = false } = {}) => {
+      const normalized = applyLanguage(code);
+
+      if (persist) {
+        await persistLanguagePreference(normalized);
+      }
+
+      return normalized;
+    },
+    [applyLanguage, persistLanguagePreference]
+  );
 
   const value = useMemo(() => {
-    const catalog = translations[language] || translations.es;
+    const catalog = translations[language] || translations.en;
 
     function translate(key, params) {
       const template = catalog[key] ?? translations.en[key] ?? key;
@@ -17,14 +77,17 @@ export function LanguageProvider({ children }) {
 
     return {
       language,
-      setLanguage,
+      setLanguage: applyLanguage,
+      setLanguagePreference,
+      syncFromUser,
       toggleLanguage() {
-        setLanguage((current) => (current === "es" ? "en" : "es"));
+        const nextLanguage = language === "es" ? "en" : "es";
+        void setLanguagePreference(nextLanguage, { persist: true });
       },
       t: catalog,
       translate
     };
-  }, [language]);
+  }, [language, applyLanguage, setLanguagePreference, syncFromUser]);
 
   return (
     <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>

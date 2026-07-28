@@ -11,7 +11,6 @@ const {
 } = require("./metaEmbeddedSignupRateLimit");
 const { metaLogger } = require("./meta/metaLogger");
 const { validateMetaEmbeddedSignupEnvironment } = require("./meta/metaEnvironmentValidator");
-const { getCachedConnectionStatus } = require("./meta/metaConnectionHealthService");
 const { getMetaGraphApiVersion } = require("./meta/metaGraphApiVersion");
 const {
   compareAuthorizationCodes,
@@ -269,19 +268,23 @@ async function discoverWhatsAppAssets(accessToken) {
 
       if (phoneNumbers.length) {
         return {
+          businessId: business.id || null,
           wabaId: waba.id,
           phoneNumberId: phoneNumbers[0].id,
           displayPhoneNumber: phoneNumbers[0].display_phone_number || null,
-          verifiedName: phoneNumbers[0].verified_name || waba.name || null
+          verifiedName: phoneNumbers[0].verified_name || waba.name || null,
+          businessName: waba.name || business.name || phoneNumbers[0].verified_name || null
         };
       }
 
       if (waba.id) {
         return {
+          businessId: business.id || null,
           wabaId: waba.id,
           phoneNumberId: null,
           displayPhoneNumber: null,
-          verifiedName: waba.name || null
+          verifiedName: waba.name || null,
+          businessName: waba.name || business.name || null
         };
       }
     }
@@ -308,13 +311,16 @@ async function subscribeWabaToApp(wabaId, accessToken) {
 }
 
 async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId }) {
+  let resolvedBusinessId = null;
   let resolvedWabaId = wabaId || null;
   let resolvedPhoneNumberId = phoneNumberId || null;
   let displayPhoneNumber = null;
   let verifiedName = null;
+  let businessName = null;
 
   if (resolvedWabaId) {
-    await fetchWabaDetails(resolvedWabaId, accessToken);
+    const wabaDetails = await fetchWabaDetails(resolvedWabaId, accessToken);
+    businessName = wabaDetails?.name || businessName;
   }
 
   if (resolvedPhoneNumberId) {
@@ -322,16 +328,19 @@ async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId }) {
     resolvedPhoneNumberId = phone.id;
     displayPhoneNumber = phone.display_phone_number || null;
     verifiedName = phone.verified_name || null;
+    businessName = businessName || phone.verified_name || null;
   }
 
   if (!resolvedWabaId || !resolvedPhoneNumberId) {
     const discovered = await discoverWhatsAppAssets(accessToken);
 
     if (discovered) {
+      resolvedBusinessId = discovered.businessId || resolvedBusinessId;
       resolvedWabaId = resolvedWabaId || discovered.wabaId;
       resolvedPhoneNumberId = resolvedPhoneNumberId || discovered.phoneNumberId;
       displayPhoneNumber = displayPhoneNumber || discovered.displayPhoneNumber;
       verifiedName = verifiedName || discovered.verifiedName;
+      businessName = businessName || discovered.businessName || discovered.verifiedName;
     }
   }
 
@@ -348,17 +357,27 @@ async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId }) {
   }
 
   return {
+    businessId: resolvedBusinessId,
     wabaId: resolvedWabaId,
     phoneNumberId: resolvedPhoneNumberId,
     displayPhoneNumber,
-    verifiedName
+    verifiedName,
+    businessName: businessName || verifiedName || null
   };
 }
 
 /**
- * @param {{ code: string, wabaId?: string, phoneNumberId?: string, onboardingType?: string }} input
+ * @param {{ organizationId: string, code: string, wabaId?: string, phoneNumberId?: string, onboardingType?: string }} input
  */
 async function completeEmbeddedSignupExchange(input) {
+  const organizationId = String(input.organizationId || "").trim();
+
+  if (!organizationId) {
+    throw Object.assign(new Error("Organization context is required."), {
+      statusCode: 400,
+      publicCode: "ORGANIZATION_REQUIRED"
+    });
+  }
   const rawCode = String(input.code || "");
   const code = rawCode.trim();
   const trimComparison = compareAuthorizationCodes(rawCode, code, "service_trim");
@@ -436,18 +455,23 @@ async function completeEmbeddedSignupExchange(input) {
   }
 
   let saved;
+  const now = new Date().toISOString();
 
   try {
-    saved = await repository.saveConnection({
+    saved = await repository.saveConnection(organizationId, {
+      business_id: assets.businessId,
       waba_id: assets.wabaId,
       phone_number_id: assets.phoneNumberId,
       connection_type: input.onboardingType || "whatsapp_business_app",
       status: "connected",
       access_token: accessToken,
       display_phone_number: assets.displayPhoneNumber,
+      business_name: assets.businessName,
       verified_name: assets.verifiedName,
       last_health_status: "healthy",
-      last_health_checked_at: new Date().toISOString()
+      last_health_checked_at: now,
+      connected_at: now,
+      last_sync_at: now
     });
   } catch (error) {
     logCompletionStageFailure(COMPLETION_STAGES.SAVE_FAILED, {
@@ -471,8 +495,14 @@ async function completeEmbeddedSignupExchange(input) {
   };
 }
 
-async function getEmbeddedSignupStatus() {
-  return getCachedConnectionStatus();
+async function getEmbeddedSignupStatus(organizationId) {
+  const connection = await repository.getConnection(organizationId);
+
+  return {
+    connected: Boolean(connection && connection.status === "connected"),
+    connection: toSafeConnection(connection),
+    storageKind: repository.getStorageKind()
+  };
 }
 
 module.exports = {

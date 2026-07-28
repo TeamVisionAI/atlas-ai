@@ -9,7 +9,7 @@ const { writeAuditLog } = require("../security/auditLogService");
 const identityWriteService = require("./identityWriteService");
 
 const AVATAR_BUCKET = "avatars";
-const AVATAR_SIZE_PX = 256;
+const AVATAR_SIZE_PX = 512;
 const WEBP_QUALITY = 82;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -44,14 +44,21 @@ function extractStoragePathFromUrl(photoUrl) {
 }
 
 async function optimizeProfilePhoto(buffer) {
-  return sharp(buffer)
+  const metadata = await sharp(buffer).rotate().metadata();
+  const hasAlpha = Boolean(metadata.hasAlpha);
+
+  const resized = sharp(buffer)
     .rotate()
     .resize(AVATAR_SIZE_PX, AVATAR_SIZE_PX, {
-      fit: "cover",
-      position: "centre"
-    })
-    .webp({ quality: WEBP_QUALITY })
-    .toBuffer();
+      fit: "fill",
+      withoutEnlargement: false
+    });
+
+  if (hasAlpha) {
+    return resized.webp({ quality: WEBP_QUALITY, alphaQuality: 100 }).toBuffer();
+  }
+
+  return resized.webp({ quality: WEBP_QUALITY }).toBuffer();
 }
 
 async function ensureAvatarBucket() {

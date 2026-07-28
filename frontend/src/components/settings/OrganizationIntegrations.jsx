@@ -4,6 +4,8 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
 import AtlasButton from "../../components/ui/AtlasButton";
+import SettingsIcon from "../../components/icons/SettingsIcons";
+import WhatsAppIntegrationCard from "../../components/settings/WhatsAppIntegrationCard";
 import {
   disconnectGoogleCalendar,
   fetchGoogleCalendarAuthUrl,
@@ -11,6 +13,7 @@ import {
   fetchOrganizationIntegrations,
   selectGoogleCalendar
 } from "../../services/configurationService";
+import { disconnectWhatsAppIntegration } from "../../services/metaEmbeddedSignupService";
 
 export default function OrganizationIntegrations() {
   const { translate } = useLanguage();
@@ -38,11 +41,12 @@ export default function OrganizationIntegrations() {
   }, []);
 
   useEffect(() => {
-    load().catch((loadError) => setError(loadError.message));
-  }, [load]);
+    load().catch(() => setError(translate("configurationLoadFailed")));
+  }, [load, translate]);
 
   useEffect(() => {
     const googleStatus = searchParams.get("google");
+    const whatsappStatus = searchParams.get("whatsapp");
 
     if (googleStatus === "connected") {
       setMessage(translate("configurationGoogleConnected"));
@@ -54,6 +58,12 @@ export default function OrganizationIntegrations() {
       setError(translate("configurationGoogleConnectFailed"));
       setSearchParams({}, { replace: true });
     }
+
+    if (whatsappStatus === "connected") {
+      setMessage(translate("whatsappSuccessTitle"));
+      setSearchParams({}, { replace: true });
+      load().catch(() => {});
+    }
   }, [load, searchParams, setSearchParams, translate]);
 
   async function connectGoogle() {
@@ -64,8 +74,8 @@ export default function OrganizationIntegrations() {
     try {
       const result = await fetchGoogleCalendarAuthUrl("settings/organization");
       window.location.href = result.url;
-    } catch (connectError) {
-      setError(connectError.message);
+    } catch {
+      setError(translate("configurationGoogleConnectFailed"));
       setBusy(false);
     }
   }
@@ -80,8 +90,24 @@ export default function OrganizationIntegrations() {
       setCalendars([]);
       setMessage(translate("configurationGoogleDisconnected"));
       await load();
-    } catch (disconnectError) {
-      setError(disconnectError.message);
+    } catch {
+      setError(translate("configurationGoogleConnectFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDisconnectWhatsApp() {
+    setError("");
+    setMessage("");
+    setBusy(true);
+
+    try {
+      await disconnectWhatsAppIntegration();
+      setMessage(translate("whatsappIntegrationDisconnected"));
+      await load();
+    } catch {
+      setError(translate("whatsappIntegrationDisconnectFailed"));
     } finally {
       setBusy(false);
     }
@@ -101,8 +127,8 @@ export default function OrganizationIntegrations() {
       await selectGoogleCalendar(calendarId);
       setMessage(translate("configurationCalendarSelected"));
       await load();
-    } catch (selectError) {
-      setError(selectError.message);
+    } catch {
+      setError(translate("configurationLoadFailed"));
     } finally {
       setBusy(false);
     }
@@ -119,32 +145,57 @@ export default function OrganizationIntegrations() {
   }
 
   const googleCalendar = integrations.googleCalendar || {};
+  const whatsapp = integrations.whatsapp || {};
 
   return (
     <ConfigurationSection title={translate("configurationIntegrations")}>
-      <div className="configuration-content">
-        <section className="configuration-subsection">
-          <h3 className="configuration-subsection__title">{translate("configurationGoogleCalendar")}</h3>
-          <dl className="configuration-meta">
+      <p className="configuration-integrations-intro">{translate("configurationIntegrationsIntro")}</p>
+
+      <div className="configuration-content configuration-content--integrations">
+        <WhatsAppIntegrationCard
+          connected={Boolean(whatsapp.connected)}
+          connection={whatsapp.connection || {}}
+          busy={busy}
+          onDisconnect={handleDisconnectWhatsApp}
+        />
+
+        <article className="integration-card">
+          <header className="integration-card__header">
+            <span className="integration-card__icon" aria-hidden="true">
+              <SettingsIcon name="calendar" />
+            </span>
             <div>
+              <h3 className="integration-card__title">{translate("configurationGoogleCalendar")}</h3>
+              <p className="integration-card__subtitle">{translate("configurationGoogleCalendarIntro")}</p>
+            </div>
+          </header>
+
+          <dl className="integration-card__meta">
+            <div className="integration-card__meta-row">
               <dt>{translate("configurationConnectionStatus")}</dt>
               <dd>
-                {googleCalendar.connected
-                  ? translate("configurationConnected")
-                  : translate("configurationNotConnected")}
+                {googleCalendar.connected ? (
+                  <span className="integration-status-badge integration-status-badge--connected">
+                    {translate("configurationConnected")}
+                  </span>
+                ) : (
+                  <span className="integration-status-badge integration-status-badge--disconnected">
+                    {translate("configurationNotConnected")}
+                  </span>
+                )}
               </dd>
             </div>
-            <div>
+            <div className="integration-card__meta-row">
               <dt>{translate("configurationGoogleAccount")}</dt>
               <dd>{googleCalendar.googleAccountEmail || translate("configurationNotSet")}</dd>
             </div>
-            <div>
+            <div className="integration-card__meta-row">
               <dt>{translate("configurationCalendar")}</dt>
               <dd>{googleCalendar.calendarId || translate("configurationNotSet")}</dd>
             </div>
           </dl>
 
-          <div className="configuration-actions">
+          <div className="integration-card__actions">
             {!googleCalendar.connected ? (
               <AtlasButton type="button" variant="primary" onClick={connectGoogle} busy={busy}>
                 {translate("configurationConnectGoogle")}
@@ -157,7 +208,7 @@ export default function OrganizationIntegrations() {
           </div>
 
           {googleCalendar.connected && calendars.length > 0 ? (
-            <label className="configuration-form" style={{ marginTop: "1rem" }}>
+            <label className="configuration-form integration-card__calendar-select">
               {translate("configurationSelectCalendar")}
               <select value={googleCalendar.calendarId || ""} onChange={handleCalendarSelect} disabled={busy}>
                 <option value="">{translate("configurationSelectCalendarPlaceholder")}</option>
@@ -170,7 +221,7 @@ export default function OrganizationIntegrations() {
               </select>
             </label>
           ) : null}
-        </section>
+        </article>
       </div>
 
       {message ? (

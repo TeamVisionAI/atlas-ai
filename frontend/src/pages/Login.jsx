@@ -3,11 +3,14 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { loginAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchSetupStatus } from "../services/setupService";
 import { appPath } from "../config/appRoutes";
+import { getDefaultLandingPath } from "../config/workspaceExperience";
+import { useLanguage } from "../i18n/LanguageContext";
 import "./Login.css";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { syncFromUser } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -18,6 +21,7 @@ export default function Login() {
 
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasValidSession, setHasValidSession] = useState(false);
+  const [sessionLandingPath, setSessionLandingPath] = useState(appPath());
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +36,10 @@ export default function Login() {
         if (!cancelled) {
           setSetupRequired(Boolean(status.setupRequired));
           setHasValidSession(Boolean(user));
+          if (user) {
+            syncFromUser(user);
+            setSessionLandingPath(getDefaultLandingPath(user.role));
+          }
         }
       } catch {
         if (!cancelled) {
@@ -51,7 +59,7 @@ export default function Login() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [syncFromUser]);
 
   if (checkingSetup || checkingSession) {
     return null;
@@ -62,7 +70,7 @@ export default function Login() {
   }
 
   if (hasValidSession) {
-    return <Navigate to={appPath()} replace />;
+    return <Navigate to={sessionLandingPath} replace />;
   }
 
   async function handleSubmit(event) {
@@ -72,7 +80,10 @@ export default function Login() {
 
     try {
       await loginAtlasSession({ email, password, rememberMe });
-      const redirectTo = location.state?.from || appPath();
+      const user = await fetchCurrentUser();
+      syncFromUser(user);
+      const defaultLanding = getDefaultLandingPath(user?.role);
+      const redirectTo = location.state?.from || defaultLanding;
       navigate(redirectTo, { replace: true });
     } catch (loginError) {
       setError(loginError.message || "Unable to sign in.");
