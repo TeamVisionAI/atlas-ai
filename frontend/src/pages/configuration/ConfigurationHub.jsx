@@ -17,6 +17,12 @@ const HUB_SECTIONS = [
     icon: "organization"
   },
   {
+    to: appPath("settings/integrations"),
+    title: SETTINGS_SECTIONS.integrations,
+    descriptionKey: "configurationHubIntegrationsDescription",
+    icon: "integrations"
+  },
+  {
     to: appPath("settings/scheduling"),
     title: SETTINGS_SECTIONS.scheduling,
     descriptionKey: "configurationHubSchedulingDescription",

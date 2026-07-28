@@ -66,7 +66,7 @@ function SidebarNav({
   currentUser
 }) {
   return (
-    <>
+    <div className="atlas-layout__sidebar-inner">
       <Link to="/" className="atlas-layout__public-link">
         ← Team Vision Financial
       </Link>
@@ -115,16 +115,18 @@ function SidebarNav({
         ))}
       </nav>
 
-      <button type="button" className="atlas-layout__language-toggle" onClick={toggleLanguage}>
-        {language === "es" ? translate("switchToEnglish") : translate("switchToSpanish")}
-      </button>
-
       {currentUser ? (
-        <SidebarUserFooter user={currentUser} translate={translate} onNavigate={onNavigate} />
+        <SidebarUserFooter
+          user={currentUser}
+          translate={translate}
+          language={language}
+          onToggleLanguage={toggleLanguage}
+          onNavigate={onNavigate}
+        />
       ) : (
         <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
       )}
-    </>
+    </div>
   );
 }
 

@@ -203,7 +203,6 @@ const NAV_ORDER = Object.freeze({
     "followUps",
     "analytics",
     "knowledge",
-    "myAccount",
     "settings",
     "adminUsers",
     "operationsCenter"
@@ -215,18 +214,18 @@ const NAV_ORDER = Object.freeze({
     "conversations",
     "appointments",
     "followUps",
-    "knowledge",
-    "myAccount"
+    "knowledge"
   ],
   [WORKSPACE_TYPES.MANAGEMENT]: [
     "teamDashboard",
     "missionControl",
     "prospectCenter",
+    "conversations",
+    "appointments",
+    "followUps",
     "production",
     "recruiting",
-    "analytics",
-    "conversations",
-    "myAccount"
+    "analytics"
   ]
 });
 

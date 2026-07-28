@@ -23,12 +23,12 @@ export default function WhatsAppConnectSuccess() {
         if (!cancelled && payload.connected && payload.connection) {
           setConnection(payload.connection);
         } else if (!cancelled) {
-          navigate(appPath("settings/organization"), { replace: true });
+          navigate(appPath("settings/integrations"), { replace: true });
         }
       })
       .catch(() => {
         if (!cancelled) {
-          navigate(appPath("settings/organization"), { replace: true });
+          navigate(appPath("settings/integrations"), { replace: true });
         }
       });
 
@@ -74,7 +74,7 @@ export default function WhatsAppConnectSuccess() {
         <div className="whatsapp-connect__actions">
           <Link
             className="whatsapp-connect__button"
-            to={`${appPath("settings/organization")}?whatsapp=connected`}
+            to={`${appPath("settings/integrations")}?whatsapp=connected`}
           >
             {translate("whatsappSuccessContinue")}
           </Link>

@@ -247,7 +247,7 @@ export default function WhatsAppConnect() {
   return (
     <div className="whatsapp-connect">
       <header className="whatsapp-connect__header">
-        <Link to={appPath("settings/organization")} className="whatsapp-connect__back">
+        <Link to={appPath("settings/integrations")} className="whatsapp-connect__back">
           ← {translate("whatsappConnectBackIntegrations")}
         </Link>
       </header>
@@ -267,7 +267,7 @@ export default function WhatsAppConnect() {
         {alreadyConnected ? (
           <div className="whatsapp-connect__connected-banner">
             <p>{translate("whatsappConnectAlreadyConnected")}</p>
-            <Link className="whatsapp-connect__button whatsapp-connect__button--secondary" to={appPath("settings/organization")}>
+            <Link className="whatsapp-connect__button whatsapp-connect__button--secondary" to={appPath("settings/integrations")}>
               {translate("whatsappErrorReturnIntegrations")}
             </Link>
           </div>

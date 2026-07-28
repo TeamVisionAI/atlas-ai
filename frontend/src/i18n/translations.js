@@ -46,7 +46,8 @@ export const translations = {
     workspaceRoleRepresentative: "Representative / Recruiter",
     workspaceRoleOperations: "Operations",
     workspaceRoleSupport: "Support",
-    sidebarLogout: "Logout",
+    sidebarLogout: "Cerrar sesión",
+    sidebarLanguage: "Idioma",
 
     forbiddenTitle: "Access denied",
     forbiddenDescription: "You do not have permission to view this page in your current workspace.",
@@ -387,6 +388,7 @@ export const translations = {
     configurationNavScheduling: "Scheduling",
     configurationHubProfileDescription: "Información personal y preferencias.",
     configurationHubOrganizationDescription: "Marca y configuración organizacional.",
+    configurationHubIntegrationsDescription: "WhatsApp Business, Google Calendar y servicios conectados.",
     configurationHubWhatsAppDescription: "Conexión de la cuenta comercial.",
     configurationHubSchedulingDescription: "Calendario y preferencias de programación.",
     configurationHubAppointmentsDescription: "Horario, reuniones y preferencias de citas.",
@@ -1142,6 +1144,9 @@ export const translations = {
       "No se pudo desconectar WhatsApp Business. Inténtalo de nuevo.",
     configurationIntegrationsIntro:
       "Conecta los servicios que tu organización usa para comunicarse y agendar con prospectos.",
+    configurationIntegrationsComingSoonTitle: "Más integraciones próximamente",
+    configurationIntegrationsComingSoonDescription:
+      "Pronto podrás conectar servicios adicionales desde esta página.",
     configurationGoogleCalendarIntro:
       "Sincroniza citas con el Google Calendar de tu equipo.",
     configurationLoadFailed:
@@ -1196,6 +1201,7 @@ export const translations = {
     workspaceRoleOperations: "Operations",
     workspaceRoleSupport: "Support",
     sidebarLogout: "Logout",
+    sidebarLanguage: "Language",
 
     forbiddenTitle: "Access denied",
     forbiddenDescription: "You do not have permission to view this page in your current workspace.",
@@ -1536,6 +1542,7 @@ export const translations = {
     configurationNavScheduling: "Scheduling",
     configurationHubProfileDescription: "Personal information and preferences.",
     configurationHubOrganizationDescription: "Branding and organization settings.",
+    configurationHubIntegrationsDescription: "WhatsApp Business, Google Calendar, and connected services.",
     configurationHubWhatsAppDescription: "Business account connection.",
     configurationHubSchedulingDescription: "Calendar and scheduling preferences.",
     configurationHubAppointmentsDescription: "Schedule, meetings, and appointment preferences.",
@@ -2285,6 +2292,9 @@ export const translations = {
     whatsappIntegrationDisconnectFailed: "Unable to disconnect WhatsApp Business. Please try again.",
     configurationIntegrationsIntro:
       "Connect the services your organization uses to communicate and schedule with prospects.",
+    configurationIntegrationsComingSoonTitle: "More integrations coming soon",
+    configurationIntegrationsComingSoonDescription:
+      "Additional services will be available to connect from this page.",
     configurationGoogleCalendarIntro: "Sync appointments with your team's Google Calendar.",
     configurationLoadFailed: "Unable to load settings. Please refresh and try again."
   }

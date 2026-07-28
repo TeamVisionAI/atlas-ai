@@ -613,3 +613,14 @@
   margin-top: 0.25rem;
   max-width: none;
 }
+
+.integration-card--placeholder {
+  opacity: 0.88;
+  border-style: dashed;
+  background: var(--config-surface-muted);
+}
+
+.integration-card__icon--muted {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--config-text-muted);
+}

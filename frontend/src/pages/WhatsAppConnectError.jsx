@@ -22,7 +22,7 @@ export default function WhatsAppConnectError() {
           <Link className="whatsapp-connect__button" to={appPath("settings/whatsapp")}>
             {translate("whatsappErrorRetry")}
           </Link>
-          <Link className="whatsapp-connect__button whatsapp-connect__button--secondary" to={appPath("settings/organization")}>
+          <Link className="whatsapp-connect__button whatsapp-connect__button--secondary" to={appPath("settings/integrations")}>
             {translate("whatsappErrorReturnIntegrations")}
           </Link>
         </div>

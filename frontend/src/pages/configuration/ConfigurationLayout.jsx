@@ -16,6 +16,12 @@ const NAV_ITEMS = [
     end: false
   },
   {
+    to: appPath("settings/integrations"),
+    label: SETTINGS_SECTIONS.integrations,
+    icon: "integrations",
+    end: false
+  },
+  {
     to: appPath("settings/scheduling"),
     label: SETTINGS_SECTIONS.scheduling,
     icon: "scheduling",

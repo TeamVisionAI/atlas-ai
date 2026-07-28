@@ -9,7 +9,6 @@ import {
   fetchOrganizationLevels,
   updateOrganizationConfiguration
 } from "../../services/configurationService";
-import OrganizationIntegrations from "../../components/settings/OrganizationIntegrations";
 import MeetingManagement from "../../components/settings/MeetingManagement";
 
 export default function OrganizationConfiguration() {
@@ -171,7 +170,6 @@ export default function OrganizationConfiguration() {
       </ConfigurationSection>
 
       <MeetingManagement />
-      <OrganizationIntegrations />
     </>
   );
 }

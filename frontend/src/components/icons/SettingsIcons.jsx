@@ -50,6 +50,20 @@ const ICONS = {
       <path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       <path d="M8 14h2v2H8v-2Zm4 0h2v2h-2v-2Z" fill="currentColor" />
     </svg>
+  ),
+  integrations: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M9 4v2M15 4v2M9 18v2M15 18v2M4 9h2M4 15h2M18 9h2M18 15h2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <rect x="7" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="13" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="7" y="13" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="13" y="13" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
   )
 };
 

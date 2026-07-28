@@ -38,6 +38,7 @@ import { appPath } from "./config/appRoutes";
 
 const ProfileConfiguration = lazy(() => import("./pages/configuration/ProfileConfiguration"));
 const OrganizationConfiguration = lazy(() => import("./pages/configuration/OrganizationConfiguration"));
+const IntegrationsConfiguration = lazy(() => import("./pages/configuration/IntegrationsConfiguration"));
 const SchedulingConfiguration = lazy(() => import("./pages/configuration/SchedulingConfiguration"));
 const AppointmentSettings = lazy(() => import("./pages/configuration/AppointmentSettings"));
 
@@ -153,6 +154,7 @@ export default function App() {
           <Route index element={<ConfigurationHub />} />
           <Route path="profile" element={<ProfileConfiguration />} />
           <Route path="organization" element={<OrganizationConfiguration />} />
+          <Route path="integrations" element={<IntegrationsConfiguration />} />
           <Route path="whatsapp" element={<WhatsAppConnect />} />
           <Route path="whatsapp/success" element={<WhatsAppConnectSuccess />} />
           <Route path="whatsapp/error" element={<WhatsAppConnectError />} />

@@ -72,7 +72,7 @@ export default function OrganizationIntegrations() {
     setBusy(true);
 
     try {
-      const result = await fetchGoogleCalendarAuthUrl("settings/organization");
+      const result = await fetchGoogleCalendarAuthUrl("settings/integrations");
       window.location.href = result.url;
     } catch {
       setError(translate("configurationGoogleConnectFailed"));
@@ -221,6 +221,20 @@ export default function OrganizationIntegrations() {
               </select>
             </label>
           ) : null}
+        </article>
+
+        <article className="integration-card integration-card--placeholder" aria-disabled="true">
+          <header className="integration-card__header">
+            <span className="integration-card__icon integration-card__icon--muted" aria-hidden="true">
+              <SettingsIcon name="integrations" />
+            </span>
+            <div>
+              <h3 className="integration-card__title">{translate("configurationIntegrationsComingSoonTitle")}</h3>
+              <p className="integration-card__subtitle">
+                {translate("configurationIntegrationsComingSoonDescription")}
+              </p>
+            </div>
+          </header>
         </article>
       </div>
 
