@@ -83,16 +83,8 @@ async function findUserByEmail(email) {
 }
 
 async function updateUserLastLogin(userId) {
-  const timestamp = new Date().toISOString();
-
-  const { error } = await supabase
-    .from("users")
-    .update({ last_login: timestamp, updated_at: timestamp })
-    .eq("id", userId);
-
-  if (error && error.code !== "42P01") {
-    throw error;
-  }
+  const identityWriteService = require("./identityWriteService");
+  await identityWriteService.recordLastLogin(userId);
 }
 
 module.exports = {

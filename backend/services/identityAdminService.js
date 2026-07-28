@@ -16,6 +16,9 @@ const {
 } = require("../services/atlasUserService");
 const { requestPasswordReset } = require("../services/authService");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+const { resolveWorkspaceOrganizationId } = require("../core/tenantOrganization");
+const { sanitizeListQuery } = require("../core/listQuerySanitizer");
+const identityWriteService = require("./identityWriteService");
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -46,9 +49,10 @@ function presentAdminUser(row, extras = {}) {
 }
 
 async function listUsers(query = {}, authContext) {
-  const limit = Math.min(Number(query.limit) || 25, 100);
-  const offset = Math.max(Number(query.offset) || 0, 0);
-  const organizationId = authContext.organizationId;
+  const filters = sanitizeListQuery(query);
+  const limit = Math.min(Number(filters.limit) || 25, 100);
+  const offset = Math.max(Number(filters.offset) || 0, 0);
+  const organizationId = await resolveWorkspaceOrganizationId(authContext);
 
   let dbQuery = supabase
     .from("atlas_users")
@@ -57,26 +61,51 @@ async function listUsers(query = {}, authContext) {
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (query.status) {
-    dbQuery = dbQuery.eq("status", normalizeStatus(query.status));
+  const normalizedStatus = filters.status ? normalizeStatus(filters.status) : null;
+
+  if (normalizedStatus) {
+    dbQuery = dbQuery.eq("status", normalizedStatus);
   }
 
-  if (query.role) {
-    dbQuery = dbQuery.eq("role", normalizeRole(query.role));
+  const normalizedRole = filters.role ? normalizeRole(filters.role) : null;
+
+  if (normalizedRole) {
+    dbQuery = dbQuery.eq("role", normalizedRole);
   }
 
-  if (query.q) {
-    const needle = `%${String(query.q).trim()}%`;
+  if (filters.q) {
+    const needle = `%${filters.q}%`;
     dbQuery = dbQuery.or(
       `email.ilike.${needle},first_name.ilike.${needle},last_name.ilike.${needle},display_name.ilike.${needle}`
     );
   }
 
+  console.info("[admin/users/list]", {
+    table: "atlas_users",
+    organizationId,
+    status: normalizedStatus,
+    role: normalizedRole,
+    search: filters.q || null,
+    limit,
+    offset
+  });
+
   const { data, error, count } = await dbQuery;
 
   if (error) {
+    console.error("[admin/users/list] query failed", {
+      organizationId,
+      code: error.code,
+      message: error.message
+    });
     throw error;
   }
+
+  console.info("[admin/users/list] result", {
+    organizationId,
+    total: count ?? (data || []).length,
+    returned: (data || []).length
+  });
 
   return {
     items: (data || []).map((row) => presentAdminUser(row)),
@@ -88,8 +117,9 @@ async function listUsers(query = {}, authContext) {
 
 async function getUserById(userId, authContext) {
   const user = await findUserById(userId);
+  const organizationId = await resolveWorkspaceOrganizationId(authContext);
 
-  if (!user || String(user.organization_id) !== String(authContext.organizationId)) {
+  if (!user || String(user.organization_id) !== String(organizationId)) {
     const error = new Error("User not found.");
     error.statusCode = 404;
     throw error;
@@ -120,29 +150,22 @@ async function createUser(input, authContext, auditMeta = {}) {
   const lastName = String(input.lastName || input.last_name || "").trim();
   const status = normalizeStatus(input.status) || USER_STATUSES.PENDING_INVITATION;
 
-  const { data: user, error } = await supabase
-    .from("atlas_users")
-    .insert({
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      display_name: buildDisplayName(firstName, lastName, email),
-      phone: input.phone || null,
-      organization_id: input.organizationId || authContext.organizationId || DEFAULT_ORGANIZATION_ID,
-      division_id: input.divisionId || input.division_id || null,
-      reports_to_user_id: input.reportsToUserId || input.reports_to_user_id || null,
-      role,
-      status,
-      timezone: input.timezone || "America/New_York",
-      preferred_language: input.preferredLanguage || input.preferred_language || "en",
-      notification_preferences: input.notificationPreferences || input.notification_preferences || {}
-    })
-    .select("*")
-    .single();
+  const organizationId = await resolveWorkspaceOrganizationId(authContext);
 
-  if (error) {
-    throw error;
-  }
+  const user = await identityWriteService.createUser({
+    email,
+    first_name: firstName,
+    last_name: lastName,
+    phone: input.phone || null,
+    organization_id: input.organizationId || organizationId || DEFAULT_ORGANIZATION_ID,
+    division_id: input.divisionId || input.division_id || null,
+    reports_to_user_id: input.reportsToUserId || input.reports_to_user_id || null,
+    role,
+    status,
+    timezone: input.timezone || "America/New_York",
+    preferred_language: input.preferredLanguage || input.preferred_language || "en",
+    notification_preferences: input.notificationPreferences || input.notification_preferences || {}
+  });
 
   let invitation = null;
 
@@ -272,16 +295,7 @@ async function updateUser(userId, input, authContext, auditMeta = {}) {
     patch.role = role;
   }
 
-  const { data, error } = await supabase
-    .from("atlas_users")
-    .update(patch)
-    .eq("id", userId)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const data = await identityWriteService.updateUser(userId, patch);
 
   if (patch.role && patch.role !== previousRole) {
     await writeAuditLog({
@@ -335,16 +349,7 @@ async function setUserStatus(userId, status, authContext, auditMeta = {}) {
     patch.archived_at = null;
   }
 
-  const { data, error } = await supabase
-    .from("atlas_users")
-    .update(patch)
-    .eq("id", userId)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const data = await identityWriteService.updateUser(userId, patch);
 
   const actionMap = {
     [USER_STATUSES.SUSPENDED]: "user.suspended",
@@ -369,8 +374,9 @@ async function setUserStatus(userId, status, authContext, auditMeta = {}) {
 
 async function forcePasswordReset(userId, authContext, auditMeta = {}) {
   const user = await findUserById(userId);
+  const organizationId = await resolveWorkspaceOrganizationId(authContext);
 
-  if (!user || String(user.organization_id) !== String(authContext.organizationId)) {
+  if (!user || String(user.organization_id) !== String(organizationId)) {
     const error = new Error("User not found.");
     error.statusCode = 404;
     throw error;
@@ -421,7 +427,7 @@ async function transferOwnership({ fromUserId, toUserId }, authContext, auditMet
   await getUserById(fromUserId, authContext);
   await getUserById(toUserId, authContext);
 
-  const orgId = authContext.organizationId;
+  const orgId = await resolveWorkspaceOrganizationId(authContext);
 
   const { data: legacyProspects, error: legacyError } = await supabase
     .from("prospects")

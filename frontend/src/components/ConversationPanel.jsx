@@ -1,5 +1,7 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatTextWithDates } from "../utils/dateFormatter";
+import UserAvatar from "./ui/UserAvatar";
+import "./ui/ProfilePhotoEditor.css";
 
 function formatMessageTime(timestamp, language) {
   if (!timestamp) {
@@ -34,7 +36,14 @@ function resolveDirectionLabel(direction, translate) {
   return translate("missionControlConversationMessage");
 }
 
-export default function ConversationPanel({ messages = [], lastMessage, direction, timestamp }) {
+export default function ConversationPanel({
+  messages = [],
+  lastMessage,
+  direction,
+  timestamp,
+  atlasAvatar = null,
+  prospectAvatar = null
+}) {
   const { translate, language } = useLanguage();
 
   const thread =
@@ -50,6 +59,27 @@ export default function ConversationPanel({ messages = [], lastMessage, directio
             }
           ]
         : [];
+
+  function resolveAvatar(messageDirection) {
+    if (messageDirection === "outgoing") {
+      return {
+        photoUrl: atlasAvatar?.photoUrl || null,
+        name: atlasAvatar?.name || translate("missionControlConversationAtlas")
+      };
+    }
+
+    if (messageDirection === "incoming") {
+      return {
+        photoUrl: prospectAvatar?.photoUrl || null,
+        name: prospectAvatar?.name || translate("missionControlConversationProspect")
+      };
+    }
+
+    return {
+      photoUrl: null,
+      name: translate("missionControlConversationMessage")
+    };
+  }
 
   return (
     <div
@@ -79,37 +109,47 @@ export default function ConversationPanel({ messages = [], lastMessage, directio
         {thread.length ? (
           thread.map((message) => {
             const outgoing = message.direction === "outgoing";
+            const avatar = resolveAvatar(message.direction);
 
             return (
               <div
                 key={message.id}
-                style={{
-                  alignSelf: outgoing ? "flex-end" : "flex-start",
-                  maxWidth: "85%",
-                  background: outgoing ? "#172554" : "#1F2937",
-                  padding: "16px 18px",
-                  borderRadius: outgoing ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                  border: "1px solid #374151"
-                }}
+                className={`conversation-message-row ${outgoing ? "is-outgoing" : "is-incoming"}`}
               >
+                <UserAvatar
+                  photoUrl={avatar.photoUrl}
+                  name={avatar.name}
+                  size="sm"
+                  className="user-avatar--on-dark"
+                />
                 <div
                   style={{
-                    color: "#94A3B8",
-                    fontSize: 12,
-                    marginBottom: 8,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12
+                    background: outgoing ? "#172554" : "#1F2937",
+                    padding: "16px 18px",
+                    borderRadius: outgoing ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                    border: "1px solid #374151",
+                    minWidth: 0
                   }}
                 >
-                  <span>{resolveDirectionLabel(message.direction, translate)}</span>
-                  {message.timestamp ? (
-                    <span>{formatMessageTime(message.timestamp, language)}</span>
-                  ) : null}
+                  <div
+                    style={{
+                      color: "#94A3B8",
+                      fontSize: 12,
+                      marginBottom: 8,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12
+                    }}
+                  >
+                    <span>{resolveDirectionLabel(message.direction, translate)}</span>
+                    {message.timestamp ? (
+                      <span>{formatMessageTime(message.timestamp, language)}</span>
+                    ) : null}
+                  </div>
+                  <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
+                    {formatTextWithDates(message.text)}
+                  </p>
                 </div>
-                <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
-                  {formatTextWithDates(message.text)}
-                </p>
               </div>
             );
           })

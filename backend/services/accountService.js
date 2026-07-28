@@ -11,6 +11,11 @@ const {
 } = require("./atlasUserService");
 const { hashPassword, verifyPassword } = require("../security/passwordService");
 const { writeAuditLog } = require("../security/auditLogService");
+const {
+  uploadProfilePhoto,
+  removeProfilePhoto
+} = require("./profilePhotoService");
+const identityWriteService = require("./identityWriteService");
 
 function presentProfile(user) {
   return {
@@ -74,16 +79,7 @@ async function updateProfile(userId, input, auditMeta = {}) {
       input.notificationPreferences || input.notification_preferences || {};
   }
 
-  const { data, error } = await supabase
-    .from("atlas_users")
-    .update(patch)
-    .eq("id", userId)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const data = await identityWriteService.updateProfile(userId, patch);
 
   await writeAuditLog({
     organizationId: data.organization_id,
@@ -99,6 +95,16 @@ async function updateProfile(userId, input, auditMeta = {}) {
   return presentProfile(data);
 }
 
+async function uploadPhoto(userId, file, auditMeta = {}) {
+  const updatedUser = await uploadProfilePhoto(userId, file, auditMeta);
+  return presentProfile(updatedUser);
+}
+
+async function removePhoto(userId, auditMeta = {}) {
+  const updatedUser = await removeProfilePhoto(userId, auditMeta);
+  return presentProfile(updatedUser);
+}
+
 async function changePassword(userId, { currentPassword, newPassword }, auditMeta = {}) {
   const user = await findUserById(userId);
 
@@ -109,17 +115,7 @@ async function changePassword(userId, { currentPassword, newPassword }, auditMet
   }
 
   const passwordHash = hashPassword(newPassword);
-
-  const { data, error } = await supabase
-    .from("atlas_users")
-    .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
-    .eq("id", userId)
-    .select("id, email, organization_id")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const data = await identityWriteService.changePassword(userId, passwordHash);
 
   await writeAuditLog({
     organizationId: data.organization_id,
@@ -198,6 +194,8 @@ async function logoutAllSessions(userId, auditMeta = {}) {
 module.exports = {
   getProfile,
   updateProfile,
+  uploadPhoto,
+  removePhoto,
   changePassword,
   listActiveSessions,
   logoutCurrentSession,

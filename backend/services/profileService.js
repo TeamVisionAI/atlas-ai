@@ -3,9 +3,9 @@
  * Extends user profile with workspace configuration fields.
  */
 
-const { supabase } = require("./supabaseService");
 const { findUserById } = require("./atlasUserService");
 const { writeAuditLog } = require("../security/auditLogService");
+const identityWriteService = require("./identityWriteService");
 
 const DEFAULT_PROFILE_SETTINGS = Object.freeze({
   businessHours: {
@@ -114,16 +114,7 @@ async function updateConfigurationProfile(userId, input, auditMeta = {}) {
 
   patch.profile_settings = profileSettings;
 
-  const { data, error } = await supabase
-    .from("atlas_users")
-    .update(patch)
-    .eq("id", userId)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const data = await identityWriteService.updateProfile(userId, patch);
 
   await writeAuditLog({
     organizationId: data.organization_id,

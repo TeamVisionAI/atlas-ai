@@ -4,6 +4,23 @@
 
 const { ROLES, canUserLogin, normalizeRole } = require("./roles");
 const { permissionsForRole, roleHasPermission } = require("./permissions");
+
+const PERMISSION_ALIASES = Object.freeze({
+  "admin:users": ["admin:users", "users:manage"],
+  "admin:roles": ["admin:roles", "settings:manage"],
+  "operations:access": ["operations:access"],
+  "audit:read": ["audit:read"]
+});
+
+function permissionMatches(context, permission) {
+  const aliases = PERMISSION_ALIASES[permission] || [permission];
+
+  if (!Array.isArray(context.permissions)) {
+    return false;
+  }
+
+  return aliases.some((code) => context.permissions.includes(code));
+}
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { normalizeSaasRole, toLegacyRole, isSuperAdmin } = require("./saasRoles");
 const { resolvePermissionsForUser } = require("./permissionService");
@@ -55,6 +72,10 @@ function hasPermission(context, permission) {
   }
 
   if (Array.isArray(context.permissions) && context.permissions.includes(permission)) {
+    return true;
+  }
+
+  if (permissionMatches(context, permission)) {
     return true;
   }
 

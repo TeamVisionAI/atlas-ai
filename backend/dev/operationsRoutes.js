@@ -16,6 +16,13 @@ function createOperationsRoutes(deps = {}) {
 
   router.use(requireAtlasUser);
 
+  router.get("/access", (req, res) => {
+    res.json({
+      success: true,
+      ...getOperationsAccessProfile(req.atlasUser)
+    });
+  });
+
   router.use((req, res, next) => {
     if (!canAccessOperationsCenter(req.atlasUser)) {
       return res.status(404).json({
@@ -26,13 +33,6 @@ function createOperationsRoutes(deps = {}) {
     }
 
     next();
-  });
-
-  router.get("/access", (req, res) => {
-    res.json({
-      success: true,
-      ...getOperationsAccessProfile(req.atlasUser)
-    });
   });
 
   router.get("/dashboard", async (req, res) => {

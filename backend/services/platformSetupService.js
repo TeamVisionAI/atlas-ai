@@ -15,6 +15,7 @@ const {
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { isPgFallbackEnabled, pgQueryOne } = require("./pgFallback");
 const { performBootstrapInstall } = require("../dev/tools/performBootstrapInstall");
+const identityWriteService = require("./identityWriteService");
 
 const SETUP_KEY = "setup_completed_at";
 
@@ -194,26 +195,16 @@ async function completePlatformSetup(input = {}, auditMeta = {}) {
     throw organizationError;
   }
 
-  const displayName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
-  const { data: adminUser, error: userError } = await supabase
-    .from("atlas_users")
-    .insert({
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      display_name: displayName,
-      organization_id: organization.id,
-      role: ROLES.ADMINISTRATOR,
-      status: USER_STATUSES.ACTIVE,
-      password_hash: passwordHash
-    })
-    .select("*")
-    .single();
-
-  if (userError) {
-    throw userError;
-  }
+  const adminUser = await identityWriteService.createUser({
+    email,
+    first_name: firstName,
+    last_name: lastName,
+    organization_id: organization.id,
+    role: ROLES.ADMINISTRATOR,
+    status: USER_STATUSES.ACTIVE,
+    password_hash: passwordHash
+  });
 
   await supabase
     .from("organizations")

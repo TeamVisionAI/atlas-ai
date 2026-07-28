@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const { supabase } = require("./supabaseService");
 const { canUserLogin } = require("../security/roles");
 const { isPgFallbackEnabled, pgQueryOne } = require("./pgFallback");
+const identityWriteService = require("./identityWriteService");
 
 const DEFAULT_USER_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -283,13 +284,12 @@ async function revokeAllSessionsForUser(userId) {
 }
 
 async function updateLastLogin(userId) {
-  const { error } = await supabase
-    .from("atlas_users")
-    .update({ last_login_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", userId);
-
-  if (error && !isMissingAtlasAuthTable(error)) {
-    throw error;
+  try {
+    await identityWriteService.recordLastLogin(userId);
+  } catch (error) {
+    if (!isMissingAtlasAuthTable(error)) {
+      throw error;
+    }
   }
 }
 

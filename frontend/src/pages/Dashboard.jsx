@@ -55,6 +55,7 @@ import {
   filterQueueForExecutiveFilter
 } from "../engines/executiveFilterEngine";
 import { useLanguage } from "../i18n/LanguageContext";
+import { fetchCurrentUser } from "../services/atlasAuthService";
 import {
   buildProspectCenterPath,
   buildProspectWorkspacePath
@@ -136,6 +137,7 @@ export default function Dashboard() {
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [executionSubmitting, setExecutionSubmitting] = useState(false);
   const [executionError, setExecutionError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const showMissionExecutionSuccess = useMissionExecutionSuccessToast();
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
@@ -171,6 +173,12 @@ export default function Dashboard() {
     } finally {
       setProspectLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchCurrentUser()
+      .then((user) => setCurrentUser(user))
+      .catch(() => setCurrentUser(null));
   }, []);
 
   useEffect(() => {
@@ -803,7 +811,12 @@ export default function Dashboard() {
             </div>
           ) : null}
           <AgentHeader
-            agentName="Ana"
+            agentName={
+              currentUser?.display_name ||
+              currentUser?.first_name ||
+              translate("missionControlAgentLabel")
+            }
+            agentPhotoUrl={currentUser?.photo_url || null}
             metrics={metrics}
             activeMetric={activeMetricPanel}
             onMetricClick={(type) =>
@@ -919,6 +932,17 @@ export default function Dashboard() {
               lastMessage={workspace.conversation.lastMessage}
               direction={workspace.conversation.direction}
               timestamp={workspace.conversation.timestamp}
+              atlasAvatar={{
+                photoUrl: currentUser?.photo_url || null,
+                name:
+                  currentUser?.display_name ||
+                  currentUser?.first_name ||
+                  translate("missionControlConversationAtlas")
+              }}
+              prospectAvatar={{
+                photoUrl: null,
+                name: workspace.prospect?.name || translate("missionControlConversationProspect")
+              }}
             />
           </ExecutiveSection>
 

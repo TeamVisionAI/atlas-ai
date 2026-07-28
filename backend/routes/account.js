@@ -5,6 +5,7 @@
 const express = require("express");
 const router = express.Router();
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { handleProfilePhotoUpload } = require("../middleware/profilePhotoUpload");
 const accountService = require("../services/accountService");
 
 router.use(requireAtlasUser);
@@ -38,6 +39,36 @@ router.patch("/profile", async (req, res) => {
     res.json({ profile });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message });
+  }
+});
+
+router.post("/photo", handleProfilePhotoUpload, async (req, res) => {
+  try {
+    const profile = await accountService.uploadPhoto(
+      req.authContext.userId,
+      req.file,
+      auditMeta(req)
+    );
+    res.json({ profile });
+  } catch (error) {
+    console.error("[account/photo]", error.message);
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "PHOTO_UPLOAD_FAILED",
+      message: error.message || "Unable to upload profile photo."
+    });
+  }
+});
+
+router.delete("/photo", async (req, res) => {
+  try {
+    const profile = await accountService.removePhoto(req.authContext.userId, auditMeta(req));
+    res.json({ profile });
+  } catch (error) {
+    console.error("[account/photo/delete]", error.message);
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "PHOTO_REMOVE_FAILED",
+      message: error.message || "Unable to remove profile photo."
+    });
   }
 });
 

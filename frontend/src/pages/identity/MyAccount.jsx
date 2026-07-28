@@ -7,9 +7,12 @@ import {
   fetchAccountSessions,
   logoutAllSessions,
   logoutCurrentSession,
-  updateAccountProfile
+  removeAccountPhoto,
+  updateAccountProfile,
+  uploadAccountPhoto
 } from "../../services/accountService";
 import { logoutAtlasSession, storeSessionToken } from "../../services/atlasAuthService";
+import ProfilePhotoEditor from "../../components/ui/ProfilePhotoEditor";
 import "./identity.css";
 
 const TABS = ["profile", "security", "sessions"];
@@ -26,6 +29,7 @@ export default function MyAccount() {
     currentPassword: "",
     newPassword: ""
   });
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   async function loadProfile() {
     const result = await fetchAccountProfile();
@@ -64,6 +68,40 @@ export default function MyAccount() {
       setMessage("Profile updated.");
     } catch (saveError) {
       setError(saveError.message);
+    }
+  }
+
+  async function handlePhotoUpload(file) {
+    setPhotoUploading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await uploadAccountPhoto(file);
+      setProfile(result.profile);
+      setMessage("Profile photo updated.");
+    } catch (uploadError) {
+      setError(uploadError.message);
+      throw uploadError;
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  async function handlePhotoRemove() {
+    setPhotoUploading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await removeAccountPhoto();
+      setProfile(result.profile);
+      setMessage("Profile photo removed.");
+    } catch (removeError) {
+      setError(removeError.message);
+      throw removeError;
+    } finally {
+      setPhotoUploading(false);
     }
   }
 
@@ -129,6 +167,12 @@ export default function MyAccount() {
 
       {tab === "profile" ? (
         <div className="identity-card">
+          <ProfilePhotoEditor
+            profile={profile}
+            onUpload={handlePhotoUpload}
+            onRemove={handlePhotoRemove}
+            uploading={photoUploading}
+          />
           <form className="identity-form" onSubmit={saveProfile}>
             <label>
               First Name

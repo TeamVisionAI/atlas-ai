@@ -12,6 +12,8 @@ import {
   suspendAdminUser,
   transferOwnership
 } from "../../services/identityService";
+import UserAvatar from "../../components/ui/UserAvatar";
+import "../../components/ui/ProfilePhotoEditor.css";
 import "./identity.css";
 
 const ROLES = [
@@ -227,7 +229,19 @@ export default function AdminUsers() {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td>{user.display_name || `${user.first_name} ${user.last_name}`}</td>
+                  <td>
+                    <div className="profile-photo-editor__table-cell">
+                      <UserAvatar
+                        photoUrl={user.photo_url}
+                        name={user.display_name || `${user.first_name} ${user.last_name}`}
+                        email={user.email}
+                        size="sm"
+                      />
+                      <div className="profile-photo-editor__table-name">
+                        <span>{user.display_name || `${user.first_name} ${user.last_name}`}</span>
+                      </div>
+                    </div>
+                  </td>
                   <td>{user.email}</td>
                   <td>{user.role}</td>
                   <td>

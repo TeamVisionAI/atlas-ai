@@ -1,0 +1,103 @@
+.profile-photo-editor {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.profile-photo-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.profile-photo-editor__hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.8125rem;
+}
+
+.profile-photo-editor__table-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.profile-photo-editor__table-name {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.profile-photo-editor__table-subtle {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.sidebar-user-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #334155;
+  color: #e2e8f0;
+  text-decoration: none;
+}
+
+.sidebar-user-link:hover {
+  color: #fff;
+}
+
+.sidebar-user-link__meta {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.sidebar-user-link__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-link__email {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.65rem;
+  max-width: 88%;
+}
+
+.conversation-message-row.is-outgoing {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.conversation-message-row.is-incoming {
+  align-self: flex-start;
+}
+
+.activity-feed-item__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.activity-feed-item__meta-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}

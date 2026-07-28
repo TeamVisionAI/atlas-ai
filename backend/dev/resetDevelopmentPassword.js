@@ -9,8 +9,7 @@ require("dotenv").config();
 
 const { hashPassword } = require("../security/passwordService");
 const { findUserByEmail } = require("../services/atlasUserService");
-const { isPgFallbackEnabled, pgQueryOne } = require("../services/pgFallback");
-const { supabase } = require("../services/supabaseService");
+const identityWriteService = require("../services/identityWriteService");
 
 const DEFAULT_EMAIL = "niovel@teamvision.ai";
 const DEFAULT_PASSWORD = "Atlas@2026!";
@@ -44,61 +43,7 @@ async function resetDevelopmentPassword(email, password) {
   }
 
   const passwordHash = hashPassword(password);
-  const updatedAt = new Date().toISOString();
-
-  if (isPgFallbackEnabled()) {
-    const usersRow = await pgQueryOne(
-      "UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3 RETURNING id, email",
-      [passwordHash, updatedAt, user.id]
-    );
-
-    if (usersRow) {
-      return { email: user.email, password };
-    }
-
-    const atlasRow = await pgQueryOne(
-      "UPDATE atlas_users SET password_hash = $1, updated_at = $2 WHERE id = $3 RETURNING id, email",
-      [passwordHash, updatedAt, user.id]
-    );
-
-    if (!atlasRow) {
-      throw new Error(`Password update affected 0 rows for ${email}.`);
-    }
-
-    return { email: user.email, password };
-  }
-
-  const { data: usersRow, error: usersError } = await supabase
-    .from("users")
-    .update({ password_hash: passwordHash, updated_at: updatedAt })
-    .eq("id", user.id)
-    .select("id, email")
-    .maybeSingle();
-
-  if (usersError && usersError.code !== "42P01") {
-    throw usersError;
-  }
-
-  if (usersRow) {
-    return { email: user.email, password };
-  }
-
-  const { data: atlasRow, error: atlasError } = await supabase
-    .from("atlas_users")
-    .update({ password_hash: passwordHash, updated_at: updatedAt })
-    .eq("id", user.id)
-    .select("id, email")
-    .maybeSingle();
-
-  if (atlasError) {
-    throw atlasError;
-  }
-
-  if (!atlasRow) {
-    throw new Error(
-      `Password update affected 0 rows for ${email}. Set SUPABASE_SERVICE_ROLE_KEY or DATABASE_URL for development resets.`
-    );
-  }
+  await identityWriteService.changePassword(user.id, passwordHash);
 
   return { email: user.email, password };
 }

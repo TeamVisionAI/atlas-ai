@@ -3,7 +3,7 @@
  * Supports JWT tokens and legacy opaque session tokens (dual-auth).
  */
 
-const { findUserBySessionToken, sanitizeUser } = require("../services/atlasUserService");
+const { findUserBySessionToken, sanitizeUser, findUserById: findAtlasUserById } = require("../services/atlasUserService");
 const { findUserById } = require("../services/userService");
 const { verifyAccessToken, isJwtFormat } = require("../security/jwtService");
 const { buildAuthContextAsync, isActiveContext } = require("../security/authorizationService");
@@ -11,6 +11,31 @@ const { normalizeUserRecord } = require("../security/normalizeUserRecord");
 const { isSuperAdmin } = require("../security/saasRoles");
 const { supabase } = require("../services/supabaseService");
 const { extractBearerToken } = require("./extractBearerToken");
+
+async function mergeAtlasUserProfile(user) {
+  if (!user?.id) {
+    return user;
+  }
+
+  const atlasUser = normalizeUserRecord(await findAtlasUserById(user.id));
+
+  if (!atlasUser) {
+    return user;
+  }
+
+  return normalizeUserRecord({
+    ...atlasUser,
+    ...user,
+    organization_id: atlasUser.organization_id || user.organization_id,
+    role: atlasUser.role || user.role,
+    status: atlasUser.status || user.status,
+    email: atlasUser.email || user.email,
+    display_name: atlasUser.display_name || user.display_name || user.name,
+    first_name: atlasUser.first_name || user.first_name,
+    last_name: atlasUser.last_name || user.last_name,
+    password_hash: atlasUser.password_hash || user.password_hash
+  });
+}
 
 async function resolveUserFromJwt(token) {
   const { valid, payload, error } = verifyAccessToken(token);
@@ -31,7 +56,13 @@ async function resolveUserFromJwt(token) {
     }
   }
 
-  const user = normalizeUserRecord(await findUserById(payload.sub || payload.user_id));
+  let user = normalizeUserRecord(await findUserById(payload.sub || payload.user_id));
+
+  if (!user) {
+    user = normalizeUserRecord(await findAtlasUserById(payload.sub || payload.user_id));
+  }
+
+  user = await mergeAtlasUserProfile(user);
 
   if (!user) {
     return { user: null, reason: "user_not_found" };
@@ -79,6 +110,7 @@ async function authenticate(req, res, next) {
       }
     } else {
       user = normalizeUserRecord(await findUserBySessionToken(token));
+      user = await mergeAtlasUserProfile(user);
 
       if (!user) {
         return res.status(401).json({

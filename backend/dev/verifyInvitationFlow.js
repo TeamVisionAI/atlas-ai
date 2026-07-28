@@ -40,6 +40,7 @@ async function cleanupTestUser(email) {
 
   await supabase.from("atlas_invitation_tokens").delete().eq("user_id", user.id);
   await supabase.from("atlas_sessions").delete().eq("user_id", user.id);
+  await supabase.from("users").delete().eq("id", user.id);
   await supabase.from("atlas_users").delete().eq("id", user.id);
 }
 

@@ -4,8 +4,8 @@
 
 const crypto = require("crypto");
 const { findUserById } = require("./atlasUserService");
-const { supabase } = require("./supabaseService");
 const { writeAuditLog } = require("../security/auditLogService");
+const identityWriteService = require("./identityWriteService");
 const {
   VIRTUAL_PROVIDERS,
   MEETING_LOCATION_TYPES,
@@ -244,16 +244,7 @@ async function updateAppointmentProfile(userId, input = {}, auditMeta = {}) {
     patch.preferred_language = input.defaults.preferredLanguage;
   }
 
-  const { data, error } = await supabase
-    .from("atlas_users")
-    .update(patch)
-    .eq("id", userId)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const data = await identityWriteService.updateProfile(userId, patch);
 
   await writeAuditLog({
     organizationId: data.organization_id,

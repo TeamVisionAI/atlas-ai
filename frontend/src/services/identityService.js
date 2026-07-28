@@ -1,8 +1,8 @@
 import { apiFetch, apiRequest } from "./apiClient";
+import { buildQueryString } from "../utils/queryString";
 
 export async function listAdminUsers(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return apiFetch(`/api/admin/users${query ? `?${query}` : ""}`);
+  return apiFetch(`/api/admin/users${buildQueryString(params)}`);
 }
 
 export async function createAdminUser(payload) {

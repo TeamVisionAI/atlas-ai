@@ -20,6 +20,7 @@ const { sendPasswordResetEmail } = require("../services/emailService");
 const { supabase } = require("../services/supabaseService");
 const { USER_STATUSES, canUserLogin } = require("../security/roles");
 const { isPgFallbackEnabled } = require("./pgFallback");
+const identityWriteService = require("./identityWriteService");
 
 const RESET_TTL_MS = 60 * 60 * 1000;
 
@@ -266,10 +267,7 @@ async function confirmPasswordReset({ token, newPassword, ipAddress, userAgent }
   const passwordHash = hashPassword(newPassword);
   const user = resetRow.user;
 
-  await supabase
-    .from("atlas_users")
-    .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
-    .eq("id", user.id);
+  await identityWriteService.confirmPasswordReset(user.id, passwordHash);
 
   await supabase
     .from("atlas_password_reset_tokens")
@@ -364,14 +362,7 @@ async function acceptInvitation({ token, password, ipAddress, userAgent }) {
   const user = inviteRow.user;
   const passwordHash = hashPassword(password);
 
-  await supabase
-    .from("atlas_users")
-    .update({
-      password_hash: passwordHash,
-      status: USER_STATUSES.ACTIVE,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", user.id);
+  await identityWriteService.acceptInvitation(user.id, passwordHash);
 
   await supabase
     .from("atlas_invitation_tokens")

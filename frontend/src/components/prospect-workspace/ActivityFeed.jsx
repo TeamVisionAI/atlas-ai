@@ -12,6 +12,8 @@ import {
   getActivityTypesQuery,
   groupActivityItems
 } from "../../engines/activityFeedViewModel";
+import UserAvatar from "../ui/UserAvatar";
+import "../ui/ProfilePhotoEditor.css";
 import "./ActivityFeed.css";
 
 function ActivityFeedItem({ item, translate, locale }) {
@@ -22,11 +24,14 @@ function ActivityFeedItem({ item, translate, locale }) {
 
   return (
     <article className="activity-feed-item" data-activity-type={item.activityType}>
-      <div className="activity-feed-item__meta">
-        <span className="activity-feed-item__type">{label}</span>
-        <span className="activity-feed-item__dot">·</span>
-        <span className="activity-feed-item__actor">{actor}</span>
-        <span className="activity-feed-item__time">{when}</span>
+      <div className="activity-feed-item__header">
+        <UserAvatar name={actor} size="sm" />
+        <div className="activity-feed-item__meta-inline">
+          <span className="activity-feed-item__type">{label}</span>
+          <span className="activity-feed-item__dot">·</span>
+          <span className="activity-feed-item__actor">{actor}</span>
+          <span className="activity-feed-item__time">{when}</span>
+        </div>
       </div>
       {body ? <p className="activity-feed-item__body">{body}</p> : null}
     </article>

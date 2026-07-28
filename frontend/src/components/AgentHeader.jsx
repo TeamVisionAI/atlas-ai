@@ -1,5 +1,6 @@
 import { getTimeGreetingKey } from "../engines/executiveDashboardViewModel";
 import { useLanguage } from "../i18n/LanguageContext";
+import UserAvatar from "./ui/UserAvatar";
 
 const metricStyle = {
   textAlign: "center",
@@ -8,6 +9,7 @@ const metricStyle = {
 
 export default function AgentHeader({
   agentName = "Agent",
+  agentPhotoUrl = null,
   metrics,
   activeMetric,
   onMetricClick
@@ -29,24 +31,7 @@ export default function AgentHeader({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: "50%",
-            background: "#1E3A8A",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 700,
-            fontSize: 18,
-            flexShrink: 0
-          }}
-          aria-hidden="true"
-        >
-          {agentName.charAt(0).toUpperCase()}
-        </div>
+        <UserAvatar photoUrl={agentPhotoUrl} name={agentName} size="lg" />
 
         <div>
           <div style={{ color: "#64748B", fontSize: 13 }}>{translate("missionControlAgentLabel")}</div>

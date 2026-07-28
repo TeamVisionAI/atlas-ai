@@ -1,9 +1,12 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { missionControlNav, operationsCenterNavItem, adminNavItem } from "../config/missionControlNav";
+import { appPath } from "../config/appRoutes";
 import { useLanguage } from "../i18n/LanguageContext";
 import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
+import UserAvatar from "../components/ui/UserAvatar";
+import "../components/ui/ProfilePhotoEditor.css";
 import "./MainLayout.css";
 
 function useLayoutMode() {
@@ -54,7 +57,8 @@ function SidebarNav({
   onClose,
   showCollapse,
   onCollapse,
-  navItems
+  navItems,
+  currentUser
 }) {
   return (
     <>
@@ -110,7 +114,27 @@ function SidebarNav({
         {language === "es" ? translate("switchToEnglish") : translate("switchToSpanish")}
       </button>
 
-      <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
+      {currentUser ? (
+        <Link to={appPath("my-account")} className="sidebar-user-link">
+          <UserAvatar
+            photoUrl={currentUser.photo_url}
+            name={currentUser.display_name || currentUser.first_name}
+            email={currentUser.email}
+            size="md"
+            className="user-avatar--on-dark"
+          />
+          <span className="sidebar-user-link__meta">
+            <span className="sidebar-user-link__name">
+              {currentUser.display_name ||
+                [currentUser.first_name, currentUser.last_name].filter(Boolean).join(" ") ||
+                currentUser.email}
+            </span>
+            <span className="sidebar-user-link__email">{currentUser.email}</span>
+          </span>
+        </Link>
+      ) : (
+        <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
+      )}
     </>
   );
 }
@@ -123,6 +147,7 @@ export default function MainLayout() {
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
   const [showOperationsCenter, setShowOperationsCenter] = useState(import.meta.env.DEV);
   const [isAdministrator, setIsAdministrator] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const navItems = useMemo(() => {
     let items = [...missionControlNav];
@@ -141,9 +166,15 @@ export default function MainLayout() {
   useEffect(() => {
     ensureAtlasSession().catch(() => {});
     fetchCurrentUser()
-      .then((user) => setIsAdministrator(user?.role === "administrator"))
-      .catch(() => setIsAdministrator(false));
-  }, []);
+      .then((user) => {
+        setCurrentUser(user);
+        setIsAdministrator(user?.role === "administrator");
+      })
+      .catch(() => {
+        setCurrentUser(null);
+        setIsAdministrator(false);
+      });
+  }, [location.pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,6 +276,7 @@ export default function MainLayout() {
           showCollapse={showSidebarCollapse}
           onCollapse={collapseTabletNav}
           navItems={navItems}
+          currentUser={currentUser}
         />
       </aside>
 
