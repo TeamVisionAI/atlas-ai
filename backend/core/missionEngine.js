@@ -1,5 +1,6 @@
 /**
  * Sprint 18.3 — Mission Engine v1.
+ * Milestone 4 (RX) PR-1 — expanded mission types + never-empty primary mission.
  * Orchestrates "what should the recruiter do next?" — no business-rule duplication.
  * Delegates state detection to Workflow Engine outputs and existing action resolution.
  */
@@ -10,7 +11,14 @@ const { getMissionControlState } = require("./missionControlReadModel");
 const { buildWorkflowReadModel } = require("./workflowReadModel");
 const { buildConversationOutcomeReadModel } = require("./conversationOutcomeEngine");
 const { loadAgentState } = require("./agentActionState");
-const { resolveAvailableActions, ACTION_IDS, isWorkflowGateActive } = require("./agentActionEngine");
+const {
+  resolveAvailableActions,
+  ACTION_IDS,
+  isWorkflowGateActive,
+  isFollowUpDue,
+  deriveMilestoneLabel,
+  getInterviewTimingPhase
+} = require("./agentActionEngine");
 const { getAgentActionLabel, toMissionAction } = require("./agentActionRegistry");
 const { MILESTONES } = require("./workflowConstants");
 const {
@@ -30,6 +38,19 @@ const SCHEDULE_MISSION_BLOCKING_OUTCOMES = new Set([
   "Needs More Time",
   "Appointment Scheduled"
 ]);
+
+const CLOSED_MILESTONES = new Set([MILESTONES.CLOSED, MILESTONES.DO_NOT_CONTACT]);
+
+const QUALIFICATION_FIELD_LABELS = Object.freeze({
+  city: "City",
+  state: "State",
+  authorization: "Immigration status",
+  occupation: "Occupation",
+  interview_type: "Interview type",
+  email: "Email",
+  name: "Name",
+  schedule: "Interview schedule"
+});
 
 function startOfDayIso(date = new Date()) {
   const copy = new Date(date);
@@ -77,6 +98,26 @@ function buildMissionPrimaryAction(actionId) {
   };
 }
 
+function resolvePrimaryActionId(availableActions = [], preferredIds = [], fallbackId) {
+  for (const actionId of preferredIds) {
+    if (availableActions.some((action) => action.id === actionId)) {
+      return actionId;
+    }
+  }
+
+  const primary = availableActions.find((action) => action.priority === "primary");
+
+  if (primary) {
+    return primary.id;
+  }
+
+  if (availableActions[0]?.id) {
+    return availableActions[0].id;
+  }
+
+  return fallbackId;
+}
+
 function needsInterviewSchedule({ conversationOutcome, brain }) {
   const workflowRequirements = conversationOutcome?.workflowRequirements || [];
 
@@ -90,6 +131,35 @@ function hasPendingRequiredInformation(conversationOutcome) {
   return (conversationOutcome?.requiredInputs || []).length > 0;
 }
 
+function hasIncompleteQualification({ brain, conversationOutcome }) {
+  if (hasPendingRequiredInformation(conversationOutcome)) {
+    return true;
+  }
+
+  const missingFields = brain?.missingFields || [];
+  return missingFields.some((field) => field !== "schedule");
+}
+
+function buildMissingInformationSummary({ brain, conversationOutcome }) {
+  const labels = new Set();
+
+  for (const input of conversationOutcome?.requiredInputs || []) {
+    if (input?.label) {
+      labels.add(input.label);
+    }
+  }
+
+  for (const field of brain?.missingFields || []) {
+    if (field === "schedule") {
+      continue;
+    }
+
+    labels.add(QUALIFICATION_FIELD_LABELS[field] || field);
+  }
+
+  return [...labels];
+}
+
 function isQualifiedWithoutConversationOutcome(conversationOutcome) {
   if (hasPendingRequiredInformation(conversationOutcome)) {
     return false;
@@ -99,7 +169,19 @@ function isQualifiedWithoutConversationOutcome(conversationOutcome) {
   return workflowRequirements.some((requirement) => requirement.key === "schedule");
 }
 
+function isClosedProspect({ agentState, workflow }) {
+  if (agentState?.outcome === "Not Interested") {
+    return true;
+  }
+
+  return CLOSED_MILESTONES.has(workflow?.canonicalMilestone);
+}
+
 function shouldGenerateScheduleInterviewMission({ conversationOutcome, agentState, brain }) {
+  if (hasIncompleteQualification({ brain, conversationOutcome })) {
+    return false;
+  }
+
   if (!needsInterviewSchedule({ conversationOutcome, brain })) {
     return false;
   }
@@ -129,10 +211,6 @@ function resolveScheduleInterviewReason({ conversationOutcome, agentState }) {
   return "Prospect is qualified and ready to schedule.";
 }
 
-function isInterestedAndAwaitingSchedule(context) {
-  return shouldGenerateScheduleInterviewMission(context);
-}
-
 function shouldEnterInterviewOutcome({ workflow, prospect, agentState }) {
   if (workflow?.canonicalMilestone === MILESTONES.INTERVIEW_RESULT_PENDING) {
     return true;
@@ -141,27 +219,102 @@ function shouldEnterInterviewOutcome({ workflow, prospect, agentState }) {
   return isWorkflowGateActive(prospect, agentState);
 }
 
-function buildScheduleInterviewMission(context, createdAt) {
-  const { prospect, brain, agentState, conversationOutcome, workflow, availableActions } =
-    context;
-
-  if (!isInterestedAndAwaitingSchedule({ conversationOutcome, agentState, brain })) {
-    return null;
+function shouldGenerateFollowUpMission({ agentState, workflow }) {
+  if (agentState?.outcome === "Needs More Time" || agentState?.outcome === "No Show") {
+    return true;
   }
 
+  return workflow?.canonicalMilestone === MILESTONES.FOLLOW_UP;
+}
+
+function shouldRecruitProspect({ agentState }) {
+  return agentState?.outcome === "Recruited" && !agentState?.orientationScheduled;
+}
+
+function shouldBeginOnboarding({ agentState, workflow }) {
+  if (agentState?.outcome !== "Recruited") {
+    return false;
+  }
+
+  if (!agentState?.orientationScheduled) {
+    return false;
+  }
+
+  if (agentState?.onboardingUnlocked) {
+    return false;
+  }
+
+  return (
+    workflow?.canonicalMilestone === MILESTONES.ORIENTATION ||
+    workflow?.canonicalMilestone === MILESTONES.FAST_START
+  );
+}
+
+function shouldContactProspect(context) {
+  const { workflow, brain, agentState, prospect } = context;
+
+  if (hasIncompleteQualification(context)) {
+    return false;
+  }
+
+  if (shouldGenerateScheduleInterviewMission(context)) {
+    return false;
+  }
+
+  if (shouldEnterInterviewOutcome({ workflow, prospect, agentState })) {
+    return false;
+  }
+
+  if (shouldGenerateFollowUpMission(context)) {
+    return false;
+  }
+
+  if (shouldRecruitProspect(context) || shouldBeginOnboarding(context)) {
+    return false;
+  }
+
+  const milestone = workflow?.canonicalMilestone;
+
+  if (milestone === MILESTONES.NEW_LEAD || milestone === MILESTONES.GREETING_SENT) {
+    return true;
+  }
+
+  const agentMilestone = deriveMilestoneLabel(
+    brain?.currentStep,
+    brain?.missingFields || [],
+    agentState || {}
+  );
+
+  return agentMilestone === "New Lead";
+}
+
+function buildMissionSkeleton({
+  prospect,
+  missionType,
+  title,
+  description,
+  reason,
+  priority,
+  primaryActionId,
+  availableActions,
+  workflow,
+  conversationOutcome,
+  createdAt,
+  dueDate,
+  estimatedMinutes = 2
+}) {
   const prospectId = prospect.phone;
-  const primaryActionId = ACTION_IDS.SCHEDULE;
 
   return {
-    id: buildMissionId(prospectId, MISSION_TYPES.SCHEDULE_INTERVIEW),
+    id: buildMissionId(prospectId, missionType),
     prospectId,
-    missionType: MISSION_TYPES.SCHEDULE_INTERVIEW,
-    priority: MISSION_PRIORITIES.HIGH,
-    title: "Schedule Interview",
-    description: "Book an interview time for this interested prospect.",
-    reason: resolveScheduleInterviewReason({ conversationOutcome, agentState }),
-    estimatedMinutes: 2,
-    dueDate: startOfDayIso(),
+    missionType,
+    priority,
+    title,
+    description,
+    reason,
+    estimatedMinutes,
+    dueDate: dueDate || startOfDayIso(),
     primaryAction: buildMissionPrimaryAction(primaryActionId),
     secondaryActions: mapSecondaryActions(availableActions, primaryActionId),
     status: MISSION_STATUS.PENDING,
@@ -172,43 +325,322 @@ function buildScheduleInterviewMission(context, createdAt) {
 }
 
 function buildEnterInterviewOutcomeMission(context, createdAt) {
-  const { prospect, brain, agentState, conversationOutcome, workflow, availableActions } =
-    context;
+  const { prospect, agentState, conversationOutcome, workflow, availableActions } = context;
 
   if (!shouldEnterInterviewOutcome({ workflow, prospect, agentState })) {
     return null;
   }
 
-  const prospectId = prospect.phone;
   const primaryActionId = ACTION_IDS.ENTER_INTERVIEW_OUTCOME;
 
-  return {
-    id: buildMissionId(prospectId, MISSION_TYPES.ENTER_INTERVIEW_OUTCOME),
-    prospectId,
+  return buildMissionSkeleton({
+    prospect,
     missionType: MISSION_TYPES.ENTER_INTERVIEW_OUTCOME,
-    priority: MISSION_PRIORITIES.CRITICAL,
-    title: "Enter Interview Outcome",
+    title: "Record Interview Outcome",
     description: "Record the interview result so Atlas can continue the workflow.",
     reason: "Interview time has passed and outcome is missing.",
-    estimatedMinutes: 3,
-    dueDate: new Date().toISOString(),
-    primaryAction: buildMissionPrimaryAction(primaryActionId),
-    secondaryActions: mapSecondaryActions(availableActions, primaryActionId),
-    status: MISSION_STATUS.PENDING,
+    priority: MISSION_PRIORITIES.CRITICAL,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
     createdAt,
-    prospect: summarizeProspect(prospect),
-    workflowState: summarizeWorkflowState(workflow, conversationOutcome)
-  };
+    dueDate: new Date().toISOString(),
+    estimatedMinutes: 3
+  });
+}
+
+function buildCompleteQualificationMission(context, createdAt) {
+  const { prospect, brain, conversationOutcome, workflow, availableActions, agentState } = context;
+
+  if (!hasIncompleteQualification({ brain, conversationOutcome })) {
+    return null;
+  }
+
+  if (shouldEnterInterviewOutcome({ workflow, prospect, agentState })) {
+    return null;
+  }
+
+  const missingSummary = buildMissingInformationSummary({ brain, conversationOutcome });
+  const reason =
+    missingSummary.length > 0
+      ? `Missing required information: ${missingSummary.join(", ")}.`
+      : "Complete remaining qualification details before advancing the workflow.";
+
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.NOTES],
+    ACTION_IDS.WHATSAPP
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.COMPLETE_QUALIFICATION,
+    title: "Complete Qualification",
+    description: "Capture the remaining qualification details for this prospect.",
+    reason,
+    priority: MISSION_PRIORITIES.HIGH,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt,
+    estimatedMinutes: 4
+  });
+}
+
+function buildScheduleInterviewMission(context, createdAt) {
+  const { prospect, agentState, conversationOutcome, workflow, availableActions, brain } =
+    context;
+
+  if (!shouldGenerateScheduleInterviewMission({ conversationOutcome, agentState, brain })) {
+    return null;
+  }
+
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    [ACTION_IDS.SCHEDULE],
+    ACTION_IDS.SCHEDULE
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.SCHEDULE_INTERVIEW,
+    title: "Schedule Interview",
+    description: "Book an interview time for this interested prospect.",
+    reason: resolveScheduleInterviewReason({ conversationOutcome, agentState }),
+    priority: MISSION_PRIORITIES.HIGH,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt
+  });
+}
+
+function buildFollowUpMission(context, createdAt) {
+  const { prospect, agentState, conversationOutcome, workflow, availableActions } = context;
+
+  if (!shouldGenerateFollowUpMission({ agentState, workflow })) {
+    return null;
+  }
+
+  if (shouldEnterInterviewOutcome({ workflow, prospect, agentState })) {
+    return null;
+  }
+
+  const due = isFollowUpDue(agentState);
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    due
+      ? [ACTION_IDS.CALL, ACTION_IDS.WHATSAPP, ACTION_IDS.RESCHEDULE]
+      : [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.RESCHEDULE],
+    due ? ACTION_IDS.CALL : ACTION_IDS.WHATSAPP
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.FOLLOW_UP,
+    title: "Follow Up",
+    description: "Reconnect with the prospect and confirm the next step.",
+    reason: due
+      ? "Follow-up date has arrived — contact the prospect now."
+      : "Prospect is waiting for follow-up.",
+    priority: due ? MISSION_PRIORITIES.HIGH : MISSION_PRIORITIES.MEDIUM,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt,
+    dueDate: due ? new Date().toISOString() : startOfDayIso(),
+    estimatedMinutes: 3
+  });
+}
+
+function buildRecruitProspectMission(context, createdAt) {
+  const { prospect, agentState, conversationOutcome, workflow, availableActions } = context;
+
+  if (!shouldRecruitProspect({ agentState })) {
+    return null;
+  }
+
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    [ACTION_IDS.NOTES, ACTION_IDS.CALL, ACTION_IDS.WHATSAPP],
+    ACTION_IDS.NOTES
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.RECRUIT_PROSPECT,
+    title: "Recruit Prospect",
+    description: "Complete recruitment steps and schedule orientation.",
+    reason: "Prospect was recruited — orientation is not scheduled yet.",
+    priority: MISSION_PRIORITIES.HIGH,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt,
+    estimatedMinutes: 5
+  });
+}
+
+function buildBeginOnboardingMission(context, createdAt) {
+  const { prospect, agentState, conversationOutcome, workflow, availableActions } = context;
+
+  if (!shouldBeginOnboarding({ agentState, workflow })) {
+    return null;
+  }
+
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    [ACTION_IDS.NOTES, ACTION_IDS.CALL, ACTION_IDS.WHATSAPP],
+    ACTION_IDS.NOTES
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.BEGIN_ONBOARDING,
+    title: "Begin Onboarding",
+    description: "Start onboarding activities for this recruited prospect.",
+    reason: "Orientation is scheduled — onboarding has not started yet.",
+    priority: MISSION_PRIORITIES.MEDIUM,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt,
+    estimatedMinutes: 5
+  });
+}
+
+function buildContactProspectMission(context, createdAt) {
+  const { prospect, conversationOutcome, workflow, availableActions } = context;
+
+  if (!shouldContactProspect(context)) {
+    return null;
+  }
+
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.NOTES],
+    ACTION_IDS.WHATSAPP
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.CALL_PROSPECT,
+    title: "Contact Prospect",
+    description: "Reach out and move this prospect forward.",
+    reason: "Prospect needs recruiter contact to continue.",
+    priority: MISSION_PRIORITIES.MEDIUM,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt
+  });
+}
+
+function buildReviewProspectMission(context, createdAt) {
+  const { prospect, conversationOutcome, workflow, availableActions } = context;
+
+  const timing = getInterviewTimingPhase(prospect);
+  const hasConfirmedInterview =
+    prospect?.current_step === "CONFIRMED" || Boolean(prospect?.calendar_event_id);
+
+  let reason = "Review this prospect and take the next best action.";
+
+  if (hasConfirmedInterview && timing === "future") {
+    reason = "Interview is scheduled — confirm details and stay ready.";
+  } else if (hasConfirmedInterview && timing === "soon") {
+    reason = "Interview is coming up soon — confirm the prospect is prepared.";
+  }
+
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    [
+      ACTION_IDS.SEND_ZOOM_LINK,
+      ACTION_IDS.SEND_OFFICE_LOCATION,
+      ACTION_IDS.WHATSAPP,
+      ACTION_IDS.CALL,
+      ACTION_IDS.NOTES
+    ],
+    ACTION_IDS.NOTES
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.REVIEW_PROSPECT,
+    title: "Review Prospect",
+    description: "Review the latest activity and decide the next step.",
+    reason,
+    priority: MISSION_PRIORITIES.LOW,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt
+  });
+}
+
+function buildTypedMissions(context, createdAt) {
+  return [
+    buildEnterInterviewOutcomeMission(context, createdAt),
+    buildCompleteQualificationMission(context, createdAt),
+    buildScheduleInterviewMission(context, createdAt),
+    buildFollowUpMission(context, createdAt),
+    buildRecruitProspectMission(context, createdAt),
+    buildBeginOnboardingMission(context, createdAt),
+    buildContactProspectMission(context, createdAt)
+  ].filter(Boolean);
+}
+
+function ensurePrimaryMission(missions, context, createdAt) {
+  if (missions.length > 0) {
+    return missions;
+  }
+
+  if (isClosedProspect(context)) {
+    const { prospect, conversationOutcome, workflow, availableActions } = context;
+    const primaryActionId = resolvePrimaryActionId(
+      availableActions,
+      [ACTION_IDS.NOTES],
+      ACTION_IDS.NOTES
+    );
+
+    return [
+      buildMissionSkeleton({
+        prospect,
+        missionType: MISSION_TYPES.REVIEW_PROSPECT,
+        title: "Review Prospect",
+        description: "Review closed prospect history.",
+        reason: "Prospect is closed — review notes and history only.",
+        priority: MISSION_PRIORITIES.LOW,
+        primaryActionId,
+        availableActions,
+        workflow,
+        conversationOutcome,
+        createdAt
+      })
+    ];
+  }
+
+  return [buildReviewProspectMission(context, createdAt)];
 }
 
 function generateMissionsFromContext(context) {
   const createdAt = new Date().toISOString();
-  const missions = [
-    buildEnterInterviewOutcomeMission(context, createdAt),
-    buildScheduleInterviewMission(context, createdAt)
-  ].filter(Boolean);
+  const typedMissions = buildTypedMissions(context, createdAt);
+  const sorted = sortMissions(typedMissions);
 
-  return sortMissions(missions);
+  return ensurePrimaryMission(sorted, context, createdAt);
+}
+
+function getPrimaryMissionFromContext(context) {
+  const missions = generateMissionsFromContext(context);
+  return missions[0] || null;
 }
 
 async function buildMissionContext(phone, organizationId) {
@@ -316,11 +748,14 @@ async function recalculateMissions(organizationId, options = {}) {
 
 module.exports = {
   generateMissionsFromContext,
+  getPrimaryMissionFromContext,
   generateMissionsForProspect,
   getHighestPriorityMissionForProspect,
   generateMissionsForOrganization,
   getMissionById,
   recalculateMissions,
   buildMissionContext,
-  shouldGenerateScheduleInterviewMission
+  shouldGenerateScheduleInterviewMission,
+  hasIncompleteQualification,
+  hasPendingRequiredInformation
 };

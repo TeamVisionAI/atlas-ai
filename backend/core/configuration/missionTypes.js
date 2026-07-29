@@ -6,7 +6,12 @@
 const MISSION_TYPES = Object.freeze({
   SCHEDULE_INTERVIEW: "ScheduleInterview",
   ENTER_INTERVIEW_OUTCOME: "EnterInterviewOutcome",
+  COMPLETE_QUALIFICATION: "CompleteQualification",
+  FOLLOW_UP: "FollowUp",
+  RECRUIT_PROSPECT: "RecruitProspect",
+  BEGIN_ONBOARDING: "BeginOnboarding",
   CALL_PROSPECT: "CallProspect",
+  REVIEW_PROSPECT: "ReviewProspect",
   RESCHEDULE_INTERVIEW: "RescheduleInterview",
   SEND_LICENSING_PACKET: "SendLicensingPacket",
   COMPLETE_ORIENTATION: "CompleteOrientation",

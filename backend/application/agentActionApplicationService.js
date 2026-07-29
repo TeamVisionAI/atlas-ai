@@ -54,6 +54,7 @@ const {
 const {
   buildConversationOutcomeReadModel
 } = require("../core/conversationOutcomeEngine");
+const { getPrimaryMissionFromContext } = require("../core/missionEngine");
 const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
 const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
@@ -481,6 +482,15 @@ async function getMissionControlWithActions(phone, options = {}) {
     Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState))
   ]);
 
+  const primaryMission = getPrimaryMissionFromContext({
+    prospect,
+    brain: missionControl.brain,
+    agentState,
+    conversationOutcome,
+    workflow,
+    availableActions
+  });
+
   return {
     ...missionControl,
     atlasBrief: {
@@ -495,6 +505,8 @@ async function getMissionControlWithActions(phone, options = {}) {
     liveRevision,
     conversationOutcome,
     workflowRequirements: conversationOutcome?.workflowRequirements || [],
+    primaryMission,
+    missions: primaryMission ? [primaryMission] : [],
     agentState: {
       flags: agentState.flags,
       outcome: agentState.outcome,

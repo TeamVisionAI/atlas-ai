@@ -361,5 +361,6 @@ module.exports = {
   deriveMilestoneLabel,
   getInterviewTimingPhase,
   isWorkflowGateActive,
+  isFollowUpDue,
   normalizeInterviewType
 };

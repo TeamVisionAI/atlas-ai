@@ -56,7 +56,7 @@ describe("Mission Engine rules", () => {
     assert.equal(missions[0].primaryAction.id, "schedule");
   });
 
-  it("does not generate Schedule Interview while required information is still pending", () => {
+  it("generates Complete Qualification while required information is still pending", () => {
     const missions = generateMissionsFromContext({
       prospect: { phone: "+15559876543", current_step: "GREETING" },
       brain: { currentStep: "GREETING", missingFields: ["city", "schedule"] },
@@ -67,10 +67,12 @@ describe("Mission Engine rules", () => {
         workflowRequirements: []
       },
       workflow: { canonicalMilestone: "QUALIFICATION" },
-      availableActions: []
+      availableActions: [{ id: "whatsapp", label: "WhatsApp", priority: "primary" }]
     });
 
-    assert.equal(missions.length, 0);
+    assert.equal(missions.length, 1);
+    assert.equal(missions[0].missionType, MISSION_TYPES.COMPLETE_QUALIFICATION);
+    assert.notEqual(missions[0].missionType, MISSION_TYPES.SCHEDULE_INTERVIEW);
   });
 
   it("keeps workflow gate active when conversation outcome is Information Collected", () => {
@@ -98,6 +100,7 @@ describe("Mission Engine rules", () => {
     });
 
     assert.equal(missions[0].missionType, MISSION_TYPES.ENTER_INTERVIEW_OUTCOME);
+    assert.equal(missions[0].title, "Record Interview Outcome");
     assert.equal(missions[0].priority, MISSION_PRIORITIES.CRITICAL);
   });
 });

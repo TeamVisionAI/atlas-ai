@@ -69,13 +69,14 @@ async function listProspectMissions(req, res) {
     const phone = req.params.phone;
     const organizationId = getTenantOrganizationId(req);
     const missions = await generateMissionsForProspect(phone, organizationId);
-    const parsed = parseMissionId(missions[0]?.id || "");
+    const primaryMission = missions[0] || null;
+    const parsed = parseMissionId(primaryMission?.id || "");
 
     res.json({
       generatedAt: new Date().toISOString(),
       prospectPhone: parsed?.prospectId || phone,
       total: missions.length,
-      primaryMission: missions[0] || null,
+      primaryMission,
       missions
     });
   } catch (error) {
