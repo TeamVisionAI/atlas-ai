@@ -1,25 +1,39 @@
 const { PHASES, parseSchedulingState } = require("./schedulingState");
 const {
   evaluateInterviewTypeDecision,
-  isInterviewTypeChoiceRequired
+  evaluateCoverage
 } = require("./businessRulesEngine");
 const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
+const {
+  defaultCaptureState,
+  parseQualificationCapture,
+  isCityExplicitlyCaptured,
+  isStateExplicitlyCaptured,
+  isAuthorizationExplicitlyCaptured,
+  isInterviewTypeExplicitlyCaptured,
+  isDayPartExplicitlyCaptured,
+  isNameExplicitlyCaptured,
+  isEmailStepComplete,
+  isLocationExplicitlyComplete,
+  explainSchedulingEligibility
+} = require("./qualificationCaptureState");
 
 const PRE_SCHEDULE_FIELDS = new Set([
-  "authorization",
-  "occupation",
   "city",
   "state",
-  "interviewType"
+  "authorization",
+  "interviewType",
+  "dayPart"
 ]);
 
 const FIELD_ORDER = [
-  "authorization",
-  "occupation",
   "city",
   "state",
+  "authorization",
   "interviewType",
+  "dayPart",
   "schedule",
+  "name",
   "email"
 ];
 
@@ -43,10 +57,24 @@ function extractEmailFromNotes(notes) {
   return null;
 }
 
+function resolveDayPartFromNotes(notes) {
+  const dayPartMatch = String(notes || "").match(/DAY_PART:([^|]+)/i);
+
+  if (dayPartMatch) {
+    return dayPartMatch[1].trim();
+  }
+
+  const schedulingState = parseSchedulingState(notes);
+  return schedulingState?.period || null;
+}
+
 function buildProfileFromProspect(prospect, channel = "whatsapp") {
   if (!prospect) {
     return createEmptyProfile(channel);
   }
+
+  const notes = prospect.notes || null;
+  const schedulingState = parseSchedulingState(notes);
 
   return {
     city: prospect.city || null,
@@ -57,12 +85,14 @@ function buildProfileFromProspect(prospect, channel = "whatsapp") {
         : prospect.work_authorized,
     occupation: prospect.occupation || null,
     interviewType: prospect.interview_type || null,
-    preferredDay: null,
+    dayPart: resolveDayPartFromNotes(notes),
+    preferredDay: schedulingState?.selectedDay || null,
     preferredTime: prospect.interview_time || null,
-    email: extractEmailFromNotes(prospect.notes),
+    email: extractEmailFromNotes(notes),
+    name: prospect.name || null,
     appointmentDate: prospect.appointment_date || null,
     calendarEventId: prospect.calendar_event_id || null,
-    confirmed: prospect.current_step === "CONFIRMED",
+    confirmed: Boolean(prospect.calendar_event_id),
     channel,
     schedulingPhase: prospect.appointment_type || null
   };
@@ -75,9 +105,11 @@ function createEmptyProfile(channel = "whatsapp") {
     authorization: null,
     occupation: null,
     interviewType: null,
+    dayPart: null,
     preferredDay: null,
     preferredTime: null,
     email: null,
+    name: null,
     appointmentDate: null,
     calendarEventId: null,
     confirmed: false,
@@ -95,13 +127,15 @@ function mergeProfile(existing, extracted, options = {}) {
       return;
     }
 
+    const targetKey = key === "preferredPeriod" ? "dayPart" : key;
+
     if (
-      overwriteKeys.has(key) ||
-      merged[key] === null ||
-      merged[key] === undefined ||
-      merged[key] === ""
+      overwriteKeys.has(targetKey) ||
+      merged[targetKey] === null ||
+      merged[targetKey] === undefined ||
+      merged[targetKey] === ""
     ) {
-      merged[key] = value;
+      merged[targetKey] = value;
     }
   });
 
@@ -118,9 +152,24 @@ function resolveInterviewTypeDecision(profile, message = "") {
   });
 }
 
-function getEffectiveInterviewType(profile, message = "") {
+function getEffectiveInterviewType(profile, message = "", options = {}) {
   if (profile.interviewType) {
     return profile.interviewType;
+  }
+
+  const notes = options.notes || null;
+  const captureState = options.captureState || defaultCaptureState();
+
+  if (!isLocationExplicitlyComplete(profile, captureState, notes)) {
+    return null;
+  }
+
+  if (!isAuthorizationExplicitlyCaptured(profile, captureState, notes)) {
+    return null;
+  }
+
+  if (profile.authorization === false) {
+    return null;
   }
 
   const decision = evaluateInterviewTypeDecision({
@@ -133,16 +182,22 @@ function getEffectiveInterviewType(profile, message = "") {
   return decision.interviewType || null;
 }
 
-function isInterviewTypeRequired(profile) {
-  return isInterviewTypeChoiceRequired({
-    city: profile.city,
-    state: profile.state,
-    interviewType: profile.interviewType
-  });
+function isInterviewTypeRequired(profile, options = {}) {
+  const notes = options.notes || null;
+  const captureState = options.captureState || defaultCaptureState();
+
+  if (!isLocationExplicitlyComplete(profile, captureState, notes)) {
+    return false;
+  }
+
+  if (!isAuthorizationExplicitlyCaptured(profile, captureState, notes)) {
+    return false;
+  }
+
+  return !isInterviewTypeExplicitlyCaptured(profile, captureState, notes);
 }
 
 function emailRequired(_profile) {
-  // Sprint 11.4 MVP — email never blocks scheduling; used only for calendar invites when provided.
   return false;
 }
 
@@ -156,43 +211,63 @@ function sortMissingFields(missing) {
     .sort((left, right) => FIELD_ORDER.indexOf(left) - FIELD_ORDER.indexOf(right));
 }
 
-function getMissingFields(profile) {
-  if (profile.confirmed || profile.calendarEventId) {
+function getMissingFields(profile, options = {}) {
+  if (profile.calendarEventId) {
     return [];
   }
 
+  const notes = options.notes || null;
+  const captureState = options.captureState || defaultCaptureState();
   const missing = [];
 
-  if (profile.authorization === null || profile.authorization === undefined) {
-    missing.push("authorization");
-  }
-
-  if (!profile.occupation) {
-    missing.push("occupation");
-  }
-
-  if (!profile.city) {
+  if (!isCityExplicitlyCaptured(profile, captureState, notes)) {
     missing.push("city");
   }
 
-  if (profile.city && !profile.state) {
+  if (
+    isCityExplicitlyCaptured(profile, captureState, notes) &&
+    !isStateExplicitlyCaptured(profile, captureState, notes)
+  ) {
     missing.push("state");
   }
 
-  if (isInterviewTypeRequired(profile)) {
-    missing.push("interviewType");
+  if (!isLocationExplicitlyComplete(profile, captureState, notes)) {
+    return sortMissingFields(missing);
   }
 
-  const effectiveInterviewType = getEffectiveInterviewType(profile);
+  if (!isAuthorizationExplicitlyCaptured(profile, captureState, notes)) {
+    missing.push("authorization");
+    return sortMissingFields(missing);
+  }
+
+  if (profile.authorization === false) {
+    return sortMissingFields(missing);
+  }
+
+  if (!isInterviewTypeExplicitlyCaptured(profile, captureState, notes)) {
+    missing.push("interviewType");
+    return sortMissingFields(missing);
+  }
+
+  if (!isDayPartExplicitlyCaptured(profile, captureState, notes)) {
+    missing.push("dayPart");
+    return sortMissingFields(missing);
+  }
+
+  const effectiveInterviewType = profile.interviewType || getEffectiveInterviewType(profile, "", { notes, captureState });
 
   if (effectiveInterviewType && !isScheduleComplete(profile)) {
     missing.push("schedule");
   }
 
+  if (isScheduleComplete(profile) && !isNameExplicitlyCaptured(profile, captureState, notes)) {
+    missing.push("name");
+  }
+
   if (
-    emailRequired({ ...profile, interviewType: effectiveInterviewType }) &&
     isScheduleComplete(profile) &&
-    !profile.email
+    isNameExplicitlyCaptured(profile, captureState, notes) &&
+    !isEmailStepComplete(profile, captureState, notes)
   ) {
     missing.push("email");
   }
@@ -200,21 +275,40 @@ function getMissingFields(profile) {
   return sortMissingFields(missing);
 }
 
-function getNextMissingField(profile) {
-  const missing = getMissingFields(profile);
+function getNextMissingField(profile, options = {}) {
+  const missing = getMissingFields(profile, options);
   return missing[0] || null;
 }
 
-function getPreScheduleMissingFields(profile) {
-  return getMissingFields(profile).filter((field) => PRE_SCHEDULE_FIELDS.has(field));
+function getPreScheduleMissingFields(profile, options = {}) {
+  return getMissingFields(profile, options).filter((field) => PRE_SCHEDULE_FIELDS.has(field));
 }
 
-function isPreScheduleQualificationComplete(profile) {
-  return getPreScheduleMissingFields(profile).length === 0 && Boolean(getEffectiveInterviewType(profile));
+function isPreScheduleQualificationComplete(profile, options = {}) {
+  return (
+    getPreScheduleMissingFields(profile, options).length === 0 &&
+    Boolean(getEffectiveInterviewType(profile, "", options))
+  );
 }
 
-function canBeginScheduling(profile) {
-  return isPreScheduleQualificationComplete(profile) && !isScheduleComplete(profile);
+function canBeginScheduling(profile, options = {}) {
+  const notes = options.notes || null;
+  const captureState = options.captureState || defaultCaptureState();
+
+  return (
+    isDayPartExplicitlyCaptured(profile, captureState, notes) &&
+    isInterviewTypeExplicitlyCaptured(profile, captureState, notes) &&
+    isPreScheduleQualificationComplete(profile, options) &&
+    !isScheduleComplete(profile)
+  );
+}
+
+function resolveIsLocal(profile) {
+  if (!profile?.city) {
+    return null;
+  }
+
+  return evaluateCoverage({ city: profile.city, state: profile.state }).coverage === "LOCAL";
 }
 
 function buildQualificationBrain(prospect, options = {}) {
@@ -224,10 +318,23 @@ function buildQualificationBrain(prospect, options = {}) {
       ? options.schedulingState
       : parseSchedulingState(prospect?.notes);
   const message = options.message || "";
+  const captureState =
+    options.captureState !== undefined
+      ? options.captureState
+      : parseQualificationCapture(prospect?.notes);
+  const brainOptions = {
+    notes: prospect?.notes || null,
+    captureState
+  };
 
   let profile = buildProfileFromProspect(prospect, channel);
 
-  if (options.applyRules !== false && profile.city) {
+  if (
+    options.applyRules !== false &&
+    isLocationExplicitlyComplete(profile, captureState, prospect?.notes) &&
+    isAuthorizationExplicitlyCaptured(profile, captureState, prospect?.notes) &&
+    profile.authorization !== false
+  ) {
     const rules = applyBusinessRulesToProfile(
       { ...profile },
       message,
@@ -236,11 +343,13 @@ function buildQualificationBrain(prospect, options = {}) {
     profile = rules.profile;
   }
 
-  const missingFields = getMissingFields(profile);
-  const nextField = getNextMissingField(profile);
-  const currentStep = deriveCurrentStep(profile, schedulingState);
-  const interviewType = getEffectiveInterviewType(profile, message);
-  const preScheduleFields = getPreScheduleMissingFields(profile);
+  const missingFields = getMissingFields(profile, brainOptions);
+  const nextField = getNextMissingField(profile, brainOptions);
+  const currentStep = deriveCurrentStep(profile, schedulingState, brainOptions);
+  const interviewType = getEffectiveInterviewType(profile, message, brainOptions);
+  const preScheduleFields = getPreScheduleMissingFields(profile, brainOptions);
+  const schedulingEligible = canBeginScheduling(profile, brainOptions);
+  const isLocal = resolveIsLocal(profile);
 
   return {
     profile,
@@ -248,47 +357,61 @@ function buildQualificationBrain(prospect, options = {}) {
     nextField,
     currentStep,
     interviewType,
+    dayPart: profile.dayPart,
     preScheduleFields,
+    captureState,
     schedulingState,
-    isPreScheduleQualificationComplete: isPreScheduleQualificationComplete(profile),
-    canBeginScheduling: canBeginScheduling(profile),
-    isScheduleComplete: isScheduleComplete(profile)
+    isLocal,
+    isPreScheduleQualificationComplete: isPreScheduleQualificationComplete(profile, brainOptions),
+    canBeginScheduling: schedulingEligible,
+    schedulingEligibleReason: explainSchedulingEligibility(
+      profile,
+      captureState,
+      prospect?.notes || null,
+      missingFields
+    ),
+    isScheduleComplete: isScheduleComplete(profile),
+    calendarChecked: Boolean(schedulingState?.offeredTimes?.length || schedulingState?.offeredDays?.length),
+    handoffRequired: false,
+    handoffReason: null
   };
 }
 
-function deriveCurrentStep(profile, schedulingState) {
-  if (profile.confirmed || profile.calendarEventId) {
+function deriveCurrentStep(profile, schedulingState, options = {}) {
+  if (profile.calendarEventId) {
     return "CONFIRMED";
   }
 
-  const nextField = getNextMissingField(profile);
+  const nextField = getNextMissingField(profile, options);
 
   switch (nextField) {
-    case "authorization":
-      return "WORK_AUTHORIZATION";
-    case "occupation":
-      return "OCCUPATION";
     case "city":
     case "state":
       return "GREETING";
+    case "authorization":
+      return "WORK_AUTHORIZATION";
     case "interviewType":
       return "INTERVIEW_TYPE";
+    case "dayPart":
+      return "DAY_PART";
     case "schedule":
-      return schedulingState?.phase ? "SCHEDULE" : "INTERVIEW_TYPE";
+      return schedulingState?.phase ? "SCHEDULE" : "DAY_PART";
+    case "name":
+      return "NAME";
     case "email":
       return "EMAIL";
     default:
       break;
   }
 
-  if (isScheduleComplete(profile) && !emailRequired(profile)) {
+  if (isScheduleComplete(profile) && nextField === null) {
     return "EMAIL";
   }
 
-  return "CONFIRMED";
+  return nextField || "GREETING";
 }
 
-function profileToProspectUpdates(profile, schedulingState = null) {
+function profileToProspectUpdates(profile, schedulingState = null, options = {}) {
   const updates = {
     city: profile.city,
     state: profile.state,
@@ -297,7 +420,8 @@ function profileToProspectUpdates(profile, schedulingState = null) {
     interview_type: profile.interviewType,
     interview_time: profile.preferredTime,
     appointment_date: profile.appointmentDate,
-    current_step: deriveCurrentStep(profile, schedulingState),
+    name: profile.name,
+    current_step: deriveCurrentStep(profile, schedulingState, options),
     appointment_type: profile.schedulingPhase
   };
 
@@ -331,6 +455,7 @@ module.exports = {
   getEffectiveInterviewType,
   isInterviewTypeRequired,
   resolveInterviewTypeDecision,
+  resolveIsLocal,
   emailRequired,
   isScheduleComplete
 };

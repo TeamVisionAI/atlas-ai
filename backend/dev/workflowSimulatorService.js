@@ -130,6 +130,12 @@ async function createSimulatorProspect(payload = {}) {
     const sanitizedSeed = { ...seed };
     delete sanitizedSeed.last_message;
 
+    await updateProspect(phone, {
+      notes: require("../core/qualificationCaptureState").encodeQualificationCapture(
+        require("../core/qualificationCaptureState").defaultCaptureState()
+      )
+    });
+
     if (Object.keys(sanitizedSeed).length > 0) {
       await updateProspect(phone, sanitizedSeed);
     }

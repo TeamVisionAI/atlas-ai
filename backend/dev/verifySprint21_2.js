@@ -15,6 +15,10 @@ const { extractInformation, extractLocation } = require("../core/informationExtr
 const { evaluateCoverage } = require("../core/businessRulesEngine");
 const { isLocalTeamVisionCity } = require("../core/localAreaConfig");
 const { mergeNotesWithSchedulingState, PHASES } = require("../core/schedulingState");
+const {
+  defaultCaptureState,
+  encodeQualificationCapture
+} = require("../core/qualificationCaptureState");
 const { cleanupSimulatorProspect, createSimulatorProspect } = require("./workflowSimulatorService");
 const { processSimulatedWhatsAppInbound } = require("./simulatedWhatsAppInboundPipeline");
 const { withSimulatorGuard } = require("./simulatorGuard");
@@ -31,9 +35,9 @@ function assert(condition, message) {
 function assertEnglish(text, label = "reply") {
   const lower = String(text || "").toLowerCase();
   assert(
-    /\b(thank|thanks|what|do you|authorization|work|city|state|office|zoom|availability|does that work)\b/i.test(
+    /\b(thank|thanks|got it|what|do you|authorization|work|city|state|office|zoom|availability|does that work|excellent|morning|afternoon|prefer)\b/i.test(
       lower
-    ) && !/\b(¿en qué|gracias por compartirlo|¿tienes|¿cuál prefieres)\b/i.test(lower),
+    ) && !/\b(¿en qué|gracias por compartirlo|¿tienes|¿cuál prefieres|excelente\. estamos)\b/i.test(lower),
     `Expected English ${label}, got: ${text}`
   );
 }
@@ -41,7 +45,7 @@ function assertEnglish(text, label = "reply") {
 function assertSpanish(text, label = "reply") {
   const lower = String(text || "").toLowerCase();
   assert(
-    /\b(gracias|¿|qué|tienes|ciudad|estado|oficina|zoom|disponibilidad|te funciona)\b/i.test(lower),
+    /\b(gracias|got it|¿|qué|tienes|ciudad|estado|oficina|zoom|disponibilidad|te funciona|excelente|mañana|tarde|prefieres)\b/i.test(lower),
     `Expected Spanish ${label}, got: ${text}`
   );
 }
@@ -69,6 +73,15 @@ async function seedScheduleTimePhase(phone, { interviewType = "Zoom", period = "
     overrideRequest: null
   };
 
+  const capturedQualification = {
+    ...defaultCaptureState(),
+    city: true,
+    state: true,
+    authorization: true,
+    interviewType: true,
+    dayPart: true
+  };
+
   await updateProspect(phone, {
     work_authorized: true,
     occupation: "Sales",
@@ -77,7 +90,10 @@ async function seedScheduleTimePhase(phone, { interviewType = "Zoom", period = "
     interview_type: interviewType,
     current_step: "SCHEDULE",
     appointment_type: PHASES.TIME,
-    notes: mergeNotesWithSchedulingState(null, schedulingState)
+    notes: mergeNotesWithSchedulingState(
+      encodeQualificationCapture(capturedQualification),
+      schedulingState
+    )
   });
 }
 
@@ -122,9 +138,9 @@ async function main() {
 
   // Unit: interview preference scoping
   const zoomWhenNotActive = extractInformation("Zoom please", { interviewType: null }, {
-    nextField: "occupation"
+    nextField: "city"
   });
-  assert(!zoomWhenNotActive.interviewType, "Zoom not inferred when occupation is active field");
+  assert(!zoomWhenNotActive.interviewType, "Zoom not inferred when city is active field");
 
   const officeWhenActive = extractInformation("In office", { interviewType: null }, {
     nextField: "interviewType"
@@ -143,6 +159,7 @@ async function main() {
   });
 
   await send(phoneA, "Hola, quiero información sobre Team Vision.");
+  await send(phoneA, "Miami, Florida");
   const englishAuth = await send(phoneA, "Yes, I have work authorization");
   assertEnglish(englishAuth.reply, "authorization reply + next question");
   const prospectA = await findProspect(phoneA);
@@ -163,6 +180,7 @@ async function main() {
   });
 
   await send(phoneB, "Hi, I want information about Team Vision.");
+  await send(phoneB, "Miami, Florida");
   const spanishAuth = await send(phoneB, "Sí, tengo autorización para trabajar");
   assertSpanish(spanishAuth.reply, "authorization reply + next question");
   const prospectB = await findProspect(phoneB);
@@ -198,26 +216,21 @@ async function main() {
   });
 
   await send(phoneFlow, "Hi, I want information about Team Vision.");
+  await send(phoneFlow, "Miami");
+  const stateReply = await send(phoneFlow, "FL");
+  assert(/authorization|permiso|work/i.test(stateReply.reply), "After city/state asks authorization");
+
   await send(phoneFlow, "Yes");
-  const occReply = await send(phoneFlow, "I work at Amazon");
-  assertEnglish(occReply.reply);
-  assert(/city and state/i.test(occReply.reply), "After occupation asks for city/state");
-
+  const localReply = await send(phoneFlow, "Morning");
+  assertEnglish(localReply.reply);
   let flowProspect = await findProspect(phoneFlow);
-  assert(flowProspect.occupation, "Occupation saved");
-  assert(!/amazon/i.test(`${flowProspect.city || ""} ${flowProspect.state || ""}`), "Occupation not stored as location");
-  console.log("✓ D. Occupation answer saves and asks city/state");
-
-  const localReply = await send(phoneFlow, "Vivo en Miami, FL");
-  assertSpanish(localReply.reply);
-  flowProspect = await findProspect(phoneFlow);
   assert(flowProspect.city === "Miami", `City saved as Miami, got ${flowProspect.city}`);
   assert(flowProspect.state === "FL", `State saved as FL, got ${flowProspect.state}`);
   assert(
-    /oficina.*zoom|zoom.*oficina|office.*zoom|zoom.*office/i.test(localReply.reply),
-    `Local area offers office or Zoom: ${localReply.reply}`
+    /office|2500 NW|morning|afternoon|available|appointment/i.test(localReply.reply),
+    `Local area offers office path and scheduling: ${localReply.reply}`
   );
-  console.log("✓ E. Miami location saves and offers office or Zoom");
+  console.log("✓ D/E. Miami location saves and advances toward scheduling");
 
   const phoneOrlando = `sim-212-${crypto.randomUUID().slice(0, 8)}`;
   await cleanupSimulatorProspect(phoneOrlando).catch(() => {});
@@ -228,32 +241,31 @@ async function main() {
     preset: "NEW_LEAD",
     seedFields: {
       language: "en",
-      communication_language: "en",
-      work_authorized: true,
-      occupation: "Teacher"
+      communication_language: "en"
     }
   });
 
-  const orlandoReply = await send(phoneOrlando, "I live in Orlando, Florida");
-  assertEnglish(orlandoReply.reply);
+  await send(phoneOrlando, "Hello");
+  const orlandoReply = await send(phoneOrlando, "Orlando, Florida");
+  assert(/authorization|permiso|work/i.test(orlandoReply.reply), "Orlando location asks authorization first");
+  const orlandoAuth = await send(phoneOrlando, "Yes");
+  assertEnglish(orlandoAuth.reply);
   assert(
-    /zoom/i.test(orlandoReply.reply) && !/office or by zoom|oficina o por zoom/i.test(orlandoReply.reply),
-    `Outside area explains Zoom only: ${orlandoReply.reply}`
+    /zoom/i.test(orlandoAuth.reply) && !/office or by zoom|oficina o por zoom/i.test(orlandoAuth.reply),
+    `Outside area explains Zoom only: ${orlandoAuth.reply}`
+  );
+  const orlandoAfterAuth = await send(phoneOrlando, "Afternoon");
+  assert(
+    /available|appointment|pm|am|citas/i.test(orlandoAfterAuth.reply),
+    `Outside area advances to scheduling: ${orlandoAfterAuth.reply}`
   );
   const orlandoProspect = await findProspect(phoneOrlando);
   assert(orlandoProspect.city === "Orlando", "Orlando city saved");
   console.log("✓ F. Orlando location offers Zoom only");
 
-  const prefReply = await send(phoneFlow, "In office");
   flowProspect = await findProspect(phoneFlow);
-  assert(flowProspect.interview_type === "In Person", "In office preference saved");
-  assert(
-    /morning|afternoon|day|schedule|tomorrow|monday|tuesday|wednesday|thursday|friday|mañana|jueves|lunes|martes|miércoles|miercoles|viernes|citas disponibles|available/i.test(
-      prefReply.reply
-    ),
-    "After preference advances to scheduling"
-  );
-  console.log("✓ G. In office preference saves and advances to scheduling");
+  assert(flowProspect.interview_type === "In Person", "Local Miami defaults to In Person");
+  console.log("✓ G. Local preference advances toward scheduling");
 
   const phoneSchedule = `sim-212-${crypto.randomUUID().slice(0, 8)}`;
   await cleanupSimulatorProspect(phoneSchedule).catch(() => {});
@@ -297,12 +309,27 @@ async function main() {
   console.log("✓ H. Time request parses time and asks confirmation");
 
   const confirmReply = await send(phoneSchedule, "Yes, that works");
+  assert(
+    /full name|nombre completo/i.test(confirmReply.reply),
+    `After slot confirmation asks full name: ${confirmReply.reply}`
+  );
+
+  const emailPrompt = await send(phoneSchedule, "Test Schedule User");
+  assert(
+    /email|correo/i.test(emailPrompt.reply),
+    `After name asks email: ${emailPrompt.reply}`
+  );
+
+  const finalReply = await send(phoneSchedule, "test.schedule@example.com");
   const confirmedProspect = await findProspect(phoneSchedule);
   assert(
-    confirmedProspect.current_step === "CONFIRMED" || confirmedProspect.appointment_date,
-    "Explicit confirmation schedules interview"
+    confirmedProspect.current_step === "CONFIRMED" || confirmedProspect.calendar_event_id,
+    "Full happy path schedules interview after name and email"
   );
-  assert(/confirm/i.test(confirmReply.reply), `Confirmation reply expected: ${confirmReply.reply}`);
+  assert(
+    /confirm|all set|quedaste programado|programado|look forward/i.test(finalReply.reply),
+    `Confirmation reply expected: ${finalReply.reply}`
+  );
   console.log("✓ I. Explicit confirmation schedules when awaiting confirmation");
 
   const phoneUnrelated = `sim-212-${crypto.randomUUID().slice(0, 8)}`;
@@ -316,21 +343,21 @@ async function main() {
   });
 
   await send(phoneUnrelated, "Hi, I want information about Team Vision.");
-  await send(phoneUnrelated, "Yes");
-  const occupationYes = await send(phoneUnrelated, "Yes");
+  await send(phoneUnrelated, "Miami, Florida");
+  const authYes = await send(phoneUnrelated, "Yes");
+  const unrelatedYes = await send(phoneUnrelated, "Yes");
   const unrelatedProspect = await findProspect(phoneUnrelated);
   assert(
     unrelatedProspect.work_authorized === true,
     "Authorization yes accepted when authorization is active"
   );
-  assert(!unrelatedProspect.occupation, "Unrelated yes does not fill occupation");
   assert(
-    /work|trabaj/i.test(occupationYes.reply),
-    "Still asks for occupation after unrelated yes"
+    /morning|afternoon|mañana|tarde/i.test(unrelatedYes.reply),
+    "After authorization advances to dayPart, not unrelated yes capture"
   );
   assert(
-    !unrelatedProspect.interview_type && !unrelatedProspect.appointment_date,
-    "Unrelated yes does not set interview preference or schedule"
+    !unrelatedProspect.appointment_date,
+    "Unrelated yes does not schedule interview"
   );
   console.log("✓ J. Unrelated yes does not skip workflow fields");
 

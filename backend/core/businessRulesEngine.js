@@ -203,10 +203,10 @@ function evaluateInterviewTypeDecision({
 
   if (coverageDecision.coverage === COVERAGE.LOCAL && !explicitRequest && !currentType) {
     return {
-      interviewType: null,
+      interviewType: INTERVIEW_TYPES.IN_PERSON,
       allowed: true,
       needsHumanCoordinator: false,
-      autoApplied: false,
+      autoApplied: true,
       coverage: coverageDecision.coverage,
       reason: null
     };
@@ -224,11 +224,10 @@ function evaluateInterviewTypeDecision({
 }
 
 function isInterviewTypeChoiceRequired({ city, state = null, interviewType }) {
-  if (!city || interviewType) {
-    return false;
-  }
-
-  return evaluateCoverage({ city, state }).coverage === COVERAGE.LOCAL;
+  void city;
+  void state;
+  void interviewType;
+  return false;
 }
 
 function evaluateSchedulingWindow({ hour, minute = 0 }) {

@@ -90,8 +90,15 @@ async function getMissionControlState(phone, options = {}) {
       nextField,
       missingFields,
       interviewType,
+      dayPart: qualification.dayPart,
+      captureState: qualification.captureState,
       canBeginScheduling: qualification.canBeginScheduling,
-      isPreScheduleQualificationComplete: qualification.isPreScheduleQualificationComplete
+      schedulingEligibleReason: qualification.schedulingEligibleReason,
+      isPreScheduleQualificationComplete: qualification.isPreScheduleQualificationComplete,
+      isLocal: qualification.isLocal,
+      calendarChecked: qualification.calendarChecked,
+      handoffRequired: qualification.handoffRequired,
+      handoffReason: qualification.handoffReason
     },
     businessRules: {
       localProspect: coverage.coverage === "LOCAL",

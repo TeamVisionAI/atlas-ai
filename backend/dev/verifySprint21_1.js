@@ -97,11 +97,8 @@ async function main() {
   await createSimulatorProspect({
     phone,
     name: "Sprint 21.1 Lead",
-    preset: "QUALIFICATION",
+    preset: "NEW_LEAD",
     seedFields: {
-      city: "Miami",
-      state: "FL",
-      work_authorized: true,
       language: "es",
       communication_language: "es"
     }
@@ -113,24 +110,25 @@ async function main() {
       body: "Hola, quiero información sobre Team Vision."
     });
 
-    const englishOccupation = await processSimulatedWhatsAppInbound({
+    const englishLocation = await processSimulatedWhatsAppInbound({
       phone,
-      body: "Unemployed"
+      body: "I live in Miami, Florida"
     });
 
-    assertReplyLanguage(englishOccupation.reply, "en");
-    const acknowledgementLine = String(englishOccupation.reply || "").split("\n\n")[0];
+    assertReplyLanguage(englishLocation.reply, "en");
+    const acknowledgementLine = String(englishLocation.reply || "").split("\n\n")[0];
     assert(
       !/excelente|perfecto|great|perfect/i.test(acknowledgementLine),
       `No praise in acknowledgement: ${acknowledgementLine}`
     );
     assert(
-      /thank you for sharing/i.test(acknowledgementLine),
-      `Neutral occupation acknowledgement expected: ${acknowledgementLine}`
+      /thanks|thank you|gracias/i.test(acknowledgementLine),
+      `Neutral location acknowledgement expected: ${acknowledgementLine}`
     );
 
     const prospectAfter = await findProspect(phone);
-    assert(prospectAfter?.occupation, "Occupation saved after answer");
+    assert(prospectAfter?.city === "Miami", "City saved after English location answer");
+    assert(prospectAfter?.state === "FL", "State saved after English location answer");
     assert(
       prospectAfter?.communication_language === "en" || prospectAfter?.language === "en",
       "English message persisted conversation language"

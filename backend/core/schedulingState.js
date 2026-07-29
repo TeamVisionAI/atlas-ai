@@ -49,21 +49,16 @@ function encodeSchedulingState(state) {
 
 function mergeNotesWithSchedulingState(existingNotes, state) {
   const emailMatch = String(existingNotes || "").match(/EMAIL:([^|]+)/i);
+  const qualCaptureMatch = String(existingNotes || "").match(/QUAL_CAPTURE:{[\s\S]*?}(?:\||$)/);
   const schedulingPart = encodeSchedulingState(state);
+  const qualPart = qualCaptureMatch ? qualCaptureMatch[0].replace(/\|$/, "") : null;
+  const parts = [qualPart, schedulingPart].filter(Boolean);
 
   if (emailMatch) {
-    return `${schedulingPart}|EMAIL:${emailMatch[1].trim()}`;
+    parts.push(`EMAIL:${emailMatch[1].trim()}`);
   }
 
-  if (String(existingNotes || "").startsWith(SCHEDULING_PREFIX)) {
-    return schedulingPart;
-  }
-
-  if (existingNotes && !String(existingNotes).includes(SCHEDULING_PREFIX)) {
-    return schedulingPart;
-  }
-
-  return schedulingPart;
+  return parts.join("|");
 }
 
 function clearSchedulingFromNotes(existingNotes, email) {

@@ -13,6 +13,10 @@ const {
   getMissingFields,
   buildProfileFromProspect
 } = require("../core/informationModel");
+const {
+  defaultCaptureState,
+  encodeQualificationCapture
+} = require("../core/qualificationCaptureState");
 const { extractInformation } = require("../core/informationExtractor");
 const { getMissionControlState } = require("../core/missionControlReadModel");
 const { assessQualificationFromProspect } = require("../core/recruitingQualificationEngine");
@@ -48,20 +52,39 @@ async function main() {
   console.log("=== Sprint 21.3 Verification ===\n");
 
   const emptyProfile = buildProfileFromProspect({ phone: "test", current_step: "NEW" });
-  assert(getNextMissingField(emptyProfile) === "authorization", "Empty profile starts at authorization");
+  assert(getNextMissingField(emptyProfile) === "city", "Empty profile starts at city");
   assert(
-    getMissingFields(emptyProfile)[0] === "authorization",
+    getMissingFields(emptyProfile)[0] === "city",
     "Missing fields ordered by workflow"
   );
-  console.log("✓ Workflow field order is authorization-first");
+  assert(!getMissingFields(emptyProfile).includes("occupation"), "Occupation is not required");
+  console.log("✓ Workflow field order is city-first");
 
   const miamiOnly = extractInformation("Miami", { city: null, state: null }, { nextField: "city" });
   assert(miamiOnly.city === "Miami", "City-only answer captures Miami");
-  assert(!miamiOnly.state, "City-only answer does not auto-fill state");
+  assert(miamiOnly.state === "FL", "Recognized city infers Florida automatically");
 
-  const profileCityOnly = { ...emptyProfile, city: "Miami", authorization: true, occupation: "Sales" };
-  assert(getMissingFields(profileCityOnly).includes("state"), "State remains required after city-only save");
-  console.log("✓ City/state regression fixed — state not auto-skipped");
+  const profileCityOnly = { ...emptyProfile, city: "Miami", state: "FL", authorization: true, occupation: "Sales" };
+  const captureNotes = encodeQualificationCapture({
+    ...defaultCaptureState(),
+    city: true,
+    state: true
+  });
+  assert(
+    !getMissingFields(profileCityOnly, {
+      notes: captureNotes,
+      captureState: { ...defaultCaptureState(), city: true, state: true }
+    }).includes("state"),
+    "Recognized city does not require a separate state question"
+  );
+  assert(
+    getMissingFields(profileCityOnly, {
+      notes: encodeQualificationCapture(defaultCaptureState()),
+      captureState: defaultCaptureState()
+    }).includes("city"),
+    "Seeded city without capture still requires city step"
+  );
+  console.log("✓ Recognized city infers state (Happy Path v1.0)");
 
   const phoneFaq = `sim-213-${crypto.randomUUID().slice(0, 8)}`;
   await cleanupSimulatorProspect(phoneFaq).catch(() => {});
@@ -74,18 +97,16 @@ async function main() {
   });
 
   await send(phoneFaq, "Hi, I want information about Team Vision.");
-  await send(phoneFaq, "Yes");
+  await send(phoneFaq, "Miami, Florida");
   const faqReply = await send(phoneFaq, "What is this about?");
-  assert(/great question|financial services/i.test(faqReply.reply), "FAQ answered naturally");
-  assert(/work|occupation|currently do/i.test(faqReply.reply), "FAQ returns to occupation step");
-  assert(/now that i've explained/i.test(faqReply.reply.toLowerCase()), "FAQ uses workflow transition");
+  assert(/financial|servicios financieros/i.test(faqReply.reply), `FAQ answered naturally: ${faqReply.reply}`);
+  assert(/authorization|permiso|work/i.test(faqReply.reply), "FAQ returns to authorization step");
 
   const faqProspect = await findProspect(phoneFaq);
-  assert(!faqProspect.occupation, "FAQ does not advance occupation");
-  assert(faqProspect.work_authorized === true, "Authorization preserved after FAQ");
+  assert(faqProspect.work_authorized !== true, "FAQ does not capture authorization");
 
   const faqBrain = buildQualificationBrain(faqProspect, { message: "What is this about?" });
-  assertBrainConsistency("FAQ turn", faqBrain, "occupation");
+  assertBrainConsistency("FAQ turn", faqBrain, "authorization");
   console.log("✓ FAQ answered without advancing workflow");
 
   const phoneFlow = `sim-213-${crypto.randomUUID().slice(0, 8)}`;
@@ -99,14 +120,12 @@ async function main() {
   });
 
   await send(phoneFlow, "Hello");
-  await send(phoneFlow, "Yes");
-  await send(phoneFlow, "Teacher");
-  const cityReply = await send(phoneFlow, "Miami");
-  assert(/state/i.test(cityReply.reply), "After city-only, Atlas asks for state");
+  const afterCity = await send(phoneFlow, "Miami");
+  assert(/permiso|authorization|work/i.test(afterCity.reply), "Recognized city skips state and asks authorization");
 
-  await send(phoneFlow, "FL");
+  await send(phoneFlow, "Yes");
   const flowProspect = await findProspect(phoneFlow);
-  assert(flowProspect.city === "Miami" && flowProspect.state === "FL", "City and state saved separately");
+  assert(flowProspect.city === "Miami" && flowProspect.state === "FL", "Recognized city persists inferred Florida");
 
   const flowBrain = buildQualificationBrain(flowProspect);
   const flowAssessment = assessQualificationFromProspect(flowProspect);
@@ -130,21 +149,18 @@ async function main() {
     preset: "NEW_LEAD",
     seedFields: {
       language: "en",
-      work_authorized: true,
-      occupation: "Sales"
+      communication_language: "en"
     }
   });
 
-  const localLocationReply = await send(phoneLocal, "I live in Miami, Florida");
-  assert(/office.*zoom|zoom.*office/i.test(localLocationReply.reply), "Local prospect offered office or Zoom");
+  await send(phoneLocal, "Hello");
+  await send(phoneLocal, "Miami, Florida");
+  await send(phoneLocal, "Yes");
+  const localLocationReply = await send(phoneLocal, "Morning");
+  assert(/office|2500 NW|morning|afternoon|available|appointment/i.test(localLocationReply.reply), "Local prospect offered office path and scheduling");
 
-  const localReply = await send(phoneLocal, "In office");
   const localProspect = await findProspect(phoneLocal);
-  assert(localProspect.interview_type === "In Person", "In office preference saved for local prospect");
-  assert(
-    /appointment|tomorrow|thursday|schedule|morning|afternoon|day/i.test(localReply.reply),
-    "Local prospect advances to scheduling after preference"
-  );
+  assert(localProspect.interview_type === "In Person", "Local prospect defaults to In Person");
   console.log("✓ Local interview routing preserved");
 
   const phoneRemote = `sim-213-${crypto.randomUUID().slice(0, 8)}`;
@@ -156,15 +172,42 @@ async function main() {
     preset: "NEW_LEAD",
     seedFields: {
       language: "en",
-      work_authorized: true,
-      occupation: "Sales"
+      communication_language: "en"
     }
   });
 
-  const remoteReply = await send(phoneRemote, "I live in Orlando, Florida");
-  assert(/zoom/i.test(remoteReply.reply), "Remote prospect gets Zoom path");
-  assert(!/office or by zoom/i.test(remoteReply.reply), "Remote prospect not offered office");
+  await send(phoneRemote, "Hello");
+  const remoteReply = await send(phoneRemote, "Orlando, Florida");
+  assert(/authorization|permiso|work/i.test(remoteReply.reply), "Remote prospect asked authorization after location");
+  assert(!/office or by zoom|office.*zoom/i.test(remoteReply.reply), "Remote prospect not offered office choice");
+  const authRemote = await send(phoneRemote, "Yes");
+  assert(/zoom/i.test(authRemote.reply), "Remote prospect gets Zoom path after authorization");
+  const remoteAfterAuth = await send(phoneRemote, "Afternoon");
+  assert(/available|appointment|pm|am|citas/i.test(remoteAfterAuth.reply), "Remote prospect advances to scheduling");
   console.log("✓ Remote interview routing preserved");
+
+  const phoneSeeded = `sim-213-${crypto.randomUUID().slice(0, 8)}`;
+  await cleanupSimulatorProspect(phoneSeeded).catch(() => {});
+
+  await createSimulatorProspect({
+    phone: phoneSeeded,
+    name: "Sprint 21.3 Seeded Bypass",
+    preset: "QUALIFICATION",
+    seedFields: { language: "en", work_authorized: true, occupation: "Sales" }
+  });
+
+  const seededProspect = await findProspect(phoneSeeded);
+  const seededBrain = buildQualificationBrain(seededProspect);
+  assert(seededProspect.city === "Miami", "Seed may preload city for display");
+  assert(seededBrain.nextField === "city", "Seeded city does not bypass city collection");
+  assert(!seededBrain.canBeginScheduling, "Seeded location does not enable scheduling");
+  assert(
+    /blocked: city not captured|blocked: state not captured|blocked: city present in profile|blocked: state present in profile/i.test(
+      seededBrain.schedulingEligibleReason
+    ),
+    `Scheduling blocked with reason: ${seededBrain.schedulingEligibleReason}`
+  );
+  console.log("✓ Simulator seed cannot bypass explicit city/state capture");
 
   const offeredDays = getOfferedDays("Zoom").map((day) => toDateKey(day));
   assert(offeredDays.length > 0, "Scheduling reads capacity-backed offered days");
@@ -189,20 +232,20 @@ async function main() {
   });
 
   await send(phoneReview, "Hi");
-  await send(phoneReview, "Yes");
+  await send(phoneReview, "Miami, Florida");
   const reviewProspect = await findProspect(phoneReview);
   const reviewMission = await getMissionControlWithActions(phoneReview, {
     reviewMode: true,
     organizationId: reviewProspect.organization_id
   });
 
-  assert(reviewMission?.brain?.nextField === "occupation", "Review Mission Control nextField matches workflow");
+  assert(reviewMission?.brain?.nextField === "authorization", "Review Mission Control nextField matches workflow");
   assert(
-    /occupation|Next field: occupation/i.test(reviewMission.atlasBrief.summary.join(" ")),
+    /authorization|Next field: authorization/i.test(reviewMission.atlasBrief.summary.join(" ")),
     "Atlas Brief reflects same next field"
   );
   assert(
-    /occupation/i.test(reviewMission.aiActionCenter?.reason || ""),
+    /authorization/i.test(reviewMission.aiActionCenter?.reason || ""),
     "AI Action Center reason references same next field"
   );
   console.log("✓ Mission Control, Atlas Brief, and AI Action Center aligned");
@@ -219,6 +262,7 @@ async function main() {
   await cleanupSimulatorProspect(phoneFlow).catch(() => {});
   await cleanupSimulatorProspect(phoneLocal).catch(() => {});
   await cleanupSimulatorProspect(phoneRemote).catch(() => {});
+  await cleanupSimulatorProspect(phoneSeeded).catch(() => {});
   await cleanupSimulatorProspect(phoneReview).catch(() => {});
 
   console.log("\n=== Sprint 21.3 Verification PASSED ===");

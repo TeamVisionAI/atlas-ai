@@ -101,7 +101,29 @@ function buildDayQuestionFromSchedule(schedule, language) {
   return `Great! We have interview appointments available ${joined}. Which day works better for you?\n\n${labels.join("\n\n")}`;
 }
 
-function buildInitialSchedulingStateFromSchedule(schedule, occupation, interviewType) {
+function buildInitialSchedulingStateFromDayPart(dayPart, interviewType, occupation = null) {
+  const offeredDays = getOfferedDays(interviewType).map((day) => toDateKey(day));
+  const selectedDay = offeredDays[0] || null;
+  const offeredTimes = selectedDay
+    ? buildOfferedTimes(selectedDay, interviewType, dayPart).slice(0, 2)
+    : [];
+
+  return {
+    ...defaultState(),
+    phase: offeredTimes.length ? PHASES.TIME : PHASES.DAY,
+    offeredDays,
+    selectedDay,
+    period: dayPart,
+    offeredTimes,
+    isWorking: isProspectWorking(occupation, occupation)
+  };
+}
+
+function buildInitialSchedulingStateFromSchedule(schedule, occupation, interviewType, dayPart = null) {
+  if (dayPart) {
+    return buildInitialSchedulingStateFromDayPart(dayPart, interviewType, occupation);
+  }
+
   const offeredDays = schedule.days
     .map((day) => day.dateKey)
     .filter(Boolean);
@@ -122,6 +144,7 @@ module.exports = {
   getSchedulingOptions,
   buildDayQuestionFromSchedule,
   buildInitialSchedulingStateFromSchedule,
+  buildInitialSchedulingStateFromDayPart,
   getInterviewPreferenceQuestion,
   getScheduleQuestion,
   parseInterviewType,

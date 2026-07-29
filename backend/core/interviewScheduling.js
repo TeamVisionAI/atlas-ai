@@ -19,6 +19,10 @@ const {
 } = require("./capacityEngine");
 const { PHASES, defaultState } = require("./schedulingState");
 const {
+  parseQualificationCapture,
+  mergeNotesWithQualificationCapture
+} = require("./qualificationCaptureState");
+const {
   evaluateOccupationScheduling,
   evaluateSameDayEligibility,
   evaluateSchedulingWindow
@@ -559,14 +563,37 @@ function shouldHandleScheduleOverride(message, override, state) {
   );
 }
 
+function stripSchedulingFromNotes(notes) {
+  return String(notes || "")
+    .replace(/\|?SCHEDULING:{[\s\S]*?}(?:\||$)/, "")
+    .replace(/^\|+/, "")
+    .trim();
+}
+
+function preserveQualificationNotes(notes) {
+  const schedulingState = parseSchedulingState(notes);
+  let preserved = mergeNotesWithQualificationCapture(
+    stripSchedulingFromNotes(notes),
+    parseQualificationCapture(notes)
+  );
+
+  if (schedulingState?.period) {
+    preserved = preserved
+      ? `${preserved}|DAY_PART:${schedulingState.period}`
+      : `DAY_PART:${schedulingState.period}`;
+  }
+
+  return preserved;
+}
+
 function buildExactTimeReply(timeKey, language) {
   const label = formatTimeLabel(timeKey, language);
 
   if (language === "es") {
-    return `Entendido. Tengo disponible a las ${label}.`;
+    return `Perfecto. Tengo disponible a las ${label}.`;
   }
 
-  return `Got it. I have ${label} available.`;
+  return `Perfect. I have ${label} available.`;
 }
 
 function buildPendingConfirmationQuestion(pending, language) {
@@ -626,7 +653,7 @@ function buildPendingConfirmationState(state, selectedTime, language) {
 
 function buildPendingConfirmationReply(state, language, personality) {
   return buildScheduleReply({
-    acknowledgement: language === "es" ? "Entendido." : "Got it.",
+    acknowledgement: "",
     question: buildPendingConfirmationQuestion(state.pendingConfirmation, language),
     personality
   });
@@ -893,12 +920,12 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
       const pending = state.pendingConfirmation || state.selectedTime;
 
       if (!pending) {
-        return {
-          replyText: buildScheduleReply({
-            acknowledgement: language === "es" ? "Entendido." : "Got it.",
-            question: buildDayQuestion(defaultState(), language),
-            personality
-          }),
+      return {
+        replyText: buildScheduleReply({
+          acknowledgement: "",
+          question: buildDayQuestion(defaultState(), language),
+          personality
+        }),
           prospectUpdates: {
             notes: mergeNotesWithSchedulingState(prospect.notes, defaultState()),
             appointment_type: PHASES.DAY,
@@ -933,11 +960,8 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
 
       return {
         replyText: buildScheduleReply({
-          acknowledgement:
-            language === "es"
-              ? "Tu entrevista quedó confirmada."
-              : "Your interview is confirmed.",
-          question: language === "es" ? "¡Esperamos conocerte!" : "We look forward to meeting you!",
+          acknowledgement: language === "es" ? "Perfecto." : "Perfect.",
+          question: "",
           personality: {
             ...personality,
             tone: "professional"
@@ -947,11 +971,11 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
           interview_time: finalized.slot.label,
           appointment_date: finalized.slot.startTimeISO,
           appointment_type: null,
-          notes: null,
-          current_step: "CONFIRMED",
+          notes: preserveQualificationNotes(prospect.notes),
+          current_step: "NAME",
           last_message: message
         },
-        complete: true
+        slotConfirmed: true
       };
     }
 
@@ -1081,7 +1105,7 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
     if (!selectedDay) {
       return {
         replyText: buildScheduleReply({
-          acknowledgement: language === "es" ? "Entendido." : "Got it.",
+          acknowledgement: "",
           question: buildDayQuestion(state, language),
           personality
         }),
@@ -1119,7 +1143,7 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
     if (!period) {
       return {
         replyText: buildScheduleReply({
-          acknowledgement: language === "es" ? "Entendido." : "Got it.",
+          acknowledgement: "",
           question: buildPeriodQuestion(state, language),
           personality
         }),
@@ -1171,7 +1195,7 @@ function handleScheduleTurn({ prospect, message, language, personality }) {
   if (!selectedTime) {
     return {
       replyText: buildScheduleReply({
-        acknowledgement: language === "es" ? "Entendido." : "Got it.",
+        acknowledgement: "",
         question: buildTimeQuestion(state, language),
         personality
       }),

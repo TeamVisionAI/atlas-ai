@@ -267,7 +267,7 @@ function extractLocation(message, options = {}) {
 
     if (isValidCityName(parsed.city)) {
       result.city = parsed.city;
-      result.state = parsed.state;
+      result.state = parsed.state || inferStateFromCity(parsed.city);
     }
   }
 
@@ -292,13 +292,14 @@ function isLikelyQuestion(message) {
 
 function extractAuthorization(message, nextField = null) {
   const text = normalize(message);
+  const asciiText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   if (nextField === "authorization") {
-    if (isYes(text)) {
+    if (isYes(text) || isYes(asciiText) || asciiText === "si" || asciiText === "yes") {
       return true;
     }
 
-    if (isNo(text)) {
+    if (isNo(text) || isNo(asciiText) || asciiText === "no") {
       return false;
     }
   }
@@ -389,11 +390,16 @@ function extractOccupation(message, existingOccupation, nextField = null) {
 }
 
 function extractInterviewType(message, nextField = null) {
-  if (nextField !== "interviewType") {
+  const text = normalize(message);
+
+  if (detectLocalZoomPreference(message)) {
+    return INTERVIEW_TYPES.ZOOM;
+  }
+
+  if (nextField !== "interviewType" && nextField !== "dayPart") {
     return null;
   }
 
-  const text = normalize(message);
   const officePatterns = [
     "office",
     "in office",
@@ -433,11 +439,79 @@ function extractScheduleConfirmation(message, options = {}) {
   return isScheduleConfirmation(message);
 }
 
-function extractEmail(message) {
+function extractEmail(message, nextField = null) {
+  if (nextField && nextField !== "email") {
+    return null;
+  }
+
   const match = String(message || "").match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
 
   if (match) {
     return match[0].trim();
+  }
+
+  return null;
+}
+
+const EMAIL_DECLINE_PATTERNS = [
+  /^no\b/i,
+  /^nop\b/i,
+  /^nope\b/i,
+  /^skip\b/i,
+  /^paso\b/i,
+  /^no gracias\b/i,
+  /^prefiero no\b/i,
+  /\bno tengo correo\b/i,
+  /\bno tengo email\b/i,
+  /\bno quiero\b/i,
+  /\bsin correo\b/i,
+  /\bdon't have\b/i,
+  /\bdont have\b/i,
+  /\bprefer not\b/i,
+  /\bno email\b/i
+];
+
+function isEmailDeclined(message) {
+  const text = String(message || "").trim();
+
+  if (!text) {
+    return false;
+  }
+
+  const normalized = normalize(text);
+
+  return EMAIL_DECLINE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+const NAME_PREFIX_PATTERNS = [
+  /^(?:my name is|mi nombre es|me llamo|soy|i am|i'm)\s+(.+)$/i
+];
+
+function extractName(message, nextField = null) {
+  if (nextField !== "name") {
+    return null;
+  }
+
+  const text = String(message || "").trim();
+
+  if (!text || isLikelyQuestion(text) || isGreetingOrSmallTalk(text)) {
+    return null;
+  }
+
+  for (const pattern of NAME_PREFIX_PATTERNS) {
+    const match = text.match(pattern);
+
+    if (match?.[1]) {
+      const candidate = trimAtClause(match[1].trim());
+
+      if (candidate.length >= 2 && candidate.length <= 80) {
+        return candidate;
+      }
+    }
+  }
+
+  if (text.length >= 2 && text.length <= 80 && !extractEmail(text)) {
+    return trimAtClause(text);
   }
 
   return null;
@@ -449,6 +523,8 @@ function extractPreferredPeriod(message) {
   if (
     text.includes("morning") ||
     text.includes("mañana") ||
+    text.includes("manana") ||
+    text === "1" ||
     text.includes("before 5") ||
     text.includes("antes de las 5")
   ) {
@@ -458,6 +534,7 @@ function extractPreferredPeriod(message) {
   if (
     text.includes("afternoon") ||
     text.includes("tarde") ||
+    text === "2" ||
     text.includes("after 5") ||
     text.includes("después de las 5") ||
     text.includes("despues de las 5")
@@ -466,6 +543,77 @@ function extractPreferredPeriod(message) {
   }
 
   return null;
+}
+
+const LOCAL_ZOOM_PREFERENCE_PATTERNS = [
+  "prefiero zoom",
+  "no puedo ir a la oficina",
+  "no puedo ir",
+  "no tengo transporte",
+  "se me hace dificil llegar",
+  "se me hace difícil llegar",
+  "trabajo lejos",
+  "tengo niños",
+  "no puedo salir",
+  "can we do zoom",
+  "cannot make it to the office",
+  "can't make it to the office",
+  "cant make it to the office",
+  "prefer zoom",
+  "by zoom",
+  "por zoom"
+];
+
+const AUTHORIZATION_HANDOFF_PATTERNS = [
+  "renewal",
+  "renovacion",
+  "renovación",
+  "receipt",
+  "recibo",
+  "pending",
+  "pendiente",
+  "applied for",
+  "aplique",
+  "apllic",
+  "solicite",
+  "solicité",
+  "asylum",
+  "asilo",
+  "visa",
+  "ead",
+  "opt",
+  "cpt",
+  "tps",
+  "daca",
+  "parole",
+  "not sure",
+  "no estoy seguro",
+  "no estoy segura",
+  "depends",
+  "depende",
+  "immigration",
+  "inmigracion",
+  "inmigración",
+  "lawyer",
+  "abogado"
+];
+
+function detectLocalZoomPreference(message) {
+  const text = normalize(message);
+  return LOCAL_ZOOM_PREFERENCE_PATTERNS.some((pattern) => text.includes(pattern));
+}
+
+function isAuthorizationAmbiguous(message) {
+  const text = normalize(message);
+  return AUTHORIZATION_HANDOFF_PATTERNS.some((pattern) => text.includes(pattern));
+}
+
+function extractDayPart(message, nextField = null) {
+  if (nextField !== "dayPart" && nextField !== "interviewType") {
+    return null;
+  }
+
+  return extractPreferredPeriod(message);
 }
 
 function extractState(message, nextField = null, existingCity = null) {
@@ -516,31 +664,56 @@ function extractInformation(message, profile = {}, options = {}) {
     delete extracted.state;
   }
 
+  if (extracted.city && !extracted.state && (nextField === "city" || nextField === "state")) {
+    const inferredState = inferStateFromCity(extracted.city);
+    if (inferredState) {
+      extracted.state = inferredState;
+    }
+  }
+
   const authorization = extractAuthorization(message, nextField);
   if (authorization !== null && (profile.authorization === null || profile.authorization === undefined)) {
     extracted.authorization = authorization;
   }
 
   const occupation = extractOccupation(message, profile.occupation, nextField);
-  if (occupation) {
+  if (occupation && nextField === "occupation") {
     extracted.occupation = occupation;
   }
 
   if (!inSchedule) {
     const interviewType = extractInterviewType(message, nextField);
-    if (interviewType && !profile.interviewType) {
+    if (interviewType && (!profile.interviewType || detectLocalZoomPreference(message))) {
       extracted.interviewType = interviewType;
     }
   }
 
-  const email = extractEmail(message);
+  const email = extractEmail(message, nextField);
   if (email && !profile.email) {
     extracted.email = email;
   }
 
+  if (nextField === "email" && isEmailDeclined(message)) {
+    extracted.emailSkipped = true;
+  }
+
+  const prospectName = extractName(message, nextField);
+  if (prospectName) {
+    extracted.name = prospectName;
+  }
+
+  const dayPart = extractDayPart(message, nextField);
+  if (dayPart && !profile.dayPart) {
+    extracted.dayPart = dayPart;
+  }
+
   const preferredPeriod = extractPreferredPeriod(message);
-  if (preferredPeriod) {
-    extracted.preferredPeriod = preferredPeriod;
+  if (preferredPeriod && !profile.dayPart && (nextField === "dayPart" || nextField === "interviewType")) {
+    extracted.dayPart = preferredPeriod;
+  }
+
+  if (nextField === "authorization" && isAuthorizationAmbiguous(message)) {
+    extracted.authorizationAmbiguous = true;
   }
 
   if (inSchedule && detectScheduleOverride(message)) {
@@ -558,5 +731,10 @@ module.exports = {
   extractInterviewType,
   extractScheduleConfirmation,
   extractEmail,
+  extractName,
+  isEmailDeclined,
+  extractDayPart,
+  detectLocalZoomPreference,
+  isAuthorizationAmbiguous,
   isValidCityName
 };

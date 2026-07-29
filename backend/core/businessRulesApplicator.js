@@ -5,7 +5,7 @@ const {
 } = require("./businessRulesEngine");
 
 function applyBusinessRulesToProfile(profile, message = "", extractedType = null) {
-  if (!profile.city) {
+  if (!profile.city || !profile.state) {
     return { profile, escalation: null };
   }
 
@@ -35,6 +35,12 @@ function applyBusinessRulesToProfile(profile, message = "", extractedType = null
   if (typeDecision.autoApplied && typeDecision.interviewType) {
     profile.interviewType = typeDecision.interviewType;
   } else if (typeDecision.interviewType && explicitRequest) {
+    profile.interviewType = typeDecision.interviewType;
+  } else if (
+    typeDecision.interviewType &&
+    !profile.interviewType &&
+    typeDecision.coverage === "LOCAL"
+  ) {
     profile.interviewType = typeDecision.interviewType;
   }
 

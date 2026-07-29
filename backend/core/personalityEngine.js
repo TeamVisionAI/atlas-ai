@@ -147,7 +147,7 @@ function getPersonality({
   if (currentStep === "SCHEDULE") {
     return {
       tone: "professional",
-      acknowledgement: lang === "es" ? "Entendido." : "Got it.",
+      acknowledgement: "",
       transition: "",
       typingDelay: 1500,
       responseStyle: "professional",
@@ -207,7 +207,7 @@ function getPersonality({
 
   return {
     tone: "neutral",
-    acknowledgement: lang === "es" ? "Entendido." : "Got it.",
+    acknowledgement: "",
     transition: "",
     typingDelay: 1500,
     responseStyle: "friendly",

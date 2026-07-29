@@ -11,9 +11,9 @@ const {
   getEffectiveInterviewType
 } = require("./informationModel");
 
-const WORKFLOW_REQUIREMENT_FIELDS = new Set(["schedule", "email", "interviewType"]);
+const WORKFLOW_REQUIREMENT_FIELDS = new Set(["schedule", "name", "email"]);
 
-function profileWithEffectiveInterviewType(profile) {
+function profileWithEffectiveInterviewType(profile, options = {}) {
   if (!profile) {
     return profile;
   }
@@ -22,7 +22,7 @@ function profileWithEffectiveInterviewType(profile) {
     return profile;
   }
 
-  const effectiveType = getEffectiveInterviewType(profile);
+  const effectiveType = getEffectiveInterviewType(profile, "", options);
 
   if (!effectiveType) {
     return profile;
@@ -34,13 +34,17 @@ function profileWithEffectiveInterviewType(profile) {
   };
 }
 
-function assessQualificationFromProfile(profile) {
-  const normalizedProfile = profileWithEffectiveInterviewType(profile || {});
-  const missingFields = getMissingFields(normalizedProfile);
+function assessQualificationFromProfile(profile, options = {}) {
+  const brainOptions = {
+    notes: options.notes || null,
+    captureState: options.captureState
+  };
+  const normalizedProfile = profileWithEffectiveInterviewType(profile || {}, brainOptions);
+  const missingFields = getMissingFields(normalizedProfile, brainOptions);
   const preScheduleFields = missingFields.filter(
     (field) => !WORKFLOW_REQUIREMENT_FIELDS.has(field)
   );
-  const resolvedInterviewType = getEffectiveInterviewType(normalizedProfile);
+  const resolvedInterviewType = getEffectiveInterviewType(normalizedProfile, "", brainOptions);
   const isQualified =
     preScheduleFields.length === 0 && Boolean(resolvedInterviewType);
   const readyForScheduling =
@@ -71,14 +75,19 @@ function assessQualificationFromProfile(profile) {
     missingFields,
     preScheduleFields,
     confidence,
-    nextFocus: getNextMissingField(normalizedProfile) || (missingFields.includes("email") ? "email" : null),
-    nextField: getNextMissingField(normalizedProfile)
+    nextFocus: getNextMissingField(normalizedProfile, brainOptions) || (missingFields.includes("email") ? "email" : null),
+    nextField: getNextMissingField(normalizedProfile, brainOptions)
   };
 }
 
 function assessQualificationFromProspect(prospect, channel = "whatsapp") {
+  const { parseQualificationCapture } = require("./qualificationCaptureState");
   const profile = buildProfileFromProspect(prospect, channel);
-  const assessment = assessQualificationFromProfile(profile);
+  const captureState = parseQualificationCapture(prospect?.notes);
+  const assessment = assessQualificationFromProfile(profile, {
+    notes: prospect?.notes || null,
+    captureState
+  });
 
   return assessment;
 }

@@ -68,11 +68,21 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function toAsciiLower(text) {
+  return String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 function matchesPattern(text, pattern) {
   const normalized = normalize(text);
+  const asciiNormalized = toAsciiLower(text);
 
   if (pattern.length <= 2) {
-    return new RegExp(`\\b${escapeRegex(pattern)}\\b`, "i").test(normalized);
+    const asciiPattern = toAsciiLower(pattern);
+    return new RegExp(`\\b${escapeRegex(asciiPattern)}\\b`, "i").test(asciiNormalized);
   }
 
   return normalized.includes(pattern);

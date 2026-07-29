@@ -16,6 +16,7 @@ const {
   getSchedulingOptions,
   buildDayQuestionFromSchedule,
   buildInitialSchedulingStateFromSchedule,
+  buildInitialSchedulingStateFromDayPart,
   getInterviewPreferenceQuestion,
   getScheduleQuestion,
   handleScheduleTurn,
@@ -40,13 +41,40 @@ const {
   canBeginScheduling,
   isPreScheduleQualificationComplete
 } = require("./informationModel");
+const {
+  defaultCaptureState,
+  parseQualificationCapture,
+  encodeQualificationCapture,
+  mergeNotesWithQualificationCapture,
+  markCapturedFields,
+  hasQualificationCaptureMarker,
+  isLocationExplicitlyComplete,
+  isAuthorizationExplicitlyCaptured
+} = require("./qualificationCaptureState");
+const { logQualificationBrainTurn } = require("./qualificationBrainLogger");
 const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
 const {
   buildHumanCoordinatorReply,
   buildCoverageScheduleIntro,
   buildInterviewPreferenceQuestion
 } = require("./conversationCopy");
-const { extractInformation } = require("./informationExtractor");
+const {
+  getFirstMessage,
+  getStateQuestion,
+  getAuthorizationQuestion,
+  getAuthorizationDeniedMessage,
+  getLocalOfficeDayPartMessage,
+  getRemoteZoomDayPartMessage,
+  getLocalZoomSwitchMessage,
+  getDayPartQuestion,
+  getNameQuestion,
+  getEmailCollectionQuestion,
+  getHandoffMessage,
+  getCanonicalFaqAnswer,
+  buildBookingConfirmation
+} = require("./teamVisionWorkflowCopy");
+const { evaluateCoverage } = require("./businessRulesEngine");
+const { extractInformation, detectLocalZoomPreference, isAuthorizationAmbiguous, isEmailDeclined } = require("./informationExtractor");
 const {
   resolveConversationLanguage,
   detectMessageLanguage
@@ -88,7 +116,7 @@ function detectLanguage(prospect, message) {
 
 function buildShortAcknowledgement(extracted, language) {
   if (!extracted || !Object.keys(extracted).length) {
-    return language === "es" ? "Entendido." : "Got it.";
+    return "";
   }
 
   if (extracted.occupation) {
@@ -99,7 +127,7 @@ function buildShortAcknowledgement(extracted, language) {
 
   if (extracted.authorization !== undefined) {
     if (extracted.authorization === false) {
-      return language === "es" ? "Entendido." : "Got it.";
+      return "";
     }
 
     return language === "es" ? "Gracias." : "Thanks.";
@@ -109,15 +137,46 @@ function buildShortAcknowledgement(extracted, language) {
     return language === "es" ? "Gracias." : "Thanks.";
   }
 
-  if (extracted.interviewType) {
-    return language === "es" ? "Entendido." : "Got it.";
+  if (extracted.interviewType || extracted.dayPart) {
+    return language === "es" ? "Excelente." : "Excellent.";
+  }
+
+  if (extracted.name) {
+    return language === "es" ? "Gracias." : "Thanks.";
   }
 
   if (extracted.email) {
     return language === "es" ? "Gracias." : "Thanks.";
   }
 
-  return language === "es" ? "Entendido." : "Got it.";
+  return "";
+}
+
+function resolveWorkflowFaq(message, language) {
+  const text = String(message || "").toLowerCase();
+
+  if (
+    /de qu[eé] se trata|de qu[eé] trata|what is it about|what is this about|necesito experiencia|need experience|\bexperiencia\b/i.test(
+      text
+    )
+  ) {
+    return getCanonicalFaqAnswer(language);
+  }
+
+  return findFAQ(message, language);
+}
+
+function buildInterviewFormatQuestion(profile, language) {
+  const coverage = evaluateCoverage({
+    city: profile.city,
+    state: profile.state
+  });
+
+  if (coverage.coverage === "LOCAL") {
+    return getLocalOfficeDayPartMessage(language);
+  }
+
+  return getRemoteZoomDayPartMessage(language);
 }
 
 function buildQuestionForMissingField(field, profile, language, prospect) {
@@ -125,27 +184,19 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
 
   switch (field) {
     case "city":
-      return language === "es"
-        ? "¿En qué ciudad y estado vives actualmente?"
-        : "What city and state do you currently live in?";
+      return getFirstMessage(language);
 
     case "state":
-      return language === "es"
-        ? `¿En qué estado está ${profile.city}?`
-        : `Which state is ${profile.city} in?`;
+      return getStateQuestion(profile.city, language);
 
     case "authorization":
-      return language === "es"
-        ? "¿Tienes autorización legal para trabajar en los Estados Unidos?"
-        : "Do you have legal authorization to work in the United States?";
-
-    case "occupation":
-      return language === "es"
-        ? "¿En qué trabajas actualmente?"
-        : "What do you currently do for work?";
+      return getAuthorizationQuestion(language);
 
     case "interviewType":
-      return buildInterviewPreferenceQuestion(profile, language);
+      return buildInterviewFormatQuestion(profile, language);
+
+    case "dayPart":
+      return getDayPartQuestion(language);
 
     case "schedule": {
       const scheduleQuestion =
@@ -169,10 +220,11 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
       return scheduleQuestion;
     }
 
-    case "email": {
-      const { getEmailCollectionQuestion } = require("./teamVisionAppointmentRules");
+    case "email":
       return getEmailCollectionQuestion(language);
-    }
+
+    case "name":
+      return getNameQuestion(language);
 
     default:
       return language === "es"
@@ -183,12 +235,7 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
 
 function buildInformationalWorkflowReply(informationalReply, nextField, profile, language, prospect) {
   const question = buildQuestionForMissingField(nextField, profile, language, prospect);
-
-  if (language === "es") {
-    return `Gracias por preguntar.\n\n${informationalReply}\n\nAhora que te lo expliqué...\n\n${question}`;
-  }
-
-  return `That's a great question.\n\n${informationalReply}\n\nNow that I've explained it...\n\n${question}`;
+  return `${informationalReply}\n\n${question}`;
 }
 
 function hasWorkflowAdvancement(extracted) {
@@ -197,7 +244,7 @@ function hasWorkflowAdvancement(extracted) {
   }
 
   return Object.entries(extracted).some(([key, value]) => {
-    if (key === "preferredPeriod" || key === "scheduleOverride") {
+    if (key === "preferredPeriod" || key === "scheduleOverride" || key === "authorizationAmbiguous") {
       return false;
     }
 
@@ -206,11 +253,14 @@ function hasWorkflowAdvancement(extracted) {
 }
 
 async function initializeScheduleIfNeeded(prospect, profile) {
-  if (!isPreScheduleQualificationComplete(profile)) {
+  const captureState = parseQualificationCapture(prospect.notes);
+  const brainOptions = { notes: prospect.notes, captureState };
+
+  if (!canBeginScheduling(profile, brainOptions)) {
     return prospect;
   }
 
-  const interviewType = getEffectiveInterviewType(profile);
+  const interviewType = getEffectiveInterviewType(profile, "", brainOptions);
 
   if (!interviewType || isScheduleComplete(profile)) {
     return prospect;
@@ -225,14 +275,18 @@ async function initializeScheduleIfNeeded(prospect, profile) {
   const schedule = await getSchedulingOptions({
     prospect,
     interviewType,
+    dayPart: profile.dayPart,
     currentDate: new Date()
   });
 
-  const nextState = buildInitialSchedulingStateFromSchedule(
-    schedule,
-    profile.occupation,
-    interviewType
-  );
+  const nextState = profile.dayPart
+    ? buildInitialSchedulingStateFromDayPart(profile.dayPart, interviewType, profile.occupation)
+    : buildInitialSchedulingStateFromSchedule(
+        schedule,
+        profile.occupation,
+        interviewType,
+        profile.dayPart
+      );
 
   await updateProspect(prospect.phone, {
     current_step: "SCHEDULE",
@@ -269,19 +323,55 @@ async function completeInterview(prospect, profile, language) {
     throw new Error("Interview slot must be selected before confirming.");
   }
 
-  const event = await createInterview({
-    name: prospect.name,
-    phone: prospect.phone,
-    email,
-    interviewType: profile.interviewType,
-    startTime: prospect.appointment_date,
-    location: profile.city
-  });
+  let event;
+
+  try {
+    event = await createInterview({
+      name: profile.name || prospect.name,
+      phone: prospect.phone,
+      email,
+      interviewType: profile.interviewType,
+      startTime: prospect.appointment_date,
+      location: profile.city
+    });
+  } catch (error) {
+    console.error("[semanticConversationEngine] calendar booking failed:", error.message);
+
+    const { releaseSlotByIso } = require("./capacityEngine");
+    releaseSlotByIso(
+      prospect.appointment_date,
+      profile.interviewType || prospect.interview_type
+    );
+
+    const captureState = parseQualificationCapture(prospect.notes);
+
+    await updateProspect(prospect.phone, {
+      appointment_date: null,
+      interview_time: null,
+      calendar_event_id: null,
+      current_step: "SCHEDULE",
+      appointment_type: PHASES.TIME,
+      notes: mergeNotesWithQualificationCapture(prospect.notes, captureState)
+    });
+
+    return {
+      success: false,
+      reply:
+        language === "es"
+          ? "No pudimos confirmar tu cita en el calendario en este momento. Por favor elige otro horario disponible."
+          : "We couldn't confirm your appointment on the calendar right now. Please choose another available time."
+    };
+  }
 
   await updateProspect(prospect.phone, {
-    notes: email ? `EMAIL:${email}` : null,
+    notes: email ? `EMAIL:${email}` : mergeNotesWithQualificationCapture(prospect.notes, {
+      ...parseQualificationCapture(prospect.notes),
+      name: true,
+      email: true
+    }),
     calendar_event_id: event.id,
     current_step: "CONFIRMED",
+    name: profile.name || prospect.name,
     last_message: prospect.last_message
   });
 
@@ -294,23 +384,53 @@ async function completeInterview(prospect, profile, language) {
     console.warn("[semanticConversationEngine] interview scheduling hook failed:", error.message);
   });
 
-  const confirmation = buildConfirmationDetails({
+  const confirmationText = buildBookingConfirmation({
     interviewType: profile.interviewType,
     slotLabel: profile.preferredTime || prospect.interview_time,
-    email: email || prospect.phone,
     language
+  });
+
+  await scheduleZoomLinkDelivery({
+    prospect,
+    profile,
+    appointmentDate: prospect.appointment_date
+  }).catch((error) => {
+    console.warn("[semanticConversationEngine] zoom link scheduling failed:", error.message);
   });
 
   const response = responseBuilder({
     tone: "celebratory",
-    acknowledgement: confirmation.acknowledgement,
-    transition: confirmation.transition,
-    question: confirmation.question,
+    acknowledgement: confirmationText,
+    transition: "",
+    question: language === "es" ? "¡Esperamos conocerte!" : "We look forward to meeting you!",
     typingDelay: 1500,
     responseStyle: "professional"
   });
 
-  return response.text;
+  return {
+    success: true,
+    reply: response.text
+  };
+}
+
+async function scheduleZoomLinkDelivery({ prospect, profile, appointmentDate }) {
+  if (!String(profile.interviewType || "").toLowerCase().includes("zoom")) {
+    return;
+  }
+
+  const appointmentTime = new Date(appointmentDate);
+  const deliveryTime = new Date(appointmentTime.getTime() - 30 * 60 * 1000);
+
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      component: "zoom_link_delivery",
+      phone: prospect.phone,
+      scheduledFor: deliveryTime.toISOString(),
+      appointmentAt: appointmentTime.toISOString(),
+      status: "scheduled"
+    })
+  );
 }
 
 async function buildSemanticReply({
@@ -319,25 +439,36 @@ async function buildSemanticReply({
   extracted,
   language,
   isNew,
-  informationalReply
+  informationalReply,
+  localZoomSwitch = false
 }) {
-  const missing = getMissingFields(profile);
-  const nextField = getNextMissingField(profile);
+  const captureState = parseQualificationCapture(prospect?.notes);
+  const brainOptions = { notes: prospect?.notes, captureState };
+  const missing = getMissingFields(profile, brainOptions);
+  const nextField = getNextMissingField(profile, brainOptions);
 
   if (!missing.length) {
-    return completeInterview(prospect, profile, language);
+    const completion = await completeInterview(prospect, profile, language);
+    return completion.reply;
   }
 
-  if (nextField === "schedule" && canBeginScheduling(profile)) {
+  if (nextField === "schedule" && canBeginScheduling(profile, brainOptions)) {
     prospect = await initializeScheduleIfNeeded(prospect, profile);
   }
 
-  const question = buildQuestionForMissingField(
-    nextField,
-    profile,
-    language,
-    prospect
-  );
+  let question = buildQuestionForMissingField(nextField, profile, language, prospect);
+
+  if (
+    nextField === "dayPart" &&
+    captureState.interviewType &&
+    (extracted.authorization !== undefined || extracted.interviewType)
+  ) {
+    question = buildInterviewFormatQuestion(profile, language);
+  }
+
+  if (localZoomSwitch) {
+    question = getLocalZoomSwitchMessage(language);
+  }
 
   if (informationalReply) {
     return buildInformationalWorkflowReply(
@@ -349,33 +480,8 @@ async function buildSemanticReply({
     );
   }
 
-  if (isNew && !Object.keys(extracted).length) {
-    const personality = getPersonality({
-      currentStep: "NEW",
-      intent: detectIntent(""),
-      memory: null,
-      leadStatus: "NEW",
-      occupation: null,
-      language,
-      message: ""
-    });
-
-    const greeting = responseBuilder({
-      tone: personality.tone,
-      acknowledgement:
-        language === "es"
-          ? "Hola. Soy Atlas, tu asistente virtual de Team Vision."
-          : "Hi! I'm Atlas, your virtual recruiting assistant with Team Vision.",
-      transition:
-        language === "es"
-          ? "Te haré unas preguntas breves para agendar tu entrevista."
-          : "I'll ask a few quick questions to schedule your interview.",
-      question,
-      typingDelay: personality.typingDelay,
-      responseStyle: personality.responseStyle
-    });
-
-    return greeting.text;
+  if (isNew && !(extracted.city || extracted.state)) {
+    return getFirstMessage(language);
   }
 
   const personality = getPersonality({
@@ -403,6 +509,11 @@ async function buildSemanticReply({
 }
 
 async function syncProfileToProspect(prospect, profile, options = {}) {
+  const captureState = options.captureState || parseQualificationCapture(prospect.notes);
+  const brainOptions = {
+    notes: prospect.notes,
+    captureState
+  };
   const updates = {
     last_message: prospect.last_message
   };
@@ -431,7 +542,7 @@ async function syncProfileToProspect(prospect, profile, options = {}) {
   if (profile.interviewType) {
     updates.interview_type = profile.interviewType;
   } else {
-    const autoType = getEffectiveInterviewType(profile);
+    const autoType = getEffectiveInterviewType(profile, "", brainOptions);
     if (autoType) {
       updates.interview_type = autoType;
     }
@@ -445,12 +556,36 @@ async function syncProfileToProspect(prospect, profile, options = {}) {
     updates.appointment_date = profile.appointmentDate;
   }
 
-  if (profile.email) {
-    updates.notes = `EMAIL:${profile.email}`;
+  if (captureState.name && profile.name) {
+    updates.name = profile.name;
   }
 
   const schedulingState = parseSchedulingState(prospect.notes);
-  updates.current_step = deriveCurrentStep(profile, schedulingState);
+  updates.current_step = deriveCurrentStep(profile, schedulingState, brainOptions);
+
+  let notes = prospect.notes;
+  if (options.captureState) {
+    notes = mergeNotesWithQualificationCapture(notes, options.captureState);
+  }
+
+  if (profile.dayPart) {
+    const currentScheduling = parseSchedulingState(notes);
+    notes = mergeNotesWithSchedulingState(notes, {
+      ...currentScheduling,
+      period: profile.dayPart
+    });
+  }
+
+  if (profile.email) {
+    notes = String(notes || "")
+      .replace(/\|?EMAIL:[^|]+/i, "")
+      .replace(/^\|+/, "");
+    notes = notes ? `${notes}|EMAIL:${profile.email}` : `EMAIL:${profile.email}`;
+  }
+
+  if (notes !== prospect.notes) {
+    updates.notes = notes;
+  }
 
   await updateProspect(prospect.phone, updates);
 }
@@ -469,10 +604,18 @@ async function handleSemanticMessage({
   const cleanMessage = String(message || "").trim();
   const intent = detectIntent(cleanMessage);
   let prospect = await findProspect(phone);
-  const isNew = !prospect;
+  const wasNewProspect = !prospect;
 
-  if (isNew) {
+  if (wasNewProspect) {
     await createProspect(phone, name, cleanMessage);
+    await updateProspect(phone, {
+      notes: encodeQualificationCapture(defaultCaptureState())
+    });
+    prospect = await findProspect(phone);
+  } else if (!hasQualificationCaptureMarker(prospect.notes)) {
+    await updateProspect(phone, {
+      notes: mergeNotesWithQualificationCapture(prospect.notes, defaultCaptureState())
+    });
     prospect = await findProspect(phone);
   }
 
@@ -506,7 +649,7 @@ async function handleSemanticMessage({
 
   const faqReply =
     shouldAnswerFAQ(cleanMessage) && !hasWorkflowAdvancement(extracted)
-      ? findFAQ(cleanMessage, language)
+      ? resolveWorkflowFaq(cleanMessage, language)
       : null;
   const isInformationalOnly = Boolean(faqReply);
 
@@ -554,15 +697,168 @@ async function handleSemanticMessage({
     authorization: extracted.authorization,
     occupation: extracted.occupation,
     interviewType: extracted.interviewType,
-    email: extracted.email
+    dayPart: extracted.dayPart,
+    email: extracted.email,
+    name: extracted.name
   });
 
-  const rulesResult = applyBusinessRulesToProfile(profile, cleanMessage, extracted.interviewType);
-  profile = rulesResult.profile;
+  if (extracted.name) {
+    profile.name = extracted.name;
+  }
+
+  let captureState = markCapturedFields(
+    parseQualificationCapture(prospect.notes),
+    extracted
+  );
+
+  if (extracted.emailSkipped) {
+    captureState.email = true;
+  }
+
+  if (extracted.authorizationAmbiguous) {
+    await syncProfileToProspect(prospect, profile, { language, captureState });
+    const handoffReply = getHandoffMessage(language);
+
+    await recordLog({
+      phone,
+      name,
+      direction: "incoming",
+      message: cleanMessage,
+      intent,
+      pipeline: "HANDOFF",
+      currentStep: "HANDOFF",
+      language,
+      city: profile.city,
+      state: profile.state
+    });
+
+    await recordLog({
+      phone,
+      name,
+      direction: "outgoing",
+      message: handoffReply,
+      intent,
+      pipeline: "HANDOFF",
+      currentStep: "HANDOFF",
+      language,
+      city: profile.city,
+      state: profile.state
+    });
+
+    const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
+    await escalateConversationToHumanAssist({
+      phone,
+      organizationId: prospect.organization_id,
+      reason: "ambiguous_work_authorization",
+      summary: "Ambiguous work authorization response"
+    }).catch(() => {});
+
+    return handoffReply;
+  }
+
+  if (extracted.authorization === false) {
+    captureState.authorization = true;
+    await syncProfileToProspect(prospect, profile, { language, captureState });
+    const deniedReply = getAuthorizationDeniedMessage(language);
+
+    await recordLog({
+      phone,
+      name,
+      direction: "incoming",
+      message: cleanMessage,
+      intent,
+      pipeline: "WORK_AUTHORIZATION",
+      currentStep: "WORK_AUTHORIZATION",
+      language,
+      city: profile.city,
+      state: profile.state
+    });
+
+    await recordLog({
+      phone,
+      name,
+      direction: "outgoing",
+      message: deniedReply,
+      intent,
+      pipeline: "WORK_AUTHORIZATION",
+      currentStep: "WORK_AUTHORIZATION",
+      language,
+      city: profile.city,
+      state: profile.state
+    });
+
+    return deniedReply;
+  }
+
+  const localCoverage = evaluateCoverage({ city: profile.city, state: profile.state });
+  const localZoomSwitch =
+    detectLocalZoomPreference(cleanMessage) &&
+    localCoverage.coverage === "LOCAL" &&
+    (nextField === "dayPart" || nextField === "interviewType" || profile.interviewType === "In Person");
+
+  if (localZoomSwitch) {
+    profile.interviewType = "Zoom";
+    captureState.interviewType = true;
+  }
+
+  let rulesResult = { profile, escalation: null };
+
+  const authReady =
+    captureState.authorization ||
+    (extracted.authorization !== undefined && extracted.authorization !== null);
+
+  if (
+    !inSchedule &&
+    isLocationExplicitlyComplete(profile, captureState, prospect.notes) &&
+    authReady &&
+    profile.authorization !== false
+  ) {
+    rulesResult = applyBusinessRulesToProfile(
+      profile,
+      cleanMessage,
+      extracted.interviewType
+    );
+    profile = rulesResult.profile;
+
+    if (profile.interviewType) {
+      captureState.interviewType = true;
+    }
+  }
+
+  const postMergeBrain = buildQualificationBrain(
+    { ...prospect, city: profile.city, state: profile.state, occupation: profile.occupation, work_authorized: profile.authorization, interview_type: profile.interviewType },
+    { channel, message: cleanMessage, captureState, applyRules: false }
+  );
+
+  logQualificationBrainTurn({
+    phone,
+    message: cleanMessage,
+    qualificationData: {
+      authorization: profile.authorization,
+      city: profile.city,
+      state: profile.state,
+      interviewType: profile.interviewType,
+      dayPart: profile.dayPart
+    },
+    captureState,
+    missingFields: postMergeBrain.missingFields,
+    nextField: postMergeBrain.nextField,
+    canBeginScheduling: postMergeBrain.canBeginScheduling,
+    schedulingEligibleReason: postMergeBrain.schedulingEligibleReason,
+    isLocal: postMergeBrain.isLocal,
+    calendarChecked: postMergeBrain.calendarChecked,
+    handoffRequired: Boolean(rulesResult.escalation?.needsHumanCoordinator),
+    handoffReason: rulesResult.escalation?.reason || null,
+    profileCity: prospect.city,
+    profileState: prospect.state,
+    seededCityBypassBlocked:
+      Boolean(prospect.city && !captureState.city) ||
+      Boolean(prospect.state && !captureState.state)
+  });
 
   if (rulesResult.escalation?.needsHumanCoordinator) {
     prospect.last_message = cleanMessage;
-    await syncProfileToProspect(prospect, profile, { language });
+    await syncProfileToProspect(prospect, profile, { language, captureState });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
@@ -615,7 +911,7 @@ async function handleSemanticMessage({
     state: profile.state
   });
 
-  if (prospect.current_step === "CONFIRMED") {
+  if (prospect.current_step === "CONFIRMED" && prospect.calendar_event_id) {
     const confirmedReply =
       language === "es"
         ? "✅ Tu entrevista ya está confirmada. Un agente de Team Vision se comunicará contigo si es necesario realizar algún ajuste."
@@ -646,15 +942,25 @@ async function handleSemanticMessage({
   const informationalReply = interruptionReply;
 
   prospect.last_message = cleanMessage;
-  await syncProfileToProspect(prospect, profile, { language });
+  await syncProfileToProspect(prospect, profile, { language, captureState });
   prospect = await findProspect(phone);
   profile = buildProfileFromProspect(prospect, channel);
+  captureState = parseQualificationCapture(prospect.notes);
 
-  const postSyncRules = applyBusinessRulesToProfile(profile, cleanMessage, extracted.interviewType);
-  profile = postSyncRules.profile;
+  const brainOptions = { notes: prospect.notes, captureState };
+  let postSyncRules = { profile, escalation: null };
+
+  if (
+    !inSchedule &&
+    !isActiveScheduleStep(prospect) &&
+    isLocationExplicitlyComplete(profile, captureState, prospect.notes)
+  ) {
+    postSyncRules = applyBusinessRulesToProfile(profile, cleanMessage, extracted.interviewType);
+    profile = postSyncRules.profile;
+  }
 
   if (postSyncRules.escalation?.needsHumanCoordinator) {
-    await syncProfileToProspect(prospect, profile, { language });
+    await syncProfileToProspect(prospect, profile, { language, captureState });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     await recordLog({
@@ -674,15 +980,16 @@ async function handleSemanticMessage({
   }
 
   if (postSyncRules.profile.interviewType !== prospect.interview_type) {
-    await syncProfileToProspect(prospect, profile, { language });
+    await syncProfileToProspect(prospect, profile, { language, captureState });
     prospect = await findProspect(phone);
     profile = buildProfileFromProspect(prospect, channel);
+    captureState = parseQualificationCapture(prospect.notes);
   }
 
   if (
     isActiveScheduleStep(prospect) &&
-    canBeginScheduling(profile) &&
-    getEffectiveInterviewType(profile) &&
+    canBeginScheduling(profile, brainOptions) &&
+    getEffectiveInterviewType(profile, cleanMessage, brainOptions) &&
     !isScheduleComplete(profile)
   ) {
     const personality = getPersonality({
@@ -737,24 +1044,57 @@ async function handleSemanticMessage({
 
     prospect = await findProspect(phone);
     profile = buildProfileFromProspect(prospect, channel);
+    captureState = parseQualificationCapture(prospect.notes);
 
-    if (isScheduleComplete(profile) && !emailRequired(profile)) {
-      const completionReply = await completeInterview(prospect, profile, language);
+    const postScheduleBrainOptions = { notes: prospect.notes, captureState };
+    const postScheduleMissing = getMissingFields(profile, postScheduleBrainOptions);
+
+    if (isScheduleComplete(profile) && postScheduleMissing.length) {
+      const identityReply = await buildSemanticReply({
+        prospect,
+        profile,
+        extracted: {},
+        language,
+        isNew: false,
+        informationalReply,
+        localZoomSwitch: false
+      });
+
+      await syncProfileToProspect(prospect, profile, { language, captureState });
 
       await recordLog({
         phone,
         name,
         direction: "outgoing",
-        message: completionReply,
+        message: identityReply,
         intent,
-        pipeline: "CONFIRMED",
-        currentStep: "CONFIRMED",
+        pipeline: deriveCurrentStep(profile, parseSchedulingState(prospect.notes), postScheduleBrainOptions),
+        currentStep: deriveCurrentStep(profile, parseSchedulingState(prospect.notes), postScheduleBrainOptions),
         language,
         city: profile.city,
         state: profile.state
       });
 
-      return completionReply;
+      return identityReply;
+    }
+
+    if (isScheduleComplete(profile) && !postScheduleMissing.length) {
+      const completion = await completeInterview(prospect, profile, language);
+
+      await recordLog({
+        phone,
+        name,
+        direction: "outgoing",
+        message: completion.reply,
+        intent,
+        pipeline: completion.success ? "CONFIRMED" : "SCHEDULE",
+        currentStep: completion.success ? "CONFIRMED" : "SCHEDULE",
+        language,
+        city: profile.city,
+        state: profile.state
+      });
+
+      return completion.reply;
     }
 
     if (informationalReply && prospect.current_step !== "EMAIL") {
@@ -800,33 +1140,93 @@ async function handleSemanticMessage({
     return scheduleReply;
   }
 
-  if (prospect.current_step === "EMAIL" || getNextMissingField(profile) === "email") {
-    const email = extracted.email || cleanMessage.trim();
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const nextFieldAfterMerge = getNextMissingField(profile, {
+    notes: prospect.notes,
+    captureState
+  });
 
-    if (emailPattern.test(email)) {
-      profile.email = email;
-      await syncProfileToProspect(prospect, profile, { language });
+  if (nextFieldAfterMerge === "email" || prospect.current_step === "EMAIL") {
+    if (extracted.email) {
+      profile.email = extracted.email;
+      captureState = markCapturedFields(captureState, extracted);
+      await updateProspect(prospect.phone, {
+        notes: mergeNotesWithQualificationCapture(prospect.notes, captureState)
+      });
       prospect = await findProspect(phone);
       profile = buildProfileFromProspect(prospect, channel);
 
-      const completionReply = await completeInterview(prospect, profile, language);
+      const completion = await completeInterview(prospect, profile, language);
 
       await recordLog({
         phone,
         name,
         direction: "outgoing",
-        message: completionReply,
+        message: completion.reply,
         intent,
-        pipeline: "CONFIRMED",
-        currentStep: "CONFIRMED",
+        pipeline: completion.success ? "CONFIRMED" : "SCHEDULE",
+        currentStep: completion.success ? "CONFIRMED" : "SCHEDULE",
         language,
         city: profile.city,
         state: profile.state
       });
 
-      return completionReply;
+      return completion.reply;
     }
+
+    if (extracted.emailSkipped || isEmailDeclined(cleanMessage)) {
+      captureState.email = true;
+      await updateProspect(prospect.phone, {
+        notes: mergeNotesWithQualificationCapture(prospect.notes, captureState)
+      });
+      prospect = await findProspect(phone);
+      profile = buildProfileFromProspect(prospect, channel);
+
+      const completion = await completeInterview(prospect, profile, language);
+
+      await recordLog({
+        phone,
+        name,
+        direction: "outgoing",
+        message: completion.reply,
+        intent,
+        pipeline: completion.success ? "CONFIRMED" : "SCHEDULE",
+        currentStep: completion.success ? "CONFIRMED" : "SCHEDULE",
+        language,
+        city: profile.city,
+        state: profile.state
+      });
+
+      return completion.reply;
+    }
+  }
+
+  if (nextFieldAfterMerge === "name" && !extracted.name && isScheduleComplete(profile)) {
+    const nameReply = await buildSemanticReply({
+      prospect,
+      profile,
+      extracted,
+      language,
+      isNew: false,
+      informationalReply,
+      localZoomSwitch
+    });
+
+    await syncProfileToProspect(prospect, profile, { language, captureState });
+
+    await recordLog({
+      phone,
+      name,
+      direction: "outgoing",
+      message: nameReply,
+      intent,
+      pipeline: "NAME",
+      currentStep: "NAME",
+      language,
+      city: profile.city,
+      state: profile.state
+    });
+
+    return nameReply;
   }
 
   const replyText = await buildSemanticReply({
@@ -834,11 +1234,12 @@ async function handleSemanticMessage({
     profile,
     extracted,
     language,
-    isNew,
-    informationalReply
+    isNew: wasNewProspect,
+    informationalReply,
+    localZoomSwitch
   });
 
-  await syncProfileToProspect(prospect, profile, { language });
+  await syncProfileToProspect(prospect, profile, { language, captureState });
   prospect = await findProspect(phone);
 
   await recordLog({
