@@ -158,8 +158,8 @@ export default function SimulatorReviewExperience({ t: parentT }) {
   }, [payload]);
 
   const atlasBriefBullets = useMemo(
-    () => buildAtlasBriefBullets(workspace?.aiBriefLines || [], null, t),
-    [workspace?.aiBriefLines, t]
+    () => buildAtlasBriefBullets(workspace?.aiBriefLines || []),
+    [workspace?.aiBriefLines]
   );
 
   async function handleSendMessage(event) {
@@ -266,10 +266,12 @@ export default function SimulatorReviewExperience({ t: parentT }) {
             <RecruitingFunnelStatus recruitingStatus={workspace?.recruitingStatus} />
 
             <div className="ops-review-mc-stack">
-              <AtlasBrief
-                bullets={atlasBriefBullets}
-                expandedContent={workspace?.expandedBrief}
-              />
+              {atlasBriefBullets.length ? (
+                <AtlasBrief
+                  bullets={atlasBriefBullets}
+                  expandedContent={workspace?.expandedBrief}
+                />
+              ) : null}
               <AiActionCenter actionCenter={workspace?.aiActionCenter} />
             </div>
           </section>

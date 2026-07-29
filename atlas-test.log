@@ -1,0 +1,11 @@
+◇ injected env (34) from .env // tip: ⌘ override existing { override: true }
+✅ simulatorRoutes.js LOADED
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+✅ Engineering guardrails passed (11.6)
+{"ts":"2026-07-29T10:19:47.715Z","component":"meta_onboarding","stage":"env_validation_warning","level":"warn","message":"META_TOKEN_ENCRYPTION_KEY is not set (recommended)."}
+🚀 Atlas AI running on http://localhost:3000
+🌎 Environment: development

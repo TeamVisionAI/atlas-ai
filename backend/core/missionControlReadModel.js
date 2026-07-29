@@ -18,7 +18,6 @@ const { detectLanguage } = require("./semanticConversationEngine");
 const {
   buildQualificationBrain
 } = require("./informationModel");
-const { buildAtlasBriefSummary } = require("./conversationCopy");
 
 async function resolveProspect(phone, organizationId = null, options = {}) {
   const tenantScoped = isTenantScopedRequest(options);
@@ -107,15 +106,7 @@ async function getMissionControlState(phone, options = {}) {
       emailRequired: requiresEmail
     },
     atlasBrief: {
-      summary: buildAtlasBriefSummary({
-        profile: ruledProfile,
-        prospect,
-        schedulingState: qualification.schedulingState,
-        handoff,
-        missingFields,
-        nextField,
-        currentStep
-      })
+      summary: []
     }
   };
 }

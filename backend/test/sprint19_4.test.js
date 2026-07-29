@@ -43,6 +43,10 @@ function assertSinglePrimaryMission(context) {
   assert.equal(primary.id, missions[0].id, "Primary mission must be first sorted mission");
   assert.ok(primary.primaryAction?.id, "Primary mission must expose primaryAction");
   assert.ok(Array.isArray(primary.secondaryActions), "Primary mission must expose secondaryActions");
+  assert.ok(
+    (context.availableActions || []).some((action) => action.id === primary.primaryAction.id),
+    "Primary action must exist in availableActions"
+  );
 
   return primary;
 }
@@ -135,7 +139,9 @@ describe("RX Mission Engine — lifecycle scenarios", () => {
         agentState: { outcome: "Information Collected" },
         conversationOutcome: { recordedOutcome: { key: "Information Collected" } },
         workflow: { canonicalMilestone: MILESTONES.INTERVIEW_RESULT_PENDING },
-        availableActions: []
+        availableActions: [
+          { id: "enter_interview_outcome", label: "Record outcome", priority: "primary" }
+        ]
       })
     );
 

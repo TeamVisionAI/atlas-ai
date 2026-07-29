@@ -1,5 +1,9 @@
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const { ACTION_IDS, buildAvailableAction } = require("./agentActionRegistry");
+const {
+  FOLLOW_UP_OUTCOMES,
+  isRecordedInterviewOutcome
+} = require("./configuration/workflowOutcomeConstants");
 
 const MILESTONES = {
   NEW_LEAD: "New Lead",
@@ -15,15 +19,6 @@ const MILESTONES = {
 
 const MAX_VISIBLE_ACTIONS = 5;
 const SOON_MS = 2 * 60 * 60 * 1000;
-
-/** Interview outcomes that close the post-interview workflow gate. */
-const RECORDED_INTERVIEW_OUTCOMES = new Set([
-  "Recruited",
-  "No Show",
-  "Needs More Time",
-  "Not Interested",
-  "Rescheduled"
-]);
 
 function normalizeInterviewType(value) {
   if (!value) {
@@ -54,7 +49,7 @@ function deriveMilestoneLabel(currentStep, missingFields, agentState) {
       : MILESTONES.RECRUITED;
   }
 
-  if (agentState.outcome === "Needs More Time" || agentState.outcome === "No Show") {
+  if (FOLLOW_UP_OUTCOMES.has(agentState.outcome)) {
     return MILESTONES.FOLLOW_UP;
   }
 
@@ -98,7 +93,7 @@ function getInterviewTimingPhase(prospect) {
 }
 
 function isWorkflowGateActive(prospect, agentState) {
-  if (agentState.outcome && RECORDED_INTERVIEW_OUTCOMES.has(agentState.outcome)) {
+  if (agentState.outcome && isRecordedInterviewOutcome(agentState.outcome)) {
     return false;
   }
 
@@ -114,7 +109,7 @@ function isSchedulingReady(missingFields, currentStep) {
 }
 
 function isFollowUpDue(agentState) {
-  if (agentState.outcome !== "Needs More Time" && agentState.outcome !== "No Show") {
+  if (!FOLLOW_UP_OUTCOMES.has(agentState.outcome)) {
     return false;
   }
 
@@ -232,7 +227,7 @@ function resolveAvailableActions({
   }
 
   if (isWorkflowGateActive(prospect, agentState)) {
-    return [];
+    return [buildAvailableAction(ACTION_IDS.ENTER_INTERVIEW_OUTCOME, "primary")];
   }
 
   const milestone = deriveMilestoneLabel(currentStep, missingFields, agentState);
@@ -279,7 +274,7 @@ function resolveAvailableActions({
     ).slice(0, MAX_VISIBLE_ACTIONS);
   }
 
-  if (agentState.outcome === "Needs More Time" || milestone === MILESTONES.FOLLOW_UP) {
+  if (FOLLOW_UP_OUTCOMES.has(agentState.outcome) || milestone === MILESTONES.FOLLOW_UP) {
     pushAction(
       actions,
       isFollowUpDue(agentState) ? ACTION_IDS.CALL : ACTION_IDS.WHATSAPP,

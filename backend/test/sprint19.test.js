@@ -96,7 +96,9 @@ describe("Mission Engine rules", () => {
       agentState: { outcome: "Information Collected" },
       conversationOutcome: { recordedOutcome: { key: "Information Collected" } },
       workflow: { canonicalMilestone: "INTERVIEW_RESULT_PENDING" },
-      availableActions: []
+      availableActions: [
+        { id: "enter_interview_outcome", label: "Record outcome", priority: "primary" }
+      ]
     });
 
     assert.equal(missions[0].missionType, MISSION_TYPES.ENTER_INTERVIEW_OUTCOME);

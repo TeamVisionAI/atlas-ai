@@ -66,7 +66,11 @@ async function main() {
     !/^\s*1\s*$/.test(String(mc1.latestConversation.text)),
     "Latest conversation should not be literal menu reply 1"
   );
-  assert(mc1.availableActions.length === 0, "Standard cards hidden while gate active");
+  assert(
+    mc1.availableActions.length === 1 &&
+      mc1.availableActions[0]?.id === "enter_interview_outcome",
+    "Workflow gate exposes only the interview outcome action"
+  );
   console.log("✓ Past confirmed interview reconciled with gate + conversation preview");
 
   const mc2 = await getMissionControlWithActions(PHONE);

@@ -8,6 +8,13 @@ export default function AtlasBrief({ bullets = [], expandedContent = null }) {
   const { translate } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const previewBullets = bullets.slice(0, 4);
+  const hasExpandedContent = Boolean(
+    expandedContent?.suggestedReply || expandedContent?.aiRecommendation
+  );
+
+  if (!previewBullets.length) {
+    return null;
+  }
 
   return (
     <ExecutivePanel>
@@ -16,28 +23,27 @@ export default function AtlasBrief({ bullets = [], expandedContent = null }) {
         className="atlas-brief__toggle"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
+        disabled={!hasExpandedContent}
       >
-        <span className="atlas-brief__heading">{translate("atlasBriefTitle")}</span>
-        <span className="atlas-brief__expand-hint">
-          {expanded ? translate("missionControlAiBriefHide") : translate("missionControlAiBriefExpand")}
-        </span>
+        <span className="atlas-brief__heading">{translate("recruiterBriefTitle")}</span>
+        {hasExpandedContent ? (
+          <span className="atlas-brief__expand-hint">
+            {expanded
+              ? translate("missionControlAiBriefHide")
+              : translate("missionControlAiBriefExpand")}
+          </span>
+        ) : null}
       </button>
 
       <ul className="atlas-brief__list">
-        {previewBullets.length ? (
-          previewBullets.map((item) => (
-            <li key={item} className="atlas-brief__item">
-              {formatTextWithDates(item)}
-            </li>
-          ))
-        ) : (
-          <li className="atlas-brief__item atlas-brief__item--empty">
-            {translate("missionControlAiBriefEmpty")}
+        {previewBullets.map((item) => (
+          <li key={item} className="atlas-brief__item">
+            {formatTextWithDates(item)}
           </li>
-        )}
+        ))}
       </ul>
 
-      {expanded && expandedContent ? (
+      {expanded && hasExpandedContent ? (
         <div className="atlas-brief__expanded">
           {expandedContent.suggestedReply ? (
             <div className="atlas-brief__detail">

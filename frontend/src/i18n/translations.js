@@ -864,6 +864,7 @@ export const translations = {
     todaysMission: "Misión de hoy",
     atlasRecommendationLabel: "Recomendación de Atlas",
     atlasBriefTitle: "Resumen Atlas",
+    recruiterBriefTitle: "Guía para el reclutador",
     executiveRecommendationScheduleInterview:
       "El prospecto completó la calificación y está listo para programar la entrevista.",
     executiveRecommendationInterviewOutcome:
@@ -2054,6 +2055,7 @@ export const translations = {
     todaysMission: "Today's Mission",
     atlasRecommendationLabel: "Atlas Recommendation",
     atlasBriefTitle: "Atlas Brief",
+    recruiterBriefTitle: "Recruiter Brief",
     executiveRecommendationScheduleInterview:
       "Prospect completed qualification and is ready for interview scheduling.",
     executiveRecommendationInterviewOutcome:

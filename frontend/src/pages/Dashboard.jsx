@@ -693,13 +693,8 @@ export default function Dashboard() {
   }, [workspaceContext]);
 
   const atlasBriefBullets = useMemo(
-    () =>
-      buildAtlasBriefBullets(
-        workspaceContext?.aiBriefLines || [],
-        primaryMission,
-        translate
-      ),
-    [workspaceContext?.aiBriefLines, primaryMission, translate]
+    () => buildAtlasBriefBullets(workspaceContext?.aiBriefLines || []),
+    [workspaceContext?.aiBriefLines]
   );
 
   const knownInformationItems = workspace?.conversationOutcome?.knownInformation || [];
@@ -912,10 +907,12 @@ export default function Dashboard() {
             </ExecutiveSection>
           ) : null}
 
-          <AtlasBrief
-            bullets={atlasBriefBullets}
-            expandedContent={workspaceContext.expandedBrief}
-          />
+          {atlasBriefBullets.length ? (
+            <AtlasBrief
+              bullets={atlasBriefBullets}
+              expandedContent={workspaceContext.expandedBrief}
+            />
+          ) : null}
 
           {hasKnownInformation ? (
             <ExecutiveSection label={translate("conversationOutcomeKnownInformation")}>

@@ -35,7 +35,6 @@ const {
   buildAgentActionTimelineMessage
 } = require("../core/agentActionCopy");
 const { getMissionControlState } = require("../core/missionControlReadModel");
-const { buildWorkflowReadModel } = require("../core/workflowReadModel");
 const {
   isProductionProspect,
   isSimulatorProspect
@@ -48,13 +47,11 @@ const {
   buildRecruitingFunnelStatus,
   buildAiActionCenter,
   mergeMissionControlActionCenters,
-  enrichAtlasBriefSummary,
   buildLiveRevision
 } = require("../core/missionControlLiveReadModel");
-const {
-  buildConversationOutcomeReadModel
-} = require("../core/conversationOutcomeEngine");
 const { getPrimaryMissionFromContext } = require("../core/missionEngine");
+const { composeMissionDecisionContext } = require("../core/missionContextBuilder");
+const { buildRecruiterBrief } = require("../core/recruiterBriefBuilder");
 const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
 const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
@@ -415,27 +412,26 @@ async function getMissionControlWithActions(phone, options = {}) {
     tenantScoped
   });
   const agentState = loadAgentState(resolvedPhone);
-  const organizationSettings = getOrganizationSettings();
 
-  const availableActions = resolveAvailableActions({
-    prospect,
-    currentStep: missionControl.brain.currentStep,
-    missingFields: missionControl.brain.missingFields,
-    interviewType: missionControl.brain.interviewType,
-    agentState,
-    organizationSettings
-  });
-
-  const workflow = await buildWorkflowReadModel({
+  const missionDecisionContext = await composeMissionDecisionContext({
     prospect,
     brain: missionControl.brain,
-    agentState
+    agentState,
+    conversationMessages
   });
 
-  const enrichedSummary = enrichAtlasBriefSummary(
-    missionControl.atlasBrief.summary,
-    conversationMessages
-  );
+  const { workflow, conversationOutcome, availableActions } = missionDecisionContext;
+
+  const primaryMission = getPrimaryMissionFromContext(missionDecisionContext);
+
+  const recruiterBrief = buildRecruiterBrief({
+    primaryMission,
+    conversationOutcome,
+    conversationMessages,
+    agentState,
+    workflow,
+    brain: missionControl.brain
+  });
 
   const aiActionCenter = buildAiActionCenter({
     workflow,
@@ -465,11 +461,6 @@ async function getMissionControlWithActions(phone, options = {}) {
 
   const recruitingStatus = buildRecruitingFunnelStatus(workflow, missionControl.brain);
   const liveRevision = buildLiveRevision(conversationMessages, workflow);
-  const conversationOutcome = buildConversationOutcomeReadModel({
-    prospect,
-    brain: missionControl.brain,
-    conversationMessages
-  });
 
   const [latestConversation, workflowGate] = await Promise.all([
     Promise.resolve(
@@ -482,19 +473,11 @@ async function getMissionControlWithActions(phone, options = {}) {
     Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState))
   ]);
 
-  const primaryMission = getPrimaryMissionFromContext({
-    prospect,
-    brain: missionControl.brain,
-    agentState,
-    conversationOutcome,
-    workflow,
-    availableActions
-  });
-
   return {
     ...missionControl,
+    recruiterBrief,
     atlasBrief: {
-      summary: enrichedSummary
+      summary: recruiterBrief.items
     },
     workflow,
     workflowGate,

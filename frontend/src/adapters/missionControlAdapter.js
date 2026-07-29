@@ -96,10 +96,10 @@ export function adaptMissionControlResponse(
     brain?.interviewType || businessRules?.interviewType
   );
   const language = normalizeProspectLanguage(brain?.language);
-  const summaryLines = normalizeSummaryLines(atlasBrief?.summary);
-  const aiBriefLines = summaryLines.length
-    ? summaryLines
-    : ["Brief not yet available."];
+  const summaryLines = normalizeSummaryLines(
+    missionControl.recruiterBrief?.items || atlasBrief?.summary
+  );
+  const aiBriefLines = summaryLines;
 
   return {
     phone: prospect?.phone || "",

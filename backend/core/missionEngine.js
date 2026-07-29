@@ -5,14 +5,8 @@
  * Delegates state detection to Workflow Engine outputs and existing action resolution.
  */
 
-const { findProspectInOrganization, loadProspectsForOrganization } = require("../services/supabaseService");
-const { getOrganizationSettings } = require("./organizationSettingsEngine");
-const { getMissionControlState } = require("./missionControlReadModel");
-const { buildWorkflowReadModel } = require("./workflowReadModel");
-const { buildConversationOutcomeReadModel } = require("./conversationOutcomeEngine");
-const { loadAgentState } = require("./agentActionState");
+const { loadProspectsForOrganization } = require("../services/supabaseService");
 const {
-  resolveAvailableActions,
   ACTION_IDS,
   isWorkflowGateActive,
   isFollowUpDue,
@@ -27,17 +21,13 @@ const {
   buildMissionId
 } = require("./configuration/missionTypes");
 const { MISSION_PRIORITIES, sortMissions } = require("./configuration/missionPriorities");
+const {
+  isInterestedOutcome,
+  isFollowUpOutcome,
+  isScheduleMissionBlockingOutcome
+} = require("./configuration/workflowOutcomeConstants");
+const { buildMissionContext } = require("./missionContextBuilder");
 const { isProductionProspect, filterProductionProspects } = require("./productionProspectFilter");
-
-const INTERESTED_OUTCOMES = new Set(["Interested", "Information Collected"]);
-
-const SCHEDULE_MISSION_BLOCKING_OUTCOMES = new Set([
-  "Not Interested",
-  "No Answer",
-  "Left Voicemail",
-  "Needs More Time",
-  "Appointment Scheduled"
-]);
 
 const CLOSED_MILESTONES = new Set([MILESTONES.CLOSED, MILESTONES.DO_NOT_CONTACT]);
 
@@ -98,7 +88,7 @@ function buildMissionPrimaryAction(actionId) {
   };
 }
 
-function resolvePrimaryActionId(availableActions = [], preferredIds = [], fallbackId) {
+function resolvePrimaryActionId(availableActions = [], preferredIds = []) {
   for (const actionId of preferredIds) {
     if (availableActions.some((action) => action.id === actionId)) {
       return actionId;
@@ -111,11 +101,7 @@ function resolvePrimaryActionId(availableActions = [], preferredIds = [], fallba
     return primary.id;
   }
 
-  if (availableActions[0]?.id) {
-    return availableActions[0].id;
-  }
-
-  return fallbackId;
+  return availableActions[0]?.id || null;
 }
 
 function needsInterviewSchedule({ conversationOutcome, brain }) {
@@ -189,11 +175,11 @@ function shouldGenerateScheduleInterviewMission({ conversationOutcome, agentStat
   const recordedKey =
     conversationOutcome?.recordedOutcome?.key || agentState?.outcome || null;
 
-  if (recordedKey && SCHEDULE_MISSION_BLOCKING_OUTCOMES.has(recordedKey)) {
+  if (recordedKey && isScheduleMissionBlockingOutcome(recordedKey)) {
     return false;
   }
 
-  if (INTERESTED_OUTCOMES.has(recordedKey)) {
+  if (isInterestedOutcome(recordedKey)) {
     return true;
   }
 
@@ -204,7 +190,7 @@ function resolveScheduleInterviewReason({ conversationOutcome, agentState }) {
   const recordedKey =
     conversationOutcome?.recordedOutcome?.key || agentState?.outcome || null;
 
-  if (INTERESTED_OUTCOMES.has(recordedKey)) {
+  if (isInterestedOutcome(recordedKey)) {
     return "Prospect is interested and waiting.";
   }
 
@@ -220,7 +206,7 @@ function shouldEnterInterviewOutcome({ workflow, prospect, agentState }) {
 }
 
 function shouldGenerateFollowUpMission({ agentState, workflow }) {
-  if (agentState?.outcome === "Needs More Time" || agentState?.outcome === "No Show") {
+  if (isFollowUpOutcome(agentState?.outcome)) {
     return true;
   }
 
@@ -303,6 +289,13 @@ function buildMissionSkeleton({
   dueDate,
   estimatedMinutes = 2
 }) {
+  if (
+    !primaryActionId ||
+    !availableActions.some((action) => action.id === primaryActionId)
+  ) {
+    return null;
+  }
+
   const prospectId = prospect.phone;
 
   return {
@@ -331,7 +324,13 @@ function buildEnterInterviewOutcomeMission(context, createdAt) {
     return null;
   }
 
-  const primaryActionId = ACTION_IDS.ENTER_INTERVIEW_OUTCOME;
+  const primaryActionId = resolvePrimaryActionId(availableActions, [
+    ACTION_IDS.ENTER_INTERVIEW_OUTCOME
+  ]);
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -367,11 +366,15 @@ function buildCompleteQualificationMission(context, createdAt) {
       ? `Missing required information: ${missingSummary.join(", ")}.`
       : "Complete remaining qualification details before advancing the workflow.";
 
-  const primaryActionId = resolvePrimaryActionId(
-    availableActions,
-    [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.NOTES],
-    ACTION_IDS.WHATSAPP
-  );
+  const primaryActionId = resolvePrimaryActionId(availableActions, [
+    ACTION_IDS.WHATSAPP,
+    ACTION_IDS.CALL,
+    ACTION_IDS.NOTES
+  ]);
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -397,11 +400,11 @@ function buildScheduleInterviewMission(context, createdAt) {
     return null;
   }
 
-  const primaryActionId = resolvePrimaryActionId(
-    availableActions,
-    [ACTION_IDS.SCHEDULE],
-    ACTION_IDS.SCHEDULE
-  );
+  const primaryActionId = resolvePrimaryActionId(availableActions, [ACTION_IDS.SCHEDULE]);
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -434,9 +437,12 @@ function buildFollowUpMission(context, createdAt) {
     availableActions,
     due
       ? [ACTION_IDS.CALL, ACTION_IDS.WHATSAPP, ACTION_IDS.RESCHEDULE]
-      : [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.RESCHEDULE],
-    due ? ACTION_IDS.CALL : ACTION_IDS.WHATSAPP
+      : [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.RESCHEDULE]
   );
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -464,11 +470,15 @@ function buildRecruitProspectMission(context, createdAt) {
     return null;
   }
 
-  const primaryActionId = resolvePrimaryActionId(
-    availableActions,
-    [ACTION_IDS.NOTES, ACTION_IDS.CALL, ACTION_IDS.WHATSAPP],
-    ACTION_IDS.NOTES
-  );
+  const primaryActionId = resolvePrimaryActionId(availableActions, [
+    ACTION_IDS.NOTES,
+    ACTION_IDS.CALL,
+    ACTION_IDS.WHATSAPP
+  ]);
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -493,11 +503,15 @@ function buildBeginOnboardingMission(context, createdAt) {
     return null;
   }
 
-  const primaryActionId = resolvePrimaryActionId(
-    availableActions,
-    [ACTION_IDS.NOTES, ACTION_IDS.CALL, ACTION_IDS.WHATSAPP],
-    ACTION_IDS.NOTES
-  );
+  const primaryActionId = resolvePrimaryActionId(availableActions, [
+    ACTION_IDS.NOTES,
+    ACTION_IDS.CALL,
+    ACTION_IDS.WHATSAPP
+  ]);
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -522,11 +536,15 @@ function buildContactProspectMission(context, createdAt) {
     return null;
   }
 
-  const primaryActionId = resolvePrimaryActionId(
-    availableActions,
-    [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.NOTES],
-    ACTION_IDS.WHATSAPP
-  );
+  const primaryActionId = resolvePrimaryActionId(availableActions, [
+    ACTION_IDS.WHATSAPP,
+    ACTION_IDS.CALL,
+    ACTION_IDS.NOTES
+  ]);
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -558,17 +576,17 @@ function buildReviewProspectMission(context, createdAt) {
     reason = "Interview is coming up soon — confirm the prospect is prepared.";
   }
 
-  const primaryActionId = resolvePrimaryActionId(
-    availableActions,
-    [
-      ACTION_IDS.SEND_ZOOM_LINK,
-      ACTION_IDS.SEND_OFFICE_LOCATION,
-      ACTION_IDS.WHATSAPP,
-      ACTION_IDS.CALL,
-      ACTION_IDS.NOTES
-    ],
+  const primaryActionId = resolvePrimaryActionId(availableActions, [
+    ACTION_IDS.SEND_ZOOM_LINK,
+    ACTION_IDS.SEND_OFFICE_LOCATION,
+    ACTION_IDS.WHATSAPP,
+    ACTION_IDS.CALL,
     ACTION_IDS.NOTES
-  );
+  ]);
+
+  if (!primaryActionId) {
+    return null;
+  }
 
   return buildMissionSkeleton({
     prospect,
@@ -604,30 +622,28 @@ function ensurePrimaryMission(missions, context, createdAt) {
 
   if (isClosedProspect(context)) {
     const { prospect, conversationOutcome, workflow, availableActions } = context;
-    const primaryActionId = resolvePrimaryActionId(
+    const primaryActionId = resolvePrimaryActionId(availableActions, [ACTION_IDS.NOTES]);
+    const closedMission = buildMissionSkeleton({
+      prospect,
+      missionType: MISSION_TYPES.REVIEW_PROSPECT,
+      title: "Review Prospect",
+      description: "Review closed prospect history.",
+      reason: "Prospect is closed — review notes and history only.",
+      priority: MISSION_PRIORITIES.LOW,
+      primaryActionId,
       availableActions,
-      [ACTION_IDS.NOTES],
-      ACTION_IDS.NOTES
-    );
+      workflow,
+      conversationOutcome,
+      createdAt
+    });
 
-    return [
-      buildMissionSkeleton({
-        prospect,
-        missionType: MISSION_TYPES.REVIEW_PROSPECT,
-        title: "Review Prospect",
-        description: "Review closed prospect history.",
-        reason: "Prospect is closed — review notes and history only.",
-        priority: MISSION_PRIORITIES.LOW,
-        primaryActionId,
-        availableActions,
-        workflow,
-        conversationOutcome,
-        createdAt
-      })
-    ];
+    if (closedMission) {
+      return [closedMission];
+    }
   }
 
-  return [buildReviewProspectMission(context, createdAt)];
+  const reviewMission = buildReviewProspectMission(context, createdAt);
+  return reviewMission ? [reviewMission] : [];
 }
 
 function generateMissionsFromContext(context) {
@@ -641,57 +657,6 @@ function generateMissionsFromContext(context) {
 function getPrimaryMissionFromContext(context) {
   const missions = generateMissionsFromContext(context);
   return missions[0] || null;
-}
-
-async function buildMissionContext(phone, organizationId) {
-  if (!phone || !organizationId || !isProductionProspect(phone)) {
-    return null;
-  }
-
-  const prospect = await findProspectInOrganization(phone, organizationId);
-
-  if (!prospect) {
-    return null;
-  }
-
-  const missionControl = await getMissionControlState(phone, { organizationId });
-
-  if (!missionControl) {
-    return null;
-  }
-
-  const agentState = loadAgentState(phone);
-  const organizationSettings = getOrganizationSettings();
-  const brain = missionControl.brain;
-
-  const [workflow, conversationOutcome] = await Promise.all([
-    buildWorkflowReadModel({ prospect, brain, agentState }),
-    Promise.resolve(
-      buildConversationOutcomeReadModel({
-        prospect,
-        brain,
-        conversationMessages: []
-      })
-    )
-  ]);
-
-  const availableActions = resolveAvailableActions({
-    prospect,
-    currentStep: brain.currentStep,
-    missingFields: brain.missingFields,
-    interviewType: brain.interviewType,
-    agentState,
-    organizationSettings
-  });
-
-  return {
-    prospect,
-    brain,
-    agentState,
-    conversationOutcome,
-    workflow,
-    availableActions
-  };
 }
 
 async function generateMissionsForProspect(phone, organizationId) {
