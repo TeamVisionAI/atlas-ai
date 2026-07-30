@@ -217,3 +217,28 @@ node backend/dev/backfillRepIds.js --set <userId> <repId> --apply
 
 All writes go through `identityWriteService` for dual-write to `atlas_users` and `users`.
 
+## Sprint 12.2 Phase 1.1 — Appointment owner Rep ID column
+
+Run in Supabase SQL editor:
+
+```
+backend/database/migrations/018_appointment_owner_rep_id.sql
+```
+
+Adds:
+
+- `owner_rep_id` on `atlas_appointments` — nullable, 5-character uppercase alphanumeric (same format as user Rep IDs)
+- Partial index on `(organization_id, owner_rep_id)` where `owner_rep_id IS NOT NULL`
+- Backfill from `metadata->>'ownerRepId'` for existing rows
+
+Rollback:
+
+```
+backend/database/migrations/018_appointment_owner_rep_id_down.sql
+```
+
+### Backward compatibility
+
+- Repository reads prefer `owner_rep_id` column, then fall back to `metadata.ownerRepId`.
+- Writes dual-publish to the column and metadata until metadata is removed in a later sprint.
+

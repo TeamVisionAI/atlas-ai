@@ -54,6 +54,17 @@ const {
 const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { buildIsoTimestamp } = require("../services/availabilityService");
 const { recordHistoryEvent } = require("../core/appointmentHistory");
+const appointmentDomainService = require("../modules/appointments/application/appointmentDomainService");
+const {
+  emitAppointmentLifecycleEvent
+} = require("../modules/appointments/application/appointmentEventAdapter");
+const { findUserById } = require("../services/atlasUserService");
+const { APPOINTMENT_OUTCOMES } = require("../core/configuration/appointmentDomain");
+
+async function resolveOwnerRepId(agentId) {
+  const user = await findUserById(agentId);
+  return user?.rep_id || null;
+}
 
 function resolveVirtualMeetingUrl(meetingProvider, options = {}) {
   const url = options.meetingUrl || options.zoomUrl || options.meetLink;
@@ -421,56 +432,56 @@ async function createAppointment(input, context = {}) {
 
   const prospectId = await findCoreProspectIdByPhone(prospectPhone);
   const timestamp = nowIso();
+  const ownerRepId = input.ownerRepId || (await resolveOwnerRepId(agentId));
 
-  const appointment = {
-    id: appointmentRepository.generateId(),
-    organizationId,
-    prospectId,
-    prospectPhone,
-    agentId,
-    purpose,
-    status: APPOINTMENT_STATUSES.SCHEDULED,
-    source,
-    startDateTime: bookingResult.startTimeISO,
-    endDateTime: bookingResult.endTimeISO,
-    durationMinutes,
-    timezone,
-    meetingType: meeting.meetingType,
-    meetingProvider: meeting.meetingProvider,
-    ...location,
-    meetingNotes: notes || location.meetingNotes,
-    virtualMeetingUrl: virtualUrlResult.url,
-    calendarEventId: bookingResult.googleCalendarEventId,
-    calendarProvider: bookingResult.googleCalendarSynced ? "google_calendar" : null,
-    confirmationStatus,
-    emailInvitationStatus: email ? "pending" : "missing",
-    reminderStatus: REMINDER_STATUSES.PENDING,
-    humanAssistRequired: false,
-    humanAssistReason: null,
-    rescheduleCount: 0,
-    cancellationReason: null,
-    outcome: null,
-    outcomeNotes: null,
-    history: recordHistoryEvent(
-      { history: [] },
-      {
-        type: "created",
-        actor: createdBy || agentId,
-        reason: null,
-        summary: "Appointment created",
-        newValues: { dateKey, timeKey, source, status: APPOINTMENT_STATUSES.SCHEDULED }
-      }
-    ),
-    metadata: {
-      prospectName: prospect.name,
-      prospectEmail: email,
-      emailStatus,
-      virtualUrlStatus: virtualUrlResult.status
+  const scheduledResult = appointmentDomainService.scheduleAppointment(
+    {
+      id: appointmentRepository.generateId(),
+      organizationId,
+      prospectId,
+      prospectPhone,
+      agentId,
+      purpose,
+      source,
+      startDateTime: bookingResult.startTimeISO,
+      endDateTime: bookingResult.endTimeISO,
+      durationMinutes,
+      timezone,
+      meetingType: meeting.meetingType,
+      meetingProvider: meeting.meetingProvider,
+      ...location,
+      meetingNotes: notes || location.meetingNotes,
+      virtualMeetingUrl: virtualUrlResult.url,
+      calendarEventId: bookingResult.googleCalendarEventId,
+      calendarProvider: bookingResult.googleCalendarSynced ? "google_calendar" : null,
+      confirmationStatus,
+      emailInvitationStatus: email ? "pending" : "missing",
+      reminderStatus: REMINDER_STATUSES.PENDING,
+      humanAssistRequired: false,
+      humanAssistReason: null,
+      rescheduleCount: 0,
+      cancellationReason: null,
+      outcome: null,
+      outcomeNotes: null,
+      ownerRepId,
+      metadata: {
+        prospectName: prospect.name,
+        prospectEmail: email,
+        emailStatus,
+        virtualUrlStatus: virtualUrlResult.status,
+        ownerRepId
+      },
+      createdBy: createdBy || agentId,
+      createdAt: timestamp,
+      updatedAt: timestamp
     },
-    createdBy: createdBy || agentId,
-    createdAt: timestamp,
-    updatedAt: timestamp
-  };
+    {
+      actor: createdBy || agentId,
+      summary: "Appointment scheduled"
+    }
+  );
+
+  const appointment = scheduledResult.appointment;
 
   const saved = await appointmentRepository.save(appointment);
   const reminderResult = appointmentReminderEngine.scheduleReminders(saved);
@@ -519,18 +530,7 @@ async function createAppointment(input, context = {}) {
   }
 
   if (!skipWorkflowSideEffects) {
-    await emitAppointmentEvent(
-      prospectPhone,
-      APPOINTMENT_EVENTS.APPOINTMENT_CREATED,
-      {
-        organizationId,
-        appointmentId: saved.id,
-        scheduledStart: bookingResult.startTimeISO,
-        purpose,
-        meetingProvider: meeting.meetingProvider
-      },
-      "Appointment scheduled"
-    );
+    await emitAppointmentLifecycleEvent(saved, scheduledResult.transition);
 
     await logConversation({
       phone: prospectPhone,
@@ -601,26 +601,20 @@ async function rescheduleAppointment(id, input, context = {}) {
 
   appointmentReminderEngine.cancelReminders(appointment.id);
 
-  const updated = {
-    ...appointment,
-    startDateTime: matchedSlot.startTimeISO,
+  const domainUpdated = await appointmentDomainService.rescheduleAppointment(appointment, {
+    actor: agentId,
+    reason,
+    scheduledTime: matchedSlot.startTimeISO,
     endDateTime: matchedSlot.endTimeISO,
-    status: APPOINTMENT_STATUSES.CONFIRMED,
-    rescheduleCount: (appointment.rescheduleCount || 0) + 1,
-    history: appendHistory(appointment, {
-      type: "rescheduled",
-      actor: agentId,
-      reason,
-      summary: "Appointment rescheduled",
-      oldValues: { startDateTime: previousStart, endDateTime: previousEnd },
-      newValues: {
-        startDateTime: matchedSlot.startTimeISO,
-        endDateTime: matchedSlot.endTimeISO,
-        dateKey,
-        timeKey
-      }
-    }),
-    updatedAt: nowIso()
+    channel: "mission_control",
+    payload: { dateKey, timeKey, previousStart, newStart: matchedSlot.startTimeISO },
+    newValues: { dateKey, timeKey }
+  });
+
+  const updated = {
+    ...domainUpdated,
+    confirmationStatus: appointment.confirmationStatus,
+    reminderStatus: appointment.reminderStatus
   };
 
   const saved = await appointmentRepository.save(updated);
@@ -635,19 +629,6 @@ async function rescheduleAppointment(id, input, context = {}) {
     appointment_date: matchedSlot.startTimeISO,
     interview_time: matchedSlot.startTimeISO
   }).catch(() => {});
-
-  await emitAppointmentEvent(
-    appointment.prospectPhone,
-    APPOINTMENT_EVENTS.APPOINTMENT_RESCHEDULED,
-    {
-      organizationId: appointment.organizationId,
-      appointmentId: saved.id,
-      reason,
-      previousStart,
-      newStart: matchedSlot.startTimeISO
-    },
-    "Appointment rescheduled"
-  );
 
   return enrichWithProspect(saved);
 }
@@ -672,32 +653,16 @@ async function cancelAppointment(id, input, context = {}) {
 
   appointmentReminderEngine.cancelReminders(appointment.id);
 
-  const saved = await appointmentRepository.save({
-    ...appointment,
-    status: APPOINTMENT_STATUSES.CANCELLED,
-    cancellationReason: input.reason || "unspecified",
-    reminderStatus: REMINDER_STATUSES.CANCELLED,
-    history: appendHistory(appointment, {
-      type: "cancelled",
-      actor: agentId || "agent",
-      reason: input.reason || "unspecified",
-      summary: "Appointment cancelled",
-      oldValues: { status: appointment.status },
-      newValues: { status: APPOINTMENT_STATUSES.CANCELLED }
-    }),
-    updatedAt: nowIso()
+  const domainUpdated = await appointmentDomainService.cancelAppointment(appointment, {
+    actor: agentId || "agent",
+    reason: input.reason || "unspecified",
+    channel: "mission_control"
   });
 
-  await emitAppointmentEvent(
-    appointment.prospectPhone,
-    APPOINTMENT_EVENTS.APPOINTMENT_CANCELLED,
-    {
-      organizationId: appointment.organizationId,
-      appointmentId: saved.id,
-      reason: input.reason
-    },
-    "Appointment cancelled"
-  );
+  const saved = await appointmentRepository.save({
+    ...domainUpdated,
+    reminderStatus: REMINDER_STATUSES.CANCELLED
+  });
 
   return enrichWithProspect(saved);
 }
@@ -716,21 +681,36 @@ async function completeAppointment(id, input, context = {}) {
     throw buildError("INVALID_OUTCOME", "Valid outcome is required to complete appointment.");
   }
 
-  const saved = await appointmentRepository.save({
-    ...appointment,
-    status: APPOINTMENT_STATUSES.COMPLETED,
-    outcome,
-    outcomeNotes: input.outcomeNotes || null,
-    history: appendHistory(appointment, {
-      type: "completed",
+  let domainUpdated;
+
+  if (outcome === APPOINTMENT_OUTCOMES.RECRUITED) {
+    domainUpdated = await appointmentDomainService.recruitFromAppointment(appointment, {
       actor: agentId || "agent",
-      reason: outcome,
-      summary: "Appointment completed",
-      oldValues: { status: appointment.status },
-      newValues: { status: APPOINTMENT_STATUSES.COMPLETED, outcome, outcomeNotes: input.outcomeNotes }
-    }),
-    updatedAt: nowIso()
-  });
+      outcomeNotes: input.outcomeNotes || null,
+      channel: "mission_control"
+    });
+  } else if (outcome === APPOINTMENT_OUTCOMES.CLIENT) {
+    domainUpdated = await appointmentDomainService.createClientFromAppointment(appointment, {
+      actor: agentId || "agent",
+      outcomeNotes: input.outcomeNotes || null,
+      channel: "mission_control"
+    });
+  } else if (outcome === APPOINTMENT_OUTCOMES.NO_SHOW) {
+    domainUpdated = await appointmentDomainService.markNoShow(appointment, {
+      actor: agentId || "agent",
+      outcomeNotes: input.outcomeNotes || null,
+      channel: "mission_control"
+    });
+  } else {
+    domainUpdated = await appointmentDomainService.completeAppointment(appointment, {
+      actor: agentId || "agent",
+      outcome,
+      outcomeNotes: input.outcomeNotes || null,
+      channel: "mission_control"
+    });
+  }
+
+  const saved = await appointmentRepository.save(domainUpdated);
 
   const milestoneMap = {
     recruited: MILESTONES.ORIENTATION,
@@ -753,27 +733,18 @@ async function completeAppointment(id, input, context = {}) {
     }).catch(() => {});
   }
 
-  await emitAppointmentEvent(
-    appointment.prospectPhone,
-    APPOINTMENT_EVENTS.APPOINTMENT_COMPLETED,
-    {
-      organizationId: appointment.organizationId,
-      appointmentId: saved.id,
-      outcome
-    },
-    "Appointment completed"
-  );
-
-  await emitAppointmentEvent(
-    appointment.prospectPhone,
-    APPOINTMENT_EVENTS.INTERVIEW_COMPLETED,
-    {
-      organizationId: appointment.organizationId,
-      appointmentId: saved.id,
-      outcome
-    },
-    "Interview completed"
-  ).catch(() => {});
+  if (outcome !== APPOINTMENT_OUTCOMES.RECRUITED && outcome !== APPOINTMENT_OUTCOMES.CLIENT) {
+    await emitAppointmentEvent(
+      appointment.prospectPhone,
+      APPOINTMENT_EVENTS.INTERVIEW_COMPLETED,
+      {
+        organizationId: appointment.organizationId,
+        appointmentId: saved.id,
+        outcome
+      },
+      "Interview completed"
+    ).catch(() => {});
+  }
 
   return enrichWithProspect(saved);
 }
@@ -836,30 +807,101 @@ async function resolveHumanAssist(id, input, context = {}) {
     throw buildError("NOT_FOUND", "Appointment not found.", 404);
   }
 
+  const domainUpdated = await appointmentDomainService.confirmAppointment(appointment, {
+    actor: agentId || "agent",
+    reason: input.resolutionNotes,
+    summary: "Human assist resolved",
+    channel: "mission_control"
+  });
+
   const saved = await appointmentRepository.save({
-    ...appointment,
-    status: APPOINTMENT_STATUSES.CONFIRMED,
+    ...domainUpdated,
     humanAssistRequired: false,
-    history: appendHistory(appointment, {
-      type: "human_assist_resolved",
-      actor: agentId || "agent",
-      reason: input.resolutionNotes,
-      summary: "Human assist resolved",
-      oldValues: { status: appointment.status, humanAssistRequired: true },
-      newValues: { status: APPOINTMENT_STATUSES.CONFIRMED, humanAssistRequired: false }
-    }),
     metadata: {
-      ...appointment.metadata,
+      ...domainUpdated.metadata,
       humanAssist: {
         ...(appointment.metadata?.humanAssist || {}),
         status: "resolved",
         resolutionNotes: input.resolutionNotes,
         resolvedAt: nowIso()
       }
-    },
-    updatedAt: nowIso()
+    }
   });
 
+  return enrichWithProspect(saved);
+}
+
+async function confirmAppointmentRecord(id, input = {}, context = {}) {
+  const { organizationId, agentId } = context;
+  const appointment = await appointmentRepository.findById(id, organizationId);
+
+  if (!appointment) {
+    throw buildError("NOT_FOUND", "Appointment not found.", 404);
+  }
+
+  const domainUpdated = await appointmentDomainService.confirmAppointment(appointment, {
+    actor: agentId || "agent",
+    reason: input.reason,
+    summary: input.summary || "Appointment confirmed",
+    channel: "mission_control"
+  });
+
+  const saved = await appointmentRepository.save(domainUpdated);
+  return enrichWithProspect(saved);
+}
+
+async function markNoShowRecord(id, input = {}, context = {}) {
+  const { organizationId, agentId } = context;
+  const appointment = await appointmentRepository.findById(id, organizationId);
+
+  if (!appointment) {
+    throw buildError("NOT_FOUND", "Appointment not found.", 404);
+  }
+
+  const domainUpdated = await appointmentDomainService.markNoShow(appointment, {
+    actor: agentId || "agent",
+    reason: input.reason,
+    outcomeNotes: input.outcomeNotes,
+    channel: "mission_control"
+  });
+
+  const saved = await appointmentRepository.save(domainUpdated);
+  return enrichWithProspect(saved);
+}
+
+async function recruitFromAppointmentRecord(id, input = {}, context = {}) {
+  const { organizationId, agentId } = context;
+  const appointment = await appointmentRepository.findById(id, organizationId);
+
+  if (!appointment) {
+    throw buildError("NOT_FOUND", "Appointment not found.", 404);
+  }
+
+  const domainUpdated = await appointmentDomainService.recruitFromAppointment(appointment, {
+    actor: agentId || "agent",
+    outcomeNotes: input.outcomeNotes,
+    channel: "mission_control"
+  });
+
+  const saved = await appointmentRepository.save(domainUpdated);
+  return enrichWithProspect(saved);
+}
+
+async function createClientFromAppointmentRecord(id, input = {}, context = {}) {
+  const { organizationId, agentId } = context;
+  const appointment = await appointmentRepository.findById(id, organizationId);
+
+  if (!appointment) {
+    throw buildError("NOT_FOUND", "Appointment not found.", 404);
+  }
+
+  const domainUpdated = await appointmentDomainService.createClientFromAppointment(appointment, {
+    actor: agentId || "agent",
+    outcomeNotes: input.outcomeNotes,
+    channel: "mission_control"
+  });
+
+  const saved = await appointmentRepository.save(domainUpdated);
   return enrichWithProspect(saved);
 }
 
@@ -891,6 +933,10 @@ module.exports = {
   rescheduleAppointment,
   cancelAppointment,
   completeAppointment,
+  confirmAppointment: confirmAppointmentRecord,
+  markNoShow: markNoShowRecord,
+  recruitFromAppointment: recruitFromAppointmentRecord,
+  createClientFromAppointment: createClientFromAppointmentRecord,
   requestHumanAssist,
   resolveHumanAssist,
   collectProspectEmail,
