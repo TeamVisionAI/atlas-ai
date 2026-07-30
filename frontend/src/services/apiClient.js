@@ -25,9 +25,8 @@ export async function apiFetch(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, await withAuthHeaders(options));
 
   if (!response.ok) {
-    throw new Error(
-      `API ${response.status}: ${response.statusText}`
-    );
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.message || payload.error || `API ${response.status}: ${response.statusText}`);
   }
 
   return response.json();

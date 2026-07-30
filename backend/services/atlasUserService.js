@@ -7,6 +7,7 @@ const { supabase } = require("./supabaseService");
 const { canUserLogin } = require("../security/roles");
 const { isPgFallbackEnabled, pgQueryOne } = require("./pgFallback");
 const identityWriteService = require("./identityWriteService");
+const { normalizeRepId } = require("../core/repIdEngine");
 
 const DEFAULT_USER_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -48,10 +49,34 @@ function sanitizeUser(user) {
     preferred_language: normalized.preferred_language || "en",
     notification_preferences: normalized.notification_preferences || {},
     reports_to_user_id: normalized.reports_to_user_id || null,
+    rep_id: normalized.rep_id || null,
     last_login_at: normalized.last_login_at || null,
     created_at: normalized.created_at,
     updated_at: normalized.updated_at
   };
+}
+
+function buildAdminUserSearchFilter(queryText) {
+  if (!queryText) {
+    return null;
+  }
+
+  const needle = `%${queryText}%`;
+  return `email.ilike.${needle},first_name.ilike.${needle},last_name.ilike.${needle},display_name.ilike.${needle},rep_id.ilike.${needle}`;
+}
+
+function resolveLoginIdentifier(identifier) {
+  const trimmed = String(identifier || "").trim();
+
+  if (!trimmed) {
+    return { mode: null, value: null };
+  }
+
+  if (trimmed.includes("@")) {
+    return { mode: "email", value: trimmed.toLowerCase() };
+  }
+
+  return { mode: "rep_id", value: trimmed };
 }
 
 async function findUserById(userId) {
@@ -98,6 +123,62 @@ async function findUserByEmail(email) {
   }
 
   return data;
+}
+
+async function findUserByRepId(repId, organizationId = null) {
+  if (!repId) {
+    return null;
+  }
+
+  const normalizedRepId = String(repId).trim().toUpperCase();
+
+  if (isPgFallbackEnabled()) {
+    if (organizationId) {
+      return pgQueryOne(
+        "SELECT * FROM atlas_users WHERE organization_id = $1 AND rep_id = $2 LIMIT 1",
+        [organizationId, normalizedRepId]
+      );
+    }
+
+    return pgQueryOne("SELECT * FROM atlas_users WHERE rep_id = $1 LIMIT 1", [normalizedRepId]);
+  }
+
+  let query = supabase.from("atlas_users").select("*").eq("rep_id", normalizedRepId);
+
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    if (isMissingAtlasAuthTable(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  return data;
+}
+
+async function findUserByLoginIdentifier(identifier, organizationId = null) {
+  const resolved = resolveLoginIdentifier(identifier);
+
+  if (!resolved.mode) {
+    return null;
+  }
+
+  if (resolved.mode === "email") {
+    return findUserByEmail(resolved.value);
+  }
+
+  try {
+    const repId = normalizeRepId(resolved.value);
+    return findUserByRepId(repId, organizationId);
+  } catch {
+    return null;
+  }
 }
 
 async function findUserBySessionToken(token) {
@@ -317,6 +398,10 @@ module.exports = {
   DEFAULT_USER_ID,
   findUserById,
   findUserByEmail,
+  findUserByRepId,
+  findUserByLoginIdentifier,
+  resolveLoginIdentifier,
+  buildAdminUserSearchFilter,
   findUserBySessionToken,
   createSessionForUser,
   revokeSessionByToken,

@@ -89,6 +89,11 @@ export default function SidebarUserFooter({
         />
         <span className="sidebar-user-footer__meta">
           <span className="sidebar-user-footer__name">{displayName}</span>
+          {user.rep_id ? (
+            <span className="sidebar-user-footer__rep-id">
+              {translate("sidebarRepId")}: {user.rep_id}
+            </span>
+          ) : null}
           <span className="sidebar-user-footer__role">{translate(getRoleLabelKey(user.role))}</span>
         </span>
         <span className="sidebar-user-footer__chevron" aria-hidden="true">

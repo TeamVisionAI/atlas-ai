@@ -10,7 +10,8 @@ import {
   reactivateAdminUser,
   resendInvitation,
   suspendAdminUser,
-  transferOwnership
+  transferOwnership,
+  updateAdminUser
 } from "../../services/identityService";
 import UserAvatar from "../../components/ui/UserAvatar";
 import "../../components/ui/ProfilePhotoEditor.css";
@@ -29,6 +30,7 @@ const ROLES = [
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
+  repId: "",
   email: "",
   phone: "",
   role: "recruiter"
@@ -44,6 +46,7 @@ export default function AdminUsers() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [transferTarget, setTransferTarget] = useState("");
+  const [repIdDrafts, setRepIdDrafts] = useState({});
 
   async function loadUsers() {
     setLoading(true);
@@ -57,6 +60,11 @@ export default function AdminUsers() {
       });
       setUsers(result.items || []);
       setTotal(result.total || 0);
+      setRepIdDrafts(
+        Object.fromEntries(
+          (result.items || []).map((user) => [user.id, user.rep_id || ""])
+        )
+      );
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -78,6 +86,17 @@ export default function AdminUsers() {
       await loadUsers();
     } catch (createError) {
       setError(createError.message);
+    }
+  }
+
+  async function saveRepId(userId) {
+    setError("");
+
+    try {
+      await updateAdminUser(userId, { repId: repIdDrafts[userId] || null });
+      await loadUsers();
+    } catch (saveError) {
+      setError(saveError.message);
     }
   }
 
@@ -126,7 +145,7 @@ export default function AdminUsers() {
 
       <div className="identity-card identity-actions">
         <input
-          placeholder="Search name or email"
+          placeholder="Search name, email, or Rep ID"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -164,6 +183,15 @@ export default function AdminUsers() {
                 value={form.lastName}
                 onChange={(event) => setForm({ ...form, lastName: event.target.value })}
                 required
+              />
+            </label>
+            <label>
+              Rep ID
+              <input
+                value={form.repId}
+                onChange={(event) => setForm({ ...form, repId: event.target.value.toUpperCase() })}
+                placeholder="4TJLK"
+                maxLength={5}
               />
             </label>
             <label>
@@ -218,6 +246,7 @@ export default function AdminUsers() {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Rep ID</th>
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
@@ -240,6 +269,29 @@ export default function AdminUsers() {
                       <div className="profile-photo-editor__table-name">
                         <span>{user.display_name || `${user.first_name} ${user.last_name}`}</span>
                       </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="identity-actions">
+                      <input
+                        value={repIdDrafts[user.id] ?? user.rep_id ?? ""}
+                        onChange={(event) =>
+                          setRepIdDrafts((current) => ({
+                            ...current,
+                            [user.id]: event.target.value.toUpperCase()
+                          }))
+                        }
+                        placeholder="4TJLK"
+                        maxLength={5}
+                        aria-label={`Rep ID for ${user.email}`}
+                      />
+                      <button
+                        type="button"
+                        className="identity-button-secondary"
+                        onClick={() => saveRepId(user.id)}
+                      >
+                        Save
+                      </button>
                     </div>
                   </td>
                   <td>{user.email}</td>

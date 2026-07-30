@@ -11,6 +11,7 @@ const { sendInvitationEmail } = require("../services/emailService");
 const {
   findUserById,
   findUserByEmail,
+  buildAdminUserSearchFilter,
   revokeAllSessionsForUser,
   sanitizeUser
 } = require("../services/atlasUserService");
@@ -74,10 +75,7 @@ async function listUsers(query = {}, authContext) {
   }
 
   if (filters.q) {
-    const needle = `%${filters.q}%`;
-    dbQuery = dbQuery.or(
-      `email.ilike.${needle},first_name.ilike.${needle},last_name.ilike.${needle},display_name.ilike.${needle}`
-    );
+    dbQuery = dbQuery.or(buildAdminUserSearchFilter(filters.q));
   }
 
   console.info("[admin/users/list]", {
@@ -156,6 +154,7 @@ async function createUser(input, authContext, auditMeta = {}) {
     email,
     first_name: firstName,
     last_name: lastName,
+    rep_id: input.repId ?? input.rep_id ?? null,
     phone: input.phone || null,
     organization_id: input.organizationId || organizationId || DEFAULT_ORGANIZATION_ID,
     division_id: input.divisionId || input.division_id || null,
@@ -279,6 +278,11 @@ async function updateUser(userId, input, authContext, auditMeta = {}) {
   if (input.notificationPreferences !== undefined || input.notification_preferences !== undefined) {
     patch.notification_preferences =
       input.notificationPreferences || input.notification_preferences || {};
+  }
+
+  if (input.repId !== undefined || input.rep_id !== undefined) {
+    const rawRepId = input.repId ?? input.rep_id;
+    patch.rep_id = rawRepId === "" || rawRepId === null ? null : rawRepId;
   }
 
   const previousRole = existing.role;

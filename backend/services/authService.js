@@ -5,6 +5,7 @@
 const crypto = require("crypto");
 const {
   findUserByEmail,
+  findUserByLoginIdentifier,
   findUserBySessionToken,
   createSessionForUser,
   revokeSessionByToken,
@@ -47,14 +48,23 @@ async function recordAuthFailure({ email, user, reason, ipAddress, userAgent }) 
   });
 }
 
-async function loginWithPassword({ email, password, rememberMe = false, ipAddress, userAgent }) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
-  const user = await findUserByEmail(normalizedEmail);
+async function loginWithPassword({
+  identifier,
+  email,
+  password,
+  organizationId = null,
+  rememberMe = false,
+  ipAddress,
+  userAgent
+}) {
+  const loginIdentifier = identifier ?? email;
+  const user = await findUserByLoginIdentifier(loginIdentifier, organizationId);
+  const auditIdentifier = String(loginIdentifier || "").trim().toLowerCase();
 
   if (!user) {
     if (process.env.NODE_ENV !== "production") {
       console.log("[auth/login/dev]", {
-        email: normalizedEmail,
+        identifier: auditIdentifier,
         userFound: false,
         tableQueried: "atlas_users",
         accessPath: isPgFallbackEnabled() ? "pg_fallback" : "supabase",
@@ -64,7 +74,7 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
     }
 
     await recordAuthFailure({
-      email: normalizedEmail,
+      email: auditIdentifier,
       reason: "invalid_credentials",
       ipAddress,
       userAgent
@@ -78,7 +88,7 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
 
   if (!canUserLogin(user.status)) {
     await recordAuthFailure({
-      email: normalizedEmail,
+      email: user.email || auditIdentifier,
       user,
       reason: `status_${user.status}`,
       ipAddress,
@@ -96,7 +106,7 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
 
   if (process.env.NODE_ENV !== "production") {
     console.log("[auth/login/dev]", {
-      email: normalizedEmail,
+      identifier: auditIdentifier,
       userFound: true,
       tableQueried: "atlas_users",
       accessPath: isPgFallbackEnabled() ? "pg_fallback" : "supabase",
@@ -107,7 +117,7 @@ async function loginWithPassword({ email, password, rememberMe = false, ipAddres
 
   if (!passwordValid) {
     await recordAuthFailure({
-      email: normalizedEmail,
+      email: user.email || auditIdentifier,
       user,
       reason: "invalid_credentials",
       ipAddress,

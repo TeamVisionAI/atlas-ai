@@ -193,6 +193,10 @@ export default function MyAccount() {
               />
             </label>
             <label>
+              Rep ID
+              <input value={profile.rep_id || "—"} readOnly disabled />
+            </label>
+            <label>
               Phone
               <input
                 value={profile.phone || ""}

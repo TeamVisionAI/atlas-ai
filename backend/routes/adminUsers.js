@@ -25,7 +25,10 @@ router.get("/users", async (req, res) => {
     const result = await identityAdminService.listUsers(req.query, req.authContext);
     res.json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -34,7 +37,10 @@ router.post("/users", async (req, res) => {
     const result = await identityAdminService.createUser(req.body, req.authContext, auditMeta(req));
     res.status(201).json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -43,7 +49,10 @@ router.get("/users/:id", async (req, res) => {
     const user = await identityAdminService.getUserById(req.params.id, req.authContext);
     res.json({ user });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -57,7 +66,10 @@ router.patch("/users/:id", async (req, res) => {
     );
     res.json({ user });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -71,7 +83,10 @@ router.post("/users/:id/suspend", async (req, res) => {
     );
     res.json({ user });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -85,7 +100,10 @@ router.post("/users/:id/reactivate", async (req, res) => {
     );
     res.json({ user });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -99,7 +117,10 @@ router.post("/users/:id/archive", async (req, res) => {
     );
     res.json({ user });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -112,7 +133,10 @@ router.post("/users/:id/force-password-reset", async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -125,7 +149,10 @@ router.post("/users/:id/force-logout", async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -138,7 +165,10 @@ router.post("/users/:id/resend-invitation", async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -154,7 +184,10 @@ router.post("/users/:id/transfer-ownership", async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 
@@ -167,7 +200,10 @@ router.get("/users/:id/login-history", async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
   }
 });
 

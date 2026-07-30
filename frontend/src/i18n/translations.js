@@ -47,6 +47,7 @@ export const translations = {
     workspaceRoleOperations: "Operations",
     workspaceRoleSupport: "Support",
     sidebarLogout: "Cerrar sesión",
+    sidebarRepId: "Rep ID",
     sidebarLanguage: "Idioma",
 
     forbiddenTitle: "Access denied",
@@ -1370,6 +1371,7 @@ export const translations = {
     workspaceRoleOperations: "Operations",
     workspaceRoleSupport: "Support",
     sidebarLogout: "Logout",
+    sidebarRepId: "Rep ID",
     sidebarLanguage: "Language",
 
     forbiddenTitle: "Access denied",

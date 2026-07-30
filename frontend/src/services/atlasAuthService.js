@@ -41,11 +41,15 @@ export async function fetchCurrentUser() {
   return response.json();
 }
 
-export async function loginAtlasSession({ email, password, rememberMe = false }) {
+export async function loginAtlasSession({ identifier, email, password, rememberMe = false }) {
   const response = await apiRequest("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, rememberMe })
+    body: JSON.stringify({
+      identifier: identifier ?? email,
+      password,
+      rememberMe
+    })
   });
 
   const payload = await response.json().catch(() => ({}));

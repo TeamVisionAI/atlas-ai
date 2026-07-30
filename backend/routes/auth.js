@@ -17,8 +17,9 @@ const {
 router.post("/auth/login", async (req, res) => {
   try {
     const result = await loginWithPassword({
-      email: req.body?.email,
+      identifier: req.body?.identifier ?? req.body?.email,
       password: req.body?.password,
+      organizationId: req.body?.organizationId ?? req.body?.organization_id ?? null,
       rememberMe: Boolean(req.body?.rememberMe),
       ipAddress: req.ip,
       userAgent: req.get("user-agent")

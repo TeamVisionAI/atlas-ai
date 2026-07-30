@@ -11,7 +11,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { syncFromUser } = useLanguage();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
@@ -79,7 +79,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await loginAtlasSession({ email, password, rememberMe });
+      await loginAtlasSession({ identifier, password, rememberMe });
       const user = await fetchCurrentUser();
       syncFromUser(user);
       const defaultLanding = getDefaultLandingPath(user?.role);
@@ -98,13 +98,14 @@ export default function Login() {
         <h1>Atlas Sign In</h1>
         <p>Use your individual Atlas account.</p>
 
-        <label htmlFor="email">Email</label>
+        <label htmlFor="identifier">Identifier</label>
         <input
-          id="email"
-          type="email"
+          id="identifier"
+          type="text"
           autoComplete="username"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          placeholder="Email or Rep ID"
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
           required
         />
 
