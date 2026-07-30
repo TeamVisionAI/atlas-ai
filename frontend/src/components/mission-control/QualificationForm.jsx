@@ -121,6 +121,7 @@ export default function QualificationForm({
   phone,
   conversationOutcome,
   disabled = false,
+  inline = false,
   onSaved,
   onDraftActiveChange
 }) {
@@ -232,16 +233,18 @@ export default function QualificationForm({
     }
   }
 
-  return (
-    <ExecutivePanel id="qualification-form" className="qualification-form">
-      <header className="qualification-form__header">
-        <h3 className="qualification-form__title">
-          {formMeta.title || translate("qualificationFormTitle")}
-        </h3>
-        <p className="qualification-form__description">
-          {formMeta.description || translate("qualificationFormDescription")}
-        </p>
-      </header>
+  const formBody = (
+    <>
+      {!inline ? (
+        <header className="qualification-form__header">
+          <h3 className="qualification-form__title">
+            {formMeta.title || translate("qualificationFormTitle")}
+          </h3>
+          <p className="qualification-form__description">
+            {formMeta.description || translate("qualificationFormDescription")}
+          </p>
+        </header>
+      ) : null}
 
       <form className="qualification-form__body" onSubmit={handleSubmit}>
         <div className="qualification-form__grid">
@@ -275,6 +278,20 @@ export default function QualificationForm({
           {submitting ? translate("qualificationFormSaving") : translate("qualificationFormContinue")}
         </button>
       </form>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div id="qualification-form" className="qualification-form qualification-form--inline">
+        {formBody}
+      </div>
+    );
+  }
+
+  return (
+    <ExecutivePanel id="qualification-form" className="qualification-form">
+      {formBody}
     </ExecutivePanel>
   );
 }

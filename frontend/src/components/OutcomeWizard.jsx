@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import MissionSemanticSection from "./mission-control/MissionSemanticSection";
 
 function defaultFollowUpDate(days = 7) {
   const date = new Date();
@@ -69,7 +70,8 @@ export default function OutcomeWizard({
   prospectName,
   onComplete,
   onBack,
-  hideTechnicalDetails = false
+  hideTechnicalDetails = false,
+  useSemanticSections = false
 }) {
   const [form, setForm] = useState(() => buildInitialForm(outcomeConfig));
 
@@ -121,8 +123,12 @@ export default function OutcomeWizard({
     );
   }
 
-  return (
-    <div className="outcome-wizard">
+  const fields = outcomeConfig?.fields || [];
+  const detailFields = fields.filter((field) => field.type !== "textarea");
+  const noteFields = fields.filter((field) => field.type === "textarea");
+
+  const wizardBody = (
+    <>
       <h3 className="outcome-wizard__title">{title}</h3>
       {prospectName ? (
         <p className="outcome-wizard__intro">
@@ -135,13 +141,33 @@ export default function OutcomeWizard({
         hideTechnicalDetails={hideTechnicalDetails}
       />
 
-      {(outcomeConfig?.fields || []).map((field) => renderField(field))}
+      {detailFields.map((field) => renderField(field))}
+
+      {noteFields.map((field) =>
+        useSemanticSections ? (
+          <MissionSemanticSection key={field.key} variant="notes">
+            {renderField(field)}
+          </MissionSemanticSection>
+        ) : (
+          renderField(field)
+        )
+      )}
 
       <ActionRow
         onBack={onBack}
         onSave={() => onComplete(form)}
         saveLabel={`Save ${title}`}
       />
+    </>
+  );
+
+  if (useSemanticSections) {
+    return <div className="outcome-wizard outcome-wizard--semantic">{wizardBody}</div>;
+  }
+
+  return (
+    <div className="outcome-wizard">
+      {wizardBody}
     </div>
   );
 }

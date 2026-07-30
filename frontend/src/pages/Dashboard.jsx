@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getOrganizationSettings } from "../services/organizationService";
 import {
@@ -12,22 +12,18 @@ import {
 } from "../adapters/missionControlAdapter";
 import AgentMetricPanel from "../components/AgentMetricPanel";
 import WorkflowCompleteBanner from "../components/WorkflowCompleteBanner";
-import ExecutiveSection from "../components/design-system/ExecutiveSection";
-import ConversationOutcomePanel from "../components/ConversationOutcomePanel";
-import JourneyPackage from "../components/JourneyPackage";
-import WorkflowGatePanel from "../components/WorkflowGatePanel";
-import MissionCard from "../components/mission-control/MissionCard";
+import MissionControlDashboard from "../components/mission-control/MissionControlDashboard";
+import MissionControlPermanentActions from "../components/mission-control/MissionControlPermanentActions";
+import CommunicationActionsPanel from "../components/communication/CommunicationActionsPanel";
 import MissionActionCenter from "../components/mission-control/MissionActionCenter";
-import MissionExecutionDialog from "../components/mission-control/MissionExecutionDialog";
 import MissionControlWorkspaceHeader from "../components/mission-control/MissionControlWorkspaceHeader";
 import MissionControlExecutionPanel from "../components/mission-control/MissionControlExecutionPanel";
-import QualificationForm from "../components/mission-control/QualificationForm";
 import { useMissionExecutionSuccessToast } from "../components/mission-control/MissionExecutionSuccessToast";
 import { useToast } from "../components/ui/ToastProvider";
 import {
-  executeSendViaWhatsApp,
   isWhatsAppCopyAction
 } from "../services/whatsappCommunicationService";
+import { executeCommunicationAction } from "../engines/communicationActionEngine";
 import { executeScheduleInterview } from "../services/missionExecutionService";
 import {
   fetchProspectMissions,
@@ -37,7 +33,6 @@ import {
   buildAgentMetrics,
   buildWorkspaceContext
 } from "../engines/contextEngine";
-import { getAvailableJourneyPackages } from "../engines/journeyEngine";
 import {
   buildQueueFromBackendWorkflowQueue,
   findQueueIndex,
@@ -53,10 +48,9 @@ import {
   filterQueueForExecutiveFilter
 } from "../engines/executiveFilterEngine";
 import { useLanguage } from "../i18n/LanguageContext";
-import {
-  buildProspectCenterPath,
-  buildProspectWorkspacePath
-} from "../utils/prospectRoutes";
+import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
+import { subscribeProspectProfileUpdated } from "../utils/prospectRefreshBus";
+import { usePromptDialog } from "../hooks/usePromptDialog";
 import "./MissionControl.css";
 
 const MISSION_CONTROL_LIVE_POLL_MS = 5000;
@@ -116,23 +110,21 @@ export default function Dashboard() {
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [workspace, setWorkspace] = useState(null);
-  const [showPackageSent, setShowPackageSent] = useState(false);
   const [workflowComplete, setWorkflowComplete] = useState(null);
   const [primaryMission, setPrimaryMission] = useState(null);
-  const [missionLoading, setMissionLoading] = useState(false);
-  const [showOutcomeGate, setShowOutcomeGate] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [prospectLoading, setProspectLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [organizationSettings, setOrganizationSettings] = useState(null);
   const [activeMetricPanel, setActiveMetricPanel] = useState(null);
-  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [expandedMissionActionId, setExpandedMissionActionId] = useState(null);
   const [executionSubmitting, setExecutionSubmitting] = useState(false);
   const [executionError, setExecutionError] = useState(null);
   const [qualificationDraftActive, setQualificationDraftActive] = useState(false);
   const showMissionExecutionSuccess = useMissionExecutionSuccessToast();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showInfo } = useToast();
+  const { prompt, promptDialog } = usePromptDialog();
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
     const item = queueItems[index];
@@ -155,7 +147,6 @@ export default function Dashboard() {
 
       setWorkspace(adapted);
       setCurrentIndex(index);
-      setShowPackageSent(false);
       setWorkflowComplete(null);
     } catch (err) {
       console.error(err);
@@ -243,21 +234,17 @@ export default function Dashboard() {
       return;
     }
 
-    setMissionLoading(true);
-
     try {
       const result = await fetchProspectMissions(prospectPhone);
       setPrimaryMission(result.primaryMission || null);
     } catch (error) {
       console.error("[missions]", error);
       setPrimaryMission(null);
-    } finally {
-      setMissionLoading(false);
     }
   }, [phone]);
 
   useEffect(() => {
-    setShowOutcomeGate(false);
+    setExpandedMissionActionId(null);
     setQualificationDraftActive(false);
     refreshMissions(phone);
   }, [phone, refreshMissions]);
@@ -275,6 +262,33 @@ export default function Dashboard() {
       setWorkspace(adapted);
     }
   }, [queue, currentIndex, dashboard]);
+
+  const evaluateMissionWorkflow = useCallback(
+    async ({ skipAdvance = false } = {}) => {
+      if (!phone) {
+        return null;
+      }
+
+      setExpandedMissionActionId(null);
+      setExecutionError(null);
+
+      const missionsResult = await fetchProspectMissions(phone);
+      const nextMission = missionsResult.primaryMission || null;
+      setPrimaryMission(nextMission);
+      await recalculateMissions({ prospectPhone: phone }).catch(() => {});
+
+      if (!skipAdvance && !nextMission) {
+        const next = getNextPriorityProspect(queue, currentIndex);
+
+        if (next) {
+          await loadProspectAtIndex(next.index, queue, dashboard);
+        }
+      }
+
+      return nextMission;
+    },
+    [phone, queue, currentIndex, dashboard, loadProspectAtIndex]
+  );
 
   const handleConversationOutcomeSaved = useCallback(
     async (result) => {
@@ -311,24 +325,15 @@ export default function Dashboard() {
         );
         setWorkspace(adapted);
         await refreshMissions(phone);
-
-        const nextMission = result.missionControl?.primaryMission;
-
-        if (
-          nextMission?.missionType === "ScheduleInterview" ||
-          nextMission?.primaryAction?.id === "schedule"
-        ) {
-          setExecutionError(null);
-          setScheduleDialogOpen(true);
-        }
+        await evaluateMissionWorkflow({ skipAdvance: Boolean(result.missionControl?.primaryMission) });
 
         return;
       }
 
       await refreshCurrentWorkspace();
-      await refreshMissions(phone);
+      await evaluateMissionWorkflow();
     },
-    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, refreshMissions]
+    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, refreshMissions, evaluateMissionWorkflow]
   );
 
   useEffect(() => {
@@ -343,6 +348,17 @@ export default function Dashboard() {
     return () => window.clearInterval(timer);
   }, [phone, workspace?.isLive, prospectLoading, qualificationDraftActive, refreshCurrentWorkspace]);
 
+  useEffect(() => {
+    return subscribeProspectProfileUpdated((updatedPhone) => {
+      if (!updatedPhone || updatedPhone !== phone) {
+        return;
+      }
+
+      refreshCurrentWorkspace();
+      refreshMissions(updatedPhone);
+    });
+  }, [phone, refreshCurrentWorkspace, refreshMissions]);
+
   const handleOrganizationResourceMissing = useCallback(
     (resourceKey) => {
       const messages = {
@@ -353,6 +369,82 @@ export default function Dashboard() {
       setActionError(messages[resourceKey] || translate("missionControlOrgResourceMissing"));
     },
     [translate]
+  );
+
+  const handleWhatsAppFallbackOffer = useCallback(
+    ({ phone: targetPhone }) => {
+      showInfo(translate("zoomInvitationCopyWhatsAppOffer"), {
+        actionLabel: translate("zoomInvitationCopyWhatsAppAction"),
+        duration: 10000,
+        onAction: () => {
+          executeCommunicationAction({
+            phone: targetPhone,
+            actionId: "send_zoom_link",
+            forceWhatsApp: true,
+            translate,
+            showSuccess,
+            showError: (message) => {
+              setActionError(message);
+              showError(message);
+            },
+            onOrganizationResourceMissing: handleOrganizationResourceMissing,
+            onRecorded: async () => {
+              await refreshCurrentWorkspace();
+              await refreshMissions(targetPhone);
+              await recalculateMissions({ prospectPhone: targetPhone }).catch(() => {});
+            }
+          });
+        }
+      });
+    },
+    [
+      translate,
+      showInfo,
+      showSuccess,
+      showError,
+      handleOrganizationResourceMissing,
+      refreshCurrentWorkspace,
+      refreshMissions
+    ]
+  );
+
+  const runCommunicationAction = useCallback(
+    async (actionId, { forceWhatsApp = false } = {}) => {
+      if (!phone) {
+        return;
+      }
+
+      await executeCommunicationAction({
+        phone,
+        actionId,
+        forceWhatsApp,
+        translate,
+        showSuccess,
+        showInfo,
+        showError: (message) => {
+          setActionError(message);
+          showError(message);
+        },
+        onOrganizationResourceMissing: handleOrganizationResourceMissing,
+        onWhatsAppFallbackOffer: handleWhatsAppFallbackOffer,
+        onRecorded: async () => {
+          await refreshCurrentWorkspace();
+          await refreshMissions(phone);
+          await recalculateMissions({ prospectPhone: phone }).catch(() => {});
+        }
+      });
+    },
+    [
+      phone,
+      translate,
+      showSuccess,
+      showInfo,
+      showError,
+      handleOrganizationResourceMissing,
+      handleWhatsAppFallbackOffer,
+      refreshCurrentWorkspace,
+      refreshMissions
+    ]
   );
 
   const handleMissionAction = useCallback(
@@ -376,27 +468,7 @@ export default function Dashboard() {
       }
 
       if (isWhatsAppCopyAction(actionId)) {
-        if (!phone) {
-          return;
-        }
-
-        await executeSendViaWhatsApp({
-          phone,
-          actionId,
-          translate,
-          showSuccess,
-          showError: (message) => {
-            setActionError(message);
-            showError(message);
-          },
-          onOrganizationResourceMissing: handleOrganizationResourceMissing,
-          onRecorded: async () => {
-            await refreshCurrentWorkspace();
-            await refreshMissions(phone);
-            await recalculateMissions({ prospectPhone: phone }).catch(() => {});
-          }
-        });
-
+        await runCommunicationAction(actionId);
         return;
       }
 
@@ -408,13 +480,20 @@ export default function Dashboard() {
         let payload = {};
 
         if (actionId === "notes") {
-          const text = window.prompt(translate("missionControlAddNotePrompt"));
+          const text = await prompt({
+            title: translate("missionControlActionNotes"),
+            label: translate("missionControlAddNotePrompt"),
+            placeholder: translate("workspaceActivityAddNotePlaceholder"),
+            confirmLabel: translate("workspaceActivityAddNote"),
+            cancelLabel: translate("workspaceCancel"),
+            multiline: true
+          });
 
-          if (!text?.trim()) {
+          if (!text) {
             return;
           }
 
-          payload = { text: text.trim() };
+          payload = { text };
         }
 
         const result = await postMissionControlAction(phone, actionId, payload);
@@ -432,88 +511,36 @@ export default function Dashboard() {
         setActionError(translate("missionControlActionFailed"));
       }
     },
-    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, showSuccess, showError, handleOrganizationResourceMissing]
+    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, runCommunicationAction, prompt]
   );
 
-  const handleMissionPrimaryAction = useCallback(
+  const handleMissionActionImmediate = useCallback(
     async (actionId) => {
-      if (actionId === "enter_interview_outcome") {
-        setShowOutcomeGate(true);
-        document.getElementById("workflow-outcome-gate")?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest"
-        });
-        return;
-      }
-
-      if (actionId === "schedule") {
-        setExecutionError(null);
-        setScheduleDialogOpen(true);
-        return;
-      }
-
-      await handleMissionAction(actionId);
-    },
-    [handleMissionAction]
-  );
-
-  const handleChecklistAction = useCallback(
-    async ({ actionId, scrollTarget }) => {
-      if (scrollTarget) {
-        document.getElementById(scrollTarget)?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest"
-        });
-      }
-
-      if (!actionId || actionId === "qualification") {
-        return;
-      }
-
-      if (actionId === "enter_interview_outcome" || actionId === "schedule") {
-        await handleMissionPrimaryAction(actionId);
-        return;
-      }
+      setActionError(null);
 
       if (isWhatsAppCopyAction(actionId)) {
         if (!phone) {
           return;
         }
 
-        await executeSendViaWhatsApp({
-          phone,
-          actionId,
-          translate,
-          showSuccess,
-          showError: (message) => {
-            setActionError(message);
-            showError(message);
-          },
-          onOrganizationResourceMissing: handleOrganizationResourceMissing,
-          onRecorded: async () => {
-            await refreshCurrentWorkspace();
-            await refreshMissions(phone);
-            await recalculateMissions({ prospectPhone: phone }).catch(() => {});
-          }
-        });
+        await runCommunicationAction(actionId);
         return;
       }
 
-      await handleMissionPrimaryAction(actionId);
+      await handleMissionAction(actionId);
+      await evaluateMissionWorkflow();
     },
     [
       phone,
       translate,
-      showSuccess,
-      showError,
-      handleMissionPrimaryAction,
-      handleOrganizationResourceMissing,
+      runCommunicationAction,
       refreshCurrentWorkspace,
-      refreshMissions
+      evaluateMissionWorkflow,
+      handleMissionAction
     ]
   );
 
-  const handleScheduleMissionSubmit = useCallback(
+  const handleMissionActionScheduleSubmit = useCallback(
     async (form) => {
       if (!phone) {
         return;
@@ -537,7 +564,8 @@ export default function Dashboard() {
           interviewType,
           recruiter: form.recruiter?.trim() || undefined,
           officeLocation: form.officeLocation?.trim() || undefined,
-          notes: form.notes?.trim() || undefined
+          notes: form.notes?.trim() || undefined,
+          email: form.email || undefined
         });
 
         if (!result.success) {
@@ -559,10 +587,8 @@ export default function Dashboard() {
         }
 
         await refreshMissions(phone);
-        await recalculateMissions({ prospectPhone: phone }).catch(() => {});
-
-        setScheduleDialogOpen(false);
         showMissionExecutionSuccess(result);
+        await evaluateMissionWorkflow();
       } catch (error) {
         console.error(error);
         setExecutionError(
@@ -582,18 +608,12 @@ export default function Dashboard() {
       refreshCurrentWorkspace,
       refreshMissions,
       translate,
-      showMissionExecutionSuccess
+      showMissionExecutionSuccess,
+      evaluateMissionWorkflow
     ]
   );
 
-  const handleMissionSecondaryAction = useCallback(
-    async (actionId) => {
-      await handleMissionAction(actionId);
-    },
-    [handleMissionAction]
-  );
-
-  const handleGateOutcome = useCallback(
+  const handleMissionActionOutcomeComplete = useCallback(
     async (formState, result) => {
       if (!phone) {
         return;
@@ -628,26 +648,16 @@ export default function Dashboard() {
             message: translate("missionControlOrientationReady")
           });
         }
-
-        await refreshMissions(phone);
-        await recalculateMissions({ prospectPhone: phone }).catch(() => {});
-        setShowOutcomeGate(false);
-        return;
+      } else {
+        await refreshCurrentWorkspace();
       }
 
-      await refreshCurrentWorkspace();
-      await refreshMissions(phone);
-      await recalculateMissions({ prospectPhone: phone }).catch(() => {});
+      await evaluateMissionWorkflow();
     },
-    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, refreshMissions, translate]
+    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, translate, evaluateMissionWorkflow]
   );
 
-  const handlePackageSent = useCallback(() => {
-    setShowPackageSent(true);
-    setWorkflowComplete({
-      message: translate("missionControlPackageSent")
-    });
-  }, [translate]);
+  const handleMissionActionQualificationSaved = handleConversationOutcomeSaved;
 
   const displayWorkflowState = useMemo(() => {
     const agentState = workspace?.raw?.agentState;
@@ -668,7 +678,6 @@ export default function Dashboard() {
       translate,
       handlers: {
         onAction: handleMissionAction,
-        onSendOnboarding: handlePackageSent,
         onOrganizationResourceMissing: handleOrganizationResourceMissing
       }
     });
@@ -678,17 +687,8 @@ export default function Dashboard() {
     displayWorkflowState,
     translate,
     handleMissionAction,
-    handlePackageSent,
     handleOrganizationResourceMissing
   ]);
-
-  const journeyPackages = useMemo(() => {
-    if (!workspaceContext) {
-      return [];
-    }
-
-    return getAvailableJourneyPackages(workspaceContext);
-  }, [workspaceContext]);
 
   const { totalProspects, previousProspect, nextProspect } = useMemo(
     () => getQueueNeighbors(queue, currentIndex),
@@ -711,7 +711,7 @@ export default function Dashboard() {
 
   const openWorkspaceForPhone = useCallback(
     (targetPhone) => {
-      navigate(buildProspectWorkspacePath({ phone: targetPhone }));
+      navigateToProspectWorkspace(navigate, targetPhone);
       setActiveMetricPanel(null);
     },
     [navigate]
@@ -753,26 +753,22 @@ export default function Dashboard() {
     );
   }
 
-  const showGate = Boolean(workspace?.workflowGate?.active);
-  const shouldShowOutcomeGate =
-    showOutcomeGate ||
-    showGate ||
-    primaryMission?.missionType === "EnterInterviewOutcome";
   const qualificationInputs = workspace?.conversationOutcome?.requiredInputs || [];
-  const showQualificationForm =
-    !prospectLoading && !shouldShowOutcomeGate && qualificationInputs.length > 0;
-  const showMissionBlock =
-    missionLoading || Boolean(primaryMission) || shouldShowOutcomeGate || showQualificationForm;
-  const showConversationOutcomePanel =
-    !prospectLoading &&
-    !shouldShowOutcomeGate &&
-    !showQualificationForm &&
-    !primaryMission &&
-    workspace?.conversationOutcome?.canRecordOutcome;
-  const metrics = buildAgentMetrics(dashboard);
+  const hasMissionActions = Boolean(primaryMission) || qualificationInputs.length > 0;
+  const metrics = {
+    ...buildAgentMetrics(dashboard),
+    prospectsAction: queue.length
+  };
+
+  const prospectEmail = workspaceContext.prospect.email || workspace?.conversationOutcome?.fields?.email || null;
+  const nextAction =
+    primaryMission?.primaryAction?.label ||
+    primaryMission?.title ||
+    null;
 
   return (
     <>
+      {promptDialog}
       <AgentMetricPanel
         type={activeMetricPanel}
         queue={queue}
@@ -782,65 +778,12 @@ export default function Dashboard() {
 
       <div className="mission-control-shell">
         <div className="mission-control-cockpit">
-          <div className="mission-control-cockpit__utility">
-            <div className="mission-control-cockpit__utility-links">
-              <Link
-                to={buildProspectCenterPath({
-                  filter: executiveFilter || undefined
-                })}
-                className="mission-control-cockpit__link"
-              >
-                {translate("missionControlOpenProspectCenter")}
-              </Link>
-              {executiveFilter ? (
-                <span className="mission-control-cockpit__filter">
-                  {EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter]
-                    ? translate(EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter])
-                    : executiveFilter}
-                </span>
-              ) : null}
-            </div>
-            <div className="mission-control-cockpit__metrics">
-              <button
-                type="button"
-                className={`mission-control-cockpit__metric${activeMetricPanel === "interviews" ? " is-active" : ""}`}
-                onClick={() =>
-                  setActiveMetricPanel((current) => (current === "interviews" ? null : "interviews"))
-                }
-              >
-                <span className="mission-control-cockpit__metric-value">
-                  {metrics?.interviews ?? 0}
-                </span>{" "}
-                {translate("missionControlMetricInterviews")}
-              </button>
-              <button
-                type="button"
-                className={`mission-control-cockpit__metric${activeMetricPanel === "followUps" ? " is-active" : ""}`}
-                onClick={() =>
-                  setActiveMetricPanel((current) => (current === "followUps" ? null : "followUps"))
-                }
-              >
-                <span className="mission-control-cockpit__metric-value">
-                  {metrics?.followUps ?? 0}
-                </span>{" "}
-                {translate("missionControlMetricFollowUps")}
-              </button>
-              <button
-                type="button"
-                className={`mission-control-cockpit__metric${activeMetricPanel === "tasks" ? " is-active" : ""}`}
-                onClick={() =>
-                  setActiveMetricPanel((current) => (current === "tasks" ? null : "tasks"))
-                }
-              >
-                <span className="mission-control-cockpit__metric-value">{metrics?.tasks ?? 0}</span>{" "}
-                {translate("missionControlMetricTasks")}
-              </button>
-            </div>
-          </div>
-
           <MissionControlWorkspaceHeader
             prospect={workspaceContext.prospect}
-            recruitingStatus={workspace.recruitingStatus}
+            phone={phone}
+            email={prospectEmail}
+            nextAction={nextAction}
+            executiveFilter={executiveFilter}
             currentIndex={currentIndex}
             totalProspects={totalProspects}
             previousProspect={previousProspect}
@@ -871,113 +814,60 @@ export default function Dashboard() {
             />
           ) : null}
 
-          <div className="mission-control-page__executive">
-          {showMissionBlock ? (
-            <ExecutiveSection>
-              {missionLoading ? (
-                <p className="mission-control-page__loading">{translate("missionLoading")}</p>
-              ) : null}
-              {primaryMission ? (
-                <MissionCard
-                  mission={primaryMission}
-                  translate={translate}
-                  phone={phone}
-                  onPrimaryAction={handleMissionPrimaryAction}
-                  busy={executionSubmitting}
-                />
-              ) : null}
-              {primaryMission && (primaryMission.secondaryActions || []).length ? (
-                <MissionActionCenter
-                  mission={primaryMission}
-                  translate={translate}
-                  phone={phone}
-                  onSecondaryAction={handleMissionSecondaryAction}
-                  busy={executionSubmitting}
-                />
-              ) : null}
-              {shouldShowOutcomeGate ? (
-                <div className="mission-control-page__outcome-gate">
-                  <WorkflowGatePanel
-                    gate={workspace.workflowGate?.active ? workspace.workflowGate : { active: true }}
-                    prospectName={workspace.prospect.name}
-                    phone={workspace.phone}
-                    onComplete={handleGateOutcome}
-                  />
-                </div>
-              ) : null}
-              {showQualificationForm ? (
-                <QualificationForm
-                  key={`qualification-${phone}`}
-                  phone={phone}
-                  conversationOutcome={workspace.conversationOutcome}
-                  disabled={prospectLoading || executionSubmitting}
-                  onSaved={handleConversationOutcomeSaved}
-                  onDraftActiveChange={setQualificationDraftActive}
-                />
-              ) : null}
-            </ExecutiveSection>
-          ) : null}
-
-          <MissionControlExecutionPanel
-            workspace={workspace}
-            primaryMission={primaryMission}
-            expandedBrief={workspaceContext.expandedBrief}
-            phone={phone}
-            onChecklistAction={handleChecklistAction}
-            checklistBusy={executionSubmitting}
+          <MissionControlDashboard
+            metrics={metrics}
+            executiveFilter={executiveFilter}
+            onOpenMetricPanel={setActiveMetricPanel}
           />
 
-          {journeyPackages.length ? (
-            <ExecutiveSection className="mission-control-page__supporting">
-              {journeyPackages.map((pkg) => (
-                <JourneyPackage
-                  key={pkg.id}
-                  title={pkg.title}
-                  items={pkg.items}
-                  actionLabel={pkg.actionLabel}
-                  language={pkg.language}
-                  onSend={handlePackageSent}
-                />
-              ))}
-              {showPackageSent ? (
-                <p className="mission-control-page__package-note">
-                  {translate("missionControlPackageQueued")}
-                </p>
-              ) : null}
-            </ExecutiveSection>
-          ) : null}
-
-          {showConversationOutcomePanel ? (
-            <ExecutiveSection className="mission-control-page__supporting">
-              <ConversationOutcomePanel
+          <div className="mission-control-page__workspace">
+            {hasMissionActions ? (
+              <MissionActionCenter
+                mission={primaryMission}
                 phone={phone}
+                prospect={workspaceContext.prospect}
                 conversationOutcome={workspace.conversationOutcome}
-                disabled={prospectLoading}
-                onSaved={handleConversationOutcomeSaved}
-                showKnownInformation={false}
+                workflowGate={workspace.workflowGate}
+                rawWorkflowGate={workspace.raw?.workflowGate}
+                recruiterName="Ana"
+                expandedActionId={expandedMissionActionId}
+                onExpandedActionIdChange={setExpandedMissionActionId}
+                busy={executionSubmitting || prospectLoading}
+                submitting={executionSubmitting}
+                submitError={executionError}
+                onImmediateAction={handleMissionActionImmediate}
+                onScheduleSubmit={handleMissionActionScheduleSubmit}
+                onOutcomeComplete={handleMissionActionOutcomeComplete}
+                onQualificationSaved={handleMissionActionQualificationSaved}
+                onQualificationDraftChange={setQualificationDraftActive}
+                onCancel={() => {
+                  setExecutionError(null);
+                  setExpandedMissionActionId(null);
+                }}
               />
-            </ExecutiveSection>
-          ) : null}
-        </div>
+            ) : null}
+
+            <CommunicationActionsPanel
+              workspace={workspace}
+              onAction={handleMissionAction}
+              busy={executionSubmitting || prospectLoading}
+            />
+
+            <MissionControlPermanentActions
+              phone={phone}
+              onAction={handleMissionAction}
+              busy={executionSubmitting || prospectLoading}
+            />
+
+            <MissionControlExecutionPanel
+              workspace={workspace}
+              primaryMission={primaryMission}
+              expandedBrief={workspaceContext.expandedBrief}
+              phone={phone}
+            />
+          </div>
         </div>
       </div>
-
-      <MissionExecutionDialog
-        open={scheduleDialogOpen}
-        phone={phone}
-        mission={primaryMission}
-        prospect={workspaceContext.prospect}
-        recruiterName="Ana"
-        submitting={executionSubmitting}
-        error={executionError}
-        onClose={() => {
-          if (!executionSubmitting) {
-            setScheduleDialogOpen(false);
-            setExecutionError(null);
-          }
-        }}
-        onSubmit={handleScheduleMissionSubmit}
-      />
     </>
   );
 }

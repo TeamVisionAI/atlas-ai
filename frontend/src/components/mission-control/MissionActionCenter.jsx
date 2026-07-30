@@ -1,38 +1,92 @@
-import ActionCard from "../design-system/ActionCard";
+import { useLanguage } from "../../i18n/LanguageContext";
 import { buildMissionActionCard } from "./missionActionUtils";
+import {
+  buildMissionActionList,
+  resolvesToInlineForm
+} from "./missionActionFormRegistry";
+import ExpandableMissionActionCard from "./ExpandableMissionActionCard";
 import "./MissionActionCenter.css";
 
 export default function MissionActionCenter({
   mission,
-  translate,
   phone,
-  onSecondaryAction,
-  busy = false
+  prospect,
+  conversationOutcome,
+  workflowGate,
+  rawWorkflowGate = null,
+  recruiterName = "",
+  expandedActionId = null,
+  onExpandedActionIdChange,
+  busy = false,
+  submitting = false,
+  submitError = null,
+  onImmediateAction,
+  onScheduleSubmit,
+  onOutcomeComplete,
+  onQualificationSaved,
+  onQualificationDraftChange,
+  onCancel
 }) {
-  const secondaryActions = (mission?.secondaryActions || []).map((action) =>
-    buildMissionActionCard(action, {
-      translate,
-      phone,
-      onClick: () => onSecondaryAction?.(action.id, mission)
-    })
-  );
+  const { translate } = useLanguage();
+  const actions = buildMissionActionList(mission, conversationOutcome, translate);
 
-  if (!secondaryActions.length) {
+  if (!actions.length) {
     return null;
   }
 
+  function handleToggle(actionId) {
+    const next = expandedActionId === actionId ? null : actionId;
+    onExpandedActionIdChange?.(next);
+  }
+
+  function handleCancel() {
+    onExpandedActionIdChange?.(null);
+    onCancel?.();
+  }
+
   return (
-    <div className="mission-action-center" aria-busy={busy || undefined}>
-      <div className="mission-action-center__supporting">
-        <p className="mission-action-center__supporting-label">
-          {translate("missionControlSupportingTools")}
-        </p>
-        <div className="mission-action-center__supporting-grid">
-          {secondaryActions.map((action) => (
-            <ActionCard key={action.id || action.title} {...action} disabled={busy} />
-          ))}
-        </div>
+    <section className="mission-action-center" aria-busy={busy || submitting || undefined}>
+      <h3 className="mission-action-center__title">{translate("missionControlMissionActions")}</h3>
+      <div className="mission-action-center__list">
+        {actions.map((action, index) => {
+          const formType = resolvesToInlineForm(action.id, mission);
+          const expanded = expandedActionId === action.id;
+          const cardProps = buildMissionActionCard(action, {
+            translate,
+            phone,
+            featured: index === 0 && !expanded,
+            variantOverride: index === 0 ? "accent" : undefined
+          });
+
+          return (
+            <ExpandableMissionActionCard
+              key={action.id}
+              action={action}
+              cardProps={cardProps}
+              formType={formType}
+              expanded={expanded}
+              active={expanded}
+              phone={phone}
+              prospect={prospect}
+              mission={mission}
+              conversationOutcome={conversationOutcome}
+              workflowGate={workflowGate}
+              rawWorkflowGate={rawWorkflowGate}
+              recruiterName={recruiterName}
+              submitting={submitting}
+              error={expanded ? submitError : null}
+              translate={translate}
+              onToggle={handleToggle}
+              onImmediateAction={onImmediateAction}
+              onScheduleSubmit={onScheduleSubmit}
+              onOutcomeComplete={onOutcomeComplete}
+              onQualificationSaved={onQualificationSaved}
+              onQualificationDraftChange={onQualificationDraftChange}
+              onCancel={handleCancel}
+            />
+          );
+        })}
       </div>
-    </div>
+    </section>
   );
 }

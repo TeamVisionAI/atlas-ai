@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import ExecutivePanel from "../design-system/ExecutivePanel";
 import AtlasButton from "../ui/AtlasButton";
+import MissionSemanticSection from "./MissionSemanticSection";
 import {
   formatNextWeekLabel,
   formatSchedulingDayLabel,
@@ -10,6 +11,8 @@ import {
   groupSlotsByDay,
   isSameSlot
 } from "../../utils/schedulingSlotGroups";
+import { needsZoomSchedulingEmailWarning } from "../../utils/prospectEmail";
+import SchedulingEmailWarning from "./SchedulingEmailWarning";
 import "./SchedulingForm.css";
 
 export const INTERVIEW_TYPE_OPTIONS = Object.freeze([
@@ -44,7 +47,10 @@ export function createInitialSchedulingForm({
     interviewType: defaultInterviewType ? normalizeInterviewType(defaultInterviewType) : "",
     recruiter: defaultRecruiter,
     officeLocation: "",
-    notes: ""
+    notes: "",
+    email: "",
+    showEmailInput: false,
+    whatsappDeliveryAcknowledged: false
   };
 }
 
@@ -102,7 +108,10 @@ export default function SchedulingForm({
   onBackToRecommended,
   onSelectDay,
   onNextWeek,
-  onInterviewTypeChange
+  onInterviewTypeChange,
+  prospect = null,
+  inline = false,
+  useSemanticSections = false
 }) {
   const { translate, language } = useLanguage();
   const locale = language === "es" ? "es-ES" : "en-US";
@@ -144,7 +153,10 @@ export default function SchedulingForm({
       ...form,
       interviewType: nextType,
       dateKey: "",
-      timeKey: ""
+      timeKey: "",
+      email: "",
+      showEmailInput: false,
+      whatsappDeliveryAcknowledged: false
     });
   }
 
@@ -157,8 +169,13 @@ export default function SchedulingForm({
     });
   }
 
-  return (
-    <ExecutivePanel className="scheduling-form">
+  const Wrapper = inline ? "div" : ExecutivePanel;
+  const wrapperProps = inline
+    ? { className: "scheduling-form scheduling-form--inline" }
+    : { className: "scheduling-form" };
+
+  const schedulingContent = (
+    <>
       <section className="scheduling-form__interview-type" aria-labelledby="scheduling-type-heading">
         <h3 id="scheduling-type-heading" className="scheduling-form__slots-title">
           {translate("missionExecutionInterviewType")}
@@ -186,6 +203,10 @@ export default function SchedulingForm({
           })}
         </div>
       </section>
+
+      {needsZoomSchedulingEmailWarning(form, prospect) ? (
+        <SchedulingEmailWarning form={form} onChange={onChange} disabled={disabled} />
+      ) : null}
 
       {interviewTypeSelected ? (
         <>
@@ -349,20 +370,51 @@ export default function SchedulingForm({
       ) : (
         <p className="scheduling-form__hint">{translate("missionExecutionSelectInterviewTypeFirst")}</p>
       )}
+    </>
+  );
 
-      <details className="scheduling-form__advanced">
-        <summary>{translate("missionExecutionAdvanced")}</summary>
-        <label className="scheduling-form__field scheduling-form__field--full">
-          <span>{translate("missionExecutionNotes")}</span>
-          <textarea
-            rows={3}
-            value={form.notes}
-            onChange={(event) => updateField("notes", event.target.value)}
-            placeholder={translate("missionExecutionNotesPlaceholder")}
-            disabled={disabled}
-          />
-        </label>
-      </details>
-    </ExecutivePanel>
+  const notesContent = useSemanticSections ? (
+    <label className="scheduling-form__field scheduling-form__field--full">
+      <span>{translate("missionExecutionNotes")}</span>
+      <textarea
+        rows={3}
+        value={form.notes}
+        onChange={(event) => updateField("notes", event.target.value)}
+        placeholder={translate("missionExecutionNotesPlaceholder")}
+        disabled={disabled}
+      />
+    </label>
+  ) : (
+    <details className="scheduling-form__advanced">
+      <summary>{translate("missionExecutionAdvanced")}</summary>
+      <label className="scheduling-form__field scheduling-form__field--full">
+        <span>{translate("missionExecutionNotes")}</span>
+        <textarea
+          rows={3}
+          value={form.notes}
+          onChange={(event) => updateField("notes", event.target.value)}
+          placeholder={translate("missionExecutionNotesPlaceholder")}
+          disabled={disabled}
+        />
+      </label>
+    </details>
+  );
+
+  if (useSemanticSections) {
+    return (
+      <Wrapper {...wrapperProps}>
+        <div className="mission-semantic-sections">
+          <MissionSemanticSection variant="scheduling">{schedulingContent}</MissionSemanticSection>
+          <MissionSemanticSection variant="notes">{notesContent}</MissionSemanticSection>
+        </div>
+      </Wrapper>
+    );
+  }
+
+  return (
+    <Wrapper {...wrapperProps}>
+      {schedulingContent}
+      {notesContent}
+    </Wrapper>
   );
 }

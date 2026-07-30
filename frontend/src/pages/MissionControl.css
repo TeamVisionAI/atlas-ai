@@ -24,73 +24,10 @@
   flex: 0 0 auto;
   flex-shrink: 0;
   position: relative;
-  z-index: 0;
+  z-index: 2;
   background: var(--mc-surface);
   border: none;
   box-shadow: none;
-}
-
-.mission-control-cockpit__utility {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 14px;
-  padding: 10px var(--mc-inset-x) 4px;
-  background: var(--mc-surface-muted);
-  border: none;
-}
-
-.mission-control-cockpit__utility-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.mission-control-cockpit__link {
-  color: #1e3a8a;
-  text-decoration: none;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.mission-control-cockpit__filter {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  border: none;
-  color: #475569;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.mission-control-cockpit__metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.mission-control-cockpit__metric {
-  border: none;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #475569;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.mission-control-cockpit__metric.is-active {
-  background: #e8eef9;
-  color: #1e3a8a;
-}
-
-.mission-control-cockpit__metric-value {
-  color: #1e3a8a;
-  font-weight: 700;
 }
 
 .mission-control-shell__body {
@@ -100,12 +37,15 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 0 var(--mc-inset-x) var(--mc-inset-bottom);
+  padding: 16px var(--mc-inset-x) var(--mc-inset-bottom);
   background: var(--mc-surface);
   scroll-padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.mission-control-page__executive {
+.mission-control-page__workspace {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -193,7 +133,7 @@
     --mc-inset-bottom: 40px;
   }
 
-  .mission-control-page__executive {
+  .mission-control-page__workspace {
     gap: 24px;
   }
 }

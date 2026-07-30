@@ -178,6 +178,27 @@
   color: #0f172a;
   background: #fff;
   border-left: 4px solid #1e3a8a;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.atlas-ui-toast__action {
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.atlas-ui-toast__action:hover,
+.atlas-ui-toast__action:focus-visible {
+  opacity: 0.85;
 }
 
 .atlas-ui-toast--success {
@@ -221,6 +242,36 @@
   margin: 0 0 16px;
   font-size: 14px;
   color: #475569;
+}
+
+.atlas-ui-dialog__field {
+  display: block;
+  margin: 0 0 16px;
+}
+
+.atlas-ui-dialog__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.atlas-ui-dialog__input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.atlas-ui-dialog__input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+  border-color: #2563eb;
 }
 
 .atlas-ui-dialog__actions {

@@ -1,50 +1,47 @@
 .mission-action-center {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.mission-action-center__supporting {
-  display: flex;
-  flex-direction: column;
   gap: 10px;
-  margin-top: 4px;
 }
 
-.mission-action-center__supporting-label {
+.mission-action-center__title {
   margin: 0;
-  color: #64748b;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: #64748b;
 }
 
-.mission-action-center__supporting-grid {
+.mission-action-center__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mission-action-center__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }
 
-.mission-action-center__supporting-grid .action-card {
-  min-height: 108px;
-  padding: 16px 18px;
+.mission-action-center__grid .action-card {
+  min-height: 96px;
 }
 
-.mission-action-center__supporting-grid .action-card__icon {
-  font-size: 26px;
-}
-
-.mission-action-center__supporting-grid .action-card__title {
-  font-size: 15px;
-}
-
-.mission-action-center__supporting-grid .action-card__subtitle {
-  font-size: 13px;
-}
-
-@media (max-width: 768px) {
-  .mission-action-center__supporting-grid {
+@media (max-width: 767px) {
+  .mission-action-center__grid {
     grid-template-columns: 1fr;
+  }
+
+  .mission-action-center__grid .action-card {
+    min-height: auto;
+    padding: 14px 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mission-action-center__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

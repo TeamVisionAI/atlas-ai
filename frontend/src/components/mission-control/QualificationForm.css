@@ -160,3 +160,11 @@
     grid-template-columns: 1fr;
   }
 }
+
+.qualification-form--inline {
+  gap: 18px;
+}
+
+.qualification-form--inline .qualification-form__body {
+  gap: 18px;
+}

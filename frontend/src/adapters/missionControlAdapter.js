@@ -112,7 +112,11 @@ export function adaptMissionControlResponse(
       milestone,
       workflowOwnership,
       canonicalMilestone: workflow?.canonicalMilestone || null,
-      interviewType
+      interviewType,
+      email:
+        missionControl.conversationOutcome?.fields?.email ||
+        dashboardProspect?.email ||
+        null
     },
     brain: {
       language: brain?.language || "en",

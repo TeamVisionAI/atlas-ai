@@ -1,0 +1,37 @@
+.mission-action-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mission-action-card--expanded {
+  border-color: #bfdbfe;
+  box-shadow: 0 4px 16px rgba(30, 58, 138, 0.08);
+}
+
+.mission-action-card__header {
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  min-height: 96px;
+}
+
+.mission-action-card--expanded .mission-action-card__header {
+  background: #f8fafc;
+}
+
+.mission-action-card__panel {
+  padding: 0 16px 16px;
+}
+
+@media (max-width: 767px) {
+  .mission-action-card__header {
+    min-height: auto;
+  }
+
+  .mission-action-card__panel {
+    padding: 0 12px 12px;
+  }
+}

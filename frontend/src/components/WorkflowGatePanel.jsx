@@ -33,6 +33,8 @@ export default function WorkflowGatePanel({
   gate,
   prospectName,
   phone,
+  inline = false,
+  useSemanticSections = false,
   onComplete
 }) {
   const { translate } = useLanguage();
@@ -83,7 +85,10 @@ export default function WorkflowGatePanel({
   }
 
   return (
-    <div className="workflow-gate-panel" id="workflow-outcome-gate">
+    <div
+      className={`workflow-gate-panel${inline ? " workflow-gate-panel--inline" : ""}`}
+      id={inline ? undefined : "workflow-outcome-gate"}
+    >
       <h3 className="workflow-gate-panel__title">
         {gate?.title || translate("workflowGateTitle")}
       </h3>
@@ -108,25 +113,32 @@ export default function WorkflowGatePanel({
       ) : null}
 
       {!selectedOutcome ? (
-        <div className="workflow-gate-panel__options" role="list">
-          {outcomes.map((outcome) => (
-            <button
-              key={outcome.id}
-              type="button"
-              className="workflow-gate-panel__option"
-              disabled={loading}
-              onClick={() => setSelectedOutcome(outcome.id)}
-            >
-              {outcome.label}
-            </button>
-          ))}
-        </div>
+        outcomes.length ? (
+          <div className="workflow-gate-panel__options" role="list">
+            {outcomes.map((outcome) => (
+              <button
+                key={outcome.id}
+                type="button"
+                className="workflow-gate-panel__option"
+                disabled={loading}
+                onClick={() => setSelectedOutcome(outcome.id)}
+              >
+                {outcome.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="workflow-gate-panel__error" role="alert">
+            {translate("workflowGateNoOutcomes")}
+          </p>
+        )
       ) : (
         <OutcomeWizard
           outcome={selectedOutcome}
           outcomeConfig={selectedOutcomeConfig}
           prospectName={prospectName}
           hideTechnicalDetails
+          useSemanticSections={useSemanticSections}
           onBack={() => {
             setSelectedOutcome(null);
             setError(null);

@@ -1,11 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLanguage } from "../../i18n/LanguageContext";
-import AtlasButton from "../ui/AtlasButton";
-import SchedulingForm, {
-  createInitialSchedulingForm,
-  isSchedulingFormValid,
-  normalizeInterviewType
-} from "./SchedulingForm";
 import {
   fetchAppointmentAvailability,
   fetchAppointmentProfile
@@ -18,8 +11,10 @@ import {
   pickRecommendedSlots,
   resolveNextWeekStart
 } from "../../utils/schedulingSlotLoader";
-import "../../styles/atlas-ui.css";
-import "./MissionExecutionDialog.css";
+import {
+  createInitialSchedulingForm,
+  normalizeInterviewType
+} from "./SchedulingForm";
 
 function resolveInterviewDuration(profile) {
   return (
@@ -29,18 +24,12 @@ function resolveInterviewDuration(profile) {
   );
 }
 
-export default function MissionExecutionDialog({
-  open,
-  phone,
-  mission,
-  prospect,
+export function useSchedulingFormController({
+  active,
+  defaultInterviewType = "",
   recruiterName = "",
-  submitting = false,
-  error = null,
-  onClose,
-  onSubmit
+  translate
 }) {
-  const { translate } = useLanguage();
   const [form, setForm] = useState(() => createInitialSchedulingForm());
   const [displaySlots, setDisplaySlots] = useState([]);
   const [windowSlots, setWindowSlots] = useState([]);
@@ -55,15 +44,11 @@ export default function MissionExecutionDialog({
 
   const slotCacheRef = useRef(new Map());
   const durationRef = useRef(30);
-  const dialogSessionRef = useRef(false);
+  const sessionRef = useRef(false);
   const slotsLoadedForRef = useRef("");
 
-  const defaultInterviewType = useMemo(() => {
-    return prospect?.interviewType || mission?.prospect?.interviewType || "";
-  }, [prospect, mission]);
-
-  const selectableDays = useMemo(() => buildSelectableDayOptions(new Date(), 8), [open]);
-  const nextWeekStartDateKey = useMemo(() => resolveNextWeekStart(new Date()), [open]);
+  const selectableDays = useMemo(() => buildSelectableDayOptions(new Date(), 8), [active]);
+  const nextWeekStartDateKey = useMemo(() => resolveNextWeekStart(new Date()), [active]);
 
   const fetchAvailability = useCallback(
     (params) => fetchAppointmentAvailability(params),
@@ -71,13 +56,13 @@ export default function MissionExecutionDialog({
   );
 
   useEffect(() => {
-    if (!open) {
-      dialogSessionRef.current = false;
+    if (!active) {
+      sessionRef.current = false;
       slotsLoadedForRef.current = "";
       return;
     }
 
-    if (dialogSessionRef.current) {
+    if (sessionRef.current) {
       setForm((current) => ({
         ...current,
         interviewType:
@@ -88,7 +73,7 @@ export default function MissionExecutionDialog({
       return;
     }
 
-    dialogSessionRef.current = true;
+    sessionRef.current = true;
     setForm(
       createInitialSchedulingForm({
         defaultInterviewType,
@@ -104,7 +89,7 @@ export default function MissionExecutionDialog({
     setHasMoreInWindow(false);
     setActiveDayKey(null);
     slotCacheRef.current = new Map();
-  }, [open, defaultInterviewType, recruiterName]);
+  }, [active, defaultInterviewType, recruiterName]);
 
   const loadSlotsForInterviewType = useCallback(
     async (interviewType) => {
@@ -157,7 +142,7 @@ export default function MissionExecutionDialog({
   );
 
   useEffect(() => {
-    if (!open || !form.interviewType) {
+    if (!active || !form.interviewType) {
       return;
     }
 
@@ -167,7 +152,7 @@ export default function MissionExecutionDialog({
 
     slotsLoadedForRef.current = form.interviewType;
     loadSlotsForInterviewType(form.interviewType);
-  }, [open, form.interviewType, loadSlotsForInterviewType]);
+  }, [active, form.interviewType, loadSlotsForInterviewType]);
 
   const handleInterviewTypeChange = useCallback(() => {
     slotsLoadedForRef.current = "";
@@ -252,68 +237,24 @@ export default function MissionExecutionDialog({
     }
   }, [fetchAvailability, translate]);
 
-  if (!open) {
-    return null;
-  }
-
-  const canSubmit =
-    isSchedulingFormValid(form) && !submitting && !loadingSlots && !loadingExpansion;
-
-  return (
-    <div className="mission-execution-dialog__backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="mission-execution-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="mission-execution-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="mission-execution-dialog__header">
-          <p className="mission-execution-dialog__eyebrow">{translate("todaysMission")}</p>
-          <h2 id="mission-execution-title" className="mission-execution-dialog__title">
-            {mission?.title || translate("missionControlActionSchedule")}
-          </h2>
-          <p className="mission-execution-dialog__subtitle">
-            {prospect?.name ? `${prospect.name} · ${prospect.phone || phone}` : phone}
-          </p>
-        </header>
-
-        <SchedulingForm
-          form={form}
-          onChange={setForm}
-          slots={displaySlots}
-          loadingSlots={loadingSlots}
-          loadingExpansion={loadingExpansion}
-          slotsError={slotsError}
-          disabled={submitting}
-          recruiterName={recruiterName || form.recruiter}
-          durationMinutes={durationMinutes}
-          displayMode={displayMode}
-          viewMode={viewMode}
-          hasMoreInWindow={hasMoreInWindow}
-          activeDayKey={activeDayKey}
-          selectableDays={selectableDays}
-          nextWeekStartDateKey={nextWeekStartDateKey}
-          onShowMoreTimes={handleShowMoreTimes}
-          onBackToRecommended={handleBackToRecommended}
-          onSelectDay={handleSelectDay}
-          onNextWeek={handleNextWeek}
-          onInterviewTypeChange={handleInterviewTypeChange}
-        />
-
-        {error ? <p className="mission-execution-dialog__error">{error}</p> : null}
-
-        <div className="mission-execution-dialog__actions">
-          <AtlasButton variant="ghost" onClick={onClose} disabled={submitting}>
-            {translate("missionExecutionCancel")}
-          </AtlasButton>
-          <AtlasButton variant="primary" onClick={() => onSubmit(form)} disabled={!canSubmit}>
-            {submitting
-              ? translate("missionExecutionScheduling")
-              : translate("missionExecutionConfirmSchedule")}
-          </AtlasButton>
-        </div>
-      </div>
-    </div>
-  );
+  return {
+    form,
+    setForm,
+    displaySlots,
+    loadingSlots,
+    loadingExpansion,
+    slotsError,
+    durationMinutes,
+    displayMode,
+    viewMode,
+    hasMoreInWindow,
+    activeDayKey,
+    selectableDays,
+    nextWeekStartDateKey,
+    handleInterviewTypeChange,
+    handleShowMoreTimes,
+    handleBackToRecommended,
+    handleSelectDay,
+    handleNextWeek
+  };
 }
