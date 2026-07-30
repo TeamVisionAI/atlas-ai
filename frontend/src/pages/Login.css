@@ -31,6 +31,7 @@
   font-size: 0.875rem;
 }
 
+.login-card input[type="text"],
 .login-card input[type="email"],
 .login-card input[type="password"] {
   width: 100%;
@@ -39,6 +40,46 @@
   border: 1px solid #475569;
   background: #0f172a;
   color: #e2e8f0;
+}
+
+.login-password-field {
+  position: relative;
+}
+
+.login-password-field input {
+  padding-right: calc(14px + 18px + 10px);
+}
+
+.login-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #8b93a7;
+  cursor: pointer;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.login-password-toggle:hover,
+.login-password-toggle:focus-visible {
+  color: #ffffff;
+  background: transparent;
+  outline: none;
+}
+
+.login-password-toggle svg {
+  width: 18px;
+  height: 18px;
 }
 
 .login-remember {
@@ -52,7 +93,7 @@
   color: #f87171;
 }
 
-.login-card button {
+.login-card button[type="submit"] {
   margin-top: 0.5rem;
   padding: 0.75rem;
   border: 0;
@@ -63,7 +104,7 @@
   cursor: pointer;
 }
 
-.login-card button:disabled {
+.login-card button[type="submit"]:disabled {
   opacity: 0.7;
   cursor: wait;
 }
