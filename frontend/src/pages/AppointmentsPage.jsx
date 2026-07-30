@@ -5,8 +5,8 @@ import AtlasButton from "../components/ui/AtlasButton";
 import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
 import Spinner from "../components/ui/Spinner";
-import { fetchAppointments } from "../services/appointmentService";
-import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
+import { fetchAppointments, normalizeAppointmentList } from "../services/appointmentService";
+import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import RescheduleAppointmentDialog from "../components/appointments/RescheduleAppointmentDialog";
 import CancelAppointmentDialog from "../components/appointments/CancelAppointmentDialog";
 import CompleteAppointmentDialog from "../components/appointments/CompleteAppointmentDialog";
@@ -139,7 +139,7 @@ export default function AppointmentsPage() {
         purpose: filters.purpose || undefined,
         meetingType: filters.meetingType || undefined
       });
-      setAppointments(result.items || []);
+      setAppointments(normalizeAppointmentList(result));
     } catch (requestError) {
       setLoadError(captureAppointmentError("load", requestError, translate));
       setAppointments([]);
@@ -365,7 +365,7 @@ export default function AppointmentsPage() {
                       <AtlasButton
                         variant="secondary"
                         size="sm"
-                        onClick={() => navigate(buildProspectWorkspacePath(appointment.prospectPhone))}
+                        onClick={() => navigateToProspectWorkspace(navigate, appointment.prospectPhone)}
                       >
                         {translate("appointmentsOpenProspect")}
                       </AtlasButton>

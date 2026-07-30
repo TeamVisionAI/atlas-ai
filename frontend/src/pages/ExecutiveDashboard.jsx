@@ -5,7 +5,7 @@ import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executi
 import { buildExecutiveDashboardViewModel } from "../engines/executiveDashboardViewModel";
 import {
   buildProspectCenterPath,
-  buildProspectWorkspacePath
+  navigateToProspectWorkspace
 } from "../utils/prospectRoutes";
 import { useLanguage } from "../i18n/LanguageContext";
 import InterviewsHero from "../components/executive/InterviewsHero";
@@ -97,7 +97,7 @@ export default function ExecutiveDashboard() {
   }
 
   function openProspectWorkspace(phone) {
-    navigate(buildProspectWorkspacePath({ phone }));
+    navigateToProspectWorkspace(navigate, phone);
   }
 
   const focusKey = searchParams.get("focus");

@@ -13,7 +13,7 @@ import {
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import {
   buildProspectCenterPath,
-  buildProspectWorkspacePath
+  navigateToProspectWorkspace
 } from "../utils/prospectRoutes";
 import "./ProspectCenter.css";
 
@@ -195,7 +195,7 @@ export default function ProspectCenter() {
   }
 
   function handleOpenWorkspace(phone) {
-    navigate(buildProspectWorkspacePath({ phone }));
+    navigateToProspectWorkspace(navigate, phone);
   }
 
   function handleOpenQueue(phone) {

@@ -29,7 +29,7 @@ export function HumanAssistPanel({ appointment, onReschedule, onResolve, transla
         </div>
       </dl>
       <div className="human-assist-panel__actions">
-        <Link to={buildProspectWorkspacePath(appointment.prospectPhone)} className="appointment-action-link">
+        <Link to={buildProspectWorkspacePath({ phone: appointment.prospectPhone })} className="appointment-action-link">
           {translate("appointmentsOpenProspect")}
         </Link>
         <AtlasButton variant="secondary" size="sm" onClick={() => onReschedule?.(appointment)}>

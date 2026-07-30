@@ -52,6 +52,11 @@ export const ACTION_PRESENTATION = {
     titleKey: "missionControlActionMissedAppointment",
     subtitleKey: "missionControlActionMissedAppointmentSubtitle"
   },
+  send_interview_reminder: {
+    icon: "⏰",
+    titleKey: "whatsappActionSendReminder",
+    subtitleKey: "whatsappActionOneClickHint"
+  },
   enter_interview_outcome: {
     icon: "✅",
     titleKey: "missionControlActionRecordOutcome",

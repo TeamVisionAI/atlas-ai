@@ -5,14 +5,43 @@ import { appPath } from "../config/appRoutes";
  * Prospect Workspace is distinct from Mission Control queue navigation.
  */
 
-export function buildProspectWorkspacePath(prospect = {}) {
-  const phone = prospect.phone || prospect.prospect_phone;
+export function resolveProspectPhone(prospect) {
+  if (prospect == null) {
+    return null;
+  }
+
+  if (typeof prospect === "string" || typeof prospect === "number") {
+    const phone = String(prospect).trim();
+    return phone || null;
+  }
+
+  const phone =
+    prospect.phone ||
+    prospect.prospectPhone ||
+    prospect.prospect_phone ||
+    null;
+
+  return phone ? String(phone).trim() : null;
+}
+
+export function buildProspectWorkspacePath(prospect) {
+  const phone = resolveProspectPhone(prospect);
 
   if (!phone) {
     return appPath("prospect-workspace");
   }
 
   return appPath(`prospect-workspace/${encodeURIComponent(phone)}`);
+}
+
+export function navigateToProspectWorkspace(navigate, prospect) {
+  if (typeof navigate !== "function") {
+    return null;
+  }
+
+  const path = buildProspectWorkspacePath(prospect);
+  navigate(path);
+  return path;
 }
 
 export function buildProspectCenterPath({ filter, search } = {}) {

@@ -5,7 +5,7 @@ import {
   QuickCaptureError,
   saveQuickCaptureProspect
 } from "../services/quickCaptureService";
-import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
+import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import QuickCaptureSuccess from "../components/quick-capture/QuickCaptureSuccess";
 import "./QuickCapture.css";
 
@@ -28,7 +28,7 @@ const EMPTY_FORM = {
   first_name: "",
   last_name: "",
   phone: "",
-  preferred_language: "english",
+  preferred_language: "spanish",
   source: "IN_PERSON"
 };
 
@@ -163,7 +163,7 @@ export default function QuickCapture() {
       return;
     }
 
-    navigate(buildProspectWorkspacePath({ phone: duplicate.phone }));
+    navigateToProspectWorkspace(navigate, duplicate.phone);
   }
 
   if (completion) {
