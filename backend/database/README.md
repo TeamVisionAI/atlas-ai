@@ -181,3 +181,39 @@ REST API at `/api/appointments` and `/api/appointments/profile`.
 
 Reminder delivery runs via `appointmentReminderEngine.js` (60s poll, WhatsApp send, `reminder_sent` events).
 
+## Sprint 12.1 — Rep ID (Identity Foundation, Phase 1)
+
+Run in Supabase SQL editor:
+
+```
+backend/database/migrations/017_rep_id.sql
+```
+
+Adds:
+
+- `rep_id` on `atlas_users` and `users` — nullable, 5-character uppercase alphanumeric
+- Partial unique indexes on `(organization_id, rep_id)` where `rep_id IS NOT NULL`
+- Updated `sync_atlas_users_from_users()` trigger to propagate `rep_id`
+
+Rollback:
+
+```
+backend/database/migrations/017_rep_id_down.sql
+```
+
+### Backward compatibility
+
+- Existing users keep `rep_id = NULL`; email login is unchanged (Phase 2 adds Rep ID login).
+- CHECK constraints allow NULL; format enforced only when a value is set.
+
+### Backfill (manual, safe)
+
+Use the dev helper (dry-run by default):
+
+```
+node backend/dev/backfillRepIds.js --report
+node backend/dev/backfillRepIds.js --set <userId> <repId> --apply
+```
+
+All writes go through `identityWriteService` for dual-write to `atlas_users` and `users`.
+

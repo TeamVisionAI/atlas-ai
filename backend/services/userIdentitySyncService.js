@@ -21,6 +21,7 @@ function buildUsersRowFromAtlasUser(atlasUser) {
     organization_id: atlasUser.organization_id,
     name: displayName,
     email: atlasUser.email,
+    rep_id: atlasUser.rep_id || null,
     password_hash: atlasUser.password_hash || null,
     role: mapLegacyRoleToSaas(atlasUser.role),
     is_active: atlasUser.status === USER_STATUSES.ACTIVE,
