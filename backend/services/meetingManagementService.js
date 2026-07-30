@@ -161,18 +161,29 @@ async function resolveOfficeAddress(organizationId) {
 
 async function resolveJoinUrlForProspect(organizationId, prospectPhone) {
   const appointmentRepository = require("../repositories/appointmentRepository");
-  const appointments = await appointmentRepository.search({
-    organizationId,
-    prospectPhone,
-    status: "scheduled"
-  });
+  const { coerceAppointmentItems } = require("../core/appointmentCollection");
 
-  const upcoming = (appointments || [])
-    .filter((item) => item.virtualMeetingUrl)
-    .sort((left, right) => new Date(left.startDateTime) - new Date(right.startDateTime))[0];
+  try {
+    const searchResult = await appointmentRepository.search({
+      organizationId,
+      prospectPhone,
+      status: "scheduled"
+    });
 
-  if (upcoming?.virtualMeetingUrl) {
-    return upcoming.virtualMeetingUrl;
+    const appointments = coerceAppointmentItems(searchResult);
+
+    const upcoming = appointments
+      .filter((item) => item.virtualMeetingUrl)
+      .sort((left, right) => new Date(left.startDateTime) - new Date(right.startDateTime))[0];
+
+    if (upcoming?.virtualMeetingUrl) {
+      return upcoming.virtualMeetingUrl;
+    }
+  } catch (error) {
+    console.error(
+      "[meetingManagement] resolveJoinUrlForProspect appointment lookup failed:",
+      error.message
+    );
   }
 
   const virtual = await resolveVirtualMeetingUrl(organizationId);

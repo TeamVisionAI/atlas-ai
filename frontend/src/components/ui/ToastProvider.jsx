@@ -11,10 +11,10 @@ export function ToastProvider({ children }) {
   }, []);
 
   const showToast = useCallback(
-    ({ message, tone = "info", duration = 4000 }) => {
+    ({ message, tone = "info", duration = 4000, actionLabel = null, onAction = null }) => {
       const id = crypto.randomUUID();
 
-      setToasts((current) => [...current, { id, message, tone }]);
+      setToasts((current) => [...current, { id, message, tone, actionLabel, onAction }]);
 
       window.setTimeout(() => {
         dismissToast(id);
@@ -28,7 +28,9 @@ export function ToastProvider({ children }) {
       showToast,
       showSuccess: (message) => showToast({ message, tone: "success" }),
       showError: (message) => showToast({ message, tone: "error" }),
-      showWarning: (message) => showToast({ message, tone: "warning" })
+      showWarning: (message) => showToast({ message, tone: "warning" }),
+      showInfo: (message, options = {}) =>
+        showToast({ message, tone: "info", duration: options.duration || 5000, ...options })
     }),
     [showToast]
   );
@@ -39,7 +41,19 @@ export function ToastProvider({ children }) {
       <div className="atlas-ui-toast-stack" aria-live="polite" aria-relevant="additions">
         {toasts.map((toast) => (
           <div key={toast.id} className={`atlas-ui-toast atlas-ui-toast--${toast.tone}`}>
-            {toast.message}
+            <span>{toast.message}</span>
+            {toast.actionLabel && toast.onAction ? (
+              <button
+                type="button"
+                className="atlas-ui-toast__action"
+                onClick={() => {
+                  toast.onAction();
+                  dismissToast(toast.id);
+                }}
+              >
+                {toast.actionLabel}
+              </button>
+            ) : null}
           </div>
         ))}
       </div>

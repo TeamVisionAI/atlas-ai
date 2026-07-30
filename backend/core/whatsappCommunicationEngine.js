@@ -28,6 +28,7 @@ const ACTION_TO_TEMPLATE = Object.freeze({
   send_zoom_link: WHATSAPP_TEMPLATES.ZOOM_INVITATION,
   send_office_location: WHATSAPP_TEMPLATES.OFFICE_LOCATION,
   send_missed_appointment: WHATSAPP_TEMPLATES.MISSED_APPOINTMENT,
+  send_interview_reminder: WHATSAPP_TEMPLATES.INTERVIEW_REMINDER,
   whatsapp: WHATSAPP_TEMPLATES.GENERAL
 });
 
@@ -235,6 +236,89 @@ function buildMissedAppointmentInvitationMessage({ prospectName, language }) {
   ].join("\n");
 }
 
+function buildInterviewReminderMessage({
+  prospectName,
+  interviewAtMs,
+  timezone = DEFAULT_TIMEZONE,
+  recruiterName,
+  zoomUrl,
+  office,
+  interviewType,
+  language
+}) {
+  const firstName = getFirstName(prospectName);
+  const greeting = firstName
+    ? language === "es"
+      ? `Hola ${firstName},`
+      : `Hi ${firstName},`
+    : language === "es"
+      ? "Hola,"
+      : "Hi,";
+
+  const schedule = interviewAtMs
+    ? formatInterviewSchedule(interviewAtMs, timezone, language)
+    : null;
+
+  const normalizedType = String(interviewType || "").toLowerCase();
+  const isZoom =
+    normalizedType.includes("zoom") || normalizedType.includes("virtual");
+  const location = office || getOrganizationSettings().office;
+
+  if (language === "es") {
+    const lines = [
+      greeting,
+      "",
+      "Te recordamos tu próxima entrevista con Team Vision.",
+      ""
+    ];
+
+    if (schedule) {
+      lines.push(
+        `Fecha: ${schedule.dateLine}`,
+        `Hora: ${schedule.timeLine}`,
+        `Zona horaria: ${schedule.timezoneLabel}`,
+        ""
+      );
+    }
+
+    if (isZoom && zoomUrl) {
+      lines.push("Únete a tu entrevista aquí:", zoomUrl, "");
+    } else if (!isZoom && location?.fullAddress) {
+      lines.push(
+        "Nuestra oficina está en:",
+        location.name,
+        location.fullAddress,
+        ""
+      );
+    }
+
+    lines.push("¡Esperamos conversar contigo!", "", "Team Vision");
+
+    return lines.join("\n");
+  }
+
+  const lines = [greeting, "", "This is a reminder about your upcoming Team Vision interview.", ""];
+
+  if (schedule) {
+    lines.push(
+      `Date: ${schedule.dateLine}`,
+      `Time: ${schedule.timeLine}`,
+      `Time Zone: ${schedule.timezoneLabel}`,
+      ""
+    );
+  }
+
+  if (isZoom && zoomUrl) {
+    lines.push("Join your interview here:", zoomUrl, "");
+  } else if (!isZoom && location?.fullAddress) {
+    lines.push("Our office is located at:", location.name, location.fullAddress, "");
+  }
+
+  lines.push("We look forward to speaking with you!", "", "Team Vision");
+
+  return lines.join("\n");
+}
+
 function buildGeneralWhatsAppMessage({ prospectName, recruiterName, language }) {
   const firstName = getFirstName(prospectName);
   const greeting = firstName
@@ -280,21 +364,7 @@ function buildStubTemplateMessage(templateId, language) {
   return `Hi,\n\n[${label} message — template pending]\n\nTeam Vision`;
 }
 
-function resolveContextTemplate(prospect) {
-  const interviewType = String(prospect?.interview_type || "").toLowerCase();
-
-  if (interviewType.includes("zoom") && parseInterviewDatetime(prospect)) {
-    return WHATSAPP_TEMPLATES.ZOOM_INVITATION;
-  }
-
-  return WHATSAPP_TEMPLATES.GENERAL;
-}
-
-function resolveTemplateForAction(actionId, prospect) {
-  if (actionId === "whatsapp") {
-    return resolveContextTemplate(prospect);
-  }
-
+function resolveTemplateForAction(actionId) {
   return ACTION_TO_TEMPLATE[actionId] || WHATSAPP_TEMPLATES.GENERAL;
 }
 
@@ -325,6 +395,17 @@ function composeWhatsAppMessage(templateId, context = {}) {
       });
 
     case WHATSAPP_TEMPLATES.INTERVIEW_REMINDER:
+      return buildInterviewReminderMessage({
+        prospectName: context.prospectName,
+        interviewAtMs: context.interviewAtMs,
+        timezone: context.timezone || DEFAULT_TIMEZONE,
+        recruiterName: context.recruiterName,
+        zoomUrl: context.zoomUrl,
+        office: context.office,
+        interviewType: context.interviewType,
+        language
+      });
+
     case WHATSAPP_TEMPLATES.APPOINTMENT_REMINDER:
     case WHATSAPP_TEMPLATES.FOLLOW_UP:
     case WHATSAPP_TEMPLATES.ORIENTATION_INVITATION:
@@ -374,5 +455,6 @@ module.exports = {
   buildZoomInvitationMessage,
   buildOfficeLocationInvitationMessage,
   buildMissedAppointmentInvitationMessage,
+  buildInterviewReminderMessage,
   buildGeneralWhatsAppMessage
 };

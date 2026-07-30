@@ -82,7 +82,7 @@ function resolveTemplate({ template, sourceAction, prospect }) {
     return template;
   }
 
-  return resolveTemplateForAction(sourceAction || "whatsapp", prospect);
+  return resolveTemplateForAction(sourceAction || "whatsapp");
 }
 
 async function buildMessageContext(prospect, template, options = {}) {
@@ -98,14 +98,27 @@ async function buildMessageContext(prospect, template, options = {}) {
     recruiterName,
     interviewAtMs,
     timezone,
-    office: getOrganizationSettings().office
+    office: getOrganizationSettings().office,
+    interviewType: prospect.interview_type || null
   };
 
-  if (template === WHATSAPP_TEMPLATES.ZOOM_INVITATION) {
-    const zoomUrl = await meetingManagementService.resolveJoinUrlForProspect(
-      organizationId,
-      prospect.phone
-    );
+  if (
+    template === WHATSAPP_TEMPLATES.ZOOM_INVITATION ||
+    (template === WHATSAPP_TEMPLATES.INTERVIEW_REMINDER &&
+      String(prospect.interview_type || "")
+        .toLowerCase()
+        .includes("zoom"))
+  ) {
+    let zoomUrl = null;
+
+    try {
+      zoomUrl = await meetingManagementService.resolveJoinUrlForProspect(
+        organizationId,
+        prospect.phone
+      );
+    } catch (error) {
+      console.error("[whatsappCommunication] resolveJoinUrlForProspect failed:", error.message);
+    }
 
     if (!zoomUrl) {
       return {
@@ -174,14 +187,6 @@ async function recordWhatsAppCopyOpen(phone, params = {}, options = {}) {
     sourceAction: params.sourceAction,
     prospect
   });
-  const flagKey = getTemplateFlagKey(template);
-
-  if (flagKey && agentState.flags?.[flagKey]) {
-    return buildError("ALREADY_SENT", "This message was already sent.", {
-      template,
-      sourceAction: params.sourceAction || null
-    });
-  }
 
   const built = await buildMessageContext(prospect, template, options);
 
@@ -196,11 +201,14 @@ async function recordWhatsAppCopyOpen(phone, params = {}, options = {}) {
         ? "Agent prepared office location via WhatsApp"
         : template === WHATSAPP_TEMPLATES.MISSED_APPOINTMENT
           ? "Agent prepared missed appointment follow-up via WhatsApp"
-          : "Agent opened WhatsApp conversation";
+          : template === WHATSAPP_TEMPLATES.INTERVIEW_REMINDER
+            ? "Agent prepared interview reminder via WhatsApp"
+            : "Agent opened WhatsApp conversation";
 
   await logAgentTimeline(prospect, buildAgentActionTimelineMessage(timelineLabel));
 
   let workflowPatch = {};
+  const flagKey = getTemplateFlagKey(template);
 
   if (flagKey) {
     workflowPatch = {

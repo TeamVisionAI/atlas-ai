@@ -8,6 +8,7 @@ const crypto = require("crypto");
 const { supabase } = require("../services/supabaseService");
 const { isProduction } = require("../core/platformProductionGuard");
 const { isMissingTableError } = require("../core/supabaseTableErrors");
+const { coerceAppointmentItems } = require("../core/appointmentCollection");
 
 const STORE_FILE = path.join(__dirname, "../data/appointments.json");
 
@@ -328,6 +329,7 @@ module.exports = {
   generateId,
   rowToAppointment,
   appointmentToRow,
+  coerceAppointmentItems,
   save,
   findById,
   search,

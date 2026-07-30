@@ -17,16 +17,13 @@ function run() {
   );
 
   assert.equal(
-    resolveTemplateForAction("whatsapp", {
-      interview_type: "Zoom",
-      interview_time: "2026-03-15T18:30:00.000Z"
-    }),
-    WHATSAPP_TEMPLATES.ZOOM_INVITATION
+    resolveTemplateForAction("whatsapp"),
+    WHATSAPP_TEMPLATES.GENERAL
   );
 
   assert.equal(
-    resolveTemplateForAction("whatsapp", {}),
-    WHATSAPP_TEMPLATES.GENERAL
+    resolveTemplateForAction("send_interview_reminder"),
+    WHATSAPP_TEMPLATES.INTERVIEW_REMINDER
   );
 
   const message = buildZoomInvitationMessage({

@@ -4,6 +4,7 @@ import {
   ACTION_PRESENTATION,
   resolveActionVariant
 } from "./actionPresentation";
+import { filterPanelCommunicationActions } from "./communicationActionEngine";
 
 function mergeWorkflowState(localWorkflowState, agentState) {
   if (!agentState) {
@@ -70,7 +71,9 @@ function buildAiBriefPreviewLines(workspace) {
  */
 export function buildNextActions(context) {
   const { workspace, availableActions, onAction, translate } = context;
-  const actions = availableActions || workspace?.availableActions || [];
+  const actions = filterPanelCommunicationActions(
+    availableActions || workspace?.availableActions || []
+  );
 
   return actions
     .map(({ id, priority }) => {

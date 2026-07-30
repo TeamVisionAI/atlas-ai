@@ -6,6 +6,9 @@ const {
   previewWhatsAppCommunication,
   recordWhatsAppCopyOpen
 } = require("../application/whatsappCommunicationApplicationService");
+const {
+  executeCommunicationAction
+} = require("../application/communicationActionApplicationService");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
 
 function tenantOptions(req) {
@@ -69,7 +72,30 @@ async function postCommunicationSend(req, res) {
   }
 }
 
+async function postCommunicationExecute(req, res) {
+  try {
+    const body = req.body || {};
+    const result = await executeCommunicationAction(
+      req.params.phone,
+      {
+        sourceAction: body.sourceAction || null,
+        channel: body.channel || "auto"
+      },
+      tenantOptions(req)
+    );
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   getCommunicationPreview,
-  postCommunicationSend
+  postCommunicationSend,
+  postCommunicationExecute
 };

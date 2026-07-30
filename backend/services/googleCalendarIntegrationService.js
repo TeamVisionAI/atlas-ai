@@ -425,8 +425,72 @@ async function updateCalendarEvent(organizationId, eventId, event) {
   const response = await calendar.events.patch({
     calendarId,
     eventId,
+    sendUpdates: "all",
     requestBody
   });
+
+  return response.data;
+}
+
+/**
+ * Re-sends a Google Calendar invitation to the prospect's email address.
+ */
+async function resendCalendarInvitation(organizationId, eventId, attendeeEmail, eventPatch = {}) {
+  if (!eventId) {
+    const error = new Error("Calendar event id is required.");
+    error.code = "NO_CALENDAR_EVENT";
+    throw error;
+  }
+
+  if (!attendeeEmail) {
+    const error = new Error("Prospect email is required.");
+    error.code = "NO_EMAIL";
+    throw error;
+  }
+
+  if (shouldMockExternalComms()) {
+    return {
+      id: eventId,
+      simulated: true,
+      attendees: [{ email: attendeeEmail }]
+    };
+  }
+
+  const { oauth2Client, integration } = await getAuthorizedClient(organizationId);
+
+  if (!oauth2Client) {
+    const error = new Error("Google Calendar is not connected.");
+    error.code = "CALENDAR_NOT_CONNECTED";
+    throw error;
+  }
+
+  const calendarId = integration?.config?.calendarId || "primary";
+  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+  const requestBody = {
+    attendees: [{ email: attendeeEmail }],
+    ...eventPatch
+  };
+
+  const response = await calendar.events.patch({
+    calendarId,
+    eventId,
+    sendUpdates: "all",
+    requestBody
+  });
+
+  await supabase
+    .from("organization_integrations")
+    .update({
+      config: {
+        ...(integration.config || {}),
+        syncStatus: "synced",
+        lastSync: new Date().toISOString()
+      },
+      updated_at: new Date().toISOString()
+    })
+    .eq("organization_id", organizationId)
+    .eq("provider", PROVIDER);
 
   return response.data;
 }
@@ -475,6 +539,7 @@ module.exports = {
   disconnect,
   createCalendarEvent,
   updateCalendarEvent,
+  resendCalendarInvitation,
   deleteCalendarEvent,
   queryFreeBusy,
   presentIntegrationStatus,
