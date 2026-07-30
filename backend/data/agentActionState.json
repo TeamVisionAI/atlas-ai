@@ -6196,9 +6196,14 @@
         "text": "Required information updated: City, State, Preferred Language, Work Authorization, Occupation, Interview Type.",
         "at": "2026-07-30T02:02:52.021Z",
         "type": "phone"
+      },
+      {
+        "text": "Interview completed. Outcome: Not Interested.",
+        "at": "2026-07-30T19:43:50.944Z",
+        "type": "phone"
       }
     ],
-    "outcome": null,
+    "outcome": "Not Interested",
     "closureReason": null,
     "futureReminder": null,
     "followUpDate": null,

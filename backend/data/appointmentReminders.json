@@ -1,80 +1,80 @@
 {
   "test-appt-1": [
     {
-      "id": "9bfc7144-a88d-4fa2-87de-eb43c943ed7c",
+      "id": "24223622-ef08-4716-8c96-e392fa105c05",
       "appointmentId": "test-appt-1",
       "organizationId": "org-1",
       "prospectPhone": "+15555550100",
       "reminderType": "confirmation",
-      "scheduledFor": "2026-07-30T02:21:32.231Z",
+      "scheduledFor": "2026-07-30T19:39:18.169Z",
       "offsetMinutes": 0,
       "status": "cancelled",
       "channel": "whatsapp",
-      "createdAt": "2026-07-30T02:21:27.231Z",
-      "appointmentStart": "2026-08-01T02:21:27.230Z",
+      "createdAt": "2026-07-30T19:39:13.169Z",
+      "appointmentStart": "2026-08-01T19:39:13.168Z",
       "timezone": "America/New_York",
       "virtualMeetingUrl": null,
       "metadata": {
         "prospectName": "Test"
       },
-      "cancelledAt": "2026-07-30T02:21:27.232Z"
+      "cancelledAt": "2026-07-30T19:39:13.169Z"
     },
     {
-      "id": "95de78ca-8a5f-4f5c-9e80-8734fa3af3c7",
+      "id": "7159f82f-9074-40cd-9a2c-a9ec78c1fde1",
       "appointmentId": "test-appt-1",
       "organizationId": "org-1",
       "prospectPhone": "+15555550100",
       "reminderType": "reminder_24h",
-      "scheduledFor": "2026-07-31T02:21:27.230Z",
+      "scheduledFor": "2026-07-31T19:39:13.168Z",
       "offsetMinutes": 1440,
       "status": "cancelled",
       "channel": "whatsapp",
-      "createdAt": "2026-07-30T02:21:27.231Z",
-      "appointmentStart": "2026-08-01T02:21:27.230Z",
+      "createdAt": "2026-07-30T19:39:13.169Z",
+      "appointmentStart": "2026-08-01T19:39:13.168Z",
       "timezone": "America/New_York",
       "virtualMeetingUrl": null,
       "metadata": {
         "prospectName": "Test"
       },
-      "cancelledAt": "2026-07-30T02:21:27.232Z"
+      "cancelledAt": "2026-07-30T19:39:13.169Z"
     },
     {
-      "id": "d2e9b5e2-0294-4dbb-bbaf-70be8fab7af4",
+      "id": "94a6a855-0292-4311-baf4-f91aafeaa5e4",
       "appointmentId": "test-appt-1",
       "organizationId": "org-1",
       "prospectPhone": "+15555550100",
       "reminderType": "reminder_1h",
-      "scheduledFor": "2026-08-01T01:21:27.230Z",
+      "scheduledFor": "2026-08-01T18:39:13.168Z",
       "offsetMinutes": 60,
       "status": "cancelled",
       "channel": "whatsapp",
-      "createdAt": "2026-07-30T02:21:27.231Z",
-      "appointmentStart": "2026-08-01T02:21:27.230Z",
+      "createdAt": "2026-07-30T19:39:13.169Z",
+      "appointmentStart": "2026-08-01T19:39:13.168Z",
       "timezone": "America/New_York",
       "virtualMeetingUrl": null,
       "metadata": {
         "prospectName": "Test"
       },
-      "cancelledAt": "2026-07-30T02:21:27.232Z"
+      "cancelledAt": "2026-07-30T19:39:13.169Z"
     },
     {
-      "id": "65fc9c9e-df38-48e4-b4b6-d2ff2543c69c",
+      "id": "d261825b-8648-42c7-9bea-9e326f5fcec7",
       "appointmentId": "test-appt-1",
       "organizationId": "org-1",
       "prospectPhone": "+15555550100",
       "reminderType": "reminder_15m",
-      "scheduledFor": "2026-08-01T02:06:27.230Z",
+      "scheduledFor": "2026-08-01T19:24:13.168Z",
       "offsetMinutes": 15,
       "status": "cancelled",
       "channel": "whatsapp",
-      "createdAt": "2026-07-30T02:21:27.231Z",
-      "appointmentStart": "2026-08-01T02:21:27.230Z",
+      "createdAt": "2026-07-30T19:39:13.169Z",
+      "appointmentStart": "2026-08-01T19:39:13.168Z",
       "timezone": "America/New_York",
       "virtualMeetingUrl": null,
       "metadata": {
         "prospectName": "Test"
       },
-      "cancelledAt": "2026-07-30T02:21:27.232Z"
+      "cancelledAt": "2026-07-30T19:39:13.169Z"
     }
   ]
 }
