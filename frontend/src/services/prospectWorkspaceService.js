@@ -1,10 +1,11 @@
 import { apiRequest } from "./apiClient";
 
 export class ProspectWorkspaceError extends Error {
-  constructor(message, status) {
+  constructor(message, status, payload = null) {
     super(message);
     this.name = "ProspectWorkspaceError";
     this.status = status;
+    this.payload = payload;
   }
 }
 
@@ -79,6 +80,29 @@ export async function updateProspectCommunicationLanguage(phone, communicationLa
     throw new ProspectWorkspaceError(
       payload.message || "Failed to update communication language",
       response.status
+    );
+  }
+
+  return payload;
+}
+
+export async function updateProspectWorkspaceProfile(phone, body) {
+  const response = await apiRequest(
+    `/api/prospect-workspace/${encodeURIComponent(phone)}/profile`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new ProspectWorkspaceError(
+      payload.message || "Failed to update prospect profile",
+      response.status,
+      payload
     );
   }
 

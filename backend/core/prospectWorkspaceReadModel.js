@@ -8,6 +8,7 @@ const { findUserById } = require("../services/atlasUserService");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const { buildJourneyProgress } = require("./journeyProgressMapper");
 const { listProspectActivityPreview } = require("./prospectActivityFeedReadModel");
+const { buildProspectEditorProfile } = require("./prospectWorkspaceProfileEngine");
 
 function buildProspectIdentity(prospect) {
   if (!prospect) {
@@ -85,10 +86,17 @@ async function composeProspectWorkspaceFromMissionControl(phone, missionControl,
     missionControl.agentState,
     missionControl.workflowGate
   );
-  const activityPreview = await listProspectActivityPreview(resolvedPhone, 5);
+  let activityPreview = [];
+
+  try {
+    activityPreview = await listProspectActivityPreview(resolvedPhone, 5);
+  } catch (error) {
+    console.error("[prospect-workspace/activityPreview]", error.message);
+  }
 
   return {
     prospect,
+    editorProfile: buildProspectEditorProfile(prospectRow || missionControl.prospect),
     owner,
     workflow: missionControl.workflow,
     workflowGate: missionControl.workflowGate,

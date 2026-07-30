@@ -21,6 +21,7 @@ import MissionControlContextPanel from "../components/MissionControlContextPanel
 import ExecutiveDashboardLinks from "../components/ExecutiveDashboardLinks";
 import QuickActionsPanel from "../components/QuickActionsPanel";
 import CommunicationHistorySection from "../components/CommunicationHistorySection";
+import CommunicationActionsPanel from "../../../components/communication/CommunicationActionsPanel";
 import {
   useIsDesktop,
   useProspectCore,
@@ -29,8 +30,11 @@ import {
 import { useMissionControlContext } from "../hooks/useMissionControlContext";
 import { useWorkspaceActions } from "../hooks/useWorkspaceActions";
 import { useConfirmDialog } from "../hooks/useConfirmDialog";
+import { usePromptDialog } from "../../../hooks/usePromptDialog";
 import { useWorkspaceKeyboardShortcuts } from "../hooks/useWorkspaceKeyboardShortcuts";
 import { appPath } from "../../../config/appRoutes";
+import ProspectEditorDrawer from "../components/ProspectEditorDrawer";
+import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import "../../../pages/ProspectWorkspace.css";
 
 export default function ProspectWorkspacePage() {
@@ -38,7 +42,9 @@ export default function ProspectWorkspacePage() {
   const navigate = useNavigate();
   const { translate } = useLanguage();
   const showToast = useToast();
+  const { user } = useWorkspace();
   const { confirm, confirmDialog } = useConfirmDialog();
+  const { prompt, promptDialog } = usePromptDialog();
   const isDesktop = useIsDesktop();
   const timelineRef = useRef(null);
   const phone = decodeURIComponent(routePhone || "");
@@ -94,7 +100,8 @@ export default function ProspectWorkspacePage() {
     refreshWorkspace,
     translate,
     showToast,
-    confirm
+    confirm,
+    prompt
   });
 
   useWorkspaceKeyboardShortcuts({
@@ -190,6 +197,7 @@ export default function ProspectWorkspacePage() {
   return (
     <div className="prospect-workspace" aria-busy={refreshing || undefined}>
       {confirmDialog}
+      {promptDialog}
       <p className="prospect-workspace__shortcuts-hint">{translate("workspaceKeyboardHint")}</p>
 
       <ProspectWorkspaceHeader
@@ -222,6 +230,7 @@ export default function ProspectWorkspacePage() {
         lifecycleBusy={actions.lifecycleBusy}
         pendingActionId={actions.pendingActionId}
         prospectCoreId={prospectCoreId}
+        userRole={user?.role}
         onLifecycleAction={actions.handleLifecycleAction}
       >
         {workflowComplete ? (
@@ -237,6 +246,12 @@ export default function ProspectWorkspacePage() {
             {actions.actionError}
           </p>
         ) : null}
+
+        <CommunicationActionsPanel
+          workspace={workspace}
+          onAction={actions.handleMissionAction}
+          busy={Boolean(actions.pendingActionId)}
+        />
 
         {showGate ? (
           <WorkflowGatePanel
@@ -273,6 +288,14 @@ export default function ProspectWorkspacePage() {
           communicationLanguageError={actions.communicationLanguageError}
         />
       </div>
+
+      <ProspectEditorDrawer
+        open={actions.prospectEditorOpen}
+        workspace={workspace}
+        translate={translate}
+        onClose={actions.handleProspectEditorClose}
+        onSaved={actions.handleProspectEditorSaved}
+      />
     </div>
   );
 }

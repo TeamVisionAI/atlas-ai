@@ -1,6 +1,10 @@
 import { memo } from "react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import AtlasButton from "../../../components/ui/AtlasButton";
+import {
+  canPerformProspectWorkspaceAction,
+  prospectWorkspaceActionRequiresCoreProspect
+} from "../../../security/workspaceProspectPermissions";
 
 const LIFECYCLE_ACTIONS = [
   { id: "assign", labelKey: "workspaceActionAssign" },
@@ -8,7 +12,6 @@ const LIFECYCLE_ACTIONS = [
   { id: "restore", labelKey: "workspaceActionRestore" },
   { id: "merge", labelKey: "workspaceActionMerge" },
   { id: "schedule", labelKey: "workspaceActionScheduleInterview" },
-  { id: "contact", labelKey: "workspaceActionContact" },
   { id: "update", labelKey: "workspaceActionUpdateProspect" }
 ];
 
@@ -16,6 +19,7 @@ function QuickActionsPanel({
   lifecycleBusy,
   pendingActionId,
   prospectCoreId,
+  userRole,
   onLifecycleAction,
   children
 }) {
@@ -31,9 +35,12 @@ function QuickActionsPanel({
         </p>
         <div className="prospect-workspace-quick-actions__grid">
           {LIFECYCLE_ACTIONS.map((action) => {
-            const needsCore = action.id !== "schedule" && action.id !== "contact";
+            const requiresCore = prospectWorkspaceActionRequiresCoreProspect(action.id);
+            const allowed = canPerformProspectWorkspaceAction(userRole, action.id);
             const disabled =
-              (needsCore && !prospectCoreId) || (lifecycleBusy && pendingActionId !== action.id);
+              !allowed ||
+              (requiresCore && !prospectCoreId) ||
+              (lifecycleBusy && pendingActionId !== action.id);
 
             return (
               <AtlasButton

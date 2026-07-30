@@ -36,6 +36,10 @@ function normalizeRole(value) {
     return role;
   }
 
+  if (role === "representative") {
+    return ROLES.RECRUITER;
+  }
+
   if (role === "regional_leader" || role === "field_trainer") {
     return role === "regional_leader" ? ROLES.DIVISION_LEADER : ROLES.AGENT;
   }

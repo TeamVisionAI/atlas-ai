@@ -2,6 +2,7 @@ export {
   getProspectWorkspace,
   getProspectActivityFeed,
   updateProspectCommunicationLanguage,
+  updateProspectWorkspaceProfile,
   ProspectWorkspaceError
 } from "../../../services/prospectWorkspaceService";
 

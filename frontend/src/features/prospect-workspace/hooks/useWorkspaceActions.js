@@ -4,18 +4,18 @@ import {
   postMissionControlAction
 } from "../../../services/missionControlService";
 import {
-  executeSendViaWhatsApp,
   isWhatsAppCopyAction
 } from "../../../services/whatsappCommunicationService";
-import { updateProspectCommunicationLanguage } from "../services/prospectWorkspaceApi";
+import { executeCommunicationAction } from "../../../engines/communicationActionEngine";
+import { updateProspectCommunicationLanguage, ProspectWorkspaceError } from "../services/prospectWorkspaceApi";
 import {
   archiveProspect,
   assignProspect,
   mergeProspects,
   ProspectLifecycleError,
-  restoreProspect,
-  updateProspect
+  restoreProspect
 } from "../services/prospectLifecycleApi";
+import { notifyProspectProfileUpdated } from "../../../utils/prospectRefreshBus";
 
 export function useWorkspaceActions({
   workspace,
@@ -23,13 +23,15 @@ export function useWorkspaceActions({
   refreshWorkspace,
   translate,
   showToast,
-  confirm
+  confirm,
+  prompt
 }) {
   const [actionError, setActionError] = useState(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [pendingActionId, setPendingActionId] = useState(null);
   const [communicationLanguageSaving, setCommunicationLanguageSaving] = useState(false);
   const [communicationLanguageError, setCommunicationLanguageError] = useState(null);
+  const [prospectEditorOpen, setProspectEditorOpen] = useState(false);
 
   const handleOrganizationResourceMissing = useCallback(
     (resourceKey) => {
@@ -43,6 +45,31 @@ export function useWorkspaceActions({
       showToast?.showError(message);
     },
     [showToast, translate]
+  );
+
+  const handleWhatsAppFallbackOffer = useCallback(
+    ({ phone: targetPhone }) => {
+      showToast?.showInfo(translate("zoomInvitationCopyWhatsAppOffer"), {
+        actionLabel: translate("zoomInvitationCopyWhatsAppAction"),
+        duration: 10000,
+        onAction: () => {
+          executeCommunicationAction({
+            phone: targetPhone,
+            actionId: "send_zoom_link",
+            forceWhatsApp: true,
+            translate,
+            showSuccess: showToast?.showSuccess,
+            showError: (message) => {
+              setActionError(message);
+              showToast?.showError(message);
+            },
+            onOrganizationResourceMissing: handleOrganizationResourceMissing,
+            onRecorded: refreshWorkspace
+          });
+        }
+      });
+    },
+    [showToast, translate, handleOrganizationResourceMissing, refreshWorkspace]
   );
 
   const handleMissionAction = useCallback(
@@ -64,16 +91,18 @@ export function useWorkspaceActions({
       }
 
       if (isWhatsAppCopyAction(actionId)) {
-        await executeSendViaWhatsApp({
+        await executeCommunicationAction({
           phone: workspace.phone,
           actionId,
           translate,
           showSuccess: showToast?.showSuccess,
+          showInfo: showToast?.showInfo,
           showError: (message) => {
             setActionError(message);
             showToast?.showError(message);
           },
           onOrganizationResourceMissing: handleOrganizationResourceMissing,
+          onWhatsAppFallbackOffer: handleWhatsAppFallbackOffer,
           onRecorded: refreshWorkspace
         });
         setPendingActionId(null);
@@ -84,14 +113,23 @@ export function useWorkspaceActions({
         let actionPayload = {};
 
         if (actionId === "notes") {
-          const text = window.prompt(translate("missionControlAddNotePrompt"));
+          const text = prompt
+            ? await prompt({
+                title: translate("missionControlActionNotes"),
+                label: translate("missionControlAddNotePrompt"),
+                placeholder: translate("workspaceActivityAddNotePlaceholder"),
+                confirmLabel: translate("workspaceActivityAddNote"),
+                cancelLabel: translate("workspaceCancel"),
+                multiline: true
+              })
+            : null;
 
-          if (!text?.trim()) {
+          if (!text) {
             setPendingActionId(null);
             return;
           }
 
-          actionPayload = { text: text.trim() };
+          actionPayload = { text };
         }
 
         const result = await postMissionControlAction(workspace.phone, actionId, actionPayload);
@@ -116,7 +154,7 @@ export function useWorkspaceActions({
         setPendingActionId(null);
       }
     },
-    [workspace?.phone, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing]
+    [workspace?.phone, refreshWorkspace, showToast, translate, prompt, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer]
   );
 
   const runLifecycleAction = useCallback(
@@ -155,15 +193,22 @@ export function useWorkspaceActions({
   const handleLifecycleAction = useCallback(
     async (actionId) => {
       if (actionId === "assign") {
-        const assignedAgentId = window.prompt(translate("workspaceAssignPrompt"));
+        const assignedAgentId = prompt
+          ? await prompt({
+              title: translate("workspaceActionAssign"),
+              label: translate("workspaceAssignPrompt"),
+              confirmLabel: translate("workspaceActionAssign"),
+              cancelLabel: translate("workspaceCancel")
+            })
+          : null;
 
-        if (!assignedAgentId?.trim()) {
+        if (!assignedAgentId) {
           return;
         }
 
         await runLifecycleAction(
           actionId,
-          () => assignProspect(prospectCoreId, { assignedAgentId: assignedAgentId.trim() }),
+          () => assignProspect(prospectCoreId, { assignedAgentId }),
           translate("workspaceToastAssigned")
         );
         return;
@@ -201,9 +246,16 @@ export function useWorkspaceActions({
       }
 
       if (actionId === "merge") {
-        const mergedId = window.prompt(translate("workspaceMergePrompt"));
+        const mergedId = prompt
+          ? await prompt({
+              title: translate("workspaceActionMerge"),
+              label: translate("workspaceMergePrompt"),
+              confirmLabel: translate("workspaceActionMerge"),
+              cancelLabel: translate("workspaceCancel")
+            })
+          : null;
 
-        if (!mergedId?.trim()) {
+        if (!mergedId) {
           return;
         }
 
@@ -212,7 +264,7 @@ export function useWorkspaceActions({
           () =>
             mergeProspects({
               survivorId: prospectCoreId,
-              mergedId: mergedId.trim()
+              mergedId
             }),
           translate("workspaceToastMerged")
         );
@@ -220,31 +272,26 @@ export function useWorkspaceActions({
       }
 
       if (actionId === "update") {
-        const displayName = window.prompt(translate("workspaceUpdatePrompt"));
-
-        if (!displayName?.trim()) {
-          return;
-        }
-
-        await runLifecycleAction(
-          actionId,
-          () => updateProspect(prospectCoreId, { displayName: displayName.trim() }),
-          translate("workspaceToastUpdated")
-        );
+        setProspectEditorOpen(true);
         return;
       }
 
       if (actionId === "schedule") {
         await handleMissionAction("schedule");
-        return;
-      }
-
-      if (actionId === "contact") {
-        await handleMissionAction("whatsapp");
       }
     },
-    [confirm, handleMissionAction, prospectCoreId, runLifecycleAction, translate]
+    [confirm, handleMissionAction, prompt, prospectCoreId, runLifecycleAction, translate]
   );
+
+  const handleProspectEditorClose = useCallback(() => {
+    setProspectEditorOpen(false);
+  }, []);
+
+  const handleProspectEditorSaved = useCallback(async () => {
+    await refreshWorkspace();
+    notifyProspectProfileUpdated(workspace?.phone);
+    showToast?.showSuccess(translate("workspaceToastUpdated"));
+  }, [refreshWorkspace, showToast, translate, workspace?.phone]);
 
   const handleCommunicationLanguageChange = useCallback(
     async (nextLanguage) => {
@@ -280,6 +327,9 @@ export function useWorkspaceActions({
     handleMissionAction,
     handleLifecycleAction,
     handleCommunicationLanguageChange,
-    handleOrganizationResourceMissing
+    handleOrganizationResourceMissing,
+    prospectEditorOpen,
+    handleProspectEditorClose,
+    handleProspectEditorSaved
   };
 }

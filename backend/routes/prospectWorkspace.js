@@ -11,7 +11,8 @@ const {
   listProspectActivityFeed
 } = require("../core/prospectActivityFeedReadModel");
 const {
-  updateProspectCommunicationLanguage
+  updateProspectCommunicationLanguage,
+  updateProspectWorkspaceProfile
 } = require("../core/prospectWorkspaceProfileEngine");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
@@ -76,6 +77,29 @@ router.get("/:phone", requireLegacyProspectAccess(), async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+router.patch(
+  "/:phone/profile",
+  requireLegacyProspectAccess({ write: true }),
+  async (req, res) => {
+    try {
+      if (rejectSimulatorProspect(req.params.phone, res)) {
+        return;
+      }
+
+      const result = await updateProspectWorkspaceProfile(req.params.phone, req.body);
+
+      if (!result.ok) {
+        return res.status(result.status).json(result.body);
+      }
+
+      res.json(result.body);
+    } catch (error) {
+      console.error("[prospect-workspace/profile]", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
 router.patch(
   "/:phone/communication-language",

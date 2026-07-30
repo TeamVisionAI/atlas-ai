@@ -35,6 +35,7 @@ import Legal from "./pages/Legal";
 import Terms from "./pages/Terms";
 import DataDeletion from "./pages/DataDeletion";
 import { appPath } from "./config/appRoutes";
+import { buildProspectWorkspacePath } from "./utils/prospectRoutes";
 
 const ProfileConfiguration = lazy(() => import("./pages/configuration/ProfileConfiguration"));
 const OrganizationConfiguration = lazy(() => import("./pages/configuration/OrganizationConfiguration"));
@@ -52,7 +53,7 @@ function LegacyProspectWorkspaceRedirect() {
   const location = useLocation();
   return (
     <Navigate
-      to={`${appPath(`prospect-workspace/${encodeURIComponent(phone)}`)}${location.search}`}
+      to={`${buildProspectWorkspacePath(phone)}${location.search}`}
       replace
     />
   );

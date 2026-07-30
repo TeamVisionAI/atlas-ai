@@ -245,6 +245,22 @@ Closed prospects are not a single state. Action visibility depends on closure re
 
 ---
 
+# Prospect Workspace
+
+## BR-038 — Prospect Workspace Editing Permissions
+
+Any authenticated recruiting user with access to a prospect may update that prospect's information in Prospect Workspace.
+
+Applies to: Representative, Field Trainer, Regional Leader, Division Leader, RVP, and Administrator.
+
+Rules:
+
+1. **Update Prospect** requires `prospect:write` and existing organization/visibility access — not administrator privileges.
+2. Prospect Workspace is the primary location for maintaining prospect information as conversations evolve.
+3. Visibility and ownership rules from the authorization service still apply; write permission does not bypass prospect access checks.
+
+---
+
 # Workflow Engine
 
 ## BR-034 — Conversation Stalled / Intelligent Human Escalation
