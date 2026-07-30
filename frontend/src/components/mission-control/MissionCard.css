@@ -96,6 +96,10 @@
   margin-top: 4px;
 }
 
+.mission-card__actions .action-card {
+  width: 100%;
+}
+
 .mission-card__empty {
   margin: 0;
   color: #64748b;

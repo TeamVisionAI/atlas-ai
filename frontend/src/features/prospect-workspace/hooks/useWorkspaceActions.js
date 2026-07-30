@@ -3,6 +3,10 @@ import {
   MissionControlError,
   postMissionControlAction
 } from "../../../services/missionControlService";
+import {
+  executeSendViaWhatsApp,
+  isWhatsAppCopyAction
+} from "../../../services/whatsappCommunicationService";
 import { updateProspectCommunicationLanguage } from "../services/prospectWorkspaceApi";
 import {
   archiveProspect,
@@ -59,10 +63,19 @@ export function useWorkspaceActions({
         return;
       }
 
-      if (actionId === "whatsapp") {
-        window.open(`https://wa.me/${workspace.phone.replace(/\D/g, "")}`, "_blank");
-        await postMissionControlAction(workspace.phone, "log_whatsapp_open");
-        showToast?.showSuccess(translate("workspaceToastActionCompleted"));
+      if (isWhatsAppCopyAction(actionId)) {
+        await executeSendViaWhatsApp({
+          phone: workspace.phone,
+          actionId,
+          translate,
+          showSuccess: showToast?.showSuccess,
+          showError: (message) => {
+            setActionError(message);
+            showToast?.showError(message);
+          },
+          onOrganizationResourceMissing: handleOrganizationResourceMissing,
+          onRecorded: refreshWorkspace
+        });
         setPendingActionId(null);
         return;
       }
@@ -103,7 +116,7 @@ export function useWorkspaceActions({
         setPendingActionId(null);
       }
     },
-    [workspace?.phone, refreshWorkspace, showToast, translate]
+    [workspace?.phone, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing]
   );
 
   const runLifecycleAction = useCallback(

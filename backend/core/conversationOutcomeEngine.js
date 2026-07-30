@@ -9,7 +9,17 @@ const {
   buildProfileFromProspect,
   getMissingFields
 } = require("./informationModel");
-const { extractInformation } = require("./informationExtractor");
+const { extractInformation, inferStateFromCity } = require("./informationExtractor");
+const { evaluateInterviewTypeDecision } = require("./businessRulesEngine");
+const {
+  parseQualificationCapture,
+  markCapturedFields,
+  mergeNotesWithQualificationCapture,
+  isCityExplicitlyCaptured,
+  isStateExplicitlyCaptured,
+  isAuthorizationExplicitlyCaptured,
+  isInterviewTypeExplicitlyCaptured
+} = require("./qualificationCaptureState");
 const { COMMUNICATION_LANGUAGES } = require("./quickCaptureConstants");
 const {
   normalizePreferredLanguage,
@@ -62,7 +72,32 @@ const FIELD_LABELS = Object.freeze({
   state: "State",
   occupation: "Occupation",
   preferred_language: "Preferred Language",
-  work_authorization_status: "Work Authorization"
+  work_authorization_status: "Work Authorization",
+  interview_type: "Interview Type"
+});
+
+const QUALIFICATION_FORM_FIELD_ORDER = Object.freeze([
+  "city",
+  "state",
+  "preferred_language",
+  "work_authorization_status",
+  "occupation",
+  "interview_type",
+  "first_name",
+  "last_name",
+  "email"
+]);
+
+const UI_INTERVIEW_TYPE_TO_BACKEND = Object.freeze({
+  office: "In Person",
+  zoom: "Zoom",
+  public_location: "Public Location"
+});
+
+const BACKEND_INTERVIEW_TYPE_TO_UI = Object.freeze({
+  "in person": "office",
+  zoom: "zoom",
+  "public location": "public_location"
 });
 
 const EXPLICIT_FIELD_TO_PROFILE_KEY = Object.freeze({
@@ -70,7 +105,8 @@ const EXPLICIT_FIELD_TO_PROFILE_KEY = Object.freeze({
   state: "state",
   occupation: "occupation",
   email: "email",
-  work_authorization_status: "authorization"
+  work_authorization_status: "authorization",
+  interview_type: "interviewType"
 });
 
 const WORKFLOW_REQUIREMENT_LABELS = Object.freeze({
@@ -90,7 +126,8 @@ const PROSPECT_FACT_MISSING_FIELDS = new Set([
 ]);
 
 const MISSING_FIELD_TO_INPUT_KEY = Object.freeze({
-  authorization: "work_authorization_status"
+  authorization: "work_authorization_status",
+  interviewType: "interview_type"
 });
 
 function sanitizeText(value) {
@@ -298,18 +335,142 @@ function mapMissingFieldToInputKey(missingField) {
   return MISSING_FIELD_TO_INPUT_KEY[missingField] || missingField;
 }
 
+function mapUiInterviewTypeToBackend(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (UI_INTERVIEW_TYPE_TO_BACKEND[normalized]) {
+    return UI_INTERVIEW_TYPE_TO_BACKEND[normalized];
+  }
+
+  if (normalized.includes("zoom") || normalized.includes("virtual")) {
+    return "Zoom";
+  }
+
+  if (normalized.includes("public")) {
+    return "Public Location";
+  }
+
+  if (normalized.includes("office") || normalized.includes("person")) {
+    return "In Person";
+  }
+
+  return sanitizeText(value);
+}
+
+function mapBackendInterviewTypeToUi(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return BACKEND_INTERVIEW_TYPE_TO_UI[normalized] || "";
+}
+
+function resolveQualificationCaptureOptions(prospect) {
+  const notes = prospect?.notes || null;
+  return {
+    notes,
+    captureState: parseQualificationCapture(notes)
+  };
+}
+
 /**
- * Workflow-scoped recruiter inputs — derived from getMissingFields(), not full knowledgeGaps.
+ * All unresolved recruiter-capturable gaps for Mission Control — no sequential gating.
  */
-function buildRequiredInputs(prospect, profile, missingFields = []) {
+function getQualificationFormGaps(prospect, profile, options = {}) {
+  if (profile.calendarEventId) {
+    return [];
+  }
+
+  const notes = options.notes ?? prospect?.notes ?? null;
+  const captureState = options.captureState || parseQualificationCapture(notes);
+  const gaps = [];
+
+  if (!isCityExplicitlyCaptured(profile, captureState, notes)) {
+    gaps.push("city");
+  }
+
+  if (!isStateExplicitlyCaptured(profile, captureState, notes)) {
+    gaps.push("state");
+  }
+
+  if (profile.authorization === null || profile.authorization === undefined) {
+    gaps.push("authorization");
+  }
+
+  if (
+    profile.authorization !== false &&
+    !isInterviewTypeExplicitlyCaptured(profile, captureState, notes)
+  ) {
+    gaps.push("interviewType");
+  }
+
+  if (!sanitizeText(profile.occupation)) {
+    gaps.push("occupation");
+  }
+
+  const structuralGaps = gaps.filter((field) => field !== "preferred_language");
+
+  if (!structuralGaps.length) {
+    return [];
+  }
+
+  gaps.push("preferred_language");
+
+  return gaps
+    .filter((field, index, list) => list.indexOf(field) === index)
+    .sort(
+      (left, right) =>
+        QUALIFICATION_FORM_FIELD_ORDER.indexOf(mapMissingFieldToInputKey(left)) -
+        QUALIFICATION_FORM_FIELD_ORDER.indexOf(mapMissingFieldToInputKey(right))
+    );
+}
+
+function buildSuggestedQualificationDefaults(prospect, profile, brain, draft = {}) {
+  const city = sanitizeText(profile.city) || sanitizeText(draft.city) || "";
+  const inferredState =
+    sanitizeText(profile.state) ||
+    sanitizeText(draft.state) ||
+    inferStateFromCity(city) ||
+    "";
+  const preferredLanguage = resolveProspectPreferredLanguage(prospect);
+
+  let interviewType = profile.interviewType || null;
+
+  if (!interviewType && city) {
+    const decision = evaluateInterviewTypeDecision({
+      city,
+      state: inferredState || profile.state,
+      currentType: null,
+      message: ""
+    });
+    interviewType = decision.interviewType || null;
+  }
+
+  return {
+    city,
+    state: inferredState,
+    preferred_language: preferredLanguage || brain?.language || "english",
+    interview_type: mapBackendInterviewTypeToUi(interviewType),
+    occupation: sanitizeText(profile.occupation) || sanitizeText(draft.occupation) || "",
+    work_authorization_status:
+      profile.authorization === true
+        ? "work_permit"
+        : profile.authorization === false
+          ? "no"
+          : draft.work_authorization_status || ""
+  };
+}
+
+/**
+ * Mission Control qualification form — every unresolved required field at once.
+ */
+function buildRequiredInputs(prospect, profile, _missingFields = [], options = {}) {
+  const captureOptions = {
+    ...resolveQualificationCaptureOptions(prospect),
+    ...options
+  };
+  const gaps = getQualificationFormGaps(prospect, profile, captureOptions);
   const inputs = [];
 
-  for (const missingField of missingFields) {
-    if (WORKFLOW_REQUIREMENT_FIELDS.has(missingField)) {
-      continue;
-    }
-
-    if (!PROSPECT_FACT_MISSING_FIELDS.has(missingField)) {
+  for (const missingField of gaps) {
+    if (missingField === "schedule" || missingField === "email") {
       continue;
     }
 
@@ -322,31 +483,7 @@ function buildRequiredInputs(prospect, profile, missingFields = []) {
     inputs.push({
       key,
       label: FIELD_LABELS[key],
-      source: "workflow_stage"
-    });
-  }
-
-  if (
-    !missingFields.includes("schedule") &&
-    !sanitizeText(prospect.first_name) &&
-    !inputs.some((row) => row.key === "first_name")
-  ) {
-    inputs.push({
-      key: "first_name",
-      label: FIELD_LABELS.first_name,
-      source: "identity_gap"
-    });
-  }
-
-  if (
-    !missingFields.includes("schedule") &&
-    !sanitizeText(prospect.last_name) &&
-    !inputs.some((row) => row.key === "last_name")
-  ) {
-    inputs.push({
-      key: "last_name",
-      label: FIELD_LABELS.last_name,
-      source: "identity_gap"
+      source: "qualification_form"
     });
   }
 
@@ -481,12 +618,23 @@ function buildConversationOutcomeReadModel({
   const latestInbound = getLatestInboundMessage(conversationMessages);
   const latestMessageText = latestInbound?.text || prospect.last_message || "";
   const draft = buildDraftFields(profile, latestMessageText);
+  const captureOptions = resolveQualificationCaptureOptions(prospect);
+  const requiredInputs = buildRequiredInputs(prospect, profile, missingFields, captureOptions);
+  const requiredInputKeys = new Set(requiredInputs.map((row) => row.key));
+  const suggestedDefaults = buildSuggestedQualificationDefaults(
+    prospect,
+    profile,
+    brain,
+    draft
+  );
   const knowledgeGaps = buildKnowledgeGaps(prospect, profile, missingFields).map((key) => ({
     key,
     label: FIELD_LABELS[key] || key
   }));
-  const workflowRequirements = buildWorkflowRequirements(profile, missingFields);
-  const requiredInputs = buildRequiredInputs(prospect, profile, missingFields);
+  const workflowRequirements = buildWorkflowRequirements(profile, missingFields).filter(
+    (requirement) =>
+      !(requirement.key === "interviewType" && requiredInputKeys.has("interview_type"))
+  );
   const recordedOutcome = resolveRecordedConversationOutcome(prospect);
   const knownInformation = buildKnownInformation(
     prospect,
@@ -505,20 +653,23 @@ function buildConversationOutcomeReadModel({
     recordedOutcome,
     canRecordOutcome: requiredInputs.length === 0 && !recordedOutcome,
     draft,
+    suggestedDefaults,
+    qualificationForm: {
+      title: "Complete Qualification",
+      description: "We need a few details before scheduling the interview.",
+      requiredInputs,
+      suggestedDefaults
+    },
     fields: {
       first_name: prospect.first_name || "",
       last_name: prospect.last_name || "",
       email: profile.email || "",
-      city: profile.city || "",
-      state: profile.state || "",
-      occupation: profile.occupation || "",
-      preferred_language: resolveProspectPreferredLanguage(prospect),
-      work_authorization_status:
-        profile.authorization === true
-          ? "work_permit"
-          : profile.authorization === false
-            ? "no"
-            : ""
+      city: suggestedDefaults.city || profile.city || "",
+      state: suggestedDefaults.state || profile.state || "",
+      occupation: suggestedDefaults.occupation || profile.occupation || "",
+      preferred_language: suggestedDefaults.preferred_language,
+      work_authorization_status: suggestedDefaults.work_authorization_status,
+      interview_type: suggestedDefaults.interview_type
     }
   };
 }
@@ -578,6 +729,16 @@ function normalizeSubmittedFields(rawFields = {}, prospect) {
     }
   }
 
+  if (rawFields.interview_type !== undefined) {
+    const interviewType = mapUiInterviewTypeToBackend(rawFields.interview_type);
+
+    if (rawFields.interview_type && !interviewType) {
+      errors.interview_type = "Unsupported interview type";
+    } else if (interviewType) {
+      fields.interview_type = interviewType;
+    }
+  }
+
   if (Object.keys(errors).length > 0) {
     return {
       ok: false,
@@ -627,8 +788,8 @@ async function saveRequiredInformation(phone, body = {}) {
   }
 
   const profile = buildProfileFromProspect(prospect);
-  const missingFields = getMissingFields(profile);
-  const requiredInputs = buildRequiredInputs(prospect, profile, missingFields);
+  const captureOptions = resolveQualificationCaptureOptions(prospect);
+  const requiredInputs = buildRequiredInputs(prospect, profile, getMissingFields(profile), captureOptions);
   const allowedKeys = new Set(requiredInputs.map((row) => row.key));
 
   if (!allowedKeys.size) {
@@ -651,6 +812,20 @@ async function saveRequiredInformation(phone, body = {}) {
       status: 400,
       error: "VALIDATION_ERROR",
       message: "At least one required information field must be provided."
+    };
+  }
+
+  const missingRequiredKeys = [...allowedKeys].filter((key) => !submittedKeys.includes(key));
+
+  if (missingRequiredKeys.length) {
+    return {
+      success: false,
+      status: 400,
+      error: "VALIDATION_ERROR",
+      message: "Please complete all required qualification fields before continuing.",
+      fields: Object.fromEntries(
+        missingRequiredKeys.map((key) => [key, "Required"])
+      )
     };
   }
 
@@ -688,7 +863,8 @@ async function saveRequiredInformation(phone, body = {}) {
     state: fields.state,
     occupation: fields.occupation,
     email: fields.email,
-    authorization: fields.work_authorization_status
+    authorization: fields.work_authorization_status,
+    interviewType: fields.interview_type
   };
 
   Object.keys(capturedFields).forEach((key) => {
@@ -717,6 +893,23 @@ async function saveRequiredInformation(phone, body = {}) {
   }
 
   const updatedProspect = await findProspect(phone);
+
+  if (updatedProspect) {
+    let captureState = markCapturedFields(parseQualificationCapture(updatedProspect.notes), {
+      city: fields.city,
+      state: fields.state,
+      authorization: fields.work_authorization_status,
+      interviewType: fields.interview_type
+    });
+
+    if (fields.interview_type) {
+      captureState.dayPart = true;
+    }
+
+    await updateProspect(updatedProspect.phone, {
+      notes: mergeNotesWithQualificationCapture(updatedProspect.notes, captureState)
+    });
+  }
 
   await logConversation({
     phone,
@@ -943,6 +1136,8 @@ module.exports = {
   buildKnowledgeGaps,
   buildRequiredInputs,
   buildWorkflowRequirements,
+  buildSuggestedQualificationDefaults,
+  getQualificationFormGaps,
   resolveExplicitProfileFields,
   saveRequiredInformation,
   saveConversationOutcome

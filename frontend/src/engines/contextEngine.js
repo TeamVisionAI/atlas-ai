@@ -61,15 +61,8 @@ export function isInterviewComplete(workflowState, workspace) {
   return Boolean(effectiveState?.outcome);
 }
 
-function buildAiBriefPreviewLines(workspace, workflowState, translate) {
-  const effectiveState = mergeWorkflowState(workflowState, workspace?.raw?.agentState);
-  const lines = [...(workspace?.aiBriefLines || [])];
-
-  if (effectiveState.outcome === "Recruited" && effectiveState.onboardingUnlocked) {
-    lines.push(translate("missionControlAiBriefOnboardingReady"));
-  }
-
-  return lines.slice(0, 5);
+function buildAiBriefPreviewLines(workspace) {
+  return [...(workspace?.aiBriefLines || [])].slice(0, 5);
 }
 
 /**
@@ -141,7 +134,7 @@ export function buildWorkspaceContext({
       ...workspace.prospect,
       milestone
     },
-    aiBriefLines: buildAiBriefPreviewLines(workspace, workflowState, translate),
+    aiBriefLines: buildAiBriefPreviewLines(workspace),
     expandedBrief: workspace.expandedBrief,
     nextActions: [],
     translate,

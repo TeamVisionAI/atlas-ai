@@ -27,6 +27,7 @@ export function adaptProspectWorkspaceResponse(workspacePayload) {
     workflow: workspacePayload.workflow,
     workflowGate: workspacePayload.workflowGate,
     latestConversation: workspacePayload.latestConversation,
+    conversationMessages: workspacePayload.conversationMessages || [],
     availableActions: workspacePayload.availableActions
   };
 

@@ -20,7 +20,7 @@ function InfoRow({ icon, label, value }) {
   );
 }
 
-export default function ExecutiveInformationPanel({ prospect }) {
+export default function ExecutiveInformationPanel({ prospect, compact = false }) {
   const { translate } = useLanguage();
 
   if (!prospect) {
@@ -30,9 +30,13 @@ export default function ExecutiveInformationPanel({ prospect }) {
   return (
     <ExecutivePanel>
       <div className="executive-info-grid">
-        <InfoRow icon="👤" label={translate("missionControlRowName")} value={prospect.name} />
+        {!compact ? (
+          <InfoRow icon="👤" label={translate("missionControlRowName")} value={prospect.name} />
+        ) : null}
         <InfoRow icon="📞" label={translate("missionControlRowPhone")} value={prospect.phone} />
-        <InfoRow icon="📍" label={translate("missionControlRowLocation")} value={prospect.location} />
+        {!compact ? (
+          <InfoRow icon="📍" label={translate("missionControlRowLocation")} value={prospect.location} />
+        ) : null}
         <InfoRow icon="🌐" label={translate("missionControlRowLanguage")} value={prospect.language} />
         <InfoRow icon="🎯" label={translate("missionControlRowMilestone")} value={prospect.milestone} />
         <InfoRow
@@ -40,11 +44,13 @@ export default function ExecutiveInformationPanel({ prospect }) {
           label={translate("missionControlRowWorkflowOwner")}
           value={prospect.workflowOwnership}
         />
-        <InfoRow
-          icon="🎥"
-          label={translate("missionControlRowInterviewType")}
-          value={prospect.interviewType}
-        />
+        {!compact ? (
+          <InfoRow
+            icon="🎥"
+            label={translate("missionControlRowInterviewType")}
+            value={prospect.interviewType}
+          />
+        ) : null}
       </div>
     </ExecutivePanel>
   );

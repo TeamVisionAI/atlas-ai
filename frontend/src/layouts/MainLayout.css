@@ -328,7 +328,26 @@
     max-width: 100%;
   }
 
-  /* Full-bleed pages manage their own surfaces */
+  /* Mission Control: lock viewport height so cockpit stays pinned */
+  .atlas-layout__content:has(.mission-control-shell) {
+    overflow: hidden;
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .atlas-layout__main:has(.mission-control-shell) {
+    overflow: hidden;
+  }
+
+  .atlas-layout__frame:has(.mission-control-shell) {
+    height: 100svh;
+    max-height: 100svh;
+    overflow: hidden;
+  }
+
+  .atlas-layout__content:has(.mission-control-shell),
   .atlas-layout__content:has(.mission-control-page),
   .atlas-layout__content:has(.prospect-workspace),
   .atlas-layout__content:has(.executive-dashboard),
@@ -338,5 +357,28 @@
     box-shadow: none;
     padding: 0;
     max-width: 100%;
+    min-height: 0;
   }
+}
+
+/* Mission Control — lock scroll to workspace body at every breakpoint */
+.atlas-layout__frame:has(.mission-control-shell) {
+  height: 100svh;
+  max-height: 100svh;
+  overflow: hidden;
+}
+
+.atlas-layout__main:has(.mission-control-shell) {
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.atlas-layout__content:has(.mission-control-shell) {
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
 }

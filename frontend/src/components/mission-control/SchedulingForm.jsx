@@ -5,6 +5,7 @@ import AtlasButton from "../ui/AtlasButton";
 import {
   formatNextWeekLabel,
   formatSchedulingDayLabel,
+  formatSchedulingTime12Hour,
   formatSlotButtonLabel,
   groupSlotsByDay,
   isSameSlot
@@ -17,7 +18,7 @@ export const INTERVIEW_TYPE_OPTIONS = Object.freeze([
   { id: "zoom", icon: "💻", labelKey: "missionExecutionInterviewTypeZoom" }
 ]);
 
-function normalizeInterviewType(value) {
+export function normalizeInterviewType(value) {
   const normalized = String(value || "").toLowerCase();
 
   if (normalized.includes("zoom") || normalized.includes("virtual")) {
@@ -126,6 +127,12 @@ export default function SchedulingForm({
 
   const isLoading = loadingSlots || loadingExpansion;
   const selectedInterviewTypeLabel = resolveInterviewTypeLabel(form.interviewType, translate);
+  const selectedDateLabel = form.dateKey
+    ? formatSchedulingDayLabel(form.dateKey, new Date(), { translate, locale })
+    : "";
+  const selectedTimeLabel = form.timeKey
+    ? formatSchedulingTime12Hour(form.timeKey, locale)
+    : "";
 
   function updateField(field, value) {
     onChange({ ...form, [field]: value });
@@ -198,6 +205,19 @@ export default function SchedulingForm({
               value={recruiterName || form.recruiter || translate("missionExecutionRecruiterPlaceholder")}
             />
           </div>
+
+          {form.dateKey || form.timeKey ? (
+            <div className="scheduling-form__selection" aria-live="polite">
+              <SummaryCard
+                label={translate("missionExecutionInterviewDate")}
+                value={selectedDateLabel || translate("missionExecutionSelectSlot")}
+              />
+              <SummaryCard
+                label={translate("missionExecutionInterviewTime")}
+                value={selectedTimeLabel || translate("missionExecutionSelectSlot")}
+              />
+            </div>
+          ) : null}
 
           <section className="scheduling-form__slots" aria-labelledby="scheduling-slots-heading">
             <div className="scheduling-form__slots-header">

@@ -1,16 +1,5 @@
 import { useState, useEffect } from "react";
 
-const fieldStyle = {
-  width: "100%",
-  padding: "10px 12px",
-  borderRadius: 8,
-  border: "1px solid #374151",
-  background: "#1F2937",
-  color: "#fff",
-  marginBottom: 12,
-  boxSizing: "border-box"
-};
-
 function defaultFollowUpDate(days = 7) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -33,26 +22,25 @@ function buildInitialForm(outcomeConfig) {
   return initial;
 }
 
-function FollowUpRecommendation({ recommendation }) {
+function FollowUpRecommendation({ recommendation, hideTechnicalDetails = false }) {
   if (!recommendation) {
     return null;
   }
 
+  const hasVisibleContent =
+    recommendation.recommendedFollowUpDate ||
+    recommendation.reminderSchedule ||
+    recommendation.preferredChannel ||
+    recommendation.suggestedScript;
+
+  if (hideTechnicalDetails && !hasVisibleContent) {
+    return null;
+  }
+
   return (
-    <div
-      style={{
-        marginBottom: 16,
-        padding: 12,
-        borderRadius: 8,
-        background: "#0F172A",
-        border: "1px solid #334155",
-        color: "#CBD5E1",
-        fontSize: 13,
-        lineHeight: 1.5
-      }}
-    >
-      <strong style={{ color: "#E2E8F0" }}>Atlas Recommendation</strong>
-      {recommendation.workflowLabel ? (
+    <div className="outcome-wizard__recommendation">
+      <strong>Atlas Recommendation</strong>
+      {!hideTechnicalDetails && recommendation.workflowLabel ? (
         <p style={{ margin: "8px 0 4px" }}>Workflow: {recommendation.workflowLabel}</p>
       ) : null}
       {recommendation.recommendedFollowUpDate ? (
@@ -80,7 +68,8 @@ export default function OutcomeWizard({
   outcomeConfig,
   prospectName,
   onComplete,
-  onBack
+  onBack,
+  hideTechnicalDetails = false
 }) {
   const [form, setForm] = useState(() => buildInitialForm(outcomeConfig));
 
@@ -88,7 +77,7 @@ export default function OutcomeWizard({
 
   useEffect(() => {
     setForm(buildInitialForm(outcomeConfig));
-  }, [outcome, outcomeConfig]);
+  }, [outcome]);
 
   function updateField(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -97,16 +86,13 @@ export default function OutcomeWizard({
   function renderField(field) {
     const commonProps = {
       value: form[field.key] || "",
-      onChange: (event) => updateField(field.key, event.target.value),
-      style: field.type === "textarea" ? { ...fieldStyle, resize: "vertical" } : fieldStyle
+      onChange: (event) => updateField(field.key, event.target.value)
     };
 
     if (field.type === "textarea") {
       return (
-        <label key={field.key} style={{ display: "block", marginBottom: 12 }}>
-          <span style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-            {field.label}
-          </span>
+        <label key={field.key} className="outcome-wizard__field">
+          <span className="outcome-wizard__field-label">{field.label}</span>
           <textarea rows={3} {...commonProps} />
         </label>
       );
@@ -114,10 +100,8 @@ export default function OutcomeWizard({
 
     if (field.type === "select") {
       return (
-        <label key={field.key} style={{ display: "block", marginBottom: 12 }}>
-          <span style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-            {field.label}
-          </span>
+        <label key={field.key} className="outcome-wizard__field">
+          <span className="outcome-wizard__field-label">{field.label}</span>
           <select {...commonProps}>
             {(field.options || []).map((option) => (
               <option key={option} value={option}>
@@ -130,25 +114,26 @@ export default function OutcomeWizard({
     }
 
     return (
-      <label key={field.key} style={{ display: "block", marginBottom: 12 }}>
-        <span style={{ display: "block", marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
-          {field.label}
-        </span>
+      <label key={field.key} className="outcome-wizard__field">
+        <span className="outcome-wizard__field-label">{field.label}</span>
         <input type={field.type || "text"} {...commonProps} />
       </label>
     );
   }
 
   return (
-    <div>
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
+    <div className="outcome-wizard">
+      <h3 className="outcome-wizard__title">{title}</h3>
       {prospectName ? (
-        <p style={{ color: "#94A3B8", marginTop: 0 }}>
+        <p className="outcome-wizard__intro">
           Record the interview outcome for {prospectName}.
         </p>
       ) : null}
 
-      <FollowUpRecommendation recommendation={outcomeConfig?.followUpRecommendation} />
+      <FollowUpRecommendation
+        recommendation={outcomeConfig?.followUpRecommendation}
+        hideTechnicalDetails={hideTechnicalDetails}
+      />
 
       {(outcomeConfig?.fields || []).map((field) => renderField(field))}
 
@@ -163,36 +148,11 @@ export default function OutcomeWizard({
 
 function ActionRow({ onBack, onSave, saveLabel }) {
   return (
-    <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-      <button
-        type="button"
-        onClick={onBack}
-        style={{
-          flex: 1,
-          padding: "12px 14px",
-          borderRadius: 8,
-          border: "1px solid #374151",
-          background: "transparent",
-          color: "#94A3B8",
-          cursor: "pointer"
-        }}
-      >
+    <div className="outcome-wizard__actions">
+      <button type="button" className="outcome-wizard__back" onClick={onBack}>
         Back
       </button>
-      <button
-        type="button"
-        onClick={onSave}
-        style={{
-          flex: 1,
-          padding: "12px 14px",
-          borderRadius: 8,
-          border: "none",
-          background: "#1E3A8A",
-          color: "#fff",
-          cursor: "pointer",
-          fontWeight: 600
-        }}
-      >
+      <button type="button" className="outcome-wizard__save" onClick={onSave}>
         {saveLabel}
       </button>
     </div>

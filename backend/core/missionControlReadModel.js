@@ -12,13 +12,9 @@ const {
   requireTenantOrganizationId,
   isTenantScopedRequest
 } = require("./tenantProspectLookup");
-const { buildHandoff } = require("./conversationEngine");
 const { detectIntent } = require("./intentEngine");
 const { detectLanguage } = require("./semanticConversationEngine");
-const {
-  buildQualificationBrain
-} = require("./informationModel");
-const { buildAtlasBriefSummary } = require("./conversationCopy");
+const { buildQualificationBrain } = require("./informationModel");
 
 async function resolveProspect(phone, organizationId = null, options = {}) {
   const tenantScoped = isTenantScopedRequest(options);
@@ -69,7 +65,6 @@ async function getMissionControlState(phone, options = {}) {
     city: ruledProfile.city,
     state: ruledProfile.state
   });
-  const handoff = buildHandoff(prospect);
   const requiresEmail = emailRequired({
     ...ruledProfile,
     interviewType
@@ -107,15 +102,7 @@ async function getMissionControlState(phone, options = {}) {
       emailRequired: requiresEmail
     },
     atlasBrief: {
-      summary: buildAtlasBriefSummary({
-        profile: ruledProfile,
-        prospect,
-        schedulingState: qualification.schedulingState,
-        handoff,
-        missingFields,
-        nextField,
-        currentStep
-      })
+      summary: []
     }
   };
 }

@@ -1,6 +1,6 @@
 import KnownInformationSection from "./mission-control/KnownInformationSection";
 import WorkflowRequirementsSection from "./mission-control/WorkflowRequirementsSection";
-import RequiredInformationPanel from "./mission-control/RequiredInformationPanel";
+import QualificationForm from "./mission-control/QualificationForm";
 import ConversationOutcomeSection from "./mission-control/ConversationOutcomeSection";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -32,9 +32,8 @@ export default function ConversationOutcomePanel({
         </section>
       ) : null}
 
-      <RequiredInformationPanel
+      <QualificationForm
         phone={phone}
-        requiredInputs={requiredInputs}
         conversationOutcome={conversationOutcome}
         disabled={disabled}
         onSaved={onSaved}

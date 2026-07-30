@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useToast } from "../../../components/ui/ToastProvider";
@@ -11,7 +11,6 @@ import {
   saveWorkflowState
 } from "../../../engines/workflowEngine";
 import JourneyProgress from "../../../components/prospect-workspace/JourneyProgress";
-import ActivityFeed from "../../../components/prospect-workspace/ActivityFeed";
 import ProspectDetailsPanel from "../../../components/prospect-workspace/ProspectDetailsPanel";
 import NextActions from "../../../components/NextActions";
 import WorkflowGatePanel from "../../../components/WorkflowGatePanel";
@@ -21,6 +20,7 @@ import ProspectHeader from "../components/ProspectHeader";
 import MissionControlContextPanel from "../components/MissionControlContextPanel";
 import ExecutiveDashboardLinks from "../components/ExecutiveDashboardLinks";
 import QuickActionsPanel from "../components/QuickActionsPanel";
+import CommunicationHistorySection from "../components/CommunicationHistorySection";
 import {
   useIsDesktop,
   useProspectCore,
@@ -32,8 +32,6 @@ import { useConfirmDialog } from "../hooks/useConfirmDialog";
 import { useWorkspaceKeyboardShortcuts } from "../hooks/useWorkspaceKeyboardShortcuts";
 import { appPath } from "../../../config/appRoutes";
 import "../../../pages/ProspectWorkspace.css";
-
-const ProspectTimelinePanel = lazy(() => import("../components/ProspectTimelinePanel"));
 
 export default function ProspectWorkspacePage() {
   const { phone: routePhone } = useParams();
@@ -255,12 +253,12 @@ export default function ProspectWorkspacePage() {
 
       <div className="prospect-workspace__columns">
         <div className="prospect-workspace__main-column">
-          <Suspense fallback={<WorkspaceSkeleton />}>
-            <ProspectTimelinePanel ref={timelineRef} prospectCoreId={prospectCoreId} />
-          </Suspense>
-          <ActivityFeed
+          <CommunicationHistorySection
             phone={workspace.phone}
-            previewItems={payload?.activityPreview || []}
+            conversation={workspace.conversation}
+            activityPreview={payload?.activityPreview || []}
+            prospectCoreId={prospectCoreId}
+            timelineRef={timelineRef}
             onNoteAdded={refreshWorkspace}
           />
         </div>

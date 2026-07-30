@@ -131,13 +131,15 @@ function hasPendingRequiredInformation(conversationOutcome) {
   return (conversationOutcome?.requiredInputs || []).length > 0;
 }
 
+const RECRUITER_PROGRESSION_FIELDS = new Set(["dayPart", "schedule", "name", "email"]);
+
 function hasIncompleteQualification({ brain, conversationOutcome }) {
   if (hasPendingRequiredInformation(conversationOutcome)) {
     return true;
   }
 
   const missingFields = brain?.missingFields || [];
-  return missingFields.some((field) => field !== "schedule");
+  return missingFields.some((field) => !RECRUITER_PROGRESSION_FIELDS.has(field));
 }
 
 function buildMissingInformationSummary({ brain, conversationOutcome }) {
@@ -150,7 +152,7 @@ function buildMissingInformationSummary({ brain, conversationOutcome }) {
   }
 
   for (const field of brain?.missingFields || []) {
-    if (field === "schedule") {
+    if (field === "schedule" || field === "dayPart") {
       continue;
     }
 

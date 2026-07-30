@@ -261,6 +261,10 @@ function validateRequiredFields(targetMilestone, context) {
     const qualMissing = getMissingFields(profile);
 
     for (const field of qualMissing) {
+      if (field === "dayPart" && (fields.interviewDateTime || isScheduleComplete(profile))) {
+        continue;
+      }
+
       if (!missingFields.includes(field)) {
         missingFields.push(field);
         errors.push({

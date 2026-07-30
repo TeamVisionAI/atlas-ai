@@ -182,3 +182,57 @@ export async function fetchMissionControlAvailability(phone, params = {}) {
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return apiFetch(`/api/mission-control/${encodeURIComponent(phone)}/availability${suffix}`);
 }
+
+/**
+ * Preview a WhatsApp message for copy+open workflow.
+ * @param {string} phone
+ * @param {{ template?: string, sourceAction?: string }} [params]
+ */
+export async function getWhatsAppCommunicationPreview(phone, params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.template) {
+    query.set("template", params.template);
+  }
+
+  if (params.sourceAction) {
+    query.set("sourceAction", params.sourceAction);
+  }
+
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const response = await apiRequest(
+    `/api/mission-control/${encodeURIComponent(phone)}/communication/preview${suffix}`
+  );
+
+  const result = await response.json();
+
+  if (!response.ok && !result?.message) {
+    throw new MissionControlError("Failed to preview WhatsApp message", response.status);
+  }
+
+  return result;
+}
+
+/**
+ * Record a copy+open WhatsApp send (sets workflow flags, logs timeline).
+ * @param {string} phone
+ * @param {{ template?: string, sourceAction?: string, deliveryMode?: string }} body
+ */
+export async function postWhatsAppCommunicationSend(phone, body = {}) {
+  const response = await apiRequest(
+    `/api/mission-control/${encodeURIComponent(phone)}/communication/send`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok && !result?.message) {
+    throw new MissionControlError("Failed to record WhatsApp send", response.status);
+  }
+
+  return result;
+}

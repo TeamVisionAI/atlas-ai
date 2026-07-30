@@ -1,0 +1,160 @@
+.workflow-gate-panel {
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.workflow-gate-panel__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.workflow-gate-panel__message {
+  margin: 0 0 16px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.workflow-gate-panel__status {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.workflow-gate-panel__error {
+  margin: 0 0 12px;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.workflow-gate-panel__success {
+  margin: 0 0 12px;
+  color: #166534;
+  font-size: 14px;
+}
+
+.workflow-gate-panel__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workflow-gate-panel__option {
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.workflow-gate-panel__option:hover:not(:disabled),
+.workflow-gate-panel__option:focus-visible {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  outline: none;
+}
+
+.workflow-gate-panel__option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.workflow-gate-panel .outcome-wizard__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.workflow-gate-panel .outcome-wizard__intro {
+  margin: 0 0 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.workflow-gate-panel .outcome-wizard__field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.workflow-gate-panel .outcome-wizard__field input,
+.workflow-gate-panel .outcome-wizard__field textarea,
+.workflow-gate-panel .outcome-wizard__field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.workflow-gate-panel .outcome-wizard__field textarea {
+  resize: vertical;
+}
+
+.workflow-gate-panel .outcome-wizard__recommendation {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.workflow-gate-panel .outcome-wizard__recommendation strong {
+  color: #0f172a;
+}
+
+.workflow-gate-panel .outcome-wizard__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.workflow-gate-panel .outcome-wizard__back,
+.workflow-gate-panel .outcome-wizard__save {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workflow-gate-panel .outcome-wizard__back {
+  border: 1px solid #e2e8f0;
+  background: transparent;
+  color: #64748b;
+}
+
+.workflow-gate-panel .outcome-wizard__save {
+  border: none;
+  background: #1e3a8a;
+  color: #ffffff;
+}
+
+.workflow-gate-panel .outcome-wizard__back:disabled,
+.workflow-gate-panel .outcome-wizard__save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -31,7 +31,16 @@ const { buildIsoTimestamp } = require("../services/availabilityService");
 const meetingManagementService = require("../services/meetingManagementService");
 const appointmentApplicationService = require("./appointmentApplicationService");
 const { APPOINTMENT_SOURCES } = require("../core/configuration/appointmentDomain");
-const { extractEmailFromNotes } = require("../core/informationModel");
+const {
+  extractEmailFromNotes,
+  deriveDayPartFromTimeKey,
+  mergeDayPartIntoNotes
+} = require("../core/informationModel");
+const {
+  parseQualificationCapture,
+  markCapturedFields,
+  mergeNotesWithQualificationCapture
+} = require("../core/qualificationCaptureState");
 const { normalizeEmail, validateEmailFormat } = require("../core/emailNormalization");
 const {
   buildActionError,
@@ -268,8 +277,24 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     current_step: "CONFIRMED"
   };
 
+  let nextNotes = prospect.notes || null;
+  const derivedDayPart = deriveDayPartFromTimeKey(payload.timeKey);
+
+  if (derivedDayPart) {
+    nextNotes = mergeDayPartIntoNotes(nextNotes, derivedDayPart);
+    const captureState = markCapturedFields(parseQualificationCapture(nextNotes), {
+      dayPart: derivedDayPart,
+      preferredPeriod: derivedDayPart
+    });
+    nextNotes = mergeNotesWithQualificationCapture(nextNotes, captureState);
+  }
+
   if (attendeeEmail) {
-    prospectUpdates.notes = buildProspectNotesWithEmail(prospect.notes, attendeeEmail);
+    nextNotes = buildProspectNotesWithEmail(nextNotes, attendeeEmail);
+  }
+
+  if (nextNotes !== prospect.notes) {
+    prospectUpdates.notes = nextNotes;
   }
 
   await updateProspect(prospect.phone, prospectUpdates);

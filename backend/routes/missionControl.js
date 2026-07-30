@@ -10,6 +10,10 @@ const { postRequiredInformation } = require("../controllers/requiredInformationC
 const { postInterviewOutcome } = require("../controllers/interviewOutcomeController");
 const { getMissionControlAvailability } = require("../controllers/availabilityController");
 const { postMissionExecution } = require("../controllers/missionExecutionController");
+const {
+  getCommunicationPreview,
+  postCommunicationSend
+} = require("../controllers/whatsappCommunicationController");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { getCommunicationGateway } = require("../communication/gateway/createCommunicationGateway");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
@@ -50,6 +54,31 @@ function rejectSimulatorProspect(phone, res) {
 }
 
 router.get("/:phone/availability", requireLegacyProspectAccess(), getMissionControlAvailability);
+
+router.get(
+  "/:phone/communication/preview",
+  requireLegacyProspectAccess(),
+  async (req, res) => {
+    if (rejectSimulatorProspect(req.params.phone, res)) {
+      return;
+    }
+
+    return getCommunicationPreview(req, res);
+  }
+);
+
+router.post(
+  "/:phone/communication/send",
+  requireLegacyProspectAccess({ write: true }),
+  requirePermission(PERMISSIONS.PROSPECT_COMMUNICATE),
+  async (req, res) => {
+    if (rejectSimulatorProspect(req.params.phone, res)) {
+      return;
+    }
+
+    return postCommunicationSend(req, res);
+  }
+);
 
 router.post(
   "/:phone/execute",

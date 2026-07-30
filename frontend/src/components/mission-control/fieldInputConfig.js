@@ -7,12 +7,11 @@ export const FIELD_INPUT_CONFIG = Object.freeze({
   state: { type: "text" },
   occupation: { type: "text" },
   preferred_language: {
-    type: "select",
+    type: "radio",
     options: [
       { value: "english", labelKey: "quickCaptureLanguageEn" },
       { value: "spanish", labelKey: "quickCaptureLanguageEs" }
-    ],
-    placeholderKey: "conversationOutcomeSelectLanguage"
+    ]
   },
   work_authorization_status: {
     type: "select",
@@ -22,6 +21,14 @@ export const FIELD_INPUT_CONFIG = Object.freeze({
       { value: "no", labelKey: "conversationOutcomeAuthorizedNo" }
     ],
     placeholderKey: "conversationOutcomeSelectWorkAuthorization"
+  },
+  interview_type: {
+    type: "radio",
+    options: [
+      { value: "office", labelKey: "missionExecutionInterviewTypeOffice", icon: "🏢" },
+      { value: "zoom", labelKey: "missionExecutionInterviewTypeZoom", icon: "💻" },
+      { value: "public_location", labelKey: "missionExecutionInterviewTypePublicLocation", icon: "☕" }
+    ]
   }
 });
 

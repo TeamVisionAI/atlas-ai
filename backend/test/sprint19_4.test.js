@@ -98,6 +98,25 @@ describe("RX Mission Engine — lifecycle scenarios", () => {
     assert.equal(primary.primaryAction.id, "schedule");
   });
 
+  it("dayPart does not block Schedule Interview after recruiter qualification", () => {
+    const primary = assertSinglePrimaryMission(
+      buildContext({
+        prospect: { phone: "+15559876544", current_step: "SCHEDULE" },
+        brain: { currentStep: "SCHEDULE", missingFields: ["schedule"] },
+        conversationOutcome: {
+          recordedOutcome: null,
+          requiredInputs: [],
+          workflowRequirements: [{ key: "schedule", label: "Interview not scheduled" }]
+        },
+        workflow: { canonicalMilestone: MILESTONES.QUALIFICATION },
+        availableActions: [{ id: "schedule", label: "Schedule Interview", priority: "primary" }]
+      })
+    );
+
+    assert.equal(primary.missionType, MISSION_TYPES.SCHEDULE_INTERVIEW);
+    assert.notEqual(primary.missionType, MISSION_TYPES.COMPLETE_QUALIFICATION);
+  });
+
   it("Interview Scheduled returns a non-empty review mission", () => {
     const primary = assertSinglePrimaryMission(
       buildContext({

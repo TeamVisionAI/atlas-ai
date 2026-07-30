@@ -19,13 +19,13 @@ export const ACTION_PRESENTATION = {
   },
   whatsapp: {
     icon: "💬",
-    titleKey: "missionControlActionWhatsapp",
-    subtitleKey: "missionControlActionWhatsappSubtitle"
+    titleKey: "missionControlActionSendViaWhatsapp",
+    subtitleKey: "missionControlActionSendViaWhatsappSubtitle"
   },
   send_zoom_link: {
-    icon: "🎥",
-    titleKey: "missionControlActionSendZoom",
-    subtitleKey: "missionControlActionSendZoomSubtitle"
+    icon: "💬",
+    titleKey: "missionControlActionSendViaWhatsapp",
+    subtitleKey: "missionControlActionSendViaWhatsappSubtitle"
   },
   send_office_location: {
     icon: "📍",

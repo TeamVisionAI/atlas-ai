@@ -1,0 +1,95 @@
+.mc-journey {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2px 0;
+}
+
+.mc-journey__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 72px;
+  min-width: 72px;
+  max-width: 120px;
+  padding-right: 12px;
+}
+
+.mc-journey__marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  border: 2px solid transparent;
+}
+
+.mc-journey__step--complete .mc-journey__marker {
+  background: #166534;
+  border-color: #166534;
+  color: #fff;
+}
+
+.mc-journey__step--current .mc-journey__marker {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.18);
+}
+
+.mc-journey__step--upcoming .mc-journey__marker {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+}
+
+.mc-journey__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  color: #64748b;
+}
+
+.mc-journey__step--complete .mc-journey__label {
+  color: #166534;
+}
+
+.mc-journey__step--current .mc-journey__label {
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.mc-journey__connector {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  width: 12px;
+  height: 2px;
+  background: #cbd5e1;
+  transform: translateX(50%);
+}
+
+.mc-journey__step--complete .mc-journey__connector {
+  background: #22c55e;
+}
+
+@media (min-width: 768px) {
+  .mc-journey {
+    flex-wrap: nowrap;
+  }
+
+  .mc-journey__step {
+    flex: 1 1 0;
+    max-width: none;
+    padding-right: 16px;
+  }
+}

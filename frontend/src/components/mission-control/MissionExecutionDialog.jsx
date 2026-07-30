@@ -3,7 +3,8 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import AtlasButton from "../ui/AtlasButton";
 import SchedulingForm, {
   createInitialSchedulingForm,
-  isSchedulingFormValid
+  isSchedulingFormValid,
+  normalizeInterviewType
 } from "./SchedulingForm";
 import {
   fetchAppointmentAvailability,
@@ -54,6 +55,8 @@ export default function MissionExecutionDialog({
 
   const slotCacheRef = useRef(new Map());
   const durationRef = useRef(30);
+  const dialogSessionRef = useRef(false);
+  const slotsLoadedForRef = useRef("");
 
   const defaultInterviewType = useMemo(() => {
     return prospect?.interviewType || mission?.prospect?.interviewType || "";
@@ -69,9 +72,23 @@ export default function MissionExecutionDialog({
 
   useEffect(() => {
     if (!open) {
+      dialogSessionRef.current = false;
+      slotsLoadedForRef.current = "";
       return;
     }
 
+    if (dialogSessionRef.current) {
+      setForm((current) => ({
+        ...current,
+        interviewType:
+          current.interviewType ||
+          (defaultInterviewType ? normalizeInterviewType(defaultInterviewType) : ""),
+        recruiter: current.recruiter || recruiterName || ""
+      }));
+      return;
+    }
+
+    dialogSessionRef.current = true;
     setForm(
       createInitialSchedulingForm({
         defaultInterviewType,
@@ -110,7 +127,9 @@ export default function MissionExecutionDialog({
           ...current,
           duration,
           recruiter: recruiterName || current.recruiter,
-          interviewType
+          interviewType,
+          dateKey: current.dateKey,
+          timeKey: current.timeKey
         }));
 
         const result = await loadInitialSchedulingSlots(fetchAvailability, duration);
@@ -142,10 +161,16 @@ export default function MissionExecutionDialog({
       return;
     }
 
+    if (slotsLoadedForRef.current === form.interviewType) {
+      return;
+    }
+
+    slotsLoadedForRef.current = form.interviewType;
     loadSlotsForInterviewType(form.interviewType);
   }, [open, form.interviewType, loadSlotsForInterviewType]);
 
   const handleInterviewTypeChange = useCallback(() => {
+    slotsLoadedForRef.current = "";
     setDisplaySlots([]);
     setWindowSlots([]);
     setDisplayMode("recommended");
@@ -168,6 +193,11 @@ export default function MissionExecutionDialog({
 
   const handleSelectDay = useCallback(
     async (dateKey) => {
+      setForm((current) => ({
+        ...current,
+        dateKey,
+        timeKey: current.dateKey === dateKey ? current.timeKey : ""
+      }));
       setLoadingExpansion(true);
       setSlotsError(null);
 

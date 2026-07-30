@@ -68,6 +68,38 @@ function resolveDayPartFromNotes(notes) {
   return schedulingState?.period || null;
 }
 
+function deriveDayPartFromTimeKey(timeKey) {
+  if (!timeKey || typeof timeKey !== "string") {
+    return null;
+  }
+
+  const [hours] = timeKey.split(":").map(Number);
+
+  if (Number.isNaN(hours)) {
+    return null;
+  }
+
+  return hours < 12 ? "morning" : "afternoon";
+}
+
+function mergeDayPartIntoNotes(notes, dayPart) {
+  if (!dayPart) {
+    return notes || null;
+  }
+
+  const remainder = String(notes || "")
+    .replace(/\|?DAY_PART:[^|]*/i, "")
+    .replace(/^\|+/, "")
+    .trim();
+  const segment = `DAY_PART:${dayPart}`;
+
+  if (!remainder) {
+    return segment;
+  }
+
+  return `${segment}|${remainder}`;
+}
+
 function buildProfileFromProspect(prospect, channel = "whatsapp") {
   if (!prospect) {
     return createEmptyProfile(channel);
@@ -251,7 +283,6 @@ function getMissingFields(profile, options = {}) {
 
   if (!isDayPartExplicitlyCaptured(profile, captureState, notes)) {
     missing.push("dayPart");
-    return sortMissingFields(missing);
   }
 
   const effectiveInterviewType = profile.interviewType || getEffectiveInterviewType(profile, "", { notes, captureState });
@@ -457,5 +488,7 @@ module.exports = {
   resolveInterviewTypeDecision,
   resolveIsLocal,
   emailRequired,
-  isScheduleComplete
+  isScheduleComplete,
+  deriveDayPartFromTimeKey,
+  mergeDayPartIntoNotes
 };

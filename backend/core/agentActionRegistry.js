@@ -19,8 +19,8 @@ const ACTION_IDS = Object.freeze({
 
 const AGENT_ACTION_METADATA = Object.freeze({
   [ACTION_IDS.CALL]: { label: "Call prospect" },
-  [ACTION_IDS.WHATSAPP]: { label: "Continue on WhatsApp" },
-  [ACTION_IDS.SEND_ZOOM_LINK]: { label: "Send Zoom interview link" },
+  [ACTION_IDS.WHATSAPP]: { label: "Send via WhatsApp" },
+  [ACTION_IDS.SEND_ZOOM_LINK]: { label: "Send via WhatsApp" },
   [ACTION_IDS.SEND_OFFICE_LOCATION]: { label: "Send office location" },
   [ACTION_IDS.SCHEDULE]: { label: "Schedule interview" },
   [ACTION_IDS.RESCHEDULE]: { label: "Reschedule interview" },

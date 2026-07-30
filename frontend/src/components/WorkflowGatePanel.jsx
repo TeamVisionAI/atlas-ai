@@ -2,64 +2,35 @@ import { useMemo, useState } from "react";
 import OutcomeWizard from "./OutcomeWizard";
 import { saveInterviewOutcome } from "../services/missionControlService";
 import { useLanguage } from "../i18n/LanguageContext";
+import "./WorkflowGatePanel.css";
 
-const panelStyle = {
-  background: "#111827",
-  border: "1px solid #374151",
-  borderRadius: 12,
-  padding: 24,
-  color: "#fff"
-};
+function findOutcomeConfig(outcomes, outcomeId) {
+  return outcomes?.find((outcome) => outcome.id === outcomeId) || null;
+}
 
-const buttonStyle = {
-  width: "100%",
-  textAlign: "left",
-  padding: "14px 16px",
-  marginBottom: 10,
-  borderRadius: 8,
-  border: "1px solid #374151",
-  background: "#1F2937",
-  color: "#fff",
-  cursor: "pointer",
-  fontSize: 15
-};
+function flattenOutcomes(categories) {
+  const seen = new Set();
+  const outcomes = [];
 
-const categoryTitleStyle = {
-  margin: "16px 0 8px",
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "#94A3B8"
-};
-
-const metaStyle = {
-  display: "flex",
-  gap: 16,
-  flexWrap: "wrap",
-  marginBottom: 16,
-  fontSize: 13,
-  color: "#94A3B8"
-};
-
-function findOutcomeConfig(categories, outcomeId) {
   for (const category of categories || []) {
-    const match = category.outcomes?.find((outcome) => outcome.id === outcomeId);
+    for (const outcome of category.outcomes || []) {
+      if (seen.has(outcome.id)) {
+        continue;
+      }
 
-    if (match) {
-      return match;
+      seen.add(outcome.id);
+      outcomes.push(outcome);
     }
   }
 
-  return null;
+  return outcomes;
 }
 
 /**
- * Inline Workflow Gate panel — grouped interview outcomes from server config.
+ * Inline interview outcome panel — recruiter-facing options only.
  */
 export default function WorkflowGatePanel({
   gate,
-  workflow,
   prospectName,
   phone,
   onComplete
@@ -70,10 +41,14 @@ export default function WorkflowGatePanel({
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  const categories = gate?.outcomeCategories || [];
+  const outcomes = useMemo(
+    () => flattenOutcomes(gate?.outcomeCategories),
+    [gate?.outcomeCategories]
+  );
+
   const selectedOutcomeConfig = useMemo(
-    () => findOutcomeConfig(categories, selectedOutcome),
-    [categories, selectedOutcome]
+    () => findOutcomeConfig(outcomes, selectedOutcome),
+    [outcomes, selectedOutcome]
   );
 
   async function handleOutcomeComplete(formState) {
@@ -108,69 +83,50 @@ export default function WorkflowGatePanel({
   }
 
   return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0, marginBottom: 8 }}>
+    <div className="workflow-gate-panel" id="workflow-outcome-gate">
+      <h3 className="workflow-gate-panel__title">
         {gate?.title || translate("workflowGateTitle")}
       </h3>
-      <p style={{ color: "#94A3B8", marginTop: 0, lineHeight: 1.6 }}>
+      <p className="workflow-gate-panel__message">
         {gate?.message || translate("workflowGateMessage")}
       </p>
 
-      {workflow ? (
-        <div style={metaStyle}>
-          <span>
-            {translate("workflowGateMilestone")}{" "}
-            <strong style={{ color: "#E2E8F0" }}>
-              {formatCanonicalMilestone(workflow.canonicalMilestone)}
-            </strong>
-          </span>
-          <span>
-            {translate("workflowGateOwner")}{" "}
-            <strong style={{ color: "#E2E8F0" }}>
-              {formatOwnership(workflow.workflowOwnership, translate)}
-            </strong>
-          </span>
-        </div>
-      ) : null}
-
       {loading ? (
-        <p style={{ color: "#94A3B8", margin: "12px 0" }}>{translate("workflowGateSaving")}</p>
+        <p className="workflow-gate-panel__status">{translate("workflowGateSaving")}</p>
       ) : null}
 
       {error ? (
-        <p style={{ color: "#FCA5A5", margin: "12px 0", fontSize: 14 }}>{error}</p>
+        <p className="workflow-gate-panel__error" role="alert">
+          {error}
+        </p>
       ) : null}
 
       {success ? (
-        <p style={{ color: "#86EFAC", margin: "12px 0", fontSize: 14 }}>{success}</p>
+        <p className="workflow-gate-panel__success" role="status">
+          {success}
+        </p>
       ) : null}
 
       {!selectedOutcome ? (
-        categories.map((category) => (
-          <div key={category.id}>
-            <h4 style={categoryTitleStyle}>{category.label}</h4>
-            {category.outcomes.map((outcome) => (
-              <button
-                key={outcome.id}
-                type="button"
-                style={{
-                  ...buttonStyle,
-                  opacity: loading ? 0.6 : 1,
-                  pointerEvents: loading ? "none" : "auto"
-                }}
-                disabled={loading}
-                onClick={() => setSelectedOutcome(outcome.id)}
-              >
-                {outcome.label}
-              </button>
-            ))}
-          </div>
-        ))
+        <div className="workflow-gate-panel__options" role="list">
+          {outcomes.map((outcome) => (
+            <button
+              key={outcome.id}
+              type="button"
+              className="workflow-gate-panel__option"
+              disabled={loading}
+              onClick={() => setSelectedOutcome(outcome.id)}
+            >
+              {outcome.label}
+            </button>
+          ))}
+        </div>
       ) : (
         <OutcomeWizard
           outcome={selectedOutcome}
           outcomeConfig={selectedOutcomeConfig}
           prospectName={prospectName}
+          hideTechnicalDetails
           onBack={() => {
             setSelectedOutcome(null);
             setError(null);
@@ -180,30 +136,4 @@ export default function WorkflowGatePanel({
       )}
     </div>
   );
-}
-
-function formatCanonicalMilestone(value) {
-  if (!value) {
-    return "—";
-  }
-
-  return String(value)
-    .split("_")
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function formatOwnership(value, translate) {
-  if (!value) {
-    return "—";
-  }
-
-  if (value === "WAITING_EVENT") {
-    return translate("workflowGateOwnershipWaiting");
-  }
-
-  return String(value)
-    .split("_")
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
 }

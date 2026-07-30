@@ -736,5 +736,6 @@ module.exports = {
   extractDayPart,
   detectLocalZoomPreference,
   isAuthorizationAmbiguous,
+  inferStateFromCity,
   isValidCityName
 };

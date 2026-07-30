@@ -1,9 +1,11 @@
+import ActionCard from "../design-system/ActionCard";
 import ExecutiveBadge from "../design-system/ExecutiveBadge";
 import ExecutivePanel from "../design-system/ExecutivePanel";
 import {
   buildExecutiveRecommendation,
   getMissionHeroIcon
 } from "../../engines/missionPresentationEngine";
+import { buildMissionActionCard } from "./missionActionUtils";
 import "./MissionCard.css";
 
 function formatDueLabel(dueDate, translate) {
@@ -27,13 +29,28 @@ function formatDueLabel(dueDate, translate) {
   });
 }
 
-export default function MissionCard({ mission, translate }) {
+export default function MissionCard({
+  mission,
+  translate,
+  phone,
+  onPrimaryAction,
+  busy = false
+}) {
   if (!mission) {
     return null;
   }
 
   const recommendation = buildExecutiveRecommendation(mission, translate);
   const heroIcon = getMissionHeroIcon(mission.missionType);
+  const primaryAction = mission.primaryAction
+    ? buildMissionActionCard(mission.primaryAction, {
+        translate,
+        phone,
+        variantOverride: "accent",
+        featured: true,
+        onClick: () => onPrimaryAction?.(mission.primaryAction.id, mission)
+      })
+    : null;
 
   return (
     <ExecutivePanel elevated className="mission-card">
@@ -74,6 +91,12 @@ export default function MissionCard({ mission, translate }) {
           <dd>{formatDueLabel(mission.dueDate, translate)}</dd>
         </div>
       </dl>
+
+      {primaryAction ? (
+        <div className="mission-card__actions">
+          <ActionCard {...primaryAction} featured disabled={busy} />
+        </div>
+      ) : null}
     </ExecutivePanel>
   );
 }

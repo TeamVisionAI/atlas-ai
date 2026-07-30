@@ -1,0 +1,134 @@
+.mc-cockpit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 var(--mc-inset-x, 20px) 12px;
+  background: transparent;
+  border: none;
+}
+
+.mc-cockpit__hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.mc-cockpit__name {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.mc-cockpit__contact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+
+.mc-cockpit__contact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mc-cockpit__contact-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.mc-cockpit__contact-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  line-height: 1.3;
+}
+
+.mc-cockpit__queue {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: none;
+}
+
+.mc-cockpit__queue-link {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mc-cockpit__queue-link--next {
+  align-items: flex-end;
+  text-align: right;
+  justify-self: end;
+}
+
+.mc-cockpit__queue-link:not(:disabled):hover {
+  color: #1e3a8a;
+}
+
+.mc-cockpit__queue-link:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mc-cockpit__queue-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-cockpit__queue-position {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .mc-cockpit__name {
+    font-size: 1.625rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .mc-cockpit__queue {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .mc-cockpit__queue-position {
+    order: -1;
+  }
+
+  .mc-cockpit__queue-link--next {
+    align-items: flex-start;
+    text-align: left;
+    justify-self: start;
+  }
+}

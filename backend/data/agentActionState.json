@@ -5978,7 +5978,7 @@
         "type": "phone"
       }
     ],
-    "outcome": "Information Collected",
+    "outcome": null,
     "closureReason": null,
     "futureReminder": null,
     "followUpDate": null,
@@ -6082,13 +6082,23 @@
         "text": "Conversation outcome recorded: Information Collected.",
         "at": "2026-07-26T13:35:04.916Z",
         "type": "phone"
+      },
+      {
+        "text": "Interview completed. Outcome: No Show.",
+        "at": "2026-07-30T01:28:46.564Z",
+        "type": "phone"
+      },
+      {
+        "text": "Interview completed. Outcome: No Show.",
+        "at": "2026-07-30T01:28:48.143Z",
+        "type": "phone"
       }
     ],
-    "outcome": "Information Collected",
+    "outcome": "No Show",
     "closureReason": null,
     "futureReminder": null,
-    "followUpDate": "2026-07-26",
-    "followUpTime": null,
+    "followUpDate": "2026-08-12",
+    "followUpTime": "02:00",
     "orientationScheduled": false,
     "onboardingUnlocked": false
   },
@@ -6164,6 +6174,79 @@
       {
         "text": "Required information updated: State.",
         "at": "2026-07-27T03:13:54.751Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+13216891236": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Required information updated: City, State, Preferred Language, Work Authorization, Occupation, Interview Type.",
+        "at": "2026-07-30T02:02:52.021Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17864442043": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Required information updated: Preferred Language, Occupation.",
+        "at": "2026-07-30T03:41:09.346Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: City, State, Preferred Language, Interview Type.",
+        "at": "2026-07-30T03:41:31.099Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17865063586": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Required information updated: Preferred Language, Occupation.",
+        "at": "2026-07-30T03:43:54.763Z",
+        "type": "phone"
+      },
+      {
+        "text": "Required information updated: City, State, Preferred Language, Interview Type.",
+        "at": "2026-07-30T03:44:23.353Z",
         "type": "phone"
       }
     ],

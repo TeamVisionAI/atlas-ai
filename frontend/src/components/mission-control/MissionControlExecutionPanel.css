@@ -1,0 +1,131 @@
+.mission-control-execution {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.mission-control-execution__block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mission-control-execution__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.mission-control-execution__snapshot {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.mission-control-execution__snapshot-item {
+  margin: 0;
+}
+
+.mission-control-execution__snapshot-item dt {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mission-control-execution__snapshot-item dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.mission-control-execution__checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mission-control-execution__checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: #334155;
+}
+
+.mission-control-execution__checklist-item--current {
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.mission-control-execution__checklist-item span[aria-hidden="true"],
+.mission-control-execution__checklist-item > span:first-child {
+  flex: 0 0 auto;
+  width: 16px;
+  color: #64748b;
+}
+
+.mission-control-execution__checklist-item--current > span:first-child {
+  color: #1e3a8a;
+}
+
+.mission-control-execution__checklist-item--actionable {
+  cursor: pointer;
+}
+
+.mission-control-execution__checklist-action {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #1e3a8a;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mission-control-execution__checklist-action:hover:not(:disabled) {
+  color: #1d4ed8;
+}
+
+.mission-control-execution__checklist-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mission-control-execution__checklist-item--current .mission-control-execution__checklist-action {
+  color: #1e3a8a;
+}
+
+.mission-control-execution__brief {
+  margin-top: 4px;
+}
+
+.mission-control-execution__history-link {
+  margin: 0;
+  font-size: 13px;
+}
+
+.mission-control-execution__history-link a {
+  color: #1e3a8a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mission-control-execution__history-link a:hover {
+  text-decoration: underline;
+}
