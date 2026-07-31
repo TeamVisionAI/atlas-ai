@@ -453,14 +453,11 @@ function isProspectDerivedAppointmentId(id) {
 }
 
 function isPersistedAppointment(appointment) {
-  if (!appointment?.id || isProspectDerivedAppointmentId(appointment.id)) {
+  if (!appointment?.id) {
     return false;
   }
 
-  return !(
-    appointment.derivedFromProspect ||
-    appointment.metadata?.derivedFromProspect
-  );
+  return !isProspectDerivedAppointmentId(appointment.id);
 }
 
 function resolvePersistedAppointmentId(appointment) {

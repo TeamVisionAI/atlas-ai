@@ -160,6 +160,32 @@ describe("appointmentListQuery", () => {
     assert.equal(resolvePersistedAppointmentId(undefined), null);
   });
 
+  it("isPersistedAppointment accepts UUID appointments regardless of derivedFromProspect metadata", () => {
+    assert.equal(
+      isPersistedAppointment({
+        id: "e93a937b-5e9e-4349-ae3b-25ab962b0e96",
+        status: "completed",
+        metadata: { derivedFromProspect: true }
+      }),
+      true
+    );
+    assert.equal(
+      isPersistedAppointment({
+        id: "e93a937b-5e9e-4349-ae3b-25ab962b0e96",
+        derivedFromProspect: true,
+        status: "completed"
+      }),
+      true
+    );
+    assert.equal(
+      resolvePersistedAppointmentId({
+        id: "e93a937b-5e9e-4349-ae3b-25ab962b0e96",
+        metadata: { derivedFromProspect: true }
+      }),
+      "e93a937b-5e9e-4349-ae3b-25ab962b0e96"
+    );
+  });
+
   it("selectActivePersistedAppointmentForProspect uses list-active rules", () => {
     const now = Date.now();
     const selected = selectActivePersistedAppointmentForProspect([

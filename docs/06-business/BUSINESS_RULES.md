@@ -266,6 +266,21 @@ Rules:
 
 ---
 
+## BR-040 — Persisted Appointment Eligibility
+
+**Implements:** Sprint 12.5.7  
+**Engine:** `appointmentListQuery.js`, `appointmentListService`, operational appointment surfaces
+
+A persisted appointment is determined solely by repository persistence and a non-synthetic UUID.
+
+Rules:
+
+1. **Identity-only eligibility:** An appointment is operationally persisted when it has an `id` that is not a `prospect-derived:` synthetic id.
+2. **Origin metadata is informational:** The field `metadata.derivedFromProspect` describes appointment origin only and must never determine operational eligibility.
+3. **No metadata gate:** Operational filters must not exclude UUID appointments because of `derivedFromProspect` flags on the row or in metadata.
+
+---
+
 # Prospect Workspace
 
 ## BR-038 — Prospect Workspace Editing Permissions
