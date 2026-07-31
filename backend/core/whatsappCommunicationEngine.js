@@ -51,14 +51,22 @@ function getFirstName(name) {
   return trimmed.split(/\s+/)[0];
 }
 
-function formatTimezoneLabel(timezone, language) {
+function extractTimezoneAbbreviation(timezone) {
   try {
     const formatter = new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,
       timeZoneName: "short"
     });
     const parts = formatter.formatToParts(new Date());
-    const abbreviation = parts.find((part) => part.type === "timeZoneName")?.value || timezone;
+    return parts.find((part) => part.type === "timeZoneName")?.value || timezone;
+  } catch {
+    return timezone;
+  }
+}
+
+function formatTimezoneLabel(timezone, language) {
+  try {
+    const abbreviation = extractTimezoneAbbreviation(timezone);
 
     if (language === "es") {
       if (timezone === "America/New_York") {
@@ -95,6 +103,7 @@ function formatInterviewSchedule(timestampMs, timezone, language) {
       minute: "2-digit",
       timeZone: timezone
     }),
+    timezoneAbbreviation: extractTimezoneAbbreviation(timezone),
     timezoneLabel: formatTimezoneLabel(timezone, language)
   };
 }
@@ -152,6 +161,18 @@ function resolveInterviewDetailsTemplate() {
   return WHATSAPP_TEMPLATES.INTERVIEW_DETAILS;
 }
 
+function resolveInterviewReminderTemplate() {
+  return WHATSAPP_TEMPLATES.INTERVIEW_REMINDER;
+}
+
+function resolveZoomInvitationTemplate() {
+  return WHATSAPP_TEMPLATES.ZOOM_INVITATION;
+}
+
+function resolveOfficeLocationTemplate() {
+  return WHATSAPP_TEMPLATES.OFFICE_LOCATION;
+}
+
 function buildInterviewDetailsMessage({
   prospectName,
   interviewAtMs,
@@ -167,65 +188,89 @@ function buildInterviewDetailsMessage({
   const greeting = firstName
     ? language === "es"
       ? `Hola ${firstName},`
-      : `Hi ${firstName},`
+      : `Hello ${firstName},`
     : language === "es"
       ? "Hola,"
-      : "Hi,";
+      : "Hello,";
 
   const schedule = interviewAtMs
     ? formatInterviewSchedule(interviewAtMs, timezone, language)
     : null;
 
-  const recruiter = recruiterName || organizationName || resolveOrganizationName();
-  const orgName = organizationName || resolveOrganizationName();
+  const representativeName = recruiterName || "";
+  const organizationDisplayName = organizationName || resolveOrganizationName({ office });
   const channel = normalizeInterviewChannel(interviewType) || "zoom";
   const location = office || getOrganizationSettings().office;
 
   if (language === "es") {
-    const lines = [greeting, "", "Aquí están los detalles de tu entrevista:", ""];
+    const lines = [greeting, "", "¡Tu entrevista está confirmada!", ""];
 
     if (schedule) {
       lines.push(
-        `Fecha: ${schedule.dateLine}`,
-        `Hora: ${schedule.timeLine}`,
-        `Zona horaria: ${schedule.timezoneLabel}`,
+        "📅 Fecha:",
+        schedule.dateLine,
+        "",
+        "🕚 Hora:",
+        `${schedule.timeLine} (${schedule.timezoneAbbreviation})`,
         ""
       );
     }
 
-    lines.push(`Representante: ${recruiter}`, "");
-
-    if (channel === "zoom" && zoomUrl) {
-      lines.push("Únete a tu entrevista aquí:", zoomUrl, "");
-    } else if (location?.fullAddress) {
-      lines.push("Nuestra oficina está en:", location.name, location.fullAddress, "");
+    if (representativeName) {
+      lines.push("👤 Entrevistador:", representativeName, "");
     }
 
-    lines.push("Recordatorio: ¡Esperamos conversar contigo!", "", orgName);
+    if (channel === "zoom" && zoomUrl) {
+      lines.push("🔗 Únete aquí:", zoomUrl, "");
+    } else if (location?.fullAddress) {
+      lines.push("📍 Ubicación:", location.name, location.fullAddress, "");
+    }
+
+    lines.push(
+      "Si tienes alguna pregunta antes de la entrevista, no dudes en responder este mensaje.",
+      "",
+      "¡Esperamos conversar contigo!",
+      "",
+      "—",
+      representativeName,
+      organizationDisplayName
+    );
 
     return lines.join("\n");
   }
 
-  const lines = [greeting, "", "Here are your interview details:", ""];
+  const lines = [greeting, "", "Your interview is confirmed!", ""];
 
   if (schedule) {
     lines.push(
-      `Date: ${schedule.dateLine}`,
-      `Time: ${schedule.timeLine}`,
-      `Time Zone: ${schedule.timezoneLabel}`,
+      "📅 Date:",
+      schedule.dateLine,
+      "",
+      "🕚 Time:",
+      `${schedule.timeLine} (${schedule.timezoneAbbreviation})`,
       ""
     );
   }
 
-  lines.push(`Representative: ${recruiter}`, "");
-
-  if (channel === "zoom" && zoomUrl) {
-    lines.push("Join your interview here:", zoomUrl, "");
-  } else if (location?.fullAddress) {
-    lines.push("Our office is located at:", location.name, location.fullAddress, "");
+  if (representativeName) {
+    lines.push("👤 Interviewer:", representativeName, "");
   }
 
-  lines.push("Reminder: We look forward to speaking with you!", "", orgName);
+  if (channel === "zoom" && zoomUrl) {
+    lines.push("🔗 Join here:", zoomUrl, "");
+  } else if (location?.fullAddress) {
+    lines.push("📍 Location:", location.name, location.fullAddress, "");
+  }
+
+  lines.push(
+    "If you have any questions before the interview, feel free to reply to this message.",
+    "",
+    "We look forward to speaking with you!",
+    "",
+    "—",
+    representativeName,
+    organizationDisplayName
+  );
 
   return lines.join("\n");
 }
@@ -387,72 +432,86 @@ function buildInterviewReminderMessage({
   const greeting = firstName
     ? language === "es"
       ? `Hola ${firstName},`
-      : `Hi ${firstName},`
+      : `Hello ${firstName},`
     : language === "es"
       ? "Hola,"
-      : "Hi,";
+      : "Hello,";
 
   const schedule = interviewAtMs
     ? formatInterviewSchedule(interviewAtMs, timezone, language)
     : null;
 
-  const normalizedType = String(interviewType || "").toLowerCase();
-  const isZoom =
-    normalizedType.includes("zoom") || normalizedType.includes("virtual");
+  const representativeName = recruiterName || "";
+  const organizationDisplayName = organizationName || resolveOrganizationName({ office });
+  const channel = normalizeInterviewChannel(interviewType) || "zoom";
   const location = office || getOrganizationSettings().office;
-  const orgName = organizationName || resolveOrganizationName({ office: location });
 
   if (language === "es") {
-    const lines = [
-      greeting,
-      "",
-      `Te recordamos tu próxima entrevista con ${orgName}.`,
-      ""
-    ];
+    const lines = [greeting, "", "Te recuerdo que tu entrevista está programada para:", ""];
 
     if (schedule) {
       lines.push(
-        `Fecha: ${schedule.dateLine}`,
-        `Hora: ${schedule.timeLine}`,
-        `Zona horaria: ${schedule.timezoneLabel}`,
+        "📅 Fecha:",
+        schedule.dateLine,
+        "",
+        "🕔 Hora:",
+        `${schedule.timeLine} (${schedule.timezoneAbbreviation})`,
         ""
       );
     }
 
-    if (isZoom && zoomUrl) {
-      lines.push("Únete a tu entrevista aquí:", zoomUrl, "");
-    } else if (!isZoom && location?.fullAddress) {
-      lines.push(
-        "Nuestra oficina está en:",
-        location.name,
-        location.fullAddress,
-        ""
-      );
+    if (channel === "zoom" && zoomUrl) {
+      lines.push("🔗 Únete aquí:", zoomUrl, "");
+    } else if (location?.fullAddress) {
+      lines.push("📍 Ubicación:", location.name, location.fullAddress, "");
     }
 
-    lines.push("¡Esperamos conversar contigo!", "", orgName);
+    lines.push(
+      "Si tienes alguna pregunta antes de la entrevista, puedes responderme por este medio.",
+      "",
+      "¡Nos vemos pronto!",
+      "",
+      "—",
+      representativeName,
+      organizationDisplayName
+    );
 
     return lines.join("\n");
   }
 
-  const lines = [greeting, "", `This is a reminder about your upcoming ${orgName} interview.`, ""];
+  const lines = [
+    greeting,
+    "",
+    "This is a reminder that your interview is scheduled for:",
+    ""
+  ];
 
   if (schedule) {
     lines.push(
-      `Date: ${schedule.dateLine}`,
-      `Time: ${schedule.timeLine}`,
-      `Time Zone: ${schedule.timezoneLabel}`,
+      "📅 Date:",
+      schedule.dateLine,
+      "",
+      "🕔 Time:",
+      `${schedule.timeLine} (${schedule.timezoneAbbreviation})`,
       ""
     );
   }
 
-  if (isZoom && zoomUrl) {
-    lines.push("Join your interview here:", zoomUrl, "");
-  } else if (!isZoom && location?.fullAddress) {
-    lines.push("Our office is located at:", location.name, location.fullAddress, "");
+  if (channel === "zoom" && zoomUrl) {
+    lines.push("🔗 Join here:", zoomUrl, "");
+  } else if (location?.fullAddress) {
+    lines.push("📍 Location:", location.name, location.fullAddress, "");
   }
 
-  lines.push("We look forward to speaking with you!", "", orgName);
+  lines.push(
+    "If you have any questions before the interview, feel free to reply to this message.",
+    "",
+    "See you soon!",
+    "",
+    "—",
+    representativeName,
+    organizationDisplayName
+  );
 
   return lines.join("\n");
 }
@@ -608,12 +667,16 @@ module.exports = {
   DEFAULT_TIMEZONE,
   resolveTemplateForAction,
   resolveInterviewDetailsTemplate,
+  resolveInterviewReminderTemplate,
+  resolveZoomInvitationTemplate,
+  resolveOfficeLocationTemplate,
   resolveInterviewTypeFromAppointment,
   composeWhatsAppMessage,
   getTemplateFlagKey,
   resolveRecruiterDisplayName,
   resolveOrganizationName,
   formatInterviewSchedule,
+  extractTimezoneAbbreviation,
   buildZoomInvitationMessage,
   buildOfficeLocationInvitationMessage,
   buildMissedAppointmentInvitationMessage,

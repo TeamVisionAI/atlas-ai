@@ -9,6 +9,8 @@ const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const { buildJourneyProgress } = require("./journeyProgressMapper");
 const { listProspectActivityPreview } = require("./prospectActivityFeedReadModel");
 const { buildProspectEditorProfile } = require("./prospectWorkspaceProfileEngine");
+const { resolvePersistedAppointmentId } = require("./appointmentListQuery");
+const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
 
 function buildProspectIdentity(prospect) {
   if (!prospect) {
@@ -40,17 +42,23 @@ function buildProspectIdentity(prospect) {
 }
 
 function buildInterviewBlock(prospect, agentState, workflowGate, activeAppointment = null) {
-  const interviewMs = parseInterviewDatetime(prospect);
+  const prospectInterviewMs = parseInterviewDatetime(prospect);
+  const appointmentInterviewMs = activeAppointment?.startDateTime
+    ? Date.parse(activeAppointment.startDateTime)
+    : Number.NaN;
+  const interviewMs = Number.isFinite(appointmentInterviewMs)
+    ? appointmentInterviewMs
+    : prospectInterviewMs;
   const now = Date.now();
 
   return {
     datetime: interviewMs ? new Date(interviewMs).toISOString() : null,
-    type: prospect?.interview_type || activeAppointment?.meetingType || null,
+    type: activeAppointment?.meetingType || prospect?.interview_type || null,
     isPast: interviewMs !== null && interviewMs < now,
     outcome: agentState?.outcome || null,
-    calendarEventId: prospect?.calendar_event_id || activeAppointment?.calendarEventId || null,
+    calendarEventId: activeAppointment?.calendarEventId || prospect?.calendar_event_id || null,
     gateActive: Boolean(workflowGate?.active),
-    appointmentId: activeAppointment?.id || null,
+    appointmentId: resolvePersistedAppointmentId(activeAppointment),
     ownerRepId: activeAppointment?.ownerRepId || null
   };
 }
@@ -86,8 +94,7 @@ async function composeProspectWorkspaceFromMissionControl(phone, missionControl,
   let activeAppointment = null;
 
   try {
-    const { findActiveAppointmentForProspect } = require("../application/appointmentApplicationService");
-    activeAppointment = await findActiveAppointmentForProspect(resolvedPhone, organizationId);
+    activeAppointment = await findPersistedAppointmentForProspect(resolvedPhone, organizationId);
   } catch (error) {
     console.error("[prospect-workspace/activeAppointment]", error.message);
   }

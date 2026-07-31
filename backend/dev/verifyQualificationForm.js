@@ -29,7 +29,8 @@ function verifyUnqualifiedProspectShowsAllFields() {
     occupation: null,
     work_authorized: null,
     preferred_language: null,
-    language: "es",
+    communication_language: null,
+    language: null,
     first_name: "Ana",
     last_name: "Test",
     notes: null
@@ -48,9 +49,52 @@ function verifyUnqualifiedProspectShowsAllFields() {
   assert(keys.includes("preferred_language"), `Expected language, got ${JSON.stringify(keys)}`);
   assert(keys.includes("interview_type"), `Expected interview type, got ${JSON.stringify(keys)}`);
 
+  console.log("✓ Unqualified prospect without stored language shows full qualification form");
+}
+
+function verifyQuickCaptureProspectKeepsLanguageOffQualificationForm() {
+  const prospect = {
+    phone: "+10000000006",
+    city: null,
+    state: null,
+    occupation: null,
+    work_authorized: null,
+    preferred_language: "spanish",
+    communication_language: "es",
+    language: "es",
+    entry_method: "QUICK_CAPTURE",
+    first_name: "Ana",
+    last_name: "Test",
+    notes: null
+  };
+  const profile = buildProfileFromProspect(prospect);
+  const keys = buildRequiredInputs(prospect, profile).map((row) => row.key);
+  const defaults = buildSuggestedQualificationDefaults(prospect, profile, { language: "en" }, {});
+
+  assert(!keys.includes("preferred_language"), `Language must stay off form, got ${JSON.stringify(keys)}`);
+  assert(defaults.preferred_language === "spanish", "Stored Spanish language should remain in defaults");
+
+  console.log("✓ Quick Capture prospect keeps preferred language off qualification form");
+}
+
+function verifyWhatsAppLanguageDefaultForProspectsWithoutStoredLanguage() {
+  const prospect = {
+    phone: "+10000000007",
+    city: null,
+    state: null,
+    occupation: null,
+    work_authorized: null,
+    preferred_language: null,
+    communication_language: null,
+    language: null,
+    first_name: "Ana",
+    last_name: "Test",
+    notes: null
+  };
+  const profile = buildProfileFromProspect(prospect);
   const defaults = buildSuggestedQualificationDefaults(prospect, profile, { language: "es" }, {});
 
-  assert(defaults.preferred_language === "spanish", "WhatsApp language should default preferred language");
+  assert(defaults.preferred_language === "spanish", "Brain language should default preferred language");
 
   const miamiDefaults = buildSuggestedQualificationDefaults(
     prospect,
@@ -64,7 +108,7 @@ function verifyUnqualifiedProspectShowsAllFields() {
   );
   assert(miamiDefaults.state === "FL", "Miami should infer Florida");
 
-  console.log("✓ Unqualified prospect shows full qualification form");
+  console.log("✓ Prospects without stored language infer defaults from brain language");
 }
 
 function verifyQualifiedProspectHasNoForm() {
@@ -176,6 +220,8 @@ function verifyScheduleProgressionAfterQualification() {
 function main() {
   console.log("=== Qualification Form Verification ===");
   verifyUnqualifiedProspectShowsAllFields();
+  verifyQuickCaptureProspectKeepsLanguageOffQualificationForm();
+  verifyWhatsAppLanguageDefaultForProspectsWithoutStoredLanguage();
   verifyQualifiedProspectHasNoForm();
   verifyReadModelIncludesQualificationForm();
   verifyScheduleProgressionAfterQualification();

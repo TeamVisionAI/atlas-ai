@@ -30,26 +30,18 @@ function normalizeInterviewTypeLabel(interviewType, language) {
   const channel = String(interviewType || "").toLowerCase();
 
   if (channel === "zoom") {
-    return language === "es" ? "Zoom (virtual)" : "Zoom (virtual)";
+    return language === "es" ? "Entrevista por Zoom" : "Zoom Interview";
   }
 
   if (channel === "office") {
-    return language === "es" ? "En persona" : "In person";
+    return language === "es" ? "Entrevista presencial" : "In-Person Interview";
   }
 
   return interviewType || null;
 }
 
-function resolveRepresentativeTitle(representative, organizationName) {
-  if (representative?.title) {
-    return representative.title;
-  }
-
-  if (organizationName) {
-    return organizationName;
-  }
-
-  return null;
+function resolveRepresentativeTitle(representative) {
+  return representative?.title || null;
 }
 
 function buildInterviewScheduleBlock(interviewAtMs, timezone, language) {
@@ -62,6 +54,7 @@ function buildInterviewScheduleBlock(interviewAtMs, timezone, language) {
   return {
     dateLine: schedule.dateLine,
     timeLine: schedule.timeLine,
+    timezoneAbbreviation: schedule.timezoneAbbreviation,
     timezoneLabel: schedule.timezoneLabel,
     iso: new Date(interviewAtMs).toISOString()
   };
@@ -70,58 +63,48 @@ function buildInterviewScheduleBlock(interviewAtMs, timezone, language) {
 function buildMissingContent({
   prospectName,
   representative,
-  representativeFallbackUsed,
+  recruiterName,
   interviewSchedule,
   interviewType,
   zoomUrl,
   office,
-  organizationName,
   media
 }) {
   const missing = [];
+  const resolvedRepresentativeName = representative?.name || recruiterName || null;
 
   if (!prospectName) {
-    missing.push({ key: MISSING_KEYS.PROSPECT_NAME, severity: "warning" });
+    missing.push({ key: MISSING_KEYS.PROSPECT_NAME, severity: "error", category: "required" });
   }
 
-  if (!representative?.name) {
-    missing.push({ key: MISSING_KEYS.REPRESENTATIVE_NAME, severity: "warning" });
-  } else if (representativeFallbackUsed) {
-    missing.push({ key: MISSING_KEYS.REPRESENTATIVE_NAME, severity: "info", fallback: true });
-  }
-
-  if (!representative?.title && !organizationName) {
-    missing.push({ key: MISSING_KEYS.REPRESENTATIVE_TITLE, severity: "info" });
-  }
-
-  if (!organizationName) {
-    missing.push({ key: MISSING_KEYS.ORGANIZATION_NAME, severity: "warning" });
+  if (!resolvedRepresentativeName) {
+    missing.push({ key: MISSING_KEYS.REPRESENTATIVE_NAME, severity: "error", category: "required" });
   }
 
   if (!interviewSchedule) {
-    missing.push({ key: MISSING_KEYS.INTERVIEW_SCHEDULE, severity: "warning" });
+    missing.push({ key: MISSING_KEYS.INTERVIEW_SCHEDULE, severity: "error", category: "required" });
   }
 
   const channel = String(interviewType || "").toLowerCase();
 
   if (channel === "zoom" && !zoomUrl) {
-    missing.push({ key: MISSING_KEYS.ZOOM_LINK, severity: "error" });
+    missing.push({ key: MISSING_KEYS.ZOOM_LINK, severity: "error", category: "required" });
   }
 
   if (channel === "office" && !office?.fullAddress) {
-    missing.push({ key: MISSING_KEYS.OFFICE_LOCATION, severity: "error" });
+    missing.push({ key: MISSING_KEYS.OFFICE_LOCATION, severity: "error", category: "required" });
   }
 
   if (!media?.profilePhotoUrl) {
-    missing.push({ key: MISSING_KEYS.PROFILE_PHOTO, severity: "info" });
+    missing.push({ key: MISSING_KEYS.PROFILE_PHOTO, severity: "recommended", category: "recommended" });
   }
 
   if (!media?.officeLogoUrl) {
-    missing.push({ key: MISSING_KEYS.OFFICE_LOGO, severity: "info" });
+    missing.push({ key: MISSING_KEYS.OFFICE_LOGO, severity: "recommended", category: "recommended" });
   }
 
-  if (!media?.signatureText && !organizationName) {
-    missing.push({ key: MISSING_KEYS.SIGNATURE, severity: "info" });
+  if (!representative?.title) {
+    missing.push({ key: MISSING_KEYS.REPRESENTATIVE_TITLE, severity: "recommended", category: "recommended" });
   }
 
   return missing;
@@ -160,6 +143,13 @@ function buildOutboundCommunicationPayload({
   const organizationName = context.organizationName || organizationSettings?.organizationName || null;
   const office = context.office || organizationSettings?.office || null;
   const signatureText = organizationName;
+  const resolvedRepresentativeName = representative?.name || context.recruiterName || null;
+  const resolvedRepresentative = resolvedRepresentativeName
+    ? {
+        ...(representative || {}),
+        name: resolvedRepresentativeName
+      }
+    : representative;
 
   const media = {
     profilePhotoUrl: representative?.profilePhotoUrl || representative?.profile_photo_url || null,
@@ -190,13 +180,12 @@ function buildOutboundCommunicationPayload({
 
   const missingContent = buildMissingContent({
     prospectName: context.prospectName || prospect?.name,
-    representative,
-    representativeFallbackUsed,
+    representative: resolvedRepresentative,
+    recruiterName: context.recruiterName,
     interviewSchedule,
     interviewType,
     zoomUrl: built.zoomUrl || context.zoomUrl || null,
     office,
-    organizationName,
     media
   });
 
@@ -216,15 +205,15 @@ function buildOutboundCommunicationPayload({
       appointmentId: appointment?.id || null
     },
     location,
-    representative: representative
+    representative: resolvedRepresentative
       ? {
-          name: representative.name || null,
-          title: resolveRepresentativeTitle(representative, organizationName),
+          name: resolvedRepresentative.name || null,
+          title: resolveRepresentativeTitle(resolvedRepresentative),
           organization: organizationName,
-          phone: representative.phone || null,
-          email: representative.email || null,
-          repId: representative.repId || null,
-          preferredLanguage: representative.preferredLanguage || null,
+          phone: resolvedRepresentative.phone || null,
+          email: resolvedRepresentative.email || null,
+          repId: resolvedRepresentative.repId || null,
+          preferredLanguage: resolvedRepresentative.preferredLanguage || null,
           fallbackUsed: representativeFallbackUsed
         }
       : null,

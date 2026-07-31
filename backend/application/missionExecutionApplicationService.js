@@ -47,6 +47,77 @@ const {
   buildActionSuccess
 } = require("./agentActionApplicationService");
 
+function resolveScheduleAgentId(options = {}) {
+  return options.userId || options.agentId || options.authorUserId || null;
+}
+
+function buildScheduleExecutionResponse({
+  bookingResult,
+  meetingUrl,
+  appointmentRecord,
+  advanceResult
+}) {
+  const appointmentId = appointmentRecord?.id || null;
+
+  if (!appointmentId || !appointmentRecord) {
+    throw new Error("Schedule response invariant violated: appointmentId is required.");
+  }
+
+  return {
+    ...buildActionSuccess(
+      ACTION_IDS.SCHEDULE,
+      "Interview scheduled successfully. Meeting invitation created."
+    ),
+    completedMissionType: MISSION_TYPES.SCHEDULE_INTERVIEW,
+    zoomLink: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
+    meetLink: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
+    meetingUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
+    calendarEventId: bookingResult.googleCalendarEventId || null,
+    booking: bookingResult,
+    appointmentId,
+    appointment: appointmentRecord,
+    workflow: advanceResult.workflow || null
+  };
+}
+
+async function createPersistedScheduleAppointment({
+  organizationId,
+  agentId,
+  phone,
+  payload,
+  bookingResult,
+  interviewType,
+  isZoom,
+  isPublicLocation,
+  location,
+  attendeeEmail
+}) {
+  const appointmentRecord = await appointmentApplicationService.createAppointment(
+    {
+      organizationId,
+      agentId,
+      prospectPhone: phone,
+      purpose: "recruiting_interview",
+      dateKey: payload.dateKey,
+      timeKey: payload.timeKey,
+      source: APPOINTMENT_SOURCES.MISSION_CONTROL,
+      meetingType: isZoom ? "virtual" : "in_person",
+      meetingProvider: isZoom ? "zoom" : undefined,
+      meetingLocationType: isPublicLocation ? "public_location" : "office",
+      meetingAddress: isZoom ? null : location,
+      notes: payload.notes,
+      contact: attendeeEmail ? { email: attendeeEmail } : {},
+      existingBooking: bookingResult,
+      skipWorkflowSideEffects: true
+    },
+    { organizationId }
+  );
+
+  await appointmentApplicationService.getAppointment(appointmentRecord.id, organizationId);
+
+  return appointmentRecord;
+}
+
 function normalizeInterviewType(value) {
   const normalized = String(value || "").toLowerCase();
 
@@ -136,25 +207,66 @@ function buildProspectNotesWithEmail(existingNotes, email) {
   return base ? `${base}|${emailToken}` : emailToken;
 }
 
-async function rollbackScheduleBooking(bookingResult, organizationId, prospect) {
+async function rollbackScheduleBooking(bookingResult, organizationId, prospect, context = {}) {
+  const rollbackErrors = [];
+
   if (!bookingResult?.startTimeISO) {
+    return rollbackErrors;
+  }
+
+  try {
+    await cancelAppointment({
+      appointmentType: APPOINTMENT_TYPES.INTERVIEW,
+      startTimeISO: bookingResult.startTimeISO,
+      googleCalendarEventId: bookingResult.googleCalendarEventId,
+      organizationId
+    });
+  } catch (error) {
+    rollbackErrors.push(`calendar: ${error.message}`);
+    console.error("[missionExecution] rollback calendar failed:", error.message, context);
+  }
+
+  try {
+    await updateProspect(prospect.phone, {
+      calendar_event_id: prospect.calendar_event_id || null,
+      appointment_date: prospect.appointment_date || null,
+      interview_time: prospect.interview_time || null,
+      interview_type: prospect.interview_type || null,
+      current_step: prospect.current_step || "SCHEDULE"
+    });
+  } catch (error) {
+    rollbackErrors.push(`prospect: ${error.message}`);
+    console.error("[missionExecution] rollback prospect failed:", error.message, context);
+  }
+
+  if (rollbackErrors.length) {
+    console.error("[missionExecution] rollback completed with errors", {
+      phone: prospect.phone,
+      errors: rollbackErrors,
+      ...context
+    });
+  }
+
+  return rollbackErrors;
+}
+
+async function rollbackPersistedAppointment(appointmentRecord, organizationId, agentId, context = {}) {
+  if (!appointmentRecord?.id) {
     return;
   }
 
-  await cancelAppointment({
-    appointmentType: APPOINTMENT_TYPES.INTERVIEW,
-    startTimeISO: bookingResult.startTimeISO,
-    googleCalendarEventId: bookingResult.googleCalendarEventId,
-    organizationId
-  }).catch(() => {});
-
-  await updateProspect(prospect.phone, {
-    calendar_event_id: prospect.calendar_event_id || null,
-    appointment_date: prospect.appointment_date || null,
-    interview_time: prospect.interview_time || null,
-    interview_type: prospect.interview_type || null,
-    current_step: prospect.current_step || "SCHEDULE"
-  }).catch(() => {});
+  try {
+    await appointmentApplicationService.cancelAppointment(
+      appointmentRecord.id,
+      { reason: context.reason || "schedule_rollback" },
+      { organizationId, agentId }
+    );
+  } catch (error) {
+    console.error("[missionExecution] rollback persisted appointment failed:", error.message, {
+      appointmentId: appointmentRecord.id,
+      ...context
+    });
+  }
 }
 
 /**
@@ -214,6 +326,16 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   const location = locationResult.location;
   const meetingUrl = locationResult.meetingUrl;
 
+  const scheduleAgentId = resolveScheduleAgentId(options);
+
+  if (!scheduleAgentId) {
+    return buildActionError(
+      ACTION_IDS.SCHEDULE,
+      "APPOINTMENT_PERSISTENCE_FAILED",
+      "Missing authenticated agent id for appointment persistence."
+    );
+  }
+
   let bookingResult;
 
   try {
@@ -260,12 +382,53 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     !bookingResult.googleCalendarEventId &&
     !shouldMockExternalComms()
   ) {
-    await rollbackScheduleBooking(bookingResult, organizationId, prospect);
+    await rollbackScheduleBooking(bookingResult, organizationId, prospect, {
+      phase: "calendar_validation"
+    });
 
     return buildActionError(
       ACTION_IDS.SCHEDULE,
       "CALENDAR_FAILED",
       "Google Calendar is connected but the meeting invitation could not be created."
+    );
+  }
+
+  let appointmentRecord = null;
+
+  try {
+    appointmentRecord = await createPersistedScheduleAppointment({
+      organizationId,
+      agentId: scheduleAgentId,
+      phone,
+      payload,
+      bookingResult,
+      interviewType,
+      isZoom,
+      isPublicLocation,
+      location,
+      attendeeEmail
+    });
+  } catch (error) {
+    await rollbackScheduleBooking(bookingResult, organizationId, prospect, {
+      phase: "appointment_persistence"
+    });
+
+    return buildActionError(
+      ACTION_IDS.SCHEDULE,
+      "APPOINTMENT_PERSISTENCE_FAILED",
+      error.message || "Unable to persist appointment record."
+    );
+  }
+
+  if (!appointmentRecord?.id) {
+    await rollbackScheduleBooking(bookingResult, organizationId, prospect, {
+      phase: "appointment_persistence_missing_id"
+    });
+
+    return buildActionError(
+      ACTION_IDS.SCHEDULE,
+      "APPOINTMENT_PERSISTENCE_FAILED",
+      "Unable to persist appointment record."
     );
   }
 
@@ -314,7 +477,13 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   });
 
   if (!advanceResult.success) {
-    await rollbackScheduleBooking(bookingResult, organizationId, prospect);
+    await rollbackScheduleBooking(bookingResult, organizationId, prospect, {
+      phase: "workflow_advance"
+    });
+    await rollbackPersistedAppointment(appointmentRecord, organizationId, scheduleAgentId, {
+      reason: "schedule_workflow_rollback",
+      phase: "workflow_advance"
+    });
 
     return buildActionError(
       ACTION_IDS.SCHEDULE,
@@ -350,47 +519,14 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     )
   );
 
-  let appointmentRecord = null;
+  const response = buildScheduleExecutionResponse({
+    bookingResult,
+    meetingUrl,
+    appointmentRecord,
+    advanceResult
+  });
 
-  try {
-    appointmentRecord = await appointmentApplicationService.createAppointment(
-      {
-        organizationId,
-        agentId: options.userId || options.agentId,
-        prospectPhone: phone,
-        purpose: "recruiting_interview",
-        dateKey: payload.dateKey,
-        timeKey: payload.timeKey,
-        source: APPOINTMENT_SOURCES.MISSION_CONTROL,
-        meetingType: isZoom ? "virtual" : "in_person",
-        meetingProvider: isZoom ? "zoom" : undefined,
-        meetingLocationType: isPublicLocation ? "public_location" : "office",
-        meetingAddress: isZoom ? null : location,
-        notes: payload.notes,
-        contact: attendeeEmail ? { email: attendeeEmail } : {},
-        existingBooking: bookingResult,
-        skipWorkflowSideEffects: true
-      },
-      { organizationId }
-    );
-  } catch (appointmentError) {
-    console.warn("[missionExecution] appointment record failed:", appointmentError.message);
-  }
-
-  return {
-    ...buildActionSuccess(
-      ACTION_IDS.SCHEDULE,
-      "Interview scheduled successfully. Meeting invitation created."
-    ),
-    completedMissionType: MISSION_TYPES.SCHEDULE_INTERVIEW,
-    zoomLink: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
-    meetLink: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
-    meetingUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl || null,
-    calendarEventId: bookingResult.googleCalendarEventId || null,
-    booking: bookingResult,
-    appointment: appointmentRecord,
-    workflow: advanceResult.workflow || null
-  };
+  return response;
 }
 
 async function executeMission(phone, body = {}, options = {}) {
@@ -416,5 +552,9 @@ module.exports = {
   executeMission,
   executeScheduleInterview,
   normalizeInterviewType,
-  validateSchedulePayload
+  validateSchedulePayload,
+  resolveScheduleAgentId,
+  buildScheduleExecutionResponse,
+  rollbackScheduleBooking,
+  rollbackPersistedAppointment
 };

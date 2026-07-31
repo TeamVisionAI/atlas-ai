@@ -3,12 +3,182 @@ const assert = require("node:assert/strict");
 const {
   WHATSAPP_TEMPLATES,
   resolveInterviewDetailsTemplate,
+  resolveInterviewReminderTemplate,
   resolveInterviewTypeFromAppointment,
   buildInterviewDetailsMessage,
+  buildInterviewReminderMessage,
   composeWhatsAppMessage,
   resolveOrganizationName
 } = require("../core/whatsappCommunicationEngine");
+const {
+  buildOutboundCommunicationPayload,
+  payloadsMatchForSend
+} = require("../core/communicationOutboundPayloadEngine");
 const { buildRepresentativeProfileFromUser, resolveAssignedRepresentative } = require("../core/representativeProfileEngine");
+
+const interviewAtMs = Date.parse("2026-03-15T18:30:00.000Z");
+const timezone = "America/New_York";
+const zoomUrl = "https://zoom.us/j/123456789";
+const organizationName = "Team Vision Financial";
+
+function countOccurrences(text, value) {
+  return text.split(value).length - 1;
+}
+
+test("resolveInterviewReminderTemplate returns interview_reminder template", () => {
+  assert.equal(resolveInterviewReminderTemplate(), WHATSAPP_TEMPLATES.INTERVIEW_REMINDER);
+});
+
+test("buildInterviewReminderMessage English zoom reminder includes representative once", () => {
+  const message = buildInterviewReminderMessage({
+    prospectName: "Sarah Chen",
+    interviewAtMs,
+    timezone,
+    recruiterName: "Ana Rivera",
+    zoomUrl,
+    interviewType: "zoom",
+    organizationName,
+    language: "en"
+  });
+
+  assert.ok(message.includes("Hello Sarah,"));
+  assert.ok(message.includes("This is a reminder that your interview is scheduled for:"));
+  assert.ok(message.includes("📅 Date:"));
+  assert.ok(message.includes("🕔 Time:"));
+  assert.ok(message.includes(zoomUrl));
+  assert.ok(message.includes("🔗 Join here:"));
+  assert.ok(message.includes("Ana Rivera"));
+  assert.equal(countOccurrences(message, organizationName), 1);
+  assert.ok(!message.includes(`reminder about your upcoming ${organizationName}`));
+});
+
+test("buildInterviewReminderMessage Spanish zoom reminder includes representative once", () => {
+  const message = buildInterviewReminderMessage({
+    prospectName: "Sarah Chen",
+    interviewAtMs,
+    timezone,
+    recruiterName: "Ana Rivera",
+    zoomUrl,
+    interviewType: "zoom",
+    organizationName,
+    language: "es"
+  });
+
+  assert.ok(message.includes("Hola Sarah,"));
+  assert.ok(message.includes("Te recuerdo que tu entrevista está programada para:"));
+  assert.ok(message.includes("📅 Fecha:"));
+  assert.ok(message.includes("🕔 Hora:"));
+  assert.ok(message.includes(zoomUrl));
+  assert.ok(message.includes("🔗 Únete aquí:"));
+  assert.ok(message.includes("Ana Rivera"));
+  assert.equal(countOccurrences(message, organizationName), 1);
+  assert.ok(!message.includes(`entrevista con ${organizationName}`));
+});
+
+test("buildInterviewReminderMessage office reminder includes address and no zoom link", () => {
+  const message = buildInterviewReminderMessage({
+    prospectName: "Sarah Chen",
+    interviewAtMs,
+    timezone,
+    recruiterName: "Ana Rivera",
+    interviewType: "office",
+    office: {
+      name: "Team Vision Office",
+      fullAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+    },
+    organizationName,
+    language: "en"
+  });
+
+  assert.ok(message.includes("Ana Rivera"));
+  assert.ok(message.includes("2500 NW 79th Ave"));
+  assert.ok(!message.includes("zoom.us"));
+  assert.ok(!message.includes("🔗 Join here:"));
+  assert.equal(countOccurrences(message, organizationName), 1);
+});
+
+test("buildInterviewReminderMessage blocks send when representative name missing in payload", () => {
+  const built = {
+    template: WHATSAPP_TEMPLATES.INTERVIEW_REMINDER,
+    message: buildInterviewReminderMessage({
+      prospectName: "Sarah Chen",
+      interviewAtMs,
+      timezone,
+      recruiterName: "",
+      zoomUrl,
+      interviewType: "zoom",
+      organizationName,
+      language: "en"
+    }),
+    language: "en",
+    phone: "+15555550100",
+    zoomUrl,
+    context: {
+      prospectName: "Sarah Chen",
+      recruiterName: null,
+      interviewAtMs,
+      timezone,
+      interviewType: "zoom",
+      organizationName
+    }
+  };
+
+  const payload = buildOutboundCommunicationPayload({
+    built,
+    prospect: { name: "Sarah Chen", phone: "+15555550100" },
+    representative: null,
+    appointment: { id: "appt-123" },
+    organizationSettings: { organizationName, office: { fullAddress: "123 Main" } }
+  });
+
+  const requiredMissing = payload.missingContent.filter((item) => item.category === "required");
+  assert.ok(requiredMissing.some((item) => item.key === "representativeName"));
+});
+
+test("buildInterviewReminderMessage preview and send payloads match", () => {
+  const built = {
+    template: WHATSAPP_TEMPLATES.INTERVIEW_REMINDER,
+    message: buildInterviewReminderMessage({
+      prospectName: "Sarah Chen",
+      interviewAtMs,
+      timezone,
+      recruiterName: "Ana Rivera",
+      zoomUrl,
+      interviewType: "zoom",
+      organizationName,
+      language: "en"
+    }),
+    language: "en",
+    phone: "+15555550100",
+    zoomUrl,
+    context: {
+      prospectName: "Sarah Chen",
+      recruiterName: "Ana Rivera",
+      interviewAtMs,
+      timezone,
+      interviewType: "zoom",
+      organizationName
+    }
+  };
+
+  const previewPayload = buildOutboundCommunicationPayload({
+    built,
+    prospect: { name: "Sarah Chen", phone: "+15555550100" },
+    representative: { name: "Ana Rivera", title: "Recruiting Manager" },
+    appointment: { id: "appt-123" },
+    organizationSettings: { organizationName }
+  });
+
+  const sendPayload = buildOutboundCommunicationPayload({
+    built,
+    prospect: { name: "Sarah Chen", phone: "+15555550100" },
+    representative: { name: "Ana Rivera", title: "Recruiting Manager" },
+    appointment: { id: "appt-123" },
+    organizationSettings: { organizationName }
+  });
+
+  assert.equal(payloadsMatchForSend(previewPayload, sendPayload), true);
+});
 
 test("resolveInterviewDetailsTemplate returns interview_details template", () => {
   assert.equal(
@@ -30,44 +200,71 @@ test("resolveInterviewTypeFromAppointment maps meeting types", () => {
   );
 });
 
-test("buildInterviewDetailsMessage includes representative and zoom link", () => {
+test("buildInterviewDetailsMessage English zoom invitation mentions organization once", () => {
   const message = buildInterviewDetailsMessage({
     prospectName: "Maria Lopez",
-    interviewAtMs: Date.parse("2026-03-15T18:30:00.000Z"),
-    timezone: "America/New_York",
+    interviewAtMs,
+    timezone,
     recruiterName: "Ana Rivera",
-    zoomUrl: "https://zoom.us/j/123456789",
+    zoomUrl,
     interviewType: "zoom",
-    organizationName: "Team Vision",
+    organizationName,
     language: "en"
   });
 
-  assert.ok(message.includes("Hi Maria,"));
-  assert.ok(message.includes("Representative: Ana Rivera"));
-  assert.ok(message.includes("Date:"));
-  assert.ok(message.includes("Time:"));
-  assert.ok(message.includes("https://zoom.us/j/123456789"));
-  assert.ok(message.includes("Reminder:"));
-  assert.ok(message.includes("Team Vision"));
-  assert.ok(!message.includes("Team Vision Office"));
+  assert.ok(message.includes("Hello Maria,"));
+  assert.ok(message.includes("Your interview is confirmed!"));
+  assert.ok(message.includes("👤 Interviewer:"));
+  assert.ok(message.includes("Ana Rivera"));
+  assert.ok(message.includes("📅 Date:"));
+  assert.ok(message.includes("🕚 Time:"));
+  assert.ok(message.includes(zoomUrl));
+  assert.ok(message.includes("🔗 Join here:"));
+  assert.equal(countOccurrences(message, organizationName), 1);
+  assert.ok(!message.includes("Your Team Vision"));
+});
+
+test("buildInterviewDetailsMessage Spanish zoom invitation mentions organization once", () => {
+  const message = buildInterviewDetailsMessage({
+    prospectName: "Maria Lopez",
+    interviewAtMs,
+    timezone,
+    recruiterName: "Ana Rivera",
+    zoomUrl,
+    interviewType: "zoom",
+    organizationName,
+    language: "es"
+  });
+
+  assert.ok(message.includes("Hola Maria,"));
+  assert.ok(message.includes("¡Tu entrevista está confirmada!"));
+  assert.ok(message.includes("👤 Entrevistador:"));
+  assert.ok(message.includes("Ana Rivera"));
+  assert.ok(message.includes("📅 Fecha:"));
+  assert.ok(message.includes("🕚 Hora:"));
+  assert.ok(message.includes(zoomUrl));
+  assert.ok(message.includes("🔗 Únete aquí:"));
+  assert.equal(countOccurrences(message, organizationName), 1);
+  assert.ok(!message.includes(`Tu entrevista con ${organizationName}`));
 });
 
 test("buildInterviewDetailsMessage includes office address for in-person interviews", () => {
   const message = buildInterviewDetailsMessage({
     prospectName: "Maria Lopez",
-    interviewAtMs: Date.parse("2026-03-15T18:30:00.000Z"),
-    timezone: "America/New_York",
+    interviewAtMs,
+    timezone,
     recruiterName: "Ana Rivera",
     interviewType: "office",
     office: {
       name: "Team Vision Office",
       fullAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
     },
-    organizationName: "Team Vision",
+    organizationName,
     language: "en"
   });
 
-  assert.ok(message.includes("Representative: Ana Rivera"));
+  assert.ok(message.includes("👤 Interviewer:"));
+  assert.ok(message.includes("Ana Rivera"));
   assert.ok(message.includes("2500 NW 79th Ave"));
   assert.ok(!message.includes("zoom.us"));
 });
@@ -77,16 +274,16 @@ test("composeWhatsAppMessage resolves Spanish interview details from prospect la
     language: "es",
     prospectName: "Maria Lopez",
     recruiterName: "Ana Rivera",
-    interviewAtMs: Date.parse("2026-03-15T18:30:00.000Z"),
-    timezone: "America/New_York",
-    zoomUrl: "https://zoom.us/j/123456789",
+    interviewAtMs,
+    timezone,
+    zoomUrl,
     interviewType: "zoom",
-    organizationName: "Team Vision"
+    organizationName
   });
 
   assert.ok(message.includes("Hola Maria,"));
-  assert.ok(message.includes("Representante: Ana Rivera"));
-  assert.ok(message.includes("Recordatorio:"));
+  assert.ok(message.includes("Ana Rivera"));
+  assert.ok(message.includes("¡Esperamos conversar contigo!"));
 });
 
 test("buildRepresentativeProfileFromUser maps future-ready representative fields", () => {

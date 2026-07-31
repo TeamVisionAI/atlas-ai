@@ -19,10 +19,10 @@ const { buildOutboundCommunicationPayload } = require(
   path.join(root, "backend/core/communicationOutboundPayloadEngine.js")
 );
 
-const interviewAtMs = Date.parse("2026-03-15T18:30:00.000Z");
+const interviewAtMs = Date.parse("2026-07-31T15:00:00.000Z");
 const timezone = "America/New_York";
 const organizationSettings = {
-  organizationName: "Team Vision",
+  organizationName: "Team Vision Financial",
   office: {
     name: "Team Vision Office",
     fullAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122",
@@ -30,16 +30,16 @@ const organizationSettings = {
   }
 };
 const representative = {
-  name: "Ana Rivera",
+  name: "Niovel Perez",
   title: "Recruiting Specialist",
-  email: "ana@teamvision.com",
+  email: "niovel@teamvision.com",
   repId: "4TJLK"
 };
 
 function buildPayload({ language, interviewType, zoomUrl = null }) {
   const message = composeWhatsAppMessage(WHATSAPP_TEMPLATES.INTERVIEW_DETAILS, {
     language,
-    prospectName: "Maria Lopez",
+    prospectName: "Abraham Manuel",
     recruiterName: representative.name,
     interviewAtMs,
     timezone,
@@ -57,7 +57,7 @@ function buildPayload({ language, interviewType, zoomUrl = null }) {
       phone: "+15555550100",
       zoomUrl,
       context: {
-        prospectName: "Maria Lopez",
+        prospectName: "Abraham Manuel",
         recruiterName: representative.name,
         interviewAtMs,
         timezone,
@@ -69,7 +69,7 @@ function buildPayload({ language, interviewType, zoomUrl = null }) {
       }
     },
     prospect: {
-      name: "Maria Lopez",
+      name: "Abraham Manuel",
       preferred_language: language === "es" ? "spanish" : "english"
     },
     representative,
@@ -79,66 +79,49 @@ function buildPayload({ language, interviewType, zoomUrl = null }) {
 
 const LABELS = {
   en: {
-    heading: "Outbound message preview",
-    channel: "Channel",
-    prospect: "Prospect",
-    schedule: "Interview date & time",
-    type: "Interview type",
-    language: "Preferred language",
+    subtitle: "Review your invitation before sending.",
+    delivery: "Delivery",
+    whatsapp: "WhatsApp",
     representative: "Representative",
-    title: "Title / organization",
-    organization: "Organization",
-    zoom: "Zoom link",
-    office: "Office location",
     message: "Final message",
     back: "Back to Edit",
-    copy: "Copy Message",
+    copy: "Copy",
     send: "Send Invitation",
-    missingHeading: "Missing or incomplete content",
+    recommendedHeading: "Recommended enhancements",
     missingProfilePhoto: "Representative photo",
-    missingOfficeLogo: "Office logo"
+    missingOfficeLogo: "Office logo",
+    missingTitle: "Representative title"
   },
   es: {
-    heading: "Vista previa del mensaje saliente",
-    channel: "Canal",
-    prospect: "Prospecto",
-    schedule: "Fecha y hora",
-    type: "Tipo de entrevista",
-    language: "Idioma preferido",
+    subtitle: "Revisa la invitación antes de enviarla.",
+    delivery: "Entrega",
+    whatsapp: "WhatsApp",
     representative: "Representante",
-    title: "Título / organización",
-    organization: "Organización",
-    zoom: "Enlace de Zoom",
-    office: "Ubicación de la oficina",
     message: "Mensaje final",
     back: "Volver a editar",
-    copy: "Copiar mensaje",
+    copy: "Copiar",
     send: "Enviar invitación",
-    missingHeading: "Contenido faltante o incompleto",
+    recommendedHeading: "Mejoras recomendadas",
     missingProfilePhoto: "Foto del representante",
-    missingOfficeLogo: "Logo de la oficina"
+    missingOfficeLogo: "Logo de la oficina",
+    missingTitle: "Título del representante"
   }
 };
 
 const MISSING_LABELS = {
   profilePhoto: { en: "Representative photo", es: "Foto del representante" },
-  officeLogo: { en: "Office logo", es: "Logo de la oficina" }
+  officeLogo: { en: "Office logo", es: "Logo de la oficina" },
+  representativeTitle: { en: "Representative title", es: "Título del representante" }
 };
 
 function renderHtml(payload, locale) {
   const labels = LABELS[locale];
   const schedule = payload.interview?.schedule;
-  const scheduleLabel = schedule
-    ? `${schedule.dateLine} · ${schedule.timeLine} (${schedule.timezoneLabel})`
-    : "—";
-  const locationLabel = payload.location?.type === "zoom" ? labels.zoom : labels.office;
-  const locationValue =
-    payload.location?.type === "zoom" ? payload.location?.zoomUrl : payload.location?.fullAddress;
-
-  const missingItems = (payload.missingContent || [])
-    .filter((item) => ["profilePhoto", "officeLogo"].includes(item.key))
+  const recommendedItems = (payload.missingContent || [])
+    .filter((item) => item.severity === "recommended")
     .map(
-      (item) => `<li class="communication-preview__missing-item">${MISSING_LABELS[item.key]?.[locale] || item.key}</li>`
+      (item) =>
+        `<li class="communication-preview__validation-item communication-preview__validation-item--recommended">${MISSING_LABELS[item.key]?.[locale] || item.key}</li>`
     )
     .join("");
 
@@ -147,34 +130,46 @@ function renderHtml(payload, locale) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${locale === "es" ? "Invitación a entrevista" : "Interview Invitation"}</title>
   <style>${css}</style>
 </head>
 <body>
   <div class="page">
+    <h1 class="page-title">${locale === "es" ? "Invitación a entrevista" : "Interview Invitation"}</h1>
     <div class="communication-preview">
       <header class="communication-preview__header">
-        <p class="communication-preview__eyebrow">${labels.heading}</p>
-        <p class="communication-preview__channel">${labels.channel}: ${payload.channel} · ${payload.deliveryMode}</p>
+        <p class="communication-preview__subtitle">${labels.subtitle}</p>
       </header>
+      <section class="communication-preview__delivery">
+        <h3 class="communication-preview__section-label">${labels.delivery}</h3>
+        <ul class="communication-preview__delivery-channels">
+          <li class="communication-preview__delivery-channel communication-preview__delivery-channel--active">${labels.whatsapp}</li>
+        </ul>
+      </section>
       ${
-        missingItems
-          ? `<div class="communication-preview__missing"><p class="communication-preview__missing-title">${labels.missingHeading}</p><ul class="communication-preview__missing-list">${missingItems}</ul></div>`
+        recommendedItems
+          ? `<div class="communication-preview__validation communication-preview__validation--recommended"><p class="communication-preview__validation-title">${labels.recommendedHeading}</p><ul class="communication-preview__validation-list">${recommendedItems}</ul></div>`
           : ""
       }
-      <section class="communication-preview__meta">
-        <dl class="communication-preview__meta-grid">
-          <div class="communication-preview__meta-row"><dt>${labels.prospect}</dt><dd>${payload.prospectName}</dd></div>
-          <div class="communication-preview__meta-row"><dt>${labels.schedule}</dt><dd>${scheduleLabel}</dd></div>
-          <div class="communication-preview__meta-row"><dt>${labels.type}</dt><dd>${payload.interview?.typeLabel}</dd></div>
-          <div class="communication-preview__meta-row"><dt>${labels.language}</dt><dd>${payload.languageLabel}</dd></div>
-          <div class="communication-preview__meta-row"><dt>${labels.representative}</dt><dd>${payload.representative?.name}</dd></div>
-          <div class="communication-preview__meta-row"><dt>${labels.title}</dt><dd>${payload.representative?.title}</dd></div>
-          <div class="communication-preview__meta-row"><dt>${labels.organization}</dt><dd>${payload.representative?.organization}</dd></div>
-          <div class="communication-preview__meta-row"><dt>${locationLabel}</dt><dd>${locationValue || "—"}</dd></div>
-        </dl>
+      <section class="communication-preview__summary">
+        <p class="communication-preview__prospect-name">${payload.prospectName}</p>
+        ${
+          schedule
+            ? `<div class="communication-preview__schedule"><p>${schedule.dateLine}</p><p>${schedule.timeLine} (${schedule.timezoneAbbreviation})</p></div>`
+            : ""
+        }
+        <div class="communication-preview__summary-meta">
+          <p>${payload.interview?.typeLabel}</p>
+          <p>${payload.languageLabel}</p>
+        </div>
+        <div class="communication-preview__representative">
+          <p class="communication-preview__section-label">${labels.representative}</p>
+          <p class="communication-preview__representative-name">${payload.representative?.name}</p>
+          ${payload.representative?.title ? `<p class="communication-preview__representative-title">${payload.representative.title}</p>` : ""}
+        </div>
       </section>
       <section class="communication-preview__message">
-        <h3 class="communication-preview__message-title">${labels.message}</h3>
+        <h3 class="communication-preview__section-label">${labels.message}</h3>
         <pre class="communication-preview__message-body">${escapeHtml(payload.message)}</pre>
       </section>
       <footer class="communication-preview__actions">
@@ -211,6 +206,11 @@ const css = `
     border-radius: 16px;
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   }
+  .page-title {
+    margin: 0 0 12px;
+    font-size: 22px;
+    font-weight: 700;
+  }
   .btn {
     border: 1px solid #cbd5e1;
     border-radius: 10px;
@@ -243,14 +243,6 @@ const scenarios = [
       language: "es",
       interviewType: "zoom",
       zoomUrl: "https://zoom.us/j/123456789"
-    })
-  },
-  {
-    filename: "communication-preview-en-in-person.png",
-    locale: "en",
-    payload: buildPayload({
-      language: "en",
-      interviewType: "office"
     })
   }
 ];

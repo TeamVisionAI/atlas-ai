@@ -273,6 +273,114 @@ async function previewInterviewDetailsCommunication(req, res) {
   }
 }
 
+async function previewInterviewReminderCommunication(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.previewInterviewReminderCommunication(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
+async function sendInterviewReminder(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.sendInterviewReminder(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
+async function previewZoomInvitationCommunication(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.previewZoomInvitationCommunication(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
+async function sendZoomInvitation(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.sendZoomInvitation(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
+async function previewOfficeLocationCommunication(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.previewOfficeLocationCommunication(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
+async function sendOfficeLocation(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.sendOfficeLocation(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -287,5 +395,11 @@ module.exports = {
   resolveHumanAssist,
   collectEmail,
   sendInterviewDetails,
-  previewInterviewDetailsCommunication
+  previewInterviewDetailsCommunication,
+  previewInterviewReminderCommunication,
+  sendInterviewReminder,
+  previewZoomInvitationCommunication,
+  sendZoomInvitation,
+  previewOfficeLocationCommunication,
+  sendOfficeLocation
 };

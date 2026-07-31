@@ -14,6 +14,9 @@ const { requireTenantOrganizationId } = require("../core/tenantProspectLookup");
 const { resolveAssignedRepresentative } = require("../core/representativeProfileEngine");
 const {
   resolveInterviewDetailsTemplate,
+  resolveInterviewReminderTemplate,
+  resolveZoomInvitationTemplate,
+  resolveOfficeLocationTemplate,
   WHATSAPP_TEMPLATES
 } = require("../core/whatsappCommunicationEngine");
 const { payloadsMatchForSend } = require("../core/communicationOutboundPayloadEngine");
@@ -36,7 +39,7 @@ function buildSuccess(message, extras = {}) {
   };
 }
 
-async function prepareInterviewDetailsCommunication(appointmentId, context = {}) {
+async function prepareAppointmentCommunication(appointmentId, context, { template, sourceAction }) {
   const organizationId = requireTenantOrganizationId(context.organizationId);
   const appointment = await appointmentApplicationService.getAppointment(appointmentId, organizationId);
   const phone = appointment.prospectPhone;
@@ -46,7 +49,6 @@ async function prepareInterviewDetailsCommunication(appointmentId, context = {})
   }
 
   const representative = await resolveAssignedRepresentative(appointment, context);
-  const template = resolveInterviewDetailsTemplate(appointment);
   const serviceOptions = {
     organizationId,
     tenantScoped: true,
@@ -61,7 +63,7 @@ async function prepareInterviewDetailsCommunication(appointmentId, context = {})
     phone,
     {
       template,
-      sourceAction: "resend_interview_details"
+      sourceAction
     },
     serviceOptions
   );
@@ -84,6 +86,34 @@ async function prepareInterviewDetailsCommunication(appointmentId, context = {})
   };
 }
 
+async function prepareInterviewDetailsCommunication(appointmentId, context = {}) {
+  return prepareAppointmentCommunication(appointmentId, context, {
+    template: resolveInterviewDetailsTemplate(),
+    sourceAction: "resend_interview_details"
+  });
+}
+
+async function prepareInterviewReminderCommunication(appointmentId, context = {}) {
+  return prepareAppointmentCommunication(appointmentId, context, {
+    template: resolveInterviewReminderTemplate(),
+    sourceAction: "send_interview_reminder"
+  });
+}
+
+async function prepareZoomInvitationCommunication(appointmentId, context = {}) {
+  return prepareAppointmentCommunication(appointmentId, context, {
+    template: resolveZoomInvitationTemplate(),
+    sourceAction: "send_zoom_link"
+  });
+}
+
+async function prepareOfficeLocationCommunication(appointmentId, context = {}) {
+  return prepareAppointmentCommunication(appointmentId, context, {
+    template: resolveOfficeLocationTemplate(),
+    sourceAction: "send_office_location"
+  });
+}
+
 /**
  * Preview-only — same payload assembly as send, without recording delivery.
  */
@@ -97,17 +127,7 @@ async function previewInterviewDetailsCommunication(appointmentId, context = {})
   return buildSuccess("Interview invitation preview ready.", prepared);
 }
 
-/**
- * Sends personalized interview details for an appointment.
- * Loads data, resolves representative + language, selects template, and records delivery.
- */
-async function sendInterviewDetails(appointmentId, context = {}) {
-  const prepared = await prepareInterviewDetailsCommunication(appointmentId, context);
-
-  if (!prepared?.success) {
-    return prepared;
-  }
-
+async function sendAppointmentCommunication(appointmentId, context, { sourceAction, prepared }) {
   const organizationId = requireTenantOrganizationId(context.organizationId);
   const appointment = await appointmentApplicationService.getAppointment(appointmentId, organizationId);
   const representative = await resolveAssignedRepresentative(appointment, context);
@@ -125,7 +145,7 @@ async function sendInterviewDetails(appointmentId, context = {}) {
     prepared.phone,
     {
       template: prepared.template,
-      sourceAction: "resend_interview_details",
+      sourceAction,
       deliveryMode: DELIVERY_MODES.COPY_OPEN
     },
     serviceOptions
@@ -141,12 +161,13 @@ async function sendInterviewDetails(appointmentId, context = {}) {
   );
 
   if (!sendMatchesPreview) {
-    console.warn("[communicationService] Preview/send payload mismatch for interview details.", {
-      appointmentId
+    console.warn("[communicationService] Preview/send payload mismatch.", {
+      appointmentId,
+      sourceAction
     });
   }
 
-  return buildSuccess("Interview details prepared.", {
+  return buildSuccess("Message prepared.", {
     channel: "whatsapp",
     template: prepared.template,
     message: prepared.message,
@@ -162,8 +183,119 @@ async function sendInterviewDetails(appointmentId, context = {}) {
   });
 }
 
+/**
+ * Sends personalized interview details for an appointment.
+ * Loads data, resolves representative + language, selects template, and records delivery.
+ */
+async function sendInterviewDetails(appointmentId, context = {}) {
+  const prepared = await prepareInterviewDetailsCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  return sendAppointmentCommunication(appointmentId, context, {
+    sourceAction: "resend_interview_details",
+    prepared
+  });
+}
+
+/**
+ * Preview-only — interview reminder uses the same payload assembly as send.
+ */
+async function previewInterviewReminderCommunication(appointmentId, context = {}) {
+  const prepared = await prepareInterviewReminderCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  return buildSuccess("Interview reminder preview ready.", prepared);
+}
+
+async function previewZoomInvitationCommunication(appointmentId, context = {}) {
+  const prepared = await prepareZoomInvitationCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  return buildSuccess("Zoom invitation preview ready.", prepared);
+}
+
+async function previewOfficeLocationCommunication(appointmentId, context = {}) {
+  const prepared = await prepareOfficeLocationCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  return buildSuccess("Office location preview ready.", prepared);
+}
+
+/**
+ * Sends a personalized interview reminder for an appointment.
+ */
+async function sendInterviewReminder(appointmentId, context = {}) {
+  const prepared = await prepareInterviewReminderCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  const result = await sendAppointmentCommunication(appointmentId, context, {
+    sourceAction: "send_interview_reminder",
+    prepared
+  });
+
+  if (!result?.success) {
+    return result;
+  }
+
+  return {
+    ...result,
+    message: result.message || "Interview reminder prepared."
+  };
+}
+
+async function sendZoomInvitation(appointmentId, context = {}) {
+  const prepared = await prepareZoomInvitationCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  return sendAppointmentCommunication(appointmentId, context, {
+    sourceAction: "send_zoom_link",
+    prepared
+  });
+}
+
+async function sendOfficeLocation(appointmentId, context = {}) {
+  const prepared = await prepareOfficeLocationCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  return sendAppointmentCommunication(appointmentId, context, {
+    sourceAction: "send_office_location",
+    prepared
+  });
+}
+
 module.exports = {
+  prepareAppointmentCommunication,
   prepareInterviewDetailsCommunication,
+  prepareInterviewReminderCommunication,
+  prepareZoomInvitationCommunication,
+  prepareOfficeLocationCommunication,
   previewInterviewDetailsCommunication,
-  sendInterviewDetails
+  previewInterviewReminderCommunication,
+  previewZoomInvitationCommunication,
+  previewOfficeLocationCommunication,
+  sendInterviewDetails,
+  sendInterviewReminder,
+  sendZoomInvitation,
+  sendOfficeLocation
 };

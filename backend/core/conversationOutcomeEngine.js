@@ -22,10 +22,12 @@ const {
 } = require("./qualificationCaptureState");
 const { COMMUNICATION_LANGUAGES } = require("./quickCaptureConstants");
 const {
+  DEFAULT_PREFERRED_LANGUAGE,
   normalizePreferredLanguage,
   resolveProspectPreferredLanguage,
   formatPreferredLanguageLabel,
-  syncProspectLanguageFields
+  syncProspectLanguageFields,
+  hasStoredPreferredLanguage
 } = require("./prospectLanguage");
 const { advanceProspectWorkflow } = require("./humanAdvancementEngine");
 const { loadAgentState } = require("./agentActionState");
@@ -411,7 +413,9 @@ function getQualificationFormGaps(prospect, profile, options = {}) {
     return [];
   }
 
-  gaps.push("preferred_language");
+  if (!hasStoredPreferredLanguage(prospect)) {
+    gaps.push("preferred_language");
+  }
 
   return gaps
     .filter((field, index, list) => list.indexOf(field) === index)
@@ -429,7 +433,9 @@ function buildSuggestedQualificationDefaults(prospect, profile, brain, draft = {
     sanitizeText(draft.state) ||
     inferStateFromCity(city) ||
     "";
-  const preferredLanguage = resolveProspectPreferredLanguage(prospect);
+  const preferredLanguage = hasStoredPreferredLanguage(prospect)
+    ? resolveProspectPreferredLanguage(prospect)
+    : normalizePreferredLanguage(brain?.language) || DEFAULT_PREFERRED_LANGUAGE;
 
   let interviewType = profile.interviewType || null;
 
@@ -446,7 +452,7 @@ function buildSuggestedQualificationDefaults(prospect, profile, brain, draft = {
   return {
     city,
     state: inferredState,
-    preferred_language: preferredLanguage || brain?.language || "english",
+    preferred_language: preferredLanguage,
     interview_type: mapBackendInterviewTypeToUi(interviewType),
     occupation: sanitizeText(profile.occupation) || sanitizeText(draft.occupation) || "",
     work_authorization_status:
@@ -792,6 +798,10 @@ async function saveRequiredInformation(phone, body = {}) {
   const requiredInputs = buildRequiredInputs(prospect, profile, getMissingFields(profile), captureOptions);
   const allowedKeys = new Set(requiredInputs.map((row) => row.key));
 
+  if (hasStoredPreferredLanguage(prospect)) {
+    allowedKeys.delete("preferred_language");
+  }
+
   if (!allowedKeys.size) {
     return {
       success: false,
@@ -803,7 +813,10 @@ async function saveRequiredInformation(phone, body = {}) {
 
   const rawFields = body.fields || {};
   const submittedKeys = Object.keys(rawFields).filter(
-    (key) => rawFields[key] !== undefined && rawFields[key] !== ""
+    (key) =>
+      rawFields[key] !== undefined &&
+      rawFields[key] !== "" &&
+      !(key === "preferred_language" && hasStoredPreferredLanguage(prospect))
   );
 
   if (!submittedKeys.length) {
@@ -842,7 +855,9 @@ async function saveRequiredInformation(phone, body = {}) {
   }
 
   const filteredRaw = Object.fromEntries(
-    submittedKeys.map((key) => [key, rawFields[key]])
+    submittedKeys
+      .filter((key) => allowedKeys.has(key))
+      .map((key) => [key, rawFields[key]])
   );
   const normalized = normalizeSubmittedFields(filteredRaw, prospect);
 
@@ -963,11 +978,14 @@ async function persistIdentityAndLanguageFields(prospect, fields) {
     }
   }
 
-  if (fields.preferred_language) {
+  if (fields.preferred_language !== undefined) {
     const synced = syncProspectLanguageFields(fields.preferred_language);
     const existingPreferred = resolveProspectPreferredLanguage(prospect);
+    const mayUpdateLanguage =
+      !hasStoredPreferredLanguage(prospect) ||
+      synced.preferred_language === existingPreferred;
 
-    if (synced.preferred_language !== existingPreferred) {
+    if (mayUpdateLanguage && synced.preferred_language !== existingPreferred) {
       Object.assign(updates, synced);
       changed.push("preferred_language");
     }

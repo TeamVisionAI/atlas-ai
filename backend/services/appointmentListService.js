@@ -1,89 +1,57 @@
 /**
- * Sprint 22.1 — Unified appointment listing (atlas_appointments + prospect-derived).
+ * Sprint 22.1 — Appointment listing (persisted atlas_appointments only).
+ * Appointment invariant: operational surfaces use persisted UUIDs only.
  */
 
 const appointmentRepository = require("../repositories/appointmentRepository");
-const { loadProspectsForOrganization, findProspectInOrganization } = require("../services/supabaseService");
-const { filterProductionProspects } = require("../core/productionProspectFilter");
 const {
-  buildProspectDerivedAppointment,
-  matchesListFilters,
-  appointmentIdentityKey,
-  prospectMatchesAgent,
-  parseProspectDerivedAppointmentId,
   buildPersistedScopeFilters,
-  mergeUnifiedAppointmentList
+  isPersistedAppointment,
+  selectActivePersistedAppointmentForProspect
 } = require("../core/appointmentListQuery");
 
-async function loadProspectDerivedAppointments(filters = {}) {
-  if (!filters.organizationId || filters.includeProspectDerived === false) {
-    return [];
-  }
-
-  let prospects = [];
-
-  prospects = filterProductionProspects(
-    await loadProspectsForOrganization(filters.organizationId)
-  );
-
-  return prospects
-    .filter((prospect) => prospectMatchesAgent(prospect, filters.agentId))
-    .map((prospect) => buildProspectDerivedAppointment(prospect, filters.organizationId))
-    .filter(Boolean)
-    .filter((appointment) => matchesListFilters(appointment, filters));
-}
-
-async function resolveProspectDerivedAppointmentById(id, organizationId, agentId) {
-  const parsed = parseProspectDerivedAppointmentId(id);
-
-  if (!parsed || !organizationId) {
-    return null;
-  }
-
-  const prospect = await findProspectInOrganization(parsed.phone, organizationId);
-
-  if (!prospect) {
-    return null;
-  }
-
-  if (agentId && !prospectMatchesAgent(prospect, agentId)) {
-    return null;
-  }
-
-  const derived = buildProspectDerivedAppointment(prospect, organizationId);
-
-  if (!derived) {
-    return null;
-  }
-
-  const derivedTimestamp = Date.parse(derived.startDateTime);
-
-  if (derivedTimestamp !== parsed.timestampMs) {
-    return null;
-  }
-
-  return derived;
-}
-
-async function listUnifiedAppointments(filters = {}) {
-  const repositoryResult = await appointmentRepository.search(filters);
-  const derivedCandidates = await loadProspectDerivedAppointments(filters);
-  const persistedScope = await appointmentRepository.search(buildPersistedScopeFilters(filters));
-  const persistedIdentityKeys = new Set(persistedScope.items.map(appointmentIdentityKey));
-  const merged = mergeUnifiedAppointmentList(
-    repositoryResult.items,
-    derivedCandidates,
-    persistedIdentityKeys
-  );
+/**
+ * Persisted atlas_appointments only — canonical list path for the Appointments module.
+ */
+async function listPersistedAppointments(filters = {}) {
+  const result = await appointmentRepository.search(buildPersistedScopeFilters(filters));
+  const items = (result.items || []).filter(isPersistedAppointment);
 
   return {
-    items: merged,
-    total: merged.length
+    items,
+    total: items.length
   };
+}
+
+/**
+ * Resolves the active persisted appointment for a prospect.
+ * Canonical for Prospect Workspace, Mission Control, and operational flows.
+ */
+async function findPersistedAppointmentForProspect(prospectPhone, organizationId, agentId = null) {
+  if (!prospectPhone || !organizationId) {
+    return null;
+  }
+
+  const filters = {
+    organizationId,
+    prospectPhone
+  };
+
+  if (agentId) {
+    filters.agentId = agentId;
+  }
+
+  const result = await listPersistedAppointments(filters);
+  return selectActivePersistedAppointmentForProspect(result.items);
+}
+
+/** @deprecated Use listPersistedAppointments — unified merge removed. */
+async function listUnifiedAppointments(filters = {}) {
+  return listPersistedAppointments(filters);
 }
 
 module.exports = {
   listUnifiedAppointments,
-  loadProspectDerivedAppointments,
-  resolveProspectDerivedAppointmentById
+  listPersistedAppointments,
+  findPersistedAppointmentForProspect
 };

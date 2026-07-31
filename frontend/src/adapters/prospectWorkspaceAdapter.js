@@ -5,6 +5,7 @@ import {
 import { formatCanonicalMilestoneLabel, formatWorkflowOwnershipLabel } from "./conversationPreview";
 import { formatAtlasDateTime } from "../utils/dateFormatter";
 import { normalizeProspectLanguage } from "../types/language";
+import { resolvePersistedAppointmentId } from "../engines/appointmentIdEngine.js";
 
 /**
  * Maps Prospect Workspace API payload to agent workspace model + workspace extensions.
@@ -41,6 +42,13 @@ export function adaptProspectWorkspaceResponse(workspacePayload) {
     { isLive: true }
   );
 
+  const interview = workspacePayload.interview
+    ? {
+        ...workspacePayload.interview,
+        appointmentId: resolvePersistedAppointmentId(workspacePayload.interview.appointmentId)
+      }
+    : null;
+
   return {
     ...workspace,
     identity: {
@@ -63,7 +71,7 @@ export function adaptProspectWorkspaceResponse(workspacePayload) {
       communicationLanguage: workspacePayload.prospect?.communication_language || null
     },
     journey: workspacePayload.journey || null,
-    interview: workspacePayload.interview || null,
+    interview,
     activityPreview: workspacePayload.activityPreview || [],
     atlasCoach: workspacePayload.atlasCoach,
     agentState: workspacePayload.agentState || null,

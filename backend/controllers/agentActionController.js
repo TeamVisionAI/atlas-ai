@@ -11,10 +11,14 @@ const {
 const { getTenantOrganizationId } = require("../services/tenantContextService");
 
 function tenantOptions(req) {
+  const userId = req.tenantContext?.userId || req.authContext?.userId || req.atlasUser?.id || null;
+
   return {
     organizationId: getTenantOrganizationId(req),
     tenantScoped: true,
-    authorUserId: req.tenantContext?.userId || req.authContext?.userId || null
+    userId,
+    agentId: userId,
+    authorUserId: userId
   };
 }
 

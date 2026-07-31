@@ -1,5 +1,6 @@
 import { MILESTONES } from "../types/milestones";
 import { normalizeProspectLanguage } from "../types/language";
+import { resolvePersistedAppointmentId } from "../engines/appointmentIdEngine.js";
 import { formatTextWithDates } from "../utils/dateFormatter";
 import {
   buildConversationPreview,
@@ -154,6 +155,12 @@ export function adaptMissionControlResponse(
     conversationOutcome: missionControl.conversationOutcome || null,
     workflowRequirements: missionControl.workflowRequirements || missionControl.conversationOutcome?.workflowRequirements || [],
     workflowGate: workflowGate || { active: false },
+    interview: missionControl.interview
+      ? {
+          ...missionControl.interview,
+          appointmentId: resolvePersistedAppointmentId(missionControl.interview.appointmentId)
+        }
+      : null,
     availableActions: missionControl.availableActions || [],
     raw: missionControl
   };

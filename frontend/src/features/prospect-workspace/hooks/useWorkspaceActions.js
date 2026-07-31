@@ -6,6 +6,11 @@ import {
 import { executeScheduleInterview } from "../../../services/missionExecutionService";
 import { fetchAppointment, isActiveAppointment } from "../../../services/appointmentService";
 import { resolveQuickActionScheduleBehavior } from "../../../engines/quickActionScheduleEngine";
+import { resolvePersistedAppointmentId } from "../../../engines/appointmentIdEngine.js";
+import {
+  isAppointmentCommunicationAction,
+  resolveAppointmentCommunicationPurpose
+} from "../../../engines/appointmentCommunicationEngine.js";
 import {
   isWhatsAppCopyAction
 } from "../../../services/whatsappCommunicationService";
@@ -99,6 +104,38 @@ export function useWorkspaceActions({
         return;
       }
 
+      if (isAppointmentCommunicationAction(actionId)) {
+        const appointmentId = resolvePersistedAppointmentId(workspace.interview?.appointmentId);
+        const purpose = resolveAppointmentCommunicationPurpose(actionId);
+        const previewOpened = await communicationPreview?.requestPreviewIfEnabled?.({
+          type: "appointment",
+          purpose,
+          actionId,
+          appointmentId
+        });
+
+        if (previewOpened) {
+          setPendingActionId(null);
+          return;
+        }
+
+        await executeCommunicationAction({
+          phone: workspace.phone,
+          actionId,
+          appointmentId,
+          translate,
+          showSuccess: showToast?.showSuccess,
+          showError: (message) => {
+            setActionError(message);
+            showToast?.showError(message);
+          },
+          onOrganizationResourceMissing: handleOrganizationResourceMissing,
+          onRecorded: refreshWorkspace
+        });
+        setPendingActionId(null);
+        return;
+      }
+
       if (isWhatsAppCopyAction(actionId)) {
         const previewOpened = await communicationPreview?.requestPreviewIfEnabled?.({
           type: "phone",
@@ -138,35 +175,6 @@ export function useWorkspaceActions({
           },
           onOrganizationResourceMissing: handleOrganizationResourceMissing,
           onWhatsAppFallbackOffer: handleWhatsAppFallbackOffer,
-          onRecorded: refreshWorkspace
-        });
-        setPendingActionId(null);
-        return;
-      }
-
-      if (actionId === "resend_interview_details") {
-        const appointmentId = workspace.interview?.appointmentId;
-        const previewOpened = await communicationPreview?.requestPreviewIfEnabled?.({
-          type: "appointment",
-          appointmentId
-        });
-
-        if (previewOpened) {
-          setPendingActionId(null);
-          return;
-        }
-
-        await executeCommunicationAction({
-          phone: workspace.phone,
-          actionId,
-          appointmentId: workspace.interview?.appointmentId,
-          translate,
-          showSuccess: showToast?.showSuccess,
-          showError: (message) => {
-            setActionError(message);
-            showToast?.showError(message);
-          },
-          onOrganizationResourceMissing: handleOrganizationResourceMissing,
           onRecorded: refreshWorkspace
         });
         setPendingActionId(null);
@@ -355,14 +363,16 @@ export function useWorkspaceActions({
         setScheduleError(null);
 
         if (behavior.mode === "reschedule" && behavior.useAppointmentRescheduleDialog) {
-          if (!workspace?.interview?.appointmentId) {
+          const appointmentId = resolvePersistedAppointmentId(workspace?.interview?.appointmentId);
+
+          if (!appointmentId) {
             return;
           }
 
           setScheduleActionBusy(true);
 
           try {
-            const appointment = await fetchAppointment(workspace.interview.appointmentId);
+            const appointment = await fetchAppointment(appointmentId);
 
             if (!isActiveAppointment(appointment)) {
               const message = translate("workspaceInterviewActionUnavailable");

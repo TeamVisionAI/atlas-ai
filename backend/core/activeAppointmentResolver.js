@@ -1,10 +1,11 @@
 /**
  * Resolves the active (non-terminal) appointment for a prospect.
- * Shared by appointment and interview outcome flows.
+ * Delegates to appointmentListService — persisted atlas_appointments only.
  */
 
 const appointmentRepository = require("../repositories/appointmentRepository");
-const { listUnifiedAppointments } = require("../services/appointmentListService");
+const { resolvePersistedAppointmentId, isPersistedAppointment } = require("./appointmentListQuery");
+const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
 
 const ACTIVE_APPOINTMENT_STATUSES = new Set([
   "draft",
@@ -35,51 +36,24 @@ function isActiveAppointment(appointment = {}) {
 }
 
 async function findActiveAppointmentForProspect(prospectPhone, organizationId, agentId = null) {
-  if (!prospectPhone || !organizationId) {
-    return null;
-  }
-
-  const result = await listUnifiedAppointments({
-    organizationId,
-    agentId,
-    prospectPhone
-  });
-
-  const active = (result.items || []).filter(isActiveAppointment);
-
-  if (!active.length) {
-    return null;
-  }
-
-  active.sort(
-    (left, right) => Date.parse(left.startDateTime || 0) - Date.parse(right.startDateTime || 0)
-  );
-
-  const now = Date.now();
-  const upcoming = active.find((appointment) => Date.parse(appointment.startDateTime) >= now);
-
-  return upcoming || active[active.length - 1];
+  return findPersistedAppointmentForProspect(prospectPhone, organizationId, agentId);
 }
 
-async function findAppointmentById(id, organizationId, agentId = null) {
+async function findAppointmentById(id, organizationId) {
   if (!id || !organizationId) {
     return null;
   }
 
-  const persisted = await appointmentRepository.findById(id, organizationId);
-
-  if (persisted) {
-    return persisted;
-  }
-
-  const { resolveProspectDerivedAppointmentById } = require("../services/appointmentListService");
-  return resolveProspectDerivedAppointmentById(id, organizationId, agentId);
+  return appointmentRepository.findById(id, organizationId);
 }
 
 module.exports = {
   ACTIVE_APPOINTMENT_STATUSES,
   TERMINAL_APPOINTMENT_LIFECYCLE_STATES,
   isActiveAppointment,
+  isPersistedAppointment,
+  resolvePersistedAppointmentId,
   findActiveAppointmentForProspect,
+  findPersistedAppointmentForProspect,
   findAppointmentById
 };

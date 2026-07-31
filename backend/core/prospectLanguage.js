@@ -60,6 +60,37 @@ function syncProspectLanguageFields(preferredLanguage) {
   };
 }
 
+function readQuickCapturePreferredLanguage(notes) {
+  const match = String(notes || "").match(/QUICK_CAPTURE:({[\s\S]*?})/);
+
+  if (!match) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(match[1]);
+    return normalizePreferredLanguage(parsed.preferred_language);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the prospect already has a stored language from capture or profile data.
+ * Unlike resolveProspectPreferredLanguage(), this does not default to English.
+ */
+function hasStoredPreferredLanguage(prospect = {}) {
+  if (
+    normalizePreferredLanguage(prospect.preferred_language) ||
+    normalizePreferredLanguage(prospect.communication_language) ||
+    normalizePreferredLanguage(prospect.language)
+  ) {
+    return true;
+  }
+
+  return Boolean(readQuickCapturePreferredLanguage(prospect.notes));
+}
+
 module.exports = {
   PREFERRED_LANGUAGES,
   DEFAULT_PREFERRED_LANGUAGE,
@@ -69,5 +100,7 @@ module.exports = {
   resolveProspectCommunicationCode,
   preferredLanguageToCommunicationCode,
   formatPreferredLanguageLabel,
-  syncProspectLanguageFields
+  syncProspectLanguageFields,
+  readQuickCapturePreferredLanguage,
+  hasStoredPreferredLanguage
 };

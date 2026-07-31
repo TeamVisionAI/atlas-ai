@@ -93,7 +93,10 @@ async function buildMessageContext(prospect, template, options = {}) {
   const language = resolveProspectCommunicationCode(prospect);
   const organizationId = requireTenantOrganizationId(options.organizationId);
   const representativeUser = options.representativeUser || options.actorUser || null;
-  const recruiterName = resolveRecruiterDisplayName(representativeUser);
+  const recruiterName =
+    resolveRecruiterDisplayName(representativeUser) ||
+    options.representativeProfile?.name ||
+    null;
   const appointment = options.appointment || null;
   let interviewAtMs = parseInterviewDatetime(prospect);
   let timezone = prospect.timezone || options.timezone || DEFAULT_TIMEZONE;

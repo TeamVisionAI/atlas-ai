@@ -9,7 +9,7 @@ const { postConversationOutcome } = require("../controllers/conversationOutcomeC
 const { postRequiredInformation } = require("../controllers/requiredInformationController");
 const { postInterviewOutcome } = require("../controllers/interviewOutcomeController");
 const { getMissionControlAvailability } = require("../controllers/availabilityController");
-const { postMissionExecution } = require("../controllers/missionExecutionController");
+const { postMissionExecution, buildMissionExecutionOptions } = require("../controllers/missionExecutionController");
 const {
   getCommunicationPreview,
   postCommunicationSend,
@@ -107,7 +107,7 @@ router.post(
       const result = await postMissionExecution(
         req.params.phone,
         req.body || {},
-        tenantMissionControlOptions(req)
+        buildMissionExecutionOptions(req)
       );
 
       res.status(result.success ? 200 : 400).json(result);

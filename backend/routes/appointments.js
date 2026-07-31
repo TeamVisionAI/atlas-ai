@@ -56,6 +56,39 @@ router.get(
   appointmentController.previewInterviewDetailsCommunication
 );
 
+router.get(
+  "/:id/interview-reminder-preview",
+  appointmentController.previewInterviewReminderCommunication
+);
+
+router.post(
+  "/:id/send-interview-reminder",
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  appointmentController.sendInterviewReminder
+);
+
+router.get(
+  "/:id/zoom-invitation-preview",
+  appointmentController.previewZoomInvitationCommunication
+);
+
+router.post(
+  "/:id/send-zoom-invitation",
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  appointmentController.sendZoomInvitation
+);
+
+router.get(
+  "/:id/office-location-preview",
+  appointmentController.previewOfficeLocationCommunication
+);
+
+router.post(
+  "/:id/send-office-location",
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  appointmentController.sendOfficeLocation
+);
+
 router.post(
   "/prospect/:phone/email",
   requirePermission(PERMISSIONS.PROSPECT_WRITE),

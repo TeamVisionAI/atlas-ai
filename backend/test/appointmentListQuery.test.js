@@ -13,6 +13,9 @@ const {
   isTomorrow,
   parseInterviewDatetime,
   parseProspectDerivedAppointmentId,
+  isPersistedAppointment,
+  resolvePersistedAppointmentId,
+  selectActivePersistedAppointmentForProspect,
   isActiveAppointmentForList,
   isCompletedAppointmentForList,
   mergeUnifiedAppointmentList,
@@ -124,6 +127,50 @@ describe("appointmentListQuery", () => {
       timestampMs: 1785439800000
     });
     assert.equal(parseProspectDerivedAppointmentId("appt-1"), null);
+  });
+
+  it("isPersistedAppointment rejects prospect-derived ids", () => {
+    assert.equal(
+      isPersistedAppointment({
+        id: "prospect-derived:+15551234567:1785439800000",
+        status: "scheduled"
+      }),
+      false
+    );
+    assert.equal(
+      isPersistedAppointment({
+        id: "appt-123",
+        status: "scheduled"
+      }),
+      true
+    );
+    assert.equal(
+      resolvePersistedAppointmentId({
+        id: "prospect-derived:+15551234567:1785439800000"
+      }),
+      null
+    );
+    assert.equal(
+      resolvePersistedAppointmentId({
+        id: "appt-789"
+      }),
+      "appt-789"
+    );
+    assert.equal(resolvePersistedAppointmentId(null), null);
+    assert.equal(resolvePersistedAppointmentId(undefined), null);
+  });
+
+  it("selectActivePersistedAppointmentForProspect uses list-active rules", () => {
+    const now = Date.now();
+    const selected = selectActivePersistedAppointmentForProspect([
+      {
+        id: "appt-upcoming",
+        status: "confirmed",
+        startDateTime: new Date(now + 60 * 60_000).toISOString()
+      }
+    ]);
+
+    assert.equal(selected.id, "appt-upcoming");
   });
 
   it("today view includes only active appointment statuses", () => {

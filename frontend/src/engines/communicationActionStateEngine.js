@@ -3,6 +3,8 @@
  * Implements BR-027; Sprint 12.2.y — section always visible, actions individually gated.
  */
 
+import { resolvePersistedAppointmentId } from "./appointmentIdEngine.js";
+
 export const COMMUNICATION_ACTION_IDS = Object.freeze({
   SEND_ZOOM: "send_zoom_link",
   SEND_OFFICE: "send_office_location",
@@ -10,6 +12,14 @@ export const COMMUNICATION_ACTION_IDS = Object.freeze({
   RESEND_INTERVIEW_DETAILS: "resend_interview_details",
   CUSTOM: "whatsapp"
 });
+
+/** Appointment-based communications — shared eligibility (BR-027). */
+export const APPOINTMENT_COMMUNICATION_ACTION_IDS = new Set([
+  COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
+  COMMUNICATION_ACTION_IDS.SEND_ZOOM,
+  COMMUNICATION_ACTION_IDS.SEND_OFFICE,
+  COMMUNICATION_ACTION_IDS.SEND_REMINDER
+]);
 
 export const PANEL_COMMUNICATION_ACTION_IDS = new Set(Object.values(COMMUNICATION_ACTION_IDS));
 
@@ -39,7 +49,6 @@ export function orderCommunicationPanelActions(
 }
 
 const SOON_MS = 2 * 60 * 60 * 1000;
-const APPROACHING_MS = 24 * 60 * 60 * 1000;
 
 const DISABLED_REASON_KEYS = Object.freeze({
   WORKFLOW_GATE: "whatsappActionDisabledWorkflowGate",
@@ -50,7 +59,6 @@ const DISABLED_REASON_KEYS = Object.freeze({
   OFFICE_NOT_CONFIGURED: "whatsappActionDisabledOfficeNotConfigured",
   INTERVIEW_TYPE_ZOOM: "whatsappActionDisabledInterviewTypeZoom",
   INTERVIEW_TYPE_OFFICE: "whatsappActionDisabledInterviewTypeOffice",
-  REMINDER_NOT_DUE: "whatsappActionDisabledReminderNotDue",
   WORKSPACE_UNAVAILABLE: "whatsappActionDisabledWorkspaceUnavailable"
 });
 
@@ -119,20 +127,6 @@ function getInterviewTimingPhase(interviewAtMs) {
   return "future";
 }
 
-function isInterviewApproaching(interviewAtMs) {
-  const timing = getInterviewTimingPhase(interviewAtMs);
-
-  if (timing === "soon") {
-    return true;
-  }
-
-  if (timing === "future" && interviewAtMs - Date.now() <= APPROACHING_MS) {
-    return true;
-  }
-
-  return false;
-}
-
 export function isInterviewConfirmed(workspace) {
   const step = workspace?.brain?.currentStep || workspace?.raw?.brain?.currentStep;
 
@@ -187,27 +181,81 @@ function isOfficeLocationAvailable(organizationSettings = null) {
   return Boolean(office?.fullAddress || office?.mapsUrl || office?.name);
 }
 
-function buildActionContext(workspace, organizationSettings = null) {
+export function buildCommunicationActionContext(workspace, organizationSettings = null) {
   const interviewAtMs = parseInterviewDatetimeMs(workspace);
   const confirmed = isInterviewConfirmed(workspace);
 
   return {
     workflowGateActive: isWorkflowGateActive(workspace),
     confirmed,
-    appointmentId: workspace?.interview?.appointmentId || null,
+    appointmentId: resolvePersistedAppointmentId(workspace?.interview?.appointmentId),
     interviewType: normalizeInterviewType(
       workspace?.prospect?.interviewType ||
         workspace?.interview?.type ||
         workspace?.brain?.interviewType
     ),
     interviewAtMs,
-    approaching: confirmed && interviewAtMs !== null && isInterviewApproaching(interviewAtMs),
     timing: getInterviewTimingPhase(interviewAtMs),
     flags: getAgentFlags(workspace),
     hasZoomMeeting: isZoomMeetingAvailable(workspace, organizationSettings),
     hasOfficeLocation: isOfficeLocationAvailable(organizationSettings),
     hasProspectEmail: Boolean(resolveProspectEmail(workspace))
   };
+}
+
+/**
+ * Canonical eligibility for all persisted appointment communications.
+ * Requires: confirmed interview, persisted atlas_appointments.id, scheduled datetime,
+ * then channel-specific resources (zoom link or office address).
+ */
+export function evaluateAppointmentCommunicationAvailability(ctx, options = {}) {
+  if (!ctx.confirmed) {
+    return DISABLED_REASON_KEYS.INTERVIEW_NOT_CONFIRMED;
+  }
+
+  if (!ctx.appointmentId) {
+    return DISABLED_REASON_KEYS.APPOINTMENT_NOT_LINKED;
+  }
+
+  if (ctx.interviewAtMs === null) {
+    return DISABLED_REASON_KEYS.INTERVIEW_NOT_CONFIRMED;
+  }
+
+  const interviewType = options.interviewType || ctx.interviewType;
+
+  if (options.requireZoomInterview) {
+    if (interviewType !== "zoom") {
+      return DISABLED_REASON_KEYS.INTERVIEW_TYPE_ZOOM;
+    }
+
+    if (!ctx.hasZoomMeeting) {
+      return DISABLED_REASON_KEYS.ZOOM_NOT_CREATED;
+    }
+
+    return null;
+  }
+
+  if (options.requireOfficeInterview) {
+    if (interviewType !== "office") {
+      return DISABLED_REASON_KEYS.INTERVIEW_TYPE_OFFICE;
+    }
+
+    if (!ctx.hasOfficeLocation) {
+      return DISABLED_REASON_KEYS.OFFICE_NOT_CONFIGURED;
+    }
+
+    return null;
+  }
+
+  if (interviewType === "zoom" && !ctx.hasZoomMeeting) {
+    return DISABLED_REASON_KEYS.ZOOM_NOT_CREATED;
+  }
+
+  if (interviewType === "office" && !ctx.hasOfficeLocation) {
+    return DISABLED_REASON_KEYS.OFFICE_NOT_CONFIGURED;
+  }
+
+  return null;
 }
 
 function enabledAction(partial, ctx, translate) {
@@ -249,67 +297,19 @@ function gateOrEnabled(partial, ctx, translate, evaluateEnabled) {
 }
 
 function evaluateResendInterviewDetails(ctx) {
-  if (!ctx.confirmed) {
-    return DISABLED_REASON_KEYS.INTERVIEW_NOT_CONFIRMED;
-  }
-
-  if (!ctx.appointmentId) {
-    return DISABLED_REASON_KEYS.APPOINTMENT_NOT_LINKED;
-  }
-
-  if (ctx.interviewType === "zoom" && !ctx.hasZoomMeeting) {
-    return DISABLED_REASON_KEYS.ZOOM_NOT_CREATED;
-  }
-
-  return null;
+  return evaluateAppointmentCommunicationAvailability(ctx);
 }
 
 function evaluateSendZoom(ctx) {
-  if (!ctx.confirmed) {
-    return DISABLED_REASON_KEYS.INTERVIEW_NOT_CONFIRMED;
-  }
-
-  if (ctx.interviewType !== "zoom") {
-    return DISABLED_REASON_KEYS.INTERVIEW_TYPE_ZOOM;
-  }
-
-  if (!ctx.hasZoomMeeting) {
-    return DISABLED_REASON_KEYS.ZOOM_NOT_CREATED;
-  }
-
-  return null;
+  return evaluateAppointmentCommunicationAvailability(ctx, { requireZoomInterview: true });
 }
 
 function evaluateSendOffice(ctx) {
-  if (!ctx.confirmed) {
-    return DISABLED_REASON_KEYS.INTERVIEW_NOT_CONFIRMED;
-  }
-
-  if (ctx.interviewType !== "office") {
-    return DISABLED_REASON_KEYS.INTERVIEW_TYPE_OFFICE;
-  }
-
-  if (!ctx.hasOfficeLocation) {
-    return DISABLED_REASON_KEYS.OFFICE_NOT_CONFIGURED;
-  }
-
-  return null;
+  return evaluateAppointmentCommunicationAvailability(ctx, { requireOfficeInterview: true });
 }
 
 function evaluateSendReminder(ctx) {
-  if (!ctx.confirmed) {
-    return DISABLED_REASON_KEYS.INTERVIEW_NOT_CONFIRMED;
-  }
-
-  if (ctx.interviewAtMs === null) {
-    return DISABLED_REASON_KEYS.REMINDER_NOT_DUE;
-  }
-
-  if (!ctx.approaching) {
-    return DISABLED_REASON_KEYS.REMINDER_NOT_DUE;
-  }
-
-  return null;
+  return evaluateAppointmentCommunicationAvailability(ctx);
 }
 
 /**
@@ -321,7 +321,7 @@ function evaluateSendReminder(ctx) {
 export function resolveCommunicationActions(workspace, { translate, organizationSettings = null, actionOrder } = {}) {
   const ctx = {
     workspacePresent: Boolean(workspace),
-    ...buildActionContext(workspace || {}, organizationSettings)
+    ...buildCommunicationActionContext(workspace || {}, organizationSettings)
   };
 
   const resendTitleKey = "whatsappActionResendInterviewDetails";

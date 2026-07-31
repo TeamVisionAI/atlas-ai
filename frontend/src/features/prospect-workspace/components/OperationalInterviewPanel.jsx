@@ -7,6 +7,7 @@ import {
   resolveOperationalInterviewActions
 } from "../../../engines/interviewOperationalEngine";
 import { fetchAppointment, isActiveAppointment } from "../../../services/appointmentService";
+import { resolvePersistedAppointmentId } from "../../../engines/appointmentIdEngine.js";
 import RescheduleAppointmentDialog from "../../../components/appointments/RescheduleAppointmentDialog";
 import CancelAppointmentDialog from "../../../components/appointments/CancelAppointmentDialog";
 import CompleteAppointmentDialog from "../../../components/appointments/CompleteAppointmentDialog";
@@ -49,14 +50,16 @@ export default function OperationalInterviewPanel({
         return;
       }
 
-      if (!interview?.appointmentId) {
+      const appointmentId = resolvePersistedAppointmentId(interview?.appointmentId);
+
+      if (!appointmentId) {
         return;
       }
 
       setActionBusy(true);
 
       try {
-        const appointment = await fetchAppointment(interview.appointmentId);
+        const appointment = await fetchAppointment(appointmentId);
 
         if (!isActiveAppointment(appointment)) {
           setActionError(translate("workspaceInterviewActionUnavailable"));

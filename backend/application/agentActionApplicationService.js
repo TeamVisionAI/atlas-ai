@@ -41,6 +41,8 @@ const {
 } = require("../core/productionProspectFilter");
 const { assertSimulatorPhone } = require("../dev/simulatorSafety");
 const { buildWorkflowGateDescriptor } = require("../core/workflowGateEngine");
+const { buildInterviewBlock } = require("../core/prospectWorkspaceReadModel");
+const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
 const { enrichActionCenterWithConfidence } = require("../core/alphaConfidenceEngine");
 const {
   fetchConversationThread,
@@ -514,8 +516,26 @@ async function getMissionControlWithActions(phone, options = {}) {
     Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState))
   ]);
 
+  let activeAppointment = null;
+
+  try {
+    activeAppointment = await findPersistedAppointmentForProspect(resolvedPhone, organizationId);
+  } catch (error) {
+    console.error("[mission-control/activeAppointment]", error.message);
+  }
+
+  const interview = buildInterviewBlock(
+    prospect,
+    {
+      outcome: agentState.outcome
+    },
+    workflowGate,
+    activeAppointment
+  );
+
   return {
     ...missionControl,
+    interview,
     recruiterBrief,
     atlasBrief: {
       summary: recruiterBrief.items

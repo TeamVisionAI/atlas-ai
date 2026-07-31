@@ -2,17 +2,35 @@ import { useCallback, useState } from "react";
 import { isCommunicationPreviewEnabled } from "../config/communicationPreview";
 import {
   extractOutboundPayload,
+  hasRequiredValidationErrors,
   previewMessageMatchesSendPayload
 } from "../engines/communicationPreviewEngine.js";
 import {
-  fetchAppointmentCommunicationPreview,
+  fetchAppointmentCommunicationPreviewByPurpose,
   fetchPhoneCommunicationPreview
 } from "../services/communicationPreviewService";
 import {
   copyMessageToClipboard,
   openWhatsAppConversation
 } from "../services/whatsappCommunicationService";
-import { sendInterviewDetails } from "../services/appointmentService";
+import {
+  sendInterviewDetails,
+  sendInterviewReminder,
+  sendZoomInvitation,
+  sendOfficeLocation
+} from "../services/appointmentService";
+import { resolvePersistedAppointmentId } from "../engines/appointmentIdEngine.js";
+import {
+  APPOINTMENT_COMMUNICATION_PURPOSES,
+  resolveAppointmentCommunicationPurpose
+} from "../engines/appointmentCommunicationEngine.js";
+
+const APPOINTMENT_SEND_BY_PURPOSE = Object.freeze({
+  [APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION]: sendInterviewDetails,
+  [APPOINTMENT_COMMUNICATION_PURPOSES.REMINDER]: sendInterviewReminder,
+  [APPOINTMENT_COMMUNICATION_PURPOSES.ZOOM]: sendZoomInvitation,
+  [APPOINTMENT_COMMUNICATION_PURPOSES.OFFICE]: sendOfficeLocation
+});
 
 export function useCommunicationPreview({ translate, showToast, onRecorded }) {
   const [open, setOpen] = useState(false);
@@ -45,7 +63,18 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
       let result;
 
       if (action.type === "appointment") {
-        result = await fetchAppointmentCommunicationPreview(action.appointmentId);
+        const appointmentId = resolvePersistedAppointmentId(action.appointmentId);
+        const purpose =
+          action.purpose ||
+          resolveAppointmentCommunicationPurpose(action.actionId) ||
+          APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION;
+
+        if (!appointmentId) {
+          setError(translate("communicationPreviewLoadFailed"));
+          return;
+        }
+
+        result = await fetchAppointmentCommunicationPreviewByPurpose(appointmentId, purpose);
       } else {
         result = await fetchPhoneCommunicationPreview(action.phone, {
           sourceAction: action.sourceAction,
@@ -130,12 +159,30 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
       return;
     }
 
+    if (hasRequiredValidationErrors(payload.missingContent)) {
+      showToast?.showError(translate("communicationPreviewRequiredMissing"));
+      return;
+    }
+
     setSending(true);
     setError(null);
 
     try {
       if (pendingAction.type === "appointment") {
-        const result = await sendInterviewDetails(pendingAction.appointmentId);
+        const appointmentId = resolvePersistedAppointmentId(pendingAction.appointmentId);
+        const purpose =
+          pendingAction.purpose ||
+          resolveAppointmentCommunicationPurpose(pendingAction.actionId) ||
+          APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION;
+        const sendFn = APPOINTMENT_SEND_BY_PURPOSE[purpose] || sendInterviewDetails;
+
+        if (!appointmentId) {
+          setError(translate("communicationPreviewLoadFailed"));
+          showToast?.showError(translate("communicationPreviewLoadFailed"));
+          return;
+        }
+
+        const result = await sendFn(appointmentId);
 
         if (!result?.success) {
           setError(result?.message || translate("missionControlActionFailed"));
@@ -152,7 +199,8 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
 
         if (!previewMessageMatchesSendPayload(payload, sendPayload)) {
           console.warn("[CommunicationPreview] Preview/send payload mismatch.", {
-            appointmentId: pendingAction.appointmentId
+            appointmentId,
+            purpose
           });
         }
 

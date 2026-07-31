@@ -245,6 +245,27 @@ Closed prospects are not a single state. Action visibility depends on closure re
 
 ---
 
+# Appointments
+
+## BR-039 — Persisted Appointment Identity
+
+**Implements:** Sprint 12.5.6  
+**Engine:** `appointmentRepository`, `appointmentListService`, `missionExecutionApplicationService`, `legacyInterviewRepairService`
+
+An interview appears in operational appointment surfaces only when a persisted `atlas_appointments` record exists.
+
+Prospect scheduling fields (`interview_time`, `calendar_event_id`, etc.) are metadata and may support legacy repair, but they are **not** an appointment identity.
+
+Rules:
+
+1. **Scheduling success invariant:** `success === true` implies `appointmentId` is a valid persisted Atlas appointment UUID. Never return success with `appointment: null` or without `appointmentId`.
+2. **Operational identity:** Only persisted appointment UUIDs may be used for Appointments, Mission Control appointment actions, Prospect Workspace appointment actions, Communication Preview, interview invitation, reminder, Zoom invitation, office location, reschedule, complete, cancel, outcome synchronization, and follow-up derivation.
+3. **Synthetic ids forbidden:** `prospect-derived:` ids and `calendarEventId` must not enter operational APIs as appointment identity.
+4. **Atomic scheduling:** Calendar booking, appointment persistence, prospect scheduling metadata update, and journey advancement must succeed together or roll back partial work.
+5. **Legacy repair:** One-time backfill may create missing persisted rows from prospect metadata without creating duplicate calendar events, journey advances, or communications.
+
+---
+
 # Prospect Workspace
 
 ## BR-038 — Prospect Workspace Editing Permissions

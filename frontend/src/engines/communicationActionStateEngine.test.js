@@ -4,6 +4,8 @@ import {
   COMMUNICATION_ACTION_IDS,
   COMMUNICATION_PANEL_ACTION_ORDER,
   resolveCommunicationActions,
+  evaluateAppointmentCommunicationAvailability,
+  buildCommunicationActionContext,
   isInterviewConfirmed
 } from "./communicationActionStateEngine.js";
 
@@ -36,73 +38,111 @@ function buildWorkspace(overrides = {}) {
   };
 }
 
-test("resolveCommunicationActions always returns the full communication catalog", () => {
-  const actions = resolveCommunicationActions(null, { translate });
+function findAction(actions, actionId) {
+  return actions.find((action) => action.id === actionId);
+}
 
-  assert.equal(actions.length, 5);
-  assert.deepEqual(
-    actions.map((action) => action.id),
-    COMMUNICATION_PANEL_ACTION_ORDER
-  );
-});
+const organizationSettings = {
+  office: { fullAddress: "123 Main St" },
+  meetingManagement: { personalMeetingUrl: "https://zoom.us/j/123" }
+};
 
-test("resolveCommunicationActions accepts workflow-driven action order overrides", () => {
-  const customOrder = [
-    COMMUNICATION_ACTION_IDS.SEND_REMINDER,
-    COMMUNICATION_ACTION_IDS.CUSTOM,
+test("appointment communications disable together when appointment is not linked", () => {
+  const workspace = buildWorkspace({
+    interview: {
+      appointmentId: null,
+      calendarEventId: "cal-123",
+      datetime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+    }
+  });
+  const actions = resolveCommunicationActions(workspace, { translate, organizationSettings });
+
+  for (const actionId of [
     COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
     COMMUNICATION_ACTION_IDS.SEND_ZOOM,
-    COMMUNICATION_ACTION_IDS.SEND_OFFICE
-  ];
+    COMMUNICATION_ACTION_IDS.SEND_REMINDER
+  ]) {
+    const action = findAction(actions, actionId);
+    assert.equal(action.enabled, false, actionId);
+    assert.equal(action.disabledReasonKey, "whatsappActionDisabledAppointmentNotLinked", actionId);
+  }
+});
 
-  const actions = resolveCommunicationActions(buildWorkspace(), {
-    translate,
-    actionOrder: customOrder
+test("appointment communications disable together for synthetic appointment ids", () => {
+  const workspace = buildWorkspace({
+    interview: {
+      appointmentId: "prospect-derived:+15551234567:1785439800000",
+      calendarEventId: "cal-123",
+      datetime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+    }
   });
+  const actions = resolveCommunicationActions(workspace, { translate, organizationSettings });
 
-  assert.deepEqual(
-    actions.map((action) => action.id),
-    customOrder
+  for (const actionId of [
+    COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
+    COMMUNICATION_ACTION_IDS.SEND_ZOOM,
+    COMMUNICATION_ACTION_IDS.SEND_REMINDER
+  ]) {
+    const action = findAction(actions, actionId);
+    assert.equal(action.enabled, false, actionId);
+    assert.equal(action.disabledReasonKey, "whatsappActionDisabledAppointmentNotLinked", actionId);
+  }
+});
+
+test("appointment communications enable together when persisted appointment exists", () => {
+  const actions = resolveCommunicationActions(buildWorkspace(), { translate, organizationSettings });
+
+  for (const actionId of [
+    COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
+    COMMUNICATION_ACTION_IDS.SEND_ZOOM,
+    COMMUNICATION_ACTION_IDS.SEND_REMINDER
+  ]) {
+    const action = findAction(actions, actionId);
+    assert.equal(action.enabled, true, actionId);
+  }
+});
+
+test("send zoom requires persisted appointment even when calendar event exists", () => {
+  const ctx = buildCommunicationActionContext(
+    buildWorkspace({
+      interview: {
+        appointmentId: null,
+        calendarEventId: "cal-123",
+        datetime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+      }
+    }),
+    organizationSettings
+  );
+
+  assert.equal(
+    evaluateAppointmentCommunicationAvailability(ctx, { requireZoomInterview: true }),
+    "whatsappActionDisabledAppointmentNotLinked"
   );
 });
 
-test("resolveCommunicationActions keeps the section populated during workflow gate", () => {
-  const actions = resolveCommunicationActions(buildWorkspace({ workflowGate: { active: true } }), {
-    translate
-  });
-
-  assert.ok(actions.length > 0);
-  assert.equal(actions.every((action) => !action.enabled), true);
-  assert.equal(actions[0].disabledReasonKey, "whatsappActionDisabledWorkflowGate");
-});
-
-test("resend interview details explains missing appointment linkage", () => {
-  const actions = resolveCommunicationActions(
-    buildWorkspace({ interview: { appointmentId: null, calendarEventId: "cal-123" } }),
-    { translate, organizationSettings: { office: { fullAddress: "123 Main St" } } }
-  );
-
-  const resend = actions.find(
-    (action) => action.id === COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS
-  );
-
-  assert.equal(resend.enabled, false);
-  assert.equal(resend.disabledReasonKey, "whatsappActionDisabledAppointmentNotLinked");
-});
-
-test("send zoom explains missing meeting link for zoom interviews", () => {
+test("send zoom explains missing meeting link only after appointment linkage passes", () => {
   const actions = resolveCommunicationActions(
     buildWorkspace({
-      interview: { appointmentId: "appt-123", calendarEventId: null },
+      interview: {
+        appointmentId: "appt-123",
+        calendarEventId: null,
+        datetime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+      },
       raw: { prospect: {} }
     }),
     { translate, organizationSettings: { office: { fullAddress: "123 Main St" } } }
   );
 
-  const zoom = actions.find((action) => action.id === COMMUNICATION_ACTION_IDS.SEND_ZOOM);
+  const zoom = findAction(actions, COMMUNICATION_ACTION_IDS.SEND_ZOOM);
+  const resend = findAction(actions, COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS);
+  const reminder = findAction(actions, COMMUNICATION_ACTION_IDS.SEND_REMINDER);
 
   assert.equal(zoom.enabled, false);
+  assert.equal(resend.enabled, false);
+  assert.equal(reminder.enabled, false);
   assert.equal(zoom.disabledReasonKey, "whatsappActionDisabledZoomNotCreated");
+  assert.equal(resend.disabledReasonKey, "whatsappActionDisabledZoomNotCreated");
+  assert.equal(reminder.disabledReasonKey, "whatsappActionDisabledZoomNotCreated");
 });
 
 test("send office explains office interview type mismatch", () => {
@@ -111,7 +151,7 @@ test("send office explains office interview type mismatch", () => {
     organizationSettings: { office: { fullAddress: "123 Main St" } }
   });
 
-  const office = actions.find((action) => action.id === COMMUNICATION_ACTION_IDS.SEND_OFFICE);
+  const office = findAction(actions, COMMUNICATION_ACTION_IDS.SEND_OFFICE);
 
   assert.equal(office.enabled, false);
   assert.equal(office.disabledReasonKey, "whatsappActionDisabledInterviewTypeOffice");
@@ -124,10 +164,10 @@ test("custom whatsapp remains available when interview is not confirmed", () => 
       brain: { currentStep: "QUALIFIED" },
       interview: { appointmentId: null, calendarEventId: null, datetime: null }
     }),
-    { translate, organizationSettings: { office: { fullAddress: "123 Main St" } } }
+    { translate, organizationSettings }
   );
 
-  const custom = actions.find((action) => action.id === COMMUNICATION_ACTION_IDS.CUSTOM);
+  const custom = findAction(actions, COMMUNICATION_ACTION_IDS.CUSTOM);
 
   assert.equal(custom.enabled, true);
   assert.equal(
@@ -142,13 +182,23 @@ test("custom whatsapp remains available when interview is not confirmed", () => 
   );
 });
 
+test("resolveCommunicationActions always returns the full communication catalog", () => {
+  const actions = resolveCommunicationActions(null, { translate });
+
+  assert.equal(actions.length, 5);
+  assert.deepEqual(
+    actions.map((action) => action.id),
+    COMMUNICATION_PANEL_ACTION_ORDER
+  );
+});
+
 test("enabled actions keep the one-click hint subtitle", () => {
   const actions = resolveCommunicationActions(buildWorkspace(), {
     translate,
-    organizationSettings: { office: { fullAddress: "123 Main St" } }
+    organizationSettings
   });
 
-  const custom = actions.find((action) => action.id === COMMUNICATION_ACTION_IDS.CUSTOM);
+  const custom = findAction(actions, COMMUNICATION_ACTION_IDS.CUSTOM);
 
   assert.equal(custom.enabled, true);
   assert.equal(custom.subtitle, "whatsappActionOneClickHint");

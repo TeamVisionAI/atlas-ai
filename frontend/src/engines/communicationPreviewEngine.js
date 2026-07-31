@@ -14,3 +14,24 @@ export function previewMessageMatchesSendPayload(previewPayload, sendPayload) {
     previewPayload.phone === sendPayload.phone
   );
 }
+
+export function partitionValidationItems(missingContent = []) {
+  const items = Array.isArray(missingContent) ? missingContent : [];
+
+  return {
+    required: items.filter((item) => item.severity === "error"),
+    recommended: items.filter((item) => item.severity === "recommended")
+  };
+}
+
+export function hasRequiredValidationErrors(missingContent = []) {
+  return partitionValidationItems(missingContent).required.length > 0;
+}
+
+export function resolveDeliveryChannelLabel(channel, translate) {
+  if (channel === "whatsapp") {
+    return translate("communicationPreviewDeliveryWhatsApp");
+  }
+
+  return translate("communicationPreviewDeliveryWhatsApp");
+}

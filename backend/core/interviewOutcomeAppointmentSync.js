@@ -8,42 +8,11 @@ const {
   resolveAppointmentOutcomeSlug,
   mapAppointmentSlugToOutcomeId
 } = require("./interviewOutcomeSlugMap");
-
-function isProspectDerivedAppointment(appointment = {}) {
-  return Boolean(
-    appointment.derivedFromProspect ||
-      appointment.metadata?.derivedFromProspect ||
-      String(appointment.id || "").startsWith("prospect-derived:")
-  );
-}
-
-async function materializeDerivedAppointment(appointment, agentId) {
-  const { findUserById } = require("../services/atlasUserService");
-  const user = agentId ? await findUserById(agentId) : null;
-  const ownerRepId = appointment.ownerRepId || user?.rep_id || null;
-
-  return {
-    ...appointment,
-    id: appointmentRepository.generateId(),
-    ownerRepId,
-    metadata: {
-      ...(appointment.metadata || {}),
-      derivedFromProspect: true,
-      sourceDerivedId: appointment.id,
-      ownerRepId
-    }
-  };
-}
+const { isPersistedAppointment } = require("./appointmentListQuery");
 
 async function applyInterviewOutcomeToAppointment(appointment, outcomeId, context = {}) {
-  if (!appointment) {
+  if (!appointment || !isPersistedAppointment(appointment)) {
     return null;
-  }
-
-  let workingAppointment = appointment;
-
-  if (isProspectDerivedAppointment(workingAppointment)) {
-    workingAppointment = await materializeDerivedAppointment(workingAppointment, context.agentId);
   }
 
   const domainContext = {
@@ -56,18 +25,18 @@ async function applyInterviewOutcomeToAppointment(appointment, outcomeId, contex
   let domainUpdated;
 
   if (outcomeSlug === "recruited") {
-    domainUpdated = await appointmentDomainService.recruitFromAppointment(workingAppointment, domainContext);
+    domainUpdated = await appointmentDomainService.recruitFromAppointment(appointment, domainContext);
   } else if (outcomeSlug === "client") {
     domainUpdated = await appointmentDomainService.createClientFromAppointment(
-      workingAppointment,
+      appointment,
       domainContext
     );
   } else if (outcomeSlug === "no_show") {
-    domainUpdated = await appointmentDomainService.markNoShow(workingAppointment, domainContext);
+    domainUpdated = await appointmentDomainService.markNoShow(appointment, domainContext);
   } else if (outcomeId === "Reschedule Interview") {
-    return workingAppointment;
+    return appointment;
   } else {
-    domainUpdated = await appointmentDomainService.completeAppointment(workingAppointment, {
+    domainUpdated = await appointmentDomainService.completeAppointment(appointment, {
       ...domainContext,
       outcome: outcomeSlug
     });
@@ -79,6 +48,5 @@ async function applyInterviewOutcomeToAppointment(appointment, outcomeId, contex
 module.exports = {
   mapAppointmentSlugToOutcomeId,
   resolveAppointmentOutcomeSlug,
-  applyInterviewOutcomeToAppointment,
-  isProspectDerivedAppointment
+  applyInterviewOutcomeToAppointment
 };

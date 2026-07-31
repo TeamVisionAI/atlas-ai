@@ -2,6 +2,8 @@
  * Universal note attachment context — no network or modal dependencies.
  */
 
+import { resolvePersistedAppointmentId } from "./appointmentIdEngine.js";
+
 export const NOTE_ENTITY_TYPES = Object.freeze({
   PROSPECT: "Prospect",
   APPOINTMENT: "Appointment",
@@ -78,7 +80,7 @@ export function resolveNoteContextFromWorkspace(workspace) {
     return null;
   }
 
-  const appointmentId = workspace?.interview?.appointmentId || null;
+  const appointmentId = resolvePersistedAppointmentId(workspace?.interview?.appointmentId);
 
   if (appointmentId) {
     return buildAppointmentNoteContext({ phone, appointmentId });

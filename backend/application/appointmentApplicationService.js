@@ -69,39 +69,12 @@ async function resolveOwnerRepId(agentId) {
   return user?.rep_id || null;
 }
 
-async function resolveAppointmentForMutation(id, organizationId, agentId) {
-  const persisted = await appointmentRepository.findById(id, organizationId);
-
-  if (persisted) {
-    return persisted;
+async function resolveAppointmentForMutation(id, organizationId) {
+  if (!id || !organizationId) {
+    return null;
   }
 
-  const { resolveProspectDerivedAppointmentById } = require("../services/appointmentListService");
-  return resolveProspectDerivedAppointmentById(id, organizationId, agentId);
-}
-
-function isProspectDerivedAppointment(appointment = {}) {
-  return Boolean(
-    appointment.derivedFromProspect ||
-      appointment.metadata?.derivedFromProspect ||
-      String(appointment.id || "").startsWith("prospect-derived:")
-  );
-}
-
-async function materializeDerivedAppointment(appointment, agentId) {
-  const ownerRepId = appointment.ownerRepId || (await resolveOwnerRepId(agentId));
-
-  return {
-    ...appointment,
-    id: appointmentRepository.generateId(),
-    ownerRepId,
-    metadata: {
-      ...(appointment.metadata || {}),
-      derivedFromProspect: true,
-      sourceDerivedId: appointment.id,
-      ownerRepId
-    }
-  };
+  return appointmentRepository.findById(id, organizationId);
 }
 
 function resolveVirtualMeetingUrl(meetingProvider, options = {}) {
@@ -317,8 +290,8 @@ async function getAppointment(id, organizationId) {
 }
 
 async function listAppointments(filters) {
-  const { listUnifiedAppointments } = require("../services/appointmentListService");
-  const result = await listUnifiedAppointments(filters);
+  const { listPersistedAppointments } = require("../services/appointmentListService");
+  const result = await listPersistedAppointments(filters);
   const items = [];
 
   for (const appointment of result.items) {
@@ -353,7 +326,9 @@ async function createAppointment(input, context = {}) {
     notes,
     createdBy,
     existingBooking = null,
-    skipWorkflowSideEffects = false
+    skipWorkflowSideEffects = false,
+    skipReminders = false,
+    skipProspectUpdate = false
   } = input;
 
   if (!organizationId || !agentId || !prospectPhone || !dateKey || !timeKey) {
@@ -503,6 +478,7 @@ async function createAppointment(input, context = {}) {
       outcomeNotes: null,
       ownerRepId,
       metadata: {
+        ...(input.metadata || {}),
         prospectName: prospect.name,
         prospectEmail: email,
         emailStatus,
@@ -522,21 +498,26 @@ async function createAppointment(input, context = {}) {
   const appointment = scheduledResult.appointment;
 
   const saved = await appointmentRepository.save(appointment);
-  const reminderResult = appointmentReminderEngine.scheduleReminders(saved);
 
-  await appointmentRepository.save({
-    ...saved,
-    reminderStatus: reminderResult.status,
-    updatedAt: nowIso()
-  });
+  if (!skipReminders) {
+    const reminderResult = appointmentReminderEngine.scheduleReminders(saved);
 
-  await updateProspect(prospectPhone, {
-    calendar_event_id: bookingResult.googleCalendarEventId,
-    appointment_date: bookingResult.startTimeISO,
-    interview_time: bookingResult.startTimeISO,
-    interview_type: isVirtual ? "Zoom" : "In Person",
-    current_step: "CONFIRMED"
-  });
+    await appointmentRepository.save({
+      ...saved,
+      reminderStatus: reminderResult.status,
+      updatedAt: nowIso()
+    });
+  }
+
+  if (!skipProspectUpdate) {
+    await updateProspect(prospectPhone, {
+      calendar_event_id: bookingResult.googleCalendarEventId,
+      appointment_date: bookingResult.startTimeISO,
+      interview_time: bookingResult.startTimeISO,
+      interview_type: isVirtual ? "Zoom" : "In Person",
+      current_step: "CONFIRMED"
+    });
+  }
 
   if (purpose === APPOINTMENT_PURPOSES.RECRUITING_INTERVIEW && !skipWorkflowSideEffects) {
     await advanceProspectWorkflow(prospectPhone, {
@@ -707,7 +688,7 @@ async function cancelAppointment(id, input, context = {}) {
 
 async function completeAppointment(id, input, context = {}) {
   const { organizationId, agentId } = context;
-  const resolved = await resolveAppointmentForMutation(id, organizationId, agentId);
+  const resolved = await resolveAppointmentForMutation(id, organizationId);
 
   if (!resolved) {
     throw buildError("NOT_FOUND", "Appointment not found.", 404);
@@ -736,7 +717,7 @@ async function completeAppointment(id, input, context = {}) {
     );
   }
 
-  const saved = result.appointment || (await resolveAppointmentForMutation(id, organizationId, agentId));
+  const saved = result.appointment || (await resolveAppointmentForMutation(id, organizationId));
 
   return enrichWithProspect(saved);
 }
@@ -933,5 +914,6 @@ module.exports = {
   resolveHumanAssist,
   collectProspectEmail,
   enrichWithProspect,
-  findActiveAppointmentForProspect
+  findActiveAppointmentForProspect,
+  findPersistedAppointmentForProspect: findActiveAppointmentForProspect
 };

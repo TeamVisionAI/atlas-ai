@@ -27,6 +27,7 @@ import MyDashboard from "./pages/MyDashboard";
 import TeamDashboard from "./pages/TeamDashboard";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
+import FollowUpsPage from "./pages/FollowUpsPage";
 import Prospect from "./pages/Prospect";
 import Home from "./pages/Home";
 import AtlasLanding from "./pages/AtlasLanding";
@@ -115,15 +116,7 @@ export default function App() {
           }
         />
         <Route path="appointments" element={<AppointmentsPage />} />
-        <Route
-          path="follow-ups"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderFollowUpsTitle"
-              descriptionKey="placeholderFollowUpsDescription"
-            />
-          }
-        />
+        <Route path="follow-ups" element={<FollowUpsPage />} />
         <Route
           path="analytics"
           element={

@@ -452,6 +452,42 @@ function isProspectDerivedAppointmentId(id) {
   return Boolean(parseProspectDerivedAppointmentId(id));
 }
 
+function isPersistedAppointment(appointment) {
+  if (!appointment?.id || isProspectDerivedAppointmentId(appointment.id)) {
+    return false;
+  }
+
+  return !(
+    appointment.derivedFromProspect ||
+    appointment.metadata?.derivedFromProspect
+  );
+}
+
+function resolvePersistedAppointmentId(appointment) {
+  if (!appointment) {
+    return null;
+  }
+
+  return isPersistedAppointment(appointment) ? appointment.id : null;
+}
+
+function selectActivePersistedAppointmentForProspect(appointments = []) {
+  const active = appointments.filter(isActiveAppointmentForList);
+
+  if (!active.length) {
+    return null;
+  }
+
+  active.sort(
+    (left, right) => Date.parse(left.startDateTime || 0) - Date.parse(right.startDateTime || 0)
+  );
+
+  const now = Date.now();
+  const upcoming = active.find((appointment) => Date.parse(appointment.startDateTime) >= now);
+
+  return upcoming || active[active.length - 1];
+}
+
 module.exports = {
   ACTIVE_UPCOMING_STATUSES,
   TERMINAL_STATUSES,
@@ -475,5 +511,8 @@ module.exports = {
   inferProspectAppointmentStatus,
   prospectMatchesAgent,
   parseProspectDerivedAppointmentId,
-  isProspectDerivedAppointmentId
+  isProspectDerivedAppointmentId,
+  isPersistedAppointment,
+  resolvePersistedAppointmentId,
+  selectActivePersistedAppointmentForProspect
 };

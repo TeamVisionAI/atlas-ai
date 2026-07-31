@@ -51,6 +51,14 @@ import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import { subscribeProspectProfileUpdated } from "../utils/prospectRefreshBus";
 import { usePromptDialog } from "../hooks/usePromptDialog";
 import { useUniversalNote } from "../hooks/useUniversalNote";
+import { useCommunicationPreview } from "../hooks/useCommunicationPreview";
+import { resolvePersistedAppointmentId } from "../engines/appointmentIdEngine.js";
+import {
+  isAppointmentCommunicationAction,
+  resolveAppointmentCommunicationPurpose
+} from "../engines/appointmentCommunicationEngine.js";
+import CommunicationPreviewDialog from "../components/communication/CommunicationPreviewDialog";
+import { resolveScheduledAppointmentId } from "../engines/missionControlScheduleFlowEngine.js";
 import { resolveNoteContextFromMissionControl } from "../engines/notesEngine";
 import "./MissionControl.css";
 
@@ -264,6 +272,28 @@ export default function Dashboard() {
     }
   }, [queue, currentIndex, dashboard]);
 
+  const refreshMissionControlProspect = useCallback(async () => {
+    await refreshCurrentWorkspace();
+
+    if (!phone) {
+      return;
+    }
+
+    await refreshMissions(phone);
+    await recalculateMissions({ prospectPhone: phone }).catch(() => {});
+  }, [phone, refreshCurrentWorkspace, refreshMissions]);
+
+  const communicationPreview = useCommunicationPreview({
+    translate,
+    showToast: { showSuccess, showError, showInfo },
+    onRecorded: refreshMissionControlProspect
+  });
+
+  const handleCommunicationPreviewClose = useCallback(async () => {
+    communicationPreview.closePreview();
+    await refreshMissionControlProspect();
+  }, [communicationPreview, refreshMissionControlProspect]);
+
   const reloadMissionControlQueue = useCallback(async () => {
     const dashboardData = await getDashboard();
     const workflowQueue = dashboardData.prioritizedWorkflowQueue || [];
@@ -447,7 +477,7 @@ export default function Dashboard() {
   );
 
   const runCommunicationAction = useCallback(
-    async (actionId, { forceWhatsApp = false } = {}) => {
+    async (actionId, { forceWhatsApp = false, appointmentId = null } = {}) => {
       if (!phone) {
         return;
       }
@@ -455,6 +485,7 @@ export default function Dashboard() {
       await executeCommunicationAction({
         phone,
         actionId,
+        appointmentId,
         forceWhatsApp,
         translate,
         showSuccess,
@@ -505,6 +536,26 @@ export default function Dashboard() {
         return;
       }
 
+      if (isAppointmentCommunicationAction(actionId)) {
+        const appointmentId = resolvePersistedAppointmentId(workspace?.interview?.appointmentId);
+
+        if (appointmentId) {
+          const previewOpened = await communicationPreview.requestPreviewIfEnabled({
+            type: "appointment",
+            purpose: resolveAppointmentCommunicationPurpose(actionId),
+            actionId,
+            appointmentId
+          });
+
+          if (previewOpened) {
+            return;
+          }
+        }
+
+        await runCommunicationAction(actionId, { appointmentId });
+        return;
+      }
+
       if (isWhatsAppCopyAction(actionId)) {
         await runCommunicationAction(actionId);
         return;
@@ -530,7 +581,7 @@ export default function Dashboard() {
         setActionError(translate("missionControlActionFailed"));
       }
     },
-    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, runCommunicationAction]
+    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, runCommunicationAction, workspace?.interview?.appointmentId, communicationPreview]
   );
 
   const handleMissionActionImmediate = useCallback(
@@ -608,6 +659,28 @@ export default function Dashboard() {
         await refreshMissions(phone);
         showMissionExecutionSuccess(result);
         await evaluateMissionWorkflow();
+
+        console.info("[MissionControl] schedule interview response", {
+          phone,
+          appointmentId: result.appointmentId || null,
+          appointmentRecordId: result.appointment?.id || null,
+          calendarEventId: result.calendarEventId || null,
+          appointmentError: result.appointmentError || null
+        });
+
+        const appointmentId = resolveScheduledAppointmentId(result);
+
+        console.info("[MissionControl] communication preview appointment request", {
+          phone,
+          appointmentId
+        });
+
+        if (appointmentId) {
+          await communicationPreview.requestPreviewIfEnabled({
+            type: "appointment",
+            appointmentId
+          });
+        }
       } catch (error) {
         console.error(error);
         setExecutionError(
@@ -628,7 +701,8 @@ export default function Dashboard() {
       refreshMissions,
       translate,
       showMissionExecutionSuccess,
-      evaluateMissionWorkflow
+      evaluateMissionWorkflow,
+      communicationPreview
     ]
   );
 
@@ -859,6 +933,17 @@ export default function Dashboard() {
     <>
       {promptDialog}
       {noteDialog}
+      <CommunicationPreviewDialog
+        open={communicationPreview.open}
+        payload={communicationPreview.payload}
+        loading={communicationPreview.loading}
+        error={communicationPreview.error}
+        sending={communicationPreview.sending}
+        copyBusy={communicationPreview.copyBusy}
+        onClose={handleCommunicationPreviewClose}
+        onCopy={communicationPreview.copyPreviewMessage}
+        onSend={communicationPreview.confirmSend}
+      />
       <AgentMetricPanel
         type={activeMetricPanel}
         queue={queue}

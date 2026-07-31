@@ -15,10 +15,7 @@ import {
 
 export const WHATSAPP_COPY_ACTIONS = new Set([
   "whatsapp",
-  "send_zoom_link",
-  "send_office_location",
-  "send_missed_appointment",
-  "send_interview_reminder"
+  "send_missed_appointment"
 ]);
 
 export function isWhatsAppCopyAction(actionId) {

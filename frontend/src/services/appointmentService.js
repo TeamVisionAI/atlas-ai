@@ -1,4 +1,5 @@
 import { apiFetch } from "./apiClient";
+import { resolvePersistedAppointmentId } from "../engines/appointmentIdEngine.js";
 import {
   copyMessageToClipboard,
   openWhatsAppConversation
@@ -180,23 +181,64 @@ export async function collectProspectEmail(phone, email) {
   });
 }
 
-export async function sendInterviewDetails(appointmentId) {
-  return apiFetch(`/api/appointments/${encodeURIComponent(appointmentId)}/send-interview-details`, {
+import { APPOINTMENT_COMMUNICATION_PURPOSES } from "../engines/appointmentCommunicationEngine.js";
+
+const APPOINTMENT_SEND_PATHS = Object.freeze({
+  [APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION]: "send-interview-details",
+  [APPOINTMENT_COMMUNICATION_PURPOSES.REMINDER]: "send-interview-reminder",
+  [APPOINTMENT_COMMUNICATION_PURPOSES.ZOOM]: "send-zoom-invitation",
+  [APPOINTMENT_COMMUNICATION_PURPOSES.OFFICE]: "send-office-location"
+});
+
+async function sendAppointmentCommunication(appointmentId, purpose) {
+  const persistedId = resolvePersistedAppointmentId(appointmentId);
+  const pathSegment = APPOINTMENT_SEND_PATHS[purpose];
+
+  if (!persistedId || !pathSegment) {
+    return { success: false, message: "Appointment not found." };
+  }
+
+  return apiFetch(`/api/appointments/${encodeURIComponent(persistedId)}/${pathSegment}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({})
   });
 }
 
-export async function executeSendInterviewDetails({
+export async function sendInterviewDetails(appointmentId) {
+  return sendAppointmentCommunication(
+    appointmentId,
+    APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION
+  );
+}
+
+export async function sendInterviewReminder(appointmentId) {
+  return sendAppointmentCommunication(
+    appointmentId,
+    APPOINTMENT_COMMUNICATION_PURPOSES.REMINDER
+  );
+}
+
+export async function sendZoomInvitation(appointmentId) {
+  return sendAppointmentCommunication(appointmentId, APPOINTMENT_COMMUNICATION_PURPOSES.ZOOM);
+}
+
+export async function sendOfficeLocation(appointmentId) {
+  return sendAppointmentCommunication(appointmentId, APPOINTMENT_COMMUNICATION_PURPOSES.OFFICE);
+}
+
+async function executeSendAppointmentCommunication({
   appointmentId,
+  purpose,
   translate,
   showSuccess,
   showError,
   onOrganizationResourceMissing,
   onRecorded
 }) {
-  if (!appointmentId) {
+  const persistedId = resolvePersistedAppointmentId(appointmentId);
+
+  if (!persistedId) {
     showError?.(translate("missionControlActionFailed"));
     return { success: false };
   }
@@ -204,7 +246,7 @@ export async function executeSendInterviewDetails({
   let result;
 
   try {
-    result = await sendInterviewDetails(appointmentId);
+    result = await sendAppointmentCommunication(persistedId, purpose);
   } catch (error) {
     showError?.(translate("missionControlActionFailed"));
     return { success: false, message: error.message };
@@ -231,4 +273,32 @@ export async function executeSendInterviewDetails({
   await onRecorded?.(result);
 
   return { success: true, ...result };
+}
+
+export async function executeSendInterviewDetails(options) {
+  return executeSendAppointmentCommunication({
+    ...options,
+    purpose: APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION
+  });
+}
+
+export async function executeSendInterviewReminder(options) {
+  return executeSendAppointmentCommunication({
+    ...options,
+    purpose: APPOINTMENT_COMMUNICATION_PURPOSES.REMINDER
+  });
+}
+
+export async function executeSendZoomInvitation(options) {
+  return executeSendAppointmentCommunication({
+    ...options,
+    purpose: APPOINTMENT_COMMUNICATION_PURPOSES.ZOOM
+  });
+}
+
+export async function executeSendOfficeLocation(options) {
+  return executeSendAppointmentCommunication({
+    ...options,
+    purpose: APPOINTMENT_COMMUNICATION_PURPOSES.OFFICE
+  });
 }

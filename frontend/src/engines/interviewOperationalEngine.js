@@ -2,9 +2,11 @@
  * Operational interview actions — visibility rules for Prospect Workspace.
  */
 
+import { resolvePersistedAppointmentId } from "./appointmentIdEngine.js";
+
 export function resolveOperationalInterviewActions(interview = {}) {
   const hasScheduledInterview = Boolean(interview?.datetime);
-  const hasAppointment = Boolean(interview?.appointmentId);
+  const hasAppointment = Boolean(resolvePersistedAppointmentId(interview?.appointmentId));
   const hasOutcome = Boolean(interview?.outcome);
   const gateActive = Boolean(interview?.gateActive);
 

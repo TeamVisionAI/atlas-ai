@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invitación a entrevista</title>
   <style>
   * { box-sizing: border-box; }
   body {
@@ -18,6 +19,11 @@
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+  .page-title {
+    margin: 0 0 12px;
+    font-size: 22px;
+    font-weight: 700;
   }
   .btn {
     border: 1px solid #cbd5e1;
@@ -44,62 +50,14 @@
   gap: 4px;
 }
 
-.communication-preview__eyebrow {
+.communication-preview__subtitle {
   margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 14px;
   color: #64748b;
 }
 
-.communication-preview__channel {
-  margin: 0;
-  font-size: 13px;
-  color: #475569;
-}
-
-.communication-preview__missing {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-}
-
-.communication-preview__missing-title {
+.communication-preview__section-label {
   margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #92400e;
-}
-
-.communication-preview__missing-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #78350f;
-  font-size: 13px;
-}
-
-.communication-preview__missing-item--error {
-  color: #b91c1c;
-  font-weight: 600;
-}
-
-.communication-preview__meta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 16px;
-  margin: 0;
-}
-
-.communication-preview__meta-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.communication-preview__meta-row dt {
-  margin: 0;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -107,15 +65,128 @@
   color: #64748b;
 }
 
-.communication-preview__meta-row dd {
+.communication-preview__delivery-channels {
   margin: 0;
-  font-size: 14px;
-  color: #0f172a;
-  word-break: break-word;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.communication-preview__meta-row--missing dd {
-  color: #b45309;
+.communication-preview__delivery-channel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #334155;
+}
+
+.communication-preview__delivery-channel--active::before {
+  content: "✓";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.communication-preview__validation {
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.communication-preview__validation--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.communication-preview__validation--recommended {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.communication-preview__validation-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.communication-preview__validation--error .communication-preview__validation-title {
+  color: #991b1b;
+}
+
+.communication-preview__validation--recommended .communication-preview__validation-title {
+  color: #92400e;
+}
+
+.communication-preview__validation-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.communication-preview__validation-item--error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.communication-preview__validation-item--recommended {
+  color: #78350f;
+}
+
+.communication-preview__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.communication-preview__prospect-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.communication-preview__schedule p,
+.communication-preview__summary-meta p {
+  margin: 0;
+  font-size: 14px;
+  color: #334155;
+}
+
+.communication-preview__summary-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.communication-preview__representative {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.communication-preview__representative-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.communication-preview__representative-title {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #64748b;
 }
 
 .communication-preview__media {
@@ -137,15 +208,6 @@
 .communication-preview__media-image--logo {
   object-fit: contain;
   padding: 8px;
-}
-
-.communication-preview__message-title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #475569;
 }
 
 .communication-preview__message-body {
@@ -180,10 +242,6 @@
 }
 
 @media (max-width: 767px) {
-  .communication-preview__meta-grid {
-    grid-template-columns: 1fr;
-  }
-
   .communication-preview__actions {
     flex-direction: column-reverse;
   }
@@ -197,46 +255,60 @@
 </head>
 <body>
   <div class="page">
+    <h1 class="page-title">Invitación a entrevista</h1>
     <div class="communication-preview">
       <header class="communication-preview__header">
-        <p class="communication-preview__eyebrow">Vista previa del mensaje saliente</p>
-        <p class="communication-preview__channel">Canal: whatsapp · copy_open</p>
+        <p class="communication-preview__subtitle">Revisa la invitación antes de enviarla.</p>
       </header>
-      <div class="communication-preview__missing"><p class="communication-preview__missing-title">Contenido faltante o incompleto</p><ul class="communication-preview__missing-list"><li class="communication-preview__missing-item">Foto del representante</li><li class="communication-preview__missing-item">Logo de la oficina</li></ul></div>
-      <section class="communication-preview__meta">
-        <dl class="communication-preview__meta-grid">
-          <div class="communication-preview__meta-row"><dt>Prospecto</dt><dd>Maria Lopez</dd></div>
-          <div class="communication-preview__meta-row"><dt>Fecha y hora</dt><dd>domingo, 15 de marzo de 2026 · 2:30 p.m. (Hora del Este (EDT))</dd></div>
-          <div class="communication-preview__meta-row"><dt>Tipo de entrevista</dt><dd>Zoom (virtual)</dd></div>
-          <div class="communication-preview__meta-row"><dt>Idioma preferido</dt><dd>Spanish</dd></div>
-          <div class="communication-preview__meta-row"><dt>Representante</dt><dd>Ana Rivera</dd></div>
-          <div class="communication-preview__meta-row"><dt>Título / organización</dt><dd>Recruiting Specialist</dd></div>
-          <div class="communication-preview__meta-row"><dt>Organización</dt><dd>Team Vision</dd></div>
-          <div class="communication-preview__meta-row"><dt>Enlace de Zoom</dt><dd>https://zoom.us/j/123456789</dd></div>
-        </dl>
+      <section class="communication-preview__delivery">
+        <h3 class="communication-preview__section-label">Entrega</h3>
+        <ul class="communication-preview__delivery-channels">
+          <li class="communication-preview__delivery-channel communication-preview__delivery-channel--active">WhatsApp</li>
+        </ul>
+      </section>
+      <div class="communication-preview__validation communication-preview__validation--recommended"><p class="communication-preview__validation-title">Mejoras recomendadas</p><ul class="communication-preview__validation-list"><li class="communication-preview__validation-item communication-preview__validation-item--recommended">Foto del representante</li><li class="communication-preview__validation-item communication-preview__validation-item--recommended">Logo de la oficina</li></ul></div>
+      <section class="communication-preview__summary">
+        <p class="communication-preview__prospect-name">Abraham Manuel</p>
+        <div class="communication-preview__schedule"><p>viernes, 31 de julio de 2026</p><p>11:00 a.m. (EDT)</p></div>
+        <div class="communication-preview__summary-meta">
+          <p>Entrevista por Zoom</p>
+          <p>Spanish</p>
+        </div>
+        <div class="communication-preview__representative">
+          <p class="communication-preview__section-label">Representante</p>
+          <p class="communication-preview__representative-name">Niovel Perez</p>
+          <p class="communication-preview__representative-title">Recruiting Specialist</p>
+        </div>
       </section>
       <section class="communication-preview__message">
-        <h3 class="communication-preview__message-title">Mensaje final</h3>
-        <pre class="communication-preview__message-body">Hola Maria,
+        <h3 class="communication-preview__section-label">Mensaje final</h3>
+        <pre class="communication-preview__message-body">Hola Abraham,
 
-Aquí están los detalles de tu entrevista:
+¡Tu entrevista está confirmada!
 
-Fecha: domingo, 15 de marzo de 2026
-Hora: 2:30 p.m.
-Zona horaria: Hora del Este (EDT)
+📅 Fecha:
+viernes, 31 de julio de 2026
 
-Representante: Ana Rivera
+🕚 Hora:
+11:00 a.m. (EDT)
 
-Únete a tu entrevista aquí:
+👤 Entrevistador:
+Niovel Perez
+
+🔗 Únete aquí:
 https://zoom.us/j/123456789
 
-Recordatorio: ¡Esperamos conversar contigo!
+Si tienes alguna pregunta antes de la entrevista, no dudes en responder este mensaje.
 
-Team Vision</pre>
+¡Esperamos conversar contigo!
+
+—
+Niovel Perez
+Team Vision Financial</pre>
       </section>
       <footer class="communication-preview__actions">
         <button type="button" class="btn btn-ghost">Volver a editar</button>
-        <button type="button" class="btn btn-secondary">Copiar mensaje</button>
+        <button type="button" class="btn btn-secondary">Copiar</button>
         <button type="button" class="btn btn-primary">Enviar invitación</button>
       </footer>
     </div>
