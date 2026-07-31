@@ -40,8 +40,8 @@ export default function CompleteAppointmentDialog({ open, appointment, onClose, 
     setError(null);
 
     try {
-      await completeAppointment(appointment.id, { outcome, outcomeNotes });
-      onSuccess?.();
+      const result = await completeAppointment(appointment.id, { outcome, outcomeNotes });
+      onSuccess?.(result?.appointment);
       onClose();
     } catch (requestError) {
       setError(captureAppointmentError("complete", requestError, translate));

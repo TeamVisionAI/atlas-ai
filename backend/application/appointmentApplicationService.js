@@ -66,6 +66,41 @@ async function resolveOwnerRepId(agentId) {
   return user?.rep_id || null;
 }
 
+async function resolveAppointmentForMutation(id, organizationId, agentId) {
+  const persisted = await appointmentRepository.findById(id, organizationId);
+
+  if (persisted) {
+    return persisted;
+  }
+
+  const { resolveProspectDerivedAppointmentById } = require("../services/appointmentListService");
+  return resolveProspectDerivedAppointmentById(id, organizationId, agentId);
+}
+
+function isProspectDerivedAppointment(appointment = {}) {
+  return Boolean(
+    appointment.derivedFromProspect ||
+      appointment.metadata?.derivedFromProspect ||
+      String(appointment.id || "").startsWith("prospect-derived:")
+  );
+}
+
+async function materializeDerivedAppointment(appointment, agentId) {
+  const ownerRepId = appointment.ownerRepId || (await resolveOwnerRepId(agentId));
+
+  return {
+    ...appointment,
+    id: appointmentRepository.generateId(),
+    ownerRepId,
+    metadata: {
+      ...(appointment.metadata || {}),
+      derivedFromProspect: true,
+      sourceDerivedId: appointment.id,
+      ownerRepId
+    }
+  };
+}
+
 function resolveVirtualMeetingUrl(meetingProvider, options = {}) {
   const url = options.meetingUrl || options.zoomUrl || options.meetLink;
 
@@ -669,11 +704,15 @@ async function cancelAppointment(id, input, context = {}) {
 
 async function completeAppointment(id, input, context = {}) {
   const { organizationId, agentId } = context;
-  const appointment = await appointmentRepository.findById(id, organizationId);
+  const resolved = await resolveAppointmentForMutation(id, organizationId, agentId);
 
-  if (!appointment) {
+  if (!resolved) {
     throw buildError("NOT_FOUND", "Appointment not found.", 404);
   }
+
+  const appointment = isProspectDerivedAppointment(resolved)
+    ? await materializeDerivedAppointment(resolved, agentId)
+    : resolved;
 
   const outcome = input.outcome;
 

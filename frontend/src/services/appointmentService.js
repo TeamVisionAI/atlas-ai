@@ -21,6 +21,63 @@ export function normalizeAppointmentList(result) {
   return [];
 }
 
+export function getAppointmentIdentityKey(appointment = {}) {
+  return `${appointment.prospectPhone}:${appointment.startDateTime}`;
+}
+
+const ACTIVE_APPOINTMENT_STATUSES = new Set([
+  "scheduled",
+  "confirmed",
+  "rescheduled",
+  "pending_confirmation",
+  "in_progress",
+  "human_assist_required"
+]);
+
+const TERMINAL_APPOINTMENT_LIFECYCLE_STATES = new Set([
+  "completed",
+  "cancelled",
+  "recruited",
+  "became_client",
+  "no_show"
+]);
+
+export function isActiveAppointment(appointment = {}) {
+  const lifecycleState = appointment.metadata?.lifecycleState;
+
+  if (lifecycleState && TERMINAL_APPOINTMENT_LIFECYCLE_STATES.has(lifecycleState)) {
+    return false;
+  }
+
+  return ACTIVE_APPOINTMENT_STATUSES.has(appointment.status);
+}
+
+export function isCompletedAppointment(appointment = {}) {
+  const lifecycleState = appointment.metadata?.lifecycleState;
+
+  if (lifecycleState === "recruited" || lifecycleState === "became_client") {
+    return true;
+  }
+
+  return appointment.status === "completed" || appointment.status === "no_show";
+}
+
+export function appointmentMatchesView(appointment, view) {
+  switch (view) {
+    case "today":
+    case "upcoming":
+    case "pending_confirmation":
+    case "human_assist":
+      return isActiveAppointment(appointment);
+    case "completed":
+      return isCompletedAppointment(appointment);
+    case "cancelled":
+      return appointment.status === "cancelled" || appointment.metadata?.lifecycleState === "cancelled";
+    default:
+      return true;
+  }
+}
+
 export async function fetchAppointmentProfile() {
   return apiFetch("/api/appointments/profile");
 }

@@ -128,7 +128,8 @@ test("invalid lifecycle transitions are rejected", () => {
     (error) => error.code === "TERMINAL_STATE"
   );
 
-  assert.equal(canTransitionLifecycle("scheduled", "recruited"), false);
+  assert.equal(canTransitionLifecycle("cancelled", "completed"), false);
+  assert.equal(canTransitionLifecycle("completed", "confirmed"), false);
 });
 
 test("every lifecycle transition has a business event mapping", () => {
@@ -150,6 +151,27 @@ test("buildAppointmentOwnership exposes required ownership fields", () => {
   assert.equal(ownership.appointmentType, "recruiting_interview");
   assert.equal(ownership.scheduledTime, "2026-08-01T15:00:00.000Z");
   assert.equal(ownership.currentState, APPOINTMENT_LIFECYCLE_STATES.SCHEDULED);
+});
+
+test("completeAppointment transitions scheduled appointments with follow_up outcome", async () => {
+  const updated = await completeAppointment(baseAppointment({ status: "scheduled" }), {
+    actor: "agent-1",
+    outcome: "follow_up"
+  });
+
+  assert.equal(updated.status, "completed");
+  assert.equal(updated.outcome, "follow_up");
+  assert.equal(resolveLifecycleState(updated), APPOINTMENT_LIFECYCLE_STATES.COMPLETED);
+});
+
+test("completeAppointment transitions rescheduled appointments", async () => {
+  const updated = await completeAppointment(baseAppointment({ status: "rescheduled" }), {
+    actor: "agent-1",
+    outcome: "follow_up"
+  });
+
+  assert.equal(updated.status, "completed");
+  assert.equal(resolveLifecycleState(updated), APPOINTMENT_LIFECYCLE_STATES.COMPLETED);
 });
 
 test("buildAppointmentOwnership falls back to metadata when column field is absent", () => {

@@ -3,13 +3,16 @@
  */
 
 const appointmentRepository = require("../repositories/appointmentRepository");
-const { loadProspectsForOrganization } = require("../services/supabaseService");
+const { loadProspectsForOrganization, findProspectInOrganization } = require("../services/supabaseService");
 const { filterProductionProspects } = require("../core/productionProspectFilter");
 const {
   buildProspectDerivedAppointment,
   matchesListFilters,
   appointmentIdentityKey,
-  prospectMatchesAgent
+  prospectMatchesAgent,
+  parseProspectDerivedAppointmentId,
+  buildPersistedScopeFilters,
+  mergeUnifiedAppointmentList
 } = require("../core/appointmentListQuery");
 
 async function loadProspectDerivedAppointments(filters = {}) {
@@ -30,24 +33,47 @@ async function loadProspectDerivedAppointments(filters = {}) {
     .filter((appointment) => matchesListFilters(appointment, filters));
 }
 
+async function resolveProspectDerivedAppointmentById(id, organizationId, agentId) {
+  const parsed = parseProspectDerivedAppointmentId(id);
+
+  if (!parsed || !organizationId) {
+    return null;
+  }
+
+  const prospect = await findProspectInOrganization(parsed.phone, organizationId);
+
+  if (!prospect) {
+    return null;
+  }
+
+  if (agentId && !prospectMatchesAgent(prospect, agentId)) {
+    return null;
+  }
+
+  const derived = buildProspectDerivedAppointment(prospect, organizationId);
+
+  if (!derived) {
+    return null;
+  }
+
+  const derivedTimestamp = Date.parse(derived.startDateTime);
+
+  if (derivedTimestamp !== parsed.timestampMs) {
+    return null;
+  }
+
+  return derived;
+}
+
 async function listUnifiedAppointments(filters = {}) {
   const repositoryResult = await appointmentRepository.search(filters);
   const derivedCandidates = await loadProspectDerivedAppointments(filters);
-
-  const merged = [...repositoryResult.items];
-  const seen = new Set(merged.map(appointmentIdentityKey));
-
-  derivedCandidates.forEach((appointment) => {
-    const key = appointmentIdentityKey(appointment);
-
-    if (!seen.has(key)) {
-      merged.push(appointment);
-      seen.add(key);
-    }
-  });
-
-  merged.sort(
-    (left, right) => new Date(left.startDateTime).getTime() - new Date(right.startDateTime).getTime()
+  const persistedScope = await appointmentRepository.search(buildPersistedScopeFilters(filters));
+  const persistedIdentityKeys = new Set(persistedScope.items.map(appointmentIdentityKey));
+  const merged = mergeUnifiedAppointmentList(
+    repositoryResult.items,
+    derivedCandidates,
+    persistedIdentityKeys
   );
 
   return {
@@ -58,5 +84,6 @@ async function listUnifiedAppointments(filters = {}) {
 
 module.exports = {
   listUnifiedAppointments,
-  loadProspectDerivedAppointments
+  loadProspectDerivedAppointments,
+  resolveProspectDerivedAppointmentById
 };

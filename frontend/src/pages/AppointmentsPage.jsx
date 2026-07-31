@@ -5,7 +5,7 @@ import AtlasButton from "../components/ui/AtlasButton";
 import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
 import Spinner from "../components/ui/Spinner";
-import { fetchAppointments, normalizeAppointmentList } from "../services/appointmentService";
+import { fetchAppointments, getAppointmentIdentityKey, normalizeAppointmentList } from "../services/appointmentService";
 import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import RescheduleAppointmentDialog from "../components/appointments/RescheduleAppointmentDialog";
 import CancelAppointmentDialog from "../components/appointments/CancelAppointmentDialog";
@@ -129,8 +129,10 @@ export default function AppointmentsPage() {
     [translate]
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setLoadError(null);
 
     try {
@@ -141,10 +143,14 @@ export default function AppointmentsPage() {
       });
       setAppointments(normalizeAppointmentList(result));
     } catch (requestError) {
-      setLoadError(captureAppointmentError("load", requestError, translate));
-      setAppointments([]);
+      if (!silent) {
+        setLoadError(captureAppointmentError("load", requestError, translate));
+        setAppointments([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [activeView, filters.meetingType, filters.purpose, translate]);
 
@@ -178,8 +184,31 @@ export default function AppointmentsPage() {
     setDialog(null);
   }
 
-  function handleActionSuccess(message) {
+  function handleActionSuccess(message, updatedAppointment) {
     setActionMessage(message || translate("appointmentsActionSuccess"));
+
+    if (updatedAppointment) {
+      const identityKey = getAppointmentIdentityKey(updatedAppointment);
+
+      setAppointments((current) =>
+        current.filter(
+          (item) =>
+            item.id !== updatedAppointment.id && getAppointmentIdentityKey(item) !== identityKey
+        )
+      );
+
+      if (
+        selectedAppointment &&
+        (selectedAppointment.id === updatedAppointment.id ||
+          getAppointmentIdentityKey(selectedAppointment) === identityKey)
+      ) {
+        setSelectedAppointment(null);
+      }
+
+      void load({ silent: true });
+      return;
+    }
+
     load();
   }
 
@@ -438,7 +467,9 @@ export default function AppointmentsPage() {
         open={dialog?.type === "complete"}
         appointment={dialog?.appointment}
         onClose={closeDialog}
-        onSuccess={() => handleActionSuccess(translate("appointmentsCompleted"))}
+        onSuccess={(updatedAppointment) =>
+          handleActionSuccess(translate("appointmentsCompleted"), updatedAppointment)
+        }
       />
       <ResolveHumanAssistDialog
         open={dialog?.type === "resolve"}

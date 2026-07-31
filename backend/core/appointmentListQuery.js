@@ -21,6 +21,19 @@ const TERMINAL_STATUSES = Object.freeze([
   APPOINTMENT_STATUSES.NO_SHOW
 ]);
 
+const COMPLETED_VIEW_STATUSES = Object.freeze([
+  APPOINTMENT_STATUSES.COMPLETED,
+  APPOINTMENT_STATUSES.NO_SHOW
+]);
+
+const TERMINAL_LIFECYCLE_STATES = Object.freeze([
+  "completed",
+  "cancelled",
+  "recruited",
+  "became_client",
+  "no_show"
+]);
+
 function startOfLocalDay(reference = new Date()) {
   return new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
 }
@@ -89,7 +102,7 @@ function resolveAppointmentViewFilters(view, reference = new Date()) {
       };
     case "completed":
       return {
-        status: APPOINTMENT_STATUSES.COMPLETED
+        status: COMPLETED_VIEW_STATUSES
       };
     case "cancelled":
       return {
@@ -191,6 +204,104 @@ function prospectMatchesAgent(prospect, agentId) {
   return !prospectAgentId || prospectAgentId === agentId;
 }
 
+function resolveAppointmentListStatus(appointment = {}) {
+  const lifecycleState = appointment.metadata?.lifecycleState;
+
+  if (lifecycleState === "recruited" || lifecycleState === "became_client") {
+    return APPOINTMENT_STATUSES.COMPLETED;
+  }
+
+  if (lifecycleState === "cancelled") {
+    return APPOINTMENT_STATUSES.CANCELLED;
+  }
+
+  if (lifecycleState === "completed") {
+    return APPOINTMENT_STATUSES.COMPLETED;
+  }
+
+  if (lifecycleState === "no_show") {
+    return APPOINTMENT_STATUSES.NO_SHOW;
+  }
+
+  if (lifecycleState === "confirmed") {
+    return APPOINTMENT_STATUSES.CONFIRMED;
+  }
+
+  if (lifecycleState === "rescheduled") {
+    return APPOINTMENT_STATUSES.RESCHEDULED;
+  }
+
+  if (lifecycleState === "scheduled") {
+    return APPOINTMENT_STATUSES.SCHEDULED;
+  }
+
+  return appointment.status;
+}
+
+function isActiveAppointmentForList(appointment = {}) {
+  const lifecycleState = appointment.metadata?.lifecycleState;
+
+  if (lifecycleState && TERMINAL_LIFECYCLE_STATES.includes(lifecycleState)) {
+    return false;
+  }
+
+  return ACTIVE_UPCOMING_STATUSES.includes(resolveAppointmentListStatus(appointment));
+}
+
+function isCompletedAppointmentForList(appointment = {}) {
+  const lifecycleState = appointment.metadata?.lifecycleState;
+
+  if (lifecycleState === "recruited" || lifecycleState === "became_client") {
+    return true;
+  }
+
+  return COMPLETED_VIEW_STATUSES.includes(resolveAppointmentListStatus(appointment));
+}
+
+function shouldIncludeProspectDerivedAppointment(derived, persistedIdentityKeys = new Set()) {
+  const key = appointmentIdentityKey(derived);
+  return !persistedIdentityKeys.has(key);
+}
+
+function buildPersistedScopeFilters(filters = {}) {
+  return {
+    organizationId: filters.organizationId,
+    agentId: filters.agentId,
+    prospectPhone: filters.prospectPhone,
+    purpose: filters.purpose,
+    meetingType: filters.meetingType,
+    from: filters.from,
+    to: filters.to,
+    humanAssistRequired: filters.humanAssistRequired
+  };
+}
+
+function mergeUnifiedAppointmentList(
+  repositoryItems = [],
+  derivedCandidates = [],
+  persistedIdentityKeys = new Set()
+) {
+  const merged = [...repositoryItems];
+  const seen = new Set(merged.map(appointmentIdentityKey));
+
+  derivedCandidates.forEach((appointment) => {
+    const key = appointmentIdentityKey(appointment);
+
+    if (!shouldIncludeProspectDerivedAppointment(appointment, persistedIdentityKeys) || seen.has(key)) {
+      return;
+    }
+
+    merged.push(appointment);
+    seen.add(key);
+  });
+
+  merged.sort(
+    (left, right) => new Date(left.startDateTime).getTime() - new Date(right.startDateTime).getTime()
+  );
+
+  return merged;
+}
+
 function matchesListFilters(record, filters = {}, reference = new Date()) {
   if (filters.organizationId && record.organizationId !== filters.organizationId) {
     return false;
@@ -217,8 +328,9 @@ function matchesListFilters(record, filters = {}, reference = new Date()) {
   }
 
   const allowedStatuses = normalizeStatusList(filters.status);
+  const recordStatus = resolveAppointmentListStatus(record);
 
-  if (!statusMatches(record.status, allowedStatuses)) {
+  if (!statusMatches(recordStatus, allowedStatuses)) {
     return false;
   }
 
@@ -314,10 +426,44 @@ function appointmentIdentityKey(appointment) {
   return `${appointment.prospectPhone}:${appointment.startDateTime}`;
 }
 
+function parseProspectDerivedAppointmentId(id) {
+  if (!id || typeof id !== "string" || !id.startsWith("prospect-derived:")) {
+    return null;
+  }
+
+  const remainder = id.slice("prospect-derived:".length);
+  const separatorIndex = remainder.lastIndexOf(":");
+
+  if (separatorIndex <= 0) {
+    return null;
+  }
+
+  const phone = remainder.slice(0, separatorIndex);
+  const timestampMs = Number(remainder.slice(separatorIndex + 1));
+
+  if (!phone || !Number.isFinite(timestampMs)) {
+    return null;
+  }
+
+  return { phone, timestampMs };
+}
+
+function isProspectDerivedAppointmentId(id) {
+  return Boolean(parseProspectDerivedAppointmentId(id));
+}
+
 module.exports = {
   ACTIVE_UPCOMING_STATUSES,
   TERMINAL_STATUSES,
+  COMPLETED_VIEW_STATUSES,
+  TERMINAL_LIFECYCLE_STATES,
   resolveAppointmentViewFilters,
+  resolveAppointmentListStatus,
+  isActiveAppointmentForList,
+  isCompletedAppointmentForList,
+  shouldIncludeProspectDerivedAppointment,
+  buildPersistedScopeFilters,
+  mergeUnifiedAppointmentList,
   matchesListFilters,
   buildProspectDerivedAppointment,
   countTomorrowsInterviews,
@@ -328,6 +474,6 @@ module.exports = {
   appointmentIdentityKey,
   inferProspectAppointmentStatus,
   prospectMatchesAgent,
-  appointmentIdentityKey,
-  inferProspectAppointmentStatus
+  parseProspectDerivedAppointmentId,
+  isProspectDerivedAppointmentId
 };

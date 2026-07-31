@@ -11,7 +11,12 @@ const {
   buildProspectDerivedAppointment,
   matchesListFilters,
   isTomorrow,
-  parseInterviewDatetime
+  parseInterviewDatetime,
+  parseProspectDerivedAppointmentId,
+  isActiveAppointmentForList,
+  isCompletedAppointmentForList,
+  mergeUnifiedAppointmentList,
+  ACTIVE_UPCOMING_STATUSES
 } = require("../core/appointmentListQuery");
 
 describe("appointmentListQuery", () => {
@@ -107,5 +112,100 @@ describe("appointmentListQuery", () => {
     );
     assert.equal(isMissingTableError({ code: "PGRST116" }), true);
     assert.equal(isMissingTableError({ message: "connection timeout" }), false);
+  });
+
+  it("parses prospect-derived appointment ids", () => {
+    const parsed = parseProspectDerivedAppointmentId(
+      "prospect-derived:+13216891236:1785439800000"
+    );
+
+    assert.deepEqual(parsed, {
+      phone: "+13216891236",
+      timestampMs: 1785439800000
+    });
+    assert.equal(parseProspectDerivedAppointmentId("appt-1"), null);
+  });
+
+  it("today view includes only active appointment statuses", () => {
+    const reference = new Date("2026-07-30T12:00:00");
+    const todayFilters = {
+      organizationId: "org-1",
+      agentId: "agent-1",
+      ...resolveAppointmentViewFilters("today", reference)
+    };
+
+    assert.deepEqual(todayFilters.status, ACTIVE_UPCOMING_STATUSES);
+
+    const activeAppointment = {
+      organizationId: "org-1",
+      agentId: "agent-1",
+      status: "scheduled",
+      startDateTime: "2026-07-30T15:00:00.000Z"
+    };
+
+    assert.equal(matchesListFilters(activeAppointment, todayFilters, reference), true);
+    assert.equal(isActiveAppointmentForList(activeAppointment), true);
+    assert.equal(
+      matchesListFilters(
+        {
+          ...activeAppointment,
+          status: "completed",
+          metadata: { lifecycleState: "completed" }
+        },
+        todayFilters,
+        reference
+      ),
+      false
+    );
+    assert.equal(
+      isActiveAppointmentForList({
+        ...activeAppointment,
+        status: "completed",
+        metadata: { lifecycleState: "recruited" }
+      }),
+      false
+    );
+  });
+
+  it("completed view includes recruited and became_client lifecycle outcomes", () => {
+    const completedFilters = {
+      organizationId: "org-1",
+      ...resolveAppointmentViewFilters("completed")
+    };
+
+    const recruited = {
+      organizationId: "org-1",
+      status: "completed",
+      outcome: "recruited",
+      metadata: { lifecycleState: "recruited" },
+      startDateTime: "2026-07-30T15:00:00.000Z"
+    };
+
+    assert.equal(matchesListFilters(recruited, completedFilters), true);
+    assert.equal(isCompletedAppointmentForList(recruited), true);
+  });
+
+  it("suppresses stale prospect-derived rows when a persisted appointment exists", () => {
+    const derived = {
+      id: "prospect-derived:+15551234567:1785439800000",
+      prospectPhone: "+15551234567",
+      startDateTime: "2026-07-30T15:00:00.000Z",
+      status: "scheduled"
+    };
+    const persistedCompleted = {
+      id: "appt-1",
+      prospectPhone: "+15551234567",
+      startDateTime: "2026-07-30T15:00:00.000Z",
+      status: "completed",
+      metadata: { lifecycleState: "completed" }
+    };
+
+    const merged = mergeUnifiedAppointmentList(
+      [],
+      [derived],
+      new Set([`${persistedCompleted.prospectPhone}:${persistedCompleted.startDateTime}`])
+    );
+
+    assert.equal(merged.length, 0);
   });
 });
