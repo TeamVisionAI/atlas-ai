@@ -13,7 +13,7 @@ export default function RecommendationCards({ items, onOpen }) {
               key={`${item.phone}-${item.rank}`}
               type="button"
               className="executive-card executive-recommendation"
-              onClick={() => onOpen(item.phone, item.filter)}
+              onClick={() => onOpen(item)}
             >
               <div className="executive-recommendation__name">{item.name}</div>
               <div className="executive-recommendation__reason">{item.reason}</div>

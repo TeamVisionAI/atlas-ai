@@ -4,6 +4,12 @@
  */
 
 import { appPath } from "../config/appRoutes";
+import {
+  MISSION_CONTROL_QUERY_KEYS,
+  buildMissionControlQuery
+} from "./missionControlRouteEngine.js";
+
+export { MISSION_CONTROL_QUERY_KEYS, buildMissionControlQuery } from "./missionControlRouteEngine.js";
 
 export const EXECUTIVE_FILTERS = {
   INTERVIEWS_TODAY: "interviews-today",
@@ -132,17 +138,7 @@ export function filterQueueForExecutiveFilter(queue, filter, workflowQueue, pros
   return queue.filter((item) => phoneSet.has(item.phone));
 }
 
-export function buildMissionControlPath({ filter, phone } = {}) {
-  const params = new URLSearchParams();
-
-  if (filter) {
-    params.set("filter", filter);
-  }
-
-  if (phone) {
-    params.set("phone", phone);
-  }
-
-  const query = params.toString();
+export function buildMissionControlPath(options = {}) {
+  const query = buildMissionControlQuery(options);
   return query ? `${appPath("mission-control")}?${query}` : appPath("mission-control");
 }

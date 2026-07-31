@@ -3,7 +3,7 @@
  * Derives launch UI metrics from existing API payloads only. No business rules.
  */
 
-import { EXECUTIVE_FILTERS } from "./executiveFilterEngine";
+import { EXECUTIVE_FILTERS, buildMissionControlPath } from "./executiveFilterEngine";
 
 const MILESTONES = {
   INTERVIEW_READY: "INTERVIEW_READY",
@@ -176,7 +176,8 @@ function buildInterviewHero(queue, prospects, todayFocus) {
     confirmed,
     waitingConfirmation,
     outcomePending,
-    rescheduled
+    rescheduled,
+    to: buildMissionControlPath({ filter: EXECUTIVE_FILTERS.INTERVIEWS_TODAY })
   };
 }
 
@@ -253,7 +254,8 @@ function buildMorningBrief({
       ? {
           label: translate("executiveBriefReviewProspect", { name: top.name }),
           phone: top.phone,
-          filter: top.filter
+          filter: top.filter,
+          to: top.to
         }
       : null,
     coachingLeader: coachingLeader
@@ -392,6 +394,7 @@ function buildFocusCards(todayFocus, queue, prospects, translate) {
       title: translate("executiveFocusOutcomes"),
       count: todayFocus?.pendingInterviewOutcomes?.count ?? 0,
       filter: EXECUTIVE_FILTERS.PENDING_OUTCOMES,
+      to: buildMissionControlPath({ filter: EXECUTIVE_FILTERS.PENDING_OUTCOMES }),
       emptyMessage: translate("executiveFocusOutcomesEmpty")
     },
     {
@@ -399,6 +402,7 @@ function buildFocusCards(todayFocus, queue, prospects, translate) {
       title: translate("executiveFocusHighPriority"),
       count: todayFocus?.highPriorityProspects?.count ?? 0,
       filter: EXECUTIVE_FILTERS.HIGH_PRIORITY,
+      to: buildMissionControlPath({ filter: EXECUTIVE_FILTERS.HIGH_PRIORITY }),
       emptyMessage: translate("executiveFocusHighPriorityEmpty")
     },
     {
@@ -406,6 +410,7 @@ function buildFocusCards(todayFocus, queue, prospects, translate) {
       title: translate("executiveFocusOrientations"),
       count: orientations,
       filter: EXECUTIVE_FILTERS.ORIENTATION_READY,
+      to: buildMissionControlPath({ filter: EXECUTIVE_FILTERS.ORIENTATION_READY }),
       emptyMessage: translate("executiveFocusOrientationsEmpty")
     },
     {
@@ -413,6 +418,7 @@ function buildFocusCards(todayFocus, queue, prospects, translate) {
       title: translate("executiveFocusTomorrow"),
       count: tomorrowCount,
       filter: EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS,
+      to: buildMissionControlPath({ filter: EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS }),
       emptyMessage: translate("executiveFocusTomorrowEmpty")
     }
   ];
@@ -458,7 +464,8 @@ function buildRecommendationCards(recommendations = [], activity = [], translate
       ...item,
       reason,
       recommendedAction: resolveRecommendationAction(item, translate),
-      priorityLabel: translate(priorityKey)
+      priorityLabel: translate(priorityKey),
+      to: buildMissionControlPath({ filter: item.filter || undefined, phone: item.phone })
     };
   });
 }

@@ -4,9 +4,9 @@ import { getDashboard } from "../services/api";
 import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executiveDashboardService";
 import { buildExecutiveDashboardViewModel } from "../engines/executiveDashboardViewModel";
 import {
-  buildProspectCenterPath,
-  navigateToProspectWorkspace
-} from "../utils/prospectRoutes";
+  EXECUTIVE_FILTERS,
+  buildMissionControlPath
+} from "../engines/executiveFilterEngine";
 import { useLanguage } from "../i18n/LanguageContext";
 import InterviewsHero from "../components/executive/InterviewsHero";
 import MorningBrief from "../components/executive/MorningBrief";
@@ -92,12 +92,22 @@ export default function ExecutiveDashboard() {
     return buildExecutiveDashboardViewModel(executive, dashboard, translate);
   }, [executive, dashboard, translate]);
 
-  function openProspectCenter(options = {}) {
-    navigate(buildProspectCenterPath(options));
+  function openMissionControl(options = {}) {
+    navigate(buildMissionControlPath(options));
   }
 
-  function openProspectWorkspace(phone) {
-    navigateToProspectWorkspace(navigate, phone);
+  function openOperationalTarget({ to, phone, filter } = {}) {
+    if (to) {
+      navigate(to);
+      return;
+    }
+
+    if (phone || filter) {
+      openMissionControl({ phone, filter });
+      return;
+    }
+
+    openMissionControl({ filter: EXECUTIVE_FILTERS.HIGH_PRIORITY });
   }
 
   const focusKey = searchParams.get("focus");
@@ -135,17 +145,23 @@ export default function ExecutiveDashboard() {
 
       <InterviewsHero
         hero={viewModel.hero}
-        onOpenMissionControl={() => openProspectCenter({ filter: "interviews-today" })}
+        onOpenMissionControl={() => navigate(viewModel.hero.to)}
       />
 
       <MorningBrief
         brief={alphaBrief || viewModel.morningBrief}
-        onReview={(phone) => openProspectWorkspace(phone)}
+        onReview={(phone, filter, to) =>
+          openOperationalTarget({
+            to,
+            phone,
+            filter
+          })
+        }
       />
 
       <FocusCards
         cards={viewModel.focusCards}
-        onNavigate={(filter) => openProspectCenter({ filter })}
+        onNavigate={(to) => navigate(to)}
       />
 
       <div className="executive-grid-two">
@@ -156,7 +172,7 @@ export default function ExecutiveDashboard() {
       <div className="executive-grid-two">
         <RecommendationCards
           items={viewModel.recommendations}
-          onOpen={(phone) => openProspectWorkspace(phone)}
+          onOpen={(item) => navigate(item.to)}
         />
         <ActivityTimeline activity={viewModel.activity} />
       </div>

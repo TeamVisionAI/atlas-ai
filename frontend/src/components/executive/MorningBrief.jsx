@@ -69,7 +69,26 @@ export default function MorningBrief({ brief, onReview }) {
           {recommendation?.phone && onReview ? (
             <button
               type="button"
-              onClick={() => onReview(recommendation.phone, recommendation.filter)}
+              onClick={() =>
+                onReview(recommendation.phone, recommendation.filter, recommendation.to)
+              }
+              style={{
+                appearance: "none",
+                border: "none",
+                background: "none",
+                padding: 0,
+                color: "#111827",
+                fontWeight: 600,
+                cursor: "pointer",
+                textDecoration: "underline"
+              }}
+            >
+              {recommendation.label}
+            </button>
+          ) : recommendation?.label && onReview ? (
+            <button
+              type="button"
+              onClick={() => onReview(null, null, recommendation.to)}
               style={{
                 appearance: "none",
                 border: "none",
@@ -104,7 +123,11 @@ export default function MorningBrief({ brief, onReview }) {
           <button
             type="button"
             onClick={() =>
-              onReview(brief.recommendedAction.phone, brief.recommendedAction.filter)
+              onReview(
+                brief.recommendedAction.phone,
+                brief.recommendedAction.filter,
+                brief.recommendedAction.to
+              )
             }
             style={{
               appearance: "none",
