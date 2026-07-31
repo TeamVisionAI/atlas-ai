@@ -12,7 +12,7 @@ export default function FocusCards({ cards, onNavigate }) {
             key={card.key}
             type="button"
             className="executive-card executive-focus-card"
-            onClick={() => onNavigate(card.filter)}
+            onClick={() => onNavigate(card.to)}
           >
             <div className="executive-focus-card__title">{card.title}</div>
             <div className="executive-focus-card__count">{card.count}</div>
