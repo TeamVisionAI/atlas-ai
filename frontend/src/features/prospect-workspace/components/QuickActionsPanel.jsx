@@ -16,6 +16,7 @@ const LIFECYCLE_ACTIONS = [
 ];
 
 function QuickActionsPanel({
+  embedded = false,
   lifecycleBusy,
   pendingActionId,
   prospectCoreId,
@@ -24,10 +25,17 @@ function QuickActionsPanel({
   children
 }) {
   const { translate } = useLanguage();
+  const HeadingTag = embedded ? "h3" : "h2";
+  const headingKey = embedded ? "workspaceOperationalQuickActions" : "workspaceSectionActions";
 
   return (
-    <section className="prospect-workspace__actions" aria-label={translate("workspaceSectionActions")}>
-      <h2 className="workspace-eyebrow">{translate("workspaceSectionActions")}</h2>
+    <section
+      className={`prospect-workspace__actions${embedded ? " prospect-workspace__actions--embedded" : ""}`}
+      aria-label={translate(headingKey)}
+    >
+      <HeadingTag className={embedded ? "prospect-workspace__operational-block-title" : "workspace-eyebrow"}>
+        {translate(headingKey)}
+      </HeadingTag>
 
       <div className="prospect-workspace-quick-actions">
         <p className="prospect-workspace-quick-actions__label">

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   COMMUNICATION_ACTION_IDS,
+  COMMUNICATION_PANEL_ACTION_ORDER,
   resolveCommunicationActions,
   isInterviewConfirmed
 } from "./communicationActionStateEngine.js";
@@ -41,13 +42,27 @@ test("resolveCommunicationActions always returns the full communication catalog"
   assert.equal(actions.length, 5);
   assert.deepEqual(
     actions.map((action) => action.id),
-    [
-      COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
-      COMMUNICATION_ACTION_IDS.SEND_ZOOM,
-      COMMUNICATION_ACTION_IDS.SEND_OFFICE,
-      COMMUNICATION_ACTION_IDS.SEND_REMINDER,
-      COMMUNICATION_ACTION_IDS.CUSTOM
-    ]
+    COMMUNICATION_PANEL_ACTION_ORDER
+  );
+});
+
+test("resolveCommunicationActions accepts workflow-driven action order overrides", () => {
+  const customOrder = [
+    COMMUNICATION_ACTION_IDS.SEND_REMINDER,
+    COMMUNICATION_ACTION_IDS.CUSTOM,
+    COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
+    COMMUNICATION_ACTION_IDS.SEND_ZOOM,
+    COMMUNICATION_ACTION_IDS.SEND_OFFICE
+  ];
+
+  const actions = resolveCommunicationActions(buildWorkspace(), {
+    translate,
+    actionOrder: customOrder
+  });
+
+  assert.deepEqual(
+    actions.map((action) => action.id),
+    customOrder
   );
 });
 

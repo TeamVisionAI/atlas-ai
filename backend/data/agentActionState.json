@@ -5976,7 +5976,8 @@
         "text": "Conversation outcome recorded: Information Collected. Updated: email, city, state, occupation, work_authorization_status.",
         "at": "2026-07-26T13:35:21.899Z",
         "type": "phone"
-      }
+      },
+      "Hola esto es una prueba"
     ],
     "outcome": null,
     "closureReason": null,

@@ -127,30 +127,35 @@ export function useWorkspaceActions({
         return;
       }
 
-      try {
-        let actionPayload = {};
+      if (actionId === "reschedule") {
+        try {
+          const result = await postMissionControlAction(workspace.phone, actionId, {});
 
-        if (actionId === "notes") {
-          const text = prompt
-            ? await prompt({
-                title: translate("missionControlActionNotes"),
-                label: translate("missionControlAddNotePrompt"),
-                placeholder: translate("workspaceActivityAddNotePlaceholder"),
-                confirmLabel: translate("workspaceActivityAddNote"),
-                cancelLabel: translate("workspaceCancel"),
-                multiline: true
-              })
-            : null;
-
-          if (!text) {
-            setPendingActionId(null);
+          if (!result.success) {
+            setActionError(result.message);
+            showToast?.showError(result.message);
             return;
           }
 
-          actionPayload = { text };
+          await refreshWorkspace();
+          showToast?.showSuccess(translate("workspaceToastActionCompleted"));
+        } catch (error) {
+          console.error(error);
+          const message =
+            error instanceof MissionControlError
+              ? translate("missionControlActionFailed")
+              : error.message;
+          setActionError(message);
+          showToast?.showError(message);
+        } finally {
+          setPendingActionId(null);
         }
 
-        const result = await postMissionControlAction(workspace.phone, actionId, actionPayload);
+        return;
+      }
+
+      try {
+        const result = await postMissionControlAction(workspace.phone, actionId, {});
 
         if (!result.success) {
           setActionError(result.message);
@@ -172,7 +177,7 @@ export function useWorkspaceActions({
         setPendingActionId(null);
       }
     },
-    [workspace?.phone, refreshWorkspace, showToast, translate, prompt, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer]
+    [workspace?.phone, workspace?.interview?.appointmentId, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer]
   );
 
   const runLifecycleAction = useCallback(

@@ -14,6 +14,9 @@ export default function ProspectDetailsPanel({
   capture,
   owner,
   collapsible = true,
+  includeInterview = true,
+  includeCoach = true,
+  sectionTitleKey = "workspaceSectionDetails",
   onCommunicationLanguageChange,
   communicationLanguageSaving = false,
   communicationLanguageError = null
@@ -27,41 +30,45 @@ export default function ProspectDetailsPanel({
 
   return (
     <div className="prospect-details">
-      <h2 className="workspace-eyebrow workspace-eyebrow--desktop-only">
-        {translate("workspaceSectionDetails")}
-      </h2>
+      {sectionTitleKey ? (
+        <h2 className="workspace-eyebrow workspace-eyebrow--desktop-only">
+          {translate(sectionTitleKey)}
+        </h2>
+      ) : null}
 
-      <WorkspaceSection
-        title={translate("workspaceDetailsInterview")}
-        summary={interviewSummary}
-        collapsible={collapsible}
-        defaultExpanded={!collapsible}
-      >
-        <dl className="prospect-details__list">
-          <div>
-            <dt>{translate("workspaceDetailsInterviewWhen")}</dt>
-            <dd>
-              {interview?.datetime
-                ? formatInterviewDateTime(interview.datetime)
-                : translate("workspaceInterviewSummaryNone")}
-            </dd>
-          </div>
-          <div>
-            <dt>{translate("workspaceDetailsInterviewType")}</dt>
-            <dd>{interview?.type || "—"}</dd>
-          </div>
-          <div>
-            <dt>{translate("workspaceDetailsInterviewOutcome")}</dt>
-            <dd>{interview?.outcome || "—"}</dd>
-          </div>
-          {interview?.gateActive ? (
+      {includeInterview ? (
+        <WorkspaceSection
+          title={translate("workspaceDetailsInterview")}
+          summary={interviewSummary}
+          collapsible={collapsible}
+          defaultExpanded={!collapsible}
+        >
+          <dl className="prospect-details__list">
             <div>
-              <dt>{translate("workspaceDetailsInterviewGate")}</dt>
-              <dd>{translate("workspaceDetailsInterviewGateActive")}</dd>
+              <dt>{translate("workspaceDetailsInterviewWhen")}</dt>
+              <dd>
+                {interview?.datetime
+                  ? formatInterviewDateTime(interview.datetime)
+                  : translate("workspaceInterviewSummaryNone")}
+              </dd>
             </div>
-          ) : null}
-        </dl>
-      </WorkspaceSection>
+            <div>
+              <dt>{translate("workspaceDetailsInterviewType")}</dt>
+              <dd>{interview?.type || "—"}</dd>
+            </div>
+            <div>
+              <dt>{translate("workspaceDetailsInterviewOutcome")}</dt>
+              <dd>{interview?.outcome || "—"}</dd>
+            </div>
+            {interview?.gateActive ? (
+              <div>
+                <dt>{translate("workspaceDetailsInterviewGate")}</dt>
+                <dd>{translate("workspaceDetailsInterviewGateActive")}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </WorkspaceSection>
+      ) : null}
 
       <WorkspaceSection
         title={translate("workspaceDetailsStatus")}
@@ -155,19 +162,21 @@ export default function ProspectDetailsPanel({
         </dl>
       </WorkspaceSection>
 
-      <WorkspaceSection
-        title={translate("workspaceDetailsCoach")}
-        summary={coachSummary}
-        collapsible={collapsible}
-        defaultExpanded={false}
-      >
-        <div className="prospect-coach-placeholder">
-          <p className="prospect-coach-placeholder__eyebrow">
-            {translate("workspaceCoachComingSoon")}
-          </p>
-          <p>{translate("workspaceCoachDescription")}</p>
-        </div>
-      </WorkspaceSection>
+      {includeCoach ? (
+        <WorkspaceSection
+          title={translate("workspaceDetailsCoach")}
+          summary={coachSummary}
+          collapsible={collapsible}
+          defaultExpanded={false}
+        >
+          <div className="prospect-coach-placeholder">
+            <p className="prospect-coach-placeholder__eyebrow">
+              {translate("workspaceCoachComingSoon")}
+            </p>
+            <p>{translate("workspaceCoachDescription")}</p>
+          </div>
+        </WorkspaceSection>
+      ) : null}
     </div>
   );
 }

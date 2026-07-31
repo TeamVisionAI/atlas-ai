@@ -13,7 +13,6 @@ import {
 import AgentMetricPanel from "../components/AgentMetricPanel";
 import WorkflowCompleteBanner from "../components/WorkflowCompleteBanner";
 import MissionControlDashboard from "../components/mission-control/MissionControlDashboard";
-import MissionControlPermanentActions from "../components/mission-control/MissionControlPermanentActions";
 import CommunicationActionsPanel from "../components/communication/CommunicationActionsPanel";
 import MissionActionCenter from "../components/mission-control/MissionActionCenter";
 import MissionControlWorkspaceHeader from "../components/mission-control/MissionControlWorkspaceHeader";
@@ -51,6 +50,8 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import { subscribeProspectProfileUpdated } from "../utils/prospectRefreshBus";
 import { usePromptDialog } from "../hooks/usePromptDialog";
+import { useUniversalNote } from "../hooks/useUniversalNote";
+import { resolveNoteContextFromMissionControl } from "../engines/notesEngine";
 import "./MissionControl.css";
 
 const MISSION_CONTROL_LIVE_POLL_MS = 5000;
@@ -262,6 +263,20 @@ export default function Dashboard() {
       setWorkspace(adapted);
     }
   }, [queue, currentIndex, dashboard]);
+
+  const { openAddNote, noteDialog, saving: noteSaving } = useUniversalNote({
+    getContext: () =>
+      resolveNoteContextFromMissionControl({
+        workspace,
+        primaryMission
+      }),
+    onSaved: async () => {
+      await refreshCurrentWorkspace();
+      await refreshMissions(phone);
+      await recalculateMissions({ prospectPhone: phone }).catch(() => {});
+    },
+    onError: (message) => setActionError(message)
+  });
 
   const evaluateMissionWorkflow = useCallback(
     async ({ skipAdvance = false } = {}) => {
@@ -477,26 +492,7 @@ export default function Dashboard() {
       }
 
       try {
-        let payload = {};
-
-        if (actionId === "notes") {
-          const text = await prompt({
-            title: translate("missionControlActionNotes"),
-            label: translate("missionControlAddNotePrompt"),
-            placeholder: translate("workspaceActivityAddNotePlaceholder"),
-            confirmLabel: translate("workspaceActivityAddNote"),
-            cancelLabel: translate("workspaceCancel"),
-            multiline: true
-          });
-
-          if (!text) {
-            return;
-          }
-
-          payload = { text };
-        }
-
-        const result = await postMissionControlAction(phone, actionId, payload);
+        const result = await postMissionControlAction(phone, actionId, {});
 
         if (!result.success) {
           setActionError(result.message);
@@ -511,7 +507,7 @@ export default function Dashboard() {
         setActionError(translate("missionControlActionFailed"));
       }
     },
-    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, runCommunicationAction, prompt]
+    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, runCommunicationAction]
   );
 
   const handleMissionActionImmediate = useCallback(
@@ -804,6 +800,7 @@ export default function Dashboard() {
   return (
     <>
       {promptDialog}
+      {noteDialog}
       <AgentMetricPanel
         type={activeMetricPanel}
         queue={queue}
@@ -887,13 +884,9 @@ export default function Dashboard() {
               workspace={workspace}
               organizationSettings={organizationSettings}
               onAction={handleMissionAction}
-              busy={executionSubmitting || prospectLoading}
-            />
-
-            <MissionControlPermanentActions
-              phone={phone}
-              onAction={handleMissionAction}
-              busy={executionSubmitting || prospectLoading}
+              onAddNote={openAddNote}
+              noteSaving={noteSaving}
+              busy={executionSubmitting || prospectLoading || noteSaving}
             />
 
             <MissionControlExecutionPanel

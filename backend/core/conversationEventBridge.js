@@ -68,8 +68,20 @@ function buildPayloadForLog(logRow, extras = {}) {
     channel: "whatsapp",
     ...(extras.providerMessageId ? { providerMessageId: extras.providerMessageId } : {}),
     ...(extras.rawWebhookPayload ? { rawWebhookPayload: extras.rawWebhookPayload } : {}),
+    ...(extras.attachment?.note ? { note: extras.attachment.note } : {}),
+    ...(extras.attachment && !extras.attachment.note
+      ? {
+          attachment: {
+            entityType: extras.attachment.entityType,
+            entityId: extras.attachment.entityId,
+            prospectPhone: extras.attachment.prospectPhone
+          }
+        }
+      : {}),
     ...(isAgentNote
-      ? { noteText: message.slice(AGENT_NOTE_PREFIX.length).trim() }
+      ? {
+          noteText: extras.attachment?.note?.content || message.slice(AGENT_NOTE_PREFIX.length).trim()
+        }
       : {})
   };
 }

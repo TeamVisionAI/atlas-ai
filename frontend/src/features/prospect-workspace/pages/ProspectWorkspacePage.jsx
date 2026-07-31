@@ -12,16 +12,12 @@ import {
 } from "../../../engines/workflowEngine";
 import JourneyProgress from "../../../components/prospect-workspace/JourneyProgress";
 import ProspectDetailsPanel from "../../../components/prospect-workspace/ProspectDetailsPanel";
-import NextActions from "../../../components/NextActions";
-import WorkflowGatePanel from "../../../components/WorkflowGatePanel";
-import WorkflowCompleteBanner from "../../../components/WorkflowCompleteBanner";
 import ProspectWorkspaceHeader from "../components/ProspectWorkspaceHeader";
 import ProspectHeader from "../components/ProspectHeader";
-import MissionControlContextPanel from "../components/MissionControlContextPanel";
-import ExecutiveDashboardLinks from "../components/ExecutiveDashboardLinks";
-import QuickActionsPanel from "../components/QuickActionsPanel";
+import OperationalWorkspace from "../components/OperationalWorkspace";
 import CommunicationHistorySection from "../components/CommunicationHistorySection";
-import CommunicationActionsPanel from "../../../components/communication/CommunicationActionsPanel";
+import ProspectCoachPanel from "../components/ProspectCoachPanel";
+import ExecutiveInsightsSection from "../components/ExecutiveInsightsSection";
 import {
   useIsDesktop,
   useProspectCore,
@@ -31,6 +27,8 @@ import { useMissionControlContext } from "../hooks/useMissionControlContext";
 import { useWorkspaceActions } from "../hooks/useWorkspaceActions";
 import { useConfirmDialog } from "../hooks/useConfirmDialog";
 import { usePromptDialog } from "../../../hooks/usePromptDialog";
+import { useUniversalNote } from "../../../hooks/useUniversalNote";
+import { resolveNoteContextFromWorkspace } from "../../../engines/notesEngine";
 import { useWorkspaceKeyboardShortcuts } from "../hooks/useWorkspaceKeyboardShortcuts";
 import { appPath } from "../../../config/appRoutes";
 import ProspectEditorDrawer from "../components/ProspectEditorDrawer";
@@ -70,6 +68,7 @@ export default function ProspectWorkspacePage() {
   const [workflowState, setWorkflowState] = useState(null);
   const [workflowComplete, setWorkflowComplete] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [activityRefreshSignal, setActivityRefreshSignal] = useState(0);
 
   useEffect(() => {
     if (!workspace?.phone) {
@@ -93,6 +92,16 @@ export default function ProspectWorkspacePage() {
       setRefreshing(false);
     }
   }, [refreshWorkspace, showToast, translate]);
+
+  const { openAddNote, noteDialog, saving: noteSaving } = useUniversalNote({
+    getContext: () => resolveNoteContextFromWorkspace(workspace),
+    onSaved: async () => {
+      await refreshWorkspace();
+      setActivityRefreshSignal((current) => current + 1);
+      showToast.showSuccess(translate("workspaceToastActionCompleted"));
+    },
+    onError: (message) => showToast.showError(message)
+  });
 
   const actions = useWorkspaceActions({
     workspace,
@@ -198,6 +207,7 @@ export default function ProspectWorkspacePage() {
     <div className="prospect-workspace" aria-busy={refreshing || undefined}>
       {confirmDialog}
       {promptDialog}
+      {noteDialog}
       <p className="prospect-workspace__shortcuts-hint">{translate("workspaceKeyboardHint")}</p>
 
       <ProspectWorkspaceHeader
@@ -217,78 +227,64 @@ export default function ProspectWorkspacePage() {
 
       <JourneyProgress journey={workspace.journey} />
 
-      <div className="prospect-workspace__insights">
-        <MissionControlContextPanel
-          prospectContext={prospectContext}
-          loading={missionControlLoading}
-          error={missionControlError}
-        />
-        <ExecutiveDashboardLinks prospectCoreId={prospectCoreId} />
-      </div>
-
-      <QuickActionsPanel
+      <OperationalWorkspace
+        workspace={workspace}
+        organizationSettings={organizationSettings}
+        interview={workspace.interview}
+        workflow={payload?.workflow}
+        workflowComplete={workflowComplete}
+        showGate={showGate}
+        actionError={actions.actionError}
         lifecycleBusy={actions.lifecycleBusy}
         pendingActionId={actions.pendingActionId}
         prospectCoreId={prospectCoreId}
         userRole={user?.role}
         onLifecycleAction={actions.handleLifecycleAction}
+        onMissionAction={actions.handleMissionAction}
+        onGateComplete={handleGateOutcome}
+        onAddNote={openAddNote}
+        onRefresh={refreshWorkspace}
+        noteSaving={noteSaving}
+      />
+
+      <CommunicationHistorySection
+        phone={workspace.phone}
+        conversation={workspace.conversation}
+        activityPreview={payload?.activityPreview || []}
+        prospectCoreId={prospectCoreId}
+        timelineRef={timelineRef}
+        activityRefreshSignal={activityRefreshSignal}
+      />
+
+      <section
+        className="prospect-workspace__reference-section"
+        aria-labelledby="prospect-information-heading"
       >
-        {workflowComplete ? (
-          <WorkflowCompleteBanner
-            message={workflowComplete.message}
-            hasNextPriority={false}
-            onNextPriority={() => {}}
-          />
-        ) : null}
-
-        {actions.actionError ? (
-          <p className="prospect-workspace__action-error" role="alert">
-            {actions.actionError}
-          </p>
-        ) : null}
-
-        <CommunicationActionsPanel
-          workspace={workspace}
-          organizationSettings={organizationSettings}
-          onAction={actions.handleMissionAction}
-          busy={Boolean(actions.pendingActionId)}
-        />
-
-        {showGate ? (
-          <WorkflowGatePanel
-            gate={workspace.workflowGate}
-            workflow={payload?.workflow}
-            prospectName={workspace.identity.name}
-            phone={workspace.phone}
-            onComplete={handleGateOutcome}
-          />
-        ) : (
-          <NextActions actions={workspaceContext.nextActions} />
-        )}
-      </QuickActionsPanel>
-
-      <div className="prospect-workspace__columns">
-        <div className="prospect-workspace__main-column">
-          <CommunicationHistorySection
-            phone={workspace.phone}
-            conversation={workspace.conversation}
-            activityPreview={payload?.activityPreview || []}
-            prospectCoreId={prospectCoreId}
-            timelineRef={timelineRef}
-            onNoteAdded={refreshWorkspace}
-          />
-        </div>
+        <h2 id="prospect-information-heading" className="workspace-eyebrow">
+          {translate("workspaceSectionProspectInformation")}
+        </h2>
         <ProspectDetailsPanel
           interview={workspace.interview}
           status={workspace.status}
           capture={workspace.capture}
           owner={workspace.owner}
           collapsible={!isDesktop}
+          includeInterview={false}
+          includeCoach={false}
           onCommunicationLanguageChange={actions.handleCommunicationLanguageChange}
           communicationLanguageSaving={actions.communicationLanguageSaving}
           communicationLanguageError={actions.communicationLanguageError}
         />
-      </div>
+      </section>
+
+      <ProspectCoachPanel collapsible={!isDesktop} />
+
+      <ExecutiveInsightsSection
+        prospectContext={prospectContext}
+        missionControlLoading={missionControlLoading}
+        missionControlError={missionControlError}
+        prospectCoreId={prospectCoreId}
+      />
 
       <ProspectEditorDrawer
         open={actions.prospectEditorOpen}

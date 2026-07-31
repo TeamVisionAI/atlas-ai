@@ -79,8 +79,115 @@
   gap: 16px;
 }
 
+.prospect-workspace__operational {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.prospect-workspace__operational-header {
+  display: grid;
+  gap: 6px;
+}
+
+.prospect-workspace__operational-intro,
+.prospect-workspace__executive-insights-intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.prospect-workspace__operational-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.prospect-workspace__operational-block--communication {
+  border-color: #bfdbfe;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.prospect-workspace__operational-block--interview {
+  background: #f8fafc;
+}
+
+.prospect-workspace__operational-block-header {
+  display: grid;
+  gap: 4px;
+}
+
+.prospect-workspace__operational-block-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.prospect-workspace__operational-block-summary {
+  margin: 0;
+  font-size: 14px;
+  color: #111827;
+}
+
+.prospect-workspace__operational-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prospect-workspace__interview-details {
+  margin-top: 12px;
+}
+
+.prospect-workspace__actions--embedded {
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.prospect-workspace__actions--embedded .prospect-workspace-quick-actions {
+  margin-bottom: 0;
+}
+
+.prospect-workspace__reference-section,
+.prospect-workspace__executive-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prospect-workspace__executive-insights {
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.prospect-workspace__executive-insights-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
 @media (min-width: 960px) {
   .prospect-workspace__insights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .prospect-workspace__executive-insights-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

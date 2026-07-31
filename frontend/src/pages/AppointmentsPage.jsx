@@ -17,6 +17,9 @@ import {
 } from "../components/appointments/AppointmentDetailsPanel";
 import AppointmentErrorCard from "../components/appointments/AppointmentErrorCard";
 import { captureAppointmentError } from "../utils/appointmentErrors";
+import { useUniversalNote } from "../hooks/useUniversalNote";
+import { buildAppointmentNoteContext } from "../engines/notesEngine";
+import UniversalNoteButton from "../components/notes/UniversalNoteButton";
 import "../styles/atlas-ui.css";
 import "./AppointmentsPage.css";
 
@@ -171,6 +174,24 @@ export default function AppointmentsPage() {
   const emptyBody = useMemo(() => {
     return translate(`appointmentsEmpty_${activeView}`) || translate("appointmentsEmptyDefault");
   }, [activeView, translate]);
+
+  const { openAddNote, noteDialog, saving: noteSaving } = useUniversalNote({
+    onSaved: () => {
+      setActionMessage(translate("workspaceToastActionCompleted"));
+    },
+    onError: (message) => setActionMessage(message)
+  });
+
+  const handleAddAppointmentNote = useCallback(
+    (appointment) =>
+      openAddNote(
+        buildAppointmentNoteContext({
+          phone: appointment.prospectPhone,
+          appointmentId: appointment.id
+        })
+      ),
+    [openAddNote]
+  );
 
   function setView(view) {
     setSearchParams({ view });
@@ -391,6 +412,11 @@ export default function AppointmentsPage() {
                     ) : null}
 
                     <div className="appointments-page__actions">
+                      <UniversalNoteButton
+                        size="sm"
+                        busy={noteSaving}
+                        onClick={() => handleAddAppointmentNote(appointment)}
+                      />
                       <AtlasButton
                         variant="secondary"
                         size="sm"
@@ -477,6 +503,7 @@ export default function AppointmentsPage() {
         onClose={closeDialog}
         onSuccess={() => handleActionSuccess(translate("appointmentsAssistResolved"))}
       />
+      {noteDialog}
     </div>
   );
 }

@@ -58,6 +58,12 @@
   padding: 24px 26px;
 }
 
+.action-card--recommended {
+  box-shadow:
+    0 0 0 2px rgba(37, 99, 235, 0.22),
+    0 10px 24px rgba(37, 99, 235, 0.14);
+}
+
 .action-card__icon {
   font-size: 32px;
   line-height: 1;

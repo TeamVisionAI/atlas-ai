@@ -31,7 +31,6 @@ const {
   buildZoomLinkMessage,
   buildOfficeLocationMessage,
   buildMissedAppointmentMessage,
-  buildAgentNoteTimelineMessage,
   buildAgentActionTimelineMessage
 } = require("../core/agentActionCopy");
 const { getMissionControlState } = require("../core/missionControlReadModel");
@@ -58,6 +57,7 @@ const { buildRecruiterBrief } = require("../core/recruiterBriefBuilder");
 const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
 const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
+const { buildPersistedAgentNote } = require("../core/notesEngine");
 const {
   requireTenantOrganizationId,
   isTenantScopedRequest
@@ -81,7 +81,7 @@ function buildActionSuccess(action, message, workflowState = null) {
   };
 }
 
-async function logAgentTimeline(prospect, message, pipeline = "AGENT") {
+async function logAgentTimeline(prospect, message, pipeline = "AGENT", extras = {}) {
   await logConversation({
     phone: prospect.phone,
     name: prospect.name,
@@ -92,7 +92,8 @@ async function logAgentTimeline(prospect, message, pipeline = "AGENT") {
     currentStep: prospect.current_step || "AGENT",
     language: prospect.language || "en",
     city: prospect.city,
-    state: prospect.state
+    state: prospect.state,
+    attachment: extras.attachment || null
   });
 }
 
@@ -233,18 +234,35 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
     }
 
     case ACTION_IDS.NOTES: {
-      const text = String(payload.text || "").trim();
+      const persisted = buildPersistedAgentNote(payload.text, payload.context || {}, {
+        organizationId,
+        authorUserId: options.authorUserId || null
+      });
 
-      if (!text) {
-        return buildActionError(action, "NOTE_REQUIRED", "Note text is required.");
+      if (!persisted.valid) {
+        return buildActionError(
+          action,
+          persisted.error,
+          persisted.error === "NOTE_REQUIRED"
+            ? "Note text is required."
+            : "Unable to attach note to the requested context."
+        );
       }
 
-      const nextNotes = [...(agentState.agentNotes || []), text];
+      const { note, attachment } = persisted;
+      const nextNotes = [...(agentState.agentNotes || []), note.content];
       mergeAgentState(phone, { agentNotes: nextNotes });
-      await logAgentTimeline(prospect, buildAgentNoteTimelineMessage(text));
+      await logAgentTimeline(prospect, persisted.timelineMessage, "AGENT", {
+        attachment: {
+          ...attachment,
+          note
+        }
+      });
 
       return buildActionSuccess(action, "Agent note saved.", {
-        agentNotes: nextNotes
+        agentNotes: nextNotes,
+        note,
+        attachment
       });
     }
 

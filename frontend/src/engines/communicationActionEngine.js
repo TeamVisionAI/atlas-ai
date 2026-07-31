@@ -10,6 +10,8 @@ import { executeSendInterviewDetails } from "../services/appointmentService";
 export {
   COMMUNICATION_ACTION_IDS,
   PANEL_COMMUNICATION_ACTION_IDS,
+  COMMUNICATION_PANEL_ACTION_ORDER,
+  orderCommunicationPanelActions,
   resolveCommunicationActions,
   isPanelCommunicationAction,
   filterPanelCommunicationActions,

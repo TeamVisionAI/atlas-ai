@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { postMissionControlAction } from "../../services/missionControlService";
 import { getProspectActivityFeed } from "../../services/prospectWorkspaceService";
 import {
   buildActivityActorLabel,
@@ -38,7 +37,11 @@ function ActivityFeedItem({ item, translate, locale }) {
   );
 }
 
-export default function ActivityFeed({ phone, previewItems = [], onNoteAdded }) {
+export default function ActivityFeed({
+  phone,
+  previewItems = [],
+  refreshSignal = 0
+}) {
   const { translate, language } = useLanguage();
   const locale = language === "es" ? "es-US" : "en-US";
   const [items, setItems] = useState(previewItems);
@@ -47,9 +50,7 @@ export default function ActivityFeed({ phone, previewItems = [], onNoteAdded }) 
   const [filterId, setFilterId] = useState("all");
   const [loading, setLoading] = useState(!previewItems.length);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [submittingNote, setSubmittingNote] = useState(false);
   const [error, setError] = useState(null);
-  const [noteText, setNoteText] = useState("");
 
   const filterOptions = useMemo(() => getActivityFilterOptions(translate), [translate]);
 
@@ -103,6 +104,16 @@ export default function ActivityFeed({ phone, previewItems = [], onNoteAdded }) 
   }, [phone, filterId, loadFeed, translate]);
 
   useEffect(() => {
+    if (!refreshSignal) {
+      return;
+    }
+
+    loadFeed({ append: false, activeFilter: filterId }).catch((err) => {
+      console.error(err);
+    });
+  }, [refreshSignal, filterId, loadFeed]);
+
+  useEffect(() => {
     const refreshLiveFeed = () => {
       if (document.visibilityState !== "visible" || loading || loadingMore) {
         return;
@@ -150,36 +161,6 @@ export default function ActivityFeed({ phone, previewItems = [], onNoteAdded }) 
     }
   }
 
-  async function handleSubmitNote(event) {
-    event.preventDefault();
-    const text = noteText.trim();
-
-    if (!text || submittingNote) {
-      return;
-    }
-
-    setSubmittingNote(true);
-    setError(null);
-
-    try {
-      const result = await postMissionControlAction(phone, "notes", { text });
-
-      if (!result.success) {
-        setError(result.message || translate("workspaceActivityNoteError"));
-        return;
-      }
-
-      setNoteText("");
-      await loadFeed({ append: false, activeFilter: filterId });
-      onNoteAdded?.();
-    } catch (err) {
-      console.error(err);
-      setError(translate("workspaceActivityNoteError"));
-    } finally {
-      setSubmittingNote(false);
-    }
-  }
-
   return (
     <section className="activity-feed" aria-label={translate("workspaceSectionActivity")}>
       <div className="activity-feed__header">
@@ -199,28 +180,6 @@ export default function ActivityFeed({ phone, previewItems = [], onNoteAdded }) 
           ))}
         </div>
       </div>
-
-      <form className="activity-feed__composer" onSubmit={handleSubmitNote}>
-        <label className="activity-feed__composer-label" htmlFor="activity-note-input">
-          {translate("workspaceActivityAddNoteLabel")}
-        </label>
-        <textarea
-          id="activity-note-input"
-          className="activity-feed__composer-input"
-          rows={3}
-          value={noteText}
-          placeholder={translate("workspaceActivityAddNotePlaceholder")}
-          onChange={(event) => setNoteText(event.target.value)}
-          disabled={submittingNote}
-        />
-        <button
-          type="submit"
-          className="activity-feed__composer-submit"
-          disabled={submittingNote || !noteText.trim()}
-        >
-          {submittingNote ? translate("workspaceActivitySavingNote") : translate("workspaceActivityAddNote")}
-        </button>
-      </form>
 
       {error ? <p className="activity-feed__error">{error}</p> : null}
 

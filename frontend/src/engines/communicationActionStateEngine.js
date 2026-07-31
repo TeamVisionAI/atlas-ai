@@ -13,6 +13,31 @@ export const COMMUNICATION_ACTION_IDS = Object.freeze({
 
 export const PANEL_COMMUNICATION_ACTION_IDS = new Set(Object.values(COMMUNICATION_ACTION_IDS));
 
+/**
+ * Static representative workflow order for the Communication panel (Sprint 12.3.3).
+ * Future: Workflow Engine supplies a prioritized list without changing panel layout.
+ */
+export const COMMUNICATION_PANEL_ACTION_ORDER = Object.freeze([
+  COMMUNICATION_ACTION_IDS.CUSTOM,
+  COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
+  COMMUNICATION_ACTION_IDS.SEND_OFFICE,
+  COMMUNICATION_ACTION_IDS.SEND_ZOOM,
+  COMMUNICATION_ACTION_IDS.SEND_REMINDER
+]);
+
+export function orderCommunicationPanelActions(
+  actions,
+  order = COMMUNICATION_PANEL_ACTION_ORDER
+) {
+  const rank = new Map(order.map((id, index) => [id, index]));
+
+  return [...actions].sort((left, right) => {
+    const leftRank = rank.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+    const rightRank = rank.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+    return leftRank - rightRank;
+  });
+}
+
 const SOON_MS = 2 * 60 * 60 * 1000;
 const APPROACHING_MS = 24 * 60 * 60 * 1000;
 
@@ -293,7 +318,7 @@ function evaluateSendReminder(ctx) {
  * @param {import("../types/missionControl").AgentWorkspaceModel | null | undefined} workspace
  * @param {{ translate?: Function, organizationSettings?: import("../types/organization").OrganizationSettings | null }} [options]
  */
-export function resolveCommunicationActions(workspace, { translate, organizationSettings = null } = {}) {
+export function resolveCommunicationActions(workspace, { translate, organizationSettings = null, actionOrder } = {}) {
   const ctx = {
     workspacePresent: Boolean(workspace),
     ...buildActionContext(workspace || {}, organizationSettings)
@@ -315,7 +340,7 @@ export function resolveCommunicationActions(workspace, { translate, organization
     },
     {
       id: COMMUNICATION_ACTION_IDS.SEND_ZOOM,
-      icon: "💬",
+      icon: "🎥",
       titleKey: zoomTitleKey,
       subtitleKey: "whatsappActionOneClickHint",
       variant: "primary",
@@ -347,19 +372,22 @@ export function resolveCommunicationActions(workspace, { translate, organization
     }
   ];
 
-  return catalog.map((entry) =>
-    gateOrEnabled(
-      {
-        id: entry.id,
-        icon: entry.icon,
-        titleKey: entry.titleKey,
-        subtitleKey: entry.subtitleKey,
-        variant: entry.variant
-      },
-      ctx,
-      translate,
-      entry.evaluate
-    )
+  return orderCommunicationPanelActions(
+    catalog.map((entry) =>
+      gateOrEnabled(
+        {
+          id: entry.id,
+          icon: entry.icon,
+          titleKey: entry.titleKey,
+          subtitleKey: entry.subtitleKey,
+          variant: entry.variant
+        },
+        ctx,
+        translate,
+        entry.evaluate
+      )
+    ),
+    actionOrder
   );
 }
 

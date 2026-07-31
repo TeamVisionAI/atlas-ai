@@ -13,7 +13,8 @@ const { getTenantOrganizationId } = require("../services/tenantContextService");
 function tenantOptions(req) {
   return {
     organizationId: getTenantOrganizationId(req),
-    tenantScoped: true
+    tenantScoped: true,
+    authorUserId: req.tenantContext?.userId || req.authContext?.userId || null
   };
 }
 

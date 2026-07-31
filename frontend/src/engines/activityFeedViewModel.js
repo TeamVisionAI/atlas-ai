@@ -103,7 +103,8 @@ export function buildActivityItemLabel(item, translate) {
 }
 
 export function buildActivityItemBody(item) {
-  const preview = item.payload?.bodyPreview || item.payload?.noteText;
+  const preview =
+    item.payload?.note?.content || item.payload?.bodyPreview || item.payload?.noteText;
 
   if (preview) {
     return preview;

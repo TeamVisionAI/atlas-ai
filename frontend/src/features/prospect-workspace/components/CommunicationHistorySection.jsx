@@ -13,7 +13,7 @@ export default function CommunicationHistorySection({
   activityPreview = [],
   prospectCoreId,
   timelineRef,
-  onNoteAdded
+  activityRefreshSignal = 0
 }) {
   const { translate } = useLanguage();
   const messageCount = conversation?.messages?.length || 0;
@@ -50,7 +50,11 @@ export default function CommunicationHistorySection({
         </div>
       ) : null}
 
-      <ActivityFeed phone={phone} previewItems={activityPreview} onNoteAdded={onNoteAdded} />
+      <ActivityFeed
+        phone={phone}
+        previewItems={activityPreview}
+        refreshSignal={activityRefreshSignal}
+      />
 
       <Suspense fallback={<WorkspaceSkeleton />}>
         <ProspectTimelinePanel ref={timelineRef} prospectCoreId={prospectCoreId} />
