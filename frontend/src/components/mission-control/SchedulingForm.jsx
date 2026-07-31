@@ -111,7 +111,8 @@ export default function SchedulingForm({
   onInterviewTypeChange,
   prospect = null,
   inline = false,
-  useSemanticSections = false
+  useSemanticSections = false,
+  presentation = "default"
 }) {
   const { translate, language } = useLanguage();
   const locale = language === "es" ? "es-ES" : "en-US";
@@ -170,9 +171,11 @@ export default function SchedulingForm({
   }
 
   const Wrapper = inline ? "div" : ExecutivePanel;
+  const scheduleDialogClass =
+    presentation === "scheduleDialog" ? " scheduling-form--schedule-dialog" : "";
   const wrapperProps = inline
-    ? { className: "scheduling-form scheduling-form--inline" }
-    : { className: "scheduling-form" };
+    ? { className: `scheduling-form scheduling-form--inline${scheduleDialogClass}` }
+    : { className: `scheduling-form${scheduleDialogClass}` };
 
   const schedulingContent = (
     <>

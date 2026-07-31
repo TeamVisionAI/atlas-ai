@@ -16,6 +16,7 @@ function OperationalWorkspace({
   actionError,
   lifecycleBusy,
   pendingActionId,
+  scheduleActionBusy = false,
   prospectCoreId,
   userRole,
   onLifecycleAction,
@@ -43,8 +44,10 @@ function OperationalWorkspace({
 
       <QuickActionsPanel
         embedded
+        interview={interview}
         lifecycleBusy={lifecycleBusy}
         pendingActionId={pendingActionId}
+        scheduleActionBusy={scheduleActionBusy}
         prospectCoreId={prospectCoreId}
         userRole={userRole}
         onLifecycleAction={onLifecycleAction}

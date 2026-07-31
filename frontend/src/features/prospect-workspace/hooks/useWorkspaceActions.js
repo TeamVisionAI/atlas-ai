@@ -3,6 +3,9 @@ import {
   MissionControlError,
   postMissionControlAction
 } from "../../../services/missionControlService";
+import { executeScheduleInterview } from "../../../services/missionExecutionService";
+import { fetchAppointment, isActiveAppointment } from "../../../services/appointmentService";
+import { resolveQuickActionScheduleBehavior } from "../../../engines/quickActionScheduleEngine";
 import {
   isWhatsAppCopyAction
 } from "../../../services/whatsappCommunicationService";
@@ -32,6 +35,11 @@ export function useWorkspaceActions({
   const [communicationLanguageSaving, setCommunicationLanguageSaving] = useState(false);
   const [communicationLanguageError, setCommunicationLanguageError] = useState(null);
   const [prospectEditorOpen, setProspectEditorOpen] = useState(false);
+  const [scheduleDialog, setScheduleDialog] = useState(null);
+  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
+  const [scheduleError, setScheduleError] = useState(null);
+  const [rescheduleAppointment, setRescheduleAppointment] = useState(null);
+  const [scheduleActionBusy, setScheduleActionBusy] = useState(false);
 
   const handleOrganizationResourceMissing = useCallback(
     (resourceKey) => {
@@ -300,10 +308,128 @@ export function useWorkspaceActions({
       }
 
       if (actionId === "schedule") {
-        await handleMissionAction("schedule");
+        const behavior = resolveQuickActionScheduleBehavior(workspace?.interview);
+
+        if (!behavior.visible) {
+          return;
+        }
+
+        setScheduleError(null);
+
+        if (behavior.mode === "reschedule" && behavior.useAppointmentRescheduleDialog) {
+          if (!workspace?.interview?.appointmentId) {
+            return;
+          }
+
+          setScheduleActionBusy(true);
+
+          try {
+            const appointment = await fetchAppointment(workspace.interview.appointmentId);
+
+            if (!isActiveAppointment(appointment)) {
+              const message = translate("workspaceInterviewActionUnavailable");
+              setActionError(message);
+              showToast?.showError(message);
+              return;
+            }
+
+            setRescheduleAppointment(appointment);
+          } catch (error) {
+            console.error(error);
+            const message = translate("workspaceInterviewActionUnavailable");
+            setActionError(message);
+            showToast?.showError(message);
+          } finally {
+            setScheduleActionBusy(false);
+          }
+
+          return;
+        }
+
+        setScheduleDialog({ mode: behavior.mode });
       }
     },
-    [confirm, handleMissionAction, prompt, prospectCoreId, runLifecycleAction, translate]
+    [
+      confirm,
+      prompt,
+      prospectCoreId,
+      runLifecycleAction,
+      showToast,
+      translate,
+      workspace?.interview
+    ]
+  );
+
+  const handleScheduleDialogClose = useCallback(() => {
+    if (scheduleSubmitting) {
+      return;
+    }
+
+    setScheduleDialog(null);
+    setScheduleError(null);
+  }, [scheduleSubmitting]);
+
+  const handleRescheduleDialogClose = useCallback(() => {
+    setRescheduleAppointment(null);
+  }, []);
+
+  const handleRescheduleDialogSuccess = useCallback(async () => {
+    setRescheduleAppointment(null);
+    await refreshWorkspace();
+    showToast?.showSuccess(translate("appointmentsRescheduled"));
+  }, [refreshWorkspace, showToast, translate]);
+
+  const handleScheduleInterviewSubmit = useCallback(
+    async (form) => {
+      if (!workspace?.phone) {
+        return;
+      }
+
+      setScheduleSubmitting(true);
+      setScheduleError(null);
+      setActionError(null);
+
+      try {
+        const interviewTypeMap = {
+          zoom: "Zoom",
+          office: "In Person",
+          public_location: "Public Location"
+        };
+        const interviewType = interviewTypeMap[form.interviewType] || "In Person";
+        const result = await executeScheduleInterview(workspace.phone, {
+          dateKey: form.dateKey,
+          timeKey: form.timeKey,
+          duration: form.duration,
+          interviewType,
+          recruiter: form.recruiter?.trim() || undefined,
+          officeLocation: form.officeLocation?.trim() || undefined,
+          notes: form.notes?.trim() || undefined,
+          email: form.email || undefined
+        });
+
+        if (!result.success) {
+          const message = result.message || translate("missionExecutionFailed");
+          setScheduleError(message);
+          showToast?.showError(message);
+          return;
+        }
+
+        setScheduleDialog(null);
+        await refreshWorkspace();
+        showToast?.showSuccess(translate("workspaceToastInterviewScheduled"));
+      } catch (error) {
+        console.error(error);
+        const message =
+          error instanceof MissionControlError
+            ? translate("missionExecutionFailed")
+            : error.message || translate("missionExecutionFailed");
+        setScheduleError(message);
+        showToast?.showError(message);
+      } finally {
+        setScheduleSubmitting(false);
+      }
+    },
+    [refreshWorkspace, showToast, translate, workspace?.phone]
   );
 
   const handleProspectEditorClose = useCallback(() => {
@@ -353,6 +479,15 @@ export function useWorkspaceActions({
     handleOrganizationResourceMissing,
     prospectEditorOpen,
     handleProspectEditorClose,
-    handleProspectEditorSaved
+    handleProspectEditorSaved,
+    scheduleDialog,
+    scheduleSubmitting,
+    scheduleError,
+    scheduleActionBusy,
+    rescheduleAppointment,
+    handleScheduleDialogClose,
+    handleScheduleInterviewSubmit,
+    handleRescheduleDialogClose,
+    handleRescheduleDialogSuccess
   };
 }

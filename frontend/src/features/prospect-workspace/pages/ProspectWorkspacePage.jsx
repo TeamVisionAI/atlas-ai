@@ -32,6 +32,8 @@ import { resolveNoteContextFromWorkspace } from "../../../engines/notesEngine";
 import { useWorkspaceKeyboardShortcuts } from "../hooks/useWorkspaceKeyboardShortcuts";
 import { appPath } from "../../../config/appRoutes";
 import ProspectEditorDrawer from "../components/ProspectEditorDrawer";
+import ScheduleInterviewDialog from "../components/ScheduleInterviewDialog";
+import RescheduleAppointmentDialog from "../../../components/appointments/RescheduleAppointmentDialog";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import "../../../pages/ProspectWorkspace.css";
 
@@ -237,6 +239,7 @@ export default function ProspectWorkspacePage() {
         actionError={actions.actionError}
         lifecycleBusy={actions.lifecycleBusy}
         pendingActionId={actions.pendingActionId}
+        scheduleActionBusy={actions.scheduleActionBusy}
         prospectCoreId={prospectCoreId}
         userRole={user?.role}
         onLifecycleAction={actions.handleLifecycleAction}
@@ -292,6 +295,24 @@ export default function ProspectWorkspacePage() {
         translate={translate}
         onClose={actions.handleProspectEditorClose}
         onSaved={actions.handleProspectEditorSaved}
+      />
+
+      <ScheduleInterviewDialog
+        open={Boolean(actions.scheduleDialog)}
+        mode={actions.scheduleDialog?.mode || "schedule"}
+        prospect={workspace.prospect}
+        recruiterName={workspace.owner?.name || ""}
+        submitting={actions.scheduleSubmitting}
+        error={actions.scheduleError}
+        onClose={actions.handleScheduleDialogClose}
+        onSubmit={actions.handleScheduleInterviewSubmit}
+      />
+
+      <RescheduleAppointmentDialog
+        open={Boolean(actions.rescheduleAppointment)}
+        appointment={actions.rescheduleAppointment}
+        onClose={actions.handleRescheduleDialogClose}
+        onSuccess={actions.handleRescheduleDialogSuccess}
       />
     </div>
   );
