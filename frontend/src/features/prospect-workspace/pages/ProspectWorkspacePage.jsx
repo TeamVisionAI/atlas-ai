@@ -28,6 +28,8 @@ import { useWorkspaceActions } from "../hooks/useWorkspaceActions";
 import { useConfirmDialog } from "../hooks/useConfirmDialog";
 import { usePromptDialog } from "../../../hooks/usePromptDialog";
 import { useUniversalNote } from "../../../hooks/useUniversalNote";
+import { useCommunicationPreview } from "../../../hooks/useCommunicationPreview";
+import CommunicationPreviewDialog from "../../../components/communication/CommunicationPreviewDialog";
 import { resolveNoteContextFromWorkspace } from "../../../engines/notesEngine";
 import { useWorkspaceKeyboardShortcuts } from "../hooks/useWorkspaceKeyboardShortcuts";
 import { appPath } from "../../../config/appRoutes";
@@ -105,6 +107,12 @@ export default function ProspectWorkspacePage() {
     onError: (message) => showToast.showError(message)
   });
 
+  const communicationPreview = useCommunicationPreview({
+    translate,
+    showToast,
+    onRecorded: refreshWorkspace
+  });
+
   const actions = useWorkspaceActions({
     workspace,
     prospectCoreId,
@@ -112,7 +120,8 @@ export default function ProspectWorkspacePage() {
     translate,
     showToast,
     confirm,
-    prompt
+    prompt,
+    communicationPreview
   });
 
   useWorkspaceKeyboardShortcuts({
@@ -313,6 +322,18 @@ export default function ProspectWorkspacePage() {
         appointment={actions.rescheduleAppointment}
         onClose={actions.handleRescheduleDialogClose}
         onSuccess={actions.handleRescheduleDialogSuccess}
+      />
+
+      <CommunicationPreviewDialog
+        open={communicationPreview.open}
+        payload={communicationPreview.payload}
+        loading={communicationPreview.loading}
+        error={communicationPreview.error}
+        sending={communicationPreview.sending}
+        copyBusy={communicationPreview.copyBusy}
+        onClose={communicationPreview.closePreview}
+        onCopy={communicationPreview.copyPreviewMessage}
+        onSend={communicationPreview.confirmSend}
       />
     </div>
   );

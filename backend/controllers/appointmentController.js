@@ -255,6 +255,24 @@ async function sendInterviewDetails(req, res) {
   }
 }
 
+async function previewInterviewDetailsCommunication(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.previewInterviewDetailsCommunication(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -268,5 +286,6 @@ module.exports = {
   requestHumanAssist,
   resolveHumanAssist,
   collectEmail,
-  sendInterviewDetails
+  sendInterviewDetails,
+  previewInterviewDetailsCommunication
 };

@@ -613,6 +613,7 @@ module.exports = {
   getTemplateFlagKey,
   resolveRecruiterDisplayName,
   resolveOrganizationName,
+  formatInterviewSchedule,
   buildZoomInvitationMessage,
   buildOfficeLocationInvitationMessage,
   buildMissedAppointmentInvitationMessage,

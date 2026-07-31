@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #eef2f7;
+    color: #0f172a;
+  }
+  .page {
+    max-width: 760px;
+    margin: 24px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+  .btn {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    background: #fff;
+    color: #0f172a;
+  }
+  .btn-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .btn-secondary { background: #f8fafc; }
+  .btn-ghost { background: transparent; border-color: transparent; color: #475569; }
+  .communication-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.communication-preview__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.communication-preview__eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.communication-preview__channel {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.communication-preview__missing {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.communication-preview__missing-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.communication-preview__missing-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #78350f;
+  font-size: 13px;
+}
+
+.communication-preview__missing-item--error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.communication-preview__meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.communication-preview__meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.communication-preview__meta-row dt {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.communication-preview__meta-row dd {
+  margin: 0;
+  font-size: 14px;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.communication-preview__meta-row--missing dd {
+  color: #b45309;
+}
+
+.communication-preview__media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.communication-preview__media-image {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.communication-preview__media-image--logo {
+  object-fit: contain;
+  padding: 8px;
+}
+
+.communication-preview__message-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.communication-preview__message-body {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #0f172a;
+  max-height: min(40vh, 320px);
+  overflow: auto;
+}
+
+.communication-preview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.communication-preview--loading,
+.communication-preview--error {
+  padding: 12px 0;
+  color: #475569;
+}
+
+@media (max-width: 767px) {
+  .communication-preview__meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .communication-preview__actions {
+    flex-direction: column-reverse;
+  }
+
+  .communication-preview__actions .atlas-button {
+    width: 100%;
+  }
+}
+
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="communication-preview">
+      <header class="communication-preview__header">
+        <p class="communication-preview__eyebrow">Vista previa del mensaje saliente</p>
+        <p class="communication-preview__channel">Canal: whatsapp · copy_open</p>
+      </header>
+      <div class="communication-preview__missing"><p class="communication-preview__missing-title">Contenido faltante o incompleto</p><ul class="communication-preview__missing-list"><li class="communication-preview__missing-item">Foto del representante</li><li class="communication-preview__missing-item">Logo de la oficina</li></ul></div>
+      <section class="communication-preview__meta">
+        <dl class="communication-preview__meta-grid">
+          <div class="communication-preview__meta-row"><dt>Prospecto</dt><dd>Maria Lopez</dd></div>
+          <div class="communication-preview__meta-row"><dt>Fecha y hora</dt><dd>domingo, 15 de marzo de 2026 · 2:30 p.m. (Hora del Este (EDT))</dd></div>
+          <div class="communication-preview__meta-row"><dt>Tipo de entrevista</dt><dd>Zoom (virtual)</dd></div>
+          <div class="communication-preview__meta-row"><dt>Idioma preferido</dt><dd>Spanish</dd></div>
+          <div class="communication-preview__meta-row"><dt>Representante</dt><dd>Ana Rivera</dd></div>
+          <div class="communication-preview__meta-row"><dt>Título / organización</dt><dd>Recruiting Specialist</dd></div>
+          <div class="communication-preview__meta-row"><dt>Organización</dt><dd>Team Vision</dd></div>
+          <div class="communication-preview__meta-row"><dt>Enlace de Zoom</dt><dd>https://zoom.us/j/123456789</dd></div>
+        </dl>
+      </section>
+      <section class="communication-preview__message">
+        <h3 class="communication-preview__message-title">Mensaje final</h3>
+        <pre class="communication-preview__message-body">Hola Maria,
+
+Aquí están los detalles de tu entrevista:
+
+Fecha: domingo, 15 de marzo de 2026
+Hora: 2:30 p.m.
+Zona horaria: Hora del Este (EDT)
+
+Representante: Ana Rivera
+
+Únete a tu entrevista aquí:
+https://zoom.us/j/123456789
+
+Recordatorio: ¡Esperamos conversar contigo!
+
+Team Vision</pre>
+      </section>
+      <footer class="communication-preview__actions">
+        <button type="button" class="btn btn-ghost">Volver a editar</button>
+        <button type="button" class="btn btn-secondary">Copiar mensaje</button>
+        <button type="button" class="btn btn-primary">Enviar invitación</button>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

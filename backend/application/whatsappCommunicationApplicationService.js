@@ -20,6 +20,9 @@ const {
   isTenantScopedRequest
 } = require("../core/tenantProspectLookup");
 const {
+  buildOutboundCommunicationPayload
+} = require("../core/communicationOutboundPayloadEngine");
+const {
   WHATSAPP_TEMPLATES,
   DELIVERY_MODES,
   DEFAULT_TIMEZONE,
@@ -168,8 +171,34 @@ async function buildMessageContext(prospect, template, options = {}) {
     message,
     language,
     phone: prospect.phone,
-    zoomUrl: context.zoomUrl || null
+    zoomUrl: context.zoomUrl || null,
+    context: {
+      prospectName: context.prospectName,
+      recruiterName: context.recruiterName,
+      interviewAtMs: context.interviewAtMs,
+      timezone: context.timezone,
+      interviewType: context.interviewType,
+      office: context.office,
+      organizationName: context.organizationName,
+      language: context.language
+    }
   };
+}
+
+function attachOutboundPayload(built, options = {}) {
+  const prospect = options.prospect || null;
+  const organizationSettings = options.organizationSettings || getOrganizationSettings();
+
+  return buildOutboundCommunicationPayload({
+    built,
+    prospect,
+    representative: options.representativeProfile || null,
+    representativeFallbackUsed: Boolean(options.representativeFallbackUsed),
+    appointment: options.appointment || null,
+    organizationSettings,
+    channel: options.channel || "whatsapp",
+    deliveryMode: options.deliveryMode || DELIVERY_MODES.COPY_OPEN
+  });
 }
 
 async function previewWhatsAppCommunication(phone, params = {}, options = {}) {
@@ -195,7 +224,18 @@ async function previewWhatsAppCommunication(phone, params = {}, options = {}) {
     return built.error;
   }
 
-  return buildSuccess("Message ready.", built);
+  const outboundPayload = attachOutboundPayload(built, {
+    prospect,
+    representativeProfile: options.representativeProfile || null,
+    representativeFallbackUsed: options.representativeFallbackUsed,
+    appointment: options.appointment || null,
+    organizationSettings: getOrganizationSettings()
+  });
+
+  return buildSuccess("Message ready.", {
+    ...built,
+    outboundPayload
+  });
 }
 
 async function recordWhatsAppCopyOpen(phone, params = {}, options = {}) {
@@ -258,6 +298,14 @@ async function recordWhatsAppCopyOpen(phone, params = {}, options = {}) {
   return buildSuccess("WhatsApp message prepared.", {
     template,
     sourceAction: params.sourceAction || null,
+    message: built.message,
+    outboundPayload: attachOutboundPayload(built, {
+      prospect,
+      representativeProfile: options.representativeProfile || null,
+      representativeFallbackUsed: options.representativeFallbackUsed,
+      appointment: options.appointment || null,
+      organizationSettings: getOrganizationSettings()
+    }),
     workflowState: {
       flags: workflowState.flags,
       outcome: workflowState.outcome
@@ -269,5 +317,6 @@ module.exports = {
   previewWhatsAppCommunication,
   recordWhatsAppCopyOpen,
   buildMessageContext,
+  attachOutboundPayload,
   DELIVERY_MODES
 };

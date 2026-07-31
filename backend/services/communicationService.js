@@ -16,6 +16,7 @@ const {
   resolveInterviewDetailsTemplate,
   WHATSAPP_TEMPLATES
 } = require("../core/whatsappCommunicationEngine");
+const { payloadsMatchForSend } = require("../core/communicationOutboundPayloadEngine");
 
 function buildError(error, message, extras = {}) {
   return {
@@ -35,11 +36,7 @@ function buildSuccess(message, extras = {}) {
   };
 }
 
-/**
- * Sends personalized interview details for an appointment.
- * Loads data, resolves representative + language, selects template, and records delivery.
- */
-async function sendInterviewDetails(appointmentId, context = {}) {
+async function prepareInterviewDetailsCommunication(appointmentId, context = {}) {
   const organizationId = requireTenantOrganizationId(context.organizationId);
   const appointment = await appointmentApplicationService.getAppointment(appointmentId, organizationId);
   const phone = appointment.prospectPhone;
@@ -55,6 +52,8 @@ async function sendInterviewDetails(appointmentId, context = {}) {
     tenantScoped: true,
     actorUser: context.actorUser || null,
     representativeUser: representative.user,
+    representativeProfile: representative.profile,
+    representativeFallbackUsed: representative.fallbackUsed,
     appointment
   };
 
@@ -71,10 +70,61 @@ async function sendInterviewDetails(appointmentId, context = {}) {
     return preview;
   }
 
-  const recordResult = await recordWhatsAppCopyOpen(
+  return {
+    success: true,
     phone,
+    channel: "whatsapp",
+    template: preview.template || template,
+    message: preview.message,
+    language: preview.language,
+    zoomUrl: preview.zoomUrl || null,
+    outboundPayload: preview.outboundPayload,
+    representative: representative.profile,
+    representativeFallbackUsed: representative.fallbackUsed
+  };
+}
+
+/**
+ * Preview-only — same payload assembly as send, without recording delivery.
+ */
+async function previewInterviewDetailsCommunication(appointmentId, context = {}) {
+  const prepared = await prepareInterviewDetailsCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  return buildSuccess("Interview invitation preview ready.", prepared);
+}
+
+/**
+ * Sends personalized interview details for an appointment.
+ * Loads data, resolves representative + language, selects template, and records delivery.
+ */
+async function sendInterviewDetails(appointmentId, context = {}) {
+  const prepared = await prepareInterviewDetailsCommunication(appointmentId, context);
+
+  if (!prepared?.success) {
+    return prepared;
+  }
+
+  const organizationId = requireTenantOrganizationId(context.organizationId);
+  const appointment = await appointmentApplicationService.getAppointment(appointmentId, organizationId);
+  const representative = await resolveAssignedRepresentative(appointment, context);
+  const serviceOptions = {
+    organizationId,
+    tenantScoped: true,
+    actorUser: context.actorUser || null,
+    representativeUser: representative.user,
+    representativeProfile: representative.profile,
+    representativeFallbackUsed: representative.fallbackUsed,
+    appointment
+  };
+
+  const recordResult = await recordWhatsAppCopyOpen(
+    prepared.phone,
     {
-      template: preview.template || template,
+      template: prepared.template,
       sourceAction: "resend_interview_details",
       deliveryMode: DELIVERY_MODES.COPY_OPEN
     },
@@ -85,20 +135,35 @@ async function sendInterviewDetails(appointmentId, context = {}) {
     return recordResult;
   }
 
+  const sendMatchesPreview = payloadsMatchForSend(
+    prepared.outboundPayload,
+    recordResult.outboundPayload
+  );
+
+  if (!sendMatchesPreview) {
+    console.warn("[communicationService] Preview/send payload mismatch for interview details.", {
+      appointmentId
+    });
+  }
+
   return buildSuccess("Interview details prepared.", {
     channel: "whatsapp",
-    template: preview.template || WHATSAPP_TEMPLATES.INTERVIEW_DETAILS,
-    message: preview.message,
-    phone,
-    language: preview.language,
-    zoomUrl: preview.zoomUrl || null,
+    template: prepared.template,
+    message: prepared.message,
+    phone: prepared.phone,
+    language: prepared.language,
+    zoomUrl: prepared.zoomUrl || null,
+    outboundPayload: recordResult.outboundPayload || prepared.outboundPayload,
     representative: representative.profile,
     representativeFallbackUsed: representative.fallbackUsed,
     toastKey: "whatsappCopyOpenConfirmation",
-    workflowState: recordResult.workflowState || null
+    workflowState: recordResult.workflowState || null,
+    previewMatchesSend: sendMatchesPreview
   });
 }
 
 module.exports = {
+  prepareInterviewDetailsCommunication,
+  previewInterviewDetailsCommunication,
   sendInterviewDetails
 };

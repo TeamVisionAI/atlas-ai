@@ -27,7 +27,8 @@ export function useWorkspaceActions({
   translate,
   showToast,
   confirm,
-  prompt
+  prompt,
+  communicationPreview
 }) {
   const [actionError, setActionError] = useState(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
@@ -99,6 +100,32 @@ export function useWorkspaceActions({
       }
 
       if (isWhatsAppCopyAction(actionId)) {
+        const previewOpened = await communicationPreview?.requestPreviewIfEnabled?.({
+          type: "phone",
+          phone: workspace.phone,
+          sourceAction: actionId,
+          onSend: async () =>
+            executeCommunicationAction({
+              phone: workspace.phone,
+              actionId,
+              translate,
+              showSuccess: showToast?.showSuccess,
+              showInfo: showToast?.showInfo,
+              showError: (message) => {
+                setActionError(message);
+                showToast?.showError(message);
+              },
+              onOrganizationResourceMissing: handleOrganizationResourceMissing,
+              onWhatsAppFallbackOffer: handleWhatsAppFallbackOffer,
+              onRecorded: refreshWorkspace
+            })
+        });
+
+        if (previewOpened) {
+          setPendingActionId(null);
+          return;
+        }
+
         await executeCommunicationAction({
           phone: workspace.phone,
           actionId,
@@ -118,6 +145,17 @@ export function useWorkspaceActions({
       }
 
       if (actionId === "resend_interview_details") {
+        const appointmentId = workspace.interview?.appointmentId;
+        const previewOpened = await communicationPreview?.requestPreviewIfEnabled?.({
+          type: "appointment",
+          appointmentId
+        });
+
+        if (previewOpened) {
+          setPendingActionId(null);
+          return;
+        }
+
         await executeCommunicationAction({
           phone: workspace.phone,
           actionId,
@@ -185,7 +223,7 @@ export function useWorkspaceActions({
         setPendingActionId(null);
       }
     },
-    [workspace?.phone, workspace?.interview?.appointmentId, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer]
+    [workspace?.phone, workspace?.interview?.appointmentId, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer, communicationPreview]
   );
 
   const runLifecycleAction = useCallback(
