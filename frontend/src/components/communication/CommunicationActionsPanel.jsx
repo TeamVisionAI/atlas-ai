@@ -9,30 +9,27 @@ import "../mission-control/MissionControlPermanentActions.css";
 
 export default function CommunicationActionsPanel({
   workspace,
+  organizationSettings = null,
   onAction,
   busy = false
 }) {
   const { translate } = useLanguage();
 
   const actions = useMemo(
-    () => resolveCommunicationActions(workspace, { translate }),
-    [workspace, translate]
+    () => resolveCommunicationActions(workspace, { translate, organizationSettings }),
+    [workspace, translate, organizationSettings]
   );
-
-  if (!actions.length) {
-    return null;
-  }
 
   const cards = actions.map((action) =>
     buildCommunicationActionCard(action, {
       onClick: () => onAction?.(action.id),
-      disabled: busy
+      busy
     })
   );
 
   return (
     <section
-      className="mc-permanent-actions"
+      className="mc-permanent-actions mc-permanent-actions--always-visible"
       aria-label={translate("missionControlCommunicationActionsLabel")}
     >
       <h3 className="mc-permanent-actions__title">
@@ -40,7 +37,7 @@ export default function CommunicationActionsPanel({
       </h3>
       <div className="mc-permanent-actions__grid">
         {cards.map((card) => (
-          <ActionCard key={card.id} {...card} disabled={busy} />
+          <ActionCard key={card.id} {...card} />
         ))}
       </div>
     </section>

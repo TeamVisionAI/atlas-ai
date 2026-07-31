@@ -5898,7 +5898,7 @@
   "+17867528080": {
     "flags": {
       "zoom_link_sent": false,
-      "office_location_sent": false,
+      "office_location_sent": true,
       "missed_appointment_sent": false
     },
     "agentNotes": [
@@ -6252,6 +6252,27 @@
       {
         "text": "Required information updated: City, State, Preferred Language, Interview Type.",
         "at": "2026-07-30T03:44:23.353Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17542727787": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Required information updated: City, State, Preferred Language, Work Authorization, Occupation, Interview Type.",
+        "at": "2026-07-31T01:13:10.897Z",
         "type": "phone"
       }
     ],

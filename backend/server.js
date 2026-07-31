@@ -42,6 +42,7 @@ const { createProspectModule } = require("./modules/prospects");
 const { createTimelineModule } = require("./modules/timeline");
 const { createMissionControlModule } = require("./modules/mission-control");
 const { createExecutiveDashboardModule } = require("./modules/executive-dashboard");
+const { createWorkflowModule } = require("./modules/workflows");
 const { requireAtlasUser } = require("./middleware/requireAtlasUser");
 const { verifyMetaWebhookSignature } = require("./middleware/metaWebhookSignature");
 const { safeRequestLogger } = require("./middleware/safeRequestLogger");
@@ -55,6 +56,10 @@ const { registerRecruitingWorkflow } = require("./core/recruitingWorkflowRegistr
 
 const businessEventModule = createBusinessEventModule({
   registerTimelineSubscriber: false
+});
+
+const workflowModule = createWorkflowModule({
+  publisher: businessEventModule.publisher
 });
 
 const projectionModule = createProjectionModule({
@@ -233,6 +238,7 @@ async function bootstrap() {
   await projectionModule.engine.register(missionControlModule.missionControlProjection);
   await projectionModule.engine.register(executiveDashboardModule.executiveDashboardProjection);
   projectionModule.engine.start();
+  workflowModule.registerAppointmentEventHandlers();
 
   app.listen(PORT, () => {
     logMetaEnvironmentWarnings();

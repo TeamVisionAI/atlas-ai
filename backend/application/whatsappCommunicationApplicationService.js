@@ -24,6 +24,7 @@ const {
   DELIVERY_MODES,
   DEFAULT_TIMEZONE,
   resolveTemplateForAction,
+  resolveInterviewTypeFromAppointment,
   composeWhatsAppMessage,
   getTemplateFlagKey,
   resolveRecruiterDisplayName
@@ -88,9 +89,32 @@ function resolveTemplate({ template, sourceAction, prospect }) {
 async function buildMessageContext(prospect, template, options = {}) {
   const language = resolveProspectCommunicationCode(prospect);
   const organizationId = requireTenantOrganizationId(options.organizationId);
-  const recruiterName = resolveRecruiterDisplayName(options.actorUser);
-  const interviewAtMs = parseInterviewDatetime(prospect);
-  const timezone = prospect.timezone || options.timezone || DEFAULT_TIMEZONE;
+  const representativeUser = options.representativeUser || options.actorUser || null;
+  const recruiterName = resolveRecruiterDisplayName(representativeUser);
+  const appointment = options.appointment || null;
+  let interviewAtMs = parseInterviewDatetime(prospect);
+  let timezone = prospect.timezone || options.timezone || DEFAULT_TIMEZONE;
+  let interviewType = prospect.interview_type || null;
+
+  if (appointment) {
+    if (appointment.startDateTime) {
+      const parsed = Date.parse(appointment.startDateTime);
+
+      if (!Number.isNaN(parsed)) {
+        interviewAtMs = parsed;
+      }
+    }
+
+    if (appointment.timezone) {
+      timezone = appointment.timezone;
+    }
+
+    interviewType = resolveInterviewTypeFromAppointment(appointment, prospect);
+  }
+
+  const resolvedInterviewType =
+    interviewType || resolveInterviewTypeFromAppointment(appointment, prospect);
+  const organizationSettings = getOrganizationSettings();
 
   const context = {
     language,
@@ -98,26 +122,30 @@ async function buildMessageContext(prospect, template, options = {}) {
     recruiterName,
     interviewAtMs,
     timezone,
-    office: getOrganizationSettings().office,
-    interviewType: prospect.interview_type || null
+    office: organizationSettings.office,
+    organizationName: organizationSettings.organizationName,
+    interviewType: resolvedInterviewType
   };
 
-  if (
-    template === WHATSAPP_TEMPLATES.ZOOM_INVITATION ||
-    (template === WHATSAPP_TEMPLATES.INTERVIEW_REMINDER &&
-      String(prospect.interview_type || "")
-        .toLowerCase()
-        .includes("zoom"))
-  ) {
-    let zoomUrl = null;
+  const isZoomInterview = String(resolvedInterviewType || "").toLowerCase() === "zoom";
 
-    try {
-      zoomUrl = await meetingManagementService.resolveJoinUrlForProspect(
-        organizationId,
-        prospect.phone
-      );
-    } catch (error) {
-      console.error("[whatsappCommunication] resolveJoinUrlForProspect failed:", error.message);
+  const needsZoomUrl =
+    template === WHATSAPP_TEMPLATES.ZOOM_INVITATION ||
+    (template === WHATSAPP_TEMPLATES.INTERVIEW_DETAILS && isZoomInterview) ||
+    (template === WHATSAPP_TEMPLATES.INTERVIEW_REMINDER && isZoomInterview);
+
+  if (needsZoomUrl) {
+    let zoomUrl = appointment?.virtualMeetingUrl || null;
+
+    if (!zoomUrl) {
+      try {
+        zoomUrl = await meetingManagementService.resolveJoinUrlForProspect(
+          organizationId,
+          prospect.phone
+        );
+      } catch (error) {
+        console.error("[whatsappCommunication] resolveJoinUrlForProspect failed:", error.message);
+      }
     }
 
     if (!zoomUrl) {
@@ -203,7 +231,9 @@ async function recordWhatsAppCopyOpen(phone, params = {}, options = {}) {
           ? "Agent prepared missed appointment follow-up via WhatsApp"
           : template === WHATSAPP_TEMPLATES.INTERVIEW_REMINDER
             ? "Agent prepared interview reminder via WhatsApp"
-            : "Agent opened WhatsApp conversation";
+            : template === WHATSAPP_TEMPLATES.INTERVIEW_DETAILS
+              ? "Agent resent interview details via WhatsApp"
+              : "Agent opened WhatsApp conversation";
 
   await logAgentTimeline(prospect, buildAgentActionTimelineMessage(timelineLabel));
 
@@ -238,5 +268,6 @@ async function recordWhatsAppCopyOpen(phone, params = {}, options = {}) {
 module.exports = {
   previewWhatsAppCommunication,
   recordWhatsAppCopyOpen,
+  buildMessageContext,
   DELIVERY_MODES
 };

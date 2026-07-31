@@ -37,6 +37,22 @@ export function buildProspectEditorInitialValues(workspace) {
   };
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function validateProspectEmail(email, translate, { required = false } = {}) {
+  const trimmed = String(email || "").trim();
+
+  if (!trimmed) {
+    return required ? translate("prospectEditorFieldRequired") : null;
+  }
+
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    return translate("prospectEditorInvalidEmail");
+  }
+
+  return null;
+}
+
 export function validateProspectEditorValues(values, translate) {
   const errors = {};
 
@@ -48,10 +64,10 @@ export function validateProspectEditorValues(values, translate) {
     errors.last_name = translate("prospectEditorFieldRequired");
   }
 
-  const email = String(values.email || "").trim();
+  const emailError = validateProspectEmail(values.email, translate);
 
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errors.email = translate("prospectEditorInvalidEmail");
+  if (emailError) {
+    errors.email = emailError;
   }
 
   return errors;

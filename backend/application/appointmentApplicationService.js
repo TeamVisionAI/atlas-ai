@@ -962,6 +962,53 @@ async function collectProspectEmail(phone, email, organizationId) {
   };
 }
 
+const ACTIVE_APPOINTMENT_STATUSES = new Set([
+  "scheduled",
+  "confirmed",
+  "rescheduled",
+  "pending_confirmation",
+  "in_progress",
+  "human_assist_required"
+]);
+
+const TERMINAL_APPOINTMENT_LIFECYCLE_STATES = new Set([
+  "completed",
+  "cancelled",
+  "recruited",
+  "became_client",
+  "no_show"
+]);
+
+async function findActiveAppointmentForProspect(prospectPhone, organizationId) {
+  if (!prospectPhone || !organizationId) {
+    return null;
+  }
+
+  const result = await listAppointments({ organizationId, prospectPhone });
+  const active = result.items.filter((appointment) => {
+    const lifecycleState = appointment.metadata?.lifecycleState;
+
+    if (lifecycleState && TERMINAL_APPOINTMENT_LIFECYCLE_STATES.has(lifecycleState)) {
+      return false;
+    }
+
+    return ACTIVE_APPOINTMENT_STATUSES.has(appointment.status);
+  });
+
+  if (!active.length) {
+    return null;
+  }
+
+  active.sort(
+    (left, right) => Date.parse(left.startDateTime || 0) - Date.parse(right.startDateTime || 0)
+  );
+
+  const now = Date.now();
+  const upcoming = active.find((appointment) => Date.parse(appointment.startDateTime) >= now);
+
+  return upcoming || active[active.length - 1];
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -979,5 +1026,6 @@ module.exports = {
   requestHumanAssist,
   resolveHumanAssist,
   collectProspectEmail,
-  enrichWithProspect
+  enrichWithProspect,
+  findActiveAppointmentForProspect
 };

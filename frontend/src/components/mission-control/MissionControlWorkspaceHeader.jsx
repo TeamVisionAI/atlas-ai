@@ -6,6 +6,7 @@ import {
   buildProspectCenterPath,
   buildProspectWorkspacePath
 } from "../../utils/prospectRoutes";
+import MissionControlInlineEmailCapture from "./MissionControlInlineEmailCapture";
 import "./MissionControlWorkspaceHeader.css";
 
 const MOBILE_DETAILS_STORAGE_KEY = "mc-header-details-expanded";
@@ -115,7 +116,8 @@ export default function MissionControlWorkspaceHeader({
   previousProspect,
   nextProspect,
   onPrevious,
-  onNext
+  onNext,
+  onEmailSaved
 }) {
   const { translate } = useLanguage();
   const [detailsExpanded, setDetailsExpanded] = useState(() => {
@@ -181,7 +183,11 @@ export default function MissionControlWorkspaceHeader({
                 {emailValue}
               </a>
             ) : (
-              translate("missionControlEmailNotProvided")
+              <MissionControlInlineEmailCapture
+                phone={phone}
+                email={emailValue}
+                onSaved={onEmailSaved}
+              />
             )}
           </HeaderField>
           <HeaderField label={translate("missionControlRowLocation")}>
@@ -295,6 +301,15 @@ export default function MissionControlWorkspaceHeader({
             <HeaderField label={translate("missionControlRowLanguage")}>
               {prospect?.language || "—"}
             </HeaderField>
+            {!emailHref ? (
+              <HeaderField label={translate("missionControlRowEmail")}>
+                <MissionControlInlineEmailCapture
+                  phone={phone}
+                  email={emailValue}
+                  onSaved={onEmailSaved}
+                />
+              </HeaderField>
+            ) : null}
             <HeaderField label={translate("missionControlRowNextAction")}>
               {nextActionLabel}
             </HeaderField>

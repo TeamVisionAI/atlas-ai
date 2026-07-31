@@ -659,6 +659,41 @@ export default function Dashboard() {
 
   const handleMissionActionQualificationSaved = handleConversationOutcomeSaved;
 
+  const handleInlineEmailSaved = useCallback(
+    async (savedEmail) => {
+      if (!phone) {
+        return;
+      }
+
+      setWorkspace((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          prospect: {
+            ...current.prospect,
+            email: savedEmail
+          },
+          conversationOutcome: current.conversationOutcome
+            ? {
+                ...current.conversationOutcome,
+                fields: {
+                  ...(current.conversationOutcome.fields || {}),
+                  email: savedEmail
+                }
+              }
+            : current.conversationOutcome
+        };
+      });
+
+      await refreshCurrentWorkspace();
+      await refreshMissions(phone);
+    },
+    [phone, refreshCurrentWorkspace, refreshMissions]
+  );
+
   const displayWorkflowState = useMemo(() => {
     const agentState = workspace?.raw?.agentState;
     return agentState
@@ -790,6 +825,7 @@ export default function Dashboard() {
             nextProspect={nextProspect}
             onPrevious={goToPrevious}
             onNext={goToNextPriority}
+            onEmailSaved={handleInlineEmailSaved}
           />
         </div>
 
@@ -849,6 +885,7 @@ export default function Dashboard() {
 
             <CommunicationActionsPanel
               workspace={workspace}
+              organizationSettings={organizationSettings}
               onAction={handleMissionAction}
               busy={executionSubmitting || prospectLoading}
             />

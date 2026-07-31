@@ -39,17 +39,19 @@ function buildProspectIdentity(prospect) {
   };
 }
 
-function buildInterviewBlock(prospect, agentState, workflowGate) {
+function buildInterviewBlock(prospect, agentState, workflowGate, activeAppointment = null) {
   const interviewMs = parseInterviewDatetime(prospect);
   const now = Date.now();
 
   return {
     datetime: interviewMs ? new Date(interviewMs).toISOString() : null,
-    type: prospect?.interview_type || null,
+    type: prospect?.interview_type || activeAppointment?.meetingType || null,
     isPast: interviewMs !== null && interviewMs < now,
     outcome: agentState?.outcome || null,
-    calendarEventId: prospect?.calendar_event_id || null,
-    gateActive: Boolean(workflowGate?.active)
+    calendarEventId: prospect?.calendar_event_id || activeAppointment?.calendarEventId || null,
+    gateActive: Boolean(workflowGate?.active),
+    appointmentId: activeAppointment?.id || null,
+    ownerRepId: activeAppointment?.ownerRepId || null
   };
 }
 
@@ -81,10 +83,20 @@ async function composeProspectWorkspaceFromMissionControl(phone, missionControl,
   const owner = await resolveOwner(prospect?.owner_user_id);
   const canonicalMilestone = missionControl.workflow?.canonicalMilestone || null;
   const journey = buildJourneyProgress(canonicalMilestone);
+  let activeAppointment = null;
+
+  try {
+    const { findActiveAppointmentForProspect } = require("../application/appointmentApplicationService");
+    activeAppointment = await findActiveAppointmentForProspect(resolvedPhone, organizationId);
+  } catch (error) {
+    console.error("[prospect-workspace/activeAppointment]", error.message);
+  }
+
   const interview = buildInterviewBlock(
     prospectRow || missionControl.prospect,
     missionControl.agentState,
-    missionControl.workflowGate
+    missionControl.workflowGate,
+    activeAppointment
   );
   let activityPreview = [];
 

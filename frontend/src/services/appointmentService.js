@@ -1,4 +1,8 @@
 import { apiFetch } from "./apiClient";
+import {
+  copyMessageToClipboard,
+  openWhatsAppConversation
+} from "./whatsappCommunicationService";
 
 /** Normalizes appointment API payloads to a plain array. */
 export function normalizeAppointmentList(result) {
@@ -174,4 +178,57 @@ export async function collectProspectEmail(phone, email) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email })
   });
+}
+
+export async function sendInterviewDetails(appointmentId) {
+  return apiFetch(`/api/appointments/${encodeURIComponent(appointmentId)}/send-interview-details`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({})
+  });
+}
+
+export async function executeSendInterviewDetails({
+  appointmentId,
+  translate,
+  showSuccess,
+  showError,
+  onOrganizationResourceMissing,
+  onRecorded
+}) {
+  if (!appointmentId) {
+    showError?.(translate("missionControlActionFailed"));
+    return { success: false };
+  }
+
+  let result;
+
+  try {
+    result = await sendInterviewDetails(appointmentId);
+  } catch (error) {
+    showError?.(translate("missionControlActionFailed"));
+    return { success: false, message: error.message };
+  }
+
+  if (!result?.success) {
+    if (result?.error === "MEETING_URL_NOT_CONFIGURED" && result?.resourceKey) {
+      onOrganizationResourceMissing?.(result.resourceKey);
+    }
+
+    showError?.(result?.message || translate("missionControlActionFailed"));
+    return { success: false, message: result?.message };
+  }
+
+  try {
+    await copyMessageToClipboard(result.message);
+  } catch {
+    showError?.(translate("whatsappCopyOpenClipboardError"));
+    return { success: false };
+  }
+
+  openWhatsAppConversation({ phone: result.phone, message: result.message });
+  showSuccess?.(translate(result.toastKey || "whatsappCopyOpenConfirmation"));
+  await onRecorded?.(result);
+
+  return { success: true, ...result };
 }

@@ -109,6 +109,24 @@ export function useWorkspaceActions({
         return;
       }
 
+      if (actionId === "resend_interview_details") {
+        await executeCommunicationAction({
+          phone: workspace.phone,
+          actionId,
+          appointmentId: workspace.interview?.appointmentId,
+          translate,
+          showSuccess: showToast?.showSuccess,
+          showError: (message) => {
+            setActionError(message);
+            showToast?.showError(message);
+          },
+          onOrganizationResourceMissing: handleOrganizationResourceMissing,
+          onRecorded: refreshWorkspace
+        });
+        setPendingActionId(null);
+        return;
+      }
+
       try {
         let actionPayload = {};
 

@@ -249,6 +249,7 @@ export default function ProspectWorkspacePage() {
 
         <CommunicationActionsPanel
           workspace={workspace}
+          organizationSettings={organizationSettings}
           onAction={actions.handleMissionAction}
           busy={Boolean(actions.pendingActionId)}
         />

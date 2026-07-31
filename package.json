@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
-    "test": "node --test backend/test/*.test.js"
+    "test": "node --test backend/test/*.test.js && npm run test --prefix frontend"
   },
   "repository": {
     "type": "git",

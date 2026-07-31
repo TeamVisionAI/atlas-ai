@@ -237,6 +237,24 @@ async function collectEmail(req, res) {
   }
 }
 
+async function sendInterviewDetails(req, res) {
+  try {
+    const communicationService = require("../services/communicationService");
+    const result = await communicationService.sendInterviewDetails(req.params.id, {
+      organizationId: req.tenantContext.organizationId,
+      actorUser: req.atlasUser || null
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -249,5 +267,6 @@ module.exports = {
   completeAppointment,
   requestHumanAssist,
   resolveHumanAssist,
-  collectEmail
+  collectEmail,
+  sendInterviewDetails
 };

@@ -21,10 +21,21 @@ function buildMapsUrl(fullAddress) {
  * Organization-wide settings for Mission Control and agent actions.
  * Extend this object as new settings are added (business hours, templates, etc.).
  */
+function resolveOrganizationDisplayName(office = getOfficeLocation()) {
+  const name = String(office?.name || "").trim();
+
+  if (!name) {
+    return "Atlas";
+  }
+
+  return name.replace(/\s+office$/i, "").trim() || name;
+}
+
 function getOrganizationSettings() {
   const office = getOfficeLocation();
 
   return {
+    organizationName: resolveOrganizationDisplayName(office),
     office: {
       name: office.name,
       street: office.street,
@@ -41,5 +52,6 @@ function getOrganizationSettings() {
 }
 
 module.exports = {
-  getOrganizationSettings
+  getOrganizationSettings,
+  resolveOrganizationDisplayName
 };

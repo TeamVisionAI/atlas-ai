@@ -46,6 +46,12 @@ router.post(
 );
 
 router.post(
+  "/:id/send-interview-details",
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  appointmentController.sendInterviewDetails
+);
+
+router.post(
   "/prospect/:phone/email",
   requirePermission(PERMISSIONS.PROSPECT_WRITE),
   appointmentController.collectEmail

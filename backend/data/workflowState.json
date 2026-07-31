@@ -5303,5 +5303,16 @@
     "doNotContact": false,
     "stallEpisodeKey": null,
     "reconcileEpisodeKey": null
+  },
+  "+17542727787": {
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
+    "workflowOwnership": "WAITING_EVENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-31T01:12:03.349Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
   }
 }

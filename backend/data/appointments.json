@@ -1,0 +1,66 @@
+[
+  {
+    "id": "e93a937b-5e9e-4349-ae3b-25ab962b0e96",
+    "organization_id": "00000000-0000-4000-8000-000000000001",
+    "prospect_id": "e1f0c463-1689-4ee0-a300-06b785e6db55",
+    "prospect_phone": "+13216891236",
+    "agent_id": "00000000-0000-4000-8000-000000000002",
+    "purpose": "recruiting_interview",
+    "status": "completed",
+    "source": "atlas_ai",
+    "start_date_time": "2026-07-30T19:30:00.000Z",
+    "end_date_time": "2026-07-30T20:00:00.000Z",
+    "duration_minutes": 30,
+    "timezone": "America/New_York",
+    "meeting_type": "virtual",
+    "meeting_provider": "zoom",
+    "meeting_location_type": "virtual",
+    "meeting_location_name": null,
+    "meeting_address": null,
+    "meeting_notes": null,
+    "virtual_meeting_url": null,
+    "calendar_event_id": "4lolg58umhrtblqd2i7q871ods",
+    "calendar_provider": "google",
+    "confirmation_status": "confirmed",
+    "email_invitation_status": "pending",
+    "reminder_status": "pending",
+    "human_assist_required": false,
+    "human_assist_reason": null,
+    "reschedule_count": 0,
+    "cancellation_reason": null,
+    "outcome": "not_interested",
+    "outcome_notes": "looking for Health license",
+    "owner_rep_id": null,
+    "history": [
+      {
+        "type": "completed",
+        "at": "2026-07-31T00:48:02.556Z",
+        "actor": "00000000-0000-4000-8000-000000000002",
+        "reason": null,
+        "summary": "Appointment completed",
+        "oldValues": {
+          "lifecycleState": "confirmed",
+          "status": "confirmed",
+          "outcome": null,
+          "scheduledTime": "2026-07-30T19:30:00.000Z"
+        },
+        "newValues": {
+          "lifecycleState": "completed",
+          "status": "completed",
+          "outcome": "not_interested",
+          "scheduledTime": "2026-07-30T19:30:00.000Z"
+        }
+      }
+    ],
+    "metadata": {
+      "derivedFromProspect": true,
+      "prospectName": "Oscar Oscar",
+      "sourceDerivedId": "prospect-derived:+13216891236:1785439800000",
+      "ownerRepId": null,
+      "lifecycleState": "completed"
+    },
+    "created_by": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-07-30T19:30:00.000Z",
+    "updated_at": "2026-07-31T00:48:02.556Z"
+  }
+]

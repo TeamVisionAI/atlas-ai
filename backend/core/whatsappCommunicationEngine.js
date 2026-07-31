@@ -6,13 +6,14 @@
 
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const { getOfficeLocation } = require("./businessRulesEngine");
-const { getOrganizationSettings } = require("./organizationSettingsEngine");
+const { getOrganizationSettings, resolveOrganizationDisplayName } = require("./organizationSettingsEngine");
 
 const WHATSAPP_TEMPLATES = Object.freeze({
   ZOOM_INVITATION: "zoom_invitation",
   OFFICE_LOCATION: "office_location",
   MISSED_APPOINTMENT: "missed_appointment",
   INTERVIEW_REMINDER: "interview_reminder",
+  INTERVIEW_DETAILS: "interview_details",
   APPOINTMENT_REMINDER: "appointment_reminder",
   FOLLOW_UP: "follow_up",
   ORIENTATION_INVITATION: "orientation_invitation",
@@ -98,6 +99,137 @@ function formatInterviewSchedule(timestampMs, timezone, language) {
   };
 }
 
+function resolveOrganizationName(context = {}) {
+  if (context.organizationName) {
+    return context.organizationName;
+  }
+
+  return resolveOrganizationDisplayName(context.office || getOrganizationSettings().office);
+}
+
+function normalizeInterviewChannel(value) {
+  const normalized = String(value || "").toLowerCase();
+
+  if (normalized.includes("zoom") || normalized.includes("virtual")) {
+    return "zoom";
+  }
+
+  if (
+    normalized.includes("office") ||
+    normalized.includes("person") ||
+    normalized.includes("public") ||
+    normalized.includes("in person") ||
+    normalized.includes("in_person")
+  ) {
+    return "office";
+  }
+
+  return null;
+}
+
+function resolveInterviewTypeFromAppointment(appointment, prospect = null) {
+  if (appointment?.meetingType === "virtual") {
+    return "zoom";
+  }
+
+  if (appointment?.meetingType === "in_person") {
+    return "office";
+  }
+
+  if (appointment?.meetingLocationType === "office") {
+    return "office";
+  }
+
+  return (
+    normalizeInterviewChannel(appointment?.meetingProvider) ||
+    normalizeInterviewChannel(prospect?.interview_type) ||
+    normalizeInterviewChannel(prospect?.interviewType) ||
+    "zoom"
+  );
+}
+
+function resolveInterviewDetailsTemplate() {
+  return WHATSAPP_TEMPLATES.INTERVIEW_DETAILS;
+}
+
+function buildInterviewDetailsMessage({
+  prospectName,
+  interviewAtMs,
+  timezone = DEFAULT_TIMEZONE,
+  recruiterName,
+  zoomUrl,
+  office,
+  interviewType,
+  organizationName,
+  language
+}) {
+  const firstName = getFirstName(prospectName);
+  const greeting = firstName
+    ? language === "es"
+      ? `Hola ${firstName},`
+      : `Hi ${firstName},`
+    : language === "es"
+      ? "Hola,"
+      : "Hi,";
+
+  const schedule = interviewAtMs
+    ? formatInterviewSchedule(interviewAtMs, timezone, language)
+    : null;
+
+  const recruiter = recruiterName || organizationName || resolveOrganizationName();
+  const orgName = organizationName || resolveOrganizationName();
+  const channel = normalizeInterviewChannel(interviewType) || "zoom";
+  const location = office || getOrganizationSettings().office;
+
+  if (language === "es") {
+    const lines = [greeting, "", "Aquí están los detalles de tu entrevista:", ""];
+
+    if (schedule) {
+      lines.push(
+        `Fecha: ${schedule.dateLine}`,
+        `Hora: ${schedule.timeLine}`,
+        `Zona horaria: ${schedule.timezoneLabel}`,
+        ""
+      );
+    }
+
+    lines.push(`Representante: ${recruiter}`, "");
+
+    if (channel === "zoom" && zoomUrl) {
+      lines.push("Únete a tu entrevista aquí:", zoomUrl, "");
+    } else if (location?.fullAddress) {
+      lines.push("Nuestra oficina está en:", location.name, location.fullAddress, "");
+    }
+
+    lines.push("Recordatorio: ¡Esperamos conversar contigo!", "", orgName);
+
+    return lines.join("\n");
+  }
+
+  const lines = [greeting, "", "Here are your interview details:", ""];
+
+  if (schedule) {
+    lines.push(
+      `Date: ${schedule.dateLine}`,
+      `Time: ${schedule.timeLine}`,
+      `Time Zone: ${schedule.timezoneLabel}`,
+      ""
+    );
+  }
+
+  lines.push(`Representative: ${recruiter}`, "");
+
+  if (channel === "zoom" && zoomUrl) {
+    lines.push("Join your interview here:", zoomUrl, "");
+  } else if (location?.fullAddress) {
+    lines.push("Our office is located at:", location.name, location.fullAddress, "");
+  }
+
+  lines.push("Reminder: We look forward to speaking with you!", "", orgName);
+
+  return lines.join("\n");
+}
+
 function buildZoomInvitationMessage({
   prospectName,
   interviewAtMs,
@@ -119,13 +251,14 @@ function buildZoomInvitationMessage({
     ? formatInterviewSchedule(interviewAtMs, timezone, language)
     : null;
 
-  const recruiter = recruiterName || "Team Vision";
+  const recruiter = recruiterName || resolveOrganizationName();
+  const orgName = resolveOrganizationName();
 
   if (language === "es") {
     const lines = [
       greeting,
       "",
-      "¡Tu entrevista con Team Vision está confirmada!",
+      `¡Tu entrevista con ${orgName} está confirmada!`,
       ""
     ];
 
@@ -146,13 +279,13 @@ function buildZoomInvitationMessage({
       "",
       "¡Esperamos conversar contigo!",
       "",
-      "Team Vision"
+      orgName
     );
 
     return lines.join("\n");
   }
 
-  const lines = [greeting, "", "Your Team Vision interview is confirmed!", ""];
+  const lines = [greeting, "", `Your ${orgName} interview is confirmed!`, ""];
 
   if (schedule) {
     lines.push(
@@ -171,43 +304,44 @@ function buildZoomInvitationMessage({
     "",
     "We look forward to speaking with you!",
     "",
-    "Team Vision"
+    orgName
   );
 
   return lines.join("\n");
 }
 
-function buildOfficeLocationInvitationMessage({ office, language }) {
+function buildOfficeLocationInvitationMessage({ office, language, organizationName }) {
   const location = office || getOrganizationSettings().office;
+  const orgName = organizationName || resolveOrganizationName({ office: location });
 
   if (language === "es") {
     return [
       "Hola,",
       "",
-      "Nuestra oficina de Team Vision está en:",
+      `Nuestra oficina de ${orgName} está en:`,
       location.name,
       location.fullAddress,
       "",
       "Te esperamos en tu entrevista.",
       "",
-      "Team Vision"
+      orgName
     ].join("\n");
   }
 
   return [
     "Hi,",
     "",
-    "Our Team Vision office is located at:",
+    `Our ${orgName} office is located at:`,
     location.name,
     location.fullAddress,
     "",
     "We look forward to seeing you at your interview.",
     "",
-    "Team Vision"
+    orgName
   ].join("\n");
 }
 
-function buildMissedAppointmentInvitationMessage({ prospectName, language }) {
+function buildMissedAppointmentInvitationMessage({ prospectName, language, organizationName }) {
   const firstName = getFirstName(prospectName);
   const greeting = firstName
     ? language === "es"
@@ -217,13 +351,15 @@ function buildMissedAppointmentInvitationMessage({ prospectName, language }) {
       ? "Hola,"
       : "Hi,";
 
+  const orgName = organizationName || resolveOrganizationName();
+
   if (language === "es") {
     return [
       greeting,
       "",
       "Notamos que no pudiste asistir a tu entrevista. ¿Te gustaría reprogramarla?",
       "",
-      "Team Vision"
+      orgName
     ].join("\n");
   }
 
@@ -232,7 +368,7 @@ function buildMissedAppointmentInvitationMessage({ prospectName, language }) {
     "",
     "We noticed you missed your interview. Would you like to reschedule?",
     "",
-    "Team Vision"
+    orgName
   ].join("\n");
 }
 
@@ -244,6 +380,7 @@ function buildInterviewReminderMessage({
   zoomUrl,
   office,
   interviewType,
+  organizationName,
   language
 }) {
   const firstName = getFirstName(prospectName);
@@ -263,12 +400,13 @@ function buildInterviewReminderMessage({
   const isZoom =
     normalizedType.includes("zoom") || normalizedType.includes("virtual");
   const location = office || getOrganizationSettings().office;
+  const orgName = organizationName || resolveOrganizationName({ office: location });
 
   if (language === "es") {
     const lines = [
       greeting,
       "",
-      "Te recordamos tu próxima entrevista con Team Vision.",
+      `Te recordamos tu próxima entrevista con ${orgName}.`,
       ""
     ];
 
@@ -292,12 +430,12 @@ function buildInterviewReminderMessage({
       );
     }
 
-    lines.push("¡Esperamos conversar contigo!", "", "Team Vision");
+    lines.push("¡Esperamos conversar contigo!", "", orgName);
 
     return lines.join("\n");
   }
 
-  const lines = [greeting, "", "This is a reminder about your upcoming Team Vision interview.", ""];
+  const lines = [greeting, "", `This is a reminder about your upcoming ${orgName} interview.`, ""];
 
   if (schedule) {
     lines.push(
@@ -314,12 +452,12 @@ function buildInterviewReminderMessage({
     lines.push("Our office is located at:", location.name, location.fullAddress, "");
   }
 
-  lines.push("We look forward to speaking with you!", "", "Team Vision");
+  lines.push("We look forward to speaking with you!", "", orgName);
 
   return lines.join("\n");
 }
 
-function buildGeneralWhatsAppMessage({ prospectName, recruiterName, language }) {
+function buildGeneralWhatsAppMessage({ prospectName, recruiterName, language, organizationName }) {
   const firstName = getFirstName(prospectName);
   const greeting = firstName
     ? language === "es"
@@ -329,39 +467,41 @@ function buildGeneralWhatsAppMessage({ prospectName, recruiterName, language }) 
       ? "Hola,"
       : "Hi,";
 
-  const recruiter = recruiterName || "Team Vision";
+  const recruiter = recruiterName || resolveOrganizationName();
+  const orgName = organizationName || resolveOrganizationName();
 
   if (language === "es") {
     return [
       greeting,
       "",
-      `Soy ${recruiter} de Team Vision. Quería dar seguimiento a tu proceso de entrevista.`,
+      `Soy ${recruiter} de ${orgName}. Quería dar seguimiento a tu proceso de entrevista.`,
       "",
       "Avísame si tienes alguna pregunta.",
       "",
-      "Team Vision"
+      orgName
     ].join("\n");
   }
 
   return [
     greeting,
     "",
-    `This is ${recruiter} from Team Vision. I wanted to follow up with you about your interview process.`,
+    `This is ${recruiter} from ${orgName}. I wanted to follow up with you about your interview process.`,
     "",
     "Let me know if you have any questions!",
     "",
-    "Team Vision"
+    orgName
   ].join("\n");
 }
 
-function buildStubTemplateMessage(templateId, language) {
+function buildStubTemplateMessage(templateId, language, organizationName) {
   const label = templateId.replace(/_/g, " ");
+  const orgName = organizationName || resolveOrganizationName();
 
   if (language === "es") {
-    return `Hola,\n\n[Mensaje ${label} — plantilla pendiente]\n\nTeam Vision`;
+    return `Hola,\n\n[Mensaje ${label} — plantilla pendiente]\n\n${orgName}`;
   }
 
-  return `Hi,\n\n[${label} message — template pending]\n\nTeam Vision`;
+  return `Hi,\n\n[${label} message — template pending]\n\n${orgName}`;
 }
 
 function resolveTemplateForAction(actionId) {
@@ -370,6 +510,7 @@ function resolveTemplateForAction(actionId) {
 
 function composeWhatsAppMessage(templateId, context = {}) {
   const language = context.language || "en";
+  const organizationName = resolveOrganizationName(context);
 
   switch (templateId) {
     case WHATSAPP_TEMPLATES.ZOOM_INVITATION:
@@ -385,13 +526,15 @@ function composeWhatsAppMessage(templateId, context = {}) {
     case WHATSAPP_TEMPLATES.OFFICE_LOCATION:
       return buildOfficeLocationInvitationMessage({
         office: context.office,
-        language
+        language,
+        organizationName
       });
 
     case WHATSAPP_TEMPLATES.MISSED_APPOINTMENT:
       return buildMissedAppointmentInvitationMessage({
         prospectName: context.prospectName,
-        language
+        language,
+        organizationName
       });
 
     case WHATSAPP_TEMPLATES.INTERVIEW_REMINDER:
@@ -403,20 +546,35 @@ function composeWhatsAppMessage(templateId, context = {}) {
         zoomUrl: context.zoomUrl,
         office: context.office,
         interviewType: context.interviewType,
+        organizationName,
+        language
+      });
+
+    case WHATSAPP_TEMPLATES.INTERVIEW_DETAILS:
+      return buildInterviewDetailsMessage({
+        prospectName: context.prospectName,
+        interviewAtMs: context.interviewAtMs,
+        timezone: context.timezone || DEFAULT_TIMEZONE,
+        recruiterName: context.recruiterName,
+        zoomUrl: context.zoomUrl,
+        office: context.office,
+        interviewType: context.interviewType,
+        organizationName,
         language
       });
 
     case WHATSAPP_TEMPLATES.APPOINTMENT_REMINDER:
     case WHATSAPP_TEMPLATES.FOLLOW_UP:
     case WHATSAPP_TEMPLATES.ORIENTATION_INVITATION:
-      return buildStubTemplateMessage(templateId, language);
+      return buildStubTemplateMessage(templateId, language, organizationName);
 
     case WHATSAPP_TEMPLATES.GENERAL:
     default:
       return buildGeneralWhatsAppMessage({
         prospectName: context.prospectName,
         recruiterName: context.recruiterName,
-        language
+        language,
+        organizationName
       });
   }
 }
@@ -449,12 +607,16 @@ module.exports = {
   ACTION_TO_TEMPLATE,
   DEFAULT_TIMEZONE,
   resolveTemplateForAction,
+  resolveInterviewDetailsTemplate,
+  resolveInterviewTypeFromAppointment,
   composeWhatsAppMessage,
   getTemplateFlagKey,
   resolveRecruiterDisplayName,
+  resolveOrganizationName,
   buildZoomInvitationMessage,
   buildOfficeLocationInvitationMessage,
   buildMissedAppointmentInvitationMessage,
   buildInterviewReminderMessage,
+  buildInterviewDetailsMessage,
   buildGeneralWhatsAppMessage
 };
