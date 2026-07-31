@@ -150,6 +150,7 @@ export default function ProspectWorkspacePage() {
       setWorkflowState(saved);
 
       await refreshWorkspace();
+      setActivityRefreshSignal((current) => current + 1);
 
       if (
         (result?.outcome === "Recruited" || result?.outcome === "Orientation Scheduled") &&

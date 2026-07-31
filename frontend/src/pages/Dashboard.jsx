@@ -264,6 +264,29 @@ export default function Dashboard() {
     }
   }, [queue, currentIndex, dashboard]);
 
+  const reloadMissionControlQueue = useCallback(async () => {
+    const dashboardData = await getDashboard();
+    const workflowQueue = dashboardData.prioritizedWorkflowQueue || [];
+    const fullQueue = buildQueueFromBackendWorkflowQueue(
+      workflowQueue,
+      dashboardData.prospects
+    );
+    const filteredQueue = executiveFilter
+      ? filterQueueForExecutiveFilter(
+          fullQueue,
+          executiveFilter,
+          workflowQueue,
+          dashboardData.prospects
+        )
+      : fullQueue;
+    const sortedQueue = filteredQueue.length ? filteredQueue : fullQueue;
+
+    setDashboard(dashboardData);
+    setQueue(sortedQueue);
+
+    return { dashboardData, sortedQueue };
+  }, [executiveFilter]);
+
   const { openAddNote, noteDialog, saving: noteSaving } = useUniversalNote({
     getContext: () =>
       resolveNoteContextFromMissionControl({
@@ -618,9 +641,32 @@ export default function Dashboard() {
       const currentItem = queue[currentIndex];
 
       if (result?.missionControl && currentItem) {
+        const prospectPatch = buildProspectPatchFromMissionControl(result.missionControl);
+        const patchedItem = prospectPatch
+          ? { ...currentItem, ...prospectPatch }
+          : currentItem;
+
+        if (prospectPatch) {
+          setDashboard((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  prospects: patchProspectInCollection(
+                    previous.prospects,
+                    currentItem.phone,
+                    prospectPatch
+                  )
+                }
+              : previous
+          );
+          setQueue((previous) =>
+            patchProspectInCollection(previous, currentItem.phone, prospectPatch)
+          );
+        }
+
         const adapted = adaptMissionControlResponse(
           result.missionControl,
-          findDashboardProspect(dashboard, currentItem.phone) || currentItem,
+          findDashboardProspect(dashboard, currentItem.phone) || patchedItem,
           { isLive: true }
         );
         setWorkspace(adapted);
@@ -648,9 +694,21 @@ export default function Dashboard() {
         await refreshCurrentWorkspace();
       }
 
+      await reloadMissionControlQueue();
+      await refreshMissions(phone);
       await evaluateMissionWorkflow();
     },
-    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, translate, evaluateMissionWorkflow]
+    [
+      phone,
+      queue,
+      currentIndex,
+      dashboard,
+      refreshCurrentWorkspace,
+      reloadMissionControlQueue,
+      refreshMissions,
+      translate,
+      evaluateMissionWorkflow
+    ]
   );
 
   const handleMissionActionQualificationSaved = handleConversationOutcomeSaved;

@@ -122,6 +122,53 @@ async function emitHumanAdvancementEvents({
     );
   }
 
+  const interviewPendingMilestones = new Set([
+    MILESTONES.INTERVIEW_RESULT_PENDING,
+    MILESTONES.INTERVIEW_DUE,
+    MILESTONES.INTERVIEW_COMPLETED,
+    MILESTONES.INTERVIEW_SCHEDULED
+  ]);
+
+  if (
+    capturedFields.outcome &&
+    interviewPendingMilestones.has(previousMilestone) &&
+    targetMilestone !== MILESTONES.INTERVIEW_SCHEDULED
+  ) {
+    emitted.push(
+      await emit(EVENT_TYPES.INTERVIEW_COMPLETED, {
+        prospectPhone: phone,
+        actor: "AGENT",
+        milestoneBefore: previousMilestone,
+        milestoneAfter: targetMilestone,
+        ownershipBefore,
+        ownershipAfter,
+        correlationId,
+        payload: {
+          outcome: capturedFields.outcome
+        }
+      })
+    );
+  }
+
+  if (targetMilestone === MILESTONES.FOLLOW_UP) {
+    emitted.push(
+      await emit(EVENT_TYPES.FOLLOW_UP_SCHEDULED, {
+        prospectPhone: phone,
+        actor: "AGENT",
+        milestoneBefore: previousMilestone,
+        milestoneAfter: targetMilestone,
+        ownershipBefore,
+        ownershipAfter,
+        correlationId,
+        payload: {
+          followUpDate: capturedFields.followUpDate || null,
+          followUpTime: capturedFields.followUpTime || null,
+          outcome: capturedFields.outcome || null
+        }
+      })
+    );
+  }
+
   emitted.push(
     await emit(EVENT_TYPES.PROSPECT_ADVANCED, {
       prospectPhone: phone,

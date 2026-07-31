@@ -6,7 +6,7 @@ const { getMissionControlWithActions } = require("./agentActionController");
 const { saveInterviewOutcome } = require("../core/interviewOutcomeEngine");
 
 async function postInterviewOutcome(phone, body = {}, options = {}) {
-  const result = await saveInterviewOutcome(phone, body);
+  const result = await saveInterviewOutcome(phone, body, options);
 
   if (!result.success) {
     return result;

@@ -59,7 +59,10 @@ const {
   emitAppointmentLifecycleEvent
 } = require("../modules/appointments/application/appointmentEventAdapter");
 const { findUserById } = require("../services/atlasUserService");
-const { APPOINTMENT_OUTCOMES } = require("../core/configuration/appointmentDomain");
+const {
+  recordInterviewOutcomeFromAppointmentSlug
+} = require("./interviewOutcomeApplicationService");
+const { findActiveAppointmentForProspect } = require("../core/activeAppointmentResolver");
 
 async function resolveOwnerRepId(agentId) {
   const user = await findUserById(agentId);
@@ -710,80 +713,30 @@ async function completeAppointment(id, input, context = {}) {
     throw buildError("NOT_FOUND", "Appointment not found.", 404);
   }
 
-  const appointment = isProspectDerivedAppointment(resolved)
-    ? await materializeDerivedAppointment(resolved, agentId)
-    : resolved;
-
   const outcome = input.outcome;
 
   if (!isValidOutcome(outcome)) {
     throw buildError("INVALID_OUTCOME", "Valid outcome is required to complete appointment.");
   }
 
-  let domainUpdated;
+  const result = await recordInterviewOutcomeFromAppointmentSlug({
+    phone: resolved.prospectPhone,
+    appointmentId: resolved.id,
+    outcomeSlug: outcome,
+    outcomeNotes: input.outcomeNotes || null,
+    organizationId,
+    agentId
+  });
 
-  if (outcome === APPOINTMENT_OUTCOMES.RECRUITED) {
-    domainUpdated = await appointmentDomainService.recruitFromAppointment(appointment, {
-      actor: agentId || "agent",
-      outcomeNotes: input.outcomeNotes || null,
-      channel: "mission_control"
-    });
-  } else if (outcome === APPOINTMENT_OUTCOMES.CLIENT) {
-    domainUpdated = await appointmentDomainService.createClientFromAppointment(appointment, {
-      actor: agentId || "agent",
-      outcomeNotes: input.outcomeNotes || null,
-      channel: "mission_control"
-    });
-  } else if (outcome === APPOINTMENT_OUTCOMES.NO_SHOW) {
-    domainUpdated = await appointmentDomainService.markNoShow(appointment, {
-      actor: agentId || "agent",
-      outcomeNotes: input.outcomeNotes || null,
-      channel: "mission_control"
-    });
-  } else {
-    domainUpdated = await appointmentDomainService.completeAppointment(appointment, {
-      actor: agentId || "agent",
-      outcome,
-      outcomeNotes: input.outcomeNotes || null,
-      channel: "mission_control"
-    });
+  if (!result.success) {
+    throw buildError(
+      result.error || "OUTCOME_FAILED",
+      result.message || "Could not record interview outcome.",
+      result.status || 400
+    );
   }
 
-  const saved = await appointmentRepository.save(domainUpdated);
-
-  const milestoneMap = {
-    recruited: MILESTONES.ORIENTATION,
-    client: MILESTONES.FNA,
-    follow_up: MILESTONES.FOLLOW_UP,
-    not_interested: MILESTONES.CLOSED,
-    no_show: MILESTONES.INTERVIEW_SCHEDULED
-  };
-
-  const targetMilestone = milestoneMap[outcome];
-
-  if (targetMilestone) {
-    await advanceProspectWorkflow(appointment.prospectPhone, {
-      targetMilestone,
-      capturedFields: {
-        outcome,
-        outcomeNotes: input.outcomeNotes
-      },
-      interactionType: "appointment_completion"
-    }).catch(() => {});
-  }
-
-  if (outcome !== APPOINTMENT_OUTCOMES.RECRUITED && outcome !== APPOINTMENT_OUTCOMES.CLIENT) {
-    await emitAppointmentEvent(
-      appointment.prospectPhone,
-      APPOINTMENT_EVENTS.INTERVIEW_COMPLETED,
-      {
-        organizationId: appointment.organizationId,
-        appointmentId: saved.id,
-        outcome
-      },
-      "Interview completed"
-    ).catch(() => {});
-  }
+  const saved = result.appointment || (await resolveAppointmentForMutation(id, organizationId, agentId));
 
   return enrichWithProspect(saved);
 }
@@ -960,53 +913,6 @@ async function collectProspectEmail(phone, email, organizationId) {
     emailStatus: resolveEmailStatus(normalized),
     typoSuggestion
   };
-}
-
-const ACTIVE_APPOINTMENT_STATUSES = new Set([
-  "scheduled",
-  "confirmed",
-  "rescheduled",
-  "pending_confirmation",
-  "in_progress",
-  "human_assist_required"
-]);
-
-const TERMINAL_APPOINTMENT_LIFECYCLE_STATES = new Set([
-  "completed",
-  "cancelled",
-  "recruited",
-  "became_client",
-  "no_show"
-]);
-
-async function findActiveAppointmentForProspect(prospectPhone, organizationId) {
-  if (!prospectPhone || !organizationId) {
-    return null;
-  }
-
-  const result = await listAppointments({ organizationId, prospectPhone });
-  const active = result.items.filter((appointment) => {
-    const lifecycleState = appointment.metadata?.lifecycleState;
-
-    if (lifecycleState && TERMINAL_APPOINTMENT_LIFECYCLE_STATES.has(lifecycleState)) {
-      return false;
-    }
-
-    return ACTIVE_APPOINTMENT_STATUSES.has(appointment.status);
-  });
-
-  if (!active.length) {
-    return null;
-  }
-
-  active.sort(
-    (left, right) => Date.parse(left.startDateTime || 0) - Date.parse(right.startDateTime || 0)
-  );
-
-  const now = Date.now();
-  const upcoming = active.find((appointment) => Date.parse(appointment.startDateTime) >= now);
-
-  return upcoming || active[active.length - 1];
 }
 
 module.exports = {
