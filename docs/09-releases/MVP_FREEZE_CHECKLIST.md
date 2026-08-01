@@ -9,7 +9,9 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 
 **Canonical rules:** BR-049 (Conversation delegates to business engines) · BR-050 (single appointment lifecycle)
 
-**Last updated:** 2026-08-01 (MVP Freeze Milestone 3)
+**Last updated:** 2026-08-01 (RC1 Production Verification Sprint)
+
+**RC1 report:** [RC1_PRODUCTION_READINESS.md](./RC1_PRODUCTION_READINESS.md) · **Recommendation:** READY EXCEPT FOR EXTERNAL WABA
 
 ---
 
@@ -30,7 +32,7 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 | 11 | Meta review docs match deployed code | ✅ **Milestone 3** | Portfolio v1.2 + [META_SUBMISSION_READINESS.md](./META_SUBMISSION_READINESS.md) |
 | 12 | Live E2E smoke test (Ad → confirmed interview) | ❌ | Blocked by WABA + env credentials |
 | 13 | Production security checklist | ⚠️ | Bootstrap auth OK for demo; LC1 login deferred |
-| 14 | `GET /health/production` passes | ⚠️ | Requires Railway env (Supabase, Google, WhatsApp) |
+| 14 | `GET /health/production` passes | ✅ **RC1** | Railway returns `mvpReady: true` (2026-08-01) |
 
 ---
 
@@ -55,8 +57,16 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 - `Meta_Approval_Portfolio.md` v1.2 — Sprint 11.4/21.0 alignment
 - `META_SUBMISSION_READINESS.md` — evidence-based checklist (~58% Meta readiness)
 - `REVIEWER_INSTRUCTIONS.md` — live + simulator review paths
-- MTP pack updated (FAQ Q14/Q15, Demo Script Path B, Screenshot checklist)
 - Verified: `node backend/dev/verifySprint21_0.js` PASSED
+
+### RC1 — Production verification sprint ✅
+
+- [RC1_PRODUCTION_READINESS.md](./RC1_PRODUCTION_READINESS.md) — full audit, risk matrix, verify summary
+- Railway `/health/production` → `mvpReady: true`
+- Engineering guardrails + 227 unit tests PASS
+- RC1 gate: `verifyProductionPipeline.js`, `verifySprint21_0.js` PASS
+- Full verify suite: 42 PASS / 21 FAIL (Existing Issue — no new RC1 regressions)
+- **Recommendation:** READY EXCEPT FOR EXTERNAL WABA
 
 ---
 
@@ -80,7 +90,7 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 2. ✅ **BR-050 handoff + `buildHandoff`** — resolve lifecycle via appointment record
 3. ✅ **Meta doc sync** — portfolio + screenshot checklist aligned with Phase A / Sprint 21.0
 4. ✅ **Simulator review verification** — `node backend/dev/verifySprint21_0.js`
-5. **Production pipeline probe** — `node backend/dev/verifyProductionPipeline.js` on Railway
+5. ✅ **Production pipeline probe** — Railway `/health/production` `mvpReady: true`
 6. **Live E2E script** — document + run when WABA unblocked
 7. Workflow state durability (if time permits before freeze)
 
@@ -92,9 +102,11 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 |------|------------|
 | Conversation + qualification code path | **~90%** |
 | Appointment persistence + MC/handoff alignment | **~82%** (post Milestone 2) |
-| Meta review operational readiness | **~58%** (docs aligned; live capture + WABA pending) |
+| Meta review operational readiness | **~58%** (docs + sim; live capture + WABA pending) |
+| Production infrastructure (Railway env) | **~100%** (RC1 health probe) |
+| Production security (LC1) | **~35%** |
 | Documentation / evidence package | **~85%** |
-| **Overall MVP freeze** | **~76%** |
+| **Overall MVP freeze / RC1** | **~78%** |
 
 ---
 
@@ -119,8 +131,12 @@ See docs/09-releases/META_SUBMISSION_READINESS.md
 # Meta review simulator bridge
 node backend/dev/verifySprint21_0.js
 
-# Production readiness (requires env)
+# RC1 production readiness audit
+See docs/09-releases/RC1_PRODUCTION_READINESS.md
+
+# Production readiness (local + Railway probe)
 node backend/dev/verifyProductionPipeline.js
+curl -s https://atlas-ai-production-01de.up.railway.app/health/production
 ```
 
 ---
