@@ -13,7 +13,6 @@ const {
   isTenantScopedRequest
 } = require("./tenantProspectLookup");
 const { detectIntent } = require("./intentEngine");
-const { detectLanguage } = require("./semanticConversationEngine");
 const { buildQualificationBrain } = require("./informationModel");
 const {
   formatPreferredLanguageLabel,
@@ -62,6 +61,7 @@ async function getMissionControlState(phone, options = {}) {
   const { profile: ruledProfile, missingFields, nextField, currentStep, interviewType } =
     qualification;
   const intent = detectIntent(lastMessage);
+  const { detectLanguage } = require("./semanticConversationEngine");
   const language = detectLanguage(prospect, lastMessage);
   const { evaluateCoverage } = require("./businessRulesEngine");
   const { emailRequired } = require("./informationModel");

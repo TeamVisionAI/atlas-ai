@@ -4,32 +4,35 @@ const {
 
 const { handleSemanticMessage } = require("./semanticConversationEngine");
 const { extractEmailFromNotes } = require("./informationModel");
+const { buildRecruiterHandoff } = require("./appointmentHandoffReadModel");
 
 function extractEmail(notes) {
   return extractEmailFromNotes(notes);
 }
 
-function buildHandoff(prospect) {
-  if (!prospect || prospect.current_step !== "CONFIRMED") {
+/**
+ * Pure handoff builder when appointment context is already resolved.
+ * Implements BR-050 — lifecycle from persisted appointments, not prospect.current_step.
+ */
+function buildHandoff(prospect, appointmentContext = null) {
+  if (!prospect) {
     return null;
   }
 
-  const email = extractEmail(prospect.notes);
+  if (appointmentContext && typeof appointmentContext === "object") {
+    return buildRecruiterHandoff(prospect, appointmentContext);
+  }
 
-  return {
-    qualified: prospect.work_authorized === true,
-    interviewType:
-      prospect.interview_type === "In Person"
-        ? "Office"
-        : prospect.interview_type,
-    interviewTime: prospect.interview_time,
-    email,
-    handoffReady: Boolean(
-      prospect.work_authorized === true &&
-      prospect.calendar_event_id &&
-      (email || prospect.interview_type === "In Person")
-    )
-  };
+  return buildRecruiterHandoff(prospect, {});
+}
+
+async function buildHandoffForProspect(prospect) {
+  if (!prospect) {
+    return null;
+  }
+
+  const { resolveRecruiterHandoffForProspect } = require("../services/appointmentListService");
+  return resolveRecruiterHandoffForProspect(prospect);
 }
 
 function buildReplyResult(reply, handoff = null) {
@@ -41,7 +44,13 @@ function buildReplyResult(reply, handoff = null) {
 
 async function finalizeReply(phone, reply) {
   const prospect = await findProspect(phone);
-  return buildReplyResult(reply, buildHandoff(prospect));
+  if (!prospect) {
+    return buildReplyResult(reply, null);
+  }
+
+  const { resolveRecruiterHandoffForProspect } = require("../services/appointmentListService");
+  const handoff = await resolveRecruiterHandoffForProspect(prospect);
+  return buildReplyResult(reply, handoff);
 }
 
 /**
@@ -49,8 +58,6 @@ async function finalizeReply(phone, reply) {
  * Semantic engine: collects missing information instead of fixed step order.
  */
 async function handleIncomingMessage(phone, name, message, options = {}) {
-  const channel = options.channel || "whatsapp";
-
   const reply = await handleSemanticMessage({
     phone,
     name,
@@ -65,5 +72,7 @@ async function handleIncomingMessage(phone, name, message, options = {}) {
 module.exports = {
   handleIncomingMessage,
   buildHandoff,
+  buildHandoffForProspect,
+  buildRecruiterHandoff,
   extractEmail
 };

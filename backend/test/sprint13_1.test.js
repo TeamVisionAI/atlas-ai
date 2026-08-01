@@ -48,6 +48,7 @@ describe("Sprint 13.1 — BR-041 preferred vs conversation language", () => {
     });
 
     try {
+      delete require.cache[require.resolve("../core/missionControlReadModel")];
       const { getMissionControlState } = require("../core/missionControlReadModel");
       const state = await getMissionControlState("+15555550100", {
         organizationId: ORG,

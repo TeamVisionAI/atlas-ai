@@ -2,7 +2,7 @@ console.log("✅ simulatorRoutes.js LOADED");
 const express = require("express");
 const path = require("path");
 
-const { buildHandoff, extractEmail } = require("../core/conversationEngine");
+const { buildHandoffForProspect, extractEmail } = require("../core/conversationEngine");
 const { processNormalizedInboundMessage } = require("../core/communicationHub");
 const { parseSchedulingState } = require("../core/schedulingState");
 const { releaseSlotByIso } = require("../core/capacityEngine");
@@ -280,7 +280,7 @@ async function buildDebugSnapshot(prospect, lastMessage, responseTimeMs) {
     (entry) => entry.intent === "PRIMERICA"
   );
 
-  const handoff = buildHandoff(prospect);
+  const handoff = await buildHandoffForProspect(prospect);
   const email = extractEmail(prospect?.notes);
 
   const debug = {
@@ -300,9 +300,14 @@ async function buildDebugSnapshot(prospect, lastMessage, responseTimeMs) {
     },
     handoff,
     readiness: {
-      conversationCompleted: currentStep === "CONFIRMED" ? "YES" : "NO",
+      conversationCompleted:
+        handoff?.handoffPhase === "active"
+          ? "YES"
+          : handoff?.handoffPhase === "terminal"
+            ? "TERMINAL"
+            : "NO",
       readyForHandoff: handoff?.handoffReady ? "YES" : "NO",
-      calendarReady: prospect?.calendar_event_id ? "YES" : "NO"
+      calendarReady: handoff?.appointmentId ? "YES" : prospect?.calendar_event_id ? "YES" : "NO"
     },
     previousPrimerica: primericaMention,
     responseTimeMs,
@@ -340,7 +345,7 @@ router.get("/simulator/state", async (req, res) => {
     const memory = prospect ? buildMemory(prospect) : null;
     const timeline = await getConversationTimeline(DEV_PHONE);
     const currentStep = prospect?.current_step || "NEW";
-    const handoff = buildHandoff(prospect);
+    const handoff = await buildHandoffForProspect(prospect);
     const email = extractEmail(prospect?.notes);
     const debug = {
       currentStage: currentStep,
@@ -357,9 +362,14 @@ router.get("/simulator/state", async (req, res) => {
       },
       handoff,
       readiness: {
-        conversationCompleted: currentStep === "CONFIRMED" ? "YES" : "NO",
+        conversationCompleted:
+          handoff?.handoffPhase === "active"
+            ? "YES"
+            : handoff?.handoffPhase === "terminal"
+              ? "TERMINAL"
+              : "NO",
         readyForHandoff: handoff?.handoffReady ? "YES" : "NO",
-        calendarReady: prospect?.calendar_event_id ? "YES" : "NO"
+        calendarReady: handoff?.appointmentId ? "YES" : prospect?.calendar_event_id ? "YES" : "NO"
       },
       responseTimeMs: 0
     };
@@ -438,9 +448,14 @@ router.post("/simulator/message", async (req, res) => {
     if (handoff) {
       debug.handoff = handoff;
       debug.readiness = {
-        conversationCompleted: "YES",
+        conversationCompleted:
+          handoff.handoffPhase === "active"
+            ? "YES"
+            : handoff.handoffPhase === "terminal"
+              ? "TERMINAL"
+              : "NO",
         readyForHandoff: handoff.handoffReady ? "YES" : "NO",
-        calendarReady: prospect?.calendar_event_id ? "YES" : "NO"
+        calendarReady: handoff.appointmentId ? "YES" : prospect?.calendar_event_id ? "YES" : "NO"
       };
     }
     const timeline = await getConversationTimeline(DEV_PHONE);

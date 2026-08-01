@@ -4,6 +4,8 @@
  */
 
 const appointmentRepository = require("../repositories/appointmentRepository");
+const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+const { buildRecruiterHandoff } = require("../core/appointmentHandoffReadModel");
 const {
   buildPersistedScopeFilters,
   isPersistedAppointment,
@@ -83,6 +85,29 @@ async function findLatestPersistedAppointmentForProspect(prospectPhone, organiza
   return items[0];
 }
 
+/**
+ * Canonical recruiter handoff for Conversation Engine and simulator surfaces (BR-050).
+ */
+async function resolveRecruiterHandoffForProspect(prospect) {
+  if (!prospect?.phone) {
+    return null;
+  }
+
+  const organizationId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
+  const activeAppointment = await findPersistedAppointmentForProspect(
+    prospect.phone,
+    organizationId
+  );
+  const latestAppointment =
+    activeAppointment ||
+    (await findLatestPersistedAppointmentForProspect(prospect.phone, organizationId));
+
+  return buildRecruiterHandoff(prospect, {
+    activeAppointment,
+    latestAppointment
+  });
+}
+
 /** @deprecated Use listPersistedAppointments — unified merge removed. */
 async function listUnifiedAppointments(filters = {}) {
   return listPersistedAppointments(filters);
@@ -92,5 +117,6 @@ module.exports = {
   listUnifiedAppointments,
   listPersistedAppointments,
   findPersistedAppointmentForProspect,
-  findLatestPersistedAppointmentForProspect
+  findLatestPersistedAppointmentForProspect,
+  resolveRecruiterHandoffForProspect
 };

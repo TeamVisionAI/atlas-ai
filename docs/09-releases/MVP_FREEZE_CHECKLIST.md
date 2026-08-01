@@ -9,7 +9,7 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 
 **Canonical rules:** BR-049 (Conversation delegates to business engines) · BR-050 (single appointment lifecycle)
 
-**Last updated:** 2026-08-01 (MVP Freeze audit)
+**Last updated:** 2026-08-01 (MVP Freeze Milestone 2)
 
 ---
 
@@ -24,9 +24,9 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 | 5 | Appointment booking via production services | ✅ **Milestone 1** | `completeInterview` → `executeScheduleInterview` (BR-049) |
 | 6 | Persisted `atlas_appointments` record | ✅ | `missionExecutionApplicationService` → `appointmentApplicationService` |
 | 7 | Prospect cache + workflow sync on schedule | ✅ | `executeScheduleInterview` rollback-safe path |
-| 8 | Mission Control reflects appointment state | ⚠️ Partial | MC interview block uses latest appointment (BR-050 partial) |
+| 8 | Mission Control reflects appointment state | ✅ | MC interview block + handoff use canonical appointment resolver (BR-050) |
 | 9 | Conversation outcome recording | ⚠️ Partial | Manual in MC — `conversationOutcomeEngine` |
-| 10 | Recruiter handoff signal | ⚠️ Partial | `buildHandoff` still uses prospect fields — BR-050 follow-up |
+| 10 | Recruiter handoff signal | ✅ **Milestone 2** | `buildHandoff` → `resolveRecruiterHandoffForProspect` + `appointmentHandoffReadModel` (BR-050) |
 | 11 | Meta review docs match deployed code | ❌ | `Meta_Approval_Portfolio.md` stale vs Sprint 11.4 Phase A |
 | 12 | Live E2E smoke test (Ad → confirmed interview) | ❌ | Blocked by WABA + env credentials |
 | 13 | Production security checklist | ⚠️ | Bootstrap auth OK for demo; LC1 login deferred |
@@ -42,6 +42,14 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 - `semanticConversationEngine.completeInterview()` delegates to `executeScheduleInterview`
 - Mission Control `buildInterviewBlock` aligned with Prospect Workspace (latest terminal appointment)
 
+### Milestone 2 — BR-050 canonical recruiter handoff ✅
+
+- `appointmentHandoffReadModel.js` — pure handoff projection from persisted lifecycle
+- `appointmentListService.resolveRecruiterHandoffForProspect()` — canonical appointment fetch + handoff
+- `conversationEngine.buildHandoff()` / `finalizeReply()` delegate to appointment resolver (not `current_step`)
+- Simulator readiness uses `handoffPhase` / `handoffReady` instead of `current_step === "CONFIRMED"`
+- `backend/test/appointmentHandoffReadModel.test.js` — lifecycle matrix + stale workflow cases
+
 ---
 
 ## Remaining blockers (priority order)
@@ -51,7 +59,6 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 | **P0** | Meta WhatsApp WABA restricted / `wabaID` null | Meta / ops | Live review screenshots, production messaging |
 | **P0** | No documented live E2E smoke pass | QA / ops | Production readiness sign-off |
 | **P1** | Meta portfolio docs stale (`Meta_Approval_Portfolio.md`) | Docs | Review submission consistency |
-| **P1** | `buildHandoff` uses `current_step` not canonical lifecycle | Backend | Recruiter handoff accuracy (BR-050) |
 | **P1** | Workflow/agent state in JSON files (Railway durability) | Backend | Mid-conversation state loss |
 | **P2** | Messenger uses `AIAdapter`, not semantic engine | Out of MVP scope unless WABA blocked | Alternate channel pivot |
 | **P2** | `completeAppointment` frontend unwrap | Frontend | Optimistic UI after complete |
@@ -62,7 +69,7 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 ## Recommended implementation order
 
 1. ✅ **BR-049 schedule delegation** (conversation → `executeScheduleInterview`)
-2. **BR-050 handoff + `buildHandoff`** — resolve lifecycle via appointment record
+2. ✅ **BR-050 handoff + `buildHandoff`** — resolve lifecycle via appointment record
 3. **Meta doc sync** — update portfolio + screenshot checklist to match Phase A
 4. **Simulator review verification** — `node backend/dev/verifySprint21_0.js` for Meta evidence
 5. **Production pipeline probe** — `node backend/dev/verifyProductionPipeline.js` on Railway
@@ -76,10 +83,10 @@ Meta Ad → WhatsApp → AI Conversation → Qualification → Appointment Sched
 | Area | % complete |
 |------|------------|
 | Conversation + qualification code path | **~90%** |
-| Appointment persistence + MC alignment | **~75%** (post Milestone 1) |
+| Appointment persistence + MC/handoff alignment | **~82%** (post Milestone 2) |
 | Meta review operational readiness | **~45%** (external WABA + E2E) |
-| Documentation / evidence package | **~60%** |
-| **Overall MVP freeze** | **~68%** |
+| Documentation / evidence package | **~65%** |
+| **Overall MVP freeze** | **~72%** |
 
 ---
 
@@ -91,6 +98,9 @@ npm test
 
 # Conversation schedule delegation
 node --test backend/test/conversationScheduleDelegation.test.js
+
+# Canonical recruiter handoff (BR-050)
+node --test backend/test/appointmentHandoffReadModel.test.js
 
 # Sprint 11.4 wiring (simulator guard)
 node backend/dev/verifySprint11_4.js

@@ -571,6 +571,20 @@ Atlas must expose **one canonical appointment lifecycle** to every surface (Appo
 
 See engineering audit: consolidate `resolveLifecycleState()` (writes) and `resolveAppointmentListStatus()` (reads); enrich API DTOs with `canonicalLifecycleState`; sync prospect scheduling cache on every transition (Schedule, Confirm, Reschedule, Complete, Cancel, No Show).
 
+### Recruiter handoff (MVP Freeze Milestone 2)
+
+**Read model:** `appointmentHandoffReadModel.js` · **Resolver:** `appointmentListService.resolveRecruiterHandoffForProspect()` · **Orchestration:** `conversationEngine.buildHandoff()` / `buildHandoffForProspect()`
+
+Rules:
+
+1. **Handoff readiness** (`handoffReady`) derives from the **active persisted appointment** lifecycle via `resolveAppointmentListStatus()` — never from `prospect.current_step === "CONFIRMED"`.
+2. **Appointment selection:** `findPersistedAppointmentForProspect()` (active) with `findLatestPersistedAppointmentForProspect()` fallback for terminal-only history. Rescheduled flows use the newest active appointment.
+3. **Separate fields:** expose `appointmentLifecycle`, `handoffPhase`, and `prospectWorkflowStep` independently — do not collapse lifecycle, conversation outcome, workflow state, or mission state into one flag.
+4. **Terminal lifecycles** (cancelled, completed, no_show) → `handoffPhase: terminal`, `handoffReady: false`. A cancelled appointment must never produce appointment-ready handoff.
+5. **Active lifecycles** (scheduled, confirmed, rescheduled, pending_confirmation, in_progress) with active persisted row → `handoffPhase: active`. `handoffReady: true` only when also qualified (`work_authorized`), calendar linked on the **appointment** (`calendarEventId`), and email captured or in-person interview type.
+6. **No appointment** → `handoffPhase: none`, `handoffReady: false`. Stale prospect cache (`current_step`, `calendar_event_id`) does not override missing or terminal persisted appointments.
+7. **Scope:** organization and prospect phone filters apply in `appointmentListService` before handoff projection — UI and routes must not duplicate selection logic.
+
 ---
 
 # Prospect Workspace
