@@ -680,6 +680,18 @@ async function rescheduleAppointment(id, input, context = {}) {
     interview_time: matchedSlot.startTimeISO
   }).catch(() => {});
 
+  await advanceProspectWorkflow(appointment.prospectPhone, {
+    targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
+    capturedFields: {
+      interviewDateTime: matchedSlot.startTimeISO,
+      confirmed: true
+    },
+    interactionNotes: `Interview rescheduled to ${dateKey} at ${timeKey}.`,
+    interactionType: "appointment_reschedule"
+  }).catch((error) => {
+    console.error("[appointment/reschedule/workflow]", error.message);
+  });
+
   return enrichWithProspect(saved);
 }
 

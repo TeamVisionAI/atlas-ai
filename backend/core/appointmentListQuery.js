@@ -483,14 +483,25 @@ function selectActivePersistedAppointmentForProspect(appointments = []) {
     return null;
   }
 
-  active.sort(
-    (left, right) => Date.parse(left.startDateTime || 0) - Date.parse(right.startDateTime || 0)
-  );
-
   const now = Date.now();
-  const upcoming = active.find((appointment) => Date.parse(appointment.startDateTime) >= now);
+  const upcoming = active.filter(
+    (appointment) => Date.parse(appointment.startDateTime || 0) >= now
+  );
+  const candidates = upcoming.length ? upcoming : active;
 
-  return upcoming || active[active.length - 1];
+  candidates.sort((left, right) => {
+    const updatedDiff =
+      Date.parse(right.updatedAt || right.startDateTime || 0) -
+      Date.parse(left.updatedAt || left.startDateTime || 0);
+
+    if (updatedDiff !== 0) {
+      return updatedDiff;
+    }
+
+    return Date.parse(left.startDateTime || 0) - Date.parse(right.startDateTime || 0);
+  });
+
+  return candidates[0];
 }
 
 module.exports = {

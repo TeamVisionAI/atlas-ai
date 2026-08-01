@@ -203,6 +203,28 @@ describe("appointmentListQuery", () => {
     assert.equal(selected.id, "appt-upcoming");
   });
 
+  it("selectActivePersistedAppointmentForProspect prefers latest rescheduled upcoming appointment", () => {
+    const now = Date.now();
+
+    const selected = selectActivePersistedAppointmentForProspect([
+      {
+        id: "appt-old",
+        status: "scheduled",
+        startDateTime: new Date(now + 60 * 60_000).toISOString(),
+        updatedAt: "2026-08-01T11:00:00.000Z"
+      },
+      {
+        id: "appt-rescheduled",
+        status: "rescheduled",
+        metadata: { lifecycleState: "rescheduled" },
+        startDateTime: new Date(now + 4 * 60 * 60_000).toISOString(),
+        updatedAt: "2026-08-01T16:00:00.000Z"
+      }
+    ]);
+
+    assert.equal(selected.id, "appt-rescheduled");
+  });
+
   it("today view includes only scheduled lifecycle statuses", () => {
     const reference = new Date("2026-07-30T12:00:00");
     const todayFilters = {

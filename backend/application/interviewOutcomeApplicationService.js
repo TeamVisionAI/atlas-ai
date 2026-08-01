@@ -111,7 +111,10 @@ async function recordInterviewOutcome({
     savedAppointment = await applyInterviewOutcomeToAppointment(appointment, outcomeId, {
       agentId,
       outcomeNotes: interactionNotes || fields.notes || null,
-      channel: interactionType === "appointment_completion" ? "appointments" : "mission_control"
+      channel: interactionType === "appointment_completion" ? "appointments" : "mission_control",
+      interviewDateTime: advancePayload.capturedFields.interviewDateTime || null,
+      scheduledTime: advancePayload.capturedFields.interviewDateTime || null,
+      reason: fields.rescheduleReason || "prospect_requested"
     });
   }
 

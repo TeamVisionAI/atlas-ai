@@ -112,6 +112,29 @@ function shouldReconcile({ persisted, computedMilestone, agentState, prospect })
     return false;
   }
 
+  const interviewAt = parseInterviewDatetime(prospect);
+  const interviewStillUpcoming =
+    interviewAt !== null && interviewAt > Date.now();
+
+  // Reschedule recovery — persisted result pending but canonical interview moved forward.
+  if (
+    persisted.canonicalMilestone === MILESTONES.INTERVIEW_RESULT_PENDING &&
+    computedMilestone === MILESTONES.INTERVIEW_SCHEDULED &&
+    !agentState?.outcome &&
+    interviewStillUpcoming
+  ) {
+    return true;
+  }
+
+  // Do not treat a future interview as already due for outcome capture.
+  if (
+    persisted.canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED &&
+    computedMilestone === MILESTONES.INTERVIEW_RESULT_PENDING &&
+    interviewStillUpcoming
+  ) {
+    return false;
+  }
+
   return isTimeProgressionAllowed(persisted.canonicalMilestone, computedMilestone) &&
     isComputedMilestoneSupportedByTiming(computedMilestone, prospect);
 }

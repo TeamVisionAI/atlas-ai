@@ -34,7 +34,31 @@ async function applyInterviewOutcomeToAppointment(appointment, outcomeId, contex
   } else if (outcomeSlug === "no_show") {
     domainUpdated = await appointmentDomainService.markNoShow(appointment, domainContext);
   } else if (outcomeId === "Reschedule Interview") {
-    return appointment;
+    const scheduledTime = context.scheduledTime || context.interviewDateTime;
+
+    if (!scheduledTime) {
+      return appointment;
+    }
+
+    const durationMinutes = Number(appointment.durationMinutes) || 30;
+    const endDateTime =
+      context.endDateTime ||
+      new Date(Date.parse(scheduledTime) + durationMinutes * 60_000).toISOString();
+
+    const domainUpdated = await appointmentDomainService.rescheduleAppointment(appointment, {
+      actor: context.agentId || "agent",
+      reason: context.reason || "prospect_requested",
+      scheduledTime,
+      endDateTime,
+      channel: context.channel || "mission_control",
+      summary: "Interview rescheduled from Mission Control outcome",
+      payload: {
+        previousStart: appointment.startDateTime,
+        newStart: scheduledTime
+      }
+    });
+
+    return appointmentRepository.save(domainUpdated);
   } else {
     domainUpdated = await appointmentDomainService.completeAppointment(appointment, {
       ...domainContext,
