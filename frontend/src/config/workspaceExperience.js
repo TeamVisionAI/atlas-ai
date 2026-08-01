@@ -1,5 +1,9 @@
 /**
- * Sprint 20.0 — Role-based workspace navigation, landing pages, and route access.
+ * Sprint 20.0 — Workspace navigation, landing pages, and route access.
+ *
+ * Business nav is capability-based: core recruiting modules appear for every role
+ * that holds the required permission. Leadership adds dashboards and extensions;
+ * it never removes core Business capabilities (Architecture Guide §4, §13).
  */
 
 import { appPath } from "./appRoutes";
@@ -101,7 +105,6 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "mission-control",
     path: appPath("mission-control"),
     labelKey: "navMissionControl",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.PROSPECT_READ
   },
   prospectCenter: {
@@ -192,43 +195,45 @@ const NAV_ITEM_DEFS = Object.freeze({
   }
 });
 
-const NAV_ORDER = Object.freeze({
-  [WORKSPACE_TYPES.ADMINISTRATOR]: [
-    "executiveDashboard",
-    "quickCapture",
-    "missionControl",
-    "prospectCenter",
-    "conversations",
-    "appointments",
-    "followUps",
-    "analytics",
-    "knowledge",
-    "settings",
-    "adminUsers",
-    "operationsCenter"
-  ],
-  [WORKSPACE_TYPES.REPRESENTATIVE]: [
-    "myDashboard",
-    "quickCapture",
-    "prospectCenter",
-    "conversations",
-    "appointments",
-    "followUps",
-    "knowledge"
-  ],
-  [WORKSPACE_TYPES.MANAGEMENT]: [
-    "teamDashboard",
-    "missionControl",
-    "prospectCenter",
-    "conversations",
-    "appointments",
-    "followUps",
-    "production",
-    "recruiting",
-    "analytics",
-    "settings"
-  ]
+/** Core Business capabilities — visible when the user has the module permission. */
+const BUSINESS_CORE_NAV_ORDER = Object.freeze([
+  "quickCapture",
+  "missionControl",
+  "prospectCenter",
+  "conversations",
+  "appointments",
+  "followUps",
+  "knowledge"
+]);
+
+const WORKSPACE_LANDING_NAV = Object.freeze({
+  [WORKSPACE_TYPES.ADMINISTRATOR]: ["executiveDashboard"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["teamDashboard"],
+  [WORKSPACE_TYPES.REPRESENTATIVE]: ["myDashboard"]
 });
+
+/** Leadership extensions beyond core Business (still permission-gated). */
+const LEADERSHIP_EXTENSION_NAV = Object.freeze({
+  [WORKSPACE_TYPES.ADMINISTRATOR]: ["analytics"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["production", "recruiting", "analytics"],
+  [WORKSPACE_TYPES.REPRESENTATIVE]: []
+});
+
+/** Administration surfaces — configuration and platform operations. */
+const ADMINISTRATION_NAV = Object.freeze({
+  [WORKSPACE_TYPES.ADMINISTRATOR]: ["settings", "adminUsers", "operationsCenter"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["settings"],
+  [WORKSPACE_TYPES.REPRESENTATIVE]: []
+});
+
+function buildNavOrderForWorkspace(workspaceType) {
+  return [
+    ...(WORKSPACE_LANDING_NAV[workspaceType] || WORKSPACE_LANDING_NAV[WORKSPACE_TYPES.REPRESENTATIVE]),
+    ...BUSINESS_CORE_NAV_ORDER,
+    ...(LEADERSHIP_EXTENSION_NAV[workspaceType] || []),
+    ...(ADMINISTRATION_NAV[workspaceType] || [])
+  ];
+}
 
 export const ROUTE_ACCESS = Object.freeze({
   "executive-dashboard": {
@@ -242,10 +247,7 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
-  "mission-control": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.PROSPECT_READ
-  },
+  "mission-control": { permission: PERMISSIONS.PROSPECT_READ },
   "prospect-center": { permission: PERMISSIONS.PROSPECT_READ },
   "prospect-workspace": { permission: PERMISSIONS.PROSPECT_READ },
   "quick-capture": { permission: PERMISSIONS.PROSPECT_WRITE },
@@ -331,7 +333,7 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
   }
 
   const workspaceType = resolveWorkspaceType(user.role);
-  const order = NAV_ORDER[workspaceType] || NAV_ORDER[WORKSPACE_TYPES.REPRESENTATIVE];
+  const order = buildNavOrderForWorkspace(workspaceType);
 
   return order
     .map((key) => NAV_ITEM_DEFS[key])
