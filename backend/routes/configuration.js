@@ -15,6 +15,7 @@ const { requirePermission } = require("../middleware/requirePermission");
 const { PERMISSIONS } = require("../security/permissions");
 const { ORGANIZATION_LEVEL_VALUES } = require("../core/configuration/organizationLevels");
 const { appPath } = require("../utils/appPathHelper");
+const { resolveFrontendBaseUrl } = require("../config/frontendBaseUrl");
 
 const router = express.Router();
 
@@ -28,7 +29,7 @@ function auditMeta(req) {
 }
 
 router.get("/scheduling/google/callback", async (req, res) => {
-  const frontendBase = process.env.ATLAS_FRONTEND_URL || "http://localhost:5173";
+  const frontendBase = resolveFrontendBaseUrl();
   let redirectTarget = `${frontendBase}${appPath("settings/scheduling")}`;
 
   try {

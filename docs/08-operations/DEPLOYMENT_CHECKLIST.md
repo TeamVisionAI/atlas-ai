@@ -38,6 +38,7 @@ Approved — Sprint 13.1.1
 | Variable | Required | Notes |
 |----------|----------|-------|
 | `ATLAS_BOOTSTRAP_TOKEN` | Yes | Session bootstrap |
+| `FRONTEND_URL` | Yes | Public Vercel/custom domain for password reset & invitation links (no trailing slash) |
 | `SUPABASE_URL` / keys | Yes | App data |
 | Meta / WhatsApp vars | Per feature | See `.env.example` |
 

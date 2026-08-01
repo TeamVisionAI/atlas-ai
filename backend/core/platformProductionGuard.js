@@ -3,6 +3,8 @@
  * Ensures production never starts without required security configuration.
  */
 
+const { readConfiguredFrontendUrl } = require("../config/frontendBaseUrl");
+
 function isProduction() {
   return process.env.NODE_ENV === "production";
 }
@@ -20,6 +22,10 @@ function assertProductionPlatformConfig() {
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
     missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  if (!readConfiguredFrontendUrl()) {
+    missing.push("FRONTEND_URL");
   }
 
   if (missing.length > 0) {

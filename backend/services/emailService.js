@@ -3,6 +3,7 @@
  */
 
 const RESEND_API_URL = "https://api.resend.com/emails";
+const { resolveFrontendBaseUrl } = require("../config/frontendBaseUrl");
 
 function getEmailConfig() {
   return {
@@ -15,7 +16,7 @@ function getEmailConfig() {
 }
 
 function getFrontendBaseUrl() {
-  return String(process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+  return resolveFrontendBaseUrl();
 }
 
 async function sendEmail({ to, subject, text, html }) {

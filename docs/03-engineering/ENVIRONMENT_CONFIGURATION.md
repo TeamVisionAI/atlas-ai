@@ -75,6 +75,7 @@ See root [.env.example](../../.env.example). Key pairs:
 
 | Backend | Frontend | Purpose |
 |---------|----------|---------|
+| `FRONTEND_URL` | — | Password reset & invitation email links (Railway → Vercel/custom domain) |
 | `ATLAS_BOOTSTRAP_TOKEN` | `VITE_ATLAS_BOOTSTRAP_TOKEN` | Must match for session bootstrap |
 | `META_APP_ID` | `VITE_META_APP_ID` | Meta SDK |
 | `META_EMBEDDED_SIGNUP_CONFIG_ID` | `VITE_META_EMBEDDED_SIGNUP_CONFIG_ID` | Embedded Signup |
