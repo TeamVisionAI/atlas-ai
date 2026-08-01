@@ -102,7 +102,8 @@ async function recordInterviewOutcome({
   if (appointmentId && organizationId) {
     appointment = await findAppointmentById(appointmentId, organizationId, agentId);
   } else if (organizationId) {
-    appointment = await findActiveAppointmentForProspect(phone, organizationId, agentId);
+    // Org-scoped active appointment only — do not filter by agentId (BR-050 handoff may differ from actor).
+    appointment = await findActiveAppointmentForProspect(phone, organizationId);
   }
 
   let savedAppointment = null;

@@ -80,11 +80,15 @@ test("recordInterviewOutcome delegates Reschedule Interview to appointmentApplic
     eventsEmitted: []
   });
   logService.logConversation = async () => null;
-  resolverModule.findActiveAppointmentForProspect = async () => ({
-    id: PERSISTED_APPOINTMENT_ID,
-    status: "scheduled",
-    startDateTime: "2026-08-01T15:00:00.000Z"
-  });
+  let lookupAgentId = "should-not-be-passed";
+  resolverModule.findActiveAppointmentForProspect = async (prospectPhone, organizationId, agentId) => {
+    lookupAgentId = agentId;
+    return {
+      id: PERSISTED_APPOINTMENT_ID,
+      status: "scheduled",
+      startDateTime: "2026-08-01T15:00:00.000Z"
+    };
+  };
 
   delete require.cache[outcomeServicePath];
   const { recordInterviewOutcome } = require(outcomeServicePath);
@@ -109,6 +113,7 @@ test("recordInterviewOutcome delegates Reschedule Interview to appointmentApplic
   assert.ok(rescheduleArgs.input.scheduledTime);
   assert.equal(rescheduleArgs.context.organizationId, "00000000-0000-4000-8000-000000000001");
   assert.equal(rescheduleArgs.context.agentId, "agent-1");
+  assert.equal(lookupAgentId, undefined);
 
   appointmentService.rescheduleAppointment = originalReschedule;
   supabaseService.findProspect = originalFindProspect;
