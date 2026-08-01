@@ -13,7 +13,8 @@ const MIGRATIONS_DIR = path.join(__dirname, "../../database/migrations");
 const APPOINTMENT_MIGRATIONS = [
   "013_atlas_appointments.sql",
   "018_appointment_owner_rep_id.sql",
-  "019_atlas_appointments_baseline_repair.sql"
+  "019_atlas_appointments_baseline_repair.sql",
+  "020_appointment_interviewer_assignment.sql"
 ];
 
 function loadSql(fileName) {

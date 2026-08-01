@@ -44,6 +44,21 @@ export function navigateToProspectWorkspace(navigate, prospect) {
   return path;
 }
 
+export function buildProspectWorkspaceCommunicationHistoryPath(prospect) {
+  const basePath = buildProspectWorkspacePath(prospect);
+  return `${basePath}#communication-history`;
+}
+
+export function navigateToProspectCommunicationHistory(navigate, prospect) {
+  if (typeof navigate !== "function") {
+    return null;
+  }
+
+  const path = buildProspectWorkspaceCommunicationHistoryPath(prospect);
+  navigate(path);
+  return path;
+}
+
 export function buildProspectCenterPath({ filter, search } = {}) {
   const params = new URLSearchParams();
 

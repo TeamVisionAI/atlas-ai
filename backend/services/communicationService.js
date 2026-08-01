@@ -20,6 +20,8 @@ const {
   WHATSAPP_TEMPLATES
 } = require("../core/whatsappCommunicationEngine");
 const { payloadsMatchForSend } = require("../core/communicationOutboundPayloadEngine");
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
+const { resolveRecruiterDisplayName } = require("../core/whatsappCommunicationEngine");
 
 function buildError(error, message, extras = {}) {
   return {
@@ -49,6 +51,25 @@ async function prepareAppointmentCommunication(appointmentId, context, { templat
   }
 
   const representative = await resolveAssignedRepresentative(appointment, context);
+
+  logInterviewerTrace({
+    authenticatedUserId: context.actorUser?.id || null,
+    authenticatedUserName: resolveRecruiterDisplayName(context.actorUser),
+    interviewerUserId: appointment?.interviewerUserId || null,
+    interviewerName: appointment?.interviewerName || null,
+    appointmentId: appointment?.id || null,
+    source: "communicationPreview.prepareAppointmentCommunication"
+  });
+
+  logInterviewerTrace({
+    authenticatedUserId: context.actorUser?.id || null,
+    authenticatedUserName: resolveRecruiterDisplayName(context.actorUser),
+    interviewerUserId: representative?.interviewerUserId || representative?.user?.id || null,
+    interviewerName: representative?.profile?.name || representative?.interviewerName || null,
+    appointmentId: appointment?.id || null,
+    source: "communicationPreview.prepareAppointmentCommunication.resolved"
+  });
+
   const serviceOptions = {
     organizationId,
     tenantScoped: true,

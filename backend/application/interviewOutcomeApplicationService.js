@@ -12,7 +12,8 @@ const {
   resolveInterviewAdvancePayload,
   buildFollowUpRecommendation,
   resolveOutcomeId,
-  listInterviewOutcomeIds
+  listInterviewOutcomeSelectorIds,
+  resolveSelectorOutcomeLabel
 } = require("../core/interviewOutcomeMappings");
 const { mapAppointmentSlugToOutcomeId } = require("../core/interviewOutcomeSlugMap");
 const { applyInterviewOutcomeToAppointment } = require("../core/interviewOutcomeAppointmentSync");
@@ -42,10 +43,10 @@ async function recordInterviewOutcome({
     };
   }
 
-  const outcomeId = resolveOutcomeId(String(outcome || "").trim());
-  const allowed = listInterviewOutcomeIds();
+  const rawOutcome = String(outcome || "").trim();
+  const selectorIds = listInterviewOutcomeSelectorIds();
 
-  if (!outcomeId || !allowed.includes(outcomeId)) {
+  if (!rawOutcome || !selectorIds.includes(rawOutcome)) {
     return {
       success: false,
       status: 400,
@@ -53,6 +54,8 @@ async function recordInterviewOutcome({
       message: "A valid interview outcome is required."
     };
   }
+
+  const outcomeId = resolveOutcomeId(rawOutcome);
 
   const prospect = await findProspect(phone);
 
@@ -125,12 +128,16 @@ async function recordInterviewOutcome({
 
   const updatedProspect = await findProspect(phone);
   const config = getInterviewOutcomeConfig(outcomeId);
+  const outcomeLabel = resolveSelectorOutcomeLabel(rawOutcome, config).replace(
+    /^[^\p{L}\p{N}]+/u,
+    ""
+  );
 
   await logConversation({
     phone,
     name: updatedProspect?.name || prospect.name,
     direction: "outgoing",
-    message: `[Interview Completed] Outcome: ${config.label}`,
+    message: `[Interview Completed] Outcome: ${outcomeLabel}`,
     intent: "INTERVIEW_OUTCOME",
     pipeline: "AGENT",
     currentStep: updatedProspect?.current_step || prospect.current_step,
@@ -146,7 +153,7 @@ async function recordInterviewOutcome({
   return {
     success: true,
     status: 200,
-    outcome: config.label,
+    outcome: outcomeLabel,
     outcomeId,
     workflowLabel: config.workflowLabel,
     followUpRecommendation: resolvedFollowUpRecommendation,

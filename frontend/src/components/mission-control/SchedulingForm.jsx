@@ -13,6 +13,9 @@ import {
 } from "../../utils/schedulingSlotGroups";
 import { needsZoomSchedulingEmailWarning } from "../../utils/prospectEmail";
 import SchedulingEmailWarning from "./SchedulingEmailWarning";
+import InterviewAssignmentSection, {
+  resolveInterviewerLabel
+} from "./InterviewAssignmentSection";
 import "./SchedulingForm.css";
 
 export const INTERVIEW_TYPE_OPTIONS = Object.freeze([
@@ -38,7 +41,8 @@ export function normalizeInterviewType(value) {
 export function createInitialSchedulingForm({
   defaultInterviewType = "",
   defaultRecruiter = "",
-  defaultDuration = 30
+  defaultDuration = 30,
+  defaultInterviewerUserId = ""
 } = {}) {
   return {
     dateKey: "",
@@ -46,6 +50,8 @@ export function createInitialSchedulingForm({
     duration: defaultDuration,
     interviewType: defaultInterviewType ? normalizeInterviewType(defaultInterviewType) : "",
     recruiter: defaultRecruiter,
+    interviewerSelection: "self",
+    interviewerUserId: defaultInterviewerUserId,
     officeLocation: "",
     notes: "",
     email: "",
@@ -110,6 +116,8 @@ export default function SchedulingForm({
   onNextWeek,
   onInterviewTypeChange,
   prospect = null,
+  currentUser = null,
+  assignmentCandidates = [],
   inline = false,
   useSemanticSections = false,
   presentation = "default"
@@ -143,6 +151,12 @@ export default function SchedulingForm({
   const selectedTimeLabel = form.timeKey
     ? formatSchedulingTime12Hour(form.timeKey, locale)
     : "";
+  const conductedByLabel =
+    resolveInterviewerLabel(assignmentCandidates, form.interviewerUserId, currentUser) ||
+    currentUser?.display_name ||
+    recruiterName ||
+    form.recruiter ||
+    translate("missionExecutionRecruiterPlaceholder");
 
   function updateField(field, value) {
     onChange({ ...form, [field]: value });
@@ -225,10 +239,18 @@ export default function SchedulingForm({
               value={selectedInterviewTypeLabel}
             />
             <SummaryCard
-              label={translate("missionExecutionRecruiter")}
-              value={recruiterName || form.recruiter || translate("missionExecutionRecruiterPlaceholder")}
+              label={translate("missionExecutionConductedBy")}
+              value={conductedByLabel}
             />
           </div>
+
+          <InterviewAssignmentSection
+            form={form}
+            onChange={onChange}
+            currentUser={currentUser}
+            candidates={assignmentCandidates}
+            disabled={disabled}
+          />
 
           {form.dateKey || form.timeKey ? (
             <div className="scheduling-form__selection" aria-live="polite">

@@ -394,6 +394,46 @@ async function bootstrapSession() {
   return { user, session };
 }
 
+function resolveUserDisplayName(user) {
+  const displayName = String(user?.display_name || "").trim();
+
+  if (displayName) {
+    return displayName;
+  }
+
+  return [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() || user?.email || "";
+}
+
+async function listActiveOrganizationUsers(organizationId, options = {}) {
+  if (!organizationId) {
+    return [];
+  }
+
+  const limit = Math.min(Number(options.limit) || 50, 100);
+
+  const { data, error } = await supabase
+    .from("atlas_users")
+    .select("id, email, first_name, last_name, display_name, rep_id, status, organization_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .order("display_name", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingAtlasAuthTable(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+
+  return (data || []).map((row) => ({
+    id: row.id,
+    display_name: resolveUserDisplayName(row),
+    rep_id: row.rep_id || null
+  }));
+}
+
 module.exports = {
   DEFAULT_USER_ID,
   findUserById,
@@ -409,5 +449,7 @@ module.exports = {
   updateLastLogin,
   bootstrapSession,
   resolveBootstrapUser,
-  sanitizeUser
+  sanitizeUser,
+  listActiveOrganizationUsers,
+  resolveUserDisplayName
 };

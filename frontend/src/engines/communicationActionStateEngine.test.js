@@ -203,3 +203,16 @@ test("enabled actions keep the one-click hint subtitle", () => {
   assert.equal(custom.enabled, true);
   assert.equal(custom.subtitle, "whatsappActionOneClickHint");
 });
+
+test("result pending gate keeps follow-up communications and hides pre-interview invitations", () => {
+  const actions = resolveCommunicationActions(
+    buildWorkspace({ workflowGate: { active: true } }),
+    { translate, organizationSettings }
+  );
+
+  assert.equal(findAction(actions, COMMUNICATION_ACTION_IDS.CUSTOM).enabled, true);
+  assert.equal(findAction(actions, COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS).enabled, true);
+  assert.equal(findAction(actions, COMMUNICATION_ACTION_IDS.SEND_ZOOM).enabled, false);
+  assert.equal(findAction(actions, COMMUNICATION_ACTION_IDS.SEND_REMINDER).enabled, false);
+  assert.equal(findAction(actions, COMMUNICATION_ACTION_IDS.SEND_OFFICE).enabled, false);
+});

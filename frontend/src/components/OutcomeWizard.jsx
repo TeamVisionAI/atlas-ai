@@ -132,9 +132,11 @@ export default function OutcomeWizard({
       <h3 className="outcome-wizard__title">{title}</h3>
       {prospectName ? (
         <p className="outcome-wizard__intro">
-          Record the interview outcome for {prospectName}.
+          What happened during the interview with {prospectName}?
         </p>
-      ) : null}
+      ) : (
+        <p className="outcome-wizard__intro">What happened during the interview?</p>
+      )}
 
       <FollowUpRecommendation
         recommendation={outcomeConfig?.followUpRecommendation}

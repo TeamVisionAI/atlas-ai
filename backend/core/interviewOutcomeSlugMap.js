@@ -7,6 +7,8 @@ const { APPOINTMENT_OUTCOMES } = require("./configuration/appointmentDomain");
 const RECRUIT_OUTCOMES = new Set(["Recruited", "Orientation Scheduled", "Pending IBA", "Pending License"]);
 const CLIENT_OUTCOMES = new Set(["Became Client", "FNA Scheduled", "Application Pending", "Policy Submitted"]);
 const FOLLOW_UP_OUTCOMES = new Set([
+  "Follow Up Needed",
+  "Needs More Time",
   "Thinking About It",
   "Requested More Information",
   "Wants to Talk to Spouse",
@@ -23,12 +25,12 @@ const CLOSED_OUTCOMES = new Set([
 const APPOINTMENT_SLUG_TO_OUTCOME_ID = Object.freeze({
   [APPOINTMENT_OUTCOMES.RECRUITED]: "Recruited",
   [APPOINTMENT_OUTCOMES.CLIENT]: "Became Client",
-  [APPOINTMENT_OUTCOMES.FOLLOW_UP]: "Thinking About It",
+  [APPOINTMENT_OUTCOMES.FOLLOW_UP]: "Follow Up Needed",
   [APPOINTMENT_OUTCOMES.NO_SHOW]: "No Show",
   [APPOINTMENT_OUTCOMES.NOT_INTERESTED]: "Not Interested",
   [APPOINTMENT_OUTCOMES.CANCELLED]: "Not Interested",
   [APPOINTMENT_OUTCOMES.RESCHEDULED]: "Reschedule Interview",
-  [APPOINTMENT_OUTCOMES.OTHER]: "Thinking About It"
+  [APPOINTMENT_OUTCOMES.OTHER]: "Follow Up Needed"
 });
 
 function mapAppointmentSlugToOutcomeId(slug) {

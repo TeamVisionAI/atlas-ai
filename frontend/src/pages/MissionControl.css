@@ -37,12 +37,12 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 16px var(--mc-inset-x) var(--mc-inset-bottom);
+  padding: 8px var(--mc-inset-x) var(--mc-inset-bottom);
   background: var(--mc-surface);
   scroll-padding-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 }
 
 .mission-control-page__workspace {
@@ -51,6 +51,12 @@
   gap: 20px;
   max-width: none;
   margin: 0;
+}
+
+/* BR-046 — action-first layout: Mission Actions → Communication immediately after header */
+.mission-control-page__workspace--focus {
+  gap: 16px;
+  margin-top: 0;
 }
 
 .mission-control-shell__body .executive-panel {

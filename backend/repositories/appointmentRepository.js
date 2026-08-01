@@ -15,6 +15,7 @@ const {
   resolveOwnerRepIdFromRow,
   resolveOwnerRepIdFromAppointment
 } = require("../core/appointmentReadModel");
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
 
 const STORE_FILE = path.join(__dirname, "../data/appointments.json");
 
@@ -73,6 +74,15 @@ async function save(appointment) {
       throw error;
     }
 
+    logInterviewerTrace({
+      authenticatedUserId: data?.agent_id || row.agent_id || null,
+      authenticatedUserName: null,
+      interviewerUserId: data?.interviewer_user_id || row.interviewer_user_id || null,
+      interviewerName: data?.interviewer_name || row.interviewer_name || null,
+      appointmentId: data?.id || row.id || null,
+      source: "appointmentRepository.save"
+    });
+
     return rowToAppointment(data);
   }
 
@@ -90,6 +100,16 @@ async function save(appointment) {
   }
 
   writeJsonStore(rows);
+
+  logInterviewerTrace({
+    authenticatedUserId: row.agent_id || null,
+    authenticatedUserName: null,
+    interviewerUserId: row.interviewer_user_id || null,
+    interviewerName: row.interviewer_name || null,
+    appointmentId: row.id || null,
+    source: "appointmentRepository.save"
+  });
+
   return rowToAppointment(row);
 }
 
@@ -109,7 +129,18 @@ async function findById(id, organizationId) {
       throw error;
     }
 
-    return rowToAppointment(data);
+    const appointment = rowToAppointment(data);
+
+    logInterviewerTrace({
+      authenticatedUserId: appointment?.agentId || null,
+      authenticatedUserName: null,
+      interviewerUserId: appointment?.interviewerUserId || null,
+      interviewerName: appointment?.interviewerName || null,
+      appointmentId: appointment?.id || null,
+      source: "appointmentRepository.findById"
+    });
+
+    return appointment;
   }
 
   const rows = readJsonStore();
@@ -117,7 +148,18 @@ async function findById(id, organizationId) {
     (row) => row.id === id && (!organizationId || row.organization_id === organizationId)
   );
 
-  return rowToAppointment(match);
+  const appointment = rowToAppointment(match);
+
+  logInterviewerTrace({
+    authenticatedUserId: appointment?.agentId || null,
+    authenticatedUserName: null,
+    interviewerUserId: appointment?.interviewerUserId || null,
+    interviewerName: appointment?.interviewerName || null,
+    appointmentId: appointment?.id || null,
+    source: "appointmentRepository.findById"
+  });
+
+  return appointment;
 }
 
 async function search(filters = {}) {

@@ -11,6 +11,7 @@ export default function ScheduleInterviewDialog({
   mode = "schedule",
   prospect,
   recruiterName = "",
+  currentUser = null,
   submitting = false,
   error = null,
   onClose,
@@ -23,7 +24,8 @@ export default function ScheduleInterviewDialog({
     active: open,
     defaultInterviewType,
     recruiterName,
-    translate
+    translate,
+    currentUser
   });
 
   const canSubmit =
@@ -34,6 +36,20 @@ export default function ScheduleInterviewDialog({
     !scheduling.loadingExpansion;
 
   function handleSubmit() {
+    console.info("[interviewer-trace]", {
+      authenticatedUserId: currentUser?.id || null,
+      authenticatedUserName: currentUser?.display_name || null,
+      interviewerUserId: scheduling.form.interviewerUserId || null,
+      interviewerName:
+        scheduling.assignmentCandidates.find(
+          (candidate) => candidate.id === scheduling.form.interviewerUserId
+        )?.display_name ||
+        currentUser?.display_name ||
+        null,
+      appointmentId: null,
+      source: "scheduleDialog.submit"
+    });
+
     onSubmit?.({
       ...scheduling.form,
       email: resolveProspectEmail(prospect, scheduling.form.email) || undefined
@@ -79,6 +95,8 @@ export default function ScheduleInterviewDialog({
           slotsError={scheduling.slotsError}
           disabled={submitting}
           recruiterName={recruiterName || scheduling.form.recruiter}
+          currentUser={scheduling.currentUser}
+          assignmentCandidates={scheduling.assignmentCandidates}
           durationMinutes={scheduling.durationMinutes}
           displayMode={scheduling.displayMode}
           viewMode={scheduling.viewMode}

@@ -8,12 +8,10 @@ import { captureAppointmentError } from "../../utils/appointmentErrors";
 const OUTCOMES = [
   "recruited",
   "client",
-  "follow_up",
-  "no_show",
-  "not_interested",
-  "cancelled",
   "rescheduled",
-  "other"
+  "no_show",
+  "follow_up",
+  "not_interested"
 ];
 
 export default function CompleteAppointmentDialog({ open, appointment, onClose, onSuccess }) {
@@ -53,7 +51,7 @@ export default function CompleteAppointmentDialog({ open, appointment, onClose, 
   return (
     <AppointmentModalShell
       open={open}
-      title={translate("appointmentsComplete")}
+      title={translate("workflowGateTitle")}
       onClose={onClose}
       footer={
         <AppointmentModalActions

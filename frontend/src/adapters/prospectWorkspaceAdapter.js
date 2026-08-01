@@ -4,7 +4,7 @@ import {
 } from "./missionControlAdapter";
 import { formatCanonicalMilestoneLabel, formatWorkflowOwnershipLabel } from "./conversationPreview";
 import { formatAtlasDateTime } from "../utils/dateFormatter";
-import { normalizeProspectLanguage } from "../types/language";
+import { resolvePreferredLanguageDisplay } from "../types/language";
 import { resolvePersistedAppointmentId } from "../engines/appointmentIdEngine.js";
 
 /**
@@ -16,7 +16,12 @@ export function adaptProspectWorkspaceResponse(workspacePayload) {
       name: workspacePayload.prospect?.name,
       phone: workspacePayload.prospect?.phone,
       city: workspacePayload.prospect?.city,
-      state: workspacePayload.prospect?.state
+      state: workspacePayload.prospect?.state,
+      preferred_language:
+        workspacePayload.prospect?.preferred_language ||
+        workspacePayload.editorProfile?.preferred_language ||
+        null,
+      preferred_language_label: workspacePayload.prospect?.preferred_language_label || null
     },
     brain: workspacePayload.brain,
     businessRules: workspacePayload.businessRules,
@@ -49,15 +54,20 @@ export function adaptProspectWorkspaceResponse(workspacePayload) {
       }
     : null;
 
+  const preferredLanguageDisplay = resolvePreferredLanguageDisplay({
+    preferred_language:
+      workspacePayload.prospect?.preferred_language ||
+      workspacePayload.editorProfile?.preferred_language,
+    preferred_language_label: workspacePayload.prospect?.preferred_language_label
+  });
+
   return {
     ...workspace,
     identity: {
       name: workspacePayload.prospect?.name || "—",
       phone: workspacePayload.prospect?.phone || "—",
       prospectNumber: workspacePayload.prospect?.prospect_number || null,
-      communicationLanguage: normalizeProspectLanguage(
-        workspacePayload.prospect?.communication_language
-      ),
+      communicationLanguage: preferredLanguageDisplay,
       location: formatProspectLocation(
         workspacePayload.prospect?.city,
         workspacePayload.prospect?.state

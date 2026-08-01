@@ -20,6 +20,7 @@ export default function CommunicationHistorySection({
 
   return (
     <section
+      id="communication-history"
       className="communication-history"
       aria-labelledby="communication-history-heading"
     >

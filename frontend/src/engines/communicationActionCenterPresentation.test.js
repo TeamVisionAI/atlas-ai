@@ -60,7 +60,7 @@ test("buildCommunicationActionCenterCards marks a recommended action without reo
   assert.equal(cards[0].id, COMMUNICATION_ACTION_CENTER_CHROME.CALL);
 });
 
-test("buildCommunicationActionCenterCards keeps disabled action subtitles from availability rules", () => {
+test("buildCommunicationActionCenterCards hides unavailable actions instead of showing them disabled", () => {
   const cards = buildCommunicationActionCenterCards({
     phone: "+15555550100",
     translate,
@@ -76,8 +76,17 @@ test("buildCommunicationActionCenterCards keeps disabled action subtitles from a
     ]
   });
 
-  const zoom = cards.find((card) => card.id === COMMUNICATION_ACTION_IDS.SEND_ZOOM);
+  assert.equal(cards.find((card) => card.id === COMMUNICATION_ACTION_IDS.SEND_ZOOM), undefined);
+});
 
-  assert.equal(zoom.subtitle, "whatsappActionDisabledZoomNotCreated");
-  assert.equal(zoom.enabled, false);
+test("buildCommunicationActionCenterCards keeps call and add note during workflow gate", () => {
+  const cards = buildCommunicationActionCenterCards({
+    phone: "+15555550100",
+    translate,
+    includeAddNote: true,
+    actions: []
+  });
+
+  assert.equal(cards.some((card) => card.id === COMMUNICATION_ACTION_CENTER_CHROME.CALL), true);
+  assert.equal(cards.some((card) => card.id === COMMUNICATION_ACTION_CENTER_CHROME.ADD_NOTE), true);
 });

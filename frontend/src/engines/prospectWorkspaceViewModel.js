@@ -18,15 +18,16 @@ export function getJourneyStepLabelKey(stepKey) {
   return JOURNEY_STEP_KEYS[stepKey] || stepKey;
 }
 
-export function buildInterviewAccordionSummary(interview, translate) {
+export function buildInterviewAccordionSummary(interview, translate, workflowState = null) {
   if (!interview?.datetime) {
     return translate("workspaceInterviewSummaryNone");
   }
 
   const when = formatInterviewDateTime(interview.datetime);
   const type = interview.type || translate("workspaceInterviewSummaryTypeUnknown");
+  const state = workflowState || (interview.gateActive ? "result_pending" : interview.outcome ? "completed" : interview.isPast ? "in_progress" : "scheduled");
 
-  if (interview.gateActive) {
+  if (state === "result_pending") {
     return translate("workspaceInterviewSummaryGate", { when, type });
   }
 
@@ -38,11 +39,11 @@ export function buildInterviewAccordionSummary(interview, translate) {
     });
   }
 
-  if (interview.isPast) {
-    return translate("workspaceInterviewSummaryPast", { when, type });
+  if (state === "in_progress") {
+    return translate("workspaceInterviewSummaryInProgress", { when, type });
   }
 
-  return translate("workspaceInterviewSummaryUpcoming", { when, type });
+  return translate("workspaceInterviewSummaryScheduled", { when, type });
 }
 
 export function buildStatusAccordionSummary(status, translate) {

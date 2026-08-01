@@ -16,6 +16,7 @@ export default function ExpandableMissionActionCard({
   workflowGate,
   rawWorkflowGate,
   recruiterName,
+  currentUser = null,
   submitting = false,
   error = null,
   translate,
@@ -63,6 +64,7 @@ export default function ExpandableMissionActionCard({
             workflowGate={workflowGate}
             rawWorkflowGate={rawWorkflowGate}
             recruiterName={recruiterName}
+            currentUser={currentUser}
             submitting={submitting}
             error={error}
             translate={translate}

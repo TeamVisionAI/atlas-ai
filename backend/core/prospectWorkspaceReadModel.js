@@ -11,6 +11,11 @@ const { listProspectActivityPreview } = require("./prospectActivityFeedReadModel
 const { buildProspectEditorProfile } = require("./prospectWorkspaceProfileEngine");
 const { resolvePersistedAppointmentId } = require("./appointmentListQuery");
 const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
+const {
+  formatPreferredLanguageLabel,
+  resolveProspectPreferredLanguage
+} = require("./prospectLanguage");
 
 function buildProspectIdentity(prospect) {
   if (!prospect) {
@@ -20,6 +25,7 @@ function buildProspectIdentity(prospect) {
   const firstName = prospect.first_name || "";
   const lastName = prospect.last_name || "";
   const composedName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  const preferredLanguage = resolveProspectPreferredLanguage(prospect);
 
   return {
     phone: prospect.phone,
@@ -27,6 +33,8 @@ function buildProspectIdentity(prospect) {
     first_name: firstName || null,
     last_name: lastName || null,
     prospect_number: prospect.prospect_number || null,
+    preferred_language: preferredLanguage,
+    preferred_language_label: formatPreferredLanguageLabel(preferredLanguage),
     communication_language: prospect.communication_language || prospect.language || null,
     city: prospect.city || null,
     state: prospect.state || null,
@@ -59,7 +67,9 @@ function buildInterviewBlock(prospect, agentState, workflowGate, activeAppointme
     calendarEventId: activeAppointment?.calendarEventId || prospect?.calendar_event_id || null,
     gateActive: Boolean(workflowGate?.active),
     appointmentId: resolvePersistedAppointmentId(activeAppointment),
-    ownerRepId: activeAppointment?.ownerRepId || null
+    ownerRepId: activeAppointment?.ownerRepId || null,
+    interviewerUserId: activeAppointment?.interviewerUserId || null,
+    interviewerName: activeAppointment?.interviewerName || null
   };
 }
 
@@ -113,9 +123,20 @@ async function composeProspectWorkspaceFromMissionControl(phone, missionControl,
     console.error("[prospect-workspace/activityPreview]", error.message);
   }
 
+  const editorProfile = buildProspectEditorProfile(prospectRow || missionControl.prospect);
+
+  logInterviewerTrace({
+    authenticatedUserId: null,
+    authenticatedUserName: null,
+    interviewerUserId: interview?.interviewerUserId || activeAppointment?.interviewerUserId || null,
+    interviewerName: interview?.interviewerName || activeAppointment?.interviewerName || null,
+    appointmentId: interview?.appointmentId || null,
+    source: "missionControl.readModel.interview"
+  });
+
   return {
     prospect,
-    editorProfile: buildProspectEditorProfile(prospectRow || missionControl.prospect),
+    editorProfile,
     owner,
     workflow: missionControl.workflow,
     workflowGate: missionControl.workflowGate,

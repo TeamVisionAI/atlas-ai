@@ -6284,5 +6284,41 @@
     "followUpTime": null,
     "orientationScheduled": false,
     "onboardingUnlocked": false
+  },
+  "+17860005555": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [
+      {
+        "text": "Required information updated: City, State, Work Authorization, Occupation, Interview Type.",
+        "at": "2026-07-31T19:16:47.051Z",
+        "type": "phone"
+      }
+    ],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
+  },
+  "+17547030050": {
+    "flags": {
+      "zoom_link_sent": false,
+      "office_location_sent": false,
+      "missed_appointment_sent": false
+    },
+    "agentNotes": [],
+    "outcome": null,
+    "closureReason": null,
+    "futureReminder": null,
+    "followUpDate": null,
+    "followUpTime": null,
+    "orientationScheduled": false,
+    "onboardingUnlocked": false
   }
 }

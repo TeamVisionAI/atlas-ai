@@ -60,6 +60,10 @@ const {
 } = require("../modules/appointments/application/appointmentEventAdapter");
 const { findUserById } = require("../services/atlasUserService");
 const {
+  resolveInterviewAssignmentForSchedule
+} = require("../core/interviewAssignmentEngine");
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
+const {
   recordInterviewOutcomeFromAppointmentSlug
 } = require("./interviewOutcomeApplicationService");
 const { findActiveAppointmentForProspect } = require("../core/activeAppointmentResolver");
@@ -446,6 +450,20 @@ async function createAppointment(input, context = {}) {
   const prospectId = await findCoreProspectIdByPhone(prospectPhone);
   const timestamp = nowIso();
   const ownerRepId = input.ownerRepId || (await resolveOwnerRepId(agentId));
+  const interviewAssignment = await resolveInterviewAssignmentForSchedule(input, {
+    organizationId,
+    userId: createdBy || agentId,
+    agentId
+  });
+
+  logInterviewerTrace({
+    authenticatedUserId: createdBy || agentId,
+    authenticatedUserName: null,
+    interviewerUserId: interviewAssignment.interviewerUserId,
+    interviewerName: interviewAssignment.interviewerName,
+    appointmentId: null,
+    source: "appointmentApplicationService.createAppointment.beforeSave"
+  });
 
   const scheduledResult = appointmentDomainService.scheduleAppointment(
     {
@@ -477,13 +495,17 @@ async function createAppointment(input, context = {}) {
       outcome: null,
       outcomeNotes: null,
       ownerRepId,
+      interviewerUserId: interviewAssignment.interviewerUserId,
+      interviewerName: interviewAssignment.interviewerName,
       metadata: {
         ...(input.metadata || {}),
         prospectName: prospect.name,
         prospectEmail: email,
         emailStatus,
         virtualUrlStatus: virtualUrlResult.status,
-        ownerRepId
+        ownerRepId,
+        interviewerUserId: interviewAssignment.interviewerUserId,
+        interviewerName: interviewAssignment.interviewerName
       },
       createdBy: createdBy || agentId,
       createdAt: timestamp,
@@ -498,6 +520,15 @@ async function createAppointment(input, context = {}) {
   const appointment = scheduledResult.appointment;
 
   const saved = await appointmentRepository.save(appointment);
+
+  logInterviewerTrace({
+    authenticatedUserId: createdBy || agentId,
+    authenticatedUserName: null,
+    interviewerUserId: saved.interviewerUserId || interviewAssignment.interviewerUserId,
+    interviewerName: saved.interviewerName || interviewAssignment.interviewerName,
+    appointmentId: saved.id || null,
+    source: "appointmentApplicationService.createAppointment.afterSave"
+  });
 
   if (!skipReminders) {
     const reminderResult = appointmentReminderEngine.scheduleReminders(saved);

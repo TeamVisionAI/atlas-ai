@@ -9,13 +9,14 @@ const { APPOINTMENT_OUTCOMES } = require("../core/configuration/appointmentDomai
 test("mapAppointmentSlugToOutcomeId maps appointment completion slugs to catalog outcomes", () => {
   assert.equal(mapAppointmentSlugToOutcomeId(APPOINTMENT_OUTCOMES.RECRUITED), "Recruited");
   assert.equal(mapAppointmentSlugToOutcomeId(APPOINTMENT_OUTCOMES.NO_SHOW), "No Show");
-  assert.equal(mapAppointmentSlugToOutcomeId(APPOINTMENT_OUTCOMES.FOLLOW_UP), "Thinking About It");
+  assert.equal(mapAppointmentSlugToOutcomeId(APPOINTMENT_OUTCOMES.FOLLOW_UP), "Follow Up Needed");
   assert.equal(mapAppointmentSlugToOutcomeId(APPOINTMENT_OUTCOMES.RESCHEDULED), "Reschedule Interview");
 });
 
 test("resolveAppointmentOutcomeSlug maps catalog outcomes back to appointment slugs", () => {
   assert.equal(resolveAppointmentOutcomeSlug("Recruited"), APPOINTMENT_OUTCOMES.RECRUITED);
   assert.equal(resolveAppointmentOutcomeSlug("No Show"), APPOINTMENT_OUTCOMES.NO_SHOW);
-  assert.equal(resolveAppointmentOutcomeSlug("Thinking About It"), APPOINTMENT_OUTCOMES.FOLLOW_UP);
+  assert.equal(resolveAppointmentOutcomeSlug("Follow Up Needed"), APPOINTMENT_OUTCOMES.FOLLOW_UP);
+  assert.equal(resolveAppointmentOutcomeSlug("Needs More Time"), APPOINTMENT_OUTCOMES.FOLLOW_UP);
   assert.equal(resolveAppointmentOutcomeSlug("Not Interested"), APPOINTMENT_OUTCOMES.NOT_INTERESTED);
 });

@@ -15,6 +15,10 @@ const {
 const { detectIntent } = require("./intentEngine");
 const { detectLanguage } = require("./semanticConversationEngine");
 const { buildQualificationBrain } = require("./informationModel");
+const {
+  formatPreferredLanguageLabel,
+  resolveProspectPreferredLanguage
+} = require("./prospectLanguage");
 
 async function resolveProspect(phone, organizationId = null, options = {}) {
   const tenantScoped = isTenantScopedRequest(options);
@@ -69,6 +73,8 @@ async function getMissionControlState(phone, options = {}) {
     ...ruledProfile,
     interviewType
   });
+  // Implements BR-041 — preferred_language is exposed on prospect; brain.language stays internal.
+  const preferredLanguage = resolveProspectPreferredLanguage(prospect);
 
   return {
     prospect: {
@@ -76,7 +82,9 @@ async function getMissionControlState(phone, options = {}) {
       phone: prospect.phone,
       city: ruledProfile.city,
       state: ruledProfile.state,
-      occupation: ruledProfile.occupation
+      occupation: ruledProfile.occupation,
+      preferred_language: preferredLanguage,
+      preferred_language_label: formatPreferredLanguageLabel(preferredLanguage)
     },
     brain: {
       language,

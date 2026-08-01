@@ -444,12 +444,20 @@ export function useWorkspaceActions({
           public_location: "Public Location"
         };
         const interviewType = interviewTypeMap[form.interviewType] || "In Person";
+        console.info("[interviewer-trace]", {
+          authenticatedUserId: null,
+          authenticatedUserName: null,
+          interviewerUserId: form.interviewerUserId || null,
+          interviewerName: null,
+          appointmentId: null,
+          source: "scheduleDialog.submit.workspace"
+        });
         const result = await executeScheduleInterview(workspace.phone, {
           dateKey: form.dateKey,
           timeKey: form.timeKey,
           duration: form.duration,
           interviewType,
-          recruiter: form.recruiter?.trim() || undefined,
+          interviewerUserId: form.interviewerUserId || undefined,
           officeLocation: form.officeLocation?.trim() || undefined,
           notes: form.notes?.trim() || undefined,
           email: form.email || undefined

@@ -7,6 +7,7 @@ const {
   formatPreferredLanguageLabel,
   resolveProspectPreferredLanguage
 } = require("./prospectLanguage");
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
 const {
   formatInterviewSchedule,
   DEFAULT_TIMEZONE,
@@ -187,6 +188,19 @@ function buildOutboundCommunicationPayload({
     zoomUrl: built.zoomUrl || context.zoomUrl || null,
     office,
     media
+  });
+
+  logInterviewerTrace({
+    authenticatedUserId: null,
+    authenticatedUserName: null,
+    interviewerUserId: appointment?.interviewerUserId || null,
+    interviewerName:
+      resolvedRepresentative?.name ||
+      context.recruiterName ||
+      appointment?.interviewerName ||
+      null,
+    appointmentId: appointment?.id || null,
+    source: "communicationPreview.buildOutboundCommunicationPayload"
   });
 
   return {

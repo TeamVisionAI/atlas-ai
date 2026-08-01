@@ -293,17 +293,6 @@
   border-top: 1px solid #f1f5f9;
 }
 
-.appointments-page__link-action {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #2563eb;
-  text-decoration: none;
-}
-
-.appointments-page__link-action:hover {
-  text-decoration: underline;
-}
-
 .appointments-page__loading {
   flex: 1;
   display: flex;

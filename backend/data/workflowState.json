@@ -5294,7 +5294,7 @@
     "reconcileEpisodeKey": null
   },
   "+17547030050": {
-    "canonicalMilestone": "INTERVIEW_DUE",
+    "canonicalMilestone": "INTERVIEW_SCHEDULED",
     "workflowOwnership": "WAITING_EVENT",
     "needsHumanAttention": false,
     "stalledAt": null,
@@ -5302,7 +5302,7 @@
     "manualAgentOwnership": false,
     "doNotContact": false,
     "stallEpisodeKey": null,
-    "reconcileEpisodeKey": "time:INTERVIEW_DUE:2026-07-31T15:00:00.000Z"
+    "reconcileEpisodeKey": null
   },
   "+17542727787": {
     "canonicalMilestone": "INTERVIEW_SCHEDULED",
@@ -5314,5 +5314,38 @@
     "doNotContact": false,
     "stallEpisodeKey": null,
     "reconcileEpisodeKey": null
+  },
+  "+17860005555": {
+    "canonicalMilestone": "INTERVIEW_RESULT_PENDING",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-31T19:16:08.703Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": "time:INTERVIEW_RESULT_PENDING:2026-07-31T22:00:00.000Z"
+  },
+  "+17862347082": {
+    "canonicalMilestone": "INTERVIEW_RESULT_PENDING",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-31T19:16:08.538Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": null
+  },
+  "+17862509432": {
+    "canonicalMilestone": "INTERVIEW_RESULT_PENDING",
+    "workflowOwnership": "AGENT",
+    "needsHumanAttention": false,
+    "stalledAt": null,
+    "initializedAt": "2026-07-31T19:16:08.556Z",
+    "manualAgentOwnership": false,
+    "doNotContact": false,
+    "stallEpisodeKey": null,
+    "reconcileEpisodeKey": "time:INTERVIEW_RESULT_PENDING:2026-07-31T21:00:00.000Z"
   }
 }

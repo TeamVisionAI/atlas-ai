@@ -5,54 +5,44 @@
 
 const { MILESTONES } = require("./workflowConstants");
 
-const INTERVIEW_OUTCOME_CATEGORIES = Object.freeze([
+/**
+ * BR-044 — Representative-facing interview outcomes (business events only).
+ * Operational milestones remain in INTERVIEW_OUTCOME_CONFIG but are not selectable.
+ */
+const INTERVIEW_OUTCOME_SELECTOR_CATEGORIES = Object.freeze([
   {
-    id: "recruiting",
-    label: "Recruiting",
+    id: "interview_outcome",
+    label: "Interview Outcome",
     outcomes: [
       "Recruited",
-      "Pending IBA",
-      "Pending License",
-      "Orientation Scheduled"
-    ]
-  },
-  {
-    id: "client",
-    label: "Client",
-    outcomes: [
       "Became Client",
-      "FNA Scheduled",
-      "Application Pending",
-      "Policy Submitted"
-    ]
-  },
-  {
-    id: "follow_up",
-    label: "Follow-Up",
-    outcomes: [
-      "Thinking About It",
-      "Requested More Information",
-      "Wants to Talk to Spouse",
-      "Call Back Later",
-      "Reschedule Interview",
-      "No Show"
-    ]
-  },
-  {
-    id: "closed",
-    label: "Closed",
-    outcomes: [
-      "Not Interested",
-      "Not Qualified",
-      "Already Working with Another Company",
-      "Unable to Contact"
+      "Rescheduled",
+      "No Show",
+      "Follow Up Needed",
+      "Not Interested"
     ]
   }
 ]);
 
+const INTERVIEW_OUTCOME_SELECTOR_LABELS = Object.freeze({
+  Recruited: "✅ Recruited",
+  "Became Client": "🤝 Became Client",
+  Rescheduled: "📅 Rescheduled",
+  "No Show": "👻 No Show",
+  "Follow Up Needed": "⏳ Follow Up Needed",
+  "Not Interested": "❌ Not Interested"
+});
+
+/** @deprecated Internal catalog — not exposed in outcome selector (BR-044). */
+const INTERVIEW_OUTCOME_CATEGORIES = INTERVIEW_OUTCOME_SELECTOR_CATEGORIES;
+
 const LEGACY_OUTCOME_ALIASES = Object.freeze({
-  "Needs More Time": "Thinking About It",
-  Rescheduled: "Reschedule Interview"
+  "Needs More Time": "Follow Up Needed",
+  Rescheduled: "Reschedule Interview",
+  "Thinking About It": "Follow Up Needed",
+  "Requested More Information": "Follow Up Needed",
+  "Wants to Talk to Spouse": "Follow Up Needed",
+  "Call Back Later": "Follow Up Needed"
 });
 
 const ORIENTATION_ELIGIBLE_OUTCOMES = new Set([
@@ -78,23 +68,20 @@ function buildInterviewDateTime(date, time) {
 const INTERVIEW_OUTCOME_CONFIG = Object.freeze({
   Recruited: {
     label: "Recruited",
-    targetMilestone: MILESTONES.ORIENTATION,
+    targetMilestone: MILESTONES.LICENSING,
     workflowLabel: "Recruiting Onboarding Workflow",
-    fields: [
-      { key: "orientationDate", type: "date", label: "Orientation Date" },
-      { key: "orientationTime", type: "time", label: "Orientation Time" }
-    ],
+    fields: [{ key: "notes", type: "textarea", label: "Notes" }],
     followUpRecommendation: {
-      daysUntilFollowUp: 1,
-      reminderSchedule: "1 day before orientation",
+      daysUntilFollowUp: 3,
+      reminderSchedule: "Every 3 days until IBA complete",
       preferredChannel: "whatsapp",
-      suggestedScript:
-        "Confirm orientation details and share the onboarding checklist."
+      suggestedScript: "Check in on IBA paperwork progress and answer questions."
     },
     buildCapturedFields(form = {}) {
       return {
-        outcome: "Recruited",
-        orientationScheduled: Boolean(form.orientationDate && form.orientationTime)
+        outcome: "Pending IBA",
+        interviewBusinessOutcome: "Recruited",
+        onboardingUnlocked: true
       };
     }
   },
@@ -153,6 +140,7 @@ const INTERVIEW_OUTCOME_CONFIG = Object.freeze({
     label: "Became Client",
     targetMilestone: MILESTONES.FAST_START,
     workflowLabel: "Client Workflow",
+    closesInterviewOutcome: true,
     fields: [{ key: "notes", type: "textarea", label: "Notes" }],
     followUpRecommendation: {
       daysUntilFollowUp: 2,
@@ -161,7 +149,31 @@ const INTERVIEW_OUTCOME_CONFIG = Object.freeze({
       suggestedScript: "Welcome them as a client and confirm next service steps."
     },
     buildCapturedFields() {
-      return { outcome: "Became Client" };
+      return { outcome: "Became Client", interviewBusinessOutcome: "Became Client" };
+    }
+  },
+  "Follow Up Needed": {
+    label: "Follow Up Needed",
+    targetMilestone: MILESTONES.FOLLOW_UP,
+    workflowLabel: "Follow-Up Workflow",
+    fields: [
+      { key: "followUpDate", type: "date", label: "Follow Up Date", defaultDays: 3 },
+      { key: "followUpTime", type: "time", label: "Follow Up Time", defaultValue: "10:00" },
+      { key: "notes", type: "textarea", label: "Notes" }
+    ],
+    followUpRecommendation: {
+      daysUntilFollowUp: 3,
+      reminderSchedule: "Day 3 and day 7 reminders",
+      preferredChannel: "whatsapp",
+      suggestedScript: "Gently follow up and offer to answer remaining questions."
+    },
+    buildCapturedFields(form = {}) {
+      return {
+        outcome: "Needs More Time",
+        interviewBusinessOutcome: "Follow Up Needed",
+        followUpDate: form.followUpDate || defaultFollowUpDate(3),
+        followUpTime: form.followUpTime || "10:00"
+      };
     }
   },
   "FNA Scheduled": {
@@ -442,8 +454,16 @@ function isOrientationEligibleOutcome(outcome) {
   return ORIENTATION_ELIGIBLE_OUTCOMES.has(outcome);
 }
 
+function listInterviewOutcomeSelectorIds() {
+  return INTERVIEW_OUTCOME_SELECTOR_CATEGORIES.flatMap((category) => category.outcomes);
+}
+
 function listInterviewOutcomeIds() {
-  return INTERVIEW_OUTCOME_CATEGORIES.flatMap((category) => category.outcomes);
+  return Object.keys(INTERVIEW_OUTCOME_CONFIG);
+}
+
+function resolveSelectorOutcomeLabel(outcomeId, config) {
+  return INTERVIEW_OUTCOME_SELECTOR_LABELS[outcomeId] || config?.label || outcomeId;
 }
 
 function buildFollowUpRecommendation(outcomeId, prospect = {}) {
@@ -473,7 +493,7 @@ function buildFollowUpRecommendation(outcomeId, prospect = {}) {
 }
 
 function buildInterviewOutcomeReadModel(prospect = null) {
-  const categories = INTERVIEW_OUTCOME_CATEGORIES.map((category) => ({
+  const categories = INTERVIEW_OUTCOME_SELECTOR_CATEGORIES.map((category) => ({
     id: category.id,
     label: category.label,
     outcomes: category.outcomes.map((outcomeId) => {
@@ -481,8 +501,8 @@ function buildInterviewOutcomeReadModel(prospect = null) {
 
       return {
         id: outcomeId,
-        label: config?.label || outcomeId,
-        workflowLabel: config?.workflowLabel || null,
+        label: resolveSelectorOutcomeLabel(outcomeId, config),
+        workflowLabel: null,
         fields: config?.fields || [],
         followUpRecommendation: buildFollowUpRecommendation(outcomeId, prospect)
       };
@@ -491,7 +511,8 @@ function buildInterviewOutcomeReadModel(prospect = null) {
 
   return {
     categories,
-    legacyAliases: { ...LEGACY_OUTCOME_ALIASES }
+    legacyAliases: { ...LEGACY_OUTCOME_ALIASES },
+    selectorOutcomeIds: listInterviewOutcomeSelectorIds()
   };
 }
 
@@ -526,12 +547,16 @@ function resolveInterviewAdvancePayload(outcomeId, formState = {}) {
 
 module.exports = {
   INTERVIEW_OUTCOME_CATEGORIES,
+  INTERVIEW_OUTCOME_SELECTOR_CATEGORIES,
+  INTERVIEW_OUTCOME_SELECTOR_LABELS,
   INTERVIEW_OUTCOME_CONFIG,
   LEGACY_OUTCOME_ALIASES,
   resolveOutcomeId,
   getInterviewOutcomeConfig,
   isOrientationEligibleOutcome,
   listInterviewOutcomeIds,
+  listInterviewOutcomeSelectorIds,
+  resolveSelectorOutcomeLabel,
   buildFollowUpRecommendation,
   buildInterviewOutcomeReadModel,
   resolveInterviewAdvancePayload,

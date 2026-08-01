@@ -47,7 +47,7 @@ export function buildCommunicationActionCenterCards({
         id: cardId,
         icon: CHROME_ICONS[cardId],
         title: translate?.("missionControlActionCall") || "Call Prospect",
-        subtitle: phone,
+        subtitle: translate?.("missionControlActionCallSubtitle") || phone,
         variant: "primary",
         enabled: true,
         recommended: recommendedActionId === cardId
@@ -74,7 +74,7 @@ export function buildCommunicationActionCenterCards({
 
     const action = actionById.get(cardId);
 
-    if (!action) {
+    if (!action || action.enabled === false) {
       continue;
     }
 
@@ -84,7 +84,7 @@ export function buildCommunicationActionCenterCards({
       title: action.title,
       subtitle: action.subtitle || "",
       variant: action.variant || "default",
-      enabled: action.enabled,
+      enabled: true,
       recommended: recommendedActionId === action.id
     });
   }

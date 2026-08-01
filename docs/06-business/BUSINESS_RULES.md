@@ -281,6 +281,174 @@ Rules:
 
 ---
 
+# Language & Communication
+
+## BR-041 — Preferred Language vs Conversation Language
+
+**Implements:** Sprint 13.1  
+**Engine:** `prospectLanguage.js`, `missionControlReadModel.js`, `communicationOutboundPayloadEngine.js`, Mission Control and Prospect Workspace adapters
+
+Preferred Language and Conversation Language are independent concepts and must never overwrite or substitute for each other.
+
+### Preferred Language
+
+- **Canonical field:** `preferred_language` (`english` | `spanish`)
+- Represents the representative's explicit choice (Quick Capture or Prospect Workspace edit).
+- Immutable unless explicitly edited by an authorized user.
+- Mission Control UI, Communication Preview metadata, invitation templates, reminder templates, and AI starting defaults must use this value (via `resolveProspectPreferredLanguage()`).
+
+### Conversation Language
+
+- **Canonical field:** `brain.language` (`en` | `es`)
+- Represents the AI's active conversation language for the current turn.
+- May change on every inbound message based on detection and persisted conversation state.
+- Remains internal to AI pipelines; must not be displayed as Preferred Language in Mission Control or Prospect Workspace.
+
+---
+
+# Interview Assignment
+
+## BR-042 — Interview Assignment
+
+**Implements:** Sprint 13.2  
+**Engine:** `interviewAssignmentEngine.js`, `appointmentReadModel.js`, `representativeProfileEngine.js`, scheduling UI
+
+Recruiter, Prospect Owner, and Interviewer are independent roles.
+
+### Interviewer
+
+- **Canonical fields:** `interviewer_user_id`, `interviewer_name` on `atlas_appointments`
+- Represents the representative assigned to conduct the interview.
+- Default at schedule time: **authenticated user** (not prospect owner, scheduler rep id, or organization default).
+- Single source of truth for interview communications and operational display.
+
+### Consumers
+
+Appointment invitation, Communication Preview, interview reminder, Zoom invitation, office invitation, Mission Control, and Prospect Workspace must resolve the interviewer **only** from the persisted appointment assignment via `resolveInterviewRepresentative()`.
+
+`owner_rep_id` remains prospect ownership metadata and must not substitute for interviewer assignment in communications.
+
+---
+
+## BR-043 — Appointment Card Join Zoom CTA
+
+**Implements:** Sprint 13.3  
+**Engine:** `appointmentCardPresentation.js`, `AppointmentCardActions.jsx`
+
+When a persisted appointment includes a valid Zoom meeting URL and is not completed or cancelled:
+
+1. **Primary CTA:** The Appointments card must show **Join Zoom** as the visually emphasized primary action (same button component family as other card actions).
+2. **Action order:** Add Note → Open Workspace → Join Zoom → Reschedule → Cancel → Complete.
+3. **Visibility:** Hide Join Zoom when the appointment is terminal (completed/cancelled) or no valid Zoom URL exists.
+4. **Terminology:** Use **Zoom** consistently in card meta and actions (`Recruiting Interview · Zoom`, `Join Zoom`). Do not mix generic labels such as Join, Meeting, or Video for Zoom interviews on this surface.
+5. **Scope:** Presentation only — no changes to appointment lifecycle, scheduling, communications, or interview assignment (BR-042).
+
+---
+
+## BR-044 — Interview Outcome Simplification
+
+**Implements:** Sprint 13.4  
+**Engine:** `interviewOutcomeMappings.js`, `interviewOutcomeApplicationService.js`, `WorkflowGatePanel`, `AppointmentCardActions` consumers
+
+Interview outcomes represent **business events** ("What happened?"). Workflow milestones represent **Atlas operational states** ("What happens next?"). They must never appear in the same selector.
+
+### Representative-facing outcomes (selector only)
+
+1. Recruited  
+2. Became Client  
+3. Rescheduled  
+4. No Show  
+5. Follow Up Needed  
+6. Not Interested  
+
+Operational milestones (`Pending IBA`, `Orientation Scheduled`, `Application Pending`, etc.) remain in the workflow engine but are **not selectable** by representatives.
+
+### Automatic workflow advancement
+
+| Outcome | Atlas behavior |
+|---|---|
+| **Recruited** | Records business outcome; advances to **Pending IBA** (licensing/onboarding track) automatically |
+| **Became Client** | Closes interview outcome gate; does **not** create Application Pending (Primerica Back Office owns applications) |
+| **Follow Up Needed** | Continues follow-up workflow |
+| **Rescheduled** | Continues appointment scheduling workflow |
+| **No Show** | Continues no-show recovery workflow |
+| **Not Interested** | Continues objection / nurture workflow |
+
+---
+
+## BR-045 — Mission Control Workflow Polish
+
+**Implements:** Sprint 13.5  
+**Engine:** `interviewWorkflowPresentationEngine.js`, `communicationActionCenterPresentation.js`, `MissionActionCenter`, `CommunicationActionsPanel`, `AppointmentCardActions`, `OperationalInterviewPanel`
+
+Presentation-only polish for the interview workflow across Mission Control, Appointments, and Prospect Workspace. **No workflow logic, backend, or database changes.**
+
+### Valid actions by interview state
+
+| UI state | Actions shown |
+|---|---|
+| **Interview Scheduled** | Join Zoom (primary when URL exists), Open Workspace, Reschedule, Cancel, Complete Interview |
+| **Interview Result Pending** | Record Outcome (Mission Control), Open Workspace; hide duplicate interview lifecycle actions |
+| **Interview Completed** | View Workspace, Communication History |
+
+Terminal states (Cancelled, No Show) follow Completed presentation rules.
+
+### Communication cards
+
+Hide cards that cannot be used (do not render disabled placeholders):
+
+- No interview scheduled → hide Zoom Invitation, Reminder, Office Address
+- Interview Result Pending → hide Zoom Invitation, Reminder, and Office Address; keep Call, WhatsApp, Add Note, and Resend Interview Details when valid (see BR-046)
+
+### CTA hierarchy
+
+1. **Primary** — next operational step (e.g. Join Zoom, Record Outcome)
+2. **Secondary** — supporting navigation (Open/View Workspace, Reschedule, Complete Interview)
+3. **Danger** — destructive actions (Cancel Interview)
+
+Every CTA subtitle must answer **why it is available now** (contextual hint, not generic label).
+
+### Standardized terminology
+
+Use these labels consistently (no mixed wording):
+
+- Interview Scheduled
+- Interview In Progress
+- Interview Result Pending
+- Interview Completed
+- Rescheduled
+- Cancelled
+- No Show
+
+---
+
+## BR-046 — Mission Control Focus Mode
+
+**Implements:** Sprint 13.6, 13.6.1  
+**Surface:** `Dashboard.jsx` (Mission Control page), `MissionControl.css`, `communicationActionStateEngine.js`, `communicationActionCenterPresentation.js`, `interviewWorkflowPresentationEngine.js`
+
+Mission Control is an **execution interface**, not a reporting dashboard. Operational statistics belong to **Executive Dashboard** and **Analytics**. Mission Control displays only information that directly supports the user's next workflow action.
+
+### Presentation rules
+
+1. **No KPI summary row** on Mission Control — do not show aggregate widgets for Appointments, Follow-ups, Tasks, or Prospects Requiring Action.
+2. **Preserve metrics elsewhere** — backend calculations, APIs, and Executive Dashboard / Analytics surfaces continue to use these metrics unchanged.
+3. **Vertical priority** — after the prospect header, the first content is **Mission Actions**, followed immediately by **Communication** cards.
+4. **No workflow changes** — routing, backend, appointment logic, and business rules remain unchanged.
+5. **Communication during outcome gate** — Mission Control hides only workflow actions that are no longer applicable. Communication actions that help the representative complete the current workflow remain available.
+
+### Communication availability by interview state
+
+| UI state | Mission Actions | Communication shown | Communication hidden |
+|---|---|---|---|
+| **Interview Scheduled** | Schedule/reschedule lifecycle actions | Call, WhatsApp, Add Note, Zoom Invitation, Reminder, Office Address (when valid) | — |
+| **Interview Result Pending** | Record Outcome (primary) | Call, WhatsApp, Add Note, Resend Interview Details (when valid) | Zoom Invitation, Reminder, Office Address |
+| **Interview Completed** | None | Call, WhatsApp, Add Note | Pre-interview invitation cards |
+
+Recruiter Brief and Communication History reference sections remain visible when data is available.
+
+---
+
 # Prospect Workspace
 
 ## BR-038 — Prospect Workspace Editing Permissions

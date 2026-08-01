@@ -62,5 +62,146 @@
     "created_by": "00000000-0000-4000-8000-000000000002",
     "created_at": "2026-07-30T19:30:00.000Z",
     "updated_at": "2026-07-31T00:48:02.556Z"
+  },
+  {
+    "id": "efc7b0ed-b520-405e-bee7-914d44676b04",
+    "organization_id": "00000000-0000-4000-8000-000000000001",
+    "prospect_id": null,
+    "prospect_phone": "+17860005555",
+    "agent_id": "00000000-0000-4000-8000-000000000002",
+    "purpose": "recruiting_interview",
+    "status": "cancelled",
+    "source": "mission_control",
+    "start_date_time": "2026-07-31T22:00:00.000Z",
+    "end_date_time": "2026-07-31T22:30:00.000Z",
+    "duration_minutes": 30,
+    "timezone": "America/New_York",
+    "meeting_type": "virtual",
+    "meeting_provider": "zoom",
+    "meeting_location_type": "office",
+    "meeting_location_name": "Office",
+    "meeting_address": null,
+    "meeting_notes": null,
+    "virtual_meeting_url": "https://us02web.zoom.us/j/7862347083",
+    "calendar_event_id": "q00ragu843gh367593qf57hvak",
+    "calendar_provider": "google_calendar",
+    "confirmation_status": "pending",
+    "email_invitation_status": "pending",
+    "reminder_status": "cancelled",
+    "human_assist_required": false,
+    "human_assist_reason": null,
+    "reschedule_count": 0,
+    "cancellation_reason": "agent_requested",
+    "outcome": "cancelled",
+    "outcome_notes": null,
+    "owner_rep_id": null,
+    "interviewer_user_id": null,
+    "interviewer_name": null,
+    "history": [
+      {
+        "type": "created",
+        "at": "2026-07-31T19:20:52.322Z",
+        "actor": "00000000-0000-4000-8000-000000000002",
+        "reason": null,
+        "summary": "Appointment scheduled",
+        "oldValues": null,
+        "newValues": {
+          "lifecycleState": "scheduled",
+          "scheduledTime": "2026-07-31T22:00:00.000Z",
+          "ownerRepId": null
+        }
+      },
+      {
+        "type": "cancelled",
+        "at": "2026-07-31T22:57:17.023Z",
+        "actor": "00000000-0000-4000-8000-000000000002",
+        "reason": "agent_requested",
+        "summary": "Appointment cancelled",
+        "oldValues": {
+          "lifecycleState": "scheduled",
+          "status": "scheduled",
+          "outcome": null,
+          "scheduledTime": "2026-07-31T22:00:00.000Z"
+        },
+        "newValues": {
+          "lifecycleState": "cancelled",
+          "status": "cancelled",
+          "outcome": "cancelled",
+          "scheduledTime": "2026-07-31T22:00:00.000Z"
+        }
+      }
+    ],
+    "metadata": {
+      "prospectName": "Test_User Test_User",
+      "prospectEmail": "test2@gmail.com",
+      "emailStatus": "unverified",
+      "virtualUrlStatus": "configured",
+      "ownerRepId": null,
+      "lifecycleState": "cancelled",
+      "interviewerUserId": null,
+      "interviewerName": null
+    },
+    "created_by": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-07-31T19:20:52.190Z",
+    "updated_at": "2026-07-31T22:57:17.023Z"
+  },
+  {
+    "id": "64d2a10f-d0f2-497a-8c73-04384ae5be71",
+    "organization_id": "00000000-0000-4000-8000-000000000001",
+    "prospect_id": null,
+    "prospect_phone": "+17547030050",
+    "agent_id": "00000000-0000-4000-8000-000000000002",
+    "purpose": "recruiting_interview",
+    "status": "scheduled",
+    "source": "mission_control",
+    "start_date_time": "2026-08-01T15:00:00.000Z",
+    "end_date_time": "2026-08-01T15:30:00.000Z",
+    "duration_minutes": 30,
+    "timezone": "America/New_York",
+    "meeting_type": "virtual",
+    "meeting_provider": "zoom",
+    "meeting_location_type": "office",
+    "meeting_location_name": "Office",
+    "meeting_address": null,
+    "meeting_notes": null,
+    "virtual_meeting_url": "https://us02web.zoom.us/j/7862347083",
+    "calendar_event_id": "pk4audrcrvfabke5grgrvfhj1c",
+    "calendar_provider": "google_calendar",
+    "confirmation_status": "pending",
+    "email_invitation_status": "pending",
+    "reminder_status": "scheduled",
+    "human_assist_required": false,
+    "human_assist_reason": null,
+    "reschedule_count": 0,
+    "cancellation_reason": null,
+    "outcome": null,
+    "outcome_notes": null,
+    "owner_rep_id": null,
+    "history": [
+      {
+        "type": "created",
+        "at": "2026-07-31T21:06:26.518Z",
+        "actor": "00000000-0000-4000-8000-000000000002",
+        "reason": null,
+        "summary": "Appointment scheduled",
+        "oldValues": null,
+        "newValues": {
+          "lifecycleState": "scheduled",
+          "scheduledTime": "2026-08-01T15:00:00.000Z",
+          "ownerRepId": null
+        }
+      }
+    ],
+    "metadata": {
+      "prospectName": "Abraham Manuel",
+      "prospectEmail": "abrahamsaldivia@hotmail.com",
+      "emailStatus": "unverified",
+      "virtualUrlStatus": "configured",
+      "ownerRepId": null,
+      "lifecycleState": "scheduled"
+    },
+    "created_by": "00000000-0000-4000-8000-000000000002",
+    "created_at": "2026-07-31T21:06:26.263Z",
+    "updated_at": "2026-07-31T21:06:26.645Z"
   }
 ]

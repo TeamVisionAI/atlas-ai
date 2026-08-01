@@ -46,6 +46,8 @@ const {
   buildActionError,
   buildActionSuccess
 } = require("./agentActionApplicationService");
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
+const { resolveRecruiterDisplayName } = require("../core/whatsappCommunicationEngine");
 
 function resolveScheduleAgentId(options = {}) {
   return options.userId || options.agentId || options.authorUserId || null;
@@ -107,6 +109,7 @@ async function createPersistedScheduleAppointment({
       meetingAddress: isZoom ? null : location,
       notes: payload.notes,
       contact: attendeeEmail ? { email: attendeeEmail } : {},
+      interviewerUserId: payload.interviewerUserId || agentId,
       existingBooking: bookingResult,
       skipWorkflowSideEffects: true
     },
@@ -327,6 +330,26 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   const meetingUrl = locationResult.meetingUrl;
 
   const scheduleAgentId = resolveScheduleAgentId(options);
+  const effectiveInterviewerUserId =
+    payload.interviewerUserId || payload.interviewer_user_id || scheduleAgentId;
+
+  logInterviewerTrace({
+    authenticatedUserId: scheduleAgentId,
+    authenticatedUserName: resolveRecruiterDisplayName(options.actorUser),
+    interviewerUserId: payload.interviewerUserId || payload.interviewer_user_id || null,
+    interviewerName: null,
+    appointmentId: null,
+    source: "missionExecutionApplicationService.executeScheduleInterview"
+  });
+
+  logInterviewerTrace({
+    authenticatedUserId: scheduleAgentId,
+    authenticatedUserName: resolveRecruiterDisplayName(options.actorUser),
+    interviewerUserId: effectiveInterviewerUserId,
+    interviewerName: null,
+    appointmentId: null,
+    source: "missionExecutionApplicationService.executeScheduleInterview.effective"
+  });
 
   if (!scheduleAgentId) {
     return buildActionError(

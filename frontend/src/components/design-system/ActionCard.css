@@ -92,6 +92,12 @@
   line-height: 1.45;
 }
 
+.action-card--danger {
+  --action-card-bg: #450a0a;
+  --action-card-border: #991b1b;
+  --action-card-hover-bg: #7f1d1d;
+}
+
 .action-card:disabled {
   opacity: 0.55;
   cursor: not-allowed;

@@ -32,6 +32,7 @@ const { emit, EVENT_TYPES } = require("./eventEngine");
 const { savePersistedWorkflowState } = require("./workflowStateStore");
 const { MILESTONES, OWNERSHIP } = require("./workflowConstants");
 const { buildQuickCaptureGuidance } = require("./quickCaptureRecommendationEngine");
+const { findProspectInOrganization } = require("../services/supabaseService");
 
 function buildValidationErrors(fields) {
   return {
@@ -328,6 +329,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
         last_message: "",
         notes: buildLegacyNotes(data, atlasUser)
       };
+
       const { data: fallbackCreated, error: fallbackError } = await supabase
         .from("prospects")
         .insert(fallbackRow)
@@ -369,6 +371,11 @@ async function createQuickCaptureProspect(payload, atlasUser) {
 
 async function finalizeQuickCaptureProspect(prospect, context) {
   const { data, atlasUser, prospectNumber, summaryOverrides = {} } = context;
+
+  const organizationId = prospect.organization_id || atlasUser.organization_id || atlasUser.organizationId;
+  const persisted = organizationId
+    ? await findProspectInOrganization(prospect.phone, organizationId)
+    : prospect;
 
   savePersistedWorkflowState(prospect.phone, {
     canonicalMilestone: MILESTONES.NEW_LEAD,

@@ -83,16 +83,16 @@ async function main() {
   console.log("=== Interview Outcome Engine Verification ===\n");
 
   const readModel = buildInterviewOutcomeReadModel();
-  assert(readModel.categories.length === 4, "Expected 4 outcome categories");
+  assert(readModel.categories.length === 1, "Expected 1 outcome category");
   assert(
-    readModel.categories.flatMap((category) => category.outcomes).length === 18,
-    "Expected 18 interview outcomes"
+    readModel.categories.flatMap((category) => category.outcomes).length === 6,
+    "Expected 6 interview outcomes"
   );
 
   const pendingIba = resolveInterviewAdvancePayload("Pending IBA", { notes: "Awaiting paperwork" });
   assert(pendingIba.targetMilestone === MILESTONES.LICENSING, "Pending IBA maps to LICENSING");
   assert(pendingIba.workflowLabel === "Pending IBA Workflow", "Pending IBA workflow label set");
-  console.log("✓ Outcome configuration exposes 4 categories / 18 outcomes");
+  console.log("✓ Outcome configuration exposes 1 category / 6 outcomes");
 
   ORIGINAL.prospect = await snapshotProspect(TEST_PHONE);
   assert(ORIGINAL.prospect, `Prospect ${TEST_PHONE} not found`);
@@ -103,13 +103,13 @@ async function main() {
   assert(before.workflowGate?.active === true, "Workflow gate should be active before save");
   assert(
     Array.isArray(before.workflowGate?.outcomeCategories) &&
-      before.workflowGate.outcomeCategories.length === 4,
-    "Gate descriptor exposes grouped outcome categories"
+      before.workflowGate.outcomeCategories.length === 1,
+    "Gate descriptor exposes simplified outcome category"
   );
   console.log("✓ Mission Control gate exposes categorized outcomes");
 
   const result = await postInterviewOutcome(TEST_PHONE, {
-    outcome: "Thinking About It",
+    outcome: "Follow Up Needed",
     fields: {
       followUpDate: "2026-08-15",
       followUpTime: "10:00"
@@ -117,7 +117,7 @@ async function main() {
   });
 
   assert(result.success === true, `Save failed: ${JSON.stringify(result)}`);
-  assert(result.outcome === "Thinking About It", "Outcome label returned");
+  assert(result.outcome === "Follow Up Needed", "Outcome label returned");
   assert(result.workflowLabel === "Follow-Up Workflow", "Workflow label mapped from config");
   assert(result.followUpRecommendation?.recommendedFollowUpDate, "Follow-up recommendation returned");
   assert(result.missionControl, "Refreshed Mission Control payload returned");
@@ -129,7 +129,7 @@ async function main() {
     after.workflow.canonicalMilestone === MILESTONES.FOLLOW_UP,
     `Expected FOLLOW_UP, got ${after.workflow.canonicalMilestone}`
   );
-  assert(loadAgentState(TEST_PHONE).outcome === "Thinking About It", "Agent outcome persisted");
+  assert(loadAgentState(TEST_PHONE).outcome === "Needs More Time", "Agent outcome persisted");
   console.log("✓ Workflow state and gate refresh after save");
 
   const activity = await listProspectActivityFeed(TEST_PHONE, { limit: 15 });
@@ -156,7 +156,7 @@ async function main() {
     followUpDate: "2026-08-20",
     followUpTime: "11:00"
   });
-  assert(legacyPayload.capturedFields.outcome === "Thinking About It", "Legacy alias resolves");
+  assert(legacyPayload.capturedFields.outcome === "Needs More Time", "Legacy alias resolves");
   console.log("✓ Legacy outcome alias supported");
 
   await restoreProspect(TEST_PHONE);

@@ -15,6 +15,7 @@ import {
   createInitialSchedulingForm,
   normalizeInterviewType
 } from "./SchedulingForm";
+import { useInterviewAssignmentCandidates } from "./InterviewAssignmentSection";
 
 function resolveInterviewDuration(profile) {
   return (
@@ -28,9 +29,11 @@ export function useSchedulingFormController({
   active,
   defaultInterviewType = "",
   recruiterName = "",
-  translate
+  translate,
+  currentUser = null
 }) {
   const [form, setForm] = useState(() => createInitialSchedulingForm());
+  const { candidates: assignmentCandidates } = useInterviewAssignmentCandidates(active);
   const [displaySlots, setDisplaySlots] = useState([]);
   const [windowSlots, setWindowSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -78,6 +81,7 @@ export function useSchedulingFormController({
       createInitialSchedulingForm({
         defaultInterviewType,
         defaultRecruiter: recruiterName,
+        defaultInterviewerUserId: currentUser?.id || "",
         defaultDuration: 30
       })
     );
@@ -89,7 +93,7 @@ export function useSchedulingFormController({
     setHasMoreInWindow(false);
     setActiveDayKey(null);
     slotCacheRef.current = new Map();
-  }, [active, defaultInterviewType, recruiterName]);
+  }, [active, defaultInterviewType, recruiterName, currentUser?.id]);
 
   const loadSlotsForInterviewType = useCallback(
     async (interviewType) => {
@@ -255,6 +259,8 @@ export function useSchedulingFormController({
     handleShowMoreTimes,
     handleBackToRecommended,
     handleSelectDay,
-    handleNextWeek
+    handleNextWeek,
+    assignmentCandidates,
+    currentUser
   };
 }

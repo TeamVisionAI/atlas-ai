@@ -3,6 +3,7 @@
  * Implements BR-027; Sprint 12.2.y — section always visible, actions individually gated.
  */
 
+import { isCommunicationActionHiddenDuringResultPending } from "./interviewWorkflowPresentationEngine.js";
 import { resolvePersistedAppointmentId } from "./appointmentIdEngine.js";
 
 export const COMMUNICATION_ACTION_IDS = Object.freeze({
@@ -283,7 +284,7 @@ function gateOrEnabled(partial, ctx, translate, evaluateEnabled) {
     return disabledAction(partial, DISABLED_REASON_KEYS.WORKSPACE_UNAVAILABLE, ctx, translate);
   }
 
-  if (ctx.workflowGateActive) {
+  if (ctx.workflowGateActive && isCommunicationActionHiddenDuringResultPending(partial.id)) {
     return disabledAction(partial, DISABLED_REASON_KEYS.WORKFLOW_GATE, ctx, translate);
   }
 

@@ -30,12 +30,68 @@ function resolveOwnerRepIdFromAppointment(appointment) {
   );
 }
 
+function resolveInterviewerUserIdFromRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return (
+    row.interviewer_user_id ||
+    row.interviewerUserId ||
+    row.metadata?.interviewerUserId ||
+    row.metadata?.interviewer_user_id ||
+    null
+  );
+}
+
+function resolveInterviewerNameFromRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return (
+    row.interviewer_name ||
+    row.interviewerName ||
+    row.metadata?.interviewerName ||
+    row.metadata?.interviewer_name ||
+    null
+  );
+}
+
+function resolveInterviewerUserIdFromAppointment(appointment) {
+  if (!appointment) {
+    return null;
+  }
+
+  return (
+    appointment.interviewerUserId ||
+    appointment.metadata?.interviewerUserId ||
+    appointment.metadata?.interviewer_user_id ||
+    null
+  );
+}
+
+function resolveInterviewerNameFromAppointment(appointment) {
+  if (!appointment) {
+    return null;
+  }
+
+  return (
+    appointment.interviewerName ||
+    appointment.metadata?.interviewerName ||
+    appointment.metadata?.interviewer_name ||
+    null
+  );
+}
+
 function rowToAppointment(row) {
   if (!row) {
     return null;
   }
 
   const ownerRepId = resolveOwnerRepIdFromRow(row);
+  const interviewerUserId = resolveInterviewerUserIdFromRow(row);
+  const interviewerName = resolveInterviewerNameFromRow(row);
 
   return {
     id: row.id,
@@ -69,6 +125,8 @@ function rowToAppointment(row) {
     outcome: row.outcome || null,
     outcomeNotes: row.outcome_notes || row.outcomeNotes || null,
     ownerRepId,
+    interviewerUserId,
+    interviewerName,
     history: row.history || [],
     metadata: row.metadata || {},
     createdBy: row.created_by || row.createdBy || null,
@@ -79,6 +137,8 @@ function rowToAppointment(row) {
 
 function appointmentToRow(appointment) {
   const ownerRepId = resolveOwnerRepIdFromAppointment(appointment);
+  const interviewerUserId = resolveInterviewerUserIdFromAppointment(appointment);
+  const interviewerName = resolveInterviewerNameFromAppointment(appointment);
 
   return {
     id: appointment.id,
@@ -112,10 +172,14 @@ function appointmentToRow(appointment) {
     outcome: appointment.outcome || null,
     outcome_notes: appointment.outcomeNotes || null,
     owner_rep_id: ownerRepId,
+    interviewer_user_id: interviewerUserId,
+    interviewer_name: interviewerName,
     history: appointment.history || [],
     metadata: {
       ...(appointment.metadata || {}),
       ownerRepId,
+      interviewerUserId,
+      interviewerName,
       lifecycleState: appointment.metadata?.lifecycleState || null
     },
     created_by: appointment.createdBy || null,
@@ -127,6 +191,10 @@ function appointmentToRow(appointment) {
 module.exports = {
   resolveOwnerRepIdFromRow,
   resolveOwnerRepIdFromAppointment,
+  resolveInterviewerUserIdFromRow,
+  resolveInterviewerNameFromRow,
+  resolveInterviewerUserIdFromAppointment,
+  resolveInterviewerNameFromAppointment,
   rowToAppointment,
   appointmentToRow
 };

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getOrganizationSettings } from "../services/organizationService";
 import {
@@ -10,15 +10,14 @@ import {
 import {
   adaptMissionControlResponse
 } from "../adapters/missionControlAdapter";
-import AgentMetricPanel from "../components/AgentMetricPanel";
 import WorkflowCompleteBanner from "../components/WorkflowCompleteBanner";
-import MissionControlDashboard from "../components/mission-control/MissionControlDashboard";
 import CommunicationActionsPanel from "../components/communication/CommunicationActionsPanel";
 import MissionActionCenter from "../components/mission-control/MissionActionCenter";
 import MissionControlWorkspaceHeader from "../components/mission-control/MissionControlWorkspaceHeader";
 import MissionControlExecutionPanel from "../components/mission-control/MissionControlExecutionPanel";
 import { useMissionExecutionSuccessToast } from "../components/mission-control/MissionExecutionSuccessToast";
 import { useToast } from "../components/ui/ToastProvider";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import {
   isWhatsAppCopyAction
 } from "../services/whatsappCommunicationService";
@@ -28,10 +27,7 @@ import {
   fetchProspectMissions,
   recalculateMissions
 } from "../services/missionService";
-import {
-  buildAgentMetrics,
-  buildWorkspaceContext
-} from "../engines/contextEngine";
+import { buildWorkspaceContext } from "../engines/contextEngine";
 import {
   buildQueueFromBackendWorkflowQueue,
   findQueueIndex,
@@ -47,7 +43,6 @@ import {
   filterQueueForExecutiveFilter
 } from "../engines/executiveFilterEngine";
 import { useLanguage } from "../i18n/LanguageContext";
-import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import { subscribeProspectProfileUpdated } from "../utils/prospectRefreshBus";
 import { usePromptDialog } from "../hooks/usePromptDialog";
 import { useUniversalNote } from "../hooks/useUniversalNote";
@@ -110,7 +105,6 @@ async function loadWorkspaceForQueueItem(item, dashboardData) {
 
 export default function Dashboard() {
   const { phone: routePhone } = useParams();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { translate } = useLanguage();
   const executiveFilter = searchParams.get("filter");
@@ -126,13 +120,13 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [organizationSettings, setOrganizationSettings] = useState(null);
-  const [activeMetricPanel, setActiveMetricPanel] = useState(null);
   const [expandedMissionActionId, setExpandedMissionActionId] = useState(null);
   const [executionSubmitting, setExecutionSubmitting] = useState(false);
   const [executionError, setExecutionError] = useState(null);
   const [qualificationDraftActive, setQualificationDraftActive] = useState(false);
   const showMissionExecutionSuccess = useMissionExecutionSuccessToast();
   const { showSuccess, showError, showInfo } = useToast();
+  const { user: currentUser } = useWorkspace();
   const { prompt, promptDialog } = usePromptDialog();
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
@@ -627,12 +621,20 @@ export default function Dashboard() {
           public_location: "Public Location"
         };
         const interviewType = interviewTypeMap[form.interviewType] || "In Person";
+        console.info("[interviewer-trace]", {
+          authenticatedUserId: currentUser?.id || null,
+          authenticatedUserName: currentUser?.display_name || null,
+          interviewerUserId: form.interviewerUserId || currentUser?.id || null,
+          interviewerName: null,
+          appointmentId: null,
+          source: "scheduleDialog.submit.dashboard"
+        });
         const result = await executeScheduleInterview(phone, {
           dateKey: form.dateKey,
           timeKey: form.timeKey,
           duration: form.duration,
           interviewType,
-          recruiter: form.recruiter?.trim() || undefined,
+          interviewerUserId: form.interviewerUserId || currentUser?.id || undefined,
           officeLocation: form.officeLocation?.trim() || undefined,
           notes: form.notes?.trim() || undefined,
           email: form.email || undefined
@@ -872,14 +874,6 @@ export default function Dashboard() {
     }
   }, [currentIndex, loadProspectAtIndex, queue, dashboard]);
 
-  const openWorkspaceForPhone = useCallback(
-    (targetPhone) => {
-      navigateToProspectWorkspace(navigate, targetPhone);
-      setActiveMetricPanel(null);
-    },
-    [navigate]
-  );
-
   function renderLoadError(error) {
     if (!error) {
       return null;
@@ -918,10 +912,6 @@ export default function Dashboard() {
 
   const qualificationInputs = workspace?.conversationOutcome?.requiredInputs || [];
   const hasMissionActions = Boolean(primaryMission) || qualificationInputs.length > 0;
-  const metrics = {
-    ...buildAgentMetrics(dashboard),
-    prospectsAction: queue.length
-  };
 
   const prospectEmail = workspaceContext.prospect.email || workspace?.conversationOutcome?.fields?.email || null;
   const nextAction =
@@ -944,13 +934,6 @@ export default function Dashboard() {
         onCopy={communicationPreview.copyPreviewMessage}
         onSend={communicationPreview.confirmSend}
       />
-      <AgentMetricPanel
-        type={activeMetricPanel}
-        queue={queue}
-        onClose={() => setActiveMetricPanel(null)}
-        onOpenWorkspace={openWorkspaceForPhone}
-      />
-
       <div className="mission-control-shell">
         <div className="mission-control-cockpit">
           <MissionControlWorkspaceHeader
@@ -990,13 +973,7 @@ export default function Dashboard() {
             />
           ) : null}
 
-          <MissionControlDashboard
-            metrics={metrics}
-            executiveFilter={executiveFilter}
-            onOpenMetricPanel={setActiveMetricPanel}
-          />
-
-          <div className="mission-control-page__workspace">
+          <div className="mission-control-page__workspace mission-control-page__workspace--focus">
             {hasMissionActions ? (
               <MissionActionCenter
                 mission={primaryMission}
@@ -1005,7 +982,8 @@ export default function Dashboard() {
                 conversationOutcome={workspace.conversationOutcome}
                 workflowGate={workspace.workflowGate}
                 rawWorkflowGate={workspace.raw?.workflowGate}
-                recruiterName="Ana"
+                recruiterName={currentUser?.display_name || ""}
+                currentUser={currentUser}
                 expandedActionId={expandedMissionActionId}
                 onExpandedActionIdChange={setExpandedMissionActionId}
                 busy={executionSubmitting || prospectLoading}

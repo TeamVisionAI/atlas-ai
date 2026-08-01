@@ -32,6 +32,7 @@ function MissionActionSchedulingForm({
   mission,
   phone,
   recruiterName,
+  currentUser,
   submitting,
   error,
   translate,
@@ -44,7 +45,8 @@ function MissionActionSchedulingForm({
     active,
     defaultInterviewType,
     recruiterName,
-    translate
+    translate,
+    currentUser
   });
 
   const canSubmit =
@@ -55,6 +57,16 @@ function MissionActionSchedulingForm({
     !scheduling.loadingExpansion;
 
   function handleScheduleSubmit() {
+    console.info("[interviewer-trace]", {
+      authenticatedUserId: scheduling.currentUser?.id || currentUser?.id || null,
+      authenticatedUserName:
+        scheduling.currentUser?.display_name || currentUser?.display_name || null,
+      interviewerUserId: scheduling.form.interviewerUserId || null,
+      interviewerName: null,
+      appointmentId: null,
+      source: "scheduleDialog.submit.missionControl"
+    });
+
     onSubmit({
       ...scheduling.form,
       email: resolveProspectEmail(prospect, scheduling.form.email) || undefined
@@ -77,6 +89,8 @@ function MissionActionSchedulingForm({
         slotsError={scheduling.slotsError}
         disabled={submitting}
         recruiterName={recruiterName || scheduling.form.recruiter}
+        currentUser={scheduling.currentUser}
+        assignmentCandidates={scheduling.assignmentCandidates}
         durationMinutes={scheduling.durationMinutes}
         displayMode={scheduling.displayMode}
         viewMode={scheduling.viewMode}
@@ -120,6 +134,7 @@ export default function MissionActionInlineForm({
   workflowGate,
   rawWorkflowGate = null,
   recruiterName = "",
+  currentUser = null,
   submitting = false,
   error = null,
   translate,
@@ -141,6 +156,7 @@ export default function MissionActionInlineForm({
         mission={mission}
         phone={phone}
         recruiterName={recruiterName}
+        currentUser={currentUser}
         submitting={submitting}
         error={error}
         translate={translate}

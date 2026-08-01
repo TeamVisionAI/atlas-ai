@@ -1,5 +1,5 @@
 import { MILESTONES } from "../types/milestones";
-import { normalizeProspectLanguage } from "../types/language";
+import { resolvePreferredLanguageDisplay } from "../types/language";
 import { resolvePersistedAppointmentId } from "../engines/appointmentIdEngine.js";
 import { formatTextWithDates } from "../utils/dateFormatter";
 import {
@@ -96,7 +96,7 @@ export function adaptMissionControlResponse(
   const interviewType = normalizeInterviewTypeDisplay(
     brain?.interviewType || businessRules?.interviewType
   );
-  const language = normalizeProspectLanguage(brain?.language);
+  const language = resolvePreferredLanguageDisplay(prospect);
   const summaryLines = normalizeSummaryLines(
     missionControl.recruiterBrief?.items || atlasBrief?.summary
   );
@@ -212,7 +212,9 @@ export function buildMockMissionControlFromQueueProspect(queueProspect) {
       phone: queueProspect.phone,
       city: queueProspect.city || null,
       state: queueProspect.state || null,
-      occupation: queueProspect.occupation || null
+      occupation: queueProspect.occupation || null,
+      preferred_language: queueProspect.preferred_language || "english",
+      preferred_language_label: queueProspect.preferred_language === "spanish" ? "Spanish" : "English"
     },
     brain: {
       language: "en",

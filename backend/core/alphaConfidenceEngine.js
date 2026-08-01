@@ -4,6 +4,10 @@
  */
 
 const { assessQualificationFromProspect } = require("./recruitingQualificationEngine");
+const {
+  formatPreferredLanguageLabel,
+  resolveProspectPreferredLanguage
+} = require("./prospectLanguage");
 
 function resolveRiskLevel(confidencePercent) {
   if (confidencePercent >= 85) {
@@ -46,7 +50,7 @@ function buildConfidenceProfile({
   const assessment = assessQualificationFromProspect(prospect || {});
   const baseConfidence = actionCenter.confidence ?? assessment.confidence ?? 0.62;
   const confidencePercent = Math.round(Math.min(100, Math.max(0, baseConfidence * 100)));
-  const language = prospect.communication_language || brain.language || "en";
+  const preferredLanguage = resolveProspectPreferredLanguage(prospect);
   const workAuthorization = resolveWorkAuthorization(prospect, brain);
 
   let reason = actionCenter.reason || "Atlas evaluated the current recruiting state.";
@@ -74,7 +78,7 @@ function buildConfidenceProfile({
     qualified: assessment.isQualified,
     interviewScheduled: assessment.isInterviewScheduled,
     workAuthorization,
-    language: String(language).toLowerCase().startsWith("es") ? "Spanish" : "English",
+    language: formatPreferredLanguageLabel(preferredLanguage),
     riskLevel: resolveRiskLevel(confidencePercent),
     signals: {
       readyForScheduling: assessment.readyForScheduling,

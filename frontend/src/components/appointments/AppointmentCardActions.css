@@ -1,0 +1,36 @@
+.appointment-card-actions {
+  /* Hook for future live-state / countdown / timer styling (BR-043). */
+}
+
+.appointment-card-actions__join-zoom {
+  /* Primary CTA — future green highlight near interview time attaches here. */
+  font-weight: 600;
+}
+
+.appointment-card-actions__danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.appointment-card-actions__danger:hover,
+.appointment-card-actions__danger:focus-visible {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.appointment-card-actions__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+}
+
+@media (max-width: 640px) {
+  .appointment-card-actions {
+    gap: 0.4rem;
+  }
+}

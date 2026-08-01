@@ -76,5 +76,158 @@
       },
       "cancelledAt": "2026-07-31T02:53:53.056Z"
     }
+  ],
+  "efc7b0ed-b520-405e-bee7-914d44676b04": [
+    {
+      "id": "60d451dc-e9a9-4958-950d-1382f04f9c0a",
+      "appointmentId": "efc7b0ed-b520-405e-bee7-914d44676b04",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "prospectPhone": "+17860005555",
+      "reminderType": "confirmation",
+      "scheduledFor": "2026-07-31T19:20:57.469Z",
+      "offsetMinutes": 0,
+      "status": "cancelled",
+      "channel": "whatsapp",
+      "createdAt": "2026-07-31T19:20:52.469Z",
+      "appointmentStart": "2026-07-31T22:00:00.000Z",
+      "timezone": "America/New_York",
+      "virtualMeetingUrl": "https://us02web.zoom.us/j/7862347083",
+      "metadata": {
+        "prospectName": "Test_User Test_User",
+        "prospectEmail": "test2@gmail.com",
+        "emailStatus": "unverified",
+        "virtualUrlStatus": "configured",
+        "ownerRepId": null,
+        "lifecycleState": "scheduled"
+      },
+      "sentAt": "2026-07-31T19:21:09.838Z",
+      "failureReason": "Authentication Error",
+      "cancelledAt": "2026-07-31T22:57:17.021Z"
+    },
+    {
+      "id": "7471c4f5-d90c-444b-b513-64690d98023b",
+      "appointmentId": "efc7b0ed-b520-405e-bee7-914d44676b04",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "prospectPhone": "+17860005555",
+      "reminderType": "reminder_1h",
+      "scheduledFor": "2026-07-31T21:00:00.000Z",
+      "offsetMinutes": 60,
+      "status": "cancelled",
+      "channel": "whatsapp",
+      "createdAt": "2026-07-31T19:20:52.469Z",
+      "appointmentStart": "2026-07-31T22:00:00.000Z",
+      "timezone": "America/New_York",
+      "virtualMeetingUrl": "https://us02web.zoom.us/j/7862347083",
+      "metadata": {
+        "prospectName": "Test_User Test_User",
+        "prospectEmail": "test2@gmail.com",
+        "emailStatus": "unverified",
+        "virtualUrlStatus": "configured",
+        "ownerRepId": null,
+        "lifecycleState": "scheduled"
+      },
+      "sentAt": "2026-07-31T21:00:05.311Z",
+      "failureReason": "Authentication Error",
+      "cancelledAt": "2026-07-31T22:57:17.021Z"
+    },
+    {
+      "id": "87fe5391-3705-4305-b6c1-1153e12424f6",
+      "appointmentId": "efc7b0ed-b520-405e-bee7-914d44676b04",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "prospectPhone": "+17860005555",
+      "reminderType": "reminder_15m",
+      "scheduledFor": "2026-07-31T21:45:00.000Z",
+      "offsetMinutes": 15,
+      "status": "cancelled",
+      "channel": "whatsapp",
+      "createdAt": "2026-07-31T19:20:52.469Z",
+      "appointmentStart": "2026-07-31T22:00:00.000Z",
+      "timezone": "America/New_York",
+      "virtualMeetingUrl": "https://us02web.zoom.us/j/7862347083",
+      "metadata": {
+        "prospectName": "Test_User Test_User",
+        "prospectEmail": "test2@gmail.com",
+        "emailStatus": "unverified",
+        "virtualUrlStatus": "configured",
+        "ownerRepId": null,
+        "lifecycleState": "scheduled"
+      },
+      "sentAt": "2026-07-31T21:45:48.137Z",
+      "failureReason": "Authentication Error",
+      "cancelledAt": "2026-07-31T22:57:17.021Z"
+    }
+  ],
+  "64d2a10f-d0f2-497a-8c73-04384ae5be71": [
+    {
+      "id": "6767e155-c03b-4dd8-b4c4-5999c105c42a",
+      "appointmentId": "64d2a10f-d0f2-497a-8c73-04384ae5be71",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "prospectPhone": "+17547030050",
+      "reminderType": "confirmation",
+      "scheduledFor": "2026-07-31T21:06:31.642Z",
+      "offsetMinutes": 0,
+      "status": "failed",
+      "channel": "whatsapp",
+      "createdAt": "2026-07-31T21:06:26.642Z",
+      "appointmentStart": "2026-08-01T15:00:00.000Z",
+      "timezone": "America/New_York",
+      "virtualMeetingUrl": "https://us02web.zoom.us/j/7862347083",
+      "metadata": {
+        "prospectName": "Abraham Manuel",
+        "prospectEmail": "abrahamsaldivia@hotmail.com",
+        "emailStatus": "unverified",
+        "virtualUrlStatus": "configured",
+        "ownerRepId": null,
+        "lifecycleState": "scheduled"
+      },
+      "sentAt": "2026-07-31T21:07:31.176Z",
+      "failureReason": "Authentication Error"
+    },
+    {
+      "id": "e89e4687-45cd-467d-968b-95842467848a",
+      "appointmentId": "64d2a10f-d0f2-497a-8c73-04384ae5be71",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "prospectPhone": "+17547030050",
+      "reminderType": "reminder_1h",
+      "scheduledFor": "2026-08-01T14:00:00.000Z",
+      "offsetMinutes": 60,
+      "status": "scheduled",
+      "channel": "whatsapp",
+      "createdAt": "2026-07-31T21:06:26.642Z",
+      "appointmentStart": "2026-08-01T15:00:00.000Z",
+      "timezone": "America/New_York",
+      "virtualMeetingUrl": "https://us02web.zoom.us/j/7862347083",
+      "metadata": {
+        "prospectName": "Abraham Manuel",
+        "prospectEmail": "abrahamsaldivia@hotmail.com",
+        "emailStatus": "unverified",
+        "virtualUrlStatus": "configured",
+        "ownerRepId": null,
+        "lifecycleState": "scheduled"
+      }
+    },
+    {
+      "id": "d8768ef4-6a73-4a63-a686-073919ebb842",
+      "appointmentId": "64d2a10f-d0f2-497a-8c73-04384ae5be71",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "prospectPhone": "+17547030050",
+      "reminderType": "reminder_15m",
+      "scheduledFor": "2026-08-01T14:45:00.000Z",
+      "offsetMinutes": 15,
+      "status": "scheduled",
+      "channel": "whatsapp",
+      "createdAt": "2026-07-31T21:06:26.642Z",
+      "appointmentStart": "2026-08-01T15:00:00.000Z",
+      "timezone": "America/New_York",
+      "virtualMeetingUrl": "https://us02web.zoom.us/j/7862347083",
+      "metadata": {
+        "prospectName": "Abraham Manuel",
+        "prospectEmail": "abrahamsaldivia@hotmail.com",
+        "emailStatus": "unverified",
+        "virtualUrlStatus": "configured",
+        "ownerRepId": null,
+        "lifecycleState": "scheduled"
+      }
+    }
   ]
 }

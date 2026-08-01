@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { buildMissionActionCard } from "./missionActionUtils";
 import {
@@ -5,6 +6,10 @@ import {
   resolvesToInlineForm
 } from "./missionActionFormRegistry";
 import ExpandableMissionActionCard from "./ExpandableMissionActionCard";
+import {
+  filterMissionActionsForInterviewWorkflow,
+  resolveRecommendedMissionActionId
+} from "../../engines/interviewWorkflowPresentationEngine";
 import "./MissionActionCenter.css";
 
 export default function MissionActionCenter({
@@ -15,6 +20,7 @@ export default function MissionActionCenter({
   workflowGate,
   rawWorkflowGate = null,
   recruiterName = "",
+  currentUser = null,
   expandedActionId = null,
   onExpandedActionIdChange,
   busy = false,
@@ -28,18 +34,72 @@ export default function MissionActionCenter({
   onCancel
 }) {
   const { translate } = useLanguage();
-  const actions = buildMissionActionList(mission, conversationOutcome, translate);
+  const actions = useMemo(
+    () =>
+      filterMissionActionsForInterviewWorkflow(
+        buildMissionActionList(mission, conversationOutcome, translate),
+        workflowGate
+      ),
+    [mission, conversationOutcome, translate, workflowGate]
+  );
+
+  const recommendedActionId = useMemo(
+    () => resolveRecommendedMissionActionId(actions, workflowGate),
+    [actions, workflowGate]
+  );
+
+  const userDismissedPanelRef = useRef(false);
+  const previousGateActiveRef = useRef(Boolean(workflowGate?.active));
+
+  useEffect(() => {
+    const gateActive = Boolean(workflowGate?.active);
+
+    if (gateActive && !previousGateActiveRef.current) {
+      userDismissedPanelRef.current = false;
+    }
+
+    if (!gateActive) {
+      userDismissedPanelRef.current = false;
+    }
+
+    previousGateActiveRef.current = gateActive;
+  }, [workflowGate?.active]);
+
+  useEffect(() => {
+    if (!workflowGate?.active || expandedActionId || userDismissedPanelRef.current) {
+      return;
+    }
+
+    if (recommendedActionId) {
+      onExpandedActionIdChange?.(recommendedActionId);
+    }
+  }, [expandedActionId, onExpandedActionIdChange, recommendedActionId, workflowGate?.active]);
 
   if (!actions.length) {
     return null;
   }
 
+  function markPanelDismissed(actionId) {
+    if (workflowGate?.active && actionId === recommendedActionId) {
+      userDismissedPanelRef.current = true;
+    }
+  }
+
   function handleToggle(actionId) {
     const next = expandedActionId === actionId ? null : actionId;
+
+    if (next === null) {
+      markPanelDismissed(actionId);
+    }
+
     onExpandedActionIdChange?.(next);
   }
 
   function handleCancel() {
+    if (expandedActionId) {
+      markPanelDismissed(expandedActionId);
+    }
+
     onExpandedActionIdChange?.(null);
     onCancel?.();
   }
@@ -51,11 +111,12 @@ export default function MissionActionCenter({
         {actions.map((action, index) => {
           const formType = resolvesToInlineForm(action.id, mission);
           const expanded = expandedActionId === action.id;
+          const featured = action.id === recommendedActionId && !expanded;
           const cardProps = buildMissionActionCard(action, {
             translate,
             phone,
-            featured: index === 0 && !expanded,
-            variantOverride: index === 0 ? "accent" : undefined
+            featured,
+            variantOverride: featured ? "accent" : undefined
           });
 
           return (
@@ -73,6 +134,7 @@ export default function MissionActionCenter({
               workflowGate={workflowGate}
               rawWorkflowGate={rawWorkflowGate}
               recruiterName={recruiterName}
+              currentUser={currentUser}
               submitting={submitting}
               error={expanded ? submitError : null}
               translate={translate}

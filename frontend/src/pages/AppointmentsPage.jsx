@@ -19,7 +19,8 @@ import AppointmentErrorCard from "../components/appointments/AppointmentErrorCar
 import { captureAppointmentError } from "../utils/appointmentErrors";
 import { useUniversalNote } from "../hooks/useUniversalNote";
 import { buildAppointmentNoteContext } from "../engines/notesEngine";
-import UniversalNoteButton from "../components/notes/UniversalNoteButton";
+import AppointmentCardActions from "../components/appointments/AppointmentCardActions";
+import { formatAppointmentMetaLabel } from "../engines/appointmentCardPresentation";
 import "../styles/atlas-ui.css";
 import "./AppointmentsPage.css";
 
@@ -76,14 +77,6 @@ function statusVariant(status) {
     default:
       return "info";
   }
-}
-
-function locationOrProvider(appointment) {
-  if (appointment.meetingType === "virtual") {
-    return appointment.meetingProvider?.replace(/_/g, " ") || "Virtual";
-  }
-
-  return appointment.meetingLocationName || appointment.meetingAddress || "In person";
 }
 
 function meetingTypeLabel(type, translate) {
@@ -378,7 +371,11 @@ export default function AppointmentsPage() {
                       </div>
                       <p className="appointments-page__when">{formatWhen(appointment.startDateTime, locale)}</p>
                       <p className="appointments-page__meta">
-                        {purposeLabel(appointment.purpose, translate)} · {locationOrProvider(appointment)}
+                        {formatAppointmentMetaLabel(
+                          appointment,
+                          translate,
+                          purposeLabel(appointment.purpose, translate)
+                        )}
                       </p>
                       {(appointment.rescheduleCount > 0 ||
                         appointment.emailStatus === "missing" ||
@@ -411,55 +408,18 @@ export default function AppointmentsPage() {
                       />
                     ) : null}
 
-                    <div className="appointments-page__actions">
-                      <UniversalNoteButton
-                        size="sm"
-                        busy={noteSaving}
-                        onClick={() => handleAddAppointmentNote(appointment)}
-                      />
-                      <AtlasButton
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => navigateToProspectWorkspace(navigate, appointment.prospectPhone)}
-                      >
-                        {translate("appointmentsOpenProspect")}
-                      </AtlasButton>
-                      {appointment.virtualMeetingUrl ? (
-                        <a
-                          className="appointments-page__link-action"
-                          href={appointment.virtualMeetingUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {translate("appointmentsJoinMeeting")}
-                        </a>
-                      ) : null}
-                      {appointment.status !== "cancelled" && appointment.status !== "completed" ? (
-                        <>
-                          <AtlasButton
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => openDialog("reschedule", appointment)}
-                          >
-                            {translate("appointmentsReschedule")}
-                          </AtlasButton>
-                          <AtlasButton
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => openDialog("cancel", appointment)}
-                          >
-                            {translate("appointmentsCancel")}
-                          </AtlasButton>
-                          <AtlasButton
-                            variant="primary"
-                            size="sm"
-                            onClick={() => openDialog("complete", appointment)}
-                          >
-                            {translate("appointmentsComplete")}
-                          </AtlasButton>
-                        </>
-                      ) : null}
-                    </div>
+                    <AppointmentCardActions
+                      appointment={appointment}
+                      translate={translate}
+                      noteSaving={noteSaving}
+                      onAddNote={() => handleAddAppointmentNote(appointment)}
+                      onOpenWorkspace={() =>
+                        navigateToProspectWorkspace(navigate, appointment.prospectPhone)
+                      }
+                      onReschedule={() => openDialog("reschedule", appointment)}
+                      onCancel={() => openDialog("cancel", appointment)}
+                      onComplete={() => openDialog("complete", appointment)}
+                    />
                   </li>
                 );
               })}

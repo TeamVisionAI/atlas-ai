@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useToast } from "../../../components/ui/ToastProvider";
 import { WorkspaceSkeleton } from "../../../components/ui/Skeleton";
@@ -36,7 +37,6 @@ import { appPath } from "../../../config/appRoutes";
 import ProspectEditorDrawer from "../components/ProspectEditorDrawer";
 import ScheduleInterviewDialog from "../components/ScheduleInterviewDialog";
 import RescheduleAppointmentDialog from "../../../components/appointments/RescheduleAppointmentDialog";
-import { useWorkspace } from "../../../contexts/WorkspaceContext";
 import "../../../pages/ProspectWorkspace.css";
 
 export default function ProspectWorkspacePage() {
@@ -311,7 +311,8 @@ export default function ProspectWorkspacePage() {
         open={Boolean(actions.scheduleDialog)}
         mode={actions.scheduleDialog?.mode || "schedule"}
         prospect={workspace.prospect}
-        recruiterName={workspace.owner?.name || ""}
+        recruiterName={user?.display_name || workspace.owner?.name || ""}
+        currentUser={user}
         submitting={actions.scheduleSubmitting}
         error={actions.scheduleError}
         onClose={actions.handleScheduleDialogClose}

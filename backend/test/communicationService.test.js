@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
@@ -313,42 +315,83 @@ test("resolveOrganizationName derives brand name from office settings", () => {
   );
 });
 
-test("resolveAssignedRepresentative prefers owner rep over operator fallback", async () => {
+test("resolveAssignedRepresentative uses appointment interviewer assignment", async () => {
   const resolved = await resolveAssignedRepresentative(
-    { id: "appt-1", ownerRepId: "4TJLK", organizationId: "org-1" },
+    {
+      id: "appt-1",
+      ownerRepId: "4TJLK",
+      interviewerUserId: "interviewer-user",
+      interviewerName: "Niovel Perez",
+      organizationId: "org-1"
+    },
     {
       organizationId: "org-1",
       actorUser: { display_name: "Operator User", rep_id: "9ZZZZ" }
     },
     {
-      findUserByRepId: async () => ({
-        id: "rep-user",
-        display_name: "Assigned Rep",
-        rep_id: "4TJLK",
-        email: "rep@example.com"
-      }),
+      findUserById: async (userId) =>
+        userId === "interviewer-user"
+          ? {
+              id: "interviewer-user",
+              display_name: "Niovel Perez",
+              rep_id: "5AAAA",
+              email: "niovel@example.com"
+            }
+          : null,
       sanitizeUser: (user) => user
     }
   );
 
   assert.equal(resolved.fallbackUsed, false);
-  assert.equal(resolved.profile.name, "Assigned Rep");
-  assert.equal(resolved.profile.repId, "4TJLK");
+  assert.equal(resolved.profile.name, "Niovel Perez");
+  assert.equal(resolved.interviewerUserId, "interviewer-user");
 });
 
-test("resolveAssignedRepresentative falls back to operator when owner rep is missing", async () => {
+test("resolveAssignedRepresentative ignores owner rep when interviewer is assigned", async () => {
   const resolved = await resolveAssignedRepresentative(
-    { id: "appt-1", ownerRepId: "4TJLK", organizationId: "org-1" },
     {
-      organizationId: "org-1",
-      actorUser: { display_name: "Operator User", rep_id: "9ZZZZ" }
+      id: "appt-1",
+      ownerRepId: "4TJLK",
+      interviewerUserId: "interviewer-user",
+      interviewerName: "Niovel Perez",
+      organizationId: "org-1"
     },
+    { organizationId: "org-1" },
     {
-      findUserByRepId: async () => null,
+      findUserById: async () => ({
+        id: "interviewer-user",
+        display_name: "Niovel Perez",
+        rep_id: "5AAAA"
+      }),
       sanitizeUser: (user) => user
     }
   );
 
-  assert.equal(resolved.fallbackUsed, true);
-  assert.equal(resolved.profile.name, "Operator User");
+  assert.equal(resolved.profile.name, "Niovel Perez");
+  assert.notEqual(resolved.profile.repId, "4TJLK");
+});
+
+test("resolveAssignedRepresentative falls back to agent id when interviewer user missing", async () => {
+  const resolved = await resolveAssignedRepresentative(
+    {
+      id: "appt-1",
+      agentId: "agent-user",
+      organizationId: "org-1"
+    },
+    { organizationId: "org-1" },
+    {
+      findUserById: async (userId) =>
+        userId === "agent-user"
+          ? {
+              id: "agent-user",
+              display_name: "Authenticated Agent",
+              rep_id: "9ZZZZ"
+            }
+          : null,
+      sanitizeUser: (user) => user
+    }
+  );
+
+  assert.equal(resolved.fallbackUsed, false);
+  assert.equal(resolved.profile.name, "Authenticated Agent");
 });

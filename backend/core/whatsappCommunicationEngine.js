@@ -563,6 +563,8 @@ function buildStubTemplateMessage(templateId, language, organizationName) {
   return `Hi,\n\n[${label} message — template pending]\n\n${orgName}`;
 }
 
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
+
 function resolveTemplateForAction(actionId) {
   return ACTION_TO_TEMPLATE[actionId] || WHATSAPP_TEMPLATES.GENERAL;
 }
@@ -570,6 +572,15 @@ function resolveTemplateForAction(actionId) {
 function composeWhatsAppMessage(templateId, context = {}) {
   const language = context.language || "en";
   const organizationName = resolveOrganizationName(context);
+
+  logInterviewerTrace({
+    authenticatedUserId: null,
+    authenticatedUserName: null,
+    interviewerUserId: null,
+    interviewerName: context.recruiterName || null,
+    appointmentId: null,
+    source: "invitationTemplate.composeWhatsAppMessage"
+  });
 
   switch (templateId) {
     case WHATSAPP_TEMPLATES.ZOOM_INVITATION:

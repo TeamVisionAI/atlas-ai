@@ -1,6 +1,6 @@
 /**
  * Resolves interview outcome gate data for inline Mission Actions.
- * Falls back to recruiter-primary outcomes when API gate descriptor is incomplete.
+ * BR-044 — six business outcomes only; operational milestones are Atlas-managed.
  */
 
 const FALLBACK_OUTCOME_CATEGORIES = [
@@ -10,41 +10,17 @@ const FALLBACK_OUTCOME_CATEGORIES = [
     outcomes: [
       {
         id: "Recruited",
-        label: "Recruited",
-        fields: [
-          { key: "orientationDate", type: "date", label: "Orientation Date" },
-          { key: "orientationTime", type: "time", label: "Orientation Time" }
-        ]
+        label: "✅ Recruited",
+        fields: [{ key: "notes", type: "textarea", label: "Notes" }]
       },
       {
-        id: "Needs More Time",
-        label: "Needs More Time",
-        fields: [
-          { key: "followUpDate", type: "date", label: "Follow Up Date", defaultDays: 3 },
-          { key: "followUpTime", type: "time", label: "Follow Up Time", defaultValue: "10:00" },
-          { key: "notes", type: "textarea", label: "Notes" }
-        ]
-      },
-      {
-        id: "No Show",
-        label: "No Show",
-        fields: [
-          { key: "followUpDate", type: "date", label: "Follow Up Date", defaultDays: 7 },
-          { key: "followUpTime", type: "time", label: "Follow Up Time", defaultValue: "10:00" },
-          { key: "notes", type: "textarea", label: "Notes" }
-        ]
-      },
-      {
-        id: "Not Interested",
-        label: "Not Interested",
-        fields: [
-          { key: "notInterestedReason", type: "textarea", label: "Reason" },
-          { key: "notes", type: "textarea", label: "Notes" }
-        ]
+        id: "Became Client",
+        label: "🤝 Became Client",
+        fields: [{ key: "notes", type: "textarea", label: "Notes" }]
       },
       {
         id: "Rescheduled",
-        label: "Rescheduled",
+        label: "📅 Rescheduled",
         fields: [
           { key: "rescheduleDate", type: "date", label: "New Interview Date" },
           { key: "rescheduleTime", type: "time", label: "New Interview Time" },
@@ -55,6 +31,32 @@ const FALLBACK_OUTCOME_CATEGORIES = [
             options: ["Zoom", "Office"],
             defaultValue: "Zoom"
           },
+          { key: "notes", type: "textarea", label: "Notes" }
+        ]
+      },
+      {
+        id: "No Show",
+        label: "👻 No Show",
+        fields: [
+          { key: "followUpDate", type: "date", label: "Follow Up Date", defaultDays: 7 },
+          { key: "followUpTime", type: "time", label: "Follow Up Time", defaultValue: "10:00" },
+          { key: "notes", type: "textarea", label: "Notes" }
+        ]
+      },
+      {
+        id: "Follow Up Needed",
+        label: "⏳ Follow Up Needed",
+        fields: [
+          { key: "followUpDate", type: "date", label: "Follow Up Date", defaultDays: 3 },
+          { key: "followUpTime", type: "time", label: "Follow Up Time", defaultValue: "10:00" },
+          { key: "notes", type: "textarea", label: "Notes" }
+        ]
+      },
+      {
+        id: "Not Interested",
+        label: "❌ Not Interested",
+        fields: [
+          { key: "notInterestedReason", type: "textarea", label: "Reason" },
           { key: "notes", type: "textarea", label: "Notes" }
         ]
       }
@@ -98,7 +100,7 @@ function normalizeGateShape(gate, translate) {
       outcomeCategories: [
         {
           id: "default",
-          label: "Outcomes",
+          label: translate("workflowGateOutcomeCategory"),
           outcomes: gate.outcomes
         }
       ]

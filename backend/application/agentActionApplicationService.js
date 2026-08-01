@@ -42,6 +42,7 @@ const {
 const { assertSimulatorPhone } = require("../dev/simulatorSafety");
 const { buildWorkflowGateDescriptor } = require("../core/workflowGateEngine");
 const { buildInterviewBlock } = require("../core/prospectWorkspaceReadModel");
+const { logInterviewerTrace } = require("../dev/interviewerTrace");
 const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
 const { enrichActionCenterWithConfidence } = require("../core/alphaConfidenceEngine");
 const {
@@ -532,6 +533,15 @@ async function getMissionControlWithActions(phone, options = {}) {
     workflowGate,
     activeAppointment
   );
+
+  logInterviewerTrace({
+    authenticatedUserId: options.userId || null,
+    authenticatedUserName: null,
+    interviewerUserId: interview?.interviewerUserId || activeAppointment?.interviewerUserId || null,
+    interviewerName: interview?.interviewerName || activeAppointment?.interviewerName || null,
+    appointmentId: interview?.appointmentId || null,
+    source: "missionControl.readModel.interview"
+  });
 
   return {
     ...missionControl,
