@@ -6,12 +6,12 @@
 |-------|-------|
 | **Document ID** | DOC-0004 |
 | **Title** | Meta Review Q&A |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Status** | Draft |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-20 |
-| **Related Sprint** | 11.4 |
-| **Related Release** | Release-11.3.1 |
+| **Last Updated** | 2026-08-01 |
+| **Related Sprint** | MVP Freeze Milestone 3 |
+| **Related Release** | MVP Freeze |
 
 > **Status values:** Draft · Review · Approved
 
@@ -169,10 +169,10 @@ Atlas requests only permissions required for Embedded Signup, webhook delivery, 
 
 | Category | Examples |
 |----------|----------|
-| **✅ Production (Release-11.3.1)** | Public website, contact form, Executive Dashboard, Mission Control, Prospect Center, Prospect Workspace, Quick Capture, WhatsApp webhook pipeline, Embedded Signup |
-| **🟡 Planned (not production)** | AI Conversation Engine, Communication Hub, Instagram Messaging, Messenger Integration, Google Calendar Automation, automated AI replies |
+| **✅ Production (MVP Freeze)** | Public website, contact form, data deletion page, Executive Dashboard, Mission Control, Prospect Center, Prospect Workspace, Quick Capture, Appointments module, WhatsApp webhook pipeline, Communication Hub backend, Conversation Engine (Sprint 11.4 Phase A), Embedded Signup, Operations Center simulator review (Sprint 21.0) |
+| **🟡 Planned (not Meta review scope)** | Standalone `/app/conversations` UI, Instagram/Messenger messaging, Meta Graph data-deletion callback, formal username/password auth |
 
-Planned features are clearly marked in [05-integrations/meta/Meta_Approval_Portfolio.md](../05-integrations/meta/Meta_Approval_Portfolio.md) and must not be interpreted as current capabilities.
+Planned features are clearly marked in [Meta_Approval_Portfolio.md](../05-integrations/meta/Meta_Approval_Portfolio.md) and [META_SUBMISSION_READINESS.md](../09-releases/META_SUBMISSION_READINESS.md).
 
 ---
 
@@ -185,6 +185,7 @@ Planned features are clearly marked in [05-integrations/meta/Meta_Approval_Portf
 | **Email** | info@teamvisionfinancial.com |
 | **Phone** | (786) 752-8080 |
 | **Privacy Policy** | `https://teamvisionfinancial.com/privacy` |
+| **Data Deletion** | `https://teamvisionfinancial.com/data-deletion` |
 | **Terms of Service** | `https://teamvisionfinancial.com/terms` |
 
 ---
@@ -193,4 +194,5 @@ Planned features are clearly marked in [05-integrations/meta/Meta_Approval_Portf
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.1 | 2026-08-01 | Atlas Development Team | MVP Freeze M3 — production vs planned aligned with Sprint 11.4/21.0 |
 | 1.0 | 2026-07-20 | Atlas Development Team | Initial Meta Review Q&A for Business Verification package |

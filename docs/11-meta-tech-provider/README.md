@@ -14,6 +14,8 @@ Official Atlas Platform documentation prepared for **Meta Tech Provider** review
 | MTP-008 | [08_Permissions_Justification.md](./08_Permissions_Justification.md) | Draft for Meta Tech Provider Review | Permissions justification — least privilege, feature mapping, Meta permission reference |
 | MTP-009 | [09_Demo_Script.md](./09_Demo_Script.md) | Draft for Meta Tech Provider Review | Demo script — Meta reviewer walkthrough of WhatsApp integration |
 | MTP-010 | [10_Reviewer_FAQ.md](./10_Reviewer_FAQ.md) | Draft for Meta Tech Provider Review | Reviewer FAQ — concise Q&A aligned with current production |
+| MTP-RI-001 | [REVIEWER_INSTRUCTIONS.md](./REVIEWER_INSTRUCTIONS.md) | Approved for MVP Freeze M3 | Hands-on Meta reviewer guide (live + simulator paths) |
+| MTP-SR-001 | [../09-releases/META_SUBMISSION_READINESS.md](../09-releases/META_SUBMISSION_READINESS.md) | MVP Freeze M3 | Evidence-based submission checklist (~58%) |
 | MTP-SC-001 | [Screenshot_Checklist.md](./Screenshot_Checklist.md) | Draft for Meta Tech Provider Review | Meta App Review screenshot capture checklist |
 | MTP-EV-001 | [evidence/CAPTURE_GUIDE.md](./evidence/CAPTURE_GUIDE.md) | Draft for Meta Tech Provider Review | Manual screenshot capture guide (evidence output: [evidence/](./evidence/)) |
 

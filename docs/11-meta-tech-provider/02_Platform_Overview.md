@@ -67,19 +67,15 @@ Typical lifecycle stages include:
 
 ---
 
-## Communications Hub
+## Communications Hub (WhatsApp — live backend)
 
-The Communications Hub centralizes customer conversations.
+WhatsApp Business messaging is integrated through the **Communication Hub backend** (Sprint 11.4 Phase A):
 
-Current communication capabilities include:
+- Inbound: Meta webhook → `communicationHub` → `conversationEngine` → `semanticConversationEngine`
+- Outbound: automated qualification replies + structured agent actions
+- History: Prospect Workspace Activity Feed and Mission Control conversation panel
 
-- WhatsApp Business
-- Message history
-- Templates
-- Follow-up reminders
-- Conversation management
-
-Future communication channels may include email and SMS.
+The standalone **Communications Hub page** (`/app/conversations`) remains a UI shell. Message history appears in Prospect Workspace.
 
 ---
 

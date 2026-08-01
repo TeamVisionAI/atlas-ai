@@ -6,12 +6,12 @@
 |-------|-------|
 | **Document ID** | DOC-0002 |
 | **Title** | Meta Approval Portfolio |
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Status** | Approved |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-20 |
-| **Related Sprint** | 11.4 |
-| **Related Release** | Release-11.3.1 |
+| **Last Updated** | 2026-08-01 |
+| **Related Sprint** | MVP Freeze Milestone 3 |
+| **Related Release** | MVP Freeze (Sprint 11.4 Phase A + Sprint 21.0) |
 
 > **Status values:** Draft · Review · Approved
 
@@ -26,8 +26,11 @@
 | DOC-0004 | [Meta_Review_QA.md](../../07-security/Meta_Review_QA.md) | Meta reviewer Q&A (Meta package) |
 | — | [WHATSAPP_EMBEDDED_SIGNUP.md](../WHATSAPP_EMBEDDED_SIGNUP.md) | Technical Embedded Signup guide |
 | — | [09-releases/sprints/SPRINT_11_1_LIVE_WHATSAPP.md](../../09-releases/sprints/SPRINT_11_1_LIVE_WHATSAPP.md) | Live WhatsApp pipeline specification |
+| — | [META_SUBMISSION_READINESS.md](../../09-releases/META_SUBMISSION_READINESS.md) | Evidence-based Meta submission checklist |
+| — | [11-meta-tech-provider/REVIEWER_INSTRUCTIONS.md](../../11-meta-tech-provider/REVIEWER_INSTRUCTIONS.md) | Hands-on Meta reviewer walkthrough |
 | — | Privacy Policy (public) | `https://teamvisionfinancial.com/privacy` |
 | — | Terms of Service (public) | `https://teamvisionfinancial.com/terms` |
+| — | Data Deletion (public) | `https://teamvisionfinancial.com/data-deletion` |
 | — | Legal (public) | `https://teamvisionfinancial.com/legal` |
 
 ---
@@ -162,26 +165,25 @@ Public Website
 
 > **Note:** The contact form delivers an email notification to the business team (Resend). An authorized agent may create a prospect record in Atlas via Quick Capture. WhatsApp messaging follows user-initiated contact — Atlas does not send WhatsApp messages as the first touchpoint after a website form submission.
 
-### 6.2 Planned architecture
+### 6.2 Multi-channel roadmap (not current Meta review scope)
 
-> 🟡 **Planned Architecture — not current production**
+> 🟡 **Planned channels — not part of current WhatsApp App Review**
 
-The following diagram describes a **future** multi-channel architecture (Communication Hub). It is included for transparency and **must not** be interpreted as live functionality in Release-11.3.1.
+Instagram Direct and Messenger business messaging are on the product roadmap but **not implemented** in the current MVP. The standalone Communications Hub **page** (`/app/conversations`) remains a UI shell.
+
+**Live today (Sprint 11.4 Phase A):** WhatsApp inbound webhooks route through `communicationHub.js` → `conversationEngine.js` → `semanticConversationEngine` for automated qualification replies. This backend Communication Hub path **is production** — only the standalone `/app/conversations` UI is deferred.
 
 ```
-Website / Facebook / Instagram
+Website / Facebook Ads → WhatsApp (user-initiated)
               │
               ▼
-      Communication Hub
+      Communication Hub (backend)
               │
               ▼
-           Atlas AI
+      Conversation Engine
               │
               ▼
-     Prospect Management
-              │
-              ▼
-      Human Recruiter
+     Prospect / Mission Control
 ```
 
 ### 6.3 Production architecture (technical)
@@ -259,7 +261,7 @@ flowchart LR
 
 ## 7. Current production features
 
-The following section lists capabilities **implemented and deployed** as of **Release-11.3.1**, aligned with [Current_System_State.md](../../00-executive/Current_System_State.md) (DOC-0001). Planned capabilities are listed separately in [Section 15](#15-future-roadmap-planned-features).
+The following section lists capabilities **implemented and deployed** on `main` as of **MVP Freeze Milestone 3**, aligned with [Current_System_State.md](../../00-executive/Current_System_State.md) (DOC-0001) and [META_SUBMISSION_READINESS.md](../../09-releases/META_SUBMISSION_READINESS.md). Planned capabilities are listed separately in [Section 15](#15-future-roadmap-planned-features).
 
 ### ✅ Production Features
 
@@ -278,7 +280,8 @@ The following section lists capabilities **implemented and deployed** as of **Re
 | Feature | Status | Description |
 |---------|--------|-------------|
 | Corporate homepage | **Live** | Services, about, careers, and contact sections |
-| Privacy Policy | **Live** | `/privacy` |
+| Privacy Policy | **Live** | `/privacy` · `https://teamvisionfinancial.com/privacy` |
+| Data Deletion instructions | **Live** | `/data-deletion` · `https://teamvisionfinancial.com/data-deletion` |
 | Legal disclosures | **Live** | `/legal` |
 | Terms of Service | **Live** | `/terms` |
 | Atlas Sign In | **Live** | Routes to private application at `/app` |
@@ -304,6 +307,9 @@ The following section lists capabilities **implemented and deployed** as of **Re
 | **Prospect Workspace** | `/app/prospect-workspace/:phone` | **Live** | Single-prospect profile, activity feed, and details |
 | **Quick Capture** | `/app/quick-capture` | **Live** | Agent-initiated prospect entry with duplicate detection |
 | **WhatsApp Connect** | `/app/settings/whatsapp` | **Live** | Meta Embedded Signup to link customer-owned WABA |
+| **Appointments** | `/app/appointments` | **Live** | Persisted `atlas_appointments` list with schedule/reschedule/cancel/complete |
+| **Operations Center** | `/app/operations-center` | **Live** | Admin-only ops dashboard; Workflow Simulator + Meta review bridge |
+| **Appointment Settings** | `/app/settings/appointments` | **Live** | Organization scheduling configuration |
 
 #### Email notifications
 
@@ -312,15 +318,18 @@ The following section lists capabilities **implemented and deployed** as of **Re
 | Contact form notification | **Live** | Resend delivers inquiry email to configured business inbox (`CONTACT_FORM_TO_EMAIL`) |
 | Reply-To header | **Live** | Set to visitor email for direct team reply |
 
-#### WhatsApp and messaging (backend — Sprint 11.1)
+#### WhatsApp and messaging (Sprint 11.1 + 11.4 Phase A + 21.0)
 
 | Feature | Status | Description |
 |---------|--------|-------------|
 | Webhook verification | **Live** | `GET /webhook` with verify token |
-| Inbound message pipeline | **Live** | Signed `POST /webhook`; parse, deduplicate, resolve/create prospect, log message |
-| Outbound send path | **Live** | Send replies via WhatsApp Cloud API with logging |
+| Inbound message pipeline | **Live** | Signed `POST /webhook` → Communication Hub → Conversation Engine |
+| Automated qualification replies | **Live** | `semanticConversationEngine` via `communicationHub` / `conversationEngine` |
+| Outbound send path | **Live** | WhatsApp Cloud API with logging; mocked under simulator guard |
 | Embedded Signup exchange | **Live** | Server-side OAuth code exchange; encrypted token storage when configured |
-| Workflow event audit | **Live** | Events such as `MessageReceived`, `MessageSent`, `ProspectCreated`, `ConversationStarted` |
+| Workflow event audit | **Live** | `MessageReceived`, `MessageSent`, `ProspectCreated`, `ConversationStarted` |
+| Simulator review bridge | **Live** | Operations Center `/app/operations-center/review/:phone` — verified by `verifySprint21_0.js` |
+| Recruiter handoff read model | **Live** | Canonical appointment lifecycle via `appointmentHandoffReadModel` (BR-050) |
 
 #### Infrastructure integrations
 
@@ -333,12 +342,13 @@ The following section lists capabilities **implemented and deployed** as of **Re
 
 #### UI placeholders (not production functionality)
 
-The following Atlas application pages exist as **UI shells only** and do not provide production functionality:
+The following Atlas application pages exist as **UI shells only** and do not provide production functionality for Meta review:
 
 | Feature | Status |
 |---------|--------|
-| Standalone Conversations page | UI shell — no standalone public messaging interface |
-| Appointments, Analytics, Settings (except WhatsApp) | UI shell |
+| Standalone Conversations page (`/app/conversations`) | UI shell — WhatsApp history appears in Prospect Workspace Activity Feed |
+| Analytics | UI shell |
+| General Settings (outside WhatsApp / Appointments) | UI shell |
 
 ---
 
@@ -485,6 +495,7 @@ Published on the production website:
 | Page | URL |
 |------|-----|
 | Privacy Policy | `https://teamvisionfinancial.com/privacy` |
+| Data Deletion | `https://teamvisionfinancial.com/data-deletion` |
 | Legal | `https://teamvisionfinancial.com/legal` |
 | Terms of Service | `https://teamvisionfinancial.com/terms` |
 
@@ -558,23 +569,20 @@ Atlas does **not** use Meta products for unrelated consumer social features, adv
 
 ## 15. Future roadmap (planned features)
 
-> ⚠️ **PLANNED WORK — NOT CURRENT PRODUCTION**  
-> The capabilities below are on the Atlas product roadmap. They are included for transparency with Meta reviewers and **must not** be interpreted as live features in Release-11.3.1.
+> ⚠️ **PLANNED WORK — NOT CURRENT META REVIEW SCOPE**  
+> The capabilities below are on the Atlas product roadmap. They are included for transparency and **must not** be interpreted as required for the current WhatsApp App Review walkthrough.
 
 ### 🟡 Planned Features
 
 | Planned capability | Description | Status |
 |--------------------|-------------|--------|
-| **AI Conversation Engine** | Structured, policy-aware conversation automation (Sprint 11.4) | 🟡 Planned |
-| **Communication Hub** | Unified architecture for multi-channel messaging coordination (see [Section 6.2](#62-planned-architecture)) | 🟡 Planned |
-| **WhatsApp Integration (expanded)** | Deeper conversation orchestration UI and automation beyond current backend pipeline | 🟡 Planned |
+| **Standalone Communications Hub UI** | Dedicated `/app/conversations` page | 🟡 Planned — backend WhatsApp path is live |
 | **Instagram Messaging** | Business messaging via Instagram Direct | 🟡 Planned — not implemented |
-| **Messenger Integration** | Facebook Messenger business messaging | 🟡 Planned — not implemented |
-| **Google Calendar Automation** | Automated calendar sync for interview scheduling | 🟡 Planned — not implemented |
-| **Executive Intelligence** | Advanced analytics and AI-assisted leadership insights beyond current dashboard | 🟡 Planned |
-| **Workflow Automation** | Expanded rule-driven automation across recruiting milestones | 🟡 Planned |
+| **Messenger Integration** | Facebook Messenger business messaging | 🟡 Planned — backend gateway stub only |
+| **Reminder engine (automated)** | Scheduled WhatsApp reminders at scale | 🟡 Partial — engine exists; not Meta walkthrough scope |
+| **Executive Intelligence** | Advanced analytics beyond current dashboard | 🟡 Planned |
 | **Formal user authentication** | Multi-user login replacing interim bootstrap token | 🟡 Planned |
-| **Automated AI conversational replies** | Policy-aware automated responses within Conversation Engine | 🟡 Planned — not implemented |
+| **Meta Graph data-deletion callback** | Automated Meta user-data deletion webhook | 🟡 Planned — email process live at `/data-deletion` |
 
 All planned features will maintain the same core principles: **voluntary user contact**, **customer-owned Meta assets**, **human oversight**, and **Meta policy compliance**.
 
@@ -620,5 +628,6 @@ We welcome Meta Business Verification, WhatsApp Business Platform review, and Fa
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.2 | 2026-08-01 | Atlas Development Team | MVP Freeze M3 — align with Sprint 11.4 Phase A Conversation Engine, Sprint 21.0 simulator review, live Appointments module, data deletion URL, BR-050 handoff |
 | 1.1 | 2026-07-20 | Atlas Development Team | Finalized after architectural review — Business Legitimacy, Compliance Statement, Business Value, production/planned separation, and messaging policy expansion |
 | 1.0 | 2026-07-20 | Atlas Development Team | Initial Meta Approval Portfolio draft for Meta Business Verification and WhatsApp Platform review |

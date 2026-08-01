@@ -3,9 +3,10 @@
 ## Meta Review Screenshot Checklist
 
 **Document ID:** MTP-SC-001  
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** Draft for Meta Tech Provider Review  
 **Owner:** Atlas Platform Team  
+**Last updated:** 2026-08-01
 
 **Related Documents:**
 - [MTP-009 Demo Script](./09_Demo_Script.md)
@@ -75,10 +76,9 @@ These surfaces are referenced in MTP-009 or MTP-010 only as **excluded**, **plac
 
 | Route / surface | Reason | MTP references |
 |-----------------|--------|----------------|
-| `/app/conversations` | UI shell only — standalone Communications Hub not implemented | MTP-009 — Step 2 note, exclusion table; MTP-010 — Q14 |
-| `/app/appointments` | UI shell only | MTP-009 — Step 6, exclusion table; MTP-010 — Q14 |
-| `/app/analytics` | UI shell only | MTP-009 — exclusion table; MTP-010 — Q14 |
-| `/app/settings` (general) | UI shell only — use `/app/settings/whatsapp` instead | MTP-009 — Step 7 note; MTP-010 — Q14 |
+| `/app/conversations` | UI shell only — WhatsApp history in Prospect Workspace Activity Feed | MTP-009 · MTP-010 Q14 |
+| `/app/analytics` | UI shell only | MTP-009 · MTP-010 Q14 |
+| `/app/settings` (general) | UI shell only — use `/app/settings/whatsapp` or `/app/settings/appointments` | MTP-009 · MTP-010 Q14 |
 | Free-form WhatsApp compose in Prospect Workspace or Mission Control | Not implemented | MTP-009 — Step 5; MTP-010 — Q7 |
 | Google Calendar booking UI | No dedicated Atlas screen (backend partial only) | MTP-009 — Step 6; MTP-010 — Q14 |
 | Instagram Direct / Messenger | Not implemented — no routes in application | MTP-009 — exclusion table; MTP-010 — Q14 |
@@ -104,6 +104,19 @@ These surfaces are referenced in MTP-009 or MTP-010 only as **excluded**, **plac
 For step-by-step narration during capture, use [MTP-009 Demo Script](./09_Demo_Script.md). For reviewer Q&A paired with evidence, use [MTP-010 Reviewer FAQ](./10_Reviewer_FAQ.md).
 
 **Manual capture:** [evidence/CAPTURE_GUIDE.md](./evidence/CAPTURE_GUIDE.md) · **Output folder:** [evidence/](./evidence/)
+
+---
+
+# Simulator review screenshots (Path B — WABA unavailable)
+
+Capture when live WABA path is blocked. Verified by `node backend/dev/verifySprint21_0.js`.
+
+| # | File name | Route | Purpose |
+|---|-----------|-------|---------|
+| S1 | `sim-01-operations-center-simulator.png` | `/app/operations-center` → Workflow Simulator | Generate WhatsApp conversation |
+| S2 | `sim-02-review-experience-conversation.png` | `/app/operations-center/review/:phone` | Simulated WhatsApp badge + Conversation panel |
+| S3 | `sim-03-review-ai-action-center.png` | Same | AI Action Center recommendations |
+| S4 | `sim-04-review-follow-up-message.png` | Same after follow-up send | Second qualification turn |
 
 ---
 

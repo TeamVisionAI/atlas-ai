@@ -3,9 +3,10 @@
 ## Demo Script
 
 **Document ID:** MTP-009  
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** Draft for Meta Tech Provider Review  
 **Owner:** Atlas Platform Team  
+**Last updated:** 2026-08-01
 
 **Related Documents:**
 - [MTP-001 Executive Summary](./01_Executive_Summary.md)
@@ -53,9 +54,9 @@ Confirm the following before starting:
 4. Meta webhook endpoint is configured and reachable on the Atlas API host.
 5. A second device or WhatsApp client is available to send a **user-initiated** test message to the connected business number.
 
-**Current review scope (production on `main`):** Executive Dashboard, Mission Control, Prospect Center, Prospect Workspace, Quick Capture, WhatsApp Connect (Embedded Signup), and the live WhatsApp inbound/outbound pipeline.
+**Current review scope (production on `main`):** Executive Dashboard, Mission Control, Prospect Center, Prospect Workspace, Quick Capture, WhatsApp Connect (Embedded Signup), live WhatsApp inbound/outbound pipeline (Sprint 11.4 Phase A), and Operations Center simulator review (Sprint 21.0 fallback).
 
-Reference documents: [MTP-004 WhatsApp Business Integration](./04_WhatsApp_Business_Integration.md), [MTP-008 Permissions Justification](./08_Permissions_Justification.md), [Current_System_State.md](../00-executive/Current_System_State.md) (DOC-0001).
+Reference documents: [MTP-004](./04_WhatsApp_Business_Integration.md), [MTP-008](./08_Permissions_Justification.md), [REVIEWER_INSTRUCTIONS.md](./REVIEWER_INSTRUCTIONS.md), [META_SUBMISSION_READINESS.md](../09-releases/META_SUBMISSION_READINESS.md), [Current_System_State.md](../00-executive/Current_System_State.md) (DOC-0001).
 
 ---
 
@@ -192,6 +193,22 @@ Reference documents: [MTP-004 WhatsApp Business Integration](./04_WhatsApp_Busin
 
 ---
 
+# Alternate Path B — Simulator review (WABA unavailable)
+
+Use when Embedded Signup or live WABA is restricted. This path reuses **production Conversation Engine** with mocked Meta delivery — verified by `node backend/dev/verifySprint21_0.js`.
+
+1. Sign in as **Administrator** → `/app/operations-center`.
+2. Workflow Simulator → **Generate WhatsApp Conversation** (creates `sim-ops-*` phone).
+3. **Open Review Experience** → `/app/operations-center/review/:phone`.
+4. Confirm **Simulated WhatsApp** badge, Conversation panel, AI Action Center, workflow trace.
+5. Send follow-up: `Vivo en Miami, Florida.` — confirm second qualification turn.
+
+**Explain:** Simulator phones are isolated from production Mission Control lists. No real Meta webhook traffic is claimed.
+
+**Maps to:** [WHATSAPP_SIMULATOR_REVIEW.md](../03-engineering/WHATSAPP_SIMULATOR_REVIEW.md) · [REVIEWER_INSTRUCTIONS.md](./REVIEWER_INSTRUCTIONS.md)
+
+---
+
 # What This Demo Does Not Show
 
 The demo intentionally does **not** demonstrate:
@@ -205,9 +222,9 @@ The following are **not part of the current Meta Tech Provider review** (planned
 
 | Item | Current status |
 |------|----------------|
-| Standalone Communications Hub page (`/app/conversations`) | UI shell only |
-| Calendar integration / automated appointment booking | Partial — backend interview booking when Google credentials are configured; not demonstrated in this walkthrough |
-| Appointments, Analytics, and general Settings pages | UI shell only |
+| Standalone Communications Hub page (`/app/conversations`) | UI shell only — WhatsApp history in Prospect Workspace Activity Feed |
+| **Appointments module** (`/app/appointments`) | **Live** — not part of core WhatsApp Meta walkthrough |
+| Analytics and general Settings pages | UI shell only |
 | Free-form WhatsApp compose in Prospect Workspace | Not implemented — outbound is automated (Phase A) or structured agent actions |
 | Reminder engine | Not implemented |
 | Instagram Direct / Messenger integration | Not implemented |

@@ -238,9 +238,10 @@ Data collection is limited to legitimate business operations authorized by the c
 
 | Capability | Current status | Part of Meta review walkthrough? |
 |------------|----------------|----------------------------------|
-| **Google Calendar / automated appointment booking** | **Partial** — backend interview booking when Google credentials are configured on Railway; not demonstrated in the walkthrough | **No** |
-| **Communications Hub** (`/app/conversations`) | **Not implemented** — UI shell only | **No** |
-| **Appointments, Analytics, general Settings** (outside WhatsApp Connect) | **Not implemented** — UI shell only | **No** |
+| **Google Calendar / automated appointment booking** | **Partial** — `executeScheduleInterview` when Google credentials configured; not demonstrated in WhatsApp walkthrough | **No** |
+| **Communications Hub page** (`/app/conversations`) | **Not implemented** — UI shell only; backend WhatsApp path is live | **No** |
+| **Appointments module** (`/app/appointments`) | **Implemented** — persisted appointments UI; not required for WhatsApp permission demo | **No** |
+| **Analytics, general Settings** (outside WhatsApp / Appointments) | **Not implemented** — UI shell only | **No** |
 | **Instagram Direct** | **Not implemented** | **No** |
 | **Messenger** | **Not implemented** | **No** |
 | **WhatsApp Business integration** | **Implemented** | **Yes** — core review scope |
@@ -253,23 +254,31 @@ Data collection is limited to legitimate business operations authorized by the c
 
 ## Q15. How can a Meta reviewer test the application?
 
-**Answer:** Follow [MTP-009 Demo Script](./09_Demo_Script.md) step by step. Summary:
+**Answer:** Follow [MTP-009 Demo Script](./09_Demo_Script.md) or [REVIEWER_INSTRUCTIONS.md](./REVIEWER_INSTRUCTIONS.md).
+
+### Path A — Live WABA (preferred)
 
 | Step | Action |
 |------|--------|
-| **Access** | Open `/app` over HTTPS. Session is established via pre-configured **bootstrap authentication** (`ATLAS_BOOTSTRAP_TOKEN` / `VITE_ATLAS_BOOTSTRAP_TOKEN`). There is no separate username/password login form in the current release. |
+| **Access** | Open `/app` over HTTPS. Session via bootstrap authentication (`ATLAS_BOOTSTRAP_TOKEN` / `VITE_ATLAS_BOOTSTRAP_TOKEN`). |
 | **Connect** | Complete Embedded Signup at `/app/settings/whatsapp`. |
-| **Inbound** | Send a **user-initiated** test message from a separate WhatsApp client to the connected business number. |
-| **Verify inbound** | Open Prospect Workspace for that phone number; confirm inbound message in Activity Feed. |
-| **Verify outbound** | Wait for automated Conversation Engine reply (~30 seconds typical); confirm on customer WhatsApp and in Activity Feed. |
-| **Optional** | Mission Control, Prospect Center, structured agent actions when workflow allows. |
-| **Close** | Review connection status and permission scope on WhatsApp Connect; explain Meta-side revocation. |
+| **Inbound** | Send user-initiated test message from personal WhatsApp to connected business number. |
+| **Verify inbound** | Prospect Workspace Activity Feed for that phone. |
+| **Verify outbound** | Automated Conversation Engine reply (~30s); confirm on device + Activity Feed. |
+| **Close** | WhatsApp Connect status; explain Meta-side revocation. |
 
-**Prerequisites:** Demo organization with bootstrap tokens configured; WABA and phone number for Embedded Signup; Meta webhook endpoint reachable on the Atlas API host; second WhatsApp client for inbound test.
+### Path B — Simulator review (WABA restricted)
 
-Technical Embedded Signup detail: [WHATSAPP_EMBEDDED_SIGNUP.md](../05-integrations/WHATSAPP_EMBEDDED_SIGNUP.md).
+| Step | Action |
+|------|--------|
+| **Access** | Administrator → `/app/operations-center` |
+| **Generate** | Workflow Simulator → Generate WhatsApp Conversation (`sim-ops-*`) |
+| **Review** | Open Review Experience → `/app/operations-center/review/:phone` |
+| **Verify** | Simulated WhatsApp badge, Conversation panel, AI Action Center, follow-up message |
 
-**See:** [MTP-009 Demo Script](./09_Demo_Script.md) — full walkthrough and troubleshooting
+**Executable verification:** `node backend/dev/verifySprint21_0.js` → `PASSED`
+
+**Prerequisites (Path A):** Bootstrap tokens; WABA + phone for Embedded Signup; webhook reachable; second WhatsApp client.
 
 ---
 

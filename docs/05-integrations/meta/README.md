@@ -9,9 +9,9 @@
 | **Version** | 1.0 |
 | **Status** | Approved |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-20 |
-| **Related Sprint** | — |
-| **Related Release** | Release-11.3.1 |
+| **Last Updated** | 2026-08-01 |
+| **Related Sprint** | MVP Freeze Milestone 3 |
+| **Related Release** | MVP Freeze |
 
 ## Related documents
 
@@ -42,9 +42,10 @@ The package explains what Atlas is, how Meta technologies are used, how user dat
 
 | Document ID | Document | Version | Status | Description |
 |-------------|----------|---------|--------|-------------|
-| DOC-0002 | [Meta_Approval_Portfolio.md](./Meta_Approval_Portfolio.md) | 1.1 | **Approved** | Primary submission portfolio — platform overview, features, messaging policy, compliance |
+| DOC-0002 | [Meta_Approval_Portfolio.md](./Meta_Approval_Portfolio.md) | 1.2 | **Approved** | Primary submission portfolio — aligned with Sprint 11.4/21.0 |
 | DOC-0003 | [../07-security/Privacy_and_Data_Handling.md](../../07-security/Privacy_and_Data_Handling.md) | 1.0 | Draft | Privacy, data collection, storage, access, retention, and Meta data handling |
-| DOC-0004 | [Meta_Review_QA.md](../../07-security/Meta_Review_QA.md) | 1.0 | Draft | Quick-reference Q&A for Meta reviewers |
+| DOC-0004 | [Meta_Review_QA.md](../../07-security/Meta_Review_QA.md) | 1.1 | Draft | Quick-reference Q&A for Meta reviewers |
+| MTP-SR-001 | [META_SUBMISSION_READINESS.md](../../09-releases/META_SUBMISSION_READINESS.md) | 1.0 | Approved | Evidence-based Meta submission checklist |
 
 ---
 
@@ -58,7 +59,8 @@ For Meta Business Verification and WhatsApp Platform review, read documents in t
 | 2 | [../07-security/Privacy_and_Data_Handling.md](../../07-security/Privacy_and_Data_Handling.md) (DOC-0003) | Data collection, storage, and protection detail |
 | 3 | [Meta_Review_QA.md](../../07-security/Meta_Review_QA.md) (DOC-0004) | Concise answers to common reviewer questions |
 | 4 | [11-meta-tech-provider/10_Reviewer_FAQ.md](../../11-meta-tech-provider/10_Reviewer_FAQ.md) (MTP-010) | Production-aligned Meta Tech Provider FAQ |
-| 5 | [11-meta-tech-provider/09_Demo_Script.md](../../11-meta-tech-provider/09_Demo_Script.md) (MTP-009) | Step-by-step reviewer walkthrough |
+| 5 | [11-meta-tech-provider/REVIEWER_INSTRUCTIONS.md](../../11-meta-tech-provider/REVIEWER_INSTRUCTIONS.md) | Hands-on reviewer walkthrough |
+| 6 | [META_SUBMISSION_READINESS.md](../../09-releases/META_SUBMISSION_READINESS.md) | Submission checklist and readiness % |
 
 ### Supporting documents (outside this folder)
 
@@ -84,6 +86,7 @@ For Meta Business Verification and WhatsApp Platform review, read documents in t
 |------|-----|
 | Privacy Policy | `https://teamvisionfinancial.com/privacy` |
 | Legal | `https://teamvisionfinancial.com/legal` |
+| Data Deletion | `https://teamvisionfinancial.com/data-deletion` |
 | Terms of Service | `https://teamvisionfinancial.com/terms` |
 
 ---
@@ -92,7 +95,7 @@ For Meta Business Verification and WhatsApp Platform review, read documents in t
 
 | Document | Status | Notes |
 |----------|--------|-------|
-| DOC-0002 Meta Approval Portfolio | ✅ **Approved** (v1.1) | Ready for submission |
+| DOC-0002 Meta Approval Portfolio | ✅ **Approved** (v1.2) | Aligned with Sprint 11.4/21.0 |
 | DOC-0003 Privacy and Data Handling | 📝 **Draft** | Pending review |
 | DOC-0004 Meta Review Q&A | 📝 **Draft** | Pending review |
 
@@ -104,7 +107,8 @@ For Meta Business Verification and WhatsApp Platform review, read documents in t
 
 | Requirement | Document | Status |
 |-------------|----------|--------|
-| Platform and business overview | DOC-0002 | ✅ Approved |
+| Platform and business overview | DOC-0002 | ✅ Approved (v1.2) |
+| Submission readiness checklist | MTP-SR-001 | ✅ Approved (~58% — capture pending) |
 | Business legitimacy and messaging policy | DOC-0002 | ✅ Approved |
 | Privacy and data handling | DOC-0003 | 📝 Draft |
 | Reviewer Q&A | DOC-0004 | 📝 Draft |
