@@ -15,6 +15,14 @@ const ACTIVE_UPCOMING_STATUSES = Object.freeze([
   APPOINTMENT_STATUSES.HUMAN_ASSIST_REQUIRED
 ]);
 
+/** Scheduled lifecycle bucket for today/upcoming tabs — excludes dedicated pending/human-assist views. */
+const SCHEDULED_VIEW_STATUSES = Object.freeze([
+  APPOINTMENT_STATUSES.SCHEDULED,
+  APPOINTMENT_STATUSES.CONFIRMED,
+  APPOINTMENT_STATUSES.RESCHEDULED,
+  APPOINTMENT_STATUSES.IN_PROGRESS
+]);
+
 const TERMINAL_STATUSES = Object.freeze([
   APPOINTMENT_STATUSES.COMPLETED,
   APPOINTMENT_STATUSES.CANCELLED,
@@ -84,12 +92,12 @@ function resolveAppointmentViewFilters(view, reference = new Date()) {
       return {
         from: todayStartIso,
         to: todayEndIso,
-        status: ACTIVE_UPCOMING_STATUSES
+        status: SCHEDULED_VIEW_STATUSES
       };
     case "upcoming":
       return {
         from: nowIso,
-        status: ACTIVE_UPCOMING_STATUSES
+        status: SCHEDULED_VIEW_STATUSES
       };
     case "pending_confirmation":
       return {
@@ -487,6 +495,7 @@ function selectActivePersistedAppointmentForProspect(appointments = []) {
 
 module.exports = {
   ACTIVE_UPCOMING_STATUSES,
+  SCHEDULED_VIEW_STATUSES,
   TERMINAL_STATUSES,
   COMPLETED_VIEW_STATUSES,
   TERMINAL_LIFECYCLE_STATES,

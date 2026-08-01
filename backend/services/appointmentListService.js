@@ -7,15 +7,19 @@ const appointmentRepository = require("../repositories/appointmentRepository");
 const {
   buildPersistedScopeFilters,
   isPersistedAppointment,
+  matchesListFilters,
   selectActivePersistedAppointmentForProspect
 } = require("../core/appointmentListQuery");
 
 /**
  * Persisted atlas_appointments only — canonical list path for the Appointments module.
  */
-async function listPersistedAppointments(filters = {}) {
+async function listPersistedAppointments(filters = {}, options = {}) {
+  const reference = options.reference || new Date();
   const result = await appointmentRepository.search(buildPersistedScopeFilters(filters));
-  const items = (result.items || []).filter(isPersistedAppointment);
+  const items = (result.items || [])
+    .filter(isPersistedAppointment)
+    .filter((appointment) => matchesListFilters(appointment, filters, reference));
 
   return {
     items,

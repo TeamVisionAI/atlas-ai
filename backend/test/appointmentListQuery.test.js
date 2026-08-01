@@ -19,14 +19,18 @@ const {
   isActiveAppointmentForList,
   isCompletedAppointmentForList,
   mergeUnifiedAppointmentList,
-  ACTIVE_UPCOMING_STATUSES
+  ACTIVE_UPCOMING_STATUSES,
+  SCHEDULED_VIEW_STATUSES
 } = require("../core/appointmentListQuery");
 
 describe("appointmentListQuery", () => {
-  it("upcoming view includes active in-progress and human assist statuses", () => {
+  it("upcoming view includes scheduled lifecycle statuses but not pending or human assist", () => {
     const filters = resolveAppointmentViewFilters("upcoming");
+    assert.deepEqual(filters.status, SCHEDULED_VIEW_STATUSES);
     assert.ok(filters.status.includes("in_progress"));
-    assert.ok(filters.status.includes("human_assist_required"));
+    assert.ok(filters.status.includes("rescheduled"));
+    assert.equal(filters.status.includes("pending_confirmation"), false);
+    assert.equal(filters.status.includes("human_assist_required"), false);
     assert.ok(filters.from);
     assert.equal(filters.to, undefined);
   });
@@ -199,7 +203,7 @@ describe("appointmentListQuery", () => {
     assert.equal(selected.id, "appt-upcoming");
   });
 
-  it("today view includes only active appointment statuses", () => {
+  it("today view includes only scheduled lifecycle statuses", () => {
     const reference = new Date("2026-07-30T12:00:00");
     const todayFilters = {
       organizationId: "org-1",
@@ -207,7 +211,7 @@ describe("appointmentListQuery", () => {
       ...resolveAppointmentViewFilters("today", reference)
     };
 
-    assert.deepEqual(todayFilters.status, ACTIVE_UPCOMING_STATUSES);
+    assert.deepEqual(todayFilters.status, SCHEDULED_VIEW_STATUSES);
 
     const activeAppointment = {
       organizationId: "org-1",
@@ -256,6 +260,56 @@ describe("appointmentListQuery", () => {
 
     assert.equal(matchesListFilters(recruited, completedFilters), true);
     assert.equal(isCompletedAppointmentForList(recruited), true);
+  });
+
+  it("view tabs exclude appointments from other lifecycle states", () => {
+    const reference = new Date("2026-07-30T12:00:00");
+    const base = {
+      organizationId: "org-1",
+      agentId: "agent-1",
+      startDateTime: "2026-07-30T15:00:00.000Z"
+    };
+
+    const todayFilters = {
+      ...resolveAppointmentViewFilters("today", reference),
+      organizationId: "org-1",
+      agentId: "agent-1"
+    };
+    const pendingFilters = {
+      ...resolveAppointmentViewFilters("pending_confirmation"),
+      organizationId: "org-1",
+      agentId: "agent-1"
+    };
+    const completedFilters = {
+      ...resolveAppointmentViewFilters("completed"),
+      organizationId: "org-1",
+      agentId: "agent-1"
+    };
+    const cancelledFilters = {
+      ...resolveAppointmentViewFilters("cancelled"),
+      organizationId: "org-1",
+      agentId: "agent-1"
+    };
+
+    const pending = { ...base, status: "pending_confirmation" };
+    const completed = {
+      ...base,
+      status: "completed",
+      metadata: { lifecycleState: "completed" }
+    };
+    const cancelled = {
+      ...base,
+      status: "cancelled",
+      metadata: { lifecycleState: "cancelled" }
+    };
+
+    assert.equal(matchesListFilters(pending, todayFilters, reference), false);
+    assert.equal(matchesListFilters(pending, pendingFilters, reference), true);
+    assert.equal(matchesListFilters(completed, todayFilters, reference), false);
+    assert.equal(matchesListFilters(completed, completedFilters, reference), true);
+    assert.equal(matchesListFilters(completed, cancelledFilters, reference), false);
+    assert.equal(matchesListFilters(cancelled, cancelledFilters, reference), true);
+    assert.equal(matchesListFilters(cancelled, completedFilters, reference), false);
   });
 
   it("suppresses stale prospect-derived rows when a persisted appointment exists", () => {

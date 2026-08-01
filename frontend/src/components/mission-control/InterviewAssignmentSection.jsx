@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLanguage } from "../../i18n/LanguageContext";
 import { fetchInterviewAssignmentCandidates } from "../../services/interviewAssignmentService";
 import "./InterviewAssignmentSection.css";
 
@@ -29,9 +30,12 @@ export default function InterviewAssignmentSection({
   onChange,
   currentUser = null,
   candidates = [],
-  disabled = false
+  disabled = false,
+  variant = "default"
 }) {
-  const [showOtherSelect, setShowOtherSelect] = useState(form.interviewerSelection === "other");
+  const { translate } = useLanguage();
+  const isCompact = variant === "compact";
+  const isOther = form.interviewerSelection === "other";
 
   const currentUserId = currentUser?.id || "";
   const currentUserName = resolveUserDisplayName(currentUser);
@@ -50,15 +54,25 @@ export default function InterviewAssignmentSection({
       interviewerSelection: selection,
       interviewerUserId
     });
-    setShowOtherSelect(selection === "other");
   }
 
   return (
-    <section className="interview-assignment" aria-labelledby="interview-assignment-heading">
-      <h3 id="interview-assignment-heading" className="interview-assignment__title">
-        Interview Assignment
-      </h3>
-      <p className="interview-assignment__label">Conducted by</p>
+    <section
+      className={`interview-assignment${isCompact ? " interview-assignment--compact" : ""}`}
+      aria-labelledby="interview-assignment-heading"
+    >
+      {!isCompact ? (
+        <h3 id="interview-assignment-heading" className="interview-assignment__title">
+          {translate("interviewAssignmentTitle")}
+        </h3>
+      ) : (
+        <span id="interview-assignment-heading" className="interview-assignment__sr-only">
+          {translate("interviewAssignmentTitle")}
+        </span>
+      )}
+
+      <p className="interview-assignment__label">{translate("missionExecutionConductedBy")}</p>
+
       <div className="interview-assignment__options" role="radiogroup" aria-labelledby="interview-assignment-heading">
         <label className="interview-assignment__option">
           <input
@@ -70,7 +84,8 @@ export default function InterviewAssignmentSection({
             onChange={() => selectAssignment("self", currentUserId)}
           />
           <span>
-            Me{currentUserName ? ` (${currentUserName})` : ""}
+            {translate("interviewAssignmentMe")}
+            {currentUserName ? ` (${currentUserName})` : ""}
           </span>
         </label>
 
@@ -93,20 +108,26 @@ export default function InterviewAssignmentSection({
             type="radio"
             name="interviewer-assignment"
             value="other"
-            checked={form.interviewerSelection === "other"}
+            checked={isOther}
             disabled={disabled}
             onChange={() => selectAssignment("other", form.interviewerUserId || otherCandidates[0]?.id || "")}
           />
-          <span>Another Representative…</span>
+          <span>{translate("interviewAssignmentAnotherRepresentative")}</span>
         </label>
       </div>
 
-      {showOtherSelect || form.interviewerSelection === "other" ? (
-        <label className="interview-assignment__select">
-          <span className="interview-assignment__label">Select representative</span>
+      <div className="interview-assignment__selector-slot" aria-hidden={!isOther}>
+        <label
+          className={`interview-assignment__selector-row${
+            isOther ? "" : " interview-assignment__selector-row--inactive"
+          }`}
+        >
+          <span className="interview-assignment__selector-label">
+            {translate("interviewAssignmentRepresentative")}
+          </span>
           <select
             value={form.interviewerUserId || ""}
-            disabled={disabled}
+            disabled={disabled || !isOther}
             onChange={(event) =>
               onChange({
                 ...form,
@@ -115,6 +136,9 @@ export default function InterviewAssignmentSection({
               })
             }
           >
+            <option value="" disabled>
+              {translate("interviewAssignmentSelectRepresentative")}
+            </option>
             {otherCandidates.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 {candidate.display_name}
@@ -122,7 +146,7 @@ export default function InterviewAssignmentSection({
             ))}
           </select>
         </label>
-      ) : null}
+      </div>
     </section>
   );
 }

@@ -449,6 +449,62 @@ Recruiter Brief and Communication History reference sections remain visible when
 
 ---
 
+## BR-047 — Interview Assignment UX (Stable Modal Layout)
+
+**Implements:** Sprint 13.7 (Part 1)  
+**Surface:** `InterviewAssignmentSection.jsx`, `SchedulingForm.jsx`, `ScheduleInterviewDialog.css`
+
+Interview assignment UI in the scheduling modal is **presentation only** — no backend, API, or assignment logic changes.
+
+### Stable scheduling modal
+
+1. The Schedule Interview dialog keeps a **fixed height**; selecting another representative must not resize the modal.
+2. **Quick selections remain:** Me, up to two colleagues, Another Representative…
+3. **Another Representative** shows a **single-line** representative selector inside the assignment area — it replaces inactive space instead of pushing scheduling controls downward.
+4. The selector row uses a **reserved slot** (hidden when not active) so toggling assignment mode does not change modal height.
+5. **Scheduling controls stay visible:** Choose another day, time slots, notes, and Confirm Interview remain reachable without extra scrolling caused by assignment expansion.
+
+---
+
+## BR-048 — Personnel Directory
+
+**Implements:** Sprint 13.8  
+**Engine:** `personnelDirectoryEngine.js`, `atlasUserService.listOrganizationUsers`, Interview Assignment route
+
+Atlas uses one canonical Personnel Directory for all assignable representatives. Interview Assignment, Round Robin, Prospect Assignment, Ownership Transfer, Human Assist, and future assignment features must consume `listAssignableRepresentatives()` — not ad hoc `atlas_users` queries with duplicated filters.
+
+### Inclusion rules
+
+Return only users who:
+
+- belong to the current organization
+- have `status = active` (not disabled, deleted, or archived)
+- are interview-eligible human representatives (recruiter, agent, division leader, RVP, administrator)
+
+### Exclusion rules
+
+Never show simulator, demo, system, or service accounts, including:
+
+- email/rep/id prefixes `sim-`, `demo-`
+- display names such as Invite Flow, Ops Access, Ops Ops, System, Automation
+- operations/support roles and non-active users
+
+### Display rules
+
+1. Sort alphabetically by display name.
+2. When two or more users share the exact same base display name, append ` • {Role}` (e.g. `Niovel Perez • Administrator`).
+3. Unique names remain unsuffixed (`Ana Perez`, `Jessica Caballero`).
+
+### API shape (future-ready)
+
+Each directory entry includes:
+
+`id`, `displayName`, `role`, `avatarUrl`, `isAvailable`, `workload`, `interviewEligible`
+
+Only `displayName` is required by current Interview Assignment UI; other fields are placeholders for Round Robin, workload balancing, availability, Human Assist, and smart assignment.
+
+---
+
 # Prospect Workspace
 
 ## BR-038 — Prospect Workspace Editing Permissions

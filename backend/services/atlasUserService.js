@@ -404,18 +404,19 @@ function resolveUserDisplayName(user) {
   return [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() || user?.email || "";
 }
 
-async function listActiveOrganizationUsers(organizationId, options = {}) {
+async function listOrganizationUsers(organizationId, options = {}) {
   if (!organizationId) {
     return [];
   }
 
-  const limit = Math.min(Number(options.limit) || 50, 100);
+  const limit = Math.min(Number(options.limit) || 200, 500);
 
   const { data, error } = await supabase
     .from("atlas_users")
-    .select("id, email, first_name, last_name, display_name, rep_id, status, organization_id")
+    .select(
+      "id, email, first_name, last_name, display_name, rep_id, status, organization_id, role, photo_url, archived_at"
+    )
     .eq("organization_id", organizationId)
-    .eq("status", "active")
     .order("display_name", { ascending: true })
     .limit(limit);
 
@@ -427,10 +428,22 @@ async function listActiveOrganizationUsers(organizationId, options = {}) {
     throw error;
   }
 
-  return (data || []).map((row) => ({
-    id: row.id,
-    display_name: resolveUserDisplayName(row),
-    rep_id: row.rep_id || null
+  return data || [];
+}
+
+async function listActiveOrganizationUsers(organizationId, options = {}) {
+  const { listAssignableRepresentatives } = require("../core/personnelDirectoryEngine");
+  const representatives = await listAssignableRepresentatives({ organizationId }, { options });
+
+  return representatives.map((representative) => ({
+    id: representative.id,
+    display_name: representative.displayName,
+    rep_id: representative.repId || null,
+    role: representative.role,
+    avatarUrl: representative.avatarUrl,
+    isAvailable: representative.isAvailable,
+    workload: representative.workload,
+    interviewEligible: representative.interviewEligible
   }));
 }
 
@@ -450,6 +463,7 @@ module.exports = {
   bootstrapSession,
   resolveBootstrapUser,
   sanitizeUser,
+  listOrganizationUsers,
   listActiveOrganizationUsers,
   resolveUserDisplayName
 };

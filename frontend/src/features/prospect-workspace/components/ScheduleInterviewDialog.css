@@ -63,6 +63,11 @@
 .appointment-modal--scheduling .scheduling-form--schedule-dialog .scheduling-form__choose-day {
   padding-top: 0;
   border-top: none;
+  flex-shrink: 0;
+}
+
+.appointment-modal--scheduling .scheduling-form--schedule-dialog .interview-assignment--compact {
+  flex-shrink: 0;
 }
 
 @media (min-width: 768px) {
@@ -108,7 +113,16 @@
   }
 
   .appointment-modal--scheduling .scheduling-form--schedule-dialog .scheduling-form__summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .appointment-modal--scheduling .scheduling-form--schedule-dialog .interview-assignment--compact {
+    flex-shrink: 0;
+  }
+
+  .appointment-modal--scheduling .scheduling-form--schedule-dialog .scheduling-form__choose-day {
+    flex-shrink: 0;
   }
 
   .appointment-modal--scheduling .scheduling-form--schedule-dialog .scheduling-form__selection {

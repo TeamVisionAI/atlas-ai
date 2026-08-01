@@ -26,10 +26,16 @@ const {
 } = require("../core/appointmentListQuery");
 const { buildInterviewBlock } = require("../core/prospectWorkspaceReadModel");
 
-const MIGRATION_FILE = path.join(
-  __dirname,
-  "../database/migrations/019_atlas_appointments_baseline_repair.sql"
-);
+const APPOINTMENT_SCHEMA_MIGRATIONS = [
+  path.join(__dirname, "../database/migrations/019_atlas_appointments_baseline_repair.sql"),
+  path.join(__dirname, "../database/migrations/020_appointment_interviewer_assignment.sql")
+];
+
+function readCumulativeAppointmentSchemaSql() {
+  return APPOINTMENT_SCHEMA_MIGRATIONS.map((migrationPath) =>
+    fs.readFileSync(migrationPath, "utf8")
+  ).join("\n");
+}
 
 const SARAH_ORG = "00000000-0000-4000-8000-000000000001";
 const SARAH_PHONE = "+17862509432";
@@ -292,7 +298,7 @@ describe("Sprint 12.5.6 — operational identity surfaces", () => {
 });
 
 describe("Sprint 12.5.6 — Supabase schema mapping", () => {
-  it("appointmentToRow fields are provisioned by migration 019", () => {
+  it("appointmentToRow fields are provisioned by migrations 019 and 020", () => {
     const row = appointmentToRow({
       id: "55555555-5555-4555-8555-555555555555",
       organizationId: SARAH_ORG,
@@ -324,6 +330,8 @@ describe("Sprint 12.5.6 — Supabase schema mapping", () => {
       outcome: null,
       outcomeNotes: null,
       ownerRepId: "4TJLK",
+      interviewerUserId: "00000000-0000-4000-8000-000000000002",
+      interviewerName: "Niovel Perez",
       history: [],
       metadata: { legacyRepair: true },
       createdBy: "00000000-0000-4000-8000-000000000002",
@@ -331,10 +339,14 @@ describe("Sprint 12.5.6 — Supabase schema mapping", () => {
       updatedAt: SARAH_START
     });
 
-    const sql = fs.readFileSync(MIGRATION_FILE, "utf8");
+    const cumulativeSchemaSql = readCumulativeAppointmentSchemaSql();
 
     Object.keys(row).forEach((column) => {
-      assert.match(sql, new RegExp(column, "i"), `migration missing column ${column}`);
+      assert.match(
+        cumulativeSchemaSql,
+        new RegExp(column, "i"),
+        `migrations 019+020 missing column ${column}`
+      );
     });
   });
 });

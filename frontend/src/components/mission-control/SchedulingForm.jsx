@@ -144,6 +144,8 @@ export default function SchedulingForm({
   );
 
   const isLoading = loadingSlots || loadingExpansion;
+  const isCompactAssignment = presentation === "scheduleDialog" || inline;
+  const showConductedBySummary = !isCompactAssignment;
   const selectedInterviewTypeLabel = resolveInterviewTypeLabel(form.interviewType, translate);
   const selectedDateLabel = form.dateKey
     ? formatSchedulingDayLabel(form.dateKey, new Date(), { translate, locale })
@@ -238,10 +240,12 @@ export default function SchedulingForm({
               label={translate("missionExecutionInterviewType")}
               value={selectedInterviewTypeLabel}
             />
-            <SummaryCard
-              label={translate("missionExecutionConductedBy")}
-              value={conductedByLabel}
-            />
+            {showConductedBySummary ? (
+              <SummaryCard
+                label={translate("missionExecutionConductedBy")}
+                value={conductedByLabel}
+              />
+            ) : null}
           </div>
 
           <InterviewAssignmentSection
@@ -250,6 +254,7 @@ export default function SchedulingForm({
             currentUser={currentUser}
             candidates={assignmentCandidates}
             disabled={disabled}
+            variant={isCompactAssignment ? "compact" : "default"}
           />
 
           {form.dateKey || form.timeKey ? (

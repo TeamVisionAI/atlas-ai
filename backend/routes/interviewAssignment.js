@@ -2,7 +2,7 @@ const express = require("express");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
-const { listActiveOrganizationUsers } = require("../services/atlasUserService");
+const { listAssignableRepresentatives } = require("../core/personnelDirectoryEngine");
 const { resolveDefaultInterviewAssignment } = require("../core/interviewAssignmentEngine");
 
 const router = express.Router();
@@ -13,12 +13,20 @@ router.use(organizationGuard());
 router.get("/candidates", async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
-    const users = await listActiveOrganizationUsers(organizationId);
+    const representatives = await listAssignableRepresentatives({ organizationId });
     const defaultAssignment = await resolveDefaultInterviewAssignment(req.atlasUser);
 
     res.json({
       defaultInterviewer: defaultAssignment,
-      candidates: users
+      candidates: representatives.map((representative) => ({
+        id: representative.id,
+        display_name: representative.displayName,
+        role: representative.role,
+        avatarUrl: representative.avatarUrl,
+        isAvailable: representative.isAvailable,
+        workload: representative.workload,
+        interviewEligible: representative.interviewEligible
+      }))
     });
   } catch (error) {
     res.status(500).json({

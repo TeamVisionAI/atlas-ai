@@ -4,10 +4,27 @@
   margin-top: 1rem;
 }
 
+.interview-assignment--compact {
+  gap: 0.5rem;
+  margin-top: 0;
+}
+
 .interview-assignment__title {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.interview-assignment__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .interview-assignment__label {
@@ -21,6 +38,10 @@
   gap: 0.5rem;
 }
 
+.interview-assignment--compact .interview-assignment__options {
+  gap: 0.35rem;
+}
+
 .interview-assignment__option {
   display: flex;
   align-items: center;
@@ -28,7 +49,44 @@
   font-size: 0.9rem;
 }
 
-.interview-assignment__select select {
-  width: 100%;
-  margin-top: 0.35rem;
+.interview-assignment__selector-slot {
+  min-height: 2.5rem;
+}
+
+.interview-assignment__selector-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  height: 2.5rem;
+}
+
+.interview-assignment__selector-row--inactive {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.interview-assignment__selector-label {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  color: var(--atlas-text-muted, #667085);
+  white-space: nowrap;
+}
+
+.interview-assignment__selector-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+.interview-assignment__selector-row select:disabled {
+  opacity: 0.65;
 }
