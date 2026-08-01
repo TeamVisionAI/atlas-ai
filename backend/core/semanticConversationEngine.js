@@ -3,8 +3,7 @@ const {
   createProspect,
   updateProspect
 } = require("../services/supabaseService");
-const { createInterview } = require("../services/calendarService");
-const { onInterviewScheduled, onConversationProgress } = require("./recruitingWorkflowHooks");
+const { onConversationProgress } = require("./recruitingWorkflowHooks");
 const { logConversation } = require("../services/logService");
 const { detectIntent } = require("./intentEngine");
 const { routeConversation } = require("./conversationRouter");
@@ -79,6 +78,10 @@ const {
   resolveConversationLanguage,
   detectMessageLanguage
 } = require("./conversationLanguage");
+const { resolveConversationSchedulePayload } = require("./conversationScheduleDelegation");
+const { executeScheduleInterview } = require("../application/missionExecutionApplicationService");
+const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+const { releaseSlotByIso } = require("./capacityEngine");
 
 const CONVERSATION_GOAL = "Schedule Interview";
 
@@ -317,42 +320,50 @@ async function handleScheduleMessage(prospect, message, language, personality) {
 }
 
 async function completeInterview(prospect, profile, language) {
-  const email = profile.email || null;
-
   if (!prospect.appointment_date) {
     throw new Error("Interview slot must be selected before confirming.");
   }
 
-  let event;
+  const schedulePayload = resolveConversationSchedulePayload(prospect, profile);
+
+  if (!schedulePayload.dateKey || !schedulePayload.timeKey || !schedulePayload.interviewType) {
+    return {
+      success: false,
+      reply:
+        language === "es"
+          ? "Necesitamos confirmar el horario antes de agendar. Por favor elige otro horario disponible."
+          : "We need a confirmed time before booking. Please choose another available slot."
+    };
+  }
+
+  // Conversation scheduling already reserved capacity with interview-type key; release before canonical booking.
+  releaseSlotByIso(
+    prospect.appointment_date,
+    profile.interviewType || prospect.interview_type || schedulePayload.interviewType
+  );
+
+  const organizationId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
+  const agentId = prospect.owner_user_id || prospect.assigned_agent_id || null;
+
+  let scheduleResult;
 
   try {
-    event = await createInterview({
-      name: profile.name || prospect.name,
-      phone: prospect.phone,
-      email,
-      interviewType: profile.interviewType,
-      startTime: prospect.appointment_date,
-      location: profile.city
-    });
-  } catch (error) {
-    console.error("[semanticConversationEngine] calendar booking failed:", error.message);
-
-    const { releaseSlotByIso } = require("./capacityEngine");
-    releaseSlotByIso(
-      prospect.appointment_date,
-      profile.interviewType || prospect.interview_type
+    scheduleResult = await executeScheduleInterview(
+      prospect.phone,
+      {
+        dateKey: schedulePayload.dateKey,
+        timeKey: schedulePayload.timeKey,
+        interviewType: schedulePayload.interviewType,
+        email: schedulePayload.email || profile.email || undefined
+      },
+      {
+        organizationId,
+        agentId,
+        userId: agentId
+      }
     );
-
-    const captureState = parseQualificationCapture(prospect.notes);
-
-    await updateProspect(prospect.phone, {
-      appointment_date: null,
-      interview_time: null,
-      calendar_event_id: null,
-      current_step: "SCHEDULE",
-      appointment_type: PHASES.TIME,
-      notes: mergeNotesWithQualificationCapture(prospect.notes, captureState)
-    });
+  } catch (error) {
+    console.error("[semanticConversationEngine] delegated schedule failed:", error.message);
 
     return {
       success: false,
@@ -363,26 +374,17 @@ async function completeInterview(prospect, profile, language) {
     };
   }
 
-  await updateProspect(prospect.phone, {
-    notes: email ? `EMAIL:${email}` : mergeNotesWithQualificationCapture(prospect.notes, {
-      ...parseQualificationCapture(prospect.notes),
-      name: true,
-      email: true
-    }),
-    calendar_event_id: event.id,
-    current_step: "CONFIRMED",
-    name: profile.name || prospect.name,
-    last_message: prospect.last_message
-  });
-
-  await onInterviewScheduled({
-    phone: prospect.phone,
-    prospect,
-    profile,
-    calendarEvent: event
-  }).catch((error) => {
-    console.warn("[semanticConversationEngine] interview scheduling hook failed:", error.message);
-  });
+  if (!scheduleResult?.success) {
+    return {
+      success: false,
+      reply:
+        language === "es"
+          ? scheduleResult.message ||
+            "No pudimos confirmar tu cita en el calendario en este momento. Por favor elige otro horario disponible."
+          : scheduleResult.message ||
+            "We couldn't confirm your appointment on the calendar right now. Please choose another available time."
+    };
+  }
 
   const confirmationText = buildBookingConfirmation({
     interviewType: profile.interviewType,
@@ -393,7 +395,7 @@ async function completeInterview(prospect, profile, language) {
   await scheduleZoomLinkDelivery({
     prospect,
     profile,
-    appointmentDate: prospect.appointment_date
+    appointmentDate: scheduleResult.booking?.startTimeISO || prospect.appointment_date
   }).catch((error) => {
     console.warn("[semanticConversationEngine] zoom link scheduling failed:", error.message);
   });
@@ -409,7 +411,8 @@ async function completeInterview(prospect, profile, language) {
 
   return {
     success: true,
-    reply: response.text
+    reply: response.text,
+    appointmentId: scheduleResult.appointmentId || null
   };
 }
 

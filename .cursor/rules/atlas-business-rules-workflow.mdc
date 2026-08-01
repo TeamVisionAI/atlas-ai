@@ -20,6 +20,7 @@ alwaysApply: true
 
 - Reference BR numbers in comments/docs when applicable: `// Implements BR-004`
 - Do **not** duplicate business logic. Reuse engines: Business Rules, Conversation, Scheduling, Capacity, Response Builder; Presence when it exists.
+- **Conversation Engine (BR-049):** understand, remember, decide, delegate — never reimplement qualification, scheduling, appointments, workflow, or communications execution inside `semanticConversationEngine.js`.
 - If logic repeats across features, recommend an engine refactor before adding more code.
 
 ## After a sprint

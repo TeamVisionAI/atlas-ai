@@ -21,6 +21,7 @@ import { useUniversalNote } from "../hooks/useUniversalNote";
 import { buildAppointmentNoteContext } from "../engines/notesEngine";
 import AppointmentCardActions from "../components/appointments/AppointmentCardActions";
 import { formatAppointmentMetaLabel } from "../engines/appointmentCardPresentation";
+import { resolveAppointmentDisplayStatus } from "../engines/interviewWorkflowPresentationEngine";
 import "../styles/atlas-ui.css";
 import "./AppointmentsPage.css";
 
@@ -350,6 +351,7 @@ export default function AppointmentsPage() {
             <ul className="appointments-page__list">
               {appointments.map((appointment) => {
                 const isSelected = selectedAppointment?.id === appointment.id;
+                const displayStatus = resolveAppointmentDisplayStatus(appointment);
 
                 return (
                   <li
@@ -365,8 +367,8 @@ export default function AppointmentsPage() {
                         <strong className="appointments-page__prospect">
                           {appointment.prospectName || appointment.prospectPhone}
                         </strong>
-                        <StatusBadge variant={statusVariant(appointment.status)}>
-                          {statusLabel(appointment.status, translate)}
+                        <StatusBadge variant={statusVariant(displayStatus)}>
+                          {statusLabel(displayStatus, translate)}
                         </StatusBadge>
                       </div>
                       <p className="appointments-page__when">{formatWhen(appointment.startDateTime, locale)}</p>
@@ -447,7 +449,9 @@ export default function AppointmentsPage() {
         open={dialog?.type === "cancel"}
         appointment={dialog?.appointment}
         onClose={closeDialog}
-        onSuccess={() => handleActionSuccess(translate("appointmentsCancelled"))}
+        onSuccess={(updatedAppointment) =>
+          handleActionSuccess(translate("appointmentsCancelled"), updatedAppointment)
+        }
       />
       <CompleteAppointmentDialog
         open={dialog?.type === "complete"}

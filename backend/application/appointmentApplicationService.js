@@ -714,6 +714,15 @@ async function cancelAppointment(id, input, context = {}) {
     reminderStatus: REMINDER_STATUSES.CANCELLED
   });
 
+  await updateProspect(appointment.prospectPhone, {
+    interview_time: null,
+    appointment_date: null,
+    calendar_event_id: null,
+    current_step: "SCHEDULE"
+  }).catch((error) => {
+    console.error("[appointments] cancel prospect sync failed:", error.message);
+  });
+
   return enrichWithProspect(saved);
 }
 

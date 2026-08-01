@@ -43,6 +43,13 @@ export function resolveInterviewWorkflowStateLabelKey(state) {
 }
 
 export function resolveInterviewWorkflowUiStateFromInterview(interview = {}) {
+  const lifecycle = String(interview.lifecycleState || "").toLowerCase();
+  const appointmentStatus = String(interview.appointmentStatus || "").toLowerCase();
+
+  if (lifecycle === "cancelled" || appointmentStatus === "cancelled") {
+    return INTERVIEW_WORKFLOW_UI_STATES.CANCELLED;
+  }
+
   if (interview.gateActive) {
     return INTERVIEW_WORKFLOW_UI_STATES.RESULT_PENDING;
   }
@@ -88,11 +95,38 @@ export function resolveInterviewWorkflowUiStateFromAppointment(appointment = {})
     return INTERVIEW_WORKFLOW_UI_STATES.COMPLETED;
   }
 
+  if (status === "rescheduled" || lifecycle === "rescheduled") {
+    return INTERVIEW_WORKFLOW_UI_STATES.RESCHEDULED;
+  }
+
+  if (status === "in_progress") {
+    return INTERVIEW_WORKFLOW_UI_STATES.IN_PROGRESS;
+  }
+
   if (shouldShowLifecycleActions(appointment)) {
     return INTERVIEW_WORKFLOW_UI_STATES.SCHEDULED;
   }
 
   return INTERVIEW_WORKFLOW_UI_STATES.COMPLETED;
+}
+
+export function resolveAppointmentDisplayStatus(appointment = {}) {
+  const state = resolveInterviewWorkflowUiStateFromAppointment(appointment);
+
+  switch (state) {
+    case INTERVIEW_WORKFLOW_UI_STATES.CANCELLED:
+      return "cancelled";
+    case INTERVIEW_WORKFLOW_UI_STATES.NO_SHOW:
+      return "no_show";
+    case INTERVIEW_WORKFLOW_UI_STATES.COMPLETED:
+      return "completed";
+    case INTERVIEW_WORKFLOW_UI_STATES.RESCHEDULED:
+      return "rescheduled";
+    case INTERVIEW_WORKFLOW_UI_STATES.IN_PROGRESS:
+      return "in_progress";
+    default:
+      return appointment.status || "scheduled";
+  }
 }
 
 export function resolveInterviewWorkflowUiStateFromWorkspace(workspace = {}) {

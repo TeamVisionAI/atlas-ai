@@ -5,8 +5,18 @@
 
 const TERMINAL_APPOINTMENT_STATUSES = new Set(["cancelled", "completed"]);
 
-function isTerminalAppointmentStatus(status) {
-  return TERMINAL_APPOINTMENT_STATUSES.has(status);
+function isTerminalAppointmentStatus(appointment = {}) {
+  const status = String(appointment.status || "").toLowerCase();
+  const lifecycle = String(appointment.metadata?.lifecycleState || "").toLowerCase();
+
+  return (
+    TERMINAL_APPOINTMENT_STATUSES.has(status) ||
+    lifecycle === "cancelled" ||
+    lifecycle === "completed" ||
+    lifecycle === "recruited" ||
+    lifecycle === "became_client" ||
+    lifecycle === "no_show"
+  );
 }
 
 function hasValidZoomMeetingUrl(appointment = {}) {
@@ -32,7 +42,7 @@ function hasValidZoomMeetingUrl(appointment = {}) {
 }
 
 export function shouldShowJoinZoomAction(appointment = {}) {
-  if (isTerminalAppointmentStatus(appointment.status)) {
+  if (isTerminalAppointmentStatus(appointment)) {
     return false;
   }
 
@@ -40,7 +50,7 @@ export function shouldShowJoinZoomAction(appointment = {}) {
 }
 
 export function shouldShowLifecycleActions(appointment = {}) {
-  return !isTerminalAppointmentStatus(appointment.status);
+  return !isTerminalAppointmentStatus(appointment);
 }
 
 export function resolveAppointmentMeetingLabel(appointment = {}, translate) {

@@ -102,12 +102,16 @@ Prefer extending existing engines over copying business logic into routes or han
 |--------|----------|------------------|
 | **Business Rules Engine** | `backend/core/businessRulesEngine.js` | Team Vision operational decisions (coverage, interview type, escalation) — **decisions only** |
 | Business Rules Applicator | `backend/core/businessRulesApplicator.js` | Apply rule decisions to prospect profile |
+| **Conversation Engine** | `backend/core/conversationEngine.js` | Thin entry; understand → remember → decide → **delegate** (BR-049) |
+| Semantic Conversation Engine | `backend/core/semanticConversationEngine.js` | Turn orchestration; **must not** duplicate qualification/scheduling/appointment/workflow logic |
 | Conversation Copy | `backend/core/conversationCopy.js` | User-facing wording (not business logic) |
-| Conversation Engine | `backend/core/conversationEngine.js` | Thin entry; delegates to semantic engine |
-| Semantic Conversation Engine | `backend/core/semanticConversationEngine.js` | Message flow, FAQ, handoff orchestration |
-| Scheduling Engine | `backend/core/schedulingEngine.js` | Scheduling decisions entry point |
+| **Appointment Application** | `backend/application/appointmentApplicationService.js` | Persisted appointment lifecycle execution (BR-039, BR-050) |
+| Mission Execution | `backend/application/missionExecutionApplicationService.js` | End-to-end schedule interview (atomic booking path) |
+| Scheduling Engine | `backend/core/schedulingEngine.js` | Scheduling **options** and turn handling (conversation + UI) |
 | Interview scheduling | `backend/core/interviewScheduling.js` | Slot/day/period/time logic |
 | Capacity Engine | `backend/core/capacityEngine.js` | Per-slot capacity (BR-006, BR-007) |
+| Human Advancement | `backend/core/humanAdvancementEngine.js` | Workflow milestone execution (BR-035) |
+| Communication Hub | `backend/core/communicationHub.js` | Channel-agnostic inbound/outbound routing |
 | Validation Engine | `backend/core/validationEngine.js` | Step validation + recovery |
 | Response Builder | `backend/core/responseBuilder.js` | Message structure, one question per turn |
 | Personality Engine | `backend/core/personalityEngine.js` | Tone and short acknowledgments (BR-011 – BR-013) |

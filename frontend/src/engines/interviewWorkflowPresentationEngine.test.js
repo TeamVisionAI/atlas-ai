@@ -27,6 +27,29 @@ test("resolveInterviewWorkflowUiStateFromInterview maps scheduled interview", ()
   );
 });
 
+test("resolveInterviewWorkflowUiStateFromInterview maps cancelled lifecycle before datetime fallback", () => {
+  assert.equal(
+    resolveInterviewWorkflowUiStateFromInterview({
+      datetime: "2026-08-01T15:00:00.000Z",
+      lifecycleState: "cancelled",
+      appointmentStatus: "cancelled"
+    }),
+    INTERVIEW_WORKFLOW_UI_STATES.CANCELLED
+  );
+});
+
+test("resolveAppointmentCardActionPlan hides lifecycle actions for cancelled appointments", () => {
+  const plan = resolveAppointmentCardActionPlan({
+    status: "cancelled",
+    metadata: { lifecycleState: "cancelled" },
+    prospectPhone: "+15551234567"
+  });
+
+  assert.equal(plan.state, INTERVIEW_WORKFLOW_UI_STATES.CANCELLED);
+  assert.equal(plan.showCancel, false);
+  assert.equal(plan.showReschedule, false);
+});
+
 test("filterMissionActionsForInterviewWorkflow keeps only outcome actions during gate", () => {
   const filtered = filterMissionActionsForInterviewWorkflow(
     [

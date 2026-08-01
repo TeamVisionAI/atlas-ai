@@ -5,6 +5,18 @@
 import { resolvePersistedAppointmentId } from "./appointmentIdEngine.js";
 
 export function resolveOperationalInterviewActions(interview = {}) {
+  const lifecycle = String(interview?.lifecycleState || "").toLowerCase();
+  const appointmentStatus = String(interview?.appointmentStatus || "").toLowerCase();
+
+  if (lifecycle === "cancelled" || appointmentStatus === "cancelled") {
+    return {
+      showReschedule: false,
+      showComplete: false,
+      showCancel: false,
+      useAppointmentDialogs: false
+    };
+  }
+
   const hasScheduledInterview = Boolean(interview?.datetime);
   const hasAppointment = Boolean(resolvePersistedAppointmentId(interview?.appointmentId));
   const hasOutcome = Boolean(interview?.outcome);

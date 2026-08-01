@@ -5,6 +5,14 @@ import {
   openWhatsAppConversation
 } from "./whatsappCommunicationService";
 
+function unwrapAppointmentPayload(result) {
+  if (result && typeof result === "object" && result.appointment) {
+    return result.appointment;
+  }
+
+  return result;
+}
+
 /** Normalizes appointment API payloads to a plain array. */
 export function normalizeAppointmentList(result) {
   if (Array.isArray(result)) {
@@ -122,7 +130,8 @@ export async function fetchAppointments(params = {}) {
 }
 
 export async function fetchAppointment(id) {
-  return apiFetch(`/api/appointments/${id}`);
+  const result = await apiFetch(`/api/appointments/${id}`);
+  return unwrapAppointmentPayload(result);
 }
 
 export async function createAppointment(payload) {
@@ -142,11 +151,13 @@ export async function rescheduleAppointment(id, payload) {
 }
 
 export async function cancelAppointment(id, payload) {
-  return apiFetch(`/api/appointments/${id}/cancel`, {
+  const result = await apiFetch(`/api/appointments/${id}/cancel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
+
+  return unwrapAppointmentPayload(result);
 }
 
 export async function completeAppointment(id, payload) {

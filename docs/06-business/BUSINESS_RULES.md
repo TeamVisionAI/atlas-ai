@@ -505,6 +505,74 @@ Only `displayName` is required by current Interview Assignment UI; other fields 
 
 ---
 
+## BR-049 — Conversation Engine Delegation
+
+**Implements:** Architecture hardening — Conversation Engine as highest-priority subsystem  
+**Engines:** `conversationEngine.js`, `semanticConversationEngine.js`, `communicationHub.js`  
+**Delegates to:** `businessRulesEngine.js`, `informationModel.js`, `schedulingEngine.js`, `appointmentApplicationService.js`, `missionExecutionApplicationService.js`, `humanAdvancementEngine.js`, `communicationHub.js` (outbound adapters)
+
+The **AI Conversation Engine** is Atlas’s primary inbound interface. It **understands**, **remembers**, **decides**, and **delegates**. Production business engines **execute**. The conversation layer must never become a second implementation of qualification, scheduling, appointments, workflow, or communications logic.
+
+### Conversation Engine owns
+
+1. **Understanding** — intent detection, information extraction, language detection, FAQ routing
+2. **Memory** — conversation profile, qualification capture state, turn context (via `informationModel`, `qualificationCaptureState`, `memoryEngine`)
+3. **Decision** — which business action to invoke next (via `businessRulesEngine`, `conversationRouter`)
+4. **Delegation** — call the canonical application service / engine for the action; never reimplement it
+5. **Copy** — user-facing wording only (`conversationCopy.js`, `teamVisionWorkflowCopy.js`, `responseBuilder.js`, `personalityEngine.js`)
+
+### Conversation Engine must NOT own
+
+- Slot capacity rules (→ `capacityEngine.js`, BR-006/BR-007)
+- Coverage / interview-type decisions (→ `businessRulesEngine.js`)
+- Calendar booking or event lifecycle (→ `schedulingService`, `googleCalendarIntegrationService`)
+- Persisted appointment identity or lifecycle (→ `appointmentApplicationService.js`, `appointmentDomainService.js`, BR-039/BR-040)
+- Workflow milestone advancement (→ `humanAdvancementEngine.js`, BR-035/BR-037)
+- Outbound message transport (→ `communicationHub.js`, channel adapters)
+- Mission Control / Appointments operational actions (→ `agentActionApplicationService.js`, `missionExecutionApplicationService.js`)
+
+### Delegation contract
+
+| Intent | Delegate to | Do not |
+|--------|-------------|--------|
+| Qualify prospect | `informationModel`, `businessRulesApplicator`, `businessRulesEngine` | Re-encode BR decisions in conversation conditionals |
+| Offer schedule options | `schedulingEngine` / `appointmentSchedulingEngine` | Hard-code slot lists or capacity |
+| Confirm interview | `missionExecutionApplicationService.executeScheduleInterview` or `appointmentApplicationService.createAppointment` | Call `createInterview` + manual `updateProspect` alone |
+| Reschedule / cancel / complete | `appointmentApplicationService` | Mutate `appointment_date` / `calendar_event_id` directly |
+| Advance recruiting workflow | `humanAdvancementEngine` / `advanceProspectWorkflow` | Set `current_step` without workflow engine |
+| Send WhatsApp / email | `communicationHub` + outbound pipelines | Embed transport logic in semantic engine |
+| Human assist / escalation | `appointmentHumanAssistBridge`, BR-034 stall rules | Ad hoc flags in conversation-only state |
+
+### Persistence rules
+
+1. **Appointment truth** — persisted `atlas_appointments` UUID + lifecycle metadata (BR-039). Prospect scheduling fields are a **cache** updated only through the same orchestrators used by Mission Control and Appointments.
+2. **Atomic scheduling** — conversation-initiated booking must use the same rollback-safe path as agent scheduling (calendar + appointment row + prospect cache + workflow, or full rollback).
+3. **Read models** — conversation handoff/readiness signals must resolve appointment state through canonical lifecycle resolution, not raw `current_step === "CONFIRMED"` alone.
+
+### Implementation gate
+
+Before merging any Conversation Engine change, verify:
+
+- [ ] No new business rule encoded only in `semanticConversationEngine.js`
+- [ ] Scheduling confirmation delegates to production appointment/scheduling application services
+- [ ] Workflow side effects go through `humanAdvancementEngine` / recruiting orchestrator
+- [ ] Copy changes stay in conversation copy modules, not in engines that decide behavior
+
+**Known refactor target:** ~~`semanticConversationEngine.completeInterview()` currently calls `createInterview()` and updates prospect rows directly~~ **Resolved (MVP Freeze Milestone 1)** — conversation confirmation delegates to `executeScheduleInterview` via `conversationScheduleDelegation.js`.
+
+---
+
+## BR-050 — Canonical Appointment Lifecycle (Read Model)
+
+**Implements:** Architecture hardening — appointment state consistency (Sprint 13.x follow-up)  
+**Engine target:** `appointmentLifecycleEngine.js` (proposed), `appointmentListQuery.js`, `appointmentDomainService.js`
+
+Atlas must expose **one canonical appointment lifecycle** to every surface (Appointments tabs, Mission Control, Prospect Workspace, Conversation handoff). All read-side status, tab membership, and action visibility must derive from a single resolver — not independent interpretation of `appointment.status`, `prospect.appointment_date`, or `current_step`.
+
+See engineering audit: consolidate `resolveLifecycleState()` (writes) and `resolveAppointmentListStatus()` (reads); enrich API DTOs with `canonicalLifecycleState`; sync prospect scheduling cache on every transition (Schedule, Confirm, Reschedule, Complete, Cancel, No Show).
+
+---
+
 # Prospect Workspace
 
 ## BR-038 — Prospect Workspace Editing Permissions
@@ -658,7 +726,9 @@ Atlas works around them.
 |-------|--------|----------------|
 | Rules | `businessRulesEngine.js` | Decisions only — coverage, interview type, scheduling window, escalation |
 | Application | `businessRulesApplicator.js` | Apply rule decisions to prospect profile |
-| Conversation | `semanticConversationEngine.js` | Message flow, FAQ, handoff orchestration |
+| Conversation | `conversationEngine.js`, `semanticConversationEngine.js` | Understand → remember → decide → **delegate** (BR-049); copy in separate modules |
+| Appointments | `appointmentApplicationService.js`, `appointmentDomainService.js` | Persisted appointment lifecycle (BR-039, BR-050) |
+| Mission execution | `missionExecutionApplicationService.js` | Atomic schedule-interview orchestration |
 | Copy | `conversationCopy.js` | User-facing wording from rule decisions |
 | Scheduling | `schedulingEngine.js` | Available times and slot logic |
 | Capacity | `capacityEngine.js` | Per-slot capacity (BR-006, BR-007) |

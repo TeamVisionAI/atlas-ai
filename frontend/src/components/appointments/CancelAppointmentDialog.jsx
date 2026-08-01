@@ -36,8 +36,8 @@ export default function CancelAppointmentDialog({ open, appointment, onClose, on
     setError(null);
 
     try {
-      await cancelAppointment(appointment.id, { reason });
-      onSuccess?.();
+      const updatedAppointment = await cancelAppointment(appointment.id, { reason });
+      onSuccess?.(updatedAppointment);
       onClose();
     } catch (requestError) {
       setError(captureAppointmentError("cancel", requestError, translate));

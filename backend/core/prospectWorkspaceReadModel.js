@@ -10,7 +10,10 @@ const { buildJourneyProgress } = require("./journeyProgressMapper");
 const { listProspectActivityPreview } = require("./prospectActivityFeedReadModel");
 const { buildProspectEditorProfile } = require("./prospectWorkspaceProfileEngine");
 const { resolvePersistedAppointmentId } = require("./appointmentListQuery");
-const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
+const {
+  findPersistedAppointmentForProspect,
+  findLatestPersistedAppointmentForProspect
+} = require("../services/appointmentListService");
 const { logInterviewerTrace } = require("../dev/interviewerTrace");
 const {
   formatPreferredLanguageLabel,
@@ -49,14 +52,33 @@ function buildProspectIdentity(prospect) {
   };
 }
 
-function buildInterviewBlock(prospect, agentState, workflowGate, activeAppointment = null) {
+function buildInterviewBlock(
+  prospect,
+  agentState,
+  workflowGate,
+  activeAppointment = null,
+  latestAppointment = null
+) {
+  const lifecycleAppointment = activeAppointment || latestAppointment || null;
+  const lifecycleState = lifecycleAppointment?.metadata?.lifecycleState || null;
+  const appointmentStatus = lifecycleAppointment?.status || null;
+  const isCancelledLifecycle =
+    lifecycleState === "cancelled" || appointmentStatus === "cancelled";
+
   const prospectInterviewMs = parseInterviewDatetime(prospect);
   const appointmentInterviewMs = activeAppointment?.startDateTime
     ? Date.parse(activeAppointment.startDateTime)
     : Number.NaN;
-  const interviewMs = Number.isFinite(appointmentInterviewMs)
+  let interviewMs = Number.isFinite(appointmentInterviewMs)
     ? appointmentInterviewMs
     : prospectInterviewMs;
+
+  if (isCancelledLifecycle && !activeAppointment) {
+    interviewMs = lifecycleAppointment?.startDateTime
+      ? Date.parse(lifecycleAppointment.startDateTime)
+      : Number.NaN;
+  }
+
   const now = Date.now();
 
   return {
@@ -67,6 +89,8 @@ function buildInterviewBlock(prospect, agentState, workflowGate, activeAppointme
     calendarEventId: activeAppointment?.calendarEventId || prospect?.calendar_event_id || null,
     gateActive: Boolean(workflowGate?.active),
     appointmentId: resolvePersistedAppointmentId(activeAppointment),
+    lifecycleState,
+    appointmentStatus,
     ownerRepId: activeAppointment?.ownerRepId || null,
     interviewerUserId: activeAppointment?.interviewerUserId || null,
     interviewerName: activeAppointment?.interviewerName || null
@@ -102,9 +126,13 @@ async function composeProspectWorkspaceFromMissionControl(phone, missionControl,
   const canonicalMilestone = missionControl.workflow?.canonicalMilestone || null;
   const journey = buildJourneyProgress(canonicalMilestone);
   let activeAppointment = null;
+  let latestAppointment = null;
 
   try {
     activeAppointment = await findPersistedAppointmentForProspect(resolvedPhone, organizationId);
+    latestAppointment =
+      activeAppointment ||
+      (await findLatestPersistedAppointmentForProspect(resolvedPhone, organizationId));
   } catch (error) {
     console.error("[prospect-workspace/activeAppointment]", error.message);
   }
@@ -113,7 +141,8 @@ async function composeProspectWorkspaceFromMissionControl(phone, missionControl,
     prospectRow || missionControl.prospect,
     missionControl.agentState,
     missionControl.workflowGate,
-    activeAppointment
+    activeAppointment,
+    latestAppointment
   );
   let activityPreview = [];
 

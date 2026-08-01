@@ -43,7 +43,7 @@ const { assertSimulatorPhone } = require("../dev/simulatorSafety");
 const { buildWorkflowGateDescriptor } = require("../core/workflowGateEngine");
 const { buildInterviewBlock } = require("../core/prospectWorkspaceReadModel");
 const { logInterviewerTrace } = require("../dev/interviewerTrace");
-const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
+const { findPersistedAppointmentForProspect, findLatestPersistedAppointmentForProspect } = require("../services/appointmentListService");
 const { enrichActionCenterWithConfidence } = require("../core/alphaConfidenceEngine");
 const {
   fetchConversationThread,
@@ -518,9 +518,13 @@ async function getMissionControlWithActions(phone, options = {}) {
   ]);
 
   let activeAppointment = null;
+  let latestAppointment = null;
 
   try {
     activeAppointment = await findPersistedAppointmentForProspect(resolvedPhone, organizationId);
+    latestAppointment =
+      activeAppointment ||
+      (await findLatestPersistedAppointmentForProspect(resolvedPhone, organizationId));
   } catch (error) {
     console.error("[mission-control/activeAppointment]", error.message);
   }
@@ -531,7 +535,8 @@ async function getMissionControlWithActions(phone, options = {}) {
       outcome: agentState.outcome
     },
     workflowGate,
-    activeAppointment
+    activeAppointment,
+    latestAppointment
   );
 
   logInterviewerTrace({
