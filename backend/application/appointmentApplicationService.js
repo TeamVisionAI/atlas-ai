@@ -596,45 +596,62 @@ async function createAppointment(input, context = {}) {
   return enrichWithProspect(saved);
 }
 
-async function rescheduleAppointment(id, input, context = {}) {
-  const { organizationId, agentId } = context;
-  const appointment = await appointmentRepository.findById(id, organizationId);
+function resolveRescheduleSlot(appointment, input = {}) {
+  const { dateKey, timeKey } = input;
 
-  if (!appointment) {
-    throw buildError("NOT_FOUND", "Appointment not found.", 404);
+  if (input.skipSlotValidation && input.scheduledTime) {
+    const durationMinutes = Number(appointment.durationMinutes) || 30;
+
+    return {
+      dateKey: dateKey || null,
+      timeKey: timeKey || null,
+      startTimeISO: input.scheduledTime,
+      endTimeISO:
+        input.endDateTime ||
+        new Date(Date.parse(input.scheduledTime) + durationMinutes * 60_000).toISOString()
+    };
   }
 
+  if (!dateKey || !timeKey) {
+    throw buildError("VALIDATION_FAILED", "dateKey and timeKey are required.");
+  }
+
+  return null;
+}
+
+async function persistRescheduledAppointment(appointment, input, context = {}) {
+  const { organizationId, agentId } = context;
   const reason = input.reason;
 
   if (!isValidRescheduleReason(reason)) {
     throw buildError("INVALID_REASON", "Invalid reschedule reason.");
   }
 
-  const { dateKey, timeKey } = input;
-
-  if (!dateKey || !timeKey) {
-    throw buildError("VALIDATION_FAILED", "dateKey and timeKey are required.");
-  }
-
-  const slotCheck = await appointmentSchedulingEngine.getAvailableSlots({
-    agentId: appointment.agentId,
-    organizationId: appointment.organizationId,
-    date: dateKey,
-    purpose: appointment.purpose,
-    durationMinutes: appointment.durationMinutes,
-    maxResults: 50
-  });
-
-  const matchedSlot = slotCheck.slots.find(
-    (slot) => slot.dateKey === dateKey && slot.timeKey === timeKey
-  );
+  let matchedSlot = resolveRescheduleSlot(appointment, input);
 
   if (!matchedSlot) {
-    throw buildError("UNAVAILABLE", "Selected slot is no longer available.");
+    const { dateKey, timeKey } = input;
+
+    const slotCheck = await appointmentSchedulingEngine.getAvailableSlots({
+      agentId: appointment.agentId,
+      organizationId: appointment.organizationId,
+      date: dateKey,
+      purpose: appointment.purpose,
+      durationMinutes: appointment.durationMinutes,
+      maxResults: 50
+    });
+
+    matchedSlot = slotCheck.slots.find(
+      (slot) => slot.dateKey === dateKey && slot.timeKey === timeKey
+    );
+
+    if (!matchedSlot) {
+      throw buildError("UNAVAILABLE", "Selected slot is no longer available.");
+    }
   }
 
   const previousStart = appointment.startDateTime;
-  const previousEnd = appointment.endDateTime;
+  const { dateKey, timeKey } = matchedSlot;
 
   if (appointment.calendarEventId) {
     await googleCalendarIntegrationService
@@ -656,7 +673,7 @@ async function rescheduleAppointment(id, input, context = {}) {
     reason,
     scheduledTime: matchedSlot.startTimeISO,
     endDateTime: matchedSlot.endTimeISO,
-    channel: "mission_control",
+    channel: input.channel || "mission_control",
     payload: { dateKey, timeKey, previousStart, newStart: matchedSlot.startTimeISO },
     newValues: { dateKey, timeKey }
   });
@@ -680,19 +697,35 @@ async function rescheduleAppointment(id, input, context = {}) {
     interview_time: matchedSlot.startTimeISO
   }).catch(() => {});
 
-  await advanceProspectWorkflow(appointment.prospectPhone, {
-    targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
-    capturedFields: {
-      interviewDateTime: matchedSlot.startTimeISO,
-      confirmed: true
-    },
-    interactionNotes: `Interview rescheduled to ${dateKey} at ${timeKey}.`,
-    interactionType: "appointment_reschedule"
-  }).catch((error) => {
-    console.error("[appointment/reschedule/workflow]", error.message);
-  });
+  if (!input.skipWorkflowAdvance) {
+    await advanceProspectWorkflow(appointment.prospectPhone, {
+      targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
+      capturedFields: {
+        interviewDateTime: matchedSlot.startTimeISO,
+        confirmed: true
+      },
+      interactionNotes:
+        dateKey && timeKey
+          ? `Interview rescheduled to ${dateKey} at ${timeKey}.`
+          : `Interview rescheduled to ${matchedSlot.startTimeISO}.`,
+      interactionType: "appointment_reschedule"
+    }).catch((error) => {
+      console.error("[appointment/reschedule/workflow]", error.message);
+    });
+  }
 
   return enrichWithProspect(saved);
+}
+
+async function rescheduleAppointment(id, input, context = {}) {
+  const { organizationId } = context;
+  const appointment = await appointmentRepository.findById(id, organizationId);
+
+  if (!appointment) {
+    throw buildError("NOT_FOUND", "Appointment not found.", 404);
+  }
+
+  return persistRescheduledAppointment(appointment, input, context);
 }
 
 async function cancelAppointment(id, input, context = {}) {

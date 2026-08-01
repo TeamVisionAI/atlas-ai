@@ -25,9 +25,13 @@ const { getTenantOrganizationId } = require("../services/tenantContextService");
 const { PERMISSIONS } = require("../security/permissions");
 
 function tenantMissionControlOptions(req) {
+  const userId = req.tenantContext?.userId || req.authContext?.userId || req.atlasUser?.id || null;
+
   return {
     organizationId: getTenantOrganizationId(req),
-    tenantScoped: true
+    tenantScoped: true,
+    userId,
+    agentId: userId
   };
 }
 

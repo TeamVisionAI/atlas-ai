@@ -106,8 +106,45 @@ async function recordInterviewOutcome({
   }
 
   let savedAppointment = null;
+  const isRescheduleOutcome = outcomeId === "Reschedule Interview";
 
-  if (appointment && isActiveAppointment(appointment)) {
+  if (isRescheduleOutcome && appointment?.id && organizationId) {
+    const scheduledTime = advancePayload.capturedFields.interviewDateTime;
+
+    if (!scheduledTime) {
+      return {
+        success: false,
+        status: 400,
+        error: "VALIDATION_ERROR",
+        message: "Reschedule date and time are required."
+      };
+    }
+
+    const appointmentApplicationService = require("./appointmentApplicationService");
+
+    try {
+      savedAppointment = await appointmentApplicationService.rescheduleAppointment(
+        appointment.id,
+        {
+          reason: fields.rescheduleReason || "prospect_requested",
+          dateKey: fields.rescheduleDate || null,
+          timeKey: fields.rescheduleTime || null,
+          scheduledTime,
+          skipSlotValidation: true,
+          skipWorkflowAdvance: true,
+          channel: interactionType === "appointment_completion" ? "appointments" : "mission_control"
+        },
+        { organizationId, agentId }
+      );
+    } catch (error) {
+      return {
+        success: false,
+        status: error.statusCode || 500,
+        error: error.code || "RESCHEDULE_FAILED",
+        message: error.message
+      };
+    }
+  } else if (appointment && isActiveAppointment(appointment)) {
     savedAppointment = await applyInterviewOutcomeToAppointment(appointment, outcomeId, {
       agentId,
       outcomeNotes: interactionNotes || fields.notes || null,
