@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../../i18n/LanguageContext";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
-import AtlasButton from "../../components/ui/AtlasButton";
+import IntegrationCard from "../../components/settings/IntegrationCard";
 import SettingsIcon from "../../components/icons/SettingsIcons";
 import WhatsAppIntegrationCard from "../../components/settings/WhatsAppIntegrationCard";
 import {
@@ -22,7 +22,7 @@ export default function OrganizationIntegrations() {
   const [calendars, setCalendars] = useState([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState(null);
 
   const load = useCallback(async () => {
     const result = await fetchOrganizationIntegrations();
@@ -69,47 +69,75 @@ export default function OrganizationIntegrations() {
   async function connectGoogle() {
     setError("");
     setMessage("");
-    setBusy(true);
+    setBusyAction("google-connect");
 
     try {
       const result = await fetchGoogleCalendarAuthUrl("settings/integrations");
       window.location.href = result.url;
     } catch {
       setError(translate("configurationGoogleConnectFailed"));
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function handleDisconnectGoogle() {
     setError("");
     setMessage("");
-    setBusy(true);
+    setBusyAction("google-disconnect");
+
+    const previousIntegrations = integrations;
+
+    setIntegrations((current) => ({
+      ...current,
+      googleCalendar: {
+        ...(current.googleCalendar || {}),
+        connected: false,
+        googleAccountEmail: null,
+        calendarId: null
+      }
+    }));
+    setCalendars([]);
 
     try {
       await disconnectGoogleCalendar();
-      setCalendars([]);
       setMessage(translate("configurationGoogleDisconnected"));
       await load();
     } catch {
+      setIntegrations(previousIntegrations);
       setError(translate("configurationGoogleConnectFailed"));
+      await load();
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function handleDisconnectWhatsApp() {
     setError("");
     setMessage("");
-    setBusy(true);
+    setBusyAction("whatsapp-disconnect");
+
+    const previousIntegrations = integrations;
+
+    setIntegrations((current) => ({
+      ...current,
+      whatsapp: {
+        ...(current.whatsapp || {}),
+        connected: false,
+        status: "disconnected",
+        connection: null
+      }
+    }));
 
     try {
       await disconnectWhatsAppIntegration();
       setMessage(translate("whatsappIntegrationDisconnected"));
       await load();
     } catch {
+      setIntegrations(previousIntegrations);
       setError(translate("whatsappIntegrationDisconnectFailed"));
+      await load();
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -121,7 +149,7 @@ export default function OrganizationIntegrations() {
 
     setError("");
     setMessage("");
-    setBusy(true);
+    setBusyAction("google-calendar");
 
     try {
       await selectGoogleCalendar(calendarId);
@@ -130,9 +158,15 @@ export default function OrganizationIntegrations() {
     } catch {
       setError(translate("configurationLoadFailed"));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
+
+  const googleBusy =
+    busyAction === "google-connect" ||
+    busyAction === "google-disconnect" ||
+    busyAction === "google-calendar";
+  const whatsappBusy = busyAction === "whatsapp-disconnect";
 
   if (!integrations) {
     return error ? (
@@ -155,62 +189,45 @@ export default function OrganizationIntegrations() {
         <WhatsAppIntegrationCard
           connected={Boolean(whatsapp.connected)}
           connection={whatsapp.connection || {}}
-          busy={busy}
+          busy={whatsappBusy}
+          disconnecting={busyAction === "whatsapp-disconnect"}
           onDisconnect={handleDisconnectWhatsApp}
         />
 
-        <article className="integration-card">
-          <header className="integration-card__header">
-            <span className="integration-card__icon" aria-hidden="true">
-              <SettingsIcon name="calendar" />
-            </span>
-            <div>
-              <h3 className="integration-card__title">{translate("configurationGoogleCalendar")}</h3>
-              <p className="integration-card__subtitle">{translate("configurationGoogleCalendarIntro")}</p>
-            </div>
-          </header>
-
-          <dl className="integration-card__meta">
-            <div className="integration-card__meta-row">
-              <dt>{translate("configurationConnectionStatus")}</dt>
-              <dd>
-                {googleCalendar.connected ? (
-                  <span className="integration-status-badge integration-status-badge--connected">
-                    {translate("configurationConnected")}
-                  </span>
-                ) : (
-                  <span className="integration-status-badge integration-status-badge--disconnected">
-                    {translate("configurationNotConnected")}
-                  </span>
-                )}
-              </dd>
-            </div>
-            <div className="integration-card__meta-row">
-              <dt>{translate("configurationGoogleAccount")}</dt>
-              <dd>{googleCalendar.googleAccountEmail || translate("configurationNotSet")}</dd>
-            </div>
-            <div className="integration-card__meta-row">
-              <dt>{translate("configurationCalendar")}</dt>
-              <dd>{googleCalendar.calendarId || translate("configurationNotSet")}</dd>
-            </div>
-          </dl>
-
-          <div className="integration-card__actions">
-            {!googleCalendar.connected ? (
-              <AtlasButton type="button" variant="primary" onClick={connectGoogle} busy={busy}>
-                {translate("configurationConnectGoogle")}
-              </AtlasButton>
-            ) : (
-              <AtlasButton type="button" variant="secondary" onClick={handleDisconnectGoogle} busy={busy}>
-                {translate("configurationDisconnectGoogle")}
-              </AtlasButton>
-            )}
-          </div>
-
+        <IntegrationCard
+          icon="calendar"
+          title={translate("configurationGoogleCalendar")}
+          subtitle={translate("configurationGoogleCalendarIntro")}
+          connected={Boolean(googleCalendar.connected)}
+          connecting={busyAction === "google-connect"}
+          disconnecting={busyAction === "google-disconnect"}
+          showDetailsWhenDisconnected
+          detailRows={[
+            {
+              key: "google-account",
+              label: translate("configurationGoogleAccount"),
+              value: googleCalendar.googleAccountEmail
+            },
+            {
+              key: "calendar",
+              label: translate("configurationCalendar"),
+              value: googleCalendar.calendarId
+            }
+          ]}
+          connectLabel={translate("configurationConnectGoogle")}
+          disconnectLabel={translate("configurationDisconnectGoogle")}
+          onConnect={connectGoogle}
+          onDisconnect={handleDisconnectGoogle}
+          busy={googleBusy}
+        >
           {googleCalendar.connected && calendars.length > 0 ? (
             <label className="configuration-form integration-card__calendar-select">
               {translate("configurationSelectCalendar")}
-              <select value={googleCalendar.calendarId || ""} onChange={handleCalendarSelect} disabled={busy}>
+              <select
+                value={googleCalendar.calendarId || ""}
+                onChange={handleCalendarSelect}
+                disabled={googleBusy}
+              >
                 <option value="">{translate("configurationSelectCalendarPlaceholder")}</option>
                 {calendars.map((calendar) => (
                   <option key={calendar.id} value={calendar.id}>
@@ -221,7 +238,7 @@ export default function OrganizationIntegrations() {
               </select>
             </label>
           ) : null}
-        </article>
+        </IntegrationCard>
 
         <article className="integration-card integration-card--placeholder" aria-disabled="true">
           <header className="integration-card__header">

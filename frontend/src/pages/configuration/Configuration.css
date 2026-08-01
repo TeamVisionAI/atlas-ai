@@ -579,6 +579,16 @@
   color: #64748b;
 }
 
+.integration-status-badge--disconnected::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 2px solid #94a3b8;
+  background: transparent;
+  box-sizing: border-box;
+}
+
 .integration-card__technical-toggle {
   appearance: none;
   border: none;
