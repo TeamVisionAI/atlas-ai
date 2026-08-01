@@ -54,6 +54,7 @@ async function verifyReadinessReportShape() {
   assert.ok(typeof report.mvpReady === "boolean", "mvpReady boolean present");
   assert.ok(report.checks.some((c) => c.id === "whatsapp_send"), "whatsapp_send check present");
   assert.ok(report.checks.some((c) => c.id === "google_calendar"), "google_calendar check present");
+  assert.ok(report.checks.some((c) => c.id === "atlas_appointments"), "atlas_appointments check present");
 
   console.log("✓ Production readiness report shape valid");
   console.log(`  mvpReady=${report.mvpReady}, blockers=[${report.mvpBlockers.join(", ")}]`);

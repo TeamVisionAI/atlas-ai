@@ -156,24 +156,51 @@ Creates:
 
 Read-only REST API at `/api/executive-dashboard`, `/api/executive-dashboard/summary`, `/api/executive-dashboard/trends`, `/api/executive-dashboard/kpis`.
 
-## Sprint 22 — Appointment Engine
+## Sprint 22 — Appointment Engine (RC1 required infrastructure)
 
-Run in Supabase SQL editor:
+Apply **all** appointment migrations before production deploy (idempotent):
+
+```bash
+node backend/dev/environment/applyAppointmentMigrations.js
+```
+
+Or run individually in Supabase SQL editor / `psql "$DATABASE_URL"`:
 
 ```
 backend/database/migrations/013_atlas_appointments.sql
+backend/database/migrations/018_appointment_owner_rep_id.sql
+backend/database/migrations/019_atlas_appointments_baseline_repair.sql
+backend/database/migrations/020_appointment_interviewer_assignment.sql
 ```
 
-Creates:
+| Migration | Purpose |
+|-----------|---------|
+| `013_atlas_appointments.sql` | Creates `public.atlas_appointments` baseline table |
+| `018_appointment_owner_rep_id.sql` | Adds `owner_rep_id` column + index |
+| `019_atlas_appointments_baseline_repair.sql` | Idempotent repair if `013` was skipped |
+| `020_appointment_interviewer_assignment.sql` | Adds `interviewer_user_id` / `interviewer_name` |
 
-- `atlas_appointments` — org-scoped appointment records with lifecycle history JSONB
+Creates / ensures:
+
+- `atlas_appointments` — org-scoped appointment records with lifecycle history JSONB (BR-039, BR-050)
 
 Agent appointment profile is stored in existing `atlas_users.profile_settings.appointmentProfile` (no new column).
 
 ### Runtime without migration
 
-- Development falls back to `backend/data/appointments.json`
-- Production requires the table (startup/read paths throw if missing)
+- **Development** falls back to `backend/data/appointments.json` when PostgREST reports the table missing.
+- **Production** requires the Supabase table for reads and writes (`/health/production` fails when missing; repository throws instead of JSON fallback).
+
+### Production health
+
+`GET /health/production` probes `public.atlas_appointments` through the same PostgREST path as `appointmentRepository.isTableAvailable()`. `mvpReady` is **false** when the table is unavailable.
+
+### Development JSON fallback audit (`backend/data/appointments.json`)
+
+- **Still used in development** when `isTableAvailable()` is false and `NODE_ENV !== "production"`.
+- **Previously masked missing production tables** because production reads silently fell back to this committed file while writes threw.
+- **RC1 hardening:** production reads now throw the same error as writes when the table is missing, so committed dev rows cannot mask infrastructure gaps.
+- **Smallest safe operational change:** keep the file for local dev but treat it as **non-authoritative** — do not commit real prospect data; prefer an empty `[]` baseline or local-only overrides via `.gitignore` (future ops task). Never rely on this file in Railway/Vercel deployments.
 
 ### After migration
 

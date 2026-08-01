@@ -4,6 +4,7 @@
  */
 
 const { resolveWhatsAppSendCredentials } = require("./whatsappSendCredentials");
+const { isTableAvailable } = require("../repositories/appointmentRepository");
 
 function isPresent(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -109,12 +110,37 @@ function checkContactForm() {
   };
 }
 
+async function checkAtlasAppointments() {
+  try {
+    const available = await isTableAvailable();
+
+    return {
+      id: "atlas_appointments",
+      label: "Persisted appointments (atlas_appointments)",
+      ok: available,
+      blocker: true,
+      detail: available
+        ? "PostgREST probe succeeded for public.atlas_appointments"
+        : "public.atlas_appointments missing from Supabase schema cache (JSON fallback disabled in production)"
+    };
+  } catch (error) {
+    return {
+      id: "atlas_appointments",
+      label: "Persisted appointments (atlas_appointments)",
+      ok: false,
+      blocker: true,
+      detail: error.message || "PostgREST probe failed for public.atlas_appointments"
+    };
+  }
+}
+
 /**
  * @returns {Promise<{ ready: boolean, mvpReady: boolean, checks: Array, blockers: string[] }>}
  */
 async function evaluateProductionReadiness() {
   const checks = [
     checkSupabase(),
+    await checkAtlasAppointments(),
     checkWebhook(),
     await checkWhatsAppSend(),
     checkGoogleCalendar(),
@@ -124,7 +150,9 @@ async function evaluateProductionReadiness() {
 
   const blockers = checks.filter((c) => c.blocker && !c.ok).map((c) => c.id);
   const mvpBlockers = blockers.filter((id) =>
-    ["supabase", "whatsapp_webhook", "whatsapp_send", "google_calendar"].includes(id)
+    ["supabase", "atlas_appointments", "whatsapp_webhook", "whatsapp_send", "google_calendar"].includes(
+      id
+    )
   );
 
   return {
@@ -140,6 +168,7 @@ async function evaluateProductionReadiness() {
 module.exports = {
   evaluateProductionReadiness,
   checkSupabase,
+  checkAtlasAppointments,
   checkWebhook,
   checkWhatsAppSend,
   checkGoogleCalendar

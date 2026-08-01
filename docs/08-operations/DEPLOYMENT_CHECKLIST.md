@@ -21,6 +21,7 @@ Approved — Sprint 13.1.1
 - [ ] `cd frontend && npm run build` — succeeds
 - [ ] `cd frontend && npm run lint` — no new errors
 - [ ] `node backend/dev/verifyKnowledgeHub.js` — passes (when Knowledge Hub changed)
+- [ ] `node backend/dev/environment/applyAppointmentMigrations.js` — applies appointment migrations `013`, `018`, `019`, `020` to Supabase (required before first RC1+ deploy or new environment)
 
 ### Environment variables
 
@@ -57,6 +58,7 @@ See [ENVIRONMENT_CONFIGURATION.md](../03-engineering/ENVIRONMENT_CONFIGURATION.m
 ### Health and API
 
 - [ ] `GET {RAILWAY_URL}/health` — 200 OK
+- [ ] `GET {RAILWAY_URL}/health/production` — 200 with `mvpReady: true` and `atlas_appointments` check `ok: true`
 - [ ] `GET {RAILWAY_URL}/api/knowledge/tree` — 401 without auth (route exists), 200 with bearer token
 - [ ] `GET {RAILWAY_URL}/api/knowledge/document?path=CURRENT_STATE.md` — 200 with bearer token
 

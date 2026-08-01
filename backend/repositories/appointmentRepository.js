@@ -18,6 +18,7 @@ const {
 const { logInterviewerTrace } = require("../dev/interviewerTrace");
 
 const STORE_FILE = path.join(__dirname, "../data/appointments.json");
+const PRODUCTION_TABLE_REQUIRED_MESSAGE = "atlas_appointments table is required in production.";
 
 function generateId() {
   return crypto.randomUUID();
@@ -59,6 +60,12 @@ async function isTableAvailable() {
   throw error;
 }
 
+function assertProductionTableAvailable(tableAvailable) {
+  if (!tableAvailable && isProduction()) {
+    throw new Error(PRODUCTION_TABLE_REQUIRED_MESSAGE);
+  }
+}
+
 async function save(appointment) {
   const row = appointmentToRow(appointment);
   const tableAvailable = await isTableAvailable();
@@ -86,9 +93,7 @@ async function save(appointment) {
     return rowToAppointment(data);
   }
 
-  if (isProduction()) {
-    throw new Error("atlas_appointments table is required in production.");
-  }
+  assertProductionTableAvailable(tableAvailable);
 
   const rows = readJsonStore();
   const index = rows.findIndex((item) => item.id === appointment.id);
@@ -142,6 +147,8 @@ async function findById(id, organizationId) {
 
     return appointment;
   }
+
+  assertProductionTableAvailable(tableAvailable);
 
   const rows = readJsonStore();
   const match = rows.find(
@@ -228,6 +235,8 @@ async function search(filters = {}) {
     };
   }
 
+  assertProductionTableAvailable(tableAvailable);
+
   let rows = readJsonStore();
 
   if (filters.organizationId) {
@@ -291,12 +300,14 @@ async function listActiveForAgent(agentId, organizationId, from, to) {
 }
 
 module.exports = {
+  PRODUCTION_TABLE_REQUIRED_MESSAGE,
   generateId,
   resolveOwnerRepIdFromRow,
   resolveOwnerRepIdFromAppointment,
   rowToAppointment,
   appointmentToRow,
   coerceAppointmentItems,
+  isTableAvailable,
   save,
   findById,
   search,
