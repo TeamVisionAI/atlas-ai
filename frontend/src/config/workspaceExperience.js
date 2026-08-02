@@ -7,6 +7,7 @@
  */
 
 import { appPath } from "./appRoutes";
+import { isMetaReviewModeEnabled } from "./metaReviewMode";
 import { normalizeRole, roleHasPermission, ROLES, PERMISSIONS } from "../security/workspacePermissions";
 
 export const WORKSPACE_TYPES = Object.freeze({
@@ -192,8 +193,90 @@ const NAV_ITEM_DEFS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.OPERATIONS_ACCESS,
     requiresOperationsAccess: true
+  },
+  whatsapp: {
+    id: "whatsapp",
+    path: appPath("settings/whatsapp"),
+    labelKey: "navWhatsApp"
+  },
+  metaReviewSettings: {
+    id: "settings",
+    path: appPath("settings"),
+    labelKey: "navSettings"
   }
 });
+
+/** Meta App Review — sidebar surfaces only (Dashboard, Prospects, Mission Control, WhatsApp, Settings). */
+const META_REVIEW_LANDING_NAV = Object.freeze({
+  [WORKSPACE_TYPES.ADMINISTRATOR]: "executiveDashboard",
+  [WORKSPACE_TYPES.MANAGEMENT]: "teamDashboard",
+  [WORKSPACE_TYPES.REPRESENTATIVE]: "myDashboard"
+});
+
+const META_REVIEW_ALLOWED_ROUTE_KEYS = new Set([
+  "executive-dashboard",
+  "my-dashboard",
+  "team-dashboard",
+  "mission-control",
+  "prospect-center",
+  "prospect-workspace",
+  "prospect",
+  "settings",
+  "settings/profile",
+  "settings/integrations",
+  "settings/whatsapp",
+  "settings/whatsapp/success",
+  "settings/whatsapp/error",
+  "settings/review-users"
+]);
+
+function getMetaReviewLandingNavKey(workspaceType) {
+  return META_REVIEW_LANDING_NAV[workspaceType] || META_REVIEW_LANDING_NAV[WORKSPACE_TYPES.REPRESENTATIVE];
+}
+
+function buildMetaReviewNavItems(user, workspaceType) {
+  const landingKey = getMetaReviewLandingNavKey(workspaceType);
+  const landingDef = NAV_ITEM_DEFS[landingKey];
+
+  const items = [
+    {
+      path: landingDef.path,
+      end: landingDef.end,
+      labelKey: "navDashboard"
+    },
+    {
+      path: NAV_ITEM_DEFS.prospectCenter.path,
+      end: NAV_ITEM_DEFS.prospectCenter.end,
+      labelKey: "navProspects"
+    },
+    {
+      path: NAV_ITEM_DEFS.missionControl.path,
+      end: NAV_ITEM_DEFS.missionControl.end,
+      labelKey: NAV_ITEM_DEFS.missionControl.labelKey
+    },
+    {
+      path: NAV_ITEM_DEFS.whatsapp.path,
+      end: NAV_ITEM_DEFS.whatsapp.end,
+      labelKey: NAV_ITEM_DEFS.whatsapp.labelKey
+    }
+  ];
+
+  const settingsPath = canAccessRoute("settings", user)
+    ? appPath("settings")
+    : appPath("settings/profile");
+
+  items.push({
+    path: settingsPath,
+    end: settingsPath === appPath("settings"),
+    labelKey: NAV_ITEM_DEFS.metaReviewSettings.labelKey
+  });
+
+  return items;
+}
+
+export function isRouteAllowedInMetaReview(routeKey) {
+  return META_REVIEW_ALLOWED_ROUTE_KEYS.has(routeKey);
+}
 
 /** Core Business capabilities — visible when the user has the module permission. */
 const BUSINESS_CORE_NAV_ORDER = Object.freeze([
@@ -300,6 +383,10 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
   },
+  "settings/review-users": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ADMIN_USERS
+  },
   "admin/users": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ADMIN_USERS
@@ -333,6 +420,11 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
   }
 
   const workspaceType = resolveWorkspaceType(user.role);
+
+  if (isMetaReviewModeEnabled()) {
+    return buildMetaReviewNavItems(user, workspaceType);
+  }
+
   const order = buildNavOrderForWorkspace(workspaceType);
 
   return order
@@ -348,6 +440,20 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
 export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {}) {
   if (!user) {
     return false;
+  }
+
+  if (isMetaReviewModeEnabled()) {
+    if (routeKey === "settings/profile" || routeKey === "settings/integrations") {
+      return true;
+    }
+
+    if (routeKey.startsWith("settings/whatsapp")) {
+      return true;
+    }
+
+    if (!isRouteAllowedInMetaReview(routeKey)) {
+      return false;
+    }
   }
 
   const rule = ROUTE_ACCESS[routeKey];
@@ -469,6 +575,17 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     icon: "scheduling",
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ORG_READ
+  },
+  {
+    id: "review-users",
+    routeKey: "settings/review-users",
+    path: appPath("settings/review-users"),
+    titleKey: "reviewUsers",
+    descriptionKey: "configurationHubReviewUsersDescription",
+    icon: "organization",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ADMIN_USERS,
+    metaReviewOnly: true
   }
 ]);
 
@@ -484,6 +601,8 @@ function canAccessSettingsSection(def, user, workspaceType) {
   return true;
 }
 
+const META_REVIEW_SETTINGS_SECTION_IDS = new Set(["profile", "integrations"]);
+
 export function buildSettingsHubSections(user, settingsSections) {
   if (!user) {
     return [];
@@ -491,7 +610,31 @@ export function buildSettingsHubSections(user, settingsSections) {
 
   const workspaceType = resolveWorkspaceType(user.role);
 
-  return SETTINGS_HUB_SECTIONS.filter((def) => canAccessSettingsSection(def, user, workspaceType)).map(
+  let sections = SETTINGS_HUB_SECTIONS.filter((def) => canAccessSettingsSection(def, user, workspaceType));
+
+  if (isMetaReviewModeEnabled()) {
+    sections = SETTINGS_HUB_SECTIONS.filter((def) => {
+      if (def.metaReviewOnly) {
+        return canAccessSettingsSection(def, user, workspaceType);
+      }
+
+      if (!META_REVIEW_SETTINGS_SECTION_IDS.has(def.id)) {
+        return false;
+      }
+
+      if (def.id === "profile" || def.id === "integrations") {
+        return true;
+      }
+
+      return canAccessSettingsSection(def, user, workspaceType);
+    });
+
+    if (sections.length === 0) {
+      sections = SETTINGS_HUB_SECTIONS.filter((def) => def.id === "profile");
+    }
+  }
+
+  return sections.map(
     (def) => ({
       to: def.path,
       title: settingsSections[def.titleKey] || def.titleKey,

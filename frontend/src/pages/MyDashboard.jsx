@@ -4,6 +4,8 @@ import { getDashboard } from "../services/api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { appPath } from "../config/appRoutes";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
+import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import MetaReviewDashboardCard from "../components/meta-review/MetaReviewDashboardCard";
 import "./WorkspaceDashboard.css";
 
 export default function MyDashboard() {
@@ -48,6 +50,8 @@ export default function MyDashboard() {
     [prospects]
   );
 
+  const metaReviewMode = isMetaReviewModeEnabled();
+
   return (
     <div className="workspace-dashboard">
       <header className="workspace-dashboard__header">
@@ -56,15 +60,19 @@ export default function MyDashboard() {
           <h1>{translate("myDashboardTitle")}</h1>
           <p className="workspace-dashboard__intro">{translate("myDashboardIntro")}</p>
         </div>
-        <div className="workspace-dashboard__actions">
-          <Link className="workspace-dashboard__button" to={appPath("quick-capture")}>
-            {translate("navQuickCapture")}
-          </Link>
-          <Link className="workspace-dashboard__button workspace-dashboard__button--secondary" to={appPath("prospect-center")}>
-            {translate("navMyProspects")}
-          </Link>
-        </div>
+        {!metaReviewMode ? (
+          <div className="workspace-dashboard__actions">
+            <Link className="workspace-dashboard__button" to={appPath("quick-capture")}>
+              {translate("navQuickCapture")}
+            </Link>
+            <Link className="workspace-dashboard__button workspace-dashboard__button--secondary" to={appPath("prospect-center")}>
+              {translate("navMyProspects")}
+            </Link>
+          </div>
+        ) : null}
       </header>
+
+      {metaReviewMode ? <MetaReviewDashboardCard /> : null}
 
       {loading ? <p>{translate("myDashboardLoading")}</p> : null}
       {error ? <p className="workspace-dashboard__error">{error}</p> : null}

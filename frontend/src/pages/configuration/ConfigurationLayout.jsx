@@ -7,6 +7,8 @@ import { buildSettingsNavItems } from "../../config/workspaceExperience";
 import { SETTINGS_SECTIONS, SETTINGS_TITLE } from "../../config/settingsProductNames";
 import SettingsIcon from "../../components/icons/SettingsIcons";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
+import { isMetaReviewModeEnabled } from "../../config/metaReviewMode";
+import MetaReviewSettingsFooter from "../../components/meta-review/MetaReviewSettingsFooter";
 import "./Configuration.css";
 
 export default function ConfigurationLayout() {
@@ -45,6 +47,8 @@ export default function ConfigurationLayout() {
       <Suspense fallback={<ConfigurationLoading />}>
         <Outlet />
       </Suspense>
+
+      {isMetaReviewModeEnabled() ? <MetaReviewSettingsFooter /> : null}
     </div>
   );
 }

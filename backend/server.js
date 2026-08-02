@@ -24,6 +24,7 @@ const organizationRoutes = require("./routes/organization");
 const quickCaptureRoutes = require("./routes/quickCapture");
 const authRoutes = require("./routes/auth");
 const adminUsersRoutes = require("./routes/adminUsers");
+const metaReviewUsersRoutes = require("./routes/metaReviewUsers");
 const setupRoutes = require("./routes/setup");
 const accountRoutes = require("./routes/account");
 const configurationRoutes = require("./routes/configuration");
@@ -53,6 +54,8 @@ const contactRoutes = require("./routes/contact");
 const {
   logMetaEnvironmentWarnings
 } = require("./core/meta/metaEnvironmentValidator");
+const { isMetaReviewModeEnabled } = require("./config/metaReviewMode");
+const { ensureMetaReviewDemoData } = require("./dev/environment/seedMetaReviewDemo");
 const { assertProductionReadinessAsync } = require("./core/productionReadinessValidator");
 const { registerRecruitingWorkflow } = require("./core/recruitingWorkflowRegistry");
 
@@ -178,6 +181,7 @@ app.use("/api/prospects", prospectModule.routes);
 app.use("/api", setupRoutes);
 app.use("/api", authRoutes);
 app.use("/api/admin", adminUsersRoutes);
+app.use("/api/admin/review-users", metaReviewUsersRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/configuration", configurationRoutes);
 app.use("/api/appointments", appointmentRoutes);
@@ -249,6 +253,18 @@ async function bootstrap() {
 
     console.log(`🚀 Atlas AI running on http://localhost:${PORT}`);
     console.log(`🌎 Environment: ${process.env.NODE_ENV || "development"}`);
+
+    if (isMetaReviewModeEnabled()) {
+      console.log("📋 Meta Review Mode enabled — demo navigation and seed data active.");
+
+      ensureMetaReviewDemoData({
+        prospectService: prospectModule.service,
+        businessEventService: businessEventModule.service,
+        prospectRepository: prospectModule.repository
+      }).catch((error) => {
+        console.error("[meta-review] Demo seed failed:", error.message);
+      });
+    }
   });
 }
 

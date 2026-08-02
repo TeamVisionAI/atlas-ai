@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { isMetaReviewModeEnabled } from "../../config/metaReviewMode";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
 import IntegrationCard from "../../components/settings/IntegrationCard";
@@ -14,6 +15,7 @@ import {
   selectGoogleCalendar
 } from "../../services/configurationService";
 import { disconnectWhatsAppIntegration } from "../../services/metaEmbeddedSignupService";
+import { META_REVIEW_COPY } from "../meta-review/metaReviewCopy";
 
 export default function OrganizationIntegrations() {
   const { translate } = useLanguage();
@@ -180,10 +182,13 @@ export default function OrganizationIntegrations() {
 
   const googleCalendar = integrations.googleCalendar || {};
   const whatsapp = integrations.whatsapp || {};
+  const metaReviewMode = isMetaReviewModeEnabled();
 
   return (
     <ConfigurationSection title={translate("configurationIntegrations")}>
-      <p className="configuration-integrations-intro">{translate("configurationIntegrationsIntro")}</p>
+      <p className="configuration-integrations-intro">
+        {metaReviewMode ? META_REVIEW_COPY.integrationsPageIntro : translate("configurationIntegrationsIntro")}
+      </p>
 
       <div className="configuration-content configuration-content--integrations">
         <WhatsAppIntegrationCard
@@ -194,65 +199,69 @@ export default function OrganizationIntegrations() {
           onDisconnect={handleDisconnectWhatsApp}
         />
 
-        <IntegrationCard
-          icon="calendar"
-          title={translate("configurationGoogleCalendar")}
-          subtitle={translate("configurationGoogleCalendarIntro")}
-          connected={Boolean(googleCalendar.connected)}
-          connecting={busyAction === "google-connect"}
-          disconnecting={busyAction === "google-disconnect"}
-          showDetailsWhenDisconnected
-          detailRows={[
-            {
-              key: "google-account",
-              label: translate("configurationGoogleAccount"),
-              value: googleCalendar.googleAccountEmail
-            },
-            {
-              key: "calendar",
-              label: translate("configurationCalendar"),
-              value: googleCalendar.calendarId
-            }
-          ]}
-          connectLabel={translate("configurationConnectGoogle")}
-          disconnectLabel={translate("configurationDisconnectGoogle")}
-          onConnect={connectGoogle}
-          onDisconnect={handleDisconnectGoogle}
-          busy={googleBusy}
-        >
-          {googleCalendar.connected && calendars.length > 0 ? (
-            <label className="configuration-form integration-card__calendar-select">
-              {translate("configurationSelectCalendar")}
-              <select
-                value={googleCalendar.calendarId || ""}
-                onChange={handleCalendarSelect}
-                disabled={googleBusy}
-              >
-                <option value="">{translate("configurationSelectCalendarPlaceholder")}</option>
-                {calendars.map((calendar) => (
-                  <option key={calendar.id} value={calendar.id}>
-                    {calendar.summary}
-                    {calendar.primary ? ` (${translate("configurationPrimaryCalendar")})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-        </IntegrationCard>
+        {!metaReviewMode ? (
+          <>
+            <IntegrationCard
+              icon="calendar"
+              title={translate("configurationGoogleCalendar")}
+              subtitle={translate("configurationGoogleCalendarIntro")}
+              connected={Boolean(googleCalendar.connected)}
+              connecting={busyAction === "google-connect"}
+              disconnecting={busyAction === "google-disconnect"}
+              showDetailsWhenDisconnected
+              detailRows={[
+                {
+                  key: "google-account",
+                  label: translate("configurationGoogleAccount"),
+                  value: googleCalendar.googleAccountEmail
+                },
+                {
+                  key: "calendar",
+                  label: translate("configurationCalendar"),
+                  value: googleCalendar.calendarId
+                }
+              ]}
+              connectLabel={translate("configurationConnectGoogle")}
+              disconnectLabel={translate("configurationDisconnectGoogle")}
+              onConnect={connectGoogle}
+              onDisconnect={handleDisconnectGoogle}
+              busy={googleBusy}
+            >
+              {googleCalendar.connected && calendars.length > 0 ? (
+                <label className="configuration-form integration-card__calendar-select">
+                  {translate("configurationSelectCalendar")}
+                  <select
+                    value={googleCalendar.calendarId || ""}
+                    onChange={handleCalendarSelect}
+                    disabled={googleBusy}
+                  >
+                    <option value="">{translate("configurationSelectCalendarPlaceholder")}</option>
+                    {calendars.map((calendar) => (
+                      <option key={calendar.id} value={calendar.id}>
+                        {calendar.summary}
+                        {calendar.primary ? ` (${translate("configurationPrimaryCalendar")})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </IntegrationCard>
 
-        <article className="integration-card integration-card--placeholder" aria-disabled="true">
-          <header className="integration-card__header">
-            <span className="integration-card__icon integration-card__icon--muted" aria-hidden="true">
-              <SettingsIcon name="integrations" />
-            </span>
-            <div>
-              <h3 className="integration-card__title">{translate("configurationIntegrationsComingSoonTitle")}</h3>
-              <p className="integration-card__subtitle">
-                {translate("configurationIntegrationsComingSoonDescription")}
-              </p>
-            </div>
-          </header>
-        </article>
+            <article className="integration-card integration-card--placeholder" aria-disabled="true">
+              <header className="integration-card__header">
+                <span className="integration-card__icon integration-card__icon--muted" aria-hidden="true">
+                  <SettingsIcon name="integrations" />
+                </span>
+                <div>
+                  <h3 className="integration-card__title">{translate("configurationIntegrationsComingSoonTitle")}</h3>
+                  <p className="integration-card__subtitle">
+                    {translate("configurationIntegrationsComingSoonDescription")}
+                  </p>
+                </div>
+              </header>
+            </article>
+          </>
+        ) : null}
       </div>
 
       {message ? (

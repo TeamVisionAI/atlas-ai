@@ -6,6 +6,8 @@ import {
   getDefaultLandingPath,
   resolveWorkspaceType
 } from "../config/workspaceExperience";
+import { isMetaReviewModeEnabled, META_REVIEW_BANNER_TEXT } from "../config/metaReviewMode";
+import "../components/meta-review/metaReviewDesign.css";
 import { WorkspaceContext } from "../contexts/WorkspaceContext";
 import RequireWorkspaceAccess from "../components/RequireWorkspaceAccess";
 import SidebarUserFooter from "../components/layout/SidebarUserFooter";
@@ -63,7 +65,8 @@ function SidebarNav({
   showCollapse,
   onCollapse,
   navItems,
-  currentUser
+  currentUser,
+  metaReviewMode = false
 }) {
   return (
     <>
@@ -125,6 +128,7 @@ function SidebarNav({
             language={language}
             onToggleLanguage={toggleLanguage}
             onNavigate={onNavigate}
+            metaReviewMode={metaReviewMode}
           />
         ) : (
           <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
@@ -138,6 +142,7 @@ export default function MainLayout() {
   const { language, toggleLanguage, translate, syncFromUser } = useLanguage();
   const location = useLocation();
   const layoutMode = useLayoutMode();
+  const metaReviewMode = isMetaReviewModeEnabled();
   const [phoneNavOpen, setPhoneNavOpen] = useState(false);
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
   const [operationsAllowed, setOperationsAllowed] = useState(false);
@@ -284,10 +289,16 @@ export default function MainLayout() {
             onCollapse={collapseTabletNav}
             navItems={navItems}
             currentUser={currentUser}
+            metaReviewMode={metaReviewMode}
           />
         </aside>
 
         <div className="atlas-layout__frame">
+          {metaReviewMode ? (
+            <div className="atlas-layout__meta-review-banner" role="status">
+              {META_REVIEW_BANNER_TEXT}
+            </div>
+          ) : null}
           <header className={`atlas-layout__header${showMobileHeader ? " is-visible" : ""}`}>
             <button
               type="button"

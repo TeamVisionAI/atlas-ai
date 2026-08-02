@@ -15,6 +15,9 @@ export const translations = {
     layoutNavLabel: "Navegación principal",
 
     navExecutiveDashboard: "Executive Dashboard",
+    navDashboard: "Dashboard",
+    navWhatsApp: "WhatsApp",
+    navProspects: "Prospects",
     navQuickCapture: "Quick Capture",
     navMissionControl: "Mission Control",
     navPipeline: "Prospect Center",
@@ -1490,6 +1493,9 @@ export const translations = {
     layoutNavLabel: "Main navigation",
 
     navExecutiveDashboard: "Executive Dashboard",
+    navDashboard: "Dashboard",
+    navWhatsApp: "WhatsApp",
+    navProspects: "Prospects",
     navQuickCapture: "Quick Capture",
     navMissionControl: "Mission Control",
     navPipeline: "Pipeline",

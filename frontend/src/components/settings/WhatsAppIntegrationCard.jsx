@@ -1,10 +1,13 @@
 import { useLanguage } from "../../i18n/LanguageContext";
 import { appPath } from "../../config/appRoutes";
-import IntegrationCard from "./IntegrationCard";
+import { isMetaReviewModeEnabled } from "../../config/metaReviewMode";
 import {
-  formatIntegrationDate,
-  formatWebhookStatus
-} from "../../utils/integrationLifecycle";
+  formatMetaReviewConnectionStatus,
+  formatMetaReviewServiceStatus,
+  formatMetaReviewSyncTime
+} from "../meta-review/metaReviewFormatters";
+import IntegrationCard from "./IntegrationCard";
+import { formatIntegrationDate, formatWebhookStatus } from "../../utils/integrationLifecycle";
 
 export default function WhatsAppIntegrationCard({
   connected,
@@ -14,7 +17,13 @@ export default function WhatsAppIntegrationCard({
   onDisconnect
 }) {
   const { translate, language } = useLanguage();
+  const metaReviewMode = isMetaReviewModeEnabled();
   const locale = language === "es" ? "es-US" : "en-US";
+
+  const webhookHealthy =
+    connected &&
+    String(connection.healthStatus || "healthy").trim().toLowerCase() !== "disconnected" &&
+    String(connection.healthStatus || "healthy").trim().toLowerCase() !== "error";
 
   const detailRows = connected
     ? [
@@ -35,13 +44,21 @@ export default function WhatsAppIntegrationCard({
         },
         {
           key: "webhook-status",
-          label: translate("whatsappIntegrationWebhookStatus"),
-          value: formatWebhookStatus(connection.healthStatus, connected, translate)
+          label: metaReviewMode
+            ? "Webhook Status"
+            : translate("whatsappIntegrationWebhookStatus"),
+          value: metaReviewMode
+            ? formatMetaReviewServiceStatus(webhookHealthy)
+            : formatWebhookStatus(connection.healthStatus, connected, translate)
         },
         {
           key: "connection-date",
-          label: translate("whatsappIntegrationConnectionDate"),
-          value: formatIntegrationDate(connection.connectedAt, locale)
+          label: metaReviewMode
+            ? "Last Synchronization"
+            : translate("whatsappIntegrationConnectionDate"),
+          value: metaReviewMode
+            ? formatMetaReviewSyncTime(connection.lastSyncAt || connection.connectedAt)
+            : formatIntegrationDate(connection.connectedAt, locale)
         }
       ]
     : [];
@@ -61,6 +78,9 @@ export default function WhatsAppIntegrationCard({
       viewDetailsTo={appPath("settings/whatsapp")}
       onDisconnect={onDisconnect}
       busy={busy}
+      connectedLabel={metaReviewMode ? formatMetaReviewConnectionStatus(connected) : null}
+      disconnectedLabel={metaReviewMode ? formatMetaReviewConnectionStatus(false) : null}
+      omitEmptyDetailRows={metaReviewMode}
     />
   );
 }

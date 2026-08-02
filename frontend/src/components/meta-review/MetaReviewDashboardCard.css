@@ -1,0 +1,27 @@
+.meta-review-dashboard-card {
+  padding: 22px var(--meta-review-card-padding);
+  margin-bottom: var(--meta-review-section-gap);
+}
+
+.meta-review-dashboard-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.meta-review-dashboard-card__title {
+  margin: 0 0 6px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--meta-review-text);
+}
+
+.meta-review-dashboard-card__intro {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--meta-review-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { updateAccountProfile } from "../services/accountService";
 import { getStoredSessionToken } from "../services/atlasAuthService";
+import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
 import {
   normalizeUiLanguage,
   resolveUiLanguage,
@@ -23,6 +24,11 @@ export function LanguageProvider({ children }) {
 
   const syncFromUser = useCallback(
     (user, { organizationDefault } = {}) => {
+      if (isMetaReviewModeEnabled()) {
+        applyLanguage(SYSTEM_DEFAULT_LANGUAGE);
+        return SYSTEM_DEFAULT_LANGUAGE;
+      }
+
       if (organizationDefault !== undefined) {
         organizationDefaultRef.current = organizationDefault;
       }
@@ -56,6 +62,10 @@ export function LanguageProvider({ children }) {
 
   const setLanguagePreference = useCallback(
     async (code, { persist = false } = {}) => {
+      if (isMetaReviewModeEnabled()) {
+        return applyLanguage(SYSTEM_DEFAULT_LANGUAGE);
+      }
+
       const normalized = applyLanguage(code);
 
       if (persist) {
@@ -81,6 +91,10 @@ export function LanguageProvider({ children }) {
       setLanguagePreference,
       syncFromUser,
       toggleLanguage() {
+        if (isMetaReviewModeEnabled()) {
+          return;
+        }
+
         const nextLanguage = language === "es" ? "en" : "es";
         void setLanguagePreference(nextLanguage, { persist: true });
       },

@@ -191,7 +191,7 @@
       "reminderType": "reminder_1h",
       "scheduledFor": "2026-08-01T14:00:00.000Z",
       "offsetMinutes": 60,
-      "status": "scheduled",
+      "status": "failed",
       "channel": "whatsapp",
       "createdAt": "2026-07-31T21:06:26.642Z",
       "appointmentStart": "2026-08-01T15:00:00.000Z",
@@ -204,7 +204,9 @@
         "virtualUrlStatus": "configured",
         "ownerRepId": null,
         "lifecycleState": "scheduled"
-      }
+      },
+      "sentAt": "2026-08-02T14:27:00.001Z",
+      "failureReason": "Authentication Error"
     },
     {
       "id": "d8768ef4-6a73-4a63-a686-073919ebb842",
@@ -214,7 +216,7 @@
       "reminderType": "reminder_15m",
       "scheduledFor": "2026-08-01T14:45:00.000Z",
       "offsetMinutes": 15,
-      "status": "scheduled",
+      "status": "failed",
       "channel": "whatsapp",
       "createdAt": "2026-07-31T21:06:26.642Z",
       "appointmentStart": "2026-08-01T15:00:00.000Z",
@@ -227,7 +229,9 @@
         "virtualUrlStatus": "configured",
         "ownerRepId": null,
         "lifecycleState": "scheduled"
-      }
+      },
+      "sentAt": "2026-08-02T14:27:00.641Z",
+      "failureReason": "Authentication Error"
     }
   ]
 }

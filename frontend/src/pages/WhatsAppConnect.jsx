@@ -15,6 +15,10 @@ import {
 } from "../utils/metaEmbeddedSignupEvents";
 import { buildWhatsAppErrorNavigationState } from "../utils/mapWhatsAppUserError";
 import { whatsAppConnectDebug } from "../utils/whatsappConnectDebug";
+import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import { fetchWhatsAppConfiguration } from "../services/configurationService";
+import { getEmbeddedSignupHealth } from "../services/metaEmbeddedSignupService";
+import MetaReviewWhatsAppPage from "../components/meta-review/MetaReviewWhatsAppPage";
 import "./WhatsAppConnect.css";
 
 const FINISH_EVENTS = new Set([
@@ -40,6 +44,10 @@ export default function WhatsAppConnect() {
   const [status, setStatus] = useState("disconnected");
   const [alreadyConnected, setAlreadyConnected] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [reviewConnection, setReviewConnection] = useState(null);
+  const [reviewHealth, setReviewHealth] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(isMetaReviewModeEnabled());
+  const [reviewError, setReviewError] = useState(false);
 
   const authorizationCodeRef = useRef(null);
   const onboardingAssetsRef = useRef({ wabaId: null, phoneNumberId: null });
@@ -172,13 +180,59 @@ export default function WhatsAppConnect() {
         if (!cancelled && payload.connected && payload.connection) {
           setAlreadyConnected(true);
           setStatus("connected");
+          setReviewConnection(payload.connection);
         }
       } catch (error) {
         whatsAppConnectDebug("status load failed", error);
       }
     }
 
+    async function loadReviewPresentation() {
+      if (!isMetaReviewModeEnabled()) {
+        return;
+      }
+
+      setReviewLoading(true);
+      setReviewError(false);
+
+      try {
+        const [configuration, health] = await Promise.all([
+          fetchWhatsAppConfiguration(),
+          getEmbeddedSignupHealth().catch(() => null)
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        const connected = Boolean(configuration?.connected);
+        setAlreadyConnected(connected);
+        setStatus(connected ? "connected" : "disconnected");
+        setReviewConnection({
+          businessName: configuration?.businessName,
+          verifiedName: configuration?.businessName,
+          wabaId: configuration?.wabaId,
+          phoneNumberId: configuration?.phoneNumberId,
+          displayPhoneNumber: configuration?.businessPhone,
+          connectedAt: configuration?.connectedAt,
+          lastSyncAt: configuration?.lastSync,
+          healthStatus: configuration?.connectionStatus
+        });
+        setReviewHealth(health);
+      } catch (error) {
+        whatsAppConnectDebug("review whatsapp load failed", error);
+        if (!cancelled) {
+          setReviewError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setReviewLoading(false);
+        }
+      }
+    }
+
     loadStatus();
+    loadReviewPresentation();
 
     return () => {
       cancelled = true;
@@ -243,6 +297,23 @@ export default function WhatsAppConnect() {
   const isConnectDisabled =
     launching || !ready || !appId || !configId || status === "connecting" || status === "finalizing";
   const configurationMissing = !appId || !configId;
+
+  if (isMetaReviewModeEnabled()) {
+    return (
+      <MetaReviewWhatsAppPage
+        connected={alreadyConnected}
+        connection={reviewConnection || {}}
+        health={reviewHealth}
+        loading={reviewLoading}
+        error={reviewError}
+        launching={launching}
+        configurationMissing={configurationMissing}
+        sdkError={sdkError}
+        onConnect={launchWhatsAppSignup}
+        connectDisabled={isConnectDisabled}
+      />
+    );
+  }
 
   return (
     <div className="whatsapp-connect">

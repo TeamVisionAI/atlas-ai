@@ -16,6 +16,8 @@ import InterviewPipeline from "../components/executive/InterviewPipeline";
 import RecommendationCards from "../components/executive/RecommendationCards";
 import ActivityTimeline from "../components/executive/ActivityTimeline";
 import AgencyHealth from "../components/executive/AgencyHealth";
+import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import MetaReviewDashboardCard from "../components/meta-review/MetaReviewDashboardCard";
 import "./ExecutiveDashboard.css";
 
 function DashboardSkeleton() {
@@ -136,6 +138,8 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="executive-dashboard">
+      {isMetaReviewModeEnabled() ? <MetaReviewDashboardCard activity={viewModel.activity} /> : null}
+
       {fromWorkspace && focusLabelKey ? (
         <div className="executive-dashboard__focus-banner" role="status">
           <p>{translate("executiveFocusFromWorkspace")}</p>

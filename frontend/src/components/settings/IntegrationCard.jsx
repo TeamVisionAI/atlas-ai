@@ -4,18 +4,18 @@ import AtlasButton from "../ui/AtlasButton";
 import SettingsIcon from "../icons/SettingsIcons";
 import { resolveIntegrationLifecycle } from "../../utils/integrationLifecycle";
 
-function IntegrationStatusBadge({ connected, translate }) {
+function IntegrationStatusBadge({ connected, translate, connectedLabel, disconnectedLabel }) {
   if (connected) {
     return (
       <span className="integration-status-badge integration-status-badge--connected">
-        {translate("configurationConnected")}
+        {connectedLabel || translate("configurationConnected")}
       </span>
     );
   }
 
   return (
     <span className="integration-status-badge integration-status-badge--disconnected">
-      {translate("configurationNotConnected")}
+      {disconnectedLabel || translate("configurationNotConnected")}
     </span>
   );
 }
@@ -37,7 +37,10 @@ export default function IntegrationCard({
   connectTo = null,
   onDisconnect,
   busy = false,
-  children = null
+  children = null,
+  connectedLabel = null,
+  disconnectedLabel = null,
+  omitEmptyDetailRows = false
 }) {
   const { translate } = useLanguage();
   const lifecycle = resolveIntegrationLifecycle({ connected, connecting, disconnecting });
@@ -46,6 +49,9 @@ export default function IntegrationCard({
   const isConnecting = lifecycle === "connecting";
   const showDetailRows =
     detailRows.length > 0 && (isConnected || showDetailsWhenDisconnected);
+  const visibleDetailRows = omitEmptyDetailRows
+    ? detailRows.filter((row) => Boolean(row.value))
+    : detailRows;
   const notSetLabel = translate("configurationNotSet");
 
   return (
@@ -64,12 +70,17 @@ export default function IntegrationCard({
         <div className="integration-card__meta-row">
           <dt>{translate("configurationConnectionStatus")}</dt>
           <dd>
-            <IntegrationStatusBadge connected={isConnected} translate={translate} />
+            <IntegrationStatusBadge
+              connected={isConnected}
+              translate={translate}
+              connectedLabel={connectedLabel}
+              disconnectedLabel={disconnectedLabel}
+            />
           </dd>
         </div>
 
         {showDetailRows
-          ? detailRows.map((row) => (
+          ? visibleDetailRows.map((row) => (
               <div className="integration-card__meta-row" key={row.key || row.label}>
                 <dt>{row.label}</dt>
                 <dd>{row.value || notSetLabel}</dd>
