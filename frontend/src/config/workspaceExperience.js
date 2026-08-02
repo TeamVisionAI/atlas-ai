@@ -442,6 +442,10 @@ export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {
     return false;
   }
 
+  if (routeKey === "settings/review-users" && !isMetaReviewModeEnabled()) {
+    return false;
+  }
+
   if (isMetaReviewModeEnabled()) {
     if (routeKey === "settings/profile" || routeKey === "settings/integrations") {
       return true;
