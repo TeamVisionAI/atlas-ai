@@ -25,6 +25,7 @@ const { META_REVIEW_PROSPECTS } = require("./environment/seedMetaReviewDemo");
 const API_BASE = process.env.API_BASE || "http://127.0.0.1:3000";
 const REVIEW_PASSWORD = "MetaReviewE2E!2026";
 const REVIEW_EMAIL = `meta-review-e2e-${Date.now()}@teamvisionfinancial.com`;
+const PERMANENT_REVIEW_EMAIL = "review@teamvisionfinancial.com";
 
 const results = [];
 let failed = 0;
@@ -105,6 +106,58 @@ async function cleanupReviewUser(email) {
   await supabase.from("atlas_sessions").delete().eq("user_id", user.id);
   await supabase.from("atlas_users").delete().eq("id", user.id);
   await supabase.from("users").delete().eq("id", user.id);
+}
+
+async function snapshotDemoProspectOwnership() {
+  const { data, error } = await supabase
+    .from("prospects")
+    .select("phone, owner_user_id, created_by_user_id")
+    .eq("entry_method", META_REVIEW_ENTRY_METHOD)
+    .order("phone");
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function restoreDemoProspectsToPermanentReviewUser(snapshot = []) {
+  const permanentReviewUser = await findUserByEmail(PERMANENT_REVIEW_EMAIL);
+
+  if (!permanentReviewUser) {
+    console.error(
+      `[meta-review-e2e] Cannot restore demo ownership — ${PERMANENT_REVIEW_EMAIL} not found`
+    );
+    return { restored: false, reason: "permanent review user missing" };
+  }
+
+  const result = await syncMetaReviewDemoProspectsToLegacy(permanentReviewUser);
+
+  const { count } = await supabase
+    .from("prospects")
+    .select("*", { count: "exact", head: true })
+    .eq("entry_method", META_REVIEW_ENTRY_METHOD)
+    .eq("owner_user_id", permanentReviewUser.id);
+
+  console.info("[meta-review-e2e] Restored demo prospect ownership", {
+    permanentReviewEmail: PERMANENT_REVIEW_EMAIL,
+    permanentReviewUserId: permanentReviewUser.id,
+    ownedDemoCount: count,
+    previousOwners: snapshot.map((row) => ({
+      phone: row.phone,
+      owner_user_id: row.owner_user_id
+    })),
+    results: result.results
+  });
+
+  if (count !== 4) {
+    console.error(
+      `[meta-review-e2e] Expected ${PERMANENT_REVIEW_EMAIL} to own 4 demo prospects after restore, got ${count}`
+    );
+  }
+
+  return { restored: true, permanentReviewUserId: permanentReviewUser.id, ownedDemoCount: count, result };
 }
 
 async function verifyReviewUserCreation(adminContext) {
@@ -362,6 +415,9 @@ async function main() {
   }
 
   const adminContext = await loadAdminAuthContext();
+  const demoOwnershipSnapshot = await snapshotDemoProspectOwnership();
+
+  console.info("[meta-review-e2e] Saved demo ownership snapshot", demoOwnershipSnapshot);
 
   try {
     await cleanupReviewUser(REVIEW_EMAIL);
@@ -369,6 +425,7 @@ async function main() {
     await verifyLoginAndApis(reviewUser);
     await verifyAdminReviewUsersAccess(adminContext);
   } finally {
+    await restoreDemoProspectsToPermanentReviewUser(demoOwnershipSnapshot);
     await cleanupReviewUser(REVIEW_EMAIL);
   }
 
