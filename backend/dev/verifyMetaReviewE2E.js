@@ -238,6 +238,18 @@ async function verifyLoginAndApis(reviewUser) {
     `status=${whatsappStatus.status}`
   );
 
+  const integrations = await apiFetch("/api/configuration/organization/integrations", { token });
+  assert(
+    "7.2 Organization integrations API reachable for reviewer",
+    integrations.status === 200,
+    `status=${integrations.status} ${JSON.stringify(integrations.json)}`
+  );
+  assert(
+    "7.3 Integrations payload includes WhatsApp status",
+    integrations.json?.integrations?.whatsapp != null,
+    JSON.stringify(integrations.json?.integrations)
+  );
+
   const profileConfig = await apiFetch("/api/configuration/profile", { token });
   assert(
     "8.0 Profile configuration API reachable for reviewer",
