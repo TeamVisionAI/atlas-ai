@@ -201,8 +201,41 @@ async function verifyLoginAndApis(reviewUser) {
   const queue = dashboard.json?.prioritizedWorkflowQueue || [];
   assert("4.4 Prioritized queue non-empty", queue.length === 4, `queue=${queue.length}`);
 
+  const prospectCenter = await apiFetch("/api/prospect-center", { token });
+  assert("4.6 Prospect Center API 200", prospectCenter.status === 200, `status=${prospectCenter.status}`);
+
+  const centerItems = prospectCenter.json?.items || [];
+  assert(
+    "4.7 Prospect Center shows exactly four demo prospects",
+    centerItems.length === 4 && prospectCenter.json?.totalCount === 4,
+    `items=${centerItems.length} totalCount=${prospectCenter.json?.totalCount}`
+  );
+  assert(
+    "4.8 Dashboard count matches Prospect Center count",
+    prospects.length === centerItems.length && prospects.length === queue.length,
+    `dashboard=${prospects.length} center=${centerItems.length} queue=${queue.length}`
+  );
+  assert(
+    "4.9 Prospect Center items are review-owned demos",
+    centerItems.every((item) =>
+      accessible.some((row) => row.phone === item.phone && row.owner_user_id === reviewUser.id)
+    )
+  );
+
   const firstPhone = queue[0]?.phone || accessible[0]?.phone;
   assert("4.5 First queue item has phone", Boolean(firstPhone), String(firstPhone));
+
+  const centerFirstPhone = centerItems[0]?.phone;
+  const openInQueuePhone = centerFirstPhone || firstPhone;
+  const encodedOpenInQueue = encodeURIComponent(openInQueuePhone);
+  const missionControlFromCenter = await apiFetch(`/api/mission-control/${encodedOpenInQueue}`, {
+    token
+  });
+  assert(
+    "4.10 Open in queue target loads in Mission Control",
+    missionControlFromCenter.status === 200,
+    `phone=${openInQueuePhone} status=${missionControlFromCenter.status}`
+  );
 
   const encodedPhone = encodeURIComponent(firstPhone);
   const missionControl = await apiFetch(`/api/mission-control/${encodedPhone}`, { token });

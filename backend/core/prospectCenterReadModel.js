@@ -58,14 +58,15 @@ function matchesSearch(item, query) {
 }
 
 /**
- * @param {{ filter?: string, search?: string, organizationId: string }} options
+ * @param {{ filter?: string, search?: string, organizationId: string, prospects?: object[] }} options
  */
 async function buildProspectCenterReadModel(options = {}) {
   if (!options.organizationId) {
     throw new Error("organizationId is required to build prospect center read model");
   }
 
-  const prospects = await loadProductionProspects(options.organizationId);
+  const prospects =
+    options.prospects ?? (await loadProductionProspects(options.organizationId));
   const queue = await buildPrioritizedWorkflowQueue(prospects);
   const prospectByPhone = new Map(prospects.map((row) => [row.phone, row]));
 
