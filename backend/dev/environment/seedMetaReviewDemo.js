@@ -1,6 +1,10 @@
 /**
  * Meta App Review — idempotent demo prospect seed.
  * Runs when META_REVIEW_MODE=true; skips if demo prospects already exist.
+ *
+ * Demo rows are stored in atlas_core_prospects. Legacy `prospects` rows for
+ * Dashboard/Mission Control are mirrored when a Meta Review user is created or
+ * activated — see metaReviewLegacyProspectBridge.js (LC2 removal target).
  */
 
 const { EventFactory } = require("../../modules/business-events/application/EventFactory");

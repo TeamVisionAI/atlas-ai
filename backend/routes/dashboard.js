@@ -12,6 +12,7 @@ const {
   buildPrioritizedWorkflowQueue
 } = require("../core/missionControlPriorityEngine");
 const { filterProductionProspects } = require("../core/productionProspectFilter");
+const { filterProspectsForAuthContext } = require("../security/authorizationService");
 const {
   buildExecutiveDashboard,
   buildRecommendations,
@@ -31,7 +32,8 @@ router.get("/", async (req, res) => {
     return res.status(500).json(error);
   }
 
-  const prospects = filterProductionProspects(data || []);
+  const productionProspects = filterProductionProspects(data || []);
+  const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
 
   const dashboard = {
     totalProspects: prospects.length,
@@ -74,7 +76,8 @@ router.get("/recommendations", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 5, 20);
     const organizationId = getTenantOrganizationId(req);
-    const prospects = await loadProductionProspects(organizationId);
+    const productionProspects = await loadProductionProspects(organizationId);
+    const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
     const queue = await buildPrioritizedWorkflowQueue(prospects);
 
     res.json({
@@ -94,9 +97,11 @@ router.get("/activity", async (req, res) => {
     const organizationId = getTenantOrganizationId(req);
     const { data } = await supabase
       .from("prospects")
-      .select("phone")
+      .select("*")
       .eq("organization_id", organizationId);
-    const phones = filterProductionProspects(data || []).map((row) => row.phone);
+    const productionProspects = filterProductionProspects(data || []);
+    const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
+    const phones = prospects.map((row) => row.phone);
     const activity = await buildRecentActivity(phones, limit);
 
     res.json({

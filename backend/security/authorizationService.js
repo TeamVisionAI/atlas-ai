@@ -145,6 +145,14 @@ function assertProspectAccess(context, prospect) {
   }
 }
 
+function filterProspectsForAuthContext(context, prospects = []) {
+  if (!Array.isArray(prospects) || prospects.length === 0) {
+    return [];
+  }
+
+  return prospects.filter((prospect) => canAccessProspect(context, prospect));
+}
+
 function getProspectListScope(context) {
   if (!isActiveContext(context)) {
     return { denied: true };
@@ -200,6 +208,7 @@ module.exports = {
   isActiveContext,
   hasPermission,
   canAccessProspect,
+  filterProspectsForAuthContext,
   assertProspectAccess,
   getProspectListScope,
   canAccessOperationsCenter,

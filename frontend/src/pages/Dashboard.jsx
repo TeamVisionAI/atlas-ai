@@ -4,6 +4,7 @@ import { getDashboard } from "../services/api";
 import { getOrganizationSettings } from "../services/organizationService";
 import {
   getMissionControl,
+  isMissionControlAccessDenied,
   MissionControlError,
   postMissionControlAction
 } from "../services/missionControlService";
@@ -103,6 +104,83 @@ async function loadWorkspaceForQueueItem(item, dashboardData) {
   });
 }
 
+async function loadWorkspaceAtQueueIndex(queueItems, dashboardData, index) {
+  const item = queueItems[index];
+
+  if (!item?.phone) {
+    return null;
+  }
+
+  const adapted = await loadWorkspaceForQueueItem(item, dashboardData);
+
+  if (!adapted) {
+    return null;
+  }
+
+  return { adapted, index };
+}
+
+function buildQueueTryOrder(length, startIndex = 0) {
+  if (length <= 0) {
+    return [];
+  }
+
+  const normalizedStart = Math.min(Math.max(startIndex, 0), length - 1);
+  const order = [];
+
+  for (let index = normalizedStart; index < length; index += 1) {
+    order.push(index);
+  }
+
+  for (let index = 0; index < normalizedStart; index += 1) {
+    order.push(index);
+  }
+
+  return order;
+}
+
+/** Defensive fallback when prospect access changes after the queue was loaded. */
+async function loadAccessibleProspectFromQueue(queueItems, dashboardData, startIndex = 0) {
+  if (!queueItems?.length) {
+    return null;
+  }
+
+  let lastForbiddenPhone = null;
+
+  for (const index of buildQueueTryOrder(queueItems.length, startIndex)) {
+    const item = queueItems[index];
+
+    if (!item?.phone) {
+      continue;
+    }
+
+    try {
+      const adapted = await loadWorkspaceForQueueItem(item, dashboardData);
+
+      if (adapted) {
+        return { adapted, index };
+      }
+    } catch (error) {
+      if (isMissionControlAccessDenied(error)) {
+        lastForbiddenPhone = item.phone;
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  if (lastForbiddenPhone) {
+    console.info("[MissionControl] No accessible prospects in queue", {
+      startIndex,
+      queueSize: queueItems.length,
+      lastForbiddenPhone
+    });
+  }
+
+  return null;
+}
+
 export default function Dashboard() {
   const { phone: routePhone } = useParams();
   const [searchParams] = useSearchParams();
@@ -130,9 +208,7 @@ export default function Dashboard() {
   const { prompt, promptDialog } = usePromptDialog();
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
-    const item = queueItems[index];
-
-    if (!item) {
+    if (!queueItems?.length) {
       return;
     }
 
@@ -141,17 +217,22 @@ export default function Dashboard() {
     setActionError(null);
 
     try {
-      const adapted = await loadWorkspaceForQueueItem(item, dashboardData);
+      const loaded = await loadWorkspaceAtQueueIndex(queueItems, dashboardData, index);
 
-      if (!adapted) {
-        setLoadError({ key: "missionControlNoData" });
+      if (!loaded) {
+        setLoadError({ key: "missionControlNoQueue" });
         return;
       }
 
-      setWorkspace(adapted);
-      setCurrentIndex(index);
+      setWorkspace(loaded.adapted);
+      setCurrentIndex(loaded.index);
       setWorkflowComplete(null);
     } catch (err) {
+      if (isMissionControlAccessDenied(err)) {
+        setLoadError({ key: "missionControlLoadError" });
+        return;
+      }
+
       console.error(err);
       setLoadError(
         err instanceof MissionControlError
@@ -185,14 +266,13 @@ export default function Dashboard() {
           : fullQueue;
         const sortedQueue = filteredQueue.length ? filteredQueue : fullQueue;
         const targetPhone = deepLinkPhone || sortedQueue[0]?.phone;
-        const initialIndex = findQueueIndex(sortedQueue, targetPhone);
-        const initialItem = sortedQueue[initialIndex];
+        const preferredIndex = findQueueIndex(sortedQueue, targetPhone);
 
         setDashboard(dashboardData);
         setOrganizationSettings(orgSettings);
         setQueue(sortedQueue);
 
-        if (!initialItem) {
+        if (!sortedQueue.length) {
           const filterLabelKey = EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter];
           setLoadError(
             executiveFilter
@@ -209,16 +289,25 @@ export default function Dashboard() {
           return;
         }
 
-        const adapted = await loadWorkspaceForQueueItem(initialItem, dashboardData);
+        const loaded = await loadWorkspaceAtQueueIndex(
+          sortedQueue,
+          dashboardData,
+          preferredIndex
+        );
 
-        if (!adapted) {
-          setLoadError({ key: "missionControlNoActive" });
+        if (!loaded) {
+          setLoadError({ key: "missionControlNoQueue" });
           return;
         }
 
-        setWorkspace(adapted);
-        setCurrentIndex(initialIndex);
+        setWorkspace(loaded.adapted);
+        setCurrentIndex(loaded.index);
       } catch (err) {
+        if (isMissionControlAccessDenied(err)) {
+          setLoadError({ key: "missionControlLoadError" });
+          return;
+        }
+
         console.error(err);
         setLoadError({ key: "missionControlWorkspaceError" });
       } finally {
@@ -259,10 +348,24 @@ export default function Dashboard() {
       return;
     }
 
-    const adapted = await loadWorkspaceForQueueItem(currentItem, dashboard);
+    try {
+      const adapted = await loadWorkspaceForQueueItem(currentItem, dashboard);
 
-    if (adapted) {
-      setWorkspace(adapted);
+      if (adapted) {
+        setWorkspace(adapted);
+        return;
+      }
+    } catch (error) {
+      if (!isMissionControlAccessDenied(error)) {
+        throw error;
+      }
+    }
+
+    const loaded = await loadAccessibleProspectFromQueue(queue, dashboard, currentIndex + 1);
+
+    if (loaded) {
+      setWorkspace(loaded.adapted);
+      setCurrentIndex(loaded.index);
     }
   }, [queue, currentIndex, dashboard]);
 

@@ -1,11 +1,16 @@
 import { apiFetch, apiRequest } from "./apiClient";
 
 export class MissionControlError extends Error {
-  constructor(message, status) {
+  constructor(message, status, code = null) {
     super(message);
     this.name = "MissionControlError";
     this.status = status;
+    this.code = code;
   }
+}
+
+export function isMissionControlAccessDenied(error) {
+  return error instanceof MissionControlError && error.status === 403;
 }
 
 /**
@@ -21,7 +26,12 @@ export async function getMissionControl(phone) {
   }
 
   if (!response.ok) {
-    throw new MissionControlError("Failed to load mission control", response.status);
+    const payload = await response.json().catch(() => ({}));
+    throw new MissionControlError(
+      payload.message || "Failed to load mission control",
+      response.status,
+      payload.error || null
+    );
   }
 
   return response.json();

@@ -12,6 +12,9 @@ const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constan
 const { resolveWorkspaceOrganizationId } = require("../core/tenantOrganization");
 const identityWriteService = require("./identityWriteService");
 const { presentAdminUser } = require("./identityAdminService");
+const {
+  syncMetaReviewDemoProspectsToLegacy
+} = require("./metaReviewLegacyProspectBridge");
 
 const REVIEW_USER_FLAG = "meta_review_user";
 
@@ -122,6 +125,10 @@ async function activateReviewUserRecord(existing, input, authContext, auditMeta 
     userAgent: auditMeta.userAgent
   });
 
+  await syncMetaReviewDemoProspectsToLegacy(user).catch((error) => {
+    console.error("[meta-review] Legacy demo prospect bridge failed:", error.message);
+  });
+
   return presentReviewUser(user);
 }
 
@@ -177,6 +184,10 @@ async function createReviewUser(input, authContext, auditMeta = {}) {
     metadata: { role, email },
     ipAddress: auditMeta.ipAddress,
     userAgent: auditMeta.userAgent
+  });
+
+  await syncMetaReviewDemoProspectsToLegacy(user).catch((error) => {
+    console.error("[meta-review] Legacy demo prospect bridge failed:", error.message);
   });
 
   return {
