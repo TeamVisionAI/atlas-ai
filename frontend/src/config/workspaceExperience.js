@@ -318,6 +318,41 @@ function buildNavOrderForWorkspace(workspaceType) {
   ];
 }
 
+const USER_MANAGEMENT_ROUTE_RULE = Object.freeze({
+  workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+  permission: PERMISSIONS.ADMIN_USERS
+});
+
+function matchesRouteAccessRule(rule, user, { operationsAllowed = false } = {}) {
+  if (!user) {
+    return false;
+  }
+
+  const workspaceType = resolveWorkspaceType(user.role);
+
+  if (rule.workspaceTypes && !rule.workspaceTypes.includes(workspaceType)) {
+    return false;
+  }
+
+  if (rule.permission && !roleHasPermission(user.role, rule.permission)) {
+    return false;
+  }
+
+  if (rule.requiresOperationsAccess && !operationsAllowed) {
+    return false;
+  }
+
+  return true;
+}
+
+function canAccessReviewUsersSettings(user, options = {}) {
+  if (!isMetaReviewModeEnabled()) {
+    return false;
+  }
+
+  return matchesRouteAccessRule(USER_MANAGEMENT_ROUTE_RULE, user, options);
+}
+
 export const ROUTE_ACCESS = Object.freeze({
   "executive-dashboard": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
@@ -383,13 +418,8 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
   },
-  "settings/review-users": {
-    permission: PERMISSIONS.ADMIN_USERS
-  },
-  "admin/users": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
-    permission: PERMISSIONS.ADMIN_USERS
-  },
+  "settings/review-users": USER_MANAGEMENT_ROUTE_RULE,
+  "admin/users": USER_MANAGEMENT_ROUTE_RULE,
   "operations-center": {
     permission: PERMISSIONS.OPERATIONS_ACCESS,
     requiresOperationsAccess: true
@@ -436,8 +466,12 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
     }));
 }
 
-export function canManageUsers(user) {
-  return roleHasPermission(user?.role, PERMISSIONS.ADMIN_USERS);
+export function canManageUsers(user, options = {}) {
+  return matchesRouteAccessRule(USER_MANAGEMENT_ROUTE_RULE, user, options);
+}
+
+export function canAccessReviewUsers(user, options = {}) {
+  return canAccessReviewUsersSettings(user, options);
 }
 
 export function getUserManagementPath() {
@@ -453,8 +487,8 @@ export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {
     return false;
   }
 
-  if (routeKey === "settings/review-users" && !isMetaReviewModeEnabled()) {
-    return false;
+  if (routeKey === "settings/review-users") {
+    return canAccessReviewUsersSettings(user, { operationsAllowed });
   }
 
   if (isMetaReviewModeEnabled()) {
@@ -464,10 +498,6 @@ export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {
 
     if (routeKey === "settings/profile" || routeKey === "settings/integrations") {
       return true;
-    }
-
-    if (routeKey === "settings/review-users") {
-      return canManageUsers(user);
     }
 
     if (routeKey.startsWith("settings/whatsapp")) {
@@ -485,21 +515,7 @@ export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {
     return true;
   }
 
-  const workspaceType = resolveWorkspaceType(user.role);
-
-  if (rule.workspaceTypes && !rule.workspaceTypes.includes(workspaceType)) {
-    return false;
-  }
-
-  if (rule.permission && !roleHasPermission(user.role, rule.permission)) {
-    return false;
-  }
-
-  if (rule.requiresOperationsAccess && !operationsAllowed) {
-    return false;
-  }
-
-  return true;
+  return matchesRouteAccessRule(rule, user, { operationsAllowed });
 }
 
 export function resolveRouteKey(pathname) {
@@ -606,6 +622,7 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "reviewUsers",
     descriptionKey: "configurationHubReviewUsersDescription",
     icon: "organization",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ADMIN_USERS,
     metaReviewOnly: true
   }
@@ -631,24 +648,29 @@ export function buildSettingsHubSections(user, settingsSections) {
   }
 
   const workspaceType = resolveWorkspaceType(user.role);
+  const metaReviewMode = isMetaReviewModeEnabled();
 
-  let sections = SETTINGS_HUB_SECTIONS.filter((def) => canAccessSettingsSection(def, user, workspaceType));
+  let sections = SETTINGS_HUB_SECTIONS.filter((def) => {
+    if (def.metaReviewOnly && !metaReviewMode) {
+      return false;
+    }
 
-  if (isMetaReviewModeEnabled()) {
-    sections = SETTINGS_HUB_SECTIONS.filter((def) => {
+    if (def.id === "review-users") {
+      return canAccessReviewUsersSettings(user);
+    }
+
+    return canAccessSettingsSection(def, user, workspaceType);
+  });
+
+  if (metaReviewMode) {
+    sections = sections.filter((def) => {
       if (def.metaReviewOnly) {
-        return canAccessSettingsSection(def, user, workspaceType);
+        return def.id === "review-users"
+          ? canAccessReviewUsersSettings(user)
+          : canAccessSettingsSection(def, user, workspaceType);
       }
 
-      if (!META_REVIEW_SETTINGS_SECTION_IDS.has(def.id)) {
-        return false;
-      }
-
-      if (def.id === "profile" || def.id === "integrations") {
-        return true;
-      }
-
-      return canAccessSettingsSection(def, user, workspaceType);
+      return META_REVIEW_SETTINGS_SECTION_IDS.has(def.id);
     });
 
     if (sections.length === 0) {

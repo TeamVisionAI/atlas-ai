@@ -21,7 +21,7 @@ export default function RequireWorkspaceAccess({ children, routeKey = null }) {
 
   if (!canAccessRoute(key, user, { operationsAllowed })) {
     if (isMetaReviewModeEnabled()) {
-      if (key === "admin/users" && canManageUsers(user)) {
+      if (key === "admin/users" && canManageUsers(user, { operationsAllowed })) {
         return <Navigate to={appPath("settings/review-users")} replace />;
       }
 
