@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
+import { isMetaReviewModeEnabled } from "../../config/metaReviewMode";
 import {
   archiveAdminUser,
   createAdminUser,
@@ -125,6 +126,10 @@ export default function AdminUsers() {
     () => users.filter((user) => user.status === "active"),
     [users]
   );
+
+  if (isMetaReviewModeEnabled()) {
+    return <Navigate to={appPath("settings/review-users")} replace />;
+  }
 
   return (
     <div className="identity-page">

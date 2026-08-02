@@ -1,7 +1,9 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { appPath } from "../config/appRoutes";
 import {
   canAccessRoute,
+  canManageUsers,
   getDefaultLandingPath,
   resolveRouteKey
 } from "../config/workspaceExperience";
@@ -19,6 +21,10 @@ export default function RequireWorkspaceAccess({ children, routeKey = null }) {
 
   if (!canAccessRoute(key, user, { operationsAllowed })) {
     if (isMetaReviewModeEnabled()) {
+      if (key === "admin/users" && canManageUsers(user)) {
+        return <Navigate to={appPath("settings/review-users")} replace />;
+      }
+
       return <Navigate to={landingPath || getDefaultLandingPath(user.role)} replace />;
     }
 

@@ -384,7 +384,6 @@ export const ROUTE_ACCESS = Object.freeze({
     permission: PERMISSIONS.ORG_READ
   },
   "settings/review-users": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ADMIN_USERS
   },
   "admin/users": {
@@ -437,6 +436,18 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
     }));
 }
 
+export function canManageUsers(user) {
+  return roleHasPermission(user?.role, PERMISSIONS.ADMIN_USERS);
+}
+
+export function getUserManagementPath() {
+  if (isMetaReviewModeEnabled()) {
+    return appPath("settings/review-users");
+  }
+
+  return appPath("admin/users");
+}
+
 export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {}) {
   if (!user) {
     return false;
@@ -447,8 +458,16 @@ export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {
   }
 
   if (isMetaReviewModeEnabled()) {
+    if (routeKey === "admin/users") {
+      return false;
+    }
+
     if (routeKey === "settings/profile" || routeKey === "settings/integrations") {
       return true;
+    }
+
+    if (routeKey === "settings/review-users") {
+      return canManageUsers(user);
     }
 
     if (routeKey.startsWith("settings/whatsapp")) {
@@ -587,7 +606,6 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "reviewUsers",
     descriptionKey: "configurationHubReviewUsersDescription",
     icon: "organization",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ADMIN_USERS,
     metaReviewOnly: true
   }

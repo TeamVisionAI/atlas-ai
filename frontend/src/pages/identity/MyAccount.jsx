@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
+import { canManageUsers, getUserManagementPath } from "../../config/workspaceExperience";
 import {
   changeAccountPassword,
   fetchAccountProfile,
@@ -24,7 +25,6 @@ export default function MyAccount() {
   const [tab, setTab] = useState("profile");
   const [profile, setProfile] = useState(null);
   const [sessions, setSessions] = useState([]);
-  const [isAdministrator, setIsAdministrator] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [passwordForm, setPasswordForm] = useState({
@@ -36,7 +36,6 @@ export default function MyAccount() {
   async function loadProfile() {
     const result = await fetchAccountProfile();
     setProfile(result.profile);
-    setIsAdministrator(result.profile?.role === "administrator");
   }
 
   async function loadSessions() {
@@ -146,8 +145,8 @@ export default function MyAccount() {
           <h1>My Account</h1>
           <p>{profile.email}</p>
         </div>
-        {isAdministrator ? (
-          <Link className="identity-button-secondary" to={appPath("admin/users")}>
+        {canManageUsers(profile) ? (
+          <Link className="identity-button-secondary" to={getUserManagementPath()}>
             Administration
           </Link>
         ) : null}
