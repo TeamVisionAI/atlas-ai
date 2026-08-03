@@ -96,15 +96,28 @@ export default function Login() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Atlas Sign In</h1>
-        <p>Use your individual Atlas account.</p>
+        <div className="login-brand">
+          <img
+            className="login-brand__logo"
+            src="/atlas-ai-logo.png"
+            alt="Atlas AI"
+            width={96}
+            height={96}
+          />
+          <p className="login-brand__motto">Connect • Automate • Grow</p>
+        </div>
 
-        <label htmlFor="identifier">Identifier</label>
+        <div className="login-intro">
+          <h1>Sign in</h1>
+          <p className="login-intro__subtitle">Secure access to your workspace.</p>
+        </div>
+
+        <label htmlFor="identifier">Email or Rep ID</label>
         <input
           id="identifier"
           type="text"
           autoComplete="username"
-          placeholder="Email or Rep ID"
+          placeholder="Enter your email or Rep ID"
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}
           required
@@ -173,8 +186,10 @@ export default function Login() {
 
         {error ? <p className="login-error">{error}</p> : null}
 
-        <p>
-          <Link to={appPath("forgot-password")}>Forgot password?</Link>
+        <p className="login-forgot">
+          <Link className="login-forgot__link" to={appPath("forgot-password")}>
+            Forgot password?
+          </Link>
         </p>
 
         <button type="submit" disabled={loading}>
