@@ -26,8 +26,8 @@
 
 .login-brand__logo {
   display: block;
-  width: 96px;
-  height: 96px;
+  width: 104px;
+  height: 104px;
   object-fit: contain;
   border-radius: 12px;
 }
@@ -36,8 +36,8 @@
   margin: 0.875rem 0 0;
   font-size: 0.6875rem;
   font-weight: 500;
-  letter-spacing: 0.07em;
-  color: #d4af37;
+  letter-spacing: 0.09em;
+  color: #e0b84c;
 }
 
 .login-intro {
@@ -59,7 +59,7 @@
   font-size: 0.9375rem;
   font-weight: 400;
   line-height: 1.5;
-  color: #94a3b8;
+  color: #b8c2d1;
 }
 
 .login-card label {
@@ -122,14 +122,14 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #8b93a7;
+  color: #a3abbf;
   cursor: pointer;
   transition: color 0.2s ease, opacity 0.2s ease;
 }
 
 .login-password-toggle:hover,
 .login-password-toggle:focus-visible {
-  color: #ffffff;
+  color: #2563eb;
   background: transparent;
   outline: none;
 }
@@ -159,6 +159,17 @@
   color: white;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.login-card button[type="submit"]:hover:not(:disabled) {
+  background: #3b82f6;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.login-card button[type="submit"]:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
 }
 
 .login-card button[type="submit"]:disabled {
@@ -172,8 +183,8 @@
   }
 
   .login-brand__logo {
-    width: 88px;
-    height: 88px;
+    width: 92px;
+    height: 92px;
   }
 
   .login-intro h1 {

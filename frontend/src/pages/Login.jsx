@@ -101,8 +101,8 @@ export default function Login() {
             className="login-brand__logo"
             src="/atlas-ai-logo.png"
             alt="Atlas AI"
-            width={96}
-            height={96}
+            width={104}
+            height={104}
           />
           <p className="login-brand__motto">Connect • Automate • Grow</p>
         </div>
