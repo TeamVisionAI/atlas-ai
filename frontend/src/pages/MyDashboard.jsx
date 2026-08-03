@@ -6,6 +6,7 @@ import { appPath } from "../config/appRoutes";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
 import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
 import MetaReviewDashboardCard from "../components/meta-review/MetaReviewDashboardCard";
+import { buildProspectMilestoneLabel } from "../engines/prospectCenterViewModel";
 import "./WorkspaceDashboard.css";
 
 export default function MyDashboard() {
@@ -49,6 +50,11 @@ export default function MyDashboard() {
     () => prospects.filter((prospect) => prospect.current_step !== "CONFIRMED"),
     [prospects]
   );
+
+  const workflowByPhone = useMemo(() => {
+    const queue = dashboard?.prioritizedWorkflowQueue || [];
+    return new Map(queue.map((entry) => [entry.phone, entry]));
+  }, [dashboard?.prioritizedWorkflowQueue]);
 
   const metaReviewMode = isMetaReviewModeEnabled();
 
@@ -106,7 +112,15 @@ export default function MyDashboard() {
                   <li key={prospect.phone || prospect.id}>
                     <div>
                       <strong>{prospect.name || prospect.phone}</strong>
-                      <span>{prospect.current_step || translate("myDashboardUnknownStep")}</span>
+                      <span>
+                        {buildProspectMilestoneLabel(
+                          {
+                            canonicalMilestone: workflowByPhone.get(prospect.phone)
+                              ?.canonicalMilestone
+                          },
+                          translate
+                        )}
+                      </span>
                     </div>
                     {prospect.phone ? (
                       <Link to={buildProspectWorkspacePath({ phone: prospect.phone })}>
