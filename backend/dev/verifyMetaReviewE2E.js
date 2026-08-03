@@ -3,6 +3,10 @@
  * Meta App Review — end-to-end verification (API + service layer).
  * Run: node backend/dev/verifyMetaReviewE2E.js
  *
+ * Uses a permanent automation account (meta-review-e2e@teamvisionfinancial.com).
+ * The automation user is never deleted — sessions are cleared and demo ownership
+ * is restored to review@teamvisionfinancial.com after each run.
+ *
  * Requires META_REVIEW_MODE=true, backend reachable at API_BASE (default http://127.0.0.1:3000).
  */
 
@@ -10,7 +14,7 @@ require("dotenv").config();
 
 const { supabase } = require("../services/supabaseService");
 const { loginWithPassword } = require("../services/authService");
-const { findUserByEmail } = require("../services/atlasUserService");
+const { findUserByEmail, revokeAllSessionsForUser } = require("../services/atlasUserService");
 const { buildAuthContextAsync } = require("../security/authorizationService");
 const { filterProspectsForAuthContext } = require("../security/authorizationService");
 const { filterProductionProspects } = require("../core/productionProspectFilter");
@@ -24,7 +28,7 @@ const { META_REVIEW_PROSPECTS } = require("./environment/seedMetaReviewDemo");
 
 const API_BASE = process.env.API_BASE || "http://127.0.0.1:3000";
 const REVIEW_PASSWORD = "MetaReviewE2E!2026";
-const REVIEW_EMAIL = `meta-review-e2e-${Date.now()}@teamvisionfinancial.com`;
+const AUTOMATION_REVIEW_EMAIL = "meta-review-e2e@teamvisionfinancial.com";
 const PERMANENT_REVIEW_EMAIL = "review@teamvisionfinancial.com";
 
 const results = [];
@@ -96,16 +100,65 @@ async function loadAdminAuthContext() {
   return buildAuthContextAsync(admin);
 }
 
-async function cleanupReviewUser(email) {
+async function clearAutomationSessions(email = AUTOMATION_REVIEW_EMAIL) {
   const user = await findUserByEmail(email);
 
   if (!user) {
     return;
   }
 
-  await supabase.from("atlas_sessions").delete().eq("user_id", user.id);
-  await supabase.from("atlas_users").delete().eq("id", user.id);
-  await supabase.from("users").delete().eq("id", user.id);
+  await revokeAllSessionsForUser(user.id);
+
+  const { error } = await supabase.from("atlas_sessions").delete().eq("user_id", user.id);
+
+  if (error && error.code !== "42P01") {
+    console.warn(`[meta-review-e2e] session cleanup warning for ${email}:`, error.message);
+  }
+}
+
+async function ensureAutomationReviewUser(adminContext) {
+  const reviewUserInput = {
+    email: AUTOMATION_REVIEW_EMAIL,
+    password: REVIEW_PASSWORD,
+    firstName: "Meta",
+    lastName: "E2E",
+    role: "recruiter"
+  };
+
+  const existing = await findUserByEmail(AUTOMATION_REVIEW_EMAIL);
+  let created = false;
+
+  if (!existing) {
+    const result = await metaReviewUserService.createReviewUser(reviewUserInput, adminContext, {});
+    created = Boolean(result.created);
+  } else if (metaReviewUserService.isMetaReviewUser(existing)) {
+    await metaReviewUserService.resetReviewUserPassword(
+      existing.id,
+      REVIEW_PASSWORD,
+      adminContext,
+      {}
+    );
+  } else {
+    const result = await metaReviewUserService.createReviewUser(reviewUserInput, adminContext, {});
+    created = Boolean(result.created || result.activated);
+  }
+
+  const reviewUser = await findUserByEmail(AUTOMATION_REVIEW_EMAIL);
+
+  if (!reviewUser) {
+    throw new Error(`Automation review user missing after setup: ${AUTOMATION_REVIEW_EMAIL}`);
+  }
+
+  await clearAutomationSessions(AUTOMATION_REVIEW_EMAIL);
+  await syncMetaReviewDemoProspectsToLegacy(reviewUser);
+
+  console.info("[meta-review-e2e] Automation review user ready", {
+    email: AUTOMATION_REVIEW_EMAIL,
+    userId: reviewUser.id,
+    created
+  });
+
+  return { reviewUser, created };
 }
 
 async function snapshotDemoProspectOwnership() {
@@ -160,22 +213,12 @@ async function restoreDemoProspectsToPermanentReviewUser(snapshot = []) {
   return { restored: true, permanentReviewUserId: permanentReviewUser.id, ownedDemoCount: count, result };
 }
 
-async function verifyReviewUserCreation(adminContext) {
-  const created = await metaReviewUserService.createReviewUser(
-    {
-      email: REVIEW_EMAIL,
-      password: REVIEW_PASSWORD,
-      firstName: "Meta",
-      lastName: "Reviewer",
-      role: "recruiter"
-    },
-    adminContext,
-    {}
+async function verifyAutomationReviewUserSetup(reviewUser, created) {
+  assert(
+    "1.1 Automation review user ready",
+    reviewUser?.email === AUTOMATION_REVIEW_EMAIL,
+    created ? "created" : "reused"
   );
-
-  assert("1.1 Review user created", created.created === true, REVIEW_EMAIL);
-
-  const reviewUser = await findUserByEmail(REVIEW_EMAIL);
   assert("1.2 Review user active in DB", reviewUser?.status === "active");
 
   const { data: demoRows, count } = await supabase
@@ -226,7 +269,7 @@ async function verifyLoginAndApis(reviewUser) {
 
   try {
     login = await loginWithPassword({
-      email: REVIEW_EMAIL,
+      email: AUTOMATION_REVIEW_EMAIL,
       password: REVIEW_PASSWORD
     });
   } catch (error) {
@@ -400,6 +443,7 @@ async function main() {
   console.log("Meta Review E2E verification");
   console.log(`API_BASE=${API_BASE}`);
   console.log(`META_REVIEW_MODE=${process.env.META_REVIEW_MODE}`);
+  console.log(`AUTOMATION_USER=${AUTOMATION_REVIEW_EMAIL}`);
 
   assert("0.1 META_REVIEW_MODE enabled on backend", isMetaReviewModeEnabled());
 
@@ -420,13 +464,13 @@ async function main() {
   console.info("[meta-review-e2e] Saved demo ownership snapshot", demoOwnershipSnapshot);
 
   try {
-    await cleanupReviewUser(REVIEW_EMAIL);
-    const reviewUser = await verifyReviewUserCreation(adminContext);
+    const { reviewUser, created } = await ensureAutomationReviewUser(adminContext);
+    await verifyAutomationReviewUserSetup(reviewUser, created);
     await verifyLoginAndApis(reviewUser);
     await verifyAdminReviewUsersAccess(adminContext);
   } finally {
     await restoreDemoProspectsToPermanentReviewUser(demoOwnershipSnapshot);
-    await cleanupReviewUser(REVIEW_EMAIL);
+    await clearAutomationSessions(AUTOMATION_REVIEW_EMAIL);
   }
 
   console.log("\n========================================");
