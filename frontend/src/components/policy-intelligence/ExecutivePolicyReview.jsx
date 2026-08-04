@@ -3,7 +3,7 @@ import ExecutiveBadge from "../design-system/ExecutiveBadge";
 import ActionCardGrid from "../design-system/ActionCardGrid";
 import CollapsibleExecutiveSection from "../design-system/CollapsibleExecutiveSection";
 import DiscussionScenariosSection from "../financial-intelligence/DiscussionScenariosSection";
-import { buildDiscussionScenarioEvaluation } from "../../lib/financial-intelligence/buildDiscussionScenarioEvaluation";
+import { buildDiscussionScenarioEvaluation } from "../../lib/financial-intelligence/preview/buildDiscussionScenarioEvaluation";
 import PolicyReviewChart from "./PolicyReviewChart";
 import "./ExecutivePolicyReview.css";
 
@@ -185,8 +185,8 @@ export default function ExecutivePolicyReview({ seed }) {
       "Review the illustration-dependency finding with a lower-rate stress view, then confirm funding discipline before long-term planning assumptions."
   };
 
-  // FI discussion scenario — visually separate from PI factual report (RC3 / BR-066).
-  // Preview uses representative-entered sample inputs; never invents official rates.
+  // PREVIEW-ONLY FI demonstration — not used by live Policy Intelligence workspace.
+  // Production FI uses FinancialIntelligencePanel + /api/financial-intelligence.
   const fiEvaluation = useMemo(() => {
     if (seed.financialIntelligenceEvaluation) {
       return seed.financialIntelligenceEvaluation;
@@ -461,11 +461,15 @@ export default function ExecutivePolicyReview({ seed }) {
         </p>
       </section>
 
-      {/* Financial Intelligence — separate from PI factual report (RC3) */}
-      <DiscussionScenariosSection
-        evaluation={fiEvaluation}
-        policySnapshot={policySnapshot}
-      />
+      {/* PREVIEW demonstration only — labeled; live FI is API-backed */}
+      <div className="epr-fi-demo-banner" role="status">
+        <strong>Demonstration data</strong>
+        <span>
+          Internal preview fixture. Not a persisted Financial Intelligence evaluation. Live
+          workflow: Policy Intelligence → Create Discussion Scenario → API.
+        </span>
+      </div>
+      <DiscussionScenariosSection evaluation={fiEvaluation} source="preview-demo" />
     </article>
   );
 }

@@ -62,7 +62,8 @@ Facebook Lead
 | Field | Value |
 |-------|--------|
 | **RC2 – Financial Intelligence Architecture** | **APPROVED** |
-| **RC3 – Invest-the-Difference foundation** | **IMPLEMENTED** |
+| **RC3 Phase A – Invest-the-Difference foundation** | **IMPLEMENTED** |
+| **RC3 Phase B – Runtime integration** | **IMPLEMENTED** |
 | Canonical doc | [08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](./08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) |
 | Runtime module | `backend/modules/financial-intelligence/` · `/api/financial-intelligence` |
 | Governance | BR-062–BR-065, **BR-066**, BR-067–BR-073 |
@@ -71,6 +72,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-08-04:** **RC3 Phase B IMPLEMENTED** — Live API-backed FI Discussion scenarios tab; frontend calc duplication removed; migration 025 verification
 - **2026-08-04:** **RC3 Phase A IMPLEMENTED** — Invest-the-Difference Strategy Evaluation foundation (FI module, APIs, UI, BR-062–073)
 - **2026-08-03:** **RC2 APPROVED** — Financial Intelligence Architecture finalized; BR-066 Human Recommendation Boundary
 - **2026-08-03:** Sprint RC2 — Financial Intelligence architecture documented (above PI; no code)

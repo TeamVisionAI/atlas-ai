@@ -1,6 +1,7 @@
 /**
- * Preview/local builder for Invest-the-Difference Strategy Evaluation.
- * Mirrors backend investTheDifferenceEngine — keep in sync. Not React.
+ * PREVIEW-ONLY demonstration builder for Invest-the-Difference Strategy Evaluation.
+ * Must never be imported by production FinancialIntelligencePanel.
+ * Live evaluations use `/api/financial-intelligence` exclusively (RC3 Phase B).
  */
 
 import { calculateMonthlyFutureValue } from "./monthlyFutureValue.js";
@@ -192,20 +193,65 @@ export function buildDiscussionScenarioEvaluation({
     premiumSource !== "PRELIMINARY_ESTIMATE" &&
     horizonYears != null;
 
+  const status = deriveStatus({
+    proposedTermMonthlyPremium,
+    longestAvailableTermConfirmed,
+    premiumSource,
+    horizonYears,
+    riskProfile
+  });
+
+  const comparisonTable = Object.freeze({
+    deathBenefit: Object.freeze({
+      existingIul: currentDeathBenefit,
+      discussionScenario: proposedTermDeathBenefit
+    }),
+    monthlyInsurancePremium: Object.freeze({
+      existingIul: currentMonthlyPremium,
+      discussionScenario: proposedTermMonthlyPremium
+    }),
+    monthlyInvestmentAmount: Object.freeze({
+      existingIul: 0,
+      discussionScenario: monthlyInvestmentDifference
+    }),
+    totalMonthlyOutlay: Object.freeze({
+      existingIul: currentMonthlyPremium,
+      discussionScenario: totalProposedMonthlyOutlay
+    })
+  });
+
+  // Shape matches backend frontend contract for display component reuse in preview only.
   return Object.freeze({
     sectionTitle: SECTION_TITLE,
-    status: deriveStatus({
-      proposedTermMonthlyPremium,
-      longestAvailableTermConfirmed,
-      premiumSource,
-      horizonYears,
-      riskProfile
+    status,
+    isCurrentVersion: true,
+    version: 0,
+    demonstrationOnly: true,
+    currentIulSnapshot: Object.freeze({
+      productType: policySnapshot?.productType || null,
+      carrier: policySnapshot?.carrier || null
     }),
+    currentIulMonthlyPremium: currentMonthlyPremium,
+    currentIulDeathBenefit: currentDeathBenefit,
+    proposedTermDeathBenefit,
+    proposedTermDuration: selectedTermDuration,
+    proposedTermMonthlyPremium,
+    premiumSource,
+    sameDeathBenefit: true,
+    totalProposedMonthlyOutlay,
+    unboundedPremiumDifference,
+    monthlyInvestmentDifference,
+    proposedMutualFundContribution: monthlyInvestmentDifference,
+    outlayValidation: null,
     missingDataWarnings: Object.freeze([...missingDataWarnings]),
     replacementWarnings: REPLACEMENT_WARNINGS,
-    canEmphasizeInvestmentScenario: Boolean(canEmphasize),
     riskProfile,
-    highlightedScenarioId: canEmphasize ? mapRisk(riskProfile) : null,
+    scenarioEmphasis: Object.freeze({
+      canEmphasizeInvestmentScenario: Boolean(canEmphasize),
+      canViewEducationalIllustration: true,
+      highlightedScenarioId: canEmphasize ? mapRisk(riskProfile) : null,
+      highlightedScenarioLabel: null
+    }),
     termQuote: termQuote
       ? Object.freeze({
           selectedTermDuration,
@@ -218,6 +264,10 @@ export function buildDiscussionScenarioEvaluation({
     investmentHorizon: horizonYears
       ? Object.freeze({ years: horizonYears, source: "representative" })
       : null,
+    projectionOutputs: projections,
+    comparisonTable,
+    disclaimers: buildDisclaimers(),
+    // Legacy nested fields retained for preview unit tests
     calculations: Object.freeze({
       currentIulMonthlyPremium: currentMonthlyPremium,
       currentIulDeathBenefit: currentDeathBenefit,
@@ -231,25 +281,8 @@ export function buildDiscussionScenarioEvaluation({
         unboundedPremiumDifference != null && unboundedPremiumDifference < 0
     }),
     projections,
-    comparisonTable: Object.freeze({
-      deathBenefit: Object.freeze({
-        existingIul: currentDeathBenefit,
-        discussionScenario: proposedTermDeathBenefit
-      }),
-      monthlyInsurancePremium: Object.freeze({
-        existingIul: currentMonthlyPremium,
-        discussionScenario: proposedTermMonthlyPremium
-      }),
-      monthlyInvestmentAmount: Object.freeze({
-        existingIul: 0,
-        discussionScenario: monthlyInvestmentDifference
-      }),
-      totalMonthlyOutlay: Object.freeze({
-        existingIul: currentMonthlyPremium,
-        discussionScenario: totalProposedMonthlyOutlay
-      })
-    }),
-    disclaimers: buildDisclaimers()
+    canEmphasizeInvestmentScenario: Boolean(canEmphasize),
+    highlightedScenarioId: canEmphasize ? mapRisk(riskProfile) : null
   });
 }
 

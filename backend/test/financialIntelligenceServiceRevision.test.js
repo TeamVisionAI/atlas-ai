@@ -181,8 +181,11 @@ describe("FI StrategyEvaluationService revision + tenant isolation", () => {
     });
 
     assert.equal(created.version, 1);
-    assert.ok(created.evaluation);
+    assert.equal(created.isCurrentVersion, true);
+    assert.equal(created.metadata.calculationAuthority, "backend");
+    assert.equal(created.metadata.frontendMayRecalculate, false);
     assert.equal(created.currentIulMonthlyPremium, 310);
+    assert.ok(created.comparisonTable || created.status);
 
     const revised = await service.updateTermQuote({
       organizationId: orgA,

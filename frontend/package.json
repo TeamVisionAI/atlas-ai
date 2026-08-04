@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --test src/engines/*.test.js src/lib/financial-intelligence/*.test.js"
+    "test": "node --test src/engines/*.test.js src/lib/financial-intelligence/**/*.test.js src/components/financial-intelligence/*.test.js"
   },
   "dependencies": {
     "react": "^19.2.7",

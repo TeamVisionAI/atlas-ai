@@ -13,7 +13,7 @@ const policySnapshot = {
   premium: { amount: 310, frequency: "monthly" }
 };
 
-describe("frontend FI discussion scenario builder", () => {
+describe("preview-only FI demonstration builder", () => {
   it("renders same-outlay positive difference without fabricating values", () => {
     const evaluation = buildDiscussionScenarioEvaluation({
       policySnapshot,

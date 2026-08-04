@@ -1,5 +1,17 @@
 /* Sprint 6 — Executive Policy Review PX (aligned with Executive Dashboard) */
 
+.epr-fi-demo-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: #fff6eb;
+  border: 1px solid #efd3b0;
+  color: #7a3e12;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .epr {
   --exec-bg: #f7f8fa;
   --exec-surface: #ffffff;

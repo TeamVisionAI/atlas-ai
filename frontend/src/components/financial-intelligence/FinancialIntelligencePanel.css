@@ -1,0 +1,151 @@
+.fi-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fi-panel__header h2 {
+  margin: 4px 0 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 1.45rem;
+}
+
+.fi-panel__eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1f4b7a;
+}
+
+.fi-panel__loading,
+.fi-panel__empty,
+.fi-panel__note {
+  color: #5c6b7a;
+  line-height: 1.45;
+}
+
+.fi-panel__error {
+  margin: 0;
+  padding: 10px 12px;
+  background: #fff1f1;
+  border: 1px solid #f0c2c2;
+  color: #7a1f1f;
+}
+
+.fi-panel__notice {
+  margin: 0;
+  padding: 10px 12px;
+  background: #eef6f1;
+  border: 1px solid #c5ddd0;
+  color: #1f4b3a;
+}
+
+.fi-panel__preliminary,
+.fi-panel__callout {
+  margin: 0;
+  padding: 12px 14px;
+  background: #fff6eb;
+  border: 1px solid #efd3b0;
+  color: #7a3e12;
+  font-weight: 600;
+}
+
+.fi-panel__meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  font-size: 0.88rem;
+  color: #5c6b7a;
+}
+
+.fi-panel__button {
+  align-self: flex-start;
+  border: 1px solid #d7dee7;
+  background: #fff;
+  color: #14213d;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fi-panel__button--primary {
+  background: #1f4b7a;
+  border-color: #1f4b7a;
+  color: #fff;
+}
+
+.fi-panel__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fi-panel__forms {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fi-panel__form {
+  padding: 16px;
+  border: 1px solid #d7dee7;
+  background: #f8fafc;
+}
+
+.fi-panel__form h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.fi-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.fi-panel__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #5c6b7a;
+}
+
+.fi-panel__form input,
+.fi-panel__form select,
+.fi-panel__form textarea {
+  padding: 8px 10px;
+  border: 1px solid #d7dee7;
+  background: #fff;
+  color: #14213d;
+  font: inherit;
+}
+
+.fi-panel__check {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.fi-panel__history ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.fi-panel__history li {
+  margin-bottom: 4px;
+  font-size: 0.88rem;
+  color: #5c6b7a;
+}
+
+@media print {
+  .fi-panel__forms,
+  .fi-panel__button,
+  .fi-panel__history,
+  .fi-panel__notice,
+  .fi-panel__meta-bar {
+    display: none !important;
+  }
+}

@@ -20,11 +20,32 @@ function requireObject(body, label = "body") {
 
 function validateTermQuoteInput(body) {
   const input = requireObject(body, "termQuote");
-  if (input.monthlyPremium != null && !Number.isFinite(Number(input.monthlyPremium))) {
-    throw badRequest("monthlyPremium must be numeric.", "FI_INVALID_TERM_PREMIUM");
+  if (input.monthlyPremium != null) {
+    const premium = Number(input.monthlyPremium);
+    if (!Number.isFinite(premium)) {
+      throw badRequest("monthlyPremium must be numeric.", "FI_INVALID_TERM_PREMIUM");
+    }
+    if (premium < 0) {
+      throw badRequest("monthlyPremium cannot be negative.", "FI_INVALID_TERM_PREMIUM");
+    }
   }
-  if (input.termDurationYears != null && !Number.isFinite(Number(input.termDurationYears))) {
-    throw badRequest("termDurationYears must be numeric.", "FI_INVALID_TERM_DURATION");
+  if (input.termDurationYears != null) {
+    const years = Number(input.termDurationYears);
+    if (!Number.isFinite(years) || years <= 0) {
+      throw badRequest(
+        "termDurationYears must be a positive number.",
+        "FI_INVALID_TERM_DURATION"
+      );
+    }
+  }
+  if (input.deathBenefit != null) {
+    const deathBenefit = Number(input.deathBenefit);
+    if (!Number.isFinite(deathBenefit) || deathBenefit <= 0) {
+      throw badRequest(
+        "deathBenefit must be a positive number when provided.",
+        "FI_INVALID_TERM_DEATH_BENEFIT"
+      );
+    }
   }
   if (
     input.premiumSource != null &&
@@ -32,7 +53,12 @@ function validateTermQuoteInput(body) {
   ) {
     throw badRequest("premiumSource is not recognized.", "FI_INVALID_PREMIUM_SOURCE");
   }
-  return input;
+  return {
+    ...input,
+    premiumSource: input.premiumSource
+      ? String(input.premiumSource).toUpperCase()
+      : input.premiumSource
+  };
 }
 
 function validateInvestmentHorizonInput(body) {

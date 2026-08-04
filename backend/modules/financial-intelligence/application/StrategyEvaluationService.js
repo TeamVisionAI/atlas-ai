@@ -20,6 +20,7 @@ const {
 } = require("../domain/constants");
 const { PROJECTION_SCENARIOS, PROJECTION_DISCLAIMER } = require("../domain/projections/projectionAssumptions");
 const { getFundCatalog } = require("../domain/config/fundFamilyConfig");
+const { buildFrontendContract } = require("./evaluationFrontendContract");
 
 function defaultFiRepository() {
   const {
@@ -423,7 +424,7 @@ class StrategyEvaluationService {
   }
 
   toDto(row) {
-    return {
+    const base = {
       id: row.id,
       organizationId: row.organizationId,
       reviewId: row.reviewId,
@@ -470,6 +471,9 @@ class StrategyEvaluationService {
         piImmutable: true
       }
     };
+
+    // Canonical frontend-safe contract (RC3 Phase B). Backend is calculation authority.
+    return buildFrontendContract(base);
   }
 }
 

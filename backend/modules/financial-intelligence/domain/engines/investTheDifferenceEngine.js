@@ -112,7 +112,14 @@ function buildInvestTheDifferenceEvaluation({
 
   const currentIulMonthlyPremium = snapshot.currentMonthlyPremium;
   const currentIulDeathBenefit = snapshot.currentDeathBenefit;
-  const proposedTermDeathBenefit = currentIulDeathBenefit;
+  const enteredTermDeathBenefit =
+    termQuote?.deathBenefit != null && Number.isFinite(Number(termQuote.deathBenefit))
+      ? Number(termQuote.deathBenefit)
+      : null;
+  // Default = same death benefit. Any different entered value is an explicit representative adjustment.
+  const proposedTermDeathBenefit =
+    enteredTermDeathBenefit != null ? enteredTermDeathBenefit : currentIulDeathBenefit;
+  const sameDeathBenefit = proposedTermDeathBenefit === currentIulDeathBenefit;
 
   const proposedTermMonthlyPremium =
     termQuote && !termQuote.isMissing ? termQuote.monthlyPremium : null;
@@ -196,6 +203,11 @@ function buildInvestTheDifferenceEvaluation({
   });
 
   const extraWarnings = [...statusResolution.missingDataWarnings];
+  if (!sameDeathBenefit) {
+    extraWarnings.push(
+      "Proposed term death benefit differs from the current IUL death benefit. This is an explicit representative adjustment — not the default same-death-benefit discussion scenario."
+    );
+  }
   if (negativeDifferenceFlag) {
     extraWarnings.push(
       "Proposed term premium exceeds the current IUL monthly premium. Investable difference is zero. Maintaining the same death benefit and selected term may exceed the existing monthly outlay — representative review required."
@@ -233,6 +245,7 @@ function buildInvestTheDifferenceEvaluation({
       currentIulDeathBenefit,
       proposedTermDeathBenefit,
       proposedTermMonthlyPremium,
+      sameDeathBenefit,
       totalProposedMonthlyOutlay,
       unboundedPremiumDifference,
       monthlyInvestmentDifference,

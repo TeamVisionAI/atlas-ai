@@ -8,6 +8,7 @@ import {
   uploadPolicyDocument
 } from "../services/policyIntelligenceService";
 import ComparisonWorkspace from "../components/policy-intelligence/ComparisonWorkspace";
+import FinancialIntelligencePanel from "../components/financial-intelligence/FinancialIntelligencePanel";
 import "./WorkspaceDashboard.css";
 import "./PolicyIntelligence.css";
 
@@ -281,6 +282,20 @@ export default function PolicyIntelligence() {
         >
           {translate("policyIntelligenceTabComparison")}
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workspaceTab === "discussion"}
+          className={
+            workspaceTab === "discussion"
+              ? "policy-intelligence__tab policy-intelligence__tab--active"
+              : "policy-intelligence__tab"
+          }
+          onClick={() => setWorkspaceTab("discussion")}
+          data-testid="pi-tab-discussion-scenarios"
+        >
+          Discussion scenarios
+        </button>
       </div>
 
       {error ? <p className="workspace-dashboard__error">{error}</p> : null}
@@ -300,6 +315,34 @@ export default function PolicyIntelligence() {
           setError={setError}
           setNotice={setNotice}
         />
+      ) : null}
+
+      {workspaceTab === "discussion" ? (
+        <section className="workspace-dashboard__panel" aria-labelledby="pi-fi-discussion">
+          <div className="workspace-dashboard__panel-head">
+            <h2 id="pi-fi-discussion">
+              Possible Discussion Scenarios for the Primerica Representative
+            </h2>
+          </div>
+          {reviews.length ? (
+            <label className="policy-intelligence__select-label">
+              <span>{translate("policyIntelligenceSelectReview")}</span>
+              <select
+                value={selectedReviewId}
+                onChange={handleSelectReview}
+                disabled={busy}
+                data-testid="fi-review-select"
+              >
+                {reviews.map((review) => (
+                  <option key={review.id} value={review.id}>
+                    {review.title} ({review.status})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <FinancialIntelligencePanel reviewId={selectedReviewId || null} />
+        </section>
       ) : null}
 
       {workspaceTab === "extract" ? (

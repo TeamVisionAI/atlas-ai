@@ -21,10 +21,10 @@ export default function PolicyIntelligencePreviewPage() {
   return (
     <div className="pi-preview">
       <div className="pi-preview__banner" role="status">
-        <strong>Internal development preview</strong>
+        <strong>Internal development preview — demonstration data</strong>
         <span>
-          Sprint 6 Executive Review PX · Local only · Meta Review unchanged ·{" "}
-          <code>{POLICY_INTELLIGENCE_PREVIEW_PATH}</code>
+          Sprint 6 Executive Review PX · Sample dollars are fixtures only · Not production FI ·
+          Meta Review unchanged · <code>{POLICY_INTELLIGENCE_PREVIEW_PATH}</code>
         </span>
       </div>
 

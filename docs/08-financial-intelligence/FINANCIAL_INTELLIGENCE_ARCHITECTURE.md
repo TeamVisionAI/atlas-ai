@@ -12,7 +12,8 @@ Define the next major Atlas bounded context that **consumes** Policy Intelligenc
 
 **APPROVED** — RC2 Financial Intelligence Architecture  
 **RC3 Phase A** — **IMPLEMENTED** Invest-the-Difference Strategy Evaluation foundation  
-**Deferred:** official Primerica quote integration; verified fund catalog; PDF export; automated eligibility; suitability workflow
+**RC3 Phase B** — **IMPLEMENTED** live API-backed runtime integration (backend calculation authority)  
+**Deferred (RC4+):** official Primerica quote integration; verified fund catalog; PDF export; automated eligibility; suitability workflow
 
 ## Business Rules
 

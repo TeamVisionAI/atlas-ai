@@ -13,15 +13,18 @@ Architecture and runtime pack for **Atlas Financial Intelligence** — the bound
 |----------|---------|
 | [FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](./FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) | Canonical architecture (RC2 APPROVED) + RC3 implementation notes |
 | [CALCULATION_ASSUMPTIONS.md](./CALCULATION_ASSUMPTIONS.md) | Canonical ITD formulas and projection assumptions |
-| [API.md](./API.md) | RC3 Financial Intelligence HTTP API |
-| [RC3 sprint notes](../09-releases/sprints/SPRINT_RC3_INVEST_THE_DIFFERENCE_FOUNDATION.md) | Implemented foundation release notes |
+| [API.md](./API.md) | RC3 Financial Intelligence HTTP API + frontend contract |
+| [RUNTIME_WORKFLOW.md](./RUNTIME_WORKFLOW.md) | Live evaluation lifecycle, deployment, rollback |
+| [RC3 Phase A](../09-releases/sprints/SPRINT_RC3_INVEST_THE_DIFFERENCE_FOUNDATION.md) | Foundation release notes |
+| [RC3 Phase B](../09-releases/sprints/SPRINT_RC3_PHASE_B_RUNTIME_INTEGRATION.md) | Runtime integration release notes |
 
 ## Status
 
 | Milestone | Status |
 |-----------|--------|
 | RC2 Financial Intelligence Architecture | **APPROVED** |
-| RC3 Invest-the-Difference foundation | **IMPLEMENTED** |
+| RC3 Phase A Invest-the-Difference foundation | **IMPLEMENTED** |
+| RC3 Phase B runtime integration | **IMPLEMENTED** |
 | Official Primerica quote integration | Deferred |
 | Verified fund catalog | Deferred |
 | PDF export | Deferred |
