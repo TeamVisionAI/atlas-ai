@@ -1,0 +1,185 @@
+/**
+ * Dedicated FI discussion-scenario print layout (no PDF library).
+ *
+ * Root causes addressed:
+ * 1) Whole-report unbreakable page boxes clipped multi-page content
+ * 2) Forced leading page break plus unhidden PI chrome produced empty pages
+ * 3) atlas-layout overflow clipping and viewport heights clipped print overflow
+ */
+
+/* ——— Screen helpers ——— */
+
+.fi-print-only {
+  display: none;
+}
+
+.fi-print-hide {
+  /* Screen-visible; hidden only in @media print */
+}
+
+/* ——— Print ——— */
+
+@media print {
+  .fi-print-only {
+    display: block !important;
+  }
+
+  /* Application chrome and PI controls — explicit classes + structural selectors */
+  .fi-print-hide,
+  .atlas-layout__sidebar,
+  .atlas-layout__header,
+  .atlas-layout__backdrop,
+  .atlas-layout__meta-review-banner,
+  .atlas-layout__menu-button,
+  .workspace-dashboard__header,
+  .policy-intelligence__tabs,
+  .policy-intelligence__select-label,
+  .workspace-dashboard__panel-head,
+  .policy-intelligence__form,
+  .policy-intelligence__notice,
+  .workspace-dashboard__error,
+  .fi-panel__forms,
+  .fi-panel__button,
+  .fi-panel__history,
+  .fi-panel__notice,
+  .fi-panel__meta-bar,
+  .fi-panel__callout,
+  .fi-panel__error {
+    display: none !important;
+  }
+
+  /* Unlock scroll/viewport constraints that clip multi-page print */
+  html,
+  body,
+  #root,
+  .atlas-layout,
+  .atlas-layout__frame,
+  .atlas-layout__main,
+  .atlas-layout__content,
+  .workspace-dashboard,
+  .workspace-dashboard--policy-intelligence,
+  .workspace-dashboard__panel,
+  .fi-panel,
+  .fi-print-root,
+  .fi-discussion-scenarios,
+  .fi-discussion-scenarios__table-wrap,
+  .fi-discussion-scenarios__projection-grid {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    position: static !important;
+    transform: none !important;
+  }
+
+  .atlas-layout {
+    display: block !important;
+  }
+
+  .atlas-layout__sidebar {
+    position: absolute !important;
+    left: -9999px !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  .atlas-layout__frame,
+  .atlas-layout__main,
+  .atlas-layout__content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Report starts on page 1 — never force a leading page break */
+  .fi-print-root,
+  .fi-discussion-scenarios {
+    break-before: auto !important;
+    page-break-before: auto !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    border-color: #666 !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .fi-print-root {
+    display: block !important;
+  }
+
+  /* Keep small critical cards together; never the whole report */
+  .fi-projection,
+  .fi-discussion-scenarios__safeguards,
+  .fi-discussion-scenarios__missing,
+  .fi-discussion-scenarios__status,
+  .fi-discussion-scenarios__print-meta,
+  .fi-discussion-scenarios__assumptions {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .fi-discussion-scenarios__header,
+  .fi-discussion-scenarios__disclaimers {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Comparison table may paginate if tall; prefer keeping rows readable */
+  .fi-discussion-scenarios__print-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .fi-discussion-scenarios__print-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .fi-discussion-scenarios__projection-grid {
+    display: block !important;
+  }
+
+  .fi-projection {
+    margin-bottom: 12px;
+    border-color: #666 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .fi-discussion-scenarios__warning,
+  .fi-discussion-scenarios__missing,
+  .fi-discussion-scenarios__safeguards,
+  .fi-panel__preliminary {
+    background: #fff !important;
+    border: 1px solid #444 !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .fi-discussion-scenarios__eyebrow,
+  .fi-discussion-scenarios__title,
+  .fi-discussion-scenarios__lede,
+  .fi-discussion-scenarios__block h3,
+  .fi-discussion-scenarios__disclaimers,
+  .fi-discussion-scenarios__note,
+  .fi-discussion-scenarios__meta {
+    color: #000 !important;
+  }
+
+  .fi-discussion-scenarios__table-wrap th,
+  .fi-discussion-scenarios__table-wrap td {
+    border-color: #666 !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  .fi-panel__preliminary {
+    display: block !important;
+    margin: 0 0 14px;
+    font-weight: 700;
+  }
+}

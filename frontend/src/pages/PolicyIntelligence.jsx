@@ -243,7 +243,7 @@ export default function PolicyIntelligence() {
 
   return (
     <div className="workspace-dashboard workspace-dashboard--policy-intelligence">
-      <header className="workspace-dashboard__header workspace-dashboard__header--inline">
+      <header className="workspace-dashboard__header workspace-dashboard__header--inline fi-print-hide">
         <div>
           <p className="workspace-dashboard__eyebrow">
             {translate("policyIntelligenceEyebrow")}
@@ -255,7 +255,7 @@ export default function PolicyIntelligence() {
         </div>
       </header>
 
-      <div className="policy-intelligence__tabs" role="tablist" aria-label="Policy Intelligence">
+      <div className="policy-intelligence__tabs fi-print-hide" role="tablist" aria-label="Policy Intelligence">
         <button
           type="button"
           role="tab"
@@ -319,13 +319,13 @@ export default function PolicyIntelligence() {
 
       {workspaceTab === "discussion" ? (
         <section className="workspace-dashboard__panel" aria-labelledby="pi-fi-discussion">
-          <div className="workspace-dashboard__panel-head">
+          <div className="workspace-dashboard__panel-head fi-print-hide">
             <h2 id="pi-fi-discussion">
               Possible Discussion Scenarios for the Primerica Representative
             </h2>
           </div>
           {reviews.length ? (
-            <label className="policy-intelligence__select-label">
+            <label className="policy-intelligence__select-label fi-print-hide">
               <span>{translate("policyIntelligenceSelectReview")}</span>
               <select
                 value={selectedReviewId}

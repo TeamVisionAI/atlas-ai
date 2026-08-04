@@ -16,7 +16,7 @@
   background:
     linear-gradient(180deg, #eef3f8 0%, #f8fafc 48%, #ffffff 100%);
   color: var(--fi-ink);
-  break-inside: avoid;
+  /* Multi-page report: never mark this container unbreakable for print. */
 }
 
 .fi-discussion-scenarios__header {
@@ -106,6 +106,39 @@
 
 .fi-discussion-scenarios__table-wrap {
   overflow-x: auto;
+  max-height: none;
+}
+
+.fi-discussion-scenarios__print-meta {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--fi-line);
+  background: var(--fi-surface);
+  font-size: 0.88rem;
+  color: var(--fi-muted);
+  line-height: 1.45;
+}
+
+.fi-discussion-scenarios__print-meta strong {
+  color: var(--fi-ink);
+}
+
+.fi-discussion-scenarios__assumptions {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--fi-line);
+  background: #fff;
+  font-size: 0.88rem;
+  color: var(--fi-muted);
+  line-height: 1.45;
+}
+
+.fi-discussion-scenarios__assumptions h4 {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fi-muted);
 }
 
 .fi-discussion-scenarios__table-wrap table {
@@ -255,29 +288,7 @@
   text-transform: uppercase;
 }
 
-@media print {
-  .fi-discussion-scenarios {
-    break-before: page;
-    box-shadow: none;
-    background: #fff;
-    border-color: #999;
-    padding: 0;
-  }
-
-  .fi-discussion-scenarios__projection-grid {
-    grid-template-columns: 1fr 1fr 1fr;
-  }
-
-  .fi-discussion-scenarios__print-table table {
-    page-break-inside: avoid;
-  }
-
-  .fi-projection,
-  .fi-discussion-scenarios__safeguards,
-  .fi-discussion-scenarios__missing {
-    break-inside: avoid;
-  }
-}
+/* Print rules live in fiPrintReport.css (dedicated FI print layout). */
 
 @media (max-width: 720px) {
   .fi-discussion-scenarios {
