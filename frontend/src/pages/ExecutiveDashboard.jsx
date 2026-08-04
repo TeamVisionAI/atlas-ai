@@ -16,7 +16,8 @@ import InterviewPipeline from "../components/executive/InterviewPipeline";
 import RecommendationCards from "../components/executive/RecommendationCards";
 import ActivityTimeline from "../components/executive/ActivityTimeline";
 import AgencyHealth from "../components/executive/AgencyHealth";
-import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import MetaReviewDashboardCard from "../components/meta-review/MetaReviewDashboardCard";
 import "./ExecutiveDashboard.css";
 
@@ -41,6 +42,8 @@ export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
+  const metaReviewWorkspace = isMetaReviewWorkspaceActive(user);
   const [executive, setExecutive] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [alphaBrief, setAlphaBrief] = useState(null);
@@ -138,7 +141,7 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="executive-dashboard">
-      {isMetaReviewModeEnabled() ? <MetaReviewDashboardCard activity={viewModel.activity} /> : null}
+      {metaReviewWorkspace ? <MetaReviewDashboardCard activity={viewModel.activity} /> : null}
 
       {fromWorkspace && focusLabelKey ? (
         <div className="executive-dashboard__focus-banner" role="status">

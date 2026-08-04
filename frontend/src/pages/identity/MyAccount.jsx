@@ -21,7 +21,7 @@ const TABS = ["profile", "security", "sessions"];
 
 export default function MyAccount() {
   const navigate = useNavigate();
-  const { refreshUser } = useWorkspace();
+  const { refreshUser, user: sessionUser } = useWorkspace();
   const [tab, setTab] = useState("profile");
   const [profile, setProfile] = useState(null);
   const [sessions, setSessions] = useState([]);
@@ -146,7 +146,7 @@ export default function MyAccount() {
           <p>{profile.email}</p>
         </div>
         {canManageUsers(profile) ? (
-          <Link className="identity-button-secondary" to={getUserManagementPath()}>
+          <Link className="identity-button-secondary" to={getUserManagementPath(sessionUser || profile)}>
             Administration
           </Link>
         ) : null}

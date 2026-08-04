@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { isMetaReviewModeEnabled } from "../../config/metaReviewMode";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { isMetaReviewWorkspaceActive } from "../../config/metaReviewMode";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
 import IntegrationCard from "../../components/settings/IntegrationCard";
@@ -19,6 +20,7 @@ import { META_REVIEW_COPY } from "../meta-review/metaReviewCopy";
 
 export default function OrganizationIntegrations() {
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const [integrations, setIntegrations] = useState(null);
   const [calendars, setCalendars] = useState([]);
@@ -182,7 +184,7 @@ export default function OrganizationIntegrations() {
 
   const googleCalendar = integrations.googleCalendar || {};
   const whatsapp = integrations.whatsapp || {};
-  const metaReviewMode = isMetaReviewModeEnabled();
+  const metaReviewMode = isMetaReviewWorkspaceActive(user);
 
   return (
     <ConfigurationSection title={translate("configurationIntegrations")}>

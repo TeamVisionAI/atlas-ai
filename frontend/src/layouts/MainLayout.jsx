@@ -6,7 +6,7 @@ import {
   getDefaultLandingPath,
   resolveWorkspaceType
 } from "../config/workspaceExperience";
-import { isMetaReviewModeEnabled, META_REVIEW_BANNER_TEXT } from "../config/metaReviewMode";
+import { isMetaReviewWorkspaceActive, META_REVIEW_BANNER_TEXT } from "../config/metaReviewMode";
 import "../components/meta-review/metaReviewDesign.css";
 import { WorkspaceContext } from "../contexts/WorkspaceContext";
 import RequireWorkspaceAccess from "../components/RequireWorkspaceAccess";
@@ -142,11 +142,11 @@ export default function MainLayout() {
   const { language, toggleLanguage, translate, syncFromUser } = useLanguage();
   const location = useLocation();
   const layoutMode = useLayoutMode();
-  const metaReviewMode = isMetaReviewModeEnabled();
   const [phoneNavOpen, setPhoneNavOpen] = useState(false);
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
   const [operationsAllowed, setOperationsAllowed] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const metaReviewMode = isMetaReviewWorkspaceActive(currentUser);
 
   const navItems = useMemo(
     () => buildNavItemsForUser(currentUser, { operationsAllowed }),

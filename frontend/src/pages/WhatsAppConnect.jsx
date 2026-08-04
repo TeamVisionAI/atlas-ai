@@ -15,7 +15,8 @@ import {
 } from "../utils/metaEmbeddedSignupEvents";
 import { buildWhatsAppErrorNavigationState } from "../utils/mapWhatsAppUserError";
 import { whatsAppConnectDebug } from "../utils/whatsappConnectDebug";
-import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import { fetchWhatsAppConfiguration } from "../services/configurationService";
 import { getEmbeddedSignupHealth } from "../services/metaEmbeddedSignupService";
 import MetaReviewWhatsAppPage from "../components/meta-review/MetaReviewWhatsAppPage";
@@ -39,6 +40,8 @@ function navigateToError(navigate, details) {
 export default function WhatsAppConnect() {
   const { translate } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useWorkspace();
+  const metaReviewWorkspace = isMetaReviewWorkspaceActive(user);
   const { ready, error: sdkError, appId, configId } = useFacebookSdk();
 
   const [status, setStatus] = useState("disconnected");
@@ -46,7 +49,7 @@ export default function WhatsAppConnect() {
   const [launching, setLaunching] = useState(false);
   const [reviewConnection, setReviewConnection] = useState(null);
   const [reviewHealth, setReviewHealth] = useState(null);
-  const [reviewLoading, setReviewLoading] = useState(isMetaReviewModeEnabled());
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState(false);
 
   const authorizationCodeRef = useRef(null);
@@ -188,7 +191,7 @@ export default function WhatsAppConnect() {
     }
 
     async function loadReviewPresentation() {
-      if (!isMetaReviewModeEnabled()) {
+      if (!metaReviewWorkspace) {
         return;
       }
 
@@ -237,7 +240,7 @@ export default function WhatsAppConnect() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [metaReviewWorkspace]);
 
   useEffect(() => {
     function handler(event) {
@@ -298,7 +301,7 @@ export default function WhatsAppConnect() {
     launching || !ready || !appId || !configId || status === "connecting" || status === "finalizing";
   const configurationMissing = !appId || !configId;
 
-  if (isMetaReviewModeEnabled()) {
+  if (metaReviewWorkspace) {
     return (
       <MetaReviewWhatsAppPage
         connected={alreadyConnected}

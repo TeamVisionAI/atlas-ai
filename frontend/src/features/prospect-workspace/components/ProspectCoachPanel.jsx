@@ -1,12 +1,14 @@
 import { useLanguage } from "../../../i18n/LanguageContext";
-import { isMetaReviewModeEnabled } from "../../../config/metaReviewMode";
+import { useWorkspace } from "../../../contexts/WorkspaceContext";
+import { isMetaReviewWorkspaceActive } from "../../../config/metaReviewMode";
 import WorkspaceSection from "../../../components/prospect-workspace/WorkspaceSection";
 import { buildCoachAccordionSummary } from "../../../engines/prospectWorkspaceViewModel";
 
 export default function ProspectCoachPanel({ collapsible = true }) {
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
 
-  if (isMetaReviewModeEnabled()) {
+  if (isMetaReviewWorkspaceActive(user)) {
     return null;
   }
   const coachSummary = buildCoachAccordionSummary(translate);

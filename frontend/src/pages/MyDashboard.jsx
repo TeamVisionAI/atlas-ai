@@ -4,13 +4,16 @@ import { getDashboard } from "../services/api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { appPath } from "../config/appRoutes";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
-import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import MetaReviewDashboardCard from "../components/meta-review/MetaReviewDashboardCard";
 import { buildProspectMilestoneLabel } from "../engines/prospectCenterViewModel";
 import "./WorkspaceDashboard.css";
 
 export default function MyDashboard() {
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
+  const metaReviewMode = isMetaReviewWorkspaceActive(user);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -55,8 +58,6 @@ export default function MyDashboard() {
     const queue = dashboard?.prioritizedWorkflowQueue || [];
     return new Map(queue.map((entry) => [entry.phone, entry]));
   }, [dashboard?.prioritizedWorkflowQueue]);
-
-  const metaReviewMode = isMetaReviewModeEnabled();
 
   return (
     <div className="workspace-dashboard">

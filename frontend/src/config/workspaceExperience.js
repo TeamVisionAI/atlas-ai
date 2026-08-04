@@ -7,7 +7,7 @@
  */
 
 import { appPath } from "./appRoutes";
-import { isMetaReviewModeEnabled } from "./metaReviewMode";
+import { isMetaReviewModeEnabled, isMetaReviewWorkspaceActive } from "./metaReviewMode";
 import { normalizeRole, roleHasPermission, ROLES, PERMISSIONS } from "../security/workspacePermissions";
 
 export const WORKSPACE_TYPES = Object.freeze({
@@ -458,7 +458,7 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
 
   const workspaceType = resolveWorkspaceType(user.role);
 
-  if (isMetaReviewModeEnabled()) {
+  if (isMetaReviewWorkspaceActive(user)) {
     return buildMetaReviewNavItems(user, workspaceType);
   }
 
@@ -482,8 +482,8 @@ export function canAccessReviewUsers(user, options = {}) {
   return canAccessReviewUsersSettings(user, options);
 }
 
-export function getUserManagementPath() {
-  if (isMetaReviewModeEnabled()) {
+export function getUserManagementPath(user = null) {
+  if (isMetaReviewWorkspaceActive(user)) {
     return appPath("settings/review-users");
   }
 
@@ -499,7 +499,7 @@ export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {
     return canAccessReviewUsersSettings(user, { operationsAllowed });
   }
 
-  if (isMetaReviewModeEnabled()) {
+  if (isMetaReviewWorkspaceActive(user)) {
     if (routeKey === "admin/users") {
       return false;
     }
@@ -657,6 +657,7 @@ export function buildSettingsHubSections(user, settingsSections) {
 
   const workspaceType = resolveWorkspaceType(user.role);
   const metaReviewMode = isMetaReviewModeEnabled();
+  const metaReviewWorkspace = isMetaReviewWorkspaceActive(user);
 
   let sections = SETTINGS_HUB_SECTIONS.filter((def) => {
     if (def.metaReviewOnly && !metaReviewMode) {
@@ -670,7 +671,10 @@ export function buildSettingsHubSections(user, settingsSections) {
     return canAccessSettingsSection(def, user, workspaceType);
   });
 
-  if (metaReviewMode) {
+  // Restrict settings hub only for the dedicated Meta Review session.
+  // Normal administrators keep full authorized settings while META_REVIEW_MODE is on
+  // so they can still manage review users without entering the locker.
+  if (metaReviewWorkspace) {
     sections = sections.filter((def) => {
       if (def.metaReviewOnly) {
         return def.id === "review-users"
