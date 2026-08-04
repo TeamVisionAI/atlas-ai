@@ -167,6 +167,12 @@ const NAV_ITEM_DEFS = Object.freeze({
     labelKey: "navKnowledge",
     permission: PERMISSIONS.PROSPECT_READ
   },
+  policyIntelligence: {
+    id: "policy-intelligence",
+    path: appPath("policy-intelligence"),
+    labelKey: "navPolicyIntelligence",
+    permission: PERMISSIONS.POLICY_READ
+  },
   myAccount: {
     id: "my-account",
     path: appPath("my-account"),
@@ -286,7 +292,8 @@ const BUSINESS_CORE_NAV_ORDER = Object.freeze([
   "conversations",
   "appointments",
   "followUps",
-  "knowledge"
+  "knowledge",
+  "policyIntelligence"
 ]);
 
 const WORKSPACE_LANDING_NAV = Object.freeze({
@@ -385,6 +392,7 @@ export const ROUTE_ACCESS = Object.freeze({
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
   knowledge: { permission: PERMISSIONS.PROSPECT_READ },
+  "policy-intelligence": { permission: PERMISSIONS.POLICY_READ },
   settings: {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ

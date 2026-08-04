@@ -30,8 +30,16 @@ Defined in `backend/security/permissions.js` and enforced via:
 | prospect:assign | Yes | Yes | Yes | No | No | No | No |
 | prospect:communicate | Yes | Yes | Yes | Assigned | Assigned | No | No |
 | dashboard:executive | Yes | Yes | Yes | No | No | No | No |
+| policy:read | Yes | Yes | Yes | Yes | Yes | No | Yes |
+| policy:write | Yes | Yes | Yes | Yes | Yes | No | No |
 | operations:access | Yes | No | No | No | No | Yes | No |
 | audit:read | Yes | Yes | No | No | No | Yes | Yes |
+
+### Policy Intelligence (BR-051)
+
+- Workspace route `/app/policy-intelligence` and `GET /api/policy-intelligence` require `policy:read`.
+- Future mutations (upload, review edits) require `policy:write`.
+- DB seeds live in `backend/database/migrations/021_policy_intelligence_foundation.sql`.
 
 ## Authorization flow
 

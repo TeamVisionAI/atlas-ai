@@ -562,6 +562,482 @@ Before merging any Conversation Engine change, verify:
 
 ---
 
+## BR-051 — Policy Intelligence Foundation
+
+**Implements:** Policy Intelligence module foundation  
+**Domain:** Business  
+**Capability:** Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence` · workspace route `/app/policy-intelligence`
+
+Policy Intelligence is a **Business** module for organizing policy document reviews. Foundation scope establishes navigation, RBAC, persistence aggregates, and a workspace shell.
+
+### Rules
+
+1. **Access** — Viewing the Policy Intelligence workspace and read APIs requires `policy:read`. Mutating reviews/documents/extractions requires `policy:write`. UI visibility does not replace API authorization.
+2. **Aggregates** — Canonical persistence entities are **PolicyReview** (`atlas_policy_reviews`), **PolicyDocument** (`atlas_policy_documents`), and (from BR-052) **PolicyExtraction** (`atlas_policy_extractions`). Documents belong to exactly one review within an organization.
+3. **No AI/OCR in foundation** — Foundation must not claim AI policy reading or OCR. Structured extraction is governed by **BR-052**.
+4. **Tenant boundary** — All reviews, documents, and extractions are organization-scoped (`organization_id`). Cross-org access is forbidden.
+5. **Engine boundary** — Policy Intelligence must not reimplement Conversation, Scheduling, Appointment, or Mission Control logic. Cross-module links (e.g. optional `prospect_id`) use published IDs/events, not repository reach-through.
+
+### Role grants (foundation)
+
+| Role | policy:read | policy:write |
+|------|-------------|--------------|
+| administrator | Yes | Yes |
+| rvp / division_leader | Yes | Yes |
+| agent / recruiter | Yes | Yes |
+| support | Yes | No |
+| operations | No | No |
+
+---
+
+## BR-052 — Atlas Extract (Policy Document Ingestion & Canonical Extraction)
+
+**Implements:** Sprint 1 — Atlas Extract  
+**Domain:** Business  
+**Capability:** Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence`  
+**Depends on:** BR-051
+
+Atlas Extract is the **document ingestion and structured PolicyExtraction** pipeline for Policy Intelligence. It uploads and stores policy documents, then persists a **canonical structured model**. It does **not** perform AI reasoning or OCR.
+
+### Rules
+
+1. **Ingestion** — Documents are uploaded via authenticated `policy:write` APIs, stored in the private `policy-documents` bucket, and recorded on `atlas_policy_documents` with checksum, MIME type, size, and `upload_status`.
+2. **Canonical model** — Structured results use **PolicyExtraction** (`atlas_policy_extractions`) with zero-knowledge `extracted_data` **schemaVersion `2.0`** (see **BR-054**). Legacy PII fields (`policyNumber`, names, beneficiaries, etc.) must be stripped on write.
+3. **Allowed methods (Sprint 1)** — `structured_ingest` (client/API-supplied fields normalized into the canonical model) and `rules` (deterministic non-PII filename/product hints only). Methods `ai` and `ocr` are forbidden until a later BR explicitly enables them.
+4. **No invented facts** — Normalization may trim/coerce types and apply deterministic rules hints; it must not fabricate carrier, coverage, or premium values via generative AI.
+5. **One extraction per document** — Each `PolicyDocument` has at most one active `PolicyExtraction` row (unique on `policy_document_id`). Re-extract updates the same row.
+6. **Review lifecycle** — First successful document store may advance a `draft` review to `uploaded`.
+7. **Access** — Downloads use short-lived signed URLs; private bucket objects are not publicly listable.
+8. **Capability flags** — Module may report `documentUpload: true` and `extraction: true` while keeping `ai: false` and `ocr: false`.
+9. **PII isolation** — Atlas Extract must comply with **BR-054** (zero-knowledge Policy Intelligence).
+
+---
+
+## BR-054 — PII Isolation & Zero-Knowledge Policy Intelligence
+
+**Implements:** Policy Intelligence privacy boundary  
+**Domain:** Business (Intelligence) vs CRM identity ownership  
+**Capability:** Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence`  
+**Depends on:** BR-051, BR-052
+
+The Intelligence Engine analyzes the **policy**, not the **person**.
+
+- The **CRM** owns identity (names, contact data, prospect linkage).
+- The **Policy Intelligence** subsystem owns insurance analysis only (mechanics, anonymous risk attributes, product economics).
+
+These are separate bounded contexts. Recruit OS and Mission Control remain unchanged.
+
+### Rules
+
+1. **No PII in canonical extraction** — `PolicyExtraction.extracted_data` (schemaVersion `2.0`) must not store or expose: first/last/full name, address, email, phone, SSN/Tax ID, policy number, exact date of birth, beneficiary names, owner names, or agent names.
+2. **Anonymous insured attributes only** — Identity is replaced by insurance attributes such as `insured.gender`, `insured.issueAge`, `insured.underwritingClass`, `insured.tobaccoStatus` (e.g. Male / Age 48 / Preferred Non-Smoker).
+3. **Allowed mechanics fields** — Carrier, product/productType, premium, face amount, charges, cash values, COI, indexes, riders, coverages (type/limit/deductible — no person names), and non-PII `mechanics`.
+4. **CRM linkage is internal** — `PolicyReview.prospectId` / review IDs may exist for Atlas CRM integration but must **never** be sent to AI prompts, knowledge embeddings, benchmark engines, shared reports, or research exports.
+5. **Knowledge Center gate** — Before any Policy Intelligence content is indexed, embedded, benchmarked, or added to Knowledge Center, run PII sanitization (`prepareContentForKnowledgeIndex` / `knowledgeCenterGate`). Masks include `[REDACTED]`, `[POLICY_ID]`, `[ADDRESS]`, `[EMAIL]`.
+6. **AI boundary** — No LLM request may include PII. AI receives only canonical insurance data via `buildAiPolicyContext` / `gateExtractionForAi`.
+7. **Benchmark boundary** — Benchmark engines operate only on anonymous insurance characteristics (`toBenchmarkFeatures`).
+8. **Reports** — Support `internal` (full Atlas RBAC access) and `shared` (automatically strip PII and CRM linkage).
+9. **Normalization strips forbidden keys** — Writes through `normalizePolicyExtractionData` must drop denylisted PII keys even if clients send them.
+
+### Acceptance
+
+- Canonical extraction contains no PII.
+- AI never receives PII.
+- Knowledge Center stores only sanitized data for Policy Intelligence ingress.
+- Benchmark engine operates only on anonymous insurance characteristics.
+- Existing Atlas Recruit OS / Mission Control architecture remains unchanged.
+
+---
+
+## BR-056 — CRM / Policy Intelligence Boundary
+
+**Implements:** Bounded-context separation between Atlas CRM and Policy Intelligence  
+**Domain:** Business  
+**Capability:** Analytics & Intelligence (mechanics) vs Prospect Management (identity)  
+**Module:** `backend/modules/policy-intelligence`  
+**Depends on:** BR-051, BR-052, BR-054
+
+**CRM owns identity. Policy Intelligence owns policy mechanics.**
+
+| CRM owns | Policy Intelligence owns |
+|----------|--------------------------|
+| Prospect / Client | Review ID |
+| Policy Number | Carrier / Product |
+| Owner / Insured names | Gender / Issue Age / Risk Classification / Tobacco |
+| Appointments / Notes | Premium / Face Amount / Charges / COI / Cash Values |
+| Contact PII | Indexes / Loans / Riders / Coverages |
+| | Findings / Business Rules / Recommendations |
+
+### Rules
+
+1. **Review identity** — Policy Intelligence identifies every review **only** by `reviewId` in APIs, AI contexts, reports, embeddings, and exports.
+2. **prospectId is internal FK only** — May exist on `atlas_policy_reviews.prospect_id` for CRM integration. Must **never** be sent to AI, exported, embedded, benchmarked, or shown in reports (internal or shared).
+3. **Policy Number belongs to CRM** — Must never enter the canonical PolicyExtraction model. If reconciliation is required, store only `crm_policy_ref_hash` (org-scoped SHA-256), never plaintext.
+4. **No client ownership concepts in PI** — Do not store or expose Owner Name, Insured Name, Beneficiary Name, Agent Name, Client Name, or Policy Holder Name.
+5. **Intelligence Engine inputs** — Only anonymous insurance characteristics: gender, issue age, risk classification, tobacco status, carrier, product, face amount, premium, coverage, charges, cash values, indexes, loans, riders, business rules, findings, recommendations.
+6. **Shared reports** — Contain no PII and no CRM linkage identifiers; anonymous insurance information only.
+7. **Non-goals** — Do not change Recruit OS or Mission Control ownership of prospects, appointments, or CRM policy numbers.
+
+### Acceptance
+
+- Policy Intelligence cannot identify a person from its public model or reports.
+- AI receives no client identity and no policy numbers.
+- Reviews are addressed by `reviewId` only across PI surfaces.
+
+---
+
+## BR-057 — Facts Before Findings
+
+**Implements:** Sprint 2 — Insurance Language Layer pipeline  
+**Domain:** Business / Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence/domain/insurance-language`  
+**Depends on:** BR-052, BR-054, BR-056
+
+Pipeline (strict order — frozen):
+
+```
+Atlas Extract
+      ↓
+Insurance Facts
+      ↓
+Annual Values Engine
+      ↓
+Business Rules
+      ↓
+Findings
+      ↓
+Recommendations
+      ↓
+AI Narrative
+```
+
+Comparison Engine (BR-061) consumes Facts / Annual Values / Findings / Recommendations and does not alter this order.
+
+### Rules
+
+1. **Facts are immutable** — created only by Atlas Extract (see BR-058).
+2. **Findings are derived** — produced only by deterministic Business Rules that read Facts.
+3. **Recommendations are generated** — produced only from Findings (never directly from AI or free-form extract fields).
+4. **AI only explains** — AI Narrative consumes **Facts + Findings only**. AI never creates Facts, never modifies Facts, and does not invent Findings.
+5. **Separation** — Findings are not Facts. Recommendations are not Findings.
+6. **Vocabulary** — Carrier terminology maps into Atlas canonical Insurance Language before Facts are frozen.
+
+---
+
+## BR-058 — Immutable Insurance Facts
+
+**Implements:** Sprint 2 — Fact immutability  
+**Domain:** Business / Analytics & Intelligence  
+**Module:** `InsuranceFacts.js`  
+**Depends on:** BR-057
+
+### Rules
+
+1. **Create/modify path** — Insurance Facts may be created or replaced **only** by Atlas Extract from the source document extraction path.
+2. **Business Rules** — may **READ** Facts; may **NEVER** modify Facts.
+3. **AI** — may **READ** Facts (with Findings); may **NEVER** modify Facts or create Facts.
+4. **Change control** — Only a new extraction from the original source document may change Facts (new frozen snapshot).
+5. **Runtime** — Fact objects are deep-frozen; `assertInsuranceFactsImmutable` guards consumers.
+
+---
+
+## BR-059 — Deterministic Policy Intelligence Rule Engine
+
+**Implements:** Sprint 3 — Policy Intelligence Rule Engine  
+**Domain:** Business / Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence/domain/insurance-language/rule-engine`  
+**Depends on:** BR-057, BR-058
+
+### Rules
+
+1. **Deterministic only** — Every Finding originates from a coded business rule. No OCR, no AI reasoning, no LLM decisions inside the rule engine.
+2. **Facts are read-only** — Rules may READ immutable Insurance Facts and must NEVER modify them (BR-058).
+3. **Standard rule object** — Each rule has: unique `id` (PI-XXX), `name`, `category`, `severity`, `inputs`, deterministic `evaluate` logic, Finding text, optional Recommendation, explanation, and evidence references to Facts.
+4. **Categories** — Policy Design, Charges, Cash Value, Sustainability, Index Strategy, Complexity, Policy Health.
+5. **Evidence required** — Every Finding includes `ruleId`, `severity`, `finding`, optional `recommendation`, `explanation`, and `evidence` (with Fact field references).
+6. **Configurable thresholds** — Numeric/list thresholds (e.g. illustration duration gap, rider count) are configurable; defaults live in `ruleThresholds.js`.
+7. **Execution metadata** — Engine returns `rulesExecuted`, `rulesPassed`, `rulesTriggered`, and `executionTime` (ms) alongside Findings.
+8. **Independently testable** — Each rule can be executed and asserted in isolation.
+
+### Initial library
+
+PI-001 Carrier Identified · PI-002 Product Identified · PI-003 Increasing Death Benefit · PI-004 Level Death Benefit · PI-005 High Illustration Dependency · PI-006 Volatility-Controlled Index · PI-007 Multiple Riders · PI-008 Indexed Crediting Strategy · PI-009 Flexible Premium Structure · PI-010 Required Insurance Facts Missing
+
+---
+
+## BR-060 — Annual Values Engine
+
+**Implements:** Sprint 4A — Annual Values Engine  
+**Domain:** Business / Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence/domain/annual-values`  
+**Depends on:** BR-051, BR-052, BR-054, BR-056, BR-058
+
+### Rules
+
+1. **Extension only** — Annual Values extend Policy Intelligence. Do not redesign Atlas Extract, Insurance Facts, Rule Engine, Language Layer, or Recommendations.
+2. **Canonical row** — Every AnnualValue includes: policyYear, insuredAge, annualPremium, scheduledPremium, premiumLoad, administrativeCharge, costOfInsurance, riderCharges, interestCredited, accountValue, cashValue, cashSurrenderValue, deathBenefit, loanBalance, withdrawals, netCashValue.
+3. **Storage** — Canonical AnnualValue entities persist linked to `reviewId` (`atlas_policy_annual_value_sets` + `atlas_policy_annual_values`). Insurance Facts remain immutable and separate.
+4. **Missing values** — Missing illustration cells become `null`. Values are never guessed or invented by AI/OCR.
+5. **Validation** — Policy years must be sequential; ages must increase correctly; premium / cash / death benefit fields must be numeric or null.
+6. **Deterministic calculations** — Total Premiums Paid, Total COI, Total Administrative Charges, Total Rider Charges, Total Internal Charges, Cash Value at ages 65/70/80/90, Break-even Year, Policy Duration.
+7. **Output** — Timeline + Summary Metrics + Calculation Metadata + Validation Results.
+8. **No OCR / No GPT** — Structured annual tables only (ingest or fixture). AI narrative remains unchanged (Facts + Findings only).
+
+---
+
+## BR-061 — Policy Intelligence Comparison Engine
+
+**Implements:** Sprint 5 — Comparison Engine  
+**Domain:** Business / Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence/domain/comparison`  
+**Depends on:** BR-057, BR-058, BR-059, BR-060
+
+### Rules
+
+1. **Calculations only** — The Comparison Engine performs deterministic calculations. No AI. No OCR.
+2. **Consumes pipeline outputs** — Comparison consumes Insurance Facts, Annual Values, Findings, and Recommendations. It does **not** generate new Facts.
+3. **Facts immutable** — Source Insurance Facts remain immutable (BR-058). Stress scenarios use cloned scenario snapshots only.
+4. **Scenario model** — Each scenario includes its own Facts snapshot, Annual Values, Findings, and Recommendations. Supported types include Current Policy, Stress Test, Alternative Funding, Alternative Strategy.
+5. **Canonical ComparisonResult** — Each metric row includes Metric, Scenario A, Scenario B, Difference, Percentage Difference, and Winner (when direction applies).
+6. **Metrics** — Annual Premium, Lifetime Premium, Total COI, Administrative Charges, Premium Loads, Rider Charges, Total Internal Charges, Cash Value, Cash Surrender Value, Death Benefit, Break-even Year, Guaranteed Duration, Illustrated Duration, Policy Duration.
+7. **Stress tests** — Deterministic stress kinds include illustrated-rate reduction and minimum funding. Scenario math remains deterministic.
+8. **Extensible types** — Comparison types are registered (side_by_side, current_vs_stress, current_vs_alternative_funding, current_iul_vs_alternative) so future comparison modes can be added without redesign.
+
+---
+
+## BR-062 — Financial Intelligence Boundary
+
+**Implements:** RC2 architecture / RC3 Phase A runtime  
+**Domain:** Financial Intelligence  
+**Module:** `backend/modules/financial-intelligence`  
+**Depends on:** BR-051–BR-061, BR-066  
+**Status:** Approved (RC3 enforceable)
+
+### Rules
+
+1. **Consume, do not mutate** — Financial Intelligence may read Policy Intelligence outputs through an adapter and must never write strategy data into PI Facts, PI Rule Engine results, PI Annual Values, PI Findings, PI Comparison outputs, or shared PI reports.
+2. **FI-owned snapshot** — Relevant PI Facts are copied into a Financial Intelligence-owned `CurrentIulSnapshot` for reproducible evaluation.
+3. **Fail closed** — Strategy evaluation fails closed when the source product is not IUL-compatible, premium cannot be normalized, or face amount is missing/invalid.
+4. **Anonymity intact** — FI must not infer identity or add personally identifying data into Policy Intelligence.
+5. **Tenant isolation** — Evaluations are scoped by organization; cross-tenant access is forbidden.
+
+---
+
+## BR-063 — Strategy Catalog Ownership
+
+**Implements:** RC2 architecture / RC3 pending-verification fund config  
+**Domain:** Financial Intelligence  
+**Module:** `domain/config/fundFamilyConfig.js`  
+**Depends on:** BR-062, BR-066  
+**Status:** Approved (catalog verification deferred)
+
+### Rules
+
+1. **FI owns strategies** — Organization strategy catalog entries (including fund-family configuration) live only in Financial Intelligence.
+2. **PI never references org strategies** — Policy Intelligence engines must not embed Team Vision / Primerica placement logic.
+3. **Pending verification** — Unverified symbols and fund metadata must carry `verificationStatus = PENDING_VERIFICATION` and `availabilityStatus = UNKNOWN`.
+4. **No client fund recommendations** — RC3 UI must not present unverified symbols as client recommendations; general categories only until an authoritative catalog is verified.
+
+---
+
+## BR-064 — Active Product Presentation Rule
+
+**Implements:** RC2 architecture (deferred product eligibility in RC3)  
+**Domain:** Financial Intelligence  
+**Depends on:** BR-062, BR-063, BR-066  
+**Status:** Approved (automated eligibility deferred)
+
+### Rules
+
+1. **Active products for new presentations** — When a verified product catalog exists, FI may evaluate ACTIVE products only for new strategy presentations.
+2. **LEGACY / RETIRED** — LEGACY or RETIRED products must not be newly presented as placements.
+3. **RC3 constraint** — Without official Primerica eligibility integration, Atlas must not invent product eligibility or claim longest available term without representative confirmation fields.
+
+---
+
+## BR-065 — Analysis vs Strategy Evaluation Separation
+
+**Implements:** RC2 architecture / RC3 naming  
+**Domain:** Policy Intelligence / Financial Intelligence  
+**Depends on:** BR-062, BR-066  
+**Status:** Approved
+
+### Rules
+
+1. **PI = analysis** — Policy Intelligence answers what the client currently owns (facts, findings, annual values, comparisons).
+2. **FI = educational strategy evaluation** — Financial Intelligence produces organization discussion scenarios / planning illustrations, not client recommendations.
+3. **Canonical naming** — Runtime capability is **Invest-the-Difference Strategy Evaluation**. Client/report section title is **Possible Discussion Scenarios for the Primerica Representative**.
+4. **Forbidden language** — Surfaces must avoid “Atlas recommends,” “best investment,” “best fund,” “replace this policy,” “client should surrender,” “final suitability determination,” or “approved for the client.”
+
+---
+
+## BR-066 — Human Recommendation Boundary
+
+**Implements:** Sprint RC2 — Financial Intelligence Governance  
+**Domain:** Platform / Financial Intelligence / Policy Intelligence  
+**Module:** Architecture governance (all analysis & strategy surfaces)  
+**Depends on:** BR-051–BR-061; Financial Intelligence Architecture (RC2)  
+**Status:** Approved
+
+### Definition
+
+Atlas generates **analysis**, **education**, **comparisons**, and **strategy evaluations**.
+
+Atlas **never** replaces the professional judgment of a licensed advisor.
+
+Atlas does **not** determine suitability.
+
+Atlas does **not** recommend purchasing or replacing products.
+
+**Final recommendations** belong to the licensed financial professional.
+
+**Final decisions** belong to the client.
+
+### Rules
+
+1. **Inform, do not decide** — Atlas may analyze policies, compare strategies, calculate projections, explain findings, educate, support advisor discussions, document assumptions, and record outcomes.
+2. **Forbidden automated advice** — Atlas shall not recommend purchasing a product, replacing a policy, or surrendering a policy.
+3. **No suitability engine** — Atlas shall not determine client suitability for any product or strategy.
+4. **No substitution of judgment** — Atlas shall not replace professional judgment or make legal, tax, or regulatory decisions.
+5. **Layer clarity** — Policy Intelligence produces facts and evidence-based findings. Financial Intelligence produces organization strategy evaluations. Advisors present. Clients decide. Mission Control records outcomes.
+6. **Explainability** — Any strategy evaluation or projection shown to users must remain explainable and must expose material assumptions.
+7. **Applies everywhere** — BR-066 governs Recruit OS presentations, Policy Intelligence, Financial Intelligence, Knowledge Center framing, and AI narratives that discuss products or strategies.
+
+### Creed
+
+```
+Atlas informs.
+Advisors recommend.
+Clients decide.
+```
+
+See: [FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](../08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) §§13–18.
+
+---
+
+## BR-067 — Invest-the-Difference Same-Outlay Rule
+
+**Implements:** RC3 Phase A — Invest-the-Difference Strategy Evaluation  
+**Domain:** Financial Intelligence  
+**Module:** `investTheDifferenceEngine.js`  
+**Depends on:** BR-062, BR-065, BR-066  
+**Status:** Approved
+
+### Rules
+
+1. **Default outlay** — `totalProposedMonthlyOutlay = currentIulMonthlyPremium` unless a documented representative override exists.
+2. **Same death benefit** — Initial term comparison uses `proposedTermDeathBenefit = currentIulDeathBenefit`.
+3. **Difference math** — `unboundedPremiumDifference = currentIulMonthlyPremium - proposedTermMonthlyPremium`; `monthlyInvestmentDifference = max(0, unboundedPremiumDifference)`; `proposedMutualFundContribution = monthlyInvestmentDifference`.
+4. **Identity check** — `proposedTermMonthlyPremium + proposedMutualFundContribution ≈ totalProposedMonthlyOutlay` within currency tolerance.
+5. **No silent increase** — Atlas must not silently raise the client’s monthly outlay.
+6. **Negative difference** — Negative unbounded difference yields zero investable contribution and a representative-review warning; unbounded difference is retained for audit.
+
+---
+
+## BR-068 — Representative-Entered Term Quote Source
+
+**Implements:** RC3 Phase A  
+**Domain:** Financial Intelligence  
+**Module:** `termQuoteModel.js`  
+**Depends on:** BR-064, BR-066, BR-067  
+**Status:** Approved
+
+### Rules
+
+1. **Identified source required** — Term premiums must come from an identified source: `OFFICIAL_QUOTE`, `REPRESENTATIVE_CONFIRMED`, `PRELIMINARY_ESTIMATE`, or `MISSING`.
+2. **No invented rates** — Atlas must not generate term premiums from invented rate tables.
+3. **No automatic longest-term claim** — Atlas must not automatically claim the entered duration is the longest eligible Primerica term.
+4. **Confirmation fields** — Capture `selectedTermDuration`, `longestAvailableTermConfirmed`, `eligibilitySource`, `eligibilityConfirmedAt`.
+5. **Absent confirmation copy** — When confirmation is absent, display: “The representative must confirm the longest available Primerica term and official premium.”
+
+---
+
+## BR-069 — Educational Projection Assumptions
+
+**Implements:** RC3 Phase A  
+**Domain:** Financial Intelligence  
+**Module:** `projectionAssumptions.js`, `monthlyFutureValue.js`  
+**Depends on:** BR-066, BR-067  
+**Status:** Approved
+
+### Rules
+
+1. **Canonical scenarios** — Conservative 4%, Moderate Growth 7%, Aggressive Growth 10% live in one configuration module.
+2. **Labels required** — Projections must be labeled Hypothetical, Educational, and Non-guaranteed, with fee methodology disclosed.
+3. **Methodology** — Future value of an ordinary annuity with monthly contributions and monthly compounding.
+4. **Separated outputs** — Return total contributions, illustrative growth, and illustrative ending value separately.
+5. **No React math** — Calculation logic must not live inside React components.
+6. **Horizon is distinct** — Investment projection horizon is representative-entered and must not silently default to term duration.
+
+---
+
+## BR-070 — Risk Profile Emphasis Gate
+
+**Implements:** RC3 Phase A  
+**Domain:** Financial Intelligence  
+**Depends on:** BR-066  
+**Status:** Approved
+
+### Rules
+
+1. **No automated suitability** — Risk-profile values are representative-entered planning inputs, not Atlas suitability determinations.
+2. **Approved values** — `NOT_COMPLETED`, `CONSERVATIVE`, `MODERATE`, `AGGRESSIVE`.
+3. **Emphasis gate** — Do not highlight a scenario as aligned unless a representative records a risk-profile classification.
+4. **Neutral viewing allowed** — Risk-profile absence may prevent scenario emphasis but should not necessarily prevent viewing an unranked educational illustration.
+5. **Absent copy** — Display: “Complete the client risk-profile process before emphasizing an investment scenario.”
+
+---
+
+## BR-071 — Replacement Safeguards
+
+**Implements:** RC3 Phase A  
+**Domain:** Financial Intelligence / Compliance  
+**Depends on:** BR-066  
+**Status:** Approved
+
+### Rules
+
+1. **Prominent display** — Strategy evaluation surfaces must display replacement safeguards covering: do not cancel/surrender before new coverage is in force; underwriting may decline/rate/delay; replacement forms may be required; surrender charges/loans/tax/riders/guarantees/contestability differences; term has no cash value and expires; mutual funds may lose value; returns are not guaranteed.
+2. **No surrender instruction** — Atlas must never produce an instruction to cancel the existing policy.
+3. **Readiness** — Arithmetic alone does not mark an evaluation ready; replacement acknowledgement participates in status readiness.
+
+---
+
+## BR-072 — Strategy Evaluation Versioning and Overrides
+
+**Implements:** RC3 Phase A  
+**Domain:** Financial Intelligence  
+**Module:** `StrategyEvaluationService.js`  
+**Depends on:** BR-062, BR-067  
+**Status:** Approved
+
+### Rules
+
+1. **Immutable revisions** — Material representative input changes preserve the prior evaluation and create a new version (prior marked `SUPERSEDED`).
+2. **Override reason required** — Representative overrides of total proposed monthly outlay require a reason and preserve the original generated evaluation.
+3. **Persistence** — FI-owned persistence links primarily to `reviewId` with optional CRM `prospect_id` outside PI Facts/shared reports.
+4. **Audit** — Create/update/override/revision actions write audit entries.
+
+---
+
+## BR-073 — Missing Inputs Must Be Exposed
+
+**Implements:** RC3 Phase A  
+**Domain:** Financial Intelligence  
+**Depends on:** BR-062, BR-066, BR-068, BR-069, BR-070  
+**Status:** Approved
+
+### Rules
+
+1. **Expose, do not fabricate** — Missing premiums, death benefits, quotes, eligibility confirmations, horizons, and risk profiles must be exposed as warnings — never fabricated.
+2. **Status model** — Explicit draft statuses include missing policy data, term quote required, term confirmation required, investment horizon required, risk profile required, and replacement review required.
+3. **Ready gate** — Do not mark READY merely because arithmetic works; readiness is defined in the canonical status service.
+
+---
+
 ## BR-050 — Canonical Appointment Lifecycle (Read Model)
 
 **Implements:** Architecture hardening — appointment state consistency (Sprint 13.x follow-up)  

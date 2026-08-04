@@ -1,0 +1,52 @@
+.pi-preview {
+  min-height: 100vh;
+  padding: 1.5rem 1.75rem 4rem;
+  background: #f7f8fa;
+  color: #0f172a;
+}
+
+.pi-preview__banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  max-width: 1180px;
+  margin: 0 auto 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #111827;
+  color: #f8fafc;
+  font-size: 0.875rem;
+}
+
+.pi-preview__banner code {
+  color: #93c5fd;
+}
+
+.pi-preview__header {
+  max-width: 1180px;
+  margin: 0 auto 2rem;
+}
+
+.pi-preview__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.pi-preview__header h1 {
+  margin: 0.4rem 0;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  letter-spacing: -0.03em;
+}
+
+.pi-preview__header p {
+  margin: 0;
+  max-width: 40rem;
+  color: #64748b;
+  line-height: 1.55;
+  font-size: 1rem;
+}

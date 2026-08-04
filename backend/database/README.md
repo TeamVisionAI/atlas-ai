@@ -269,3 +269,73 @@ backend/database/migrations/018_appointment_owner_rep_id_down.sql
 - Repository reads prefer `owner_rep_id` column, then fall back to `metadata.ownerRepId`.
 - Writes dual-publish to the column and metadata until metadata is removed in a later sprint.
 
+## Policy Intelligence Foundation (BR-051)
+
+Run in Supabase SQL editor:
+
+```
+backend/database/migrations/021_policy_intelligence_foundation.sql
+```
+
+Creates:
+
+- `atlas_policy_reviews` — PolicyReview aggregate (org-scoped review container)
+- `atlas_policy_documents` — PolicyDocument aggregate (files linked to a review)
+- Permissions `policy:read` / `policy:write` and role grants (only for roles present in `roles`)
+
+Note: role grants join against existing `roles` rows so environments missing `SUPPORT` / `OPERATIONS` do not fail the FK on `role_permissions`.
+
+Rollback:
+
+```
+backend/database/migrations/021_policy_intelligence_foundation_down.sql
+```
+
+### Runtime without migration
+
+- Foundation API `GET /api/policy-intelligence` returns a static summary and does not query these tables yet.
+- Workspace UI is a placeholder dashboard; upload/OCR/extraction are not enabled.
+
+### After migration
+
+Persistence is ready for Atlas Extract repositories and document storage. See [POLICY_INTELLIGENCE.md](../../docs/04-architecture/policy-intelligence/POLICY_INTELLIGENCE.md).
+
+## Policy Intelligence — Atlas Extract (BR-052)
+
+Run in Supabase SQL editor (or apply via `DATABASE_URL`):
+
+```
+backend/database/migrations/022_policy_intelligence_atlas_extract.sql
+```
+
+Creates:
+
+- Private Storage bucket `policy-documents` (25 MB; PDF/images/text/JSON)
+- `atlas_policy_extractions` — PolicyExtraction aggregate (canonical `extracted_data` JSONB)
+
+Rollback:
+
+```
+backend/database/migrations/022_policy_intelligence_atlas_extract_down.sql
+```
+
+### Runtime notes
+
+- Bucket DDL may require SQL-editor owner privileges; if skipped, `ensurePolicyDocumentBucket()` creates `policy-documents` via the Storage API.
+- Uploads use service-role Supabase Storage + short-lived signed download URLs.
+- Extraction methods: `structured_ingest`, `rules` only (`ai` / `ocr` forbidden).
+- API: `/api/policy-intelligence/*` (see sprint doc).
+
+## Policy Intelligence — CRM Boundary (BR-056)
+
+```
+backend/database/migrations/023_policy_intelligence_crm_boundary.sql
+```
+
+Adds:
+
+- `atlas_policy_reviews.crm_policy_ref_hash` — hashed CRM policy number for reconciliation (never plaintext)
+- Column/table comments clarifying `prospect_id` is an internal CRM FK only
+
+PI APIs identify reviews by `reviewId` only and never return `prospectId` or plaintext policy numbers.
+

@@ -57,8 +57,27 @@ Facebook Lead
 - Mission Control — bug fixes only
 - Executive Dashboard — bug fixes only
 
+## Architecture baseline — RC2 / RC3 Financial Intelligence
+
+| Field | Value |
+|-------|--------|
+| **RC2 – Financial Intelligence Architecture** | **APPROVED** |
+| **RC3 – Invest-the-Difference foundation** | **IMPLEMENTED** |
+| Canonical doc | [08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](./08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) |
+| Runtime module | `backend/modules/financial-intelligence/` · `/api/financial-intelligence` |
+| Governance | BR-062–BR-065, **BR-066**, BR-067–BR-073 |
+| Freeze | Recruit OS · Policy Intelligence (frozen) · Knowledge Center — extend, do not redesign PI |
+| Deferred | Official Primerica quote · verified fund catalog · PDF export · automated eligibility · suitability |
+
 ## Recent Decisions
 
+- **2026-08-04:** **RC3 Phase A IMPLEMENTED** — Invest-the-Difference Strategy Evaluation foundation (FI module, APIs, UI, BR-062–073)
+- **2026-08-03:** **RC2 APPROVED** — Financial Intelligence Architecture finalized; BR-066 Human Recommendation Boundary
+- **2026-08-03:** Sprint RC2 — Financial Intelligence architecture documented (above PI; no code)
+- **2026-08-03:** Policy Intelligence Sprint 6 — Executive Review PX (presentation only; architecture frozen)
+- **2026-08-03:** Policy Intelligence Sprint 5 — Comparison Engine (BR-061) + Comparison Workspace
+- **2026-08-03:** Policy Intelligence Sprint 4A — Annual Values Engine (BR-060); F&G fixture timeline + metrics
+- **2026-08-03:** Policy Intelligence Sprint 3 — deterministic Rule Engine (BR-059), PI-001…PI-010 on frozen pipeline
 - **2026-07-24:** Atlas RC1 certified — `ATLAS RC1 CERTIFIED` from `verifyRC1.js`
 - **2026-07-24:** Timeline `prospect_created` summary defaults to "Lead created" via EventFactory
 - **2026-07-24:** Sprint 16 starts Phase 2 — Production Recruiting Automation
@@ -67,6 +86,12 @@ Facebook Lead
 
 | Document | Path |
 |----------|------|
+| RC2 Financial Intelligence (APPROVED) | [08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](./08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) |
+| BR-066 Human Recommendation Boundary | [06-business/BUSINESS_RULES.md](./06-business/BUSINESS_RULES.md) |
+| Sprint RC2 record | [09-releases/sprints/SPRINT_RC2_FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](./09-releases/sprints/SPRINT_RC2_FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) |
+| Sprint 5 Comparison | [09-releases/sprints/SPRINT_POLICY_INTELLIGENCE_COMPARISON.md](./09-releases/sprints/SPRINT_POLICY_INTELLIGENCE_COMPARISON.md) |
+| Sprint 4A Annual Values | [09-releases/sprints/SPRINT_POLICY_INTELLIGENCE_ANNUAL_VALUES.md](./09-releases/sprints/SPRINT_POLICY_INTELLIGENCE_ANNUAL_VALUES.md) |
+| Sprint 3 Rule Engine | [09-releases/sprints/SPRINT_POLICY_INTELLIGENCE_RULE_ENGINE.md](./09-releases/sprints/SPRINT_POLICY_INTELLIGENCE_RULE_ENGINE.md) |
 | RC1 Certification | [10-release-candidate/RC1_CERTIFICATION.md](./10-release-candidate/RC1_CERTIFICATION.md) |
 | Sprint 16 Plan | [00-executive/Sprint_16.md](./00-executive/Sprint_16.md) |
 | Environment tooling | [backend/dev/environment/](../backend/dev/environment/) |

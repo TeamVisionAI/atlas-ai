@@ -116,6 +116,8 @@ Prefer extending existing engines over copying business logic into routes or han
 | Response Builder | `backend/core/responseBuilder.js` | Message structure, one question per turn |
 | Personality Engine | `backend/core/personalityEngine.js` | Tone and short acknowledgments (BR-011 – BR-013) |
 | Presence Engine | *planned* | Recruiter presence (BR-008 – BR-010) |
+| **Policy Intelligence** | `backend/modules/policy-intelligence/` | Frozen analysis pipeline (Facts, Rules, Annual Values, Comparison) — BR-051–BR-061 |
+| **Financial Intelligence** | `backend/modules/financial-intelligence/` | Invest-the-Difference Strategy Evaluation (consumes PI; never mutates PI) — BR-062–BR-073 / BR-066 |
 
 ### 7. Recommend refactors when logic repeats
 

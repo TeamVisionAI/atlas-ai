@@ -1,0 +1,360 @@
+/* Sprint 6 — Executive Policy Review PX (aligned with Executive Dashboard) */
+
+.epr {
+  --exec-bg: #f7f8fa;
+  --exec-surface: #ffffff;
+  --exec-border: #e8eaed;
+  --exec-text: #0f172a;
+  --exec-muted: #64748b;
+  --exec-subtle: #94a3b8;
+  --exec-accent: #111827;
+  --exec-radius: 16px;
+  --exec-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+  color: var(--exec-text);
+}
+
+.epr .executive-section-label {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--exec-muted);
+}
+
+.epr .executive-card {
+  background: var(--exec-surface);
+  border: 1px solid var(--exec-border);
+  border-radius: var(--exec-radius);
+  box-shadow: var(--exec-shadow);
+}
+
+/* Hero */
+.epr-hero {
+  padding: 36px 40px;
+}
+
+.epr-hero__headline {
+  margin: 10px 0 0;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.epr-hero__summary {
+  margin: 14px 0 0;
+  max-width: 52rem;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.epr-hero__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.epr-hero-card {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--exec-border);
+}
+
+.epr-hero-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--exec-muted);
+}
+
+.epr-hero-card__value {
+  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.epr-hero__brief {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--exec-border);
+}
+
+.epr-hero__bullets {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* KPI cards */
+.epr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.epr-kpi-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.epr-kpi {
+  padding: 22px 20px;
+}
+
+.epr-kpi__label {
+  font-size: 13px;
+  color: var(--exec-muted);
+  margin-bottom: 10px;
+}
+
+.epr-kpi__value {
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.epr-kpi__hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--exec-subtle);
+}
+
+/* Charts */
+.epr-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.epr-chart-card {
+  padding: 20px 22px;
+}
+
+.epr-chart__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.epr-chart__head h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.epr-chart__meta {
+  font-size: 12px;
+  color: var(--exec-subtle);
+}
+
+.epr-chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.epr-chart__empty {
+  margin: 0;
+  color: var(--exec-muted);
+  font-size: 14px;
+}
+
+/* Findings */
+.epr-finding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.epr-finding {
+  padding: 22px 22px 18px;
+}
+
+.epr-finding__top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.epr-finding__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.epr-finding__evidence {
+  margin: 14px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.epr-finding__kicker {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--exec-muted);
+}
+
+.epr-finding__toggle,
+.epr-finding__tech {
+  margin-top: 14px;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.epr-finding__details {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--exec-border);
+  display: grid;
+  gap: 12px;
+}
+
+.epr-finding__details h5 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--exec-muted);
+}
+
+.epr-finding__details p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.epr-finding__rule {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px !important;
+  color: var(--exec-muted) !important;
+}
+
+/* Actions / discussion / conclusion */
+.epr-placeholder-note {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--exec-subtle);
+}
+
+.epr-action-footnote {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--exec-muted);
+  line-height: 1.5;
+}
+
+.epr-discussion,
+.epr-conclusion {
+  padding: 28px 32px;
+}
+
+.epr-discussion__grid,
+.epr-conclusion__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.epr-conclusion__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.epr-discussion h4,
+.epr-conclusion h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.epr-discussion ul,
+.epr-conclusion ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.epr-conclusion__next {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--exec-border);
+}
+
+.epr-conclusion__next p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #1e293b;
+}
+
+.epr-conclusion__disclaimer {
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: var(--exec-subtle);
+}
+
+.epr .action-card:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .epr-kpi-grid,
+  .epr-kpi-grid--four,
+  .epr-chart-grid,
+  .epr-discussion__grid,
+  .epr-conclusion__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .epr-hero {
+    padding: 24px 20px;
+  }
+
+  .epr-kpi-grid,
+  .epr-kpi-grid--four,
+  .epr-chart-grid,
+  .epr-discussion__grid,
+  .epr-conclusion__grid {
+    grid-template-columns: 1fr;
+  }
+}

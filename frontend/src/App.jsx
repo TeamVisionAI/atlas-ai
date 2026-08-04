@@ -27,6 +27,8 @@ import { WorkspaceLandingRedirect } from "./components/RequireWorkspaceAccess";
 import MyDashboard from "./pages/MyDashboard";
 import TeamDashboard from "./pages/TeamDashboard";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import PolicyIntelligence from "./pages/PolicyIntelligence";
+import PolicyIntelligencePreviewPage from "./pages/PolicyIntelligencePreviewPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
 import Prospect from "./pages/Prospect";
@@ -38,6 +40,10 @@ import Terms from "./pages/Terms";
 import DataDeletion from "./pages/DataDeletion";
 import { appPath } from "./config/appRoutes";
 import { buildProspectWorkspacePath } from "./utils/prospectRoutes";
+import {
+  POLICY_INTELLIGENCE_PREVIEW_ALIAS_PATH,
+  POLICY_INTELLIGENCE_PREVIEW_PATH
+} from "./config/internalPreview";
 
 const ProfileConfiguration = lazy(() => import("./pages/configuration/ProfileConfiguration"));
 const OrganizationConfiguration = lazy(() => import("./pages/configuration/OrganizationConfiguration"));
@@ -86,6 +92,13 @@ export default function App() {
       <Route path="/app/forgot-password" element={<ForgotPassword />} />
       <Route path="/app/reset-password" element={<ResetPassword />} />
       <Route path="/app/accept-invitation" element={<AcceptInvitation />} />
+
+      {/* Dev-only PI Executive Review preview — outside /app so Meta Review nav is untouched */}
+      <Route path={POLICY_INTELLIGENCE_PREVIEW_PATH} element={<PolicyIntelligencePreviewPage />} />
+      <Route
+        path={POLICY_INTELLIGENCE_PREVIEW_ALIAS_PATH}
+        element={<PolicyIntelligencePreviewPage />}
+      />
 
       <Route
         path="/app"
@@ -158,6 +171,7 @@ export default function App() {
           <Route path="appointments" element={<AppointmentSettings />} />
         </Route>
         <Route path="knowledge" element={<KnowledgeHub />} />
+        <Route path="policy-intelligence" element={<PolicyIntelligence />} />
         <Route path="my-account" element={<MyAccount />} />
         <Route path="admin/users" element={<AdminUsers />} />
         <Route path="operations-center/*" element={<OperationsCenter />} />
@@ -175,6 +189,7 @@ export default function App() {
       <Route path="/settings/whatsapp" element={<Navigate to="/app/settings/whatsapp" replace />} />
       <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
       <Route path="/knowledge" element={<Navigate to="/app/knowledge" replace />} />
+      <Route path="/policy-intelligence" element={<Navigate to="/app/policy-intelligence" replace />} />
       <Route path="/pipeline" element={<Navigate to="/app/prospect-center" replace />} />
       <Route path="/prospect/:id" element={<LegacyProspectRedirect />} />
     </Routes>
