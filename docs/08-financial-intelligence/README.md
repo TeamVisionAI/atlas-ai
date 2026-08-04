@@ -5,7 +5,7 @@
 Architecture and runtime pack for **Atlas Financial Intelligence** — the bounded context above Policy Intelligence that produces educational organization strategy evaluations after objective policy analysis.
 
 - **RC2** — APPROVED architecture baseline
-- **RC3 Phase A** — IMPLEMENTED Invest-the-Difference Strategy Evaluation foundation
+- **RC3** — Production **APPROVED WITH MINOR LIMITATIONS** (Phases A–B live)
 
 ## Documents
 
@@ -15,10 +15,11 @@ Architecture and runtime pack for **Atlas Financial Intelligence** — the bound
 | [CALCULATION_ASSUMPTIONS.md](./CALCULATION_ASSUMPTIONS.md) | Canonical ITD formulas and projection assumptions |
 | [API.md](./API.md) | RC3 Financial Intelligence HTTP API + frontend contract |
 | [RUNTIME_WORKFLOW.md](./RUNTIME_WORKFLOW.md) | Live evaluation lifecycle, deployment, rollback |
-| [RC3_PRODUCTION_ACCEPTANCE.md](./RC3_PRODUCTION_ACCEPTANCE.md) | Production deploy gates, blockers, operator runbook |
-| [RC3_RELEASE_MANIFEST.md](./RC3_RELEASE_MANIFEST.md) | Sanitized release candidate identity and handoff |
-| [RC3 Phase A](../09-releases/sprints/SPRINT_RC3_INVEST_THE_DIFFERENCE_FOUNDATION.md) | Foundation release notes |
-| [RC3 Phase B](../09-releases/sprints/SPRINT_RC3_PHASE_B_RUNTIME_INTEGRATION.md) | Runtime integration release notes |
+| [RC3_PRODUCTION_ACCEPTANCE.md](./RC3_PRODUCTION_ACCEPTANCE.md) | Production acceptance closeout (APPROVED WITH MINOR LIMITATIONS) |
+| [RC3_RELEASE_MANIFEST.md](./RC3_RELEASE_MANIFEST.md) | Sanitized release identity and production SHAs |
+| [RC3 final release notes](../09-releases/RC3_FINANCIAL_INTELLIGENCE_RELEASE_NOTES.md) | Final RC3 release notes |
+| [RC3 Phase A](../09-releases/sprints/SPRINT_RC3_INVEST_THE_DIFFERENCE_FOUNDATION.md) | Foundation sprint record |
+| [RC3 Phase B](../09-releases/sprints/SPRINT_RC3_PHASE_B_RUNTIME_INTEGRATION.md) | Runtime integration sprint record |
 
 ## Status
 
@@ -27,11 +28,12 @@ Architecture and runtime pack for **Atlas Financial Intelligence** — the bound
 | RC2 Financial Intelligence Architecture | **APPROVED** |
 | RC3 Phase A Invest-the-Difference foundation | **IMPLEMENTED** |
 | RC3 Phase B runtime integration | **IMPLEMENTED** |
-| Official Primerica quote integration | Deferred |
-| Verified fund catalog | Deferred |
-| PDF export | Deferred |
-| Automated product eligibility | Deferred |
-| Automated suitability workflow | Deferred |
+| RC3 production acceptance | **APPROVED WITH MINOR LIMITATIONS** |
+| Official Primerica quote integration | Deferred (RC4+) |
+| Verified fund catalog | Deferred (RC4+) |
+| Native PDF export | Deferred (RC4+) |
+| Automated product eligibility | Deferred (RC4+) |
+| Automated suitability workflow | Deferred (RC4+) |
 
 ## Governance
 

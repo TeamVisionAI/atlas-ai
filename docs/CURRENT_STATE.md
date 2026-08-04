@@ -64,15 +64,19 @@ Facebook Lead
 | **RC2 – Financial Intelligence Architecture** | **APPROVED** |
 | **RC3 Phase A – Invest-the-Difference foundation** | **IMPLEMENTED** |
 | **RC3 Phase B – Runtime integration** | **IMPLEMENTED** |
+| **RC3 production acceptance** | **APPROVED WITH MINOR LIMITATIONS** (2026-08-04) |
 | Canonical doc | [08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](./08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) |
+| Acceptance | [RC3_PRODUCTION_ACCEPTANCE.md](./08-financial-intelligence/RC3_PRODUCTION_ACCEPTANCE.md) |
+| Release notes | [RC3_FINANCIAL_INTELLIGENCE_RELEASE_NOTES.md](./09-releases/RC3_FINANCIAL_INTELLIGENCE_RELEASE_NOTES.md) |
 | Runtime module | `backend/modules/financial-intelligence/` · `/api/financial-intelligence` |
 | Governance | BR-062–BR-065, **BR-066**, BR-067–BR-073 |
 | Freeze | Recruit OS · Policy Intelligence (frozen) · Knowledge Center — extend, do not redesign PI |
-| Deferred | Official Primerica quote · verified fund catalog · PDF export · automated eligibility · suitability |
+| Deferred (RC4+) | Official Primerica quote · verified fund catalog · native PDF · automated eligibility · suitability |
 
 ## Recent Decisions
 
-- **2026-08-04:** **RC3 production acceptance NOT APPROVED** — blockers: no verified backup, commits not on origin, deploy CLIs/auth unavailable; see `docs/08-financial-intelligence/RC3_PRODUCTION_ACCEPTANCE.md`
+- **2026-08-04:** **RC3 production APPROVED WITH MINOR LIMITATIONS** — migration 025 live; deploy `4e49e6f` (+ print fix `355abec`); live formula/projection/print acceptance; see `RC3_PRODUCTION_ACCEPTANCE.md`
+- **2026-08-04:** Meta Review locker scoped to `meta_review_user` sessions (`5159e8e`); FI print layout fix (`b776305`)
 - **2026-08-04:** **RC3 Phase B IMPLEMENTED** — Live API-backed FI Discussion scenarios tab; frontend calc duplication removed; migration 025 verification
 - **2026-08-04:** **RC3 Phase A IMPLEMENTED** — Invest-the-Difference Strategy Evaluation foundation (FI module, APIs, UI, BR-062–073)
 - **2026-08-03:** **RC2 APPROVED** — Financial Intelligence Architecture finalized; BR-066 Human Recommendation Boundary
@@ -116,4 +120,4 @@ Facebook Lead
 
 ## Last Updated
 
-2026-07-24
+2026-08-04

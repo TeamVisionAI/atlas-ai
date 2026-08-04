@@ -6,13 +6,27 @@
 |-------|-------|
 | **Document ID** | DOC-0600 |
 | **Title** | Atlas AI Changelog |
-| **Version** | 1.3 |
+| **Version** | 1.4 |
 | **Status** | Approved |
 | **Owner** | Atlas Development Team |
-| **Last Updated** | 2026-07-23 |
-| **Related Release** | Documentation Foundation v1.0 |
+| **Last Updated** | 2026-08-04 |
+| **Related Release** | RC3 Financial Intelligence |
 
 > **Status values:** Draft · Review · Approved
+
+---
+
+## RC3 — Financial Intelligence (Invest-the-Difference)
+
+**Date:** 2026-08-04  
+**Status:** **APPROVED WITH MINOR LIMITATIONS**
+
+- Live API-backed Discussion Scenarios on Policy Intelligence (`/api/financial-intelligence`)
+- Backend-only ITD calculations, versioned persistence, migration `025`
+- Production acceptance: formula `$173.00 − $116.92 = $56.08`, 25-year 4%/7%/10% projections, Moderate emphasis, revision history, replacement safeguards
+- Meta Review locker scoped to dedicated review sessions (`5159e8e`)
+- Dedicated FI browser-print layout (`b776305`) — no PDF library
+- Release notes: [RC3_FINANCIAL_INTELLIGENCE_RELEASE_NOTES.md](./RC3_FINANCIAL_INTELLIGENCE_RELEASE_NOTES.md)
 
 ---
 

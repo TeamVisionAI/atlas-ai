@@ -5,8 +5,9 @@
 | Milestone | Status |
 |-----------|--------|
 | RC3 Phase A | Foundation engines, persistence, APIs, preview UI |
-| **RC3 Phase B** | **Live API-backed Executive Review integration** |
-| RC4 | Deferred: official quotes, eligibility, verified funds, suitability, PDF |
+| **RC3 Phase B** | **Live API-backed Discussion scenarios — production accepted** |
+| RC3 production | **APPROVED WITH MINOR LIMITATIONS** (2026-08-04) |
+| RC4 | Planning may begin after closeout push; implementation not started |
 
 ## Canonical calculation authority
 
@@ -67,24 +68,21 @@ Tenant isolation is application-level (`organization_id` on every query). Option
 
 See full gate status and operator checklist:
 
-**[RC3_PRODUCTION_ACCEPTANCE.md](./RC3_PRODUCTION_ACCEPTANCE.md)**
+**[RC3_PRODUCTION_ACCEPTANCE.md](./RC3_PRODUCTION_ACCEPTANCE.md)** · **[RC3_RELEASE_MANIFEST.md](./RC3_RELEASE_MANIFEST.md)** · **[Release notes](../09-releases/RC3_FINANCIAL_INTELLIGENCE_RELEASE_NOTES.md)**
 
-Current production acceptance status: **NOT APPROVED** (deployment blockers — backup, publish, deploy tooling).
+Current production acceptance status: **APPROVED WITH MINOR LIMITATIONS**.
 
-When cleared:
+Production sequence completed:
 
-1. Snapshot / backup per ops practice (record snapshot ID)  
-2. Apply migration 025 (or verify if already applied)  
-3. `node -r dotenv/config backend/dev/verifyFiProductionSchema.js`  
-4. Deploy backend (`600a0b6`) → health + unauthenticated FI → 401  
-5. Deploy frontend only after DB + backend OK  
-6. Create evaluation from org-owned PI review  
-7. Enter preliminary term quote + horizon  
-8. Confirm backend projections + history  
-9. Confirm cross-tenant isolation + PI Facts unchanged  
-10. Confirm print; confirm preview fixtures unavailable in production  
+1. Backup/snapshot recorded by operator before migration 025  
+2. Migration 025 applied and schema verified  
+3. Backend deployed (operator record `4e49e6f`; lineage includes `1ab3165`) → health + unauthenticated FI → 401  
+4. Frontend deployed; Discussion scenarios live  
+5. Meta Review locker scoped to dedicated review sessions (`5159e8e`)  
+6. Live evaluation accepted (formula, projections, risk emphasis, history, replacement)  
+7. Print layout fix (`b776305`) — complete 4-page print without blank pages  
 
-Helpers (do not apply migration without backup confirmation):
+Helpers (historical; do not re-apply migration 025 in production unless intentionally rebuilding an empty schema):
 
 ```bash
 CONFIRM_FI_MIGRATION_025=yes node -r dotenv/config backend/dev/applyFiMigration025.js

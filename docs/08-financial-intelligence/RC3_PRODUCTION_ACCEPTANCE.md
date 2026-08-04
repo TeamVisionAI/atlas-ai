@@ -1,190 +1,182 @@
 # RC3 Production Deployment and Acceptance
 
-## Final RC3 status (this environment)
+## Final RC3 status
 
-**NOT APPROVED** — production deployment blocked pending operator actions.
+```text
+APPROVED WITH MINOR LIMITATIONS
+```
+
+Closeout date: **2026-08-04**.  
+RC4 implementation must not begin until this closeout commit is on `main` (planning may begin after push).
+
+---
+
+## Gate summary
 
 | Gate | Result |
 |------|--------|
-| Pre-deploy tests (local) | Pass — see § Pre-deployment verification |
-| Clean working tree for deploy | Pass on `release/rc3-financial-intelligence` after stash (see release manifest) |
-| Approved commits on branch | Pass — `9278e0a` → `600a0b6` → `7478a39` → release-prep |
-| Commits published to `origin/main` | **Fail** until release branch is pushed/merged |
-| Verified production DB backup | **Not performed** — no Supabase/Railway CLI; no recorded snapshot ID |
-| Migration 025 applied in target DB | **Not applied** — `atlas_fi_strategy_evaluations` absent (read-only probe) |
-| Backend/frontend production deploy | **Not performed** — Railway/Vercel CLIs unavailable; `gh` not authenticated |
-| Live production API/browser acceptance | **Not tested** |
-
-Per RC3 release-candidate rules: migration must not proceed without a verified backup. Deployment tooling and publish access are required for production acceptance.
-
----
-
-## Approved deployment candidate
-
-```text
-RC3 Phase A: 9278e0a
-RC3 Phase B: 600a0b6   ← approved implementation candidate
-Operator docs/helpers: 7478a39
-Release branch: release/rc3-financial-intelligence
-```
-
-Record at deploy time: exact SHA = tip of `release/rc3-financial-intelligence` (see `RC3_RELEASE_MANIFEST.md`).
+| Pre-deploy tests (local release candidate) | **Pass** |
+| Release candidate merged to `main` | **Pass** — PR #1 → `1ab3165` |
+| Meta Review locker session-scope fix | **Pass** — PR #2 → `4e49e6f` / `5159e8e` |
+| FI print-layout fix | **Pass** — PR #3 → `355abec` / `b776305` |
+| Migration 025 applied + schema verified | **Pass** |
+| Railway backend healthy | **Pass** |
+| Vercel frontend production ready | **Pass** |
+| Live FI evaluation acceptance | **Pass** (operator evidence below) |
+| Meta Review locker (admin vs review user) | **Pass** |
+| Production print (4 pages, complete) | **Pass** |
+| Production log review | **Pass with access note** (see § Log review) |
+| Production status | **APPROVED WITH MINOR LIMITATIONS** |
 
 ---
 
-## Pre-deployment verification (executed 2026-08-04)
+## Production identity
 
-| Command | Exit | Result |
-|---------|------|--------|
-| `git status` | 0 | Dirty: `knowledgeHubService.js`, `appointmentReminders.json`, `workflowState.json` (unrelated; do not include in RC3 deploy) |
-| `git log --oneline -5` | 0 | HEAD = `600a0b6` |
-| `node backend/dev/verifyFiMigration025.js` | 0 | Structural OK; DB probe skipped unless `DATABASE_URL` loaded via dotenv |
-| `node --test backend/test/financialIntelligence*.test.js` | 0 | **30/30 pass** |
-| `node --test backend/test/policyIntelligenceRuleEngine.test.js backend/test/annualValuesEngine.test.js` | 0 | **2/2 pass** (includes language layer) |
-| `cd frontend && npm test` | 0 | **65/65 pass** |
-| `cd frontend && npm run lint` | 0 | Warnings only (pre-existing Dashboard/hooks) |
-| `cd frontend && npm run build` | 0 | Production artifact generated (`dist/`) |
-
-Environment-dependent: full `backend/test/*.test.js` may fail `sprint19_1` on Supabase DNS — treat as environment, not FI regression.
-
-Read-only DB probe (local `.env` `DATABASE_URL`, values not disclosed):
-
-- Connected: yes  
-- `atlas_policy_reviews`: present  
-- `atlas_fi_strategy_evaluations`: **absent** (migration 025 not applied)
-
-Local `VITE_API_BASE_URL` resolves to **localhost** — not used as production target.
+| Field | Value |
+|-------|--------|
+| RC3 Phase A | `9278e0a` |
+| RC3 Phase B (implementation) | `600a0b6` |
+| Release candidate tip (pre-merge) | `d204d52` |
+| Merge to `main` (RC3 FI) | `1ab3165` (PR #1) |
+| Operator-recorded production deploy SHA | `4e49e6f` (PR #2 — Meta Review locker) |
+| Print-layout fix on `main` | `355abec` (PR #3; includes `b776305`) |
+| Migration | `025_financial_intelligence_strategy_evaluations.sql` |
+| Backend route prefix | `/api/financial-intelligence` |
+| Frontend surface | `/app/policy-intelligence` → Discussion scenarios |
 
 ---
 
-## Blockers (must clear before production approval)
+## Backup gate (pre-migration)
 
-### Blocker B1 — No verified backup / snapshot
-- No `supabase`, `railway`, or documented automated backup was executed in this session.
-- **Action:** Create a Supabase project backup / PITR restore point (or approved ops snapshot). Record snapshot ID, actor, and timestamp. Then proceed.
+| Field | Value |
+|-------|--------|
+| Environment name | Production |
+| Backup / snapshot method | Operator-verified production backup/snapshot before migration 025 |
+| Backup timestamp (UTC) | Retained in operator deployment record (not copied here) |
+| Snapshot or backup identifier | Retained in operator channel — **not** stored in git |
+| Operator / deployment record | Production migration operator |
+| Confirmation backup predates migration 025 | **yes** |
 
-### Blocker B2 — RC3 commits not on `origin/main`
-- Local `main` is ahead of `origin/main` by 2 commits.
-- **Action:** Review dirty tree; stash/discard unrelated files; `git push origin HEAD` (or PR merge) so Railway/Vercel deploy the candidate SHA.
-
-### Blocker B3 — Deploy tooling / auth unavailable here
-- `railway`, `vercel`, `supabase` CLIs not installed.
-- `gh` not authenticated.
-- **Action:** Deploy from an operator machine with Railway + Vercel access after push.
-
-### Production access still required
-
-| Access | Purpose |
-|--------|---------|
-| Authorized Supabase migration access | Apply / verify migration 025 |
-| Verified backup or snapshot capability | Pre-migration restore point |
-| Railway backend deployment access | Deploy FI API |
-| Vercel frontend deployment access | Deploy Discussion scenarios UI |
-| GitHub push or PR access | Publish release branch |
-| Production test account with FI permissions | Live acceptance |
-| Approved second test organization (when available) | Tenant-isolation verification |
-
-Local `localhost` API results and local builds are **not** production evidence.
-
-### Blocker B4 — Unrelated dirty working tree
-- **Resolved for release branch:** unrelated work stashed as `stash@{0}` (`pre-RC3 unrelated local work`): `knowledgeHubService.js`, `appointmentReminders.json`, `workflowState.json`.
-- Deploy only from a clean checkout of `release/rc3-financial-intelligence`.
-
----
-
-## Operator runbook (after blockers cleared)
-
-### 1. Backup gate (required before migration)
-
-Do not attempt a production backup from an environment without authorized tools.
+Do not copy credentials, connection strings, or tokens into documentation.  
 The migration helper is **not** a substitute for a backup.
 
-The production operator must record **before** applying migration 025:
+---
 
-| Field | Value (operator fills) |
-|-------|------------------------|
-| Environment name | |
-| Backup / snapshot method | e.g. Supabase PITR / project backup |
-| Backup timestamp (UTC) | |
-| Snapshot or backup identifier | when the platform provides one |
-| Operator identity / deployment record | |
-| Confirmation backup predates migration 025 | yes / no |
+## Migration 025
 
-Do not copy credentials, connection strings, or tokens into documentation.
-
-### 2. Apply migration 025
-Preferred: Supabase SQL editor or approved migration runner, execute:
-
-`backend/database/migrations/025_financial_intelligence_strategy_evaluations.sql`
-
-Then verify:
-
-```bash
-node -r dotenv/config backend/dev/verifyFiMigration025.js
-# and/or
-node -r dotenv/config backend/dev/verifyFiProductionSchema.js
-```
-
-If already applied, **do not re-apply**; verify schema only. Corrections → new migration number.
-
-### 3. Backend deploy (Railway)
-1. Deploy commit `600a0b6`.  
-2. `GET {RAILWAY_URL}/health` → 200  
-3. `GET {RAILWAY_URL}/health/production` → mvpReady as expected  
-4. `GET {RAILWAY_URL}/api/financial-intelligence` → **401** unauthenticated  
-5. Authenticated GET → module summary; org from auth context only.
-
-### 4. Production API acceptance (authorized test org / test review)
-Follow sections 7 and 10–14 of the RC3 release-candidate brief:
-
-- Create evaluation (v1, no fabricated investable difference)  
-- Preliminary term quote revision  
-- Horizon → 4%/7%/10% projections  
-- Risk profile emphasis (BR-070)  
-- Replacement acknowledgement (warnings remain)  
-- History: sequential versions, one current  
-- Formula checks (±$0.02); positive/zero/negative difference  
-- PI Fact version unchanged after revisions  
-- Cross-tenant not-found  
-- `policy:read` vs `policy:write` UI/API alignment  
-
-### 5. Frontend deploy (Vercel) — only after DB + backend OK
-1. Ensure `VITE_ENABLE_INTERNAL_PREVIEWS` is **not** enabling production demos.  
-2. Deploy frontend for same SHA.  
-3. Browser E2E checklist (release brief §9).  
-4. Print preview (§16).  
-5. Log review for sensitive payloads (§15).
-
-### 6. Rollback (non-destructive default)
-1. Hide/disable FI tab or redeploy prior frontend.  
-2. Redeploy prior backend.  
-3. **Leave migration 025 in place** unless schema causes outage.  
-4. Do **not** run down migration in production without explicit destructive decision + backup.  
-5. Confirm PI still healthy.
+| Check | Result |
+|-------|--------|
+| Applied | **Yes** |
+| `atlas_fi_strategy_evaluations` present | **Yes** |
+| Required columns / versioning / indexes | **Verified** |
+| Organization scoping | **Present** (application-enforced) |
+| Review linkage | **Present** |
+| Optional `prospect_id` FI-owned | **Confirmed** |
+| Re-apply | Not performed (already present) |
+| PI data modified by migration | **No** |
 
 ---
 
-## Evidence to attach when complete
+## Deployments
 
-- Deployed commit SHA  
-- Backup/snapshot ID  
-- Migration verify output (no connection strings)  
-- Sanitized API create/revision/history responses  
-- Formula + projection independent check  
-- Tenant isolation + permission results  
-- Print preview note  
-- Log review summary  
-- Final status: APPROVED / APPROVED WITH MINOR LIMITATIONS / NOT APPROVED  
+| Surface | Result |
+|---------|--------|
+| Railway backend | Healthy (`/health` 200; `/health/production` `mvpReady: true`) |
+| Deploy SHA (operator record) | `4e49e6f` |
+| Subsequent print fix on `main` | `355abec` |
+| Vercel frontend | Production deployment ready / live |
+| Unauthenticated `GET /api/financial-intelligence` | **401** `UNAUTHORIZED` |
+| Unauthenticated create evaluation | **401** |
+
+---
+
+## Live acceptance evidence (sanitized)
+
+Authorized production test account and organization-owned IUL Policy Intelligence review (no unrelated customer data). Internal review identifiers omitted from this document.
+
+| Scenario | Result |
+|----------|--------|
+| Normal administrator workspace | Full authorized Atlas workspace (Policy Intelligence visible) |
+| Dedicated Meta Review login | Remains restricted to approved Meta Review routes |
+| Create Discussion Scenario | Persisted FI evaluation (versioned) |
+| Official / representative term quote revision | Created |
+| Formula | `$173.00 − $116.92 = $56.08` verified |
+| Same-outlay validation | **Passed** |
+| Projections | 25-year educational illustrations at **4% / 7% / 10%** verified |
+| Risk profile | **Moderate** emphasis verified (BR-070) |
+| Revision history | Sequential; one current; retained across logout/login |
+| Replacement acknowledgement | Recorded; safeguards remain visible |
+| Production print | **4 pages**, complete; no blank pages; disclaimers not clipped |
+| PI immutability | FI revisions did not mutate frozen PI engines/Facts (acceptance) |
+| Tenant isolation | Application org scoping retained; no cross-tenant disclosure observed |
+
+---
+
+## Log review
+
+### Access note
+
+Railway CLI is **not authenticated** in the closeout agent environment (`railway login` / token unavailable). Live log *stream* pull was therefore not possible from this workstation.
+
+### What was reviewed instead
+
+1. **Production public probes (2026-08-04 closeout):**
+   - `GET /health` → `200` `{ status: "healthy" }`
+   - `GET /health/production` → `mvpReady: true`, empty blockers
+   - Unauthenticated FI routes → `401` only (no 5xx)
+2. **FI code-path log/audit safety:**
+   - Audit actions: `fi.strategy_evaluation.created` / revision actions
+   - Audit metadata limited to `reviewId`, `version`, `status`, `strategyKey`, `previousEvaluationId`
+   - **Not** logged in audit metadata: full PI Facts, FI input snapshots, quote notes, tokens, credentials, or full financial payloads
+   - `auditLogService` failure path logs `error.message` + action name only
+3. **Operator live workflow exercise** (same session as acceptance evidence above): no FI runtime errors, schema/migration errors, or valid-user authentication failures reported; no cross-tenant disclosure reported.
+
+### Log review verdict
+
+**Pass for closeout** — no blocker or major logging defect identified.  
+If Railway dashboard access is available, operators should spot-check the same window for the action names above and confirm absence of snapshot/token dumps.
+
+---
+
+## Minor limitations (accepted)
+
+1. Browser print headers/footers require disabling in the print dialog for cleaner output.  
+2. Print spacing can be refined later (non-blocking).  
+3. PI extraction may still require manual fallback for some documents.  
+4. Deferred (RC4+): official Primerica quote integration, eligibility automation, verified fund catalog, suitability automation, native PDF generation.
+
+---
+
+## Defects corrected during production acceptance
+
+| Defect | Class | Fix SHA |
+|--------|-------|---------|
+| Normal admin routed into Meta Review locker | MAJOR | `5159e8e` (merged `4e49e6f`) |
+| Print clipped FI report / blank pages / missing disclaimers | MAJOR | `b776305` (merged `355abec`) |
+
+---
+
+## Rollback readiness
+
+1. Hide/disable Discussion scenarios entry or redeploy prior frontend artifact.  
+2. Redeploy prior Railway backend artifact.  
+3. **Leave migration 025 and FI rows in place** unless a confirmed schema outage requires a separate decision.  
+4. Do **not** automatically run the down migration in production.  
+5. Preserve FI records for audit.  
+6. Confirm PI remains operational after application rollback.
+
+Prior deployable artifact IDs: retained in Railway/Vercel operator records (not copied here).
 
 ---
 
 ## Deferred (unchanged)
 
-Official Primerica quotes · automated eligibility · verified fund catalog · suitability · PDF · transaction initiation
+Official Primerica quotes · automated eligibility · verified fund catalog · suitability · native PDF · transaction initiation
 
 ---
 
 ## Recommendation
 
-**RC4 planning may begin only after RC3 production acceptance is APPROVED (or APPROVED WITH MINOR LIMITATIONS).**  
-Until blockers B1–B4 are cleared and live acceptance evidence exists, keep RC4 development frozen.
+**RC3 is APPROVED WITH MINOR LIMITATIONS.**  
+**RC4 planning may begin after this closeout commit is pushed to `main`.**  
+Do not begin RC4 implementation in the same change set as this closeout.
