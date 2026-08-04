@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>FI Print Evidence Fixture</title>
+    <link rel="stylesheet" href="../src/components/financial-intelligence/DiscussionScenariosSection.css" />
+    <link rel="stylesheet" href="../src/components/financial-intelligence/fiPrintReport.css" />
+    <style>
+      /* Minimal app chrome to prove print-hide works */
+      .atlas-layout__sidebar,
+      .atlas-layout__header,
+      .workspace-dashboard__header,
+      .policy-intelligence__tabs,
+      .policy-intelligence__select-label,
+      .workspace-dashboard__panel-head,
+      .fi-panel__forms,
+      .fi-panel__meta-bar {
+        padding: 8px;
+        border: 1px dashed #999;
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="atlas-layout">
+      <aside class="atlas-layout__sidebar fi-print-hide">SIDEBAR MUST NOT PRINT</aside>
+      <div class="atlas-layout__frame">
+        <header class="atlas-layout__header fi-print-hide">APP HEADER MUST NOT PRINT</header>
+        <main class="atlas-layout__main">
+          <div class="atlas-layout__content">
+            <div class="workspace-dashboard workspace-dashboard--policy-intelligence">
+              <header class="workspace-dashboard__header fi-print-hide">PI HEADER MUST NOT PRINT</header>
+              <div class="policy-intelligence__tabs fi-print-hide">TABS MUST NOT PRINT</div>
+              <section class="workspace-dashboard__panel">
+                <div class="workspace-dashboard__panel-head fi-print-hide">PANEL HEAD MUST NOT PRINT</div>
+                <label class="policy-intelligence__select-label fi-print-hide">SELECT MUST NOT PRINT</label>
+                <section class="fi-panel">
+                  <div class="fi-panel__meta-bar">META BAR MUST NOT PRINT</div>
+                  <div class="fi-panel__forms">FORMS MUST NOT PRINT</div>
+                  <div class="fi-print-root" data-testid="fi-print-root">
+                    <section class="fi-discussion-scenarios" data-testid="fi-discussion-scenarios">
+                      <header class="fi-discussion-scenarios__header">
+                        <p class="fi-discussion-scenarios__eyebrow">Financial Intelligence</p>
+                        <h2 class="fi-discussion-scenarios__title">
+                          Possible Discussion Scenarios for the Primerica Representative
+                        </h2>
+                        <p class="fi-discussion-scenarios__lede">
+                          Educational planning illustration. Atlas informs. Representatives recommend. Clients decide.
+                        </p>
+                      </header>
+                      <div class="fi-discussion-scenarios__print-meta">
+                        Status: <strong>Ready for representative review</strong><br />
+                        Current version: <strong>3</strong><br />
+                        Generated: <strong>Aug 4, 2026, 2:00 PM</strong>
+                      </div>
+                      <div class="fi-discussion-scenarios__block">
+                        <h3>Existing IUL summary</h3>
+                        <p>Current monthly premium $310.00 · Death benefit $400,000</p>
+                      </div>
+                      <div class="fi-discussion-scenarios__block fi-discussion-scenarios__print-table">
+                        <h3>Discussion scenario comparison</h3>
+                        <table>
+                          <thead>
+                            <tr><th>Category</th><th>Existing IUL</th><th>Discussion Scenario</th></tr>
+                          </thead>
+                          <tbody>
+                            <tr><th>Death benefit</th><td>$400,000</td><td>$400,000</td></tr>
+                            <tr><th>Monthly insurance premium</th><td>$310.00</td><td>$78.50</td></tr>
+                            <tr><th>Monthly investment amount</th><td>Not evaluated</td><td>$231.50</td></tr>
+                            <tr><th>Total monthly outlay</th><td>$310.00</td><td>$310.00</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div class="fi-discussion-scenarios__block">
+                        <h3>Invest-the-Difference</h3>
+                        <p>Same-outlay validation: Passes</p>
+                      </div>
+                      <div class="fi-discussion-scenarios__block">
+                        <h3>Educational investment projections</h3>
+                        <div class="fi-discussion-scenarios__projection-grid" data-testid="fi-projections">
+                          <article class="fi-projection"><h4>Conservative</h4><p>4%</p></article>
+                          <article class="fi-projection"><h4>Moderate growth</h4><p>7%</p></article>
+                          <article class="fi-projection"><h4>Aggressive growth</h4><p>10%</p></article>
+                        </div>
+                        <div class="fi-discussion-scenarios__assumptions">
+                          <h4>Projection assumptions</h4>
+                          <ul>
+                            <li>Illustrative rates 4%, 7%, 10%</li>
+                            <li>Not guaranteed or expected returns</li>
+                          </ul>
+                        </div>
+                      </div>
+                      <div class="fi-discussion-scenarios__block fi-discussion-scenarios__missing">
+                        <h3>Missing information</h3>
+                        <ul><li>Confirm longest available Primerica term</li></ul>
+                      </div>
+                      <div class="fi-discussion-scenarios__block fi-discussion-scenarios__safeguards">
+                        <h3>Replacement safeguards</h3>
+                        <ul>
+                          <li>Do not cancel or surrender existing coverage before new coverage is in force.</li>
+                        </ul>
+                      </div>
+                      <footer class="fi-discussion-scenarios__disclaimers" data-testid="fi-disclaimers">
+                        <h3>Educational disclaimers</h3>
+                        <ul>
+                          <li>Atlas informs. Representatives recommend. Clients decide.</li>
+                          <li>These projections are hypothetical and educational.</li>
+                        </ul>
+                      </footer>
+                    </section>
+                  </div>
+                </section>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

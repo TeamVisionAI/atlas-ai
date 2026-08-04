@@ -13,6 +13,7 @@ import {
 import DiscussionScenariosSection from "./DiscussionScenariosSection";
 import "./DiscussionScenariosSection.css";
 import "./FinancialIntelligencePanel.css";
+import "./fiPrintReport.css";
 
 const PREMIUM_SOURCES = [
   "OFFICIAL_QUOTE",

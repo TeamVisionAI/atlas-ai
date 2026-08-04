@@ -140,12 +140,4 @@
   color: #5c6b7a;
 }
 
-@media print {
-  .fi-panel__forms,
-  .fi-panel__button,
-  .fi-panel__history,
-  .fi-panel__notice,
-  .fi-panel__meta-bar {
-    display: none !important;
-  }
-}
+/* Print chrome hiding and overflow unlock live in fiPrintReport.css */
