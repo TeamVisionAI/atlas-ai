@@ -1,0 +1,290 @@
+/* Financial Intelligence — discussion scenarios (separate from PI report) */
+
+.fi-discussion-scenarios {
+  --fi-ink: #14213d;
+  --fi-muted: #5c6b7a;
+  --fi-line: #d7dee7;
+  --fi-surface: #f4f7fb;
+  --fi-accent: #1f4b7a;
+  --fi-warn: #7a3e12;
+  --fi-warn-bg: #fff6eb;
+
+  margin-top: 12px;
+  padding: 28px 24px;
+  border: 2px solid var(--fi-line);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, #eef3f8 0%, #f8fafc 48%, #ffffff 100%);
+  color: var(--fi-ink);
+  break-inside: avoid;
+}
+
+.fi-discussion-scenarios__header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--fi-line);
+}
+
+.fi-discussion-scenarios__eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fi-accent);
+}
+
+.fi-discussion-scenarios__title {
+  margin: 0 0 8px;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--fi-ink);
+}
+
+.fi-discussion-scenarios__lede {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--fi-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.fi-discussion-scenarios__status {
+  display: inline-flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 20px;
+  padding: 8px 12px;
+  background: var(--fi-surface);
+  border: 1px solid var(--fi-line);
+  font-size: 0.85rem;
+}
+
+.fi-discussion-scenarios__status-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fi-muted);
+  font-size: 0.72rem;
+}
+
+.fi-discussion-scenarios__block {
+  margin: 0 0 22px;
+}
+
+.fi-discussion-scenarios__block h3 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fi-muted);
+}
+
+.fi-discussion-scenarios__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+}
+
+.fi-discussion-scenarios__facts dt {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fi-muted);
+}
+
+.fi-discussion-scenarios__facts dd {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.fi-discussion-scenarios__table-wrap {
+  overflow-x: auto;
+}
+
+.fi-discussion-scenarios__table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.fi-discussion-scenarios__table-wrap th,
+.fi-discussion-scenarios__table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--fi-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.fi-discussion-scenarios__table-wrap thead th {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fi-muted);
+  background: var(--fi-surface);
+}
+
+.fi-discussion-scenarios__table-wrap tbody th {
+  font-weight: 600;
+  color: var(--fi-ink);
+}
+
+.fi-discussion-scenarios__table-wrap td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fi-discussion-scenarios__hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--fi-muted);
+  font-weight: 400;
+}
+
+.fi-discussion-scenarios__meta,
+.fi-discussion-scenarios__note {
+  margin: 10px 0 0;
+  color: var(--fi-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.fi-discussion-scenarios__projection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.fi-projection {
+  padding: 14px;
+  border: 1px solid var(--fi-line);
+  background: #fff;
+}
+
+.fi-projection--aligned {
+  border-color: var(--fi-accent);
+  box-shadow: inset 0 0 0 1px var(--fi-accent);
+}
+
+.fi-projection h4 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.fi-projection__rate,
+.fi-projection__align {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: var(--fi-muted);
+}
+
+.fi-projection__align {
+  color: var(--fi-accent);
+  font-weight: 600;
+}
+
+.fi-projection dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fi-projection dt {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fi-muted);
+}
+
+.fi-projection dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.fi-discussion-scenarios__warning,
+.fi-discussion-scenarios__missing,
+.fi-discussion-scenarios__safeguards {
+  background: var(--fi-warn-bg);
+  border: 1px solid #efd3b0;
+  padding: 14px 16px;
+}
+
+.fi-discussion-scenarios__warning {
+  margin-top: 12px;
+  color: var(--fi-warn);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.fi-discussion-scenarios__missing ul,
+.fi-discussion-scenarios__safeguards ul,
+.fi-discussion-scenarios__disclaimers ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.fi-discussion-scenarios__missing li,
+.fi-discussion-scenarios__safeguards li,
+.fi-discussion-scenarios__disclaimers li {
+  margin: 0 0 6px;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.fi-discussion-scenarios__disclaimers {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--fi-line);
+  color: var(--fi-muted);
+}
+
+.fi-discussion-scenarios__disclaimers h3 {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media print {
+  .fi-discussion-scenarios {
+    break-before: page;
+    box-shadow: none;
+    background: #fff;
+    border-color: #999;
+    padding: 0;
+  }
+
+  .fi-discussion-scenarios__projection-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .fi-discussion-scenarios__print-table table {
+    page-break-inside: avoid;
+  }
+
+  .fi-projection,
+  .fi-discussion-scenarios__safeguards,
+  .fi-discussion-scenarios__missing {
+    break-inside: avoid;
+  }
+}
+
+@media (max-width: 720px) {
+  .fi-discussion-scenarios {
+    padding: 20px 16px;
+  }
+
+  .fi-discussion-scenarios__table-wrap td {
+    text-align: left;
+  }
+}

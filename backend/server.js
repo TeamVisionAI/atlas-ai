@@ -45,6 +45,8 @@ const { createProspectModule } = require("./modules/prospects");
 const { createTimelineModule } = require("./modules/timeline");
 const { createMissionControlModule } = require("./modules/mission-control");
 const { createExecutiveDashboardModule } = require("./modules/executive-dashboard");
+const { createPolicyIntelligenceModule } = require("./modules/policy-intelligence");
+const { createFinancialIntelligenceModule } = require("./modules/financial-intelligence");
 const { createWorkflowModule } = require("./modules/workflows");
 const { requireAtlasUser } = require("./middleware/requireAtlasUser");
 const { verifyMetaWebhookSignature } = require("./middleware/metaWebhookSignature");
@@ -86,6 +88,9 @@ const executiveDashboardModule = createExecutiveDashboardModule({
   projectionEngine: projectionModule.engine,
   businessEventRepository: businessEventModule.repository
 });
+
+const policyIntelligenceModule = createPolicyIntelligenceModule();
+const financialIntelligenceModule = createFinancialIntelligenceModule();
 
 const prospectModule = createProspectModule({
   businessEventEngine: businessEventModule.prospectAdapter,
@@ -159,6 +164,8 @@ app.use("/api/mission-control", missionControlModule.routes);
 app.use("/api/mission-control", missionControlRoutes);
 app.use("/api/executive-dashboard", executiveDashboardModule.routes);
 app.use("/api/executive-dashboard", executiveDashboardRoutes);
+app.use("/api/policy-intelligence", policyIntelligenceModule.routes);
+app.use("/api/financial-intelligence", financialIntelligenceModule.routes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/follow-ups", followUpsRoutes);

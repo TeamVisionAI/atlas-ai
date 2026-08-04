@@ -1,0 +1,146 @@
+.policy-intelligence__tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.policy-intelligence__tab {
+  padding: 0.55rem 0.95rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.policy-intelligence__tab--active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+.policy-intelligence__empty-copy {
+  margin: 0 0 12px;
+  max-width: 640px;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.comparison-workspace__form {
+  max-width: 720px;
+}
+
+.comparison-workspace__rate-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.comparison-workspace__table-wrap {
+  overflow-x: auto;
+}
+
+.comparison-workspace__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.comparison-workspace__table th,
+.comparison-workspace__table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.comparison-workspace__table th {
+  color: #475569;
+  font-weight: 700;
+  background: #f8fafc;
+}
+
+.comparison-workspace__table--compact td,
+.comparison-workspace__table--compact th {
+  padding: 0.4rem 0.55rem;
+}
+
+.policy-intelligence__notice {
+  margin: 0;
+  color: #166534;
+  font-weight: 600;
+}
+
+.policy-intelligence__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.policy-intelligence__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: #334155;
+}
+
+.policy-intelligence__form input[type="text"],
+.policy-intelligence__form input[type="number"],
+.policy-intelligence__form input[type="date"],
+.policy-intelligence__form input:not([type]),
+.policy-intelligence__form select,
+.policy-intelligence__select-label select {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+}
+
+.policy-intelligence__form button,
+.policy-intelligence__grid button {
+  align-self: flex-start;
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.policy-intelligence__form button:disabled,
+.policy-intelligence__grid button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.policy-intelligence__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.policy-intelligence__grid button {
+  grid-column: 1 / -1;
+}
+
+.policy-intelligence__select-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 480px;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  color: #334155;
+}
+
+.policy-intelligence__meta {
+  margin: 0 0 8px;
+  color: #475569;
+  font-size: 0.875rem;
+}

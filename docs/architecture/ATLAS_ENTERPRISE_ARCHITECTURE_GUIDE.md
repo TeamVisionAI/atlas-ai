@@ -124,7 +124,7 @@ Atlas Platform
 
 **Responsibility:** Execute the customer organization's daily operations.
 
-**Owns:** Mission Control, Quick Capture, Prospect Center, Conversations, Appointments, Follow Ups, Dashboards, Recruiting, Sales (future), Analytics, Knowledge—and all package-enriched behavior on those surfaces.
+**Owns:** Mission Control, Quick Capture, Prospect Center, Conversations, Appointments, Follow Ups, Dashboards, Recruiting, Sales (future), Analytics, Policy Intelligence, Knowledge—and all package-enriched behavior on those surfaces.
 
 **Must not be:** Split by leadership tier into separate operating products (no Rep Atlas vs RVP Atlas).
 
@@ -290,6 +290,7 @@ The **Business Domain** is the operational layer of the customer's organization.
 | **Recruiting** | Recruiting | Qualification and hiring workflow (package-enriched) |
 | **Sales** | Sales | Post-recruit pipeline (future, package-enriched) |
 | **Analytics** | Analytics & Intelligence | Performance and funnel |
+| **Policy Intelligence** | Analytics & Intelligence | Policy document reviews (foundation; AI/OCR deferred — BR-051) |
 | **Knowledge** | Knowledge Management | Playbooks and reference |
 
 ### Leadership in Business

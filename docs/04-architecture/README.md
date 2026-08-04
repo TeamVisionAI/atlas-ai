@@ -22,6 +22,8 @@ Approved — Sprint 14.0.2
 | [prospect-engine/PROSPECT_TIMELINE.md](./prospect-engine/PROSPECT_TIMELINE.md) | Chronological history |
 | [prospect-engine/BUSINESS_EVENTS.md](./prospect-engine/BUSINESS_EVENTS.md) | Official event language |
 | [prospect-engine/PROSPECT_PERMISSIONS.md](./prospect-engine/PROSPECT_PERMISSIONS.md) | Roles, ownership, audit |
+| [policy-intelligence/POLICY_INTELLIGENCE.md](./policy-intelligence/POLICY_INTELLIGENCE.md) | Policy Intelligence module foundation (BR-051) |
+| [../08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](../08-financial-intelligence/FINANCIAL_INTELLIGENCE_ARCHITECTURE.md) | Financial Intelligence architecture (above PI; Sprint RC2) |
 
 ## Related Documents
 

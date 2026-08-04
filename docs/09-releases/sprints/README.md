@@ -13,6 +13,9 @@ Implementation specifications for Team Vision production sprints on `main`.
 | [Sprint-11.4.md](./Sprint-11.4.md) | 11.4 Conversation Engine |
 | [Sprint-11.4-Implementation-Plan.md](./Sprint-11.4-Implementation-Plan.md) | 11.4 Implementation plan |
 | [SPRINT_KNOWLEDGE_HUB_PHASE_1.md](./SPRINT_KNOWLEDGE_HUB_PHASE_1.md) | Knowledge Hub Phase 1 |
+| [SPRINT_POLICY_INTELLIGENCE_FOUNDATION.md](./SPRINT_POLICY_INTELLIGENCE_FOUNDATION.md) | Policy Intelligence foundation (Sprint 0) |
+| [SPRINT_POLICY_INTELLIGENCE_ATLAS_EXTRACT.md](./SPRINT_POLICY_INTELLIGENCE_ATLAS_EXTRACT.md) | Policy Intelligence Atlas Extract (Sprint 1) |
+| [SPRINT_POLICY_INTELLIGENCE_INSURANCE_LANGUAGE.md](./SPRINT_POLICY_INTELLIGENCE_INSURANCE_LANGUAGE.md) | Policy Intelligence Insurance Language Layer (Sprint 2) |
 | [SPRINT_13_1_KNOWLEDGE_HUB_ENHANCEMENTS.md](./SPRINT_13_1_KNOWLEDGE_HUB_ENHANCEMENTS.md) | Sprint 13.1 Knowledge Hub |
 | [SPRINT_14_PROSPECT_ENGINE_ARCHITECTURE.md](./SPRINT_14_PROSPECT_ENGINE_ARCHITECTURE.md) | Sprint 14.0 Prospect Engine |
 | [SPRINT_14_0_1_BUSINESS_EVENTS_PERMISSIONS.md](./SPRINT_14_0_1_BUSINESS_EVENTS_PERMISSIONS.md) | Sprint 14.0.1 Events & Permissions |
