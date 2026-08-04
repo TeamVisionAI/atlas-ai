@@ -72,6 +72,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-08-04:** **RC3 production acceptance NOT APPROVED** — blockers: no verified backup, commits not on origin, deploy CLIs/auth unavailable; see `docs/08-financial-intelligence/RC3_PRODUCTION_ACCEPTANCE.md`
 - **2026-08-04:** **RC3 Phase B IMPLEMENTED** — Live API-backed FI Discussion scenarios tab; frontend calc duplication removed; migration 025 verification
 - **2026-08-04:** **RC3 Phase A IMPLEMENTED** — Invest-the-Difference Strategy Evaluation foundation (FI module, APIs, UI, BR-062–073)
 - **2026-08-03:** **RC2 APPROVED** — Financial Intelligence Architecture finalized; BR-066 Human Recommendation Boundary
