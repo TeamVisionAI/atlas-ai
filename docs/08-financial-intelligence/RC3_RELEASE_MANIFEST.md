@@ -20,7 +20,7 @@ RC4 planning and development remain **frozen**.
 | Implementation candidate | `600a0b6` |
 | Operator docs / helpers baseline | `7478a39` |
 | Release preparation SHA | `959aa1f77eaec152f49f4c59fe4d282761f886fe` |
-| Release candidate SHA | `7c8ccb73f7cdc4178ba08ad0dba1e3c98698de2c` |
+| Release candidate SHA | Tip of `release/rc3-financial-intelligence` — authoritative: `git rev-parse HEAD` on this branch after push |
 | Migration | `025_financial_intelligence_strategy_evaluations.sql` |
 | Backend route prefix | `/api/financial-intelligence` |
 | Frontend surface | `/app/policy-intelligence` → Discussion scenarios tab |
@@ -37,12 +37,13 @@ RC4 planning and development remain **frozen**.
 7478a39  Production acceptance docs + migration helpers
 959aa1f  Release preparation — safer gates + manifest
 7c8ccb7  Release identity + acceptance blocker updates
+fca4026  Release-prep test results recorded
 ```
 
 History from Phase A through release candidate:
 
 ```text
-9278e0a → 600a0b6 → 7478a39 → 959aa1f → 7c8ccb7
+9278e0a → 600a0b6 → 7478a39 → 959aa1f → 7c8ccb7 → fca4026
 ```
 
 ---
@@ -70,7 +71,7 @@ History from Phase A through release candidate:
 
 ## Test results (release preparation)
 
-Recorded on clean branch `release/rc3-financial-intelligence` at SHA `7c8ccb7` (2026-08-04).
+Recorded on clean branch `release/rc3-financial-intelligence` (2026-08-04). Offline gates verified before tip documentation commit `fca4026`.
 
 | Gate | Result |
 |------|--------|
