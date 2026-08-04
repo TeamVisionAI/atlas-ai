@@ -7,7 +7,7 @@ import {
   getDefaultLandingPath,
   resolveRouteKey
 } from "../config/workspaceExperience";
-import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
 import ForbiddenPage from "../pages/ForbiddenPage";
 
 export default function RequireWorkspaceAccess({ children, routeKey = null }) {
@@ -20,7 +20,7 @@ export default function RequireWorkspaceAccess({ children, routeKey = null }) {
   }
 
   if (!canAccessRoute(key, user, { operationsAllowed })) {
-    if (isMetaReviewModeEnabled()) {
+    if (isMetaReviewWorkspaceActive(user)) {
       if (key === "admin/users" && canManageUsers(user, { operationsAllowed })) {
         return <Navigate to={appPath("settings/review-users")} replace />;
       }

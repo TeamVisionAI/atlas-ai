@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
-import { isMetaReviewModeEnabled } from "../../config/metaReviewMode";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { isMetaReviewWorkspaceActive } from "../../config/metaReviewMode";
 import {
   archiveAdminUser,
   createAdminUser,
@@ -38,6 +39,7 @@ const EMPTY_FORM = {
 };
 
 export default function AdminUsers() {
+  const { user: sessionUser } = useWorkspace();
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
@@ -127,7 +129,7 @@ export default function AdminUsers() {
     [users]
   );
 
-  if (isMetaReviewModeEnabled()) {
+  if (isMetaReviewWorkspaceActive(sessionUser)) {
     return <Navigate to={appPath("settings/review-users")} replace />;
   }
 

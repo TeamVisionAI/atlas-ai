@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { updateAccountProfile } from "../services/accountService";
 import { getStoredSessionToken } from "../services/atlasAuthService";
-import { isMetaReviewModeEnabled } from "../config/metaReviewMode";
+import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
 import {
   normalizeUiLanguage,
   resolveUiLanguage,
@@ -15,6 +15,7 @@ const LanguageContext = createContext(null);
 export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(SYSTEM_DEFAULT_LANGUAGE);
   const organizationDefaultRef = useRef(null);
+  const metaReviewWorkspaceLockedRef = useRef(false);
 
   const applyLanguage = useCallback((code) => {
     const normalized = normalizeUiLanguage(code) || SYSTEM_DEFAULT_LANGUAGE;
@@ -24,7 +25,10 @@ export function LanguageProvider({ children }) {
 
   const syncFromUser = useCallback(
     (user, { organizationDefault } = {}) => {
-      if (isMetaReviewModeEnabled()) {
+      const locked = isMetaReviewWorkspaceActive(user);
+      metaReviewWorkspaceLockedRef.current = locked;
+
+      if (locked) {
         applyLanguage(SYSTEM_DEFAULT_LANGUAGE);
         return SYSTEM_DEFAULT_LANGUAGE;
       }
@@ -62,7 +66,7 @@ export function LanguageProvider({ children }) {
 
   const setLanguagePreference = useCallback(
     async (code, { persist = false } = {}) => {
-      if (isMetaReviewModeEnabled()) {
+      if (metaReviewWorkspaceLockedRef.current) {
         return applyLanguage(SYSTEM_DEFAULT_LANGUAGE);
       }
 
@@ -91,7 +95,7 @@ export function LanguageProvider({ children }) {
       setLanguagePreference,
       syncFromUser,
       toggleLanguage() {
-        if (isMetaReviewModeEnabled()) {
+        if (metaReviewWorkspaceLockedRef.current) {
           return;
         }
 

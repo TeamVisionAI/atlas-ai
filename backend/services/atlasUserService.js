@@ -50,6 +50,9 @@ function sanitizeUser(user) {
     notification_preferences: normalized.notification_preferences || {},
     reports_to_user_id: normalized.reports_to_user_id || null,
     rep_id: normalized.rep_id || null,
+    // Canonical Meta Review demo identity (profile_settings.meta_review_user).
+    // Drives the session-scoped UI locker; does not elevate permissions.
+    meta_review_user: normalized.profile_settings?.meta_review_user === true,
     last_login_at: normalized.last_login_at || null,
     created_at: normalized.created_at,
     updated_at: normalized.updated_at

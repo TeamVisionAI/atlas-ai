@@ -40,6 +40,35 @@ test("sanitizeUser exposes rep_id in profile DTOs", () => {
   });
 
   assert.equal(dto.rep_id, "4XHKH");
+  assert.equal(dto.meta_review_user, false);
+});
+
+test("sanitizeUser exposes meta_review_user only for dedicated review accounts", () => {
+  const reviewDto = sanitizeUser({
+    id: "00000000-0000-4000-8000-000000000100",
+    email: "review@example.com",
+    first_name: "Meta",
+    last_name: "Reviewer",
+    role: "recruiter",
+    status: "active",
+    organization_id: "00000000-0000-4000-8000-000000000001",
+    profile_settings: { meta_review_user: true }
+  });
+
+  const adminDto = sanitizeUser({
+    id: "00000000-0000-4000-8000-000000000101",
+    email: "admin@example.com",
+    first_name: "Niovel",
+    last_name: "Perez",
+    role: "administrator",
+    status: "active",
+    organization_id: "00000000-0000-4000-8000-000000000001",
+    profile_settings: {}
+  });
+
+  assert.equal(reviewDto.meta_review_user, true);
+  assert.equal(adminDto.meta_review_user, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(reviewDto, "profile_settings"), false);
 });
 
 test("buildAdminUserSearchFilter includes rep_id for name and Rep ID search", () => {

@@ -1,6 +1,7 @@
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { appPath } from "../../config/appRoutes";
-import { isMetaReviewModeEnabled } from "../../config/metaReviewMode";
+import { isMetaReviewWorkspaceActive } from "../../config/metaReviewMode";
 import {
   formatMetaReviewConnectionStatus,
   formatMetaReviewServiceStatus,
@@ -17,7 +18,8 @@ export default function WhatsAppIntegrationCard({
   onDisconnect
 }) {
   const { translate, language } = useLanguage();
-  const metaReviewMode = isMetaReviewModeEnabled();
+  const { user } = useWorkspace();
+  const metaReviewMode = isMetaReviewWorkspaceActive(user);
   const locale = language === "es" ? "es-US" : "en-US";
 
   const webhookHealthy =
