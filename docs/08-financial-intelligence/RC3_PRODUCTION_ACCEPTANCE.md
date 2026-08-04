@@ -7,9 +7,9 @@
 | Gate | Result |
 |------|--------|
 | Pre-deploy tests (local) | Pass — see § Pre-deployment verification |
-| Clean working tree for deploy | **Fail** — unrelated local modifications present |
-| Approved commits on branch | Pass — `9278e0a`, `600a0b6` |
-| Commits published to `origin/main` | **Fail** — branch ahead by 2 commits (not pushed) |
+| Clean working tree for deploy | Pass on `release/rc3-financial-intelligence` after stash (see release manifest) |
+| Approved commits on branch | Pass — `9278e0a` → `600a0b6` → `7478a39` → release-prep |
+| Commits published to `origin/main` | **Fail** until release branch is pushed/merged |
 | Verified production DB backup | **Not performed** — no Supabase/Railway CLI; no recorded snapshot ID |
 | Migration 025 applied in target DB | **Not applied** — `atlas_fi_strategy_evaluations` absent (read-only probe) |
 | Backend/frontend production deploy | **Not performed** — Railway/Vercel CLIs unavailable; `gh` not authenticated |
@@ -23,10 +23,12 @@ Per RC3 release-candidate rules: migration must not proceed without a verified b
 
 ```text
 RC3 Phase A: 9278e0a
-RC3 Phase B: 600a0b6   ← deployment candidate SHA
+RC3 Phase B: 600a0b6   ← approved implementation candidate
+Operator docs/helpers: 7478a39
+Release branch: release/rc3-financial-intelligence
 ```
 
-Record at deploy time: exact SHA = `600a0b669cc77e31a3f54e74288427d0bf6cbd3c` (or a narrowly corrected descendant).
+Record at deploy time: exact SHA = tip of `release/rc3-financial-intelligence` (see `RC3_RELEASE_MANIFEST.md`).
 
 ---
 
@@ -85,8 +87,8 @@ Local `VITE_API_BASE_URL` resolves to **localhost** — not used as production t
 Local `localhost` API results and local builds are **not** production evidence.
 
 ### Blocker B4 — Unrelated dirty working tree
-- Do not ship `appointmentReminders.json` / `workflowState.json` / incidental Knowledge Hub edits with RC3.
-- **Action:** Keep deploy artifact = clean checkout of `600a0b6` (or approved descendant).
+- **Resolved for release branch:** unrelated work stashed as `stash@{0}` (`pre-RC3 unrelated local work`): `knowledgeHubService.js`, `appointmentReminders.json`, `workflowState.json`.
+- Deploy only from a clean checkout of `release/rc3-financial-intelligence`.
 
 ---
 

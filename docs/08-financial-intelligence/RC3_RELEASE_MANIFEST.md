@@ -19,7 +19,8 @@ RC4 planning and development remain **frozen**.
 | Release branch | `release/rc3-financial-intelligence` |
 | Implementation candidate | `600a0b6` |
 | Operator docs / helpers baseline | `7478a39` |
-| Release candidate SHA | *(set to HEAD of this branch after release-prep commit)* |
+| Release preparation SHA | `959aa1f77eaec152f49f4c59fe4d282761f886fe` |
+| Release candidate SHA | Tip of `release/rc3-financial-intelligence` (see completion report / `git rev-parse HEAD`) |
 | Migration | `025_financial_intelligence_strategy_evaluations.sql` |
 | Backend route prefix | `/api/financial-intelligence` |
 | Frontend surface | `/app/policy-intelligence` → Discussion scenarios tab |
@@ -34,13 +35,13 @@ RC4 planning and development remain **frozen**.
 9278e0a  RC3 Phase A — FI foundation
 600a0b6  RC3 Phase B — live API-backed runtime
 7478a39  Production acceptance docs + migration helpers
-(+ release-prep commit on this branch, if any)
+959aa1f  Release preparation — safer gates + manifest
 ```
 
 History from Phase A through release prep:
 
 ```text
-9278e0a → 600a0b6 → 7478a39 → [release-prep]
+9278e0a → 600a0b6 → 7478a39 → 959aa1f
 ```
 
 ---
