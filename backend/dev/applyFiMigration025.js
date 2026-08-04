@@ -3,6 +3,7 @@
  *
  * SAFETY: Requires explicit confirmation flag.
  * Do not run until a verified backup/snapshot ID is recorded.
+ * This helper is not a substitute for a backup.
  *
  * Usage:
  *   CONFIRM_FI_MIGRATION_025=yes node -r dotenv/config backend/dev/applyFiMigration025.js
@@ -14,77 +15,137 @@ const fs = require("fs");
 const path = require("path");
 const { Client } = require("pg");
 
-async function main() {
-  if (process.env.CONFIRM_FI_MIGRATION_025 !== "yes") {
-    console.error(
-      JSON.stringify({
-        ok: false,
-        error:
-          "Refusing to apply. Set CONFIRM_FI_MIGRATION_025=yes only after a verified backup/snapshot."
-      })
+function assertConfirmationGate(env = process.env) {
+  if (env.CONFIRM_FI_MIGRATION_025 !== "yes") {
+    const error = new Error(
+      "Refusing to apply. Set CONFIRM_FI_MIGRATION_025=yes only after a verified backup/snapshot."
     );
-    process.exit(1);
+    error.exitCode = 1;
+    error.code = "FI_MIGRATION_CONFIRMATION_REQUIRED";
+    throw error;
   }
+}
 
-  if (!process.env.DATABASE_URL) {
-    console.error(JSON.stringify({ ok: false, error: "DATABASE_URL not set" }));
-    process.exit(1);
+function assertDatabaseUrl(env = process.env) {
+  if (!env.DATABASE_URL) {
+    const error = new Error("DATABASE_URL not set");
+    error.exitCode = 1;
+    error.code = "FI_MIGRATION_DATABASE_URL_MISSING";
+    throw error;
   }
+}
 
+function loadMigration025Sql() {
   const sqlPath = path.join(
     __dirname,
     "../database/migrations/025_financial_intelligence_strategy_evaluations.sql"
   );
-  const sql = fs.readFileSync(sqlPath, "utf8");
+  if (!fs.existsSync(sqlPath)) {
+    const error = new Error("Migration 025 SQL file not found");
+    error.exitCode = 1;
+    error.code = "FI_MIGRATION_FILE_MISSING";
+    throw error;
+  }
+  return fs.readFileSync(sqlPath, "utf8");
+}
 
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    connectionTimeoutMillis: 30000
-  });
+async function applyFiMigration025({ env = process.env, clientFactory = null } = {}) {
+  assertConfirmationGate(env);
+  assertDatabaseUrl(env);
+  const sql = loadMigration025Sql();
 
-  await client.connect();
+  const client =
+    clientFactory ||
+    new Client({
+      connectionString: env.DATABASE_URL,
+      connectionTimeoutMillis: 30000
+    });
+
+  let shouldEnd = !clientFactory;
   try {
+    if (!clientFactory) {
+      await client.connect();
+    }
+
     const before = await client.query(
       `SELECT to_regclass('public.atlas_fi_strategy_evaluations') AS t`
     );
     if (before.rows[0]?.t) {
-      console.log(
-        JSON.stringify({
-          ok: true,
-          applied: false,
-          message: "Table already present — skipped apply; run verifyFiProductionSchema.js"
-        })
-      );
-      return;
+      return {
+        ok: true,
+        applied: false,
+        fiTablePresent: true,
+        message: "Table already present — skipped apply; run verifyFiProductionSchema.js"
+      };
     }
 
     await client.query("BEGIN");
-    await client.query(sql);
-    await client.query("COMMIT");
+    try {
+      await client.query(sql);
+      await client.query("COMMIT");
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        /* ignore rollback errors */
+      }
+      throw error;
+    }
 
     const after = await client.query(
       `SELECT to_regclass('public.atlas_fi_strategy_evaluations') AS t`
     );
 
-    console.log(
-      JSON.stringify({
-        ok: Boolean(after.rows[0]?.t),
-        applied: true,
-        fiTablePresent: Boolean(after.rows[0]?.t),
-        message: "Migration 025 applied. Run verifyFiProductionSchema.js next."
-      })
-    );
-  } catch (error) {
-    try {
-      await client.query("ROLLBACK");
-    } catch {
-      /* ignore */
+    if (!after.rows[0]?.t) {
+      const error = new Error("Migration 025 completed but table is still missing");
+      error.exitCode = 1;
+      error.code = "FI_MIGRATION_VERIFY_FAILED";
+      throw error;
     }
-    console.error(JSON.stringify({ ok: false, applied: false, error: error.message }));
-    process.exit(1);
+
+    return {
+      ok: true,
+      applied: true,
+      fiTablePresent: true,
+      message: "Migration 025 applied. Run verifyFiProductionSchema.js next."
+    };
   } finally {
-    await client.end();
+    if (shouldEnd) {
+      try {
+        await client.end();
+      } catch {
+        /* ignore */
+      }
+    }
   }
 }
 
-main();
+async function main() {
+  try {
+    const result = await applyFiMigration025();
+    console.log(JSON.stringify(result));
+    process.exit(0);
+  } catch (error) {
+    // Never print connection strings or env values.
+    console.error(
+      JSON.stringify({
+        ok: false,
+        applied: false,
+        error: error.message,
+        code: error.code || "FI_MIGRATION_ERROR"
+      })
+    );
+    process.exit(error.exitCode || 1);
+  }
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  assertConfirmationGate,
+  assertDatabaseUrl,
+  loadMigration025Sql,
+  applyFiMigration025
+};

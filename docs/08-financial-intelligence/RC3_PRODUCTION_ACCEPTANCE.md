@@ -70,6 +70,20 @@ Local `VITE_API_BASE_URL` resolves to **localhost** — not used as production t
 - `gh` not authenticated.
 - **Action:** Deploy from an operator machine with Railway + Vercel access after push.
 
+### Production access still required
+
+| Access | Purpose |
+|--------|---------|
+| Authorized Supabase migration access | Apply / verify migration 025 |
+| Verified backup or snapshot capability | Pre-migration restore point |
+| Railway backend deployment access | Deploy FI API |
+| Vercel frontend deployment access | Deploy Discussion scenarios UI |
+| GitHub push or PR access | Publish release branch |
+| Production test account with FI permissions | Live acceptance |
+| Approved second test organization (when available) | Tenant-isolation verification |
+
+Local `localhost` API results and local builds are **not** production evidence.
+
 ### Blocker B4 — Unrelated dirty working tree
 - Do not ship `appointmentReminders.json` / `workflowState.json` / incidental Knowledge Hub edits with RC3.
 - **Action:** Keep deploy artifact = clean checkout of `600a0b6` (or approved descendant).
@@ -78,10 +92,23 @@ Local `VITE_API_BASE_URL` resolves to **localhost** — not used as production t
 
 ## Operator runbook (after blockers cleared)
 
-### 1. Backup
-1. Supabase Dashboard → Database → Backups / PITR restore point.  
-2. Record: snapshot ID, UTC time, operator name.  
-3. Confirm backup **before** migration 025.
+### 1. Backup gate (required before migration)
+
+Do not attempt a production backup from an environment without authorized tools.
+The migration helper is **not** a substitute for a backup.
+
+The production operator must record **before** applying migration 025:
+
+| Field | Value (operator fills) |
+|-------|------------------------|
+| Environment name | |
+| Backup / snapshot method | e.g. Supabase PITR / project backup |
+| Backup timestamp (UTC) | |
+| Snapshot or backup identifier | when the platform provides one |
+| Operator identity / deployment record | |
+| Confirmation backup predates migration 025 | yes / no |
+
+Do not copy credentials, connection strings, or tokens into documentation.
 
 ### 2. Apply migration 025
 Preferred: Supabase SQL editor or approved migration runner, execute:

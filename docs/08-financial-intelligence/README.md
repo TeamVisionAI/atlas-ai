@@ -16,6 +16,7 @@ Architecture and runtime pack for **Atlas Financial Intelligence** — the bound
 | [API.md](./API.md) | RC3 Financial Intelligence HTTP API + frontend contract |
 | [RUNTIME_WORKFLOW.md](./RUNTIME_WORKFLOW.md) | Live evaluation lifecycle, deployment, rollback |
 | [RC3_PRODUCTION_ACCEPTANCE.md](./RC3_PRODUCTION_ACCEPTANCE.md) | Production deploy gates, blockers, operator runbook |
+| [RC3_RELEASE_MANIFEST.md](./RC3_RELEASE_MANIFEST.md) | Sanitized release candidate identity and handoff |
 | [RC3 Phase A](../09-releases/sprints/SPRINT_RC3_INVEST_THE_DIFFERENCE_FOUNDATION.md) | Foundation release notes |
 | [RC3 Phase B](../09-releases/sprints/SPRINT_RC3_PHASE_B_RUNTIME_INTEGRATION.md) | Runtime integration release notes |
 

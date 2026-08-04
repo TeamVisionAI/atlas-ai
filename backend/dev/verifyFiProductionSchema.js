@@ -43,9 +43,8 @@ async function main() {
     connectionTimeoutMillis: 20000
   });
 
-  await client.connect();
-
   try {
+    await client.connect();
     const table = await client.query(
       `SELECT to_regclass('public.atlas_fi_strategy_evaluations') AS t`
     );
