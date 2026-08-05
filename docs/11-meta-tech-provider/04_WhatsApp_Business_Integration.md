@@ -147,6 +147,20 @@ Atlas is designed to comply with Meta Platform requirements by:
 
 ---
 
+# Outbound authorization (BR-075)
+
+Atlas enforces a customer-care messaging window and approved-template gate before every WhatsApp Cloud API send:
+
+- Free-form text is allowed only while a valid inbound customer message keeps the customer-care window open.
+- Outside that window, only firm-approved Meta templates from the Atlas registry may be sent.
+- Missing or unapproved templates fail closed with a durable retry/audit record.
+- Reminders, follow-ups, Conversation Engine replies, agent sends, and lead-welcome messages share the same gate.
+- Meta Reviewer workspace isolation and language lock are unchanged.
+
+Operational details: `docs/03-engineering/WHATSAPP_OUTBOUND_AUTHORIZATION.md`.
+
+---
+
 # Summary
 
 Atlas integrates with the WhatsApp Business Platform through Meta's official onboarding and API ecosystem.

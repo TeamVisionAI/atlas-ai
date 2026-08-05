@@ -7,12 +7,10 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { sendTextMessage } = require("./whatsappService");
-const { logConversation } = require("./logService");
 const { findProspectInOrganization } = require("./supabaseService");
 const { recordBusinessEvent } = require("../core/recruitingBusinessEventBridge");
 const { APPOINTMENT_EVENTS } = require("../modules/business-events/domain/EventTypes");
 const { REMINDER_STATUSES } = require("../core/configuration/appointmentDomain");
-const { shouldMockExternalComms } = require("../dev/simulatorGuard");
 
 const REMINDER_FILE = path.join(__dirname, "../data/appointmentReminders.json");
 
@@ -148,6 +146,18 @@ function replaceReminders(appointment) {
   return scheduleReminders(appointment);
 }
 
+function buildReminderTemplateVariables(appointment, prospect) {
+  const firstName = String(prospect?.name || appointment.metadata?.prospectName || "")
+    .trim()
+    .split(/\s+/)[0] || "there";
+  const when = formatWhen(appointment.startDateTime, appointment.timezone);
+
+  return {
+    prospect_first_name: firstName,
+    interview_when: when
+  };
+}
+
 async function deliverReminder(entry, appointment) {
   const prospect = await findProspectInOrganization(
     entry.prospectPhone,
@@ -155,29 +165,29 @@ async function deliverReminder(entry, appointment) {
   );
 
   const message = buildReminderMessage(appointment, entry.reminderType, prospect);
+  const idempotencyKey = `reminder:${entry.appointmentId || appointment.id}:${entry.reminderType}`;
 
-  if (!shouldMockExternalComms()) {
-    const result = await sendTextMessage(entry.prospectPhone, message, {
-      intent: "APPOINTMENT_REMINDER",
-      actor: "ATLAS"
-    });
+  // Always authorize through the canonical WhatsApp gate (including mocked provider sends).
+  const result = await sendTextMessage(entry.prospectPhone, message, {
+    intent: "APPOINTMENT_REMINDER",
+    actor: "ATLAS",
+    organizationId: entry.organizationId,
+    templateKey: "interview_reminder",
+    templateVariables: buildReminderTemplateVariables(appointment, prospect),
+    idempotencyKey
+  });
 
-    if (!result.success) {
-      return { delivered: false, reason: result.error || "SEND_FAILED" };
-    }
+  if (!result.success) {
+    return {
+      delivered: false,
+      reason: result.error || result.status || "SEND_FAILED",
+      status: result.status || REMINDER_STATUSES.FAILED,
+      retryable: Boolean(result.retryable),
+      delivery: result.delivery || null
+    };
   }
 
-  await logConversation({
-    phone: entry.prospectPhone,
-    name: prospect?.name || appointment.metadata?.prospectName,
-    direction: "outgoing",
-    message,
-    intent: "APPOINTMENT_REMINDER",
-    pipeline: "APPOINTMENT",
-    currentStep: prospect?.current_step || "CONFIRMED",
-    language: prospect?.language || "es"
-  }).catch(() => {});
-
+  // REMINDER_SENT only after successful authorized delivery (freeform or approved template).
   await recordBusinessEvent({
     phone: entry.prospectPhone,
     eventType: APPOINTMENT_EVENTS.REMINDER_SENT,
@@ -188,11 +198,17 @@ async function deliverReminder(entry, appointment) {
     payload: {
       appointmentId: entry.appointmentId,
       reminderType: entry.reminderType,
-      scheduledFor: entry.scheduledFor
+      scheduledFor: entry.scheduledFor,
+      deliveryStatus: result.status,
+      simulated: Boolean(result.simulated)
     }
   }).catch(() => {});
 
-  return { delivered: true };
+  return {
+    delivered: true,
+    status: result.status,
+    delivery: result.delivery || null
+  };
 }
 
 async function processDueReminders() {
@@ -224,10 +240,18 @@ async function processDueReminders() {
 
       try {
         const result = await deliverReminder(entry, appointment);
-        entry.status = result.delivered ? REMINDER_STATUSES.SENT : REMINDER_STATUSES.FAILED;
-        entry.sentAt = new Date().toISOString();
-        if (!result.delivered) {
+        if (result.delivered) {
+          entry.status = REMINDER_STATUSES.SENT;
+          entry.sentAt = new Date().toISOString();
+          entry.deliveryStatus = result.status || null;
+          delete entry.failureReason;
+        } else {
+          // Do not mark sent when blocked/failed — keep retryable durable failure state.
+          entry.status = REMINDER_STATUSES.FAILED;
           entry.failureReason = result.reason;
+          entry.deliveryStatus = result.status || null;
+          entry.retryable = Boolean(result.retryable);
+          entry.lastAttemptAt = new Date().toISOString();
         }
         processed += 1;
         changed = true;

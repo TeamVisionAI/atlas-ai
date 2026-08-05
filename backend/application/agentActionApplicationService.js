@@ -100,18 +100,25 @@ async function logAgentTimeline(prospect, message, pipeline = "AGENT", extras = 
   });
 }
 
-async function sendWhatsAppOrFail(prospect, message) {
+async function sendWhatsAppOrFail(prospect, message, options = {}) {
   const result = await sendTextMessage(prospect.phone, message, {
     intent: "AGENT_ACTION",
-    actor: "AGENT"
+    actor: "AGENT",
+    organizationId: options.organizationId || prospect.organization_id || null,
+    templateKey: options.templateKey || null,
+    templateVariables: options.templateVariables || {},
+    idempotencyKey: options.idempotencyKey || null
   });
 
   if (!result.success) {
-    return buildActionError(
+    const error = buildActionError(
       "send_message",
-      "WHATSAPP_SEND_FAILED",
+      result.status || "WHATSAPP_SEND_FAILED",
       result.error || "Failed to send WhatsApp message."
     );
+    error.deliveryStatus = result.status || null;
+    error.retryable = Boolean(result.retryable);
+    return error;
   }
 
   return null;

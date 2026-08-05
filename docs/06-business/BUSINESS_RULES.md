@@ -1038,6 +1038,36 @@ See: [FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](../08-financial-intelligence/FINAN
 
 ---
 
+## BR-075 — WhatsApp Outbound Customer-Care Window and Approved-Template Gate
+
+**Implements:** Recruit AI Production Readiness — WhatsApp outbound safety  
+**Domain:** Communications / Recruit AI  
+**Depends on:** BR-012, BR-041  
+**Status:** Approved  
+**Engine target:** `whatsappOutboundAuthorizationGate.js`, `whatsappCustomerCareWindow.js`, `whatsappApprovedTemplateRegistry.js`, `whatsappOutboundPipeline.js`
+
+### Rules
+
+1. **Single canonical gate** — Every real WhatsApp Cloud API send must authorize through one outbound gate before Graph delivery. No unguarded category-specific bypasses (reminders, follow-ups, CE replies, agent sends, lead welcome).
+2. **Customer-care window source** — The window opens only from the latest valid **inbound** customer WhatsApp message timestamp in durable `conversation_logs` (UTC). Do not use frontend time, process memory, `workflowState.json`, `agentActionState.json`, last outbound timestamp, or appointment creation time as a substitute.
+3. **Canonical duration** — Window length is defined once as `CUSTOMER_CARE_WINDOW_MS` (24 hours). Do not hardcode alternate durations in callers.
+4. **Inside the window** — Free-form text replies are permitted for immediate Recruit AI / qualification conversation. Delivery must be recorded with status `sent_freeform`.
+5. **Outside the window** — Free-form text must never be sent. Atlas must either send an **approved and active** Meta template from the registry whose purpose matches the outbound intent, or fail closed with a durable blocked/retry record (`blocked_window_closed`, `blocked_template_missing`, `blocked_template_unapproved`, or `retry_required` / `provider_failed`).
+6. **Approved templates only** — Template names come from the approved registry (optionally activated via operational `WHATSAPP_APPROVED_TEMPLATES_JSON`). Caller-supplied Meta template names are rejected. Placeholder/internal copy templates are not Meta-approved.
+7. **Preferred language for templates** — Template locale selection uses canonical `preferred_language`. Mutable conversation-language fields must not override a valid preferred language. If preferred language is missing, use the documented default (`english`). Missing language-specific approved templates fail closed (no silent cross-language fallback).
+8. **Reminders and follow-ups** — Appointment reminders, no-response follow-ups, missed-appointment, and reschedule confirmations use the same gate. A blocked reminder must not be marked `sent`. Appointment rows remain valid when confirmation/reminder delivery is blocked.
+9. **Workflow integrity** — Blocked or failed outbound must not advance workflow as though contact occurred (no false `MESSAGE_SENT` / reminder-sent completion). Immediate appointment creation is not rolled back solely because an outbound confirmation is blocked; record appointment and communication delivery state separately.
+10. **Durable failure** — Blocked/failed attempts persist to `whatsapp_outbound_deliveries` (and sanitized conversation/business-event audit). Do not store critical blocked state only in memory or local JSON.
+11. **Idempotency** — Successful sends with an idempotency key must not create duplicate provider template deliveries on retry.
+12. **Sanitized results** — Delivery results expose status, intent, mode, template key, retryability, and safe reason — never access tokens, app secrets, or raw provider payloads.
+13. **Meta Review boundary** — Meta Review allowlist, language lock, session scoping, and WhatsApp-only reviewer behavior remain unchanged by this rule.
+
+### Operational requirement
+
+Production outside-window messaging requires firm-approved Meta templates configured in `WHATSAPP_APPROVED_TEMPLATES_JSON` (or equivalent ops configuration). Until configured, outside-window sends fail closed by design.
+
+---
+
 ## BR-074 — Firm-Verified Securities Content Access
 
 **Implements:** RC4 Milestone 1 — Firm-Verified Securities Access Foundation

@@ -128,14 +128,20 @@ async function processFacebookLead(input = {}) {
   });
 
   const welcomeMessage = input.welcomeMessage || buildWelcomeMessage({ displayName, language });
+  const firstName = String(displayName || "").trim().split(/\s+/)[0] || "there";
   const outbound = await sendAndPersistWhatsAppMessage({
     to: phone,
     message: welcomeMessage,
     actor: "ATLAS",
-    intent: "FACEBOOK_LEAD_WELCOME"
+    intent: "FACEBOOK_LEAD_WELCOME",
+    organizationId: input.organizationId || null,
+    templateKey: "lead_welcome",
+    templateVariables: { prospect_first_name: firstName },
+    idempotencyKey: input.leadgenId ? `facebook-lead-welcome:${input.leadgenId}` : null
   });
 
-  if (bridge.prospectId) {
+  // Do not claim MESSAGE_SENT when the outbound gate blocked or provider failed.
+  if (bridge.prospectId && outbound?.success) {
     await recordBusinessEvent({
       phone,
       prospectId: bridge.prospectId,
@@ -147,7 +153,8 @@ async function processFacebookLead(input = {}) {
       payload: {
         direction: "outbound",
         channel: "whatsapp",
-        source: "facebook_lead"
+        source: "facebook_lead",
+        deliveryStatus: outbound.status || null
       },
       correlationId: input.leadgenId ? `facebook-lead:${input.leadgenId}` : null
     });
