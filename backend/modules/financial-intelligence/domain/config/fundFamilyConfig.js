@@ -1,6 +1,13 @@
 /**
- * Pending-verification fund family configuration (RC3).
- * Do not surface symbols as client recommendations until verified.
+ * NON-PRODUCTION PLACEHOLDER fund family configuration.
+ *
+ * These example symbols (FELAX, VAFAX, …) are development fixtures only.
+ * They are NOT an approved authoritative SB-72 / firm fund catalog.
+ *
+ * Live APIs, print/export, UI, and AI retrieval must never return this data
+ * until canExposeVerifiedFundCatalog() is true for an approved catalog release.
+ *
+ * Implements product-boundary companion to BR-074 (RC4 M1 hotfix).
  */
 
 const FUND_FAMILIES = Object.freeze(["Fidelity", "Invesco", "Franklin Templeton"]);
@@ -18,7 +25,7 @@ const EXAMPLE_FUNDS = Object.freeze([
     verificationStatus: "PENDING_VERIFICATION",
     verificationSource: null,
     effectiveDate: null,
-    notes: "Unverified example symbol — not for client recommendation UI."
+    notes: "NON_PRODUCTION_PLACEHOLDER — not for live API, UI, print, or AI retrieval."
   },
   {
     symbol: "VAFAX",
@@ -32,7 +39,7 @@ const EXAMPLE_FUNDS = Object.freeze([
     verificationStatus: "PENDING_VERIFICATION",
     verificationSource: null,
     effectiveDate: null,
-    notes: "Unverified example symbol — not for client recommendation UI."
+    notes: "NON_PRODUCTION_PLACEHOLDER — not for live API, UI, print, or AI retrieval."
   },
   {
     symbol: "VADAX",
@@ -46,7 +53,7 @@ const EXAMPLE_FUNDS = Object.freeze([
     verificationStatus: "PENDING_VERIFICATION",
     verificationSource: null,
     effectiveDate: null,
-    notes: "Unverified example symbol — not for client recommendation UI."
+    notes: "NON_PRODUCTION_PLACEHOLDER — not for live API, UI, print, or AI retrieval."
   },
   {
     symbol: "EPGAX",
@@ -60,7 +67,7 @@ const EXAMPLE_FUNDS = Object.freeze([
     verificationStatus: "PENDING_VERIFICATION",
     verificationSource: null,
     effectiveDate: null,
-    notes: "Unverified example symbol — not for client recommendation UI."
+    notes: "NON_PRODUCTION_PLACEHOLDER — not for live API, UI, print, or AI retrieval."
   },
   {
     symbol: "ACEIX",
@@ -74,7 +81,7 @@ const EXAMPLE_FUNDS = Object.freeze([
     verificationStatus: "PENDING_VERIFICATION",
     verificationSource: null,
     effectiveDate: null,
-    notes: "Unverified example symbol — not for client recommendation UI."
+    notes: "NON_PRODUCTION_PLACEHOLDER — not for live API, UI, print, or AI retrieval."
   },
   {
     symbol: "SBLGX",
@@ -88,24 +95,36 @@ const EXAMPLE_FUNDS = Object.freeze([
     verificationStatus: "PENDING_VERIFICATION",
     verificationSource: null,
     effectiveDate: null,
-    notes: "Unverified example symbol — not for client recommendation UI."
+    notes: "NON_PRODUCTION_PLACEHOLDER — not for live API, UI, print, or AI retrieval."
   }
 ].map((row) => Object.freeze(row)));
 
-function getFundCatalog() {
+/**
+ * Internal / test-only placeholder catalog. Do not attach to live API responses.
+ */
+function getNonProductionPlaceholderFundCatalog() {
   return Object.freeze({
+    productionAuthorized: false,
+    catalogStatus: "NON_PRODUCTION_PLACEHOLDER",
     families: FUND_FAMILIES,
     funds: EXAMPLE_FUNDS,
     uiPolicy: Object.freeze({
       showSymbolsInClientUi: false,
       scenariosUseGeneralCategoriesOnly: true,
-      verificationRequiredBeforeRecommendation: true
+      verificationRequiredBeforeRecommendation: true,
+      liveApiExposureForbidden: true
     })
   });
+}
+
+/** @deprecated Use getNonProductionPlaceholderFundCatalog — not a live catalog. */
+function getFundCatalog() {
+  return getNonProductionPlaceholderFundCatalog();
 }
 
 module.exports = {
   FUND_FAMILIES,
   EXAMPLE_FUNDS,
-  getFundCatalog
+  getFundCatalog,
+  getNonProductionPlaceholderFundCatalog
 };

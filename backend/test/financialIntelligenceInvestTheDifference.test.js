@@ -350,15 +350,19 @@ describe("FI term quote and status readiness", () => {
 });
 
 describe("FI fund catalog pending verification", () => {
-  it("marks example symbols pending and hides from client UI policy", () => {
+  it("marks placeholder symbols non-production and forbids live API exposure", () => {
     const catalog = getFundCatalog();
+    assert.equal(catalog.productionAuthorized, false);
+    assert.equal(catalog.catalogStatus, "NON_PRODUCTION_PLACEHOLDER");
     assert.ok(catalog.families.includes("Fidelity"));
     assert.ok(catalog.families.includes("Invesco"));
     assert.ok(catalog.families.includes("Franklin Templeton"));
     assert.equal(catalog.uiPolicy.showSymbolsInClientUi, false);
+    assert.equal(catalog.uiPolicy.liveApiExposureForbidden, true);
     for (const fund of catalog.funds) {
       assert.equal(fund.verificationStatus, "PENDING_VERIFICATION");
       assert.equal(fund.availabilityStatus, "UNKNOWN");
+      assert.match(fund.notes, /NON_PRODUCTION_PLACEHOLDER/);
     }
   });
 });

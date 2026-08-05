@@ -386,10 +386,21 @@ test("generic FI 4%/7%/10% remains available without named securities", () => {
   assert.doesNotMatch(serialized, /FELAX|VAFAX|VADAX|EPGAX|ACEIX|SBLGX/);
 });
 
-test("fund catalog exists internally but UI policy hides symbols pending securities gate", () => {
+test("placeholder fund catalog remains non-production and is not a live API contract", () => {
   const catalog = getFundCatalog();
+  assert.equal(catalog.productionAuthorized, false);
+  assert.equal(catalog.catalogStatus, "NON_PRODUCTION_PLACEHOLDER");
   assert.equal(catalog.uiPolicy.showSymbolsInClientUi, false);
+  assert.equal(catalog.uiPolicy.liveApiExposureForbidden, true);
   assert.ok(catalog.funds.some((fund) => fund.symbol === "FELAX"));
+
+  const {
+    canExposeVerifiedFundCatalog
+  } = require("../security/verifiedFundCatalogGate");
+  assert.equal(
+    canExposeVerifiedFundCatalog({ canAccessSecuritiesContent: true }),
+    false
+  );
 });
 
 test("BR-074 is documented in BUSINESS_RULES.md", () => {

@@ -62,8 +62,19 @@ class StrategyEvaluationService {
     this.policyRepository = deps.policyRepository || defaultPolicyRepository();
   }
 
-  getModuleSummary() {
-    return {
+  /**
+   * Public module summary for live API contracts.
+   *
+   * Named fundCatalog is omitted unless a future authoritative catalog release
+   * activates canExposeVerifiedFundCatalog(). Placeholder example symbols must
+   * never ship in production responses merely because a user is VERIFIED_ACTIVE.
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.includeNonProductionFundCatalogPreview]
+   *   Test/dev only — attaches the non-production placeholder catalog.
+   */
+  getModuleSummary(options = {}) {
+    const summary = {
       moduleId: MODULE_ID,
       version: MODULE_VERSION,
       sectionTitle: SECTION_TITLE,
@@ -78,10 +89,19 @@ class StrategyEvaluationService {
       },
       projectionAssumptions: PROJECTION_SCENARIOS,
       projectionDisclaimer: PROJECTION_DISCLAIMER,
-      fundCatalog: getFundCatalog(),
+      // Live contract: named catalog inactive for current release (BR-074 boundary).
+      namedFundCatalogActive: false,
+      securitiesContentRestricted: true,
       statuses: EVALUATION_STATUSES,
       br066: true
     };
+
+    if (options.includeNonProductionFundCatalogPreview === true) {
+      summary.fundCatalog = getFundCatalog();
+      summary.fundCatalogPreviewOnly = true;
+    }
+
+    return summary;
   }
 
   /**

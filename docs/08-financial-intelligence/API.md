@@ -50,8 +50,16 @@ The UI must not reconstruct business rules from raw persistence columns.
 
 - `status` codes, scenario `id`s, and known English warning/disclaimer strings are mapped to EN/ES presentation strings in `frontend/src/i18n/fiReportMessages.js`.
 - Historical evaluations are **not** rewritten for localization. Numeric fields remain backend-authoritative.
-- `Accept-Language` / UI language must not change calculations, create revisions, or restore securities-restricted fields such as `fundCatalog` for unverified users.
+- `Accept-Language` / UI language must not change calculations, create revisions, or restore securities-restricted fields such as `fundCatalog`.
 - Report title displayed to users uses the localized FI dictionary (not a recalculated `sectionTitle`).
+
+## Named fund catalog (current release)
+
+`GET /api/financial-intelligence` **must not** return `fundCatalog`, ticker symbols, fund names, share classes, model portfolios, or placeholder securities configuration.
+
+`VERIFIED_ACTIVE` authorizes access to approved securities content, but **no named fund catalog is approved or active in the current release.** Exposure requires `canExposeVerifiedFundCatalog()` (securities access **and** an approved authoritative catalog version). Until that future milestone, responses set `namedFundCatalogActive: false` and `securitiesContentRestricted: true` for all actors.
+
+Generic educational FI (premiums, Invest-the-Difference, hypothetical 4% / 7% / 10%, disclosures, replacement safeguards, registered-representative handoff) remains available.
 
 ## Validation (selected)
 

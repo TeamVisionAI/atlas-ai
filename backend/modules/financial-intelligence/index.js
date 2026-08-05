@@ -25,7 +25,10 @@ const {
   PROJECTION_SCENARIOS,
   listProjectionScenarios
 } = require("./domain/projections/projectionAssumptions");
-const { getFundCatalog } = require("./domain/config/fundFamilyConfig");
+const {
+  getFundCatalog,
+  getNonProductionPlaceholderFundCatalog
+} = require("./domain/config/fundFamilyConfig");
 const {
   resolveStrategyEvaluationStatus
 } = require("./domain/models/strategyEvaluationStatus");
@@ -73,5 +76,6 @@ module.exports = {
   PROJECTION_SCENARIOS,
   listProjectionScenarios,
   getFundCatalog,
+  getNonProductionPlaceholderFundCatalog,
   resolveStrategyEvaluationStatus
 };
