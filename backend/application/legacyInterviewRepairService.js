@@ -37,8 +37,16 @@ function hasScheduledInterviewMetadata(prospect = {}) {
   return true;
 }
 
+/**
+ * Resolve the agent_id stamped on repaired appointments.
+ *
+ * Appointments → Upcoming filters by authenticated user id (`agent_id`).
+ * Prefer an explicit preferredAgentId (e.g. operating RVP) over a prospect
+ * owner that may be a different same-org admin account.
+ */
 function resolveRepairAgentId(prospect, options = {}) {
   return (
+    options.preferredAgentId ||
     options.repairActorId ||
     prospect.owner_user_id ||
     prospect.created_by_user_id ||
@@ -301,5 +309,6 @@ module.exports = {
   listLegacyRepairCandidates,
   repairLegacyInterviewForProspect,
   runLegacyInterviewRepair,
-  buildRepairCandidateSummary
+  buildRepairCandidateSummary,
+  resolveRepairAgentId
 };
