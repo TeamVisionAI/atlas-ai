@@ -34,18 +34,35 @@ Canonical production-safety gate for every Atlas WhatsApp Cloud API send.
 
 ## Approved template configuration
 
-Operational env JSON (example):
+Set via `WHATSAPP_APPROVED_TEMPLATES_JSON`.
+
+**Accepted locale keys are only `english` and `spanish`** (not `en`, `en_US`, `es`, or `es_US`).  
+Meta language codes (`en` / `es`) are derived internally from those locale keys.
+
+Sanitized placeholder schema (not production-ready):
 
 ```json
 {
   "interview_reminder": {
     "english": {
-      "metaTemplateName": "tv_interview_reminder_en",
+      "metaTemplateName": "<APPROVED_EN_TEMPLATE_NAME>",
       "approved": true,
       "active": true
     },
     "spanish": {
-      "metaTemplateName": "tv_interview_reminder_es",
+      "metaTemplateName": "<APPROVED_ES_TEMPLATE_NAME>",
+      "approved": true,
+      "active": true
+    }
+  },
+  "follow_up": {
+    "english": {
+      "metaTemplateName": "<APPROVED_EN_FOLLOW_UP_TEMPLATE_NAME>",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "<APPROVED_ES_FOLLOW_UP_TEMPLATE_NAME>",
       "approved": true,
       "active": true
     }
@@ -53,7 +70,9 @@ Operational env JSON (example):
 }
 ```
 
-Set via `WHATSAPP_APPROVED_TEMPLATES_JSON`.
+Known registry keys: `interview_reminder`, `follow_up`, `missed_appointment`, `interview_details`, `human_assist_notice`, `lead_welcome`.
+
+Required variables are defined in code per key (for example `interview_reminder` expects `prospect_first_name` and `interview_when`). Do not invent template names.
 
 Until configured, outside-window sends fail closed by design.
 

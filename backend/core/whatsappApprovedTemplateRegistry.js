@@ -169,8 +169,11 @@ function parseApprovedTemplatesEnv(raw = process.env.WHATSAPP_APPROVED_TEMPLATES
 
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
+    console.warn(
+      "[whatsappApprovedTemplateRegistry] WHATSAPP_APPROVED_TEMPLATES_JSON is malformed; using inactive fail-closed registry"
+    );
     return { __parseError: true };
   }
 }

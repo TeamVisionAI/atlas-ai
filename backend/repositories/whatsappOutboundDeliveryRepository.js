@@ -6,6 +6,19 @@ const { supabase } = require("../services/supabaseService");
 
 const SUCCESS_STATUSES = new Set(["sent_freeform", "sent_template"]);
 
+function isTableMissingError(error) {
+  const message = String(error?.message || error?.details || error || "");
+  const code = String(error?.code || "");
+
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /does not exist/i.test(message) ||
+    /Could not find the table/i.test(message) ||
+    /schema cache/i.test(message)
+  );
+}
+
 async function findSuccessfulDeliveryByIdempotencyKey({
   organizationId,
   idempotencyKey,
@@ -30,8 +43,8 @@ async function findSuccessfulDeliveryByIdempotencyKey({
   const { data, error } = await query;
 
   if (error) {
-    // Table may not exist yet in older environments — fail open to in-process dedupe only.
-    if (String(error.message || "").includes("does not exist")) {
+    // Table may not exist yet during migration/deploy skew — continue without durable dedupe.
+    if (isTableMissingError(error)) {
       return null;
     }
 
@@ -67,7 +80,7 @@ async function recordOutboundDelivery(record, client = supabase) {
     .single();
 
   if (error) {
-    if (String(error.message || "").includes("does not exist")) {
+    if (isTableMissingError(error)) {
       return {
         success: false,
         skipped: true,
@@ -106,5 +119,6 @@ module.exports = {
   findSuccessfulDeliveryByIdempotencyKey,
   recordOutboundDelivery,
   isSuccessfulDeliveryStatus,
+  isTableMissingError,
   SUCCESS_STATUSES
 };
