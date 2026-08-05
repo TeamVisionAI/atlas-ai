@@ -18,6 +18,8 @@ function buildListFilters(req) {
   const organizationId = req.tenantContext.organizationId;
   const filters = { organizationId };
 
+  // Upcoming/Today lists are intentionally agent-scoped to the session user.
+  // Same-org appointments owned by another user (different agent_id) are excluded.
   if (agentId) {
     filters.agentId = agentId;
   } else {
