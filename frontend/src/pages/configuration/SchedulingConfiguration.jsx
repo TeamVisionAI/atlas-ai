@@ -13,6 +13,10 @@ import {
   selectGoogleCalendar,
   updateSchedulingConfiguration
 } from "../../services/configurationService";
+import {
+  resolveGoogleCalendarListUiFailure,
+  shouldFetchGoogleCalendarList
+} from "../../services/googleCalendarListUi";
 
 export default function SchedulingConfiguration() {
   const { translate } = useLanguage();
@@ -29,15 +33,30 @@ export default function SchedulingConfiguration() {
     setScheduling(result.scheduling);
     setGoogleCalendar(result.googleCalendar);
 
-    if (result.googleCalendar?.connected) {
+    const google = result.googleCalendar || {};
+
+    if (google.reconnectRequired) {
+      setCalendars([]);
+      setError(translate("configurationGoogleReconnectRequired"));
+      return;
+    }
+
+    if (shouldFetchGoogleCalendarList(google)) {
       try {
         const calendarResult = await fetchGoogleCalendars();
         setCalendars(calendarResult.calendars || []);
-      } catch {
-        setCalendars([]);
+        setError("");
+      } catch (calendarError) {
+        const uiFailure = resolveGoogleCalendarListUiFailure(calendarError, google);
+        setCalendars(uiFailure.calendars);
+        if (uiFailure.reconnectRequired) {
+          setError(translate("configurationGoogleReconnectRequired"));
+        }
       }
+    } else {
+      setCalendars([]);
     }
-  }, []);
+  }, [translate]);
 
   useEffect(() => {
     load().catch((loadError) => setError(loadError.message));

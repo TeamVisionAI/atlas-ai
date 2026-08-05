@@ -26,7 +26,13 @@ export async function apiFetch(path, options = {}) {
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.message || payload.error || `API ${response.status}: ${response.statusText}`);
+    const error = new Error(
+      payload.message || payload.error || `API ${response.status}: ${response.statusText}`
+    );
+    error.status = response.status;
+    error.code = payload.error || payload.code || null;
+    error.reconnectRequired = Boolean(payload.reconnectRequired);
+    throw error;
   }
 
   return response.json();

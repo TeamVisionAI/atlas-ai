@@ -124,6 +124,7 @@ async function getAuthorizedClient(organizationId) {
 
 function presentIntegrationStatus(integration) {
   const config = integration?.config || {};
+  const reconnectRequired = config.syncStatus === "reconnect_required";
 
   return {
     connected: integration?.status === "connected",
@@ -131,9 +132,166 @@ function presentIntegrationStatus(integration) {
     googleAccountEmail: config.googleAccountEmail || null,
     calendarId: config.calendarId || null,
     syncStatus: config.syncStatus || "idle",
+    reconnectRequired,
     lastSync: config.lastSync || null,
     connectedAt: integration?.connected_at || null
   };
+}
+
+/**
+ * Classify Google OAuth / Calendar API failures for safe client responses.
+ * Never includes tokens or raw upstream payloads.
+ */
+function classifyGoogleCalendarUpstreamError(error) {
+  const message = String(error?.message || "");
+  const responseError = error?.response?.data?.error;
+  const responseErrorString =
+    typeof responseError === "string"
+      ? responseError
+      : String(responseError?.message || responseError?.error || "");
+  const gaxiosReason = String(error?.errors?.[0]?.reason || "");
+  const haystack = `${message} ${responseErrorString} ${gaxiosReason}`.toLowerCase();
+
+  if (
+    haystack.includes("invalid_grant") ||
+    haystack.includes("token has been expired or revoked") ||
+    haystack.includes("invalid_rapt")
+  ) {
+    return {
+      kind: "reconnect_required",
+      reason: "invalid_grant"
+    };
+  }
+
+  if (
+    haystack.includes("insufficient permissions") ||
+    haystack.includes("access_not_configured") ||
+    haystack.includes("accessdenied") ||
+    haystack.includes("insufficientauthenticationscopes")
+  ) {
+    return {
+      kind: "reconnect_required",
+      reason: "insufficient_scope"
+    };
+  }
+
+  if (haystack.includes("invalid_client") || haystack.includes("unauthorized_client")) {
+    return {
+      kind: "misconfigured",
+      reason: "oauth_client"
+    };
+  }
+
+  return {
+    kind: "upstream_unavailable",
+    reason: "google_api_error"
+  };
+}
+
+function createGoogleCalendarListError({
+  statusCode,
+  publicCode,
+  message,
+  reconnectRequired = false,
+  reason = null
+}) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  err.publicCode = publicCode;
+  err.reconnectRequired = reconnectRequired;
+  err.reason = reason;
+  return err;
+}
+
+function toPublicGoogleCalendarListError(error) {
+  if (error?.publicCode) {
+    return error;
+  }
+
+  const classified = classifyGoogleCalendarUpstreamError(error);
+
+  if (classified.kind === "reconnect_required") {
+    return createGoogleCalendarListError({
+      statusCode: 409,
+      publicCode: "GOOGLE_RECONNECT_REQUIRED",
+      message: "Google Calendar authorization expired. Reconnect Google Calendar to continue.",
+      reconnectRequired: true,
+      reason: classified.reason
+    });
+  }
+
+  if (classified.kind === "misconfigured") {
+    return createGoogleCalendarListError({
+      statusCode: 503,
+      publicCode: "GOOGLE_OAUTH_MISCONFIGURED",
+      message: "Google Calendar is temporarily unavailable. Please try again later.",
+      reconnectRequired: false,
+      reason: classified.reason
+    });
+  }
+
+  return createGoogleCalendarListError({
+    statusCode: 502,
+    publicCode: "GOOGLE_CALENDAR_UNAVAILABLE",
+    message: "Unable to load Google calendars right now. Please try again.",
+    reconnectRequired: false,
+    reason: classified.reason
+  });
+}
+
+function presentGoogleCalendarListFailure(error) {
+  const publicError = toPublicGoogleCalendarListError(error);
+
+  return {
+    statusCode: publicError.statusCode || 500,
+    body: {
+      error: publicError.publicCode || "GOOGLE_CALENDAR_LIST_FAILED",
+      message: publicError.message,
+      reconnectRequired: Boolean(publicError.reconnectRequired),
+      calendars: []
+    }
+  };
+}
+
+async function markReconnectRequired(organizationId, integration) {
+  if (!organizationId || !integration) {
+    return;
+  }
+
+  const previousConfig = integration.config || {};
+  if (previousConfig.syncStatus === "reconnect_required") {
+    return;
+  }
+
+  const config = {
+    ...previousConfig,
+    // Preserve selected calendar and account email while signaling reconnect.
+    syncStatus: "reconnect_required",
+    lastErrorCode: "invalid_grant",
+    lastErrorAt: new Date().toISOString()
+  };
+
+  const { error } = await supabase
+    .from("organization_integrations")
+    .update({
+      config,
+      updated_at: new Date().toISOString()
+    })
+    .eq("organization_id", organizationId)
+    .eq("provider", PROVIDER);
+
+  if (error) {
+    console.warn(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        component: "google_calendar",
+        stage: "mark_reconnect_required_failed",
+        level: "warn",
+        organizationId,
+        message: "Unable to persist Google Calendar reconnect_required status."
+      })
+    );
+  }
 }
 
 async function getIntegrationStatus(organizationId) {
@@ -225,24 +383,54 @@ async function handleOAuthCallback(code, state) {
   };
 }
 
-async function listCalendars(organizationId) {
-  const { oauth2Client } = await getAuthorizedClient(organizationId);
+async function listCalendars(organizationId, deps = {}) {
+  const getClient = deps.getAuthorizedClient || getAuthorizedClient;
+  const createCalendarClient =
+    deps.createCalendarClient || ((auth) => google.calendar({ version: "v3", auth }));
+  const persistReconnectRequired = deps.markReconnectRequired || markReconnectRequired;
+
+  const { oauth2Client, integration } = await getClient(organizationId);
 
   if (!oauth2Client) {
-    const error = new Error("Google Calendar is not connected.");
-    error.statusCode = 400;
-    throw error;
+    if (integration?.status === "connected") {
+      await persistReconnectRequired(organizationId, integration);
+      throw createGoogleCalendarListError({
+        statusCode: 409,
+        publicCode: "GOOGLE_RECONNECT_REQUIRED",
+        message: "Google Calendar authorization is missing. Reconnect Google Calendar to continue.",
+        reconnectRequired: true,
+        reason: "missing_refresh_token"
+      });
+    }
+
+    throw createGoogleCalendarListError({
+      statusCode: 400,
+      publicCode: "GOOGLE_NOT_CONNECTED",
+      message: "Google Calendar is not connected.",
+      reconnectRequired: false,
+      reason: "not_connected"
+    });
   }
 
-  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
-  const response = await calendar.calendarList.list({ minAccessRole: "writer" });
+  try {
+    const calendar = createCalendarClient(oauth2Client);
+    const response = await calendar.calendarList.list({ minAccessRole: "writer" });
 
-  return (response.data.items || []).map((item) => ({
-    id: item.id,
-    summary: item.summary,
-    primary: Boolean(item.primary),
-    accessRole: item.accessRole
-  }));
+    return (response.data.items || []).map((item) => ({
+      id: item.id,
+      summary: item.summary,
+      primary: Boolean(item.primary),
+      accessRole: item.accessRole
+    }));
+  } catch (upstreamError) {
+    const publicError = toPublicGoogleCalendarListError(upstreamError);
+
+    if (publicError.reconnectRequired) {
+      await persistReconnectRequired(organizationId, integration);
+    }
+
+    throw publicError;
+  }
 }
 
 async function setCalendar(organizationId, calendarId) {
@@ -543,6 +731,9 @@ module.exports = {
   deleteCalendarEvent,
   queryFreeBusy,
   presentIntegrationStatus,
+  presentGoogleCalendarListFailure,
+  classifyGoogleCalendarUpstreamError,
+  toPublicGoogleCalendarListError,
   signOAuthState,
   verifyOAuthState
 };

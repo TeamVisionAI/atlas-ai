@@ -239,7 +239,9 @@ router.get("/scheduling/google/calendars", async (req, res) => {
     );
     res.json({ calendars });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+    // Sanitize Google/OAuth upstream failures — never return raw grant payloads.
+    const failure = googleCalendarIntegrationService.presentGoogleCalendarListFailure(error);
+    res.status(failure.statusCode).json(failure.body);
   }
 });
 
