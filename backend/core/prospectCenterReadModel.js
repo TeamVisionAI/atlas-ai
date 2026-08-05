@@ -11,19 +11,33 @@ const {
   resolveExecutiveFilterPhones,
   buildExecutiveFilterCounts
 } = require("./executiveFilterResolver");
+const appointmentListService = require("../services/appointmentListService");
+const { MILESTONES } = require("./workflowConstants");
 
-function buildProspectCenterItem(prospect, summary) {
+function buildProspectCenterItem(prospect, summary, options = {}) {
   const interviewMs = parseInterviewDatetime(prospect);
+  const hasCanonicalAppointment = options.phonesWithAppointments
+    ? options.phonesWithAppointments.has(summary.phone)
+    : true;
+
+  // Implements BR-039 — do not present INTERVIEW_SCHEDULED without a persisted appointment.
+  let canonicalMilestone = summary.canonicalMilestone;
+  let interviewAt = interviewMs ? new Date(interviewMs).toISOString() : null;
+
+  if (canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED && !hasCanonicalAppointment) {
+    canonicalMilestone = MILESTONES.INTERVIEW_READY;
+    interviewAt = null;
+  }
 
   return {
     phone: summary.phone,
     name: summary.name || prospect?.name || null,
     prospectNumber: prospect?.prospect_number || null,
-    canonicalMilestone: summary.canonicalMilestone,
+    canonicalMilestone,
     currentStep: summary.currentStep,
     missionControlPriority: summary.missionControlPriority,
     missionControlPriorityTier: summary.missionControlPriorityTier,
-    interviewAt: interviewMs ? new Date(interviewMs).toISOString() : null,
+    interviewAt,
     interviewType: prospect?.interview_type || null,
     city: prospect?.city || null,
     state: prospect?.state || null,
@@ -33,7 +47,9 @@ function buildProspectCenterItem(prospect, summary) {
     communicationLanguage: prospect?.communication_language || null,
     lastMessagePreview: prospect?.last_message
       ? String(prospect.last_message).slice(0, 120)
-      : null
+      : null,
+    appointmentMissing:
+      summary.canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED && !hasCanonicalAppointment
   };
 }
 
@@ -70,9 +86,25 @@ async function buildProspectCenterReadModel(options = {}) {
   const queue = await buildPrioritizedWorkflowQueue(prospects);
   const prospectByPhone = new Map(prospects.map((row) => [row.phone, row]));
 
+  const appointmentList = await appointmentListService.listPersistedAppointments({
+    organizationId: options.organizationId
+  });
+  const phonesWithAppointments = new Set(
+    (appointmentList.items || [])
+      .filter((appointment) =>
+        ["scheduled", "confirmed", "rescheduled", "in_progress"].includes(
+          String(appointment.status || "").toLowerCase()
+        )
+      )
+      .map((appointment) => appointment.prospectPhone)
+      .filter(Boolean)
+  );
+
   let items = queue
     .map((summary) =>
-      buildProspectCenterItem(prospectByPhone.get(summary.phone), summary)
+      buildProspectCenterItem(prospectByPhone.get(summary.phone), summary, {
+        phonesWithAppointments
+      })
     )
     .filter(Boolean);
 

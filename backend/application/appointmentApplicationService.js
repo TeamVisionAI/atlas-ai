@@ -67,6 +67,9 @@ const {
   recordInterviewOutcomeFromAppointmentSlug
 } = require("./interviewOutcomeApplicationService");
 const { findActiveAppointmentForProspect } = require("../core/activeAppointmentResolver");
+const {
+  syncAppointmentGoogleCalendar
+} = require("../core/appointmentGoogleSyncEngine");
 
 async function resolveOwnerRepId(agentId) {
   const user = await findUserById(agentId);
@@ -653,18 +656,25 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   const previousStart = appointment.startDateTime;
   const { dateKey, timeKey } = matchedSlot;
 
-  if (appointment.calendarEventId) {
-    await googleCalendarIntegrationService
-      .updateCalendarEvent(appointment.organizationId, appointment.calendarEventId, {
+  // Implements BR-039/BR-050 — never silently skip Google sync when event id is missing/stale.
+  const calendarSync = await syncAppointmentGoogleCalendar(
+    {
+      ...appointment,
+      startDateTime: matchedSlot.startTimeISO,
+      endDateTime: matchedSlot.endTimeISO
+    },
+    {
+      organizationId: appointment.organizationId,
+      eventOverrides: {
         summary: formatAppointmentTitle(appointment.purpose, appointment.metadata),
         description: appointment.meetingNotes || "",
         startTimeISO: matchedSlot.startTimeISO,
         endTimeISO: matchedSlot.endTimeISO,
         timezone: appointment.timezone,
-        location: appointment.meetingAddress
-      })
-      .catch(() => {});
-  }
+        location: appointment.meetingAddress || appointment.virtualMeetingUrl || null
+      }
+    }
+  );
 
   appointmentReminderEngine.cancelReminders(appointment.id);
 
@@ -681,7 +691,16 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   const updated = {
     ...domainUpdated,
     confirmationStatus: appointment.confirmationStatus,
-    reminderStatus: appointment.reminderStatus
+    reminderStatus: appointment.reminderStatus,
+    calendarEventId: calendarSync.calendarEventId,
+    calendarProvider: calendarSync.calendarProvider,
+    metadata: {
+      ...(domainUpdated.metadata || appointment.metadata || {}),
+      calendarSyncStatus: calendarSync.calendarSyncStatus,
+      calendarSyncError: calendarSync.calendarSyncError,
+      calendarSyncedAt: new Date().toISOString(),
+      calendarSyncAction: calendarSync.action
+    }
   };
 
   const saved = await appointmentRepository.save(updated);
@@ -694,7 +713,8 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
 
   await updateProspect(appointment.prospectPhone, {
     appointment_date: matchedSlot.startTimeISO,
-    interview_time: matchedSlot.startTimeISO
+    interview_time: matchedSlot.startTimeISO,
+    calendar_event_id: calendarSync.calendarEventId || null
   }).catch(() => {});
 
   if (!input.skipWorkflowAdvance) {
@@ -981,6 +1001,45 @@ async function collectProspectEmail(phone, email, organizationId) {
   };
 }
 
+/**
+ * Create-or-update Google Calendar for an existing persisted appointment.
+ * Used by repair/reconnect paths when calendarEventId is missing or stale.
+ */
+async function reconcileAppointmentGoogleCalendar(id, context = {}) {
+  const { organizationId } = context;
+  const appointment = await appointmentRepository.findById(id, organizationId);
+
+  if (!appointment) {
+    throw buildError("NOT_FOUND", "Appointment not found.", 404);
+  }
+
+  const calendarSync = await syncAppointmentGoogleCalendar(appointment, {
+    organizationId: appointment.organizationId
+  });
+
+  const saved = await appointmentRepository.save({
+    ...appointment,
+    calendarEventId: calendarSync.calendarEventId,
+    calendarProvider: calendarSync.calendarProvider,
+    metadata: {
+      ...(appointment.metadata || {}),
+      calendarSyncStatus: calendarSync.calendarSyncStatus,
+      calendarSyncError: calendarSync.calendarSyncError,
+      calendarSyncedAt: new Date().toISOString(),
+      calendarSyncAction: calendarSync.action
+    },
+    updatedAt: nowIso()
+  });
+
+  await updateProspect(appointment.prospectPhone, {
+    calendar_event_id: calendarSync.calendarEventId || null,
+    appointment_date: appointment.startDateTime,
+    interview_time: appointment.startDateTime
+  }).catch(() => {});
+
+  return enrichWithProspect(saved);
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -989,6 +1048,7 @@ module.exports = {
   listAppointments,
   createAppointment,
   rescheduleAppointment,
+  reconcileAppointmentGoogleCalendar,
   cancelAppointment,
   completeAppointment,
   confirmAppointment: confirmAppointmentRecord,
