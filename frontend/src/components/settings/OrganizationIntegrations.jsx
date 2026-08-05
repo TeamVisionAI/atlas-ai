@@ -15,6 +15,10 @@ import {
   fetchOrganizationIntegrations,
   selectGoogleCalendar
 } from "../../services/configurationService";
+import {
+  resolveGoogleCalendarListUiFailure,
+  shouldFetchGoogleCalendarList
+} from "../../services/googleCalendarListUi";
 import { disconnectWhatsAppIntegration } from "../../services/metaEmbeddedSignupService";
 import { META_REVIEW_COPY } from "../meta-review/metaReviewCopy";
 
@@ -32,17 +36,30 @@ export default function OrganizationIntegrations() {
     const result = await fetchOrganizationIntegrations();
     setIntegrations(result.integrations);
 
-    if (result.integrations?.googleCalendar?.connected) {
+    const googleCalendar = result.integrations?.googleCalendar || {};
+
+    if (googleCalendar.reconnectRequired) {
+      setCalendars([]);
+      setError(translate("configurationGoogleReconnectRequired"));
+      return;
+    }
+
+    if (shouldFetchGoogleCalendarList(googleCalendar)) {
       try {
         const calendarResult = await fetchGoogleCalendars();
         setCalendars(calendarResult.calendars || []);
-      } catch {
-        setCalendars([]);
+        setError("");
+      } catch (calendarError) {
+        const uiFailure = resolveGoogleCalendarListUiFailure(calendarError, googleCalendar);
+        setCalendars(uiFailure.calendars);
+        if (uiFailure.reconnectRequired) {
+          setError(translate("configurationGoogleReconnectRequired"));
+        }
       }
     } else {
       setCalendars([]);
     }
-  }, []);
+  }, [translate]);
 
   useEffect(() => {
     load().catch(() => setError(translate("configurationIntegrationsLoadFailed")));

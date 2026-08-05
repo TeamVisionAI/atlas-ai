@@ -595,6 +595,8 @@ export const translations = {
     configurationDisconnectGoogle: "Desconectar",
     configurationGoogleConnected: "Google Calendar conectado.",
     configurationGoogleConnectFailed: "No se pudo conectar Google Calendar.",
+    configurationGoogleReconnectRequired:
+      "La autorización de Google Calendar expiró. Vuelve a conectar Google Calendar para continuar.",
     configurationGoogleDisconnected: "Google Calendar desconectado.",
     configurationSelectCalendar: "Seleccionar calendario",
     configurationSelectCalendarPlaceholder: "Elegir calendario…",
@@ -2148,6 +2150,8 @@ export const translations = {
     configurationDisconnectGoogle: "Disconnect",
     configurationGoogleConnected: "Google Calendar connected.",
     configurationGoogleConnectFailed: "Unable to connect Google Calendar.",
+    configurationGoogleReconnectRequired:
+      "Google Calendar authorization expired. Reconnect Google Calendar to continue.",
     configurationGoogleDisconnected: "Google Calendar disconnected.",
     configurationSelectCalendar: "Select calendar",
     configurationSelectCalendarPlaceholder: "Choose a calendar…",
