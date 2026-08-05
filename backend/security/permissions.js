@@ -17,11 +17,19 @@ const PERMISSIONS = Object.freeze({
   OPERATIONS_ACCESS: "operations:access",
   ADMIN_USERS: "admin:users",
   ADMIN_ROLES: "admin:roles",
-  AUDIT_READ: "audit:read"
+  AUDIT_READ: "audit:read",
+  // BR-074 — catalog constant only. Never grant via ROLE_PERMISSIONS / admin wildcard path.
+  // Evaluate exclusively through hasExplicitUserPermission / canVerifySecuritiesAuthorization.
+  SECURITIES_VERIFY: "securities:verify"
 });
 
+/** BR-074 — securities:verify must never appear in role matrices (explicit user grant only). */
+const ROLE_GRANTABLE_PERMISSIONS = Object.freeze(
+  Object.values(PERMISSIONS).filter((code) => code !== PERMISSIONS.SECURITIES_VERIFY)
+);
+
 const ROLE_PERMISSIONS = Object.freeze({
-  [ROLES.ADMINISTRATOR]: Object.values(PERMISSIONS),
+  [ROLES.ADMINISTRATOR]: ROLE_GRANTABLE_PERMISSIONS,
   [ROLES.OPERATIONS]: [PERMISSIONS.OPERATIONS_ACCESS, PERMISSIONS.AUDIT_READ],
   [ROLES.RVP]: [
     PERMISSIONS.PROSPECT_READ,

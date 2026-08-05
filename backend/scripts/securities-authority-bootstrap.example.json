@@ -1,0 +1,16 @@
+{
+  "organizationId": "REPLACE_WITH_ORGANIZATION_UUID",
+  "targetUserId": "REPLACE_WITH_TARGET_USER_UUID",
+  "technicalActor": "REPLACE_WITH_TECHNICAL_OPERATOR_EMAIL",
+  "verificationSource": "INITIAL_FIRM_AUTHORITY_BOOTSTRAP",
+  "evidenceSource": "WRITTEN_COMPLIANCE_CONFIRMATION",
+  "evidenceReference": "firm-authority-review-YYYY-MM-DD",
+  "evidenceVerifiedAt": "YYYY-MM-DD",
+  "effectiveFrom": "YYYY-MM-DD",
+  "effectiveTo": null,
+  "permittedProductScope": ["MUTUAL_FUNDS"],
+  "jurisdictionScope": ["XX"],
+  "principalScope": [],
+  "registrationType": null,
+  "reason": "Initial organization securities authority bootstrap"
+}

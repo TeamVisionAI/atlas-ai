@@ -105,12 +105,40 @@ async function listUsers(query = {}, authContext) {
     returned: (data || []).length
   });
 
-  return {
-    items: (data || []).map((row) => presentAdminUser(row)),
-    total: count ?? (data || []).length,
-    limit,
-    offset
-  };
+  const presented = (data || []).map((row) => presentAdminUser(row));
+
+  try {
+    const {
+      attachSecuritiesSummaries
+    } = require("../security/securitiesAccessService");
+    const withSecurities = await attachSecuritiesSummaries(organizationId, presented);
+    return {
+      items: withSecurities,
+      total: count ?? withSecurities.length,
+      limit,
+      offset
+    };
+  } catch (securitiesError) {
+    console.error("[admin/users/list] securities summary attach failed", securitiesError.message);
+    return {
+      items: presented.map((user) => ({
+        ...user,
+        securities_access: {
+          securities_access_status: "UNKNOWN",
+          securities_access_verified: false,
+          permitted_product_scope: [],
+          registration_type: null,
+          effective_from: null,
+          effective_to: null,
+          jurisdiction_scope: null,
+          canAccessSecuritiesContent: false
+        }
+      })),
+      total: count ?? presented.length,
+      limit,
+      offset
+    };
+  }
 }
 
 async function getUserById(userId, authContext) {
@@ -123,7 +151,28 @@ async function getUserById(userId, authContext) {
     throw error;
   }
 
-  return presentAdminUser(user);
+  const presented = presentAdminUser(user);
+
+  try {
+    const { getAdminSecuritiesSummary } = require("../security/securitiesAccessService");
+    const securities_access = await getAdminSecuritiesSummary(organizationId, userId);
+    return { ...presented, securities_access };
+  } catch (securitiesError) {
+    console.error("[admin/users/get] securities summary failed", securitiesError.message);
+    return {
+      ...presented,
+      securities_access: {
+        securities_access_status: "UNKNOWN",
+        securities_access_verified: false,
+        permitted_product_scope: [],
+        registration_type: null,
+        effective_from: null,
+        effective_to: null,
+        jurisdiction_scope: null,
+        canAccessSecuritiesContent: false
+      }
+    };
+  }
 }
 
 async function createUser(input, authContext, auditMeta = {}) {
