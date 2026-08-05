@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { useLanguage } from "../../i18n/LanguageContext";
+import {
+  localizeFiStatus,
+  translateFiReport
+} from "../../i18n/fiReportMessages";
 import { PERMISSIONS, roleHasPermission } from "../../security/workspacePermissions";
 import {
   acknowledgeReplacement,
@@ -24,25 +29,14 @@ const PREMIUM_SOURCES = [
 
 const RISK_PROFILES = ["NOT_COMPLETED", "CONSERVATIVE", "MODERATE", "AGGRESSIVE"];
 
-const STATUS_LABELS = {
-  DRAFT_MISSING_POLICY_DATA: "Missing policy data",
-  DRAFT_TERM_QUOTE_REQUIRED: "Term quote required",
-  DRAFT_TERM_CONFIRMATION_REQUIRED: "Term confirmation required",
-  DRAFT_INVESTMENT_HORIZON_REQUIRED: "Investment horizon required",
-  DRAFT_RISK_PROFILE_REQUIRED: "Risk-profile process incomplete",
-  DRAFT_REPLACEMENT_REVIEW_REQUIRED: "Replacement review required",
-  READY_FOR_REPRESENTATIVE_REVIEW: "Ready for representative review",
-  REPRESENTATIVE_ADJUSTED: "Representative adjusted",
-  CLIENT_DISCUSSION_VERSION: "Client-discussion version",
-  SUPERSEDED: "Superseded"
-};
-
 /**
  * Live Financial Intelligence panel — API-backed only (RC3 Phase B).
  * Does not import preview fixtures or frontend calculation engines.
  */
 export default function FinancialIntelligencePanel({ reviewId }) {
   const { user } = useWorkspace();
+  const { language } = useLanguage();
+  const t = (key, params) => translateFiReport(language, key, params);
   const canWrite = roleHasPermission(user?.role, PERMISSIONS.POLICY_WRITE);
 
   const [evaluation, setEvaluation] = useState(null);
@@ -297,9 +291,7 @@ export default function FinancialIntelligencePanel({ reviewId }) {
           <p className="fi-panel__eyebrow">Financial Intelligence</p>
           <h2>Possible Discussion Scenarios for the Primerica Representative</h2>
         </header>
-        <p className="fi-panel__empty">
-          No Financial Intelligence strategy evaluation has been created for this policy review.
-        </p>
+        <p className="fi-panel__empty">{t("fiPanelNoEvaluation")}</p>
         {canWrite ? (
           <button
             type="button"
@@ -308,10 +300,10 @@ export default function FinancialIntelligencePanel({ reviewId }) {
             disabled={busy}
             data-testid="fi-create-discussion-scenario"
           >
-            Create Discussion Scenario
+            {t("fiPanelCreateScenario")}
           </button>
         ) : (
-          <p className="fi-panel__note">You do not have permission to create evaluations.</p>
+          <p className="fi-panel__note">{t("fiPanelNoPermission")}</p>
         )}
         {error ? (
           <p className="fi-panel__error" role="alert">
@@ -322,11 +314,11 @@ export default function FinancialIntelligencePanel({ reviewId }) {
     );
   }
 
-  const statusLabel = STATUS_LABELS[evaluation.status] || evaluation.status;
+  const statusLabel = localizeFiStatus(language, evaluation.status);
   const isPreliminary = evaluation.premiumSource === "PRELIMINARY_ESTIMATE";
 
   return (
-    <section className="fi-panel" data-testid="fi-panel-connected">
+    <section className="fi-panel" data-testid="fi-panel-connected" data-fi-language={language}>
       {notice ? <p className="fi-panel__notice">{notice}</p> : null}
       {error ? (
         <p className="fi-panel__error" role="alert">
@@ -336,27 +328,28 @@ export default function FinancialIntelligencePanel({ reviewId }) {
 
       <div className="fi-panel__meta-bar">
         <span>
-          Status: <strong data-testid="fi-status-label">{statusLabel}</strong>
+          {t("fiPanelStatus")}: <strong data-testid="fi-status-label">{statusLabel}</strong>
         </span>
         <span>
-          Version: <strong data-testid="fi-version">{evaluation.version}</strong>
-          {evaluation.isCurrentVersion ? " (current)" : " (superseded)"}
+          {t("fiPanelVersion")}: <strong data-testid="fi-version">{evaluation.version}</strong>
+          {evaluation.isCurrentVersion
+            ? ` ${t("fiPanelVersionCurrent")}`
+            : ` ${t("fiPanelVersionSuperseded")}`}
         </span>
         <span>
-          Review: <code>{evaluation.reviewId}</code>
+          {t("fiPanelReview")}: <code>{evaluation.reviewId}</code>
         </span>
       </div>
 
       {isPreliminary ? (
         <p className="fi-panel__preliminary" role="status" data-testid="fi-preliminary-banner">
-          Preliminary planning estimate — not an official Primerica quote.
+          {t("fiPreliminaryEstimate")}
         </p>
       ) : null}
 
       {evaluation.status === "DRAFT_TERM_QUOTE_REQUIRED" ? (
         <p className="fi-panel__callout" data-testid="fi-quote-required">
-          Enter or attach the representative-confirmed term illustration to calculate the
-          invest-the-difference scenario.
+          {t("fiPanelQuoteRequired")}
         </p>
       ) : null}
 

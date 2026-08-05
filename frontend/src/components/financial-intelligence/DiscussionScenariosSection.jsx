@@ -1,64 +1,34 @@
+import { useLanguage } from "../../i18n/LanguageContext";
+import {
+  formatFiMoney,
+  formatFiPercent,
+  formatFiTimestamp,
+  localizeFiBackendMessage,
+  localizeFiScenarioLabel,
+  localizeFiStatus,
+  normalizeFiLanguage,
+  translateFiReport
+} from "../../i18n/fiReportMessages";
 import "./DiscussionScenariosSection.css";
 import "./fiPrintReport.css";
 
-const STATUS_LABELS = {
-  DRAFT_MISSING_POLICY_DATA: "Missing policy data",
-  DRAFT_TERM_QUOTE_REQUIRED: "Term quote required",
-  DRAFT_TERM_CONFIRMATION_REQUIRED: "Term confirmation required",
-  DRAFT_INVESTMENT_HORIZON_REQUIRED: "Investment horizon required",
-  DRAFT_RISK_PROFILE_REQUIRED: "Risk-profile process incomplete",
-  DRAFT_REPLACEMENT_REVIEW_REQUIRED: "Replacement review required",
-  READY_FOR_REPRESENTATIVE_REVIEW: "Ready for representative review",
-  REPRESENTATIVE_ADJUSTED: "Representative adjusted",
-  CLIENT_DISCUSSION_VERSION: "Client-discussion version",
-  SUPERSEDED: "Superseded"
-};
-
-function money(value, { cents = true } = {}) {
-  if (value == null || Number.isNaN(Number(value))) {
-    return "—";
-  }
-  return Number(value).toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: cents ? 2 : 0,
-    maximumFractionDigits: cents ? 2 : 0
-  });
-}
-
-function percent(rate) {
-  if (rate == null) {
-    return "—";
-  }
-  return `${(Number(rate) * 100).toFixed(0)}%`;
-}
-
-function formatTimestamp(value) {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}
-
 /**
- * Display-only FI scenario section.
- * All authoritative values must come from the backend API contract (RC3 Phase B).
- * No Invest-the-Difference or projection math is performed here.
+ * Display-only FI scenario section (RC4 M1.1 bilingual + visual polish).
+ * All authoritative values come from the backend API contract.
+ * Language changes presentation only — no Invest-the-Difference or projection math.
+ * Projection cards use backend ending values only (no invented annual series).
  */
 export default function DiscussionScenariosSection({ evaluation, source = "api" }) {
+  const { language } = useLanguage();
+
   if (!evaluation) {
     return null;
   }
+
+  const t = (key, params) => translateFiReport(language, key, params);
+  const money = (value, options) => formatFiMoney(value, language, options);
+  const percent = formatFiPercent;
+  const lang = normalizeFiLanguage(language);
 
   const snapshot = evaluation.currentIulSnapshot || {};
   const table = evaluation.comparisonTable;
@@ -66,8 +36,8 @@ export default function DiscussionScenariosSection({ evaluation, source = "api" 
   const termQuote = evaluation.termQuote;
   const emphasize = Boolean(evaluation.scenarioEmphasis?.canEmphasizeInvestmentScenario);
   const highlightedId = evaluation.scenarioEmphasis?.highlightedScenarioId || null;
-  const statusLabel = STATUS_LABELS[evaluation.status] || evaluation.status;
-  const generatedAt = formatTimestamp(evaluation.updatedAt || evaluation.createdAt);
+  const statusLabel = localizeFiStatus(language, evaluation.status);
+  const generatedAt = formatFiTimestamp(evaluation.updatedAt || evaluation.createdAt, language);
   const assumptions = evaluation.projectionAssumptions || null;
   const overrideReason =
     evaluation.overrideReason ||
@@ -77,8 +47,27 @@ export default function DiscussionScenariosSection({ evaluation, source = "api" 
   const quoteNotes = termQuote?.notes || null;
   const isPreliminary = evaluation.premiumSource === "PRELIMINARY_ESTIMATE";
 
+  const termDuration = termQuote?.selectedTermDuration ?? evaluation.proposedTermDuration;
+  const proposedTermPremium =
+    table?.monthlyInsurancePremium?.discussionScenario ?? evaluation.proposedTermMonthlyPremium;
+  const proposedDeathBenefit =
+    table?.deathBenefit?.discussionScenario ?? evaluation.proposedTermDeathBenefit;
+  const monthlyDifference =
+    table?.monthlyInvestmentAmount?.discussionScenario ?? evaluation.monthlyInvestmentDifference;
+
+  const maxEndingValue = projections.reduce((max, scenario) => {
+    const value = Number(scenario.illustrativeProjectedValue);
+    return Number.isFinite(value) && value > max ? value : max;
+  }, 0);
+
   return (
-    <div className="fi-print-root" data-testid="fi-print-root">
+    <div
+      className="fi-print-root"
+      data-testid="fi-print-root"
+      data-fi-language={lang}
+      data-fi-evaluation-id={evaluation.id || ""}
+      data-fi-evaluation-version={evaluation.version ?? ""}
+    >
       <section
         className="fi-discussion-scenarios"
         aria-labelledby="fi-discussion-scenarios-title"
@@ -86,205 +75,215 @@ export default function DiscussionScenariosSection({ evaluation, source = "api" 
         data-fi-source={source}
       >
         <header className="fi-discussion-scenarios__header">
-          <p className="fi-discussion-scenarios__eyebrow">Financial Intelligence</p>
-          <h2 id="fi-discussion-scenarios-title" className="fi-discussion-scenarios__title">
-            {evaluation.sectionTitle ||
-              "Possible Discussion Scenarios for the Primerica Representative"}
-          </h2>
-          <p className="fi-discussion-scenarios__lede">
-            Educational planning illustration for representative review. Atlas informs.
-            Representatives recommend. Clients decide. Values shown are provided by the Atlas
-            Financial Intelligence API.
+          <p className="fi-discussion-scenarios__eyebrow">{t("fiReportEyebrow")}</p>
+          <p
+            className="fi-discussion-scenarios__illustration-label"
+            data-testid="fi-educational-illustration-label"
+          >
+            {t("fiEducationalIllustration")}
           </p>
+          <h2 id="fi-discussion-scenarios-title" className="fi-discussion-scenarios__title">
+            {t("fiReportTitle")}
+          </h2>
+          <p className="fi-discussion-scenarios__lede">{t("fiReportLede")}</p>
         </header>
 
-        <div
-          className="fi-discussion-scenarios__print-meta"
-          data-testid="fi-print-meta"
-        >
+        <div className="fi-discussion-scenarios__print-meta" data-testid="fi-print-meta">
           <div>
-            Status: <strong data-testid="fi-status-label-print">{statusLabel}</strong>
+            {t("fiReportLanguageLabel")}:{" "}
+            <strong data-testid="fi-report-language">
+              {lang === "es" ? t("fiReportLanguageEs") : t("fiReportLanguageEn")}
+            </strong>
+          </div>
+          <div>
+            {t("fiStatus")}: <strong data-testid="fi-status-label-print">{statusLabel}</strong>
             <span className="fi-print-only"> ({evaluation.status})</span>
           </div>
           <div>
-            Current version: <strong data-testid="fi-version-print">{evaluation.version ?? "—"}</strong>
-            {evaluation.isCurrentVersion === false ? " (superseded — not for client discussion)" : ""}
+            {t("fiCurrentVersion")}:{" "}
+            <strong data-testid="fi-version-print">{evaluation.version ?? "—"}</strong>
+            {evaluation.isCurrentVersion === false ? ` ${t("fiSupersededNotForClient")}` : ""}
           </div>
           {generatedAt ? (
             <div>
-              Generated: <strong data-testid="fi-generated-at">{generatedAt}</strong>
+              {t("fiGenerated")}: <strong data-testid="fi-generated-at">{generatedAt}</strong>
             </div>
           ) : null}
+          <div data-testid="fi-educational-status">{t("fiEducationalStatus")}</div>
         </div>
 
         {isPreliminary ? (
           <p className="fi-panel__preliminary" role="status" data-testid="fi-preliminary-in-report">
-            Preliminary planning estimate — not an official Primerica quote.
+            {t("fiPreliminaryEstimate")}
           </p>
         ) : null}
 
         <div className="fi-discussion-scenarios__status" data-status={evaluation.status}>
-          <span className="fi-discussion-scenarios__status-label">Status</span>
+          <span className="fi-discussion-scenarios__status-label">{t("fiStatus")}</span>
           <span data-testid="fi-status-code">{statusLabel}</span>
         </div>
 
-        <div className="fi-discussion-scenarios__block">
-          <h3>Existing IUL summary</h3>
-          <dl className="fi-discussion-scenarios__facts">
-            <div>
-              <dt>Product</dt>
-              <dd data-testid="fi-existing-product">
-                {snapshot.productType || snapshot.product || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt>Current monthly premium</dt>
+        {/* 1. Current situation */}
+        <div
+          className="fi-discussion-scenarios__block fi-report-section"
+          data-testid="fi-section-current"
+        >
+          <h3>{t("fiSectionCurrentSituation")}</h3>
+          <dl className="fi-discussion-scenarios__facts fi-report-facts fi-report-facts--primary">
+            <div className="fi-report-fact">
+              <dt>{t("fiCurrentMonthlyPremium")}</dt>
               <dd data-testid="fi-existing-premium">
                 {money(evaluation.currentIulMonthlyPremium)}
               </dd>
             </div>
-            <div>
-              <dt>Current death benefit</dt>
+            <div className="fi-report-fact">
+              <dt>{t("fiCurrentDeathBenefit")}</dt>
               <dd data-testid="fi-existing-death-benefit">
                 {money(evaluation.currentIulDeathBenefit, { cents: false })}
               </dd>
             </div>
-            <div>
-              <dt>Carrier</dt>
-              <dd>{snapshot.carrier || "—"}</dd>
-            </div>
           </dl>
+          {(snapshot.productType || snapshot.product || snapshot.carrier) && (
+            <p className="fi-discussion-scenarios__meta" data-testid="fi-existing-product">
+              {[snapshot.productType || snapshot.product, snapshot.carrier]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
         </div>
 
-        {table ? (
-          <div className="fi-discussion-scenarios__block fi-discussion-scenarios__print-table">
-            <h3>Discussion scenario comparison</h3>
-            <div className="fi-discussion-scenarios__table-wrap">
-              <table data-testid="fi-comparison-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Category</th>
-                    <th scope="col">Existing IUL</th>
-                    <th scope="col">Discussion Scenario</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th scope="row">Death benefit</th>
-                    <td>{money(table.deathBenefit?.existingIul, { cents: false })}</td>
-                    <td data-testid="fi-proposed-death-benefit">
-                      {money(table.deathBenefit?.discussionScenario, { cents: false })}
-                      {evaluation.sameDeathBenefit ? (
-                        <span className="fi-discussion-scenarios__hint"> Same amount in term</span>
-                      ) : (
-                        <span className="fi-discussion-scenarios__hint">
-                          {" "}
-                          Explicit representative adjustment
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Monthly insurance premium</th>
-                    <td>{money(table.monthlyInsurancePremium?.existingIul)}</td>
-                    <td data-testid="fi-proposed-term-premium">
-                      {money(table.monthlyInsurancePremium?.discussionScenario)}
-                      {evaluation.premiumSource ? (
-                        <span className="fi-discussion-scenarios__hint">
-                          {" "}
-                          Source: {String(evaluation.premiumSource).replace(/_/g, " ")}
-                        </span>
-                      ) : null}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Monthly investment amount</th>
-                    <td>Not evaluated</td>
-                    <td data-testid="fi-monthly-investment-difference">
-                      {money(table.monthlyInvestmentAmount?.discussionScenario)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Total monthly outlay</th>
-                    <td>{money(table.totalMonthlyOutlay?.existingIul)}</td>
-                    <td data-testid="fi-total-proposed-outlay">
-                      {money(table.totalMonthlyOutlay?.discussionScenario)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+        {/* 2. Proposed term strategy */}
+        <div
+          className="fi-discussion-scenarios__block fi-report-section"
+          data-testid="fi-section-proposed-term"
+        >
+          <h3>{t("fiSectionProposedTerm")}</h3>
+          <dl className="fi-discussion-scenarios__facts fi-report-facts fi-report-facts--primary">
+            <div className="fi-report-fact">
+              <dt>{t("fiProposedTermPremium")}</dt>
+              <dd data-testid="fi-proposed-term-premium">{money(proposedTermPremium)}</dd>
             </div>
-            {termQuote?.selectedTermDuration != null || evaluation.proposedTermDuration != null ? (
-              <p className="fi-discussion-scenarios__meta">
-                Representative-entered term duration:{" "}
-                {termQuote?.selectedTermDuration ?? evaluation.proposedTermDuration} years
-                {evaluation.investmentHorizon?.years != null
-                  ? ` · Investment projection horizon: ${evaluation.investmentHorizon.years} years (distinct field)`
-                  : ""}
-                {termQuote?.quoteDate ? ` · Quote date: ${termQuote.quoteDate}` : ""}
-              </p>
-            ) : null}
-            {!evaluation.sameDeathBenefit ? (
-              <p className="fi-discussion-scenarios__warning" role="status" data-testid="fi-death-benefit-adjustment">
-                Explicit death-benefit adjustment.
-                {overrideReason ? ` Representative reason: ${overrideReason}` : " Representative reason required for audit."}
-              </p>
-            ) : null}
-            {evaluation.eligibilityConfirmationStatus === "PENDING" ||
-            !termQuote?.longestAvailableTermConfirmed ? (
-              <p className="fi-discussion-scenarios__warning" role="status">
-                The representative must confirm the longest available Primerica term and official
-                premium.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="fi-discussion-scenarios__block">
-          <h3>Invest-the-Difference</h3>
-          <dl className="fi-discussion-scenarios__facts">
-            <div>
-              <dt>Unbounded premium difference</dt>
-              <dd data-testid="fi-unbounded-difference">
-                {money(evaluation.unboundedPremiumDifference)}
+            <div className="fi-report-fact">
+              <dt>{t("fiDeathBenefit")}</dt>
+              <dd data-testid="fi-proposed-death-benefit">
+                {money(proposedDeathBenefit, { cents: false })}
+                {evaluation.sameDeathBenefit ? (
+                  <span className="fi-discussion-scenarios__hint">{t("fiSameAmountInTerm")}</span>
+                ) : (
+                  <span className="fi-discussion-scenarios__hint">{t("fiExplicitAdjustment")}</span>
+                )}
               </dd>
             </div>
-            <div>
-              <dt>Monthly investment difference</dt>
-              <dd>{money(evaluation.monthlyInvestmentDifference)}</dd>
-            </div>
-            <div>
-              <dt>Proposed mutual-fund contribution</dt>
-              <dd data-testid="fi-mf-contribution">
-                {money(evaluation.proposedMutualFundContribution)}
-              </dd>
-            </div>
-            <div>
-              <dt>Same-outlay validation</dt>
-              <dd data-testid="fi-outlay-validation">
-                {evaluation.outlayValidation
-                  ? evaluation.outlayValidation.passesOutlayIdentity
-                    ? "Passes"
-                    : "Review required"
-                  : "Pending term premium"}
+            <div className="fi-report-fact">
+              <dt>{t("fiTermDuration")}</dt>
+              <dd data-testid="fi-term-duration">
+                {termDuration != null ? t("fiYearsUnit", { years: termDuration }) : "—"}
               </dd>
             </div>
           </dl>
-          {Number(evaluation.unboundedPremiumDifference) < 0 ? (
+          {evaluation.premiumSource ? (
+            <p className="fi-discussion-scenarios__meta">
+              {t("fiSource")}: {String(evaluation.premiumSource).replace(/_/g, " ")}
+              {termQuote?.quoteDate
+                ? ` · ${t("fiQuoteDateMeta", { date: termQuote.quoteDate })}`
+                : ""}
+            </p>
+          ) : null}
+          {!evaluation.sameDeathBenefit ? (
+            <p
+              className="fi-discussion-scenarios__warning"
+              role="status"
+              data-testid="fi-death-benefit-adjustment"
+            >
+              {t("fiDeathBenefitAdjustment")}{" "}
+              {overrideReason
+                ? t("fiOverrideReason", { reason: overrideReason })
+                : t("fiOverrideReasonRequired")}
+            </p>
+          ) : null}
+          {evaluation.eligibilityConfirmationStatus === "PENDING" ||
+          !termQuote?.longestAvailableTermConfirmed ? (
             <p className="fi-discussion-scenarios__warning" role="status">
-              Term premium exceeds current IUL monthly outlay. Investment contribution is zero.
-              Negative mutual-fund contributions are not shown. Representative review required.
+              {t("fiConfirmLongestTerm")}
             </p>
           ) : null}
         </div>
 
-        <div className="fi-discussion-scenarios__block">
-          <h3>Educational investment projections</h3>
-          <p className="fi-discussion-scenarios__note">
-            Hypothetical · Educational · Non-guaranteed. Before investment fees, expenses, taxes, and
-            inflation unless separately disclosed. General categories only — fund symbols are not
-            presented as client recommendations. Projection math is computed by the backend.
-          </p>
+        {/* 3. Invest-the-Difference — principal visual result */}
+        <div
+          className="fi-discussion-scenarios__block fi-report-section fi-hero-difference"
+          data-testid="fi-section-monthly-difference"
+        >
+          <h3>{t("fiSectionMonthlyDifference")}</h3>
+          <div className="fi-hero-difference__card">
+            <p className="fi-hero-difference__eyebrow">{t("fiInvestTheDifference")}</p>
+            <p className="fi-hero-difference__label">{t("fiHeroDifferenceLabel")}</p>
+            <p className="fi-hero-difference__value" data-testid="fi-monthly-investment-difference">
+              {money(monthlyDifference)}
+            </p>
+            <p className="fi-hero-difference__hint">{t("fiHeroDifferenceHint")}</p>
+            <p className="fi-hero-difference__outlay" data-testid="fi-total-proposed-outlay">
+              {t("fiTotalMonthlyOutlay")}:{" "}
+              <strong>
+                {money(
+                  table?.totalMonthlyOutlay?.discussionScenario ??
+                    evaluation.totalProposedMonthlyOutlay
+                )}
+              </strong>
+            </p>
+          </div>
+          {Number(evaluation.unboundedPremiumDifference) < 0 ? (
+            <p className="fi-discussion-scenarios__warning" role="status">
+              {t("fiNegativeDifferenceWarning")}
+            </p>
+          ) : null}
+        </div>
+
+        {/* 4. Hypothetical growth — three equal cards; backend ending values only */}
+        <div
+          className="fi-discussion-scenarios__block fi-report-section"
+          data-testid="fi-section-projections"
+        >
+          <h3>{t("fiSectionHypotheticalGrowth")}</h3>
+          <p className="fi-discussion-scenarios__note">{t("fiProjectionsNote")}</p>
+
+          {projections.length && maxEndingValue > 0 ? (
+            <div
+              className="fi-projection-compare"
+              data-testid="fi-projection-compare"
+              aria-label={t("fiSectionHypotheticalGrowth")}
+            >
+              <p className="fi-projection-compare__caption">{t("fiComparisonBarsCaption")}</p>
+              <ul className="fi-projection-compare__bars">
+                {projections.map((scenario) => {
+                  const ending = Number(scenario.illustrativeProjectedValue) || 0;
+                  const widthPct = maxEndingValue > 0 ? (ending / maxEndingValue) * 100 : 0;
+                  return (
+                    <li key={`bar-${scenario.id}`} className="fi-projection-compare__row">
+                      <div className="fi-projection-compare__meta">
+                        <span>{localizeFiScenarioLabel(language, scenario)}</span>
+                        <span>
+                          {percent(scenario.annualReturn)} · {t("fiHypotheticalBadge")}
+                        </span>
+                      </div>
+                      <div
+                        className="fi-projection-compare__track"
+                        role="img"
+                        aria-label={`${localizeFiScenarioLabel(language, scenario)} ${money(ending)}`}
+                      >
+                        <div
+                          className="fi-projection-compare__fill"
+                          style={{ width: `${Math.max(widthPct, ending > 0 ? 4 : 0)}%` }}
+                        />
+                      </div>
+                      <div className="fi-projection-compare__value">{money(ending)}</div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+
           {projections.length ? (
             <div className="fi-discussion-scenarios__projection-grid" data-testid="fi-projections">
               {projections.map((scenario) => {
@@ -292,40 +291,50 @@ export default function DiscussionScenariosSection({ evaluation, source = "api" 
                 return (
                   <article
                     key={scenario.id}
-                    className={highlighted ? "fi-projection fi-projection--aligned" : "fi-projection"}
+                    className={
+                      highlighted ? "fi-projection fi-projection--aligned" : "fi-projection"
+                    }
                     data-testid={`fi-projection-${scenario.id}`}
                   >
-                    <h4>{scenario.label}</h4>
+                    <div className="fi-projection__badge">{t("fiHypotheticalBadge")}</div>
+                    <h4>{localizeFiScenarioLabel(language, scenario)}</h4>
                     <p className="fi-projection__rate">
-                      Illustrative annual return: {percent(scenario.annualReturn)}
+                      {t("fiAnnualHypotheticalRate")}: {percent(scenario.annualReturn)}
                     </p>
                     {scenario.monthlyContribution != null ? (
                       <p className="fi-projection__rate">
-                        Monthly contribution: {money(scenario.monthlyContribution)}
+                        {t("fiMonthlyContribution", {
+                          amount: money(scenario.monthlyContribution)
+                        })}
                       </p>
                     ) : null}
                     {scenario.timeHorizonYears != null ? (
                       <p className="fi-projection__rate">
-                        Horizon: {scenario.timeHorizonYears} years
+                        {t("fiInvestmentHorizon")}:{" "}
+                        {t("fiYearsUnit", { years: scenario.timeHorizonYears })}
                       </p>
                     ) : null}
                     {highlighted ? (
                       <p className="fi-projection__align">
-                        {evaluation.scenarioEmphasis?.highlightedScenarioLabel ||
-                          "Scenario most aligned with the information currently available"}
+                        {evaluation.scenarioEmphasis?.highlightedScenarioLabel
+                          ? localizeFiScenarioLabel(language, {
+                              id: highlightedId,
+                              label: evaluation.scenarioEmphasis.highlightedScenarioLabel
+                            })
+                          : t("fiScenarioAligned")}
                       </p>
                     ) : null}
                     <dl>
                       <div>
-                        <dt>Total contributions</dt>
+                        <dt>{t("fiTotalContributions")}</dt>
                         <dd>{money(scenario.totalContributions)}</dd>
                       </div>
                       <div>
-                        <dt>Illustrative growth</dt>
+                        <dt>{t("fiIllustrativeGrowth")}</dt>
                         <dd>{money(scenario.illustrativeGrowth)}</dd>
                       </div>
                       <div>
-                        <dt>Illustrative ending value</dt>
+                        <dt>{t("fiHypotheticalProjectedValue")}</dt>
                         <dd>{money(scenario.illustrativeProjectedValue)}</dd>
                       </div>
                     </dl>
@@ -334,62 +343,48 @@ export default function DiscussionScenariosSection({ evaluation, source = "api" 
               })}
             </div>
           ) : (
-            <p className="fi-discussion-scenarios__note">
-              Projections appear after a confirmed term premium and investment horizon are provided
-              to the Financial Intelligence API.
-            </p>
+            <p className="fi-discussion-scenarios__note">{t("fiProjectionsPending")}</p>
           )}
+
           {!emphasize ? (
             <p className="fi-discussion-scenarios__warning" role="status">
-              Complete the client risk-profile process before emphasizing an investment scenario.
-              Scenarios remain unranked educational illustrations until a representative records a
-              risk-profile classification. Arithmetic completion alone does not make the evaluation
-              client-ready.
+              {t("fiRiskProfileGate")}
             </p>
           ) : (
             <p className="fi-discussion-scenarios__note" data-testid="fi-risk-emphasis">
-              Risk-profile classification recorded:{" "}
-              {String(evaluation.riskProfile || "").replace(/_/g, " ")}. Emphasis follows the
-              representative-entered planning classification and does not constitute a suitability
-              determination.
+              {t("fiRiskProfileRecorded", {
+                profile: String(evaluation.riskProfile || "").replace(/_/g, " ")
+              })}
             </p>
           )}
-          {assumptions ? (
-            <div className="fi-discussion-scenarios__assumptions" data-testid="fi-projection-assumptions">
-              <h4>Projection assumptions</h4>
-              <ul>
-                {assumptions.rates ? (
-                  <li>
-                    Illustrative rates:{" "}
-                    {[assumptions.rates.conservative, assumptions.rates.moderate, assumptions.rates.aggressive]
-                      .filter((rate) => rate != null)
-                      .map((rate) => percent(rate))
-                      .join(", ") || "Canonical backend configuration"}
-                  </li>
-                ) : (
-                  <li>Rates sourced from canonical backend configuration (4% / 7% / 10% educational assumptions).</li>
-                )}
-                <li>Monthly compounding · ordinary-annuity timing · educational / non-guaranteed.</li>
-                {assumptions.notes
-                  ? (Array.isArray(assumptions.notes) ? assumptions.notes : [assumptions.notes]).map(
-                      (note) => <li key={note}>{note}</li>
-                    )
-                  : null}
-              </ul>
-            </div>
-          ) : (
-            <div className="fi-discussion-scenarios__assumptions" data-testid="fi-projection-assumptions">
-              <h4>Projection assumptions</h4>
-              <ul>
+
+          <div
+            className="fi-discussion-scenarios__assumptions"
+            data-testid="fi-projection-assumptions"
+          >
+            <h4>{t("fiProjectionAssumptions")}</h4>
+            <ul>
+              {assumptions?.rates ? (
                 <li>
-                  Illustrative annual returns use canonical backend educational assumptions (typically
-                  4%, 7%, and 10%).
+                  {t("fiIllustrativeRates", {
+                    rates:
+                      [
+                        assumptions.rates.conservative,
+                        assumptions.rates.moderate,
+                        assumptions.rates.aggressive
+                      ]
+                        .filter((rate) => rate != null)
+                        .map((rate) => percent(rate))
+                        .join(", ") || "—"
+                  })}
                 </li>
-                <li>Monthly compounding and ordinary-annuity contribution timing.</li>
-                <li>Not guaranteed or expected returns. Not an official Primerica illustration.</li>
-              </ul>
-            </div>
-          )}
+              ) : (
+                <li>{t("fiAssumptionsDefaultRates")}</li>
+              )}
+              <li>{t("fiAssumptionsCompounding")}</li>
+              <li>{t("fiAssumptionsNotGuaranteed")}</li>
+            </ul>
+          </div>
         </div>
 
         {(evaluation.missingDataWarnings || []).length ? (
@@ -397,51 +392,53 @@ export default function DiscussionScenariosSection({ evaluation, source = "api" 
             className="fi-discussion-scenarios__block fi-discussion-scenarios__missing"
             data-testid="fi-missing-warnings"
           >
-            <h3>Missing information</h3>
+            <h3>{t("fiMissingInformation")}</h3>
             <ul>
               {evaluation.missingDataWarnings.map((warning) => (
-                <li key={warning}>{warning}</li>
+                <li key={warning}>{localizeFiBackendMessage(language, warning)}</li>
               ))}
             </ul>
           </div>
         ) : null}
 
-        <div className="fi-discussion-scenarios__block fi-discussion-scenarios__safeguards">
-          <h3>Replacement safeguards</h3>
+        {/* 5. Important safeguards */}
+        <div
+          className="fi-discussion-scenarios__block fi-report-section fi-discussion-scenarios__safeguards"
+          data-testid="fi-section-safeguards"
+        >
+          <h3>{t("fiSectionImportantSafeguards")}</h3>
+          <ul className="fi-safeguards-pillars" data-testid="fi-safeguard-pillars">
+            <li>{t("fiEducationalIllustration")}</li>
+            <li>{t("fiNonGuaranteed")}</li>
+            <li data-testid="fi-not-a-recommendation">{t("fiNotARecommendation")}</li>
+            <li data-testid="fi-registered-rep-handoff">{t("fiRegisteredRepHandoff")}</li>
+          </ul>
+          <h4 className="fi-safeguards-subtitle">{t("fiReplacementSafeguards")}</h4>
           <ul data-testid="fi-replacement-warnings">
             {(evaluation.replacementWarnings || []).map((warning) => (
-              <li key={warning}>{warning}</li>
+              <li key={warning}>{localizeFiBackendMessage(language, warning)}</li>
             ))}
           </ul>
           {evaluation.replacementAcknowledged ? (
-            <p className="fi-discussion-scenarios__meta">
-              Representative acknowledgement recorded. Acknowledgement does not complete all legal
-              or company replacement requirements.
-            </p>
+            <p className="fi-discussion-scenarios__meta">{t("fiReplacementAcknowledgement")}</p>
           ) : null}
         </div>
 
         {quoteNotes ? (
           <div className="fi-discussion-scenarios__block" data-testid="fi-quote-notes">
-            <h3>Representative notes</h3>
+            <h3>{t("fiRepresentativeNotes")}</h3>
             <p className="fi-discussion-scenarios__note">{quoteNotes}</p>
           </div>
         ) : null}
 
         <footer className="fi-discussion-scenarios__disclaimers" data-testid="fi-disclaimers">
-          <h3>Educational disclaimers</h3>
+          <h3>{t("fiEducationalDisclaimers")}</h3>
           <ul>
             {(evaluation.disclaimers || []).map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item}>{localizeFiBackendMessage(language, item)}</li>
             ))}
-            <li>
-              These projections are hypothetical and educational. They are not guaranteed or expected
-              returns and must not be presented as such.
-            </li>
-            <li>
-              Atlas does not instruct cancellation or surrender of existing coverage. Replacement
-              decisions remain with the licensed representative and client under applicable rules.
-            </li>
+            <li>{t("fiDisclaimerHypotheticalReturns")}</li>
+            <li>{t("fiDisclaimerNoSurrender")}</li>
           </ul>
         </footer>
       </section>

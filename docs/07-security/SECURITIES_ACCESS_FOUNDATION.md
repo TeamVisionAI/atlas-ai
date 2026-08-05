@@ -37,6 +37,10 @@ When no verifier exists, use the controlled ops script (not HTTP):
 - Lock table: `atlas_organization_securities_authority_bootstrap` (migration 027)
 - Procedure: [SECURITIES_ACCESS_BOOTSTRAP.md](./SECURITIES_ACCESS_BOOTSTRAP.md) Phase A
 
+## Localization note (RC4 M1.1)
+
+Report language (English / Spanish) is presentation-only. Changing language does **not** grant securities access, alter authorization status, or expose fund catalog / SB-72 content. BR-074 enforcement remains independent of UI language.
+
 ## Out of scope (this milestone)
 
 SB-72 upload/parse, fund catalog UI, model portfolios, Content Center, quote evidence, suitability, FINRA/CRD integration, native PDF, PI OCR, automated CRD/BrokerCheck queries.

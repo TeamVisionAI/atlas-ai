@@ -1,0 +1,150 @@
+[
+  {
+    "view": "en-desktop",
+    "url": "http://[::1]:5173/fi-m11-visual-acceptance.html?lang=en&viewport=desktop",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "en",
+    "itd": "$56.08",
+    "meta": "language=en · viewport=desktop · evaluationId=fi-eval-visual-m11-001 · version=3 · monthlyDifference=56.08 · endingValues=28832.39|45428.82|74408.82 · canEmphasize=false",
+    "overflowX": {
+      "docScrollWidth": 1440,
+      "docClientWidth": 1440,
+      "reportScrollWidth": 978,
+      "reportClientWidth": 978,
+      "hasHorizontalOverflow": false
+    },
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "hasNotRec": true,
+    "hasReplacement": true,
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/en-desktop.png"
+  },
+  {
+    "view": "es-desktop",
+    "url": "http://[::1]:5173/fi-m11-visual-acceptance.html?lang=es&viewport=desktop",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "es",
+    "itd": "$56.08",
+    "meta": "language=es · viewport=desktop · evaluationId=fi-eval-visual-m11-001 · version=3 · monthlyDifference=56.08 · endingValues=28832.39|45428.82|74408.82 · canEmphasize=false",
+    "overflowX": {
+      "docScrollWidth": 1440,
+      "docClientWidth": 1440,
+      "reportScrollWidth": 978,
+      "reportClientWidth": 978,
+      "hasHorizontalOverflow": false
+    },
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "hasNotRec": true,
+    "hasReplacement": true,
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/es-desktop.png"
+  },
+  {
+    "view": "en-mobile",
+    "url": "http://[::1]:5173/fi-m11-visual-acceptance.html?lang=en&viewport=mobile",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "en",
+    "itd": "$56.08",
+    "meta": "language=en · viewport=mobile · evaluationId=fi-eval-visual-m11-001 · version=3 · monthlyDifference=56.08 · endingValues=28832.39|45428.82|74408.82 · canEmphasize=false",
+    "overflowX": {
+      "docScrollWidth": 390,
+      "docClientWidth": 390,
+      "reportScrollWidth": 364,
+      "reportClientWidth": 364,
+      "hasHorizontalOverflow": false
+    },
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "hasNotRec": true,
+    "hasReplacement": true,
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/en-mobile.png"
+  },
+  {
+    "view": "es-mobile",
+    "url": "http://[::1]:5173/fi-m11-visual-acceptance.html?lang=es&viewport=mobile",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "es",
+    "itd": "$56.08",
+    "meta": "language=es · viewport=mobile · evaluationId=fi-eval-visual-m11-001 · version=3 · monthlyDifference=56.08 · endingValues=28832.39|45428.82|74408.82 · canEmphasize=false",
+    "overflowX": {
+      "docScrollWidth": 390,
+      "docClientWidth": 390,
+      "reportScrollWidth": 364,
+      "reportClientWidth": 364,
+      "hasHorizontalOverflow": false
+    },
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "hasNotRec": true,
+    "hasReplacement": true,
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/es-mobile.png"
+  },
+  {
+    "view": "en-tablet",
+    "url": "http://[::1]:5173/fi-m11-visual-acceptance.html?lang=en&viewport=tablet",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "en",
+    "itd": "$56.08",
+    "meta": "language=en · viewport=tablet · evaluationId=fi-eval-visual-m11-001 · version=3 · monthlyDifference=56.08 · endingValues=28832.39|45428.82|74408.82 · canEmphasize=false",
+    "overflowX": {
+      "docScrollWidth": 768,
+      "docClientWidth": 768,
+      "reportScrollWidth": 742,
+      "reportClientWidth": 742,
+      "hasHorizontalOverflow": false
+    },
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "hasNotRec": true,
+    "hasReplacement": true,
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/en-tablet.png"
+  },
+  {
+    "view": "es-tablet",
+    "url": "http://[::1]:5173/fi-m11-visual-acceptance.html?lang=es&viewport=tablet",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "es",
+    "itd": "$56.08",
+    "meta": "language=es · viewport=tablet · evaluationId=fi-eval-visual-m11-001 · version=3 · monthlyDifference=56.08 · endingValues=28832.39|45428.82|74408.82 · canEmphasize=false",
+    "overflowX": {
+      "docScrollWidth": 768,
+      "docClientWidth": 768,
+      "reportScrollWidth": 742,
+      "reportClientWidth": 742,
+      "hasHorizontalOverflow": false
+    },
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "hasNotRec": true,
+    "hasReplacement": true,
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/es-tablet.png"
+  },
+  {
+    "view": "en-print",
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/en-print.pdf",
+    "preview": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/en-print-preview.png",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "en",
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "toolbarHiddenInPrint": true
+  },
+  {
+    "view": "es-print",
+    "artifact": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/es-print.pdf",
+    "preview": "/Users/niovelperezrvp/Documents/AtlasAi/atlas-ai/docs/08-financial-intelligence/evidence/m1-1-visual/es-print-preview.png",
+    "evalId": "fi-eval-visual-m11-001",
+    "version": "3",
+    "language": "es",
+    "securitiesLeak": false,
+    "hasHandoff": true,
+    "toolbarHiddenInPrint": true
+  }
+]
