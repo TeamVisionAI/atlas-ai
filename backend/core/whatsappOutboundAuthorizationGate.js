@@ -74,6 +74,7 @@ async function authorizeWhatsAppOutbound({
   evaluateWindow = evaluateCustomerCareWindow,
   resolveTemplate = resolveApprovedTemplate
 } = {}) {
+  const safeProspect = prospect || {};
   const text = message == null ? "" : String(message).trim();
   const window = await evaluateWindow({ phone, organizationId, now });
 
@@ -107,7 +108,7 @@ async function authorizeWhatsAppOutbound({
   const template = resolveTemplate({
     intent,
     templateKey,
-    prospect,
+    prospect: safeProspect,
     variables: templateVariables,
     callerMetaTemplateName
   });
