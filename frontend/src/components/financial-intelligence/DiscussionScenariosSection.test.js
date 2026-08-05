@@ -19,6 +19,15 @@ describe("FI production display isolation", () => {
     assert.ok(source.includes("financialIntelligenceService"));
   });
 
+  it("FinancialIntelligencePanel uses localizeFiStatus for history and never references STATUS_LABELS", () => {
+    const source = readFileSync(join(__dirname, "FinancialIntelligencePanel.jsx"), "utf8");
+    assert.equal(source.includes("STATUS_LABELS"), false);
+    assert.ok(source.includes("localizeFiStatus"));
+    assert.ok(source.includes("localizeFiStatus(language, item.status)"));
+    assert.ok(source.includes("localizeFiStatus(language, evaluation.status)"));
+    assert.ok(source.includes('data-testid="fi-history"'));
+  });
+
   it("DiscussionScenariosSection does not perform difference or FV math", () => {
     const source = readFileSync(join(__dirname, "DiscussionScenariosSection.jsx"), "utf8");
     assert.equal(/monthlyInvestmentDifference\s*=/.test(source), false);

@@ -11,6 +11,7 @@ import {
   assertSameNumericEvaluation,
   buildLocalizedFiReportView,
   formatFiMoney,
+  formatUnknownFiStatusCode,
   localizeFiBackendMessage,
   localizeFiScenarioLabel,
   localizeFiStatus,
@@ -80,6 +81,11 @@ describe("FI bilingual report presentation", () => {
   it("status and scenario labels localize by stable codes/ids", () => {
     assert.equal(localizeFiStatus("en", "READY_FOR_REPRESENTATIVE_REVIEW"), "Ready for representative review");
     assert.equal(localizeFiStatus("es", "READY_FOR_REPRESENTATIVE_REVIEW"), "Lista para revisión del representante");
+    assert.equal(localizeFiStatus("en", "CLIENT_DISCUSSION_VERSION"), "Client-discussion version");
+    assert.equal(
+      localizeFiStatus("es", "CLIENT_DISCUSSION_VERSION"),
+      "Versión para conversación con el cliente"
+    );
     assert.equal(localizeFiScenarioLabel("es", { id: "conservative", label: "Conservative" }), "Conservador");
     assert.equal(
       localizeFiBackendMessage(
@@ -88,6 +94,16 @@ describe("FI bilingual report presentation", () => {
       ),
       "Las proyecciones de inversión son hipotéticas y no garantizadas."
     );
+  });
+
+  it("unknown status codes fail safely with a readable fallback and do not throw", () => {
+    assert.equal(formatUnknownFiStatusCode("SOME_NEW_STATUS_CODE"), "SOME NEW STATUS CODE");
+    assert.equal(formatUnknownFiStatusCode(""), "—");
+    assert.equal(formatUnknownFiStatusCode(null), "—");
+    assert.equal(localizeFiStatus("en", "SOME_NEW_STATUS_CODE"), "SOME NEW STATUS CODE");
+    assert.equal(localizeFiStatus("es", "SOME_NEW_STATUS_CODE"), "SOME NEW STATUS CODE");
+    assert.doesNotThrow(() => localizeFiStatus("en", undefined));
+    assert.doesNotThrow(() => localizeFiStatus("es", null));
   });
 
   it("currency formatting may differ by locale while numeric input is unchanged", () => {

@@ -563,8 +563,8 @@ export default function FinancialIntelligencePanel({ reviewId }) {
           <h3>Evaluation history</h3>
           <ul>
             {history.map((item) => (
-              <li key={item.id}>
-                v{item.version} · {STATUS_LABELS[item.status] || item.status}
+              <li key={item.id} data-testid="fi-history-item">
+                v{item.version} · {localizeFiStatus(language, item.status)}
                 {item.isCurrentVersion ? " · current" : ""}
                 {item.id === evaluation.id ? " · viewing" : ""}
               </li>

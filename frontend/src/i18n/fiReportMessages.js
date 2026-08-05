@@ -428,10 +428,22 @@ export function translateFiReport(language, key, params) {
   return params ? interpolate(template, params) : template;
 }
 
+/**
+ * Format an unknown FI status code for safe display (never throw).
+ * Example: READY_FOR_FOO → "READY FOR FOO"
+ */
+export function formatUnknownFiStatusCode(statusCode) {
+  if (statusCode == null || statusCode === "") {
+    return "—";
+  }
+  return String(statusCode).replace(/_/g, " ").trim() || "—";
+}
+
 export function localizeFiStatus(language, statusCode) {
   const key = STATUS_KEYS[statusCode];
   if (!key) {
-    return statusCode || "—";
+    // Fail closed for display: readable fallback, never crash the page.
+    return formatUnknownFiStatusCode(statusCode);
   }
   return translateFiReport(language, key);
 }
