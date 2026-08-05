@@ -8,6 +8,7 @@ const { google } = require("googleapis");
 const { supabase } = require("./supabaseService");
 const { createTokenEncryption } = require("../core/meta/tokenEncryption");
 const { shouldMockExternalComms } = require("../dev/simulatorGuard");
+const { isProduction } = require("../core/platformProductionGuard");
 
 const PROVIDER = "google_calendar";
 const SCOPES = [
@@ -16,24 +17,138 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email"
 ];
 
+/** Exact Google OAuth callback path registered on the configuration router. */
+const GOOGLE_OAUTH_CALLBACK_PATH = "/api/configuration/scheduling/google/callback";
+
 const tokenEncryption = createTokenEncryption();
+
+function stripTrailingSlash(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function isCanonicalGoogleOAuthRedirectUri(value) {
+  if (!value || typeof value !== "string") {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return parsed.pathname === GOOGLE_OAUTH_CALLBACK_PATH;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve the redirect_uri sent to Google.
+ * Prefer GOOGLE_CONFIGURATION_REDIRECT_URI, then a canonical GOOGLE_REDIRECT_URI,
+ * then ATLAS_PUBLIC_URL + the configuration callback path.
+ *
+ * Rejects stale localhost / legacy onboarding callback values in production so
+ * GOOGLE_REDIRECT_URI cannot silently override the live Railway callback route.
+ */
+function resolveGoogleOAuthRedirectUri(env = process.env) {
+  const configured = stripTrailingSlash(env.GOOGLE_CONFIGURATION_REDIRECT_URI);
+  if (configured && isCanonicalGoogleOAuthRedirectUri(configured)) {
+    return configured;
+  }
+
+  const legacy = stripTrailingSlash(env.GOOGLE_REDIRECT_URI);
+  if (legacy && isCanonicalGoogleOAuthRedirectUri(legacy)) {
+    return legacy;
+  }
+
+  const publicBase = stripTrailingSlash(env.ATLAS_PUBLIC_URL);
+  if (publicBase) {
+    return `${publicBase}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+  }
+
+  const fallback = `http://localhost:3000${GOOGLE_OAUTH_CALLBACK_PATH}`;
+  const production = env.NODE_ENV === "production";
+
+  if (production) {
+    const error = new Error(
+      "Google OAuth redirect URI is misconfigured. Set GOOGLE_CONFIGURATION_REDIRECT_URI " +
+        `(or ATLAS_PUBLIC_URL) to the HTTPS backend callback ending with ${GOOGLE_OAUTH_CALLBACK_PATH}.`
+    );
+    error.statusCode = 503;
+    error.publicCode = "GOOGLE_OAUTH_REDIRECT_MISCONFIGURED";
+    throw error;
+  }
+
+  if (configured || legacy) {
+    console.warn(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        component: "google_calendar",
+        stage: "oauth_redirect_uri_ignored",
+        level: "warn",
+        message:
+          "Ignoring non-canonical GOOGLE_* redirect URI; using local configuration callback path."
+      })
+    );
+  }
+
+  return fallback;
+}
+
+function assertProductionRedirectUri(redirectUri, env = process.env) {
+  if (env.NODE_ENV !== "production") {
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(redirectUri);
+  } catch {
+    const error = new Error("Google OAuth redirect URI is invalid.");
+    error.statusCode = 503;
+    error.publicCode = "GOOGLE_OAUTH_REDIRECT_MISCONFIGURED";
+    throw error;
+  }
+
+  if (parsed.protocol !== "https:") {
+    const error = new Error(
+      "Google OAuth redirect URI must use HTTPS in production " +
+        `(expected path ${GOOGLE_OAUTH_CALLBACK_PATH}).`
+    );
+    error.statusCode = 503;
+    error.publicCode = "GOOGLE_OAUTH_REDIRECT_MISCONFIGURED";
+    throw error;
+  }
+
+  if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+    const error = new Error(
+      "Google OAuth redirect URI cannot target localhost in production."
+    );
+    error.statusCode = 503;
+    error.publicCode = "GOOGLE_OAUTH_REDIRECT_MISCONFIGURED";
+    throw error;
+  }
+
+  if (parsed.pathname !== GOOGLE_OAUTH_CALLBACK_PATH) {
+    const error = new Error(
+      `Google OAuth redirect URI path must be ${GOOGLE_OAUTH_CALLBACK_PATH}.`
+    );
+    error.statusCode = 503;
+    error.publicCode = "GOOGLE_OAUTH_REDIRECT_MISCONFIGURED";
+    throw error;
+  }
+}
 
 function createOAuthClient() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri =
-    process.env.GOOGLE_CONFIGURATION_REDIRECT_URI ||
-    process.env.GOOGLE_REDIRECT_URI ||
-    `${process.env.ATLAS_PUBLIC_URL || "http://localhost:3000"}/api/configuration/scheduling/google/callback`;
 
   if (!clientId || !clientSecret) {
     return null;
   }
 
+  const redirectUri = resolveGoogleOAuthRedirectUri();
+  assertProductionRedirectUri(redirectUri);
+
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
-
-const { isProduction } = require("../core/platformProductionGuard");
 
 function resolveOAuthStateSecret() {
   if (process.env.GOOGLE_OAUTH_STATE_SECRET?.trim()) {
@@ -308,6 +423,8 @@ function getAuthUrl(organizationId, userId, options = {}) {
     throw error;
   }
 
+  const redirectUri = resolveGoogleOAuthRedirectUri();
+
   const state = signOAuthState({
     organizationId,
     userId,
@@ -322,7 +439,9 @@ function getAuthUrl(organizationId, userId, options = {}) {
     state
   });
 
-  return { url, state };
+  // redirectUri is intentionally returned (not a secret) so operators can verify
+  // exact parity with Google Cloud authorized redirect URIs.
+  return { url, state, redirectUri };
 }
 
 async function handleOAuthCallback(code, state) {
@@ -734,6 +853,9 @@ module.exports = {
   presentGoogleCalendarListFailure,
   classifyGoogleCalendarUpstreamError,
   toPublicGoogleCalendarListError,
+  resolveGoogleOAuthRedirectUri,
+  isCanonicalGoogleOAuthRedirectUri,
+  GOOGLE_OAUTH_CALLBACK_PATH,
   signOAuthState,
   verifyOAuthState
 };
