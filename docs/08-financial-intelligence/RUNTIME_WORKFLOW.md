@@ -7,11 +7,21 @@
 | RC3 Phase A | Foundation engines, persistence, APIs, preview UI |
 | **RC3 Phase B** | **Live API-backed Discussion scenarios — production accepted** |
 | RC3 production | **APPROVED WITH MINOR LIMITATIONS** (2026-08-04) |
-| RC4 | Planning may begin after closeout push; implementation not started |
+| RC4 M1 | Firm-verified securities access foundation (separate milestone) |
+| **RC4 M1.1** | **Bilingual EN/ES educational FI report presentation** |
 
 ## Canonical calculation authority
 
 **Backend only.** The frontend formats and displays the API contract. It must not compute invest-the-difference math, projections, status, or warnings.
+
+## Bilingual report presentation (RC4 M1.1)
+
+- Application language (`LanguageContext`) controls **presentation only** for the live FI educational report and print output.
+- English and Spanish use the **same** evaluation ID, version, projection snapshot, and numeric fields.
+- Switching language must not call FI write APIs or create a revision.
+- Status labels and known backend warning/disclaimer strings map via stable codes / fingerprints in `frontend/src/i18n/fiReportMessages.js`.
+- Meta Review language-lock behavior is unchanged.
+- Localization does **not** alter BR-074 securities access. Unverified users still receive only the generic 4% / 7% / 10% illustration (no named funds, tickers, or SB-72).
 
 Preview demonstration builders live under `frontend/src/lib/financial-intelligence/preview/` and must not be imported by `FinancialIntelligencePanel`.
 

@@ -73,7 +73,8 @@ describe("FI print layout contract", () => {
     assert.ok(sectionJsx.includes("fi-print-meta"));
     assert.ok(sectionJsx.includes("fi-projection-assumptions"));
     assert.ok(sectionJsx.includes("fi-disclaimers"));
-    assert.ok(sectionJsx.includes("STATUS_LABELS"));
+    assert.ok(sectionJsx.includes("localizeFiStatus"));
+    assert.ok(sectionJsx.includes("fiRegisteredRepHandoff"));
     assert.ok(panelJsx.includes("fiPrintReport.css"));
   });
 

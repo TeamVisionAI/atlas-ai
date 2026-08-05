@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FI bilingual visual acceptance</title>
+    <link rel="stylesheet" href="./src/components/financial-intelligence/DiscussionScenariosSection.css" />
+    <link rel="stylesheet" href="./src/components/financial-intelligence/fiPrintReport.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: #e8eef4;
+        color: #0f2744;
+      }
+      .page {
+        max-width: 1040px;
+        margin: 24px auto;
+        padding: 0 12px 48px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .toolbar button {
+        border: 1px solid #c5d0dc;
+        background: #fff;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+      .toolbar button.is-active {
+        border-color: #1a4f7c;
+        background: #e8f0f7;
+        font-weight: 650;
+      }
+      .viewport-frame {
+        margin: 0 auto;
+        background: transparent;
+        overflow: visible;
+      }
+      .viewport-frame.is-mobile {
+        max-width: 390px;
+      }
+      .viewport-frame.is-tablet {
+        max-width: 768px;
+      }
+      .viewport-frame.is-desktop {
+        max-width: 980px;
+      }
+      .note {
+        margin: 12px 0 0;
+        color: #5a6b7d;
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+      @media print {
+        .page > h1,
+        .page > .note,
+        .toolbar,
+        #meta {
+          display: none !important;
+        }
+        body {
+          background: #fff !important;
+        }
+        .page {
+          max-width: none;
+          margin: 0;
+          padding: 0;
+        }
+        .viewport-frame {
+          max-width: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>FI bilingual visual acceptance</h1>
+      <p class="note">
+        Renders a backend-produced evaluation snapshot
+        (<code>fi-visual-acceptance-evaluation.json</code>). Frontend does not recalculate
+        Invest-the-Difference or projection ending values.
+      </p>
+      <div class="toolbar fi-print-hide">
+        <button type="button" data-lang="en">English</button>
+        <button type="button" data-lang="es">Español</button>
+        <button type="button" data-viewport="desktop">Desktop</button>
+        <button type="button" data-viewport="tablet">Tablet</button>
+        <button type="button" data-viewport="mobile">Mobile</button>
+        <button type="button" data-action="print">Print preview</button>
+      </div>
+      <div id="frame" class="viewport-frame is-desktop"></div>
+      <p class="note" id="meta"></p>
+    </div>
+    <script type="module">
+      import {
+        buildLocalizedFiReportView,
+        formatFiMoney,
+        formatFiPercent,
+        formatFiTimestamp,
+        localizeFiBackendMessage,
+        localizeFiScenarioLabel,
+        localizeFiStatus,
+        translateFiReport
+      } from "./src/i18n/fiReportMessages.js";
+
+      const evaluation = await fetch("./fi-visual-acceptance-evaluation.json").then((r) => r.json());
+
+      const params = new URLSearchParams(window.location.search);
+      let language = params.get("lang") === "es" ? "es" : "en";
+      let viewport =
+        params.get("viewport") === "mobile"
+          ? "mobile"
+          : params.get("viewport") === "tablet"
+            ? "tablet"
+            : "desktop";
+
+      function money(value, cents = true) {
+        return formatFiMoney(value, language, { cents });
+      }
+
+      function syncToolbar() {
+        document.querySelectorAll("[data-lang]").forEach((btn) => {
+          btn.classList.toggle("is-active", btn.getAttribute("data-lang") === language);
+        });
+        document.querySelectorAll("[data-viewport]").forEach((btn) => {
+          btn.classList.toggle("is-active", btn.getAttribute("data-viewport") === viewport);
+        });
+      }
+
+      function render() {
+        const t = (key, values) => translateFiReport(language, key, values);
+        const view = buildLocalizedFiReportView(evaluation, language);
+        const projections = evaluation.projectionOutputs?.scenarios || [];
+        const maxEnding = projections.reduce((max, scenario) => {
+          const value = Number(scenario.illustrativeProjectedValue);
+          return Number.isFinite(value) && value > max ? value : max;
+        }, 0);
+        const statusLabel = localizeFiStatus(language, evaluation.status);
+        const generatedAt = formatFiTimestamp(evaluation.updatedAt || evaluation.createdAt, language);
+        const termDuration =
+          evaluation.termQuote?.selectedTermDuration ?? evaluation.proposedTermDuration;
+        const proposedTermPremium =
+          evaluation.comparisonTable?.monthlyInsurancePremium?.discussionScenario ??
+          evaluation.proposedTermMonthlyPremium;
+        const proposedDeathBenefit =
+          evaluation.comparisonTable?.deathBenefit?.discussionScenario ??
+          evaluation.proposedTermDeathBenefit;
+        const monthlyDifference =
+          evaluation.comparisonTable?.monthlyInvestmentAmount?.discussionScenario ??
+          evaluation.monthlyInvestmentDifference;
+        const totalOutlay =
+          evaluation.comparisonTable?.totalMonthlyOutlay?.discussionScenario ??
+          evaluation.totalProposedMonthlyOutlay;
+        const snapshot = evaluation.currentIulSnapshot || {};
+
+        const frame = document.getElementById("frame");
+        frame.className = `viewport-frame is-${viewport}`;
+        document.documentElement.lang = language;
+
+        frame.innerHTML = `
+          <div
+            class="fi-print-root"
+            data-testid="fi-print-root"
+            data-fi-language="${language}"
+            data-fi-evaluation-id="${evaluation.id}"
+            data-fi-evaluation-version="${evaluation.version}"
+          >
+            <section class="fi-discussion-scenarios" data-testid="fi-discussion-scenarios">
+              <header class="fi-discussion-scenarios__header">
+                <p class="fi-discussion-scenarios__eyebrow">${t("fiReportEyebrow")}</p>
+                <p class="fi-discussion-scenarios__illustration-label">${t("fiEducationalIllustration")}</p>
+                <h2 class="fi-discussion-scenarios__title">${t("fiReportTitle")}</h2>
+                <p class="fi-discussion-scenarios__lede">${t("fiReportLede")}</p>
+              </header>
+
+              <div class="fi-discussion-scenarios__print-meta" data-testid="fi-print-meta">
+                <div>${t("fiReportLanguageLabel")}: <strong data-testid="fi-report-language">${
+                  language === "es" ? t("fiReportLanguageEs") : t("fiReportLanguageEn")
+                }</strong></div>
+                <div>${t("fiStatus")}: <strong>${statusLabel}</strong></div>
+                <div>${t("fiCurrentVersion")}: <strong data-testid="fi-version-print">${evaluation.version}</strong></div>
+                ${generatedAt ? `<div>${t("fiGenerated")}: <strong>${generatedAt}</strong></div>` : ""}
+                <div data-testid="fi-educational-status">${t("fiEducationalStatus")}</div>
+              </div>
+
+              <div class="fi-discussion-scenarios__status">
+                <span class="fi-discussion-scenarios__status-label">${t("fiStatus")}</span>
+                <span>${statusLabel}</span>
+              </div>
+
+              <div class="fi-report-section" data-testid="fi-section-current">
+                <h3>${t("fiSectionCurrentSituation")}</h3>
+                <dl class="fi-report-facts fi-report-facts--primary">
+                  <div class="fi-report-fact">
+                    <dt>${t("fiCurrentMonthlyPremium")}</dt>
+                    <dd data-testid="fi-existing-premium">${money(evaluation.currentIulMonthlyPremium)}</dd>
+                  </div>
+                  <div class="fi-report-fact">
+                    <dt>${t("fiCurrentDeathBenefit")}</dt>
+                    <dd data-testid="fi-existing-death-benefit">${money(evaluation.currentIulDeathBenefit, false)}</dd>
+                  </div>
+                </dl>
+                <p class="fi-discussion-scenarios__meta">${[
+                  snapshot.productType || snapshot.product,
+                  snapshot.carrier
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}</p>
+              </div>
+
+              <div class="fi-report-section" data-testid="fi-section-proposed-term">
+                <h3>${t("fiSectionProposedTerm")}</h3>
+                <dl class="fi-report-facts fi-report-facts--primary">
+                  <div class="fi-report-fact">
+                    <dt>${t("fiProposedTermPremium")}</dt>
+                    <dd data-testid="fi-proposed-term-premium">${money(proposedTermPremium)}</dd>
+                  </div>
+                  <div class="fi-report-fact">
+                    <dt>${t("fiDeathBenefit")}</dt>
+                    <dd data-testid="fi-proposed-death-benefit">${money(proposedDeathBenefit, false)}</dd>
+                  </div>
+                  <div class="fi-report-fact">
+                    <dt>${t("fiTermDuration")}</dt>
+                    <dd data-testid="fi-term-duration">${
+                      termDuration != null ? t("fiYearsUnit", { years: termDuration }) : "—"
+                    }</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div class="fi-report-section fi-hero-difference" data-testid="fi-section-monthly-difference">
+                <h3>${t("fiSectionMonthlyDifference")}</h3>
+                <div class="fi-hero-difference__card">
+                  <p class="fi-hero-difference__eyebrow">${t("fiInvestTheDifference")}</p>
+                  <p class="fi-hero-difference__label">${t("fiHeroDifferenceLabel")}</p>
+                  <p class="fi-hero-difference__value" data-testid="fi-monthly-investment-difference">${money(
+                    monthlyDifference
+                  )}</p>
+                  <p class="fi-hero-difference__hint">${t("fiHeroDifferenceHint")}</p>
+                  <p class="fi-hero-difference__outlay">${t("fiTotalMonthlyOutlay")}: <strong>${money(
+                    totalOutlay
+                  )}</strong></p>
+                </div>
+              </div>
+
+              <div class="fi-report-section" data-testid="fi-section-projections">
+                <h3>${t("fiSectionHypotheticalGrowth")}</h3>
+                <p class="fi-discussion-scenarios__note">${t("fiProjectionsNote")}</p>
+                <div class="fi-projection-compare" data-testid="fi-projection-compare">
+                  <p class="fi-projection-compare__caption">${t("fiComparisonBarsCaption")}</p>
+                  <ul class="fi-projection-compare__bars">
+                    ${projections
+                      .map((scenario) => {
+                        const ending = Number(scenario.illustrativeProjectedValue) || 0;
+                        const width = maxEnding > 0 ? (ending / maxEnding) * 100 : 0;
+                        return `<li class="fi-projection-compare__row">
+                          <div class="fi-projection-compare__meta">
+                            <span>${localizeFiScenarioLabel(language, scenario)}</span>
+                            <span>${formatFiPercent(scenario.annualReturn)} · ${t("fiHypotheticalBadge")}</span>
+                          </div>
+                          <div class="fi-projection-compare__track">
+                            <div class="fi-projection-compare__fill" style="width:${Math.max(width, ending > 0 ? 4 : 0)}%"></div>
+                          </div>
+                          <div class="fi-projection-compare__value">${money(ending)}</div>
+                        </li>`;
+                      })
+                      .join("")}
+                  </ul>
+                </div>
+                <div class="fi-discussion-scenarios__projection-grid" data-testid="fi-projections">
+                  ${projections
+                    .map(
+                      (scenario) => `<article class="fi-projection" data-testid="fi-projection-${scenario.id}">
+                        <div class="fi-projection__badge">${t("fiHypotheticalBadge")}</div>
+                        <h4>${localizeFiScenarioLabel(language, scenario)}</h4>
+                        <p class="fi-projection__rate">${t("fiAnnualHypotheticalRate")}: ${formatFiPercent(
+                        scenario.annualReturn
+                      )}</p>
+                        <p class="fi-projection__rate">${t("fiMonthlyContribution", {
+                          amount: money(scenario.monthlyContribution)
+                        })}</p>
+                        <p class="fi-projection__rate">${t("fiInvestmentHorizon")}: ${t("fiYearsUnit", {
+                          years: scenario.timeHorizonYears
+                        })}</p>
+                        <dl>
+                          <div><dt>${t("fiTotalContributions")}</dt><dd>${money(
+                            scenario.totalContributions
+                          )}</dd></div>
+                          <div><dt>${t("fiIllustrativeGrowth")}</dt><dd>${money(
+                            scenario.illustrativeGrowth
+                          )}</dd></div>
+                          <div><dt>${t("fiHypotheticalProjectedValue")}</dt><dd>${money(
+                            scenario.illustrativeProjectedValue
+                          )}</dd></div>
+                        </dl>
+                      </article>`
+                    )
+                    .join("")}
+                </div>
+                <p class="fi-discussion-scenarios__warning" role="status">${t("fiRiskProfileGate")}</p>
+              </div>
+
+              <div class="fi-discussion-scenarios__safeguards" data-testid="fi-section-safeguards">
+                <h3>${t("fiSectionImportantSafeguards")}</h3>
+                <ul class="fi-safeguards-pillars">
+                  <li>${t("fiEducationalIllustration")}</li>
+                  <li>${t("fiNonGuaranteed")}</li>
+                  <li data-testid="fi-not-a-recommendation">${t("fiNotARecommendation")}</li>
+                  <li data-testid="fi-registered-rep-handoff">${view.registeredRepHandoff}</li>
+                </ul>
+                <h4 class="fi-safeguards-subtitle">${t("fiReplacementSafeguards")}</h4>
+                <ul data-testid="fi-replacement-warnings">
+                  ${view.replacementWarnings.map((warning) => `<li>${warning}</li>`).join("")}
+                </ul>
+              </div>
+
+              <footer class="fi-discussion-scenarios__disclaimers" data-testid="fi-disclaimers">
+                <h3>${t("fiEducationalDisclaimers")}</h3>
+                <ul>
+                  ${view.disclaimers
+                    .map((item) => `<li>${item}</li>`)
+                    .join("")}
+                  <li>${t("fiDisclaimerHypotheticalReturns")}</li>
+                  <li>${t("fiDisclaimerNoSurrender")}</li>
+                </ul>
+              </footer>
+            </section>
+          </div>
+        `;
+
+        document.getElementById("meta").textContent = [
+          `language=${language}`,
+          `viewport=${viewport}`,
+          `evaluationId=${view.evaluationId}`,
+          `version=${view.version}`,
+          `monthlyDifference=${view.monthlyInvestmentDifference}`,
+          `endingValues=${projections.map((s) => s.illustrativeProjectedValue).join("|")}`,
+          `canEmphasize=${Boolean(evaluation.scenarioEmphasis?.canEmphasizeInvestmentScenario)}`
+        ].join(" · ");
+        syncToolbar();
+      }
+
+      document.querySelectorAll("[data-lang]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          language = btn.getAttribute("data-lang");
+          const url = new URL(window.location.href);
+          url.searchParams.set("lang", language);
+          history.replaceState({}, "", url);
+          render();
+        });
+      });
+      document.querySelectorAll("[data-viewport]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          viewport = btn.getAttribute("data-viewport");
+          const url = new URL(window.location.href);
+          url.searchParams.set("viewport", viewport);
+          history.replaceState({}, "", url);
+          render();
+        });
+      });
+      document.querySelector("[data-action='print']").addEventListener("click", () => window.print());
+      render();
+    </script>
+  </body>
+</html>

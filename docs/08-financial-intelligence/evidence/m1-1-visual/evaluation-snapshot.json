@@ -1,0 +1,172 @@
+{
+  "id": "fi-eval-visual-m11-001",
+  "version": 3,
+  "status": "DRAFT_RISK_PROFILE_REQUIRED",
+  "isCurrentVersion": true,
+  "currentIulMonthlyPremium": 173,
+  "currentIulDeathBenefit": 250000,
+  "proposedTermMonthlyPremium": 116.92,
+  "proposedTermDeathBenefit": 250000,
+  "proposedTermDuration": 20,
+  "monthlyInvestmentDifference": 56.08,
+  "unboundedPremiumDifference": 56.08,
+  "totalProposedMonthlyOutlay": 173,
+  "sameDeathBenefit": true,
+  "premiumSource": "REPRESENTATIVE_CONFIRMED",
+  "investmentHorizon": {
+    "years": 25,
+    "goalLabel": "Educational illustration horizon",
+    "source": "representative",
+    "confirmed": true
+  },
+  "currentIulSnapshot": {
+    "productType": "Indexed Universal Life",
+    "carrier": "Sample Carrier",
+    "sourceReviewId": "review-visual-m11",
+    "product": "Indexed Universal Life",
+    "currentMonthlyPremium": 173,
+    "originalPremiumAmount": 173,
+    "originalPremiumFrequency": "monthly",
+    "currentDeathBenefit": 250000,
+    "issueAge": 42,
+    "gender": "Female",
+    "riskClassification": "Preferred Non-Smoker",
+    "tobaccoStatus": "Non-Smoker",
+    "illustratedDuration": 30,
+    "guaranteedDuration": 15,
+    "deathBenefitOption": null,
+    "cashValueSummary": {
+      "latestAmount": null,
+      "rowCount": 0
+    },
+    "loanSummary": {
+      "count": 0,
+      "balances": []
+    },
+    "riderSummary": {
+      "count": 0,
+      "types": []
+    },
+    "sourceFactVersion": "extract-visual-m11",
+    "capturedAt": "2026-08-05T00:41:56.093Z",
+    "piLayer": "insurance_facts",
+    "factsImmutable": true
+  },
+  "comparisonTable": {
+    "deathBenefit": {
+      "existingIul": 250000,
+      "discussionScenario": 250000
+    },
+    "monthlyInsurancePremium": {
+      "existingIul": 173,
+      "discussionScenario": 116.92
+    },
+    "monthlyInvestmentAmount": {
+      "existingIul": 0,
+      "discussionScenario": 56.08
+    },
+    "totalMonthlyOutlay": {
+      "existingIul": 173,
+      "discussionScenario": 173
+    }
+  },
+  "projectionOutputs": {
+    "scenarios": [
+      {
+        "id": "conservative",
+        "label": "Conservative",
+        "annualReturn": 0.04,
+        "monthlyContribution": 56.08,
+        "timeHorizonYears": 25,
+        "totalContributions": 16824,
+        "illustrativeGrowth": 12008.39,
+        "illustrativeProjectedValue": 28832.39
+      },
+      {
+        "id": "moderate_growth",
+        "label": "Moderate Growth",
+        "annualReturn": 0.07,
+        "monthlyContribution": 56.08,
+        "timeHorizonYears": 25,
+        "totalContributions": 16824,
+        "illustrativeGrowth": 28604.82,
+        "illustrativeProjectedValue": 45428.82
+      },
+      {
+        "id": "aggressive_growth",
+        "label": "Aggressive Growth",
+        "annualReturn": 0.1,
+        "monthlyContribution": 56.08,
+        "timeHorizonYears": 25,
+        "totalContributions": 16824,
+        "illustrativeGrowth": 57584.82,
+        "illustrativeProjectedValue": 74408.82
+      }
+    ],
+    "disclaimer": {
+      "hypothetical": true,
+      "educational": true,
+      "guaranteed": false,
+      "methodology": "Future value of an ordinary annuity with monthly contributions and monthly compounding. Figures are before investment fees, expenses, taxes, and inflation unless separately disclosed.",
+      "caveats": "Fees, expenses, taxes, inflation, market losses, and contribution interruptions can materially affect actual results. Not a promise of performance."
+    }
+  },
+  "projectionAssumptions": {
+    "rates": {
+      "conservative": 0.04,
+      "moderate": 0.07,
+      "aggressive": 0.1
+    }
+  },
+  "replacementWarnings": [
+    "Do not cancel or surrender the existing policy before new coverage is approved, issued, accepted, paid, and confirmed in force.",
+    "The proposed term coverage may be declined, rated, delayed, or modified through underwriting.",
+    "Replacement forms and procedures may be required.",
+    "Existing surrender charges, loans, tax consequences, riders, guarantees, contestability periods, and other policy differences must be reviewed.",
+    "Term insurance does not build cash value and expires after the selected term.",
+    "Mutual funds fluctuate and may lose value.",
+    "Investment returns are not guaranteed."
+  ],
+  "disclaimers": [
+    "Planning illustration for representative discussion only. Not a client recommendation.",
+    "Atlas informs. Representatives recommend. Clients decide.",
+    "Investment projections are hypothetical and non-guaranteed.",
+    "Specific mutual-fund symbols are not recommended in this evaluation.",
+    "Official product eligibility, premiums, replacement requirements, and investment suitability must be verified outside any preliminary estimate."
+  ],
+  "missingDataWarnings": [
+    "Complete the client risk-profile process before emphasizing an investment scenario."
+  ],
+  "outlayValidation": {
+    "passesOutlayIdentity": true,
+    "left": 173,
+    "right": 173,
+    "tolerance": 0.02
+  },
+  "scenarioEmphasis": {
+    "canEmphasizeInvestmentScenario": false,
+    "highlightedScenarioId": null,
+    "highlightedScenarioLabel": null
+  },
+  "replacementAcknowledged": true,
+  "eligibilityConfirmationStatus": "CONFIRMED",
+  "termQuote": {
+    "deathBenefit": 250000,
+    "selectedTermDuration": 20,
+    "monthlyPremium": 116.92,
+    "productLabel": null,
+    "premiumSource": "REPRESENTATIVE_CONFIRMED",
+    "quoteDate": "2026-08-01",
+    "representativeConfirmed": true,
+    "longestAvailableTermConfirmed": true,
+    "eligibilitySource": null,
+    "eligibilityConfirmedAt": null,
+    "notes": null,
+    "missingUnderwritingInformation": false,
+    "isOfficial": false,
+    "isPreliminaryEstimate": false,
+    "isMissing": false
+  },
+  "updatedAt": "2026-08-04T18:00:00.000Z",
+  "createdAt": "2026-08-04T17:00:00.000Z"
+}

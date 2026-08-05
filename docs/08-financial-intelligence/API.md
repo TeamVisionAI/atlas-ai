@@ -46,6 +46,13 @@ Successful create/get/update responses return `{ evaluation }` where `evaluation
 
 The UI must not reconstruct business rules from raw persistence columns.
 
+## Frontend localization contract (RC4 M1.1)
+
+- `status` codes, scenario `id`s, and known English warning/disclaimer strings are mapped to EN/ES presentation strings in `frontend/src/i18n/fiReportMessages.js`.
+- Historical evaluations are **not** rewritten for localization. Numeric fields remain backend-authoritative.
+- `Accept-Language` / UI language must not change calculations, create revisions, or restore securities-restricted fields such as `fundCatalog` for unverified users.
+- Report title displayed to users uses the localized FI dictionary (not a recalculated `sectionTitle`).
+
 ## Validation (selected)
 
 - Negative premiums rejected  

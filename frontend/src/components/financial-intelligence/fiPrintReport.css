@@ -112,6 +112,9 @@
 
   /* Keep small critical cards together; never the whole report */
   .fi-projection,
+  .fi-hero-difference__card,
+  .fi-projection-compare,
+  .fi-report-fact,
   .fi-discussion-scenarios__safeguards,
   .fi-discussion-scenarios__missing,
   .fi-discussion-scenarios__status,
@@ -121,10 +124,26 @@
     page-break-inside: avoid;
   }
 
+  .fi-report-section > h3,
+  .fi-discussion-scenarios__block > h3,
+  .fi-safeguards-subtitle {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
   .fi-discussion-scenarios__header,
-  .fi-discussion-scenarios__disclaimers {
+  .fi-discussion-scenarios__disclaimers,
+  .fi-safeguards-pillars {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .fi-hero-difference__outlay,
+  .fi-hero-difference__hint,
+  .fi-hero-difference__label,
+  .fi-hero-difference__value {
+    color: #000 !important;
+    opacity: 1 !important;
   }
 
   /* Comparison table may paginate if tall; prefer keeping rows readable */
@@ -139,14 +158,44 @@
   }
 
   .fi-discussion-scenarios__projection-grid {
-    display: block !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
   }
 
-  .fi-projection {
-    margin-bottom: 12px;
+  .fi-projection,
+  .fi-hero-difference__card,
+  .fi-projection-compare,
+  .fi-report-fact {
+    margin-bottom: 10px;
     border-color: #666 !important;
     box-shadow: none !important;
     background: #fff !important;
+    color: #000 !important;
+  }
+
+  .fi-hero-difference__card {
+    background: #fff !important;
+    border: 2px solid #000 !important;
+  }
+
+  .fi-hero-difference__eyebrow,
+  .fi-hero-difference__label,
+  .fi-hero-difference__value,
+  .fi-hero-difference__hint,
+  .fi-hero-difference__secondary dt,
+  .fi-hero-difference__secondary dd {
+    color: #000 !important;
+    opacity: 1 !important;
+  }
+
+  .fi-projection-compare__fill {
+    background: #555 !important;
+  }
+
+  .fi-projection-compare__track {
+    background: #eee !important;
+    border: 1px solid #999 !important;
   }
 
   .fi-discussion-scenarios__warning,

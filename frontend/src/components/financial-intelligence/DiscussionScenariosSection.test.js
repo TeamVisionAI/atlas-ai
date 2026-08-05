@@ -24,8 +24,22 @@ describe("FI production display isolation", () => {
     assert.equal(/monthlyInvestmentDifference\s*=/.test(source), false);
     assert.equal(/Math\.pow|annualReturn\s*\//.test(source), false);
     assert.equal(source.includes("calculateMonthlyFutureValue"), false);
+    assert.equal(source.includes("buildProjections"), false);
     assert.ok(source.includes("evaluation.monthlyInvestmentDifference"));
     assert.ok(source.includes("evaluation.projectionOutputs"));
+    // Bar widths may scale backend ending values for display; they must not invent yearly series.
+    assert.equal(source.includes("annualPoints"), false);
+    assert.equal(/for\s*\(.*months/.test(source), false);
+  });
+
+  it("scenario cards render from backend scenario ids without preferred-rate styling by default", () => {
+    const source = readFileSync(join(__dirname, "DiscussionScenariosSection.jsx"), "utf8");
+    const css = readFileSync(join(__dirname, "DiscussionScenariosSection.css"), "utf8");
+    assert.ok(source.includes("fi-projection-${scenario.id}"));
+    assert.ok(source.includes("canEmphasizeInvestmentScenario"));
+    assert.ok(css.includes(".fi-discussion-scenarios__projection-grid"));
+    assert.ok(css.includes("grid-template-columns: 1fr"));
+    assert.equal(css.includes("aggressive") && /aggressive[\s\S]{0,40}recommended/i.test(css), false);
   });
 
   it("renders values from a mocked API contract shape", () => {
