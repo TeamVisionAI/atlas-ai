@@ -1038,6 +1038,43 @@ See: [FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](../08-financial-intelligence/FINAN
 
 ---
 
+## BR-074 — Firm-Verified Securities Content Access
+
+**Implements:** RC4 Milestone 1 — Firm-Verified Securities Access Foundation
+**Domain:** Security / Financial Intelligence / Knowledge
+**Depends on:** BR-066
+**Status:** Approved
+**Engine target:** `securitiesAccessService.js`, `explicitUserPermissionService.js`
+
+### Rules
+
+1. **Operational roles are not securities authorization** — Atlas roles (`administrator`, `rvp`, `division_leader`, `agent`, `recruiter`, `operations`, `support`, and SaaS equivalents) do not authorize named securities-content access.
+2. **Insurance licensing is not securities authorization** — An insurance license or insurance-only representative status does not unlock securities-specific content.
+3. **Exams are not access** — Passing or recording Series 6, Series 7, Series 24, or another examination does not by itself authorize securities-content access.
+4. **Named securities require firm verification** — Fund names, ticker symbols, SB-72, allocation guides, model portfolios, securities-restricted training, downloads, search results, AI retrieval of securities materials, and exports containing named securities require firm-verified active authorization.
+5. **Only VERIFIED_ACTIVE unlocks** — Securities-specific content is available only when `securities_access_status = VERIFIED_ACTIVE`, the authorization is within its effective window, and verification metadata is complete (`verification_source`, `verified_by`, `verified_at`).
+6. **Fail closed** — `UNKNOWN`, `NOT_REGISTERED`, `PENDING_VERIFICATION`, `RESTRICTED`, `SUSPENDED`, `EXPIRED`, and `TERMINATED` receive no securities-specific content. Missing authorization rows resolve as `UNKNOWN`.
+7. **Backend enforcement is mandatory** — Frontend navigation and display hiding are supplemental. APIs, downloads, search, print/export, and AI retrieval must re-evaluate authorization on each protected request.
+8. **No self-verification** — Representatives and administrators cannot create, approve, verify, reactivate, or extend their own securities authorization (`actor.userId !== target.userId`).
+9. **Explicit verify permission** — Changing another user’s securities authorization requires an active organization-scoped user-level grant of `securities:verify`.
+10. **No role/admin wildcard for verify** — Administrator, SUPER_ADMIN, and other role wildcards do not satisfy `securities:verify`. Evaluation uses only explicit `user_permissions` grants via a dedicated resolver.
+11. **Audit** — Authorization creates/updates/verifications/revocations/expirations and denied securities-content access must write metadata-only audit events. Do not log documents, registration numbers, tokens, credentials, or unnecessary personal licensing data.
+12. **Immediate loss of access** — Expiration, suspension, restriction, termination, or revocation removes securities-content access immediately at request evaluation time.
+13. **Generic FI remains available** — Users without verified securities access may still use insurance premium, proposed term premium, Invest-the-Difference amount, hypothetical 4% / 7% / 10% projections, non-guarantee disclosures, and handoff language to a properly registered representative — without named securities.
+14. **Preserve BR-066** — Atlas informs; representatives recommend; clients decide. Securities access does not authorize suitability determinations or product recommendations by Atlas.
+15. **Manual firm verification (v1)** — Atlas records firm verification (`MANUAL_FIRM_VERIFICATION`). Atlas does not independently certify FINRA, CRD, or Primerica registration status.
+16. **Initial authority bootstrap (ops only)** — When an organization has no securities verifier, a controlled one-time operations script may establish the first authority using `INITIAL_FIRM_AUTHORITY_BOOTSTRAP`, documented firm evidence, an explicit `securities:verify` grant, history/audit metadata, and an organization bootstrap lock. This is not a normal Admin Users or HTTP action. After bootstrap, the authority still cannot self-modify via application routes.
+
+### Jurisdiction (v1 limitation)
+
+`jurisdiction_scope` may be null. A missing jurisdiction must not be interpreted as unrestricted authorization. For v1, jurisdiction is informational unless a specific securities resource declares explicit jurisdiction restrictions.
+
+### Content classification (future)
+
+Knowledge / Content Center materials must support access classes: `GENERAL`, `INSURANCE`, `SECURITIES_REGISTERED_ONLY`, `SECURITIES_PRINCIPAL_ONLY`, `COMPLIANCE_ONLY`, `ADMIN_ONLY`. Future SB-72 content defaults to `SECURITIES_REGISTERED_ONLY` and `INTERNAL_ONLY`.
+
+---
+
 ## BR-050 — Canonical Appointment Lifecycle (Read Model)
 
 **Implements:** Architecture hardening — appointment state consistency (Sprint 13.x follow-up)  

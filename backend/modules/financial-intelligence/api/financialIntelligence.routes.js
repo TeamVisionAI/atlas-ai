@@ -32,9 +32,21 @@ function createFinancialIntelligenceRoutes(deps = {}) {
   router.use(requireAtlasUser);
   router.use(organizationGuard());
 
-  router.get("/", requirePermission(PERMISSIONS.POLICY_READ), async (_req, res) => {
+  router.get("/", requirePermission(PERMISSIONS.POLICY_READ), async (req, res) => {
     try {
-      res.json(service.getModuleSummary());
+      // BR-074 — named fund catalog is securities-restricted; strip unless verified active.
+      const summary = service.getModuleSummary();
+      const {
+        canAccessSecuritiesContent
+      } = require("../../../security/securitiesAccessService");
+      const allowed = await canAccessSecuritiesContent(req.authContext);
+
+      if (!allowed) {
+        delete summary.fundCatalog;
+        summary.securitiesContentRestricted = true;
+      }
+
+      res.json(summary);
     } catch (error) {
       sendError(res, error);
     }

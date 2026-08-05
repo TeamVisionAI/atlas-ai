@@ -60,7 +60,40 @@ router.post("/auth/logout", requireAtlasUser, async (req, res) => {
 });
 
 router.get("/auth/me", requireAtlasUser, async (req, res) => {
-  return res.json(req.sanitizedUser);
+  try {
+    const {
+      getSecuritiesAccessSummary,
+      canVerifySecuritiesAuthorization
+    } = require("../security/securitiesAccessService");
+
+    const securities = await getSecuritiesAccessSummary(req.authContext);
+    const canVerify = await canVerifySecuritiesAuthorization(req.authContext);
+
+    return res.json({
+      ...req.sanitizedUser,
+      securities_access_status: securities.securities_access_status,
+      securities_access_verified: securities.securities_access_verified,
+      permitted_product_scope: securities.permitted_product_scope,
+      effective_to: securities.effective_to,
+      capabilities: {
+        canAccessSecuritiesContent: securities.canAccessSecuritiesContent === true,
+        canVerifySecuritiesAuthorization: canVerify === true
+      }
+    });
+  } catch (error) {
+    console.error("[auth/me] securities summary failed", error.message);
+    return res.json({
+      ...req.sanitizedUser,
+      securities_access_status: "UNKNOWN",
+      securities_access_verified: false,
+      permitted_product_scope: [],
+      effective_to: null,
+      capabilities: {
+        canAccessSecuritiesContent: false,
+        canVerifySecuritiesAuthorization: false
+      }
+    });
+  }
 });
 
 router.post("/auth/password-reset/request", async (req, res) => {

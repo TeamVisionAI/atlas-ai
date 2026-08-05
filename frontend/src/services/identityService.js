@@ -57,6 +57,26 @@ export async function getLoginHistory(userId) {
   return apiFetch(`/api/admin/users/${userId}/login-history`);
 }
 
+export async function getUserSecuritiesAuthorization(userId) {
+  return apiFetch(`/api/admin/securities-access/users/${userId}`);
+}
+
+export async function updateUserSecuritiesAuthorization(userId, payload) {
+  return apiFetch(`/api/admin/securities-access/users/${userId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function revokeUserSecuritiesAuthorization(userId, reason) {
+  return apiFetch(`/api/admin/securities-access/users/${userId}/revoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason })
+  });
+}
+
 export async function requestPasswordReset(email) {
   const response = await apiRequest("/api/auth/password-reset/request", {
     method: "POST",
