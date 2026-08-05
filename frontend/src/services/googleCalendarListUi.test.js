@@ -25,5 +25,27 @@ describe("googleCalendarListUi", () => {
     assert.equal(ui.reconnectRequired, true);
     assert.equal(ui.pageBlocked, false);
     assert.equal(ui.keepIntegrationsVisible, true);
+    assert.equal(ui.suppressGoogleError, false);
+  });
+
+  it("never fetches or surfaces Google calendar failures in Meta Review workspace", () => {
+    assert.equal(
+      shouldFetchGoogleCalendarList(
+        { connected: true, reconnectRequired: true },
+        { metaReviewWorkspaceActive: true }
+      ),
+      false
+    );
+
+    const ui = resolveGoogleCalendarListUiFailure(
+      { reconnectRequired: true, message: "invalid_grant" },
+      { connected: true, calendarId: "niovelpm@gmail.com" },
+      { metaReviewWorkspaceActive: true }
+    );
+
+    assert.deepEqual(ui.calendars, []);
+    assert.equal(ui.reconnectRequired, false);
+    assert.equal(ui.suppressGoogleError, true);
+    assert.equal(ui.pageBlocked, false);
   });
 });

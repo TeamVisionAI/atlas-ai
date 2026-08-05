@@ -37,6 +37,13 @@ export default function OrganizationIntegrations() {
     setIntegrations(result.integrations);
 
     const googleCalendar = result.integrations?.googleCalendar || {};
+    const metaReviewWorkspaceActive = isMetaReviewWorkspaceActive(user);
+
+    // Meta Review Integrations is WhatsApp-only — never fetch or surface Google Calendar.
+    if (metaReviewWorkspaceActive) {
+      setCalendars([]);
+      return;
+    }
 
     if (googleCalendar.reconnectRequired) {
       setCalendars([]);
@@ -44,22 +51,24 @@ export default function OrganizationIntegrations() {
       return;
     }
 
-    if (shouldFetchGoogleCalendarList(googleCalendar)) {
+    if (shouldFetchGoogleCalendarList(googleCalendar, { metaReviewWorkspaceActive })) {
       try {
         const calendarResult = await fetchGoogleCalendars();
         setCalendars(calendarResult.calendars || []);
         setError("");
       } catch (calendarError) {
-        const uiFailure = resolveGoogleCalendarListUiFailure(calendarError, googleCalendar);
+        const uiFailure = resolveGoogleCalendarListUiFailure(calendarError, googleCalendar, {
+          metaReviewWorkspaceActive
+        });
         setCalendars(uiFailure.calendars);
-        if (uiFailure.reconnectRequired) {
+        if (uiFailure.reconnectRequired && !uiFailure.suppressGoogleError) {
           setError(translate("configurationGoogleReconnectRequired"));
         }
       }
     } else {
       setCalendars([]);
     }
-  }, [translate]);
+  }, [translate, user]);
 
   useEffect(() => {
     load().catch(() => setError(translate("configurationIntegrationsLoadFailed")));

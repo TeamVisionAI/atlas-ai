@@ -274,6 +274,7 @@ test("9. Settings page remains usable during an upstream failure", () => {
   assert.match(integrationsSource, /shouldFetchGoogleCalendarList/);
   assert.match(integrationsSource, /resolveGoogleCalendarListUiFailure/);
   assert.match(integrationsSource, /configurationGoogleReconnectRequired/);
+  assert.match(integrationsSource, /Meta Review Integrations is WhatsApp-only/);
 });
 
 test("10. Policy Intelligence does not depend on calendar-list success", () => {
