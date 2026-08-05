@@ -30,7 +30,7 @@ Architecture and runtime pack for **Atlas Financial Intelligence** — the bound
 | RC3 Phase B runtime integration | **IMPLEMENTED** |
 | RC3 production acceptance | **APPROVED WITH MINOR LIMITATIONS** |
 | Official Primerica quote integration | Deferred (RC4+) |
-| Verified fund catalog | Deferred (RC4+) |
+| Verified fund catalog | Deferred (RC4+) — placeholders not live; `canExposeVerifiedFundCatalog` fails closed |
 | Native PDF export | Deferred (RC4+) |
 | Automated product eligibility | Deferred (RC4+) |
 | Automated suitability workflow | Deferred (RC4+) |

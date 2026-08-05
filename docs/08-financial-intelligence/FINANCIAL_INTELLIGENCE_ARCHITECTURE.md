@@ -13,7 +13,9 @@ Define the next major Atlas bounded context that **consumes** Policy Intelligenc
 **APPROVED** — RC2 Financial Intelligence Architecture  
 **RC3 Phase A** — **IMPLEMENTED** Invest-the-Difference Strategy Evaluation foundation  
 **RC3 Phase B** — **IMPLEMENTED** live API-backed runtime integration (backend calculation authority)  
-**Deferred (RC4+):** official Primerica quote integration; verified fund catalog; PDF export; automated eligibility; suitability workflow
+**Deferred (RC4+):** official Primerica quote integration; **authoritative verified fund catalog** (placeholder examples are non-production and must not ship in live APIs); PDF export; automated eligibility; suitability workflow
+
+**RC4 M1 product boundary:** `VERIFIED_ACTIVE` authorizes access to approved securities content, but no named fund catalog is approved or active in the current release. Gate: `backend/security/verifiedFundCatalogGate.js` (`canExposeVerifiedFundCatalog`).
 
 ## Business Rules
 

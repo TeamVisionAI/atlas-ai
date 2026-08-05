@@ -111,6 +111,7 @@ node -r dotenv/config backend/scripts/bootstrapInitialSecuritiesAuthority.js \
 - Future changes to the authority’s own row require another explicit verifier or a separate controlled procedure.
 - Other administrators remain unable to verify unless explicitly granted `securities:verify`.
 - Re-running Phase A is refused (`BOOTSTRAP_ALREADY_COMPLETED`).
+- **Named fund catalog remains unavailable** until a future authoritative catalog release activates `canExposeVerifiedFundCatalog()`. `VERIFIED_ACTIVE` alone must not expose placeholder fund symbols.
 
 ---
 

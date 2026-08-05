@@ -34,15 +34,24 @@ function createFinancialIntelligenceRoutes(deps = {}) {
 
   router.get("/", requirePermission(PERMISSIONS.POLICY_READ), async (req, res) => {
     try {
-      // BR-074 — named fund catalog is securities-restricted; strip unless verified active.
+      // BR-074 + catalog release gate — VERIFIED_ACTIVE is necessary but not
+      // sufficient for named fund catalog. Current release: fail closed for all.
       const summary = service.getModuleSummary();
       const {
         canAccessSecuritiesContent
       } = require("../../../security/securitiesAccessService");
-      const allowed = await canAccessSecuritiesContent(req.authContext);
+      const {
+        canExposeVerifiedFundCatalog
+      } = require("../../../security/verifiedFundCatalogGate");
 
-      if (!allowed) {
+      const securitiesAllowed = await canAccessSecuritiesContent(req.authContext);
+      const exposeCatalog = canExposeVerifiedFundCatalog({
+        canAccessSecuritiesContent: securitiesAllowed
+      });
+
+      if (!exposeCatalog) {
         delete summary.fundCatalog;
+        summary.namedFundCatalogActive = false;
         summary.securitiesContentRestricted = true;
       }
 
