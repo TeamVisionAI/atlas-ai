@@ -221,7 +221,7 @@ function listRegistryKeys(registry = getApprovedTemplateRegistry()) {
 }
 
 function resolveTemplateLanguage(prospect = {}) {
-  const preferred = normalizePreferredLanguage(prospect.preferred_language);
+  const preferred = normalizePreferredLanguage((prospect || {}).preferred_language);
 
   if (preferred) {
     return preferred;

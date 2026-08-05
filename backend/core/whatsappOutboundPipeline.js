@@ -79,25 +79,26 @@ async function persistBlockedOrFailedAttempt({
   idempotencyKey,
   providerMessageId = null
 }) {
+  const safeProspect = prospect || {};
   const auditMessage = `[whatsapp_outbound:${status}] intent=${intent}; reason=${authorization.reason || status}`;
 
   const logResult = await logConversation({
-    phone: prospect?.phone || storagePhone,
-    name: prospect?.name || null,
+    phone: safeProspect.phone || storagePhone,
+    name: safeProspect.name || null,
     direction: "outgoing",
     message: auditMessage,
     intent: `WHATSAPP_OUTBOUND_${String(status).toUpperCase()}`,
-    pipeline: prospect?.current_step || "NEW",
-    currentStep: prospect?.current_step || "NEW",
-    language: resolveProspectCommunicationCode(prospect),
-    city: prospect?.city || null,
-    state: prospect?.state || null,
+    pipeline: safeProspect.current_step || "NEW",
+    currentStep: safeProspect.current_step || "NEW",
+    language: resolveProspectCommunicationCode(safeProspect),
+    city: safeProspect.city || null,
+    state: safeProspect.state || null,
     actorOverride: actor
   }).catch(() => ({ success: false }));
 
   await recordOutboundDelivery({
-    organizationId: organizationId || prospect?.organization_id || null,
-    prospectPhone: prospect?.phone || storagePhone,
+    organizationId: organizationId || safeProspect.organization_id || null,
+    prospectPhone: safeProspect.phone || storagePhone,
     intent,
     idempotencyKey,
     status,
@@ -116,11 +117,11 @@ async function persistBlockedOrFailedAttempt({
   }).catch(() => ({ success: false }));
 
   await recordBusinessEvent({
-    phone: prospect?.phone || storagePhone,
+    phone: safeProspect.phone || storagePhone,
     eventType: COMMUNICATION_EVENTS.OUTBOUND_BLOCKED,
     actor,
     channel: "whatsapp",
-    organizationId: organizationId || prospect?.organization_id || null,
+    organizationId: organizationId || safeProspect.organization_id || null,
     summary: `WhatsApp outbound ${status}`,
     payload: {
       status,
@@ -210,8 +211,9 @@ async function sendAndPersistWhatsAppMessage({
 
   const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
   const storagePhone = resolveStoragePhone(metaTo);
-  const prospect = await resolveProspectForOutbound(to, organizationId);
-  const resolvedOrgId = organizationId || prospect?.organization_id || null;
+  const prospectRecord = await resolveProspectForOutbound(to, organizationId);
+  const prospect = prospectRecord || {};
+  const resolvedOrgId = organizationId || prospectRecord?.organization_id || null;
 
   if (idempotencyKey) {
     const existing = await findSuccessfulDeliveryByIdempotencyKey({
@@ -244,9 +246,9 @@ async function sendAndPersistWhatsAppMessage({
 
   const authorization = await authorizeWhatsAppOutbound({
     intent,
-    phone: prospect?.phone || storagePhone,
+    phone: prospect.phone || storagePhone,
     organizationId: resolvedOrgId,
-    prospect: prospect || {},
+    prospect,
     message,
     templateKey,
     templateVariables,
@@ -260,7 +262,7 @@ async function sendAndPersistWhatsAppMessage({
 
   if (!isAuthorized) {
     await persistBlockedOrFailedAttempt({
-      prospect,
+      prospect: prospectRecord,
       storagePhone,
       organizationId: resolvedOrgId,
       intent,
