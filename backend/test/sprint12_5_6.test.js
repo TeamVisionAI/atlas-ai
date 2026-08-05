@@ -191,6 +191,7 @@ describe("Sprint 12.5.6 — legacy repair execution", () => {
     const originalFindActive = appointmentListService.findPersistedAppointmentForProspect;
     const originalList = appointmentListService.listPersistedAppointments;
     const originalCreate = appointmentApplicationService.createAppointment;
+    const originalReconcile = appointmentApplicationService.reconcileAppointmentGoogleCalendar;
     const originalFindById = appointmentRepository.findById;
 
     appointmentListService.findPersistedAppointmentForProspect = async () => null;
@@ -207,10 +208,17 @@ describe("Sprint 12.5.6 — legacy repair execution", () => {
         prospectPhone: SARAH_PHONE
       };
     };
+    appointmentApplicationService.reconcileAppointmentGoogleCalendar = async (id) => ({
+      id,
+      calendarEventId: SARAH_CALENDAR_EVENT,
+      prospectPhone: SARAH_PHONE,
+      metadata: { calendarSyncStatus: "synced" }
+    });
     appointmentRepository.findById = async () => ({
       id: createdId,
       calendarEventId: SARAH_CALENDAR_EVENT,
-      prospectPhone: SARAH_PHONE
+      prospectPhone: SARAH_PHONE,
+      metadata: { calendarSyncStatus: "synced" }
     });
 
     try {
@@ -227,6 +235,7 @@ describe("Sprint 12.5.6 — legacy repair execution", () => {
       appointmentListService.findPersistedAppointmentForProspect = originalFindActive;
       appointmentListService.listPersistedAppointments = originalList;
       appointmentApplicationService.createAppointment = originalCreate;
+      appointmentApplicationService.reconcileAppointmentGoogleCalendar = originalReconcile;
       appointmentRepository.findById = originalFindById;
     }
   });

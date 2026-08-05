@@ -180,7 +180,9 @@ async function repairLegacyInterviewForProspect(prospect, options = {}) {
         startTimeISO: startDateTime,
         endTimeISO: endDateTime,
         googleCalendarEventId: prospect.calendar_event_id || null,
-        googleCalendarSynced: Boolean(prospect.calendar_event_id)
+        // Always reconcile after persist so Google time matches the appointment
+        // even when a stale event id survived reconnect.
+        googleCalendarSynced: false
       },
       skipWorkflowSideEffects: true,
       skipReminders: true,
@@ -193,7 +195,12 @@ async function repairLegacyInterviewForProspect(prospect, options = {}) {
     { organizationId }
   );
 
-  const verified = await appointmentRepository.findById(appointmentRecord.id, organizationId);
+  const synced = await appointmentApplicationService.reconcileAppointmentGoogleCalendar(
+    appointmentRecord.id,
+    { organizationId, agentId }
+  );
+
+  const verified = await appointmentRepository.findById(synced.id || appointmentRecord.id, organizationId);
 
   if (!verified || !isPersistedAppointment(verified)) {
     return {
@@ -210,7 +217,8 @@ async function repairLegacyInterviewForProspect(prospect, options = {}) {
     summary: {
       ...summary,
       appointmentId: verified.id,
-      calendarEventId: verified.calendarEventId
+      calendarEventId: verified.calendarEventId,
+      calendarSyncStatus: verified.metadata?.calendarSyncStatus || null
     }
   };
 }

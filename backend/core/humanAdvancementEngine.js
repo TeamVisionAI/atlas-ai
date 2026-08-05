@@ -232,6 +232,28 @@ async function advanceProspectWorkflow(phone, payload = {}) {
     return buildValidationErrorResponse(validation, targetMilestone);
   }
 
+  // Implements BR-039 — INTERVIEW_SCHEDULED requires a persisted appointment row.
+  if (targetMilestone === MILESTONES.INTERVIEW_SCHEDULED) {
+    const organizationId = payload.organizationId || prospect.organization_id || null;
+
+    if (organizationId && !capturedFields.appointmentId) {
+      const { findActiveAppointmentForProspect } = require("./activeAppointmentResolver");
+      const activeAppointment = await findActiveAppointmentForProspect(phone, organizationId);
+
+      if (!activeAppointment) {
+        return {
+          success: false,
+          action: "workflow_advance",
+          error: "APPOINTMENT_REQUIRED",
+          message:
+            "INTERVIEW_SCHEDULED requires a persisted appointment. Schedule or repair the appointment first."
+        };
+      }
+
+      capturedFields.appointmentId = activeAppointment.id;
+    }
+  }
+
   const beforeProfile = buildProfileFromProspect(prospect);
   const mergedProfile = validation.mergedProfile;
   const ownershipBefore =

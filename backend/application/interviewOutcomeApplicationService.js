@@ -109,7 +109,7 @@ async function recordInterviewOutcome({
   let savedAppointment = null;
   const isRescheduleOutcome = outcomeId === "Reschedule Interview";
 
-  if (isRescheduleOutcome && appointment?.id && organizationId) {
+  if (isRescheduleOutcome && organizationId) {
     const scheduledTime = advancePayload.capturedFields.interviewDateTime;
 
     if (!scheduledTime) {
@@ -121,22 +121,92 @@ async function recordInterviewOutcome({
       };
     }
 
+    if (!agentId) {
+      return {
+        success: false,
+        status: 400,
+        error: "VALIDATION_ERROR",
+        message: "An agent is required to reschedule an interview."
+      };
+    }
+
     const appointmentApplicationService = require("./appointmentApplicationService");
+    const { deriveDateKeyTimeKey } = require("../core/legacyInterviewRepairEngine");
 
     try {
-      savedAppointment = await appointmentApplicationService.rescheduleAppointment(
-        appointment.id,
-        {
-          reason: fields.rescheduleReason || "prospect_requested",
-          dateKey: fields.rescheduleDate || null,
-          timeKey: fields.rescheduleTime || null,
-          scheduledTime,
-          skipSlotValidation: true,
-          skipWorkflowAdvance: true,
-          channel: interactionType === "appointment_completion" ? "appointments" : "mission_control"
-        },
-        { organizationId, agentId }
-      );
+      if (appointment?.id) {
+        // Implements BR-039 — reschedule mutates the canonical appointment row.
+        savedAppointment = await appointmentApplicationService.rescheduleAppointment(
+          appointment.id,
+          {
+            reason: fields.rescheduleReason || "prospect_requested",
+            dateKey: fields.rescheduleDate || null,
+            timeKey: fields.rescheduleTime || null,
+            scheduledTime,
+            skipSlotValidation: true,
+            skipWorkflowAdvance: true,
+            channel: interactionType === "appointment_completion" ? "appointments" : "mission_control"
+          },
+          { organizationId, agentId }
+        );
+      } else {
+        // Implements BR-039 — never advance INTERVIEW_SCHEDULED without a persisted appointment.
+        const keys =
+          (fields.rescheduleDate && fields.rescheduleTime
+            ? { dateKey: fields.rescheduleDate, timeKey: fields.rescheduleTime }
+            : null) || deriveDateKeyTimeKey(scheduledTime);
+
+        if (!keys?.dateKey || !keys?.timeKey) {
+          return {
+            success: false,
+            status: 400,
+            error: "VALIDATION_ERROR",
+            message: "Reschedule date and time are required."
+          };
+        }
+
+        const endDateTime = new Date(
+          Date.parse(scheduledTime) + 30 * 60_000
+        ).toISOString();
+        const interviewType = String(
+          fields.rescheduleInterviewType || prospect.interview_type || "Zoom"
+        ).toLowerCase();
+        const isVirtual = interviewType.includes("zoom") || interviewType.includes("virtual");
+
+        savedAppointment = await appointmentApplicationService.createAppointment(
+          {
+            organizationId,
+            agentId,
+            prospectPhone: phone,
+            purpose: "recruiting_interview",
+            dateKey: keys.dateKey,
+            timeKey: keys.timeKey,
+            source: "mission_control",
+            meetingType: isVirtual ? "virtual" : "in_person",
+            meetingProvider: isVirtual ? "zoom" : undefined,
+            existingBooking: {
+              success: true,
+              startTimeISO: scheduledTime,
+              endTimeISO: endDateTime,
+              // Do not trust a stale prospect calendar_event_id after reconnect.
+              googleCalendarEventId: null,
+              googleCalendarSynced: false
+            },
+            skipWorkflowSideEffects: true,
+            skipReminders: false,
+            skipProspectUpdate: false,
+            metadata: {
+              createdFromOutcomeReschedule: true
+            }
+          },
+          { organizationId, agentId }
+        );
+
+        savedAppointment = await appointmentApplicationService.reconcileAppointmentGoogleCalendar(
+          savedAppointment.id,
+          { organizationId, agentId }
+        );
+      }
     } catch (error) {
       return {
         success: false,
