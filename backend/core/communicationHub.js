@@ -141,7 +141,8 @@ async function processNormalizedInboundMessage(normalized, { prospect, contactNa
       to: normalized.phone,
       message: replyText,
       actor: "ATLAS",
-      intent: "CONVERSATION_ENGINE_REPLY"
+      intent: "CONVERSATION_ENGINE_REPLY",
+      organizationId: prospect?.organization_id || null
     });
 
     logWhatsAppStage("conversation_engine_reply_sent", {

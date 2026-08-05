@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS idx_whatsapp_outbound_deliveries_idempotent_success;
+DROP INDEX IF EXISTS idx_whatsapp_outbound_deliveries_status_created;
+DROP INDEX IF EXISTS idx_whatsapp_outbound_deliveries_org_phone_created;
+DROP TABLE IF EXISTS whatsapp_outbound_deliveries;

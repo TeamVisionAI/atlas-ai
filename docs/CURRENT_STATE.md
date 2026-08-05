@@ -47,6 +47,7 @@ Facebook Lead
 ## In Progress
 
 - **Sprint 16** — Facebook Lead → WhatsApp → qualification → interview scheduling automation
+- **BR-075** — WhatsApp outbound customer-care window + approved-template gate (production safety); outside-window messaging requires operational Meta template configuration
 
 ## Architecture freeze (v1.0)
 

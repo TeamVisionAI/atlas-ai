@@ -339,3 +339,48 @@ Adds:
 
 PI APIs identify reviews by `reviewId` only and never return `prospectId` or plaintext policy numbers.
 
+
+## BR-075 — WhatsApp outbound deliveries (migration 028)
+
+### Backup / recovery (required before apply)
+
+1. Create a verified Supabase/Postgres snapshot (or `pg_dump` of production) and record the snapshot ID/time.
+2. Confirm rollback file exists: `028_whatsapp_outbound_deliveries_down.sql`.
+3. Apply only with explicit confirmation (script below). This tooling does **not** create backups.
+
+### Apply migration
+
+Idempotent (`CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`):
+
+```
+backend/database/migrations/028_whatsapp_outbound_deliveries.sql
+```
+
+Canonical apply helper:
+
+```bash
+CONFIRM_WHATSAPP_OUTBOUND_MIGRATION_028=yes node -r dotenv/config \
+  backend/dev/applyWhatsAppOutboundDeliveriesMigration028.js
+```
+
+Creates:
+
+- `whatsapp_outbound_deliveries` — durable outbound authorization/delivery audit
+- Indexes for org+phone, status, and idempotent successful sends
+
+Rollback:
+
+```
+backend/database/migrations/028_whatsapp_outbound_deliveries_down.sql
+```
+
+### Runtime without migration
+
+- Outbound authorization gate still runs (window + template fail-closed).
+- Durable delivery inserts are skipped safely when the table is missing (`TABLE_MISSING`).
+- Sanitized conversation-log / business-event audit still records blocked attempts.
+- Application startup does not require the table.
+
+### After migration
+
+Blocked/sent WhatsApp attempts persist to `whatsapp_outbound_deliveries` with organization scoping and idempotency for successful sends.

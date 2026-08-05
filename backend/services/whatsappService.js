@@ -2,8 +2,8 @@ const { sendAndPersistWhatsAppMessage } = require("../core/whatsappOutboundPipel
 const { normalizePhoneNumber } = require("../core/phoneNormalizer");
 
 /**
- * Sprint 11.1 — WhatsApp send entry point.
- * All outbound messages persist + emit through the outbound pipeline.
+ * Sprint 11.1 / BR-075 — WhatsApp send entry point.
+ * All outbound messages authorize + persist through the outbound pipeline gate.
  */
 async function sendTextMessage(to, message, options = {}) {
   const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
@@ -12,7 +12,13 @@ async function sendTextMessage(to, message, options = {}) {
     to: metaTo,
     message,
     actor: options.actor || (options.intent === "AGENT_ACTION" ? "AGENT" : "ATLAS"),
-    intent: options.intent || "WHATSAPP_OUTBOUND"
+    intent: options.intent || "WHATSAPP_OUTBOUND",
+    organizationId: options.organizationId || null,
+    templateKey: options.templateKey || null,
+    templateVariables: options.templateVariables || {},
+    callerMetaTemplateName: options.metaTemplateName || options.callerMetaTemplateName || null,
+    idempotencyKey: options.idempotencyKey || null,
+    now: options.now
   });
 }
 

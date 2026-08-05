@@ -25,6 +25,8 @@ const LEAD_EVENTS = Object.freeze({
 const COMMUNICATION_EVENTS = Object.freeze({
   MESSAGE_RECEIVED: "message_received",
   MESSAGE_SENT: "message_sent",
+  OUTBOUND_BLOCKED: "whatsapp_outbound_blocked",
+  OUTBOUND_RETRY_REQUIRED: "whatsapp_outbound_retry_required",
   CALL_STARTED: "call_started",
   CALL_COMPLETED: "call_completed",
   EMAIL_SENT: "email_sent",

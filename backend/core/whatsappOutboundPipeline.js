@@ -1,13 +1,13 @@
 /**
- * Sprint 11.1 — Outbound WhatsApp message pipeline.
- * Send → persist → event engine (symmetric with inbound).
+ * Sprint 11.1 / BR-075 — Outbound WhatsApp message pipeline.
+ * All real WhatsApp Cloud API sends authorize through the customer-care window + template gate.
  */
 
 const crypto = require("crypto");
 const axios = require("axios");
 const { shouldMockExternalComms } = require("../dev/simulatorGuard");
 const { logConversation } = require("../services/logService");
-const { findProspect } = require("../services/supabaseService");
+const { findProspect, findProspectInOrganization } = require("../services/supabaseService");
 const { normalizePhoneNumber } = require("./phoneNormalizer");
 const { resolveStoragePhone } = require("./whatsappProspectResolver");
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
@@ -15,106 +15,405 @@ const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { resolveWhatsAppSendCredentials } = require("./whatsappSendCredentials");
 const { onMessageSent } = require("./recruitingWorkflowHooks");
 const { resolveProspectCommunicationCode } = require("./prospectLanguage");
+const {
+  authorizeWhatsAppOutbound,
+  DELIVERY_STATUSES,
+  buildDeliveryResult
+} = require("./whatsappOutboundAuthorizationGate");
+const {
+  findSuccessfulDeliveryByIdempotencyKey,
+  recordOutboundDelivery
+} = require("../repositories/whatsappOutboundDeliveryRepository");
+const { recordBusinessEvent } = require("./recruitingBusinessEventBridge");
+const { COMMUNICATION_EVENTS } = require("../modules/business-events/domain/EventTypes");
 
 function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
 }
 
-async function sendAndPersistWhatsAppMessage({
-  to,
-  message,
-  actor = "ATLAS",
-  intent = "WHATSAPP_OUTBOUND"
-}) {
-  const text = String(message || "").trim();
-
-  if (!to || !text) {
-    return { success: false, error: "PHONE_AND_MESSAGE_REQUIRED" };
+function buildTemplateComponents(expectedVariableKeys = [], variables = {}) {
+  if (!expectedVariableKeys.length) {
+    return undefined;
   }
 
+  return [
+    {
+      type: "body",
+      parameters: expectedVariableKeys.map((key) => ({
+        type: "text",
+        text: String(variables[key] ?? "")
+      }))
+    }
+  ];
+}
+
+async function resolveProspectForOutbound(to, organizationId = null) {
   const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
   const storagePhone = resolveStoragePhone(metaTo);
-  const prospect =
-    (await findProspect(storagePhone)) ||
-    (await findProspect(to)) ||
-    (await findProspect(`+${metaTo}`));
-  const providerMessageId = crypto.randomUUID();
-  const correlationId = buildOutboundCorrelationId(providerMessageId);
 
-  let sendResult = { success: true, simulated: false, providerMessageId: null };
-
-  if (shouldMockExternalComms()) {
-    logWhatsAppStage("outbound_delivery_mocked", { to, preview: text.slice(0, 80) });
-    sendResult = { success: true, simulated: true, providerMessageId: null };
-  } else {
-    const credentials = await resolveWhatsAppSendCredentials();
-
-    if (!credentials?.accessToken || !credentials?.phoneNumberId) {
-      logWhatsAppStage("outbound_delivery_failed", {
-        to,
-        level: "error",
-        error: "WHATSAPP_SEND_CREDENTIALS_MISSING"
-      });
-
-      return {
-        success: false,
-        error: "WhatsApp send credentials not configured (Embedded Signup or WHATSAPP_* env)."
-      };
-    }
-
-    try {
-      const response = await axios.post(
-        `https://graph.facebook.com/${credentials.graphApiVersion}/${credentials.phoneNumberId}/messages`,
-        {
-          messaging_product: "whatsapp",
-          to: metaTo,
-          type: "text",
-          text: { body: text }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${credentials.accessToken}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-
-      sendResult = {
-        success: true,
-        simulated: false,
-        providerMessageId: response.data?.messages?.[0]?.id || providerMessageId,
-        credentialSource: credentials.source
-      };
-
-      logWhatsAppStage("outbound_delivery_sent", {
-        to,
-        providerMessageId: sendResult.providerMessageId,
-        credentialSource: credentials.source
-      });
-    } catch (error) {
-      logWhatsAppStage("outbound_delivery_failed", {
-        to,
-        level: "error",
-        status: error.response?.status || null,
-        error: error.response?.data?.error?.message || error.message
-      });
-
-      return {
-        success: false,
-        error: error.response?.data?.error?.message || error.message
-      };
-    }
+  if (organizationId) {
+    return (
+      (await findProspectInOrganization(storagePhone, organizationId)) ||
+      (await findProspectInOrganization(to, organizationId)) ||
+      (await findProspectInOrganization(`+${metaTo}`, organizationId)) ||
+      null
+    );
   }
 
-  const outboundCorrelationId = sendResult.providerMessageId
-    ? buildOutboundCorrelationId(sendResult.providerMessageId)
-    : correlationId;
+  return (
+    (await findProspect(storagePhone)) ||
+    (await findProspect(to)) ||
+    (await findProspect(`+${metaTo}`)) ||
+    null
+  );
+}
+
+async function persistBlockedOrFailedAttempt({
+  prospect,
+  storagePhone,
+  organizationId,
+  intent,
+  actor,
+  authorization,
+  status,
+  idempotencyKey,
+  providerMessageId = null
+}) {
+  const auditMessage = `[whatsapp_outbound:${status}] intent=${intent}; reason=${authorization.reason || status}`;
 
   const logResult = await logConversation({
     phone: prospect?.phone || storagePhone,
     name: prospect?.name || null,
     direction: "outgoing",
-    message: text,
+    message: auditMessage,
+    intent: `WHATSAPP_OUTBOUND_${String(status).toUpperCase()}`,
+    pipeline: prospect?.current_step || "NEW",
+    currentStep: prospect?.current_step || "NEW",
+    language: resolveProspectCommunicationCode(prospect),
+    city: prospect?.city || null,
+    state: prospect?.state || null,
+    actorOverride: actor
+  }).catch(() => ({ success: false }));
+
+  await recordOutboundDelivery({
+    organizationId: organizationId || prospect?.organization_id || null,
+    prospectPhone: prospect?.phone || storagePhone,
+    intent,
+    idempotencyKey,
+    status,
+    deliveryMode: authorization.permittedDeliveryMode,
+    templateKey: authorization.templateKey,
+    metaTemplateName: authorization.metaTemplateName,
+    language: authorization.language,
+    retryable: true,
+    reason: authorization.reason || status,
+    providerMessageId,
+    conversationLogId: logResult?.log?.id || null,
+    metadata: {
+      window: authorization.window,
+      sanitized: true
+    }
+  }).catch(() => ({ success: false }));
+
+  await recordBusinessEvent({
+    phone: prospect?.phone || storagePhone,
+    eventType: COMMUNICATION_EVENTS.OUTBOUND_BLOCKED,
+    actor,
+    channel: "whatsapp",
+    organizationId: organizationId || prospect?.organization_id || null,
+    summary: `WhatsApp outbound ${status}`,
+    payload: {
+      status,
+      intent,
+      reason: authorization.reason || status,
+      retryable: true,
+      templateKey: authorization.templateKey || null,
+      idempotencyKey: idempotencyKey || null
+    }
+  }).catch(() => null);
+
+  return logResult;
+}
+
+async function sendViaGraphApi({
+  credentials,
+  metaTo,
+  mode,
+  text,
+  metaTemplateName,
+  languageCode,
+  expectedVariableKeys,
+  variables
+}) {
+  const body =
+    mode === "template"
+      ? {
+          messaging_product: "whatsapp",
+          to: metaTo,
+          type: "template",
+          template: {
+            name: metaTemplateName,
+            language: { code: languageCode },
+            ...(buildTemplateComponents(expectedVariableKeys, variables)
+              ? { components: buildTemplateComponents(expectedVariableKeys, variables) }
+              : {})
+          }
+        }
+      : {
+          messaging_product: "whatsapp",
+          to: metaTo,
+          type: "text",
+          text: { body: text }
+        };
+
+  const response = await axios.post(
+    `https://graph.facebook.com/${credentials.graphApiVersion}/${credentials.phoneNumberId}/messages`,
+    body,
+    {
+      headers: {
+        Authorization: `Bearer ${credentials.accessToken}`,
+        "Content-Type": "application/json"
+      }
+    }
+  );
+
+  return {
+    success: true,
+    providerMessageId: response.data?.messages?.[0]?.id || null,
+    credentialSource: credentials.source
+  };
+}
+
+/**
+ * Canonical WhatsApp send entry — authorizes then delivers.
+ */
+async function sendAndPersistWhatsAppMessage({
+  to,
+  message,
+  actor = "ATLAS",
+  intent = "WHATSAPP_OUTBOUND",
+  organizationId = null,
+  templateKey = null,
+  templateVariables = {},
+  callerMetaTemplateName = null,
+  idempotencyKey = null,
+  now = new Date()
+} = {}) {
+  if (!to) {
+    return {
+      success: false,
+      status: DELIVERY_STATUSES.PROVIDER_FAILED,
+      error: "PHONE_REQUIRED",
+      retryable: false
+    };
+  }
+
+  const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
+  const storagePhone = resolveStoragePhone(metaTo);
+  const prospect = await resolveProspectForOutbound(to, organizationId);
+  const resolvedOrgId = organizationId || prospect?.organization_id || null;
+
+  if (idempotencyKey) {
+    const existing = await findSuccessfulDeliveryByIdempotencyKey({
+      organizationId: resolvedOrgId,
+      idempotencyKey
+    }).catch(() => null);
+
+    if (existing) {
+      return {
+        success: true,
+        status: DELIVERY_STATUSES.DUPLICATE_SUPPRESSED,
+        simulated: false,
+        providerMessageId: existing.provider_message_id || null,
+        conversationLogId: existing.conversation_log_id || null,
+        retryable: false,
+        reason: "IDEMPOTENT_SUCCESS_EXISTS",
+        delivery: buildDeliveryResult({
+          status: DELIVERY_STATUSES.DUPLICATE_SUPPRESSED,
+          intent,
+          prospectPhone: prospect?.phone || storagePhone,
+          organizationId: resolvedOrgId,
+          permittedDeliveryMode: existing.delivery_mode,
+          templateKey: existing.template_key,
+          reason: "IDEMPOTENT_SUCCESS_EXISTS",
+          retryable: false
+        })
+      };
+    }
+  }
+
+  const authorization = await authorizeWhatsAppOutbound({
+    intent,
+    phone: prospect?.phone || storagePhone,
+    organizationId: resolvedOrgId,
+    prospect: prospect || {},
+    message,
+    templateKey,
+    templateVariables,
+    callerMetaTemplateName,
+    now
+  });
+
+  const isAuthorized =
+    authorization.status === "authorized_freeform" ||
+    authorization.status === "authorized_template";
+
+  if (!isAuthorized) {
+    await persistBlockedOrFailedAttempt({
+      prospect,
+      storagePhone,
+      organizationId: resolvedOrgId,
+      intent,
+      actor,
+      authorization,
+      status: authorization.status,
+      idempotencyKey
+    });
+
+    return {
+      success: false,
+      status: authorization.status,
+      error: authorization.reason,
+      retryable: Boolean(authorization.retryable),
+      delivery: authorization,
+      providerMessageId: null,
+      conversationLogId: null
+    };
+  }
+
+  const mode = authorization.permittedDeliveryMode;
+  const text =
+    mode === "freeform"
+      ? String(authorization.message || message || "").trim()
+      : `[template:${authorization.metaTemplateName}]`;
+
+  const providerMessageIdSeed = crypto.randomUUID();
+  let sendResult = {
+    success: true,
+    simulated: false,
+    providerMessageId: null
+  };
+
+  if (shouldMockExternalComms()) {
+    logWhatsAppStage("outbound_delivery_mocked", {
+      to,
+      mode,
+      preview: text.slice(0, 80)
+    });
+    sendResult = {
+      success: true,
+      simulated: true,
+      providerMessageId: `mock_${providerMessageIdSeed}`
+    };
+  } else {
+    const credentials = await resolveWhatsAppSendCredentials(resolvedOrgId);
+
+    if (!credentials?.accessToken || !credentials?.phoneNumberId) {
+      const failedAuth = {
+        ...authorization,
+        reason: "WHATSAPP_SEND_CREDENTIALS_MISSING",
+        status: DELIVERY_STATUSES.RETRY_REQUIRED,
+        retryable: true
+      };
+
+      await persistBlockedOrFailedAttempt({
+        prospect,
+        storagePhone,
+        organizationId: resolvedOrgId,
+        intent,
+        actor,
+        authorization: failedAuth,
+        status: DELIVERY_STATUSES.RETRY_REQUIRED,
+        idempotencyKey
+      });
+
+      return {
+        success: false,
+        status: DELIVERY_STATUSES.RETRY_REQUIRED,
+        error: "WhatsApp send credentials not configured (Embedded Signup or WHATSAPP_* env).",
+        retryable: true,
+        delivery: failedAuth
+      };
+    }
+
+    try {
+      const graphResult = await sendViaGraphApi({
+        credentials,
+        metaTo,
+        mode,
+        text: authorization.message || message,
+        metaTemplateName: authorization.metaTemplateName,
+        languageCode: authorization.languageCode,
+        expectedVariableKeys: authorization.expectedVariableKeys || [],
+        variables: authorization.variables || templateVariables
+      });
+
+      sendResult = {
+        success: true,
+        simulated: false,
+        providerMessageId: graphResult.providerMessageId || providerMessageIdSeed,
+        credentialSource: graphResult.credentialSource
+      };
+
+      logWhatsAppStage("outbound_delivery_sent", {
+        to,
+        mode,
+        providerMessageId: sendResult.providerMessageId,
+        credentialSource: sendResult.credentialSource
+      });
+    } catch (error) {
+      const safeReason = error.response?.data?.error?.message || error.message || "PROVIDER_FAILED";
+      logWhatsAppStage("outbound_delivery_failed", {
+        to,
+        level: "error",
+        status: error.response?.status || null,
+        error: safeReason
+      });
+
+      const failedAuth = {
+        ...authorization,
+        reason: "PROVIDER_FAILED",
+        status: DELIVERY_STATUSES.PROVIDER_FAILED,
+        retryable: true
+      };
+
+      await persistBlockedOrFailedAttempt({
+        prospect,
+        storagePhone,
+        organizationId: resolvedOrgId,
+        intent,
+        actor,
+        authorization: failedAuth,
+        status: DELIVERY_STATUSES.PROVIDER_FAILED,
+        idempotencyKey
+      });
+
+      return {
+        success: false,
+        status: DELIVERY_STATUSES.PROVIDER_FAILED,
+        error: safeReason,
+        retryable: true,
+        delivery: failedAuth
+      };
+    }
+  }
+
+  const status =
+    mode === "template" ? DELIVERY_STATUSES.SENT_TEMPLATE : DELIVERY_STATUSES.SENT_FREEFORM;
+  const outboundCorrelationId = buildOutboundCorrelationId(
+    sendResult.providerMessageId || providerMessageIdSeed
+  );
+
+  const persistBody =
+    mode === "template"
+      ? `[whatsapp_template:${authorization.metaTemplateName}] intent=${intent}`
+      : String(authorization.message || message || "").trim();
+
+  const logResult = await logConversation({
+    phone: prospect?.phone || storagePhone,
+    name: prospect?.name || null,
+    direction: "outgoing",
+    message: persistBody,
     intent,
     pipeline: prospect?.current_step || "NEW",
     currentStep: prospect?.current_step || "NEW",
@@ -122,7 +421,7 @@ async function sendAndPersistWhatsAppMessage({
     city: prospect?.city || null,
     state: prospect?.state || null,
     eventCorrelationId: outboundCorrelationId,
-    providerMessageId: sendResult.providerMessageId || providerMessageId,
+    providerMessageId: sendResult.providerMessageId || providerMessageIdSeed,
     actorOverride: actor
   });
 
@@ -145,22 +444,58 @@ async function sendAndPersistWhatsAppMessage({
 
     await onMessageSent({
       phone: prospect?.phone || storagePhone,
-      message: text,
+      message: persistBody,
       summary: intent === "FACEBOOK_LEAD_WELCOME" ? "Initial outreach" : "Message sent"
     }).catch((error) => {
       console.warn("[whatsappOutboundPipeline] recruiting workflow hook failed:", error.message);
     });
   }
 
-  return {
-    success: sendResult.success,
-    simulated: sendResult.simulated,
+  await recordOutboundDelivery({
+    organizationId: resolvedOrgId,
+    prospectPhone: prospect?.phone || storagePhone,
+    intent,
+    idempotencyKey,
+    status,
+    deliveryMode: mode,
+    templateKey: authorization.templateKey || null,
+    metaTemplateName: authorization.metaTemplateName || null,
+    language: authorization.language || null,
+    retryable: false,
+    reason: authorization.reason || status,
     providerMessageId: sendResult.providerMessageId,
-    conversationLogId: logResult.log?.id || null
+    conversationLogId: logResult.log?.id || null,
+    metadata: {
+      simulated: Boolean(sendResult.simulated),
+      window: authorization.window
+    }
+  }).catch(() => ({ success: false }));
+
+  return {
+    success: true,
+    status,
+    simulated: Boolean(sendResult.simulated),
+    providerMessageId: sendResult.providerMessageId,
+    conversationLogId: logResult.log?.id || null,
+    retryable: false,
+    delivery: buildDeliveryResult({
+      status,
+      intent,
+      prospectPhone: prospect?.phone || storagePhone,
+      organizationId: resolvedOrgId,
+      permittedDeliveryMode: mode,
+      templateKey: authorization.templateKey,
+      metaTemplateName: authorization.metaTemplateName,
+      language: authorization.language,
+      retryable: false,
+      reason: authorization.reason,
+      window: authorization.window
+    })
   };
 }
 
 module.exports = {
   sendAndPersistWhatsAppMessage,
-  buildOutboundCorrelationId
+  buildOutboundCorrelationId,
+  buildTemplateComponents
 };
