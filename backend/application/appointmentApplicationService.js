@@ -70,6 +70,12 @@ const { findActiveAppointmentForProspect } = require("../core/activeAppointmentR
 const {
   syncAppointmentGoogleCalendar
 } = require("../core/appointmentGoogleSyncEngine");
+const {
+  VIRTUAL_MEETING_URL_SOURCES,
+  VIRTUAL_URL_STATUSES,
+  isZoomProvider,
+  resolveCanonicalVirtualMeetingUrl
+} = require("../core/virtualMeetingUrlResolver");
 
 async function resolveOwnerRepId(agentId) {
   const user = await findUserById(agentId);
@@ -82,46 +88,6 @@ async function resolveAppointmentForMutation(id, organizationId) {
   }
 
   return appointmentRepository.findById(id, organizationId);
-}
-
-function resolveVirtualMeetingUrl(meetingProvider, options = {}) {
-  const url = options.meetingUrl || options.zoomUrl || options.meetLink;
-
-  if (meetingProvider === VIRTUAL_PROVIDERS.ZOOM && url) {
-    return {
-      url,
-      status: "configured",
-      provider: meetingProvider
-    };
-  }
-
-  if (meetingProvider === VIRTUAL_PROVIDERS.ZOOM) {
-    return {
-      url: null,
-      status: "pending",
-      provider: meetingProvider,
-      message: "Virtual meeting link will use the workspace personal meeting URL."
-    };
-  }
-
-  if (meetingProvider === VIRTUAL_PROVIDERS.WHATSAPP_VIDEO) {
-    return {
-      url: null,
-      status: "whatsapp_scheduled",
-      provider: meetingProvider,
-      message: "WhatsApp video call — no link required."
-    };
-  }
-
-  if (meetingProvider === VIRTUAL_PROVIDERS.PHONE_CALL) {
-    return {
-      url: null,
-      status: "phone_scheduled",
-      provider: meetingProvider
-    };
-  }
-
-  return { url: null, status: "pending", provider: meetingProvider || VIRTUAL_PROVIDERS.OTHER };
 }
 
 function buildError(code, message, statusCode = 400) {
@@ -391,22 +357,35 @@ async function createAppointment(input, context = {}) {
 
   let meetingUrl = null;
   let officeLocation = location.meetingAddress;
+  // Implements BR-076 — incomplete existingBooking must not suppress org Personal Meeting URL.
+  let virtualUrlResult = {
+    url: null,
+    status: isVirtual ? VIRTUAL_URL_STATUSES.PENDING : VIRTUAL_URL_STATUSES.NOT_APPLICABLE,
+    source: VIRTUAL_MEETING_URL_SOURCES.UNAVAILABLE,
+    provider: meeting.meetingProvider || null
+  };
 
-  if (isVirtual && !existingBooking) {
-    const virtual = await meetingManagementService.resolveVirtualMeetingUrl(organizationId);
+  if (isVirtual) {
+    virtualUrlResult = await resolveCanonicalVirtualMeetingUrl({
+      organizationId,
+      meetingType: meeting.meetingType,
+      meetingProvider: meeting.meetingProvider,
+      existingBooking
+    });
 
-    if (!virtual.configured) {
+    meetingUrl = virtualUrlResult.url;
+
+    if (
+      !existingBooking &&
+      isZoomProvider(meeting.meetingProvider, meeting.meetingType) &&
+      !meetingUrl
+    ) {
       throw buildError(
         "MEETING_URL_NOT_CONFIGURED",
         "Personal meeting URL is not configured. Add it under Organization → Meeting Management.",
         400
       );
     }
-
-    meetingUrl = virtual.url;
-  } else if (isVirtual && existingBooking) {
-    meetingUrl =
-      existingBooking.meetingUrl || existingBooking.zoomLink || existingBooking.meetLink || null;
   } else if (!officeLocation) {
     officeLocation = await meetingManagementService.resolveOfficeAddress(organizationId);
   }
@@ -440,11 +419,26 @@ async function createAppointment(input, context = {}) {
     throw buildError(bookingResult.reason || "UNAVAILABLE", "Unable to book selected slot.");
   }
 
-  const virtualUrlResult = resolveVirtualMeetingUrl(meeting.meetingProvider, {
-    meetLink: bookingResult.meetingUrl || bookingResult.zoomLink || bookingResult.meetLink,
-    meetingUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl,
-    zoomUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl
-  });
+  if (isVirtual) {
+    // Re-resolve after booking so booking-echoed URLs still win over org settings.
+    virtualUrlResult = await resolveCanonicalVirtualMeetingUrl({
+      organizationId,
+      meetingType: meeting.meetingType,
+      meetingProvider: meeting.meetingProvider,
+      existingBooking: {
+        success: existingBooking?.success,
+        startTimeISO: bookingResult.startTimeISO || existingBooking?.startTimeISO,
+        endTimeISO: bookingResult.endTimeISO || existingBooking?.endTimeISO,
+        googleCalendarEventId:
+          bookingResult.googleCalendarEventId || existingBooking?.googleCalendarEventId || null,
+        meetingUrl: bookingResult.meetingUrl || existingBooking?.meetingUrl || meetingUrl,
+        zoomLink: bookingResult.zoomLink || existingBooking?.zoomLink || null,
+        zoomUrl: bookingResult.zoomUrl || existingBooking?.zoomUrl || null,
+        meetLink: bookingResult.meetLink || existingBooking?.meetLink || null
+      }
+    });
+    meetingUrl = virtualUrlResult.url;
+  }
 
   const emailStatus = resolveEmailStatus(email);
   const confirmationStatus =
@@ -485,7 +479,7 @@ async function createAppointment(input, context = {}) {
       meetingProvider: meeting.meetingProvider,
       ...location,
       meetingNotes: notes || location.meetingNotes,
-      virtualMeetingUrl: virtualUrlResult.url,
+      virtualMeetingUrl: isVirtual ? virtualUrlResult.url : null,
       calendarEventId: bookingResult.googleCalendarEventId,
       calendarProvider: bookingResult.googleCalendarSynced ? "google_calendar" : null,
       confirmationStatus,
@@ -506,6 +500,7 @@ async function createAppointment(input, context = {}) {
         prospectEmail: email,
         emailStatus,
         virtualUrlStatus: virtualUrlResult.status,
+        virtualUrlSource: virtualUrlResult.source,
         ownerRepId,
         interviewerUserId: interviewAssignment.interviewerUserId,
         interviewerName: interviewAssignment.interviewerName
@@ -656,25 +651,40 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   const previousStart = appointment.startDateTime;
   const { dateKey, timeKey } = matchedSlot;
 
+  // Implements BR-076 — preserve persisted Zoom URL; fill missing from org settings only.
+  const virtualUrlResolution = await resolveCanonicalVirtualMeetingUrl({
+    organizationId: appointment.organizationId || organizationId,
+    meetingType: appointment.meetingType,
+    meetingProvider: appointment.meetingProvider,
+    persistedAppointment: appointment
+  });
+
+  const appointmentForSync = {
+    ...appointment,
+    startDateTime: matchedSlot.startTimeISO,
+    endDateTime: matchedSlot.endTimeISO,
+    virtualMeetingUrl:
+      appointment.meetingType === MEETING_TYPES.VIRTUAL
+        ? virtualUrlResolution.url || appointment.virtualMeetingUrl || null
+        : null
+  };
+
   // Implements BR-039/BR-050 — never silently skip Google sync when event id is missing/stale.
-  const calendarSync = await syncAppointmentGoogleCalendar(
-    {
-      ...appointment,
-      startDateTime: matchedSlot.startTimeISO,
-      endDateTime: matchedSlot.endTimeISO
-    },
-    {
-      organizationId: appointment.organizationId,
-      eventOverrides: {
-        summary: formatAppointmentTitle(appointment.purpose, appointment.metadata),
-        description: appointment.meetingNotes || "",
-        startTimeISO: matchedSlot.startTimeISO,
-        endTimeISO: matchedSlot.endTimeISO,
-        timezone: appointment.timezone,
-        location: appointment.meetingAddress || appointment.virtualMeetingUrl || null
-      }
+  const calendarSync = await syncAppointmentGoogleCalendar(appointmentForSync, {
+    organizationId: appointment.organizationId,
+    eventOverrides: {
+      summary: formatAppointmentTitle(appointment.purpose, appointment.metadata),
+      description: appointment.meetingNotes || "",
+      startTimeISO: matchedSlot.startTimeISO,
+      endTimeISO: matchedSlot.endTimeISO,
+      timezone: appointment.timezone,
+      location:
+        appointment.meetingAddress ||
+        appointmentForSync.virtualMeetingUrl ||
+        null,
+      zoomUrl: appointmentForSync.virtualMeetingUrl || null
     }
-  );
+  });
 
   appointmentReminderEngine.cancelReminders(appointment.id);
 
@@ -690,12 +700,24 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
 
   const updated = {
     ...domainUpdated,
+    virtualMeetingUrl:
+      appointment.meetingType === MEETING_TYPES.VIRTUAL
+        ? virtualUrlResolution.url || domainUpdated.virtualMeetingUrl || appointment.virtualMeetingUrl || null
+        : domainUpdated.virtualMeetingUrl || null,
     confirmationStatus: appointment.confirmationStatus,
     reminderStatus: appointment.reminderStatus,
     calendarEventId: calendarSync.calendarEventId,
     calendarProvider: calendarSync.calendarProvider,
     metadata: {
       ...(domainUpdated.metadata || appointment.metadata || {}),
+      virtualUrlStatus:
+        appointment.meetingType === MEETING_TYPES.VIRTUAL
+          ? virtualUrlResolution.status
+          : domainUpdated.metadata?.virtualUrlStatus || appointment.metadata?.virtualUrlStatus,
+      virtualUrlSource:
+        appointment.meetingType === MEETING_TYPES.VIRTUAL
+          ? virtualUrlResolution.source
+          : domainUpdated.metadata?.virtualUrlSource || appointment.metadata?.virtualUrlSource,
       calendarSyncStatus: calendarSync.calendarSyncStatus,
       calendarSyncError: calendarSync.calendarSyncError,
       calendarSyncedAt: new Date().toISOString(),
