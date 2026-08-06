@@ -1,7 +1,5 @@
 # Recruit AI v2 — Forensic Audit & Communications Architecture
 
-**Sprint status:** Evidence and architecture only — conversation engine not rewritten.  
-**Branch:** `feature/recruit-ai-v2-communications-audit`  
 **Canonical forensic case:** TV-000028 / Juanito Garcia (Team Vision)  
 **Conversation window (America/New_York):** 2026-08-05 ~20:06 – 21:36 ET  
 **(UTC records):** 2026-08-06T00:06Z – 2026-08-06T01:36Z
@@ -14,15 +12,18 @@
 | [02_COMMUNICATIONS_INVENTORY.md](./02_COMMUNICATIONS_INVENTORY.md) | Phase 3 — every communication source + source-of-truth map |
 | [03_CURRENT_ARCHITECTURE_MAP.md](./03_CURRENT_ARCHITECTURE_MAP.md) | Phase 4 — inbound→outbound execution path |
 | [04_RECRUIT_AI_V2_ARCHITECTURE.md](./04_RECRUIT_AI_V2_ARCHITECTURE.md) | Phase 6 — v2 engine + Communications Center design |
+| [05_COMMUNICATIONS_CENTER_READ_MODEL.md](./05_COMMUNICATIONS_CENTER_READ_MODEL.md) | Communications Center MVP — read-only aggregation API |
 
 ## Regression fixture
 
 `backend/test/fixtures/recruitAiV2/tv000028-scheduling-replay.json`  
-Contract test: `backend/test/recruitAiV2Tv000028ReplayContract.test.js`
+Contract tests:
+- `backend/test/recruitAiV2Tv000028ReplayContract.test.js`
+- `backend/test/communicationsCenterReadModel.test.js`
 
-## Boundaries (audit phase)
+## Boundaries
 
-Do **not** change in this sprint:
+Do **not** change without an explicit sprint:
 
 - Meta Review auth/session/allowlist/language lock
 - BR-075 gate, WhatsApp/WABA config
@@ -30,10 +31,11 @@ Do **not** change in this sprint:
 - Migrations 026–030, RLS, securities, Policy Intelligence
 - Production prospect/appointment rows
 - Live WhatsApp sends
+- Recruit AI decision / parser / response-generation logic (until v2 cutover sprint)
 
-## Next implementation sprints (not this PR)
+## Implementation order
 
-1. Communications Center read model (unified chronological view)
+1. ~~Communications Center read model (unified chronological view)~~ — MVP API
 2. Durable conversation context store
 3. Structured decision contract + side-effect authorization
 4. Replay harness driving CE against this fixture (no live WhatsApp)

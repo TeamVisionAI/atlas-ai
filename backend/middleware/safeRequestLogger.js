@@ -6,6 +6,7 @@ function sanitizeUrl(url = "") {
   return String(url)
     .replace(/\/api\/mission-control\/[^/?]+/gi, "/api/mission-control/[redacted]")
     .replace(/\/api\/prospect-workspace\/[^/?]+/gi, "/api/prospect-workspace/[redacted]")
+    .replace(/\/api\/communications-center\/[^/?]+/gi, "/api/communications-center/[redacted]")
     .replace(/\/timeline\/[^/?]+/gi, "/timeline/[redacted]")
     .replace(/\/api\/prospects\/[^/?]+/gi, "/api/prospects/[redacted]");
 }
