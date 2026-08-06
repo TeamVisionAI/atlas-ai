@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prospect Workspace scroll fixture</title>
+    <!-- Real layout CSS (copied into page by verification script, or linked for manual runs). -->
+    <link rel="stylesheet" href="../src/index.css" />
+    <link rel="stylesheet" href="../src/layouts/MainLayout.css" />
+    <link rel="stylesheet" href="../src/pages/ProspectWorkspace.css" />
+    <style>
+      /* Fixture-only markers — no production behavior */
+      .fixture-block {
+        min-height: 420px;
+        padding: 24px;
+        border: 1px dashed #94a3b8;
+        background: #f8fafc;
+        margin: 0;
+      }
+      .fixture-block h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="atlas-layout">
+        <aside class="atlas-layout__sidebar is-open" aria-hidden="true">
+          <div class="atlas-layout__sidebar-header">
+            <h2 class="atlas-layout__brand-title">Atlas AI</h2>
+          </div>
+          <nav class="atlas-layout__nav" aria-label="Fixture nav">
+            <a class="atlas-layout__nav-link" href="#top">Nav</a>
+          </nav>
+        </aside>
+        <div class="atlas-layout__frame">
+          <header class="atlas-layout__header is-visible">
+            <span class="atlas-layout__header-title">Atlas AI</span>
+          </header>
+          <main class="atlas-layout__main">
+            <div class="atlas-layout__content">
+              <div class="prospect-workspace" data-testid="prospect-workspace" data-fixture="true">
+                <p class="prospect-workspace__shortcuts-hint">Fixture — no PII</p>
+                <header data-testid="primary-header">
+                  <h1>Fixture Prospect</h1>
+                  <p>Synthetic identity for scroll verification only.</p>
+                </header>
+                <section id="operational-interview" class="fixture-block" data-testid="interview">
+                  <h2>Interview</h2>
+                  <p>Long fixture block A.</p>
+                </section>
+                <section id="communication-history" class="fixture-block" data-testid="history">
+                  <h2>Communication History</h2>
+                  <p>Long fixture block B.</p>
+                </section>
+                <section
+                  id="communications-center"
+                  class="fixture-block"
+                  data-testid="communications-center"
+                >
+                  <h2>Communications Center</h2>
+                  <p>Long fixture block C.</p>
+                </section>
+                <section class="fixture-block" data-testid="bottom-block">
+                  <h2>Bottom</h2>
+                  <p>End of workspace fixture.</p>
+                </section>
+                <!-- Extra height so the page must scroll -->
+                <div class="fixture-block" aria-hidden="true" style="min-height: 1200px"></div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+    <script>
+      window.__atlasScrollProbe = function atlasScrollProbe() {
+        const selectors = [
+          ["html", document.documentElement],
+          ["body", document.body],
+          ["#root", document.querySelector("#root")],
+          [".atlas-layout", document.querySelector(".atlas-layout")],
+          [".atlas-layout__frame", document.querySelector(".atlas-layout__frame")],
+          [".atlas-layout__main", document.querySelector(".atlas-layout__main")],
+          [".atlas-layout__content", document.querySelector(".atlas-layout__content")],
+          [".prospect-workspace", document.querySelector(".prospect-workspace")]
+        ];
+
+        function metrics(el) {
+          if (!el) return null;
+          const cs = getComputedStyle(el);
+          return {
+            overflow: cs.overflow,
+            overflowX: cs.overflowX,
+            overflowY: cs.overflowY,
+            overscrollBehavior: cs.overscrollBehavior,
+            position: cs.position,
+            pointerEvents: cs.pointerEvents,
+            height: cs.height,
+            maxHeight: cs.maxHeight,
+            clientHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight,
+            scrollTop: el.scrollTop,
+            canScrollY: el.scrollHeight > el.clientHeight + 1
+          };
+        }
+
+        const nodes = {};
+        for (const [name, el] of selectors) {
+          nodes[name] = metrics(el);
+        }
+
+        const se = document.scrollingElement;
+        return {
+          scrollingElement: se === document.documentElement ? "documentElement" : se === document.body ? "body" : String(se),
+          bodyOverflowInline: document.body.style.overflow || "",
+          documentScrollTop: document.scrollingElement?.scrollTop ?? 0,
+          documentScrollHeight: document.scrollingElement?.scrollHeight ?? 0,
+          documentClientHeight: document.scrollingElement?.clientHeight ?? 0,
+          nodes,
+          overlayHit: (() => {
+            const midX = Math.floor(window.innerWidth / 2);
+            const midY = Math.floor(window.innerHeight / 2);
+            const top = document.elementFromPoint(midX, midY);
+            return top
+              ? {
+                  tag: top.tagName,
+                  className: typeof top.className === "string" ? top.className.slice(0, 120) : "",
+                  fixed:
+                    getComputedStyle(top).position === "fixed" ||
+                    getComputedStyle(top).position === "sticky"
+                }
+              : null;
+          })()
+        };
+      };
+    </script>
+  </body>
+</html>
