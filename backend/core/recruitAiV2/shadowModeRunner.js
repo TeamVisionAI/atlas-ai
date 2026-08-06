@@ -1,0 +1,266 @@
+/**
+ * Recruit AI v2 — production shadow-mode runner.
+ *
+ * Live CE remains authoritative. Shadow runs asynchronously after the live turn
+ * and must never delay or interrupt customer-visible responses.
+ *
+ * Implements BR-081 Phase 3.
+ */
+
+const { logWhatsAppStage } = require("../whatsappStructuredLogger");
+const { resolveProspectPreferredLanguage } = require("../prospectLanguage");
+const { isEligibleForShadowEvaluation } = require("./shadowConfig");
+const { isMetaReviewScope, createContextPersistenceService } = require("./contextPersistenceService");
+const {
+  createSupabaseContextRepository,
+  createMemoryContextRepository
+} = require("./contextRepository");
+const {
+  createSupabaseShadowEvaluationRepository,
+  createMemoryShadowEvaluationRepository
+} = require("./shadowEvaluationRepository");
+const {
+  createShadowEvaluationService,
+  sanitizeFailureMessage
+} = require("./shadowEvaluationService");
+
+let cachedService = null;
+let cachedServiceKey = null;
+
+function resolveSupabaseClient() {
+  try {
+    const { getServiceRoleClient } = require("../../services/backendDbService");
+    return getServiceRoleClient();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build shadow service (Supabase when available; memory for tests/injection).
+ */
+function getOrCreateShadowEvaluationService({
+  shadowRepository = null,
+  contextRepository = null,
+  persistenceService = null,
+  forceNew = false
+} = {}) {
+  if (shadowRepository || contextRepository || persistenceService) {
+    const contextRepo = contextRepository || createMemoryContextRepository();
+    const persist =
+      persistenceService ||
+      createContextPersistenceService({ repository: contextRepo });
+    const shadowRepo =
+      shadowRepository || createMemoryShadowEvaluationRepository();
+    return createShadowEvaluationService({
+      repository: shadowRepo,
+      persistenceService: persist
+    });
+  }
+
+  const supabase = resolveSupabaseClient();
+  const key = supabase ? "supabase" : "memory-fallback";
+
+  if (!forceNew && cachedService && cachedServiceKey === key) {
+    return cachedService;
+  }
+
+  if (supabase) {
+    cachedService = createShadowEvaluationService({
+      repository: createSupabaseShadowEvaluationRepository(supabase),
+      persistenceService: createContextPersistenceService({
+        repository: createSupabaseContextRepository(supabase)
+      })
+    });
+  } else {
+    // Local/dev without service role: evaluate + keep in-process only.
+    cachedService = createShadowEvaluationService({
+      repository: createMemoryShadowEvaluationRepository(),
+      persistenceService: createContextPersistenceService({
+        repository: createMemoryContextRepository()
+      })
+    });
+  }
+
+  cachedServiceKey = key;
+  return cachedService;
+}
+
+function resetShadowEvaluationServiceCache() {
+  cachedService = null;
+  cachedServiceKey = null;
+}
+
+/**
+ * Execute shadow evaluation synchronously (tests / explicit callers).
+ * Never throws for runtime evaluation failures.
+ */
+async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
+  const {
+    prospect,
+    organizationId = null,
+    inbound = null,
+    conversation = null,
+    env = process.env,
+    messageText = null,
+    inboundMessageId = null,
+    channel = "whatsapp"
+  } = input;
+
+  const orgId = organizationId || prospect?.organization_id || null;
+  const prospectId = prospect?.id || null;
+  const providerMessageId =
+    inboundMessageId ||
+    inbound?.providerMessageId ||
+    null;
+
+  const eligibility = isEligibleForShadowEvaluation({
+    organizationId: orgId,
+    prospectId,
+    inboundMessageId: providerMessageId,
+    env
+  });
+
+  if (!eligibility.eligible) {
+    return {
+      scheduled: false,
+      skipped: true,
+      reason: eligibility.reason,
+      config: eligibility.config
+    };
+  }
+
+  if (
+    isMetaReviewScope({
+      organizationId: orgId,
+      prospectId,
+      channel
+    })
+  ) {
+    return {
+      scheduled: false,
+      skipped: true,
+      reason: "META_REVIEW_ISOLATED",
+      config: eligibility.config
+    };
+  }
+
+  const service = deps.service || getOrCreateShadowEvaluationService(deps);
+
+  try {
+    const result = await service.evaluateShadowTurn({
+      prospect,
+      organizationId: orgId,
+      inboundMessageId: providerMessageId,
+      messageText:
+        messageText != null
+          ? messageText
+          : inbound?.body || inbound?.text || "",
+      channel,
+      conversation: conversation || {},
+      language: resolveProspectPreferredLanguage(prospect || {}),
+      options: {
+        env,
+        flexible: true
+      }
+    });
+
+    logWhatsAppStage("recruit_ai_v2_shadow_evaluated", {
+      organizationId: orgId,
+      prospectId,
+      providerMessageId,
+      divergence: result.divergenceClassification || null,
+      skipped: Boolean(result.skipped),
+      reason: result.reason || null
+    });
+
+    return {
+      scheduled: false,
+      skipped: Boolean(result.skipped),
+      reason: result.reason,
+      config: eligibility.config,
+      result
+    };
+  } catch (error) {
+    logWhatsAppStage("recruit_ai_v2_shadow_failed", {
+      level: "warn",
+      organizationId: orgId,
+      prospectId,
+      providerMessageId,
+      error: sanitizeFailureMessage(error)
+    });
+
+    return {
+      scheduled: false,
+      skipped: false,
+      reason: "SHADOW_RUNTIME_ERROR",
+      config: eligibility.config,
+      error: sanitizeFailureMessage(error)
+    };
+  }
+}
+
+/**
+ * Fire-and-forget shadow evaluation after the live turn completes.
+ * Must never reject into the live inbound pipeline.
+ */
+function scheduleRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
+  const schedule =
+    deps.schedule ||
+    ((fn) => {
+      setImmediate(fn);
+    });
+
+  try {
+    const eligibility = isEligibleForShadowEvaluation({
+      organizationId: input.organizationId || input.prospect?.organization_id,
+      prospectId: input.prospect?.id,
+      inboundMessageId:
+        input.inboundMessageId || input.inbound?.providerMessageId || null,
+      env: input.env || process.env
+    });
+
+    if (!eligibility.eligible) {
+      return {
+        scheduled: false,
+        skipped: true,
+        reason: eligibility.reason,
+        config: eligibility.config
+      };
+    }
+
+    schedule(() =>
+      runRecruitAiV2ShadowEvaluation(input, deps).catch((error) => {
+        logWhatsAppStage("recruit_ai_v2_shadow_failed", {
+          level: "warn",
+          error: sanitizeFailureMessage(error)
+        });
+      })
+    );
+
+    return {
+      scheduled: true,
+      skipped: false,
+      reason: null,
+      config: eligibility.config
+    };
+  } catch (error) {
+    logWhatsAppStage("recruit_ai_v2_shadow_schedule_failed", {
+      level: "warn",
+      error: sanitizeFailureMessage(error)
+    });
+    return {
+      scheduled: false,
+      skipped: true,
+      reason: "SHADOW_SCHEDULE_ERROR",
+      error: sanitizeFailureMessage(error)
+    };
+  }
+}
+
+module.exports = {
+  scheduleRecruitAiV2ShadowEvaluation,
+  runRecruitAiV2ShadowEvaluation,
+  getOrCreateShadowEvaluationService,
+  resetShadowEvaluationServiceCache
+};

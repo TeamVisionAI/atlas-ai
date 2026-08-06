@@ -35,6 +35,28 @@ const {
   createContextPersistenceService,
   isMetaReviewScope
 } = require("./contextPersistenceService");
+const {
+  resolveShadowConfig,
+  isShadowModeEnabled,
+  isEligibleForShadowEvaluation
+} = require("./shadowConfig");
+const {
+  createMemoryShadowEvaluationRepository,
+  createSupabaseShadowEvaluationRepository
+} = require("./shadowEvaluationRepository");
+const {
+  createShadowEvaluationService,
+  buildReconstructionInput
+} = require("./shadowEvaluationService");
+const {
+  scheduleRecruitAiV2ShadowEvaluation,
+  runRecruitAiV2ShadowEvaluation
+} = require("./shadowModeRunner");
+const {
+  classifyDivergence,
+  extractLiveCeResponseIntent,
+  DIVERGENCE
+} = require("./shadowDivergence");
 const constants = require("./constants");
 
 module.exports = {
@@ -62,5 +84,17 @@ module.exports = {
   createSupabaseContextRepository,
   createContextPersistenceService,
   isMetaReviewScope,
+  resolveShadowConfig,
+  isShadowModeEnabled,
+  isEligibleForShadowEvaluation,
+  createMemoryShadowEvaluationRepository,
+  createSupabaseShadowEvaluationRepository,
+  createShadowEvaluationService,
+  buildReconstructionInput,
+  scheduleRecruitAiV2ShadowEvaluation,
+  runRecruitAiV2ShadowEvaluation,
+  classifyDivergence,
+  extractLiveCeResponseIntent,
+  DIVERGENCE,
   ...constants
 };

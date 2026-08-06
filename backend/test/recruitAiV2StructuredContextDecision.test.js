@@ -164,7 +164,7 @@ test("8. side-effect authorizer denies send/book even if env looks enabled", () 
     responsePlan: { templateKey: "appointment_confirm_deferred" },
     env: {
       RECRUIT_AI_V2_EXECUTION_ENABLED: "true",
-      RECRUIT_AI_V2_SHADOW: "true"
+      RECRUIT_AI_V2_SHADOW_ENABLED: "true"
     }
   });
 

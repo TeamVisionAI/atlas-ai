@@ -1,6 +1,6 @@
 # Recruit AI v2 — Durable Context Schema (Phase 2)
 
-**Status:** Designed + implemented in code/tests; migration `032` not applied by this PR’s stop conditions.  
+**Status:** Migration `032` applied; durable context + shadow ledger tables exist.  
 **Rule:** BR-081  
 **Not a production CE cutover.**
 
@@ -31,7 +31,7 @@ Unique active constraint: `(organization_id, prospect_id, channel) WHERE archive
 
 ### `recruit_ai_v2_shadow_evaluations`
 
-Prepared for the next phase. Stores divergence telemetry fields (live CE intent vs v2 intent/decision/confidence/proposed side effect). **No write path enabled in Phase 2.**
+Stores divergence telemetry (live CE intent vs v2 intent/decision/confidence/proposed side effect). Write path is Phase 3 (`shadowEvaluationService`) and is **disabled by default** via `RECRUIT_AI_V2_SHADOW_ENABLED=false`. See [07_SHADOW_MODE.md](./07_SHADOW_MODE.md).
 
 ## Persistence rules
 
@@ -55,4 +55,4 @@ Prepared for the next phase. Stores divergence telemetry fields (live CE intent 
 
 ## Next phase
 
-Shadow-mode CE wiring that writes `recruit_ai_v2_shadow_evaluations` beside live CE responses — requires explicit approval.
+Controlled production enablement of shadow flags (org allowlist + sample rate), then CE cutover behind BR-075 — each requires explicit approval.
