@@ -108,6 +108,36 @@ async function buildAlphaMorningBrief(options = {}) {
   const topRecommendation = executive.recommendations?.[0] || null;
   const localHour = partsInZone(reference.getTime(), todayWindow.timeZone).hour;
 
+  // Implements BR-080 — attention counts (org-local day for "new today" via created_at window).
+  let unassignedLeads = 0;
+  let newUnacknowledgedLeads = 0;
+  let humanAttentionRequiredLeads = 0;
+
+  for (const summary of queue) {
+    const prospect = prospectByPhone.get(summary.phone) || {};
+    if (!prospect.owner_user_id) {
+      unassignedLeads += 1;
+    }
+
+    if (
+      !prospect.acknowledged_at &&
+      (prospect.attention_status === "new" ||
+        prospect.attention_status === "ai_responding" ||
+        prospect.attention_status === "waiting_for_prospect" ||
+        prospect.attention_status === "human_required" ||
+        prospect.new_lead_received_at)
+    ) {
+      newUnacknowledgedLeads += 1;
+    }
+
+    if (
+      summary.needsHumanAttention ||
+      prospect.attention_status === "human_required"
+    ) {
+      humanAttentionRequiredLeads += 1;
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     timeZone: todayWindow.timeZone,
@@ -144,7 +174,15 @@ async function buildAlphaMorningBrief(options = {}) {
     todaysPriorities: {
       followUpsOverdue,
       interviewsToday,
-      hotProspects
+      hotProspects,
+      unassignedLeads,
+      newUnacknowledgedLeads,
+      humanAttentionRequiredLeads
+    },
+    attention: {
+      unassignedLeads,
+      newUnacknowledgedLeads,
+      humanAttentionRequiredLeads
     },
     aiRecommendation: topRecommendation
       ? {

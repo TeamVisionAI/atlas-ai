@@ -16,7 +16,9 @@ const MISSION_TYPES = Object.freeze({
   SEND_LICENSING_PACKET: "SendLicensingPacket",
   COMPLETE_ORIENTATION: "CompleteOrientation",
   REVIEW_FNA: "ReviewFNA",
-  POLICY_DELIVERY: "PolicyDelivery"
+  POLICY_DELIVERY: "PolicyDelivery",
+  // Implements BR-080 — durable new-lead / unassigned / unacknowledged attention.
+  NEW_LEAD_ATTENTION: "NewLeadAttention"
 });
 
 const MISSION_TYPE_VALUES = Object.freeze(Object.values(MISSION_TYPES));

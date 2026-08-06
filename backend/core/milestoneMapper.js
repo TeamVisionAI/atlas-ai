@@ -222,8 +222,39 @@ function deriveDefaultOwnership(milestone, agentState = {}) {
   return OWNERSHIP.ATLAS;
 }
 
+function isOpenNewLeadAttention(prospect = {}) {
+  if (prospect.acknowledged_at || prospect.attention_status === "acknowledged") {
+    return false;
+  }
+
+  if (prospect.attention_status === "resolved") {
+    return false;
+  }
+
+  const step = String(prospect.current_step || prospect.status || "").toUpperCase();
+  if (["CLOSED", "DO_NOT_CONTACT", "RECRUITED"].includes(step)) {
+    return false;
+  }
+
+  return Boolean(
+    prospect.new_lead_received_at ||
+      prospect.attention_status === "new" ||
+      prospect.attention_status === "ai_responding" ||
+      prospect.attention_status === "waiting_for_prospect" ||
+      prospect.attention_status === "human_required" ||
+      milestoneIsEarlyLead(prospect)
+  );
+}
+
+function milestoneIsEarlyLead(prospect = {}) {
+  const step = String(prospect.current_step || prospect.status || "").toUpperCase();
+  return ["NEW", "GREETING", "NEW_LEAD", "GREETING_SENT"].includes(step);
+}
+
 /**
- * Mission Control priority tier (read-only, Sprint 8A target order).
+ * Mission Control priority tier (read-only, Sprint 8A target order + BR-080).
+ * PENDING_INTERVIEW_RESULTS remains CRITICAL (rank 1) — not weakened.
+ * UNASSIGNED_NEW_LEAD also uses rank 1; both are critical.
  */
 function computeMissionControlPriority({
   milestone,
@@ -238,10 +269,33 @@ function computeMissionControlPriority({
     };
   }
 
-  if (needsHumanAttention) {
+  const unassigned =
+    prospect &&
+    !prospect.owner_user_id &&
+    isOpenNewLeadAttention(prospect);
+
+  if (unassigned) {
+    return {
+      rank: PRIORITY_TIERS.UNASSIGNED_NEW_LEAD,
+      tier: "UNASSIGNED_NEW_LEAD"
+    };
+  }
+
+  if (needsHumanAttention || prospect?.attention_status === "human_required") {
     return {
       rank: PRIORITY_TIERS.HUMAN_ESCALATION,
       tier: "HUMAN_ESCALATION"
+    };
+  }
+
+  if (
+    prospect?.owner_user_id &&
+    isOpenNewLeadAttention(prospect) &&
+    !prospect.acknowledged_at
+  ) {
+    return {
+      rank: PRIORITY_TIERS.ASSIGNED_UNACKNOWLEDGED_NEW,
+      tier: "ASSIGNED_UNACKNOWLEDGED_NEW"
     };
   }
 

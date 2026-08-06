@@ -21,6 +21,10 @@ const {
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const recruitingWorkflowHooks = require("./recruitingWorkflowHooks");
 const whatsappInboundOrganizationResolver = require("./whatsappInboundOrganizationResolver");
+const {
+  resolveNewLeadAssignment,
+  buildNewLeadAttentionFields
+} = require("./newLeadAssignmentEngine");
 
 const { supabase } = supabaseService;
 const { EVENT_TYPES } = eventEngine;
@@ -41,7 +45,12 @@ function isMissingWhatsAppColumn(error) {
     message.includes("prospect_number") ||
     message.includes("entry_method") ||
     message.includes("source") ||
-    message.includes("organization_id")
+    message.includes("organization_id") ||
+    message.includes("assignment_status") ||
+    message.includes("attention_status") ||
+    message.includes("new_lead_received_at") ||
+    message.includes("acknowledged_at") ||
+    message.includes("escalation_level")
   );
 }
 
@@ -87,6 +96,13 @@ async function insertWhatsAppProspectRow({
   const prospectNumber = await prospectNumberService.generateNextProspectNumber();
   const fullName = String(name || "Unknown").trim() || "Unknown";
 
+  // Implements BR-080 — deterministic owner or durable Unassigned at create.
+  const assignment = await resolveNewLeadAssignment({
+    organizationId,
+    source: WHATSAPP_SOURCE.FACEBOOK
+  });
+  const attentionFields = buildNewLeadAttentionFields(assignment);
+
   // Implements tenant scoping for WhatsApp inbound leads (org required).
   const insertRow = {
     phone: storagePhone,
@@ -103,7 +119,8 @@ async function insertWhatsAppProspectRow({
     source: WHATSAPP_SOURCE.FACEBOOK,
     entry_method: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     preferred_communication_channel: "WHATSAPP",
-    last_message: firstMessage || ""
+    last_message: firstMessage || "",
+    ...attentionFields
   };
 
   const { data, error } = await supabase.from("prospects").insert(insertRow).select().single();
@@ -115,6 +132,7 @@ async function insertWhatsAppProspectRow({
         phone: storagePhone,
         name: fullName,
         organization_id: organizationId,
+        owner_user_id: attentionFields.owner_user_id,
         current_step: "NEW",
         language: "es",
         last_message: firstMessage || "",
@@ -123,7 +141,11 @@ async function insertWhatsAppProspectRow({
           entry_method: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
           normalized_phone: normalizedPhone,
           prospect_number: prospectNumber,
-          organization_id: organizationId
+          organization_id: organizationId,
+          assignment_status: attentionFields.assignment_status,
+          assignment_source: attentionFields.assignment_source,
+          attention_status: attentionFields.attention_status,
+          new_lead_received_at: attentionFields.new_lead_received_at
         })
       })
       .select()
@@ -265,6 +287,7 @@ async function locateOrCreateWhatsAppProspect({
       updates.organization_id = organizationId;
     }
 
+    // BR-080 — never reassign a valid owner on duplicate/repeated inbound.
     await supabaseService.updateProspect(prospect.phone, updates);
     prospect = (await supabaseService.findProspect(prospect.phone)) || prospect;
   }

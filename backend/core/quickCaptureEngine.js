@@ -269,6 +269,19 @@ async function createQuickCaptureProspect(payload, atlasUser) {
   const fullName = `${data.firstName} ${data.lastName}`.trim();
   const userId = atlasUser.id;
 
+  // Implements BR-080 — creator ownership when eligible; else RVP/default/unassigned.
+  const {
+    resolveNewLeadAssignment,
+    buildNewLeadAttentionFields
+  } = require("./newLeadAssignmentEngine");
+  const assignment = await resolveNewLeadAssignment({
+    organizationId,
+    source: data.source,
+    createdByUserId: userId,
+    preferCreator: true
+  });
+  const attentionFields = buildNewLeadAttentionFields(assignment);
+
   const insertRow = {
     phone: data.phone,
     normalized_phone: data.normalizedPhone,
@@ -278,14 +291,19 @@ async function createQuickCaptureProspect(payload, atlasUser) {
     ...buildPersistedLanguageFields(data.languageFields),
     entry_method: data.entryMethod,
     source: data.source,
-    owner_user_id: userId,
+    owner_user_id: attentionFields.owner_user_id || userId,
     created_by_user_id: userId,
     organization_id: organizationId,
     status: data.status,
     current_step: data.status,
     prospect_number: prospectNumber,
     preferred_communication_channel: data.preferredCommunicationChannel,
-    last_message: ""
+    last_message: "",
+    assignment_status: attentionFields.assignment_status,
+    assignment_source: attentionFields.assignment_source,
+    attention_status: attentionFields.attention_status,
+    new_lead_received_at: attentionFields.new_lead_received_at,
+    escalation_level: 0
   };
 
   const { data: created, error } = await supabase

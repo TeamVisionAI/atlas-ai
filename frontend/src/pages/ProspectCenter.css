@@ -196,6 +196,44 @@
   color: #cbd5e1;
 }
 
+.prospect-center-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.prospect-center-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  padding: 2px 6px;
+  line-height: 1.2;
+}
+
+.prospect-center-badge--new {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.prospect-center-badge--unassigned {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.prospect-center-badge--human {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.prospect-center-badge--ai {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
 .prospect-center-row__stall {
   margin: 8px 0 0;
   font-size: 12px;

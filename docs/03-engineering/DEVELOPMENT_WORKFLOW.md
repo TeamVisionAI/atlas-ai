@@ -102,6 +102,8 @@ Prefer extending existing engines over copying business logic into routes or han
 |--------|----------|------------------|
 | **Business Rules Engine** | `backend/core/businessRulesEngine.js` | Team Vision operational decisions (coverage, interview type, escalation) — **decisions only** |
 | Business Rules Applicator | `backend/core/businessRulesApplicator.js` | Apply rule decisions to prospect profile |
+| **New Lead Assignment (BR-080)** | `backend/core/newLeadAssignmentEngine.js` | Create-time CRM owner or Unassigned — never use ATLAS workflow ownership as CRM ownership |
+| **New Lead Attention (BR-080)** | `backend/core/newLeadAttentionEngine.js` | Acknowledge/claim/escalate; AI success ≠ human acknowledgement |
 | **Conversation Engine** | `backend/core/conversationEngine.js` | Thin entry; understand → remember → decide → **delegate** (BR-049) |
 | Semantic Conversation Engine | `backend/core/semanticConversationEngine.js` | Turn orchestration; **must not** duplicate qualification/scheduling/appointment/workflow logic |
 | Conversation Copy | `backend/core/conversationCopy.js` | User-facing wording (not business logic) |

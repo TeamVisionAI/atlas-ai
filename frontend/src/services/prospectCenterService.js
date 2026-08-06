@@ -38,3 +38,15 @@ export async function getProspectCenter(options = {}) {
     );
   }
 }
+
+export async function acknowledgeProspectLead(phone) {
+  return apiFetch(`/api/new-lead-attention/${encodeURIComponent(phone)}/acknowledge`, {
+    method: "POST"
+  });
+}
+
+export async function claimProspectLead(phone) {
+  return apiFetch(`/api/new-lead-attention/${encodeURIComponent(phone)}/claim`, {
+    method: "POST"
+  });
+}

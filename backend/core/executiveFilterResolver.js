@@ -18,7 +18,11 @@ const EXECUTIVE_FILTERS = Object.freeze({
   PENDING_OUTCOMES: "pending-outcomes",
   HIGH_PRIORITY: "high-priority",
   ORIENTATION_READY: "orientation-ready",
-  STALLED: "stalled"
+  STALLED: "stalled",
+  // Implements BR-080
+  UNASSIGNED: "unassigned",
+  NEW_UNACKNOWLEDGED: "new-unacknowledged",
+  HUMAN_ATTENTION: "human-attention"
 });
 
 function findProspectByPhone(prospects, phone) {
@@ -92,6 +96,43 @@ function resolveExecutiveFilterPhones(
     case EXECUTIVE_FILTERS.STALLED:
       return queue.filter((summary) => Boolean(summary.stalledAt)).map((row) => row.phone);
 
+    case EXECUTIVE_FILTERS.UNASSIGNED:
+      return queue
+        .filter((summary) => {
+          const prospect = findProspectByPhone(prospects, summary.phone);
+          return Boolean(prospect) && !prospect.owner_user_id;
+        })
+        .map((row) => row.phone);
+
+    case EXECUTIVE_FILTERS.NEW_UNACKNOWLEDGED:
+      return queue
+        .filter((summary) => {
+          const prospect = findProspectByPhone(prospects, summary.phone);
+          if (!prospect || prospect.acknowledged_at) {
+            return false;
+          }
+
+          return (
+            prospect.attention_status === "new" ||
+            prospect.attention_status === "ai_responding" ||
+            prospect.attention_status === "waiting_for_prospect" ||
+            prospect.attention_status === "human_required" ||
+            Boolean(prospect.new_lead_received_at)
+          );
+        })
+        .map((row) => row.phone);
+
+    case EXECUTIVE_FILTERS.HUMAN_ATTENTION:
+      return queue
+        .filter((summary) => {
+          const prospect = findProspectByPhone(prospects, summary.phone);
+          return (
+            Boolean(summary.needsHumanAttention) ||
+            prospect?.attention_status === "human_required"
+          );
+        })
+        .map((row) => row.phone);
+
     default:
       return [];
   }
@@ -149,6 +190,33 @@ function buildExecutiveFilterCounts(prospects = [], queue = [], options = {}) {
       id: EXECUTIVE_FILTERS.STALLED,
       count: resolveExecutiveFilterPhones(
         EXECUTIVE_FILTERS.STALLED,
+        prospects,
+        queue,
+        options
+      ).length
+    },
+    {
+      id: EXECUTIVE_FILTERS.UNASSIGNED,
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.UNASSIGNED,
+        prospects,
+        queue,
+        options
+      ).length
+    },
+    {
+      id: EXECUTIVE_FILTERS.NEW_UNACKNOWLEDGED,
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.NEW_UNACKNOWLEDGED,
+        prospects,
+        queue,
+        options
+      ).length
+    },
+    {
+      id: EXECUTIVE_FILTERS.HUMAN_ATTENTION,
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.HUMAN_ATTENTION,
         prospects,
         queue,
         options
