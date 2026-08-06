@@ -1,0 +1,181 @@
+{
+  "fixtureId": "tv000028-scheduling-replay",
+  "version": 1,
+  "description": "Production forensic replay: Team Vision Juanito Garcia scheduling sequence (2026-08-05 ET).",
+  "boundaries": {
+    "noLiveWhatsApp": true,
+    "noAppointmentMutation": true,
+    "metaReviewUntouched": true
+  },
+  "identity": {
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "prospectId": "29853100-f151-4ca8-b07d-624fd20c6685",
+    "displayName": "Juanito Garcia",
+    "phoneMasked": "+***7338",
+    "preferredLanguage": "english",
+    "ownerRepId": "4TJLK",
+    "ownerUserId": "33ad243a-9d00-4a4d-810b-df2762c0f076",
+    "appointmentId": "2be8f18b-06be-4b2b-b8e0-c4b86d8c384f",
+    "timezone": "America/New_York"
+  },
+  "window": {
+    "startUtc": "2026-08-06T00:06:19.000Z",
+    "endUtc": "2026-08-06T01:36:50.000Z",
+    "labelEt": "2026-08-05 20:06–21:36 America/New_York"
+  },
+  "turns": [
+    {
+      "id": "t01",
+      "atUtc": "2026-08-06T00:06:23.254Z",
+      "direction": "inbound",
+      "text": "Hey, whats the opportunity about??",
+      "observedOutbound": "Hi! What city and state do you live in?",
+      "overallGrade": "weak",
+      "failureTags": ["ignored_question", "no_value_prop"]
+    },
+    {
+      "id": "t02",
+      "atUtc": "2026-08-06T00:27:26.796Z",
+      "direction": "inbound",
+      "text": "Hi! What city and state do you live in?",
+      "observedOutbound": "Hi! What city and state do you live in?",
+      "overallGrade": "incorrect",
+      "failureTags": ["echo_loop", "repeated_question"]
+    },
+    {
+      "id": "t03",
+      "atUtc": "2026-08-06T00:32:29.294Z",
+      "direction": "inbound",
+      "text": "Miami fl",
+      "observedOutbound": "Great! We have interview appointments available Tomorrow and Monday. Which day works better for you?\n\n1️⃣ Tomorrow\n\n2️⃣ Monday",
+      "overallGrade": "acceptable",
+      "failureTags": []
+    },
+    {
+      "id": "t04",
+      "atUtc": "2026-08-06T00:32:53.758Z",
+      "direction": "inbound",
+      "text": "2",
+      "observedOutbound": "Great.\n\nSince you're currently working, would before or after 5:00 PM be more convenient?\n\n1️⃣ Before 5:00 PM\n\n2️⃣ After 5:00 PM",
+      "overallGrade": "acceptable",
+      "failureTags": []
+    },
+    {
+      "id": "t05",
+      "atUtc": "2026-08-06T00:33:09.752Z",
+      "direction": "inbound",
+      "text": "After",
+      "observedOutbound": "Thanks.\n\nI have appointments available at 5:00 PM and 5:15 PM. Which works best for you?\n\n1️⃣ 5:00 PM\n\n2️⃣ 5:15 PM",
+      "overallGrade": "acceptable",
+      "failureTags": []
+    },
+    {
+      "id": "t06",
+      "atUtc": "2026-08-06T00:33:23.820Z",
+      "direction": "inbound",
+      "text": "2",
+      "observedOutbound": "We have availability Monday at 5:15 PM. Does that work for you?",
+      "overallGrade": "acceptable",
+      "failureTags": []
+    },
+    {
+      "id": "t07",
+      "atUtc": "2026-08-06T00:33:46.636Z",
+      "direction": "inbound",
+      "text": "I prefer at 6",
+      "observedOutbound": "We have availability Monday at 5:15 PM. Does that work for you?",
+      "overallGrade": "incorrect",
+      "failureTags": ["ignored_counteroffer", "no_slot_memory"],
+      "v2Expected": {
+        "intent": "scheduling_counteroffer",
+        "decision": {
+          "nextAction": "acknowledge_and_check_availability",
+          "mayCreateAppointment": false,
+          "shouldEscalate": false
+        }
+      }
+    },
+    {
+      "id": "t08",
+      "atUtc": "2026-08-06T00:34:05.075Z",
+      "direction": "inbound",
+      "text": "Ok",
+      "observedOutbound": "What is your full name?",
+      "overallGrade": "acceptable",
+      "failureTags": []
+    },
+    {
+      "id": "t09",
+      "atUtc": "2026-08-06T00:34:24.978Z",
+      "direction": "inbound",
+      "text": "Juanito Garcia",
+      "observedOutbound": "Missing authenticated agent id for appointment persistence.",
+      "overallGrade": "dangerous",
+      "failureTags": ["internal_error_leaked", "booking_failed"],
+      "v2Expected": {
+        "decision": {
+          "nextAction": "safe_failure_and_escalate",
+          "mayCreateAppointment": false,
+          "shouldEscalate": true
+        },
+        "customerReplyMustNotContain": ["authenticated agent", "persistence"]
+      }
+    },
+    {
+      "id": "t10",
+      "atUtc": "2026-08-06T01:02:34.888Z",
+      "direction": "inbound",
+      "text": "What about 6:30 pm?",
+      "observedOutbound": "I have appointments available at 5:00 PM and 5:15 PM. Which works best for you?\n\n1️⃣ 5:00 PM\n\n2️⃣ 5:15 PM",
+      "overallGrade": "incorrect",
+      "failureTags": ["ignored_counteroffer", "repeat_unavailable_slots"]
+    },
+    {
+      "id": "t11",
+      "atUtc": "2026-08-06T01:02:52.841Z",
+      "direction": "inbound",
+      "text": "6?",
+      "observedOutbound": "I have appointments available at 5:00 PM and 5:15 PM. Which works best for you?\n\n1️⃣ 5:00 PM\n\n2️⃣ 5:15 PM",
+      "overallGrade": "incorrect",
+      "failureTags": ["ignored_counteroffer", "repeat_unavailable_slots", "should_escalate"]
+    },
+    {
+      "id": "t12",
+      "atUtc": "2026-08-06T01:03:04.677Z",
+      "direction": "inbound",
+      "text": "2",
+      "observedOutbound": "We have availability Tomorrow at 5:15 PM. Does that work for you?",
+      "overallGrade": "weak",
+      "failureTags": ["day_drift"]
+    },
+    {
+      "id": "t13",
+      "atUtc": "2026-08-06T01:03:18.077Z",
+      "direction": "inbound",
+      "text": "Ok",
+      "observedOutbound": [
+        "You're all set for Tomorrow at 5:15 PM at our office (2500 NW 79th Ave, Miami, Florida).\n\nWe look forward to meeting you!",
+        "Hola Juanito, tu entrevista por Zoom quedó confirmada para vie, 7 de ago, 1:15 p.m..\n\nTeam Vision"
+      ],
+      "overallGrade": "dangerous",
+      "failureTags": ["dual_confirmation", "language_drift", "channel_mismatch"]
+    },
+    {
+      "id": "t14",
+      "atUtc": "2026-08-06T01:36:40.127Z",
+      "direction": "inbound",
+      "text": "What about 6?",
+      "observedOutbound": "✅ Your interview is already confirmed. A Team Vision agent will contact you if any adjustment is needed.",
+      "overallGrade": "weak",
+      "failureTags": ["no_reschedule_path"]
+    }
+  ],
+  "invariants": {
+    "mustNotLeakInternalDiagnostics": true,
+    "mustNotSendConflictingConfirmations": true,
+    "mustAcknowledgeCounteroffers": true,
+    "mustNotRepeatIdenticalUnavailableSlotMenu": true,
+    "preferredLanguageSticky": "english",
+    "metaReviewFlexibilityDisabled": true
+  }
+}
