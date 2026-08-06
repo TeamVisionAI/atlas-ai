@@ -5,9 +5,15 @@
 
 const TERMINAL_APPOINTMENT_STATUSES = new Set(["cancelled", "completed"]);
 
+function normalizeToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
 function isTerminalAppointmentStatus(appointment = {}) {
-  const status = String(appointment.status || "").toLowerCase();
-  const lifecycle = String(appointment.metadata?.lifecycleState || "").toLowerCase();
+  const status = normalizeToken(appointment.status);
+  const lifecycle = normalizeToken(appointment.metadata?.lifecycleState);
 
   return (
     TERMINAL_APPOINTMENT_STATUSES.has(status) ||
@@ -19,8 +25,26 @@ function isTerminalAppointmentStatus(appointment = {}) {
   );
 }
 
+/** Case-insensitive Zoom interview detection (provider enum / label variants). */
+export function isZoomMeetingAppointment(appointment = {}) {
+  const meetingType = normalizeToken(appointment.meetingType || appointment.meeting_type);
+  const provider = normalizeToken(appointment.meetingProvider || appointment.meeting_provider);
+
+  if (meetingType && meetingType !== "virtual") {
+    return false;
+  }
+
+  if (provider === "zoom") {
+    return true;
+  }
+
+  // Fallback: URL host proves Zoom even if provider casing/legacy field drifts.
+  const url = String(appointment.virtualMeetingUrl || appointment.virtual_meeting_url || "").trim();
+  return Boolean(url) && /zoom\.(us|gov)/i.test(url);
+}
+
 function hasValidZoomMeetingUrl(appointment = {}) {
-  const url = String(appointment.virtualMeetingUrl || "").trim();
+  const url = String(appointment.virtualMeetingUrl || appointment.virtual_meeting_url || "").trim();
 
   if (!url) {
     return false;
@@ -32,7 +56,7 @@ function hasValidZoomMeetingUrl(appointment = {}) {
     return false;
   }
 
-  const provider = String(appointment.meetingProvider || "").toLowerCase();
+  const provider = normalizeToken(appointment.meetingProvider || appointment.meeting_provider);
 
   if (provider === "zoom") {
     return true;
@@ -49,13 +73,35 @@ export function shouldShowJoinZoomAction(appointment = {}) {
   return hasValidZoomMeetingUrl(appointment);
 }
 
+/**
+ * Scheduled Zoom interview without a persisted join URL (BR-043).
+ * Presentation-only warning — never fabricates or regenerates a meeting link.
+ */
+export function shouldShowZoomLinkUnavailableWarning(appointment = {}) {
+  if (isTerminalAppointmentStatus(appointment)) {
+    return false;
+  }
+
+  if (!isZoomMeetingAppointment(appointment)) {
+    return false;
+  }
+
+  return !hasValidZoomMeetingUrl(appointment);
+}
+
+export function shouldShowCopyZoomLinkAction(appointment = {}) {
+  return shouldShowJoinZoomAction(appointment);
+}
+
 export function shouldShowLifecycleActions(appointment = {}) {
   return !isTerminalAppointmentStatus(appointment);
 }
 
 export function resolveAppointmentMeetingLabel(appointment = {}, translate) {
-  if (appointment.meetingType === "virtual") {
-    const provider = String(appointment.meetingProvider || "").toLowerCase();
+  const meetingType = normalizeToken(appointment.meetingType || appointment.meeting_type);
+
+  if (meetingType === "virtual") {
+    const provider = normalizeToken(appointment.meetingProvider || appointment.meeting_provider);
 
     if (provider === "zoom") {
       const key = "appointmentsMeetingProvider_zoom";
@@ -94,4 +140,17 @@ export function formatAppointmentMetaLabel(appointment = {}, translate, purposeL
   const meeting = resolveAppointmentMeetingLabel(appointment, translate);
 
   return `${purpose} · ${meeting}`;
+}
+
+/** Safe diagnostics — never include meeting URLs or credentials. */
+export function buildAppointmentZoomDiagnostics(appointment = {}) {
+  return {
+    meetingType: normalizeToken(appointment.meetingType || appointment.meeting_type) || null,
+    meetingProvider: normalizeToken(appointment.meetingProvider || appointment.meeting_provider) || null,
+    isZoom: isZoomMeetingAppointment(appointment),
+    hasValidZoomMeetingUrl: hasValidZoomMeetingUrl(appointment),
+    showJoinZoom: shouldShowJoinZoomAction(appointment),
+    showZoomLinkUnavailable: shouldShowZoomLinkUnavailableWarning(appointment),
+    terminal: isTerminalAppointmentStatus(appointment)
+  };
 }

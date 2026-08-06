@@ -338,10 +338,11 @@ Appointment invitation, Communication Preview, interview reminder, Zoom invitati
 When a persisted appointment includes a valid Zoom meeting URL and is not completed or cancelled:
 
 1. **Primary CTA:** The Appointments card must show **Join Zoom** as the visually emphasized primary action (same button component family as other card actions).
-2. **Action order:** Add Note → Open Workspace → Join Zoom → Reschedule → Cancel → Complete.
+2. **Action order:** Add Note → Open Workspace → Join Zoom → Copy Zoom Link (optional) → Reschedule → Cancel → Complete.
 3. **Visibility:** Hide Join Zoom when the appointment is terminal (completed/cancelled) or no valid Zoom URL exists.
-4. **Terminology:** Use **Zoom** consistently in card meta and actions (`Recruiting Interview · Zoom`, `Join Zoom`). Do not mix generic labels such as Join, Meeting, or Video for Zoom interviews on this surface.
-5. **Scope:** Presentation only — no changes to appointment lifecycle, scheduling, communications, or interview assignment (BR-042).
+4. **Missing link:** For a non-terminal Zoom interview without a valid persisted meeting URL, show a clear **Zoom link unavailable** warning. Do not fabricate or auto-regenerate a meeting URL from the card.
+5. **Terminology:** Use **Zoom** consistently in card meta and actions (`Recruiting Interview · Zoom`, `Join Zoom`). Provider/type matching is case-insensitive. Do not mix generic labels such as Join, Meeting, or Video for Zoom interviews on this surface.
+6. **Scope:** Presentation only — no changes to appointment lifecycle, scheduling, communications, Google Calendar writes, or interview assignment (BR-042).
 
 ---
 

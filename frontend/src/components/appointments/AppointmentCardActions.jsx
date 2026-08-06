@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import AtlasButton from "../ui/AtlasButton";
 import UniversalNoteButton from "../notes/UniversalNoteButton";
@@ -7,6 +8,7 @@ import "./AppointmentCardActions.css";
 
 /**
  * Operational actions for an appointment list card (BR-043, BR-045).
+ * Presentation only — does not mutate appointments or write Google Calendar.
  */
 export default function AppointmentCardActions({
   appointment,
@@ -19,6 +21,7 @@ export default function AppointmentCardActions({
   onComplete
 }) {
   const plan = resolveAppointmentCardActionPlan(appointment);
+  const [copyState, setCopyState] = useState("idle");
 
   function handleJoinZoom() {
     const url = String(appointment.virtualMeetingUrl || "").trim();
@@ -30,12 +33,29 @@ export default function AppointmentCardActions({
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  async function handleCopyZoomLink() {
+    const url = String(appointment.virtualMeetingUrl || "").trim();
+
+    if (!url || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyState("copied");
+      window.setTimeout(() => setCopyState("idle"), 2000);
+    } catch {
+      setCopyState("idle");
+    }
+  }
+
   return (
     <div
       className="appointment-card-actions appointments-page__actions"
       data-appointment-id={appointment.id || undefined}
       data-interview-workflow-state={plan.state}
       data-join-zoom-visible={plan.showJoinZoom ? "true" : "false"}
+      data-zoom-link-unavailable={plan.showZoomLinkUnavailable ? "true" : "false"}
     >
       {plan.showAddNote ? (
         <UniversalNoteButton size="sm" busy={noteSaving} onClick={onAddNote} />
@@ -69,6 +89,29 @@ export default function AppointmentCardActions({
         >
           {translate("appointmentsJoinZoom")}
         </AtlasButton>
+      ) : null}
+
+      {plan.showCopyZoomLink ? (
+        <AtlasButton
+          variant="ghost"
+          size="sm"
+          className="appointment-card-actions__copy-zoom"
+          onClick={handleCopyZoomLink}
+        >
+          {copyState === "copied"
+            ? translate("appointmentsZoomLinkCopied")
+            : translate("appointmentsCopyZoomLink")}
+        </AtlasButton>
+      ) : null}
+
+      {plan.showZoomLinkUnavailable ? (
+        <span
+          className="appointment-card-actions__zoom-unavailable"
+          role="status"
+          data-zoom-warning="unavailable"
+        >
+          {translate("appointmentsZoomLinkUnavailable")}
+        </span>
       ) : null}
 
       {plan.showReschedule ? (

@@ -84,8 +84,42 @@ test("resolveAppointmentCardActionPlan shows terminal actions only when complete
   });
 
   assert.equal(plan.showJoinZoom, false);
+  assert.equal(plan.showCopyZoomLink, false);
+  assert.equal(plan.showZoomLinkUnavailable, false);
   assert.equal(plan.showCommunicationHistory, true);
   assert.equal(plan.openWorkspaceLabelKey, "appointmentsViewWorkspace");
+});
+
+test("resolveAppointmentCardActionPlan keeps Open Workspace when Zoom link missing", () => {
+  const plan = resolveAppointmentCardActionPlan({
+    status: "scheduled",
+    meetingType: "virtual",
+    meetingProvider: "zoom",
+    virtualMeetingUrl: null,
+    prospectPhone: "+15551234567"
+  });
+
+  assert.equal(plan.showJoinZoom, false);
+  assert.equal(plan.showZoomLinkUnavailable, true);
+  assert.equal(plan.showOpenWorkspace, true);
+  assert.equal(plan.showAddNote, true);
+  assert.equal(plan.showReschedule, true);
+  assert.equal(plan.openWorkspacePrimary, true);
+});
+
+test("resolveAppointmentCardActionPlan shows Join Zoom when URL valid", () => {
+  const plan = resolveAppointmentCardActionPlan({
+    status: "scheduled",
+    meetingType: "virtual",
+    meetingProvider: "zoom",
+    virtualMeetingUrl: "https://us02web.zoom.us/j/123",
+    prospectPhone: "+15551234567"
+  });
+
+  assert.equal(plan.showJoinZoom, true);
+  assert.equal(plan.showCopyZoomLink, true);
+  assert.equal(plan.showZoomLinkUnavailable, false);
+  assert.equal(plan.openWorkspacePrimary, false);
 });
 
 test("resolveOperationalInterviewActionPlan hides actions when result pending", () => {
