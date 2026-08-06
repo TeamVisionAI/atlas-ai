@@ -137,18 +137,27 @@ async function processNormalizedInboundMessage(normalized, { prospect, contactNa
   }
 
   if (normalized.channel === "whatsapp") {
+    const outboundIntent =
+      engineResult?.outboundIntent ||
+      (engineResult?.confirmationIdempotencyKey
+        ? "APPOINTMENT_CONFIRMATION"
+        : "CONVERSATION_ENGINE_REPLY");
+
     const delivery = await sendAndPersistWhatsAppMessage({
       to: normalized.phone,
       message: replyText,
       actor: "ATLAS",
-      intent: "CONVERSATION_ENGINE_REPLY",
-      organizationId: prospect?.organization_id || null
+      intent: outboundIntent,
+      organizationId: prospect?.organization_id || null,
+      idempotencyKey: engineResult?.confirmationIdempotencyKey || null
     });
 
     logWhatsAppStage("conversation_engine_reply_sent", {
       phone: normalized.phone,
       success: delivery.success,
-      simulated: delivery.simulated || false
+      simulated: delivery.simulated || false,
+      intent: outboundIntent,
+      idempotent: Boolean(engineResult?.confirmationIdempotencyKey)
     });
 
     return {

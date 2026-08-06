@@ -66,8 +66,7 @@ const {
   getNameQuestion,
   getEmailCollectionQuestion,
   getHandoffMessage,
-  getCanonicalFaqAnswer,
-  buildBookingConfirmation
+  getCanonicalFaqAnswer
 } = require("./teamVisionWorkflowCopy");
 const { evaluateCoverage } = require("./businessRulesEngine");
 const { extractInformation, detectLocalZoomPreference, isAuthorizationAmbiguous, isEmailDeclined } = require("./informationExtractor");
@@ -83,6 +82,9 @@ const autonomousScheduleAgentResolver = require("./autonomousScheduleAgentResolv
 const workflowStateStore = require("./workflowStateStore");
 const { OWNERSHIP, MILESTONES } = require("./workflowConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
+const {
+  buildPersistedAppointmentConfirmation
+} = require("./appointmentConfirmationCopy");
 
 const CONVERSATION_GOAL = "Schedule Interview";
 
@@ -470,11 +472,22 @@ async function completeInterview(prospect, profile, language) {
     };
   }
 
-  const confirmationText = buildBookingConfirmation({
-    interviewType: profile.interviewType,
-    slotLabel: profile.preferredTime || prospect.interview_time,
-    language
-  });
+  // Implements BR-039/BR-041 — one confirmation from persisted appointment + preferred language.
+  // Never use stale profile slot labels or conversation-language fallback for this message.
+  const confirmation = buildPersistedAppointmentConfirmation(
+    scheduleResult.appointment || {
+      id: scheduleResult.appointmentId,
+      startDateTime: scheduleResult.booking?.startTimeISO || null,
+      timezone: scheduleResult.appointment?.timezone || "America/New_York",
+      meetingType: scheduleResult.appointment?.meetingType || profile.interviewType,
+      meetingAddress: scheduleResult.appointment?.meetingAddress || null,
+      virtualMeetingUrl:
+        scheduleResult.appointment?.virtualMeetingUrl ||
+        scheduleResult.meetingUrl ||
+        null
+    },
+    prospect
+  );
 
   await scheduleZoomLinkDelivery({
     prospect,
@@ -484,21 +497,14 @@ async function completeInterview(prospect, profile, language) {
     console.warn("[semanticConversationEngine] zoom link scheduling failed:", error.message);
   });
 
-  const response = responseBuilder({
-    tone: "celebratory",
-    acknowledgement: confirmationText,
-    transition: "",
-    question: language === "es" ? "¡Esperamos conocerte!" : "We look forward to meeting you!",
-    typingDelay: 1500,
-    responseStyle: "professional"
-  });
-
   return {
     success: true,
-    reply: response.text,
+    reply: confirmation.text,
     appointmentId: scheduleResult.appointmentId || null,
     agentId,
-    agentSource: resolvedAgent.source
+    agentSource: resolvedAgent.source,
+    confirmationIdempotencyKey: confirmation.idempotencyKey,
+    outboundIntent: "APPOINTMENT_CONFIRMATION"
   };
 }
 
