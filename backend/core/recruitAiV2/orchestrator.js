@@ -21,8 +21,8 @@ const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine"
 const { buildResponsePlan } = require("./responsePlan");
 const { renderCustomerReply } = require("./responseRenderer");
 const { authorizeSideEffects } = require("./sideEffectAuthorizer");
-const { mergeConversationContext } = require("./conversationContext");
 const { containsInternalDiagnostics } = require("./sanitize");
+const { buildNextContextFromInterpretation } = require("./contextTurnUpdate");
 
 /**
  * Run one Recruit AI v2 decision cycle.
@@ -112,33 +112,15 @@ async function processRecruitAiV2Turn({
     env: options.env || process.env
   });
 
-  let nextContext = mergeConversationContext(loaded, structuredDecision.contextPatch || {});
+  let nextContext = buildNextContextFromInterpretation({
+    loaded,
+    interpretation,
+    structuredDecision
+  });
   nextContext.conversation = {
     ...nextContext.conversation,
-    lastProspectIntent: interpretation.intent,
-    lastOfferMade: responsePlan.templateKey || nextContext.conversation.lastOfferMade,
-    lastCounterofferTime:
-      interpretation.intent === "scheduling_counteroffer"
-        ? interpretation.entities?.requestedTime ||
-          nextContext.conversation.lastCounterofferTime
-        : nextContext.conversation.lastCounterofferTime
+    lastOfferMade: responsePlan.templateKey || nextContext.conversation.lastOfferMade
   };
-
-  if (
-    (interpretation.intent === "scheduling_counteroffer" ||
-      interpretation.intent === "reschedule_request") &&
-    interpretation.entities?.requestedTime
-  ) {
-    nextContext.appointment = {
-      ...nextContext.appointment,
-      proposedTime: interpretation.entities.requestedTime,
-      status:
-        interpretation.intent === "reschedule_request" ||
-        nextContext.appointment?.status === "confirmed"
-          ? "reschedule_requested"
-          : nextContext.appointment?.status || "proposed"
-    };
-  }
 
   let persistenceResult = null;
 
@@ -254,10 +236,13 @@ function processRecruitAiV2TurnSync(args = {}) {
     env: options.env || process.env
   });
 
-  const nextContext = mergeConversationContext(loaded, structuredDecision.contextPatch || {});
+  const nextContext = buildNextContextFromInterpretation({
+    loaded,
+    interpretation,
+    structuredDecision
+  });
   nextContext.conversation = {
     ...nextContext.conversation,
-    lastProspectIntent: interpretation.intent,
     lastOfferMade: responsePlan.templateKey || nextContext.conversation.lastOfferMade
   };
 

@@ -53,6 +53,16 @@ const {
   runRecruitAiV2ShadowEvaluation
 } = require("./shadowModeRunner");
 const {
+  scheduleRecruitAiV2PostLiveAdvisory,
+  runRecruitAiV2PostLiveAdvisory
+} = require("./advisoryTurnRunner");
+const {
+  resolveContextCaptureConfig,
+  isEligibleForContextCapture
+} = require("./contextCaptureConfig");
+const { createContextCaptureService } = require("./contextCaptureService");
+const { computeContextOnlyTurn } = require("./contextTurnUpdate");
+const {
   classifyDivergence,
   extractLiveCeResponseIntent,
   DIVERGENCE
@@ -87,12 +97,18 @@ module.exports = {
   resolveShadowConfig,
   isShadowModeEnabled,
   isEligibleForShadowEvaluation,
+  resolveContextCaptureConfig,
+  isEligibleForContextCapture,
+  createContextCaptureService,
+  computeContextOnlyTurn,
   createMemoryShadowEvaluationRepository,
   createSupabaseShadowEvaluationRepository,
   createShadowEvaluationService,
   buildReconstructionInput,
   scheduleRecruitAiV2ShadowEvaluation,
   runRecruitAiV2ShadowEvaluation,
+  scheduleRecruitAiV2PostLiveAdvisory,
+  runRecruitAiV2PostLiveAdvisory,
   classifyDivergence,
   extractLiveCeResponseIntent,
   DIVERGENCE,

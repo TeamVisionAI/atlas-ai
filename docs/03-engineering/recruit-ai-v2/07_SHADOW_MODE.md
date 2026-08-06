@@ -21,14 +21,13 @@ Recruit AI v2 is advisory and silent.
 inbound persisted
   → live CE decides + reply proceeds normally
   → BR-080 attention updates (unchanged)
-  → scheduleRecruitAiV2ShadowEvaluation (async, non-blocking)
-       → eligibility (enabled / non-empty org allowlist / sample rate)
-       → processRecruitAiV2Turn (side effects denied, bounded timeout)
-       → optional durable context persist
-       → write recruit_ai_v2_shadow_evaluations
+  → scheduleRecruitAiV2PostLiveAdvisory (async, non-blocking)
+       → if shadow sampled: full v2 eval + context persist once + shadow row
+       → else if context capture eligible: lightweight context persist only
 ```
 
-Shadow failures are logged sanitized and never interrupt the live turn.
+See [08_CONTINUOUS_CONTEXT_CAPTURE.md](./08_CONTINUOUS_CONTEXT_CAPTURE.md).  
+Shadow/capture failures are logged sanitized and never interrupt the live turn.
 
 ## Feature flags
 

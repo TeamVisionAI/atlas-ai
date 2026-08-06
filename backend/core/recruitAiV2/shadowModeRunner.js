@@ -248,64 +248,14 @@ async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
 
 /**
  * Fire-and-forget shadow evaluation after the live turn completes.
- * Must never reject into the live inbound pipeline.
+ * Phase 3B: delegates to post-live advisory so continuous capture can run
+ * on unsampled turns without double-advancing context on sampled turns.
  */
 function scheduleRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
-  const schedule =
-    deps.schedule ||
-    ((fn) => {
-      setImmediate(fn);
-    });
-
-  try {
-    const eligibility = isEligibleForShadowEvaluation({
-      organizationId: input.organizationId || input.prospect?.organization_id,
-      prospectId: input.prospect?.id,
-      inboundMessageId:
-        input.inboundMessageId || input.inbound?.providerMessageId || null,
-      env: input.env || process.env
-    });
-
-    if (!eligibility.eligible) {
-      return {
-        scheduled: false,
-        skipped: true,
-        reason: eligibility.reason,
-        config: eligibility.config
-      };
-    }
-
-    schedule(() =>
-      runRecruitAiV2ShadowEvaluation(input, deps).catch((error) => {
-        logWhatsAppStage("recruit_ai_v2_shadow_failed", {
-          level: "warn",
-          error: sanitizeFailureMessage(error),
-          retries: 0
-        });
-      })
-    );
-
-    return {
-      scheduled: true,
-      skipped: false,
-      reason: null,
-      config: eligibility.config,
-      timeoutMs: eligibility.config.timeoutMs,
-      retries: 0
-    };
-  } catch (error) {
-    logWhatsAppStage("recruit_ai_v2_shadow_schedule_failed", {
-      level: "warn",
-      error: sanitizeFailureMessage(error)
-    });
-    return {
-      scheduled: false,
-      skipped: true,
-      reason: "SHADOW_SCHEDULE_ERROR",
-      error: sanitizeFailureMessage(error),
-      retries: 0
-    };
-  }
+  const {
+    scheduleRecruitAiV2PostLiveAdvisory
+  } = require("./advisoryTurnRunner");
+  return scheduleRecruitAiV2PostLiveAdvisory(input, deps);
 }
 
 module.exports = {

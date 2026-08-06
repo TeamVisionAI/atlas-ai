@@ -74,6 +74,8 @@ const FEATURE_FLAGS = Object.freeze({
   SHADOW_ENABLED_ENV: "RECRUIT_AI_V2_SHADOW_ENABLED",
   /** Legacy alias accepted by shadowConfig / authorizer. */
   SHADOW_ENABLED_LEGACY_ENV: "RECRUIT_AI_V2_SHADOW",
+  /** Continuous context capture (Phase 3B; default false; independent of shadow sample). */
+  CONTEXT_CAPTURE_ENABLED_ENV: "RECRUIT_AI_V2_CONTEXT_CAPTURE_ENABLED",
   /** When true, SideEffectAuthorizer may approve execution (must stay false). */
   EXECUTION_ENABLED_ENV: "RECRUIT_AI_V2_EXECUTION_ENABLED"
 });

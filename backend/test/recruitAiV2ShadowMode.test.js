@@ -405,10 +405,10 @@ test("13. live CE remains authoritative in inbound pipeline wiring", () => {
   const ce = fs.readFileSync(CE_PATH, "utf8");
 
   assert.match(pipeline, /processConversationAfterInbound/);
-  assert.match(pipeline, /scheduleRecruitAiV2ShadowEvaluation/);
+  assert.match(pipeline, /scheduleRecruitAiV2PostLiveAdvisory/);
   assert.match(
     pipeline,
-    /processConversationAfterInbound[\s\S]*markAiResponding[\s\S]*scheduleRecruitAiV2ShadowEvaluation/
+    /processConversationAfterInbound[\s\S]*markAiResponding[\s\S]*scheduleRecruitAiV2PostLiveAdvisory/
   );
   assert.doesNotMatch(hub, /processRecruitAiV2Turn|scheduleRecruitAiV2ShadowEvaluation/);
   assert.doesNotMatch(ce, /processRecruitAiV2Turn|scheduleRecruitAiV2ShadowEvaluation/);
