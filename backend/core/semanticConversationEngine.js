@@ -1,8 +1,5 @@
-const {
-  findProspect,
-  createProspect,
-  updateProspect
-} = require("../services/supabaseService");
+const supabaseService = require("../services/supabaseService");
+const { findProspect, createProspect, updateProspect } = supabaseService;
 const { onConversationProgress } = require("./recruitingWorkflowHooks");
 const { logConversation } = require("../services/logService");
 const { detectIntent } = require("./intentEngine");
@@ -79,9 +76,13 @@ const {
   detectMessageLanguage
 } = require("./conversationLanguage");
 const { resolveConversationSchedulePayload } = require("./conversationScheduleDelegation");
-const { executeScheduleInterview } = require("../application/missionExecutionApplicationService");
+const missionExecutionApplicationService = require("../application/missionExecutionApplicationService");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
-const { releaseSlotByIso } = require("./capacityEngine");
+const capacityEngine = require("./capacityEngine");
+const autonomousScheduleAgentResolver = require("./autonomousScheduleAgentResolver");
+const workflowStateStore = require("./workflowStateStore");
+const { OWNERSHIP, MILESTONES } = require("./workflowConstants");
+const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 
 const CONVERSATION_GOAL = "Schedule Interview";
 
@@ -319,6 +320,24 @@ async function handleScheduleMessage(prospect, message, language, personality) {
   return result;
 }
 
+async function markAutonomousScheduleHumanAssist(prospect, organizationId, reason, details = {}) {
+  workflowStateStore.savePersistedWorkflowState(prospect.phone, {
+    canonicalMilestone: MILESTONES.INTERVIEW_READY,
+    workflowOwnership: OWNERSHIP.AGENT,
+    needsHumanAttention: true,
+    manualAgentOwnership: true,
+    doNotContact: false
+  });
+
+  logWhatsAppStage("autonomous_schedule_human_assist", {
+    level: "warn",
+    phone: prospect.phone,
+    organizationId,
+    reason,
+    ...details
+  });
+}
+
 async function completeInterview(prospect, profile, language) {
   if (!prospect.appointment_date) {
     throw new Error("Interview slot must be selected before confirming.");
@@ -337,18 +356,46 @@ async function completeInterview(prospect, profile, language) {
   }
 
   // Conversation scheduling already reserved capacity with interview-type key; release before canonical booking.
-  releaseSlotByIso(
+  capacityEngine.releaseSlotByIso(
     prospect.appointment_date,
     profile.interviewType || prospect.interview_type || schedulePayload.interviewType
   );
 
   const organizationId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
-  const agentId = prospect.owner_user_id || prospect.assigned_agent_id || null;
+  const resolvedAgent = await autonomousScheduleAgentResolver.resolveAutonomousScheduleAgentId({
+    prospect,
+    organizationId
+  });
+  const agentId = resolvedAgent.agentId;
+
+  if (!agentId) {
+    await markAutonomousScheduleHumanAssist(prospect, organizationId, "missing_schedule_agent", {
+      resolutionSource: resolvedAgent.source
+    });
+
+    return {
+      success: false,
+      reply: autonomousScheduleAgentResolver.buildSafeScheduleFailureReply(language),
+      humanAssist: true
+    };
+  }
+
+  // Stamp ownership for autonomous WhatsApp leads so appointments and UI stay tenant-scoped.
+  if (!prospect.owner_user_id) {
+    await supabaseService.updateProspect(prospect.phone, { owner_user_id: agentId }).catch((error) => {
+      logWhatsAppStage("autonomous_schedule_owner_stamp_failed", {
+        level: "warn",
+        error: error.message,
+        phone: prospect.phone
+      });
+    });
+    prospect = { ...prospect, owner_user_id: agentId };
+  }
 
   let scheduleResult;
 
   try {
-    scheduleResult = await executeScheduleInterview(
+    scheduleResult = await missionExecutionApplicationService.executeScheduleInterview(
       prospect.phone,
       {
         dateKey: schedulePayload.dateKey,
@@ -363,26 +410,63 @@ async function completeInterview(prospect, profile, language) {
       }
     );
   } catch (error) {
-    console.error("[semanticConversationEngine] delegated schedule failed:", error.message);
+    logWhatsAppStage("autonomous_schedule_exception", {
+      level: "error",
+      error: error.message,
+      phone: prospect.phone,
+      organizationId,
+      agentSource: resolvedAgent.source
+    });
+
+    await markAutonomousScheduleHumanAssist(prospect, organizationId, "schedule_exception", {
+      agentSource: resolvedAgent.source
+    });
 
     return {
       success: false,
-      reply:
-        language === "es"
-          ? "No pudimos confirmar tu cita en el calendario en este momento. Por favor elige otro horario disponible."
-          : "We couldn't confirm your appointment on the calendar right now. Please choose another available time."
+      reply: autonomousScheduleAgentResolver.buildSafeScheduleFailureReply(language),
+      humanAssist: true
     };
   }
 
   if (!scheduleResult?.success) {
+    logWhatsAppStage("autonomous_schedule_failed", {
+      level: "error",
+      phone: prospect.phone,
+      organizationId,
+      publicCode: scheduleResult?.error || null,
+      agentSource: resolvedAgent.source
+    });
+
+    await markAutonomousScheduleHumanAssist(prospect, organizationId, "schedule_persistence_failed", {
+      publicCode: scheduleResult?.error || null,
+      agentSource: resolvedAgent.source
+    });
+
+    // Never forward internal diagnostics; only allow already-safe customer copy through.
+    const rawMessage = scheduleResult?.message || "";
+    const reply =
+      rawMessage &&
+      !autonomousScheduleAgentResolver.isUnsafeCustomerScheduleMessage(rawMessage)
+        ? rawMessage
+        : autonomousScheduleAgentResolver.buildSafeScheduleFailureReply(language);
+
     return {
       success: false,
-      reply:
-        language === "es"
-          ? scheduleResult.message ||
-            "No pudimos confirmar tu cita en el calendario en este momento. Por favor elige otro horario disponible."
-          : scheduleResult.message ||
-            "We couldn't confirm your appointment on the calendar right now. Please choose another available time."
+      reply,
+      humanAssist: true
+    };
+  }
+
+  if (!scheduleResult.appointmentId) {
+    await markAutonomousScheduleHumanAssist(prospect, organizationId, "missing_appointment_id", {
+      agentSource: resolvedAgent.source
+    });
+
+    return {
+      success: false,
+      reply: autonomousScheduleAgentResolver.buildSafeScheduleFailureReply(language),
+      humanAssist: true
     };
   }
 
@@ -412,7 +496,9 @@ async function completeInterview(prospect, profile, language) {
   return {
     success: true,
     reply: response.text,
-    appointmentId: scheduleResult.appointmentId || null
+    appointmentId: scheduleResult.appointmentId || null,
+    agentId,
+    agentSource: resolvedAgent.source
   };
 }
 
@@ -1270,5 +1356,6 @@ module.exports = {
   detectLanguage,
   handleSemanticMessage,
   buildQuestionForMissingField,
-  buildShortAcknowledgement
+  buildShortAcknowledgement,
+  completeInterview
 };
