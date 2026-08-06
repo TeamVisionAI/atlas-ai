@@ -17,8 +17,9 @@ export function mapStepToMilestoneLabel(currentStep, missingFields = []) {
     return MILESTONES.INTERVIEW_CONFIRMED;
   }
 
+  // Pre-booking only — "Interview Scheduled" requires backend workflow + BR-039 appointment.
   if (missingFields.includes("schedule") || currentStep === "SCHEDULE") {
-    return MILESTONES.INTERVIEW_SCHEDULED;
+    return "Interview Ready";
   }
 
   if (missingFields.length) {

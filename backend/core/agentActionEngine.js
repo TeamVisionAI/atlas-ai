@@ -66,8 +66,9 @@ function deriveMilestoneLabel(currentStep, missingFields, agentState) {
     return MILESTONES.INTERVIEW_CONFIRMED;
   }
 
+  // Ready to schedule — Interview Scheduled requires confirmed booking + BR-039 appointment.
   if (missingFields.includes("schedule") || currentStep === "SCHEDULE") {
-    return MILESTONES.INTERVIEW_SCHEDULED;
+    return "Interview Ready";
   }
 
   if (missingFields.length) {

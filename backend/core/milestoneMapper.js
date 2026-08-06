@@ -139,12 +139,14 @@ function mapToCanonicalMilestone({
     return MILESTONES.INTERVIEW_SCHEDULED;
   }
 
+  // Ready to schedule — not yet scheduled. INTERVIEW_SCHEDULED requires
+  // CONFIRMED (below) and an active atlas_appointments row (BR-039 gate).
   if (
     missingFields.includes("schedule") ||
     currentStep === "SCHEDULE" ||
     currentStep === "EMAIL"
   ) {
-    return MILESTONES.INTERVIEW_SCHEDULED;
+    return MILESTONES.INTERVIEW_READY;
   }
 
   if (missingFields.length === 0 && currentStep !== "GREETING") {
