@@ -1,6 +1,8 @@
 const {
   detectScheduleOverride,
   normalizeHour,
+  normalizeScheduleMessage,
+  isConversationalScheduleFlexibilityEnabled,
   EN_DAYS,
   ES_DAYS
 } = require("./scheduleLanguageParser");
@@ -405,7 +407,10 @@ function parsePeriodSelection(message, state) {
 }
 
 function parseTimeSelection(message, state) {
-  const text = normalize(message);
+  // Choice matching stays strict in Meta Review; production may strip soft punctuation.
+  const text = isConversationalScheduleFlexibilityEnabled()
+    ? normalizeScheduleMessage(message, { flexible: true })
+    : normalize(message);
 
   if (text === "1" && state.offeredTimes[0]) {
     return state.offeredTimes[0];
