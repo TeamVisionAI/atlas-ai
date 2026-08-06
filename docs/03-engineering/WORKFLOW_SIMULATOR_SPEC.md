@@ -561,4 +561,18 @@ When simulator code is built, these scenarios must pass manually:
 
 ---
 
-**No simulator code is included in this specification.** Implementation awaits Sprint 8A.4 product approval.
+## Recruit AI v2 Scenarios (Ops Center extension)
+
+Operations Center → Workflow Simulator now includes a **Recruit AI v2 Scenarios** panel.
+
+- Ephemeral interpretation/decision simulation via `processRecruitAiV2TurnSync`
+- Does **not** write production context/shadow tables
+- Side effects always denied
+- Named scenarios live in `backend/dev/recruitAiV2ScenarioDefinitions.js`
+- Docs: [recruit-ai-v2/10_WORKFLOW_SIMULATOR_SCENARIOS.md](./recruit-ai-v2/10_WORKFLOW_SIMULATOR_SCENARIOS.md)
+
+**Regression rule:** every confirmed production Recruit AI defect should become a deterministic v2 simulator scenario before closure.
+
+---
+
+**Historical note:** The original 8A.4 document was written as a pre-implementation spec; workflow simulator code and Recruit AI v2 scenarios have since shipped.

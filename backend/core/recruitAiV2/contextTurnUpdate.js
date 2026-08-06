@@ -100,6 +100,20 @@ function buildNextContextFromInterpretation({
     };
   }
 
+  if (
+    interpretation.intent === "provide_meeting_preference" &&
+    interpretation.entities?.appointmentType
+  ) {
+    nextContext.knownFacts = {
+      ...nextContext.knownFacts,
+      preferredMeetingType: interpretation.entities.appointmentType
+    };
+    nextContext.appointment = {
+      ...nextContext.appointment,
+      meetingType: interpretation.entities.appointmentType
+    };
+  }
+
   return nextContext;
 }
 

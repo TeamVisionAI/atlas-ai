@@ -20,6 +20,12 @@ const COPY = Object.freeze({
     continue_qualification_after_location:
       "Thanks. Do you have work authorization or legal documentation to work in the United States?",
     continue_after_day_part: "Thanks — noted. Let's continue.",
+    meeting_preference_zoom:
+      "Got it — we can do the interview by Zoom. Do you prefer morning or afternoon?",
+    meeting_preference_in_person:
+      "Got it — we can do the interview in person. Do you prefer morning or afternoon?",
+    acknowledge_cancel_no_write:
+      "Understood — I've noted your cancel request. A teammate will confirm any changes; nothing was changed automatically.",
     clarify_day_part:
       "I didn't catch that — do you prefer morning or afternoon?",
     clarify_day_part_alt:
@@ -53,6 +59,12 @@ const COPY = Object.freeze({
     continue_qualification_after_location:
       "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?",
     continue_after_day_part: "Gracias — anotado. Continuemos.",
+    meeting_preference_zoom:
+      "Entendido — podemos hacer la entrevista por Zoom. ¿Prefieres en la mañana o en la tarde?",
+    meeting_preference_in_person:
+      "Entendido — podemos hacer la entrevista en persona. ¿Prefieres en la mañana o en la tarde?",
+    acknowledge_cancel_no_write:
+      "Entendido — anoté tu solicitud de cancelación. Un compañero confirmará cualquier cambio; no se modificó nada automáticamente.",
     clarify_day_part:
       "No te entendí bien — ¿prefieres en la mañana o en la tarde?",
     clarify_day_part_alt:

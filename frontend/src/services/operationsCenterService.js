@@ -107,6 +107,21 @@ export async function runSimulatorScenario(scenarioId) {
   });
 }
 
+export async function fetchRecruitAiV2SimulatorScenarios() {
+  return operationsFetch("/simulator/recruit-ai-v2/scenarios");
+}
+
+export async function runAllRecruitAiV2SimulatorScenarios() {
+  return operationsFetch("/simulator/recruit-ai-v2/scenarios/run-all", { method: "POST" });
+}
+
+export async function runRecruitAiV2SimulatorScenario(scenarioId) {
+  return operationsFetch(
+    `/simulator/recruit-ai-v2/scenarios/${encodeURIComponent(scenarioId)}/run`,
+    { method: "POST" }
+  );
+}
+
 export async function simulateFacebookLead(payload = {}) {
   return operationsFetch("/simulator/facebook-lead", {
     method: "POST",
