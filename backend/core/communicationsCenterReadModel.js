@@ -13,6 +13,9 @@ const {
   maskPhoneLast4,
   maskProviderMessageId
 } = require("./communicationsCenterMasks");
+const {
+  sanitizeCommunicationsCenterResponse
+} = require("./communicationsCenterSanitizer");
 
 const CONVERSATION_LOG_CORRELATION_PREFIX = "conversation_log:";
 
@@ -1145,7 +1148,7 @@ async function buildCommunicationsCenterTimeline(input = {}) {
   const truncated = items.length > limit;
   const page = truncated ? items.slice(-limit) : items;
 
-  return {
+  return sanitizeCommunicationsCenterResponse({
     generatedAt: new Date().toISOString(),
     prospect: {
       id: prospectId,
@@ -1180,7 +1183,7 @@ async function buildCommunicationsCenterTimeline(input = {}) {
       ambiguousRecordsExcluded: stats.ambiguousRecordsExcluded,
       unlinkedRecordsExcluded: stats.unlinkedRecordsExcluded
     }
-  };
+  });
 }
 
 module.exports = {

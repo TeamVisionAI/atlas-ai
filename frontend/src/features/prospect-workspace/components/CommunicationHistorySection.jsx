@@ -3,6 +3,7 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 import ConversationPanel from "../../../components/ConversationPanel";
 import ActivityFeed from "../../../components/prospect-workspace/ActivityFeed";
 import { WorkspaceSkeleton } from "../../../components/ui/Skeleton";
+import CommunicationsCenterTimeline from "./CommunicationsCenterTimeline";
 import "./CommunicationHistorySection.css";
 
 const ProspectTimelinePanel = lazy(() => import("./ProspectTimelinePanel"));
@@ -12,6 +13,7 @@ export default function CommunicationHistorySection({
   conversation,
   activityPreview = [],
   prospectCoreId,
+  organizationId = null,
   timelineRef,
   activityRefreshSignal = 0
 }) {
@@ -50,6 +52,12 @@ export default function CommunicationHistorySection({
           />
         </div>
       ) : null}
+
+      <CommunicationsCenterTimeline
+        prospectId={prospectCoreId}
+        organizationId={organizationId}
+        refreshSignal={activityRefreshSignal}
+      />
 
       <ActivityFeed
         phone={phone}

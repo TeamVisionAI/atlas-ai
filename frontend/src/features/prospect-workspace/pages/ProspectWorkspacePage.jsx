@@ -265,6 +265,12 @@ export default function ProspectWorkspacePage() {
         conversation={workspace.conversation}
         activityPreview={payload?.activityPreview || []}
         prospectCoreId={prospectCoreId}
+        organizationId={
+          user?.organization_id ||
+          organizationSettings?.organizationId ||
+          organizationSettings?.id ||
+          null
+        }
         timelineRef={timelineRef}
         activityRefreshSignal={activityRefreshSignal}
       />

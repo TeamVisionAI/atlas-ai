@@ -14,6 +14,9 @@ const {
 } = require("../core/communicationsCenterIdentity");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../core/phoneNormalizer");
 const { isProductionProspect } = require("../core/productionProspectFilter");
+const {
+  sanitizeCommunicationsCenterResponse
+} = require("../core/communicationsCenterSanitizer");
 
 function countLegacyProspectsSharingPhone(args) {
   return require("../security/prospectAccessService").countLegacyProspectsSharingPhone(
@@ -121,7 +124,7 @@ async function getProspectCommunications({
   const phoneSafety = await evaluatePhoneSafety({ organizationId, identities });
   const authorizedPhones = collectAuthorizedPhoneVariants(identities);
 
-  return buildCommunicationsCenterTimeline({
+  const timeline = await buildCommunicationsCenterTimeline({
     prospectId: String(prospectId),
     organizationId,
     prospectDisplayName: prospectDisplayName(prospect),
@@ -136,6 +139,9 @@ async function getProspectCommunications({
     limit: query.limit,
     loaders
   });
+
+  // Defense-in-depth: never return raw contact addresses / secrets from this API.
+  return sanitizeCommunicationsCenterResponse(timeline);
 }
 
 module.exports = {

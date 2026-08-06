@@ -254,6 +254,10 @@ test("TV-000028 synthetic timeline is prospect-canonical with forensic flags", a
 
   // Must not require phone as top-level auth key
   assert.equal(Object.prototype.hasOwnProperty.call(timeline, "phone"), false);
+
+  const serialized = JSON.stringify(timeline);
+  assert.doesNotMatch(serialized, /\+\d{10,15}\b/);
+  assert.doesNotMatch(serialized, /Bearer\s+[A-Za-z0-9._-]{8,}/i);
 });
 
 test("prospect id is required; phone alone cannot build timeline", async () => {
