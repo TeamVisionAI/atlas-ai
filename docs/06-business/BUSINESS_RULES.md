@@ -1091,6 +1091,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-077 — Office Address Snapshot on Canonical In-Person Appointments
+
+**Implements:** Full office address (including suite/unit) for in-person appointments  
+**Domain:** Appointments / Meeting Management  
+**Depends on:** BR-018, BR-039, BR-050  
+**Status:** Approved  
+**Engine target:** `officeAddressResolver.js`, `appointmentApplicationService.js`, `appointmentConfirmationCopy.js`
+
+### Rules
+
+1. **Canonical snapshot** — For in-person appointments, Atlas resolves the complete same-organization office address and persists it on `atlas_appointments.meeting_address` with `metadata.officeAddressStatus` and `metadata.officeAddressSource`. Confirmation, reminders, resend details, Send Office Address, and Calendar consumers should prefer that snapshot.
+2. **Resolution precedence** — (1) valid persisted appointment `meeting_address` when preserving; (2) valid explicit request address; (3) Meeting Management `officeAddress`; (4) BR-018 organization `fullAddress`; (5) unavailable.
+3. **Completeness** — Never construct a partial truthy address (e.g. city/state only) that suppresses `fullAddress`. Always include suite/unit when present in the configured source.
+4. **No truncated hardcode** — Do not use a hardcoded address that omits suite or changes city (legacy “Miami, Florida” string is forbidden).
+5. **Field mapping** — When composing from structured office fields, use `street` + `suite` + `city` + `state` + `zip` (or `fullAddress`). Do not join legacy `address`/`postalCode` keys that drop suite.
+6. **Virtual appointments** — Never populate `meeting_address` with office address for Zoom/virtual appointments.
+7. **Organization isolation** — Never use another organization’s office address.
+8. **Provenance** — Record `officeAddressSource` as `persisted_appointment` | `request` | `meeting_management` | `organization_profile` | `unavailable`.
+9. **Boundaries** — Does not send WhatsApp, mutate legacy rows, or invent Calendar events. Data repair and Calendar update for existing truncated rows are separate authorized operations.
+
+---
+
 ## BR-074 — Firm-Verified Securities Content Access
 
 **Implements:** RC4 Milestone 1 — Firm-Verified Securities Access Foundation

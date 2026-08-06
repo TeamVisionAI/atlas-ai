@@ -1,9 +1,17 @@
 /**
  * Sprint 21.4 — Canonical Team Vision recruiting workflow copy.
  * Implements BR-018, BR-019, BR-020, BR-021.
+ * Office strings always come from BR-018 fullAddress (includes suite) — BR-077.
  */
 
-const OFFICE_ADDRESS = "2500 NW 79th Ave, Miami, Florida";
+const { getOfficeLocation } = require("./businessRulesEngine");
+
+function getCanonicalOfficeAddress() {
+  return getOfficeLocation().fullAddress;
+}
+
+/** @deprecated Prefer getCanonicalOfficeAddress(); kept for call-site compatibility. */
+const OFFICE_ADDRESS = getCanonicalOfficeAddress();
 
 function getFirstMessage(language) {
   return language === "es"
@@ -30,9 +38,10 @@ function getAuthorizationDeniedMessage(language) {
 }
 
 function getLocalOfficeDayPartMessage(language) {
+  const officeAddress = getCanonicalOfficeAddress();
   return language === "es"
-    ? `Excelente. Estamos realizando las entrevistas en nuestras oficinas ubicadas en ${OFFICE_ADDRESS}. ¿Prefieres en la mañana o en la tarde?`
-    : `Excellent. We're conducting interviews at our offices located at ${OFFICE_ADDRESS}. Do you prefer morning or afternoon?`;
+    ? `Excelente. Estamos realizando las entrevistas en nuestras oficinas ubicadas en ${officeAddress}. ¿Prefieres en la mañana o en la tarde?`
+    : `Excellent. We're conducting interviews at our offices located at ${officeAddress}. Do you prefer morning or afternoon?`;
 }
 
 function getRemoteZoomDayPartMessage(language) {
@@ -79,24 +88,26 @@ function getCanonicalFaqAnswer(language) {
 
 function buildBookingConfirmation({ interviewType, slotLabel, language }) {
   const isZoom = String(interviewType || "").toLowerCase().includes("zoom");
+  const officeAddress = getCanonicalOfficeAddress();
 
   if (language === "es") {
     if (isZoom) {
       return `Listo, quedaste programado para ${slotLabel} por Zoom. Te enviaremos el enlace 30 minutos antes para conectarte.`;
     }
 
-    return `Listo, quedaste programado para ${slotLabel} en nuestras oficinas (${OFFICE_ADDRESS}).`;
+    return `Listo, quedaste programado para ${slotLabel} en nuestras oficinas (${officeAddress}).`;
   }
 
   if (isZoom) {
     return `You're all set for ${slotLabel} via Zoom. We'll send the link 30 minutes before your interview.`;
   }
 
-  return `You're all set for ${slotLabel} at our office (${OFFICE_ADDRESS}).`;
+  return `You're all set for ${slotLabel} at our office (${officeAddress}).`;
 }
 
 module.exports = {
   OFFICE_ADDRESS,
+  getCanonicalOfficeAddress,
   getFirstMessage,
   getStateQuestion,
   getAuthorizationQuestion,
