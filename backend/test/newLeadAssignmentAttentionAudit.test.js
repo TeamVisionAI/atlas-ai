@@ -179,27 +179,25 @@ test("12. AI/schedule failure path sets Human Attention Required", () => {
 });
 
 test("13-14. BR-075/078 blocked send remains fail-closed and must not look successful", async () => {
+  // Stub window closed + inactive template path — no live provider / DB lookups.
   const result = await authorizeWhatsAppOutbound({
     organizationId: ORG_A,
     intent: "confirmation",
-    preferredLanguage: "en",
-    recipientPhone: "+15550001111",
-    appointment: { id: "a1", startDateTime: new Date().toISOString() },
+    phone: "+15550001111",
+    prospect: { organization_id: ORG_A },
     now: new Date("2026-08-06T12:00:00.000Z"),
-    lastInboundAt: null
+    evaluateWindow: async () => ({ open: false, reason: "WINDOW_CLOSED" }),
+    resolveTemplate: () => ({
+      ok: false,
+      status: "blocked_template_unapproved",
+      reason: "TEMPLATE_INACTIVE",
+      templateKey: "CONFIRMATION"
+    })
   });
 
-  const blocked =
-    result?.authorized === false ||
-    result?.allowed === false ||
-    result?.ok === false ||
-    Boolean(result?.blocked) ||
-    String(result?.deliveryStatus || "").toLowerCase() === "blocked" ||
-    String(result?.status || "").toLowerCase().includes("block") ||
-    String(result?.status || "").toLowerCase().includes("denied");
-
-  assert.equal(blocked, true, `expected fail-closed result, got ${JSON.stringify(result)}`);
-  assert.notEqual(String(result?.deliveryStatus || "").toLowerCase(), "sent");
+  assert.match(String(result?.status || ""), /blocked/i);
+  assert.equal(result?.extras?.authorized, false);
+  assert.notEqual(String(result?.status || "").toLowerCase(), "sent");
 });
 
 test("15-17. duplicate webhook + same-org / cross-org isolation contracts exist", () => {
