@@ -352,10 +352,11 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   });
 
   if (!scheduleAgentId) {
+    // Safe customer-facing copy — never expose internal auth/persistence diagnostics.
     return buildActionError(
       ACTION_IDS.SCHEDULE,
       "APPOINTMENT_PERSISTENCE_FAILED",
-      "Missing authenticated agent id for appointment persistence."
+      "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
     );
   }
 
