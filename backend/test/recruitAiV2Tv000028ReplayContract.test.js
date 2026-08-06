@@ -66,7 +66,8 @@ test("architecture docs exist for Recruit AI v2 audit sprint", () => {
     "04_RECRUIT_AI_V2_ARCHITECTURE.md",
     "05_COMMUNICATIONS_CENTER_READ_MODEL.md",
     "06_DURABLE_CONTEXT_SCHEMA.md",
-    "07_SHADOW_MODE.md"
+    "07_SHADOW_MODE.md",
+    "08_CONTINUOUS_CONTEXT_CAPTURE.md"
   ]) {
     assert.ok(fs.existsSync(path.join(root, name)), name);
   }
