@@ -404,4 +404,26 @@ backend/database/migrations/029_rls_backend_only_public_tables_down.sql
 Contract tests: `backend/test/rls029BackendOnlyPublicTables.test.js`  
 Optional live probes after apply: `ATLAS_RLS_029_LIVE=1`.
 
-Follow-up (not in this migration): `030_fix_sync_atlas_users_search_path.sql` for Function Search Path Mutable on `sync_atlas_users_from_users()`.
+Follow-up: migration 030 hardens `sync_atlas_users_from_users()` search_path (see below).
+
+## Migration 030 — Harden `sync_atlas_users_from_users` search_path
+
+Addresses Security Advisor warning **Function Search Path Mutable** on
+`public.sync_atlas_users_from_users()`.
+
+```
+backend/database/migrations/030_fix_sync_atlas_users_search_path.sql
+backend/database/migrations/030_fix_sync_atlas_users_search_path_down.sql
+```
+
+- Pins `search_path` to `pg_catalog, public`
+- Qualifies `public.atlas_users` and selected builtins
+- Revokes `EXECUTE` from `PUBLIC` / `anon` / `authenticated`
+- Keeps `EXECUTE` for `service_role` (trigger invocations from backend)
+- Preserves SECURITY INVOKER, VOLATILE, trigger binding, and migration 017 sync contract
+- Does **not** touch Meta Review `profile_settings` / RLS policies / migration 029
+
+Contract tests: `backend/test/syncAtlasUsersSearchPath030.test.js`  
+Optional transactional dry-run (apply + probe + ROLLBACK): `ATLAS_030_LIVE_DRY_RUN=1`.
+
+**Rollback warning:** down migration restores the mutable-search-path finding and broader EXECUTE grants.
