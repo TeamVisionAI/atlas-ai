@@ -6,6 +6,9 @@
 const {
   getProspectCommunications
 } = require("../application/communicationsCenterApplicationService");
+const {
+  sanitizeCommunicationsCenterResponse
+} = require("../core/communicationsCenterSanitizer");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireProspectAccessById } = require("../middleware/requireProspectAccess");
@@ -36,14 +39,17 @@ async function prospectCommunicationsHandler(req, res) {
     res.json(timeline);
   } catch (error) {
     const status = error.statusCode || 500;
-    console.error("[communications-center]", error.message);
-    res.status(status).json({
-      error: error.publicCode || "COMMUNICATIONS_CENTER_FAILED",
-      message:
-        status === 404
-          ? error.message
-          : "Failed to load communications timeline"
-    });
+    console.error("[communications-center]", "request_failed");
+    const safeMessage =
+      status === 404
+        ? "Communications Center prospect not found"
+        : "Failed to load communications timeline";
+    res.status(status).json(
+      sanitizeCommunicationsCenterResponse({
+        error: error.publicCode || "COMMUNICATIONS_CENTER_FAILED",
+        message: safeMessage
+      })
+    );
   }
 }
 

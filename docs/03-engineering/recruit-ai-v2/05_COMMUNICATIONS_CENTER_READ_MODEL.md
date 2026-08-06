@@ -99,9 +99,33 @@ Suggested fields: `id`, `organization_id`, `prospect_id`, `channel`, `normalized
 
 Do not implement without explicit approval.
 
+## Output sanitization
+
+All API responses pass through `communicationsCenterSanitizer.js` before leaving the process.
+
+- Correlation IDs like `advance:+1…:slot` → `advance:<masked-contact>:slot`
+- Recursive redaction of phones, emails, tokens, secrets in metadata
+- Source DB rows are never mutated
+- Error bodies are also sanitized; CC path logs do not echo raw phones
+
+## UI
+
+Prospect Workspace → Communication History section → `CommunicationsCenterTimeline`
+
+- Loads `GET /api/prospects/:id/communications` with `prospectCoreId`
+- Filters: All / Messages / Workflow / Appointments / System·Errors
+- Diagnostics collapsed by default
+- Cache identity: `communications:${organizationId}:${prospectId}`
+
+## Authenticated production smoke
+
+No verify password is present in local `.env`. Do not create production passwords for smoke.
+Use mocked/unit auth contracts + CI secrets if operators add them later.
+
 ## Boundaries
 
 - Read-only (no WhatsApp sends, no appointment mutations, no CE/parser changes)
 - Express + service-role only
 - Meta Review / BR-075 / migrations / Storage untouched
 - No phone-keyed public Communications Center URL
+- No `atlas_prospect_channel_identities` migration in this sprint
