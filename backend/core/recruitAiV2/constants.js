@@ -79,15 +79,20 @@ const FEATURE_FLAGS = Object.freeze({
 });
 
 const SHADOW_DIVERGENCE = Object.freeze({
-  ALIGNED: "aligned",
-  INTENT_MISMATCH: "intent_mismatch",
+  EXACT_OR_EQUIVALENT: "exact_or_equivalent",
   LANGUAGE_MISMATCH: "language_mismatch",
-  ACTION_MISMATCH: "action_mismatch",
-  LIVE_EMPTY_V2_ACTIVE: "live_empty_v2_active",
-  V2_SAFE_FAILURE: "v2_safe_failure",
-  V2_EVALUATION_FAILED: "v2_evaluation_failed",
-  DIAGNOSTIC_LEAK: "diagnostic_leak",
-  UNKNOWN: "unknown"
+  INTENT_MISMATCH: "intent_mismatch",
+  TIME_COUNTEROFFER_MISSED_BY_LIVE: "time_counteroffer_missed_by_live",
+  TIME_COUNTEROFFER_MISSED_BY_V2: "time_counteroffer_missed_by_v2",
+  CONFIRMATION_DUPLICATE_RISK: "confirmation_duplicate_risk",
+  RESCHEDULE_MISSED: "reschedule_missed",
+  APPOINTMENT_STATE_MISMATCH: "appointment_state_mismatch",
+  UNSAFE_SIDE_EFFECT_DIFFERENCE: "unsafe_side_effect_difference",
+  DIAGNOSTIC_LEAK_LIVE: "diagnostic_leak_live",
+  DIAGNOSTIC_LEAK_V2: "diagnostic_leak_v2",
+  HUMAN_ESCALATION_DIFFERENCE: "human_escalation_difference",
+  UNSUPPORTED_FOR_COMPARISON: "unsupported_for_comparison",
+  SHADOW_ERROR: "shadow_error"
 });
 
 const MAX_COUNTEROFFER_MISMATCHES_BEFORE_ESCALATE = 2;

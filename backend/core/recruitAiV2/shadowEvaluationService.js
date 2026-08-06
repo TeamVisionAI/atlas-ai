@@ -11,9 +11,13 @@ const { isMetaReviewScope } = require("./contextPersistenceService");
 const {
   extractLiveCeResponseIntent,
   extractLiveLanguage,
+  extractLiveReplyText,
   languagesAgree,
   classifyDivergence,
-  extractProposedSideEffect
+  extractLiveSideEffectCategory,
+  extractV2SideEffectCategory,
+  resolveAppointmentStateAgreement,
+  DIVERGENCE
 } = require("./shadowDivergence");
 const { resolveProspectPreferredLanguage } = require("../prospectLanguage");
 
@@ -23,7 +27,22 @@ function sanitizeFailureMessage(error) {
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[redacted-email]")
     .replace(/\+?\d[\d\s().-]{7,}\d/g, "[redacted-phone]")
     .replace(/Bearer\s+\S+/gi, "[redacted-token]")
+    .replace(/at\s+\S+\s+\([^)]+\)/g, "[redacted-frame]")
     .slice(0, 240);
+}
+
+function safeErrorCode(error) {
+  if (!error) {
+    return null;
+  }
+  if (error.code) {
+    return String(error.code).slice(0, 80);
+  }
+  const message = String(error.message || "");
+  if (/timeout/i.test(message)) {
+    return "SHADOW_EVALUATION_TIMEOUT";
+  }
+  return "SHADOW_EVALUATION_FAILED";
 }
 
 function buildReconstructionInput(prospect = {}, extras = {}) {
@@ -69,19 +88,35 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
 }
 
 function buildSanitizedMetadata({
-  eligibilityReason = null,
+  evaluationStatus = "completed",
+  safeError = null,
   persistence = null,
-  evaluationError = null,
   liveReason = null,
   liveReplied = null,
+  liveSideEffectCategory = null,
+  v2SideEffectCategory = null,
+  appointmentStateAgreement = null,
+  escalationRecommended = null,
   v2NextAction = null,
-  v2ReasonCodes = null
+  v2ReasonCodes = null,
+  diagnosticLeakLive = null,
+  diagnosticLeakV2 = null
 } = {}) {
   return {
     shadowPhase: 3,
-    eligibilityReason,
+    evaluationStatus,
+    safeErrorCode: safeError,
     liveReason: liveReason || null,
     liveReplied: liveReplied == null ? null : Boolean(liveReplied),
+    liveSideEffectCategory: liveSideEffectCategory || "none",
+    v2SideEffectCategory: v2SideEffectCategory || "none",
+    appointmentStateAgreement:
+      appointmentStateAgreement == null ? null : Boolean(appointmentStateAgreement),
+    escalationRecommended:
+      escalationRecommended == null ? null : Boolean(escalationRecommended),
+    diagnosticLeakLive:
+      diagnosticLeakLive == null ? null : Boolean(diagnosticLeakLive),
+    diagnosticLeakV2: diagnosticLeakV2 == null ? null : Boolean(diagnosticLeakV2),
     persistence: persistence
       ? {
           attempted: Boolean(persistence.attempted),
@@ -94,8 +129,7 @@ function buildSanitizedMetadata({
     v2NextAction: v2NextAction || null,
     v2ReasonCodes: Array.isArray(v2ReasonCodes)
       ? v2ReasonCodes.slice(0, 12)
-      : null,
-    evaluationError: evaluationError ? sanitizeFailureMessage(evaluationError) : null
+      : null
   };
 }
 
@@ -114,7 +148,7 @@ function createShadowEvaluationService({
 
   /**
    * Evaluate one inbound turn in shadow mode and persist comparison.
-   * Throws only for programming misuse; runtime failures are captured as rows.
+   * Runtime failures are captured as sanitized ledger rows when possible.
    */
   async function evaluateShadowTurn({
     prospect,
@@ -145,6 +179,8 @@ function createShadowEvaluationService({
 
     const liveCeResponseIntent = extractLiveCeResponseIntent(conversation);
     const liveLanguage = extractLiveLanguage(conversation, language);
+    const liveReplyText = extractLiveReplyText(conversation);
+    const liveSideEffectCategory = extractLiveSideEffectCategory(conversation);
     const reconstructionInput = buildReconstructionInput(prospect, {
       organizationId: orgId,
       prospectId,
@@ -155,11 +191,18 @@ function createShadowEvaluationService({
     let evaluationError = null;
 
     try {
+      const text = String(messageText || "").trim();
+      if (!text) {
+        const malformed = new Error("SHADOW_MALFORMED_INPUT");
+        malformed.code = "SHADOW_MALFORMED_INPUT";
+        throw malformed;
+      }
+
       turnResult = await processTurn({
         message: {
           id: inboundMessageId || null,
           providerMessageId: inboundMessageId || null,
-          text: String(messageText || "").trim()
+          text
         },
         contextInput: reconstructionInput,
         options: {
@@ -188,19 +231,42 @@ function createShadowEvaluationService({
       turnResult?.structuredDecision?.preferredLanguage ||
       null;
     const v2RenderedText = turnResult?.rendered?.text || "";
-    const diagnosticLeakCheck = containsInternalDiagnostics(v2RenderedText);
+    const diagnosticLeakV2 = containsInternalDiagnostics(v2RenderedText);
+    const diagnosticLeakLive = containsInternalDiagnostics(liveReplyText);
     const languageAgreement = languagesAgree(liveLanguage, v2Language);
-    const v2ProposedSideEffect = extractProposedSideEffect(turnResult?.authorization);
+    const v2SideEffectCategory = extractV2SideEffectCategory(
+      turnResult?.authorization,
+      turnResult?.structuredDecision
+    );
+    const v2AppointmentStatus =
+      turnResult?.nextContext?.appointment?.status ||
+      turnResult?.context?.appointment?.status ||
+      null;
+    const appointmentStateAgreement = resolveAppointmentStateAgreement({
+      liveAppointmentStatus: reconstructionInput.appointment?.status || null,
+      v2AppointmentStatus
+    });
+    const escalationRecommended = Boolean(
+      turnResult?.structuredDecision?.decision?.shouldEscalate
+    );
 
     const divergenceClassification = classifyDivergence({
       liveCeResponseIntent,
       liveLanguage,
+      liveReplyText,
       v2InterpretedIntent,
       v2DecisionCode,
       v2Language,
       v2RenderedText,
       evaluationFailed: Boolean(evaluationError),
-      languageAgreement
+      languageAgreement,
+      appointmentStateAgreement,
+      liveSideEffectCategory,
+      v2SideEffectCategory,
+      liveHumanAssist: Boolean(
+        conversation?.humanAssist || liveCeResponseIntent === "HUMAN_ASSIST"
+      ),
+      v2ShouldEscalate: escalationRecommended
     });
 
     const contextId =
@@ -208,7 +274,13 @@ function createShadowEvaluationService({
       turnResult?.context?._persistence?.id ||
       null;
 
-    const row = await persistShadowRow({
+    const evaluationStatus = evaluationError
+      ? "error"
+      : turnResult?.persistence?.result?.idempotent
+        ? "idempotent"
+        : "completed";
+
+    const rowPayload = {
       organization_id: orgId,
       prospect_id: prospectId,
       channel,
@@ -218,19 +290,43 @@ function createShadowEvaluationService({
       v2_interpreted_intent: v2InterpretedIntent,
       v2_decision_code: evaluationError ? null : v2DecisionCode,
       v2_confidence: v2Confidence,
-      v2_proposed_side_effect: evaluationError ? "none" : v2ProposedSideEffect,
+      v2_proposed_side_effect: evaluationError ? "none" : v2SideEffectCategory,
       divergence_classification: divergenceClassification,
       language_agreement: languageAgreement,
-      diagnostic_leak_check: diagnosticLeakCheck === false,
+      diagnostic_leak_check: !diagnosticLeakV2 && !diagnosticLeakLive,
       metadata: buildSanitizedMetadata({
+        evaluationStatus,
+        safeError: safeErrorCode(evaluationError),
         liveReason: conversation?.reason || null,
         liveReplied: conversation?.replied,
+        liveSideEffectCategory,
+        v2SideEffectCategory: evaluationError ? "none" : v2SideEffectCategory,
+        appointmentStateAgreement,
+        escalationRecommended,
         persistence: turnResult?.persistence || null,
-        evaluationError,
         v2NextAction: v2DecisionCode,
-        v2ReasonCodes: turnResult?.structuredDecision?.reasonCodes || null
+        v2ReasonCodes: turnResult?.structuredDecision?.reasonCodes || null,
+        diagnosticLeakLive,
+        diagnosticLeakV2
       })
-    });
+    };
+
+    let row = null;
+    try {
+      row = await persistShadowRow(rowPayload);
+    } catch (insertError) {
+      // Insert failure must not escape into live CE. Return sanitized failure.
+      return {
+        skipped: false,
+        reason: "SHADOW_INSERT_FAILED",
+        row: null,
+        turnResult,
+        evaluationError: sanitizeFailureMessage(insertError),
+        divergenceClassification: DIVERGENCE.SHADOW_ERROR,
+        liveCeResponseIntent,
+        authorizationDenied: true
+      };
+    }
 
     return {
       skipped: false,
@@ -258,5 +354,6 @@ function createShadowEvaluationService({
 module.exports = {
   createShadowEvaluationService,
   buildReconstructionInput,
-  sanitizeFailureMessage
+  sanitizeFailureMessage,
+  safeErrorCode
 };

@@ -4,12 +4,21 @@
  * Live CE remains authoritative. Shadow runs asynchronously after the live turn
  * and must never delay or interrupt customer-visible responses.
  *
+ * Performance:
+ * - fire-and-forget via setImmediate
+ * - single attempt (no retry storm)
+ * - bounded timeout (default 5000ms, max 15000ms)
+ *
  * Implements BR-081 Phase 3.
  */
 
 const { logWhatsAppStage } = require("../whatsappStructuredLogger");
 const { resolveProspectPreferredLanguage } = require("../prospectLanguage");
-const { isEligibleForShadowEvaluation } = require("./shadowConfig");
+const {
+  isEligibleForShadowEvaluation,
+  resolveShadowConfig,
+  DEFAULT_TIMEOUT_MS
+} = require("./shadowConfig");
 const { isMetaReviewScope, createContextPersistenceService } = require("./contextPersistenceService");
 const {
   createSupabaseContextRepository,
@@ -34,6 +43,26 @@ function resolveSupabaseClient() {
   } catch {
     return null;
   }
+}
+
+function withTimeout(promise, timeoutMs, code = "SHADOW_EVALUATION_TIMEOUT") {
+  const ms = Number(timeoutMs) > 0 ? Number(timeoutMs) : DEFAULT_TIMEOUT_MS;
+  let timer = null;
+
+  return Promise.race([
+    Promise.resolve(promise).finally(() => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error(code);
+        error.code = code;
+        reject(error);
+      }, ms);
+    })
+  ]);
 }
 
 /**
@@ -73,7 +102,6 @@ function getOrCreateShadowEvaluationService({
       })
     });
   } else {
-    // Local/dev without service role: evaluate + keep in-process only.
     cachedService = createShadowEvaluationService({
       repository: createMemoryShadowEvaluationRepository(),
       persistenceService: createContextPersistenceService({
@@ -92,8 +120,8 @@ function resetShadowEvaluationServiceCache() {
 }
 
 /**
- * Execute shadow evaluation synchronously (tests / explicit callers).
- * Never throws for runtime evaluation failures.
+ * Execute shadow evaluation (tests / scheduled worker).
+ * Never throws for runtime evaluation failures. No retries.
  */
 async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
   const {
@@ -146,24 +174,32 @@ async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
   }
 
   const service = deps.service || getOrCreateShadowEvaluationService(deps);
+  const timeoutMs =
+    deps.timeoutMs ||
+    eligibility.config.timeoutMs ||
+    resolveShadowConfig(env).timeoutMs ||
+    DEFAULT_TIMEOUT_MS;
 
   try {
-    const result = await service.evaluateShadowTurn({
-      prospect,
-      organizationId: orgId,
-      inboundMessageId: providerMessageId,
-      messageText:
-        messageText != null
-          ? messageText
-          : inbound?.body || inbound?.text || "",
-      channel,
-      conversation: conversation || {},
-      language: resolveProspectPreferredLanguage(prospect || {}),
-      options: {
-        env,
-        flexible: true
-      }
-    });
+    const result = await withTimeout(
+      service.evaluateShadowTurn({
+        prospect,
+        organizationId: orgId,
+        inboundMessageId: providerMessageId,
+        messageText:
+          messageText != null
+            ? messageText
+            : inbound?.body || inbound?.text || "",
+        channel,
+        conversation: conversation || {},
+        language: resolveProspectPreferredLanguage(prospect || {}),
+        options: {
+          env,
+          flexible: true
+        }
+      }),
+      timeoutMs
+    );
 
     logWhatsAppStage("recruit_ai_v2_shadow_evaluated", {
       organizationId: orgId,
@@ -171,7 +207,8 @@ async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
       providerMessageId,
       divergence: result.divergenceClassification || null,
       skipped: Boolean(result.skipped),
-      reason: result.reason || null
+      reason: result.reason || null,
+      timeoutMs
     });
 
     return {
@@ -179,6 +216,8 @@ async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
       skipped: Boolean(result.skipped),
       reason: result.reason,
       config: eligibility.config,
+      timeoutMs,
+      retries: 0,
       result
     };
   } catch (error) {
@@ -187,14 +226,21 @@ async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
       organizationId: orgId,
       prospectId,
       providerMessageId,
-      error: sanitizeFailureMessage(error)
+      error: sanitizeFailureMessage(error),
+      timeoutMs,
+      retries: 0
     });
 
     return {
       scheduled: false,
       skipped: false,
-      reason: "SHADOW_RUNTIME_ERROR",
+      reason:
+        error?.code === "SHADOW_EVALUATION_TIMEOUT"
+          ? "SHADOW_EVALUATION_TIMEOUT"
+          : "SHADOW_RUNTIME_ERROR",
       config: eligibility.config,
+      timeoutMs,
+      retries: 0,
       error: sanitizeFailureMessage(error)
     };
   }
@@ -233,7 +279,8 @@ function scheduleRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
       runRecruitAiV2ShadowEvaluation(input, deps).catch((error) => {
         logWhatsAppStage("recruit_ai_v2_shadow_failed", {
           level: "warn",
-          error: sanitizeFailureMessage(error)
+          error: sanitizeFailureMessage(error),
+          retries: 0
         });
       })
     );
@@ -242,7 +289,9 @@ function scheduleRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
       scheduled: true,
       skipped: false,
       reason: null,
-      config: eligibility.config
+      config: eligibility.config,
+      timeoutMs: eligibility.config.timeoutMs,
+      retries: 0
     };
   } catch (error) {
     logWhatsAppStage("recruit_ai_v2_shadow_schedule_failed", {
@@ -253,7 +302,8 @@ function scheduleRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
       scheduled: false,
       skipped: true,
       reason: "SHADOW_SCHEDULE_ERROR",
-      error: sanitizeFailureMessage(error)
+      error: sanitizeFailureMessage(error),
+      retries: 0
     };
   }
 }
@@ -262,5 +312,7 @@ module.exports = {
   scheduleRecruitAiV2ShadowEvaluation,
   runRecruitAiV2ShadowEvaluation,
   getOrCreateShadowEvaluationService,
-  resetShadowEvaluationServiceCache
+  resetShadowEvaluationServiceCache,
+  withTimeout,
+  DEFAULT_TIMEOUT_MS
 };

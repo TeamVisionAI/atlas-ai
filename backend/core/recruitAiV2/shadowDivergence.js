@@ -8,37 +8,25 @@ const { containsInternalDiagnostics } = require("./sanitize");
 const { normalizeLanguage } = require("./conversationContext");
 
 const DIVERGENCE = Object.freeze({
-  ALIGNED: "aligned",
-  INTENT_MISMATCH: "intent_mismatch",
+  EXACT_OR_EQUIVALENT: "exact_or_equivalent",
   LANGUAGE_MISMATCH: "language_mismatch",
-  ACTION_MISMATCH: "action_mismatch",
-  LIVE_EMPTY_V2_ACTIVE: "live_empty_v2_active",
-  V2_SAFE_FAILURE: "v2_safe_failure",
-  V2_EVALUATION_FAILED: "v2_evaluation_failed",
-  DIAGNOSTIC_LEAK: "diagnostic_leak",
-  UNKNOWN: "unknown"
+  INTENT_MISMATCH: "intent_mismatch",
+  TIME_COUNTEROFFER_MISSED_BY_LIVE: "time_counteroffer_missed_by_live",
+  TIME_COUNTEROFFER_MISSED_BY_V2: "time_counteroffer_missed_by_v2",
+  CONFIRMATION_DUPLICATE_RISK: "confirmation_duplicate_risk",
+  RESCHEDULE_MISSED: "reschedule_missed",
+  APPOINTMENT_STATE_MISMATCH: "appointment_state_mismatch",
+  UNSAFE_SIDE_EFFECT_DIFFERENCE: "unsafe_side_effect_difference",
+  DIAGNOSTIC_LEAK_LIVE: "diagnostic_leak_live",
+  DIAGNOSTIC_LEAK_V2: "diagnostic_leak_v2",
+  HUMAN_ESCALATION_DIFFERENCE: "human_escalation_difference",
+  UNSUPPORTED_FOR_COMPARISON: "unsupported_for_comparison",
+  SHADOW_ERROR: "shadow_error"
 });
 
-const LIVE_SCHEDULING_INTENTS = new Set([
-  "APPOINTMENT_CONFIRMATION",
-  "INTERVIEW_DETAILS",
-  "RESCHEDULE_CONFIRMATION",
-  "CONVERSATION_ENGINE_REPLY"
-]);
-
-const V2_SCHEDULING_INTENTS = new Set([
+const COUNTEROFFER_INTENTS = new Set([
   "scheduling_counteroffer",
-  "schedule_confirm",
-  "reschedule_request",
-  "select_option"
-]);
-
-const V2_SCHEDULING_ACTIONS = new Set([
-  "acknowledge_and_check_availability",
-  "offer_alternatives_or_escalate",
-  "ask_explicit_confirmation",
-  "create_appointment",
-  "offer_reschedule_flow"
+  "reschedule_request"
 ]);
 
 function unwrapEnginePayload(engineResult) {
@@ -46,7 +34,6 @@ function unwrapEnginePayload(engineResult) {
     return null;
   }
 
-  // conversationEngine.finalizeReply may nest semantic object results under .reply
   if (
     engineResult.reply &&
     typeof engineResult.reply === "object" &&
@@ -59,6 +46,17 @@ function unwrapEnginePayload(engineResult) {
   }
 
   return engineResult;
+}
+
+function extractLiveReplyText(conversation = {}) {
+  const engine = unwrapEnginePayload(conversation.engineResult);
+  if (typeof conversation.replyText === "string") {
+    return conversation.replyText;
+  }
+  if (typeof engine?.reply === "string") {
+    return engine.reply;
+  }
+  return "";
 }
 
 function extractLiveCeResponseIntent(conversation = {}) {
@@ -114,55 +112,97 @@ function languagesAgree(liveLanguage, v2Language) {
   return live === v2;
 }
 
-function intentsRoughlyAligned(liveIntent, v2Intent, v2Action) {
-  const live = String(liveIntent || "");
-  const v2 = String(v2Intent || "");
-  const action = String(v2Action || "");
-
-  if (live === "HUMAN_ASSIST" || live === "CONVERSATION_ENGINE_ERROR") {
-    return (
-      action === "escalate_to_human" ||
-      action === "safe_failure_and_escalate" ||
-      action === "offer_alternatives_or_escalate"
-    );
+function extractLiveSideEffectCategory(conversation = {}) {
+  const intent = extractLiveCeResponseIntent(conversation);
+  if (intent === "APPOINTMENT_CONFIRMATION") {
+    return "appointment_confirm";
   }
-
-  if (live === "APPOINTMENT_CONFIRMATION") {
-    return v2 === "schedule_confirm" || action === "create_appointment";
+  if (intent === "RESCHEDULE_CONFIRMATION") {
+    return "appointment_reschedule";
   }
-
-  if (live === "RESCHEDULE_CONFIRMATION" || live === "INTERVIEW_DETAILS") {
-    return v2 === "reschedule_request" || action === "offer_reschedule_flow";
+  if (intent === "HUMAN_ASSIST" || intent === "CONVERSATION_ENGINE_ERROR") {
+    return "human_escalation";
   }
-
-  if (LIVE_SCHEDULING_INTENTS.has(live)) {
-    return V2_SCHEDULING_INTENTS.has(v2) || V2_SCHEDULING_ACTIONS.has(action);
+  if (intent === "EMPTY_REPLY" || intent === "NO_LIVE_REPLY" || intent === "REPLY_SUPPRESSED") {
+    return "none";
   }
-
-  if (live === "EMPTY_REPLY" || live === "NO_LIVE_REPLY" || live === "REPLY_SUPPRESSED") {
-    return action === "noop" || action === "clarify_once";
+  if (conversation?.replied) {
+    return "whatsapp_reply";
   }
+  return "none";
+}
 
-  return Boolean(v2);
+function extractV2SideEffectCategory(authorization, structuredDecision) {
+  const proposals = Array.isArray(authorization?.proposals)
+    ? authorization.proposals
+    : [];
+  if (proposals.some((p) => p?.type === "create_appointment")) {
+    return "appointment_create:denied";
+  }
+  if (proposals.some((p) => p?.type === "mark_human_attention")) {
+    return "human_escalation:denied";
+  }
+  if (proposals.some((p) => p?.type === "send_whatsapp_reply")) {
+    return "whatsapp_reply:denied";
+  }
+  const action = structuredDecision?.decision?.nextAction;
+  if (action === "create_appointment") {
+    return "appointment_create:denied";
+  }
+  if (
+    action === "escalate_to_human" ||
+    action === "safe_failure_and_escalate" ||
+    action === "offer_alternatives_or_escalate"
+  ) {
+    return "human_escalation:denied";
+  }
+  if (structuredDecision?.decision?.shouldEscalate) {
+    return "human_escalation:denied";
+  }
+  return "none";
+}
+
+function resolveAppointmentStateAgreement({
+  liveAppointmentStatus = null,
+  v2AppointmentStatus = null
+} = {}) {
+  if (!liveAppointmentStatus && !v2AppointmentStatus) {
+    return true;
+  }
+  if (!liveAppointmentStatus || !v2AppointmentStatus) {
+    return liveAppointmentStatus == null || v2AppointmentStatus == null
+      ? true
+      : false;
+  }
+  return String(liveAppointmentStatus) === String(v2AppointmentStatus);
 }
 
 function classifyDivergence({
   liveCeResponseIntent,
   liveLanguage,
+  liveReplyText = "",
   v2InterpretedIntent,
   v2DecisionCode,
   v2Language,
-  v2RenderedText,
+  v2RenderedText = "",
   evaluationFailed = false,
-  languageAgreement = null
+  languageAgreement = null,
+  appointmentStateAgreement = true,
+  liveSideEffectCategory = "none",
+  v2SideEffectCategory = "none",
+  liveHumanAssist = false,
+  v2ShouldEscalate = false
 } = {}) {
   if (evaluationFailed) {
-    return DIVERGENCE.V2_EVALUATION_FAILED;
+    return DIVERGENCE.SHADOW_ERROR;
   }
 
-  const diagnosticLeak = containsInternalDiagnostics(v2RenderedText);
-  if (diagnosticLeak) {
-    return DIVERGENCE.DIAGNOSTIC_LEAK;
+  if (containsInternalDiagnostics(liveReplyText)) {
+    return DIVERGENCE.DIAGNOSTIC_LEAK_LIVE;
+  }
+
+  if (containsInternalDiagnostics(v2RenderedText)) {
+    return DIVERGENCE.DIAGNOSTIC_LEAK_V2;
   }
 
   const langOk =
@@ -174,61 +214,115 @@ function classifyDivergence({
     return DIVERGENCE.LANGUAGE_MISMATCH;
   }
 
+  if (appointmentStateAgreement === false) {
+    return DIVERGENCE.APPOINTMENT_STATE_MISMATCH;
+  }
+
+  const live = String(liveCeResponseIntent || "");
+  const v2Intent = String(v2InterpretedIntent || "");
+  const v2Action = String(v2DecisionCode || "");
+
   if (
-    String(v2DecisionCode || "") === "safe_failure_and_escalate" ||
-    String(v2DecisionCode || "") === "escalate_to_human"
+    COUNTEROFFER_INTENTS.has(v2Intent) &&
+    (live === "EMPTY_REPLY" ||
+      live === "NO_LIVE_REPLY" ||
+      live === "REPLY_SUPPRESSED" ||
+      live === "CONVERSATION_ENGINE_REPLY")
   ) {
+    // Live answered generically while v2 understood a counteroffer.
     if (
-      liveCeResponseIntent === "HUMAN_ASSIST" ||
-      liveCeResponseIntent === "CONVERSATION_ENGINE_ERROR"
+      live === "EMPTY_REPLY" ||
+      live === "NO_LIVE_REPLY" ||
+      live === "REPLY_SUPPRESSED"
     ) {
-      return DIVERGENCE.ALIGNED;
+      return DIVERGENCE.TIME_COUNTEROFFER_MISSED_BY_LIVE;
     }
-    return DIVERGENCE.V2_SAFE_FAILURE;
   }
 
   if (
-    (liveCeResponseIntent === "EMPTY_REPLY" ||
-      liveCeResponseIntent === "NO_LIVE_REPLY") &&
-    v2DecisionCode &&
-    v2DecisionCode !== "noop"
+    (live === "CONVERSATION_ENGINE_REPLY" || live === "APPOINTMENT_CONFIRMATION") &&
+    !COUNTEROFFER_INTENTS.has(v2Intent) &&
+    v2Intent === "unknown"
   ) {
-    return DIVERGENCE.LIVE_EMPTY_V2_ACTIVE;
+    return DIVERGENCE.TIME_COUNTEROFFER_MISSED_BY_V2;
   }
 
   if (
-    !intentsRoughlyAligned(liveCeResponseIntent, v2InterpretedIntent, v2DecisionCode)
+    live === "APPOINTMENT_CONFIRMATION" &&
+    (v2Action === "create_appointment" || v2Intent === "schedule_confirm")
   ) {
-    // Prefer action mismatch when both sides have scheduling-like signals.
-    if (
-      LIVE_SCHEDULING_INTENTS.has(String(liveCeResponseIntent)) ||
-      V2_SCHEDULING_ACTIONS.has(String(v2DecisionCode))
-    ) {
-      return DIVERGENCE.ACTION_MISMATCH;
-    }
-    return DIVERGENCE.INTENT_MISMATCH;
+    return DIVERGENCE.CONFIRMATION_DUPLICATE_RISK;
   }
 
-  return DIVERGENCE.ALIGNED;
+  if (
+    v2Intent === "reschedule_request" &&
+    live !== "RESCHEDULE_CONFIRMATION" &&
+    live !== "INTERVIEW_DETAILS" &&
+    live !== "HUMAN_ASSIST"
+  ) {
+    return DIVERGENCE.RESCHEDULE_MISSED;
+  }
+
+  const liveEscalation =
+    liveHumanAssist ||
+    live === "HUMAN_ASSIST" ||
+    live === "CONVERSATION_ENGINE_ERROR" ||
+    liveSideEffectCategory === "human_escalation";
+  if (Boolean(liveEscalation) !== Boolean(v2ShouldEscalate)) {
+    return DIVERGENCE.HUMAN_ESCALATION_DIFFERENCE;
+  }
+
+  const liveBooks =
+    liveSideEffectCategory === "appointment_confirm" ||
+    liveSideEffectCategory === "appointment_reschedule";
+  const v2WouldBook = String(v2SideEffectCategory || "").startsWith("appointment_");
+  if (liveBooks !== v2WouldBook && (liveBooks || v2WouldBook)) {
+    return DIVERGENCE.UNSAFE_SIDE_EFFECT_DIFFERENCE;
+  }
+
+  if (
+    live === "EMPTY_REPLY" ||
+    live === "NO_LIVE_REPLY" ||
+    live === "REPLY_SUPPRESSED"
+  ) {
+    if (!v2Action || v2Action === "noop" || v2Action === "clarify_once") {
+      return DIVERGENCE.EXACT_OR_EQUIVALENT;
+    }
+    return DIVERGENCE.UNSUPPORTED_FOR_COMPARISON;
+  }
+
+  if (
+    COUNTEROFFER_INTENTS.has(v2Intent) &&
+    (live === "CONVERSATION_ENGINE_REPLY" || live === "INTERVIEW_DETAILS")
+  ) {
+    return DIVERGENCE.TIME_COUNTEROFFER_MISSED_BY_LIVE;
+  }
+
+  if (v2Intent && live && v2Intent !== "unknown") {
+    return DIVERGENCE.EXACT_OR_EQUIVALENT;
+  }
+
+  if (v2Intent === "unknown" || !v2Intent) {
+    return DIVERGENCE.UNSUPPORTED_FOR_COMPARISON;
+  }
+
+  return DIVERGENCE.INTENT_MISMATCH;
 }
 
 function extractProposedSideEffect(authorization) {
-  const proposals = Array.isArray(authorization?.proposals)
-    ? authorization.proposals
-    : [];
-  const first = proposals.find((p) => p?.type) || null;
-  if (!first) {
-    return "none";
-  }
-  return `${first.type}:denied`;
+  return extractV2SideEffectCategory(authorization, null);
 }
 
 module.exports = {
   DIVERGENCE,
   unwrapEnginePayload,
+  extractLiveReplyText,
   extractLiveCeResponseIntent,
   extractLiveLanguage,
   languagesAgree,
+  extractLiveSideEffectCategory,
+  extractV2SideEffectCategory,
+  resolveAppointmentStateAgreement,
   classifyDivergence,
   extractProposedSideEffect
 };

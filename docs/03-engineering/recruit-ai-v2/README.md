@@ -46,7 +46,7 @@ Do **not** change without an explicit sprint:
 ### Phase 2–3 notes
 
 - Table: `recruit_ai_conversation_contexts` (unique active row per org + prospect + channel)
-- Shadow ledger: `recruit_ai_v2_shadow_evaluations` (write path behind `RECRUIT_AI_V2_SHADOW_ENABLED`, default false)
+- Shadow ledger: `recruit_ai_v2_shadow_evaluations` (write path behind flags; default off; empty allowlist = no orgs eligible)
 - Backend-only RLS (deny anon/authenticated; service_role only)
 - Optimistic `context_version` compare-and-set; duplicate `last_processed_message_id` is idempotent
 - Persisted JSON is sanitized (no tokens, stack traces, hidden reasoning, unmasked phones)
