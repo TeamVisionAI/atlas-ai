@@ -15,9 +15,7 @@ import JourneyProgress from "../../../components/prospect-workspace/JourneyProgr
 import ProspectDetailsPanel from "../../../components/prospect-workspace/ProspectDetailsPanel";
 import ProspectWorkspaceHeader from "../components/ProspectWorkspaceHeader";
 import ProspectHeader from "../components/ProspectHeader";
-import ProspectStickyIdentityHeader from "../components/ProspectStickyIdentityHeader";
 import OperationalWorkspace from "../components/OperationalWorkspace";
-import { resolveProspectWorkspaceScrollRoot } from "../../../engines/prospectWorkspaceScrollContract";
 import CommunicationHistorySection from "../components/CommunicationHistorySection";
 import ProspectCoachPanel from "../components/ProspectCoachPanel";
 import ExecutiveInsightsSection from "../components/ExecutiveInsightsSection";
@@ -51,10 +49,6 @@ export default function ProspectWorkspacePage() {
   const { prompt, promptDialog } = usePromptDialog();
   const isDesktop = useIsDesktop();
   const timelineRef = useRef(null);
-  const workspaceRootRef = useRef(null);
-  const primaryHeaderRef = useRef(null);
-  const layoutScrollRootRef = useRef(null);
-  const [stickyIdentityActive, setStickyIdentityActive] = useState(false);
   const phone = decodeURIComponent(routePhone || "");
 
   const {
@@ -88,37 +82,6 @@ export default function ProspectWorkspacePage() {
 
     setWorkflowState(loadWorkflowState(workspace.phone) || createDefaultWorkflowState());
   }, [workspace?.phone]);
-
-  useEffect(() => {
-    const sentinel = primaryHeaderRef.current;
-    const root = resolveProspectWorkspaceScrollRoot(
-      workspaceRootRef.current || sentinel
-    );
-    layoutScrollRootRef.current = root;
-
-    if (!sentinel || typeof IntersectionObserver === "undefined") {
-      setStickyIdentityActive(false);
-      return undefined;
-    }
-
-    // Observe against the layout content scrollport (or viewport). Never a nested shell.
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setStickyIdentityActive(!(entry?.isIntersecting ?? true));
-      },
-      {
-        root,
-        threshold: 0,
-        rootMargin: "-8px 0px 0px 0px"
-      }
-    );
-
-    observer.observe(sentinel);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [workspace?.phone, prospectCoreId]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -254,11 +217,10 @@ export default function ProspectWorkspacePage() {
 
   return (
     <div
-      ref={workspaceRootRef}
       className="prospect-workspace"
       aria-busy={refreshing || undefined}
       data-prospect-id={prospectCoreId || undefined}
-      data-workspace-scroll-owner="atlas-layout-content"
+      data-workspace-scroll-owner="atlas-layout-main"
     >
       {confirmDialog}
       {promptDialog}
@@ -273,30 +235,13 @@ export default function ProspectWorkspacePage() {
         }
       />
 
-      <ProspectStickyIdentityHeader
-        active={stickyIdentityActive}
-        prospectId={prospectCoreId}
+      <ProspectHeader
         identity={workspace.identity}
         status={workspace.status}
         owner={workspace.owner}
+        capture={workspace.capture}
         prospectCore={prospectCore}
-        interview={workspace.interview}
-        scrollRootRef={layoutScrollRootRef}
       />
-
-      <div
-        ref={primaryHeaderRef}
-        className="prospect-workspace__primary-header"
-        data-prospect-primary-header="true"
-      >
-        <ProspectHeader
-          identity={workspace.identity}
-          status={workspace.status}
-          owner={workspace.owner}
-          capture={workspace.capture}
-          prospectCore={prospectCore}
-        />
-      </div>
 
       <JourneyProgress journey={workspace.journey} />
 

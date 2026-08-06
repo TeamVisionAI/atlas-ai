@@ -403,12 +403,20 @@
 }
 
 /*
- * Prospect Workspace scroll owner — layout content only.
- * Do not nest a second overflow:hidden/auto shell inside the page (PR #26 regression).
+ * Prospect Workspace scroll owner — layout main (sticky header disabled).
+ * Main already has a bounded flex height; overflow:hidden was clipping the page
+ * after PR #26/#28. Do not reintroduce nested page shells or sticky identity.
  */
-.atlas-layout__content:has(.prospect-workspace) {
+.atlas-layout__main:has(.prospect-workspace) {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+.atlas-layout__content:has(.prospect-workspace) {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: auto;
+  overflow: visible;
 }
