@@ -137,12 +137,18 @@ async function checkAtlasAppointments() {
 /**
  * @returns {Promise<{ ready: boolean, mvpReady: boolean, checks: Array, blockers: string[] }>}
  */
+function checkWhatsAppApprovedTemplates() {
+  const { getTemplateRegistryHealth } = require("./whatsappApprovedTemplateRegistry");
+  return getTemplateRegistryHealth();
+}
+
 async function evaluateProductionReadiness() {
   const checks = [
     checkSupabase(),
     await checkAtlasAppointments(),
     checkWebhook(),
     await checkWhatsAppSend(),
+    checkWhatsAppApprovedTemplates(),
     checkGoogleCalendar(),
     checkMetaEmbeddedSignup(),
     checkContactForm()

@@ -1113,6 +1113,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-078 — WhatsApp Approved Template Catalog and Call-Site Mapping
+
+**Implements:** Meta WhatsApp template catalog semantics, intent→key mapping, parameters, and language rules  
+**Domain:** Communications / Recruit AI  
+**Depends on:** BR-075, BR-041, BR-012  
+**Related:** BR-076 (Zoom URL), BR-077 (office address)  
+**Status:** Implemented in code (Phase 1) — catalog contracts + call-site wiring ready; templates remain inactive until Meta approval + explicit env authorization  
+**Engine target:** `whatsappApprovedTemplateRegistry.js`, `whatsappTemplateVariableBuilder.js`, outbound call sites, ops `WHATSAPP_APPROVED_TEMPLATES_JSON`  
+**Approval packet:** `docs/03-engineering/WHATSAPP_TEMPLATE_APPROVAL_PACKET.md`
+
+### Rules
+
+1. **Gate vs catalog** — BR-075 remains the sole authorization gate for every Cloud API send. BR-078 defines which registry keys exist, which intents map to them, required parameters, categories, and language selection rules for templates.
+2. **No outside-window freeform fallback** — If the customer-care window is closed, Atlas may send only an exact approved+active Meta template for the resolved registry key and preferred-language locale. Otherwise fail closed.
+3. **Exact activation tuple** — Outside-window send requires exact registry key + exact locale (`english` / `spanish`) + `approved: true` + `active: true` + non-empty `metaTemplateName`. Missing or invalid mapping fails closed.
+4. **Semantic separation** — Confirmation, reminder, details/reschedule, missed, Zoom, location, human-assist, and lead welcome are distinct keys. Do not alias `CONFIRMATION` onto `interview_reminder`. Do not reuse `interview_details` for initial confirmation.
+5. **Marketing retention** — Templates classified as marketing (including `lead_welcome`) must remain marketing. Do not reclassify recruiting/marketing content as utility to ease Meta approval.
+6. **Preferred language** — Template locale uses canonical `preferred_language`. Never send both languages. No silent EN↔ES fallback.
+7. **Canonical data** — Appointment datetime, Zoom URL (BR-076), and meeting address (BR-077 / appointment snapshot) must come from canonical sources. Never fabricate Zoom URLs. Never substitute office address for a public-location appointment.
+8. **Production activation** — Setting real Meta template names in production `WHATSAPP_APPROVED_TEMPLATES_JSON` requires (a) Meta approval of those templates and (b) explicit environment authorization. Phase 0 drafts and inactive JSON examples are not activation.
+9. **Boundaries** — Does not itself send WhatsApp, submit templates to Meta, connect ads, or weaken BR-075 fail-closed behavior.
+
+---
+
 ## BR-074 — Firm-Verified Securities Content Access
 
 **Implements:** RC4 Milestone 1 — Firm-Verified Securities Access Foundation

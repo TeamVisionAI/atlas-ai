@@ -1,10 +1,11 @@
 /**
- * Canonical WhatsApp outbound authorization gate (BR-075).
+ * Canonical WhatsApp outbound authorization gate (BR-075 / BR-078).
  * Free-form text only inside the customer-care window; outside requires an approved Meta template.
  */
 
 const { evaluateCustomerCareWindow } = require("./whatsappCustomerCareWindow");
 const { resolveApprovedTemplate } = require("./whatsappApprovedTemplateRegistry");
+const { isProspectOptedOut } = require("./whatsappTemplateVariableBuilder");
 
 const DELIVERY_STATUSES = Object.freeze({
   SENT_FREEFORM: "sent_freeform",
@@ -69,6 +70,7 @@ async function authorizeWhatsAppOutbound({
   message = null,
   templateKey = null,
   templateVariables = {},
+  templateButtonVariables = {},
   callerMetaTemplateName = null,
   now = new Date(),
   evaluateWindow = evaluateCustomerCareWindow,
@@ -76,6 +78,37 @@ async function authorizeWhatsAppOutbound({
 } = {}) {
   const safeProspect = prospect || {};
   const text = message == null ? "" : String(message).trim();
+
+  if (isProspectOptedOut(safeProspect)) {
+    return buildDeliveryResult({
+      status: DELIVERY_STATUSES.BLOCKED_TEMPLATE_UNAPPROVED,
+      intent,
+      prospectPhone: phone,
+      organizationId,
+      permittedDeliveryMode: null,
+      retryable: false,
+      reason: "PROSPECT_OPTED_OUT",
+      extras: { authorized: false }
+    });
+  }
+
+  if (
+    organizationId &&
+    safeProspect.organization_id &&
+    String(safeProspect.organization_id) !== String(organizationId)
+  ) {
+    return buildDeliveryResult({
+      status: DELIVERY_STATUSES.BLOCKED_TEMPLATE_UNAPPROVED,
+      intent,
+      prospectPhone: phone,
+      organizationId,
+      permittedDeliveryMode: null,
+      retryable: false,
+      reason: "CROSS_ORGANIZATION_REJECTED",
+      extras: { authorized: false }
+    });
+  }
+
   const window = await evaluateWindow({ phone, organizationId, now });
 
   if (window.open) {
@@ -110,6 +143,7 @@ async function authorizeWhatsAppOutbound({
     templateKey,
     prospect: safeProspect,
     variables: templateVariables,
+    buttonVariables: templateButtonVariables,
     callerMetaTemplateName
   });
 
@@ -134,6 +168,7 @@ async function authorizeWhatsAppOutbound({
       extras: {
         authorized: false,
         missingVariables: template.missingVariables || null,
+        category: template.category || null,
         windowClosed: true
       }
     });
@@ -155,7 +190,12 @@ async function authorizeWhatsAppOutbound({
       authorized: true,
       languageCode: template.languageCode,
       variables: template.variables,
-      expectedVariableKeys: template.expectedVariableKeys
+      buttonVariables: template.buttonVariables,
+      expectedVariableKeys: template.expectedVariableKeys,
+      expectedButtonVariableKeys: template.expectedButtonVariableKeys,
+      category: template.category,
+      version: template.version,
+      zoomUrlDeliveryMode: template.zoomUrlDeliveryMode
     }
   });
 }

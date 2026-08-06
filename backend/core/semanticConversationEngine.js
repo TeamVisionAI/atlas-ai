@@ -474,7 +474,7 @@ async function completeInterview(prospect, profile, language) {
 
   // Implements BR-039/BR-041 — one confirmation from persisted appointment + preferred language.
   // Never use stale profile slot labels or conversation-language fallback for this message.
-  const confirmation = buildPersistedAppointmentConfirmation(
+  const confirmationAppointment =
     scheduleResult.appointment || {
       id: scheduleResult.appointmentId,
       startDateTime: scheduleResult.booking?.startTimeISO || null,
@@ -485,7 +485,10 @@ async function completeInterview(prospect, profile, language) {
         scheduleResult.appointment?.virtualMeetingUrl ||
         scheduleResult.meetingUrl ||
         null
-    },
+    };
+
+  const confirmation = buildPersistedAppointmentConfirmation(
+    confirmationAppointment,
     prospect
   );
 
@@ -504,6 +507,7 @@ async function completeInterview(prospect, profile, language) {
     agentId,
     agentSource: resolvedAgent.source,
     confirmationIdempotencyKey: confirmation.idempotencyKey,
+    confirmationAppointment,
     outboundIntent: "APPOINTMENT_CONFIRMATION"
   };
 }

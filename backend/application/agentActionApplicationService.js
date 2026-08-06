@@ -102,11 +102,12 @@ async function logAgentTimeline(prospect, message, pipeline = "AGENT", extras = 
 
 async function sendWhatsAppOrFail(prospect, message, options = {}) {
   const result = await sendTextMessage(prospect.phone, message, {
-    intent: "AGENT_ACTION",
+    intent: options.intent || "AGENT_ACTION",
     actor: "AGENT",
     organizationId: options.organizationId || prospect.organization_id || null,
     templateKey: options.templateKey || null,
     templateVariables: options.templateVariables || {},
+    templateButtonVariables: options.templateButtonVariables || {},
     idempotencyKey: options.idempotencyKey || null
   });
 
@@ -156,12 +157,17 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
 
   switch (action) {
     case ACTION_IDS.SEND_ZOOM_LINK: {
+      const {
+        buildZoomInvitationVariables,
+        isValidHttpsZoomUrl
+      } = require("../core/whatsappTemplateVariableBuilder");
+
       const url = await meetingManagementService.resolveJoinUrlForProspect(
         organizationId,
         phone
       );
 
-      if (!url) {
+      if (!isValidHttpsZoomUrl(url)) {
         return buildActionError(
           action,
           "MEETING_URL_NOT_CONFIGURED",
@@ -173,8 +179,24 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
         return buildActionError(action, "ALREADY_SENT", "Zoom link was already sent.");
       }
 
+      const zoomVars = buildZoomInvitationVariables(prospect, url);
+      if (!zoomVars.ok) {
+        return buildActionError(
+          action,
+          zoomVars.reason || "MEETING_URL_NOT_CONFIGURED",
+          "No meeting link is available."
+        );
+      }
+
       const message = buildZoomLinkMessage({ url, language });
-      const sendError = await sendWhatsAppOrFail(prospect, message);
+      // Implements BR-078 — outside-window uses zoom_invitation; flags only after success.
+      const sendError = await sendWhatsAppOrFail(prospect, message, {
+        organizationId,
+        intent: "SEND_ZOOM_LINK",
+        templateKey: "zoom_invitation",
+        templateVariables: zoomVars.variables,
+        templateButtonVariables: zoomVars.buttonVariables
+      });
 
       if (sendError) {
         return { ...sendError, action };
@@ -194,11 +216,58 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
         return buildActionError(action, "ALREADY_SENT", "Office location was already sent.");
       }
 
+      const {
+        buildOfficeLocationVariables
+      } = require("../core/whatsappTemplateVariableBuilder");
+      const { composeOfficeAddressFromOfficeModel } = require("../core/officeAddressResolver");
+      const appointmentRepository = require("../repositories/appointmentRepository");
+      const { coerceAppointmentItems } = require("../core/appointmentCollection");
+
+      let appointment = {};
+      try {
+        const searchResult = await appointmentRepository.search({
+          organizationId,
+          prospectPhone: phone,
+          status: "scheduled"
+        });
+        const appointments = coerceAppointmentItems(searchResult);
+        appointment =
+          appointments
+            .filter((item) => item.meetingAddress || item.meeting_address)
+            .sort((left, right) => new Date(left.startDateTime) - new Date(right.startDateTime))[0] ||
+          {};
+      } catch {
+        appointment = {};
+      }
+
+      const orgOffice = getOrganizationSettings().office;
+      const fallbackAddress = composeOfficeAddressFromOfficeModel(orgOffice);
+      const locationVars = buildOfficeLocationVariables(appointment, prospect, {
+        fallbackAddress
+      });
+
+      if (!locationVars.ok) {
+        return buildActionError(
+          action,
+          locationVars.reason || "OFFICE_ADDRESS_NOT_CONFIGURED",
+          "A complete meeting address is not available."
+        );
+      }
+
       const message = buildOfficeLocationMessage({
-        office: getOrganizationSettings().office,
+        office: {
+          name: orgOffice?.name || "Office",
+          fullAddress: locationVars.variables.meeting_address
+        },
         language
       });
-      const sendError = await sendWhatsAppOrFail(prospect, message);
+      // Implements BR-078 — outside-window uses office_location with canonical meeting_address.
+      const sendError = await sendWhatsAppOrFail(prospect, message, {
+        organizationId,
+        intent: "SEND_OFFICE_LOCATION",
+        templateKey: "office_location",
+        templateVariables: locationVars.variables
+      });
 
       if (sendError) {
         return { ...sendError, action };
@@ -222,11 +291,21 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
         );
       }
 
+      const {
+        buildMissedAppointmentVariables
+      } = require("../core/whatsappTemplateVariableBuilder");
+
       const message = buildMissedAppointmentMessage({
         name: prospect.name,
         language
       });
-      const sendError = await sendWhatsAppOrFail(prospect, message);
+      // Implements BR-078 — outside-window uses missed_appointment.
+      const sendError = await sendWhatsAppOrFail(prospect, message, {
+        organizationId,
+        intent: "MISSED_APPOINTMENT",
+        templateKey: "missed_appointment",
+        templateVariables: buildMissedAppointmentVariables(prospect)
+      });
 
       if (sendError) {
         return { ...sendError, action };
