@@ -47,6 +47,37 @@
   gap: 6px;
 }
 
+.prospect-center__updates {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  border-radius: 10px;
+  color: #1e3a8a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prospect-center__updates-button {
+  appearance: none;
+  border: 1px solid #1e3a8a;
+  background: #1e3a8a;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prospect-center__updates-button:hover {
+  background: #1d4ed8;
+}
+
 .prospect-center__search-label {
   font-size: 12px;
   font-weight: 700;
