@@ -1,9 +1,10 @@
 /**
  * Single customer-facing appointment confirmation copy.
  * Built only from persisted atlas_appointments + canonical preferred_language (BR-041).
+ * In-person office text uses snapshotted meetingAddress; BR-018 fullAddress only as last resort (BR-077).
  */
 
-const { OFFICE_ADDRESS } = require("./teamVisionWorkflowCopy");
+const { getOfficeLocation } = require("./businessRulesEngine");
 const {
   resolveProspectPreferredLanguage,
   preferredLanguageToCommunicationCode
@@ -77,13 +78,17 @@ function formatAppointmentWhen(appointment = {}, languageCode = "en") {
 }
 
 function resolveOfficeAddress(appointment = {}) {
-  return (
+  const snapshotted =
     appointment.meetingAddress ||
     appointment.meeting_address ||
-    appointment.meetingLocationName ||
-    appointment.meeting_location_name ||
-    OFFICE_ADDRESS
-  );
+    null;
+
+  if (snapshotted && String(snapshotted).trim()) {
+    return String(snapshotted).trim();
+  }
+
+  // Implements BR-077 — never use truncated hardcoded Miami fallback.
+  return getOfficeLocation().fullAddress || null;
 }
 
 /**

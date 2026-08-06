@@ -76,6 +76,12 @@ const {
   isZoomProvider,
   resolveCanonicalVirtualMeetingUrl
 } = require("../core/virtualMeetingUrlResolver");
+const {
+  OFFICE_ADDRESS_SOURCES,
+  OFFICE_ADDRESS_STATUSES,
+  composeOfficeAddressFromOfficeModel,
+  resolveCanonicalOfficeAddress
+} = require("../core/officeAddressResolver");
 
 async function resolveOwnerRepId(agentId) {
   const user = await findUserById(agentId);
@@ -123,16 +129,16 @@ function mapInterviewTypeToMeeting(meetingType, meetingProvider) {
 function resolveLocationDetails(profile, payload = {}) {
   const locationType = payload.meetingLocationType || MEETING_LOCATION_TYPES.OFFICE;
 
+  // Implements BR-077 — office branch prefers complete fullAddress / street+suite.
+  // Final in-person snapshot is applied via resolveCanonicalOfficeAddress in createAppointment.
   if (locationType === MEETING_LOCATION_TYPES.OFFICE) {
     const office = profile?.office || getOrganizationSettings().office;
-    const address = [office.address, office.city, office.state, office.postalCode]
-      .filter(Boolean)
-      .join(", ");
+    const composed = composeOfficeAddressFromOfficeModel(office);
 
     return {
       meetingLocationType: MEETING_LOCATION_TYPES.OFFICE,
       meetingLocationName: office.name || "Office",
-      meetingAddress: address || office.fullAddress || null,
+      meetingAddress: composed,
       meetingNotes: office.parkingNotes || null
     };
   }
@@ -356,13 +362,19 @@ async function createAppointment(input, context = {}) {
   const attendeeEmail = email && validateEmailFormat(email) ? email : null;
 
   let meetingUrl = null;
-  let officeLocation = location.meetingAddress;
+  let officeLocation = null;
   // Implements BR-076 — incomplete existingBooking must not suppress org Personal Meeting URL.
   let virtualUrlResult = {
     url: null,
     status: isVirtual ? VIRTUAL_URL_STATUSES.PENDING : VIRTUAL_URL_STATUSES.NOT_APPLICABLE,
     source: VIRTUAL_MEETING_URL_SOURCES.UNAVAILABLE,
     provider: meeting.meetingProvider || null
+  };
+  // Implements BR-077 — complete office address snapshot (includes suite/unit).
+  let officeAddressResult = {
+    address: null,
+    status: isVirtual ? OFFICE_ADDRESS_STATUSES.NOT_APPLICABLE : OFFICE_ADDRESS_STATUSES.UNAVAILABLE,
+    source: OFFICE_ADDRESS_SOURCES.UNAVAILABLE
   };
 
   if (isVirtual) {
@@ -386,8 +398,14 @@ async function createAppointment(input, context = {}) {
         400
       );
     }
-  } else if (!officeLocation) {
-    officeLocation = await meetingManagementService.resolveOfficeAddress(organizationId);
+  } else {
+    officeAddressResult = await resolveCanonicalOfficeAddress({
+      organizationId,
+      meetingType: meeting.meetingType,
+      requestAddress: input.meetingAddress || location.meetingAddress || null
+    });
+    officeLocation = officeAddressResult.address;
+    location.meetingAddress = officeLocation;
   }
 
   const bookingResult =
@@ -478,6 +496,7 @@ async function createAppointment(input, context = {}) {
       meetingType: meeting.meetingType,
       meetingProvider: meeting.meetingProvider,
       ...location,
+      meetingAddress: isVirtual ? null : officeLocation,
       meetingNotes: notes || location.meetingNotes,
       virtualMeetingUrl: isVirtual ? virtualUrlResult.url : null,
       calendarEventId: bookingResult.googleCalendarEventId,
@@ -501,6 +520,8 @@ async function createAppointment(input, context = {}) {
         emailStatus,
         virtualUrlStatus: virtualUrlResult.status,
         virtualUrlSource: virtualUrlResult.source,
+        officeAddressStatus: officeAddressResult.status,
+        officeAddressSource: officeAddressResult.source,
         ownerRepId,
         interviewerUserId: interviewAssignment.interviewerUserId,
         interviewerName: interviewAssignment.interviewerName
