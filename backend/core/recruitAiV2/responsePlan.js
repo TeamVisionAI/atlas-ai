@@ -20,7 +20,10 @@ function buildResponsePlan(structuredDecision) {
     mayCreateAppointment: false,
     maySendOutbound: false,
     reasonCodes: [...(structuredDecision?.reasonCodes || [])],
-    entities: structuredDecision?.entities || {},
+    entities: {
+      ...(structuredDecision?.entities || {}),
+      ...(structuredDecision?.customerReplyPlan?.entities || {})
+    },
     offeredSlots: structuredDecision?.context?.previouslyOfferedSlots || [],
     alternatives: structuredDecision?.availability?.nearestAlternatives || []
   };

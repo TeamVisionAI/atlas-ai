@@ -61,7 +61,16 @@ const {
   isEligibleForContextCapture
 } = require("./contextCaptureConfig");
 const { createContextCaptureService } = require("./contextCaptureService");
-const { computeContextOnlyTurn } = require("./contextTurnUpdate");
+const {
+  computeContextOnlyTurn,
+  buildCaptureDiagnostic
+} = require("./contextTurnUpdate");
+const { resolveConversationalLanguage } = require("./languagePolicy");
+const {
+  parseLocationAnswer,
+  proposeStateFromCity,
+  FACT_CERTAINTY
+} = require("./locationFacts");
 const {
   classifyDivergence,
   extractLiveCeResponseIntent,
@@ -101,6 +110,11 @@ module.exports = {
   isEligibleForContextCapture,
   createContextCaptureService,
   computeContextOnlyTurn,
+  buildCaptureDiagnostic,
+  resolveConversationalLanguage,
+  parseLocationAnswer,
+  proposeStateFromCity,
+  FACT_CERTAINTY,
   createMemoryShadowEvaluationRepository,
   createSupabaseShadowEvaluationRepository,
   createShadowEvaluationService,

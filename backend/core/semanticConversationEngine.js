@@ -63,13 +63,20 @@ const {
   getRemoteZoomDayPartMessage,
   getLocalZoomSwitchMessage,
   getDayPartQuestion,
+  getDayPartClarificationQuestion,
   getNameQuestion,
   getEmailCollectionQuestion,
   getHandoffMessage,
   getCanonicalFaqAnswer
 } = require("./teamVisionWorkflowCopy");
 const { evaluateCoverage } = require("./businessRulesEngine");
-const { extractInformation, detectLocalZoomPreference, isAuthorizationAmbiguous, isEmailDeclined } = require("./informationExtractor");
+const {
+  extractInformation,
+  detectLocalZoomPreference,
+  isAuthorizationAmbiguous,
+  isEmailDeclined,
+  inferStateFromCity
+} = require("./informationExtractor");
 const {
   resolveConversationLanguage,
   detectMessageLanguage
@@ -193,7 +200,9 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
       return getFirstMessage(language);
 
     case "state":
-      return getStateQuestion(profile.city, language);
+      return getStateQuestion(profile.city, language, {
+        proposedState: inferStateFromCity(profile.city)
+      });
 
     case "authorization":
       return getAuthorizationQuestion(language);
@@ -539,7 +548,8 @@ async function buildSemanticReply({
   language,
   isNew,
   informationalReply,
-  localZoomSwitch = false
+  localZoomSwitch = false,
+  dayPartMiss = false
 }) {
   const captureState = parseQualificationCapture(prospect?.notes);
   const brainOptions = { notes: prospect?.notes, captureState };
@@ -557,8 +567,15 @@ async function buildSemanticReply({
 
   let question = buildQuestionForMissingField(nextField, profile, language, prospect);
 
+  // BR-082: unrecognized day-part fragment → alternate clarification, not identical loop.
+  if (nextField === "dayPart" && dayPartMiss && !extracted?.dayPart) {
+    const attempts = Number(captureState.dayPartClarifyAttempts || 0);
+    question = getDayPartClarificationQuestion(language, attempts);
+  }
+
   if (
     nextField === "dayPart" &&
+    !dayPartMiss &&
     captureState.interviewType &&
     (extracted.authorization !== undefined || extracted.interviewType)
   ) {
@@ -809,6 +826,16 @@ async function handleSemanticMessage({
     parseQualificationCapture(prospect.notes),
     extracted
   );
+
+  // BR-082: track day-part clarification attempts; reset on success.
+  if (nextField === "dayPart") {
+    if (extracted.dayPart) {
+      captureState.dayPartClarifyAttempts = 0;
+    } else {
+      captureState.dayPartClarifyAttempts =
+        Number(captureState.dayPartClarifyAttempts || 0) + 1;
+    }
+  }
 
   if (extracted.emailSkipped) {
     captureState.email = true;
@@ -1328,6 +1355,9 @@ async function handleSemanticMessage({
     return nameReply;
   }
 
+  const dayPartMiss =
+    nextField === "dayPart" && !extracted.dayPart && Boolean(cleanMessage);
+
   const replyText = await buildSemanticReply({
     prospect,
     profile,
@@ -1335,7 +1365,8 @@ async function handleSemanticMessage({
     language,
     isNew: wasNewProspect,
     informationalReply,
-    localZoomSwitch
+    localZoomSwitch,
+    dayPartMiss
   });
 
   await syncProfileToProspect(prospect, profile, { language, captureState });

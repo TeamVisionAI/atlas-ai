@@ -1,13 +1,14 @@
 /**
  * Recruit AI v2 — shared context advancement for a single inbound turn.
  * Used by continuous capture (lightweight) and shadow evaluation (full).
- * Implements BR-081 Phase 3B: exactly-once durable context per inbound_message_id.
+ * Implements BR-081 Phase 3B / BR-082: exactly-once durable context per inbound_message_id.
  */
 
 const { interpretInboundMessage } = require("./interpreter");
 const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine");
 const { mergeConversationContext } = require("./conversationContext");
 const { loadConversationContext } = require("./contextLoader");
+const { FACT_CERTAINTY } = require("./locationFacts");
 
 /**
  * Apply interpretation + decision patches to context without rendering copy.
@@ -51,16 +52,45 @@ function buildNextContextFromInterpretation({
   if (interpretation.preferredLanguage && interpretation.preferredLanguage !== "unknown") {
     nextContext.preferredLanguage = interpretation.preferredLanguage;
   }
-
-  if (
-    interpretation.intent === "provide_location" &&
-    (interpretation.entities?.city || interpretation.entities?.state)
-  ) {
-    nextContext.knownFacts = {
-      ...nextContext.knownFacts,
-      city: interpretation.entities.city || nextContext.knownFacts?.city || null,
-      state: interpretation.entities.state || nextContext.knownFacts?.state || null
+  if (interpretation.languageMeta) {
+    nextContext.languageMeta = {
+      ...(nextContext.languageMeta || {}),
+      ...interpretation.languageMeta
     };
+  }
+
+  if (interpretation.intent === "provide_location") {
+    const completeness = interpretation.entities?.completeness;
+    const city =
+      interpretation.entities?.city || nextContext.knownFacts?.city || null;
+    const state = interpretation.entities?.state || null;
+    const proposedState =
+      interpretation.entities?.proposedState ||
+      (completeness === "partial"
+        ? interpretation.entities?.proposedState
+        : null);
+
+    if (completeness === "complete" && city && state) {
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        city,
+        state,
+        cityCertainty: FACT_CERTAINTY.CONFIRMED,
+        stateCertainty: FACT_CERTAINTY.CONFIRMED,
+        proposedState: null
+      };
+    } else if (city) {
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        city,
+        state: null,
+        cityCertainty: FACT_CERTAINTY.PARTIAL,
+        stateCertainty: proposedState
+          ? FACT_CERTAINTY.PROPOSED
+          : FACT_CERTAINTY.UNKNOWN,
+        proposedState: proposedState || null
+      };
+    }
   }
 
   if (interpretation.intent === "provide_name" && interpretation.entities?.name) {
@@ -117,7 +147,46 @@ function computeContextOnlyTurn({
   };
 }
 
+/**
+ * Sanitized capture-only diagnostic (no raw PII / message body / secrets).
+ */
+function buildCaptureDiagnostic({
+  inboundMessageId = null,
+  interpretation = null,
+  decisionCode = null,
+  nextContext = null,
+  elapsedMs = null,
+  requiresClarification = null
+} = {}) {
+  const id = inboundMessageId ? String(inboundMessageId) : null;
+  return {
+    inboundMessageIdTail: id && id.length > 12 ? id.slice(-12) : id,
+    intent: interpretation?.intent || null,
+    confidence:
+      interpretation?.confidence != null
+        ? Number(interpretation.confidence)
+        : null,
+    messageLanguage: interpretation?.messageLanguage || null,
+    preferredLanguage: interpretation?.preferredLanguage || null,
+    languageAdapted: Boolean(interpretation?.languageAdapted),
+    stage: nextContext?.currentStage || null,
+    clarification: Boolean(
+      requiresClarification ?? interpretation?.requiresClarification
+    ),
+    decisionCode: decisionCode || null,
+    reasonCodes: Array.isArray(
+      interpretation?.reasonCodes || interpretation?.structuredReasonCodes
+    )
+      ? interpretation.reasonCodes
+      : null,
+    cityCertainty: nextContext?.knownFacts?.cityCertainty || null,
+    stateCertainty: nextContext?.knownFacts?.stateCertainty || null,
+    elapsedMs: elapsedMs != null ? Number(elapsedMs) : null
+  };
+}
+
 module.exports = {
   buildNextContextFromInterpretation,
-  computeContextOnlyTurn
+  computeContextOnlyTurn,
+  buildCaptureDiagnostic
 };

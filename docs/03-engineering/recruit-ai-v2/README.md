@@ -16,6 +16,7 @@
 | [06_DURABLE_CONTEXT_SCHEMA.md](./06_DURABLE_CONTEXT_SCHEMA.md) | Phase 2 — durable context + shadow ledger tables |
 | [07_SHADOW_MODE.md](./07_SHADOW_MODE.md) | Phase 3 — production shadow evaluation |
 | [08_CONTINUOUS_CONTEXT_CAPTURE.md](./08_CONTINUOUS_CONTEXT_CAPTURE.md) | Phase 3B — 100% context capture ≠ 10% shadow |
+| [09_FIRST_PRODUCTION_FEEDBACK.md](./09_FIRST_PRODUCTION_FEEDBACK.md) | BR-082 — greeting/partial location/language/fragments |
 
 ## Regression fixture
 

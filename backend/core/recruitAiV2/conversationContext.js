@@ -13,10 +13,16 @@ function emptyKnownFacts() {
   return {
     city: null,
     state: null,
+    /** confirmed | proposed | partial | unknown — BR-082 */
+    cityCertainty: "unknown",
+    stateCertainty: "unknown",
+    /** Likely state proposal; never treated as confirmed until affirmed. */
+    proposedState: null,
     workAuthorization: null,
     currentOccupation: null,
     preferredMeetingType: null,
-    fullName: null
+    fullName: null,
+    name: null
   };
 }
 
@@ -43,11 +49,23 @@ function emptyConversationMeta() {
     lastConfirmationSentAt: null,
     lastAtlasOutboundText: null,
     counterofferMismatchCount: 0,
+    /** Recoverable clarification attempts (BR-082). */
+    clarificationCount: 0,
+    lastClarificationTemplateKey: null,
     confirmedFields: [],
     unresolvedFields: [],
     confirmationVersion: 0,
     lastConfirmationSentVersion: 0,
     lastCounterofferTime: null
+  };
+}
+
+function emptyLanguageMeta() {
+  return {
+    source: "default",
+    spanishEvidenceCount: 0,
+    englishEvidenceCount: 0,
+    lastMessageLanguage: "unknown"
   };
 }
 
@@ -66,6 +84,7 @@ function createConversationContext(overrides = {}) {
     prospectId: null,
     organizationId: null,
     preferredLanguage: LANGUAGES.UNKNOWN,
+    languageMeta: emptyLanguageMeta(),
     currentStage: STAGES.GREETING,
     knownFacts: emptyKnownFacts(),
     appointment: emptyAppointment(),
@@ -106,6 +125,11 @@ function mergeConversationContext(base, patch = {}) {
       ...emptyAttention(),
       ...(base.attention || {}),
       ...(patch.attention || {})
+    },
+    languageMeta: {
+      ...emptyLanguageMeta(),
+      ...(base.languageMeta || {}),
+      ...(patch.languageMeta || {})
     }
   };
 
@@ -177,6 +201,7 @@ module.exports = {
   emptyAppointment,
   emptyConversationMeta,
   emptyAttention,
+  emptyLanguageMeta,
   normalizeLanguage,
   languageToLocaleCode,
   slotKey,

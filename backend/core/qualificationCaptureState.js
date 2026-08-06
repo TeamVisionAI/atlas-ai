@@ -14,7 +14,9 @@ function defaultCaptureState() {
     interviewType: false,
     dayPart: false,
     name: false,
-    email: false
+    email: false,
+    /** BR-082 — consecutive unrecognized day-part replies */
+    dayPartClarifyAttempts: 0
   };
 }
 
@@ -87,8 +89,13 @@ function markCapturedFields(captureState, extracted = {}) {
     next.city = true;
   }
 
-  if (extracted.state) {
+  // BR-082: only explicit/confirmed state counts — never proposedState alone.
+  if (extracted.state && !extracted.stateProposedOnly) {
     next.state = true;
+  }
+
+  if (typeof extracted.dayPartClarifyAttempts === "number") {
+    next.dayPartClarifyAttempts = extracted.dayPartClarifyAttempts;
   }
 
   if (extracted.interviewType) {

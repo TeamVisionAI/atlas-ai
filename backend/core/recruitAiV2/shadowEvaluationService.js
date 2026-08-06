@@ -54,11 +54,21 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
     organizationId: extras.organizationId || prospect.organization_id || null,
     prospectId: extras.prospectId || prospect.id || null,
     preferredLanguage,
+    // Prospect-seeded language is inferred/default — mutable by active conversation (BR-082).
+    languageMeta: {
+      source: extras.languageSource || "inferred",
+      spanishEvidenceCount: 0,
+      englishEvidenceCount: 0,
+      lastMessageLanguage: "unknown"
+    },
     timezone: extras.timezone || "America/New_York",
     knownFacts: {
       name: prospect.name || null,
       city: prospect.city || null,
       state: prospect.state || null,
+      cityCertainty: prospect.city && prospect.state ? "confirmed" : prospect.city ? "partial" : "unknown",
+      stateCertainty: prospect.state ? "confirmed" : "unknown",
+      proposedState: null,
       email: null
     },
     appointment: {

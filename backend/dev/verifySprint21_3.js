@@ -62,7 +62,9 @@ async function main() {
 
   const miamiOnly = extractInformation("Miami", { city: null, state: null }, { nextField: "city" });
   assert(miamiOnly.city === "Miami", "City-only answer captures Miami");
-  assert(miamiOnly.state === "FL", "Recognized city infers Florida automatically");
+  // BR-082: city-only must not persist inferred state as confirmed.
+  assert(!miamiOnly.state, "City-only does not auto-confirm Florida");
+  assert(miamiOnly.proposedState === "FL", "Recognized city may propose Florida for confirmation");
 
   const profileCityOnly = { ...emptyProfile, city: "Miami", state: "FL", authorization: true, occupation: "Sales" };
   const captureNotes = encodeQualificationCapture({
@@ -84,7 +86,7 @@ async function main() {
     }).includes("city"),
     "Seeded city without capture still requires city step"
   );
-  console.log("✓ Recognized city infers state (Happy Path v1.0)");
+  console.log("✓ City-only proposes state for confirmation (BR-082)");
 
   const phoneFaq = `sim-213-${crypto.randomUUID().slice(0, 8)}`;
   await cleanupSimulatorProspect(phoneFaq).catch(() => {});
@@ -121,11 +123,17 @@ async function main() {
 
   await send(phoneFlow, "Hello");
   const afterCity = await send(phoneFlow, "Miami");
-  assert(/permiso|authorization|work/i.test(afterCity.reply), "Recognized city skips state and asks authorization");
+  assert(
+    /Florida|estado|state/i.test(afterCity.reply),
+    "City-only asks state confirmation instead of skipping to authorization"
+  );
+
+  const afterState = await send(phoneFlow, "Florida");
+  assert(/permiso|authorization|work/i.test(afterState.reply), "Confirmed state advances to authorization");
 
   await send(phoneFlow, "Yes");
   const flowProspect = await findProspect(phoneFlow);
-  assert(flowProspect.city === "Miami" && flowProspect.state === "FL", "Recognized city persists inferred Florida");
+  assert(flowProspect.city === "Miami" && flowProspect.state === "FL", "Confirmed city/state persisted");
 
   const flowBrain = buildQualificationBrain(flowProspect);
   const flowAssessment = assessQualificationFromProspect(flowProspect);

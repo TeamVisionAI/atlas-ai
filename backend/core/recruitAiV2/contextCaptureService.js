@@ -7,7 +7,10 @@
  */
 
 const { isMetaReviewScope } = require("./contextPersistenceService");
-const { computeContextOnlyTurn } = require("./contextTurnUpdate");
+const {
+  computeContextOnlyTurn,
+  buildCaptureDiagnostic
+} = require("./contextTurnUpdate");
 const { buildReconstructionInput } = require("./shadowEvaluationService");
 const { resolveProspectPreferredLanguage } = require("../prospectLanguage");
 
@@ -64,6 +67,7 @@ function createContextCaptureService({ persistenceService } = {}) {
       reconstructionInput
     });
 
+    const startedAt = Date.now();
     const computed = computeContextOnlyTurn({
       message: {
         id: inboundMessageId,
@@ -76,6 +80,22 @@ function createContextCaptureService({ persistenceService } = {}) {
         channel
       }
     });
+
+    const diagnostic = buildCaptureDiagnostic({
+      inboundMessageId,
+      interpretation: computed.interpretation,
+      decisionCode: computed.decisionCode,
+      nextContext: computed.nextContext,
+      elapsedMs: Date.now() - startedAt,
+      requiresClarification: computed.interpretation?.requiresClarification
+    });
+    diagnostic.reasonCodes = Array.isArray(
+      computed.structuredDecision?.reasonCodes
+    )
+      ? computed.structuredDecision.reasonCodes.filter(
+          (code) => typeof code === "string" && code.length < 80
+        )
+      : [];
 
     try {
       const persistence = await persistenceService.compareAndSaveContext({
@@ -94,6 +114,7 @@ function createContextCaptureService({ persistenceService } = {}) {
         reason: null,
         interpretation: computed.interpretation,
         decisionCode: computed.decisionCode,
+        diagnostic,
         persistence,
         source: loadedOrRebuilt.source,
         preferredLanguage:
