@@ -17,6 +17,7 @@
 | [07_SHADOW_MODE.md](./07_SHADOW_MODE.md) | Phase 3 — production shadow evaluation |
 | [08_CONTINUOUS_CONTEXT_CAPTURE.md](./08_CONTINUOUS_CONTEXT_CAPTURE.md) | Phase 3B — 100% context capture ≠ 10% shadow |
 | [09_FIRST_PRODUCTION_FEEDBACK.md](./09_FIRST_PRODUCTION_FEEDBACK.md) | BR-082 — greeting/partial location/language/fragments |
+| [10_WORKFLOW_SIMULATOR_SCENARIOS.md](./10_WORKFLOW_SIMULATOR_SCENARIOS.md) | Ops Center v2 scenario pack (ephemeral regression) |
 
 ## Regression fixture
 

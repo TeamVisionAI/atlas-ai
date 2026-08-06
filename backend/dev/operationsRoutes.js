@@ -312,6 +312,41 @@ function createOperationsRoutes(deps = {}) {
     }
   });
 
+  router.get("/simulator/recruit-ai-v2/scenarios", (req, res) => {
+    res.json({
+      success: true,
+      scenarios: operationsCenterService.listRecruitAiV2SimulatorScenarios()
+    });
+  });
+
+  router.post("/simulator/recruit-ai-v2/scenarios/run-all", (req, res) => {
+    try {
+      const report = operationsCenterService.runAllRecruitAiV2SimulatorScenarios();
+      res.json({ success: true, ...report });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "V2_SCENARIO_SUITE_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.post("/simulator/recruit-ai-v2/scenarios/:scenarioId/run", (req, res) => {
+    try {
+      const report = operationsCenterService.runRecruitAiV2SimulatorScenario(
+        req.params.scenarioId
+      );
+      res.json({ success: true, report });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: "V2_SCENARIO_RUN_FAILED",
+        message: error.message
+      });
+    }
+  });
+
   router.post("/simulator/facebook-lead", async (req, res) => {
     try {
       const result = await operationsCenterService.simulateFacebookLead(req.body || {});

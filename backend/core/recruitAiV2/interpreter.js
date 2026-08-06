@@ -107,7 +107,31 @@ function isEchoOfLastQuestion(text, context) {
 }
 
 function looksLikeOpportunityQuestion(text) {
-  return /\b(opportunity|what.*(about|is).*(job|role|position)|tell me more)\b/i.test(
+  return /\b(opportunity|what.*(about|is).*(job|role|position)|tell me more|que es esto|qué es esto)\b/i.test(
+    String(text || "")
+  );
+}
+
+function looksLikeZoomPreference(text) {
+  return /\b(zoom|por zoom|video call|videocall|virtual|remote)\b/i.test(
+    String(text || "")
+  );
+}
+
+function looksLikeInPersonPreference(text) {
+  return /\b(in[- ]?person|office|oficina|presencial|en persona)\b/i.test(
+    String(text || "")
+  );
+}
+
+function looksLikeCancelRequest(text) {
+  return /\b(cancel|cancelar|no puedo ir|can'?t make it|cannot make it)\b/i.test(
+    String(text || "")
+  );
+}
+
+function looksLikeRescheduleRequest(text) {
+  return /\b(reschedule|reprogram|change (the )?(time|appointment|it)|can we change|cambiar (la )?hora|podemos cambiar)\b/i.test(
     String(text || "")
   );
 }
@@ -280,6 +304,23 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (looksLikeOpportunityQuestion(text)) {
     intent = INTENTS.OPPORTUNITY_QUESTION;
     confidence = 0.85;
+  } else if (looksLikeCancelRequest(text) && isConfirmed) {
+    intent = INTENTS.CANCEL_REQUEST;
+    confidence = 0.88;
+  } else if (
+    looksLikeRescheduleRequest(text) ||
+    (isConfirmed && looksLikeRescheduleRequest(text))
+  ) {
+    intent = INTENTS.RESCHEDULE_REQUEST;
+    confidence = 0.88;
+  } else if (looksLikeZoomPreference(text)) {
+    intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
+    confidence = 0.9;
+    entities.appointmentType = "zoom";
+  } else if (looksLikeInPersonPreference(text)) {
+    intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
+    confidence = 0.9;
+    entities.appointmentType = "in_person";
   } else if (dayPartCtx && dayPartParse?.complete) {
     intent = INTENTS.PROVIDE_DAY_PART;
     confidence = 0.9;

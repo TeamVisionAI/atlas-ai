@@ -222,6 +222,43 @@ function decideConversationTurn({
     return structured;
   }
 
+  if (intent === INTENTS.PROVIDE_MEETING_PREFERENCE) {
+    const meetingType = interpretation.entities?.appointmentType || null;
+    structured.decision.nextAction = NEXT_ACTIONS.UPDATE_MEETING_PREFERENCE;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey =
+      meetingType === "zoom"
+        ? "meeting_preference_zoom"
+        : "meeting_preference_in_person";
+    structured.contextPatch = {
+      knownFacts: {
+        preferredMeetingType: meetingType
+      },
+      appointment: {
+        meetingType
+      },
+      conversation: {
+        lastProspectIntent: INTENTS.PROVIDE_MEETING_PREFERENCE,
+        lastQuestionAsked: "ask_day_part"
+      }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.CANCEL_REQUEST) {
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_CANCEL_NO_WRITE;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = "acknowledge_cancel_no_write";
+    structured.contextPatch = {
+      conversation: {
+        lastProspectIntent: INTENTS.CANCEL_REQUEST,
+        pendingClarification: "cancel_confirm"
+      }
+    };
+    return structured;
+  }
+
   if (intent === INTENTS.PROVIDE_DAY_PART) {
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
     structured.customerReplyPlan.templateKey = "continue_after_day_part";

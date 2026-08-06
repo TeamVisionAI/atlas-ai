@@ -30,6 +30,12 @@ const {
 } = require("./workflowSimulatorService");
 const { runAllGoldenScenarios, GOLDEN_SCENARIOS } = require("./goldenScenarios");
 const { runCompleteValidation } = require("./autonomousValidationEngine");
+const {
+  listRecruitAiV2Scenarios,
+  runRecruitAiV2ScenarioById,
+  runAllRecruitAiV2ScenarioPack,
+  getRecruitAiV2GoldenSuiteMeta
+} = require("./recruitAiV2ScenarioPack");
 
 const BACKEND_VERSION = "0.4.0";
 const SPRINT_LABEL = "Sprint 17.1";
@@ -721,6 +727,35 @@ function listSimulatorScenarios() {
   }));
 }
 
+function listRecruitAiV2SimulatorScenarios() {
+  return listRecruitAiV2Scenarios();
+}
+
+function runRecruitAiV2SimulatorScenario(scenarioId) {
+  const report = runRecruitAiV2ScenarioById(scenarioId);
+  recordActivity({
+    level: report.pass ? "info" : "error",
+    category: "workflow_simulator",
+    message: `Recruit AI v2 scenario ${scenarioId}`,
+    detail: report.pass ? "PASS" : "FAIL"
+  });
+  return report;
+}
+
+function runAllRecruitAiV2SimulatorScenarios() {
+  const suite = runAllRecruitAiV2ScenarioPack();
+  recordActivity({
+    level: suite.failed === 0 ? "info" : "error",
+    category: "workflow_simulator",
+    message: "Recruit AI v2 golden suite",
+    detail: `${suite.passed}/${suite.total} passed`
+  });
+  return {
+    ...suite,
+    goldenSuite: getRecruitAiV2GoldenSuiteMeta()
+  };
+}
+
 async function simulateFacebookLead(payload = {}) {
   const phone =
     payload.phone ||
@@ -953,6 +988,9 @@ module.exports = {
   getProspectTimeline,
   getDiagnostics,
   listSimulatorScenarios,
+  listRecruitAiV2SimulatorScenarios,
+  runRecruitAiV2SimulatorScenario,
+  runAllRecruitAiV2SimulatorScenarios,
   simulateFacebookLead,
   simulateWebsiteLead,
   simulateWhatsAppConversation,

@@ -23,6 +23,10 @@ import OpsAlphaChecklist from "./operations/OpsAlphaChecklist";
 import OpsGoldenPathTrace from "./operations/OpsGoldenPathTrace";
 import SimulatorReviewExperience from "./operations/SimulatorReviewExperience";
 import {
+  formatRecruitAiV2FactChanges,
+  summarizeRecruitAiV2ScenarioReport
+} from "../engines/recruitAiV2SimulatorPresentation";
+import {
   advanceWorkflowSimulator,
   fetchBusinessEventById,
   fetchBusinessEvents,
@@ -31,6 +35,7 @@ import {
   fetchOperationsDashboard,
   fetchProspectTimeline,
   fetchSimulatorScenarios,
+  fetchRecruitAiV2SimulatorScenarios,
   fetchSmokeTests,
   fetchSystemHealth,
   fetchWorkflowSimulatorState,
@@ -40,6 +45,8 @@ import {
   replaySingleProspect,
   resetProjectionState,
   runAllSimulatorScenarios,
+  runAllRecruitAiV2SimulatorScenarios,
+  runRecruitAiV2SimulatorScenario,
   runSimulatorScenario,
   runSmokeTest,
   simulateFacebookLead,
@@ -159,10 +166,94 @@ function LiveActivitySection({ t }) {
   );
 }
 
+function RecruitAiV2ScenarioResult({ report, t }) {
+  if (!report) {
+    return null;
+  }
+
+  const summary = summarizeRecruitAiV2ScenarioReport(report);
+  const turns = Array.isArray(report.turns) ? report.turns : [];
+
+  return (
+    <div className="ops-panel">
+      <div className="ops-panel ops-panel--row" style={{ border: "none", padding: 0 }}>
+        <div>
+          <h3>{summary.scenarioName}</h3>
+          <p className="ops-muted">
+            {t.opsV2Assertions}: {summary.passed}/{summary.totalAssertions} ·{" "}
+            {t.opsV2FinalStage}: {summary.finalContextStage || "—"} ·{" "}
+            {t.opsV2HumanEscalation}: {summary.humanEscalation ? t.opsYes : t.opsNo} ·{" "}
+            {t.opsV2SideEffectsDenied}: {summary.sideEffectsDenied ? t.opsYes : t.opsNo}
+          </p>
+        </div>
+        <OpsStatusBadge status={summary.pass ? "healthy" : "failure"} label={summary.pass ? "PASS" : "FAIL"} />
+      </div>
+
+      {turns.length ? (
+        <div className="ops-table-wrap" style={{ overflowX: "auto", marginTop: "0.75rem" }}>
+          <table className="ops-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{t.opsV2ColInput}</th>
+                <th>{t.opsV2ColLanguage}</th>
+                <th>{t.opsV2ColIntent}</th>
+                <th>{t.opsV2ColConfidence}</th>
+                <th>{t.opsV2ColStage}</th>
+                <th>{t.opsV2ColFacts}</th>
+                <th>{t.opsV2ColClarify}</th>
+                <th>{t.opsV2ColDecision}</th>
+                <th>{t.opsV2ColSideEffect}</th>
+                <th>{t.opsV2ColAuth}</th>
+                <th>{t.opsV2ColResult}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {turns.map((turn) => (
+                <tr key={`${turn.turn}-${turn.turnNumber}`}>
+                  <td>{turn.turnNumber}</td>
+                  <td>{turn.prospectInput}</td>
+                  <td>{turn.preferredLanguage}</td>
+                  <td>{turn.interpretedIntent}</td>
+                  <td>{turn.confidence != null ? Number(turn.confidence).toFixed(2) : "—"}</td>
+                  <td>{turn.currentStage}</td>
+                  <td>
+                    <code className="ops-code" style={{ whiteSpace: "pre-wrap" }}>
+                      {formatRecruitAiV2FactChanges(turn.knownFactChanges)}
+                    </code>
+                  </td>
+                  <td>{turn.clarificationRequired ? t.opsYes : t.opsNo}</td>
+                  <td>{turn.decision}</td>
+                  <td>{turn.proposedSideEffect || "—"}</td>
+                  <td>{turn.authorizationResult}</td>
+                  <td>
+                    <OpsStatusBadge
+                      status={turn.pass ? "healthy" : "failure"}
+                      label={turn.pass ? "PASS" : "FAIL"}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      <details style={{ marginTop: "0.75rem" }}>
+        <summary className="ops-muted">{t.opsV2ExpandContext}</summary>
+        <pre className="ops-code">{JSON.stringify(report.finalContext || {}, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
 function WorkflowSimulatorSection({ t }) {
   const [scenarios, setScenarios] = useState([]);
+  const [v2Scenarios, setV2Scenarios] = useState([]);
   const [activePhone, setActivePhone] = useState("");
   const [workflowState, setWorkflowState] = useState(null);
+  const [v2Report, setV2Report] = useState(null);
+  const [v2Suite, setV2Suite] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const { tasks, runTask } = useRunningTasks();
@@ -170,6 +261,9 @@ function WorkflowSimulatorSection({ t }) {
   useEffect(() => {
     fetchSimulatorScenarios()
       .then((data) => setScenarios(data.scenarios || []))
+      .catch(() => {});
+    fetchRecruitAiV2SimulatorScenarios()
+      .then((data) => setV2Scenarios(data.scenarios || []))
       .catch(() => {});
   }, []);
 
@@ -185,8 +279,27 @@ function WorkflowSimulatorSection({ t }) {
         setActivePhone(payload.phone);
         const state = await fetchWorkflowSimulatorState(payload.phone);
         setWorkflowState(state);
-      } else if (payload.reports) {
+      } else if (payload.reports && !payload.recruitAiV2) {
         setWorkflowState({ scenarios: payload.reports });
+      }
+    } catch (actionError) {
+      setError(actionError.message);
+    }
+  }
+
+  async function runV2Action(id, label, action) {
+    setError(null);
+    setResult(null);
+    setV2Report(null);
+    setV2Suite(null);
+
+    try {
+      const payload = await runTask(id, label, action);
+      setResult(payload);
+      if (payload.report?.recruitAiV2) {
+        setV2Report(payload.report);
+      } else if (payload.recruitAiV2 && payload.reports) {
+        setV2Suite(payload);
       }
     } catch (actionError) {
       setError(actionError.message);
@@ -264,6 +377,36 @@ function WorkflowSimulatorSection({ t }) {
         </div>
       ) : null}
 
+      <div className="ops-panel">
+        <h3>{t.opsRecruitAiV2Scenarios}</h3>
+        <p className="ops-muted">{t.opsRecruitAiV2ScenariosHint}</p>
+        <div className="ops-action-row">
+          <button
+            type="button"
+            className="ops-button"
+            onClick={() =>
+              runV2Action("v2-suite", t.opsRunAllV2Scenarios, runAllRecruitAiV2SimulatorScenarios)
+            }
+          >
+            {t.opsRunAllV2Scenarios}
+          </button>
+          {v2Scenarios.map((scenario) => (
+            <button
+              key={scenario.id}
+              type="button"
+              className="ops-button ops-button--secondary"
+              onClick={() =>
+                runV2Action(`v2-${scenario.id}`, scenario.name, () =>
+                  runRecruitAiV2SimulatorScenario(scenario.id)
+                )
+              }
+            >
+              {scenario.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {activePhone ? (
         <div className="ops-panel">
           <h3>{t.opsWorkflowProgress}</h3>
@@ -297,6 +440,28 @@ function WorkflowSimulatorSection({ t }) {
 
       {error ? <p className="ops-error">{error}</p> : null}
       <ActionResult result={result} />
+
+      {v2Report ? <RecruitAiV2ScenarioResult report={v2Report} t={t} /> : null}
+
+      {v2Suite?.reports ? (
+        <div className="ops-panel">
+          <h3>{t.opsV2SuiteSummary}</h3>
+          <p className="ops-muted">
+            {v2Suite.passed}/{v2Suite.total} {t.opsV2Passed}
+          </p>
+          <div className="ops-stack">
+            {v2Suite.reports.map((report) => (
+              <div key={report.scenarioId} className="ops-panel ops-panel--row">
+                <span>{report.scenarioName}</span>
+                <OpsStatusBadge
+                  status={report.pass ? "healthy" : "failure"}
+                  label={report.pass ? "PASS" : "FAIL"}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {result?.phone ? (
         <div className="ops-action-row">

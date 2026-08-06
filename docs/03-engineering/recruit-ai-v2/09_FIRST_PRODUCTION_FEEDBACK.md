@@ -33,3 +33,13 @@ First Team Vision post-activation conversation (`Hola` → `Miami` → `La or`) 
 
 `backend/test/fixtures/recruitAiV2/first-production-feedback.json`  
 Tests: `backend/test/recruitAiV2FirstProductionFeedback.test.js`
+
+## Simulator regression
+
+The same conversation is also a named Ops Center scenario:
+
+**First Production Failure** (`first-production-failure`)
+
+See `10_WORKFLOW_SIMULATOR_SCENARIOS.md`.
+
+**Development rule:** every confirmed production Recruit AI defect should be converted into a deterministic simulator regression scenario before the defect is considered closed.
