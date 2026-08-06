@@ -7,6 +7,45 @@
   width: 100%;
 }
 
+/* Scroll shell so sticky identity can pin without covering the app sidebar */
+.prospect-workspace--shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: 0;
+  overflow: hidden;
+}
+
+.prospect-workspace__chrome {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+  background: #f3f5f9;
+  z-index: 5;
+}
+
+.prospect-workspace__scroll-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-top: 12px;
+}
+
+.prospect-workspace__primary-header {
+  scroll-margin-top: 8px;
+}
+
 .prospect-workspace__toolbar {
   display: flex;
   align-items: center;

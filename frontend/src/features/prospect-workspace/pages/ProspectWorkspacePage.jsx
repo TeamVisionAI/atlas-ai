@@ -15,6 +15,7 @@ import JourneyProgress from "../../../components/prospect-workspace/JourneyProgr
 import ProspectDetailsPanel from "../../../components/prospect-workspace/ProspectDetailsPanel";
 import ProspectWorkspaceHeader from "../components/ProspectWorkspaceHeader";
 import ProspectHeader from "../components/ProspectHeader";
+import ProspectStickyIdentityHeader from "../components/ProspectStickyIdentityHeader";
 import OperationalWorkspace from "../components/OperationalWorkspace";
 import CommunicationHistorySection from "../components/CommunicationHistorySection";
 import ProspectCoachPanel from "../components/ProspectCoachPanel";
@@ -49,6 +50,9 @@ export default function ProspectWorkspacePage() {
   const { prompt, promptDialog } = usePromptDialog();
   const isDesktop = useIsDesktop();
   const timelineRef = useRef(null);
+  const scrollBodyRef = useRef(null);
+  const primaryHeaderRef = useRef(null);
+  const [stickyIdentityActive, setStickyIdentityActive] = useState(false);
   const phone = decodeURIComponent(routePhone || "");
 
   const {
@@ -82,6 +86,33 @@ export default function ProspectWorkspacePage() {
 
     setWorkflowState(loadWorkflowState(workspace.phone) || createDefaultWorkflowState());
   }, [workspace?.phone]);
+
+  useEffect(() => {
+    const sentinel = primaryHeaderRef.current;
+    const root = scrollBodyRef.current;
+
+    if (!sentinel || !root || typeof IntersectionObserver === "undefined") {
+      setStickyIdentityActive(false);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setStickyIdentityActive(!(entry?.isIntersecting ?? true));
+      },
+      {
+        root,
+        threshold: 0,
+        rootMargin: "-8px 0px 0px 0px"
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [workspace?.phone, prospectCoreId]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -216,94 +247,119 @@ export default function ProspectWorkspacePage() {
   }
 
   return (
-    <div className="prospect-workspace" aria-busy={refreshing || undefined}>
+    <div
+      className="prospect-workspace prospect-workspace--shell"
+      aria-busy={refreshing || undefined}
+      data-prospect-id={prospectCoreId || undefined}
+    >
       {confirmDialog}
       {promptDialog}
       {noteDialog}
-      <p className="prospect-workspace__shortcuts-hint">{translate("workspaceKeyboardHint")}</p>
 
-      <ProspectWorkspaceHeader
-        phone={workspace.phone}
-        onOpenMissionControl={(targetPhone) =>
-          navigate(`/mission-control?phone=${encodeURIComponent(targetPhone)}`)
-        }
-      />
-
-      <ProspectHeader
-        identity={workspace.identity}
-        status={workspace.status}
-        owner={workspace.owner}
-        capture={workspace.capture}
-        prospectCore={prospectCore}
-      />
-
-      <JourneyProgress journey={workspace.journey} />
-
-      <OperationalWorkspace
-        workspace={workspace}
-        organizationSettings={organizationSettings}
-        interview={workspace.interview}
-        workflow={payload?.workflow}
-        workflowComplete={workflowComplete}
-        showGate={showGate}
-        actionError={actions.actionError}
-        lifecycleBusy={actions.lifecycleBusy}
-        pendingActionId={actions.pendingActionId}
-        scheduleActionBusy={actions.scheduleActionBusy}
-        prospectCoreId={prospectCoreId}
-        userRole={user?.role}
-        onLifecycleAction={actions.handleLifecycleAction}
-        onMissionAction={actions.handleMissionAction}
-        onGateComplete={handleGateOutcome}
-        onAddNote={openAddNote}
-        onRefresh={refreshWorkspace}
-        noteSaving={noteSaving}
-      />
-
-      <CommunicationHistorySection
-        phone={workspace.phone}
-        conversation={workspace.conversation}
-        activityPreview={payload?.activityPreview || []}
-        prospectCoreId={prospectCoreId}
-        organizationId={
-          user?.organization_id ||
-          organizationSettings?.organizationId ||
-          organizationSettings?.id ||
-          null
-        }
-        timelineRef={timelineRef}
-        activityRefreshSignal={activityRefreshSignal}
-      />
-
-      <section
-        className="prospect-workspace__reference-section"
-        aria-labelledby="prospect-information-heading"
-      >
-        <h2 id="prospect-information-heading" className="workspace-eyebrow">
-          {translate("workspaceSectionProspectInformation")}
-        </h2>
-        <ProspectDetailsPanel
-          interview={workspace.interview}
-          status={workspace.status}
-          capture={workspace.capture}
-          owner={workspace.owner}
-          collapsible={!isDesktop}
-          includeInterview={false}
-          includeCoach={false}
-          onCommunicationLanguageChange={actions.handleCommunicationLanguageChange}
-          communicationLanguageSaving={actions.communicationLanguageSaving}
-          communicationLanguageError={actions.communicationLanguageError}
+      <div className="prospect-workspace__chrome">
+        <p className="prospect-workspace__shortcuts-hint">{translate("workspaceKeyboardHint")}</p>
+        <ProspectWorkspaceHeader
+          phone={workspace.phone}
+          onOpenMissionControl={(targetPhone) =>
+            navigate(`/mission-control?phone=${encodeURIComponent(targetPhone)}`)
+          }
         />
-      </section>
+      </div>
 
-      <ProspectCoachPanel collapsible={!isDesktop} />
+      <div className="prospect-workspace__scroll-body" ref={scrollBodyRef}>
+        <ProspectStickyIdentityHeader
+          active={stickyIdentityActive}
+          prospectId={prospectCoreId}
+          identity={workspace.identity}
+          status={workspace.status}
+          owner={workspace.owner}
+          prospectCore={prospectCore}
+          interview={workspace.interview}
+          scrollRootRef={scrollBodyRef}
+        />
 
-      <ExecutiveInsightsSection
-        prospectContext={prospectContext}
-        missionControlLoading={missionControlLoading}
-        missionControlError={missionControlError}
-        prospectCoreId={prospectCoreId}
-      />
+        <div
+          ref={primaryHeaderRef}
+          className="prospect-workspace__primary-header"
+          data-prospect-primary-header="true"
+        >
+          <ProspectHeader
+            identity={workspace.identity}
+            status={workspace.status}
+            owner={workspace.owner}
+            capture={workspace.capture}
+            prospectCore={prospectCore}
+          />
+        </div>
+
+        <JourneyProgress journey={workspace.journey} />
+
+        <OperationalWorkspace
+          workspace={workspace}
+          organizationSettings={organizationSettings}
+          interview={workspace.interview}
+          workflow={payload?.workflow}
+          workflowComplete={workflowComplete}
+          showGate={showGate}
+          actionError={actions.actionError}
+          lifecycleBusy={actions.lifecycleBusy}
+          pendingActionId={actions.pendingActionId}
+          scheduleActionBusy={actions.scheduleActionBusy}
+          prospectCoreId={prospectCoreId}
+          userRole={user?.role}
+          onLifecycleAction={actions.handleLifecycleAction}
+          onMissionAction={actions.handleMissionAction}
+          onGateComplete={handleGateOutcome}
+          onAddNote={openAddNote}
+          onRefresh={refreshWorkspace}
+          noteSaving={noteSaving}
+        />
+
+        <CommunicationHistorySection
+          phone={workspace.phone}
+          conversation={workspace.conversation}
+          activityPreview={payload?.activityPreview || []}
+          prospectCoreId={prospectCoreId}
+          organizationId={
+            user?.organization_id ||
+            organizationSettings?.organizationId ||
+            organizationSettings?.id ||
+            null
+          }
+          timelineRef={timelineRef}
+          activityRefreshSignal={activityRefreshSignal}
+        />
+
+        <section
+          className="prospect-workspace__reference-section"
+          aria-labelledby="prospect-information-heading"
+        >
+          <h2 id="prospect-information-heading" className="workspace-eyebrow">
+            {translate("workspaceSectionProspectInformation")}
+          </h2>
+          <ProspectDetailsPanel
+            interview={workspace.interview}
+            status={workspace.status}
+            capture={workspace.capture}
+            owner={workspace.owner}
+            collapsible={!isDesktop}
+            includeInterview={false}
+            includeCoach={false}
+            onCommunicationLanguageChange={actions.handleCommunicationLanguageChange}
+            communicationLanguageSaving={actions.communicationLanguageSaving}
+            communicationLanguageError={actions.communicationLanguageError}
+          />
+        </section>
+
+        <ProspectCoachPanel collapsible={!isDesktop} />
+
+        <ExecutiveInsightsSection
+          prospectContext={prospectContext}
+          missionControlLoading={missionControlLoading}
+          missionControlError={missionControlError}
+          prospectCoreId={prospectCoreId}
+        />
+      </div>
 
       <ProspectEditorDrawer
         open={actions.prospectEditorOpen}

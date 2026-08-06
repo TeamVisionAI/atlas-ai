@@ -401,3 +401,18 @@
   flex-direction: column;
   background: #ffffff;
 }
+
+/* Prospect Workspace — lock scroll to workspace body for sticky identity */
+.atlas-layout__main:has(.prospect-workspace--shell) {
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.atlas-layout__content:has(.prospect-workspace--shell) {
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

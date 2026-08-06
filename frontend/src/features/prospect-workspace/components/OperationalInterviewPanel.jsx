@@ -132,6 +132,7 @@ export default function OperationalInterviewPanel({
 
   return (
     <section
+      id="operational-interview"
       className="prospect-workspace__operational-block prospect-workspace__operational-block--interview"
       aria-labelledby="operational-interview-heading"
       data-interview-workflow-state={actionPlan.state}
