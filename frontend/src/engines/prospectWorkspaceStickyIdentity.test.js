@@ -119,7 +119,8 @@ test("7-8. sticky wiring uses one sticky header and primary sentinel", () => {
   assert.match(page, /IntersectionObserver/);
   assert.equal((page.match(/<ProspectStickyIdentityHeader/g) || []).length, 1);
   assert.equal((page.match(/<ProspectHeader/g) || []).length, 1);
-  assert.match(page, /prospect-workspace--shell/);
+  assert.doesNotMatch(page, /prospect-workspace--shell/);
+  assert.match(page, /data-workspace-scroll-owner="atlas-layout-content"/);
   assert.match(page, /data-prospect-id=\{prospectCoreId/);
 });
 

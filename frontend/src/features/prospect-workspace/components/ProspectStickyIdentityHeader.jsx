@@ -42,8 +42,7 @@ export default function ProspectStickyIdentityHeader({
   }, [active]);
 
   function scrollToId(id) {
-    const root = scrollRootRef?.current;
-    const target = (root || document).querySelector?.(`#${id}`) || document.getElementById(id);
+    const target = document.getElementById(id);
 
     if (!target) {
       return;

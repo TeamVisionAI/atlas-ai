@@ -402,17 +402,13 @@
   background: #ffffff;
 }
 
-/* Prospect Workspace — lock scroll to workspace body for sticky identity */
-.atlas-layout__main:has(.prospect-workspace--shell) {
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-}
-
-.atlas-layout__content:has(.prospect-workspace--shell) {
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+/*
+ * Prospect Workspace scroll owner — layout content only.
+ * Do not nest a second overflow:hidden/auto shell inside the page (PR #26 regression).
+ */
+.atlas-layout__content:has(.prospect-workspace) {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
