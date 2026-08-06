@@ -63,7 +63,8 @@ test("architecture docs exist for Recruit AI v2 audit sprint", () => {
     "01_TV000028_FORENSIC_TIMELINE.md",
     "02_COMMUNICATIONS_INVENTORY.md",
     "03_CURRENT_ARCHITECTURE_MAP.md",
-    "04_RECRUIT_AI_V2_ARCHITECTURE.md"
+    "04_RECRUIT_AI_V2_ARCHITECTURE.md",
+    "05_COMMUNICATIONS_CENTER_READ_MODEL.md"
   ]) {
     assert.ok(fs.existsSync(path.join(root, name)), name);
   }

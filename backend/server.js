@@ -33,6 +33,9 @@ const appointmentRoutes = require("./routes/appointments");
 const interviewAssignmentRoutes = require("./routes/interviewAssignment");
 const missionRoutes = require("./routes/missions");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
+const {
+  prospectCommunicationsStack
+} = require("./routes/communicationsCenter");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const followUpsRoutes = require("./routes/followUps");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
@@ -185,6 +188,7 @@ app.get(
   requireAtlasUser,
   timelineModule.prospectTimelineHandler
 );
+app.get("/api/prospects/:id/communications", ...prospectCommunicationsStack);
 app.use("/api/prospects", prospectModule.routes);
 app.use("/api", setupRoutes);
 app.use("/api", authRoutes);
