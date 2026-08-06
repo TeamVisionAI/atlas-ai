@@ -4,8 +4,10 @@
  */
 
 import {
+  shouldShowCopyZoomLinkAction,
   shouldShowJoinZoomAction,
-  shouldShowLifecycleActions
+  shouldShowLifecycleActions,
+  shouldShowZoomLinkUnavailableWarning
 } from "./appointmentCardPresentation.js";
 import { resolvePersistedAppointmentId } from "./appointmentIdEngine.js";
 
@@ -180,6 +182,8 @@ export function shouldHideCommunicationCard(card = {}) {
 export function resolveAppointmentCardActionPlan(appointment = {}) {
   const state = resolveInterviewWorkflowUiStateFromAppointment(appointment);
   const showJoinZoom = shouldShowJoinZoomAction(appointment);
+  const showCopyZoomLink = shouldShowCopyZoomLinkAction(appointment);
+  const showZoomLinkUnavailable = shouldShowZoomLinkUnavailableWarning(appointment);
   const showLifecycle = shouldShowLifecycleActions(appointment);
 
   if (
@@ -195,6 +199,8 @@ export function resolveAppointmentCardActionPlan(appointment = {}) {
       openWorkspaceLabelKey: "appointmentsViewWorkspace",
       showCommunicationHistory: true,
       showJoinZoom: false,
+      showCopyZoomLink: false,
+      showZoomLinkUnavailable: false,
       showReschedule: false,
       showCancel: false,
       showCompleteInterview: false
@@ -210,6 +216,8 @@ export function resolveAppointmentCardActionPlan(appointment = {}) {
     showCommunicationHistory: false,
     showJoinZoom,
     showJoinZoomPrimary: showJoinZoom,
+    showCopyZoomLink,
+    showZoomLinkUnavailable,
     showReschedule: showLifecycle,
     showCancel: showLifecycle,
     showCompleteInterview: showLifecycle,
