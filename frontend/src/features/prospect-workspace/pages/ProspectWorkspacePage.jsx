@@ -220,7 +220,6 @@ export default function ProspectWorkspacePage() {
       className="prospect-workspace"
       aria-busy={refreshing || undefined}
       data-prospect-id={prospectCoreId || undefined}
-      data-workspace-scroll-owner="atlas-layout-main"
     >
       {confirmDialog}
       {promptDialog}
