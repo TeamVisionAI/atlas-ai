@@ -196,7 +196,7 @@ test("13-14. BR-075/078 blocked send remains fail-closed and must not look succe
   });
 
   assert.match(String(result?.status || ""), /blocked/i);
-  assert.equal(result?.extras?.authorized, false);
+  assert.equal(result?.authorized, false);
   assert.notEqual(String(result?.status || "").toLowerCase(), "sent");
 });
 
