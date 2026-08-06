@@ -11,7 +11,8 @@ const {
 } = require("./milestoneMapper");
 const {
   resolveWorkflowState,
-  loadPersistedWorkflowState
+  loadPersistedWorkflowState,
+  savePersistedWorkflowState
 } = require("./workflowStateStore");
 const { detectConversationStall } = require("./stallDetectionEngine");
 const { applyStallTransition } = require("./workflowOwnershipEngine");
@@ -20,8 +21,12 @@ const {
   emitStallClearanceEvents
 } = require("./workflowTransitionEvents");
 const { applyTimeBasedReconciliation } = require("./workflowReconciliationEngine");
+const {
+  claimsScheduledInterview,
+  resolveAppointmentMilestoneTruth
+} = require("./appointmentMilestoneTruth");
 const { supabase } = require("../services/supabaseService");
-const { OWNERSHIP } = require("./workflowConstants");
+const { MILESTONES, OWNERSHIP } = require("./workflowConstants");
 
 /**
  * Message log hints for GREETING_SENT detection and BR-034 stall clock.
@@ -200,15 +205,42 @@ async function evaluateWorkflowState({
       : refreshed.workflowOwnership || computed.workflowOwnership
   });
 
-  const priority = computeMissionControlPriority({
+  // Implements BR-039 — persisted/computed INTERVIEW_SCHEDULED cannot outrank
+  // atlas_appointments. Workflow cache must not impersonate a scheduled interview.
+  const appointmentTruth = await resolveAppointmentMilestoneTruth({
+    phone,
+    organizationId: prospect?.organization_id || null,
     milestone: resolved.canonicalMilestone,
+    prospect
+  });
+
+  let canonicalMilestoneOut = appointmentTruth.milestone;
+  let sourceOut = resolved.source;
+
+  if (appointmentTruth.downgraded) {
+    canonicalMilestoneOut = MILESTONES.INTERVIEW_READY;
+    sourceOut = {
+      ...(resolved.source || {}),
+      milestone: "appointment_truth",
+      appointmentMissing: true
+    };
+
+    if (phone && claimsScheduledInterview(refreshed.canonicalMilestone)) {
+      savePersistedWorkflowState(phone, {
+        canonicalMilestone: MILESTONES.INTERVIEW_READY
+      });
+    }
+  }
+
+  const priority = computeMissionControlPriority({
+    milestone: canonicalMilestoneOut,
     needsHumanAttention: resolved.needsHumanAttention,
     agentState,
     prospect
   });
 
   return {
-    canonicalMilestone: resolved.canonicalMilestone,
+    canonicalMilestone: canonicalMilestoneOut,
     workflowOwnership: resolved.workflowOwnership,
     needsHumanAttention: resolved.needsHumanAttention,
     stalledAt: resolved.stalledAt,
@@ -217,8 +249,9 @@ async function evaluateWorkflowState({
       : null,
     missionControlPriority: priority.rank,
     missionControlPriorityTier: priority.tier,
-    source: resolved.source,
+    source: sourceOut,
     mappedFrom: resolved.mappedFrom,
+    appointmentMissing: appointmentTruth.downgraded === true,
     stall: {
       isStalled: stallResult.isStalled,
       reason: stallResult.reason || null,

@@ -445,7 +445,7 @@ async function getMissionControlWithActions(phone, options = {}) {
   const agentState = loadAgentState(resolvedPhone);
   const organizationSettings = getOrganizationSettings();
 
-  const availableActions = resolveAvailableActions({
+  let availableActions = resolveAvailableActions({
     prospect,
     currentStep: missionControl.brain.currentStep,
     missingFields: missionControl.brain.missingFields,
@@ -466,13 +466,31 @@ async function getMissionControlWithActions(phone, options = {}) {
     conversationMessages
   });
 
+  let activeAppointment = null;
+  let latestAppointment = null;
+
+  try {
+    activeAppointment = await findPersistedAppointmentForProspect(resolvedPhone, organizationId);
+    latestAppointment =
+      activeAppointment ||
+      (await findLatestPersistedAppointmentForProspect(resolvedPhone, organizationId));
+  } catch (error) {
+    console.error("[mission-control/activeAppointment]", error.message);
+  }
+
+  // Implements BR-039 — do not offer Schedule interview when an active appointment exists.
+  if (activeAppointment) {
+    availableActions = availableActions.filter((action) => action.id !== ACTION_IDS.SCHEDULE);
+  }
+
   const primaryMission = getPrimaryMissionFromContext({
     prospect,
     brain: missionControl.brain,
     agentState,
     conversationOutcome,
     workflow,
-    availableActions
+    availableActions,
+    activeAppointment
   });
 
   const recruiterBrief = buildRecruiterBrief({
@@ -523,18 +541,6 @@ async function getMissionControlWithActions(phone, options = {}) {
     ),
     Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState))
   ]);
-
-  let activeAppointment = null;
-  let latestAppointment = null;
-
-  try {
-    activeAppointment = await findPersistedAppointmentForProspect(resolvedPhone, organizationId);
-    latestAppointment =
-      activeAppointment ||
-      (await findLatestPersistedAppointmentForProspect(resolvedPhone, organizationId));
-  } catch (error) {
-    console.error("[mission-control/activeAppointment]", error.message);
-  }
 
   const interview = buildInterviewBlock(
     prospect,

@@ -179,7 +179,27 @@ function isClosedProspect({ agentState, workflow }) {
   return CLOSED_MILESTONES.has(workflow?.canonicalMilestone);
 }
 
-function shouldGenerateScheduleInterviewMission({ conversationOutcome, agentState, brain }) {
+function shouldGenerateScheduleInterviewMission({
+  conversationOutcome,
+  agentState,
+  brain,
+  workflow,
+  activeAppointment
+}) {
+  // Implements BR-039 — an active persisted appointment suppresses Schedule Interview.
+  if (activeAppointment) {
+    return false;
+  }
+
+  if (
+    workflow?.canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED ||
+    workflow?.canonicalMilestone === MILESTONES.INTERVIEW_DUE ||
+    workflow?.canonicalMilestone === MILESTONES.INTERVIEW_COMPLETED ||
+    workflow?.canonicalMilestone === MILESTONES.INTERVIEW_RESULT_PENDING
+  ) {
+    return false;
+  }
+
   if (hasIncompleteQualification({ brain, conversationOutcome })) {
     return false;
   }
@@ -392,10 +412,25 @@ function buildCompleteQualificationMission(context, createdAt) {
 }
 
 function buildScheduleInterviewMission(context, createdAt) {
-  const { prospect, agentState, conversationOutcome, workflow, availableActions, brain } =
-    context;
+  const {
+    prospect,
+    agentState,
+    conversationOutcome,
+    workflow,
+    availableActions,
+    brain,
+    activeAppointment
+  } = context;
 
-  if (!shouldGenerateScheduleInterviewMission({ conversationOutcome, agentState, brain })) {
+  if (
+    !shouldGenerateScheduleInterviewMission({
+      conversationOutcome,
+      agentState,
+      brain,
+      workflow,
+      activeAppointment
+    })
+  ) {
     return null;
   }
 
