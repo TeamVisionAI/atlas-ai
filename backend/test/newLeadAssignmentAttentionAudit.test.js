@@ -55,18 +55,16 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, rel), "utf8");
 }
 
-test("1-2. WhatsApp create path does not assign owner; Quick Capture assigns creator", () => {
+test("1-2. WhatsApp create path resolves BR-080 assignment; Quick Capture prefers creator", () => {
   const wa = read("../core/whatsappProspectResolver.js");
   assert.match(wa, /insertWhatsAppProspectRow/);
+  assert.match(wa, /resolveNewLeadAssignment/);
+  assert.match(wa, /buildNewLeadAttentionFields/);
   assert.match(wa, /organization_id:\s*organizationId/);
-  assert.doesNotMatch(
-    wa.slice(wa.indexOf("async function insertWhatsAppProspectRow"), wa.indexOf("async function locateOrCreate")),
-    /owner_user_id/
-  );
 
   const qc = read("../core/quickCaptureEngine.js");
-  assert.match(qc, /owner_user_id:\s*atlasUser\.id/);
-  assert.match(qc, /created_by_user_id:\s*atlasUser\.id/);
+  assert.match(qc, /preferCreator:\s*true/);
+  assert.match(qc, /created_by_user_id:\s*userId/);
 });
 
 test("3-5. schedule agent resolver rejects inactive / wrong-org / missing agents", async () => {
@@ -160,11 +158,14 @@ test("9. mission engine can generate CallProspect for NEW_LEAD / GREETING_SENT (
   assert.doesNotMatch(missionEngine, /AssignLead|UnassignedPool|NEW_LEAD_MISSION/);
 });
 
-test("10-11. no durable acknowledgement field; AI response does not equal human acknowledgement", () => {
+test("10-11. AI response path does not call acknowledgeLead; create still sets ATLAS workflow", () => {
   const wa = read("../core/whatsappProspectResolver.js");
+  const inbound = read("../core/whatsappInboundPipeline.js");
   const semantic = read("../core/semanticConversationEngine.js");
-  assert.doesNotMatch(wa, /acknowledged_at|agent_acknowledged|human_acknowledged/);
-  assert.doesNotMatch(semantic, /acknowledged_at|agent_acknowledged|human_acknowledged/);
+
+  assert.doesNotMatch(inbound, /acknowledgeLead\(/);
+  assert.doesNotMatch(semantic, /acknowledgeLead\(/);
+  assert.match(inbound, /markAiResponding/);
 
   // AI workflow ownership ATLAS with needsHumanAttention false at create
   assert.match(wa, /workflowOwnership:\s*OWNERSHIP\.ATLAS|OWNERSHIP\.ATLAS/);

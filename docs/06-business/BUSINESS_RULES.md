@@ -1164,31 +1164,35 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 **Implements:** Deterministic owner or durable Unassigned queue; New Lead mission; human acknowledgement; failure escalation  
 **Domain:** Lead intake / Assignment / Mission Control / Prospect Center  
-**Depends on:** BR-034, BR-036, BR-048, BR-049, BR-075, BR-078  
+**Depends on:** BR-034, BR-036, BR-048, BR-049, BR-075, BR-078, BR-079  
 **Related:** BR-015–017 (human takeover), BR-024 (needsHumanCoordinator), BR-025–031 (missions)  
-**Status:** Recommended — **not implemented** (audit 2026-08-06)  
-**Engine target (proposed):** lead assignment resolver at create; Unassigned queue visibility; New Lead mission type; acknowledgement field; escalation timers  
-**Audit tests:** `backend/test/newLeadAssignmentAttentionAudit.test.js`
+**Status:** Implemented  
+**Engine target:** `newLeadAssignmentEngine.js`, `newLeadAttentionEngine.js`, WhatsApp/Quick Capture create paths, Mission `NewLeadAttention`, Prospect Center badges/filters, escalation poller  
+**Migration:** `031_br080_new_lead_attention.sql` (additive; no ownership backfill)  
+**Tests:** `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/newLeadAssignmentAttentionAudit.test.js`
 
-### Rules (target behavior)
+### Rules
 
-1. **Deterministic owner or durable Unassigned** — Every new canonical prospect must receive either an eligible `owner_user_id` at create or an explicit Unassigned state that is visible to a responsible human queue (RVP/Admin at minimum; agent claim pool if policy allows).
-2. **Create-time assignment precedence** — Resolve in order when configured: (1) explicit source/campaign agent mapping, (2) form/page mapping, (3) organization default owner / default recruiter, (4) round robin among `listAssignableRepresentatives()`, (5) recruiter hierarchy, (6) authenticated creator (Quick Capture / manual), (7) current conversation owner, (8) fallback RVP/Admin, (9) Unassigned queue. Reject disabled, wrong-org, deleted, and ineligible agents and fall through.
-3. **Paid inbound must not stay invisible to line agents** — WhatsApp/Facebook CTWA creates with `owner_user_id = null` are insufficient for a paid-lead pilot unless Unassigned is a first-class visible queue with notification.
-4. **New Lead attention is distinct from AI handling** — `workflowOwnership = ATLAS` / Recruit AI reply does **not** imply human acknowledgement. A lead remains New/Unacknowledged until an assigned human explicitly acknowledges or performs a defined successful human action.
-5. **New Lead mission** — Creating a new lead must surface a durable priority action (mission) for the owner or Unassigned queue. Opening Mission Control / Prospect Center must not silently clear New without acknowledgement policy.
-6. **Failure escalation** — AI throw, invalid AI output, provider send failure, BR-075 block, BR-078 inactive template outside window, opt-out, and invalid phone must set Human Attention Required (or equivalent) and remain visible; they must not appear successfully handled.
-7. **Escalation timers (pilot minimum)** — Unassigned or unacknowledged new leads escalate to RVP/Admin after a configured SLA (recommend 5–15 minutes for first ad pilot). BR-034 24h stall remains for post-outbound silence and must not be the only unassigned safety net.
-8. **Acknowledgement is durable** — Persist `acknowledged_at` / `acknowledged_by_user_id` (or equivalent). Page open alone must not clear New unless product explicitly approves that rule.
-9. **Boundaries** — Does not require email/SMS/Slack channels for v1; in-app Mission + Prospect Center visibility + optional toast for logged-in owners is the minimum. Does not connect ads or activate WhatsApp templates.
+1. **Deterministic owner or durable Unassigned** — Every new canonical prospect receives either an eligible `owner_user_id` at create or `assignment_status = unassigned` visible to Admin/RVP (and Division Leader when hierarchy permits).
+2. **Create-time assignment precedence** — (1) valid explicit same-org agent, (2) campaign/form mapping when provided, (3) organization `defaultRecruiterUserId`, (4) active organization RVP fallback, (5) authenticated creator when preferred (Quick Capture/manual), (6) Unassigned queue. Reject disabled, deleted, wrong-org, operations/support, and Meta Review fixtures. Never use ATLAS workflow ownership as CRM ownership. Never pick an arbitrary first user.
+3. **AI ownership ≠ human CRM ownership** — `workflowOwnership = ATLAS` and Recruit AI replies do not assign `owner_user_id` and do not acknowledge.
+4. **New persists until acknowledgement** — `attention_status` remains new/ai_responding/waiting/human_required until explicit Acknowledge or Claim & Acknowledge. Page open, card render, dashboard load, and AI reply do **not** clear New.
+5. **New Lead mission** — Mission type `NewLeadAttention` surfaces for unassigned, assigned-unacknowledged, and human-required leads. Priority: Unassigned new and unresolved Update Outcome share CRITICAL rank 1 (Update Outcome not weakened); Human Attention / assigned-unacknowledged at rank 2.
+6. **Blocked/failed AI creates human-visible attention** — Conversation engine failure and humanAssist paths set Human Attention Required with sanitized reason and durable mission visibility. BR-075/078 blocked sends remain fail-closed and must not mark sent/handled.
+7. **Escalation** — Elapsed UTC SLA: 5 minutes unassigned → escalation level 1; 15 minutes unassigned or unacknowledged → level 2 + Human Attention Required. Idempotent. Acknowledged/closed leads stop escalating. No email/SMS/Slack/browser push in v1.
+8. **Claim is compare-and-set** — Claim only when `owner_user_id IS NULL`; concurrent claims return conflict. Claim assigns and acknowledges.
+9. **No lead disappears because owner is null** — Unassigned leads remain visible to Admin/RVP filters (`unassigned`, `new-unacknowledged`, `human-attention`). Agents see owned leads immediately after assignment.
+10. **Tenant isolation** — Cross-org denial unchanged. Assignments, claims, acknowledgements, and escalations write sanitized audit events.
+11. **Boundaries** — No ads connect, no template activation, no live WhatsApp sends from this rule, no production ownership backfill, no Meta Review auth changes.
 
-### Current-state gaps (audit)
+### Automatic acknowledgement triggers (v1)
 
-- WhatsApp/Facebook create intentionally omits `owner_user_id` (`whatsappProspectResolver.insertWhatsAppProspectRow`).
-- Agents/Recruiters cannot see unassigned leads (`authorizationService.canAccessProspect`).
-- Ownership often stamped only at autonomous interview booking (`semanticConversationEngine.completeInterview` → preferred org RVP).
-- No agent push/email/SMS/new-lead badge/acknowledgement; missions are computed, not pushed.
-- `leadDistribution.enabled = false`; round robin not implemented at create.
+Only these clear New:
+
+- Explicit **Acknowledge** API action by an authorized owner/Admin/RVP/DL
+- Explicit **Claim & Acknowledge** on an unassigned lead by Admin/RVP/DL
+
+Not automatic in v1: page open, AI reply, mission list render, schedule booking (booking may stamp owner if null but does not acknowledge).
 
 ---
 

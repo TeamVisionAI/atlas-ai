@@ -323,7 +323,8 @@ function buildMissionSkeleton({
   conversationOutcome,
   createdAt,
   dueDate,
-  estimatedMinutes = 2
+  estimatedMinutes = 2,
+  metadata = null
 }) {
   const prospectId = prospect.phone;
 
@@ -342,7 +343,8 @@ function buildMissionSkeleton({
     status: MISSION_STATUS.PENDING,
     createdAt,
     prospect: summarizeProspect(prospect),
-    workflowState: summarizeWorkflowState(workflow, conversationOutcome)
+    workflowState: summarizeWorkflowState(workflow, conversationOutcome),
+    metadata: metadata || null
   };
 }
 
@@ -552,6 +554,102 @@ function buildBeginOnboardingMission(context, createdAt) {
   });
 }
 
+function shouldGenerateNewLeadAttentionMission(context) {
+  const prospect = context?.prospect || {};
+  if (prospect.acknowledged_at || prospect.attention_status === "acknowledged") {
+    return false;
+  }
+
+  if (prospect.attention_status === "resolved") {
+    return false;
+  }
+
+  const step = String(prospect.current_step || prospect.status || "").toUpperCase();
+  if (["CLOSED", "DO_NOT_CONTACT", "RECRUITED"].includes(step)) {
+    return false;
+  }
+
+  if (prospect.attention_status === "human_required") {
+    return true;
+  }
+
+  if (!prospect.owner_user_id) {
+    return true;
+  }
+
+  if (
+    prospect.attention_status === "new" ||
+    prospect.attention_status === "ai_responding" ||
+    prospect.attention_status === "waiting_for_prospect" ||
+    prospect.new_lead_received_at
+  ) {
+    return !prospect.acknowledged_at;
+  }
+
+  const milestone = context?.workflow?.canonicalMilestone;
+  return milestone === MILESTONES.NEW_LEAD || milestone === MILESTONES.GREETING_SENT;
+}
+
+function buildNewLeadAttentionMission(context, createdAt) {
+  const { prospect, conversationOutcome, workflow, availableActions } = context;
+
+  if (!shouldGenerateNewLeadAttentionMission(context)) {
+    return null;
+  }
+
+  const unassigned = !prospect.owner_user_id;
+  const humanRequired =
+    prospect.attention_status === "human_required" ||
+    Boolean(workflow?.needsHumanAttention);
+
+  let title = "Acknowledge New Lead";
+  let reason = "New lead is assigned but not yet acknowledged by a human.";
+  let priority = MISSION_PRIORITIES.HIGH;
+
+  if (unassigned) {
+    title = "Claim Unassigned Lead";
+    reason = "New lead has no CRM owner — claim or assign immediately.";
+    priority = MISSION_PRIORITIES.CRITICAL;
+  } else if (humanRequired) {
+    title = "Human Attention Required";
+    reason =
+      prospect.human_attention_reason ||
+      "Recruit AI or outbound delivery needs a human.";
+    priority = MISSION_PRIORITIES.CRITICAL;
+  }
+
+  const primaryActionId = resolvePrimaryActionId(
+    availableActions,
+    [ACTION_IDS.CALL, ACTION_IDS.WHATSAPP, ACTION_IDS.NOTES],
+    ACTION_IDS.CALL
+  );
+
+  return buildMissionSkeleton({
+    prospect,
+    missionType: MISSION_TYPES.NEW_LEAD_ATTENTION,
+    title,
+    description: unassigned
+      ? "Assign or claim this lead so a human owns the next step."
+      : "Acknowledge the lead so New status clears for the owner.",
+    reason,
+    priority,
+    primaryActionId,
+    availableActions,
+    workflow,
+    conversationOutcome,
+    createdAt,
+    estimatedMinutes: 5,
+    metadata: {
+      assignmentStatus: unassigned ? "unassigned" : "assigned",
+      attentionStatus: prospect.attention_status || "new",
+      newLeadReceivedAt: prospect.new_lead_received_at || prospect.created_at || null,
+      escalationLevel: prospect.escalation_level || 0,
+      source: prospect.source || null,
+      entryMethod: prospect.entry_method || null
+    }
+  });
+}
+
 function buildContactProspectMission(context, createdAt) {
   const { prospect, conversationOutcome, workflow, availableActions } = context;
 
@@ -624,6 +722,9 @@ function buildReviewProspectMission(context, createdAt) {
 
 function buildTypedMissions(context, createdAt) {
   return [
+    // BR-080 New Lead Attention — critical, but EnterInterviewOutcome remains present
+    // and also CRITICAL so Update Outcome is never dropped from the typed set.
+    buildNewLeadAttentionMission(context, createdAt),
     buildEnterInterviewOutcomeMission(context, createdAt),
     buildCompleteQualificationMission(context, createdAt),
     buildScheduleInterviewMission(context, createdAt),

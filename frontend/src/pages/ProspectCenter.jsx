@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
-import { getProspectCenter, ProspectCenterError } from "../services/prospectCenterService";
+import {
+  getProspectCenter,
+  acknowledgeProspectLead,
+  claimProspectLead,
+  ProspectCenterError
+} from "../services/prospectCenterService";
 import {
   buildProspectCenterSummary,
   buildProspectLocationLabel,
@@ -17,11 +22,22 @@ import {
 } from "../utils/prospectRoutes";
 import "./ProspectCenter.css";
 
-function ProspectRow({ item, translate, locale, onOpenWorkspace, onOpenQueue }) {
+function ProspectRow({
+  item,
+  translate,
+  locale,
+  onOpenWorkspace,
+  onOpenQueue,
+  onAcknowledge,
+  onClaim,
+  actionBusyPhone
+}) {
   const milestone = buildProspectMilestoneLabel(item, translate);
   const priority = buildProspectPriorityLabel(item, translate);
   const location = buildProspectLocationLabel(item);
   const interviewWhen = formatProspectInterviewWhen(item.interviewAt, locale);
+  const badges = item.badges || {};
+  const busy = actionBusyPhone === item.phone;
 
   return (
     <article className="prospect-center-row">
@@ -36,6 +52,28 @@ function ProspectRow({ item, translate, locale, onOpenWorkspace, onOpenQueue }) 
             {item.prospectNumber ? (
               <span className="prospect-center-row__number">{item.prospectNumber}</span>
             ) : null}
+            <div className="prospect-center-row__badges">
+              {badges.new ? (
+                <span className="prospect-center-badge prospect-center-badge--new">
+                  {translate("prospectCenterBadgeNew")}
+                </span>
+              ) : null}
+              {badges.unassigned ? (
+                <span className="prospect-center-badge prospect-center-badge--unassigned">
+                  {translate("prospectCenterBadgeUnassigned")}
+                </span>
+              ) : null}
+              {badges.humanAttention ? (
+                <span className="prospect-center-badge prospect-center-badge--human">
+                  {translate("prospectCenterBadgeHumanAttention")}
+                </span>
+              ) : null}
+              {badges.aiResponding ? (
+                <span className="prospect-center-badge prospect-center-badge--ai">
+                  {translate("prospectCenterBadgeAi")}
+                </span>
+              ) : null}
+            </div>
           </div>
           <span className={`prospect-center-row__priority priority-${item.missionControlPriority}`}>
             {priority}
@@ -56,6 +94,12 @@ function ProspectRow({ item, translate, locale, onOpenWorkspace, onOpenQueue }) 
               <span>{interviewWhen}</span>
             </>
           ) : null}
+          {item.source ? (
+            <>
+              <span className="prospect-center-row__dot">·</span>
+              <span>{item.source}</span>
+            </>
+          ) : null}
         </div>
 
         {item.stalledAt ? (
@@ -68,6 +112,26 @@ function ProspectRow({ item, translate, locale, onOpenWorkspace, onOpenQueue }) 
       </button>
 
       <div className="prospect-center-row__actions">
+        {badges.unassigned ? (
+          <button
+            type="button"
+            className="prospect-center-row__action prospect-center-row__action--primary"
+            disabled={busy}
+            onClick={() => onClaim(item.phone)}
+          >
+            {translate("prospectCenterClaimAcknowledge")}
+          </button>
+        ) : null}
+        {badges.new && !badges.unassigned ? (
+          <button
+            type="button"
+            className="prospect-center-row__action prospect-center-row__action--primary"
+            disabled={busy}
+            onClick={() => onAcknowledge(item.phone)}
+          >
+            {translate("prospectCenterAcknowledge")}
+          </button>
+        ) : null}
         <button
           type="button"
           className="prospect-center-row__action prospect-center-row__action--primary"
@@ -99,6 +163,7 @@ export default function ProspectCenter() {
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionBusyPhone, setActionBusyPhone] = useState(null);
 
   const loadCenter = useCallback(async () => {
     setLoading(true);
@@ -207,6 +272,34 @@ export default function ProspectCenter() {
     );
   }
 
+  async function handleAcknowledge(phone) {
+    setActionBusyPhone(phone);
+    setError(null);
+    try {
+      await acknowledgeProspectLead(phone);
+      await loadCenter();
+    } catch (err) {
+      console.error(err);
+      setError(translate("prospectCenterAcknowledgeError"));
+    } finally {
+      setActionBusyPhone(null);
+    }
+  }
+
+  async function handleClaim(phone) {
+    setActionBusyPhone(phone);
+    setError(null);
+    try {
+      await claimProspectLead(phone);
+      await loadCenter();
+    } catch (err) {
+      console.error(err);
+      setError(translate("prospectCenterClaimError"));
+    } finally {
+      setActionBusyPhone(null);
+    }
+  }
+
   return (
     <div className="prospect-center">
       <header className="prospect-center__header">
@@ -277,6 +370,9 @@ export default function ProspectCenter() {
               locale={locale}
               onOpenWorkspace={handleOpenWorkspace}
               onOpenQueue={handleOpenQueue}
+              onAcknowledge={handleAcknowledge}
+              onClaim={handleClaim}
+              actionBusyPhone={actionBusyPhone}
             />
           ))}
         </div>

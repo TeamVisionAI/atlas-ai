@@ -17,7 +17,10 @@ export const EXECUTIVE_FILTERS = {
   PENDING_OUTCOMES: "pending-outcomes",
   HIGH_PRIORITY: "high-priority",
   ORIENTATION_READY: "orientation-ready",
-  STALLED: "stalled"
+  STALLED: "stalled",
+  UNASSIGNED: "unassigned",
+  NEW_UNACKNOWLEDGED: "new-unacknowledged",
+  HUMAN_ATTENTION: "human-attention"
 };
 
 /** i18n translation keys — resolve with translate(key). */
@@ -27,7 +30,10 @@ export const EXECUTIVE_FILTER_LABEL_KEYS = {
   [EXECUTIVE_FILTERS.PENDING_OUTCOMES]: "executiveFilterPendingOutcomes",
   [EXECUTIVE_FILTERS.HIGH_PRIORITY]: "executiveFilterHighPriority",
   [EXECUTIVE_FILTERS.ORIENTATION_READY]: "executiveFilterOrientationReady",
-  [EXECUTIVE_FILTERS.STALLED]: "executiveFilterStalled"
+  [EXECUTIVE_FILTERS.STALLED]: "executiveFilterStalled",
+  [EXECUTIVE_FILTERS.UNASSIGNED]: "executiveFilterUnassigned",
+  [EXECUTIVE_FILTERS.NEW_UNACKNOWLEDGED]: "executiveFilterNewUnacknowledged",
+  [EXECUTIVE_FILTERS.HUMAN_ATTENTION]: "executiveFilterHumanAttention"
 };
 
 function parseInterviewTimestamp(prospect) {

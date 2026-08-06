@@ -36,10 +36,17 @@ const LEGACY_OWNERSHIP_SYSTEM_WAITING = "SYSTEM_WAITING";
 /** BR-034 stall threshold — no prospect reply after Atlas outbound. */
 const STALL_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
-/** Mission Control queue priority tiers (rank 1 = highest). */
+/**
+ * Mission Control queue priority tiers (rank 1 = highest).
+ * BR-080: UNASSIGNED_NEW_LEAD shares CRITICAL rank 1 with PENDING_INTERVIEW_RESULTS —
+ * unresolved Update Outcome is not weakened; both are critical. When both apply on
+ * different prospects, both surface at the top; secondary sort is by age/due date.
+ */
 const PRIORITY_TIERS = Object.freeze({
   PENDING_INTERVIEW_RESULTS: 1,
+  UNASSIGNED_NEW_LEAD: 1,
   HUMAN_ESCALATION: 2,
+  ASSIGNED_UNACKNOWLEDGED_NEW: 2,
   INTERVIEW_IMMEDIATE: 3,
   FOLLOW_UP_DUE: 4,
   ATLAS_ACTIVE: 5,

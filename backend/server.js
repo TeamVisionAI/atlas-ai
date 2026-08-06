@@ -172,6 +172,7 @@ app.use("/api/policy-intelligence", policyIntelligenceModule.routes);
 app.use("/api/financial-intelligence", financialIntelligenceModule.routes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
+app.use("/api/new-lead-attention", require("./routes/newLeadAttention"));
 app.use("/api/follow-ups", followUpsRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
@@ -286,6 +287,8 @@ async function main() {
   await bootstrap();
   const { startReminderPoller } = require("./services/appointmentReminderEngine");
   startReminderPoller(60_000);
+  const { startNewLeadEscalationPoller } = require("./core/newLeadAttentionEngine");
+  startNewLeadEscalationPoller(60_000);
 }
 
 main().catch((error) => {

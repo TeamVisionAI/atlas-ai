@@ -29,6 +29,17 @@ function buildProspectCenterItem(prospect, summary, options = {}) {
     interviewAt = null;
   }
 
+  const unassigned = !prospect?.owner_user_id;
+  const acknowledged = Boolean(prospect?.acknowledged_at);
+  const attentionStatus = prospect?.attention_status || (unassigned ? "new" : null);
+  const isNewUnacknowledged =
+    !acknowledged &&
+    (attentionStatus === "new" ||
+      attentionStatus === "ai_responding" ||
+      attentionStatus === "waiting_for_prospect" ||
+      attentionStatus === "human_required" ||
+      Boolean(prospect?.new_lead_received_at));
+
   return {
     phone: summary.phone,
     name: summary.name || prospect?.name || null,
@@ -42,14 +53,35 @@ function buildProspectCenterItem(prospect, summary, options = {}) {
     city: prospect?.city || null,
     state: prospect?.state || null,
     stalledAt: summary.stalledAt,
-    needsHumanAttention: summary.needsHumanAttention,
+    needsHumanAttention:
+      summary.needsHumanAttention || attentionStatus === "human_required",
     workflowOwnership: summary.workflowOwnership,
     communicationLanguage: prospect?.communication_language || null,
     lastMessagePreview: prospect?.last_message
       ? String(prospect.last_message).slice(0, 120)
       : null,
     appointmentMissing:
-      summary.canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED && !hasCanonicalAppointment
+      summary.canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED && !hasCanonicalAppointment,
+    // Implements BR-080 — assignment / attention surface fields (safe operational).
+    ownerUserId: prospect?.owner_user_id || null,
+    assignmentStatus: prospect?.assignment_status || (unassigned ? "unassigned" : "assigned"),
+    attentionStatus,
+    acknowledgedAt: prospect?.acknowledged_at || null,
+    newLeadReceivedAt: prospect?.new_lead_received_at || prospect?.created_at || null,
+    escalationLevel: prospect?.escalation_level || 0,
+    source: prospect?.source || null,
+    entryMethod: prospect?.entry_method || null,
+    isUnassigned: unassigned,
+    isNew: isNewUnacknowledged,
+    isHumanAttentionRequired:
+      summary.needsHumanAttention || attentionStatus === "human_required",
+    badges: {
+      new: isNewUnacknowledged,
+      unassigned,
+      humanAttention:
+        summary.needsHumanAttention || attentionStatus === "human_required",
+      aiResponding: attentionStatus === "ai_responding"
+    }
   };
 }
 

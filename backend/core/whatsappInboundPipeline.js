@@ -142,6 +142,34 @@ async function processInboundWhatsAppMessage(inbound) {
     };
   }
 
+  // Implements BR-080 — AI success does not acknowledge; failures raise human attention.
+  try {
+    const {
+      markAiResponding,
+      markHumanAttentionRequired
+    } = require("./newLeadAttentionEngine");
+
+    if (conversation?.success && conversation?.replied) {
+      await markAiResponding(prospect, { waitingForProspect: true });
+    } else if (
+      conversation &&
+      (conversation.success === false ||
+        conversation.humanAssist ||
+        conversation.reason === "CONVERSATION_ENGINE_ERROR")
+    ) {
+      await markHumanAttentionRequired(
+        prospect,
+        conversation.reason || conversation.error || "ai_or_delivery_failure"
+      );
+    }
+  } catch (attentionError) {
+    logWhatsAppStage("br080_attention_update_failed", {
+      level: "warn",
+      phone: storagePhone,
+      error: attentionError.message
+    });
+  }
+
   return {
     success: true,
     skipped: false,
