@@ -37,6 +37,15 @@ Do **not** change without an explicit sprint:
 
 1. ~~Communications Center read model (unified chronological view)~~ — MVP API
 2. ~~Structured conversation context + decision engine (BR-081, side effects disabled)~~ — `backend/core/recruitAiV2/`
-3. Durable conversation context store (DB migration / persistence)
-4. Replay harness driving CE cutover against this fixture (no live WhatsApp)
-5. Side-effect authorization cutover (explicit sprint; BR-075 gate remains)
+3. ~~Durable conversation context store (Phase 2)~~ — migration `032_br081_recruit_ai_conversation_contexts.sql` + `contextPersistenceService` (simulation/shadow-ready; **not** production CE cutover)
+4. Shadow-mode semantic CE wiring + divergence telemetry (explicit approval)
+5. Controlled cutover behind BR-075 + authorized appointment side effects (explicit sprint)
+
+### Phase 2 persistence notes
+
+- Table: `recruit_ai_conversation_contexts` (unique active row per org + prospect + channel)
+- Shadow ledger table present but unused: `recruit_ai_v2_shadow_evaluations`
+- Backend-only RLS (deny anon/authenticated; service_role only)
+- Optimistic `context_version` compare-and-set; duplicate `last_processed_message_id` is idempotent
+- Persisted JSON is sanitized (no tokens, stack traces, hidden reasoning, unmasked phones)
+- Customer-facing sends/booking/BR-080 writes remain denied

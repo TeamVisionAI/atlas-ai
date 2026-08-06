@@ -3,7 +3,10 @@
  * Side effects remain disabled; use processRecruitAiV2Turn for auditable decisions.
  */
 
-const { processRecruitAiV2Turn } = require("./orchestrator");
+const {
+  processRecruitAiV2Turn,
+  processRecruitAiV2TurnSync
+} = require("./orchestrator");
 const {
   createConversationContext,
   mergeConversationContext,
@@ -20,10 +23,23 @@ const { buildResponsePlan } = require("./responsePlan");
 const { renderCustomerReply } = require("./responseRenderer");
 const { authorizeSideEffects, isExecutionEnabled, isShadowEnabled } = require("./sideEffectAuthorizer");
 const { containsInternalDiagnostics, sanitizeCustomerCopy } = require("./sanitize");
+const {
+  sanitizeContextForPersistence,
+  assertNoForbiddenPayload
+} = require("./contextSanitizer");
+const {
+  createMemoryContextRepository,
+  createSupabaseContextRepository
+} = require("./contextRepository");
+const {
+  createContextPersistenceService,
+  isMetaReviewScope
+} = require("./contextPersistenceService");
 const constants = require("./constants");
 
 module.exports = {
   processRecruitAiV2Turn,
+  processRecruitAiV2TurnSync,
   createConversationContext,
   mergeConversationContext,
   normalizeLanguage,
@@ -40,5 +56,11 @@ module.exports = {
   isShadowEnabled,
   containsInternalDiagnostics,
   sanitizeCustomerCopy,
+  sanitizeContextForPersistence,
+  assertNoForbiddenPayload,
+  createMemoryContextRepository,
+  createSupabaseContextRepository,
+  createContextPersistenceService,
+  isMetaReviewScope,
   ...constants
 };
