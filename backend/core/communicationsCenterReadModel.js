@@ -9,6 +9,10 @@
 
 const { EVENT_TYPES } = require("./workflowConstants");
 const { isTableMissingError } = require("./supabaseTableErrors");
+const {
+  maskPhoneLast4,
+  maskProviderMessageId
+} = require("./communicationsCenterMasks");
 
 const CONVERSATION_LOG_CORRELATION_PREFIX = "conversation_log:";
 
@@ -70,19 +74,6 @@ function isMissingRelationError(error) {
   );
 }
 
-function maskProviderMessageId(value) {
-  if (!value) {
-    return null;
-  }
-
-  const text = String(value);
-
-  if (text.length <= 8) {
-    return `${text.slice(0, 2)}***`;
-  }
-
-  return `${text.slice(0, 4)}…${text.slice(-4)}`;
-}
 
 function formatLocalTimestamp(isoUtc, timezone) {
   const date = new Date(isoUtc);
@@ -318,6 +309,10 @@ function mapConversationLog(row, context) {
     flags.push("agent_note");
   }
 
+  if (context.markLegacyPhoneCorrelation) {
+    flags.push("legacy_phone_correlation");
+  }
+
   return baseItem({
     id: `log:${row.id}`,
     eventType: isAgentNote
@@ -354,7 +349,12 @@ function mapConversationLog(row, context) {
     metadata: {
       pipeline: row.pipeline || null,
       language: row.language || null,
-      organizationIdOnRow: row.organization_id || null
+      organizationIdOnRow: row.organization_id || null,
+      correlationTier: context.markLegacyPhoneCorrelation
+        ? "authorized_current_phone_fallback"
+        : "unknown",
+      channelIdentityId: context.channelIdentityId || null,
+      conversationId: null
     }
   });
 }
@@ -625,11 +625,79 @@ function attachDeliveriesToMessages(items, deliveries) {
   });
 }
 
-async function defaultLoadConversationLogs(phone) {
+function phoneSet(phones = []) {
+  return new Set((phones || []).filter(Boolean).map(String));
+}
+
+function rowPhoneMatches(rowPhone, authorizedPhones) {
+  if (!rowPhone || !authorizedPhones?.size) {
+    return false;
+  }
+
+  const raw = String(rowPhone);
+  if (authorizedPhones.has(raw)) {
+    return true;
+  }
+
+  const digits = raw.replace(/\D/g, "");
+  for (const candidate of authorizedPhones) {
+    if (String(candidate).replace(/\D/g, "") === digits) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function filterPhoneKeyedRows(rows, {
+  organizationId,
+  authorizedPhones,
+  allowNullOrgPhoneFallback,
+  stats
+}) {
+  const kept = [];
+
+  for (const row of rows || []) {
+    const rowOrg = row.organization_id || row.organizationId || null;
+    const rowProspectId = row.prospect_id || row.prospectId || null;
+
+    if (rowProspectId && stats.authorizedProspectId && String(rowProspectId) !== String(stats.authorizedProspectId)) {
+      stats.ambiguousRecordsExcluded += 1;
+      continue;
+    }
+
+    if (rowOrg && organizationId && String(rowOrg) !== String(organizationId)) {
+      stats.unlinkedRecordsExcluded += 1;
+      continue;
+    }
+
+    if (!rowPhoneMatches(row.prospect_phone || row.prospectPhone, authorizedPhones)) {
+      stats.unlinkedRecordsExcluded += 1;
+      continue;
+    }
+
+    if (!rowOrg) {
+      if (!allowNullOrgPhoneFallback) {
+        stats.ambiguousRecordsExcluded += 1;
+        continue;
+      }
+    }
+
+    kept.push(row);
+  }
+
+  return kept;
+}
+
+async function defaultLoadConversationLogs(query) {
+  if (!query.phoneFallbackAllowed || !query.authorizedPhones?.length) {
+    return [];
+  }
+
   const { data, error } = await getSupabase()
     .from("conversation_logs")
     .select("*")
-    .eq("prospect_phone", phone)
+    .in("prospect_phone", query.authorizedPhones)
     .order("created_at", { ascending: true })
     .limit(MAX_LIMIT);
 
@@ -637,22 +705,31 @@ async function defaultLoadConversationLogs(phone) {
     throw error;
   }
 
-  return data || [];
+  return filterPhoneKeyedRows(data || [], {
+    organizationId: query.organizationId,
+    authorizedPhones: phoneSet(query.authorizedPhones),
+    allowNullOrgPhoneFallback: query.allowNullOrgPhoneFallback,
+    stats: query.stats
+  });
 }
 
-async function defaultLoadOutboundDeliveries(phone, organizationId) {
-  let query = getSupabase()
+async function defaultLoadOutboundDeliveries(query) {
+  if (!query.phoneFallbackAllowed || !query.authorizedPhones?.length) {
+    return [];
+  }
+
+  let dbQuery = getSupabase()
     .from("whatsapp_outbound_deliveries")
     .select("*")
-    .eq("prospect_phone", phone)
+    .in("prospect_phone", query.authorizedPhones)
     .order("created_at", { ascending: false })
     .limit(MAX_LIMIT);
 
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
+  if (query.organizationId) {
+    dbQuery = dbQuery.eq("organization_id", query.organizationId);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await dbQuery;
 
   if (error) {
     if (isMissingRelationError(error)) {
@@ -662,14 +739,23 @@ async function defaultLoadOutboundDeliveries(phone, organizationId) {
     throw error;
   }
 
-  return data || [];
+  return filterPhoneKeyedRows(data || [], {
+    organizationId: query.organizationId,
+    authorizedPhones: phoneSet(query.authorizedPhones),
+    allowNullOrgPhoneFallback: false,
+    stats: query.stats
+  });
 }
 
-async function defaultLoadWorkflowEvents(phone) {
+async function defaultLoadWorkflowEvents(query) {
+  if (!query.phoneFallbackAllowed || !query.authorizedPhones?.length) {
+    return [];
+  }
+
   const { data, error } = await getSupabase()
     .from("workflow_events")
     .select("*")
-    .eq("prospect_phone", phone)
+    .in("prospect_phone", query.authorizedPhones)
     .order("created_at", { ascending: true })
     .limit(MAX_LIMIT);
 
@@ -681,17 +767,77 @@ async function defaultLoadWorkflowEvents(phone) {
     throw error;
   }
 
-  return data || [];
+  return filterPhoneKeyedRows(data || [], {
+    organizationId: query.organizationId,
+    authorizedPhones: phoneSet(query.authorizedPhones),
+    allowNullOrgPhoneFallback: query.allowNullOrgPhoneFallback,
+    stats: query.stats
+  });
 }
 
-async function defaultLoadAppointments(phone, organizationId) {
-  const result = await getAppointmentRepository().search({
-    prospectPhone: phone,
-    organizationId,
-    limit: 50
-  });
+async function defaultLoadAppointments(query) {
+  const byId = [];
 
-  return result.items || [];
+  if (query.prospectId && query.organizationId) {
+    const { data, error } = await getSupabase()
+      .from("atlas_appointments")
+      .select("*")
+      .eq("organization_id", query.organizationId)
+      .eq("prospect_id", query.prospectId)
+      .order("start_date_time", { ascending: true })
+      .limit(50);
+
+    if (error) {
+      if (!isMissingRelationError(error)) {
+        throw error;
+      }
+    } else {
+      byId.push(...(data || []));
+    }
+  }
+
+  let byPhone = [];
+
+  if (query.phoneFallbackAllowed && query.authorizedPhones?.length) {
+    const primaryPhone = query.authorizedPhones[0];
+    const result = await getAppointmentRepository().search({
+      prospectPhone: primaryPhone,
+      organizationId: query.organizationId,
+      limit: 50
+    });
+    byPhone = result.items || [];
+  }
+
+  const seen = new Set(byId.map((row) => String(row.id)));
+  const merged = [...byId];
+
+  for (const appointment of byPhone) {
+    const id = String(appointment.id);
+    const appointmentProspectId =
+      appointment.prospectId || appointment.prospect_id || null;
+
+    if (appointmentProspectId && String(appointmentProspectId) !== String(query.prospectId)) {
+      query.stats.ambiguousRecordsExcluded += 1;
+      continue;
+    }
+
+    if (seen.has(id)) {
+      continue;
+    }
+
+    seen.add(id);
+    merged.push(appointment);
+  }
+
+  const { rowToAppointment } = require("./appointmentReadModel");
+
+  return merged.map((row) => {
+    if (row.prospectPhone || row.startDateTime) {
+      return row;
+    }
+
+    return rowToAppointment(row);
+  });
 }
 
 async function defaultLoadBusinessEvents(prospectId, organizationId) {
@@ -752,37 +898,109 @@ async function defaultLoadTimelineEntries(prospectId, organizationId) {
   return { rows: data || [], gap: null };
 }
 
+function mapAppointmentWithCorrelation(appointment, context) {
+  const item = mapAppointment(appointment, context);
+  const appointmentProspectId =
+    appointment.prospectId || appointment.prospect_id || null;
+  const flags = new Set(item.flags || []);
+  let correlationTier = "appointment_linked_to_prospect";
+
+  if (appointmentProspectId && String(appointmentProspectId) === String(context.prospectId)) {
+    correlationTier = "explicit_prospect_id";
+  } else {
+    flags.add("legacy_phone_correlation");
+    correlationTier = "authorized_current_phone_fallback";
+  }
+
+  return {
+    ...item,
+    flags: [...flags],
+    metadata: {
+      ...item.metadata,
+      correlationTier,
+      channelIdentityId: context.channelIdentityId || null
+    }
+  };
+}
+
 /**
+ * Prospect-canonical Communications Center timeline.
+ * Phone is contact-channel metadata only — never an authorization key.
+ *
  * @param {object} input
- * @param {string} input.phone
- * @param {string} [input.organizationId]
- * @param {string} [input.prospectId]
- * @param {string} [input.prospectDisplayName]
- * @param {string} [input.timezone]
- * @param {number} [input.limit]
- * @param {object} [input.loaders] injectable loaders for tests
+ * @param {string} input.prospectId
+ * @param {string} input.organizationId
+ * @param {object} [input.prospect]
+ * @param {object[]} [input.channelIdentities]
+ * @param {string[]} [input.authorizedPhones]
+ * @param {boolean} [input.phoneFallbackAllowed]
+ * @param {boolean} [input.allowNullOrgPhoneFallback]
+ * @param {object} [input.phoneSafety]
+ * @param {object} [input.loaders]
  */
 async function buildCommunicationsCenterTimeline(input = {}) {
-  const phone = String(input.phone || "").trim();
+  const prospectId = String(input.prospectId || "").trim();
 
-  if (!phone) {
-    throw new Error("COMMUNICATIONS_CENTER_PHONE_REQUIRED");
+  if (!prospectId) {
+    throw new Error("COMMUNICATIONS_CENTER_PROSPECT_ID_REQUIRED");
   }
 
   const organizationId = input.organizationId || null;
-  const prospectId = input.prospectId || null;
+
+  if (!organizationId) {
+    throw new Error("COMMUNICATIONS_CENTER_ORGANIZATION_REQUIRED");
+  }
+
   const timezone = input.timezone || DEFAULT_TIMEZONE;
   const limit = Math.min(
     Math.max(Number(input.limit) || DEFAULT_LIMIT, 1),
     MAX_LIMIT
   );
   const loaders = input.loaders || {};
-  const context = {
-    timezone,
-    prospectDisplayName: input.prospectDisplayName || null
+  const channelIdentities = input.channelIdentities || [];
+  const authorizedPhones = input.authorizedPhones || [];
+  const phoneFallbackAllowed = input.phoneFallbackAllowed !== false && authorizedPhones.length > 0;
+  const allowNullOrgPhoneFallback = Boolean(input.allowNullOrgPhoneFallback);
+  const currentIdentity = channelIdentities.find((identity) => identity.isCurrent) || channelIdentities[0] || null;
+  const stats = {
+    authorizedProspectId: prospectId,
+    legacyPhoneCorrelations: 0,
+    ambiguousRecordsExcluded: 0,
+    unlinkedRecordsExcluded: 0
   };
 
   const gaps = [];
+  const context = {
+    timezone,
+    prospectDisplayName: input.prospectDisplayName || null,
+    prospectId,
+    markLegacyPhoneCorrelation: phoneFallbackAllowed,
+    channelIdentityId: currentIdentity?.channelIdentityId || null
+  };
+
+  const phoneQuery = {
+    prospectId,
+    organizationId,
+    authorizedPhones,
+    phoneFallbackAllowed,
+    allowNullOrgPhoneFallback,
+    stats
+  };
+
+  if (!phoneFallbackAllowed) {
+    gaps.push({
+      code: "phone_fallback_disabled",
+      detail:
+        input.phoneSafety?.reason ||
+        "Authorized current-phone fallback disabled due to ambiguity or missing contact identity."
+    });
+  }
+
+  gaps.push({
+    code: "historical_channel_identity_unavailable",
+    detail:
+      "Atlas does not yet retain prior phone/channel identities. Old-phone history cannot be recovered reliably after a number change."
+  });
 
   const [
     conversationLogs,
@@ -792,13 +1010,10 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     businessResult,
     timelineResult
   ] = await Promise.all([
-    (loaders.loadConversationLogs || defaultLoadConversationLogs)(phone),
-    (loaders.loadOutboundDeliveries || defaultLoadOutboundDeliveries)(
-      phone,
-      organizationId
-    ),
-    (loaders.loadWorkflowEvents || defaultLoadWorkflowEvents)(phone),
-    (loaders.loadAppointments || defaultLoadAppointments)(phone, organizationId),
+    (loaders.loadConversationLogs || defaultLoadConversationLogs)(phoneQuery),
+    (loaders.loadOutboundDeliveries || defaultLoadOutboundDeliveries)(phoneQuery),
+    (loaders.loadWorkflowEvents || defaultLoadWorkflowEvents)(phoneQuery),
+    (loaders.loadAppointments || defaultLoadAppointments)(phoneQuery),
     (loaders.loadBusinessEvents || defaultLoadBusinessEvents)(
       prospectId,
       organizationId
@@ -809,19 +1024,12 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     )
   ]);
 
-  if (!organizationId) {
-    gaps.push({
-      code: "organization_id_not_provided",
-      detail: "Caller did not supply organization scope; delivery/appointment filters may be broader."
-    });
-  }
-
   const nullOrgLogs = conversationLogs.filter((row) => !row.organization_id);
 
   if (nullOrgLogs.length) {
     gaps.push({
       code: "conversation_logs_missing_organization_id",
-      detail: `${nullOrgLogs.length} conversation_logs rows have null organization_id (phone-linked only).`,
+      detail: `${nullOrgLogs.length} conversation_logs rows have null organization_id (phone-correlated only).`,
       count: nullOrgLogs.length
     });
   }
@@ -834,7 +1042,7 @@ async function buildCommunicationsCenterTimeline(input = {}) {
   } else if (!businessResult.rows.length) {
     gaps.push({
       code: "atlas_business_events_empty",
-      detail: "No prospect-linked business events in window."
+      detail: "No prospect-linked business events."
     });
   }
 
@@ -855,28 +1063,103 @@ async function buildCommunicationsCenterTimeline(input = {}) {
   let items = [
     ...conversationLogs.map((row) => mapConversationLog(row, context)),
     ...deliveries
-      .map((row) => mapDelivery(row, context, linkedLogIds))
+      .map((row) => {
+        const item = mapDelivery(row, context, linkedLogIds);
+        if (!item) {
+          return null;
+        }
+        const flags = new Set(item.flags || []);
+        flags.add("legacy_phone_correlation");
+        return {
+          ...item,
+          flags: [...flags],
+          metadata: {
+            ...item.metadata,
+            correlationTier: "authorized_current_phone_fallback",
+            channelIdentityId: context.channelIdentityId
+          }
+        };
+      })
       .filter(Boolean),
     ...workflowEvents
-      .map((row) => mapWorkflowEvent(row, context, linkedLogIds))
+      .map((row) => {
+        const item = mapWorkflowEvent(row, context, linkedLogIds);
+        if (!item) {
+          return null;
+        }
+        const flags = new Set(item.flags || []);
+        flags.add("legacy_phone_correlation");
+        return {
+          ...item,
+          flags: [...flags],
+          metadata: {
+            ...item.metadata,
+            correlationTier: "authorized_current_phone_fallback",
+            channelIdentityId: context.channelIdentityId
+          }
+        };
+      })
       .filter(Boolean),
-    ...appointments.map((row) => mapAppointment(row, context)),
-    ...businessResult.rows.map((row) => mapBusinessEvent(row, context)).filter(Boolean),
-    ...timelineResult.rows.map((row) => mapTimelineEntry(row, context)).filter(Boolean)
+    ...appointments.map((row) => mapAppointmentWithCorrelation(row, context)),
+    ...businessResult.rows
+      .map((row) => {
+        const item = mapBusinessEvent(row, context);
+        if (!item) {
+          return null;
+        }
+        return {
+          ...item,
+          metadata: {
+            ...item.metadata,
+            correlationTier: "explicit_prospect_id"
+          }
+        };
+      })
+      .filter(Boolean),
+    ...timelineResult.rows
+      .map((row) => {
+        const item = mapTimelineEntry(row, context);
+        if (!item) {
+          return null;
+        }
+        return {
+          ...item,
+          metadata: {
+            ...item.metadata,
+            correlationTier: "explicit_prospect_id"
+          }
+        };
+      })
+      .filter(Boolean)
   ];
 
   items = attachDeliveriesToMessages(items, deliveries);
   items = annotateSequenceFlags(items);
+
+  for (const item of items) {
+    if ((item.flags || []).includes("legacy_phone_correlation")) {
+      stats.legacyPhoneCorrelations += 1;
+    }
+  }
 
   const truncated = items.length > limit;
   const page = truncated ? items.slice(-limit) : items;
 
   return {
     generatedAt: new Date().toISOString(),
-    phoneMasked: maskPhoneLast4(phone),
+    prospect: {
+      id: prospectId,
+      displayName: context.prospectDisplayName,
+      preferredLanguage: input.preferredLanguage || null,
+      currentContact: currentIdentity
+        ? {
+            channel: currentIdentity.channel,
+            maskedAddress: currentIdentity.maskedAddress
+          }
+        : null
+    },
+    channelIdentities: input.publicChannelIdentities || [],
     organizationId,
-    prospectId,
-    prospectDisplayName: context.prospectDisplayName,
     timezone,
     sources: {
       conversation_logs: conversationLogs.length,
@@ -887,20 +1170,17 @@ async function buildCommunicationsCenterTimeline(input = {}) {
       atlas_timeline_entries: timelineResult.rows.length
     },
     gaps,
-    itemCount: page.length,
-    truncated,
-    items: page
+    items: page,
+    pagination: {
+      nextCursor: null,
+      hasMore: truncated
+    },
+    dataQuality: {
+      legacyPhoneCorrelations: stats.legacyPhoneCorrelations,
+      ambiguousRecordsExcluded: stats.ambiguousRecordsExcluded,
+      unlinkedRecordsExcluded: stats.unlinkedRecordsExcluded
+    }
   };
-}
-
-function maskPhoneLast4(phone) {
-  const digits = String(phone || "").replace(/\D/g, "");
-
-  if (digits.length < 4) {
-    return "+***";
-  }
-
-  return `+***${digits.slice(-4)}`;
 }
 
 module.exports = {
@@ -915,6 +1195,7 @@ module.exports = {
   mapDelivery,
   mapWorkflowEvent,
   mapAppointment,
+  filterPhoneKeyedRows,
   COUNTEROFFER_PATTERNS,
   DEFAULT_TIMEZONE
 };

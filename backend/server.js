@@ -33,7 +33,9 @@ const appointmentRoutes = require("./routes/appointments");
 const interviewAssignmentRoutes = require("./routes/interviewAssignment");
 const missionRoutes = require("./routes/missions");
 const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
-const communicationsCenterRoutes = require("./routes/communicationsCenter");
+const {
+  prospectCommunicationsStack
+} = require("./routes/communicationsCenter");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const followUpsRoutes = require("./routes/followUps");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
@@ -169,7 +171,6 @@ app.use("/api/executive-dashboard", executiveDashboardRoutes);
 app.use("/api/policy-intelligence", policyIntelligenceModule.routes);
 app.use("/api/financial-intelligence", financialIntelligenceModule.routes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
-app.use("/api/communications-center", communicationsCenterRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/follow-ups", followUpsRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
@@ -187,6 +188,7 @@ app.get(
   requireAtlasUser,
   timelineModule.prospectTimelineHandler
 );
+app.get("/api/prospects/:id/communications", ...prospectCommunicationsStack);
 app.use("/api/prospects", prospectModule.routes);
 app.use("/api", setupRoutes);
 app.use("/api", authRoutes);

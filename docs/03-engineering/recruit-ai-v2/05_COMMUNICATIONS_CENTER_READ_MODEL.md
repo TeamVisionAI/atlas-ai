@@ -1,57 +1,107 @@
 # Communications Center — Read Model (MVP)
 
 **Status:** Implemented (read-only aggregation)  
-**Branch intent:** `feature/communications-center-read-model`  
-**Endpoint:** `GET /api/communications-center/:phone`
+**Canonical endpoint:** `GET /api/prospects/:prospectId/communications`  
+**Identity rule:** `prospect.id` is canonical. Phone is contact-channel metadata only.
 
 ## Purpose
 
-One chronological, backend-aggregated timeline of prospect communications and operational events. This is the observability/evidence layer before Recruit AI v2 decision changes.
+One chronological, backend-aggregated timeline of prospect communications and operational events. Observability/evidence layer before Recruit AI v2 decision changes.
+
+## Request flow
+
+1. `requireAtlasUser`
+2. `organizationGuard`
+3. `requireProspectAccessById` — load legacy `prospects` by id, else core; org + hierarchy checks
+4. Resolve approved channel identities from the authorized prospect
+5. Evaluate phone-sharing / recycled-number safety
+6. Aggregate by correlation precedence
+7. Return masked contact information only
+
+Never authorize from phone possession. Never: phone → global search → infer prospect.
+
+## Identity model (read response)
+
+| Field | Meaning |
+|---|---|
+| `prospectId` | Immutable Atlas prospect identity |
+| `conversationId` | Thread/session when known (often null today) |
+| `channelIdentityId` | Opaque id for a WhatsApp/phone/email identity |
+| `normalizedAddress` | Internal only — not returned in API |
+| `maskedAddress` | Public mask (`***7338`) |
+| `validFrom` / `validTo` / `isCurrent` | Identity validity |
+| `source` | Where the identity was resolved from |
+| `verifiedAt` | Verification timestamp when known |
+
+## Historical contact identity audit
+
+| Source | Historical prior phone? |
+|---|---|
+| `prospects.phone` / `normalized_phone` | **Current only** — no prior-phone column |
+| `atlas_core_prospects.primary_phone` / `secondary_phone` / `communication_channels` | Secondary exists; no dated prior-phone history |
+| `conversation_logs.prospect_phone` | Phone-keyed transcript; no `prospect_id` |
+| `workflow_events` / `whatsapp_outbound_deliveries` | Phone-keyed; no durable prior identity |
+| `atlas_appointments.prospect_id` | Explicit link when present |
+| Merge / dedup history | Core `merged_into_id` only — not a channel ledger |
+
+**Conclusion for PR #22:** Historical channel identity does **not** exist as a canonical store. Old-phone history cannot be recovered reliably after a number change. Phone fallback is limited to the prospect’s **currently authorized** contact identities and marked `legacy_phone_correlation`.
+
+## Correlation precedence
+
+1. Explicit `prospect_id`
+2. Conversation/thread linked to prospect (when available)
+3. Appointment linked to prospect
+4. Provider delivery linked to a prospect conversation log
+5. Historical channel identity linked to prospect *(not available yet)*
+6. Authorized current-phone fallback — flagged `legacy_phone_correlation`
+7. Otherwise exclude + report in `dataQuality` / `gaps`
+
+Phone match alone never overrides a conflicting `prospect_id`.
+
+## Shared / recycled number safety
+
+- Within-org shared phone → disable phone fallback
+- Cross-org shared phone → allow org-scoped rows only; exclude null-`organization_id` phone rows
+- Ambiguous or unlinked rows → excluded, counted in `dataQuality`
+- Reassignment of a phone must not transfer old communications to a new prospect (no auto-merge)
+
+## Response envelope
+
+```json
+{
+  "prospect": {
+    "id": "immutable-prospect-id",
+    "displayName": "Juanito Garcia",
+    "preferredLanguage": "en",
+    "currentContact": {
+      "channel": "whatsapp",
+      "maskedAddress": "***7338"
+    }
+  },
+  "channelIdentities": [],
+  "items": [],
+  "pagination": { "nextCursor": null, "hasMore": false },
+  "dataQuality": {
+    "legacyPhoneCorrelations": 0,
+    "ambiguousRecordsExcluded": 0,
+    "unlinkedRecordsExcluded": 0
+  },
+  "gaps": [],
+  "sources": {}
+}
+```
+
+## Follow-up (not in this PR)
+
+Proposed durable table: `atlas_prospect_channel_identities`
+
+Suggested fields: `id`, `organization_id`, `prospect_id`, `channel`, `normalized_address`, `provider_contact_id`, `valid_from`, `valid_to`, `is_current`, `verification_status`, `source`, `created_at`, `updated_at`.
+
+Do not implement without explicit approval.
 
 ## Boundaries
 
 - Read-only (no WhatsApp sends, no appointment mutations, no CE/parser changes)
-- Express + service-role only (no browser Supabase)
-- Auth: `requireAtlasUser` + `organizationGuard` + `requireLegacyProspectAccess`
-- Simulator phones rejected via `isProductionProspect`
+- Express + service-role only
 - Meta Review / BR-075 / migrations / Storage untouched
-
-## Sources (verified)
-
-| Source | Role | Inclusion rule |
-|---|---|---|
-| `conversation_logs` | Canonical message content + order | Always (phone-linked) |
-| `whatsapp_outbound_deliveries` | Delivery / BR-075 ledger | Enrich messages by `conversation_log_id`; emit standalone when unlinked |
-| `workflow_events` | Lifecycle / ownership | Include; skip message mirrors already covered by logs |
-| `atlas_appointments` | Appointment chips | Phone + org filter |
-| `atlas_business_events` | Domain analytics | Only when `prospect_id` present |
-| `atlas_timeline_entries` | Projection | Only when `prospect_id` present |
-
-Unlinkable rows are omitted and reported in `gaps[]`.
-
-## Contract
-
-See timeline item shape in the sprint brief / `communicationsCenterReadModel.js` `baseItem()`.
-
-Response envelope:
-
-- `items[]` chronological ascending
-- `sources` counts
-- `gaps[]` missing org on logs, empty BE/timeline, etc.
-- `phoneMasked` only (`+***####`)
-
-## Forensic flags (observability)
-
-Heuristic flags for TV-000028 evidence (not decision engine):
-
-- `counteroffer` / `counteroffer_6` / `counteroffer_630`
-- `ignored_counteroffer` / `unhandled`
-- `internal_error_leaked`
-- `dual_confirmation`
-- `post_confirmation_lock` / `no_reschedule_path`
-- `repeated_slot_menu`
-- `br075_decision` / `delivery_attention`
-
-## Tests
-
-`backend/test/communicationsCenterReadModel.test.js` replays sanitized TV-000028 turns through injectable loaders (no production writes).
+- No phone-keyed public Communications Center URL

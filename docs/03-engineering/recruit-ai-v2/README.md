@@ -12,7 +12,7 @@
 | [02_COMMUNICATIONS_INVENTORY.md](./02_COMMUNICATIONS_INVENTORY.md) | Phase 3 — every communication source + source-of-truth map |
 | [03_CURRENT_ARCHITECTURE_MAP.md](./03_CURRENT_ARCHITECTURE_MAP.md) | Phase 4 — inbound→outbound execution path |
 | [04_RECRUIT_AI_V2_ARCHITECTURE.md](./04_RECRUIT_AI_V2_ARCHITECTURE.md) | Phase 6 — v2 engine + Communications Center design |
-| [05_COMMUNICATIONS_CENTER_READ_MODEL.md](./05_COMMUNICATIONS_CENTER_READ_MODEL.md) | Communications Center MVP — read-only aggregation API |
+| [05_COMMUNICATIONS_CENTER_READ_MODEL.md](./05_COMMUNICATIONS_CENTER_READ_MODEL.md) | Communications Center MVP — `GET /api/prospects/:id/communications` |
 
 ## Regression fixture
 
