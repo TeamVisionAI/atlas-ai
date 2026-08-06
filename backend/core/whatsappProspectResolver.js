@@ -1,15 +1,16 @@
 /**
  * Sprint 11.1 — Locate or create prospects for inbound WhatsApp leads.
+ * Organization scoping: resolve via whatsappInboundOrganizationResolver (tenant-safe).
  */
 
-const { supabase, findProspect, updateProspect } = require("../services/supabaseService");
-const { findProspectByNormalizedPhone } = require("../core/quickCaptureEngine");
+const supabaseService = require("../services/supabaseService");
+const quickCaptureEngine = require("../core/quickCaptureEngine");
 const {
   normalizePhoneNumber,
   formatPhoneForStorage
 } = require("../core/phoneNormalizer");
-const { generateNextProspectNumber } = require("../services/prospectNumberService");
-const { emit, EVENT_TYPES } = require("./eventEngine");
+const prospectNumberService = require("../services/prospectNumberService");
+const eventEngine = require("./eventEngine");
 const { savePersistedWorkflowState } = require("./workflowStateStore");
 const { MILESTONES, OWNERSHIP } = require("./workflowConstants");
 const {
@@ -18,7 +19,12 @@ const {
   REOPENED_INACTIVITY_MS
 } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
-const { onLegacyProspectCreated } = require("./recruitingWorkflowHooks");
+const recruitingWorkflowHooks = require("./recruitingWorkflowHooks");
+const whatsappInboundOrganizationResolver = require("./whatsappInboundOrganizationResolver");
+
+const { supabase } = supabaseService;
+const { EVENT_TYPES } = eventEngine;
+const { WhatsAppInboundOrganizationError } = whatsappInboundOrganizationResolver;
 
 function resolveStoragePhone(rawPhone) {
   const normalized = normalizePhoneNumber(rawPhone);
@@ -34,7 +40,8 @@ function isMissingWhatsAppColumn(error) {
     message.includes("normalized_phone") ||
     message.includes("prospect_number") ||
     message.includes("entry_method") ||
-    message.includes("source")
+    message.includes("source") ||
+    message.includes("organization_id")
   );
 }
 
@@ -56,10 +63,31 @@ function shouldEmitConversationReopened(prospect) {
   return false;
 }
 
-async function insertWhatsAppProspectRow(storagePhone, normalizedPhone, name, firstMessage) {
-  const prospectNumber = await generateNextProspectNumber();
+/**
+ * @param {object} params
+ * @param {string} params.storagePhone
+ * @param {string|null} params.normalizedPhone
+ * @param {string|null} params.name
+ * @param {string|null} params.firstMessage
+ * @param {string} params.organizationId
+ */
+async function insertWhatsAppProspectRow({
+  storagePhone,
+  normalizedPhone,
+  name,
+  firstMessage,
+  organizationId
+}) {
+  if (!organizationId) {
+    throw new WhatsAppInboundOrganizationError(
+      "Refusing to create WhatsApp prospect without organization_id."
+    );
+  }
+
+  const prospectNumber = await prospectNumberService.generateNextProspectNumber();
   const fullName = String(name || "Unknown").trim() || "Unknown";
 
+  // Implements tenant scoping for WhatsApp inbound leads (org required).
   const insertRow = {
     phone: storagePhone,
     normalized_phone: normalizedPhone,
@@ -67,6 +95,7 @@ async function insertWhatsAppProspectRow(storagePhone, normalizedPhone, name, fi
     first_name: fullName.split(" ")[0] || fullName,
     last_name: fullName.split(" ").slice(1).join(" ") || null,
     prospect_number: prospectNumber,
+    organization_id: organizationId,
     current_step: "NEW",
     status: "NEW",
     language: "es",
@@ -85,6 +114,7 @@ async function insertWhatsAppProspectRow(storagePhone, normalizedPhone, name, fi
       .insert({
         phone: storagePhone,
         name: fullName,
+        organization_id: organizationId,
         current_step: "NEW",
         language: "es",
         last_message: firstMessage || "",
@@ -92,7 +122,8 @@ async function insertWhatsAppProspectRow(storagePhone, normalizedPhone, name, fi
           source: WHATSAPP_SOURCE.FACEBOOK,
           entry_method: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
           normalized_phone: normalizedPhone,
-          prospect_number: prospectNumber
+          prospect_number: prospectNumber,
+          organization_id: organizationId
         })
       })
       .select()
@@ -112,7 +143,10 @@ async function insertWhatsAppProspectRow(storagePhone, normalizedPhone, name, fi
   return data;
 }
 
-async function emitProspectLifecycleEvents(prospect, { created, reopened, correlationBase }) {
+async function emitProspectLifecycleEvents(
+  prospect,
+  { created, reopened, correlationBase, organizationId }
+) {
   if (created) {
     savePersistedWorkflowState(prospect.phone, {
       canonicalMilestone: MILESTONES.NEW_LEAD,
@@ -122,7 +156,7 @@ async function emitProspectLifecycleEvents(prospect, { created, reopened, correl
       doNotContact: false
     });
 
-    await emit(EVENT_TYPES.PROSPECT_CREATED, {
+    await eventEngine.emit(EVENT_TYPES.PROSPECT_CREATED, {
       prospectPhone: prospect.phone,
       actor: "SYSTEM",
       milestoneAfter: MILESTONES.NEW_LEAD,
@@ -131,12 +165,13 @@ async function emitProspectLifecycleEvents(prospect, { created, reopened, correl
         source: WHATSAPP_SOURCE.FACEBOOK,
         entry_method: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
         channel: "whatsapp",
-        prospect_number: prospect.prospect_number || null
+        prospect_number: prospect.prospect_number || null,
+        organization_id: organizationId || prospect.organization_id || null
       },
       correlationId: `${correlationBase}:prospect_created`
     });
 
-    await emit(EVENT_TYPES.CONVERSATION_STARTED, {
+    await eventEngine.emit(EVENT_TYPES.CONVERSATION_STARTED, {
       prospectPhone: prospect.phone,
       actor: "prospect",
       payload: {
@@ -147,14 +182,20 @@ async function emitProspectLifecycleEvents(prospect, { created, reopened, correl
       correlationId: `${correlationBase}:conversation_started`
     });
 
-    logWhatsAppStage("prospect_created", { phone: prospect.phone });
-
-    await onLegacyProspectCreated({
-      prospect,
-      source: WHATSAPP_SOURCE.FACEBOOK
-    }).catch((error) => {
-      console.warn("[whatsappProspectResolver] core prospect bridge failed:", error.message);
+    logWhatsAppStage("prospect_created", {
+      phone: prospect.phone,
+      organizationId: organizationId || prospect.organization_id || null
     });
+
+    await recruitingWorkflowHooks
+      .onLegacyProspectCreated({
+        prospect,
+        source: WHATSAPP_SOURCE.FACEBOOK,
+        organizationId: organizationId || prospect.organization_id || null
+      })
+      .catch((error) => {
+        console.warn("[whatsappProspectResolver] core prospect bridge failed:", error.message);
+      });
 
     return;
   }
@@ -162,7 +203,7 @@ async function emitProspectLifecycleEvents(prospect, { created, reopened, correl
   logWhatsAppStage("prospect_located", { phone: prospect.phone });
 
   if (reopened) {
-    await emit(EVENT_TYPES.CONVERSATION_REOPENED, {
+    await eventEngine.emit(EVENT_TYPES.CONVERSATION_REOPENED, {
       prospectPhone: prospect.phone,
       actor: "prospect",
       payload: {
@@ -177,32 +218,55 @@ async function emitProspectLifecycleEvents(prospect, { created, reopened, correl
 }
 
 /**
- * @returns {Promise<{ prospect: Object, created: boolean, storagePhone: string }>}
+ * @returns {Promise<{ prospect: Object, created: boolean, storagePhone: string, organizationId: string|null }>}
  */
-async function locateOrCreateWhatsAppProspect({ phone, name, firstMessage, correlationBase }) {
+async function locateOrCreateWhatsAppProspect({
+  phone,
+  name,
+  firstMessage,
+  correlationBase,
+  phoneNumberId = null,
+  wabaId = null,
+  organizationId: explicitOrganizationId = null
+} = {}) {
   const normalizedPhone = normalizePhoneNumber(phone);
   const storagePhone = resolveStoragePhone(phone);
 
+  const { organizationId, source: organizationSource } =
+    await whatsappInboundOrganizationResolver.resolveWhatsAppInboundOrganizationId({
+      phoneNumberId,
+      wabaId,
+      explicitOrganizationId
+    });
+
   let prospect =
-    (await findProspectByNormalizedPhone(normalizedPhone || phone)) ||
-    (await findProspect(storagePhone)) ||
-    (await findProspect(phone));
+    (await quickCaptureEngine.findProspectByNormalizedPhone(normalizedPhone || phone)) ||
+    (await supabaseService.findProspect(storagePhone)) ||
+    (await supabaseService.findProspect(phone));
 
   const created = !prospect;
 
   if (created) {
-    prospect = await insertWhatsAppProspectRow(
+    prospect = await insertWhatsAppProspectRow({
       storagePhone,
       normalizedPhone,
       name,
-      firstMessage
-    );
+      firstMessage,
+      organizationId
+    });
   } else if (firstMessage) {
-    await updateProspect(prospect.phone, {
+    const updates = {
       last_message: firstMessage,
       name: prospect.name || name || prospect.name
-    });
-    prospect = (await findProspect(prospect.phone)) || prospect;
+    };
+
+    // Repair null-org rows on subsequent inbound when safe for the same tenant.
+    if (!prospect.organization_id) {
+      updates.organization_id = organizationId;
+    }
+
+    await supabaseService.updateProspect(prospect.phone, updates);
+    prospect = (await supabaseService.findProspect(prospect.phone)) || prospect;
   }
 
   const reopened = !created && shouldEmitConversationReopened(prospect);
@@ -210,18 +274,27 @@ async function locateOrCreateWhatsAppProspect({ phone, name, firstMessage, corre
   await emitProspectLifecycleEvents(prospect, {
     created,
     reopened,
-    correlationBase
+    correlationBase,
+    organizationId
+  });
+
+  logWhatsAppStage("inbound_organization_resolved", {
+    organizationId,
+    organizationSource,
+    created
   });
 
   return {
     prospect,
     created,
-    storagePhone: prospect.phone
+    storagePhone: prospect.phone,
+    organizationId
   };
 }
 
 module.exports = {
   locateOrCreateWhatsAppProspect,
   resolveStoragePhone,
-  shouldEmitConversationReopened
+  shouldEmitConversationReopened,
+  insertWhatsAppProspectRow
 };

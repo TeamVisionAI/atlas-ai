@@ -3,13 +3,13 @@
  * Webhook → prospect resolve → persist → event engine → Conversation Engine → outbound.
  */
 
-const { findWorkflowEventByCorrelationId } = require("../services/workflowEventService");
+const workflowEventService = require("../services/workflowEventService");
 const { logConversation } = require("../services/logService");
-const { locateOrCreateWhatsAppProspect } = require("./whatsappProspectResolver");
+const whatsappProspectResolver = require("./whatsappProspectResolver");
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { processConversationAfterInbound } = require("./communicationHub");
-const { onMessageReceived } = require("./recruitingWorkflowHooks");
+const recruitingWorkflowHooks = require("./recruitingWorkflowHooks");
 const { resolveProspectCommunicationCode } = require("./prospectLanguage");
 
 function buildInboundCorrelationId(providerMessageId) {
@@ -21,7 +21,7 @@ function buildInboundCorrelationId(providerMessageId) {
  */
 async function processInboundWhatsAppMessage(inbound) {
   const correlationId = buildInboundCorrelationId(inbound.providerMessageId);
-  const existing = await findWorkflowEventByCorrelationId(correlationId);
+  const existing = await workflowEventService.findWorkflowEventByCorrelationId(correlationId);
 
   if (existing) {
     logWhatsAppStage("message_duplicate_skipped", {
@@ -39,11 +39,20 @@ async function processInboundWhatsAppMessage(inbound) {
 
   const body = inbound.body || `[${inbound.messageType} message]`;
 
-  const { prospect, created, storagePhone } = await locateOrCreateWhatsAppProspect({
-    phone: inbound.phone,
-    name: inbound.contactName,
-    firstMessage: body,
-    correlationBase: correlationId
+  const { prospect, created, storagePhone, organizationId } =
+    await whatsappProspectResolver.locateOrCreateWhatsAppProspect({
+      phone: inbound.phone,
+      name: inbound.contactName,
+      firstMessage: body,
+      correlationBase: correlationId,
+      phoneNumberId: inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
+      wabaId: inbound.wabaId || null
+    });
+
+  logWhatsAppStage("inbound_prospect_ready", {
+    phone: storagePhone,
+    created,
+    organizationId: organizationId || prospect?.organization_id || null
   });
 
   const logResult = await logConversation({
@@ -88,12 +97,14 @@ async function processInboundWhatsAppMessage(inbound) {
     conversationLogId: logResult.log?.id || null
   });
 
-  await onMessageReceived({
-    phone: storagePhone,
-    message: body
-  }).catch((error) => {
-    console.warn("[whatsappInboundPipeline] recruiting workflow hook failed:", error.message);
-  });
+  await recruitingWorkflowHooks
+    .onMessageReceived({
+      phone: storagePhone,
+      message: body
+    })
+    .catch((error) => {
+      console.warn("[whatsappInboundPipeline] recruiting workflow hook failed:", error.message);
+    });
 
   logWhatsAppStage("event_emitted", {
     phone: storagePhone,

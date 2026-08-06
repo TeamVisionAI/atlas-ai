@@ -172,7 +172,11 @@ async function processFacebookLead(input = {}) {
   };
 }
 
-async function onLegacyProspectCreated({ prospect, source = "facebook" }) {
+async function onLegacyProspectCreated({
+  prospect,
+  source = "facebook",
+  organizationId = null
+}) {
   if (!prospect?.phone) {
     return null;
   }
@@ -180,6 +184,7 @@ async function onLegacyProspectCreated({ prospect, source = "facebook" }) {
   return ensureCoreProspectForLegacyLead({
     phone: prospect.phone,
     displayName: prospect.name,
+    organizationId: organizationId || prospect.organization_id || null,
     leadSource: {
       sourceType: "social",
       sourceDetail: source === "facebook" ? "Facebook" : source

@@ -36,6 +36,8 @@ function parseWhatsAppWebhookBody(body) {
   const messages = [];
 
   for (const entry of body?.entry || []) {
+    const wabaId = entry?.id ? String(entry.id) : null;
+
     for (const change of entry?.changes || []) {
       const value = change?.value;
 
@@ -44,6 +46,9 @@ function parseWhatsAppWebhookBody(body) {
       }
 
       const contactName = value.contacts?.[0]?.profile?.name || "Unknown";
+      const phoneNumberId = value.metadata?.phone_number_id
+        ? String(value.metadata.phone_number_id)
+        : null;
 
       for (const message of value.messages) {
         if (!message?.from || !message?.id) {
@@ -59,6 +64,8 @@ function parseWhatsAppWebhookBody(body) {
           timestamp: message.timestamp
             ? new Date(Number(message.timestamp) * 1000).toISOString()
             : new Date().toISOString(),
+          phoneNumberId,
+          wabaId,
           rawMessage: message,
           rawValue: value
         });

@@ -48,17 +48,23 @@ async function ensureCoreProspectForLegacyLead({
   displayName,
   email = null,
   leadSource = { sourceType: "social", sourceDetail: "Facebook Lead Ads" },
-  actor = "SYSTEM"
+  actor = "SYSTEM",
+  organizationId = null
 }) {
   const storagePhone = normalizeStoragePhone(phone);
   const existingId = await findCoreProspectIdByPhone(storagePhone);
+  const resolvedOrganizationId = organizationId || DEFAULT_ORGANIZATION_ID;
 
   if (existingId) {
-    return { prospectId: existingId, created: false };
+    return {
+      prospectId: existingId,
+      created: false,
+      organizationId: resolvedOrganizationId
+    };
   }
 
   if (!isRecruitingWorkflowReady()) {
-    return { prospectId: null, created: false, skipped: true };
+    return { prospectId: null, created: false, skipped: true, organizationId: resolvedOrganizationId };
   }
 
   const { prospectService } = getRecruitingWorkflowDeps();
@@ -67,6 +73,7 @@ async function ensureCoreProspectForLegacyLead({
       displayName: displayName || storagePhone,
       primaryPhone: storagePhone,
       email: email || undefined,
+      organizationId: resolvedOrganizationId,
       leadSource,
       tags: ["autonomous-recruiting"],
       customFields: {
@@ -82,7 +89,7 @@ async function ensureCoreProspectForLegacyLead({
   return {
     prospectId: created.prospectId,
     created: true,
-    organizationId: created.organizationId || DEFAULT_ORGANIZATION_ID
+    organizationId: created.organizationId || resolvedOrganizationId
   };
 }
 
