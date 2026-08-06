@@ -45,7 +45,10 @@ function buildListFilters(req) {
   if (status) {
     filters.status = status;
   } else if (view) {
-    Object.assign(filters, resolveAppointmentViewFilters(view));
+    Object.assign(
+      filters,
+      resolveAppointmentViewFilters(view, new Date(), { organizationId })
+    );
   }
 
   return filters;

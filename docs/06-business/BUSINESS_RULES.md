@@ -1137,6 +1137,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-079 — Organization-Local Calendar Windows
+
+**Implements:** Team Dashboard / Alpha Brief / relative-date metrics timezone correctness  
+**Domain:** Dashboards / Analytics / Operations  
+**Depends on:** organization settings, appointment profile defaults  
+**Related:** BR-035–037 (follow-ups), BR-050 (appointments)  
+**Status:** Implemented  
+**Engine target:** `organizationDateWindow.js`, Alpha Brief, Executive Dashboard, Prospect Center filters, Appointments today view, Follow-ups overdue/due-today
+
+### Rules
+
+1. **Organization timezone is the calendar source of truth** — User-facing relative dates (`today`, `yesterday`, `tomorrow`, `this week`, `last week`, `current month`, `previous month`, interviews today, prospects created yesterday, overdue as of today) use the organization’s configured business timezone.
+2. **Server runtime timezone is never authoritative** — Railway UTC (or any host `TZ`) must not define business-calendar day boundaries. Do not use bare `setHours` / `startOfDay` / `endOfDay` without IANA timezone context for these metrics.
+3. **Timezone precedence** — Resolve in order: (1) organization-configured timezone / organization settings, (2) organization profile timezone (e.g. appointment profile defaults), (3) approved Atlas default (`America/New_York` or `ATLAS_DEFAULT_TIMEZONE`), (4) `UTC` only as an explicit final fallback. Reject invalid IANA values and fall through.
+4. **UTC boundaries for persistence comparisons** — Convert organization-local windows to UTC start/end instants and compare canonical timestamps (`created_at`, interview datetime, follow-up due) against those UTC bounds. Do not format database timestamps to local strings before comparison.
+5. **DST-aware IANA calculations required** — Local days may not be 24 hours. Spring-forward and fall-back must use timezone-aware conversion (e.g. `Intl` / equivalent).
+6. **Creation metrics are historical** — “Yesterday — new prospects” counts canonical prospects whose `created_at` falls in the previous organization-local calendar day, regardless of current lifecycle status (`NEW`, `QUALIFIED`, `INTERVIEW_SCHEDULED`, `CONFIRMED`, `COMPLETED`, `RECRUITED`, etc.).
+7. **Organization isolation** — Date windows must use the authenticated session’s organization (or authorized report scope). Never apply another organization’s timezone. Never accept client-supplied timezone overrides. Cross-organization super-admin reports must resolve windows per organization; do not silently aggregate multi-org metrics under one timezone unless a report explicitly documents that behavior.
+8. **Cache keys** — Any dashboard / Alpha Brief cache must include organization ID, effective timezone, and local date or resolved UTC window so a UTC-generated brief is never reused across organization-local days.
+9. **Boundaries** — Does not change WhatsApp intake, Recruit AI behavior, Railway server `TZ`, or database timestamp storage format.
+
+---
+
 ## BR-074 — Firm-Verified Securities Content Access
 
 **Implements:** RC4 Milestone 1 — Firm-Verified Securities Access Foundation

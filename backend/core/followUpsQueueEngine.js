@@ -1,9 +1,14 @@
 /**
  * Pure follow-up queue classification and sorting helpers.
  * Sprint 12.5.2 — shared by read model and tests.
+ * Implements BR-079 — overdue / due-today use organization-local calendar windows.
  */
 
 const { MILESTONES } = require("./workflowConstants");
+const {
+  RELATIVE_PERIODS,
+  getOrganizationDateWindow
+} = require("./organizationDateWindow");
 
 const FOLLOW_UP_FILTERS = Object.freeze({
   ALL: "all",
@@ -30,18 +35,6 @@ function getNowMs() {
   }
 }
 
-function startOfLocalDay(reference = new Date()) {
-  const copy = new Date(reference);
-  copy.setHours(0, 0, 0, 0);
-  return copy.getTime();
-}
-
-function endOfLocalDay(reference = new Date()) {
-  const copy = new Date(reference);
-  copy.setHours(23, 59, 59, 999);
-  return copy.getTime();
-}
-
 function parseFollowUpAtMs(followUpDate, followUpTime) {
   if (!followUpDate) {
     return null;
@@ -59,7 +52,14 @@ function isActiveFollowUp(canonicalMilestone, priorityTier) {
   );
 }
 
-function classifyFollowUpStatus({ canonicalMilestone, followUpAtMs, priorityTier }) {
+function classifyFollowUpStatus({
+  canonicalMilestone,
+  followUpAtMs,
+  priorityTier,
+  organizationId = null,
+  reference = null,
+  todayWindow = null
+}) {
   const active = isActiveFollowUp(canonicalMilestone, priorityTier);
 
   if (!active) {
@@ -74,14 +74,19 @@ function classifyFollowUpStatus({ canonicalMilestone, followUpAtMs, priorityTier
     return "overdue";
   }
 
-  const dayStart = startOfLocalDay(new Date(getNowMs()));
-  const dayEnd = endOfLocalDay(new Date(getNowMs()));
+  const window =
+    todayWindow ||
+    getOrganizationDateWindow({
+      organizationId,
+      relativePeriod: RELATIVE_PERIODS.TODAY,
+      reference: reference || new Date(getNowMs())
+    });
 
-  if (followUpAtMs < dayStart) {
+  if (followUpAtMs < window.utcStartMs) {
     return "overdue";
   }
 
-  if (followUpAtMs <= dayEnd) {
+  if (followUpAtMs <= window.utcEndMs) {
     return "due-today";
   }
 

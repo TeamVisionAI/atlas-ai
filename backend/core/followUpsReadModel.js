@@ -17,6 +17,10 @@ const {
   compareFollowUpItems,
   buildFilterCounts
 } = require("./followUpsQueueEngine");
+const {
+  RELATIVE_PERIODS,
+  getOrganizationDateWindow
+} = require("./organizationDateWindow");
 
 async function resolveRepresentativeName(ownerUserId, cache) {
   if (!ownerUserId) {
@@ -49,13 +53,16 @@ async function resolveRepresentativeName(ownerUserId, cache) {
   }
 }
 
-async function buildFollowUpItem(prospect, summary, representativeCache) {
+async function buildFollowUpItem(prospect, summary, representativeCache, context = {}) {
   const agentState = loadAgentState(summary.phone);
   const followUpAtMs = parseFollowUpAtMs(agentState.followUpDate, agentState.followUpTime);
   const status = classifyFollowUpStatus({
     canonicalMilestone: summary.canonicalMilestone,
     followUpAtMs,
-    priorityTier: summary.missionControlPriorityTier
+    priorityTier: summary.missionControlPriorityTier,
+    organizationId: context.organizationId || null,
+    reference: context.reference || null,
+    todayWindow: context.todayWindow || null
   });
 
   if (!status) {
@@ -93,6 +100,18 @@ async function buildFollowUpsReadModel(options = {}) {
     throw new Error("organizationId is required to build follow-ups read model");
   }
 
+  const reference = options.reference ? new Date(options.reference) : new Date();
+  const todayWindow = getOrganizationDateWindow({
+    organizationId: options.organizationId,
+    relativePeriod: RELATIVE_PERIODS.TODAY,
+    reference
+  });
+  const context = {
+    organizationId: options.organizationId,
+    reference,
+    todayWindow
+  };
+
   const prospects = await loadProductionProspects(options.organizationId);
   const queue = await buildPrioritizedWorkflowQueue(prospects);
   const prospectByPhone = new Map(prospects.map((row) => [row.phone, row]));
@@ -108,7 +127,7 @@ async function buildFollowUpsReadModel(options = {}) {
     }
 
     const prospect = prospectByPhone.get(summary.phone);
-    const item = await buildFollowUpItem(prospect, summary, representativeCache);
+    const item = await buildFollowUpItem(prospect, summary, representativeCache, context);
 
     if (item) {
       items.push(item);
@@ -137,6 +156,13 @@ async function buildFollowUpsReadModel(options = {}) {
 
   return {
     generatedAt: new Date().toISOString(),
+    timeZone: todayWindow.timeZone,
+    period: {
+      timeZone: todayWindow.timeZone,
+      period: RELATIVE_PERIODS.TODAY,
+      localStart: todayWindow.localStart,
+      localEnd: todayWindow.localEnd
+    },
     totalCount: filters.find((row) => row.id === FOLLOW_UP_FILTERS.ALL)?.count || 0,
     filteredCount: items.length,
     activeFilter,

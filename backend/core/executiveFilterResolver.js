@@ -1,6 +1,7 @@
 /**
  * Sprint 10.3 — Shared executive filter resolution for read models.
  * Business rules stay in workflow engines; this module only maps filters → phones.
+ * Implements BR-079 — interviews today/tomorrow use organization-local windows.
  */
 
 const {
@@ -24,17 +25,29 @@ function findProspectByPhone(prospects, phone) {
   return prospects.find((row) => row.phone === phone) || null;
 }
 
-function resolveExecutiveFilterPhones(filter, prospects = [], queue = []) {
+function resolveExecutiveFilterPhones(
+  filter,
+  prospects = [],
+  queue = [],
+  options = {}
+) {
   if (!filter || filter === "all" || !queue.length) {
     return queue.map((row) => row.phone);
   }
+
+  const organizationId = options.organizationId || null;
+  const reference = options.reference || new Date();
 
   switch (filter) {
     case EXECUTIVE_FILTERS.INTERVIEWS_TODAY:
       return queue
         .filter((summary) => {
           const prospect = findProspectByPhone(prospects, summary.phone);
-          return isSameLocalDay(parseInterviewDatetime(prospect));
+          return isSameLocalDay(
+            parseInterviewDatetime(prospect),
+            reference,
+            organizationId
+          );
         })
         .map((row) => row.phone);
 
@@ -42,7 +55,11 @@ function resolveExecutiveFilterPhones(filter, prospects = [], queue = []) {
       return queue
         .filter((summary) => {
           const prospect = findProspectByPhone(prospects, summary.phone);
-          return isTomorrow(parseInterviewDatetime(prospect));
+          return isTomorrow(
+            parseInterviewDatetime(prospect),
+            reference,
+            organizationId
+          );
         })
         .map((row) => row.phone);
 
@@ -80,32 +97,62 @@ function resolveExecutiveFilterPhones(filter, prospects = [], queue = []) {
   }
 }
 
-function buildExecutiveFilterCounts(prospects = [], queue = []) {
+function buildExecutiveFilterCounts(prospects = [], queue = [], options = {}) {
   return [
     { id: "all", count: queue.length },
     {
       id: EXECUTIVE_FILTERS.INTERVIEWS_TODAY,
-      count: resolveExecutiveFilterPhones(EXECUTIVE_FILTERS.INTERVIEWS_TODAY, prospects, queue).length
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.INTERVIEWS_TODAY,
+        prospects,
+        queue,
+        options
+      ).length
     },
     {
       id: EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS,
-      count: resolveExecutiveFilterPhones(EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS, prospects, queue).length
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.TOMORROWS_INTERVIEWS,
+        prospects,
+        queue,
+        options
+      ).length
     },
     {
       id: EXECUTIVE_FILTERS.PENDING_OUTCOMES,
-      count: resolveExecutiveFilterPhones(EXECUTIVE_FILTERS.PENDING_OUTCOMES, prospects, queue).length
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.PENDING_OUTCOMES,
+        prospects,
+        queue,
+        options
+      ).length
     },
     {
       id: EXECUTIVE_FILTERS.HIGH_PRIORITY,
-      count: resolveExecutiveFilterPhones(EXECUTIVE_FILTERS.HIGH_PRIORITY, prospects, queue).length
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.HIGH_PRIORITY,
+        prospects,
+        queue,
+        options
+      ).length
     },
     {
       id: EXECUTIVE_FILTERS.ORIENTATION_READY,
-      count: resolveExecutiveFilterPhones(EXECUTIVE_FILTERS.ORIENTATION_READY, prospects, queue).length
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.ORIENTATION_READY,
+        prospects,
+        queue,
+        options
+      ).length
     },
     {
       id: EXECUTIVE_FILTERS.STALLED,
-      count: resolveExecutiveFilterPhones(EXECUTIVE_FILTERS.STALLED, prospects, queue).length
+      count: resolveExecutiveFilterPhones(
+        EXECUTIVE_FILTERS.STALLED,
+        prospects,
+        queue,
+        options
+      ).length
     }
   ];
 }
