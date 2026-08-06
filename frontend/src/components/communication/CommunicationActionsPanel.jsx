@@ -14,6 +14,8 @@ export default function CommunicationActionsPanel({
   busy = false,
   /** Future: Workflow Engine supplies prioritized action ids. */
   actionOrder,
+  /** Card order for the Action Center grid (presentation only). */
+  cardOrder,
   /** Future: Workflow Engine highlights one recommended card without reordering the grid. */
   recommendedActionId = null
 }) {
@@ -38,9 +40,10 @@ export default function CommunicationActionsPanel({
         actions,
         translate,
         includeAddNote: Boolean(onAddNote),
-        recommendedActionId
+        recommendedActionId,
+        ...(cardOrder ? { order: cardOrder } : {})
       }),
-    [phone, actions, translate, onAddNote, recommendedActionId]
+    [phone, actions, translate, onAddNote, recommendedActionId, cardOrder]
   );
 
   function handleCardClick(cardId) {
