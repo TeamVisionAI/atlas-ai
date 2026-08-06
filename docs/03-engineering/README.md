@@ -11,4 +11,5 @@
 | [ENVIRONMENT_STRATEGY.md](./ENVIRONMENT_STRATEGY.md) | Local / production / future staging |
 | [DAILY_WORKFLOW.md](./DAILY_WORKFLOW.md) | Daily session operating procedure |
 | [WORKFLOW_SIMULATOR_SPEC.md](./WORKFLOW_SIMULATOR_SPEC.md) | Dev workflow simulator |
+| [recruit-ai-v2/](./recruit-ai-v2/) | Recruit AI v2 forensic audit + Communications Center architecture |
 | [frontend/](./frontend/) | Frontend audits and UX debt |
