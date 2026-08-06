@@ -68,12 +68,31 @@ const REASON_CODES = Object.freeze({
   PREMATURE_BOOKING_BLOCKED: "PREMATURE_BOOKING_BLOCKED"
 });
 
-/** Feature flags — v2 decisions are auditable; execution stays off this sprint. */
+/** Feature flags — v2 decisions are auditable; execution stays off until cutover. */
 const FEATURE_FLAGS = Object.freeze({
-  /** When true, orchestrator may return decisions for shadow logging. */
-  SHADOW_ENABLED_ENV: "RECRUIT_AI_V2_SHADOW",
-  /** When true, SideEffectAuthorizer may approve execution (must stay false in this sprint). */
+  /** Primary production shadow flag (default false). */
+  SHADOW_ENABLED_ENV: "RECRUIT_AI_V2_SHADOW_ENABLED",
+  /** Legacy alias accepted by shadowConfig / authorizer. */
+  SHADOW_ENABLED_LEGACY_ENV: "RECRUIT_AI_V2_SHADOW",
+  /** When true, SideEffectAuthorizer may approve execution (must stay false). */
   EXECUTION_ENABLED_ENV: "RECRUIT_AI_V2_EXECUTION_ENABLED"
+});
+
+const SHADOW_DIVERGENCE = Object.freeze({
+  EXACT_OR_EQUIVALENT: "exact_or_equivalent",
+  LANGUAGE_MISMATCH: "language_mismatch",
+  INTENT_MISMATCH: "intent_mismatch",
+  TIME_COUNTEROFFER_MISSED_BY_LIVE: "time_counteroffer_missed_by_live",
+  TIME_COUNTEROFFER_MISSED_BY_V2: "time_counteroffer_missed_by_v2",
+  CONFIRMATION_DUPLICATE_RISK: "confirmation_duplicate_risk",
+  RESCHEDULE_MISSED: "reschedule_missed",
+  APPOINTMENT_STATE_MISMATCH: "appointment_state_mismatch",
+  UNSAFE_SIDE_EFFECT_DIFFERENCE: "unsafe_side_effect_difference",
+  DIAGNOSTIC_LEAK_LIVE: "diagnostic_leak_live",
+  DIAGNOSTIC_LEAK_V2: "diagnostic_leak_v2",
+  HUMAN_ESCALATION_DIFFERENCE: "human_escalation_difference",
+  UNSUPPORTED_FOR_COMPARISON: "unsupported_for_comparison",
+  SHADOW_ERROR: "shadow_error"
 });
 
 const MAX_COUNTEROFFER_MISMATCHES_BEFORE_ESCALATE = 2;
@@ -99,6 +118,7 @@ module.exports = {
   NEXT_ACTIONS,
   REASON_CODES,
   FEATURE_FLAGS,
+  SHADOW_DIVERGENCE,
   MAX_COUNTEROFFER_MISMATCHES_BEFORE_ESCALATE,
   INTERNAL_DIAGNOSTIC_PATTERNS
 };

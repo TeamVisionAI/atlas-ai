@@ -1162,15 +1162,16 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ## BR-081 — Recruit AI v2 Structured Context and Decision Engine
 
-**Implements:** Canonical conversation context → structured interpretation → auditable business decision → response plan → rendered copy → side-effect proposal → authorization gate → durable context persistence (Phase 2)  
+**Implements:** Canonical conversation context → structured interpretation → auditable business decision → response plan → rendered copy → side-effect proposal → authorization gate → durable context persistence (Phase 2) → production shadow evaluation (Phase 3, flag-gated)  
 **Domain:** Recruit AI / Conversation / Scheduling dialogue  
 **Depends on:** BR-049, BR-039, BR-041, BR-075, BR-078  
 **Related:** BR-034 (escalation), BR-024 (needsHumanCoordinator), BR-080 (attention read-only input), forensic case TV-000028  
-**Status:** In progress (decisions + durable context; customer-facing execution disabled; no production CE cutover)  
-**Engine target:** `backend/core/recruitAiV2/*` (`conversationContext`, `contextLoader`, `interpreter`, `decisionEngine`, `responsePlan`, `responseRenderer`, `sideEffectAuthorizer`, `orchestrator`, `contextPersistenceService`, `contextRepository`)  
+**Status:** In progress (decisions + durable context + shadow capability deployed but **inactive**; customer-facing execution disabled; production CE remains authoritative; shadow flags must remain off until explicit activation)  
+**Engine target:** `backend/core/recruitAiV2/*` (`conversationContext`, `contextLoader`, `interpreter`, `decisionEngine`, `responsePlan`, `responseRenderer`, `sideEffectAuthorizer`, `orchestrator`, `contextPersistenceService`, `contextRepository`, `shadowModeRunner`, `shadowEvaluationService`)  
 **Migration:** `032_br081_recruit_ai_conversation_contexts.sql` (additive; backend-only RLS; no prospect backfill)  
-**Tests:** `backend/test/recruitAiV2StructuredContextDecision.test.js`, `backend/test/recruitAiV2DurableContext.test.js`, `backend/test/recruitAiV2Tv000028ReplayContract.test.js`  
-**Fixture:** `backend/test/fixtures/recruitAiV2/tv000028-scheduling-replay.json`
+**Tests:** `backend/test/recruitAiV2StructuredContextDecision.test.js`, `backend/test/recruitAiV2DurableContext.test.js`, `backend/test/recruitAiV2ShadowMode.test.js`, `backend/test/recruitAiV2Tv000028ReplayContract.test.js`  
+**Fixture:** `backend/test/fixtures/recruitAiV2/tv000028-scheduling-replay.json`  
+**Shadow docs:** `docs/03-engineering/recruit-ai-v2/07_SHADOW_MODE.md`
 
 ### Rules
 
@@ -1180,13 +1181,14 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Counteroffers are first-class** — Messages like `6?`, `6:30?`, `I prefer at 6` are `scheduling_counteroffer` intents. Do not ignore them or re-offer an identical rejected slot menu without a new availability result.
 5. **Proposed ≠ confirmed** — Tentative time discussion does not create appointments. `mayCreateAppointment` requires explicit confirmation rules and authorized execution (disabled until cutover).
 6. **Reschedule after confirm** — Post-confirmation time counteroffers become `reschedule_request` / reschedule flow; conversations must not permanently lock.
-7. **No diagnostic leakage** — Customer copy and persisted `context_json` must never include internal agent/persistence/error identifiers, tokens, stack traces, or hidden reasoning.
+7. **No diagnostic leakage** — Customer copy and persisted `context_json` / shadow metadata must never include internal agent/persistence/error identifiers, tokens, stack traces, or hidden reasoning.
 8. **Language sticky** — Preferred language drives automated copy for the turn; do not mix English/Spanish confirmations.
 9. **Escalate when uncertain / repeated mismatch** — Low confidence or ≥2 counteroffer mismatches → human attention path with sanitized reason.
-10. **Customer-facing side effects disabled** — SideEffectAuthorizer denies WhatsApp send, appointment create/reschedule, and BR-080 attention writes from the v2 orchestrator until an explicit cutover sprint. Context persistence is the only authorized v2 write in Phase 2.
+10. **Customer-facing side effects disabled** — SideEffectAuthorizer denies WhatsApp send, appointment create/reschedule, and BR-080 attention writes from the v2 orchestrator until an explicit cutover sprint. Authorized v2 writes are durable context rows and (when shadow flags are enabled) `recruit_ai_v2_shadow_evaluations` comparison rows only.
 11. **BR-080 read-only** — v2 may read assignment/attention signals into context; persistence must not mutate BR-080 prospect attention/ownership fields.
 12. **BR-049 delegation** — Conversation Engine orchestrates; scheduling/appointment/outbound engines execute later. Do not reimplement booking inside `semanticConversationEngine.js` or v2 decision JSON. Production turns remain on the existing CE until a dedicated cutover sprint.
-13. **Boundaries** — No live WhatsApp, no production prospect mutation beyond optional context-table writes after migration apply, no Meta Review auth changes, no template activation, no ad connection, no shadow-mode enablement without explicit approval.
+13. **Production shadow mode (Phase 3)** — Shadow capability may be deployed while inactive. When explicitly enabled via `RECRUIT_AI_V2_SHADOW_ENABLED` **and** a non-empty org allowlist **and** `sampleRate > 0`, v2 may evaluate asynchronously after the live CE response. Empty allowlist means no organizations are eligible. Malformed config fails closed. Live CE remains the only source of customer-visible copy, WhatsApp sends, appointment execution, BR-080 attention writes, and workflow advancement. Shadow failures must never interrupt the live turn. Default/production config is disabled (`enabled=false`, `organizationIds=[]`, `sampleRate=0`).
+14. **Boundaries** — No live WhatsApp from v2, no appointment writes from v2, no Meta Review auth changes, no template activation, no ad connection, no shadow-mode production enablement without explicit approval, no CE cutover without an explicit sprint.
 
 ---
 

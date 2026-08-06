@@ -170,6 +170,30 @@ async function processInboundWhatsAppMessage(inbound) {
     });
   }
 
+  // Implements BR-081 Phase 3 — Recruit AI v2 production shadow (advisory only).
+  // Live CE / WhatsApp / appointments / BR-080 remain authoritative. Failures never interrupt.
+  try {
+    const {
+      scheduleRecruitAiV2ShadowEvaluation
+    } = require("./recruitAiV2/shadowModeRunner");
+
+    scheduleRecruitAiV2ShadowEvaluation({
+      prospect,
+      organizationId: organizationId || prospect?.organization_id || null,
+      inbound,
+      storagePhone,
+      conversation,
+      inboundMessageId: inbound.providerMessageId || null,
+      messageText: body
+    });
+  } catch (shadowError) {
+    logWhatsAppStage("recruit_ai_v2_shadow_schedule_failed", {
+      level: "warn",
+      phone: storagePhone,
+      error: shadowError.message
+    });
+  }
+
   return {
     success: true,
     skipped: false,

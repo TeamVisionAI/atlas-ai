@@ -11,7 +11,14 @@ function isExecutionEnabled(env = process.env) {
 }
 
 function isShadowEnabled(env = process.env) {
-  return String(env[FEATURE_FLAGS.SHADOW_ENABLED_ENV] || "").toLowerCase() === "true";
+  const primary = String(env[FEATURE_FLAGS.SHADOW_ENABLED_ENV] || "").toLowerCase();
+  if (primary === "true") {
+    return true;
+  }
+  if (primary === "false") {
+    return false;
+  }
+  return String(env[FEATURE_FLAGS.SHADOW_ENABLED_LEGACY_ENV] || "").toLowerCase() === "true";
 }
 
 /**
