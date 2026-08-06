@@ -5,6 +5,8 @@ import CommunicationActionsPanel from "../../../components/communication/Communi
 import OperationalInterviewPanel from "./OperationalInterviewPanel";
 import WorkflowGatePanel from "../../../components/WorkflowGatePanel";
 import WorkflowCompleteBanner from "../../../components/WorkflowCompleteBanner";
+import { WORKSPACE_GENERAL_COMMUNICATION_ORDER } from "../../../engines/communicationActionCenterPresentation";
+import { shouldRenderScheduledInterviewModule } from "../../../engines/interviewModulePresentation";
 
 function OperationalWorkspace({
   workspace,
@@ -75,6 +77,7 @@ function OperationalWorkspace({
           onAddNote={onAddNote}
           noteSaving={noteSaving}
           busy={Boolean(pendingActionId) || noteSaving}
+          cardOrder={WORKSPACE_GENERAL_COMMUNICATION_ORDER}
         />
 
         {showGate ? (
@@ -88,13 +91,17 @@ function OperationalWorkspace({
         ) : null}
       </div>
 
-      <OperationalInterviewPanel
-        interview={interview}
-        phone={workspace.phone}
-        busy={Boolean(pendingActionId) || noteSaving}
-        onMissionAction={onMissionAction}
-        onRefresh={onRefresh}
-      />
+      {shouldRenderScheduledInterviewModule(interview) ? (
+        <OperationalInterviewPanel
+          interview={interview}
+          phone={workspace.phone}
+          workspace={workspace}
+          organizationSettings={organizationSettings}
+          busy={Boolean(pendingActionId) || noteSaving}
+          onMissionAction={onMissionAction}
+          onRefresh={onRefresh}
+        />
+      ) : null}
     </section>
   );
 }

@@ -148,8 +148,25 @@
   gap: 10px;
 }
 
+.prospect-workspace__operational-actions--lifecycle {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.prospect-workspace__operational-actions--lifecycle .action-card--danger {
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
 .prospect-workspace__interview-details {
-  margin-top: 12px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 720px) {
+  .prospect-workspace__operational-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .prospect-workspace__actions--embedded {

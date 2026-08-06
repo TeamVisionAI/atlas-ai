@@ -8,6 +8,13 @@ import {
 } from "../../../engines/interviewWorkflowPresentationEngine";
 import { buildInterviewAccordionSummary } from "../../../engines/prospectWorkspaceViewModel";
 import { resolveOperationalInterviewActions } from "../../../engines/interviewOperationalEngine";
+import { resolveCommunicationActions } from "../../../engines/communicationActionEngine";
+import {
+  buildInterviewModuleCommunicationCards,
+  formatInterviewMeetingTypeLabel,
+  formatInterviewOutcomeLabel,
+  formatInterviewStatusLabel
+} from "../../../engines/interviewModulePresentation";
 import { fetchAppointment, isActiveAppointment } from "../../../services/appointmentService";
 import { resolvePersistedAppointmentId } from "../../../engines/appointmentIdEngine.js";
 import RescheduleAppointmentDialog from "../../../components/appointments/RescheduleAppointmentDialog";
@@ -17,6 +24,8 @@ import CompleteAppointmentDialog from "../../../components/appointments/Complete
 export default function OperationalInterviewPanel({
   interview,
   phone,
+  workspace = null,
+  organizationSettings = null,
   busy = false,
   onMissionAction,
   onRefresh
@@ -35,6 +44,43 @@ export default function OperationalInterviewPanel({
   const [dialog, setDialog] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+
+  const communicationActions = useMemo(
+    () =>
+      resolveCommunicationActions(workspace || { phone, interview }, {
+        translate,
+        organizationSettings
+      }),
+    [workspace, phone, interview, translate, organizationSettings]
+  );
+
+  const showAppointmentCommunications = [
+    "scheduled",
+    "in_progress",
+    "rescheduled"
+  ].includes(actionPlan.state);
+
+  const communicationCards = useMemo(
+    () =>
+      showAppointmentCommunications
+        ? buildInterviewModuleCommunicationCards({
+            phone,
+            actions: communicationActions,
+            translate
+          })
+        : [],
+    [showAppointmentCommunications, phone, communicationActions, translate]
+  );
+
+  const statusHeading = useMemo(() => {
+    if (actionPlan.state && actionPlan.state !== "none") {
+      return stateLabel;
+    }
+
+    return formatInterviewStatusLabel(
+      interview?.appointmentStatus || interview?.lifecycleState || "scheduled"
+    );
+  }, [actionPlan.state, stateLabel, interview?.appointmentStatus, interview?.lifecycleState]);
 
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -89,16 +135,44 @@ export default function OperationalInterviewPanel({
       className="prospect-workspace__operational-block prospect-workspace__operational-block--interview"
       aria-labelledby="operational-interview-heading"
       data-interview-workflow-state={actionPlan.state}
+      data-interview-module="consolidated"
     >
       <header className="prospect-workspace__operational-block-header">
         <h3 id="operational-interview-heading" className="prospect-workspace__operational-block-title">
           {translate("workspaceOperationalInterview")}
         </h3>
-        {actionPlan.state !== "none" ? (
-          <p className="prospect-workspace__operational-block-state">{stateLabel}</p>
-        ) : null}
+        <p className="prospect-workspace__operational-block-state">{statusHeading}</p>
         <p className="prospect-workspace__operational-block-summary">{summary}</p>
       </header>
+
+      <dl className="prospect-details__list prospect-workspace__interview-details">
+        <div>
+          <dt>{translate("workspaceDetailsInterviewWhen")}</dt>
+          <dd>
+            {interview?.datetime
+              ? formatInterviewDateTime(interview.datetime)
+              : translate("workspaceInterviewSummaryNone")}
+          </dd>
+        </div>
+        <div>
+          <dt>{translate("workspaceDetailsInterviewType")}</dt>
+          <dd>{formatInterviewMeetingTypeLabel(interview?.type)}</dd>
+        </div>
+        <div>
+          <dt>{translate("workspaceDetailsInterviewInterviewer")}</dt>
+          <dd>{interview?.interviewerName || "—"}</dd>
+        </div>
+        <div>
+          <dt>{translate("workspaceDetailsInterviewOutcome")}</dt>
+          <dd>{formatInterviewOutcomeLabel(interview?.outcome)}</dd>
+        </div>
+        {interview?.gateActive ? (
+          <div>
+            <dt>{translate("workspaceDetailsInterviewGate")}</dt>
+            <dd>{translate("workspaceDetailsInterviewGateActive")}</dd>
+          </div>
+        ) : null}
+      </dl>
 
       {actionPlan.showRecordOutcomeHint ? (
         <p className="prospect-workspace__operational-block-hint">
@@ -106,8 +180,27 @@ export default function OperationalInterviewPanel({
         </p>
       ) : null}
 
+      {communicationCards.length ? (
+        <div
+          className="prospect-workspace__operational-actions prospect-workspace__operational-actions--comms"
+          aria-label={translate("workspaceOperationalInterview")}
+        >
+          {communicationCards.map((card) => (
+            <ActionCard
+              key={card.id}
+              icon={card.icon}
+              title={card.title}
+              subtitle={card.subtitle}
+              variant={card.variant}
+              disabled={busy || actionBusy || card.enabled === false}
+              onClick={() => onMissionAction?.(card.id)}
+            />
+          ))}
+        </div>
+      ) : null}
+
       {actionPlan.showPanelActions ? (
-        <div className="prospect-workspace__operational-actions">
+        <div className="prospect-workspace__operational-actions prospect-workspace__operational-actions--lifecycle">
           {actionPlan.showReschedule ? (
             <ActionCard
               icon="📅"
@@ -145,35 +238,6 @@ export default function OperationalInterviewPanel({
           {actionError}
         </p>
       ) : null}
-
-      <dl className="prospect-details__list prospect-workspace__interview-details">
-        <div>
-          <dt>{translate("workspaceDetailsInterviewWhen")}</dt>
-          <dd>
-            {interview?.datetime
-              ? formatInterviewDateTime(interview.datetime)
-              : translate("workspaceInterviewSummaryNone")}
-          </dd>
-        </div>
-        <div>
-          <dt>{translate("workspaceDetailsInterviewType")}</dt>
-          <dd>{interview?.type || "—"}</dd>
-        </div>
-        <div>
-          <dt>{translate("workspaceDetailsInterviewInterviewer")}</dt>
-          <dd>{interview?.interviewerName || "—"}</dd>
-        </div>
-        <div>
-          <dt>{translate("workspaceDetailsInterviewOutcome")}</dt>
-          <dd>{interview?.outcome || "—"}</dd>
-        </div>
-        {interview?.gateActive ? (
-          <div>
-            <dt>{translate("workspaceDetailsInterviewGate")}</dt>
-            <dd>{translate("workspaceDetailsInterviewGateActive")}</dd>
-          </div>
-        ) : null}
-      </dl>
 
       <RescheduleAppointmentDialog
         open={dialog?.type === "reschedule"}

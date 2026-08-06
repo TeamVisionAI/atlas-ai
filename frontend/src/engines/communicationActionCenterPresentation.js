@@ -21,6 +21,24 @@ export const COMMUNICATION_ACTION_CENTER_ORDER = Object.freeze([
   COMMUNICATION_ACTION_CENTER_CHROME.ADD_NOTE
 ]);
 
+/**
+ * Prospect Workspace Communication section — general prospect actions only.
+ * Appointment-specific sends live in the Interview module.
+ */
+export const WORKSPACE_GENERAL_COMMUNICATION_ORDER = Object.freeze([
+  COMMUNICATION_ACTION_CENTER_CHROME.CALL,
+  COMMUNICATION_ACTION_IDS.CUSTOM,
+  COMMUNICATION_ACTION_CENTER_CHROME.ADD_NOTE
+]);
+
+/** Appointment communication actions rendered inside the Interview module. */
+export const INTERVIEW_MODULE_COMMUNICATION_ORDER = Object.freeze([
+  COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS,
+  COMMUNICATION_ACTION_IDS.SEND_OFFICE,
+  COMMUNICATION_ACTION_IDS.SEND_ZOOM,
+  COMMUNICATION_ACTION_IDS.SEND_REMINDER
+]);
+
 const CHROME_ICONS = Object.freeze({
   [COMMUNICATION_ACTION_CENTER_CHROME.CALL]: "📞",
   [COMMUNICATION_ACTION_CENTER_CHROME.ADD_NOTE]: "📝"
