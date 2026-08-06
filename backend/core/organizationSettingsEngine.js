@@ -34,8 +34,17 @@ function resolveOrganizationDisplayName(office = getOfficeLocation()) {
 function getOrganizationSettings() {
   const office = getOfficeLocation();
 
+  // Implements BR-079 — organization business timezone (optional override).
+  // When unset, organizationDateWindow falls through to appointment profile / Atlas default.
+  const timezone =
+    typeof process.env.ATLAS_ORGANIZATION_TIMEZONE === "string" &&
+    process.env.ATLAS_ORGANIZATION_TIMEZONE.trim()
+      ? process.env.ATLAS_ORGANIZATION_TIMEZONE.trim()
+      : null;
+
   return {
     organizationName: resolveOrganizationDisplayName(office),
+    timezone,
     office: {
       name: office.name,
       street: office.street,

@@ -1,10 +1,16 @@
 /**
  * Shared appointment list filters — used by Appointments API and executive read models.
  * Keeps Executive Dashboard interview counts aligned with Appointments views.
+ * Implements BR-079 — today/tomorrow windows use organization-local calendar.
  */
 
 const { APPOINTMENT_STATUSES, APPOINTMENT_PURPOSES } = require("./configuration/appointmentDomain");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
+const {
+  RELATIVE_PERIODS,
+  getOrganizationDateWindow,
+  isTimestampInWindow
+} = require("./organizationDateWindow");
 
 const ACTIVE_UPCOMING_STATUSES = Object.freeze([
   APPOINTMENT_STATUSES.SCHEDULED,
@@ -42,57 +48,50 @@ const TERMINAL_LIFECYCLE_STATES = Object.freeze([
   "no_show"
 ]);
 
-function startOfLocalDay(reference = new Date()) {
-  return new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
-}
-
-function endOfLocalDay(reference = new Date()) {
-  return new Date(
-    reference.getFullYear(),
-    reference.getMonth(),
-    reference.getDate(),
-    23,
-    59,
-    59,
-    999
-  );
-}
-
-function isSameLocalDay(timestampMs, reference = new Date()) {
+function isSameLocalDay(timestampMs, reference = new Date(), organizationId = null) {
   if (!timestampMs) {
     return false;
   }
 
-  const target = new Date(timestampMs);
-  const ref = new Date(reference);
-  return (
-    target.getFullYear() === ref.getFullYear() &&
-    target.getMonth() === ref.getMonth() &&
-    target.getDate() === ref.getDate()
-  );
+  const window = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.TODAY,
+    reference
+  });
+
+  return isTimestampInWindow(timestampMs, window);
 }
 
-function isTomorrow(timestampMs, reference = new Date()) {
+function isTomorrow(timestampMs, reference = new Date(), organizationId = null) {
   if (!timestampMs) {
     return false;
   }
 
-  const tomorrow = new Date(reference);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return isSameLocalDay(timestampMs, tomorrow);
+  const window = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.TOMORROW,
+    reference
+  });
+
+  return isTimestampInWindow(timestampMs, window);
 }
 
-function resolveAppointmentViewFilters(view, reference = new Date()) {
+function resolveAppointmentViewFilters(view, reference = new Date(), options = {}) {
+  const organizationId = options.organizationId || null;
   const nowIso = reference.toISOString();
-  const todayStartIso = startOfLocalDay(reference).toISOString();
-  const todayEndIso = endOfLocalDay(reference).toISOString();
+  const todayWindow = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.TODAY,
+    reference
+  });
 
   switch (view) {
     case "today":
       return {
-        from: todayStartIso,
-        to: todayEndIso,
-        status: SCHEDULED_VIEW_STATUSES
+        from: todayWindow.utcStart,
+        to: todayWindow.utcEnd,
+        status: SCHEDULED_VIEW_STATUSES,
+        timeZone: todayWindow.timeZone
       };
     case "upcoming":
       return {

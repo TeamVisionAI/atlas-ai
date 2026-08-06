@@ -13,6 +13,11 @@ const { loadAgentState } = require("./agentActionState");
 const { listRecentWorkflowEvents } = require("../services/workflowEventService");
 const { computeAgencyPulseScore } = require("./agencyPulseEngine");
 const { MILESTONES, PRIORITY_TIERS } = require("./workflowConstants");
+const {
+  RELATIVE_PERIODS,
+  getOrganizationDateWindow,
+  isTimestampInWindow
+} = require("./organizationDateWindow");
 
 const EXECUTIVE_FILTERS = Object.freeze({
   INTERVIEWS_TODAY: "interviews-today",
@@ -22,43 +27,33 @@ const EXECUTIVE_FILTERS = Object.freeze({
   STALLED: "stalled"
 });
 
-function startOfLocalDay(date = new Date()) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy.getTime();
-}
-
-function endOfLocalDay(date = new Date()) {
-  const copy = new Date(date);
-  copy.setHours(23, 59, 59, 999);
-  return copy.getTime();
-}
-
-function isSameLocalDay(timestampMs, reference = new Date()) {
+/** @deprecated Prefer organization date windows (BR-079). Kept for test compatibility. */
+function isSameLocalDay(timestampMs, reference = new Date(), organizationId = null) {
   if (!timestampMs) {
     return false;
   }
 
-  const dayStart = startOfLocalDay(reference);
-  const dayEnd = endOfLocalDay(reference);
-  return timestampMs >= dayStart && timestampMs <= dayEnd;
+  const window = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.TODAY,
+    reference
+  });
+
+  return isTimestampInWindow(timestampMs, window);
 }
 
-function isThisLocalWeek(timestampMs, reference = new Date()) {
+function isThisLocalWeek(timestampMs, reference = new Date(), organizationId = null) {
   if (!timestampMs) {
     return false;
   }
 
-  const ref = new Date(reference);
-  const weekStartDate = new Date(ref);
-  weekStartDate.setHours(0, 0, 0, 0);
-  weekStartDate.setDate(weekStartDate.getDate() - weekStartDate.getDay());
+  const window = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.THIS_WEEK,
+    reference
+  });
 
-  const weekEndDate = new Date(weekStartDate);
-  weekEndDate.setDate(weekEndDate.getDate() + 6);
-  weekEndDate.setHours(23, 59, 59, 999);
-
-  return timestampMs >= weekStartDate.getTime() && timestampMs <= weekEndDate.getTime();
+  return isTimestampInWindow(timestampMs, window);
 }
 
 async function loadProductionProspects(organizationId) {
@@ -82,11 +77,19 @@ function findProspectByPhone(prospects, phone) {
   return prospects.find((row) => row.phone === phone) || null;
 }
 
-function buildTodayFocus(prospects, queue) {
+function buildTodayFocus(prospects, queue, context = {}) {
+  const todayWindow =
+    context.todayWindow ||
+    getOrganizationDateWindow({
+      organizationId: context.organizationId || null,
+      relativePeriod: RELATIVE_PERIODS.TODAY,
+      reference: context.reference || new Date()
+    });
+
   const interviewsToday = queue.filter((summary) => {
     const prospect = findProspectByPhone(prospects, summary.phone);
     const at = parseInterviewDatetime(prospect);
-    return isSameLocalDay(at);
+    return Boolean(at && isTimestampInWindow(at, todayWindow));
   });
 
   const pendingOutcomes = queue.filter(
@@ -139,15 +142,32 @@ function buildTodayFocus(prospects, queue) {
   };
 }
 
-function buildProductionSnapshot(prospects, queue) {
+function buildProductionSnapshot(prospects, queue, context = {}) {
+  const todayWindow =
+    context.todayWindow ||
+    getOrganizationDateWindow({
+      organizationId: context.organizationId || null,
+      relativePeriod: RELATIVE_PERIODS.TODAY,
+      reference: context.reference || new Date()
+    });
+  const weekWindow =
+    context.weekWindow ||
+    getOrganizationDateWindow({
+      organizationId: context.organizationId || null,
+      relativePeriod: RELATIVE_PERIODS.THIS_WEEK,
+      reference: context.reference || new Date()
+    });
+
   const interviewsToday = queue.filter((summary) => {
     const prospect = findProspectByPhone(prospects, summary.phone);
-    return isSameLocalDay(parseInterviewDatetime(prospect));
+    const at = parseInterviewDatetime(prospect);
+    return Boolean(at && isTimestampInWindow(at, todayWindow));
   }).length;
 
   const interviewsThisWeek = queue.filter((summary) => {
     const prospect = findProspectByPhone(prospects, summary.phone);
-    return isThisLocalWeek(parseInterviewDatetime(prospect));
+    const at = parseInterviewDatetime(prospect);
+    return Boolean(at && isTimestampInWindow(at, weekWindow));
   }).length;
 
   const recruitCount = queue.filter(
@@ -173,7 +193,15 @@ function buildProductionSnapshot(prospects, queue) {
   };
 }
 
-function buildTodayCalendar(prospects, queue) {
+function buildTodayCalendar(prospects, queue, context = {}) {
+  const todayWindow =
+    context.todayWindow ||
+    getOrganizationDateWindow({
+      organizationId: context.organizationId || null,
+      relativePeriod: RELATIVE_PERIODS.TODAY,
+      reference: context.reference || new Date()
+    });
+
   const interviews = [];
   const orientations = [];
   const training = [];
@@ -183,7 +211,7 @@ function buildTodayCalendar(prospects, queue) {
     const prospect = findProspectByPhone(prospects, summary.phone);
     const at = parseInterviewDatetime(prospect);
 
-    if (!isSameLocalDay(at)) {
+    if (!at || !isTimestampInWindow(at, todayWindow)) {
       return;
     }
 
@@ -371,24 +399,44 @@ function buildAgencyPulse(prospects, queue, todayFocus) {
   });
 }
 
-async function buildExecutiveDashboard(organizationId) {
+async function buildExecutiveDashboard(organizationId, options = {}) {
   if (!organizationId) {
     throw new Error("organizationId is required to build executive dashboard");
   }
 
+  const reference = options.reference ? new Date(options.reference) : new Date();
+  const todayWindow = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.TODAY,
+    reference
+  });
+  const weekWindow = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.THIS_WEEK,
+    reference
+  });
+  const context = { organizationId, reference, todayWindow, weekWindow };
+
   const prospects = await loadProductionProspects(organizationId);
   const queue = await buildPrioritizedWorkflowQueue(prospects);
-  const todayFocus = buildTodayFocus(prospects, queue);
-  const productionSnapshot = buildProductionSnapshot(prospects, queue);
+  const todayFocus = buildTodayFocus(prospects, queue, context);
+  const productionSnapshot = buildProductionSnapshot(prospects, queue, context);
   const agencyPulse = buildAgencyPulse(prospects, queue, todayFocus);
   const recommendations = buildRecommendations(queue, prospects);
-  const calendar = buildTodayCalendar(prospects, queue);
+  const calendar = buildTodayCalendar(prospects, queue, context);
   const activity = await buildRecentActivity(
     prospects.map((row) => row.phone)
   );
 
   return {
     generatedAt: new Date().toISOString(),
+    timeZone: todayWindow.timeZone,
+    period: {
+      timeZone: todayWindow.timeZone,
+      period: RELATIVE_PERIODS.TODAY,
+      localStart: todayWindow.localStart,
+      localEnd: todayWindow.localEnd
+    },
     prospectCount: prospects.length,
     todayFocus,
     productionSnapshot,

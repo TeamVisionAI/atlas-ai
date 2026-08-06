@@ -111,9 +111,14 @@ async function buildProspectCenterReadModel(options = {}) {
   const activeFilter = options.filter && options.filter !== "all" ? options.filter : "all";
   const search = String(options.search || "").trim();
 
+  const dateOptions = {
+    organizationId: options.organizationId,
+    reference: options.reference ? new Date(options.reference) : new Date()
+  };
+
   if (activeFilter !== "all") {
     const allowedPhones = new Set(
-      resolveExecutiveFilterPhones(activeFilter, prospects, queue)
+      resolveExecutiveFilterPhones(activeFilter, prospects, queue, dateOptions)
     );
     items = items.filter((item) => allowedPhones.has(item.phone));
   }
@@ -128,7 +133,7 @@ async function buildProspectCenterReadModel(options = {}) {
     filteredCount: items.length,
     activeFilter,
     search,
-    filters: buildExecutiveFilterCounts(prospects, queue),
+    filters: buildExecutiveFilterCounts(prospects, queue, dateOptions),
     items
   };
 }
