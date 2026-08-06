@@ -49,7 +49,8 @@ async function main() {
   console.log("✓ Canonical workflow field order");
 
   const miamiOnly = extractInformation("Miami", { city: null, state: null }, { nextField: "city" });
-  assert(miamiOnly.city === "Miami" && miamiOnly.state === "FL", "Recognized city infers Florida (Happy Path v1.0)");
+  assert(miamiOnly.city === "Miami" && !miamiOnly.state, "City-only does not auto-confirm Florida (BR-082)");
+  assert(miamiOnly.proposedState === "FL", "City-only may propose Florida for confirmation");
 
   const emptyProfile = buildProfileFromProspect({ phone: "test", current_step: "NEW" });
   assert(getNextMissingField(emptyProfile) === "city", "Empty profile starts at city");

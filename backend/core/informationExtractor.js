@@ -267,7 +267,11 @@ function extractLocation(message, options = {}) {
 
     if (isValidCityName(parsed.city)) {
       result.city = parsed.city;
-      result.state = parsed.state || inferStateFromCity(parsed.city);
+      // BR-082: city-only stays partial — do not invent confirmed state.
+      result.state = parsed.state || null;
+      if (!result.state) {
+        result.proposedState = inferStateFromCity(parsed.city);
+      }
     }
   }
 
@@ -664,10 +668,31 @@ function extractInformation(message, profile = {}, options = {}) {
     delete extracted.state;
   }
 
-  if (extracted.city && !extracted.state && (nextField === "city" || nextField === "state")) {
-    const inferredState = inferStateFromCity(extracted.city);
-    if (inferredState) {
-      extracted.state = inferredState;
+  // BR-082: proposed/inferred state is NOT confirmed prospect state.
+  if (extracted.city && !extracted.state) {
+    const proposed = location.proposedState || inferStateFromCity(extracted.city);
+    if (proposed) {
+      extracted.proposedState = proposed;
+    }
+  }
+
+  // Affirmation can confirm a proposed state when we asked for state confirmation.
+  if (
+    nextField === "state" &&
+    !extracted.state &&
+    (profile.city || extracted.city) &&
+    (isYes(normalize(message)) ||
+      isYes(
+        normalize(message)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+      ))
+  ) {
+    const proposed =
+      extracted.proposedState ||
+      inferStateFromCity(profile.city || extracted.city);
+    if (proposed) {
+      extracted.state = proposed;
     }
   }
 

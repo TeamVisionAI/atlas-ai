@@ -19,7 +19,18 @@ function getFirstMessage(language) {
     : "Hi! What city and state do you live in?";
 }
 
-function getStateQuestion(city, language) {
+function getStateQuestion(city, language, options = {}) {
+  const proposedState = options.proposedState || null;
+  if (city && proposedState === "FL") {
+    return language === "es"
+      ? `Perfecto. ¿${city}, Florida?`
+      : `Perfect. ${city}, Florida?`;
+  }
+  if (city && proposedState) {
+    return language === "es"
+      ? `Perfecto. ¿${city}, ${proposedState}?`
+      : `Perfect. ${city}, ${proposedState}?`;
+  }
   return language === "es"
     ? `¿En qué estado está ${city}?`
     : `Which state is ${city} in?`;
@@ -74,6 +85,18 @@ function getDayPartQuestion(language) {
     : "Do you prefer morning or afternoon?";
 }
 
+/** BR-082 — alternate day-part clarification (avoid identical loop). */
+function getDayPartClarificationQuestion(language, attempt = 1) {
+  if (Number(attempt) >= 2) {
+    return language === "es"
+      ? "Sin problema. Responde mañana o tarde para continuar."
+      : "No problem. Please reply morning or afternoon so we can continue.";
+  }
+  return language === "es"
+    ? "No te entendí bien — ¿prefieres en la mañana o en la tarde?"
+    : "I didn't catch that — do you prefer morning or afternoon?";
+}
+
 function getHandoffMessage(language) {
   return language === "es"
     ? "Quiero asegurarme de darte la información correcta. Permíteme conectarte con uno de nuestros líderes para ayudarte personalmente."
@@ -118,6 +141,7 @@ module.exports = {
   getNameQuestion,
   getEmailCollectionQuestion,
   getDayPartQuestion,
+  getDayPartClarificationQuestion,
   getHandoffMessage,
   getCanonicalFaqAnswer,
   buildBookingConfirmation

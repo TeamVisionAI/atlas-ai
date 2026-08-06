@@ -74,6 +74,7 @@ function loadConversationContext(input = {}) {
     prospectId = null,
     organizationId = null,
     preferredLanguage = null,
+    languageMeta = null,
     timezone = "America/New_York",
     knownFacts = {},
     appointment = {},
@@ -133,6 +134,7 @@ function loadConversationContext(input = {}) {
     preferredLanguage: normalizeLanguage(
       preferredLanguage || base.preferredLanguage || LANGUAGES_FALLBACK()
     ),
+    languageMeta: languageMeta || base.languageMeta || { source: "inferred" },
     currentStage,
     timezone,
     knownFacts,

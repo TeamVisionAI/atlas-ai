@@ -333,6 +333,7 @@ async function runRecruitAiV2PostLiveAdvisory(input = {}, deps = {}) {
         "CONTEXT_CAPTURE_TIMEOUT"
       );
 
+      const diagnostic = captureResult.diagnostic || {};
       logWhatsAppStage("recruit_ai_v2_context_captured", {
         organizationId: orgId,
         prospectId,
@@ -340,7 +341,20 @@ async function runRecruitAiV2PostLiveAdvisory(input = {}, deps = {}) {
         skipped: Boolean(captureResult.skipped),
         reason: captureResult.reason || null,
         idempotent: Boolean(captureResult.persistence?.idempotent),
-        elapsedMs: Date.now() - startedAt
+        elapsedMs: Date.now() - startedAt,
+        // Sanitized capture-only audit (BR-082) — no raw message body / PII.
+        intent: diagnostic.intent || null,
+        confidence: diagnostic.confidence ?? null,
+        messageLanguage: diagnostic.messageLanguage || null,
+        preferredLanguage: diagnostic.preferredLanguage || null,
+        stage: diagnostic.stage || null,
+        clarification: Boolean(diagnostic.clarification),
+        decisionCode: diagnostic.decisionCode || captureResult.decisionCode || null,
+        reasonCodes: Array.isArray(diagnostic.reasonCodes)
+          ? diagnostic.reasonCodes.slice(0, 8)
+          : null,
+        cityCertainty: diagnostic.cityCertainty || null,
+        stateCertainty: diagnostic.stateCertainty || null
       });
 
       return {

@@ -1,0 +1,82 @@
+{
+  "id": "first-production-feedback-tv-hola-miami-laor",
+  "description": "Sanitized first Team Vision post-activation conversation (BR-082). No PII.",
+  "identity": {
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "prospectId": "fixture-prospect-first-live-feedback",
+    "preferredLanguage": "english",
+    "languageMeta": {
+      "source": "inferred",
+      "spanishEvidenceCount": 0,
+      "englishEvidenceCount": 0,
+      "lastMessageLanguage": "unknown"
+    },
+    "timezone": "America/New_York"
+  },
+  "turns": [
+    {
+      "id": "t01",
+      "direction": "inbound",
+      "text": "Hola",
+      "expect": {
+        "intent": "greeting",
+        "messageLanguage": "spanish",
+        "preferredLanguage": "spanish",
+        "shouldEscalate": false,
+        "nextAction": "continue_after_greeting"
+      }
+    },
+    {
+      "id": "t02",
+      "direction": "inbound",
+      "text": "Miami",
+      "expect": {
+        "intent": "provide_location",
+        "city": "Miami",
+        "state": null,
+        "completeness": "partial",
+        "requiresClarification": true,
+        "stateCertainty": "proposed",
+        "proposedState": "FL",
+        "shouldEscalate": false,
+        "nextAction": "clarify_location",
+        "noDayPart": true
+      }
+    },
+    {
+      "id": "t03",
+      "direction": "inbound",
+      "text": "La or",
+      "setup": {
+        "lastQuestionAsked": "ask_day_part",
+        "lastAtlasOutboundText": "¿Prefieres en la mañana o en la tarde?"
+      },
+      "expect": {
+        "intent": "incomplete_day_part",
+        "notIntent": "provide_name",
+        "requiresClarification": true,
+        "shouldEscalate": false,
+        "noFabricatedName": true
+      }
+    },
+    {
+      "id": "t04",
+      "direction": "inbound",
+      "text": "Florida",
+      "setup": {
+        "seedPartialMiami": true
+      },
+      "expect": {
+        "intent": "provide_location",
+        "city": "Miami",
+        "state": "FL",
+        "completeness": "complete",
+        "cityCertainty": "confirmed",
+        "stateCertainty": "confirmed",
+        "nextAction": "continue_qualification",
+        "stage": "qualification",
+        "noDayPartScheduling": true
+      }
+    }
+  ]
+}

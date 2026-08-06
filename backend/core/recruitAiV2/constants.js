@@ -1,6 +1,7 @@
 /**
  * Recruit AI v2 — shared constants.
  * Implements BR-081 (structured context + decision; side effects disabled).
+ * BR-082 — conversational clarification and partial-fact resolution.
  */
 
 const STAGES = Object.freeze({
@@ -27,10 +28,14 @@ const LANGUAGES = Object.freeze({
 });
 
 const INTENTS = Object.freeze({
+  GREETING: "greeting",
   OPPORTUNITY_QUESTION: "opportunity_question",
   ECHO_OR_NOOP: "echo_or_noop",
   PROVIDE_LOCATION: "provide_location",
   PROVIDE_NAME: "provide_name",
+  PROVIDE_DAY_PART: "provide_day_part",
+  INCOMPLETE_DAY_PART: "incomplete_day_part",
+  AMBIGUOUS_FRAGMENT: "ambiguous_fragment",
   SELECT_OPTION: "select_option",
   SCHEDULING_COUNTEROFFER: "scheduling_counteroffer",
   SCHEDULE_CONFIRM: "schedule_confirm",
@@ -40,7 +45,10 @@ const INTENTS = Object.freeze({
 
 const NEXT_ACTIONS = Object.freeze({
   ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY: "answer_brief_value_prop_then_qualify",
+  CONTINUE_AFTER_GREETING: "continue_after_greeting",
   CLARIFY_ONCE: "clarify_once",
+  CLARIFY_LOCATION: "clarify_location",
+  CLARIFY_DAY_PART: "clarify_day_part",
   CONTINUE_QUALIFICATION: "continue_qualification",
   ACKNOWLEDGE_AND_CHECK_AVAILABILITY: "acknowledge_and_check_availability",
   OFFER_ALTERNATIVES_OR_ESCALATE: "offer_alternatives_or_escalate",
@@ -62,10 +70,17 @@ const REASON_CODES = Object.freeze({
   RESCHEDULE_AFTER_CONFIRMATION: "RESCHEDULE_AFTER_CONFIRMATION",
   FORBID_INTERNAL_DIAGNOSTICS: "FORBID_INTERNAL_DIAGNOSTICS",
   LANGUAGE_STICKY: "LANGUAGE_STICKY",
+  LANGUAGE_ADAPTED_ACTIVE_CONVERSATION: "LANGUAGE_ADAPTED_ACTIVE_CONVERSATION",
   SIDE_EFFECTS_DISABLED: "SIDE_EFFECTS_DISABLED",
   LOW_CONFIDENCE: "LOW_CONFIDENCE",
   ECHO_DETECTED: "ECHO_DETECTED",
-  PREMATURE_BOOKING_BLOCKED: "PREMATURE_BOOKING_BLOCKED"
+  PREMATURE_BOOKING_BLOCKED: "PREMATURE_BOOKING_BLOCKED",
+  PARTIAL_LOCATION: "PARTIAL_LOCATION",
+  LOCATION_STATE_UNCONFIRMED: "LOCATION_STATE_UNCONFIRMED",
+  RECOVERABLE_AMBIGUITY: "RECOVERABLE_AMBIGUITY",
+  REPEATED_AMBIGUITY_ESCALATE: "REPEATED_AMBIGUITY_ESCALATE",
+  GREETING_NO_ESCALATE: "GREETING_NO_ESCALATE",
+  FRAGMENT_NOT_NAME: "FRAGMENT_NOT_NAME"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */
@@ -98,6 +113,8 @@ const SHADOW_DIVERGENCE = Object.freeze({
 });
 
 const MAX_COUNTEROFFER_MISMATCHES_BEFORE_ESCALATE = 2;
+/** Recoverable ambiguity clarifications before human handoff (BR-082). */
+const MAX_CLARIFICATIONS_BEFORE_ESCALATE = 2;
 
 const INTERNAL_DIAGNOSTIC_PATTERNS = Object.freeze([
   /authenticated agent/i,
@@ -122,5 +139,6 @@ module.exports = {
   FEATURE_FLAGS,
   SHADOW_DIVERGENCE,
   MAX_COUNTEROFFER_MISMATCHES_BEFORE_ESCALATE,
+  MAX_CLARIFICATIONS_BEFORE_ESCALATE,
   INTERNAL_DIAGNOSTIC_PATTERNS
 };
