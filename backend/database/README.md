@@ -427,3 +427,37 @@ Contract tests: `backend/test/syncAtlasUsersSearchPath030.test.js`
 Optional transactional dry-run (apply + probe + ROLLBACK): `ATLAS_030_LIVE_DRY_RUN=1`.
 
 **Rollback warning:** down migration restores the mutable-search-path finding and broader EXECUTE grants.
+
+## Migration 031 — BR-080 new lead attention columns
+
+```
+backend/database/migrations/031_br080_new_lead_attention.sql
+backend/database/migrations/031_br080_new_lead_attention_down.sql
+```
+
+Additive columns on `prospects` for assignment/attention lifecycle. No ownership backfill.
+
+## Migration 032 — BR-081 Recruit AI v2 durable conversation contexts
+
+```
+backend/database/migrations/032_br081_recruit_ai_conversation_contexts.sql
+backend/database/migrations/032_br081_recruit_ai_conversation_contexts_down.sql
+```
+
+Creates:
+
+- `recruit_ai_conversation_contexts` — one active sanitized context per organization + prospect + channel
+- `recruit_ai_v2_shadow_evaluations` — shadow ledger table (unused until shadow-mode sprint)
+
+Also:
+
+- Unique partial index on active contexts
+- Organization / updated_at / last_processed_message_id indexes
+- Backend-only RLS (deny anon + authenticated; grant service_role)
+- No prospect/appointment backfill
+- Safe to apply before application deploy
+
+Contract tests: `backend/test/recruitAiV2DurableContext.test.js`  
+**Do not apply in production until an authorized migration/deploy window.**
+
+**Rollback warning:** down migration drops both tables.

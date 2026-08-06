@@ -106,7 +106,7 @@ Prefer extending existing engines over copying business logic into routes or han
 | **New Lead Attention (BR-080)** | `backend/core/newLeadAttentionEngine.js` | Acknowledge/claim/escalate; AI success ≠ human acknowledgement |
 | **Conversation Engine** | `backend/core/conversationEngine.js` | Thin entry; understand → remember → decide → **delegate** (BR-049) |
 | Semantic Conversation Engine | `backend/core/semanticConversationEngine.js` | Turn orchestration; **must not** duplicate qualification/scheduling/appointment/workflow logic |
-| Recruit AI v2 (BR-081) | `backend/core/recruitAiV2/` | Structured context → interpret → decide → response plan → render → authorize (execution disabled this sprint) |
+| Recruit AI v2 (BR-081) | `backend/core/recruitAiV2/` | Structured context → interpret → decide → response plan → render → authorize; durable context via `contextPersistenceService` + migration 032 (customer execution disabled; no CE cutover) |
 | Conversation Copy | `backend/core/conversationCopy.js` | User-facing wording (not business logic) |
 | **Appointment Application** | `backend/application/appointmentApplicationService.js` | Persisted appointment lifecycle execution (BR-039, BR-050) |
 | Mission Execution | `backend/application/missionExecutionApplicationService.js` | End-to-end schedule interview (atomic booking path) |

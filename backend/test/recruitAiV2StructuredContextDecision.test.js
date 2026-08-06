@@ -9,7 +9,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
-  processRecruitAiV2Turn,
+  processRecruitAiV2TurnSync,
   loadContextFromReplayFixture,
   decideSafeFailure,
   containsInternalDiagnostics,
@@ -40,7 +40,7 @@ function runTurn(fixture, turnId, extras = {}) {
   const idx = inboundIndex(fixture, turnId);
   const turn = fixture.turns.find((t) => t.id === turnId);
   const context = loadContextFromReplayFixture(fixture, idx);
-  return processRecruitAiV2Turn({
+  return processRecruitAiV2TurnSync({
     message: { text: turn.text },
     context,
     options: { flexible: true, ...extras.options },
@@ -113,7 +113,7 @@ test("5. internal diagnostic failure never leaks to customer copy", () => {
   const fx = loadFixture();
   const idx = inboundIndex(fx, "t09");
   const context = loadContextFromReplayFixture(fx, idx);
-  const result = processRecruitAiV2Turn({
+  const result = processRecruitAiV2TurnSync({
     message: { text: "Juanito Garcia" },
     context,
     options: {
@@ -197,7 +197,7 @@ test("11. schedule confirm remains side-effect disabled (no premature book)", ()
   const context = loadContextFromReplayFixture(fx, idx);
   context.appointment.status = "proposed";
   context.conversation.lastQuestionAsked = "confirm_slot";
-  const result = processRecruitAiV2Turn({
+  const result = processRecruitAiV2TurnSync({
     message: { text: "Ok" },
     context,
     options: { flexible: true }

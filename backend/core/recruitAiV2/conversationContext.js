@@ -44,7 +44,10 @@ function emptyConversationMeta() {
     lastAtlasOutboundText: null,
     counterofferMismatchCount: 0,
     confirmedFields: [],
-    unresolvedFields: []
+    unresolvedFields: [],
+    confirmationVersion: 0,
+    lastConfirmationSentVersion: 0,
+    lastCounterofferTime: null
   };
 }
 
