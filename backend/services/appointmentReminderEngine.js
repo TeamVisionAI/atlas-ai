@@ -11,10 +11,20 @@ const { findProspectInOrganization } = require("./supabaseService");
 const { recordBusinessEvent } = require("../core/recruitingBusinessEventBridge");
 const { APPOINTMENT_EVENTS } = require("../modules/business-events/domain/EventTypes");
 const { REMINDER_STATUSES } = require("../core/configuration/appointmentDomain");
+const {
+  resolveProspectPreferredLanguage,
+  preferredLanguageToCommunicationCode
+} = require("../core/prospectLanguage");
+const {
+  isVirtualMeeting,
+  formatAppointmentWhen
+} = require("../core/appointmentConfirmationCopy");
 
 const REMINDER_FILE = path.join(__dirname, "../data/appointmentReminders.json");
 
 const REMINDER_TYPES = Object.freeze({
+  // Immediate booking confirmation is owned by appointment persistence → Conversation
+  // reply with idempotency key appointment-confirmation:{id}. Do not send a second one.
   CONFIRMATION: "confirmation",
   REMINDER_24H: "reminder_24h",
   REMINDER_1H: "reminder_1h",
@@ -22,7 +32,6 @@ const REMINDER_TYPES = Object.freeze({
 });
 
 const REMINDER_SCHEDULE = Object.freeze([
-  { type: REMINDER_TYPES.CONFIRMATION, offsetMinutes: 0, immediate: true },
   { type: REMINDER_TYPES.REMINDER_24H, offsetMinutes: 24 * 60 },
   { type: REMINDER_TYPES.REMINDER_1H, offsetMinutes: 60 },
   { type: REMINDER_TYPES.REMINDER_15M, offsetMinutes: 15 }
@@ -50,38 +59,63 @@ function writeStore(store) {
   fs.writeFileSync(REMINDER_FILE, JSON.stringify(store, null, 2));
 }
 
-function formatWhen(iso, timezone = "America/New_York") {
-  try {
-    return new Date(iso).toLocaleString("es-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: timezone
-    });
-  } catch {
-    return iso;
-  }
+function formatWhen(iso, timezone = "America/New_York", languageCode = "en") {
+  return formatAppointmentWhen(
+    { startDateTime: iso, timezone },
+    languageCode
+  );
 }
 
 function buildReminderMessage(appointment, reminderType, prospect) {
+  const preferred = resolveProspectPreferredLanguage(prospect);
+  const language = preferredLanguageToCommunicationCode(preferred);
   const name = prospect?.name || appointment.metadata?.prospectName || "";
-  const when = formatWhen(appointment.startDateTime, appointment.timezone);
-  const greeting = name ? `Hola ${name.split(" ")[0]},` : "Hola,";
-  const meetLink = appointment.virtualMeetingUrl ? `\nEnlace: ${appointment.virtualMeetingUrl}` : "";
+  const first = name ? String(name).trim().split(/\s+/)[0] : "";
+  const when = formatWhen(appointment.startDateTime, appointment.timezone, language);
+  const virtual = isVirtualMeeting(appointment);
+  const meetLink = appointment.virtualMeetingUrl
+    ? language === "es"
+      ? `\nEnlace: ${appointment.virtualMeetingUrl}`
+      : `\nLink: ${appointment.virtualMeetingUrl}`
+    : "";
+  const channelLabel =
+    language === "es"
+      ? virtual
+        ? "por Zoom"
+        : "en la oficina"
+      : virtual
+        ? "via Zoom"
+        : "at our office";
 
+  if (language === "es") {
+    const greeting = first ? `Hola ${first},` : "Hola,";
+    switch (reminderType) {
+      case REMINDER_TYPES.CONFIRMATION:
+        // Kept for backwards-compatible delivery of legacy queued confirmation rows only.
+        return `${greeting} tu entrevista ${channelLabel} quedó confirmada para ${when}.${meetLink}\n\nTeam Vision`;
+      case REMINDER_TYPES.REMINDER_24H:
+        return `${greeting} te recordamos que mañana tienes tu entrevista ${channelLabel} (${when}).${meetLink}\n\nTeam Vision`;
+      case REMINDER_TYPES.REMINDER_1H:
+        return `${greeting} tu entrevista ${channelLabel} es en 1 hora (${when}).${meetLink}\n\nTeam Vision`;
+      case REMINDER_TYPES.REMINDER_15M:
+        return `${greeting} tu entrevista ${channelLabel} comienza en 15 minutos.${meetLink}\n\nTeam Vision`;
+      default:
+        return `${greeting} recordatorio de entrevista: ${when}.${meetLink}\n\nTeam Vision`;
+    }
+  }
+
+  const greeting = first ? `Hi ${first},` : "Hi,";
   switch (reminderType) {
     case REMINDER_TYPES.CONFIRMATION:
-      return `${greeting} tu entrevista por Zoom quedó confirmada para ${when}.${meetLink}\n\nTeam Vision`;
+      return `${greeting} your interview ${channelLabel} is confirmed for ${when}.${meetLink}\n\nTeam Vision`;
     case REMINDER_TYPES.REMINDER_24H:
-      return `${greeting} te recordamos que mañana tienes tu entrevista por Zoom a las ${when.split(", ").pop() || when}.${meetLink}\n\nTeam Vision`;
+      return `${greeting} reminder: your interview ${channelLabel} is tomorrow (${when}).${meetLink}\n\nTeam Vision`;
     case REMINDER_TYPES.REMINDER_1H:
-      return `${greeting} tu entrevista por Zoom es en 1 hora (${when}).${meetLink}\n\nTeam Vision`;
+      return `${greeting} your interview ${channelLabel} is in 1 hour (${when}).${meetLink}\n\nTeam Vision`;
     case REMINDER_TYPES.REMINDER_15M:
-      return `${greeting} tu entrevista por Zoom comienza en 15 minutos.${meetLink}\n\nTeam Vision`;
+      return `${greeting} your interview ${channelLabel} starts in 15 minutes.${meetLink}\n\nTeam Vision`;
     default:
-      return `${greeting} recordatorio de entrevista: ${when}.${meetLink}\n\nTeam Vision`;
+      return `${greeting} interview reminder: ${when}.${meetLink}\n\nTeam Vision`;
   }
 }
 
@@ -159,6 +193,18 @@ function buildReminderTemplateVariables(appointment, prospect) {
 }
 
 async function deliverReminder(entry, appointment) {
+  // Immediate confirmations are owned by the scheduling reply path.
+  if (entry.reminderType === REMINDER_TYPES.CONFIRMATION) {
+    return {
+      delivered: false,
+      reason: "CONFIRMATION_OWNED_BY_SCHEDULE_REPLY",
+      status: REMINDER_STATUSES.CANCELLED,
+      retryable: false,
+      delivery: null,
+      suppressed: true
+    };
+  }
+
   const prospect = await findProspectInOrganization(
     entry.prospectPhone,
     entry.organizationId
@@ -235,11 +281,23 @@ async function processDueReminders() {
         startDateTime: entry.appointmentStart || entry.scheduledFor,
         timezone: entry.timezone || "America/New_York",
         virtualMeetingUrl: entry.virtualMeetingUrl || null,
+        meetingType: entry.meetingType || null,
+        meetingLocationType: entry.meetingLocationType || null,
+        meetingProvider: entry.meetingProvider || null,
+        meetingAddress: entry.meetingAddress || null,
         metadata: entry.metadata || {}
       };
 
       try {
         const result = await deliverReminder(entry, appointment);
+        if (result.suppressed) {
+          entry.status = REMINDER_STATUSES.CANCELLED;
+          entry.cancelledAt = new Date().toISOString();
+          entry.failureReason = result.reason;
+          processed += 1;
+          changed = true;
+          continue;
+        }
         if (result.delivered) {
           entry.status = REMINDER_STATUSES.SENT;
           entry.sentAt = new Date().toISOString();
@@ -277,6 +335,10 @@ function enrichEntriesWithAppointment(appointment, entries) {
     appointmentStart: appointment.startDateTime,
     timezone: appointment.timezone,
     virtualMeetingUrl: appointment.virtualMeetingUrl,
+    meetingType: appointment.meetingType || null,
+    meetingLocationType: appointment.meetingLocationType || null,
+    meetingProvider: appointment.meetingProvider || null,
+    meetingAddress: appointment.meetingAddress || null,
     metadata: appointment.metadata
   }));
 }
@@ -326,6 +388,8 @@ module.exports = {
   cancelReminders,
   replaceReminders: replaceRemindersForAppointment,
   processDueReminders,
+  buildReminderMessage,
+  deliverReminder,
   startReminderPoller,
   stopReminderPoller,
   buildReminderMessage
