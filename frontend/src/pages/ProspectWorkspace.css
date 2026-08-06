@@ -5,15 +5,6 @@
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
-  /* Page content only — scroll ownership stays on .atlas-layout__content */
-  overflow: visible;
-  height: auto;
-  max-height: none;
-  padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-}
-
-.prospect-workspace__primary-header {
-  scroll-margin-top: 8px;
 }
 
 .prospect-workspace__toolbar {
