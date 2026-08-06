@@ -36,6 +36,7 @@ Do **not** change without an explicit sprint:
 ## Implementation order
 
 1. ~~Communications Center read model (unified chronological view)~~ — MVP API
-2. Durable conversation context store
-3. Structured decision contract + side-effect authorization
-4. Replay harness driving CE against this fixture (no live WhatsApp)
+2. ~~Structured conversation context + decision engine (BR-081, side effects disabled)~~ — `backend/core/recruitAiV2/`
+3. Durable conversation context store (DB migration / persistence)
+4. Replay harness driving CE cutover against this fixture (no live WhatsApp)
+5. Side-effect authorization cutover (explicit sprint; BR-075 gate remains)

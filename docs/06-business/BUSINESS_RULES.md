@@ -1160,6 +1160,33 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-081 — Recruit AI v2 Structured Context and Decision Engine
+
+**Implements:** Canonical conversation context → structured interpretation → auditable business decision → response plan → rendered copy → side-effect proposal → authorization gate  
+**Domain:** Recruit AI / Conversation / Scheduling dialogue  
+**Depends on:** BR-049, BR-039, BR-041, BR-075, BR-078  
+**Related:** BR-034 (escalation), BR-024 (needsHumanCoordinator), forensic case TV-000028  
+**Status:** In progress (decisions auditable; execution disabled)  
+**Engine target:** `backend/core/recruitAiV2/*` (`conversationContext`, `contextLoader`, `interpreter`, `decisionEngine`, `responsePlan`, `responseRenderer`, `sideEffectAuthorizer`, `orchestrator`)  
+**Tests:** `backend/test/recruitAiV2StructuredContextDecision.test.js`, `backend/test/recruitAiV2Tv000028ReplayContract.test.js`  
+**Fixture:** `backend/test/fixtures/recruitAiV2/tv000028-scheduling-replay.json`
+
+### Rules
+
+1. **Structured path required** — Inbound Recruit AI turns must produce a StructuredDecision before customer copy or any side-effect proposal. Raw LLM/copy must not directly book or send.
+2. **Canonical context** — Preserve preferred language, stage, known facts, appointment proposed vs confirmed vs reschedule-requested, last question/offer, counteroffer mismatch count, and human-attention flags.
+3. **Counteroffers are first-class** — Messages like `6?`, `6:30?`, `I prefer at 6` are `scheduling_counteroffer` intents. Do not ignore them or re-offer an identical rejected slot menu without a new availability result.
+4. **Proposed ≠ confirmed** — Tentative time discussion does not create appointments. `mayCreateAppointment` requires explicit confirmation rules and authorized execution (disabled in this sprint).
+5. **Reschedule after confirm** — Post-confirmation time counteroffers become `reschedule_request` / reschedule flow; conversations must not permanently lock.
+6. **No diagnostic leakage** — Customer copy must never include internal agent/persistence/error identifiers. Fail closed to safe escalate copy.
+7. **Language sticky** — Preferred language drives automated copy for the turn; do not mix English/Spanish confirmations.
+8. **Escalate when uncertain / repeated mismatch** — Low confidence or ≥2 counteroffer mismatches → human attention path with sanitized reason.
+9. **Side effects disabled this sprint** — SideEffectAuthorizer denies WhatsApp send, appointment create, and attention writes from the v2 orchestrator until an explicit cutover sprint. Decisions remain auditable.
+10. **BR-049 delegation** — Conversation Engine orchestrates; scheduling/appointment/outbound engines execute later. Do not reimplement booking inside `semanticConversationEngine.js` or v2 decision JSON.
+11. **Boundaries** — No live WhatsApp, no production prospect mutation, no Meta Review auth changes, no template activation, no ad connection in this rule’s implementation sprint.
+
+---
+
 ## BR-080 — Canonical New Lead Assignment and Attention Lifecycle
 
 **Implements:** Deterministic owner or durable Unassigned queue; New Lead mission; human acknowledgement; failure escalation  
@@ -1411,7 +1438,7 @@ Atlas works around them.
 |-------|--------|----------------|
 | Rules | `businessRulesEngine.js` | Decisions only — coverage, interview type, scheduling window, escalation |
 | Application | `businessRulesApplicator.js` | Apply rule decisions to prospect profile |
-| Conversation | `conversationEngine.js`, `semanticConversationEngine.js` | Understand → remember → decide → **delegate** (BR-049); copy in separate modules |
+| Conversation | `conversationEngine.js`, `semanticConversationEngine.js`, `recruitAiV2/` | Understand → remember → decide → **delegate** (BR-049 / BR-081); copy in separate modules |
 | Appointments | `appointmentApplicationService.js`, `appointmentDomainService.js` | Persisted appointment lifecycle (BR-039, BR-050) |
 | Mission execution | `missionExecutionApplicationService.js` | Atomic schedule-interview orchestration |
 | Copy | `conversationCopy.js` | User-facing wording from rule decisions |
