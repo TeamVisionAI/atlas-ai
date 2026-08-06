@@ -190,6 +190,8 @@ async function repairLegacyInterviewForProspect(prospect, options = {}) {
         googleCalendarEventId: prospect.calendar_event_id || null,
         // Always reconcile after persist so Google time matches the appointment
         // even when a stale event id survived reconnect.
+        // Meeting URL intentionally omitted — createAppointment (BR-076) hydrates
+        // from same-organization Personal Meeting URL when Zoom and URL is missing.
         googleCalendarSynced: false
       },
       skipWorkflowSideEffects: true,

@@ -341,7 +341,7 @@ When a persisted appointment includes a valid Zoom meeting URL and is not comple
 2. **Action order:** Add Note → Open Workspace → Join Zoom → Reschedule → Cancel → Complete.
 3. **Visibility:** Hide Join Zoom when the appointment is terminal (completed/cancelled) or no valid Zoom URL exists.
 4. **Terminology:** Use **Zoom** consistently in card meta and actions (`Recruiting Interview · Zoom`, `Join Zoom`). Do not mix generic labels such as Join, Meeting, or Video for Zoom interviews on this surface.
-5. **Scope:** Presentation only — no changes to appointment lifecycle, scheduling, communications, or interview assignment (BR-042).
+5. **Scope:** Presentation only — no changes to appointment lifecycle, scheduling, communications, or interview assignment (BR-042). Canonical Zoom URL snapshot/hydration is BR-076.
 
 ---
 
@@ -1065,6 +1065,29 @@ See: [FINANCIAL_INTELLIGENCE_ARCHITECTURE.md](../08-financial-intelligence/FINAN
 ### Operational requirement
 
 Production outside-window messaging requires firm-approved Meta templates configured in `WHATSAPP_APPROVED_TEMPLATES_JSON` (or equivalent ops configuration). Until configured, outside-window sends fail closed by design.
+
+---
+
+## BR-076 — Zoom Meeting URL Snapshot on Canonical Appointments
+
+**Implements:** Zoom URL legacy-repair / incomplete-`existingBooking` fix  
+**Domain:** Appointments / Meeting Management  
+**Depends on:** BR-039, BR-043, BR-050  
+**Status:** Approved  
+**Engine target:** `virtualMeetingUrlResolver.js`, `appointmentApplicationService.js`, `meetingManagementService.js`
+
+### Rules
+
+1. **Canonical snapshot** — For Zoom/virtual appointments, Atlas resolves an approved meeting URL and persists it on `atlas_appointments.virtual_meeting_url` with `metadata.virtualUrlStatus` and `metadata.virtualUrlSource`. Join Zoom (BR-043) and Calendar/WhatsApp consumers read the appointment snapshot — not live Settings on every render.
+2. **Resolution precedence** — (1) valid persisted appointment URL; (2) valid URL on `existingBooking`; (3) valid same-organization Personal Meeting URL from Meeting Management; (4) `null` with `virtualUrlStatus = pending`.
+3. **Incomplete booking must not suppress org URL** — An `existingBooking` used by legacy repair or other paths that omits `meetingUrl` / `zoomLink` / `meetLink` must still hydrate from organization Meeting Management when configured.
+4. **Validation** — Only approved HTTPS Zoom hosts (`zoom.us` / `*.zoom.us` / `zoom.gov` / `*.zoom.gov`) may be snapshotted. Never fabricate a meeting URL or create a new Zoom meeting from this rule.
+5. **Organization isolation** — Never use another organization’s Personal Meeting URL.
+6. **In-person** — Never populate `virtual_meeting_url` for in-person appointments.
+7. **Reschedule** — Preserve an existing valid appointment URL. If missing, fill from the current approved organization URL. Do not replace a valid appointment URL merely because Settings changed (unless an explicit refresh action is approved later).
+8. **Null safety** — Null booking fields or null Settings must never erase a valid persisted appointment URL.
+9. **Provenance** — Record `virtualUrlSource` as `persisted_appointment` | `existing_booking` | `organization_meeting_settings` | `unavailable`.
+10. **Boundaries** — Does not change BR-075, Meta Review, or invent Google Calendar events without the normal sync engines. Calendar inclusion of the URL continues through existing sync payloads that read `virtualMeetingUrl`.
 
 ---
 

@@ -136,10 +136,11 @@ function hasPreference(meetingManagement, preference) {
 }
 
 async function resolveVirtualMeetingUrl(organizationId) {
+  const { isApprovedHttpsZoomUrl } = require("../core/virtualMeetingUrlResolver");
   const meetingManagement = await getMeetingManagement(organizationId);
   const url = meetingManagement.personalMeetingUrl;
 
-  if (!url) {
+  if (!url || !isApprovedHttpsZoomUrl(url)) {
     return {
       url: null,
       configured: false,
