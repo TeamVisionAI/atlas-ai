@@ -143,8 +143,16 @@ function parsePeriodHint(text) {
   return null;
 }
 
+function resolveFlexibleFlag(context = {}) {
+  if (context.flexible !== undefined) {
+    return Boolean(context.flexible);
+  }
+
+  return isConversationalScheduleFlexibilityEnabled();
+}
+
 function parseTimeHint(text, context = {}) {
-  const flexible = isConversationalScheduleFlexibilityEnabled();
+  const flexible = resolveFlexibleFlag(context);
 
   const timePatterns = [
     /(?:prefer(?:ring)?|at|around|about|for|a las|como a las|can it be at|could it be at|puede ser a las|podria ser a las|seria a las|sería a las)\s+(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)?/i,
@@ -216,11 +224,11 @@ function normalizeHour(hour, meridiem) {
 }
 
 function parseScheduleRequest(message, context = {}) {
-  const flexible = isConversationalScheduleFlexibilityEnabled();
+  const flexible = resolveFlexibleFlag(context);
   const text = normalizeScheduleMessage(message, { flexible });
   const dayHint = parseDayHint(text);
   const periodHint = parsePeriodHint(text);
-  const timeHint = parseTimeHint(text, context);
+  const timeHint = parseTimeHint(text, { ...context, flexible });
 
   if (!dayHint && !periodHint && !timeHint) {
     return null;
@@ -253,6 +261,7 @@ module.exports = {
   normalizeHour,
   parseDayHint,
   parseTimeHint,
+  resolveFlexibleFlag,
   parsePeriodHint,
   normalizeScheduleMessage,
   isConversationalScheduleFlexibilityEnabled
