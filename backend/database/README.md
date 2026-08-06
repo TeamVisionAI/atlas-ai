@@ -384,3 +384,24 @@ backend/database/migrations/028_whatsapp_outbound_deliveries_down.sql
 ### After migration
 
 Blocked/sent WhatsApp attempts persist to `whatsapp_outbound_deliveries` with organization scoping and idempotency for successful sends.
+
+## Migration 029 — Backend-only RLS (Security Advisor)
+
+Closes PostgREST access for `anon` / `authenticated` on 18 public tables that previously had RLS disabled. Atlas continues to authorize users via Express sessions; Railway uses `service_role`.
+
+```
+backend/database/migrations/029_rls_backend_only_public_tables.sql
+backend/database/migrations/029_rls_backend_only_public_tables_down.sql
+```
+
+- Enable RLS + deny policies in one transaction
+- Revoke table privileges from `anon` / `authenticated`
+- Preserve `service_role`
+- No tenant JWT policies, no data changes, no Meta Review auth changes
+
+**Rollback warning:** the down migration re-opens the prior public exposure. Prefer re-applying 029.
+
+Contract tests: `backend/test/rls029BackendOnlyPublicTables.test.js`  
+Optional live probes after apply: `ATLAS_RLS_029_LIVE=1`.
+
+Follow-up (not in this migration): `030_fix_sync_atlas_users_search_path.sql` for Function Search Path Mutable on `sync_atlas_users_from_users()`.
