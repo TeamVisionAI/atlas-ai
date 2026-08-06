@@ -128,7 +128,7 @@ async function processFacebookLead(input = {}) {
   });
 
   const welcomeMessage = input.welcomeMessage || buildWelcomeMessage({ displayName, language });
-  const firstName = String(displayName || "").trim().split(/\s+/)[0] || "there";
+  const { buildLeadWelcomeVariables } = require("./whatsappTemplateVariableBuilder");
   const outbound = await sendAndPersistWhatsAppMessage({
     to: phone,
     message: welcomeMessage,
@@ -136,7 +136,7 @@ async function processFacebookLead(input = {}) {
     intent: "FACEBOOK_LEAD_WELCOME",
     organizationId: input.organizationId || null,
     templateKey: "lead_welcome",
-    templateVariables: { prospect_first_name: firstName },
+    templateVariables: buildLeadWelcomeVariables({ name: displayName || "" }),
     idempotencyKey: input.leadgenId ? `facebook-lead-welcome:${input.leadgenId}` : null
   });
 

@@ -50,7 +50,11 @@ test("2. expired customer-care window blocks free-form without approved template
     phone: "+17865550100",
     message: "Reminder freeform",
     templateKey: "interview_reminder",
-    templateVariables: { prospect_first_name: "Ana", interview_when: "Fri 1:51 PM" },
+    templateVariables: {
+      prospect_first_name: "Ana",
+      interview_when: "Fri 1:51 PM",
+      meeting_type: "Zoom"
+    },
     now: NOW,
     evaluateWindow: async () =>
       evaluateCustomerCareWindowFromInboundAt({
@@ -151,7 +155,11 @@ test("8. outside-window approved template authorizes successfully", async () => 
     message: "ignored outside window",
     templateKey: "interview_reminder",
     prospect: { preferred_language: "english" },
-    templateVariables: { prospect_first_name: "Ana", interview_when: "Fri 1:51 PM" },
+    templateVariables: {
+      prospect_first_name: "Ana",
+      interview_when: "Fri 1:51 PM",
+      meeting_type: "Zoom"
+    },
     now: NOW,
     evaluateWindow: async () =>
       evaluateCustomerCareWindowFromInboundAt({
@@ -191,7 +199,11 @@ test("10-12. unapproved, inactive, and caller-supplied template names are reject
     intent: "APPOINTMENT_REMINDER",
     templateKey: "interview_reminder",
     prospect: { preferred_language: "english" },
-    variables: { prospect_first_name: "A", interview_when: "now" }
+    variables: {
+      prospect_first_name: "A",
+      interview_when: "now",
+      meeting_type: "Zoom"
+    }
   });
   assert.equal(unapproved.ok, false);
   assert.equal(unapproved.status, "blocked_template_unapproved");
@@ -211,7 +223,11 @@ test("10-12. unapproved, inactive, and caller-supplied template names are reject
     intent: "APPOINTMENT_REMINDER",
     templateKey: "interview_reminder",
     prospect: { preferred_language: "english" },
-    variables: { prospect_first_name: "A", interview_when: "now" },
+    variables: {
+      prospect_first_name: "A",
+      interview_when: "now",
+      meeting_type: "Zoom"
+    },
     registry
   });
   assert.equal(inactive.ok, false);
@@ -220,7 +236,11 @@ test("10-12. unapproved, inactive, and caller-supplied template names are reject
     intent: "APPOINTMENT_REMINDER",
     templateKey: "interview_reminder",
     prospect: { preferred_language: "english" },
-    variables: { prospect_first_name: "A", interview_when: "now" },
+    variables: {
+      prospect_first_name: "A",
+      interview_when: "now",
+      meeting_type: "Zoom"
+    },
     callerMetaTemplateName: "evil_template",
     registry
   });
@@ -276,7 +296,7 @@ test("14-16. preferred language selects locale and does not fall back across lan
     intent: "APPOINTMENT_REMINDER",
     templateKey: "interview_reminder",
     prospect: { preferred_language: "spanish" },
-    variables: { prospect_first_name: "Ofelia", interview_when: "viernes" },
+    variables: { prospect_first_name: "Ofelia", interview_when: "viernes", meeting_type: "Zoom" },
     registry
   });
   assert.equal(spanish.ok, true);
@@ -286,7 +306,7 @@ test("14-16. preferred language selects locale and does not fall back across lan
     intent: "APPOINTMENT_REMINDER",
     templateKey: "interview_reminder",
     prospect: { preferred_language: "english" },
-    variables: { prospect_first_name: "Ana", interview_when: "Friday" },
+    variables: { prospect_first_name: "Ana", interview_when: "Friday", meeting_type: "Zoom" },
     registry
   });
   assert.equal(englishMissing.ok, false);
@@ -298,7 +318,7 @@ test("17-19. reminder authorization inside/outside window", async () => {
     phone: "+17865550111",
     message: "Hola, recordatorio",
     templateKey: "interview_reminder",
-    templateVariables: { prospect_first_name: "Ana", interview_when: "tomorrow" },
+    templateVariables: { prospect_first_name: "Ana", interview_when: "tomorrow", meeting_type: "Zoom" },
     now: NOW,
     evaluateWindow: async () =>
       evaluateCustomerCareWindowFromInboundAt({
@@ -313,7 +333,7 @@ test("17-19. reminder authorization inside/outside window", async () => {
     phone: "+17865550111",
     message: "Hola, recordatorio",
     templateKey: "interview_reminder",
-    templateVariables: { prospect_first_name: "Ana", interview_when: "tomorrow" },
+    templateVariables: { prospect_first_name: "Ana", interview_when: "tomorrow", meeting_type: "Zoom" },
     now: NOW,
     evaluateWindow: async () =>
       evaluateCustomerCareWindowFromInboundAt({
@@ -357,7 +377,7 @@ test("25-27. blocked delivery result is retryable and does not look like sent", 
     phone: "+17865550133",
     message: "reminder",
     templateKey: "interview_reminder",
-    templateVariables: { prospect_first_name: "A", interview_when: "B" },
+    templateVariables: { prospect_first_name: "A", interview_when: "B", meeting_type: "Zoom" },
     now: NOW,
     evaluateWindow: async () =>
       evaluateCustomerCareWindowFromInboundAt({
@@ -375,11 +395,12 @@ test("25-27. blocked delivery result is retryable and does not look like sent", 
 
 test("28. template component builder is deterministic for idempotent payloads", () => {
   const components = buildTemplateComponents(
-    ["prospect_first_name", "interview_when"],
-    { prospect_first_name: "Ana", interview_when: "Fri" }
+    ["prospect_first_name", "interview_when", "meeting_type"],
+    { prospect_first_name: "Ana", interview_when: "Fri", meeting_type: "Zoom" }
   );
-  assert.equal(components[0].parameters.length, 2);
+  assert.equal(components[0].parameters.length, 3);
   assert.equal(components[0].parameters[0].text, "Ana");
+  assert.equal(components[0].parameters[2].text, "Zoom");
 });
 
 test("29-30. delivery audit result is sanitized (no token fields)", async () => {

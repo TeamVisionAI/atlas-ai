@@ -104,12 +104,24 @@ N/A
 
 N/A
 
+### WhatsApp approved templates (BR-078)
+
+Optional backend env: `WHATSAPP_APPROVED_TEMPLATES_JSON` (see root `.env.example`).
+
+- Locale keys must be `english` / `spanish`.
+- Leave unset or inactive (`metaTemplateName: null`, `approved: false`, `active: false`) until Meta approval and explicit ops authorization.
+- Malformed JSON fail-closes template sending without crashing the service; `/health/production` reports non-blocking degradation via `whatsapp_approved_templates`.
+- Do not put real production Meta names, WABA secrets, or phone numbers in examples.
+
+See [WHATSAPP_TEMPLATE_APPROVAL_PACKET.md](./WHATSAPP_TEMPLATE_APPROVAL_PACKET.md) and [WHATSAPP_OUTBOUND_AUTHORIZATION.md](./WHATSAPP_OUTBOUND_AUTHORIZATION.md).
+
 ## Related Documents
 
 - [ENVIRONMENT_STRATEGY.md](./ENVIRONMENT_STRATEGY.md)
 - [DEPLOYMENT_CHECKLIST.md](../08-operations/DEPLOYMENT_CHECKLIST.md)
 - [local-development.md](../08-operations/local-development.md)
 - [KNOWLEDGE_HUB.md](./KNOWLEDGE_HUB.md)
+- [WHATSAPP_TEMPLATE_APPROVAL_PACKET.md](./WHATSAPP_TEMPLATE_APPROVAL_PACKET.md)
 
 ## Decision History
 

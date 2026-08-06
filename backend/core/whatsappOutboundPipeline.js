@@ -31,20 +31,44 @@ function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
 }
 
-function buildTemplateComponents(expectedVariableKeys = [], variables = {}) {
-  if (!expectedVariableKeys.length) {
-    return undefined;
-  }
+function buildTemplateComponents(
+  expectedVariableKeys = [],
+  variables = {},
+  expectedButtonVariableKeys = [],
+  buttonVariables = {}
+) {
+  const components = [];
 
-  return [
-    {
+  if (expectedVariableKeys.length) {
+    components.push({
       type: "body",
       parameters: expectedVariableKeys.map((key) => ({
         type: "text",
         text: String(variables[key] ?? "")
       }))
+    });
+  }
+
+  // Preferred Zoom contract: dynamic URL button (index 0).
+  if (expectedButtonVariableKeys.includes("meeting_url") && buttonVariables.meeting_url) {
+    const raw = String(buttonVariables.meeting_url).trim();
+    let suffix = raw;
+    try {
+      const parsed = new URL(raw);
+      suffix = `${parsed.pathname}${parsed.search}`.replace(/^\//, "");
+    } catch {
+      suffix = raw.replace(/^https?:\/\/[^/]+\//i, "");
     }
-  ];
+
+    components.push({
+      type: "button",
+      sub_type: "url",
+      index: "0",
+      parameters: [{ type: "text", text: suffix }]
+    });
+  }
+
+  return components.length ? components : undefined;
 }
 
 async function resolveProspectForOutbound(to, organizationId = null) {
@@ -112,6 +136,9 @@ async function persistBlockedOrFailedAttempt({
     conversationLogId: logResult?.log?.id || null,
     metadata: {
       window: authorization.window,
+      category: authorization.category || null,
+      version: authorization.version || null,
+      languageCode: authorization.languageCode || null,
       sanitized: true
     }
   }).catch(() => ({ success: false }));
@@ -144,8 +171,16 @@ async function sendViaGraphApi({
   metaTemplateName,
   languageCode,
   expectedVariableKeys,
-  variables
+  variables,
+  expectedButtonVariableKeys = [],
+  buttonVariables = {}
 }) {
+  const components = buildTemplateComponents(
+    expectedVariableKeys,
+    variables,
+    expectedButtonVariableKeys,
+    buttonVariables
+  );
   const body =
     mode === "template"
       ? {
@@ -155,9 +190,7 @@ async function sendViaGraphApi({
           template: {
             name: metaTemplateName,
             language: { code: languageCode },
-            ...(buildTemplateComponents(expectedVariableKeys, variables)
-              ? { components: buildTemplateComponents(expectedVariableKeys, variables) }
-              : {})
+            ...(components ? { components } : {})
           }
         }
       : {
@@ -196,6 +229,7 @@ async function sendAndPersistWhatsAppMessage({
   organizationId = null,
   templateKey = null,
   templateVariables = {},
+  templateButtonVariables = {},
   callerMetaTemplateName = null,
   idempotencyKey = null,
   now = new Date()
@@ -252,6 +286,7 @@ async function sendAndPersistWhatsAppMessage({
     message,
     templateKey,
     templateVariables,
+    templateButtonVariables,
     callerMetaTemplateName,
     now
   });
@@ -347,7 +382,9 @@ async function sendAndPersistWhatsAppMessage({
         metaTemplateName: authorization.metaTemplateName,
         languageCode: authorization.languageCode,
         expectedVariableKeys: authorization.expectedVariableKeys || [],
-        variables: authorization.variables || templateVariables
+        variables: authorization.variables || templateVariables,
+        expectedButtonVariableKeys: authorization.expectedButtonVariableKeys || [],
+        buttonVariables: authorization.buttonVariables || templateButtonVariables
       });
 
       sendResult = {
@@ -469,7 +506,11 @@ async function sendAndPersistWhatsAppMessage({
     conversationLogId: logResult.log?.id || null,
     metadata: {
       simulated: Boolean(sendResult.simulated),
-      window: authorization.window
+      window: authorization.window,
+      category: authorization.category || null,
+      version: authorization.version || null,
+      languageCode: authorization.languageCode || null,
+      sanitized: true
     }
   }).catch(() => ({ success: false }));
 
@@ -491,7 +532,12 @@ async function sendAndPersistWhatsAppMessage({
       language: authorization.language,
       retryable: false,
       reason: authorization.reason,
-      window: authorization.window
+      window: authorization.window,
+      extras: {
+        category: authorization.category || null,
+        version: authorization.version || null,
+        languageCode: authorization.languageCode || null
+      }
     })
   };
 }

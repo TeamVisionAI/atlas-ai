@@ -1,7 +1,11 @@
 /**
- * Approved Meta WhatsApp template registry (BR-075).
+ * BR-075 / BR-078 — Approved Meta WhatsApp template registry.
  * Internal copy templates are NOT Meta-approved templates.
- * Only registry entries marked approved + active with an explicit metaTemplateName may send outside the customer-care window.
+ * Only registry entries marked approved + active with an explicit metaTemplateName
+ * may send outside the customer-care window.
+ *
+ * Phase 1: catalog contracts + mappings are code-ready; all locales remain inactive
+ * until WHATSAPP_APPROVED_TEMPLATES_JSON is explicitly authorized after Meta approval.
  */
 
 const {
@@ -11,141 +15,163 @@ const {
 
 const TEMPLATE_LOCALES = Object.freeze(["english", "spanish"]);
 
+const ZOOM_URL_DELIVERY_MODES = Object.freeze({
+  DYNAMIC_URL_BUTTON: "dynamic_url_button",
+  BODY_VARIABLE: "body_variable"
+});
+
+function localeStub(languageCode) {
+  return Object.freeze({
+    languageCode,
+    metaTemplateName: null,
+    approved: false,
+    active: false
+  });
+}
+
+function dualLocales() {
+  return Object.freeze({
+    english: localeStub("en"),
+    spanish: localeStub("es")
+  });
+}
+
 /**
- * Internal intent keys → registry entries.
- * metaTemplateName is null until operational configuration activates them.
+ * Canonical BR-078 registry.
+ * metaTemplateName remains null until operational configuration activates entries.
  */
 const BASE_REGISTRY = Object.freeze({
+  lead_welcome: Object.freeze({
+    key: "lead_welcome",
+    category: "marketing",
+    status: "draft",
+    version: "1",
+    sendable: true,
+    intents: Object.freeze(["FACEBOOK_LEAD_WELCOME", "LEAD_WELCOME"]),
+    expectedVariableKeys: Object.freeze(["prospect_first_name"]),
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
+  }),
+  interview_confirmation: Object.freeze({
+    key: "interview_confirmation",
+    category: "utility",
+    status: "draft",
+    version: "1",
+    sendable: true,
+    intents: Object.freeze(["APPOINTMENT_CONFIRMATION", "SCHEDULE_CONFIRMATION"]),
+    expectedVariableKeys: Object.freeze([
+      "prospect_first_name",
+      "interview_when",
+      "meeting_type",
+      "meeting_location"
+    ]),
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
+  }),
   interview_reminder: Object.freeze({
     key: "interview_reminder",
     category: "utility",
+    status: "draft",
+    version: "1",
+    sendable: true,
     intents: Object.freeze([
       "APPOINTMENT_REMINDER",
       "send_interview_reminder",
       "REMINDER_24H",
       "REMINDER_1H",
-      "REMINDER_15M",
-      "CONFIRMATION"
+      "REMINDER_15M"
     ]),
-    expectedVariableKeys: Object.freeze(["prospect_first_name", "interview_when"]),
-    locales: Object.freeze({
-      english: Object.freeze({
-        languageCode: "en",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      }),
-      spanish: Object.freeze({
-        languageCode: "es",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      })
-    })
-  }),
-  follow_up: Object.freeze({
-    key: "follow_up",
-    category: "utility",
-    intents: Object.freeze(["FOLLOW_UP", "NO_RESPONSE_FOLLOW_UP", "WHATSAPP_FOLLOW_UP"]),
-    expectedVariableKeys: Object.freeze(["prospect_first_name"]),
-    locales: Object.freeze({
-      english: Object.freeze({
-        languageCode: "en",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      }),
-      spanish: Object.freeze({
-        languageCode: "es",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      })
-    })
-  }),
-  missed_appointment: Object.freeze({
-    key: "missed_appointment",
-    category: "utility",
-    intents: Object.freeze(["MISSED_APPOINTMENT", "send_missed_appointment"]),
-    expectedVariableKeys: Object.freeze(["prospect_first_name"]),
-    locales: Object.freeze({
-      english: Object.freeze({
-        languageCode: "en",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      }),
-      spanish: Object.freeze({
-        languageCode: "es",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      })
-    })
+    expectedVariableKeys: Object.freeze([
+      "prospect_first_name",
+      "interview_when",
+      "meeting_type"
+    ]),
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
   }),
   interview_details: Object.freeze({
     key: "interview_details",
     category: "utility",
-    intents: Object.freeze([
-      "INTERVIEW_DETAILS",
-      "RESCHEDULE_CONFIRMATION",
-      "SCHEDULE_CONFIRMATION"
+    status: "draft",
+    version: "1",
+    sendable: true,
+    intents: Object.freeze(["INTERVIEW_DETAILS", "RESCHEDULE_CONFIRMATION"]),
+    expectedVariableKeys: Object.freeze([
+      "prospect_first_name",
+      "interview_when",
+      "meeting_type",
+      "meeting_location"
     ]),
-    expectedVariableKeys: Object.freeze(["prospect_first_name", "interview_when"]),
-    locales: Object.freeze({
-      english: Object.freeze({
-        languageCode: "en",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      }),
-      spanish: Object.freeze({
-        languageCode: "es",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      })
-    })
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
+  }),
+  missed_appointment: Object.freeze({
+    key: "missed_appointment",
+    category: "utility",
+    status: "draft",
+    version: "1",
+    sendable: true,
+    intents: Object.freeze([
+      "MISSED_APPOINTMENT",
+      "send_missed_appointment",
+      "AGENT_MISSED_APPOINTMENT"
+    ]),
+    expectedVariableKeys: Object.freeze(["prospect_first_name"]),
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
+  }),
+  zoom_invitation: Object.freeze({
+    key: "zoom_invitation",
+    category: "utility",
+    status: "draft",
+    version: "1",
+    sendable: true,
+    intents: Object.freeze(["SEND_ZOOM_LINK", "ZOOM_INVITATION"]),
+    expectedVariableKeys: Object.freeze(["prospect_first_name"]),
+    expectedButtonVariableKeys: Object.freeze(["meeting_url"]),
+    zoomUrlDeliveryMode: ZOOM_URL_DELIVERY_MODES.DYNAMIC_URL_BUTTON,
+    locales: dualLocales()
+  }),
+  office_location: Object.freeze({
+    key: "office_location",
+    category: "utility",
+    status: "draft",
+    version: "1",
+    sendable: true,
+    intents: Object.freeze(["SEND_OFFICE_LOCATION", "OFFICE_LOCATION"]),
+    expectedVariableKeys: Object.freeze(["prospect_first_name", "meeting_address"]),
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
   }),
   human_assist_notice: Object.freeze({
     key: "human_assist_notice",
     category: "utility",
+    status: "draft",
+    version: "1",
+    sendable: true,
     intents: Object.freeze(["HUMAN_ASSIST", "HANDOFF", "HUMAN_ASSIST_NOTICE"]),
     expectedVariableKeys: Object.freeze(["prospect_first_name"]),
-    locales: Object.freeze({
-      english: Object.freeze({
-        languageCode: "en",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      }),
-      spanish: Object.freeze({
-        languageCode: "es",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      })
-    })
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
   }),
-  lead_welcome: Object.freeze({
-    key: "lead_welcome",
-    category: "marketing",
-    intents: Object.freeze(["FACEBOOK_LEAD_WELCOME", "LEAD_WELCOME"]),
+  follow_up: Object.freeze({
+    key: "follow_up",
+    category: "pending_classification",
+    status: "draft_pending_classification",
+    version: "1",
+    sendable: false,
+    intents: Object.freeze(["FOLLOW_UP", "NO_RESPONSE_FOLLOW_UP", "WHATSAPP_FOLLOW_UP"]),
     expectedVariableKeys: Object.freeze(["prospect_first_name"]),
-    locales: Object.freeze({
-      english: Object.freeze({
-        languageCode: "en",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      }),
-      spanish: Object.freeze({
-        languageCode: "es",
-        metaTemplateName: null,
-        approved: false,
-        active: false
-      })
-    })
+    expectedButtonVariableKeys: Object.freeze([]),
+    zoomUrlDeliveryMode: null,
+    locales: dualLocales()
   })
 });
 
@@ -164,28 +190,76 @@ function deepCloneRegistry() {
 
 function parseApprovedTemplatesEnv(raw = process.env.WHATSAPP_APPROVED_TEMPLATES_JSON) {
   if (!raw || !String(raw).trim()) {
-    return {};
+    return { overrides: {}, parseError: false, unknownKeys: [] };
   }
 
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { overrides: {}, parseError: true, unknownKeys: [] };
+    }
+
+    return { overrides: parsed, parseError: false, unknownKeys: [] };
   } catch {
     console.warn(
       "[whatsappApprovedTemplateRegistry] WHATSAPP_APPROVED_TEMPLATES_JSON is malformed; using inactive fail-closed registry"
     );
-    return { __parseError: true };
+    return { overrides: {}, parseError: true, unknownKeys: [] };
   }
 }
 
-function applyOperationalOverrides(registry, overrides = {}) {
-  if (overrides.__parseError) {
+function applyOperationalOverrides(registry, parsed = {}) {
+  const diagnostics = {
+    parseError: Boolean(parsed.parseError),
+    unknownKeys: [],
+    invalidLocales: [],
+    templateSendingDisabled: Boolean(parsed.parseError)
+  };
+
+  if (parsed.parseError) {
+    registry.__diagnostics = diagnostics;
     return registry;
   }
 
+  const overrides = parsed.overrides || parsed;
+
   Object.entries(overrides).forEach(([key, localeMap]) => {
-    if (!registry[key] || !localeMap || typeof localeMap !== "object") {
+    if (key.startsWith("__")) {
       return;
+    }
+
+    if (!registry[key]) {
+      diagnostics.unknownKeys.push(key);
+      console.warn(
+        `[whatsappApprovedTemplateRegistry] unknown template key rejected: ${key}`
+      );
+      return;
+    }
+
+    if (!localeMap || typeof localeMap !== "object") {
+      return;
+    }
+
+    if (localeMap.category && typeof localeMap.category === "string") {
+      // Category overrides are documentation/ops hints only for known marketing/utility;
+      // pending_classification cannot be overridden to a sendable category via env.
+      if (registry[key].category !== "pending_classification") {
+        registry[key].category = localeMap.category;
+      }
+    }
+
+    if (localeMap.version != null) {
+      registry[key].version = String(localeMap.version);
+    }
+
+    if (localeMap.zoomUrlDeliveryMode === ZOOM_URL_DELIVERY_MODES.BODY_VARIABLE) {
+      // Documented fallback mode — disabled by default; enable only via explicit config.
+      registry[key].zoomUrlDeliveryMode = ZOOM_URL_DELIVERY_MODES.BODY_VARIABLE;
+      registry[key].expectedVariableKeys = [
+        "prospect_first_name",
+        "meeting_url"
+      ];
+      registry[key].expectedButtonVariableKeys = [];
     }
 
     TEMPLATE_LOCALES.forEach((locale) => {
@@ -200,15 +274,42 @@ function applyOperationalOverrides(registry, overrides = {}) {
           ? override.metaTemplateName.trim()
           : null;
 
+      const wantsApproved = Boolean(override.approved);
+      const wantsActive = Boolean(override.active);
+
+      if ((wantsApproved || wantsActive) && !metaTemplateName) {
+        diagnostics.invalidLocales.push({
+          key,
+          locale,
+          reason: "APPROVED_OR_ACTIVE_WITHOUT_META_NAME"
+        });
+      }
+
+      if (wantsActive && !wantsApproved) {
+        diagnostics.invalidLocales.push({
+          key,
+          locale,
+          reason: "ACTIVE_WITHOUT_APPROVED"
+        });
+      }
+
+      const approved = wantsApproved && Boolean(metaTemplateName);
+      const active = wantsActive && approved && Boolean(metaTemplateName);
+
       registry[key].locales[locale] = {
         ...registry[key].locales[locale],
         metaTemplateName,
-        approved: Boolean(override.approved) && Boolean(metaTemplateName),
-        active: Boolean(override.active) && Boolean(override.approved) && Boolean(metaTemplateName)
+        approved,
+        active,
+        languageCode:
+          typeof override.languageCode === "string" && override.languageCode.trim()
+            ? override.languageCode.trim()
+            : registry[key].locales[locale].languageCode
       };
     });
   });
 
+  registry.__diagnostics = diagnostics;
   return registry;
 }
 
@@ -216,8 +317,43 @@ function getApprovedTemplateRegistry(envRaw) {
   return applyOperationalOverrides(deepCloneRegistry(), parseApprovedTemplatesEnv(envRaw));
 }
 
+function getTemplateRegistryHealth(registry = getApprovedTemplateRegistry()) {
+  const diagnostics = registry.__diagnostics || {
+    parseError: false,
+    unknownKeys: [],
+    invalidLocales: [],
+    templateSendingDisabled: false
+  };
+
+  const degraded =
+    diagnostics.parseError ||
+    diagnostics.unknownKeys.length > 0 ||
+    diagnostics.invalidLocales.length > 0;
+
+  return {
+    id: "whatsapp_approved_templates",
+    label: "WhatsApp approved template catalog (BR-078)",
+    ok: !diagnostics.parseError,
+    blocker: false,
+    degraded,
+    detail: diagnostics.parseError
+      ? "WHATSAPP_APPROVED_TEMPLATES_JSON malformed; template sending fail-closed"
+      : diagnostics.unknownKeys.length
+        ? `unknown keys rejected: ${diagnostics.unknownKeys.join(", ")}`
+        : diagnostics.invalidLocales.length
+          ? "invalid approved/active locale entries ignored for sendability"
+          : "registry loaded; templates inactive until Meta approval + env authorization",
+    diagnostics: {
+      parseError: diagnostics.parseError,
+      unknownKeyCount: diagnostics.unknownKeys.length,
+      invalidLocaleCount: diagnostics.invalidLocales.length,
+      templateSendingDisabled: Boolean(diagnostics.templateSendingDisabled)
+    }
+  };
+}
+
 function listRegistryKeys(registry = getApprovedTemplateRegistry()) {
-  return Object.keys(registry);
+  return Object.keys(registry).filter((key) => !key.startsWith("__"));
 }
 
 function resolveTemplateLanguage(prospect = {}) {
@@ -227,19 +363,21 @@ function resolveTemplateLanguage(prospect = {}) {
     return preferred;
   }
 
-  // Documented safe fallback when preferred_language is missing (BR-041 default).
-  // Mutable conversation-language fields must not override a valid preferred language,
-  // and must not silently drive template locale selection in this gate.
   return DEFAULT_PREFERRED_LANGUAGE;
 }
 
 function resolveRegistryKeyForIntent(intent, explicitKey = null, registry = getApprovedTemplateRegistry()) {
   if (explicitKey) {
-    if (!registry[explicitKey]) {
+    if (!registry[explicitKey] || String(explicitKey).startsWith("__")) {
       return { ok: false, code: "UNKNOWN_TEMPLATE_KEY", key: null };
     }
 
     return { ok: true, key: explicitKey };
+  }
+
+  // Ambiguous legacy alias — must never resolve to interview_reminder.
+  if (String(intent || "") === "CONFIRMATION") {
+    return { ok: false, code: "AMBIGUOUS_CONFIRMATION_INTENT", key: null };
   }
 
   const mapped = INTENT_TO_KEY[intent];
@@ -251,14 +389,86 @@ function resolveRegistryKeyForIntent(intent, explicitKey = null, registry = getA
   return { ok: true, key: mapped };
 }
 
+function validateOrderedVariables(expectedKeys = [], variables = {}) {
+  const providedKeys = Object.keys(variables || {});
+  const missing = expectedKeys.filter((key) => {
+    const value = variables[key];
+    return value == null || String(value).trim() === "";
+  });
+
+  if (missing.length) {
+    return {
+      ok: false,
+      reason: "TEMPLATE_VARIABLES_INVALID",
+      missingVariables: missing,
+      providedVariableKeys: providedKeys
+    };
+  }
+
+  const unexpected = providedKeys.filter((key) => !expectedKeys.includes(key));
+
+  if (unexpected.length) {
+    return {
+      ok: false,
+      reason: "TEMPLATE_VARIABLE_ORDER_OR_KEYS_INVALID",
+      missingVariables: [],
+      providedVariableKeys: providedKeys,
+      unexpectedVariableKeys: unexpected
+    };
+  }
+
+  if (providedKeys.length !== expectedKeys.length) {
+    return {
+      ok: false,
+      reason: "TEMPLATE_VARIABLE_COUNT_INVALID",
+      missingVariables: [],
+      providedVariableKeys: providedKeys
+    };
+  }
+
+  // Enforce contract order: callers should supply keys in contract order.
+  for (let i = 0; i < expectedKeys.length; i += 1) {
+    if (providedKeys[i] !== expectedKeys[i]) {
+      return {
+        ok: false,
+        reason: "TEMPLATE_VARIABLE_ORDER_INVALID",
+        missingVariables: [],
+        providedVariableKeys: providedKeys,
+        expectedVariableKeys: expectedKeys
+      };
+    }
+  }
+
+  return { ok: true, providedVariableKeys: providedKeys };
+}
+
+function resolveBodyAndButtonKeys(entry) {
+  const bodyKeys = [...(entry.expectedVariableKeys || [])];
+  const buttonKeys = [...(entry.expectedButtonVariableKeys || [])];
+  return { bodyKeys, buttonKeys };
+}
+
 function resolveApprovedTemplate({
   intent,
   templateKey = null,
   prospect = {},
   variables = {},
+  buttonVariables = {},
   callerMetaTemplateName = null,
   registry = getApprovedTemplateRegistry()
 } = {}) {
+  if (registry.__diagnostics?.templateSendingDisabled) {
+    return {
+      ok: false,
+      status: "blocked_template_missing",
+      reason: "TEMPLATE_REGISTRY_CONFIG_INVALID",
+      templateKey: templateKey || null,
+      metaTemplateName: null,
+      language: resolveTemplateLanguage(prospect),
+      languageCode: null
+    };
+  }
+
   if (callerMetaTemplateName) {
     return {
       ok: false,
@@ -289,6 +499,19 @@ function resolveApprovedTemplate({
   const language = resolveTemplateLanguage(prospect);
   const locale = entry.locales[language];
 
+  if (entry.category === "pending_classification" || entry.sendable === false) {
+    return {
+      ok: false,
+      status: "blocked_template_unapproved",
+      reason: "UNSUPPORTED_OR_PENDING_CATEGORY",
+      templateKey: entry.key,
+      metaTemplateName: locale?.metaTemplateName || null,
+      language,
+      languageCode: locale?.languageCode || null,
+      category: entry.category
+    };
+  }
+
   if (!locale) {
     return {
       ok: false,
@@ -309,7 +532,8 @@ function resolveApprovedTemplate({
       templateKey: entry.key,
       metaTemplateName: locale.metaTemplateName,
       language,
-      languageCode: locale.languageCode
+      languageCode: locale.languageCode,
+      category: entry.category
     };
   }
 
@@ -321,28 +545,48 @@ function resolveApprovedTemplate({
       templateKey: entry.key,
       metaTemplateName: locale.metaTemplateName,
       language,
-      languageCode: locale.languageCode
+      languageCode: locale.languageCode,
+      category: entry.category
     };
   }
 
-  const providedKeys = Object.keys(variables || {});
-  const missing = entry.expectedVariableKeys.filter((key) => {
-    const value = variables[key];
-    return value == null || String(value).trim() === "";
-  });
+  const { bodyKeys, buttonKeys } = resolveBodyAndButtonKeys(entry);
+  const bodyValidation = validateOrderedVariables(bodyKeys, variables);
 
-  if (missing.length) {
+  if (!bodyValidation.ok) {
     return {
       ok: false,
       status: "blocked_template_missing",
-      reason: "TEMPLATE_VARIABLES_INVALID",
+      reason: bodyValidation.reason,
       templateKey: entry.key,
       metaTemplateName: locale.metaTemplateName,
       language,
       languageCode: locale.languageCode,
-      missingVariables: missing,
-      providedVariableKeys: providedKeys
+      category: entry.category,
+      missingVariables: bodyValidation.missingVariables || [],
+      providedVariableKeys: bodyValidation.providedVariableKeys || []
     };
+  }
+
+  if (buttonKeys.length) {
+    const buttonValidation = validateOrderedVariables(buttonKeys, buttonVariables);
+
+    if (!buttonValidation.ok) {
+      return {
+        ok: false,
+        status: "blocked_template_missing",
+        reason: buttonValidation.reason.startsWith("TEMPLATE_")
+          ? buttonValidation.reason.replace("TEMPLATE_VARIABLE", "TEMPLATE_BUTTON_VARIABLE")
+          : "TEMPLATE_BUTTON_VARIABLES_INVALID",
+        templateKey: entry.key,
+        metaTemplateName: locale.metaTemplateName,
+        language,
+        languageCode: locale.languageCode,
+        category: entry.category,
+        missingVariables: buttonValidation.missingVariables || [],
+        providedVariableKeys: buttonValidation.providedVariableKeys || []
+      };
+    }
   }
 
   return {
@@ -354,8 +598,12 @@ function resolveApprovedTemplate({
     language,
     languageCode: locale.languageCode,
     category: entry.category,
-    expectedVariableKeys: entry.expectedVariableKeys,
-    variables: { ...variables }
+    version: entry.version || "1",
+    expectedVariableKeys: bodyKeys,
+    expectedButtonVariableKeys: buttonKeys,
+    zoomUrlDeliveryMode: entry.zoomUrlDeliveryMode || null,
+    variables: { ...variables },
+    buttonVariables: { ...(buttonVariables || {}) }
   };
 }
 
@@ -363,10 +611,13 @@ module.exports = {
   BASE_REGISTRY,
   TEMPLATE_LOCALES,
   INTENT_TO_KEY,
+  ZOOM_URL_DELIVERY_MODES,
   getApprovedTemplateRegistry,
+  getTemplateRegistryHealth,
   listRegistryKeys,
   resolveTemplateLanguage,
   resolveRegistryKeyForIntent,
   resolveApprovedTemplate,
-  parseApprovedTemplatesEnv
+  parseApprovedTemplatesEnv,
+  validateOrderedVariables
 };

@@ -86,6 +86,18 @@ Blocked/failed attempts also write sanitized conversation log intents and busine
 
 Meta Review allowlist, language lock, session scoping, and WhatsApp-only reviewer surfaces are unchanged. This gate does not open Google Calendar or new workspace permissions.
 
+## Template catalog (BR-078 Phase 1)
+
+Firm-approval worksheets, exact EN/ES bodies, intent→key mapping, and inactive env examples live in:
+
+[WHATSAPP_TEMPLATE_APPROVAL_PACKET.md](./WHATSAPP_TEMPLATE_APPROVAL_PACKET.md).
+
+**Code-ready:** registry keys, intent mapping, ordered parameter contracts, locale rules, and production call-site wiring are implemented.  
+**Still inactive:** all Meta `metaTemplateName` values remain null/`approved:false`/`active:false` until Meta approval and explicit Railway/env authorization.  
+**Outside-window production sends still fail closed** by design.
+
+Canonical keys: `lead_welcome`, `interview_confirmation`, `interview_reminder`, `interview_details`, `missed_appointment`, `zoom_invitation`, `office_location`, `human_assist_notice`, `follow_up` (pending classification — non-sendable).
+
 ## Known limitations
 
 - Internal copy templates in `whatsappCommunicationEngine` remain preview/copy+open helpers; they are not Meta-approved templates.

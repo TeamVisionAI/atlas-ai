@@ -181,15 +181,12 @@ function replaceReminders(appointment) {
 }
 
 function buildReminderTemplateVariables(appointment, prospect) {
-  const firstName = String(prospect?.name || appointment.metadata?.prospectName || "")
-    .trim()
-    .split(/\s+/)[0] || "there";
-  const when = formatWhen(appointment.startDateTime, appointment.timezone);
+  // Implements BR-078 — localized interview_when + meeting_type (preferred language).
+  const {
+    buildInterviewReminderVariables
+  } = require("../core/whatsappTemplateVariableBuilder");
 
-  return {
-    prospect_first_name: firstName,
-    interview_when: when
-  };
+  return buildInterviewReminderVariables(appointment, prospect);
 }
 
 async function deliverReminder(entry, appointment) {

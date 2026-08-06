@@ -143,13 +143,43 @@ async function processNormalizedInboundMessage(normalized, { prospect, contactNa
         ? "APPOINTMENT_CONFIRMATION"
         : "CONVERSATION_ENGINE_REPLY");
 
+    let templateKey = null;
+    let templateVariables = {};
+
+    // Implements BR-078 — outside-window confirmation uses interview_confirmation.
+    // Inside the care window, freeform body remains authorized by BR-075.
+    if (outboundIntent === "APPOINTMENT_CONFIRMATION") {
+      const {
+        buildInterviewConfirmationVariables
+      } = require("./whatsappTemplateVariableBuilder");
+      templateKey = "interview_confirmation";
+      templateVariables = buildInterviewConfirmationVariables(
+        engineResult?.confirmationAppointment || {},
+        prospect
+      );
+    } else if (
+      outboundIntent === "INTERVIEW_DETAILS" ||
+      outboundIntent === "RESCHEDULE_CONFIRMATION"
+    ) {
+      const {
+        buildInterviewDetailsVariables
+      } = require("./whatsappTemplateVariableBuilder");
+      templateKey = "interview_details";
+      templateVariables = buildInterviewDetailsVariables(
+        engineResult?.detailsAppointment || engineResult?.confirmationAppointment || {},
+        prospect
+      );
+    }
+
     const delivery = await sendAndPersistWhatsAppMessage({
       to: normalized.phone,
       message: replyText,
       actor: "ATLAS",
       intent: outboundIntent,
       organizationId: prospect?.organization_id || null,
-      idempotencyKey: engineResult?.confirmationIdempotencyKey || null
+      idempotencyKey: engineResult?.confirmationIdempotencyKey || null,
+      templateKey,
+      templateVariables
     });
 
     logWhatsAppStage("conversation_engine_reply_sent", {

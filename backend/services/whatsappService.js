@@ -2,7 +2,7 @@ const { sendAndPersistWhatsAppMessage } = require("../core/whatsappOutboundPipel
 const { normalizePhoneNumber } = require("../core/phoneNormalizer");
 
 /**
- * Sprint 11.1 / BR-075 — WhatsApp send entry point.
+ * Sprint 11.1 / BR-075 / BR-078 — WhatsApp send entry point.
  * All outbound messages authorize + persist through the outbound pipeline gate.
  */
 async function sendTextMessage(to, message, options = {}) {
@@ -16,6 +16,7 @@ async function sendTextMessage(to, message, options = {}) {
     organizationId: options.organizationId || null,
     templateKey: options.templateKey || null,
     templateVariables: options.templateVariables || {},
+    templateButtonVariables: options.templateButtonVariables || {},
     callerMetaTemplateName: options.metaTemplateName || options.callerMetaTemplateName || null,
     idempotencyKey: options.idempotencyKey || null,
     now: options.now
