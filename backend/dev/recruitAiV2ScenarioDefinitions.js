@@ -610,8 +610,8 @@ const RECRUIT_AI_V2_SCENARIOS = [
         id: "u01",
         text: "Tell me more about the opportunity",
         expect: {
-          intent: "opportunity_question",
-          nextAction: "answer_brief_value_prop_then_qualify",
+          intent: "job_opportunity_question",
+          nextAction: "answer_job_opportunity_then_resume",
           shouldEscalate: false,
           sideEffectsDenied: true
         }
@@ -736,10 +736,10 @@ const RECRUIT_AI_V2_SCENARIOS = [
             "Perfecto, gracias. Excelente. Estamos realizando las entrevistas en nuestras oficinas."
         },
         expect: {
-          intent: "opportunity_question",
+          intent: "job_opportunity_question",
           preferredLanguage: "spanish",
           shouldEscalate: false,
-          nextAction: "answer_brief_value_prop_then_qualify",
+          nextAction: "answer_job_opportunity_then_resume",
           sideEffectsDenied: true
         }
       }
@@ -831,9 +831,9 @@ const RECRUIT_AI_V2_SCENARIOS = [
         text: "de que se trata?",
         inboundMessageId: "sim-wamid.license-orlando.t05",
         expect: {
-          intent: "opportunity_question",
+          intent: "job_opportunity_question",
           shouldEscalate: false,
-          nextAction: "answer_brief_value_prop_then_qualify",
+          nextAction: "answer_job_opportunity_then_resume",
           pendingQuestion: "clarify_license_type",
           workAuthorization: null,
           sideEffectsDenied: true
@@ -1519,6 +1519,140 @@ const RECRUIT_AI_V2_SCENARIOS = [
             "12:00 AM"
           ],
           authorizationAuthorized: false,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
+  },
+  {
+    id: "tampa-faq-day-part-continuity",
+    name: "Tampa FAQ + Day-Part Continuity",
+    category: "production_defect",
+    description:
+      "Job/compensation FAQ outranks scheduling; mañana=morning; meta-conversation explains pending time (BR-088).",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation",
+      currentStage: "greeting",
+      timezone: "America/New_York",
+      testNow: "2026-08-07T15:00:00.000-04:00",
+      knownFacts: {},
+      appointment: { status: "none" },
+      conversation: {}
+    },
+    turns: [
+      {
+        id: "tf01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.tampa-faq.t01",
+        expect: {
+          intent: "greeting",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "tf02",
+        text: "Tampa, Florida",
+        inboundMessageId: "sim-wamid.tampa-faq.t02",
+        expect: {
+          intent: "provide_location",
+          city: "Tampa",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "tf03",
+        text: "Sí tengo permiso de trabajo",
+        inboundMessageId: "sim-wamid.tampa-faq.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          meetingType: "zoom",
+          replyIncludes: ["Zoom", "mañana"],
+          replyExcludes: ["2500 NW 79th"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "tf04",
+        text: "Esto es un trabajo",
+        inboundMessageId: "sim-wamid.tampa-faq.t04",
+        expect: {
+          intent: "job_opportunity_question",
+          nextAction: "answer_job_opportunity_then_resume",
+          replyIncludes: ["oportunidad", "servicios financieros"],
+          replyExcludes: [
+            "Esa hora puede no estar disponible",
+            "dato que te acabo de pedir",
+            "Continuemos."
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "tf05",
+        text: "¿Esto es un trabajo?",
+        inboundMessageId: "sim-wamid.tampa-faq.t05",
+        expect: {
+          intent: "job_opportunity_question",
+          replyIncludes: ["oportunidad"],
+          replyExcludes: [
+            "Esa hora puede no estar disponible",
+            "dato que te acabo de pedir"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "tf06",
+        text: "¿Es salario o comisión?",
+        inboundMessageId: "sim-wamid.tampa-faq.t06",
+        expect: {
+          intent: "compensation_question",
+          replyIncludes: ["mañana"],
+          replyExcludes: ["Esa hora puede no estar disponible", "Continuemos."],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "tf07",
+        text: "mañana",
+        inboundMessageId: "sim-wamid.tampa-faq.t07",
+        expect: {
+          intent: "provide_day_part",
+          nextAction: "acknowledge_day_part_ask_time",
+          replyIncludes: ["hora", "mañana"],
+          replyExcludes: ["Continuemos.", "Esa hora puede no estar disponible"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "tf08",
+        text: "continuemos con que?",
+        inboundMessageId: "sim-wamid.tampa-faq.t08",
+        expect: {
+          intent: "conversation_clarification_request",
+          nextAction: "explain_pending_then_ask",
+          replyIncludes: ["hora", "mañana"],
+          replyExcludes: [
+            "dato que te acabo de pedir",
+            "Continuemos.",
+            "Esa hora puede no estar disponible"
+          ],
           shouldEscalate: false,
           sideEffectsDenied: true
         }

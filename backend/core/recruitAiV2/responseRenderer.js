@@ -8,6 +8,7 @@ const { LANGUAGES } = require("./constants");
 const { sanitizeCustomerCopy } = require("./sanitize");
 const {
   getCanonicalFaqAnswer,
+  getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getLicenseRequirementFaqAnswer,
   getCompensationFaqAnswer,
@@ -35,12 +36,36 @@ const COPY = Object.freeze({
       "Thanks. Do you have work authorization or legal documentation to work in the United States?",
     continue_qualification_after_authorization: null, // canonical day-part
     outside_zoom_day_part: null,
-    continue_after_day_part: "Thanks — noted. Let's continue.",
+    continue_after_day_part:
+      "Perfect. What time in the morning or afternoon works best for you?",
+    acknowledge_morning_ask_time:
+      "Perfect. What time in the morning works best for you?",
+    acknowledge_afternoon_ask_time:
+      "Perfect. What time in the afternoon works best for you?",
+    explain_pending_day_part:
+      "I mean the interview schedule. Do you prefer morning or afternoon?",
+    explain_pending_morning_time:
+      "I mean the interview time. I already noted you prefer morning — what time works best?",
+    explain_pending_afternoon_time:
+      "I mean the interview time. I already noted you prefer afternoon — what time works best?",
+    explain_pending_time:
+      "I mean the interview time. What time works best for you?",
+    explain_pending_confirm_slot:
+      "I was confirming the appointment time. Does {dateLabel} at {requestedTime} still work?",
+    explain_pending_authorization:
+      "I still need to know whether you have work authorization to work in the United States.",
+    explain_pending_location:
+      "I still need your city and state so we can continue.",
+    explain_pending_date:
+      "I mean which day works for the interview. What day works best for you?",
+    explain_pending_generic:
+      "Happy to clarify — what I still need is the next detail for your interview. Could you share that?",
     clarify_license_type: null,
     clarify_work_auth_after_license: null,
     insurance_faq_then_resume: null,
     license_requirement_faq_then_resume: null,
     compensation_faq_then_resume: null,
+    job_opportunity_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
     acknowledge_location_correction:
       "Perfect, thanks for clarifying. So you're in {city}, {proposedStateName}. {resumeQuestion}",
@@ -130,12 +155,36 @@ const COPY = Object.freeze({
       "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?",
     continue_qualification_after_authorization: null,
     outside_zoom_day_part: null,
-    continue_after_day_part: "Gracias — anotado. Continuemos.",
+    continue_after_day_part:
+      "Perfecto. ¿Qué hora en la mañana o en la tarde te funciona mejor?",
+    acknowledge_morning_ask_time:
+      "Perfecto. ¿Qué hora en la mañana te funciona mejor?",
+    acknowledge_afternoon_ask_time:
+      "Perfecto. ¿Qué hora en la tarde te funciona mejor?",
+    explain_pending_day_part:
+      "Me refiero al horario de la entrevista. ¿Prefieres en la mañana o en la tarde?",
+    explain_pending_morning_time:
+      "Me refiero a la hora de la entrevista. Ya anoté que prefieres en la mañana; ¿qué hora te funciona mejor?",
+    explain_pending_afternoon_time:
+      "Me refiero a la hora de la entrevista. Ya anoté que prefieres en la tarde; ¿qué hora te funciona mejor?",
+    explain_pending_time:
+      "Me refiero a la hora de la entrevista. ¿Qué hora te funciona mejor?",
+    explain_pending_confirm_slot:
+      "Estaba confirmando el horario de la cita. ¿Te funciona el {dateLabel} a las {requestedTime}?",
+    explain_pending_authorization:
+      "Todavía necesito saber si tienes autorización o documentación para trabajar en Estados Unidos.",
+    explain_pending_location:
+      "Todavía necesito tu ciudad y estado para continuar.",
+    explain_pending_date:
+      "Me refiero al día de la entrevista. ¿Qué día te funciona mejor?",
+    explain_pending_generic:
+      "Con gusto te aclaro — todavía necesito el siguiente dato para tu entrevista. ¿Me lo puedes compartir?",
     clarify_license_type: null,
     clarify_work_auth_after_license: null,
     insurance_faq_then_resume: null,
     license_requirement_faq_then_resume: null,
     compensation_faq_then_resume: null,
+    job_opportunity_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
     acknowledge_location_correction:
       "Perfecto, gracias por aclararlo. Entonces estás en {city}, {proposedStateName}. {resumeQuestion}",
@@ -287,7 +336,29 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
     case "clarify_day_part":
     case "ask_day_part":
     case "ask_day_part_simple":
+    case "explain_pending_day_part":
       return getDayPartQuestion(lang);
+    case "acknowledge_morning_ask_time":
+    case "explain_pending_morning_time":
+      return language === LANGUAGES.SPANISH
+        ? "¿Qué hora en la mañana te funciona mejor?"
+        : "What time in the morning works best for you?";
+    case "acknowledge_afternoon_ask_time":
+    case "explain_pending_afternoon_time":
+      return language === LANGUAGES.SPANISH
+        ? "¿Qué hora en la tarde te funciona mejor?"
+        : "What time in the afternoon works best for you?";
+    case "ask_time_after_constraint":
+    case "ask_time_preference":
+    case "explain_pending_time":
+      return language === LANGUAGES.SPANISH
+        ? "¿Qué hora te funciona mejor?"
+        : "What time works best for you?";
+    case "confirm_date_with_time":
+    case "explain_pending_confirm_slot":
+      return language === LANGUAGES.SPANISH
+        ? "¿Ese día y hora te funcionan?"
+        : "Does that day and time still work?";
     case "clarify_license_type":
       return getClarifyLicenseTypeMessage(lang);
     case "clarify_work_auth_after_license":
@@ -310,8 +381,13 @@ function composeFaqThenResume(faqText, language, entities = {}) {
 }
 
 function composeValuePropThenQualify(language, entities = {}) {
+  return composeJobOpportunityThenResume(language, entities);
+}
+
+function composeJobOpportunityThenResume(language, entities = {}) {
   return composeFaqThenResume(
-    getCanonicalFaqAnswer(localeCode(language)),
+    getJobOpportunityFaqAnswer(localeCode(language)) ||
+      getCanonicalFaqAnswer(localeCode(language)),
     language,
     entities
   );
@@ -331,19 +407,23 @@ function renderCustomerReply(responsePlan) {
 
   let template = pack[key];
 
-  // BR-084 — handoff copy only when decision explicitly requires a human.
+  // BR-084/088 — handoff copy only when decision explicitly requires a human.
+  // Never remap uncertain escalate → scheduling "time unavailable" (FAQ collision).
   const requiresHuman = Boolean(entities.requiresHuman);
-  if (
-    !requiresHuman &&
-    (key === "escalate_after_counteroffer_mismatch" ||
-      key === "safe_uncertain_escalate" ||
-      key === "safe_failure_escalate")
-  ) {
+  if (!requiresHuman && key === "escalate_after_counteroffer_mismatch") {
     template = pack.offer_alternatives_no_handoff || pack.clarify_once;
+  } else if (
+    !requiresHuman &&
+    (key === "safe_uncertain_escalate" || key === "safe_failure_escalate")
+  ) {
+    template = pack.clarify_once || pack.default;
   }
 
-  if (key === "value_prop_then_qualify") {
-    template = composeValuePropThenQualify(language, entities);
+  if (
+    key === "value_prop_then_qualify" ||
+    key === "job_opportunity_faq_then_resume"
+  ) {
+    template = composeJobOpportunityThenResume(language, entities);
   } else if (key === "insurance_faq_then_resume") {
     template = composeFaqThenResume(
       getInsuranceFaqAnswer(lang),

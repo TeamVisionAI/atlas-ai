@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -13,6 +13,10 @@ const {
   hasAvailabilityConstraint,
   hasProposedTime
 } = require("./schedulingMemory");
+const {
+  resolvePendingExplanation,
+  resolveDayPartContinuation
+} = require("./conversationContinuity");
 
 const {
   INTENTS,
@@ -283,10 +287,58 @@ function resolvePendingResume(context) {
       };
     }
   }
+  // BR-088 — resume time ask after day-part (never bare Continuemos).
+  if (
+    lastQ === "ask_time_preference" ||
+    lastQ === "ask_time_after_day_part" ||
+    lastQ === "ask_time_after_constraint"
+  ) {
+    const dayPart = String(context.knownFacts?.preferredDayPart || "").toLowerCase();
+    if (dayPart === "morning") {
+      return {
+        templateKey: "acknowledge_morning_ask_time",
+        lastQuestionAsked: "ask_time_preference",
+        entities: { dayPart: "morning" }
+      };
+    }
+    if (dayPart === "afternoon" || dayPart === "evening") {
+      return {
+        templateKey: "acknowledge_afternoon_ask_time",
+        lastQuestionAsked: "ask_time_preference",
+        entities: { dayPart: dayPart === "evening" ? "evening" : "afternoon" }
+      };
+    }
+    if (hasAvailabilityConstraint(context)) {
+      return {
+        templateKey: "ask_time_after_constraint",
+        lastQuestionAsked: "ask_time_preference",
+        entities: {
+          earliestTime:
+            context.knownFacts?.availabilityConstraint?.earliestTime || null
+        }
+      };
+    }
+    return {
+      templateKey: "explain_pending_time",
+      lastQuestionAsked: "ask_time_preference",
+      entities: {}
+    };
+  }
+  if (lastQ === "confirm_slot" && hasProposedTime(context)) {
+    return {
+      templateKey: "confirm_date_with_time",
+      lastQuestionAsked: "confirm_slot",
+      entities: {
+        requestedTime: context.appointment.proposedTime,
+        dateLabel: resolveDateLabel(context, "spanish")
+      }
+    };
+  }
   if (lastQ === "ask_day_part" || lastQ === "confirm_slot") {
     return {
       templateKey: "ask_day_part_simple",
-      lastQuestionAsked: lastQ
+      lastQuestionAsked: "ask_day_part",
+      entities: {}
     };
   }
   return resolveQualificationResume(context);
@@ -344,9 +396,25 @@ function buildFaqResumeDecision(structured, context, intent, templateKey) {
     resumeTemplateKey: resume.templateKey,
     city: context.knownFacts?.city || null,
     proposedState: context.knownFacts?.proposedState || null,
-    state: context.knownFacts?.state || null
+    state: context.knownFacts?.state || null,
+    preferredMeetingType: context.knownFacts?.preferredMeetingType || null,
+    meetingType:
+      context.knownFacts?.preferredMeetingType ||
+      context.appointment?.meetingType ||
+      null,
+    coverage: context.knownFacts?.coverage || null,
+    dayPart: context.knownFacts?.preferredDayPart || null,
+    requestedTime: context.appointment?.proposedTime || null,
+    dateLabel: resolveDateLabel(
+      context,
+      structured.preferredLanguage || "spanish"
+    ),
+    earliestTime:
+      context.knownFacts?.availabilityConstraint?.earliestTime || null,
+    ...resume.entities
   };
   structured.reasonCodes.push(REASON_CODES.DIRECT_QUESTION_ANSWERED);
+  structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_SCHEDULING);
   structured.reasonCodes.push(REASON_CODES.SPECIFIC_FAQ_ANSWERED);
   structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
   structured.contextPatch = {
@@ -408,15 +476,54 @@ function decideConversationTurn({
     return structured;
   }
 
-  if (intent === INTENTS.OPPORTUNITY_QUESTION) {
+  if (
+    intent === INTENTS.JOB_OPPORTUNITY_QUESTION ||
+    intent === INTENTS.OPPORTUNITY_QUESTION
+  ) {
     structured.decision.nextAction =
-      NEXT_ACTIONS.ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY;
+      NEXT_ACTIONS.ANSWER_JOB_OPPORTUNITY_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.JOB_OPPORTUNITY_FAQ);
+    structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
     return buildFaqResumeDecision(
       structured,
       context,
       intent,
-      "value_prop_then_qualify"
+      "job_opportunity_faq_then_resume"
     );
+  }
+
+  if (intent === INTENTS.CONVERSATION_CLARIFICATION_REQUEST) {
+    const explanation = resolvePendingExplanation(
+      context,
+      structured.preferredLanguage || "spanish"
+    );
+    structured.decision.nextAction = NEXT_ACTIONS.EXPLAIN_PENDING_THEN_ASK;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = explanation.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ...explanation.entities,
+      city: context.knownFacts?.city || null,
+      preferredMeetingType: context.knownFacts?.preferredMeetingType || null,
+      coverage: context.knownFacts?.coverage || null
+    };
+    structured.reasonCodes.push(REASON_CODES.META_CONVERSATION_CLARIFIED);
+    structured.reasonCodes.push(REASON_CODES.NO_DEAD_END_CONTINUATION);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      conversation: {
+        lastProspectIntent: INTENTS.CONVERSATION_CLARIFICATION_REQUEST,
+        lastQuestionAsked:
+          explanation.lastQuestionAsked ||
+          context.conversation?.lastQuestionAsked ||
+          null,
+        pendingClarification: null,
+        clarificationCount: 0
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
   }
 
   if (intent === INTENTS.INSURANCE_QUESTION) {
@@ -1143,6 +1250,13 @@ function decideConversationTurn({
     }
     structured.reasonCodes.push(REASON_CODES.DATE_ONLY_PROPOSAL);
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    const dateHint =
+      interpretation.entities?.requestedDate ||
+      interpretation.scheduleParse?.dayHint ||
+      null;
+    if (dateHint?.kind === "offset" && Number(dateHint.days) === 1) {
+      structured.reasonCodes.push(REASON_CODES.MANANA_DATE_CONTEXT);
+    }
     structured.decision.shouldEscalate = false;
     structured.decision.mayCreateAppointment = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
@@ -1381,17 +1495,41 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.PROVIDE_DAY_PART) {
-    structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
-    structured.customerReplyPlan.templateKey = "continue_after_day_part";
+    const dayPart = interpretation.entities?.dayPart || null;
+    const cont = resolveDayPartContinuation(
+      dayPart,
+      structured.preferredLanguage || "spanish"
+    );
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_DAY_PART_ASK_TIME;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    // BR-088 — never emit bare "Continuemos"; always ask for time next.
+    structured.customerReplyPlan.templateKey = cont.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ...cont.entities,
+      dayPart
+    };
+    structured.reasonCodes.push(REASON_CODES.DAY_PART_ADVANCES_TO_TIME);
+    structured.reasonCodes.push(REASON_CODES.NO_DEAD_END_CONTINUATION);
+    if (
+      String(interpretation.entities?.rawText || interpretation.rawText || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .match(/^(manana|mañana|morning)$/)
+    ) {
+      structured.reasonCodes.push(REASON_CODES.MANANA_DAY_PART_CONTEXT);
+    }
     structured.contextPatch = {
       conversation: {
         clarificationCount: 0,
         pendingClarification: null,
-        lastQuestionAsked: "ask_time_preference",
+        lastQuestionAsked: cont.lastQuestionAsked,
         lastProspectIntent: INTENTS.PROVIDE_DAY_PART
       },
       knownFacts: {
-        preferredDayPart: interpretation.entities?.dayPart || null
+        preferredDayPart: dayPart
       },
       currentStage: STAGES.SCHEDULING
     };

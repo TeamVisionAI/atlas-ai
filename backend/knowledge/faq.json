@@ -1,10 +1,23 @@
 {
   "what_is_the_job": {
     "keywords": [
+      "is this a job",
+      "is this employment",
+      "what kind of job",
+      "business opportunity",
+      "esto es un trabajo",
+      "es un trabajo",
+      "es un empleo",
+      "trabajo de verdad",
+      "tipo de trabajo",
+      "oportunidad de negocio",
+      "part time",
+      "full time",
+      "part-time",
+      "full-time",
       "job",
       "work",
       "position",
-      "trabajo",
       "empleo",
       "what is the job",
       "de que trata",
@@ -15,8 +28,8 @@
       "más información",
       "info"
     ],
-    "response_en": "We work in financial services. No experience is required, and during the interview you'll learn all the details so you can decide if it's a good fit for you.",
-    "response_es": "Trabajamos en la asesoría y distribución de servicios financieros. No se requiere experiencia y durante la entrevista te darán todos los detalles para que puedas decidir si es una buena oportunidad para ti."
+    "response_en": "This is an opportunity in financial services (advisory and distribution), not a guaranteed salaried or hourly job. No experience is required, and during the interview you'll learn the details so you can decide if it's a good fit.",
+    "response_es": "Es una oportunidad en servicios financieros (asesoría y distribución), no un empleo asalariado u por hora garantizado. No se requiere experiencia; durante la entrevista te dan todos los detalles para que decidas si es una buena opción para ti."
   },
 
   "insurance": {
