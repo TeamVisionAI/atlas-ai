@@ -19,6 +19,10 @@ const {
   lastQuestionImpliesDayPart: continuityImpliesDayPart
 } = require("./conversationContinuity");
 const {
+  looksLikeSalesObjection,
+  classifySalesObjectionKind
+} = require("./salesObjection");
+const {
   looksLikePuertoRicoOriginStatement,
   looksLikeFixedEmploymentPreference,
   looksLikeCurrentJobSearchFocus,
@@ -857,6 +861,16 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     // BR-098 — detector must survive comparisonText (no "?") and raw variants.
     intent = INTENTS.INSURANCE_QUESTION;
     confidence = 0.92;
+  } else if (
+    looksLikeSalesObjection(text) ||
+    looksLikeSalesObjection(originalText)
+  ) {
+    // Implements BR-099 — before experience FAQ and correction/location parsing.
+    intent = INTENTS.SALES_OBJECTION;
+    confidence = 0.94;
+    entities.salesObjectionKind =
+      classifySalesObjectionKind(text) ||
+      classifySalesObjectionKind(originalText);
   } else if (looksLikeExperienceQuestion(text) || looksLikeExperienceQuestion(originalText)) {
     // Implements BR-098 — experience FAQ before location/name/fragment handling.
     intent = INTENTS.EXPERIENCE_QUESTION;
@@ -1201,6 +1215,8 @@ module.exports = {
   looksLikeConversationClarificationRequest,
   looksLikeInsuranceQuestion,
   looksLikeExperienceQuestion,
+  looksLikeSalesObjection,
+  classifySalesObjectionKind,
   looksLikeLicenseRequirementQuestion,
   looksLikeCompensationQuestion,
   looksLikeWorkAuthorizationAnswer,

@@ -1160,6 +1160,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-099 — Recruit AI Sales Skill / Sales Aversion Objection Recognition
+
+**Implements:** Recognize EN/ES sales skill, sales-experience, and sales-aversion objections before correction/location/name/fragment handling so phrases like `no se vender` never invent city `Vender`  
+**Domain:** Recruit AI / Conversation / Objection handling  
+**Depends on:** BR-081, BR-088, BR-095, BR-098  
+**Related:** BR-097 (overview FAQ), BR-090 (fixed-employment preference distinct), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/salesObjection.js`, interpreter, decisionEngine, responseRenderer, `locationFacts.js`, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix11.test.js`  
+**Simulator:** `sales-objection-not-location`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/27_SALES_OBJECTION_RECOGNITION.md`
+
+### Rules
+
+1. **Intent** — Map clear sales objections to `sales_objection` with kind `skill` | `experience` | `aversion`.
+2. **Priority** — Evaluate before correction interpretation, location parsing, name extraction, fragments, and scheduling reinterpretation.
+3. **Skill/experience reply** — Reassure that sales skill/experience is not required to start; training teaches the process step by step; resume pending question.
+4. **Aversion reply** — Acknowledge naturally; never claim “esto no es ventas” / “this is not sales”; no pressure, income guarantees, or licensing dumps.
+5. **No false cities** — `no se vender` must not create city `Vender` or ask for its state.
+6. **Normalization** — Accent/case/punctuation variants classify equivalently (BR-095); preserve raw inbound text.
+7. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-098 — Recruit AI FAQ Routing Priority and Experience Question Recognition
 
 **Implements:** Recognize experience FAQ intents; make Spanish/English insurance FAQ detection survive BR-095 comparisonText routing; keep clear FAQ/business intents ahead of permissive location parsing so phrases like `¿Necesito experiencia?` never invent cities  
