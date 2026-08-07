@@ -523,17 +523,17 @@ function shouldTreatAsDateOnlyProposal(schedule, text, context) {
     return false;
   }
 
-  // BR-088 — Spanish "mañana" ambiguity:
-  // pending day-part → morning; pending date question → tomorrow.
-  if (
-    dayHint.kind === "offset" &&
-    dayHint.days === 1 &&
-    parseDayPart(text)?.complete
-  ) {
+  // BR-088 / BR-101 — Spanish "mañana" ambiguity is context-priority:
+  // pending ask_day_part → morning (not tomorrow); pending date ask → tomorrow.
+  if (dayHint.kind === "offset" && dayHint.days === 1) {
+    const explicitDateFraming =
+      /\b(puede ser|pasado|tomorrow|how about|mejor el|el dia|que dia|which day|what day)\b/i.test(
+        text
+      );
     if (
       lastQuestionImpliesDayPart(context) &&
       !lastQuestionImpliesDate(context) &&
-      !/\b(puede ser|pasado|tomorrow|how about|mejor el|el dia)\b/i.test(text)
+      !explicitDateFraming
     ) {
       return false;
     }
@@ -541,6 +541,7 @@ function shouldTreatAsDateOnlyProposal(schedule, text, context) {
       return true;
     }
     if (
+      parseDayPart(text)?.complete &&
       lastQuestionImpliesDayPart(context) &&
       !context?.appointment?.proposedTime
     ) {
@@ -580,17 +581,26 @@ function parseDayPart(text) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
+  // Implements BR-101 — "en la mañana" / "por la mañana" are morning day-part,
+  // not date-tomorrow when ask_day_part is pending.
   if (
-    /^(morning|manana|por la manana|in the morning|1)$/.test(t) ||
-    /\b(morning|por la manana)\b/.test(t)
+    /^(morning|manana|por la manana|en la manana|a la manana|in the morning|1)$/.test(
+      t
+    ) ||
+    /\b(por la manana|en la manana|a la manana|in the morning)\b/.test(t)
   ) {
     return { dayPart: "morning", complete: true };
   }
   if (
-    /^(afternoon|evening|tarde|por la tarde|in the afternoon|2)$/.test(t) ||
-    /\b(afternoon|evening|por la tarde)\b/.test(t)
+    /^(afternoon|evening|tarde|por la tarde|en la tarde|in the afternoon|2)$/.test(
+      t
+    ) ||
+    /\b(afternoon|evening|por la tarde|en la tarde)\b/.test(t)
   ) {
     return { dayPart: "afternoon", complete: true };
   }

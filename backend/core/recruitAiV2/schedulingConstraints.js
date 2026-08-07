@@ -147,6 +147,31 @@ function looksLikeDirectTimeProposal(text) {
 }
 
 /**
+ * Implements BR-101 — confirmed day-part resolves bare hours without AM/PM ask.
+ * morning + 10 → 10:00; afternoon + 3 → 15:00.
+ */
+function applyDayPartToClock(hour, minute, dayPart) {
+  const part = String(dayPart || "").toLowerCase();
+  if (!Number.isFinite(hour)) {
+    return null;
+  }
+  const mm = Number.isFinite(minute) ? minute : 0;
+  if (part === "morning") {
+    if (hour >= 13 && hour <= 23) {
+      return padTime(hour - 12, mm);
+    }
+    return padTime(hour === 24 ? 0 : hour, mm);
+  }
+  if (part === "afternoon" || part === "evening") {
+    if (hour >= 1 && hour <= 11) {
+      return padTime(hour + 12, mm);
+    }
+    return padTime(hour, mm);
+  }
+  return null;
+}
+
+/**
  * Resolve AM/PM for a bare hour using constraints / day-part context.
  * Returns { time, needsAmPmClarification }.
  */
@@ -154,6 +179,10 @@ function resolveCandidateTime(text, context = {}, scheduleNormalizedHour = null)
   const raw = String(text || "").trim();
   const t = normalizeAscii(raw.replace(/[?!.]+$/g, ""));
   const constraint = context.knownFacts?.availabilityConstraint || null;
+  const dayPart =
+    context.knownFacts?.preferredDayPart ||
+    constraint?.dayPart ||
+    null;
 
   const mejor = t.match(
     /^(?:mejor|actually|prefiero|better)\s+(\d{1,2})(?::(\d{2}))?$/
@@ -172,12 +201,15 @@ function resolveCandidateTime(text, context = {}, scheduleNormalizedHour = null)
     const hasMeridiemEarly = /\b(am|pm|a\.?m\.?|p\.?m\.?|mañana|manana|tarde)\b/.test(
       normalizeAscii(raw)
     );
+    const fromDayPart = applyDayPartToClock(hh > 12 ? hh - 12 : hh, mm, dayPart);
+    if (!hasMeridiemEarly && fromDayPart) {
+      return { time: fromDayPart, needsAmPmClarification: false };
+    }
     const hasContext =
       Boolean(constraint?.earliestTime) ||
-      constraint?.dayPart === "evening" ||
-      constraint?.dayPart === "afternoon" ||
-      context.knownFacts?.preferredDayPart === "evening" ||
-      context.knownFacts?.preferredDayPart === "afternoon";
+      dayPart === "evening" ||
+      dayPart === "afternoon" ||
+      dayPart === "morning";
     if (!hasMeridiemEarly && !hasContext && hh >= 8 && hh <= 11) {
       return {
         time: null,
@@ -212,13 +244,15 @@ function resolveCandidateTime(text, context = {}, scheduleNormalizedHour = null)
     normalizeAscii(raw)
   );
   const constraintEarliest = constraint?.earliestTime || null;
-  const dayPart =
-    context.knownFacts?.preferredDayPart ||
-    constraint?.dayPart ||
-    null;
 
   if (hasMeridiem) {
     return { time: parseClockToken(hour > 12 ? hour - 12 : hour, minute), needsAmPmClarification: false };
+  }
+
+  // BR-101 — confirmed day-part inherits AM/PM; never ask when known.
+  const fromDayPart = applyDayPartToClock(hour, minute, dayPart);
+  if (fromDayPart) {
+    return { time: fromDayPart, needsAmPmClarification: false };
   }
 
   // Context: after-5 / evening → 6 means 18:00.
@@ -256,6 +290,7 @@ module.exports = {
   parseAvailabilityConstraint,
   looksLikeDirectTimeProposal,
   resolveCandidateTime,
+  applyDayPartToClock,
   isTimeLikeToken,
   padTime
 };
