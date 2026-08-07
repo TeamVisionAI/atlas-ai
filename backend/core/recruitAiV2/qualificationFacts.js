@@ -267,7 +267,7 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
-  // Implements BR-096 — status shorthand while ask_authorization is pending.
+  // Implements BR-096 — status / birthplace shorthand while ask_authorization is pending.
   // Bare "residente" / "ciudadano" is enough; optional "soy …" also accepted.
   const pendingStatusShorthand =
     pendingAuth &&
@@ -275,6 +275,18 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     /^(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$/.test(
       t
     );
+
+  // Birthplace affirmatives (EN/ES) — not a location correction when auth is pending.
+  const pendingBornHereAffirmative =
+    pendingAuth &&
+    !mentionsLicense(raw) &&
+    (/^(yo )?(naci|nacio) (aqui|en (estados unidos|ee\.? ?uu\.?|usa|us|eeuu))([.!]?)?$/.test(
+      t
+    ) ||
+      /^(i )?(was )?born (here|in the (us|u\.s\.?|usa|united states))([.!]?)?$/.test(
+        t
+      ) ||
+      /^born here([.!]?)?$/.test(t));
 
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);
@@ -289,7 +301,13 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     !/\b(no|not|sin)\b/.test(t) &&
     !mentionsLicense(raw);
 
-  if (pendingStatusShorthand || yesAuth || yesShort || patternYes) {
+  if (
+    pendingStatusShorthand ||
+    pendingBornHereAffirmative ||
+    yesAuth ||
+    yesShort ||
+    patternYes
+  ) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 

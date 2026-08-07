@@ -78,7 +78,17 @@ const SHORTHANDS = [
   "RESIDENTE",
   "Ciudadano!",
   "soy residente",
-  "soy ciudadana"
+  "soy ciudadana",
+  "nací aquí",
+  "naci aqui",
+  "yo nací aquí",
+  "yo naci aqui",
+  "nací en Estados Unidos",
+  "naci en Estados Unidos",
+  "nací en USA",
+  "born here",
+  "I was born here",
+  "I was born in the US"
 ];
 
 for (const text of SHORTHANDS) {
@@ -93,9 +103,23 @@ for (const text of SHORTHANDS) {
     assert.equal(r.interpretation.intent, "provide_authorization");
     assert.equal(r.nextContext.knownFacts.workAuthorization, true);
     assert.equal(r.nextContext.knownFacts.workAuthorizationStatus, "authorized");
-    assert.doesNotMatch(r.rendered.text, /permiso de trabajo|documentaci[oó]n legal/i);
+    assert.notEqual(r.interpretation.intent, "provide_location");
+    assert.notEqual(r.interpretation.intent, "correct_location");
+    assert.doesNotMatch(
+      r.rendered.text,
+      /permiso de trabajo|documentaci[oó]n legal|ciudad y estado|which city/i
+    );
   });
 }
+
+test("outside pending auth, bare born-here does not invent authorization", () => {
+  assert.equal(
+    parseWorkAuthorizationAnswer("nací aquí", {
+      conversation: { lastQuestionAsked: "ask_day_part" }
+    }),
+    null
+  );
+});
 
 test("outside pending auth, bare residente does not invent authorization", () => {
   assert.equal(

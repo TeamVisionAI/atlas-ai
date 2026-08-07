@@ -1175,10 +1175,11 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Pending-auth only** — Shorthand applies when `lastQuestionAsked` is `ask_authorization` (or equivalent pending work-auth ask).
 2. **Accepted Spanish status forms** — At minimum: `residente`, `residente permanente`, `ciudadano`, `ciudadana`, `ciudadano americano`, `ciudadana americana` (case/accent/punctuation tolerant via BR-095).
-3. **No “soy …” requirement** — Do not require `soy residente` / `soy ciudadano` when the pending question already makes meaning clear.
-4. **License boundary** — License-only wording still does not satisfy work authorization (BR-083 / BR-089).
-5. **No out-of-context inventing** — Bare status tokens outside a pending work-auth question must not invent authorization.
-6. **Boundaries** — Does not enable execution, change shadow/capture, cut over live CE, send WhatsApp, or mutate appointments/Calendar/BR-080.
+3. **Accepted birthplace affirmatives (pending-auth)** — At minimum: `nací aquí` / `naci aqui`, `yo nací aquí`, `nací en Estados Unidos` / `nací en USA`, `born here`, `I was born here`, `I was born in the US`. These satisfy work authorization and must not be reinterpreted as a location answer or trigger an immigration-document re-ask.
+4. **No “soy …” requirement** — Do not require `soy residente` / `soy ciudadano` when the pending question already makes meaning clear.
+5. **License boundary** — License-only wording still does not satisfy work authorization (BR-083 / BR-089).
+6. **No out-of-context inventing** — Bare status / birthplace tokens outside a pending work-auth question must not invent authorization.
+7. **Boundaries** — Does not enable execution, change shadow/capture, cut over live CE, send WhatsApp, or mutate appointments/Calendar/BR-080.
 
 ---
 
