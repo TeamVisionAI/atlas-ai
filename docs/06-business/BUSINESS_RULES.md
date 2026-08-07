@@ -1160,6 +1160,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-100 — Recruit AI Affirmative-Prefix Work-Authorization Status
+
+**Implements:** When `ask_authorization` is pending, affirmative discourse markers (`sí`/`si`/`claro`/`yes`/…) before an already-recognized BR-096 status (e.g. `si soy ciudadano`) still satisfy work authorization and must not fall through to schedule confirm / human-assist handoff  
+**Domain:** Recruit AI / Qualification  
+**Depends on:** BR-081, BR-083, BR-095, BR-096  
+**Related:** BR-090 (Puerto Rico origin), BR-099 (unrelated sales objection)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/qualificationFacts.js` (`parseWorkAuthorizationAnswer`)  
+**Tests:** `backend/test/recruitAiV2AffirmativePrefixWorkAuthBr100.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/28_AFFIRMATIVE_PREFIX_WORK_AUTH.md`
+
+### Rules
+
+1. **Pending-auth only** — Affirmative-prefix status applies when `lastQuestionAsked` is `ask_authorization`.
+2. **Prefix + BR-096 status** — Accept optional `sí`/`si`/`claro`/`correcto`/`por supuesto`/`yes`/`yeah`/`yep` (with optional comma) before residente/ciudadano/resident/citizen forms (and birthplace affirmatives).
+3. **Continue recruiting flow** — Satisfied auth continues to the next canonical step (e.g. day-part). Never route to companion handoff, terminal confirmation, or human-assist copy solely because of the prefix.
+4. **Negatives win** — Mixed negatives (`sí, pero no tengo permiso`, `yes, but I'm not authorized yet`) remain NOT authorized.
+5. **Visa ambiguity** — `si tengo visa` / `tengo visa` still do not auto-authorize.
+6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-099 — Recruit AI Sales Skill / Sales Aversion Objection Recognition
 
 **Implements:** Recognize EN/ES sales skill, sales-experience, and sales-aversion objections before correction/location/name/fragment handling so phrases like `no se vender` never invent city `Vender`  
@@ -1235,7 +1257,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Recognize short legal-status answers (`residente`, `ciudadano`/`ciudadana`, and close variants) as affirmative work authorization when Atlas is specifically asking for work authorization  
 **Domain:** Recruit AI / Qualification  
 **Depends on:** BR-081, BR-083, BR-095  
-**Related:** BR-090 (Puerto Rico origin), BR-089 (license ≠ work auth)  
+**Related:** BR-090 (Puerto Rico origin), BR-089 (license ≠ work auth), BR-100 (affirmative prefixes)  
 **Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
 **Engine target:** `recruitAiV2/qualificationFacts.js` (`parseWorkAuthorizationAnswer`)  
 **Tests:** `backend/test/recruitAiV2WorkAuthStatusShorthandBr096.test.js`  
@@ -1247,9 +1269,10 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **Accepted Spanish status forms** — At minimum: `residente`, `residente permanente`, `ciudadano`, `ciudadana`, `ciudadano americano`, `ciudadana americana` (case/accent/punctuation tolerant via BR-095).
 3. **Accepted birthplace affirmatives (pending-auth)** — At minimum: `nací aquí` / `naci aqui`, `yo nací aquí`, `nací en Estados Unidos` / `nací en USA`, `born here`, `I was born here`, `I was born in the US`. These satisfy work authorization and must not be reinterpreted as a location answer or trigger an immigration-document re-ask.
 4. **No “soy …” requirement** — Do not require `soy residente` / `soy ciudadano` when the pending question already makes meaning clear.
-5. **License boundary** — License-only wording still does not satisfy work authorization (BR-083 / BR-089).
-6. **No out-of-context inventing** — Bare status / birthplace tokens outside a pending work-auth question must not invent authorization.
-7. **Boundaries** — Does not enable execution, change shadow/capture, cut over live CE, send WhatsApp, or mutate appointments/Calendar/BR-080.
+5. **Affirmative prefixes** — Optional discourse markers before these forms are covered by BR-100 (`si soy ciudadano`).
+6. **License boundary** — License-only wording still does not satisfy work authorization (BR-083 / BR-089).
+7. **No out-of-context inventing** — Bare status / birthplace tokens outside a pending work-auth question must not invent authorization.
+8. **Boundaries** — Does not enable execution, change shadow/capture, cut over live CE, send WhatsApp, or mutate appointments/Calendar/BR-080.
 
 ---
 

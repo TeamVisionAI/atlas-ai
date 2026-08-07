@@ -4,6 +4,7 @@
  * BR-089 — license requirement questions ≠ ambiguous license statements.
  * BR-090 — explicit Puerto Rico origin statements satisfy work authorization.
  * BR-096 — pending-auth status shorthand (residente / ciudadano) satisfies work auth.
+ * BR-100 — affirmative discourse prefixes (sí/si/yes/claro) before BR-096 status still authorize.
  */
 
 const {
@@ -267,8 +268,8 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
-  // Negatives first while auth is pending — "estoy esperando el permiso" must not
-  // match the generic permiso affirmative path.
+  // Negatives first while auth is pending — including mixed "sí, pero no tengo…".
+  // Superficial affirmative tokens must never override negative meaning (BR-100).
   const noAuth =
     pendingAuth &&
     (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
@@ -277,33 +278,42 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
       ) ||
       /\b(i don'?t have (a )?work permit|i am not authorized to work( yet)?|i'?m not authorized to work( yet)?|not authorized( to work)?( yet)?)\b/.test(
         t
-      ));
+      ) ||
+      /\b(pero )?(no tengo|todavia no|estoy esperando)\b/.test(t) &&
+        /\b(permiso|papeles|autoriz)\b/.test(t) ||
+      /\b(but )?(i'?m |i am )?not authorized\b/.test(t));
   if (noAuth) {
     return WORK_AUTHORIZATION.NOT_AUTHORIZED;
   }
 
-  // Implements BR-096 — status / birthplace shorthand while ask_authorization is pending.
-  // Bare "residente" / "ciudadano" / "resident" / "citizen" is enough; optional soy/I'm also accepted.
+  // Implements BR-096 / BR-100 — status / birthplace shorthand while ask_authorization
+  // is pending. Optional affirmative discourse prefix (sí/si/claro/yes) is ignored for
+  // matching so "si soy ciudadano" never falls through to schedule_confirm/handoff.
+  const affirmPrefix = "((si|claro|correcto|por supuesto|yes|yeah|yep)[,:]?\\s+)?";
   const pendingStatusShorthand =
     pendingAuth &&
     !mentionsLicense(raw) &&
-    (/^(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$/.test(
-      t
-    ) ||
-      /^(i'?m a |i am a )?(permanent )?resident([.!]?)?$/.test(t) ||
-      /^(i'?m a |i am a )?(us |u\.s\.? |american )?citizen([.!]?)?$/.test(t));
+    (new RegExp(
+      `^${affirmPrefix}(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$`
+    ).test(t) ||
+      new RegExp(
+        `^${affirmPrefix}(i'?m a |i am a )?(permanent )?resident([.!]?)?$`
+      ).test(t) ||
+      new RegExp(
+        `^${affirmPrefix}(i'?m a |i am a )?(us |u\\.s\\.? |american )?citizen([.!]?)?$`
+      ).test(t));
 
   // Birthplace affirmatives (EN/ES) — not a location correction when auth is pending.
   const pendingBornHereAffirmative =
     pendingAuth &&
     !mentionsLicense(raw) &&
-    (/^(yo )?(naci|nacio) (aqui|en (estados unidos|ee\.? ?uu\.?|usa|us|eeuu))([.!]?)?$/.test(
-      t
-    ) ||
-      /^(i )?(was )?born (here|in the (us|u\.s\.?|usa|united states))([.!]?)?$/.test(
-        t
-      ) ||
-      /^born here([.!]?)?$/.test(t));
+    (new RegExp(
+      `^${affirmPrefix}(yo )?(naci|nacio) (aqui|en (estados unidos|ee\\.? ?uu\\.?|usa|us|eeuu))([.!]?)?$`
+    ).test(t) ||
+      new RegExp(
+        `^${affirmPrefix}(i )?(was )?born (here|in the (us|u\\.s\\.?|usa|united states))([.!]?)?$`
+      ).test(t) ||
+      new RegExp(`^${affirmPrefix}born here([.!]?)?$`).test(t));
 
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);

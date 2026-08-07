@@ -35,6 +35,7 @@
 | [25_CONCISE_JOB_FAQ_OVERVIEW.md](./25_CONCISE_JOB_FAQ_OVERVIEW.md) | BR-097 — concise first-level job FAQ + progressive disclosure |
 | [26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md](./26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md) | BR-098 — experience FAQ + insurance routing priority before location |
 | [27_SALES_OBJECTION_RECOGNITION.md](./27_SALES_OBJECTION_RECOGNITION.md) | BR-099 — sales skill/aversion objection ≠ location correction |
+| [28_AFFIRMATIVE_PREFIX_WORK_AUTH.md](./28_AFFIRMATIVE_PREFIX_WORK_AUTH.md) | BR-100 — `si soy ciudadano` affirmative-prefix work auth |
 
 ## Regression fixture
 
