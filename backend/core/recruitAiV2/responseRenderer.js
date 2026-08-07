@@ -11,6 +11,7 @@ const {
   getJobOverviewFaqAnswer,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
+  getExperienceFaqAnswer,
   getLicenseRequirementFaqAnswer,
   getLicensePathDetailFaqAnswer,
   getCompensationFaqAnswer,
@@ -70,6 +71,7 @@ const COPY = Object.freeze({
     license_requirement_faq_then_resume: null,
     license_path_detail_faq_then_resume: null,
     compensation_faq_then_resume: null,
+    experience_faq_then_resume: null,
     job_opportunity_faq_then_resume: null,
     job_overview_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
@@ -193,6 +195,7 @@ const COPY = Object.freeze({
     license_requirement_faq_then_resume: null,
     license_path_detail_faq_then_resume: null,
     compensation_faq_then_resume: null,
+    experience_faq_then_resume: null,
     job_opportunity_faq_then_resume: null,
     job_overview_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
@@ -469,6 +472,13 @@ function renderCustomerReply(responsePlan) {
       getInsuranceFaqAnswer(lang),
       language,
       entities
+    );
+  } else if (key === "experience_faq_then_resume") {
+    template = composeFaqThenResume(
+      getExperienceFaqAnswer(lang),
+      language,
+      entities,
+      { omitBridge: true }
     );
   } else if (key === "license_requirement_faq_then_resume") {
     template = composeFaqThenResume(

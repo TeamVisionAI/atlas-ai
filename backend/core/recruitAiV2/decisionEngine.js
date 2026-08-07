@@ -632,11 +632,27 @@ function decideConversationTurn({
 
   if (intent === INTENTS.INSURANCE_QUESTION) {
     structured.decision.nextAction = NEXT_ACTIONS.ANSWER_INSURANCE_FAQ_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.INSURANCE_FAQ_ROUTED);
+    structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_LOCATION);
     return buildFaqResumeDecision(
       structured,
       context,
       intent,
       "insurance_faq_then_resume"
+    );
+  }
+
+  if (intent === INTENTS.EXPERIENCE_QUESTION) {
+    // Implements BR-098 — concise experience FAQ, then resume pending question.
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_EXPERIENCE_FAQ_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.EXPERIENCE_FAQ);
+    structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_LOCATION);
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "experience_faq_then_resume"
     );
   }
 

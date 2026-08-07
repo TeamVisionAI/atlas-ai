@@ -1160,6 +1160,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-098 — Recruit AI FAQ Routing Priority and Experience Question Recognition
+
+**Implements:** Recognize experience FAQ intents; make Spanish/English insurance FAQ detection survive BR-095 comparisonText routing; keep clear FAQ/business intents ahead of permissive location parsing so phrases like `¿Necesito experiencia?` never invent cities  
+**Domain:** Recruit AI / Conversation / FAQ routing  
+**Depends on:** BR-081, BR-083, BR-088, BR-095, BR-097  
+**Related:** BR-089 (license FAQ), BR-094 (legitimate location still works), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/interpreter.js`, decisionEngine, responseRenderer, `locationFacts.js`, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix10.test.js`  
+**Simulator:** `faq-priority-experience-insurance`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md`
+
+### Rules
+
+1. **Experience intent** — EN/ES experience asks/statements (`¿Necesito experiencia?`, `Do I need experience?`, `No tengo experiencia`, etc.) map to `experience_question`.
+2. **Concise experience answer** — Prior experience is not required; training is provided to learn the process. Resume the exact pending workflow question. Do not stack licensing/compensation caveats.
+3. **Insurance routing** — Spanish/English insurance FAQ shapes (`¿Es de seguros?`, `es de seguros`, `Is this insurance?`, etc.) must resolve to `insurance_question` on comparisonText and raw text. Detector truth must survive final routing.
+4. **FAQ before location** — Clear FAQ/business intents (job, compensation, insurance, experience, license, meeting access, opt-out/withdraw/cancel) outrank permissive location/name/fragment parsing.
+5. **No false cities** — Experience/insurance FAQ messages must not create location facts (e.g. city `Necesito Experiencia`).
+6. **Workflow continuity** — After FAQ answers, resume the pending question (e.g. `ask_day_part`); no scheduling collision, generic clarification, or state reset.
+7. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-097 — Recruit AI Concise First-Level Job FAQ (Progressive Disclosure)
 
 **Implements:** First-level job/overview questions (`de que se trata`, `qué hacen`, `what is this about`, etc.) receive a short financial-services answer and resume the pending workflow question; do not volunteer salary/experience/license/employment caveats until specifically asked  
