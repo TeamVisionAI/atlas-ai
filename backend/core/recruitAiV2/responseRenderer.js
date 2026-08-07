@@ -6,6 +6,7 @@
 
 const { LANGUAGES } = require("./constants");
 const { sanitizeCustomerCopy } = require("./sanitize");
+const { collapseRedundantAcknowledgements } = require("./acknowledgementStyle");
 const { stateDisplayName } = require("./locationFacts");
 const {
   getCanonicalFaqAnswer,
@@ -523,8 +524,9 @@ function renderCustomerReply(responsePlan) {
   } else if (key === "acknowledge_current_not_fit_no_write") {
     template = getCurrentNotFitClosureMessage(lang);
   } else if (key === "continue_qualification_after_authorization") {
-    const ack =
-      language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
+    // Single acknowledgement — stack collapse also strips leading "Excelente." from
+    // canonical office/Zoom day-part copy (BR-102 conversation quality).
+    const ack = language === LANGUAGES.SPANISH ? "Perfecto." : "Perfect.";
     // Never emit Doral office copy when active modality is Zoom / OUTSIDE.
     const forceZoom =
       String(entities.coverage || "").toUpperCase() === "OUTSIDE" ||
@@ -534,8 +536,7 @@ function renderCustomerReply(responsePlan) {
       ? `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`
       : `${ack} ${getLocalOfficeDayPartMessage(lang)}`;
   } else if (key === "outside_zoom_day_part") {
-    const ack =
-      language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
+    const ack = language === LANGUAGES.SPANISH ? "Perfecto." : "Perfect.";
     template = `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`;
   } else if (key === "clarify_license_type") {
     template = getClarifyLicenseTypeMessage(lang);
@@ -675,9 +676,15 @@ function renderCustomerReply(responsePlan) {
     .replace(/\{resumeQuestion\}/g, entities.resumeQuestion || "");
 
   const fallback = pack.safe_failure_escalate || pack.default;
+  const sanitized = sanitizeCustomerCopy(rendered, fallback);
+  // Implements BR-102 — do not stack equivalent acknowledgements in one reply.
+  const text =
+    sanitized === fallback
+      ? sanitized
+      : collapseRedundantAcknowledgements(sanitized);
 
   return {
-    text: sanitizeCustomerCopy(rendered, fallback),
+    text,
     language,
     templateKey: key
   };
@@ -688,5 +695,6 @@ module.exports = {
   formatRequestedTime,
   composeValuePropThenQualify,
   resolveResumeQuestion,
+  collapseRedundantAcknowledgements,
   COPY
 };

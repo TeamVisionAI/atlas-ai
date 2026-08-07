@@ -1180,7 +1180,8 @@ Production outside-window messaging requires firm-approved Meta templates config
 5. **After-time constraints** — Under pending time (esp. afternoon/evening), phrases like `despues de la 5` / `después de las 5` / `a partir de las 5` / `luego de las 5` / `after 5` / `anytime after 5` → `availability_constraint` with PM earliest time (`17:00` for 5). No AM interpretation, no generic fallback, no invented date, no handoff.
 6. **Reuse BR-084/085** — Constraints remain independent of concrete appointment candidates; ask the next useful time question or review options after 5 — do not fabricate availability.
 7. **Bare affirmation hygiene** — Exact bare `si`/`yes`/… only; prefixed status phrases stay on auth/status paths.
-8. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+8. **Acknowledgement stacking** — Do not stack multiple equivalent acknowledgement phrases in one customer reply (e.g. `Perfecto, gracias. Excelente.`). Keep one natural acknowledgement; preserve phrases with genuinely different functions.
+9. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
 
 ---
 

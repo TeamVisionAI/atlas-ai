@@ -23,6 +23,7 @@ Playground regressions after BR-101:
 5. **After-time variants** — At minimum recognize `despues de la 5` / `las 5` / `a partir de` / `luego de` / English `after 5` forms as `availability_constraint` with `earliestTime=17:00` (PM bias).
 6. **No invent** — Constraints do not invent dates, do not ask AM/PM when PM is resolved, do not hand off, do not execute side effects.
 7. **Bare affirmation** — `isAffirmative` is exact bare tokens only so `si soy ciudadano` cannot become `schedule_confirm` via a leading `si`.
+8. **Acknowledgement stacking** — Renderer collapses consecutive equivalent acknowledgements (`Perfecto` / `Gracias` / `Excelente` / EN peers) to one natural opener. Informational sentences are preserved.
 
 ## Engines
 
@@ -30,6 +31,7 @@ Playground regressions after BR-101:
 - `interpreter.js` — state-only provide_location; city-after-state completion; bare affirmative tighten
 - `decisionEngine.js` / `contextTurnUpdate.js` / `responseRenderer.js` — `ask_city` path
 - `locationFacts.js` — `stateDisplayName` for all USPS codes
+- `acknowledgementStyle.js` — redundant acknowledgement collapse
 
 ## Tests
 

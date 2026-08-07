@@ -15,6 +15,9 @@ const { buildNextContextFromInterpretation } = require("../core/recruitAiV2/cont
 const { parseAvailabilityConstraint } = require("../core/recruitAiV2/schedulingConstraints");
 const { parseLocationAnswer } = require("../core/recruitAiV2/locationFacts");
 const {
+  collapseRedundantAcknowledgements
+} = require("../core/recruitAiV2/acknowledgementStyle");
+const {
   authorizeSideEffects,
   isExecutionEnabled
 } = require("../core/recruitAiV2/sideEffectAuthorizer");
@@ -22,6 +25,19 @@ const {
   runRecruitAiV2ScenarioById,
   runAllRecruitAiV2ScenarioPack
 } = require("../dev/recruitAiV2ScenarioPack");
+
+function assertNoStackedAcknowledgements(text) {
+  const collapsed = collapseRedundantAcknowledgements(text);
+  assert.equal(
+    collapsed,
+    text,
+    `stacked acknowledgements in reply: ${text}`
+  );
+  assert.doesNotMatch(
+    text,
+    /\b(perfecto|gracias|excelente|perfect|thanks|thank you|excellent|great)\b[^.!?]*[.!?]\s+\b(perfecto|gracias|excelente|perfect|thanks|thank you|excellent|great)\b/i
+  );
+}
 
 const FIXED_NOW = new Date("2026-08-07T15:00:00.000-04:00");
 
@@ -212,6 +228,13 @@ test("exact playground: florida → miami → auth → tarde → despues de la 5
   assert.match(out[1].text, /ciudad de Florida/i);
   assert.equal(out[5].intent, "provide_availability_constraint");
   assert.doesNotMatch(out.map((o) => o.text).join("\n"), /dato que te acabo/i);
+  for (const step of out) {
+    assertNoStackedAcknowledgements(step.text);
+  }
+  assert.doesNotMatch(
+    out.map((o) => o.text).join("\n"),
+    /Perfecto,?\s*gracias\.\s*Excelente/i
+  );
   assert.equal(
     authorizeSideEffects({
       structuredDecision: turn("despues de la 5", afternoonTimeContext())
@@ -250,6 +273,112 @@ test("BR-084 trabajo hasta las 5 still constraint", () => {
     r.nextContext.knownFacts.availabilityConstraint.earliestTime,
     "17:00"
   );
+});
+
+test("acknowledgement collapse unit: Perfecto, gracias. Excelente.", () => {
+  assert.equal(
+    collapseRedundantAcknowledgements(
+      "Perfecto, gracias. Excelente. Estamos realizando las entrevistas en nuestras oficinas."
+    ),
+    "Perfecto. Estamos realizando las entrevistas en nuestras oficinas."
+  );
+  assert.equal(
+    collapseRedundantAcknowledgements(
+      "Perfect, thank you. Excellent. We're conducting interviews at our offices."
+    ),
+    "Perfect. We're conducting interviews at our offices."
+  );
+  // Informational second sentence preserved (not ack-only).
+  assert.equal(
+    collapseRedundantAcknowledgements(
+      "Perfecto. Estamos realizando las entrevistas por Zoom."
+    ),
+    "Perfecto. Estamos realizando las entrevistas por Zoom."
+  );
+});
+
+test("work-auth confirmation → no stacked acknowledgements", () => {
+  const r = turn(
+    "si soy ciudadano",
+    createConversationContext({
+      preferredLanguage: "spanish",
+      _testNow: FIXED_NOW,
+      knownFacts: {
+        city: "Miami",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        coverage: "LOCAL"
+      },
+      conversation: {
+        lastQuestionAsked: "ask_authorization",
+        lastAtlasOutboundText: "¿Tienes permiso de trabajo?"
+      }
+    })
+  );
+  assert.equal(r.interpretation.intent, "provide_authorization");
+  assertNoStackedAcknowledgements(r.rendered.text);
+  assert.match(r.rendered.text, /^Perfecto\./);
+  assert.doesNotMatch(r.rendered.text, /Perfecto,?\s*gracias\.\s*Excelente/i);
+  assert.match(r.rendered.text, /entrevistas|mañana o en la tarde/i);
+});
+
+test("work-auth confirmation English → no stacked acknowledgements", () => {
+  const r = turn(
+    "yes I'm a citizen",
+    createConversationContext({
+      preferredLanguage: "english",
+      languageMeta: { source: "explicit" },
+      _testNow: FIXED_NOW,
+      knownFacts: {
+        city: "Miami",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        coverage: "LOCAL"
+      },
+      conversation: {
+        lastQuestionAsked: "ask_authorization",
+        lastAtlasOutboundText: "Do you have work authorization?"
+      }
+    })
+  );
+  assert.equal(r.interpretation.intent, "provide_authorization");
+  assertNoStackedAcknowledgements(r.rendered.text);
+  assert.match(r.rendered.text, /^Perfect\./);
+  assert.doesNotMatch(r.rendered.text, /Perfect,?\s*thank you\.\s*Excellent/i);
+});
+
+test("location confirmation → no stacked acknowledgements", () => {
+  const r = turn("miami fl", locationAskContext());
+  assert.equal(r.interpretation.entities.completeness, "complete");
+  assertNoStackedAcknowledgements(r.rendered.text);
+  assert.doesNotMatch(r.rendered.text, /Gracias\.\s*(Perfecto|Excelente)\./i);
+});
+
+test("scheduling confirmation → no stacked acknowledgements", () => {
+  const dayPartCtx = createConversationContext({
+    preferredLanguage: "spanish",
+    _testNow: FIXED_NOW,
+    knownFacts: {
+      city: "Miami",
+      state: "FL",
+      workAuthorization: true,
+      coverage: "LOCAL"
+    },
+    conversation: {
+      lastQuestionAsked: "ask_day_part",
+      lastAtlasOutboundText: "¿Prefieres en la mañana o en la tarde?"
+    }
+  });
+  const day = turn("tarde", dayPartCtx);
+  assert.equal(day.interpretation.intent, "provide_day_part");
+  assertNoStackedAcknowledgements(day.rendered.text);
+  assert.match(day.rendered.text, /^Perfecto\./);
+  assert.doesNotMatch(day.rendered.text, /Perfecto\.\s*Excelente\./i);
+
+  const constraint = turn("despues de la 5", afternoonTimeContext());
+  assertNoStackedAcknowledgements(constraint.rendered.text);
 });
 
 test("BR-100 / BR-099 / BR-097 regressions", () => {
