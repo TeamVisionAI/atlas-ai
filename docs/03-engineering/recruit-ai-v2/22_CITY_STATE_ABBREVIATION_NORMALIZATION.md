@@ -10,12 +10,13 @@ Playground / pending-location replies like `miami fl` were classified as `ambigu
 2. `miami fl` is exactly length 8, so it never reached `parseLocationAnswer` in the interpreter branch order.
 3. The space-separated state regex only listed a small subset of USPS codes / names.
 
-## Fix (BR-094)
+## Fix (BR-094 + BR-095)
 
 - Canonical USPS name/abbreviation map in `locationFacts.js` (`US_STATE_NAME_TO_ABBR`).
 - `normalizeStateToken` accepts only known postal codes / state names (not arbitrary two-letter scraps).
 - `parseCityStatePhrase` handles comma/no-comma, multi-word cities, and multi-word state names.
 - Interpreter / fragment guard skips complete city+state phrases.
+- Shared BR-095 `inputNormalization.js` supplies comparison text so `MIAMI FL` / `Miami, FL` / `miami fl` match equivalently without rewriting the raw transcript.
 - Preserve BR-082: city-only stays partial; `FL` alone is state-only; regional phrases like `South Florida` are not `city = South`.
 
 ## Scenario

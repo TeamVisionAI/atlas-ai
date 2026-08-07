@@ -180,6 +180,15 @@ test("19. comma/no-comma", () => {
   assertCompleteCityState("Miami FL", "Miami", "FL");
 });
 
+test("19b. BR-095 case/punct/whitespace location variants", () => {
+  for (const text of ["MIAMI FL", "Miami - FL", "Miami. FL", "  miami   fl "]) {
+    assertCompleteCityState(text, "Miami", "FL");
+    const r = turn(text, locationPendingContext());
+    assert.equal(r.interpretation.entities.rawText, text);
+    assert.equal(r.nextContext.knownFacts.city, "Miami");
+  }
+});
+
 test("20. Miami remains partial, not fabricated", () => {
   const parsed = parseLocationAnswer("Miami");
   assert.equal(parsed.completeness, "partial");

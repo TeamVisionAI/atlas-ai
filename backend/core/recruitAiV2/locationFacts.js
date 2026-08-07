@@ -2,7 +2,10 @@
  * Recruit AI v2 — location facts (BR-082 / BR-094).
  * City-only answers are partial. City + recognized state abbrev/name → confirmed.
  * Implements BR-094 — U.S. postal abbreviation / informal city-state normalization.
+ * Uses BR-095 inbound normalization for case/punctuation/whitespace tolerance.
  */
+
+const { prepareLocationSearchText } = require("./inputNormalization");
 
 const FACT_CERTAINTY = Object.freeze({
   CONFIRMED: "confirmed",
@@ -335,10 +338,18 @@ function parseLocationAnswer(text) {
     return null;
   }
 
+  // BR-095 — punctuation/case/whitespace-tolerant search form ("Miami,FL", "MIAMI FL").
+  const searchForm = prepareLocationSearchText(rawOriginal) || rawOriginal;
   const extracted = extractLocationCandidateText(rawOriginal);
-  const candidates = [rawOriginal];
+  const extractedSearch = extracted.text
+    ? prepareLocationSearchText(extracted.text) || extracted.text
+    : "";
+  const candidates = [searchForm, rawOriginal];
+  if (extractedSearch && !candidates.includes(extractedSearch)) {
+    candidates.unshift(extractedSearch);
+  }
   if (extracted.text && extracted.text !== rawOriginal) {
-    candidates.unshift(extracted.text);
+    candidates.push(extracted.text);
   }
 
   for (const raw of candidates) {

@@ -1160,11 +1160,33 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-095 — Recruit AI Deterministic Inbound Input Normalization
+
+**Implements:** Shared interpretation-only normalization layer so WhatsApp case/accent/punctuation/whitespace variants classify equivalently without mutating original transcript text  
+**Domain:** Recruit AI / Conversation Interpretation  
+**Depends on:** BR-081  
+**Related:** BR-094 (city/state uses this layer), BR-088 (context-sensitive `mañana`/`manana`), BR-086, BR-091  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/inputNormalization.js`, `recruitAiV2/interpreter.js`  
+**Tests:** `backend/test/recruitAiV2InputNormalization.test.js`, `backend/test/recruitAiV2PlaygroundFeedbackFix8.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/23_INPUT_NORMALIZATION.md`
+
+### Rules
+
+1. **Raw preserved** — Keep original inbound text for audit/transcript; matching uses a separate comparison form.
+2. **Tolerances** — Case-insensitive, accent/diacritic-insensitive, punctuation-tolerant (where punctuation does not change meaning), whitespace-tolerant.
+3. **No semantic erasure** — Do not globally force `si`→affirmative or erase BR-088 day-part vs tomorrow ambiguity for `manana`/`mañana`.
+4. **No fuzzy inventing** — Deterministic only; no aggressive autocorrect / edit-distance intent invention.
+5. **Reuse** — Prefer this utility before domain detectors (location, licensing, opt-out, scheduling, FAQ) instead of one-off regex patches.
+6. **Boundaries** — Does not enable execution, change shadow/capture, cut over live CE, send WhatsApp, or mutate appointments/Calendar/BR-080.
+
+---
+
 ## BR-094 — Recruit AI U.S. City-State Abbreviation Normalization
 
 **Implements:** Recognize informal U.S. city + state abbreviation / name replies (e.g. `miami fl`) as confirmed location facts when Atlas is collecting city/state; advance qualification without generic fragment clarification  
 **Domain:** Recruit AI / Qualification  
-**Depends on:** BR-081, BR-082  
+**Depends on:** BR-081, BR-082, BR-095  
 **Related:** BR-083 (qualification fact separation), BR-090 (Puerto Rico — not a USPS state pair), BR-091 (withdrawal)  
 **Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
 **Engine target:** `recruitAiV2/locationFacts.js`, `recruitAiV2/interpreter.js`  
