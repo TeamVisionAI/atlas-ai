@@ -347,6 +347,100 @@ function createOperationsRoutes(deps = {}) {
     }
   });
 
+  router.get("/simulator/recruit-ai-v2/playground/meta", (req, res) => {
+    res.json({
+      success: true,
+      ...operationsCenterService.getRecruitAiV2PlaygroundMeta()
+    });
+  });
+
+  router.post("/simulator/recruit-ai-v2/playground/sessions", (req, res) => {
+    try {
+      const session = operationsCenterService.startRecruitAiV2PlaygroundSession(
+        req.body || {}
+      );
+      res.status(201).json({ success: true, session });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: error.code || "PLAYGROUND_START_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.get("/simulator/recruit-ai-v2/playground/sessions/:sessionId", (req, res) => {
+    try {
+      const session = operationsCenterService.getRecruitAiV2PlaygroundSession(
+        req.params.sessionId
+      );
+      res.json({ success: true, session });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: error.code || "PLAYGROUND_SESSION_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.post(
+    "/simulator/recruit-ai-v2/playground/sessions/:sessionId/reset",
+    (req, res) => {
+      try {
+        const session = operationsCenterService.resetRecruitAiV2PlaygroundSession(
+          req.params.sessionId,
+          req.body || {}
+        );
+        res.json({ success: true, session });
+      } catch (error) {
+        res.status(error.statusCode || 500).json({
+          success: false,
+          error: error.code || "PLAYGROUND_RESET_FAILED",
+          message: error.message
+        });
+      }
+    }
+  );
+
+  router.post(
+    "/simulator/recruit-ai-v2/playground/sessions/:sessionId/turns",
+    (req, res) => {
+      try {
+        const result = operationsCenterService.sendRecruitAiV2PlaygroundTurn(
+          req.params.sessionId,
+          req.body || {}
+        );
+        res.json(result);
+      } catch (error) {
+        res.status(error.statusCode || 500).json({
+          success: false,
+          error: error.code || "PLAYGROUND_TURN_FAILED",
+          message: error.message
+        });
+      }
+    }
+  );
+
+  router.post(
+    "/simulator/recruit-ai-v2/playground/sessions/:sessionId/regression-candidate",
+    (req, res) => {
+      try {
+        const result =
+          operationsCenterService.exportRecruitAiV2PlaygroundRegressionCandidate(
+            req.params.sessionId
+          );
+        res.json(result);
+      } catch (error) {
+        res.status(error.statusCode || 500).json({
+          success: false,
+          error: error.code || "PLAYGROUND_CANDIDATE_FAILED",
+          message: error.message
+        });
+      }
+    }
+  );
+
   router.post("/simulator/facebook-lead", async (req, res) => {
     try {
       const result = await operationsCenterService.simulateFacebookLead(req.body || {});

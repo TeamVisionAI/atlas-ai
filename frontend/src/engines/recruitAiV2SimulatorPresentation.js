@@ -52,5 +52,48 @@ export const RECRUIT_AI_V2_SIMULATOR_PATHS = {
   list: "/simulator/recruit-ai-v2/scenarios",
   runAll: "/simulator/recruit-ai-v2/scenarios/run-all",
   runOne: (scenarioId) =>
-    `/simulator/recruit-ai-v2/scenarios/${encodeURIComponent(scenarioId)}/run`
+    `/simulator/recruit-ai-v2/scenarios/${encodeURIComponent(scenarioId)}/run`,
+  playgroundMeta: "/simulator/recruit-ai-v2/playground/meta",
+  playgroundSessions: "/simulator/recruit-ai-v2/playground/sessions",
+  playgroundSession: (sessionId) =>
+    `/simulator/recruit-ai-v2/playground/sessions/${encodeURIComponent(sessionId)}`,
+  playgroundTurn: (sessionId) =>
+    `/simulator/recruit-ai-v2/playground/sessions/${encodeURIComponent(sessionId)}/turns`,
+  playgroundReset: (sessionId) =>
+    `/simulator/recruit-ai-v2/playground/sessions/${encodeURIComponent(sessionId)}/reset`,
+  playgroundCandidate: (sessionId) =>
+    `/simulator/recruit-ai-v2/playground/sessions/${encodeURIComponent(sessionId)}/regression-candidate`
 };
+
+export const PLAYGROUND_EXPECTATIONS = [
+  "greeting",
+  "partial_location",
+  "qualification",
+  "counteroffer",
+  "clarification",
+  "reschedule",
+  "cancellation",
+  "human_escalation",
+  "language_switch"
+];
+
+export function formatPlaygroundDiagnostics(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== "object") {
+    return [];
+  }
+  return [
+    ["detectedLanguage", diagnostics.detectedLanguage],
+    ["preferredConversationLanguage", diagnostics.preferredConversationLanguage],
+    ["interpretedIntent", diagnostics.interpretedIntent],
+    ["confidence", diagnostics.confidence],
+    ["currentStage", diagnostics.currentStage],
+    ["clarificationRequired", diagnostics.clarificationRequired],
+    ["appointmentState", diagnostics.appointmentState],
+    ["pendingQuestion", diagnostics.pendingQuestion],
+    ["decisionCode", diagnostics.decisionCode],
+    ["proposedSideEffect", diagnostics.proposedSideEffect],
+    ["authorizationResult", diagnostics.authorizationResult],
+    ["humanEscalationState", diagnostics.humanEscalationState],
+    ["elapsedMs", diagnostics.elapsedMs]
+  ];
+}

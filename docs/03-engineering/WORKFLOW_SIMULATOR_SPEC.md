@@ -573,6 +573,15 @@ Operations Center → Workflow Simulator now includes a **Recruit AI v2 Scenario
 
 **Regression rule:** every confirmed production Recruit AI defect should become a deterministic v2 simulator scenario before closure.
 
+### Custom Conversation Playground
+
+Same Workflow Simulator page also includes **Recruit AI v2 Custom Conversation**:
+
+- Interactive chat against the same ephemeral v2 pipeline
+- Optional expectation PASS/FAIL
+- Sanitized “Save as Regression Candidate” export (manual promotion to scenario pack)
+- Docs: [recruit-ai-v2/11_CUSTOM_CONVERSATION_PLAYGROUND.md](./recruit-ai-v2/11_CUSTOM_CONVERSATION_PLAYGROUND.md)
+
 ---
 
 **Historical note:** The original 8A.4 document was written as a pre-implementation spec; workflow simulator code and Recruit AI v2 scenarios have since shipped.
