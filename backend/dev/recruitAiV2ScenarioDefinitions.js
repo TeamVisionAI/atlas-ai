@@ -744,6 +744,152 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "license-confusion-orlando-faq-flow",
+    name: "License Confusion + Orlando FAQ Flow",
+    category: "production_defect",
+    description:
+      "Orlando + 'sí, tengo licencia' must not satisfy work auth; clarify license; answer insurance/license/compensation FAQs; Zoom for out-of-area.",
+    seed: {
+      preferredLanguage: "english",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "lc01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.license-orlando.t01",
+        expect: {
+          intent: "greeting",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc02",
+        text: "Orlando",
+        inboundMessageId: "sim-wamid.license-orlando.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Orlando",
+          proposedState: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc03",
+        text: "sí",
+        inboundMessageId: "sim-wamid.license-orlando.t03",
+        setup: {
+          lastQuestionAsked: "confirm_location",
+          lastAtlasOutboundText: "Perfecto. ¿Orlando, Florida?",
+          knownFacts: {
+            city: "Orlando",
+            proposedState: "FL",
+            cityCertainty: "partial",
+            stateCertainty: "proposed"
+          }
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Orlando",
+          state: "FL",
+          shouldEscalate: false,
+          nextAction: "continue_qualification",
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc04",
+        text: "sí, tengo licencia",
+        inboundMessageId: "sim-wamid.license-orlando.t04",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "ambiguous_license_statement",
+          workAuthorization: null,
+          financialLicenseStatus: "unclear",
+          shouldEscalate: false,
+          nextAction: "clarify_license_type",
+          pendingQuestion: "clarify_license_type",
+          replyIncludes: ["conducir"],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc05",
+        text: "de que se trata?",
+        inboundMessageId: "sim-wamid.license-orlando.t05",
+        expect: {
+          intent: "opportunity_question",
+          shouldEscalate: false,
+          nextAction: "answer_brief_value_prop_then_qualify",
+          pendingQuestion: "clarify_license_type",
+          workAuthorization: null,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc06",
+        text: "vivo en Orlando, me queda muy lejos, tienes virtual?",
+        inboundMessageId: "sim-wamid.license-orlando.t06",
+        expect: {
+          intent: "provide_meeting_preference",
+          meetingType: "zoom",
+          workAuthorization: null,
+          shouldEscalate: false,
+          replyIncludes: ["Zoom"],
+          replyExcludes: ["2500 NW 79th"],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc07",
+        text: "Is this insurance?",
+        inboundMessageId: "sim-wamid.license-orlando.t07",
+        expect: {
+          intent: "insurance_question",
+          shouldEscalate: false,
+          nextAction: "answer_insurance_faq_then_resume",
+          replyIncludes: ["seguro"],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc08",
+        text: "Do I need a license?",
+        inboundMessageId: "sim-wamid.license-orlando.t08",
+        expect: {
+          intent: "license_requirement_question",
+          shouldEscalate: false,
+          nextAction: "answer_license_requirement_then_resume",
+          replyIncludes: ["licenci"],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lc09",
+        text: "How much money do I make?",
+        inboundMessageId: "sim-wamid.license-orlando.t09",
+        expect: {
+          intent: "compensation_question",
+          shouldEscalate: false,
+          nextAction: "answer_compensation_faq_then_resume",
+          replyExcludes: ["$"],
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 

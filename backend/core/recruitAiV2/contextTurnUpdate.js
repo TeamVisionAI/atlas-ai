@@ -103,7 +103,24 @@ function buildNextContextFromInterpretation({
   ) {
     nextContext.knownFacts = {
       ...nextContext.knownFacts,
-      workAuthorization: Boolean(interpretation.entities.workAuthorization)
+      workAuthorization: Boolean(interpretation.entities.workAuthorization),
+      workAuthorizationStatus: Boolean(interpretation.entities.workAuthorization)
+        ? "authorized"
+        : "not_authorized"
+    };
+  }
+
+  if (
+    interpretation.intent === "ambiguous_license_statement" ||
+    interpretation.intent === "provide_license_clarification"
+  ) {
+    const status = interpretation.entities?.financialLicenseStatus;
+    const types = interpretation.entities?.financialLicenseTypes;
+    nextContext.knownFacts = {
+      ...nextContext.knownFacts,
+      ...(status ? { financialLicenseStatus: status } : {}),
+      ...(Array.isArray(types) ? { financialLicenseTypes: types } : {})
+      // Intentionally do not touch workAuthorization here (BR-083).
     };
   }
 

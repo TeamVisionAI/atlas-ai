@@ -160,6 +160,15 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
+  // Never invent cities from license / authorization phrasing (BR-083).
+  if (
+    /\b(licen[cs]ia|license|permiso|autoriz|seguro|driver|conducir|215|214)\b/i.test(
+      raw
+    )
+  ) {
+    return null;
+  }
+
   const comma = raw.match(/^([^,]+),\s*(.+)$/);
   if (comma) {
     const city = titleCaseCity(comma[1]);

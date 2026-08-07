@@ -173,7 +173,8 @@ test("8. direct question during scheduling does not escalate", () => {
     conversation: { lastQuestionAsked: "confirm_slot" }
   });
   const result = turn("Is this insurance?", context);
-  assert.equal(result.interpretation.intent, "opportunity_question");
+  // BR-083: insurance has its own FAQ intent (still no handoff).
+  assert.equal(result.interpretation.intent, "insurance_question");
   assert.equal(result.structuredDecision.decision.shouldEscalate, false);
 });
 

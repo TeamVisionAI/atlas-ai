@@ -19,8 +19,14 @@ function emptyKnownFacts() {
     /** Likely state proposal; never treated as confirmed until affirmed. */
     proposedState: null,
     workAuthorization: null,
+    /** BR-083 — authorized | not_authorized | unclear | unknown … */
+    workAuthorizationStatus: "unknown",
+    /** BR-083 — independent of work authorization */
+    financialLicenseStatus: "unknown",
+    financialLicenseTypes: [],
     currentOccupation: null,
     preferredMeetingType: null,
+    coverage: null,
     fullName: null,
     name: null
   };

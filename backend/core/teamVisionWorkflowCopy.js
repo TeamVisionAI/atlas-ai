@@ -5,6 +5,7 @@
  */
 
 const { getOfficeLocation } = require("./businessRulesEngine");
+const { findFAQ } = require("./faqEngine");
 
 function getCanonicalOfficeAddress() {
   return getOfficeLocation().fullAddress;
@@ -109,6 +110,51 @@ function getCanonicalFaqAnswer(language) {
     : "We work in financial advisory and distribution services. No experience is required, and you'll learn more during the interview.";
 }
 
+function getInsuranceFaqAnswer(language) {
+  return (
+    findFAQ("is this insurance", language === "es" ? "es" : "en") ||
+    getCanonicalFaqAnswer(language)
+  );
+}
+
+function getLicenseRequirementFaqAnswer(language) {
+  return (
+    findFAQ("do I need a license", language === "es" ? "es" : "en") ||
+    (language === "es"
+      ? "Como es una profesión licenciada, todos realizan un curso de licencia. Durante la entrevista te explicarán cómo funciona el proceso y cómo te acompañaremos en cada paso."
+      : "Since it's a licensed profession, everyone completes a licensing course. During the interview we'll explain how the process works and how we'll help you through it.")
+  );
+}
+
+function getCompensationFaqAnswer(language) {
+  return (
+    findFAQ("how much does it pay", language === "es" ? "es" : "en") ||
+    (language === "es"
+      ? "No es un trabajo por hora. Durante la entrevista te explicarán cómo funciona la compensación, responderán tus preguntas y podrás decidir si es una buena oportunidad para ti."
+      : "This isn't an hourly position. During the interview we'll explain how the compensation works, answer your questions, and you can decide if it's a good fit for you.")
+  );
+}
+
+/** BR-083 — generic “tengo licencia” is ambiguous (often driver's license). */
+function getClarifyLicenseTypeMessage(language) {
+  return language === "es"
+    ? "¿Te refieres a una licencia profesional de seguros o servicios financieros, o a la licencia de conducir?"
+    : "Do you mean a professional insurance/financial-services license, or a driver's license?";
+}
+
+function getClarifyWorkAuthAfterLicenseMessage(language) {
+  return language === "es"
+    ? "Perfecto, gracias. Por separado, ¿tienes autorización legal o documentación para trabajar en Estados Unidos?"
+    : "Got it, thanks. Separately, do you have legal authorization or documentation to work in the United States?";
+}
+
+function getOutsideZoomDayPartMessage(city, language) {
+  const place = city || (language === "es" ? "tu área" : "your area");
+  return language === "es"
+    ? `Como estás en ${place}, podemos hacer la entrevista por Zoom. ¿Prefieres en la mañana o en la tarde?`
+    : `Since you're in ${place}, we can do the interview by Zoom. Do you prefer morning or afternoon?`;
+}
+
 function buildBookingConfirmation({ interviewType, slotLabel, language }) {
   const isZoom = String(interviewType || "").toLowerCase().includes("zoom");
   const officeAddress = getCanonicalOfficeAddress();
@@ -144,5 +190,11 @@ module.exports = {
   getDayPartClarificationQuestion,
   getHandoffMessage,
   getCanonicalFaqAnswer,
+  getInsuranceFaqAnswer,
+  getLicenseRequirementFaqAnswer,
+  getCompensationFaqAnswer,
+  getClarifyLicenseTypeMessage,
+  getClarifyWorkAuthAfterLicenseMessage,
+  getOutsideZoomDayPartMessage,
   buildBookingConfirmation
 };
