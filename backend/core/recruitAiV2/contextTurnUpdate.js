@@ -59,7 +59,10 @@ function buildNextContextFromInterpretation({
     };
   }
 
-  if (interpretation.intent === "provide_location") {
+  if (
+    interpretation.intent === "provide_location" ||
+    interpretation.intent === "correct_location"
+  ) {
     const completeness = interpretation.entities?.completeness;
     const city =
       interpretation.entities?.city || nextContext.knownFacts?.city || null;
@@ -71,6 +74,7 @@ function buildNextContextFromInterpretation({
         : null);
 
     if (completeness === "complete" && city && state) {
+      // Correction overwrites prior city; no competing active city fact.
       nextContext.knownFacts = {
         ...nextContext.knownFacts,
         city,
@@ -93,10 +97,32 @@ function buildNextContextFromInterpretation({
     }
   }
 
+  if (
+    interpretation.intent === "provide_authorization" &&
+    interpretation.entities?.workAuthorization != null
+  ) {
+    nextContext.knownFacts = {
+      ...nextContext.knownFacts,
+      workAuthorization: Boolean(interpretation.entities.workAuthorization)
+    };
+  }
+
   if (interpretation.intent === "provide_name" && interpretation.entities?.name) {
     nextContext.knownFacts = {
       ...nextContext.knownFacts,
       name: interpretation.entities.name
+    };
+  }
+
+  if (
+    interpretation.intent === "request_language_switch" &&
+    interpretation.entities?.requestedLanguage
+  ) {
+    nextContext.preferredLanguage = interpretation.entities.requestedLanguage;
+    nextContext.languageMeta = {
+      ...(nextContext.languageMeta || {}),
+      source: "explicit",
+      lastMessageLanguage: interpretation.entities.requestedLanguage
     };
   }
 

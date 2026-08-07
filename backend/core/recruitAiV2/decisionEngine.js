@@ -95,6 +95,45 @@ function shouldEscalateAfterClarifications(context, family = null) {
 }
 
 /**
+ * Resolve which qualification template/question to resume after a digression.
+ * Canonical Team Vision order: location → authorization → day-part.
+ */
+function resolveQualificationResume(context) {
+  const facts = context?.knownFacts || {};
+  const cityOk = Boolean(facts.city) && facts.cityCertainty === "confirmed";
+  const stateOk = Boolean(facts.state) && facts.stateCertainty === "confirmed";
+
+  if (!facts.city || facts.cityCertainty === "unknown") {
+    return {
+      templateKey: "greeting_ask_location",
+      lastQuestionAsked: "ask_location"
+    };
+  }
+  if (!stateOk) {
+    return {
+      templateKey: facts.proposedState
+        ? "confirm_location_proposal"
+        : "ask_state",
+      lastQuestionAsked: facts.proposedState ? "confirm_location" : "ask_state",
+      entities: {
+        city: facts.city,
+        proposedState: facts.proposedState || null
+      }
+    };
+  }
+  if (facts.workAuthorization == null) {
+    return {
+      templateKey: "continue_qualification_after_location",
+      lastQuestionAsked: "ask_authorization"
+    };
+  }
+  return {
+    templateKey: "ask_day_part_simple",
+    lastQuestionAsked: "ask_day_part"
+  };
+}
+
+/**
  * Decide next business action from context + interpretation.
  * Availability is optional injected tool result (read-only).
  */
@@ -139,9 +178,60 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.OPPORTUNITY_QUESTION) {
+    const resume = resolveQualificationResume(context);
     structured.decision.nextAction = NEXT_ACTIONS.ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY;
+    structured.decision.shouldEscalate = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
     structured.customerReplyPlan.templateKey = "value_prop_then_qualify";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      resumeTemplateKey: resume.templateKey,
+      city: context.knownFacts?.city || null,
+      proposedState: context.knownFacts?.proposedState || null,
+      state: context.knownFacts?.state || null
+    };
+    structured.reasonCodes.push(REASON_CODES.DIRECT_QUESTION_ANSWERED);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      currentStage: context.currentStage || STAGES.QUALIFICATION,
+      conversation: {
+        clarificationCount: 0,
+        pendingClarification: null,
+        lastQuestionAsked: resume.lastQuestionAsked,
+        lastProspectIntent: INTENTS.OPPORTUNITY_QUESTION
+      }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.REQUEST_LANGUAGE_SWITCH) {
+    const requested =
+      interpretation.entities?.requestedLanguage || interpretation.preferredLanguage;
+    structured.decision.nextAction = NEXT_ACTIONS.SWITCH_LANGUAGE_CONTINUE;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    const resume = resolveQualificationResume({
+      ...context,
+      preferredLanguage: requested
+    });
+    structured.customerReplyPlan.templateKey = "language_switch_resume";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      resumeTemplateKey: resume.templateKey,
+      city: context.knownFacts?.city || null,
+      proposedState: context.knownFacts?.proposedState || null
+    };
+    structured.reasonCodes.push(REASON_CODES.LANGUAGE_EXPLICIT_SWITCH);
+    structured.contextPatch = {
+      preferredLanguage: requested,
+      languageMeta: {
+        source: "explicit",
+        lastMessageLanguage: requested
+      },
+      conversation: {
+        lastQuestionAsked: resume.lastQuestionAsked,
+        lastProspectIntent: INTENTS.REQUEST_LANGUAGE_SWITCH
+      }
+    };
     return structured;
   }
 
@@ -149,6 +239,155 @@ function decideConversationTurn({
     structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
     structured.customerReplyPlan.templateKey = "clarify_once";
     structured.reasonCodes.push(REASON_CODES.ECHO_DETECTED);
+    return structured;
+  }
+
+  if (intent === INTENTS.CORRECT_LOCATION) {
+    const city = interpretation.entities?.city || null;
+    const state = interpretation.entities?.state || null;
+    const proposedState = interpretation.entities?.proposedState || null;
+    const complete =
+      interpretation.entities?.completeness === "complete" && city && state;
+    const pendingBefore = context.conversation?.lastQuestionAsked || "ask_authorization";
+
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_CORRECTION_THEN_RESUME;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.reasonCodes.push(REASON_CODES.FACT_CORRECTION);
+    structured.reasonCodes.push(REASON_CODES.PENDING_QUESTION_DEFERRED);
+
+    if (complete) {
+      const resumeKey =
+        pendingBefore === "ask_authorization" ||
+        context.knownFacts?.workAuthorization == null
+          ? "continue_qualification_after_location"
+          : resolveQualificationResume({
+              ...context,
+              knownFacts: {
+                ...context.knownFacts,
+                city,
+                state,
+                cityCertainty: "confirmed",
+                stateCertainty: "confirmed",
+                workAuthorization: context.knownFacts?.workAuthorization
+              }
+            }).templateKey;
+      structured.customerReplyPlan.templateKey = "acknowledge_location_correction";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        city,
+        state,
+        proposedState: state,
+        resumeTemplateKey: resumeKey
+      };
+      structured.contextPatch = {
+        currentStage: STAGES.QUALIFICATION,
+        knownFacts: {
+          city,
+          state,
+          cityCertainty: "confirmed",
+          stateCertainty: "confirmed",
+          proposedState: null
+        },
+        conversation: {
+          clarificationCount: 0,
+          pendingClarification: null,
+          lastQuestionAsked:
+            resumeKey === "continue_qualification_after_location"
+              ? "ask_authorization"
+              : resolveQualificationResume({
+                  knownFacts: {
+                    city,
+                    state,
+                    cityCertainty: "confirmed",
+                    stateCertainty: "confirmed",
+                    workAuthorization: context.knownFacts?.workAuthorization
+                  }
+                }).lastQuestionAsked,
+          lastProspectIntent: INTENTS.CORRECT_LOCATION,
+          confirmedFields: Array.from(
+            new Set([...(context.conversation?.confirmedFields || []), "city", "state"])
+          )
+        }
+      };
+      return structured;
+    }
+
+    // Partial correction — propose state, do not keep stale city.
+    structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LOCATION;
+    structured.customerReplyPlan.templateKey = proposedState
+      ? "acknowledge_correction_confirm_location"
+      : "acknowledge_correction_ask_state";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      city,
+      proposedState
+    };
+    structured.contextPatch = {
+      currentStage: STAGES.QUALIFICATION,
+      knownFacts: {
+        city,
+        state: null,
+        cityCertainty: "partial",
+        stateCertainty: proposedState ? "proposed" : "unknown",
+        proposedState: proposedState || null
+      },
+      conversation: {
+        clarificationCount: 0,
+        pendingClarification: null,
+        lastQuestionAsked: proposedState ? "confirm_location" : "ask_state",
+        lastProspectIntent: INTENTS.CORRECT_LOCATION
+      }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.PROVIDE_AUTHORIZATION) {
+    const authorized = interpretation.entities?.workAuthorization;
+    structured.decision.shouldEscalate = false;
+    structured.reasonCodes.push(REASON_CODES.AUTHORIZATION_CAPTURED);
+
+    if (authorized === false) {
+      structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+      structured.customerReplyPlan.templateKey = "authorization_denied";
+      structured.contextPatch = {
+        knownFacts: { workAuthorization: false },
+        conversation: {
+          clarificationCount: 0,
+          pendingClarification: null,
+          lastQuestionAsked: null,
+          lastProspectIntent: INTENTS.PROVIDE_AUTHORIZATION,
+          confirmedFields: Array.from(
+            new Set([
+              ...(context.conversation?.confirmedFields || []),
+              "workAuthorization"
+            ])
+          )
+        }
+      };
+      return structured;
+    }
+
+    structured.decision.nextAction = NEXT_ACTIONS.CAPTURE_AUTHORIZATION_CONTINUE;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey =
+      "continue_qualification_after_authorization";
+    structured.contextPatch = {
+      currentStage: STAGES.QUALIFICATION,
+      knownFacts: { workAuthorization: true },
+      conversation: {
+        clarificationCount: 0,
+        pendingClarification: null,
+        lastQuestionAsked: "ask_day_part",
+        lastProspectIntent: INTENTS.PROVIDE_AUTHORIZATION,
+        confirmedFields: Array.from(
+          new Set([
+            ...(context.conversation?.confirmedFields || []),
+            "workAuthorization"
+          ])
+        )
+      }
+    };
     return structured;
   }
 
@@ -439,6 +678,7 @@ function decideConversationTurn({
   }
 
   // Recoverable unknown — clarify first; escalate only after repeats.
+  // Never use human-handoff copy for ordinary mid-flow unknowns on first pass.
   if (interpretation.confidence < 0.5) {
     structured.reasonCodes.push(REASON_CODES.RECOVERABLE_AMBIGUITY);
     if (shouldEscalateAfterClarifications(context)) {
@@ -459,6 +699,8 @@ function decideConversationTurn({
     }
 
     structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
+    structured.decision.shouldEscalate = false;
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
     structured.customerReplyPlan.templateKey = "clarify_once";
     structured.contextPatch = {
       conversation: {
@@ -470,6 +712,8 @@ function decideConversationTurn({
   }
 
   structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
+  structured.decision.shouldEscalate = false;
+  structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
   structured.customerReplyPlan.templateKey = "clarify_once";
   return structured;
 }
@@ -510,5 +754,6 @@ function decideSafeFailure({ context, interpretation, failureReason = null } = {
 module.exports = {
   decideConversationTurn,
   decideSafeFailure,
-  buildBaseDecision
+  buildBaseDecision,
+  resolveQualificationResume
 };

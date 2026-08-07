@@ -1186,6 +1186,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 10. **Capture diagnostics** — Capture-only turns log sanitized intent/confidence/language/stage/clarification/reasonCodes/elapsedMs. No raw message bodies, phones, provider payloads, secrets, or stack traces. Does not convert capture-only turns into full shadow rows.
 11. **Boundaries** — No v2 cutover, no shadow sample increase, no v2 WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review auth changes.
 12. **Simulator regression** — Every confirmed production Recruit AI defect must be added as a deterministic Workflow Simulator (Recruit AI v2 Scenarios) case before the defect is considered closed. Simulator runs are ephemeral and must never write production context/shadow tables or execute side effects.
+13. **Fact correction & mid-flow questions** — Correction language (`digo` / `actually` / `vivo en`…) must overwrite the active city fact (no competing stale city). Pending questions are context, not a prison: interpret the new message first. After a valid authorization answer, ask the next canonical Team Vision step in the same reply. Direct opportunity/FAQ questions must be answered with approved copy and resume qualification — never human-handoff copy unless an explicit escalate condition exists. A single foreign-language digression must not flip established conversation language.
 
 ---
 

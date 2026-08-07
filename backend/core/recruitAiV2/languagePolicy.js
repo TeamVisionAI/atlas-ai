@@ -114,6 +114,23 @@ function resolveConversationalLanguage({
     };
   }
 
+  // Established active-conversation language is sticky against a single
+  // foreign-language digression (e.g. one English FAQ mid-Spanish flow).
+  if (
+    meta.source === LANGUAGE_SOURCE.ACTIVE_CONVERSATION &&
+    (prior === LANGUAGES.SPANISH || prior === LANGUAGES.ENGLISH) &&
+    msgLang !== LANGUAGES.UNKNOWN &&
+    msgLang !== prior &&
+    intent !== "request_language_switch"
+  ) {
+    return {
+      preferredLanguage: prior,
+      languageMeta: meta,
+      adapted: false,
+      reason: "ACTIVE_CONVERSATION_STICKY"
+    };
+  }
+
   // Clear Spanish greeting/evidence may supersede default/inferred English.
   if (
     isMutableLanguageSource(meta.source) &&

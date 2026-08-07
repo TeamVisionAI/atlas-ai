@@ -647,6 +647,103 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "fact-correction-mid-flow-question",
+    name: "Fact Correction + Mid-Flow Question",
+    category: "production_defect",
+    description:
+      "Hola → Miami, Florida → Digo, vivo en Doral → Sí tengo permiso → What is this about?",
+    seed: {
+      preferredLanguage: "english",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "fc01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.fact-correct.t01",
+        expect: {
+          intent: "greeting",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fc02",
+        text: "Miami, florida",
+        inboundMessageId: "sim-wamid.fact-correct.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          state: "FL",
+          cityCertainty: "confirmed",
+          stateCertainty: "confirmed",
+          shouldEscalate: false,
+          nextAction: "continue_qualification",
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fc03",
+        text: "Digo, vivo en Doral",
+        inboundMessageId: "sim-wamid.fact-correct.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "correct_location",
+          city: "Doral",
+          state: "FL",
+          cityCertainty: "confirmed",
+          stateCertainty: "confirmed",
+          shouldEscalate: false,
+          nextAction: "acknowledge_correction_then_resume",
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fc04",
+        text: "Si tengo permiso",
+        inboundMessageId: "sim-wamid.fact-correct.t04",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Perfecto, gracias por aclararlo. Entonces estás en Doral, Florida. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          shouldEscalate: false,
+          nextAction: "capture_authorization_continue",
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fc05",
+        text: "What is this about?",
+        inboundMessageId: "sim-wamid.fact-correct.t05",
+        setup: {
+          lastQuestionAsked: "ask_day_part",
+          lastAtlasOutboundText:
+            "Perfecto, gracias. Excelente. Estamos realizando las entrevistas en nuestras oficinas."
+        },
+        expect: {
+          intent: "opportunity_question",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          nextAction: "answer_brief_value_prop_then_qualify",
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
