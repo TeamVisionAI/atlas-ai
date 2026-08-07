@@ -1,8 +1,9 @@
 /**
- * Recruit AI v2 — qualification fact separation (BR-083 / BR-089 / BR-090).
+ * Recruit AI v2 — qualification fact separation (BR-083 / BR-089 / BR-090 / BR-096).
  * workAuthorization and financialLicense* are independent facts.
  * BR-089 — license requirement questions ≠ ambiguous license statements.
  * BR-090 — explicit Puerto Rico origin statements satisfy work authorization.
+ * BR-096 — pending-auth status shorthand (residente / ciudadano) satisfies work auth.
  */
 
 const {
@@ -266,6 +267,44 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
+  // Negatives first while auth is pending — "estoy esperando el permiso" must not
+  // match the generic permiso affirmative path.
+  const noAuth =
+    pendingAuth &&
+    (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
+      /\b(no tengo (permiso|papeles)|todavia no tengo permiso|estoy esperando( el)? permiso|sin permiso|sin papeles)\b/.test(
+        t
+      ) ||
+      /\b(i don'?t have (a )?work permit|i am not authorized to work( yet)?|i'?m not authorized to work( yet)?|not authorized( to work)?( yet)?)\b/.test(
+        t
+      ));
+  if (noAuth) {
+    return WORK_AUTHORIZATION.NOT_AUTHORIZED;
+  }
+
+  // Implements BR-096 — status / birthplace shorthand while ask_authorization is pending.
+  // Bare "residente" / "ciudadano" / "resident" / "citizen" is enough; optional soy/I'm also accepted.
+  const pendingStatusShorthand =
+    pendingAuth &&
+    !mentionsLicense(raw) &&
+    (/^(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$/.test(
+      t
+    ) ||
+      /^(i'?m a |i am a )?(permanent )?resident([.!]?)?$/.test(t) ||
+      /^(i'?m a |i am a )?(us |u\.s\.? |american )?citizen([.!]?)?$/.test(t));
+
+  // Birthplace affirmatives (EN/ES) — not a location correction when auth is pending.
+  const pendingBornHereAffirmative =
+    pendingAuth &&
+    !mentionsLicense(raw) &&
+    (/^(yo )?(naci|nacio) (aqui|en (estados unidos|ee\.? ?uu\.?|usa|us|eeuu))([.!]?)?$/.test(
+      t
+    ) ||
+      /^(i )?(was )?born (here|in the (us|u\.s\.?|usa|united states))([.!]?)?$/.test(
+        t
+      ) ||
+      /^born here([.!]?)?$/.test(t));
+
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);
   const yesShort =
@@ -276,20 +315,21 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
         mentionsWorkAuthorization(raw)));
   const patternYes =
     mentionsWorkAuthorization(raw) &&
-    !/\b(no|not|sin)\b/.test(t) &&
+    !/\b(no|not|sin|esperando|todavia)\b/.test(t) &&
     !mentionsLicense(raw);
 
-  if (yesAuth || yesShort || patternYes) {
+  if (
+    pendingStatusShorthand ||
+    pendingBornHereAffirmative ||
+    yesAuth ||
+    yesShort ||
+    patternYes
+  ) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
-  const noAuth =
-    pendingAuth &&
-    (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
-      /\b(no tengo permiso|not authorized|sin permiso|sin papeles)\b/.test(t));
-  if (noAuth) {
-    return WORK_AUTHORIZATION.NOT_AUTHORIZED;
-  }
+  // "tengo visa" / bare visa mentions intentionally fall through (null) so existing
+  // clarification behavior can run — never auto-satisfy work authorization.
 
   return null;
 }

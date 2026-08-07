@@ -1160,6 +1160,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-096 — Recruit AI Pending Work-Authorization Status Shorthand
+
+**Implements:** Recognize short legal-status answers (`residente`, `ciudadano`/`ciudadana`, and close variants) as affirmative work authorization when Atlas is specifically asking for work authorization  
+**Domain:** Recruit AI / Qualification  
+**Depends on:** BR-081, BR-083, BR-095  
+**Related:** BR-090 (Puerto Rico origin), BR-089 (license ≠ work auth)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/qualificationFacts.js` (`parseWorkAuthorizationAnswer`)  
+**Tests:** `backend/test/recruitAiV2WorkAuthStatusShorthandBr096.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/24_WORK_AUTH_STATUS_SHORTHAND.md`
+
+### Rules
+
+1. **Pending-auth only** — Shorthand applies when `lastQuestionAsked` is `ask_authorization` (or equivalent pending work-auth ask).
+2. **Accepted Spanish status forms** — At minimum: `residente`, `residente permanente`, `ciudadano`, `ciudadana`, `ciudadano americano`, `ciudadana americana` (case/accent/punctuation tolerant via BR-095).
+3. **Accepted birthplace affirmatives (pending-auth)** — At minimum: `nací aquí` / `naci aqui`, `yo nací aquí`, `nací en Estados Unidos` / `nací en USA`, `born here`, `I was born here`, `I was born in the US`. These satisfy work authorization and must not be reinterpreted as a location answer or trigger an immigration-document re-ask.
+4. **No “soy …” requirement** — Do not require `soy residente` / `soy ciudadano` when the pending question already makes meaning clear.
+5. **License boundary** — License-only wording still does not satisfy work authorization (BR-083 / BR-089).
+6. **No out-of-context inventing** — Bare status / birthplace tokens outside a pending work-auth question must not invent authorization.
+7. **Boundaries** — Does not enable execution, change shadow/capture, cut over live CE, send WhatsApp, or mutate appointments/Calendar/BR-080.
+
+---
+
 ## BR-095 — Recruit AI Deterministic Inbound Input Normalization
 
 **Implements:** Shared interpretation-only normalization layer so WhatsApp case/accent/punctuation/whitespace variants classify equivalently without mutating original transcript text  
