@@ -41,6 +41,11 @@ const {
   resolveDateExclusions,
   isDateOnlySchedule
 } = require("./dateResolution");
+const {
+  looksLikeMeetingAccessRequest,
+  looksLikeRepetitionSignal,
+  hasAvailabilityConstraint
+} = require("./schedulingMemory");
 const { resolveConversationalLanguage } = require("./languagePolicy");
 
 function detectMessageLanguageHint(text) {
@@ -788,6 +793,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   ) {
     intent = INTENTS.RESCHEDULE_REQUEST;
     confidence = 0.88;
+  } else if (looksLikeMeetingAccessRequest(text)) {
+    // BR-087 — Zoom link / join logistics (before Zoom modality preference).
+    intent = INTENTS.MEETING_ACCESS_REQUEST;
+    confidence = 0.94;
   } else if (looksLikeZoomPreference(text)) {
     intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
     confidence = 0.9;
@@ -802,6 +811,16 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     confidence = 0.93;
     entities.availabilityConstraint = availabilityConstraint;
     entities.requestedTime = null;
+    entities.repetitionSignal = looksLikeRepetitionSignal(text);
+  } else if (
+    looksLikeRepetitionSignal(text) &&
+    hasAvailabilityConstraint(context)
+  ) {
+    // BR-087 — "ya te dije" with known after-5; do not force prospect to repeat.
+    intent = INTENTS.REASSERT_KNOWN_FACT;
+    confidence = 0.92;
+    entities.repetitionSignal = true;
+    entities.reassertedFact = "availability_constraint";
   } else if (needsAmPmClarification) {
     intent = INTENTS.CLARIFY_AM_PM;
     confidence = 0.9;

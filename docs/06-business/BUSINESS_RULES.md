@@ -1160,6 +1160,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-087 — Recruit AI Scheduling Memory and Meeting Logistics Continuity
+
+**Implements:** Preserve independent scheduling dimensions across meeting-modality changes; ask only for missing information; Zoom-link / meeting-access logistics without fabricating URLs (BR-076); repetition/frustration acknowledgement without recapture; clean withdraw closure without companion-reopen copy  
+**Domain:** Recruit AI / Conversation / Scheduling dialogue  
+**Depends on:** BR-081, BR-083, BR-084, BR-085, BR-076, BR-049  
+**Related:** BR-086 (opt-out distinct from withdraw), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in code (flags unchanged; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/schedulingMemory.js`, interpreter, decisionEngine, responseRenderer, sideEffectAuthorizer  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix6.test.js`  
+**Simulator:** `long-scheduling-memory-modality-zoom-link`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/17_PLAYGROUND_FEEDBACK_SCHEDULING_MEMORY.md`
+
+### Rules
+
+1. **Independent dimensions** — Treat location, coverage, meeting type, availability constraints, proposed date, proposed time, confirmed date/time, and scheduling stage as separate. Changing meeting type must not erase availability / proposed date / proposed time unless the modality change invalidates the slot.
+2. **Post-modality resume** — After in-person travel confirm or Zoom reselection, confirm the existing candidate slot (or ask only for the next missing fact). Never reset to morning/afternoon when after-5 / date / time are already known and still applicable.
+3. **Zoom clears office** — Explicit Zoom restores virtual modality and clears office location; retain date/time candidates.
+4. **Ask only for missing information** — Before rendering a scheduling question, check durable context. Do not re-ask day-part, time, date, or modality when known with sufficient certainty.
+5. **Meeting-access / Zoom-link intent** — Recognize EN/ES link/join requests. Never fabricate a URL. Unconfirmed appointment: explain link is shared after confirmation and resume scheduling. Confirmed + canonical URL: propose BR-076 approved URL (side effect denied). Confirmed but unavailable: pending/unavailable copy.
+6. **Repetition signals** — “ya te dije” / “I already told you” → inspect context, acknowledge briefly, reuse known facts; do not escalate solely for mild frustration.
+7. **Clean withdrawal** — Explicit withdraw/cancel-of-process gets a concise terminal acknowledgement without companion-reopen or continued-outreach copy. Withdraw ≠ STOP unless stated (BR-086).
+8. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-086 — Recruit AI Natural-Language Communication Opt-Out Resolution
 
 **Implements:** Deterministic natural-language stop-contact / opt-out detection (EN/ES) with priority over location correction, name extraction, FAQ, and scheduling; keep opt-out distinct from appointment cancel and withdraw interest; combined cancel+opt-out may propose both denied side effects  

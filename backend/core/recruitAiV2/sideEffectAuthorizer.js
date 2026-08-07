@@ -91,6 +91,19 @@ function authorizeSideEffects({
     });
   }
 
+  // BR-087 — Zoom link share remains proposal-only (BR-076; never fabricate).
+  if (
+    nextAction === "acknowledge_meeting_access" ||
+    intent === "meeting_access_request"
+  ) {
+    proposals.push({
+      type: "share_zoom_link",
+      status: "proposed",
+      authorized: false,
+      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
+    });
+  }
+
   if (structuredDecision?.decision?.shouldEscalate) {
     proposals.push({
       type: "mark_human_attention",
