@@ -6,6 +6,7 @@
 
 const { LANGUAGES } = require("./constants");
 const { sanitizeCustomerCopy } = require("./sanitize");
+const { stateDisplayName } = require("./locationFacts");
 const {
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
@@ -37,6 +38,7 @@ const COPY = Object.freeze({
       "Happy to help — could you share the detail I just asked for so we can keep moving?",
     confirm_location_proposal: "Perfect. {city}, {proposedStateName}?",
     ask_state: "Perfect. Which state is {city} in?",
+    ask_city: "Thanks. What city in {proposedStateName} do you live in?",
     continue_qualification: "Thanks — that helps. Let's continue.",
     continue_qualification_after_location:
       "Thanks. Do you have work authorization or legal documentation to work in the United States?",
@@ -162,6 +164,7 @@ const COPY = Object.freeze({
       "Con gusto te ayudo — ¿puedes compartir el dato que te acabo de pedir para continuar?",
     confirm_location_proposal: "Perfecto. ¿{city}, {proposedStateName}?",
     ask_state: "Perfecto. ¿En qué estado está {city}?",
+    ask_city: "Gracias. ¿En qué ciudad de {proposedStateName} vives?",
     continue_qualification: "Gracias — eso ayuda. Continuemos.",
     continue_qualification_after_location:
       "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?",
@@ -327,10 +330,11 @@ function formatRequestedTime(hhmm, language) {
 
 function proposedStateName(code, language) {
   const entry = STATE_DISPLAY[String(code || "").toUpperCase()];
-  if (!entry) {
-    return code || "";
+  if (entry) {
+    return language === LANGUAGES.SPANISH ? entry.es : entry.en;
   }
-  return language === LANGUAGES.SPANISH ? entry.es : entry.en;
+  // BR-102 — fall back to canonical U.S. state display for any USPS code.
+  return stateDisplayName(code, language === LANGUAGES.SPANISH ? "spanish" : "english");
 }
 
 function localeCode(language) {
@@ -351,6 +355,12 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
       return getStateQuestion(city, lang, { proposedState: proposed });
     case "ask_state":
       return getStateQuestion(city, lang, {});
+    case "ask_city": {
+      const stateName = proposedStateName(proposed || entities.state, language);
+      return language === LANGUAGES.SPANISH
+        ? `¿En qué ciudad de ${stateName} vives?`
+        : `What city in ${stateName} do you live in?`;
+    }
     case "continue_qualification_after_location":
       return getAuthorizationQuestion(lang);
     case "continue_qualification_after_authorization": {

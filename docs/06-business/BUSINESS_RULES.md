@@ -1160,6 +1160,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-102 — Recruit AI Partial-State Location + After-Time Scheduling
+
+**Implements:** State-only answers (`Florida` / `Texas` / …) while city+state is pending are retained as partial state with an ask-city follow-up; city then completes with the retained state. Natural after-5 phrases (`despues de la 5`, `a partir de las 5`, `after 5`, …) under `ask_time` resolve as PM availability constraints (BR-084), not generic clarification.  
+**Domain:** Recruit AI / Qualification + Scheduling continuity  
+**Depends on:** BR-081, BR-082, BR-084, BR-085, BR-094, BR-095, BR-101  
+**Related:** BR-087 (scheduling memory), BR-100 (auth), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/schedulingConstraints.js`, `interpreter.js`, `decisionEngine.js`, `contextTurnUpdate.js`, `responseRenderer.js`, `locationFacts.js`  
+**Tests:** `backend/test/recruitAiV2PartialStateAfterTimeBr102.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/30_PARTIAL_STATE_AFTER_TIME.md`
+
+### Rules
+
+1. **State-only partial** — Valid U.S. state/DC while location is pending → `completeness=state_only`, retain state, ask only for city (“¿En qué ciudad de {State} vives?”). Do not discard the state or re-ask city+state.
+2. **City completes retained state** — After state-only, a compatible city (e.g. `miami` after `florida`) confirms city+state per BR-094 completeness.
+3. **City-only preserved** — Bare city without prior state still uses BR-094 proposal/confirmation (`¿Miami, Florida?`).
+4. **New York** — Bare `New York` is state-only NY; do not invent New York City.
+5. **After-time constraints** — Under pending time (esp. afternoon/evening), phrases like `despues de la 5` / `después de las 5` / `a partir de las 5` / `luego de las 5` / `after 5` / `anytime after 5` → `availability_constraint` with PM earliest time (`17:00` for 5). No AM interpretation, no generic fallback, no invented date, no handoff.
+6. **Reuse BR-084/085** — Constraints remain independent of concrete appointment candidates; ask the next useful time question or review options after 5 — do not fabricate availability.
+7. **Bare affirmation hygiene** — Exact bare `si`/`yes`/… only; prefixed status phrases stay on auth/status paths.
+8. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-101 — Recruit AI Day-Part Context Priority for “mañana” and Hour Inheritance
 
 **Implements:** When `ask_day_part` is pending, `mañana` / `en la mañana` / `por la mañana` resolve to day-part morning (not tomorrow); only pending date asks treat `mañana` as tomorrow; confirmed day-part inherits AM/PM for bare numeric times without clarification  

@@ -1111,6 +1111,37 @@ function decideConversationTurn({
     const proposedState =
       interpretation.entities?.proposedState || context.knownFacts?.proposedState;
 
+    // Implements BR-102 — state-only partial asks for city in that state.
+    if (completeness === "state_only" || (state && !city)) {
+      structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LOCATION;
+      structured.reasonCodes.push(REASON_CODES.PARTIAL_LOCATION);
+      structured.reasonCodes.push(REASON_CODES.STATE_ONLY_LOCATION);
+      structured.customerReplyPlan.acknowledgeRequest = true;
+      structured.customerReplyPlan.templateKey = "ask_city";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        city: null,
+        state: state || null,
+        proposedState: state || null
+      };
+      structured.contextPatch = {
+        currentStage: STAGES.QUALIFICATION,
+        knownFacts: {
+          city: null,
+          state: state || null,
+          cityCertainty: "unknown",
+          stateCertainty: "partial",
+          proposedState: null
+        },
+        conversation: {
+          ...bumpClarification(context, "ask_city"),
+          lastQuestionAsked: "ask_city",
+          lastProspectIntent: INTENTS.PROVIDE_LOCATION
+        }
+      };
+      return structured;
+    }
+
     if (completeness === "partial" || (city && !state)) {
       structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LOCATION;
       structured.reasonCodes.push(REASON_CODES.PARTIAL_LOCATION);
@@ -1838,6 +1869,7 @@ function decideConversationTurn({
       pendingQ === "ask_location" ||
       pendingQ === "confirm_location" ||
       pendingQ === "ask_state" ||
+      pendingQ === "ask_city" ||
       (context.knownFacts?.workAuthorization == null &&
         context.currentStage === STAGES.QUALIFICATION &&
         !dayPartPending &&

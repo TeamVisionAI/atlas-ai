@@ -83,6 +83,16 @@ function buildNextContextFromInterpretation({
         stateCertainty: FACT_CERTAINTY.CONFIRMED,
         proposedState: null
       };
+    } else if (completeness === "state_only" && state && !city) {
+      // Implements BR-102 — retain state-only partial; ask city next.
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        city: null,
+        state,
+        cityCertainty: FACT_CERTAINTY.UNKNOWN,
+        stateCertainty: FACT_CERTAINTY.PARTIAL,
+        proposedState: null
+      };
     } else if (city) {
       nextContext.knownFacts = {
         ...nextContext.knownFacts,
