@@ -137,19 +137,22 @@ function resolveQualificationResume(context) {
     };
   }
 
-  const coverage = evaluateCoverage({
-    city: facts.city,
-    state: facts.state
-  });
-  const meetingType = facts.preferredMeetingType || null;
-  if (!meetingType && coverage.coverage === "OUTSIDE") {
+  const modality = resolveMeetingModalityForLocation(facts);
+  if (modality.coverage === "OUTSIDE") {
     return {
       templateKey: "outside_zoom_day_part",
       lastQuestionAsked: "ask_day_part",
       entities: { city: facts.city, coverage: "OUTSIDE" }
     };
   }
-  if (!meetingType && coverage.coverage === "LOCAL") {
+  if (modality.coverage === "LOCAL" && modality.meetingType === "zoom") {
+    return {
+      templateKey: "outside_zoom_day_part",
+      lastQuestionAsked: "ask_day_part",
+      entities: { city: facts.city, coverage: "LOCAL" }
+    };
+  }
+  if (modality.coverage === "LOCAL") {
     return {
       templateKey: "continue_qualification_after_authorization",
       lastQuestionAsked: "ask_day_part",
@@ -159,6 +162,55 @@ function resolveQualificationResume(context) {
   return {
     templateKey: "ask_day_part_simple",
     lastQuestionAsked: "ask_day_part"
+  };
+}
+
+/**
+ * Re-evaluate coverage → meeting modality (BR-083 / location transition fix).
+ * OUTSIDE defaults to Zoom and clears stale office/in_person coverage defaults.
+ * Prospect-explicit Zoom is preserved; prospect in_person on OUTSIDE still defaults Zoom.
+ */
+function resolveMeetingModalityForLocation(facts = {}) {
+  const coverage = evaluateCoverage({
+    city: facts.city,
+    state: facts.state
+  });
+  const outside = coverage.coverage === "OUTSIDE";
+  const source = facts.meetingPreferenceSource || null;
+  const prior = facts.preferredMeetingType || null;
+
+  if (outside) {
+    return {
+      coverage: "OUTSIDE",
+      meetingType: "zoom",
+      meetingPreferenceSource:
+        source === "prospect" && prior === "zoom" ? "prospect" : "coverage_default",
+      clearedStaleOffice: prior === "in_person" || facts.coverage === "LOCAL"
+    };
+  }
+
+  if (coverage.coverage === "LOCAL") {
+    if (source === "prospect" && prior === "zoom") {
+      return {
+        coverage: "LOCAL",
+        meetingType: "zoom",
+        meetingPreferenceSource: "prospect",
+        clearedStaleOffice: false
+      };
+    }
+    return {
+      coverage: "LOCAL",
+      meetingType: prior === "zoom" && source === "prospect" ? "zoom" : "in_person",
+      meetingPreferenceSource: source === "prospect" ? "prospect" : "coverage_default",
+      clearedStaleOffice: false
+    };
+  }
+
+  return {
+    coverage: coverage.coverage || null,
+    meetingType: prior || null,
+    meetingPreferenceSource: source,
+    clearedStaleOffice: false
   };
 }
 
@@ -446,6 +498,22 @@ function decideConversationTurn({
     structured.reasonCodes.push(REASON_CODES.PENDING_QUESTION_DEFERRED);
 
     if (complete) {
+      const modality = resolveMeetingModalityForLocation({
+        ...context.knownFacts,
+        city,
+        state
+      });
+      const nextFacts = {
+        ...context.knownFacts,
+        city,
+        state,
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        proposedState: null,
+        coverage: modality.coverage,
+        preferredMeetingType: modality.meetingType,
+        meetingPreferenceSource: modality.meetingPreferenceSource
+      };
       const resumeKey =
         pendingBefore === "ask_authorization" ||
         context.knownFacts?.workAuthorization == null
@@ -453,11 +521,7 @@ function decideConversationTurn({
           : resolveQualificationResume({
               ...context,
               knownFacts: {
-                ...context.knownFacts,
-                city,
-                state,
-                cityCertainty: "confirmed",
-                stateCertainty: "confirmed",
+                ...nextFacts,
                 workAuthorization: context.knownFacts?.workAuthorization
               }
             }).templateKey;
@@ -467,8 +531,16 @@ function decideConversationTurn({
         city,
         state,
         proposedState: state,
-        resumeTemplateKey: resumeKey
+        resumeTemplateKey: resumeKey,
+        coverage: modality.coverage
       };
+      structured.reasonCodes.push(REASON_CODES.LOCATION_COVERAGE_REEVALUATED);
+      if (modality.clearedStaleOffice) {
+        structured.reasonCodes.push(REASON_CODES.OUTSIDE_CLEARS_STALE_OFFICE);
+      }
+      if (modality.coverage === "OUTSIDE") {
+        structured.reasonCodes.push(REASON_CODES.OUTSIDE_COVERAGE_ZOOM_DEFAULT);
+      }
       structured.contextPatch = {
         currentStage: STAGES.QUALIFICATION,
         knownFacts: {
@@ -476,7 +548,13 @@ function decideConversationTurn({
           state,
           cityCertainty: "confirmed",
           stateCertainty: "confirmed",
-          proposedState: null
+          proposedState: null,
+          coverage: modality.coverage,
+          preferredMeetingType: modality.meetingType,
+          meetingPreferenceSource: modality.meetingPreferenceSource
+        },
+        appointment: {
+          meetingType: modality.meetingType
         },
         conversation: {
           clarificationCount: 0,
@@ -486,10 +564,7 @@ function decideConversationTurn({
               ? "ask_authorization"
               : resolveQualificationResume({
                   knownFacts: {
-                    city,
-                    state,
-                    cityCertainty: "confirmed",
-                    stateCertainty: "confirmed",
+                    ...nextFacts,
                     workAuthorization: context.knownFacts?.workAuthorization
                   }
                 }).lastQuestionAsked,
@@ -600,14 +675,12 @@ function decideConversationTurn({
       return structured;
     }
 
-    const coverage = evaluateCoverage({
-      city: context.knownFacts?.city,
-      state: context.knownFacts?.state
-    });
-    const outside = coverage.coverage === "OUTSIDE";
-    const templateKey = outside
-      ? "outside_zoom_day_part"
-      : "continue_qualification_after_authorization";
+    const modality = resolveMeetingModalityForLocation(context.knownFacts || {});
+    const outside = modality.coverage === "OUTSIDE";
+    const templateKey =
+      outside || modality.meetingType === "zoom"
+        ? "outside_zoom_day_part"
+        : "continue_qualification_after_authorization";
 
     structured.decision.nextAction = NEXT_ACTIONS.CAPTURE_AUTHORIZATION_CONTINUE;
     structured.customerReplyPlan.acknowledgeRequest = true;
@@ -615,27 +688,28 @@ function decideConversationTurn({
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
       city: context.knownFacts?.city || null,
-      coverage: coverage.coverage
+      coverage: modality.coverage
     };
+    structured.reasonCodes.push(REASON_CODES.LOCATION_COVERAGE_REEVALUATED);
     structured.reasonCodes.push(
       outside
         ? REASON_CODES.OUTSIDE_COVERAGE_ZOOM_DEFAULT
         : REASON_CODES.LOCAL_COVERAGE_OFFICE_DEFAULT
     );
+    if (modality.clearedStaleOffice) {
+      structured.reasonCodes.push(REASON_CODES.OUTSIDE_CLEARS_STALE_OFFICE);
+    }
     structured.contextPatch = {
       currentStage: STAGES.QUALIFICATION,
       knownFacts: {
         workAuthorization: true,
         workAuthorizationStatus: WORK_AUTHORIZATION.AUTHORIZED,
-        coverage: coverage.coverage,
-        preferredMeetingType: outside
-          ? "zoom"
-          : context.knownFacts?.preferredMeetingType || "in_person"
+        coverage: modality.coverage,
+        preferredMeetingType: modality.meetingType,
+        meetingPreferenceSource: modality.meetingPreferenceSource
       },
       appointment: {
-        meetingType: outside
-          ? "zoom"
-          : context.appointment?.meetingType || "in_person"
+        meetingType: modality.meetingType
       },
       conversation: {
         clarificationCount: 0,
@@ -749,7 +823,8 @@ function decideConversationTurn({
     };
     structured.contextPatch = {
       knownFacts: {
-        preferredMeetingType: meetingType
+        preferredMeetingType: meetingType,
+        meetingPreferenceSource: "prospect"
       },
       appointment: {
         meetingType
@@ -1250,5 +1325,6 @@ module.exports = {
   decideConversationTurn,
   decideSafeFailure,
   buildBaseDecision,
-  resolveQualificationResume
+  resolveQualificationResume,
+  resolveMeetingModalityForLocation
 };

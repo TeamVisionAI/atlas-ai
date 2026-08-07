@@ -26,6 +26,11 @@ function emptyKnownFacts() {
     financialLicenseTypes: [],
     currentOccupation: null,
     preferredMeetingType: null,
+    /**
+     * BR-083/085 — who set meeting modality:
+     * coverage_default | prospect | null
+     */
+    meetingPreferenceSource: null,
     /** BR-084 — morning | afternoon | evening; independent of meeting type */
     preferredDayPart: null,
     /** BR-084 — { type, earliestTime, latestTime, dayPart, explicitCandidateTime, raw } */

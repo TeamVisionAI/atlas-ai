@@ -205,8 +205,15 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
       return getStateQuestion(city, lang, {});
     case "continue_qualification_after_location":
       return getAuthorizationQuestion(lang);
-    case "continue_qualification_after_authorization":
-      return getLocalOfficeDayPartMessage(lang);
+    case "continue_qualification_after_authorization": {
+      const forceZoom =
+        String(entities.coverage || "").toUpperCase() === "OUTSIDE" ||
+        String(entities.preferredMeetingType || "").toLowerCase() === "zoom" ||
+        String(entities.meetingType || "").toLowerCase() === "zoom";
+      return forceZoom
+        ? getOutsideZoomDayPartMessage(entities.city, lang)
+        : getLocalOfficeDayPartMessage(lang);
+    }
     case "outside_zoom_day_part":
       return getOutsideZoomDayPartMessage(entities.city, lang);
     case "clarify_day_part":
@@ -290,7 +297,14 @@ function renderCustomerReply(responsePlan) {
   } else if (key === "continue_qualification_after_authorization") {
     const ack =
       language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
-    template = `${ack} ${getLocalOfficeDayPartMessage(lang)}`;
+    // Never emit Doral office copy when active modality is Zoom / OUTSIDE.
+    const forceZoom =
+      String(entities.coverage || "").toUpperCase() === "OUTSIDE" ||
+      String(entities.preferredMeetingType || "").toLowerCase() === "zoom" ||
+      String(entities.meetingType || "").toLowerCase() === "zoom";
+    template = forceZoom
+      ? `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`
+      : `${ack} ${getLocalOfficeDayPartMessage(lang)}`;
   } else if (key === "outside_zoom_day_part") {
     const ack =
       language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
