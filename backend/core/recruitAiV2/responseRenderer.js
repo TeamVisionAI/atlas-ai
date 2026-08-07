@@ -15,6 +15,7 @@ const {
   getInsuranceFaqAnswer,
   getExperienceFaqAnswer,
   getSalesObjectionFaqAnswer,
+  getNetworkObjectionFaqAnswer,
   getLicenseRequirementFaqAnswer,
   getLicensePathDetailFaqAnswer,
   getCompensationFaqAnswer,
@@ -77,6 +78,8 @@ const COPY = Object.freeze({
     compensation_faq_then_resume: null,
     experience_faq_then_resume: null,
     sales_objection_faq_then_resume: null,
+    network_objection_faq_then_resume: null,
+    acknowledge_preference_awaiting_availability: "Perfect.",
     job_opportunity_faq_then_resume: null,
     job_overview_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
@@ -203,6 +206,8 @@ const COPY = Object.freeze({
     compensation_faq_then_resume: null,
     experience_faq_then_resume: null,
     sales_objection_faq_then_resume: null,
+    network_objection_faq_then_resume: null,
+    acknowledge_preference_awaiting_availability: "Perfecto.",
     job_opportunity_faq_then_resume: null,
     job_overview_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
@@ -401,6 +406,9 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
       return language === LANGUAGES.SPANISH
         ? "¿Ese día y hora te funcionan?"
         : "Does that day and time still work?";
+    case "acknowledge_preference_awaiting_availability":
+      // BR-103 — preference already captured; do not re-ask time/auth/day-part.
+      return "";
     case "clarify_license_type":
       return getClarifyLicenseTypeMessage(lang);
     case "clarify_work_auth_after_license":
@@ -417,12 +425,16 @@ function composeFaqThenResume(faqText, language, entities = {}, options = {}) {
     resumeKey === "outside_zoom_day_part"
       ? getDayPartQuestion(localeCode(language))
       : resolveResumeQuestion(resumeKey, language, entities);
+  const resumeText = String(resume || "").trim();
+  if (!resumeText) {
+    return String(faqText || "").trim();
+  }
   if (options.omitBridge) {
-    return `${faqText} ${resume}`;
+    return `${faqText} ${resumeText}`;
   }
   const bridge =
     language === LANGUAGES.SPANISH ? "Por cierto" : "By the way";
-  return `${faqText} ${bridge}, ${resume}`;
+  return `${faqText} ${bridge}, ${resumeText}`;
 }
 
 function composeValuePropThenQualify(language, entities = {}) {
@@ -497,6 +509,13 @@ function renderCustomerReply(responsePlan) {
   } else if (key === "sales_objection_faq_then_resume") {
     template = composeFaqThenResume(
       getSalesObjectionFaqAnswer(lang, entities.salesObjectionKind),
+      language,
+      entities,
+      { omitBridge: true }
+    );
+  } else if (key === "network_objection_faq_then_resume") {
+    template = composeFaqThenResume(
+      getNetworkObjectionFaqAnswer(lang),
       language,
       entities,
       { omitBridge: true }

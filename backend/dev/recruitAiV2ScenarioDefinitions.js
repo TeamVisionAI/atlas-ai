@@ -992,9 +992,43 @@ const RECRUIT_AI_V2_SCENARIOS = [
             meetingType: "zoom"
           },
           conversation: {
-            lastQuestionAsked: "confirm_slot",
+            // BR-103 — "revisar disponibilidad" is not a confirmable proposal.
+            lastQuestionAsked: "awaiting_availability",
             lastAtlasOutboundText:
               "Entendido — prefieres 6:30 PM. Voy a revisar disponibilidad."
+          }
+        },
+        expect: {
+          intent: "soft_acknowledgement",
+          nextAction: "acknowledge_soft_continue",
+          shouldEscalate: false,
+          authorizationAuthorized: false,
+          sideEffectsDenied: true,
+          replyExcludes: [
+            "anoté tu confirmación",
+            "compañero finalizará",
+            "teammate will finalize"
+          ]
+        }
+      },
+      {
+        id: "wt07",
+        text: "ok",
+        inboundMessageId: "sim-wamid.work-until.t07",
+        setup: {
+          appointment: {
+            status: "proposed",
+            proposedTime: "18:30",
+            proposedDate: "2026-08-11",
+            meetingType: "zoom",
+            previouslyOfferedSlots: [
+              { date: "2026-08-11", time: "18:30", timezone: "America/New_York" }
+            ]
+          },
+          conversation: {
+            lastQuestionAsked: "confirm_slot",
+            lastAtlasOutboundText:
+              "Tenemos disponible el lunes a las 6:30 PM por Zoom. ¿Te funciona?"
           }
         },
         expect: {
@@ -2141,6 +2175,139 @@ const RECRUIT_AI_V2_SCENARIOS = [
             "Con gusto te ayudo",
             "compañero de Team Vision te contactará"
           ],
+          sideEffectsDenied: true
+        }
+      }
+    ]
+  },
+  {
+    id: "acknowledgement-not-confirmation-network-objection",
+    name: "Acknowledgement Not Confirmation + Network Objection",
+    category: "production_defect",
+    description:
+      "BR-103 — ok after availability-pending is not appointment confirm; no conozco a nadie is network_objection.",
+    seed: {
+      preferredLanguage: "english",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "an01",
+        text: "hola",
+        inboundMessageId: "sim-wamid.ack-network.t01",
+        expect: {
+          intent: "greeting",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "an02",
+        text: "florida",
+        inboundMessageId: "sim-wamid.ack-network.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          state: "FL",
+          pendingQuestion: "ask_city",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "an03",
+        text: "Orlando",
+        inboundMessageId: "sim-wamid.ack-network.t03",
+        expect: {
+          intent: "provide_location",
+          city: "Orlando",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "an04",
+        text: "si soy residente",
+        inboundMessageId: "sim-wamid.ack-network.t04",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          pendingQuestion: "ask_day_part",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "an05",
+        text: "en la manana",
+        inboundMessageId: "sim-wamid.ack-network.t05",
+        expect: {
+          intent: "provide_day_part",
+          dayPart: "morning",
+          pendingQuestion: "ask_time_preference",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "an06",
+        text: "10",
+        inboundMessageId: "sim-wamid.ack-network.t06",
+        expect: {
+          intent: "scheduling_counteroffer",
+          proposedTime: "10:00",
+          pendingQuestion: "awaiting_availability",
+          shouldEscalate: false,
+          sideEffectsDenied: true,
+          replyExcludes: ["anoté tu confirmación", "compañero finalizará"]
+        }
+      },
+      {
+        id: "an07",
+        text: "ok",
+        inboundMessageId: "sim-wamid.ack-network.t07",
+        expect: {
+          intent: "soft_acknowledgement",
+          nextAction: "acknowledge_soft_continue",
+          proposedTime: "10:00",
+          pendingQuestion: "awaiting_availability",
+          shouldEscalate: false,
+          sideEffectsDenied: true,
+          replyExcludes: [
+            "anoté tu confirmación",
+            "compañero finalizará",
+            "dato que te acabo"
+          ]
+        }
+      },
+      {
+        id: "an08",
+        text: "no conozco a nadie",
+        inboundMessageId: "sim-wamid.ack-network.t08",
+        expect: {
+          intent: "network_objection",
+          proposedTime: "10:00",
+          dayPart: "morning",
+          pendingQuestion: "awaiting_availability",
+          replyIncludes: ["entrenamiento", "red de contactos"],
+          replyExcludes: [
+            "dato que te acabo",
+            "compañero de Team Vision te contactará",
+            "garantiz",
+            "te conseguimos clientes",
+            "te damos leads"
+          ],
+          shouldEscalate: false,
           sideEffectsDenied: true
         }
       }

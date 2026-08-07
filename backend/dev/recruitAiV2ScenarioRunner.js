@@ -118,6 +118,9 @@ function evaluateExpect(actual, expect = {}) {
   check("meetingTypeRequested", actual.meetingTypeRequested, expect.meetingTypeRequested);
   check("meetingTypeConfirmed", actual.meetingTypeConfirmed, expect.meetingTypeConfirmed);
   check("meetingPreferenceSource", actual.meetingPreferenceSource, expect.meetingPreferenceSource);
+  // Implements BR-103 — scenarios may assert dayPart; runner exposes preferredDayPart
+  check("dayPart", actual.preferredDayPart, expect.dayPart);
+  check("preferredDayPart", actual.preferredDayPart, expect.preferredDayPart);
   check("pendingQuestion", actual.pendingQuestion, expect.pendingQuestion);
   if (expect.proposedSideEffect != null) {
     check("proposedSideEffect", actual.proposedSideEffects?.[0] || null, expect.proposedSideEffect);

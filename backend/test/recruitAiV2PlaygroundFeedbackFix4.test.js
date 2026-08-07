@@ -245,9 +245,13 @@ test("16. one active candidate only", () => {
   );
 });
 
-test("17. confirmation proposed once", () => {
+test("17. confirmation only after concrete slot (BR-103)", () => {
   const report = runRecruitAiV2ScenarioById("work-until-5-direct-time-negotiation");
-  const confirm = report.turns.find((t) => t.turn === "wt06");
+  const soft = report.turns.find((t) => t.turn === "wt06");
+  assert.equal(soft.actual.intent, "soft_acknowledgement");
+  assert.equal(soft.actual.nextAction, "acknowledge_soft_continue");
+  assert.equal(soft.actual.authorizationAuthorized, false);
+  const confirm = report.turns.find((t) => t.turn === "wt07");
   assert.equal(confirm.actual.nextAction, "create_appointment");
   assert.equal(confirm.actual.authorizationAuthorized, false);
 });

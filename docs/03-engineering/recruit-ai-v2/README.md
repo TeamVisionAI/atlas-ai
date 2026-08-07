@@ -38,6 +38,7 @@
 | [28_AFFIRMATIVE_PREFIX_WORK_AUTH.md](./28_AFFIRMATIVE_PREFIX_WORK_AUTH.md) | BR-100 — `si soy ciudadano` affirmative-prefix work auth |
 | [29_DAY_PART_MANANA_CONTEXT_PRIORITY.md](./29_DAY_PART_MANANA_CONTEXT_PRIORITY.md) | BR-101 — ask_day_part outranks mañana=tomorrow; hour inherits day-part |
 | [30_PARTIAL_STATE_AFTER_TIME.md](./30_PARTIAL_STATE_AFTER_TIME.md) | BR-102 — state-only partial location + after-5 time constraint variants |
+| [31_ACK_VS_CONFIRM_NETWORK_OBJECTION.md](./31_ACK_VS_CONFIRM_NETWORK_OBJECTION.md) | BR-103 — soft ack ≠ confirm; network/prospecting objection |
 
 ## Regression fixture
 

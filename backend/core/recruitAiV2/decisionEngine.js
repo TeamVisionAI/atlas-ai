@@ -36,6 +36,9 @@ const {
   WORK_AUTHORIZATION,
   FINANCIAL_LICENSE_STATUS
 } = require("./qualificationFacts");
+const {
+  hasConfirmableAppointmentProposal
+} = require("./schedulingConfirmation");
 
 function buildBaseDecision({ context, interpretation }) {
   return {
@@ -322,6 +325,16 @@ function resolvePendingResume(context) {
       templateKey: "explain_pending_time",
       lastQuestionAsked: "ask_time_preference",
       entities: {}
+    };
+  }
+  // Implements BR-103 — preference captured; availability not yet presented.
+  if (lastQ === "awaiting_availability" && hasProposedTime(context)) {
+    return {
+      templateKey: "acknowledge_preference_awaiting_availability",
+      lastQuestionAsked: "awaiting_availability",
+      entities: {
+        requestedTime: context.appointment.proposedTime
+      }
     };
   }
   if (lastQ === "confirm_slot" && hasProposedTime(context)) {
@@ -675,6 +688,55 @@ function decideConversationTurn({
         interpretation.entities?.salesObjectionKind || "skill"
     };
     return salesFaq;
+  }
+
+  if (intent === INTENTS.NETWORK_OBJECTION) {
+    // Implements BR-103 — network objection; preserve scheduling facts and resume.
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_NETWORK_OBJECTION_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.NETWORK_OBJECTION_RECOGNIZED);
+    structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_SCHEDULING);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "network_objection_faq_then_resume"
+    );
+  }
+
+  if (intent === INTENTS.SOFT_ACKNOWLEDGEMENT) {
+    // Implements BR-103 — ok/perfecto while availability pending is not confirmation.
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_SOFT_CONTINUE;
+    structured.decision.shouldEscalate = false;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey =
+      "acknowledge_preference_awaiting_availability";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requestedTime: context.appointment?.proposedTime || null,
+      dayPart: context.knownFacts?.preferredDayPart || null
+    };
+    structured.reasonCodes.push(REASON_CODES.SOFT_ACKNOWLEDGEMENT_ONLY);
+    structured.reasonCodes.push(REASON_CODES.PREMATURE_SCHEDULE_CONFIRM_BLOCKED);
+    structured.reasonCodes.push(REASON_CODES.CONFIRMATION_REQUIRES_CONCRETE_SLOT);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      currentStage: context.currentStage || STAGES.SCHEDULING,
+      conversation: {
+        clarificationCount: 0,
+        pendingClarification: null,
+        lastProspectIntent: INTENTS.SOFT_ACKNOWLEDGEMENT,
+        lastQuestionAsked:
+          context.conversation?.lastQuestionAsked === "confirm_slot" &&
+          !hasConfirmableAppointmentProposal(context)
+            ? "awaiting_availability"
+            : context.conversation?.lastQuestionAsked || "awaiting_availability"
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
   }
 
   if (intent === INTENTS.LICENSE_PATH_DETAIL_QUESTION) {
@@ -2046,7 +2108,8 @@ function decideConversationTurn({
           priorCandidate && priorCandidate !== requestedTime ? 0 : mismatchCount,
         clarificationCount: 0,
         lastCounterofferTime: requestedTime,
-        lastQuestionAsked: "confirm_slot",
+        // Implements BR-103 — preference noted; options not yet presented.
+        lastQuestionAsked: "awaiting_availability",
         lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER,
         pendingClarification: null
       },
@@ -2063,6 +2126,33 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.SCHEDULE_CONFIRM) {
+    // Defense in depth — never confirm without a concrete confirmable proposal.
+    if (!hasConfirmableAppointmentProposal(context)) {
+      structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_SOFT_CONTINUE;
+      structured.decision.shouldEscalate = false;
+      structured.decision.mayCreateAppointment = false;
+      structured.customerReplyPlan.acknowledgeRequest = true;
+      structured.customerReplyPlan.templateKey =
+        "acknowledge_preference_awaiting_availability";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        requestedTime: context.appointment?.proposedTime || null
+      };
+      structured.reasonCodes.push(REASON_CODES.PREMATURE_SCHEDULE_CONFIRM_BLOCKED);
+      structured.reasonCodes.push(REASON_CODES.CONFIRMATION_REQUIRES_CONCRETE_SLOT);
+      structured.reasonCodes.push(REASON_CODES.SOFT_ACKNOWLEDGEMENT_ONLY);
+      structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+      structured.contextPatch = {
+        conversation: {
+          lastQuestionAsked: "awaiting_availability",
+          lastProspectIntent: INTENTS.SOFT_ACKNOWLEDGEMENT,
+          clarificationCount: 0,
+          pendingClarification: null
+        },
+        attention: { needsHumanAttention: false, reason: null }
+      };
+      return structured;
+    }
     structured.decision.nextAction = NEXT_ACTIONS.CREATE_APPOINTMENT;
     structured.decision.requiresExplicitConfirmation = true;
     structured.decision.mayCreateAppointment = false;

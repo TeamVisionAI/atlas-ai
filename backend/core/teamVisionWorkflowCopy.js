@@ -161,6 +161,16 @@ function getSalesObjectionFaqAnswer(language, kind = "skill") {
     : "You don't need sales experience to get started. Training is provided so you can learn the process step by step.";
 }
 
+/**
+ * BR-103 — network / prospecting objection.
+ * Do not promise leads, clients, or guaranteed success.
+ */
+function getNetworkObjectionFaqAnswer(language) {
+  return language === "es"
+    ? "Eso se puede aprender y desarrollar con entrenamiento. No necesitas tener una gran red de contactos para comenzar."
+    : "That's something you can learn and develop with training. You don't need a huge network of contacts to get started.";
+}
+
 function getLicenseRequirementFaqAnswer(language) {
   // BR-089 — ordinary requirement FAQ stays simple; never volunteer 2-14/2-15.
   return (
@@ -302,6 +312,7 @@ module.exports = {
   getInsuranceFaqAnswer,
   getExperienceFaqAnswer,
   getSalesObjectionFaqAnswer,
+  getNetworkObjectionFaqAnswer,
   getLicenseRequirementFaqAnswer,
   getLicensePathKnowledge,
   getLicensePathDetailFaqAnswer,

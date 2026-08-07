@@ -374,7 +374,7 @@ function parseLocationAnswerCore(raw) {
 
   // Never invent cities from license / authorization / FAQ phrasing (BR-083/098/099).
   if (
-    /\b(licen[cs]ia|license|permiso|autoriz|seguro|seguros|driver|conducir|215|214|experiencia|experience|necesito|comision|comisión|salario|sueldo|vender|vendiendo|vendedor|vendedora|ventas|selling|sales|salesperson)\b/i.test(
+    /\b(licen[cs]ia|license|permiso|autoriz|seguro|seguros|driver|conducir|215|214|experiencia|experience|necesito|comision|comisión|salario|sueldo|vender|vendiendo|vendedor|vendedora|ventas|selling|sales|salesperson|conozco|contactos|clientes|network)\b/i.test(
       raw
     )
   ) {
