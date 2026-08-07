@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  formatPlaygroundDiagnostics,
   formatRecruitAiV2FactChanges,
+  PLAYGROUND_EXPECTATIONS,
   RECRUIT_AI_V2_SIMULATOR_PATHS,
   summarizeRecruitAiV2ScenarioReport
 } from "./recruitAiV2SimulatorPresentation.js";
@@ -48,4 +50,26 @@ test("Recruit AI v2 simulator paths stay isolated from live WhatsApp routes", ()
   );
   assert.match(RECRUIT_AI_V2_SIMULATOR_PATHS.runOne("a/b"), /a%2Fb/);
   assert.equal(RECRUIT_AI_V2_SIMULATOR_PATHS.list.includes("whatsapp"), false);
+  assert.match(RECRUIT_AI_V2_SIMULATOR_PATHS.playgroundSessions, /playground\/sessions/);
+  assert.ok(PLAYGROUND_EXPECTATIONS.includes("greeting"));
+});
+
+test("formatPlaygroundDiagnostics returns ordered diagnostic rows", () => {
+  const rows = formatPlaygroundDiagnostics({
+    detectedLanguage: "spanish",
+    preferredConversationLanguage: "spanish",
+    interpretedIntent: "greeting",
+    confidence: 0.9,
+    currentStage: "greeting",
+    clarificationRequired: false,
+    appointmentState: null,
+    pendingQuestion: null,
+    decisionCode: "continue_after_greeting",
+    proposedSideEffect: null,
+    authorizationResult: "denied",
+    humanEscalationState: false,
+    elapsedMs: 12
+  });
+  assert.equal(rows[0][1], "spanish");
+  assert.equal(rows.find((r) => r[0] === "authorizationResult")?.[1], "denied");
 });

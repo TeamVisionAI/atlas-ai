@@ -122,6 +122,47 @@ export async function runRecruitAiV2SimulatorScenario(scenarioId) {
   );
 }
 
+export async function fetchRecruitAiV2PlaygroundMeta() {
+  return operationsFetch("/simulator/recruit-ai-v2/playground/meta");
+}
+
+export async function startRecruitAiV2PlaygroundSession(payload = {}) {
+  return operationsFetch("/simulator/recruit-ai-v2/playground/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function sendRecruitAiV2PlaygroundTurn(sessionId, payload = {}) {
+  return operationsFetch(
+    `/simulator/recruit-ai-v2/playground/sessions/${encodeURIComponent(sessionId)}/turns`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function resetRecruitAiV2PlaygroundSession(sessionId, payload = {}) {
+  return operationsFetch(
+    `/simulator/recruit-ai-v2/playground/sessions/${encodeURIComponent(sessionId)}/reset`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function exportRecruitAiV2PlaygroundCandidate(sessionId) {
+  return operationsFetch(
+    `/simulator/recruit-ai-v2/playground/sessions/${encodeURIComponent(sessionId)}/regression-candidate`,
+    { method: "POST" }
+  );
+}
+
 export async function simulateFacebookLead(payload = {}) {
   return operationsFetch("/simulator/facebook-lead", {
     method: "POST",

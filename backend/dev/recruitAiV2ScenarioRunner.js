@@ -252,6 +252,7 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
     RECRUIT_AI_V2_SHADOW_ENABLED: "false"
   };
 
+  const startedAt = Date.now();
   const result = processRecruitAiV2TurnSync({
     message: { id: inboundMessageId, text },
     context: session.context,
@@ -265,6 +266,7 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
     },
     availability: turn.availability || null
   });
+  const elapsedMs = Date.now() - startedAt;
 
   // Hard re-check authorizer for simulator report honesty.
   const authorization = authorizeSideEffects({
@@ -315,11 +317,15 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
     idempotent: false,
     confirmationVersion: nextContext.conversation?.confirmationVersion ?? 0,
     proposedSideEffects: (authorization.proposals || []).map((p) => p.type),
+    renderedText: String(result.rendered?.text || ""),
     renderedPreview: String(result.rendered?.text || "").slice(0, 160),
     templateKey: result.responsePlan?.templateKey || null,
     reasonCodes: result.structuredDecision?.reasonCodes || [],
     factChanges: diffKnownFacts(beforeFacts, nextContext.knownFacts),
-    humanAttention: Boolean(nextContext.attention?.needsHumanAttention)
+    humanAttention: Boolean(nextContext.attention?.needsHumanAttention),
+    pendingQuestion: nextContext.conversation?.lastQuestionAsked || null,
+    appointmentStatus: nextContext.appointment?.status || null,
+    elapsedMs
   };
 
   const assertion = evaluateExpect(actual, turn.expect || {});
@@ -343,7 +349,14 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
     actual,
     pass: assertion.pass,
     failures: assertion.failures,
+    renderedText: actual.renderedText,
     renderedPreview: actual.renderedPreview,
+    pendingQuestion: actual.pendingQuestion,
+    appointmentStatus: actual.appointmentStatus,
+    reasonCodes: actual.reasonCodes,
+    elapsedMs: actual.elapsedMs,
+    detectedLanguage: actual.messageLanguage,
+    humanEscalation: actual.shouldEscalate || actual.humanAttention,
     contextSnapshot: {
       stage: nextContext.currentStage,
       preferredLanguage: nextContext.preferredLanguage,

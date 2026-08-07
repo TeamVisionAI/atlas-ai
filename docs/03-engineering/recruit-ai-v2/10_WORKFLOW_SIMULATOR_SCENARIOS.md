@@ -32,6 +32,10 @@ Uses the same sync pipeline as production shadow (`processRecruitAiV2TurnSync`).
 
 **Every confirmed production Recruit AI defect must be converted into a deterministic simulator scenario before the defect is considered closed.**
 
+Recommended path:
+
+Real defect → reproduce in [Custom Conversation Playground](./11_CUSTOM_CONVERSATION_PLAYGROUND.md) → Save as Regression Candidate → convert to deterministic scenario → fix → keep scenario green.
+
 ## Modules
 
 - `backend/dev/recruitAiV2ScenarioRunner.js`

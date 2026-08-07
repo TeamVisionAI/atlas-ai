@@ -23,11 +23,14 @@ import OpsAlphaChecklist from "./operations/OpsAlphaChecklist";
 import OpsGoldenPathTrace from "./operations/OpsGoldenPathTrace";
 import SimulatorReviewExperience from "./operations/SimulatorReviewExperience";
 import {
+  formatPlaygroundDiagnostics,
   formatRecruitAiV2FactChanges,
+  PLAYGROUND_EXPECTATIONS,
   summarizeRecruitAiV2ScenarioReport
 } from "../engines/recruitAiV2SimulatorPresentation";
 import {
   advanceWorkflowSimulator,
+  exportRecruitAiV2PlaygroundCandidate,
   fetchBusinessEventById,
   fetchBusinessEvents,
   fetchDiagnostics,
@@ -44,14 +47,17 @@ import {
   replayAllProjections,
   replaySingleProspect,
   resetProjectionState,
+  resetRecruitAiV2PlaygroundSession,
   runAllSimulatorScenarios,
   runAllRecruitAiV2SimulatorScenarios,
   runRecruitAiV2SimulatorScenario,
   runSimulatorScenario,
   runSmokeTest,
+  sendRecruitAiV2PlaygroundTurn,
   simulateFacebookLead,
   simulateWebsiteLead,
-  simulateWhatsAppConversation
+  simulateWhatsAppConversation,
+  startRecruitAiV2PlaygroundSession
 } from "../services/operationsCenterService";
 import "./OperationsCenter.css";
 
@@ -247,6 +253,325 @@ function RecruitAiV2ScenarioResult({ report, t }) {
   );
 }
 
+function RecruitAiV2CustomPlayground({ t }) {
+  const [session, setSession] = useState(null);
+  const [turns, setTurns] = useState([]);
+  const [context, setContext] = useState(null);
+  const [message, setMessage] = useState("");
+  const [initialLanguage, setInitialLanguage] = useState("auto");
+  const [meetingContext, setMeetingContext] = useState("none");
+  const [expectation, setExpectation] = useState("");
+  const [candidateJson, setCandidateJson] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const suggested =
+    session?.suggestedPrompts || {
+      spanish: ["Hola", "Miami", "Florida"],
+      english: ["Hi", "I live in Tampa", "Florida"],
+      fragments: ["La or", "idk", "maybe"],
+      unexpected: ["Is this insurance?", "Stop texting me"]
+    };
+
+  async function startConversation() {
+    setError(null);
+    setCandidateJson("");
+    setBusy(true);
+    try {
+      const payload = await startRecruitAiV2PlaygroundSession({
+        initialLanguage,
+        meetingContext
+      });
+      setSession(payload.session);
+      setTurns([]);
+      setContext(payload.session?.context || null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetConversation() {
+    setError(null);
+    setCandidateJson("");
+    setBusy(true);
+    try {
+      if (!session?.sessionId) {
+        await startConversation();
+        return;
+      }
+      const payload = await resetRecruitAiV2PlaygroundSession(session.sessionId, {
+        initialLanguage,
+        meetingContext
+      });
+      setSession(payload.session);
+      setTurns([]);
+      setContext(payload.session?.context || null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendMessage(textOverride) {
+    const text = String(textOverride ?? message).trim();
+    if (!text) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      let active = session;
+      if (!active?.sessionId) {
+        const started = await startRecruitAiV2PlaygroundSession({
+          initialLanguage,
+          meetingContext
+        });
+        active = started.session;
+        setSession(active);
+      }
+      const payload = await sendRecruitAiV2PlaygroundTurn(active.sessionId, {
+        text,
+        expectation: expectation || undefined
+      });
+      setTurns((prev) => [...prev, payload.turn]);
+      setContext(payload.context || null);
+      setMessage("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveRegressionCandidate() {
+    if (!session?.sessionId) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const payload = await exportRecruitAiV2PlaygroundCandidate(session.sessionId);
+      setCandidateJson(payload.copyText || JSON.stringify(payload.candidate, null, 2));
+      if (navigator?.clipboard?.writeText && payload.copyText) {
+        await navigator.clipboard.writeText(payload.copyText);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="ops-panel">
+      <h3>{t.opsV2PlaygroundTitle}</h3>
+      <p className="ops-muted">{t.opsV2PlaygroundHint}</p>
+
+      <div className="ops-action-row" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+        <label className="ops-muted">
+          {t.opsV2PlaygroundLanguage}{" "}
+          <select
+            value={initialLanguage}
+            onChange={(e) => setInitialLanguage(e.target.value)}
+            disabled={busy}
+          >
+            <option value="auto">{t.opsV2PlaygroundLangAuto}</option>
+            <option value="english">{t.opsV2PlaygroundLangEnglish}</option>
+            <option value="spanish">{t.opsV2PlaygroundLangSpanish}</option>
+          </select>
+        </label>
+        <label className="ops-muted">
+          {t.opsV2PlaygroundMeeting}{" "}
+          <select
+            value={meetingContext}
+            onChange={(e) => setMeetingContext(e.target.value)}
+            disabled={busy}
+          >
+            <option value="none">{t.opsV2PlaygroundMeetingNone}</option>
+            <option value="appointment_proposed">{t.opsV2PlaygroundMeetingProposed}</option>
+            <option value="appointment_confirmed">{t.opsV2PlaygroundMeetingConfirmed}</option>
+          </select>
+        </label>
+        <label className="ops-muted">
+          {t.opsV2PlaygroundExpectation}{" "}
+          <select
+            value={expectation}
+            onChange={(e) => setExpectation(e.target.value)}
+            disabled={busy}
+          >
+            <option value="">{t.opsV2PlaygroundExpectationNone}</option>
+            {PLAYGROUND_EXPECTATIONS.map((key) => (
+              <option key={key} value={key}>
+                {key}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="ops-action-row">
+        <button type="button" className="ops-button" disabled={busy} onClick={startConversation}>
+          {t.opsV2PlaygroundStart}
+        </button>
+        <button
+          type="button"
+          className="ops-button ops-button--secondary"
+          disabled={busy}
+          onClick={resetConversation}
+        >
+          {t.opsV2PlaygroundReset}
+        </button>
+        <button
+          type="button"
+          className="ops-button ops-button--secondary"
+          disabled={busy || !session?.sessionId || !turns.length}
+          onClick={saveRegressionCandidate}
+        >
+          {t.opsV2PlaygroundSaveCandidate}
+        </button>
+      </div>
+
+      <div className="ops-muted" style={{ marginTop: "0.5rem" }}>
+        <span>{t.opsV2PlaygroundSuggested}: </span>
+        {Object.entries(suggested).map(([group, prompts]) => (
+          <span key={group} style={{ marginRight: "0.75rem" }}>
+            <strong>{group}</strong>{" "}
+            {(prompts || []).map((prompt) => (
+              <button
+                key={`${group}-${prompt}`}
+                type="button"
+                className="ops-button ops-button--secondary"
+                style={{ margin: "0.15rem", padding: "0.2rem 0.45rem", fontSize: "0.8rem" }}
+                disabled={busy}
+                onClick={() => sendMessage(prompt)}
+              >
+                {prompt}
+              </button>
+            ))}
+          </span>
+        ))}
+      </div>
+
+      <div
+        className="ops-panel"
+        style={{
+          marginTop: "0.75rem",
+          maxHeight: "280px",
+          overflowY: "auto",
+          background: "transparent"
+        }}
+      >
+        {!turns.length ? (
+          <p className="ops-muted">{t.opsV2PlaygroundEmpty}</p>
+        ) : (
+          turns.map((turn) => {
+            const diagRows = formatPlaygroundDiagnostics(turn.diagnostics);
+            return (
+              <div key={turn.turnId || turn.turnNumber} style={{ marginBottom: "0.85rem" }}>
+                <p>
+                  <strong>{t.opsV2PlaygroundProspect}</strong> {turn.prospectInput}
+                </p>
+                <p>
+                  <strong>{t.opsV2PlaygroundAtlasReply}</strong>{" "}
+                  {turn.atlasProposedReply || "—"}
+                </p>
+                {turn.pass != null ? (
+                  <OpsStatusBadge
+                    status={turn.pass ? "healthy" : "failure"}
+                    label={turn.pass ? "PASS" : "FAIL"}
+                  />
+                ) : null}
+                <details>
+                  <summary className="ops-muted">{t.opsV2PlaygroundDiagnostics}</summary>
+                  <table className="ops-table">
+                    <tbody>
+                      {diagRows.map(([key, value]) => (
+                        <tr key={key}>
+                          <td>{key}</td>
+                          <td>
+                            <code className="ops-code">
+                              {value == null || value === ""
+                                ? "—"
+                                : typeof value === "object"
+                                  ? JSON.stringify(value)
+                                  : String(value)}
+                            </code>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td>knownFactsChanged</td>
+                        <td>
+                          <code className="ops-code">
+                            {formatRecruitAiV2FactChanges(turn.diagnostics?.knownFactsChanged)}
+                          </code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>safeReasonCodes</td>
+                        <td>
+                          <code className="ops-code">
+                            {(turn.diagnostics?.safeReasonCodes || []).join(", ") || "—"}
+                          </code>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </details>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="ops-action-row" style={{ alignItems: "flex-end" }}>
+        <label style={{ flex: 1 }}>
+          <span className="ops-muted">{t.opsV2PlaygroundCompose}</span>
+          <input
+            type="text"
+            style={{ width: "100%", marginTop: "0.25rem", padding: "0.45rem 0.6rem" }}
+            value={message}
+            disabled={busy}
+            placeholder={t.opsV2PlaygroundPlaceholder}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="ops-button"
+          disabled={busy || !message.trim()}
+          onClick={() => sendMessage()}
+        >
+          {t.opsV2PlaygroundSend}
+        </button>
+      </div>
+
+      <details style={{ marginTop: "0.75rem" }}>
+        <summary className="ops-muted">{t.opsV2PlaygroundContext}</summary>
+        <pre className="ops-code">{JSON.stringify(context || {}, null, 2)}</pre>
+      </details>
+
+      {candidateJson ? (
+        <details open style={{ marginTop: "0.75rem" }}>
+          <summary className="ops-muted">{t.opsV2PlaygroundCandidateReady}</summary>
+          <pre className="ops-code">{candidateJson}</pre>
+        </details>
+      ) : null}
+
+      {error ? <p className="ops-error">{error}</p> : null}
+    </div>
+  );
+}
+
 function WorkflowSimulatorSection({ t }) {
   const [scenarios, setScenarios] = useState([]);
   const [v2Scenarios, setV2Scenarios] = useState([]);
@@ -406,6 +731,8 @@ function WorkflowSimulatorSection({ t }) {
           ))}
         </div>
       </div>
+
+      <RecruitAiV2CustomPlayground t={t} />
 
       {activePhone ? (
         <div className="ops-panel">

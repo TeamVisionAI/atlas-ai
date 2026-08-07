@@ -36,6 +36,14 @@ const {
   runAllRecruitAiV2ScenarioPack,
   getRecruitAiV2GoldenSuiteMeta
 } = require("./recruitAiV2ScenarioPack");
+const {
+  createPlaygroundSession,
+  getPlaygroundSession,
+  resetPlaygroundSession,
+  sendPlaygroundTurn,
+  buildRegressionCandidate,
+  listPlaygroundMeta
+} = require("./recruitAiV2CustomPlayground");
 
 const BACKEND_VERSION = "0.4.0";
 const SPRINT_LABEL = "Sprint 17.1";
@@ -756,6 +764,37 @@ function runAllRecruitAiV2SimulatorScenarios() {
   };
 }
 
+function getRecruitAiV2PlaygroundMeta() {
+  return listPlaygroundMeta();
+}
+
+function startRecruitAiV2PlaygroundSession(payload = {}) {
+  const session = createPlaygroundSession(payload);
+  recordActivity({
+    level: "info",
+    category: "workflow_simulator",
+    message: "Recruit AI v2 playground session started",
+    detail: session.sessionId.slice(-12)
+  });
+  return session;
+}
+
+function getRecruitAiV2PlaygroundSession(sessionId) {
+  return getPlaygroundSession(sessionId);
+}
+
+function resetRecruitAiV2PlaygroundSession(sessionId, payload = {}) {
+  return resetPlaygroundSession(sessionId, payload);
+}
+
+function sendRecruitAiV2PlaygroundTurn(sessionId, payload = {}) {
+  return sendPlaygroundTurn(sessionId, payload);
+}
+
+function exportRecruitAiV2PlaygroundRegressionCandidate(sessionId) {
+  return buildRegressionCandidate(sessionId);
+}
+
 async function simulateFacebookLead(payload = {}) {
   const phone =
     payload.phone ||
@@ -991,6 +1030,12 @@ module.exports = {
   listRecruitAiV2SimulatorScenarios,
   runRecruitAiV2SimulatorScenario,
   runAllRecruitAiV2SimulatorScenarios,
+  getRecruitAiV2PlaygroundMeta,
+  startRecruitAiV2PlaygroundSession,
+  getRecruitAiV2PlaygroundSession,
+  resetRecruitAiV2PlaygroundSession,
+  sendRecruitAiV2PlaygroundTurn,
+  exportRecruitAiV2PlaygroundRegressionCandidate,
   simulateFacebookLead,
   simulateWebsiteLead,
   simulateWhatsAppConversation,
