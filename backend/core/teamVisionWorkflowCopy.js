@@ -195,6 +195,20 @@ function getCompensationFaqAnswer(language) {
   );
 }
 
+/** BR-090 — first acknowledgement of fixed/salaried employment preference (no pressure). */
+function getFixedEmploymentPreferenceMessage(language) {
+  return language === "es"
+    ? "Entiendo. Esta oportunidad no es un empleo con sueldo fijo garantizado. Algunas personas la evalúan de forma adicional a su trabajo actual, pero depende de lo que estés buscando."
+    : "I understand. This opportunity is not a guaranteed salaried or hourly position. Some people evaluate it alongside their current job, but it depends on what you're looking for.";
+}
+
+/** BR-090 — polite terminal closure for current non-fit (not opt-out). */
+function getCurrentNotFitClosureMessage(language) {
+  return language === "es"
+    ? "Entiendo. Si en algún momento te interesa conocer esta oportunidad, puedes escribirnos por aquí. Te deseo mucho éxito en tu búsqueda."
+    : "I understand. If you'd like to learn about this opportunity later, you can write us here. I wish you every success in your search.";
+}
+
 /** BR-083 — generic “tengo licencia” is ambiguous (often driver's license). */
 function getClarifyLicenseTypeMessage(language) {
   return language === "es"
@@ -257,6 +271,8 @@ module.exports = {
   getLicensePathDetailFaqAnswer,
   looksLikeLicensePathDetailQuestion,
   getCompensationFaqAnswer,
+  getFixedEmploymentPreferenceMessage,
+  getCurrentNotFitClosureMessage,
   getClarifyLicenseTypeMessage,
   getClarifyWorkAuthAfterLicenseMessage,
   getOutsideZoomDayPartMessage,

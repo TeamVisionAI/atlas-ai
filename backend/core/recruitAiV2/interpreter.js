@@ -18,6 +18,12 @@ const {
   lastQuestionImpliesDayPart: continuityImpliesDayPart
 } = require("./conversationContinuity");
 const {
+  looksLikePuertoRicoOriginStatement,
+  looksLikeFixedEmploymentPreference,
+  looksLikeCurrentJobSearchFocus,
+  hasEmploymentFitContext
+} = require("./employmentFit");
+const {
   normalizeLanguage,
   APPOINTMENT_STATUS
 } = require("./conversationContext");
@@ -129,14 +135,26 @@ function isOptionSelection(text) {
 }
 
 function isGreeting(text) {
-  const t = String(text || "")
-    .trim()
+  const raw = String(text || "").trim();
+  const t = raw
     .toLowerCase()
-    .replace(/[!.,]+$/g, "");
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[¡!¿?.,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!t) {
     return false;
   }
-  return /^(hi|hello|hey|good morning|good afternoon|good evening|hola|buenos d[ií]as|buenas tardes|buenas noches|buenas)$/i.test(
+  if (
+    /^(hi|hello|hey|good morning|good afternoon|good evening|hola|buenos dias|buenas tardes|buenas noches|buenas)$/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  // Real-world opener: greeting + brief interest (still begin qualification).
+  return /^(hola|hi|hello|hey)\b.{0,40}\b(quiero mas informacion|me interesa|quisiera (mas )?informacion|looking for (more )?info)\b/.test(
     t
   );
 }
@@ -697,6 +715,29 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (isEchoOfLastQuestion(text, context)) {
     intent = INTENTS.ECHO_OR_NOOP;
     confidence = 0.9;
+  } else if (
+    looksLikeCurrentJobSearchFocus(text) &&
+    hasEmploymentFitContext(context)
+  ) {
+    // BR-090 — reinforced job-search focus after opportunity/preference explained.
+    intent = INTENTS.CURRENT_NOT_FIT;
+    confidence = 0.94;
+    entities.currentFit = "not_now";
+  } else if (looksLikeFixedEmploymentPreference(text)) {
+    // BR-090 — preference outranks compensation FAQ when seeking fixed employment.
+    if (
+      context?.conversation?.fixedEmploymentAcknowledged === true ||
+      context?.knownFacts?.employmentPreference === "fixed"
+    ) {
+      intent = INTENTS.CURRENT_NOT_FIT;
+      confidence = 0.94;
+      entities.currentFit = "not_now";
+      entities.employmentPreference = "fixed";
+    } else {
+      intent = INTENTS.FIXED_EMPLOYMENT_PREFERENCE;
+      confidence = 0.94;
+      entities.employmentPreference = "fixed";
+    }
   } else if (looksLikeCompensationQuestion(text)) {
     // BR-088 — FAQ/business intents outrank scheduling parsing.
     intent = INTENTS.COMPENSATION_QUESTION;
@@ -792,6 +833,9 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     confidence = 0.92;
     entities.workAuthorization = authAnswer;
     entities.requiresClarification = false;
+    if (looksLikePuertoRicoOriginStatement(text)) {
+      entities.puertoRicoOrigin = true;
+    }
   } else if (
     looksLikeRescheduleRequest(text) ||
     (isConfirmed && looksLikeRescheduleRequest(text))
@@ -1024,6 +1068,9 @@ module.exports = {
   looksLikeCompensationQuestion,
   looksLikeWorkAuthorizationAnswer,
   looksLikeExplicitLanguageSwitch,
+  looksLikePuertoRicoOriginStatement,
+  looksLikeFixedEmploymentPreference,
+  looksLikeCurrentJobSearchFocus,
   lastQuestionImpliesDate,
   lastQuestionImpliesDayPart,
   parseDayPart

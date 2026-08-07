@@ -13,6 +13,8 @@ const {
   getLicenseRequirementFaqAnswer,
   getLicensePathDetailFaqAnswer,
   getCompensationFaqAnswer,
+  getFixedEmploymentPreferenceMessage,
+  getCurrentNotFitClosureMessage,
   getClarifyLicenseTypeMessage,
   getClarifyWorkAuthAfterLicenseMessage,
   getOutsideZoomDayPartMessage,
@@ -102,6 +104,8 @@ const COPY = Object.freeze({
       "Understood. We'll cancel the process for now. Thanks for letting us know.",
     acknowledge_opt_out_no_write:
       "Understood — I've noted your request to stop messages. Nothing was changed automatically.",
+    acknowledge_fixed_employment_preference: null,
+    acknowledge_current_not_fit_no_write: null,
     acknowledge_known_availability:
       "You're right — you already told me you're available after {earliestTime}. What time works best?",
     acknowledge_known_availability_confirm_slot:
@@ -222,6 +226,8 @@ const COPY = Object.freeze({
       "Entiendo. Cancelamos el proceso por ahora. Gracias por avisarnos.",
     acknowledge_opt_out_no_write:
       "Entendido — anoté tu solicitud de no recibir más mensajes. No se modificó nada automáticamente.",
+    acknowledge_fixed_employment_preference: null,
+    acknowledge_current_not_fit_no_write: null,
     acknowledge_known_availability:
       "Sí, tienes razón — me dijiste que puedes después de las {earliestTime}. ¿Qué hora te funciona mejor?",
     acknowledge_known_availability_confirm_slot:
@@ -451,6 +457,10 @@ function renderCustomerReply(responsePlan) {
       language,
       entities
     );
+  } else if (key === "acknowledge_fixed_employment_preference") {
+    template = getFixedEmploymentPreferenceMessage(lang);
+  } else if (key === "acknowledge_current_not_fit_no_write") {
+    template = getCurrentNotFitClosureMessage(lang);
   } else if (key === "continue_qualification_after_authorization") {
     const ack =
       language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";

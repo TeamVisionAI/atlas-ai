@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -484,12 +484,102 @@ function decideConversationTurn({
       NEXT_ACTIONS.ANSWER_JOB_OPPORTUNITY_THEN_RESUME;
     structured.reasonCodes.push(REASON_CODES.JOB_OPPORTUNITY_FAQ);
     structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
-    return buildFaqResumeDecision(
+    const jobFaq = buildFaqResumeDecision(
       structured,
       context,
       intent,
       "job_opportunity_faq_then_resume"
     );
+    jobFaq.contextPatch = {
+      ...(jobFaq.contextPatch || {}),
+      conversation: {
+        ...((jobFaq.contextPatch && jobFaq.contextPatch.conversation) || {}),
+        opportunityExplained: true
+      }
+    };
+    return jobFaq;
+  }
+
+  // BR-090 — fixed-employment preference: acknowledge without forcing scheduling.
+  if (intent === INTENTS.FIXED_EMPLOYMENT_PREFERENCE) {
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ACKNOWLEDGE_FIXED_EMPLOYMENT_PREFERENCE;
+    structured.decision.mayCreateAppointment = false;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey =
+      "acknowledge_fixed_employment_preference";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requiresHuman: false
+    };
+    structured.reasonCodes.push(
+      REASON_CODES.FIXED_EMPLOYMENT_PREFERENCE_RECOGNIZED
+    );
+    structured.reasonCodes.push(REASON_CODES.FIXED_EMPLOYMENT_NO_PRESSURE);
+    structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
+    structured.reasonCodes.push(REASON_CODES.EMPLOYMENT_FIT_STATE_SEPARATED);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      knownFacts: {
+        employmentPreference: "fixed",
+        currentFit: context.knownFacts?.currentFit || "exploring"
+      },
+      conversation: {
+        lastProspectIntent: INTENTS.FIXED_EMPLOYMENT_PREFERENCE,
+        lastQuestionAsked: null,
+        pendingClarification: null,
+        fixedEmploymentAcknowledged: true,
+        opportunityExplained:
+          context.conversation?.opportunityExplained === true
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
+  }
+
+  // BR-090 — polite terminal closure for clear current non-fit (not opt-out).
+  if (intent === INTENTS.CURRENT_NOT_FIT) {
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ACKNOWLEDGE_CURRENT_NOT_FIT_NO_WRITE;
+    structured.decision.mayCreateAppointment = false;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey =
+      "acknowledge_current_not_fit_no_write";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requiresHuman: false,
+      stopContact: false
+    };
+    structured.reasonCodes.push(REASON_CODES.CURRENT_NOT_FIT_RECOGNIZED);
+    structured.reasonCodes.push(REASON_CODES.POLITE_CURRENT_NOT_FIT_CLOSURE);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_STOPPED);
+    structured.reasonCodes.push(REASON_CODES.EMPLOYMENT_FIT_STATE_SEPARATED);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      currentStage: STAGES.CURRENT_NOT_FIT,
+      knownFacts: {
+        employmentPreference:
+          interpretation.entities?.employmentPreference ||
+          context.knownFacts?.employmentPreference ||
+          "fixed",
+        currentFit: "not_now"
+      },
+      appointment: {
+        status: APPOINTMENT_STATUS.NONE
+      },
+      conversation: {
+        lastProspectIntent: INTENTS.CURRENT_NOT_FIT,
+        lastQuestionAsked: null,
+        pendingClarification: null,
+        lastOfferMade: null,
+        fixedEmploymentAcknowledged: true,
+        opportunityExplained: true
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
   }
 
   if (intent === INTENTS.CONVERSATION_CLARIFICATION_REQUEST) {
@@ -568,12 +658,22 @@ function decideConversationTurn({
     structured.decision.nextAction =
       NEXT_ACTIONS.ANSWER_COMPENSATION_FAQ_THEN_RESUME;
     structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
-    return buildFaqResumeDecision(
+    const compensationFaq = buildFaqResumeDecision(
       structured,
       context,
       intent,
       "compensation_faq_then_resume"
     );
+    compensationFaq.contextPatch = {
+      ...(compensationFaq.contextPatch || {}),
+      conversation: {
+        ...((compensationFaq.contextPatch &&
+          compensationFaq.contextPatch.conversation) ||
+          {}),
+        opportunityExplained: true
+      }
+    };
+    return compensationFaq;
   }
 
   if (
@@ -834,6 +934,9 @@ function decideConversationTurn({
     structured.decision.shouldEscalate = false;
     structured.reasonCodes.push(REASON_CODES.AUTHORIZATION_CAPTURED);
     structured.reasonCodes.push(REASON_CODES.WORK_AUTH_LICENSE_SEPARATED);
+    if (interpretation.entities?.puertoRicoOrigin) {
+      structured.reasonCodes.push(REASON_CODES.PUERTO_RICO_WORK_AUTH_NORMALIZED);
+    }
 
     if (authorized === false) {
       structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;

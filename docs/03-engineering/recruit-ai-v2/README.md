@@ -27,6 +27,7 @@
 | [17_PLAYGROUND_FEEDBACK_SCHEDULING_MEMORY.md](./17_PLAYGROUND_FEEDBACK_SCHEDULING_MEMORY.md) | BR-087 — scheduling memory across modality, Zoom-link logistics, clean withdraw |
 | [18_PLAYGROUND_FEEDBACK_INTENT_PRIORITY.md](./18_PLAYGROUND_FEEDBACK_INTENT_PRIORITY.md) | BR-088 — job/opportunity FAQ, intent priority, mañana disambiguation, contextual continuation |
 | [19_LICENSE_REQUIREMENT_INTENT_PRECISION.md](./19_LICENSE_REQUIREMENT_INTENT_PRECISION.md) | BR-089 — license requirement question vs ambiguous license statement |
+| [20_PUERTO_RICO_FIXED_EMPLOYMENT_PREFERENCE.md](./20_PUERTO_RICO_FIXED_EMPLOYMENT_PREFERENCE.md) | BR-090 — Puerto Rico work-auth + fixed-employment preference / not-now closure |
 
 ## Regression fixture
 
