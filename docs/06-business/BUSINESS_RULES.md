@@ -1160,6 +1160,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-101 — Recruit AI Day-Part Context Priority for “mañana” and Hour Inheritance
+
+**Implements:** When `ask_day_part` is pending, `mañana` / `en la mañana` / `por la mañana` resolve to day-part morning (not tomorrow); only pending date asks treat `mañana` as tomorrow; confirmed day-part inherits AM/PM for bare numeric times without clarification  
+**Domain:** Recruit AI / Conversation / Scheduling continuity  
+**Depends on:** BR-081, BR-084, BR-085, BR-088, BR-095  
+**Related:** BR-087 (scheduling memory), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/interpreter.js` (`parseDayPart`, `shouldTreatAsDateOnlyProposal`), `schedulingConstraints.js` (`resolveCandidateTime`), decisionEngine  
+**Tests:** `backend/test/recruitAiV2DayPartMananaContextBr101.test.js`, `backend/test/recruitAiV2PlaygroundFeedbackFix7.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/29_DAY_PART_MANANA_CONTEXT_PRIORITY.md`
+
+### Rules
+
+1. **Context priority** — Pending `ask_day_part` outranks the generic date meaning of Spanish `mañana`.
+2. **Morning day-part forms** — At minimum: `mañana`, `manana`, `en la mañana`, `en la manana`, `por la mañana` → `preferredDayPart = morning`.
+3. **Date meaning reserved** — `mañana` → tomorrow only when a date question is pending (or explicit date framing), not while morning/afternoon is being asked.
+4. **Hour inheritance** — With confirmed morning day-part, bare `10` / `10:00` → 10:00 AM. With afternoon, bare `3` → 15:00. Do not ask AM/PM when day-part already resolves it.
+5. **Continue flow** — Day-part answers still advance to the time question (BR-088); no Saturday false-positive from morning phrases.
+6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-100 — Recruit AI Affirmative-Prefix Work-Authorization Status
 
 **Implements:** When `ask_authorization` is pending, affirmative discourse markers (`sí`/`si`/`claro`/`yes`/…) before an already-recognized BR-096 status (e.g. `si soy ciudadano`) still satisfy work authorization and must not fall through to schedule confirm / human-assist handoff  
@@ -1455,7 +1477,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 1. **Job/opportunity intent** — Recognize EN/ES job/employment/opportunity questions (with or without punctuation) as `job_opportunity_question`. Never collapse them into scheduling/time/unavailable.
 2. **Canonical answer** — For employment-structure asks (“is this a job?”), explain financial-services opportunity (not guaranteed salaried/hourly employment); no income guarantees; then resume the pending workflow question. First-level overview asks use short progressive-disclosure copy per BR-097.
 3. **Intent priority** — Clear FAQ/business intents (job, insurance, license, compensation), opt-out/cancel/withdraw, corrections, and meeting logistics outrank time/day-part/date/availability/counteroffer parsing. Scheduling context is evidence, not permission to reinterpret unrelated language.
-4. **“mañana” disambiguation** — Pending morning/afternoon ask → day-part morning. Pending “what day” ask → date tomorrow.
+4. **“mañana” disambiguation** — Pending morning/afternoon ask → day-part morning (including `en la mañana`). Pending “what day” ask → date tomorrow. See BR-101 for context-priority hardening and day-part→meridiem inheritance.
 5. **Day-part advances** — After morning/afternoon is captured, immediately ask for a clock time. Never reply only “Continuemos.”
 6. **No dead-end continuation** — Every non-terminal reply must answer, ask the next relevant question, confirm state/action, or explain a next step.
 7. **Meta-conversation** — “continuemos con qué?” / “what do you still need?” explains the pending missing fact and re-asks it (not generic clarify).

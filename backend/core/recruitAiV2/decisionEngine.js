@@ -1691,14 +1691,24 @@ function decideConversationTurn({
     };
     structured.reasonCodes.push(REASON_CODES.DAY_PART_ADVANCES_TO_TIME);
     structured.reasonCodes.push(REASON_CODES.NO_DEAD_END_CONTINUATION);
-    if (
-      String(interpretation.entities?.rawText || interpretation.rawText || "")
+    {
+      const mananaNorm = String(
+        interpretation.entities?.rawText || interpretation.rawText || ""
+      )
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .match(/^(manana|mañana|morning)$/)
-    ) {
-      structured.reasonCodes.push(REASON_CODES.MANANA_DAY_PART_CONTEXT);
+        .replace(/[?!¡¿.]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (
+        /^(manana|morning|en la manana|por la manana|a la manana|in the morning)$/.test(
+          mananaNorm
+        )
+      ) {
+        structured.reasonCodes.push(REASON_CODES.MANANA_DAY_PART_CONTEXT);
+        structured.reasonCodes.push(REASON_CODES.DAY_PART_CONTEXT_PRIORITY);
+      }
     }
     structured.contextPatch = {
       conversation: {

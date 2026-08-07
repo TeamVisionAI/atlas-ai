@@ -36,6 +36,7 @@
 | [26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md](./26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md) | BR-098 — experience FAQ + insurance routing priority before location |
 | [27_SALES_OBJECTION_RECOGNITION.md](./27_SALES_OBJECTION_RECOGNITION.md) | BR-099 — sales skill/aversion objection ≠ location correction |
 | [28_AFFIRMATIVE_PREFIX_WORK_AUTH.md](./28_AFFIRMATIVE_PREFIX_WORK_AUTH.md) | BR-100 — `si soy ciudadano` affirmative-prefix work auth |
+| [29_DAY_PART_MANANA_CONTEXT_PRIORITY.md](./29_DAY_PART_MANANA_CONTEXT_PRIORITY.md) | BR-101 — ask_day_part outranks mañana=tomorrow; hour inherits day-part |
 
 ## Regression fixture
 
