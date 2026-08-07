@@ -9,6 +9,9 @@ const {
 } = require("../scheduleLanguageParser");
 const { INTENTS, LANGUAGES } = require("./constants");
 const {
+  looksLikeLicensePathDetailQuestion
+} = require("../teamVisionWorkflowCopy");
+const {
   looksLikeJobOpportunityQuestion,
   looksLikeConversationClarificationRequest,
   lastQuestionImpliesDate,
@@ -29,6 +32,7 @@ const {
   parseWorkAuthorizationAnswer,
   looksLikeDriversLicense,
   looksLikeFinancialLicense,
+  looksLikeLicenseRequirementQuestion,
   mentionsLicense,
   mentionsWorkAuthorization,
   toBooleanWorkAuthorization,
@@ -176,18 +180,6 @@ function looksLikeInsuranceQuestion(text) {
     /es (esto )?seguro/i.test(t) ||
     /es para vender seguros/i.test(t) ||
     /\bseguros\b/i.test(t) && /\?/.test(t)
-  );
-}
-
-function looksLikeLicenseRequirementQuestion(text) {
-  const t = String(text || "").trim();
-  return (
-    /do i need a license/i.test(t) ||
-    /need a license/i.test(t) ||
-    /necesito (una )?licencia/i.test(t) ||
-    /necesito una\??$/i.test(t) ||
-    /do i need a 215/i.test(t) ||
-    /hace falta licencia/i.test(t)
   );
 }
 
@@ -712,9 +704,15 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (looksLikeInsuranceQuestion(text)) {
     intent = INTENTS.INSURANCE_QUESTION;
     confidence = 0.92;
+  } else if (looksLikeLicensePathDetailQuestion(text)) {
+    // BR-089 — 2-14/2-15 path detail only when explicitly asked.
+    intent = INTENTS.LICENSE_PATH_DETAIL_QUESTION;
+    confidence = 0.94;
+    entities.licensePathDetail = true;
   } else if (looksLikeLicenseRequirementQuestion(text)) {
     intent = INTENTS.LICENSE_REQUIREMENT_QUESTION;
     confidence = 0.92;
+    entities.licensePathDetail = false;
   } else if (looksLikeJobOpportunityQuestion(text)) {
     intent = INTENTS.JOB_OPPORTUNITY_QUESTION;
     confidence = 0.93;

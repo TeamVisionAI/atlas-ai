@@ -26,6 +26,7 @@
 | [16_NATURAL_LANGUAGE_OPT_OUT.md](./16_NATURAL_LANGUAGE_OPT_OUT.md) | BR-086 — natural-language communication opt-out (no more messages, etc.) |
 | [17_PLAYGROUND_FEEDBACK_SCHEDULING_MEMORY.md](./17_PLAYGROUND_FEEDBACK_SCHEDULING_MEMORY.md) | BR-087 — scheduling memory across modality, Zoom-link logistics, clean withdraw |
 | [18_PLAYGROUND_FEEDBACK_INTENT_PRIORITY.md](./18_PLAYGROUND_FEEDBACK_INTENT_PRIORITY.md) | BR-088 — job/opportunity FAQ, intent priority, mañana disambiguation, contextual continuation |
+| [19_LICENSE_REQUIREMENT_INTENT_PRECISION.md](./19_LICENSE_REQUIREMENT_INTENT_PRECISION.md) | BR-089 — license requirement question vs ambiguous license statement |
 
 ## Regression fixture
 

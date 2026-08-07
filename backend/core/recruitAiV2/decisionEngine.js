@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -536,9 +536,26 @@ function decideConversationTurn({
     );
   }
 
+  if (intent === INTENTS.LICENSE_PATH_DETAIL_QUESTION) {
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_LICENSE_PATH_DETAIL_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.LICENSE_PATH_DETAIL_ANSWERED);
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "license_path_detail_faq_then_resume"
+    );
+  }
+
   if (intent === INTENTS.LICENSE_REQUIREMENT_QUESTION) {
     structured.decision.nextAction =
       NEXT_ACTIONS.ANSWER_LICENSE_REQUIREMENT_THEN_RESUME;
+    structured.reasonCodes.push(
+      REASON_CODES.LICENSE_REQUIREMENT_QUESTION_RECOGNIZED
+    );
+    // Ordinary requirement FAQ must not volunteer 2-14/2-15 path detail.
+    structured.reasonCodes.push(REASON_CODES.LICENSE_PATH_DETAIL_NOT_VOLUNTEERED);
     return buildFaqResumeDecision(
       structured,
       context,
@@ -570,6 +587,7 @@ function decideConversationTurn({
     structured.customerReplyPlan.templateKey = "clarify_license_type";
     structured.reasonCodes.push(REASON_CODES.WORK_AUTH_LICENSE_SEPARATED);
     structured.reasonCodes.push(REASON_CODES.GENERIC_LICENSE_AMBIGUOUS);
+    structured.reasonCodes.push(REASON_CODES.LICENSE_AMBIGUITY_RESERVED);
     structured.contextPatch = {
       knownFacts: {
         financialLicenseStatus: FINANCIAL_LICENSE_STATUS.UNCLEAR,
@@ -589,6 +607,7 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.PROVIDE_LICENSE_CLARIFICATION) {
+    structured.reasonCodes.push(REASON_CODES.LICENSE_STATUS_STATEMENT);
     const status =
       interpretation.entities?.financialLicenseStatus ||
       FINANCIAL_LICENSE_STATUS.UNKNOWN;

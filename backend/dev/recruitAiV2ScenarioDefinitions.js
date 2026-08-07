@@ -1658,6 +1658,100 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "license-requirement-preserves-day-part",
+    name: "License Requirement Preserves Day-Part",
+    category: "production_defect",
+    description:
+      "¿Tengo que tener licencia? is license FAQ (not ambiguous); mañana after FAQ remains morning (BR-089).",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation",
+      currentStage: "greeting",
+      timezone: "America/New_York",
+      testNow: "2026-08-07T15:00:00.000-04:00",
+      knownFacts: {},
+      appointment: { status: "none" },
+      conversation: {}
+    },
+    turns: [
+      {
+        id: "lr01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.license-req.t01",
+        expect: {
+          intent: "greeting",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lr02",
+        text: "Tampa, Florida",
+        inboundMessageId: "sim-wamid.license-req.t02",
+        expect: {
+          intent: "provide_location",
+          city: "Tampa",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lr03",
+        text: "Sí tengo permiso de trabajo",
+        inboundMessageId: "sim-wamid.license-req.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          meetingType: "zoom",
+          replyIncludes: ["Zoom", "mañana"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lr04",
+        text: "¿Tengo que tener licencia?",
+        inboundMessageId: "sim-wamid.license-req.t04",
+        expect: {
+          intent: "license_requirement_question",
+          nextAction: "answer_license_requirement_then_resume",
+          pendingQuestion: "ask_day_part",
+          replyIncludes: ["licenci", "mañana"],
+          replyExcludes: [
+            "conducir",
+            "Esa hora puede no estar disponible",
+            "2-14",
+            "2-15",
+            "214",
+            "215",
+            "$"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "lr05",
+        text: "mañana",
+        inboundMessageId: "sim-wamid.license-req.t05",
+        expect: {
+          intent: "provide_day_part",
+          nextAction: "acknowledge_day_part_ask_time",
+          replyIncludes: ["hora", "mañana"],
+          replyExcludes: ["sábado", "Continuemos.", "12:00 AM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
