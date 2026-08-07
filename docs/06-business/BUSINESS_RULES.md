@@ -1160,6 +1160,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-084 — Recruit AI Scheduling Constraint and Direct-Time Resolution
+
+**Implements:** Availability constraints vs appointment candidates; direct clock-time proposals that override pending day-part; AM/PM clarification without handoff; single active candidate with replacement history; unavailable-slot alternatives without human escalation  
+**Domain:** Recruit AI / Conversation / Scheduling dialogue  
+**Depends on:** BR-081, BR-082, BR-083, BR-018–021  
+**Related:** BR-049 (Conversation Engine), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in code (flags unchanged; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/schedulingConstraints.js`, interpreter, decisionEngine, contextTurnUpdate, responseRenderer, shadowDivergence  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix4.test.js`  
+**Simulator:** `work-until-5-direct-time-negotiation`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/14_PLAYGROUND_FEEDBACK_SCHEDULING_CONSTRAINTS.md`
+
+### Rules
+
+1. **Availability constraints** — Phrases like “Trabajo hasta las 5” / “After 5 works” / “evenings only” are constraints (`earliestTime` / dayPart), not appointment proposals. Do not overwrite `proposedTime` from a constraint alone.
+2. **Direct time overrides day-part** — Bare times (`6?`, `6:30?`, `Mejor 7`) during pending day-part are scheduling counteroffers. Day-part is context, not a hard gate.
+3. **Contextual AM/PM** — After-5 / evening context disambiguates `6` → 18:00. Without context, ask morning vs afternoon for genuinely ambiguous hours; do not escalate.
+4. **Candidate replacement** — Latest valid candidate is active; prior values are history only. Replacing times must not escalate.
+5. **Unavailable slots** — Offer alternatives and remain in scheduling. Ordinary negotiation never emits companion/handoff copy unless `requiresHuman=true`.
+6. **Independent scheduling facts** — Preserve dayPart, availabilityConstraint, proposedTime/date, meeting type, and confirmation/reschedule state separately.
+7. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-083 — Recruit AI Qualification Fact Separation and Specific FAQ Resolution
 
 **Implements:** Independent work-authorization vs financial-license facts; ambiguous “tengo licencia” clarification (driver vs professional); specific insurance / license-requirement / compensation FAQ intents with approved Team Vision copy; location-aware meeting modality (OUTSIDE → Zoom before day-part); mid-flow direct questions answered before resuming pending qualification  

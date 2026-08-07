@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084.
  */
 
 const {
@@ -778,6 +778,65 @@ function decideConversationTurn({
     return structured;
   }
 
+  if (intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT) {
+    const constraint = interpretation.entities?.availabilityConstraint || null;
+    const pendingQ = String(context.conversation?.lastQuestionAsked || "");
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ACKNOWLEDGE_AVAILABILITY_CONSTRAINT;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey =
+      "acknowledge_availability_constraint";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      earliestTime: constraint?.earliestTime || null,
+      dayPart: constraint?.dayPart || null
+    };
+    structured.reasonCodes.push(REASON_CODES.AVAILABILITY_CONSTRAINT_CAPTURED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    structured.contextPatch = {
+      knownFacts: {
+        availabilityConstraint: constraint,
+        preferredDayPart:
+          constraint?.dayPart || context.knownFacts?.preferredDayPart || null
+      },
+      conversation: {
+        clarificationCount: 0,
+        pendingClarification: null,
+        lastProspectIntent: INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT,
+        // Keep day-part pending if that was the open question; otherwise ask for a time.
+        lastQuestionAsked:
+          pendingQ === "ask_day_part" ? "ask_day_part" : "ask_time_preference"
+      },
+      currentStage:
+        context.currentStage === STAGES.GREETING
+          ? STAGES.QUALIFICATION
+          : context.currentStage || STAGES.SCHEDULING
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.CLARIFY_AM_PM) {
+    structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_AM_PM;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.templateKey = "clarify_am_pm";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ambiguousHour: interpretation.entities?.ambiguousHour || null
+    };
+    structured.reasonCodes.push(REASON_CODES.AMPM_CLARIFICATION_REQUIRED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    structured.contextPatch = {
+      conversation: {
+        clarificationCount: 0,
+        pendingClarification: "clarify_am_pm",
+        lastQuestionAsked: "clarify_am_pm",
+        lastProspectIntent: INTENTS.CLARIFY_AM_PM
+      }
+    };
+    return structured;
+  }
+
   if (intent === INTENTS.PROVIDE_DAY_PART) {
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
     structured.customerReplyPlan.templateKey = "continue_after_day_part";
@@ -785,12 +844,13 @@ function decideConversationTurn({
       conversation: {
         clarificationCount: 0,
         pendingClarification: null,
-        lastQuestionAsked: null,
+        lastQuestionAsked: "ask_time_preference",
         lastProspectIntent: INTENTS.PROVIDE_DAY_PART
       },
       knownFacts: {
-        preferredMeetingType: interpretation.entities?.dayPart || null
-      }
+        preferredDayPart: interpretation.entities?.dayPart || null
+      },
+      currentStage: STAGES.SCHEDULING
     };
     return structured;
   }
@@ -901,8 +961,7 @@ function decideConversationTurn({
 
   if (intent === INTENTS.SCHEDULING_COUNTEROFFER) {
     const pendingQ = String(context.conversation?.lastQuestionAsked || "");
-    const dayPartPending =
-      pendingQ === "ask_day_part" || pendingQ === "confirm_slot";
+    const dayPartPending = pendingQ === "ask_day_part";
     const qualificationPending =
       pendingQ === "ask_authorization" ||
       pendingQ === "clarify_license_type" ||
@@ -911,10 +970,11 @@ function decideConversationTurn({
       pendingQ === "ask_state" ||
       (context.knownFacts?.workAuthorization == null &&
         context.currentStage === STAGES.QUALIFICATION &&
-        !dayPartPending);
+        !dayPartPending &&
+        pendingQ !== "ask_time_preference" &&
+        pendingQ !== "confirm_slot");
 
-    // Time mentions during unresolved qualification must not enter the
-    // counteroffer/escalation loop — acknowledge and resume the pending step.
+    // Soft path only while work-auth/location still unresolved (not day-part).
     if (qualificationPending) {
       const resume = resolvePendingResume(context);
       structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
@@ -944,48 +1004,159 @@ function decideConversationTurn({
       return structured;
     }
 
+    const priorCandidate = context.appointment?.proposedTime || null;
+    const history = Array.isArray(context.appointment?.proposedTimeHistory)
+      ? [...context.appointment.proposedTimeHistory]
+      : [];
+    if (priorCandidate && priorCandidate !== requestedTime) {
+      history.push(priorCandidate);
+      structured.reasonCodes.push(REASON_CODES.CANDIDATE_TIME_REPLACED);
+    }
+    if (dayPartPending) {
+      structured.reasonCodes.push(REASON_CODES.DIRECT_TIME_OVERRIDES_DAY_PART);
+    }
+
     const inOffered = isTimeInOfferedSlots(requestedTime, offered);
     structured.customerReplyPlan.acknowledgeRequest = true;
     structured.reasonCodes.push(REASON_CODES.COUNTEROFFER_DETECTED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    structured.decision.shouldEscalate = false;
+    structured.decision.mayCreateAppointment = false;
 
-    if (!inOffered) {
-      structured.reasonCodes.push(REASON_CODES.COUNTEROFFER_OUTSIDE_OFFERED_SET);
-      mismatchCount += 1;
-    }
-
-    if (
-      availability?.checked &&
-      availability.requestedSlotAvailable === false &&
+    const unavailable =
+      availability?.checked && availability.requestedSlotAvailable === false;
+    const sameMenuRejected =
+      unavailable &&
       Array.isArray(availability.nearestAlternatives) &&
-      slotsEqual(availability.nearestAlternatives, offered)
-    ) {
-      structured.reasonCodes.push(REASON_CODES.SAME_SLOTS_ALREADY_REJECTED);
+      slotsEqual(availability.nearestAlternatives, offered);
+
+    if (!inOffered && offered.length > 0 && !priorCandidate) {
+      // First counteroffer outside menu — note once; do not treat replacements as mismatches.
       mismatchCount += 1;
+      structured.reasonCodes.push(REASON_CODES.COUNTEROFFER_OUTSIDE_OFFERED_SET);
+    } else if (!inOffered && offered.length > 0 && priorCandidate === requestedTime) {
+      // Repeating the same unavailable candidate can bump once.
+      mismatchCount += 1;
+      structured.reasonCodes.push(REASON_CODES.COUNTEROFFER_OUTSIDE_OFFERED_SET);
     }
 
-    structured.contextPatch = {
-      conversation: {
-        counterofferMismatchCount: mismatchCount,
-        lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER
-      }
-    };
+    if (sameMenuRejected) {
+      structured.reasonCodes.push(REASON_CODES.SAME_SLOTS_ALREADY_REJECTED);
+      structured.reasonCodes.push(REASON_CODES.SLOT_UNAVAILABLE_OFFER_ALTERNATIVES);
+      structured.decision.nextAction = NEXT_ACTIONS.OFFER_ALTERNATIVES_NO_HANDOFF;
+      structured.customerReplyPlan.templateKey = "offer_alternatives_no_handoff";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        requestedTime,
+        alternatives: availability.nearestAlternatives || []
+      };
+      structured.contextPatch = {
+        currentStage: STAGES.SCHEDULING,
+        appointment: {
+          status: APPOINTMENT_STATUS.PROPOSED,
+          proposedTime: requestedTime,
+          proposedTimeHistory: history
+        },
+        conversation: {
+          counterofferMismatchCount: mismatchCount,
+          clarificationCount: 0,
+          lastCounterofferTime: requestedTime,
+          lastQuestionAsked: "offer_time_choices",
+          lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER,
+          pendingClarification: null
+        },
+        attention: {
+          needsHumanAttention: false,
+          reason: null
+        }
+      };
+      return structured;
+    }
 
-    if (mismatchCount >= MAX_COUNTEROFFER_MISMATCHES_BEFORE_ESCALATE) {
+    if (unavailable) {
+      structured.reasonCodes.push(REASON_CODES.SLOT_UNAVAILABLE_OFFER_ALTERNATIVES);
+      structured.decision.nextAction = NEXT_ACTIONS.OFFER_ALTERNATIVES_NO_HANDOFF;
+      structured.customerReplyPlan.templateKey = "offer_alternatives_no_handoff";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        requestedTime,
+        alternatives: availability.nearestAlternatives || []
+      };
+      structured.contextPatch = {
+        currentStage: STAGES.SCHEDULING,
+        appointment: {
+          status: APPOINTMENT_STATUS.PROPOSED,
+          proposedTime: requestedTime,
+          proposedTimeHistory: history
+        },
+        conversation: {
+          counterofferMismatchCount: Math.min(mismatchCount, 1),
+          clarificationCount: 0,
+          lastCounterofferTime: requestedTime,
+          lastQuestionAsked: "offer_time_choices",
+          lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER
+        },
+        attention: { needsHumanAttention: false, reason: null }
+      };
+      return structured;
+    }
+
+    // Provider hard failure may escalate — ordinary negotiation never does (BR-084).
+    if (availability?.providerFailure === true) {
       structured.decision.nextAction = NEXT_ACTIONS.OFFER_ALTERNATIVES_OR_ESCALATE;
       structured.decision.shouldEscalate = true;
       structured.customerReplyPlan.templateKey = "escalate_after_counteroffer_mismatch";
-      structured.reasonCodes.push(REASON_CODES.ESCALATE_AFTER_REPEATED_MISMATCH);
-      structured.contextPatch.attention = {
-        needsHumanAttention: true,
-        reason: "repeated_counteroffer_mismatch"
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        requiresHuman: true
       };
-      structured.contextPatch.currentStage = STAGES.HUMAN_REQUIRED;
+      structured.reasonCodes.push(REASON_CODES.ESCALATE_AFTER_REPEATED_MISMATCH);
+      structured.contextPatch = {
+        attention: {
+          needsHumanAttention: true,
+          reason: "provider_availability_failure"
+        },
+        currentStage: STAGES.HUMAN_REQUIRED,
+        conversation: {
+          counterofferMismatchCount: mismatchCount,
+          lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER
+        }
+      };
       return structured;
     }
 
     structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_AND_CHECK_AVAILABILITY;
-    structured.decision.mayCreateAppointment = false;
-    structured.customerReplyPlan.templateKey = "acknowledge_counteroffer_check_availability";
+    structured.customerReplyPlan.templateKey =
+      "acknowledge_counteroffer_check_availability";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requestedTime
+    };
+    structured.contextPatch = {
+      currentStage: STAGES.SCHEDULING,
+      appointment: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedTime: requestedTime,
+        proposedTimeHistory: history
+      },
+      conversation: {
+        counterofferMismatchCount:
+          priorCandidate && priorCandidate !== requestedTime ? 0 : mismatchCount,
+        clarificationCount: 0,
+        lastCounterofferTime: requestedTime,
+        lastQuestionAsked: "confirm_slot",
+        lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER,
+        pendingClarification: null
+      },
+      attention: { needsHumanAttention: false, reason: null },
+      knownFacts: {
+        preferredDayPart:
+          context.knownFacts?.preferredDayPart ||
+          (requestedTime && Number(String(requestedTime).split(":")[0]) >= 12
+            ? "afternoon"
+            : context.knownFacts?.preferredDayPart)
+      }
+    };
     return structured;
   }
 

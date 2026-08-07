@@ -67,6 +67,11 @@ const COPY = Object.freeze({
       "Thanks. Before we lock anything in, please reply YES to confirm that time, or suggest another time.",
     acknowledge_counteroffer_check_availability:
       "Got it — you prefer {requestedTime}. Let me check availability for that time and share options that work.",
+    acknowledge_availability_constraint:
+      "Got it — noted that you're available after {earliestTime}. What time works best for you?",
+    clarify_am_pm: "Do you mean {ambiguousHour} in the morning or {ambiguousHour} in the afternoon/evening?",
+    offer_alternatives_no_handoff:
+      "That time may not be available. I can offer nearby options — what other time works for you?",
     escalate_after_counteroffer_mismatch:
       "Thanks for your patience. I'm looping in a Team Vision teammate to help find a time that works for you.",
     offer_reschedule_flow:
@@ -123,6 +128,12 @@ const COPY = Object.freeze({
       "Gracias. Antes de confirmar, responde SI para confirmar esa hora, o sugiere otra hora.",
     acknowledge_counteroffer_check_availability:
       "Entendido — prefieres {requestedTime}. Voy a revisar disponibilidad y te comparto opciones que funcionen.",
+    acknowledge_availability_constraint:
+      "Entendido — anoto que puedes después de las {earliestTime}. ¿Qué hora te funciona mejor?",
+    clarify_am_pm:
+      "¿Te refieres a las {ambiguousHour} de la mañana o a las {ambiguousHour} de la tarde?",
+    offer_alternatives_no_handoff:
+      "Esa hora puede no estar disponible. Puedo ofrecerte opciones cercanas — ¿qué otra hora te funciona?",
     escalate_after_counteroffer_mismatch:
       "Gracias por tu paciencia. Voy a conectar a un compañero de Team Vision para ayudarte a encontrar un horario.",
     offer_reschedule_flow:
@@ -245,6 +256,17 @@ function renderCustomerReply(responsePlan) {
 
   let template = pack[key];
 
+  // BR-084 — handoff copy only when decision explicitly requires a human.
+  const requiresHuman = Boolean(entities.requiresHuman);
+  if (
+    !requiresHuman &&
+    (key === "escalate_after_counteroffer_mismatch" ||
+      key === "safe_uncertain_escalate" ||
+      key === "safe_failure_escalate")
+  ) {
+    template = pack.offer_alternatives_no_handoff || pack.clarify_once;
+  }
+
   if (key === "value_prop_then_qualify") {
     template = composeValuePropThenQualify(language, entities);
   } else if (key === "insurance_faq_then_resume") {
@@ -342,8 +364,28 @@ function renderCustomerReply(responsePlan) {
     template = pack.default;
   }
 
+  const earliestLabel = formatRequestedTime(
+    entities.earliestTime || null,
+    language
+  );
+  const ambiguousHour = entities.ambiguousHour != null ? String(entities.ambiguousHour) : "6";
+
+  if (key === "acknowledge_availability_constraint") {
+    template = (pack.acknowledge_availability_constraint || "").replace(
+      /\{earliestTime\}/g,
+      earliestLabel
+    );
+  } else if (key === "clarify_am_pm") {
+    template = (pack.clarify_am_pm || "").replace(
+      /\{ambiguousHour\}/g,
+      ambiguousHour
+    );
+  }
+
   const rendered = String(template)
     .replace(/\{requestedTime\}/g, requestedTime)
+    .replace(/\{earliestTime\}/g, earliestLabel)
+    .replace(/\{ambiguousHour\}/g, ambiguousHour)
     .replace(/\{city\}/g, city)
     .replace(/\{proposedStateName\}/g, proposed || "your state")
     .replace(/\{proposedState\}/g, entities.proposedState || "")

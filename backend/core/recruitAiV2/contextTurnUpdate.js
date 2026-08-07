@@ -157,6 +157,50 @@ function buildNextContextFromInterpretation({
     };
   }
 
+  if (
+    interpretation.intent === "provide_availability_constraint" &&
+    interpretation.entities?.availabilityConstraint
+  ) {
+    nextContext.knownFacts = {
+      ...nextContext.knownFacts,
+      availabilityConstraint: interpretation.entities.availabilityConstraint,
+      preferredDayPart:
+        interpretation.entities.availabilityConstraint.dayPart ||
+        nextContext.knownFacts?.preferredDayPart ||
+        null
+    };
+  }
+
+  if (
+    interpretation.intent === "provide_day_part" &&
+    interpretation.entities?.dayPart
+  ) {
+    nextContext.knownFacts = {
+      ...nextContext.knownFacts,
+      preferredDayPart: interpretation.entities.dayPart
+    };
+  }
+
+  if (
+    (interpretation.intent === "scheduling_counteroffer" ||
+      interpretation.intent === "reschedule_request") &&
+    interpretation.entities?.requestedTime
+  ) {
+    const prior = nextContext.appointment?.proposedTime || null;
+    const history = Array.isArray(nextContext.appointment?.proposedTimeHistory)
+      ? [...nextContext.appointment.proposedTimeHistory]
+      : [];
+    if (prior && prior !== interpretation.entities.requestedTime) {
+      history.push(prior);
+    }
+    nextContext.appointment = {
+      ...nextContext.appointment,
+      proposedTime: interpretation.entities.requestedTime,
+      proposedTimeHistory: history,
+      status: nextContext.appointment?.status || "proposed"
+    };
+  }
+
   return nextContext;
 }
 

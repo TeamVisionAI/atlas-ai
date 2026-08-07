@@ -28,6 +28,12 @@ const {
   toBooleanWorkAuthorization,
   FINANCIAL_LICENSE_STATUS
 } = require("./qualificationFacts");
+const {
+  parseAvailabilityConstraint,
+  looksLikeDirectTimeProposal,
+  resolveCandidateTime,
+  isTimeLikeToken
+} = require("./schedulingConstraints");
 const { resolveConversationalLanguage } = require("./languagePolicy");
 
 function detectMessageLanguageHint(text) {
@@ -306,6 +312,10 @@ function looksLikeAmbiguousFragment(text) {
   if (!trimmed) {
     return true;
   }
+  // Bare clock tokens are time proposals, not day-part fragments (BR-084).
+  if (isTimeLikeToken(trimmed)) {
+    return false;
+  }
   if (trimmed.length <= 2) {
     return true;
   }
@@ -373,23 +383,44 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       : isConversationalScheduleFlexibilityEnabled();
 
   const appointmentStatus = context?.appointment?.status || APPOINTMENT_STATUS.NONE;
-  const schedulingPhase =
+  const dayPartCtxEarly = lastQuestionImpliesDayPart(context);
+  const schedulingActive =
     appointmentStatus === APPOINTMENT_STATUS.PROPOSED ||
     appointmentStatus === APPOINTMENT_STATUS.CONFIRMED ||
     appointmentStatus === APPOINTMENT_STATUS.RESCHEDULE_REQUESTED ||
     context?.currentStage === "scheduling" ||
     context?.currentStage === "proposed" ||
     context?.currentStage === "confirmed" ||
-    context?.currentStage === "rescheduling"
-      ? "OVERRIDE"
-      : undefined;
+    context?.currentStage === "rescheduling" ||
+    dayPartCtxEarly ||
+    Boolean(context?.appointment?.proposedTime) ||
+    Boolean(context?.knownFacts?.availabilityConstraint);
+
+  // BR-084 — allow bare HH:MM during day-part / open scheduling negotiation.
+  const schedulingPhase = schedulingActive ? "OVERRIDE" : undefined;
 
   const scheduleText = String(text || "").replace(/[?]+$/g, "").trim();
-  const schedule = parseScheduleRequest(scheduleText, {
-    flexible,
-    phase: schedulingPhase
-  });
-  const requestedTime = formatTimeEntity(schedule);
+  const availabilityConstraint = parseAvailabilityConstraint(text);
+  const schedule = availabilityConstraint
+    ? null
+    : parseScheduleRequest(scheduleText, {
+        flexible,
+        phase: schedulingPhase
+      });
+  let requestedTime = formatTimeEntity(schedule);
+  let needsAmPmClarification = false;
+  let ambiguousHour = null;
+
+  if (!availabilityConstraint && (requestedTime || looksLikeDirectTimeProposal(text))) {
+    const resolved = resolveCandidateTime(text, context, requestedTime);
+    if (resolved.needsAmPmClarification) {
+      needsAmPmClarification = true;
+      ambiguousHour = resolved.ambiguousHour;
+      requestedTime = null;
+    } else if (resolved.time) {
+      requestedTime = resolved.time;
+    }
+  }
   const hasTimeEntity = Boolean(requestedTime);
 
   const messageLanguage = detectMessageLanguageHint(text);
@@ -408,11 +439,14 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     dayPart: null,
     completeness: null,
     requiresClarification: false,
-    name: null
+    name: null,
+    availabilityConstraint: null,
+    needsAmPmClarification: false,
+    ambiguousHour: null
   };
 
   const isConfirmed = appointmentStatus === APPOINTMENT_STATUS.CONFIRMED;
-  const dayPartCtx = lastQuestionImpliesDayPart(context);
+  const dayPartCtx = dayPartCtxEarly;
   const locationCtx = lastQuestionImpliesLocation(context);
   const dayPartParse = parseDayPart(text);
 
@@ -531,6 +565,29 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
     confidence = 0.9;
     entities.appointmentType = "in_person";
+  } else if (availabilityConstraint) {
+    // BR-084 — constraints are not appointment candidates.
+    intent = INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT;
+    confidence = 0.93;
+    entities.availabilityConstraint = availabilityConstraint;
+    entities.requestedTime = null;
+  } else if (needsAmPmClarification) {
+    intent = INTENTS.CLARIFY_AM_PM;
+    confidence = 0.9;
+    entities.needsAmPmClarification = true;
+    entities.ambiguousHour = ambiguousHour;
+    entities.requiresClarification = true;
+    entities.requestedTime = null;
+  } else if (hasTimeEntity || looksLikeDirectTimeProposal(text)) {
+    // Direct time overrides pending day-part (BR-084).
+    if (isConfirmed) {
+      intent = INTENTS.RESCHEDULE_REQUEST;
+      confidence = 0.9;
+    } else {
+      intent = INTENTS.SCHEDULING_COUNTEROFFER;
+      confidence = flexible ? 0.94 : 0.88;
+    }
+    entities.requestedTime = requestedTime;
   } else if (dayPartCtx && dayPartParse?.complete) {
     intent = INTENTS.PROVIDE_DAY_PART;
     confidence = 0.9;
@@ -546,19 +603,18 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     confidence = 0.88;
     entities.dayPart = dayPartParse.dayPart;
     entities.completeness = "complete";
-  } else if (isConfirmed && hasTimeEntity) {
-    intent = INTENTS.RESCHEDULE_REQUEST;
-    confidence = 0.9;
-  } else if (hasTimeEntity) {
-    intent = INTENTS.SCHEDULING_COUNTEROFFER;
-    confidence = flexible ? 0.94 : 0.7;
   } else if (
-    isAffirmative(text) &&
     (appointmentStatus === APPOINTMENT_STATUS.PROPOSED ||
-      context?.conversation?.lastQuestionAsked === "confirm_slot")
+      context?.conversation?.lastQuestionAsked === "confirm_slot" ||
+      Boolean(context?.appointment?.proposedTime)) &&
+    (isAffirmative(text) ||
+      /\b(est[aá] bien|sounds good|that works|perfecto|de acuerdo)\b/i.test(text))
   ) {
     intent = INTENTS.SCHEDULE_CONFIRM;
-    confidence = 0.88;
+    confidence = 0.9;
+    if (hasTimeEntity) {
+      entities.requestedTime = requestedTime;
+    }
   } else if (
     isAffirmative(text) &&
     (context?.conversation?.lastQuestionAsked === "confirm_location" ||

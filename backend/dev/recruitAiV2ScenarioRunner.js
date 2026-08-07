@@ -113,7 +113,15 @@ function evaluateExpect(actual, expect = {}) {
     actual.financialLicenseStatus,
     expect.financialLicenseStatus
   );
+  check("proposedTime", actual.proposedTime, expect.proposedTime);
   check("pendingQuestion", actual.pendingQuestion, expect.pendingQuestion);
+  if (expect.availabilityConstraintEarliest !== undefined) {
+    check(
+      "availabilityConstraintEarliest",
+      actual.availabilityConstraintEarliest,
+      expect.availabilityConstraintEarliest
+    );
+  }
   check("authorizationAuthorized", actual.authorizationAuthorized, expect.authorizationAuthorized);
   check("contextAdvanced", actual.contextAdvanced, expect.contextAdvanced);
   check("idempotent", actual.idempotent, expect.idempotent);
@@ -349,6 +357,10 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
         : nextContext.knownFacts?.workAuthorization,
     financialLicenseStatus:
       nextContext.knownFacts?.financialLicenseStatus || null,
+    proposedTime: nextContext.appointment?.proposedTime || null,
+    availabilityConstraintEarliest:
+      nextContext.knownFacts?.availabilityConstraint?.earliestTime || null,
+    preferredDayPart: nextContext.knownFacts?.preferredDayPart || null,
     authorizationAuthorized: authorization.authorized,
     contextAdvanced: true,
     idempotent: false,

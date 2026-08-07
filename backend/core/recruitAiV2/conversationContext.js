@@ -26,6 +26,10 @@ function emptyKnownFacts() {
     financialLicenseTypes: [],
     currentOccupation: null,
     preferredMeetingType: null,
+    /** BR-084 — morning | afternoon | evening; independent of meeting type */
+    preferredDayPart: null,
+    /** BR-084 — { type, earliestTime, latestTime, dayPart, explicitCandidateTime, raw } */
+    availabilityConstraint: null,
     coverage: null,
     fullName: null,
     name: null
@@ -37,6 +41,8 @@ function emptyAppointment() {
     status: APPOINTMENT_STATUS.NONE,
     proposedDate: null,
     proposedTime: null,
+    /** BR-084 — prior candidate times (history only; one active proposedTime) */
+    proposedTimeHistory: [],
     confirmedDate: null,
     confirmedTime: null,
     meetingType: null,
