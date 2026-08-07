@@ -14,5 +14,6 @@
 | [WHATSAPP_OUTBOUND_AUTHORIZATION.md](./WHATSAPP_OUTBOUND_AUTHORIZATION.md) | BR-075 customer-care window + approved-template gate |
 | [WHATSAPP_OUTBOUND_CALL_SITE_INVENTORY.md](./WHATSAPP_OUTBOUND_CALL_SITE_INVENTORY.md) | Production WhatsApp outbound call sites |
 | [WHATSAPP_TEMPLATE_APPROVAL_PACKET.md](./WHATSAPP_TEMPLATE_APPROVAL_PACKET.md) | Phase 0 Meta template catalog approval worksheets (BR-078) |
+| [WHATSAPP_TEMPLATE_REGISTRY_MAPPING_AUDIT.md](./WHATSAPP_TEMPLATE_REGISTRY_MAPPING_AUDIT.md) | BR-078 canonical Meta-name mapping audit (`es_v2` missed appointment) |
 | [recruit-ai-v2/](./recruit-ai-v2/) | Recruit AI v2 forensic audit + Communications Center architecture |
 | [frontend/](./frontend/) | Frontend audits and UX debt |

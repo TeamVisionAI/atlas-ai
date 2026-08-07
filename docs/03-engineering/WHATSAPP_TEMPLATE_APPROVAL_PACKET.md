@@ -280,7 +280,7 @@ Hola {{1}}, aquí tienes los detalles actualizados de tu entrevista con Team Vis
 |---|---|
 | Registry key | `missed_appointment` |
 | Category | **utility** |
-| Meta names | `atlas_missed_appointment_en` / `atlas_missed_appointment_es` |
+| Meta names | `atlas_missed_appointment_en` / `atlas_missed_appointment_es_v2` (canonical ES; do **not** use deprecated `atlas_missed_appointment_es`) |
 | Language codes | `en` / `es` |
 | Approval status | `draft` |
 | Activation status | `inactive` |
@@ -509,7 +509,7 @@ Proposed Meta names (documentation only — not for env until approved):
 | `interview_confirmation` | `atlas_interview_confirmation_en` | `atlas_interview_confirmation_es` |
 | `interview_reminder` | `atlas_interview_reminder_en` | `atlas_interview_reminder_es` |
 | `interview_details` | `atlas_interview_details_en` | `atlas_interview_details_es` |
-| `missed_appointment` | `atlas_missed_appointment_en` | `atlas_missed_appointment_es` |
+| `missed_appointment` | `atlas_missed_appointment_en` | `atlas_missed_appointment_es_v2` |
 | `zoom_invitation` | `atlas_zoom_invitation_en` | `atlas_zoom_invitation_es` |
 | `office_location` | `atlas_office_location_en` | `atlas_office_location_es` |
 | `human_assist_notice` | `atlas_human_assist_notice_en` | `atlas_human_assist_notice_es` |
@@ -531,7 +531,7 @@ Summary:
 - Marketing templates retain marketing classification.
 - Production activation requires Meta approval **and** explicit environment authorization.
 
-**Runtime BR-078 behavior is not implemented in Phase 0.**
+**Runtime BR-078 Phase 1 catalog + call-site mapping is implemented** (`whatsappApprovedTemplateRegistry.js`). Templates remain inactive until Meta approval **and** explicit `WHATSAPP_APPROVED_TEMPLATES_JSON` authorization. Canonical Meta names live in `CANONICAL_META_TEMPLATE_NAMES`; stale `atlas_missed_appointment_es` is rejected fail-closed in favor of `atlas_missed_appointment_es_v2`.
 
 ---
 

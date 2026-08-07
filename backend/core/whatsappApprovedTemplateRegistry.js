@@ -20,6 +20,67 @@ const ZOOM_URL_DELIVERY_MODES = Object.freeze({
   BODY_VARIABLE: "body_variable"
 });
 
+/**
+ * Canonical Meta Cloud API template names for approved/active Team Vision templates.
+ * Documentation + ops contract only — does not activate sending by itself.
+ * Implements BR-078 mapping audit (2026-08-07).
+ */
+const CANONICAL_META_TEMPLATE_NAMES = Object.freeze({
+  interview_reminder: Object.freeze({
+    english: "atlas_interview_reminder_en",
+    spanish: "atlas_interview_reminder_es"
+  }),
+  interview_confirmation: Object.freeze({
+    english: "atlas_interview_confirmation_en",
+    spanish: "atlas_interview_confirmation_es"
+  }),
+  interview_details: Object.freeze({
+    english: "atlas_interview_details_en",
+    spanish: "atlas_interview_details_es"
+  }),
+  missed_appointment: Object.freeze({
+    english: "atlas_missed_appointment_en",
+    // Canonical Spanish missed-appointment template — never atlas_missed_appointment_es.
+    spanish: "atlas_missed_appointment_es_v2"
+  }),
+  zoom_invitation: Object.freeze({
+    english: "atlas_zoom_invitation_en",
+    spanish: "atlas_zoom_invitation_es"
+  }),
+  office_location: Object.freeze({
+    english: "atlas_office_location_en",
+    spanish: "atlas_office_location_es"
+  }),
+  human_assist_notice: Object.freeze({
+    english: "atlas_human_assist_notice_en",
+    spanish: "atlas_human_assist_notice_es"
+  }),
+  lead_welcome: Object.freeze({
+    english: "atlas_lead_welcome_en",
+    spanish: "atlas_lead_welcome_es"
+  }),
+  follow_up: Object.freeze({
+    english: "atlas_follow_up_en",
+    spanish: "atlas_follow_up_es"
+  })
+});
+
+/** Superseded Meta names — must never activate. */
+const STALE_META_TEMPLATE_NAMES = Object.freeze(["atlas_missed_appointment_es"]);
+
+function getCanonicalMetaTemplateName(registryKey, locale) {
+  const entry = CANONICAL_META_TEMPLATE_NAMES[registryKey];
+  if (!entry) {
+    return null;
+  }
+  return entry[locale] || null;
+}
+
+function isStaleMetaTemplateName(metaTemplateName) {
+  const name = String(metaTemplateName || "").trim();
+  return Boolean(name) && STALE_META_TEMPLATE_NAMES.includes(name);
+}
+
 function localeStub(languageCode) {
   return Object.freeze({
     languageCode,
@@ -293,6 +354,26 @@ function applyOperationalOverrides(registry, parsed = {}) {
         });
       }
 
+      // Fail closed: never activate superseded Meta names (e.g. atlas_missed_appointment_es).
+      if (metaTemplateName && isStaleMetaTemplateName(metaTemplateName)) {
+        diagnostics.invalidLocales.push({
+          key,
+          locale,
+          reason: "STALE_META_TEMPLATE_NAME",
+          metaTemplateName
+        });
+        console.warn(
+          `[whatsappApprovedTemplateRegistry] stale Meta template rejected: ${metaTemplateName} (${key}/${locale})`
+        );
+        registry[key].locales[locale] = {
+          ...registry[key].locales[locale],
+          metaTemplateName: null,
+          approved: false,
+          active: false
+        };
+        return;
+      }
+
       const approved = wantsApproved && Boolean(metaTemplateName);
       const active = wantsActive && approved && Boolean(metaTemplateName);
 
@@ -550,6 +631,20 @@ function resolveApprovedTemplate({
     };
   }
 
+  // Defense in depth — stale Meta names must never authorize a send.
+  if (isStaleMetaTemplateName(locale.metaTemplateName)) {
+    return {
+      ok: false,
+      status: "blocked_template_unapproved",
+      reason: "STALE_META_TEMPLATE_NAME",
+      templateKey: entry.key,
+      metaTemplateName: locale.metaTemplateName,
+      language,
+      languageCode: locale.languageCode,
+      category: entry.category
+    };
+  }
+
   const { bodyKeys, buttonKeys } = resolveBodyAndButtonKeys(entry);
   const bodyValidation = validateOrderedVariables(bodyKeys, variables);
 
@@ -612,6 +707,10 @@ module.exports = {
   TEMPLATE_LOCALES,
   INTENT_TO_KEY,
   ZOOM_URL_DELIVERY_MODES,
+  CANONICAL_META_TEMPLATE_NAMES,
+  STALE_META_TEMPLATE_NAMES,
+  getCanonicalMetaTemplateName,
+  isStaleMetaTemplateName,
   getApprovedTemplateRegistry,
   getTemplateRegistryHealth,
   listRegistryKeys,
