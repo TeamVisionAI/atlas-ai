@@ -108,9 +108,39 @@ function evaluateExpect(actual, expect = {}) {
   check("stage", actual.stage, expect.stage);
   check("meetingType", actual.meetingType, expect.meetingType);
   check("workAuthorization", actual.workAuthorization, expect.workAuthorization);
+  check(
+    "financialLicenseStatus",
+    actual.financialLicenseStatus,
+    expect.financialLicenseStatus
+  );
+  check("pendingQuestion", actual.pendingQuestion, expect.pendingQuestion);
   check("authorizationAuthorized", actual.authorizationAuthorized, expect.authorizationAuthorized);
   check("contextAdvanced", actual.contextAdvanced, expect.contextAdvanced);
   check("idempotent", actual.idempotent, expect.idempotent);
+
+  if (Array.isArray(expect.replyIncludes)) {
+    for (const fragment of expect.replyIncludes) {
+      if (!String(actual.renderedText || "").includes(fragment)) {
+        failures.push({
+          path: "replyIncludes",
+          expected: fragment,
+          actual: String(actual.renderedText || "").slice(0, 200)
+        });
+      }
+    }
+  }
+
+  if (Array.isArray(expect.replyExcludes)) {
+    for (const fragment of expect.replyExcludes) {
+      if (String(actual.renderedText || "").includes(fragment)) {
+        failures.push({
+          path: "replyExcludes",
+          expected: `not containing ${fragment}`,
+          actual: String(actual.renderedText || "").slice(0, 200)
+        });
+      }
+    }
+  }
 
   if (expect.noDayPartScheduling === true) {
     if (actual.stage === "scheduling" || actual.nextAction === "clarify_day_part") {
@@ -317,6 +347,8 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
       nextContext.knownFacts?.workAuthorization === undefined
         ? null
         : nextContext.knownFacts?.workAuthorization,
+    financialLicenseStatus:
+      nextContext.knownFacts?.financialLicenseStatus || null,
     authorizationAuthorized: authorization.authorized,
     contextAdvanced: true,
     idempotent: false,

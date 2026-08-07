@@ -17,6 +17,11 @@ const {
   APPOINTMENT_STATUS,
   STAGES
 } = require("./conversationContext");
+const { evaluateCoverage } = require("../businessRulesEngine");
+const {
+  WORK_AUTHORIZATION,
+  FINANCIAL_LICENSE_STATUS
+} = require("./qualificationFacts");
 
 function buildBaseDecision({ context, interpretation }) {
   return {
@@ -121,16 +126,93 @@ function resolveQualificationResume(context) {
       }
     };
   }
-  if (facts.workAuthorization == null) {
+  if (
+    facts.workAuthorization == null &&
+    facts.workAuthorizationStatus !== WORK_AUTHORIZATION.AUTHORIZED &&
+    facts.workAuthorizationStatus !== WORK_AUTHORIZATION.NOT_AUTHORIZED
+  ) {
     return {
       templateKey: "continue_qualification_after_location",
       lastQuestionAsked: "ask_authorization"
+    };
+  }
+
+  const coverage = evaluateCoverage({
+    city: facts.city,
+    state: facts.state
+  });
+  const meetingType = facts.preferredMeetingType || null;
+  if (!meetingType && coverage.coverage === "OUTSIDE") {
+    return {
+      templateKey: "outside_zoom_day_part",
+      lastQuestionAsked: "ask_day_part",
+      entities: { city: facts.city, coverage: "OUTSIDE" }
+    };
+  }
+  if (!meetingType && coverage.coverage === "LOCAL") {
+    return {
+      templateKey: "continue_qualification_after_authorization",
+      lastQuestionAsked: "ask_day_part",
+      entities: { city: facts.city, coverage: "LOCAL" }
     };
   }
   return {
     templateKey: "ask_day_part_simple",
     lastQuestionAsked: "ask_day_part"
   };
+}
+
+function resolvePendingResume(context) {
+  const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+  if (lastQ === "clarify_license_type") {
+    return {
+      templateKey: "clarify_license_type",
+      lastQuestionAsked: "clarify_license_type"
+    };
+  }
+  if (lastQ === "ask_authorization") {
+    return {
+      templateKey: "continue_qualification_after_location",
+      lastQuestionAsked: "ask_authorization"
+    };
+  }
+  if (lastQ === "ask_day_part" || lastQ === "confirm_slot") {
+    return {
+      templateKey: "ask_day_part_simple",
+      lastQuestionAsked: lastQ
+    };
+  }
+  return resolveQualificationResume(context);
+}
+
+function buildFaqResumeDecision(structured, context, intent, templateKey) {
+  const resume = resolvePendingResume(context);
+  structured.decision.shouldEscalate = false;
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey = templateKey;
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    resumeTemplateKey: resume.templateKey,
+    city: context.knownFacts?.city || null,
+    proposedState: context.knownFacts?.proposedState || null,
+    state: context.knownFacts?.state || null
+  };
+  structured.reasonCodes.push(REASON_CODES.DIRECT_QUESTION_ANSWERED);
+  structured.reasonCodes.push(REASON_CODES.SPECIFIC_FAQ_ANSWERED);
+  structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+  structured.contextPatch = {
+    currentStage: context.currentStage || STAGES.QUALIFICATION,
+    conversation: {
+      clarificationCount: 0,
+      pendingClarification:
+        resume.lastQuestionAsked === "clarify_license_type"
+          ? "clarify_license_type"
+          : null,
+      lastQuestionAsked: resume.lastQuestionAsked,
+      lastProspectIntent: intent
+    }
+  };
+  return structured;
 }
 
 /**
@@ -178,27 +260,134 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.OPPORTUNITY_QUESTION) {
-    const resume = resolveQualificationResume(context);
-    structured.decision.nextAction = NEXT_ACTIONS.ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY;
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY;
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "value_prop_then_qualify"
+    );
+  }
+
+  if (intent === INTENTS.INSURANCE_QUESTION) {
+    structured.decision.nextAction = NEXT_ACTIONS.ANSWER_INSURANCE_FAQ_THEN_RESUME;
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "insurance_faq_then_resume"
+    );
+  }
+
+  if (intent === INTENTS.LICENSE_REQUIREMENT_QUESTION) {
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_LICENSE_REQUIREMENT_THEN_RESUME;
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "license_requirement_faq_then_resume"
+    );
+  }
+
+  if (intent === INTENTS.COMPENSATION_QUESTION) {
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_COMPENSATION_FAQ_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "compensation_faq_then_resume"
+    );
+  }
+
+  if (
+    intent === INTENTS.AMBIGUOUS_LICENSE_STATEMENT ||
+    (intent === INTENTS.PROVIDE_LICENSE_CLARIFICATION &&
+      interpretation.entities?.ambiguousLicense)
+  ) {
+    structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LICENSE_TYPE;
     structured.decision.shouldEscalate = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey = "value_prop_then_qualify";
-    structured.customerReplyPlan.entities = {
-      ...structured.customerReplyPlan.entities,
-      resumeTemplateKey: resume.templateKey,
-      city: context.knownFacts?.city || null,
-      proposedState: context.knownFacts?.proposedState || null,
-      state: context.knownFacts?.state || null
-    };
-    structured.reasonCodes.push(REASON_CODES.DIRECT_QUESTION_ANSWERED);
-    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.customerReplyPlan.templateKey = "clarify_license_type";
+    structured.reasonCodes.push(REASON_CODES.WORK_AUTH_LICENSE_SEPARATED);
+    structured.reasonCodes.push(REASON_CODES.GENERIC_LICENSE_AMBIGUOUS);
     structured.contextPatch = {
-      currentStage: context.currentStage || STAGES.QUALIFICATION,
+      knownFacts: {
+        financialLicenseStatus: FINANCIAL_LICENSE_STATUS.UNCLEAR,
+        // Never mark work authorization from a generic license statement.
+        workAuthorization: context.knownFacts?.workAuthorization ?? null,
+        workAuthorizationStatus:
+          context.knownFacts?.workAuthorizationStatus || WORK_AUTHORIZATION.UNKNOWN
+      },
       conversation: {
         clarificationCount: 0,
-        pendingClarification: null,
+        pendingClarification: "clarify_license_type",
+        lastQuestionAsked: "clarify_license_type",
+        lastProspectIntent: intent
+      }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.PROVIDE_LICENSE_CLARIFICATION) {
+    const status =
+      interpretation.entities?.financialLicenseStatus ||
+      FINANCIAL_LICENSE_STATUS.UNKNOWN;
+    const types = interpretation.entities?.financialLicenseTypes || [];
+    const workAuthUnresolved =
+      context.knownFacts?.workAuthorization == null &&
+      context.knownFacts?.workAuthorizationStatus !==
+        WORK_AUTHORIZATION.AUTHORIZED;
+
+    structured.decision.shouldEscalate = false;
+    structured.reasonCodes.push(REASON_CODES.WORK_AUTH_LICENSE_SEPARATED);
+    structured.customerReplyPlan.acknowledgeRequest = true;
+
+    if (workAuthUnresolved) {
+      structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_WORK_AUTH_AFTER_LICENSE;
+      structured.customerReplyPlan.templateKey = "clarify_work_auth_after_license";
+      structured.contextPatch = {
+        knownFacts: {
+          financialLicenseStatus: status,
+          financialLicenseTypes: types,
+          workAuthorization: null,
+          workAuthorizationStatus: WORK_AUTHORIZATION.UNKNOWN
+        },
+        conversation: {
+          clarificationCount: 0,
+          pendingClarification: null,
+          lastQuestionAsked: "ask_authorization",
+          lastProspectIntent: intent
+        }
+      };
+      return structured;
+    }
+
+    const resume = resolveQualificationResume({
+      ...context,
+      knownFacts: {
+        ...context.knownFacts,
+        financialLicenseStatus: status,
+        financialLicenseTypes: types
+      }
+    });
+    structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+    structured.customerReplyPlan.templateKey = resume.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      city: context.knownFacts?.city || null
+    };
+    structured.contextPatch = {
+      knownFacts: {
+        financialLicenseStatus: status,
+        financialLicenseTypes: types
+      },
+      conversation: {
         lastQuestionAsked: resume.lastQuestionAsked,
-        lastProspectIntent: INTENTS.OPPORTUNITY_QUESTION
+        lastProspectIntent: intent
       }
     };
     return structured;
@@ -346,12 +535,16 @@ function decideConversationTurn({
     const authorized = interpretation.entities?.workAuthorization;
     structured.decision.shouldEscalate = false;
     structured.reasonCodes.push(REASON_CODES.AUTHORIZATION_CAPTURED);
+    structured.reasonCodes.push(REASON_CODES.WORK_AUTH_LICENSE_SEPARATED);
 
     if (authorized === false) {
       structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
       structured.customerReplyPlan.templateKey = "authorization_denied";
       structured.contextPatch = {
-        knownFacts: { workAuthorization: false },
+        knownFacts: {
+          workAuthorization: false,
+          workAuthorizationStatus: WORK_AUTHORIZATION.NOT_AUTHORIZED
+        },
         conversation: {
           clarificationCount: 0,
           pendingClarification: null,
@@ -368,13 +561,82 @@ function decideConversationTurn({
       return structured;
     }
 
+    // If license type was still being clarified, keep that pending after capturing auth.
+    const licenseStillUnclear =
+      String(context.conversation?.lastQuestionAsked || "") ===
+        "clarify_license_type" ||
+      context.knownFacts?.financialLicenseStatus ===
+        FINANCIAL_LICENSE_STATUS.UNCLEAR;
+    if (
+      licenseStillUnclear &&
+      context.knownFacts?.financialLicenseStatus !==
+        FINANCIAL_LICENSE_STATUS.NONE &&
+      context.knownFacts?.financialLicenseStatus !==
+        FINANCIAL_LICENSE_STATUS.LICENSED &&
+      context.knownFacts?.financialLicenseStatus !==
+        FINANCIAL_LICENSE_STATUS.IN_PROGRESS
+    ) {
+      structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LICENSE_TYPE;
+      structured.customerReplyPlan.acknowledgeRequest = true;
+      structured.customerReplyPlan.templateKey = "clarify_license_type";
+      structured.contextPatch = {
+        knownFacts: {
+          workAuthorization: true,
+          workAuthorizationStatus: WORK_AUTHORIZATION.AUTHORIZED
+        },
+        conversation: {
+          clarificationCount: 0,
+          pendingClarification: "clarify_license_type",
+          lastQuestionAsked: "clarify_license_type",
+          lastProspectIntent: INTENTS.PROVIDE_AUTHORIZATION,
+          confirmedFields: Array.from(
+            new Set([
+              ...(context.conversation?.confirmedFields || []),
+              "workAuthorization"
+            ])
+          )
+        }
+      };
+      return structured;
+    }
+
+    const coverage = evaluateCoverage({
+      city: context.knownFacts?.city,
+      state: context.knownFacts?.state
+    });
+    const outside = coverage.coverage === "OUTSIDE";
+    const templateKey = outside
+      ? "outside_zoom_day_part"
+      : "continue_qualification_after_authorization";
+
     structured.decision.nextAction = NEXT_ACTIONS.CAPTURE_AUTHORIZATION_CONTINUE;
     structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey =
-      "continue_qualification_after_authorization";
+    structured.customerReplyPlan.templateKey = templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      city: context.knownFacts?.city || null,
+      coverage: coverage.coverage
+    };
+    structured.reasonCodes.push(
+      outside
+        ? REASON_CODES.OUTSIDE_COVERAGE_ZOOM_DEFAULT
+        : REASON_CODES.LOCAL_COVERAGE_OFFICE_DEFAULT
+    );
     structured.contextPatch = {
       currentStage: STAGES.QUALIFICATION,
-      knownFacts: { workAuthorization: true },
+      knownFacts: {
+        workAuthorization: true,
+        workAuthorizationStatus: WORK_AUTHORIZATION.AUTHORIZED,
+        coverage: coverage.coverage,
+        preferredMeetingType: outside
+          ? "zoom"
+          : context.knownFacts?.preferredMeetingType || "in_person"
+      },
+      appointment: {
+        meetingType: outside
+          ? "zoom"
+          : context.appointment?.meetingType || "in_person"
+      },
       conversation: {
         clarificationCount: 0,
         pendingClarification: null,
@@ -463,12 +725,28 @@ function decideConversationTurn({
 
   if (intent === INTENTS.PROVIDE_MEETING_PREFERENCE) {
     const meetingType = interpretation.entities?.appointmentType || null;
-    structured.decision.nextAction = NEXT_ACTIONS.UPDATE_MEETING_PREFERENCE;
-    structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey =
-      meetingType === "zoom"
+    const workAuth = String(context.knownFacts?.workAuthorizationStatus || "").toLowerCase();
+    const workAuthResolved =
+      workAuth === "authorized" || workAuth === "not_authorized";
+    const resume = resolvePendingResume(context);
+    // Capture Zoom/in-person preference, but do not skip unresolved work auth.
+    const nextQuestion = workAuthResolved
+      ? "ask_day_part"
+      : resume.lastQuestionAsked || "ask_authorization";
+    const templateKey = !workAuthResolved
+      ? meetingType === "zoom"
+        ? "meeting_preference_zoom_then_auth"
+        : "meeting_preference_in_person_then_auth"
+      : meetingType === "zoom"
         ? "meeting_preference_zoom"
         : "meeting_preference_in_person";
+    structured.decision.nextAction = NEXT_ACTIONS.UPDATE_MEETING_PREFERENCE;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      resumeTemplateKey: resume.templateKey
+    };
     structured.contextPatch = {
       knownFacts: {
         preferredMeetingType: meetingType
@@ -478,7 +756,9 @@ function decideConversationTurn({
       },
       conversation: {
         lastProspectIntent: INTENTS.PROVIDE_MEETING_PREFERENCE,
-        lastQuestionAsked: "ask_day_part"
+        lastQuestionAsked: nextQuestion,
+        pendingClarification:
+          nextQuestion === "clarify_license_type" ? "clarify_license_type" : null
       }
     };
     return structured;
@@ -620,6 +900,50 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.SCHEDULING_COUNTEROFFER) {
+    const pendingQ = String(context.conversation?.lastQuestionAsked || "");
+    const dayPartPending =
+      pendingQ === "ask_day_part" || pendingQ === "confirm_slot";
+    const qualificationPending =
+      pendingQ === "ask_authorization" ||
+      pendingQ === "clarify_license_type" ||
+      pendingQ === "ask_location" ||
+      pendingQ === "confirm_location" ||
+      pendingQ === "ask_state" ||
+      (context.knownFacts?.workAuthorization == null &&
+        context.currentStage === STAGES.QUALIFICATION &&
+        !dayPartPending);
+
+    // Time mentions during unresolved qualification must not enter the
+    // counteroffer/escalation loop — acknowledge and resume the pending step.
+    if (qualificationPending) {
+      const resume = resolvePendingResume(context);
+      structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+      structured.decision.shouldEscalate = false;
+      structured.customerReplyPlan.acknowledgeRequest = true;
+      structured.customerReplyPlan.templateKey =
+        "acknowledge_availability_then_resume";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        resumeTemplateKey: resume.templateKey,
+        city: context.knownFacts?.city || null,
+        proposedState: context.knownFacts?.proposedState || null,
+        state: context.knownFacts?.state || null,
+        requestedTime
+      };
+      structured.reasonCodes.push(REASON_CODES.DIRECT_QUESTION_ANSWERED);
+      structured.contextPatch = {
+        conversation: {
+          lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER,
+          lastQuestionAsked: resume.lastQuestionAsked,
+          pendingClarification:
+            resume.lastQuestionAsked === "clarify_license_type"
+              ? "clarify_license_type"
+              : null
+        }
+      };
+      return structured;
+    }
+
     const inOffered = isTimeInOfferedSlots(requestedTime, offered);
     structured.customerReplyPlan.acknowledgeRequest = true;
     structured.reasonCodes.push(REASON_CODES.COUNTEROFFER_DETECTED);

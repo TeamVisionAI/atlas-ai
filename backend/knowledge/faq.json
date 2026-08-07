@@ -24,10 +24,12 @@
       "insurance",
       "seguro",
       "is it insurance",
-      "es seguro"
+      "is this insurance",
+      "es seguro",
+      "vender seguros"
     ],
-    "response_en": "We work in the financial services industry. No experience is required, and during the interview we'll explain the opportunity in detail and answer all your questions.",
-    "response_es": "Trabajamos en la asesoría y distribución de servicios financieros. No se requiere experiencia y durante la entrevista te darán más detalles."
+    "response_en": "Yes — this opportunity is in the financial services industry and includes insurance and related financial products. No prior experience is required; during the interview we'll explain how the business works so you can decide if it's a good fit. This is not a guaranteed salaried job offer.",
+    "response_es": "Sí — esta oportunidad es en servicios financieros e incluye seguros y productos financieros relacionados. No se requiere experiencia previa; durante la entrevista te explicamos cómo funciona el negocio para que decidas si es una buena opción. No es una oferta de empleo asalariado garantizado."
   },
 
   "pay": {
@@ -41,10 +43,19 @@
       "salario",
       "pagan",
       "cuanto pagan",
-      "cuánto pagan"
+      "cuánto pagan",
+      "how much money",
+      "how much do i make",
+      "how much can i make",
+      "compensation",
+      "commission",
+      "comision",
+      "comisión",
+      "cuánto se gana",
+      "cuanto se gana"
     ],
-    "response_en": "This isn't an hourly position. During the interview we'll explain how the compensation works, answer your questions, and you can decide if it's a good fit for you.",
-    "response_es": "No es un trabajo por hora. Durante la entrevista te explicarán cómo funciona la compensación, responderán tus preguntas y podrás decidir si es una buena oportunidad para ti."
+    "response_en": "This isn't an hourly or guaranteed-salary position. Compensation depends on the role, licensing, and production, and we'll explain the structure during the interview without promising a specific income. You can decide then if it's a good fit.",
+    "response_es": "No es un puesto por hora ni con sueldo garantizado. La compensación depende del rol, las licencias y la producción; durante la entrevista te explicamos la estructura sin prometer un ingreso específico. Ahí podrás decidir si te conviene."
   },
 
   "sales": {

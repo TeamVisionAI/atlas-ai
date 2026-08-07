@@ -30,10 +30,15 @@ const LANGUAGES = Object.freeze({
 const INTENTS = Object.freeze({
   GREETING: "greeting",
   OPPORTUNITY_QUESTION: "opportunity_question",
+  INSURANCE_QUESTION: "insurance_question",
+  LICENSE_REQUIREMENT_QUESTION: "license_requirement_question",
+  COMPENSATION_QUESTION: "compensation_question",
   ECHO_OR_NOOP: "echo_or_noop",
   PROVIDE_LOCATION: "provide_location",
   CORRECT_LOCATION: "correct_location",
   PROVIDE_AUTHORIZATION: "provide_authorization",
+  AMBIGUOUS_LICENSE_STATEMENT: "ambiguous_license_statement",
+  PROVIDE_LICENSE_CLARIFICATION: "provide_license_clarification",
   PROVIDE_NAME: "provide_name",
   PROVIDE_DAY_PART: "provide_day_part",
   INCOMPLETE_DAY_PART: "incomplete_day_part",
@@ -50,10 +55,15 @@ const INTENTS = Object.freeze({
 
 const NEXT_ACTIONS = Object.freeze({
   ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY: "answer_brief_value_prop_then_qualify",
+  ANSWER_INSURANCE_FAQ_THEN_RESUME: "answer_insurance_faq_then_resume",
+  ANSWER_LICENSE_REQUIREMENT_THEN_RESUME: "answer_license_requirement_then_resume",
+  ANSWER_COMPENSATION_FAQ_THEN_RESUME: "answer_compensation_faq_then_resume",
   CONTINUE_AFTER_GREETING: "continue_after_greeting",
   CLARIFY_ONCE: "clarify_once",
   CLARIFY_LOCATION: "clarify_location",
   CLARIFY_DAY_PART: "clarify_day_part",
+  CLARIFY_LICENSE_TYPE: "clarify_license_type",
+  CLARIFY_WORK_AUTH_AFTER_LICENSE: "clarify_work_auth_after_license",
   CONTINUE_QUALIFICATION: "continue_qualification",
   ACKNOWLEDGE_CORRECTION_THEN_RESUME: "acknowledge_correction_then_resume",
   CAPTURE_AUTHORIZATION_CONTINUE: "capture_authorization_continue",
@@ -96,7 +106,13 @@ const REASON_CODES = Object.freeze({
   DIRECT_QUESTION_ANSWERED: "DIRECT_QUESTION_ANSWERED",
   HANDOFF_GUARD_SKIPPED: "HANDOFF_GUARD_SKIPPED",
   AUTHORIZATION_CAPTURED: "AUTHORIZATION_CAPTURED",
-  LANGUAGE_EXPLICIT_SWITCH: "LANGUAGE_EXPLICIT_SWITCH"
+  LANGUAGE_EXPLICIT_SWITCH: "LANGUAGE_EXPLICIT_SWITCH",
+  WORK_AUTH_LICENSE_SEPARATED: "WORK_AUTH_LICENSE_SEPARATED",
+  GENERIC_LICENSE_AMBIGUOUS: "GENERIC_LICENSE_AMBIGUOUS",
+  SPECIFIC_FAQ_ANSWERED: "SPECIFIC_FAQ_ANSWERED",
+  OUTSIDE_COVERAGE_ZOOM_DEFAULT: "OUTSIDE_COVERAGE_ZOOM_DEFAULT",
+  LOCAL_COVERAGE_OFFICE_DEFAULT: "LOCAL_COVERAGE_OFFICE_DEFAULT",
+  NO_INCOME_GUARANTEE: "NO_INCOME_GUARANTEE"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */

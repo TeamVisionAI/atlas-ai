@@ -18,6 +18,16 @@ const {
   looksLikeLocationCorrection,
   proposeStateFromCity
 } = require("./locationFacts");
+const {
+  parseLicenseStatement,
+  parseWorkAuthorizationAnswer,
+  looksLikeDriversLicense,
+  looksLikeFinancialLicense,
+  mentionsLicense,
+  mentionsWorkAuthorization,
+  toBooleanWorkAuthorization,
+  FINANCIAL_LICENSE_STATUS
+} = require("./qualificationFacts");
 const { resolveConversationalLanguage } = require("./languagePolicy");
 
 function detectMessageLanguageHint(text) {
@@ -63,8 +73,22 @@ function formatTimeEntity(schedule) {
 }
 
 function isAffirmative(text) {
-  return /^(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|sí)\b/i.test(
-    String(text || "").trim()
+  // Normalize accents: JS \b treats í as non-word, so "sí\b" fails.
+  const t = String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[!?.]+$/g, "");
+  if (!t) {
+    return false;
+  }
+  // Do not treat "sí tengo licencia/permiso…" as bare affirmation.
+  if (mentionsLicense(t) || /\b(tengo|have|permiso|autoriz)/i.test(t)) {
+    return false;
+  }
+  return /^(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro|por supuesto)(\s|$)/i.test(
+    t
   );
 }
 
@@ -116,59 +140,57 @@ function looksLikeOpportunityQuestion(text) {
   if (!t) {
     return false;
   }
+  // Keep opportunity/about separate from insurance/license/compensation FAQs.
   return (
     /what is this about/i.test(t) ||
     /how does this work/i.test(t) ||
-    /is this insurance/i.test(t) ||
-    /do i need a license/i.test(t) ||
     /de qu[eé] se trata/i.test(t) ||
     /de qu[eé] trata/i.test(t) ||
-    /es para vender seguros/i.test(t) ||
-    /necesito licencia/i.test(t) ||
     /\b(opportunity|tell me more|que es esto|qué es esto)\b/i.test(t) ||
     /what.*(about|is).*(job|role|position|opportunity)/i.test(t)
   );
 }
 
+function looksLikeInsuranceQuestion(text) {
+  const t = String(text || "").trim();
+  return (
+    /is this insurance/i.test(t) ||
+    /is it insurance/i.test(t) ||
+    /es (esto )?seguro/i.test(t) ||
+    /es para vender seguros/i.test(t) ||
+    /\bseguros\b/i.test(t) && /\?/.test(t)
+  );
+}
+
+function looksLikeLicenseRequirementQuestion(text) {
+  const t = String(text || "").trim();
+  return (
+    /do i need a license/i.test(t) ||
+    /need a license/i.test(t) ||
+    /necesito (una )?licencia/i.test(t) ||
+    /necesito una\??$/i.test(t) ||
+    /do i need a 215/i.test(t) ||
+    /hace falta licencia/i.test(t)
+  );
+}
+
+function looksLikeCompensationQuestion(text) {
+  const t = String(text || "").trim();
+  return (
+    /how much money do i make/i.test(t) ||
+    /how much (do|can) i make/i.test(t) ||
+    /how much does it pay/i.test(t) ||
+    /what'?s the compensation/i.test(t) ||
+    /is there a salary/i.test(t) ||
+    /is it commission/i.test(t) ||
+    /cu[aá]nto (pagan|se gana|gano)/i.test(t) ||
+    /\b(salary|sueldo|salario|commission|comisi[oó]n)\b/i.test(t)
+  );
+}
+
 function looksLikeWorkAuthorizationAnswer(text, context) {
-  const raw = String(text || "").trim();
-  if (!raw) {
-    return null;
-  }
-  const t = raw
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  const pendingAuth =
-    String(context?.conversation?.lastQuestionAsked || "") === "ask_authorization";
-
-  const yesAuth =
-    /^(si|sí|yes|yep|yeah)\b/.test(t) &&
-    /\b(permiso|autorizacion|authorization|documentacion|documentation|papeles|legal)\b/.test(
-      t
-    );
-  const yesShort =
-    pendingAuth &&
-    (/^(si|sí|yes|yep|yeah|claro|por supuesto)([.!]?)$/i.test(raw.trim()) ||
-      /^(si|sí|yes).{0,40}\b(tengo|have|cuento con)\b/i.test(raw));
-  const patternYes =
-    /\b(permiso de trabajo|work (permit|authorization)|authorized to work|green card|ciudadan[ií]a|citizenship|residencia)\b/i.test(
-      raw
-    ) && !/\b(no|not|sin)\b/i.test(t);
-
-  if (yesAuth || yesShort || patternYes) {
-    return true;
-  }
-
-  const noAuth =
-    pendingAuth &&
-    (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
-      /\b(no tengo permiso|not authorized|sin permiso|sin papeles)\b/i.test(t));
-  if (noAuth) {
-    return false;
-  }
-
-  return null;
+  const status = parseWorkAuthorizationAnswer(text, context);
+  return toBooleanWorkAuthorization(status);
 }
 
 function looksLikeExplicitLanguageSwitch(text) {
@@ -362,7 +384,8 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       ? "OVERRIDE"
       : undefined;
 
-  const schedule = parseScheduleRequest(text, {
+  const scheduleText = String(text || "").replace(/[?]+$/g, "").trim();
+  const schedule = parseScheduleRequest(scheduleText, {
     flexible,
     phase: schedulingPhase
   });
@@ -395,6 +418,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
 
   const languageSwitchTo = looksLikeExplicitLanguageSwitch(text);
   const authAnswer = looksLikeWorkAuthorizationAnswer(text, context);
+  const licenseStatement = parseLicenseStatement(text);
+  const pendingLicenseClarify =
+    String(context?.conversation?.lastQuestionAsked || "") ===
+    "clarify_license_type";
 
   if (isGreeting(text)) {
     intent = INTENTS.GREETING;
@@ -406,9 +433,82 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (isEchoOfLastQuestion(text, context)) {
     intent = INTENTS.ECHO_OR_NOOP;
     confidence = 0.9;
+  } else if (looksLikeCompensationQuestion(text)) {
+    intent = INTENTS.COMPENSATION_QUESTION;
+    confidence = 0.92;
+  } else if (looksLikeInsuranceQuestion(text)) {
+    intent = INTENTS.INSURANCE_QUESTION;
+    confidence = 0.92;
+  } else if (looksLikeLicenseRequirementQuestion(text)) {
+    intent = INTENTS.LICENSE_REQUIREMENT_QUESTION;
+    confidence = 0.92;
   } else if (looksLikeOpportunityQuestion(text)) {
     intent = INTENTS.OPPORTUNITY_QUESTION;
     confidence = 0.9;
+  } else if (
+    pendingLicenseClarify &&
+    mentionsWorkAuthorization(text) &&
+    !mentionsLicense(text)
+  ) {
+    // Work-auth answer during license clarify — capture auth only; keep license unclear.
+    intent = INTENTS.PROVIDE_AUTHORIZATION;
+    confidence = 0.9;
+    entities.workAuthorization = authAnswer === true;
+    entities.requiresClarification = false;
+  } else if (pendingLicenseClarify && licenseStatement) {
+    intent = INTENTS.PROVIDE_LICENSE_CLARIFICATION;
+    confidence = 0.93;
+    entities.financialLicenseStatus = licenseStatement.financialLicenseStatus;
+    entities.financialLicenseTypes = licenseStatement.financialLicenseTypes;
+    entities.driversLicense = Boolean(licenseStatement.driversLicense);
+    entities.ambiguousLicense = Boolean(licenseStatement.ambiguous);
+  } else if (
+    pendingLicenseClarify &&
+    (looksLikeDriversLicense(text) ||
+      /^(de )?seguros/i.test(text) ||
+      /de seguros no/i.test(text) ||
+      /^(no|ninguna)/i.test(text.trim()))
+  ) {
+    intent = INTENTS.PROVIDE_LICENSE_CLARIFICATION;
+    confidence = 0.9;
+    if (looksLikeDriversLicense(text)) {
+      entities.financialLicenseStatus = FINANCIAL_LICENSE_STATUS.NONE;
+      entities.driversLicense = true;
+    } else if (/^(no|ninguna)/i.test(text.trim()) || /de seguros no/i.test(text)) {
+      entities.financialLicenseStatus = FINANCIAL_LICENSE_STATUS.NONE;
+      entities.driversLicense = false;
+    } else if (looksLikeFinancialLicense(text) || /seguros/i.test(text)) {
+      entities.financialLicenseStatus = FINANCIAL_LICENSE_STATUS.LICENSED;
+      entities.driversLicense = false;
+    }
+  } else if (
+    /de seguros no/i.test(text) ||
+    /\bno (tengo )?(licencia )?(de )?seguros\b/i.test(text)
+  ) {
+    intent = INTENTS.PROVIDE_LICENSE_CLARIFICATION;
+    confidence = 0.88;
+    entities.financialLicenseStatus = FINANCIAL_LICENSE_STATUS.NONE;
+    entities.driversLicense = false;
+    entities.ambiguousLicense = false;
+  } else if (
+    licenseStatement &&
+    (String(context?.conversation?.lastQuestionAsked || "") ===
+      "ask_authorization" ||
+      licenseStatement.ambiguous ||
+      mentionsLicense(text))
+  ) {
+    // Generic/explicit license statements never satisfy work authorization.
+    if (licenseStatement.ambiguous || !licenseStatement.driversLicense) {
+      intent = licenseStatement.ambiguous
+        ? INTENTS.AMBIGUOUS_LICENSE_STATEMENT
+        : INTENTS.PROVIDE_LICENSE_CLARIFICATION;
+      confidence = 0.9;
+      entities.financialLicenseStatus = licenseStatement.financialLicenseStatus;
+      entities.financialLicenseTypes = licenseStatement.financialLicenseTypes;
+      entities.driversLicense = Boolean(licenseStatement.driversLicense);
+      entities.ambiguousLicense = Boolean(licenseStatement.ambiguous);
+      entities.requiresClarification = Boolean(licenseStatement.ambiguous);
+    }
   } else if (authAnswer !== null) {
     intent = INTENTS.PROVIDE_AUTHORIZATION;
     confidence = 0.92;
@@ -599,6 +699,9 @@ module.exports = {
   looksLikeName,
   looksLikeAmbiguousFragment,
   looksLikeOpportunityQuestion,
+  looksLikeInsuranceQuestion,
+  looksLikeLicenseRequirementQuestion,
+  looksLikeCompensationQuestion,
   looksLikeWorkAuthorizationAnswer,
   looksLikeExplicitLanguageSwitch,
   parseDayPart

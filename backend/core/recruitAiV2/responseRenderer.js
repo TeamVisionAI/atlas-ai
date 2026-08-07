@@ -8,7 +8,14 @@ const { LANGUAGES } = require("./constants");
 const { sanitizeCustomerCopy } = require("./sanitize");
 const {
   getCanonicalFaqAnswer,
+  getInsuranceFaqAnswer,
+  getLicenseRequirementFaqAnswer,
+  getCompensationFaqAnswer,
+  getClarifyLicenseTypeMessage,
+  getClarifyWorkAuthAfterLicenseMessage,
+  getOutsideZoomDayPartMessage,
   getLocalOfficeDayPartMessage,
+  getRemoteZoomDayPartMessage,
   getAuthorizationDeniedMessage,
   getAuthorizationQuestion,
   getStateQuestion,
@@ -27,7 +34,14 @@ const COPY = Object.freeze({
     continue_qualification_after_location:
       "Thanks. Do you have work authorization or legal documentation to work in the United States?",
     continue_qualification_after_authorization: null, // canonical day-part
+    outside_zoom_day_part: null,
     continue_after_day_part: "Thanks — noted. Let's continue.",
+    clarify_license_type: null,
+    clarify_work_auth_after_license: null,
+    insurance_faq_then_resume: null,
+    license_requirement_faq_then_resume: null,
+    compensation_faq_then_resume: null,
+    acknowledge_availability_then_resume: null,
     acknowledge_location_correction:
       "Perfect, thanks for clarifying. So you're in {city}, {proposedStateName}. {resumeQuestion}",
     acknowledge_correction_confirm_location:
@@ -39,8 +53,10 @@ const COPY = Object.freeze({
       "Of course — we can continue in English. {resumeQuestion}",
     meeting_preference_zoom:
       "Got it — we can do the interview by Zoom. Do you prefer morning or afternoon?",
+    meeting_preference_zoom_then_auth: null,
     meeting_preference_in_person:
       "Got it — we can do the interview in person. Do you prefer morning or afternoon?",
+    meeting_preference_in_person_then_auth: null,
     acknowledge_cancel_no_write:
       "Understood — I've noted your cancel request. A teammate will confirm any changes; nothing was changed automatically.",
     clarify_day_part:
@@ -74,7 +90,14 @@ const COPY = Object.freeze({
     continue_qualification_after_location:
       "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?",
     continue_qualification_after_authorization: null,
+    outside_zoom_day_part: null,
     continue_after_day_part: "Gracias — anotado. Continuemos.",
+    clarify_license_type: null,
+    clarify_work_auth_after_license: null,
+    insurance_faq_then_resume: null,
+    license_requirement_faq_then_resume: null,
+    compensation_faq_then_resume: null,
+    acknowledge_availability_then_resume: null,
     acknowledge_location_correction:
       "Perfecto, gracias por aclararlo. Entonces estás en {city}, {proposedStateName}. {resumeQuestion}",
     acknowledge_correction_confirm_location:
@@ -86,8 +109,10 @@ const COPY = Object.freeze({
       "Claro — podemos continuar en español. {resumeQuestion}",
     meeting_preference_zoom:
       "Entendido — podemos hacer la entrevista por Zoom. ¿Prefieres en la mañana o en la tarde?",
+    meeting_preference_zoom_then_auth: null,
     meeting_preference_in_person:
       "Entendido — podemos hacer la entrevista en persona. ¿Prefieres en la mañana o en la tarde?",
+    meeting_preference_in_person_then_auth: null,
     acknowledge_cancel_no_write:
       "Entendido — anoté tu solicitud de cancelación. Un compañero confirmará cualquier cambio; no se modificó nada automáticamente.",
     clarify_day_part:
@@ -171,26 +196,39 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
       return getAuthorizationQuestion(lang);
     case "continue_qualification_after_authorization":
       return getLocalOfficeDayPartMessage(lang);
+    case "outside_zoom_day_part":
+      return getOutsideZoomDayPartMessage(entities.city, lang);
     case "clarify_day_part":
     case "ask_day_part":
     case "ask_day_part_simple":
       return getDayPartQuestion(lang);
+    case "clarify_license_type":
+      return getClarifyLicenseTypeMessage(lang);
+    case "clarify_work_auth_after_license":
+      return getClarifyWorkAuthAfterLicenseMessage(lang);
     default:
       return getAuthorizationQuestion(lang);
   }
 }
 
-function composeValuePropThenQualify(language, entities = {}) {
-  const faq = getCanonicalFaqAnswer(localeCode(language));
+function composeFaqThenResume(faqText, language, entities = {}) {
   const resumeKey = entities.resumeTemplateKey || "greeting_ask_location";
-  // Mid-flow FAQ resume: prefer the short pending question, not a full office reprint.
   const resume =
-    resumeKey === "continue_qualification_after_authorization"
+    resumeKey === "continue_qualification_after_authorization" ||
+    resumeKey === "outside_zoom_day_part"
       ? getDayPartQuestion(localeCode(language))
       : resolveResumeQuestion(resumeKey, language, entities);
   const bridge =
     language === LANGUAGES.SPANISH ? "Por cierto" : "By the way";
-  return `${faq} ${bridge}, ${resume}`;
+  return `${faqText} ${bridge}, ${resume}`;
+}
+
+function composeValuePropThenQualify(language, entities = {}) {
+  return composeFaqThenResume(
+    getCanonicalFaqAnswer(localeCode(language)),
+    language,
+    entities
+  );
 }
 
 function renderCustomerReply(responsePlan) {
@@ -209,10 +247,75 @@ function renderCustomerReply(responsePlan) {
 
   if (key === "value_prop_then_qualify") {
     template = composeValuePropThenQualify(language, entities);
+  } else if (key === "insurance_faq_then_resume") {
+    template = composeFaqThenResume(
+      getInsuranceFaqAnswer(lang),
+      language,
+      entities
+    );
+  } else if (key === "license_requirement_faq_then_resume") {
+    template = composeFaqThenResume(
+      getLicenseRequirementFaqAnswer(lang),
+      language,
+      entities
+    );
+  } else if (key === "compensation_faq_then_resume") {
+    template = composeFaqThenResume(
+      getCompensationFaqAnswer(lang),
+      language,
+      entities
+    );
   } else if (key === "continue_qualification_after_authorization") {
     const ack =
       language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
     template = `${ack} ${getLocalOfficeDayPartMessage(lang)}`;
+  } else if (key === "outside_zoom_day_part") {
+    const ack =
+      language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
+    template = `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`;
+  } else if (key === "clarify_license_type") {
+    template = getClarifyLicenseTypeMessage(lang);
+  } else if (key === "clarify_work_auth_after_license") {
+    template = getClarifyWorkAuthAfterLicenseMessage(lang);
+  } else if (key === "acknowledge_availability_then_resume") {
+    const resume = resolveResumeQuestion(
+      entities.resumeTemplateKey || "continue_qualification_after_location",
+      language,
+      entities
+    );
+    const ack =
+      language === LANGUAGES.SPANISH
+        ? `Entendido — anoto tu preferencia de horario${
+            requestedTime && requestedTime !== "esa hora"
+              ? ` (${requestedTime})`
+              : ""
+          }.`
+        : `Got it — I've noted your time preference${
+            requestedTime && requestedTime !== "that time"
+              ? ` (${requestedTime})`
+              : ""
+          }.`;
+    const bridge =
+      language === LANGUAGES.SPANISH ? "Por cierto" : "By the way";
+    template = `${ack} ${bridge}, ${resume}`;
+  } else if (
+    key === "meeting_preference_zoom_then_auth" ||
+    key === "meeting_preference_in_person_then_auth"
+  ) {
+    const ack =
+      key === "meeting_preference_zoom_then_auth"
+        ? language === LANGUAGES.SPANISH
+          ? "Entendido — podemos hacer la entrevista por Zoom."
+          : "Got it — we can do the interview by Zoom."
+        : language === LANGUAGES.SPANISH
+          ? "Entendido — podemos hacer la entrevista en persona."
+          : "Got it — we can do the interview in person.";
+    const resume = resolveResumeQuestion(
+      entities.resumeTemplateKey || "continue_qualification_after_location",
+      language,
+      entities
+    );
+    template = `${ack} ${resume}`;
   } else if (key === "authorization_denied") {
     template = getAuthorizationDeniedMessage(lang);
   } else if (key === "language_switch_resume") {

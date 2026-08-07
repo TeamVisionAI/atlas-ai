@@ -20,6 +20,7 @@
 | [10_WORKFLOW_SIMULATOR_SCENARIOS.md](./10_WORKFLOW_SIMULATOR_SCENARIOS.md) | Ops Center v2 scenario pack (ephemeral regression) |
 | [11_CUSTOM_CONVERSATION_PLAYGROUND.md](./11_CUSTOM_CONVERSATION_PLAYGROUND.md) | Interactive custom conversation playground (ephemeral) |
 | [12_PLAYGROUND_FEEDBACK_FACT_CORRECTION.md](./12_PLAYGROUND_FEEDBACK_FACT_CORRECTION.md) | Fact correction, mid-flow questions, continuity |
+| [13_PLAYGROUND_FEEDBACK_LICENSE_FAQ_MEETING_MODE.md](./13_PLAYGROUND_FEEDBACK_LICENSE_FAQ_MEETING_MODE.md) | BR-083 — work auth vs license, specific FAQs, Zoom modality |
 
 ## Regression fixture
 

@@ -154,7 +154,17 @@ function sanitizeContextSnapshot(context = {}, contextVersion = 1) {
         context.knownFacts?.workAuthorization === undefined
           ? null
           : context.knownFacts?.workAuthorization,
-      preferredMeetingType: context.knownFacts?.preferredMeetingType || null
+      workAuthorizationStatus:
+        context.knownFacts?.workAuthorizationStatus || null,
+      financialLicenseStatus:
+        context.knownFacts?.financialLicenseStatus || null,
+      financialLicenseTypes: Array.isArray(
+        context.knownFacts?.financialLicenseTypes
+      )
+        ? context.knownFacts.financialLicenseTypes
+        : [],
+      preferredMeetingType: context.knownFacts?.preferredMeetingType || null,
+      coverage: context.knownFacts?.coverage || null
     },
     lastQuestion: context.conversation?.lastQuestionAsked || null,
     lastProspectIntent: context.conversation?.lastProspectIntent || null,

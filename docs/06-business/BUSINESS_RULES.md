@@ -1160,6 +1160,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-083 — Recruit AI Qualification Fact Separation and Specific FAQ Resolution
+
+**Implements:** Independent work-authorization vs financial-license facts; ambiguous “tengo licencia” clarification (driver vs professional); specific insurance / license-requirement / compensation FAQ intents with approved Team Vision copy; location-aware meeting modality (OUTSIDE → Zoom before day-part); mid-flow direct questions answered before resuming pending qualification  
+**Domain:** Recruit AI / Conversation / Qualification dialogue  
+**Depends on:** BR-081, BR-082, BR-018–021, BR-019/020 (coverage / meeting mode)  
+**Related:** BR-049 (Conversation Engine), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in code (flags unchanged: context capture / shadow rates not modified; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/*` (`qualificationFacts.js`, interpreter, decisionEngine, contextTurnUpdate, responseRenderer), `teamVisionWorkflowCopy.js`, `backend/knowledge/faq.json`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix3.test.js`  
+**Simulator:** `license-confusion-orlando-faq-flow`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/13_PLAYGROUND_FEEDBACK_LICENSE_FAQ_MEETING_MODE.md`
+
+### Rules
+
+1. **Fact separation** — `workAuthorization*` and `financialLicense*` are independent. Never infer work authorization from a license statement, or a financial license from work authorization.
+2. **Ambiguous license** — Generic “tengo licencia” / “I have a license” is ambiguous (often driver’s license). Clarify professional insurance/financial-services license vs driver’s license before storing `financialLicenseStatus=licensed`.
+3. **Pending work-auth + license wording** — If Atlas asked for work authorization and the prospect answers with license-only wording, leave work authorization unresolved and clarify.
+4. **Specific FAQ intents** — “Is this insurance?”, “Do I need a license?”, and compensation/pay/salary/commission questions have dedicated intents and approved copy. Do not answer only with generic “servicios financieros” value-prop text when a specific FAQ applies. Do not invent income figures or guarantee income.
+5. **Location-aware meeting mode** — After work authorization is established, use canonical coverage evaluation: OUTSIDE/remote (e.g. Orlando) defaults to Zoom before day-part; LOCAL (e.g. Doral) may lead with office. Do not force Doral office copy on clearly out-of-area prospects.
+6. **Meeting mode before time** — For out-of-area prospects, resolve meeting modality before morning/afternoon when business rules require it.
+7. **Mid-flow questions** — Direct prospect questions are interpreted before blindly repeating the pending question: answer → preserve state → resume pending workflow.
+8. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-082 — Recruit AI Conversational Clarification and Partial-Fact Resolution
 
 **Implements:** Greeting recognition; partial location (city-only) with proposed≠confirmed state; fact certainty metadata; adaptive conversation language; fragment/typo guardrails; last-question contextual interpretation; day-part clarification; recoverable-ambiguity before escalation; capture-only sanitized diagnostics; narrow live CE safety guards while CE remains authoritative  
