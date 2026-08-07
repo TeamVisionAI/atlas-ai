@@ -483,13 +483,27 @@ function decideConversationTurn({
     structured.decision.nextAction =
       NEXT_ACTIONS.ANSWER_JOB_OPPORTUNITY_THEN_RESUME;
     structured.reasonCodes.push(REASON_CODES.JOB_OPPORTUNITY_FAQ);
-    structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
+    // Implements BR-097 — progressive disclosure for first-level overview asks.
+    const overviewFaq =
+      interpretation.entities?.jobFaqDetailLevel === "overview";
+    if (overviewFaq) {
+      structured.reasonCodes.push(REASON_CODES.JOB_OVERVIEW_FAQ);
+      structured.reasonCodes.push(REASON_CODES.JOB_FAQ_PROGRESSIVE_DISCLOSURE);
+    } else {
+      structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
+    }
     const jobFaq = buildFaqResumeDecision(
       structured,
       context,
       intent,
-      "job_opportunity_faq_then_resume"
+      overviewFaq
+        ? "job_overview_faq_then_resume"
+        : "job_opportunity_faq_then_resume"
     );
+    jobFaq.customerReplyPlan.entities = {
+      ...jobFaq.customerReplyPlan.entities,
+      jobFaqDetailLevel: overviewFaq ? "overview" : "employment_framing"
+    };
     jobFaq.contextPatch = {
       ...(jobFaq.contextPatch || {}),
       conversation: {
