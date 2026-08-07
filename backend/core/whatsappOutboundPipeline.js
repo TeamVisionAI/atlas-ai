@@ -26,6 +26,9 @@ const {
 } = require("../repositories/whatsappOutboundDeliveryRepository");
 const { recordBusinessEvent } = require("./recruitingBusinessEventBridge");
 const { COMMUNICATION_EVENTS } = require("../modules/business-events/domain/EventTypes");
+const {
+  normalizeZoomDynamicUrlButtonParameter
+} = require("./whatsappTemplateVariableBuilder");
 
 function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
@@ -49,22 +52,28 @@ function buildTemplateComponents(
     });
   }
 
-  // Preferred Zoom contract: dynamic URL button (index 0).
-  if (expectedButtonVariableKeys.includes("meeting_url") && buttonVariables.meeting_url) {
-    const raw = String(buttonVariables.meeting_url).trim();
-    let suffix = raw;
-    try {
-      const parsed = new URL(raw);
-      suffix = `${parsed.pathname}${parsed.search}`.replace(/^\//, "");
-    } catch {
-      suffix = raw.replace(/^https?:\/\/[^/]+\//i, "");
+  // BR-092 — Zoom invitation: Meta URL button base is https://zoom.us/j/{{1}}.
+  // Parameter must be meeting-id suffix only (never j/{id}, never full URL).
+  if (expectedButtonVariableKeys.includes("meeting_url")) {
+    const raw = buttonVariables?.meeting_url;
+    if (raw == null || String(raw).trim() === "") {
+      const err = new Error("ZOOM_BUTTON_PARAM_MISSING");
+      err.code = "ZOOM_BUTTON_PARAM_MISSING";
+      throw err;
+    }
+
+    const normalized = normalizeZoomDynamicUrlButtonParameter(raw);
+    if (!normalized.ok || !normalized.parameter) {
+      const err = new Error(normalized.reason || "ZOOM_BUTTON_PARAM_INVALID");
+      err.code = "ZOOM_BUTTON_PARAM_INVALID";
+      throw err;
     }
 
     components.push({
       type: "button",
       sub_type: "url",
       index: "0",
-      parameters: [{ type: "text", text: suffix }]
+      parameters: [{ type: "text", text: normalized.parameter }]
     });
   }
 

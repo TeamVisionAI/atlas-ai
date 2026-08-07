@@ -1,0 +1,86 @@
+{
+  "interview_reminder": {
+    "english": {
+      "metaTemplateName": "atlas_interview_reminder_en",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "atlas_interview_reminder_es",
+      "approved": true,
+      "active": true
+    }
+  },
+  "interview_confirmation": {
+    "english": {
+      "metaTemplateName": "atlas_interview_confirmation_en",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "atlas_interview_confirmation_es",
+      "approved": true,
+      "active": true
+    }
+  },
+  "interview_details": {
+    "english": {
+      "metaTemplateName": "atlas_interview_details_en",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "atlas_interview_details_es",
+      "approved": true,
+      "active": true
+    }
+  },
+  "missed_appointment": {
+    "english": {
+      "metaTemplateName": "atlas_missed_appointment_en",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "atlas_missed_appointment_es_v2",
+      "approved": true,
+      "active": true
+    }
+  },
+  "zoom_invitation": {
+    "english": {
+      "metaTemplateName": "atlas_zoom_invitation_en",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "atlas_zoom_invitation_es",
+      "approved": true,
+      "active": true
+    }
+  },
+  "office_location": {
+    "english": {
+      "metaTemplateName": "atlas_office_location_en",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "atlas_office_location_es",
+      "approved": true,
+      "active": true
+    }
+  },
+  "human_assist_notice": {
+    "english": {
+      "metaTemplateName": "atlas_human_assist_notice_en",
+      "approved": true,
+      "active": true
+    },
+    "spanish": {
+      "metaTemplateName": "atlas_human_assist_notice_es",
+      "approved": true,
+      "active": true
+    }
+  }
+}

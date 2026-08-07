@@ -1118,7 +1118,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Meta WhatsApp template catalog semantics, intent→key mapping, parameters, and language rules  
 **Domain:** Communications / Recruit AI  
 **Depends on:** BR-075, BR-041, BR-012  
-**Related:** BR-076 (Zoom URL), BR-077 (office address)  
+**Related:** BR-076 (Zoom URL), BR-077 (office address), BR-092 (Zoom button suffix)  
 **Status:** Implemented in code (Phase 1) — catalog contracts + call-site wiring ready; templates remain inactive until Meta approval + explicit env authorization  
 **Engine target:** `whatsappApprovedTemplateRegistry.js`, `whatsappTemplateVariableBuilder.js`, outbound call sites, ops `WHATSAPP_APPROVED_TEMPLATES_JSON`  
 **Approval packet:** `docs/03-engineering/WHATSAPP_TEMPLATE_APPROVAL_PACKET.md`
@@ -1157,6 +1157,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Organization isolation** — Date windows must use the authenticated session’s organization (or authorized report scope). Never apply another organization’s timezone. Never accept client-supplied timezone overrides. Cross-organization super-admin reports must resolve windows per organization; do not silently aggregate multi-org metrics under one timezone unless a report explicitly documents that behavior.
 8. **Cache keys** — Any dashboard / Alpha Brief cache must include organization ID, effective timezone, and local date or resolved UTC window so a UTC-generated brief is never reused across organization-local days.
 9. **Boundaries** — Does not change WhatsApp intake, Recruit AI behavior, Railway server `TZ`, or database timestamp storage format.
+
+---
+
+## BR-092 — WhatsApp Zoom Template Dynamic URL Parameter Normalization
+
+**Implements:** Normalize BR-076 canonical Zoom URLs into the Meta dynamic URL button suffix for `atlas_zoom_invitation_en` / `atlas_zoom_invitation_es`  
+**Domain:** Communications / WhatsApp Templates  
+**Depends on:** BR-075, BR-076, BR-078  
+**Related:** Meta WABA audit (approved URL pattern `https://zoom.us/j/{{1}}`)  
+**Status:** Implemented in code — templates remain inactive until explicit `WHATSAPP_APPROVED_TEMPLATES_JSON` authorization  
+**Engine target:** `whatsappTemplateVariableBuilder.js` (`normalizeZoomDynamicUrlButtonParameter` / `buildZoomInvitationVariables`), `whatsappApprovedTemplateRegistry.js`, `whatsappOutboundPipeline.js`  
+**Tests:** `backend/test/whatsappZoomTemplateButtonParamBr092.test.js`  
+**Docs:** `docs/03-engineering/WHATSAPP_ZOOM_TEMPLATE_BUTTON_PARAM.md`
+
+### Rules
+
+1. **Meta button contract** — Approved Zoom invitation templates use dynamic URL button base `https://zoom.us/j/{{1}}`. The button parameter is only the suffix after that base (typically the meeting id, plus query when present on the canonical join path).
+2. **Canonical storage unchanged** — BR-076 persisted `virtual_meeting_url` values remain full approved HTTPS Zoom URLs. Adaptation happens only at the WhatsApp template variable-builder / send boundary.
+3. **Normalization** — `https://zoom.us/j/123456789`, `j/123456789`, `/j/123456789`, and already-normalized `123456789` all yield button parameter `123456789`. Never emit `j/{id}` into Meta’s base (no `…/j/j/{id}`).
+4. **Fail closed** — Empty, malformed, non-Zoom, or unsupported-host values must not authorize or send a Zoom invitation template button. Do not silently ship a broken URL.
+5. **Body vs button** — BODY `{{1}}` remains prospect/name (`prospect_first_name`). BUTTON `{{1}}` is the separate Zoom dynamic URL suffix. Namespaces stay distinct.
+6. **EN/ES** — `atlas_zoom_invitation_en` and `atlas_zoom_invitation_es` use the same suffix normalization. No silent language fallback.
+7. **Boundaries** — Does not activate templates, change Railway variables, send WhatsApp, enable Recruit AI v2 execution, write appointments/Calendar, or mutate BR-080.
 
 ---
 

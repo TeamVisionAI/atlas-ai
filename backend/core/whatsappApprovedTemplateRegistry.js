@@ -12,6 +12,9 @@ const {
   normalizePreferredLanguage,
   DEFAULT_PREFERRED_LANGUAGE
 } = require("./prospectLanguage");
+const {
+  normalizeZoomDynamicUrlButtonParameter
+} = require("./whatsappTemplateVariableBuilder");
 
 const TEMPLATE_LOCALES = Object.freeze(["english", "spanish"]);
 
@@ -663,8 +666,10 @@ function resolveApprovedTemplate({
     };
   }
 
+  let resolvedButtonVariables = { ...(buttonVariables || {}) };
+
   if (buttonKeys.length) {
-    const buttonValidation = validateOrderedVariables(buttonKeys, buttonVariables);
+    const buttonValidation = validateOrderedVariables(buttonKeys, resolvedButtonVariables);
 
     if (!buttonValidation.ok) {
       return {
@@ -680,6 +685,31 @@ function resolveApprovedTemplate({
         category: entry.category,
         missingVariables: buttonValidation.missingVariables || [],
         providedVariableKeys: buttonValidation.providedVariableKeys || []
+      };
+    }
+
+    // BR-092 — Zoom URL button must be Meta dynamic suffix for https://zoom.us/j/{{1}}.
+    if (buttonKeys.includes("meeting_url")) {
+      const normalized = normalizeZoomDynamicUrlButtonParameter(
+        resolvedButtonVariables.meeting_url
+      );
+      if (!normalized.ok || !normalized.parameter) {
+        return {
+          ok: false,
+          status: "blocked_template_missing",
+          reason: "TEMPLATE_BUTTON_VARIABLES_INVALID",
+          templateKey: entry.key,
+          metaTemplateName: locale.metaTemplateName,
+          language,
+          languageCode: locale.languageCode,
+          category: entry.category,
+          missingVariables: ["meeting_url"],
+          providedVariableKeys: Object.keys(resolvedButtonVariables)
+        };
+      }
+      resolvedButtonVariables = {
+        ...resolvedButtonVariables,
+        meeting_url: normalized.parameter
       };
     }
   }
@@ -698,7 +728,7 @@ function resolveApprovedTemplate({
     expectedButtonVariableKeys: buttonKeys,
     zoomUrlDeliveryMode: entry.zoomUrlDeliveryMode || null,
     variables: { ...variables },
-    buttonVariables: { ...(buttonVariables || {}) }
+    buttonVariables: resolvedButtonVariables
   };
 }
 
