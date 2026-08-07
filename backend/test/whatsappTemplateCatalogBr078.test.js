@@ -440,6 +440,8 @@ test("37-38. Meta Review untouched; audit components sanitized", () => {
   assert.equal(components[0].type, "body");
   assert.equal(components[1].type, "button");
   assert.equal(components[1].sub_type, "url");
+  // BR-092 — Meta https://zoom.us/j/{{1}} expects meeting id, not j/{id}.
+  assert.equal(components[1].parameters[0].text, "555111222");
   const blob = JSON.stringify(components);
   assert.equal(blob.includes("ACCESS_TOKEN"), false);
   assert.equal(blob.includes("Bearer"), false);
@@ -460,6 +462,7 @@ test("39. unknown env keys rejected without crashing registry", () => {
 test("40. Zoom invitation authorizes with body + button variables", () => {
   const registry = activeRegistry("zoom_invitation", "english", "tv_zoom_en");
   const zoomVars = buildZoomInvitationVariables({ name: "Ana" }, ZOOM_URL);
+  assert.equal(zoomVars.buttonVariables.meeting_url, "555111222");
   const resolved = resolveApprovedTemplate({
     templateKey: "zoom_invitation",
     prospect: { preferred_language: "english" },
@@ -469,6 +472,7 @@ test("40. Zoom invitation authorizes with body + button variables", () => {
   });
   assert.equal(resolved.ok, true);
   assert.equal(resolved.expectedButtonVariableKeys[0], "meeting_url");
+  assert.equal(resolved.buttonVariables.meeting_url, "555111222");
 });
 
 test("41. source contracts: CONFIRMATION removed from reminder intents", () => {

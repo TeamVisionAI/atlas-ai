@@ -43,7 +43,7 @@ Also catalogued (not on the 2026-08-07 activation list): `lead_welcome`, `follow
 | `interview_confirmation` | prospect_first_name, interview_when, meeting_type, meeting_location | — | date/time + location text |
 | `interview_details` | same as confirmation | — | date/time + location text |
 | `missed_appointment` | prospect_first_name | — | name only in registry |
-| `zoom_invitation` | prospect_first_name | meeting_url | Zoom URL button (or body fallback via ops mode) |
+| `zoom_invitation` | prospect_first_name | meeting_url | Meta URL button `https://zoom.us/j/{{1}}`; `meeting_url` = dynamic suffix only (BR-092) |
 | `office_location` | prospect_first_name, meeting_address | — | office address |
 | `human_assist_notice` | prospect_first_name | — | name only; no production call-site yet |
 
@@ -61,3 +61,5 @@ Exact Meta body parameter **order vs approved Meta assets** must be confirmed ag
 ## Activation posture
 
 Templates remain **inactive** until explicit ops authorization. This audit does not enable sends.
+
+Proposed (not applied) packet after BR-092 Zoom button-suffix fix: `docs/03-engineering/WHATSAPP_APPROVED_TEMPLATES_JSON.proposed.json` (includes Zoom EN/ES).

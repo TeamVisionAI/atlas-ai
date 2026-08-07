@@ -1,6 +1,7 @@
 /**
- * BR-078 — Canonical WhatsApp template variable builders.
+ * BR-078 / BR-092 — Canonical WhatsApp template variable builders.
  * Builds ordered parameter objects for approved Meta templates.
+ * Zoom invitation button params are Meta dynamic URL suffixes (BR-092), not full URLs.
  */
 
 const {
@@ -16,6 +17,17 @@ const {
   MEETING_TYPES,
   MEETING_LOCATION_TYPES
 } = require("./configuration/appointmentDomain");
+const { isApprovedHttpsZoomUrl } = require("./virtualMeetingUrlResolver");
+
+/**
+ * Meta-approved Zoom invitation URL button base (WABA audit):
+ * https://zoom.us/j/{{1}}
+ * {{1}} must be only the suffix after that base (meeting id [+ supported query]).
+ */
+const META_ZOOM_INVITATION_URL_BUTTON_BASE = "https://zoom.us/j/";
+
+/** Safe Meta dynamic suffix: meeting id, optional query — never a host or /j/ prefix. */
+const SAFE_ZOOM_BUTTON_SUFFIX_RE = /^[A-Za-z0-9._-]+(?:\?[^\s#]*)?$/;
 
 const MEETING_TYPE_LABELS = Object.freeze({
   en: Object.freeze({
@@ -95,20 +107,90 @@ function resolveMeetingLocationLabel(appointment = {}, prospect = {}) {
 }
 
 function isValidHttpsZoomUrl(value) {
-  if (!value || typeof value !== "string") {
-    return false;
+  // Implements BR-076 host approval for Zoom invitation inputs.
+  return isApprovedHttpsZoomUrl(value);
+}
+
+/**
+ * BR-092 — Normalize a Zoom value into the Meta dynamic URL button parameter.
+ * Meta template base is https://zoom.us/j/{{1}}; {{1}} must not include a leading j/.
+ *
+ * Accepts canonical BR-076 URLs and defensive relative/already-normalized forms.
+ * Does not mutate persisted appointment Zoom URLs.
+ *
+ * @param {unknown} value
+ * @returns {{ ok: boolean, reason: string|null, parameter: string|null }}
+ */
+function normalizeZoomDynamicUrlButtonParameter(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || /\s/.test(raw)) {
+    return {
+      ok: false,
+      reason: "MEETING_URL_UNAVAILABLE_OR_INVALID",
+      parameter: null
+    };
   }
 
-  try {
-    const url = new URL(value.trim());
-    if (url.protocol !== "https:") {
-      return false;
+  let pathAndQuery = null;
+
+  if (/^https?:\/\//i.test(raw)) {
+    if (!isApprovedHttpsZoomUrl(raw)) {
+      return {
+        ok: false,
+        reason: "MEETING_URL_UNAVAILABLE_OR_INVALID",
+        parameter: null
+      };
     }
 
-    return /(^|\.)zoom\.us$/i.test(url.hostname);
-  } catch {
-    return false;
+    try {
+      const parsed = new URL(raw);
+      pathAndQuery = `${parsed.pathname || ""}${parsed.search || ""}`;
+    } catch {
+      return {
+        ok: false,
+        reason: "MEETING_URL_UNAVAILABLE_OR_INVALID",
+        parameter: null
+      };
+    }
+  } else if (/^\/?j\//i.test(raw)) {
+    pathAndQuery = raw.startsWith("/") ? raw : `/${raw}`;
+  } else {
+    // Already-normalized meeting id / suffix (no host, no j/ prefix).
+    const bare = raw.replace(/^\//, "");
+    if (!SAFE_ZOOM_BUTTON_SUFFIX_RE.test(bare) || /^j\//i.test(bare)) {
+      return {
+        ok: false,
+        reason: "MEETING_URL_UNAVAILABLE_OR_INVALID",
+        parameter: null
+      };
+    }
+    return { ok: true, reason: null, parameter: bare };
   }
+
+  const joinMatch = String(pathAndQuery || "").match(/\/j\/(.+)$/i);
+  if (!joinMatch || !joinMatch[1]) {
+    return {
+      ok: false,
+      reason: "MEETING_URL_UNAVAILABLE_OR_INVALID",
+      parameter: null
+    };
+  }
+
+  let suffix = joinMatch[1];
+  // Defense: strip accidental repeated j/ segments so Meta never gets j/j/{id}.
+  while (/^j\//i.test(suffix)) {
+    suffix = suffix.replace(/^j\//i, "");
+  }
+
+  if (!suffix || !SAFE_ZOOM_BUTTON_SUFFIX_RE.test(suffix)) {
+    return {
+      ok: false,
+      reason: "MEETING_URL_UNAVAILABLE_OR_INVALID",
+      parameter: null
+    };
+  }
+
+  return { ok: true, reason: null, parameter: suffix };
 }
 
 function assertSameOrganization(entityOrgId, expectedOrgId) {
@@ -213,10 +295,13 @@ function buildOfficeLocationVariables(appointment = {}, prospect = {}, options =
 }
 
 function buildZoomInvitationVariables(prospect = {}, meetingUrl = null) {
-  if (!isValidHttpsZoomUrl(meetingUrl)) {
+  // Button parameter adaptation to Meta's https://zoom.us/j/{{1}} suffix (BR-092).
+  // Canonical persisted Zoom URLs remain unchanged (BR-076); only the template param is adapted.
+  const normalized = normalizeZoomDynamicUrlButtonParameter(meetingUrl);
+  if (!normalized.ok) {
     return {
       ok: false,
-      reason: "MEETING_URL_UNAVAILABLE_OR_INVALID",
+      reason: normalized.reason || "MEETING_URL_UNAVAILABLE_OR_INVALID",
       variables: null,
       buttonVariables: null
     };
@@ -229,18 +314,21 @@ function buildZoomInvitationVariables(prospect = {}, meetingUrl = null) {
       prospect_first_name: deriveProspectFirstName(prospect)
     }),
     buttonVariables: orderedObject(["meeting_url"], {
-      meeting_url: String(meetingUrl).trim()
+      // Meta dynamic URL button {{1}} — meeting id / suffix only (not full URL, not j/{id}).
+      meeting_url: normalized.parameter
     })
   };
 }
 
 module.exports = {
   MEETING_TYPE_LABELS,
+  META_ZOOM_INVITATION_URL_BUTTON_BASE,
   deriveProspectFirstName,
   localizeMeetingType,
   resolveMeetingAddress,
   resolveMeetingLocationLabel,
   isValidHttpsZoomUrl,
+  normalizeZoomDynamicUrlButtonParameter,
   assertSameOrganization,
   isProspectOptedOut,
   buildLeadWelcomeVariables,
