@@ -1,10 +1,18 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087.
  */
 
 const { formatDateLabel } = require("./dateResolution");
+const {
+  resolvePostModalityScheduling,
+  resolveSchedulingQuestionSkip,
+  resolveZoomLinkFromContext,
+  resolveDateLabel,
+  hasAvailabilityConstraint,
+  hasProposedTime
+} = require("./schedulingMemory");
 
 const {
   INTENTS,
@@ -139,6 +147,9 @@ function resolveQualificationResume(context) {
     };
   }
 
+  // BR-087 — do not re-ask day-part when slot/constraint already known.
+  // resolveQualificationResume only has knownFacts; callers with full context
+  // use resolveSchedulingQuestionSkip separately.
   const modality = resolveMeetingModalityForLocation(facts);
   if (modality.coverage === "OUTSIDE") {
     return {
@@ -254,6 +265,24 @@ function resolvePendingResume(context) {
       lastQuestionAsked: "ask_authorization"
     };
   }
+  // BR-087 — skip redundant day-part when constraint/slot already known.
+  const skip = resolveSchedulingQuestionSkip(context);
+  if (skip && (lastQ === "ask_day_part" || lastQ === "confirm_slot" || !lastQ)) {
+    if (hasProposedTime(context)) {
+      return {
+        templateKey: "confirm_date_with_time",
+        lastQuestionAsked: "confirm_slot",
+        entities: skip.entities
+      };
+    }
+    if (hasAvailabilityConstraint(context)) {
+      return {
+        templateKey: "ask_time_after_constraint",
+        lastQuestionAsked: "ask_time_preference",
+        entities: skip.entities
+      };
+    }
+  }
   if (lastQ === "ask_day_part" || lastQ === "confirm_slot") {
     return {
       templateKey: "ask_day_part_simple",
@@ -261,6 +290,48 @@ function resolvePendingResume(context) {
     };
   }
   return resolveQualificationResume(context);
+}
+
+function applyPostModalityScheduling(structured, context, meetingType) {
+  const language = structured.preferredLanguage || "spanish";
+  const resume = resolvePostModalityScheduling(context, language);
+  const office =
+    meetingType === "in_person" &&
+    String(context.knownFacts?.coverage || "").toUpperCase() === "OUTSIDE";
+
+  let templateKey;
+  if (resume.templateKeySuffix === "confirm_slot") {
+    templateKey =
+      meetingType === "zoom"
+        ? "meeting_preference_zoom_confirm_slot"
+        : office
+          ? "meeting_preference_in_person_office_confirm_slot"
+          : "meeting_preference_in_person_confirm_slot";
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_MEMORY_PRESERVED);
+    structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+  } else if (resume.templateKeySuffix === "ask_time") {
+    templateKey =
+      meetingType === "zoom"
+        ? "meeting_preference_zoom_ask_time"
+        : "meeting_preference_in_person_ask_time";
+    structured.reasonCodes.push(REASON_CODES.SKIP_REDUNDANT_DAY_PART);
+    structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+  } else {
+    templateKey =
+      meetingType === "zoom"
+        ? "meeting_preference_zoom"
+        : "meeting_preference_in_person";
+  }
+
+  structured.customerReplyPlan.templateKey = templateKey;
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    preferredMeetingType: meetingType,
+    meetingType,
+    coverage: context.knownFacts?.coverage || null,
+    ...resume.entities
+  };
+  return resume;
 }
 
 function buildFaqResumeDecision(structured, context, intent, templateKey) {
@@ -877,36 +948,41 @@ function decideConversationTurn({
       structured.reasonCodes.push(REASON_CODES.EXPLICIT_ZOOM_CLEARS_OFFICE);
     }
 
-    const nextQuestion = workAuthResolved
-      ? "ask_day_part"
-      : resume.lastQuestionAsked || "ask_authorization";
-    const templateKey = !workAuthResolved
-      ? meetingType === "zoom"
-        ? "meeting_preference_zoom_then_auth"
-        : "meeting_preference_in_person_then_auth"
-      : meetingType === "zoom"
-        ? "meeting_preference_zoom"
-        : "meeting_preference_in_person";
     structured.decision.nextAction = NEXT_ACTIONS.UPDATE_MEETING_PREFERENCE;
     structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey = templateKey;
-    structured.customerReplyPlan.entities = {
-      ...structured.customerReplyPlan.entities,
-      resumeTemplateKey: resume.templateKey,
-      preferredMeetingType: meetingType,
-      meetingType,
-      coverage: context.knownFacts?.coverage || null
-    };
+
+    let nextQuestion;
+    if (!workAuthResolved) {
+      nextQuestion = resume.lastQuestionAsked || "ask_authorization";
+      structured.customerReplyPlan.templateKey =
+        meetingType === "zoom"
+          ? "meeting_preference_zoom_then_auth"
+          : "meeting_preference_in_person_then_auth";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        resumeTemplateKey: resume.templateKey,
+        preferredMeetingType: meetingType,
+        meetingType,
+        coverage: context.knownFacts?.coverage || null
+      };
+    } else {
+      // BR-087 — preserve date/time/constraint; confirm slot instead of day-part reset.
+      const post = applyPostModalityScheduling(structured, context, meetingType);
+      nextQuestion = post.lastQuestionAsked;
+    }
+
     structured.contextPatch = {
       knownFacts: {
         preferredMeetingType: meetingType,
         meetingPreferenceSource: "prospect",
         meetingTypeRequested: meetingType,
         meetingTypeConfirmed: true
+        // availabilityConstraint intentionally untouched
       },
       appointment: {
         meetingType,
         location: meetingType === "zoom" ? null : context.appointment?.location
+        // proposedDate / proposedTime preserved via merge
       },
       conversation: {
         lastProspectIntent: INTENTS.PROVIDE_MEETING_PREFERENCE,
@@ -925,16 +1001,24 @@ function decideConversationTurn({
     structured.decision.nextAction = NEXT_ACTIONS.UPDATE_MEETING_PREFERENCE;
     structured.decision.mayCreateAppointment = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey = workAuthResolved
-      ? "meeting_preference_in_person"
-      : "meeting_preference_in_person_then_auth";
-    structured.customerReplyPlan.entities = {
-      ...structured.customerReplyPlan.entities,
-      preferredMeetingType: "in_person",
-      meetingType: "in_person",
-      coverage: context.knownFacts?.coverage || null
-    };
     structured.reasonCodes.push(REASON_CODES.IN_PERSON_TRAVEL_CONFIRMED);
+
+    let nextQuestion;
+    if (!workAuthResolved) {
+      nextQuestion = "ask_authorization";
+      structured.customerReplyPlan.templateKey =
+        "meeting_preference_in_person_then_auth";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        preferredMeetingType: "in_person",
+        meetingType: "in_person",
+        coverage: context.knownFacts?.coverage || null
+      };
+    } else {
+      const post = applyPostModalityScheduling(structured, context, "in_person");
+      nextQuestion = post.lastQuestionAsked;
+    }
+
     structured.contextPatch = {
       knownFacts: {
         preferredMeetingType: "in_person",
@@ -948,7 +1032,7 @@ function decideConversationTurn({
       },
       conversation: {
         lastProspectIntent: INTENTS.CONFIRM_IN_PERSON_TRAVEL,
-        lastQuestionAsked: workAuthResolved ? "ask_day_part" : "ask_authorization",
+        lastQuestionAsked: nextQuestion,
         pendingClarification: null
       }
     };
@@ -986,6 +1070,7 @@ function decideConversationTurn({
     structured.customerReplyPlan.templateKey = "acknowledge_withdraw_no_write";
     structured.reasonCodes.push(REASON_CODES.WITHDRAW_INTENT_RECOGNIZED);
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_STOPPED);
+    structured.reasonCodes.push(REASON_CODES.CLEAN_WITHDRAWAL_CLOSURE);
     structured.contextPatch = {
       currentStage: STAGES.WITHDRAWN,
       appointment: {
@@ -1128,38 +1213,148 @@ function decideConversationTurn({
 
   if (intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT) {
     const constraint = interpretation.entities?.availabilityConstraint || null;
-    const pendingQ = String(context.conversation?.lastQuestionAsked || "");
+    const prior = context.knownFacts?.availabilityConstraint || null;
+    const repetition =
+      Boolean(interpretation.entities?.repetitionSignal) ||
+      (prior?.earliestTime &&
+        constraint?.earliestTime &&
+        prior.earliestTime === constraint.earliestTime);
     structured.decision.nextAction =
       NEXT_ACTIONS.ACKNOWLEDGE_AVAILABILITY_CONSTRAINT;
     structured.decision.shouldEscalate = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey =
-      "acknowledge_availability_constraint";
+
+    const proposedTime = context.appointment?.proposedTime || null;
+    if (repetition) {
+      structured.customerReplyPlan.templateKey = proposedTime
+        ? "acknowledge_known_availability_confirm_slot"
+        : "acknowledge_known_availability";
+      structured.reasonCodes.push(REASON_CODES.REPETITION_ACKNOWLEDGED);
+      structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+    } else {
+      structured.customerReplyPlan.templateKey =
+        "acknowledge_availability_constraint";
+      structured.reasonCodes.push(REASON_CODES.AVAILABILITY_CONSTRAINT_CAPTURED);
+    }
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    structured.reasonCodes.push(REASON_CODES.SKIP_REDUNDANT_DAY_PART);
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
-      earliestTime: constraint?.earliestTime || null,
-      dayPart: constraint?.dayPart || null
+      earliestTime: constraint?.earliestTime || prior?.earliestTime || null,
+      dayPart: constraint?.dayPart || prior?.dayPart || null,
+      requestedTime: proposedTime,
+      dateLabel: resolveDateLabel(
+        context,
+        structured.preferredLanguage || "spanish"
+      )
     };
-    structured.reasonCodes.push(REASON_CODES.AVAILABILITY_CONSTRAINT_CAPTURED);
-    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
     structured.contextPatch = {
       knownFacts: {
-        availabilityConstraint: constraint,
+        availabilityConstraint: constraint || prior,
         preferredDayPart:
-          constraint?.dayPart || context.knownFacts?.preferredDayPart || null
+          constraint?.dayPart ||
+          prior?.dayPart ||
+          context.knownFacts?.preferredDayPart ||
+          null
       },
       conversation: {
         clarificationCount: 0,
         pendingClarification: null,
         lastProspectIntent: INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT,
-        // Keep day-part pending if that was the open question; otherwise ask for a time.
-        lastQuestionAsked:
-          pendingQ === "ask_day_part" ? "ask_day_part" : "ask_time_preference"
+        // BR-087 — never bounce back to day-part after after-5 is known.
+        lastQuestionAsked: proposedTime ? "confirm_slot" : "ask_time_preference"
       },
       currentStage:
         context.currentStage === STAGES.GREETING
           ? STAGES.QUALIFICATION
           : context.currentStage || STAGES.SCHEDULING
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.REASSERT_KNOWN_FACT) {
+    const proposedTime = context.appointment?.proposedTime || null;
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_KNOWN_AVAILABILITY;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = proposedTime
+      ? "acknowledge_known_availability_confirm_slot"
+      : "acknowledge_known_availability";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      earliestTime:
+        context.knownFacts?.availabilityConstraint?.earliestTime || null,
+      requestedTime: proposedTime,
+      dateLabel: resolveDateLabel(
+        context,
+        structured.preferredLanguage || "spanish"
+      )
+    };
+    structured.reasonCodes.push(REASON_CODES.REPETITION_ACKNOWLEDGED);
+    structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      conversation: {
+        lastProspectIntent: INTENTS.REASSERT_KNOWN_FACT,
+        lastQuestionAsked: proposedTime ? "confirm_slot" : "ask_time_preference",
+        pendingClarification: null,
+        clarificationCount: 0
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.MEETING_ACCESS_REQUEST) {
+    const link = resolveZoomLinkFromContext(context);
+    const proposedTime = context.appointment?.proposedTime || null;
+    const dateLabel = resolveDateLabel(
+      context,
+      structured.preferredLanguage || "spanish"
+    );
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_MEETING_ACCESS;
+    structured.decision.mayCreateAppointment = false;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.reasonCodes.push(REASON_CODES.MEETING_ACCESS_REQUESTED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+
+    if (!link.confirmed) {
+      structured.customerReplyPlan.templateKey = proposedTime
+        ? "zoom_link_after_confirm_with_slot"
+        : "zoom_link_after_confirm";
+      structured.reasonCodes.push(REASON_CODES.ZOOM_LINK_DEFERRED_UNTIL_CONFIRM);
+    } else if (link.available) {
+      structured.customerReplyPlan.templateKey = "zoom_link_canonical_share";
+      structured.reasonCodes.push(REASON_CODES.ZOOM_LINK_CANONICAL_PROPOSED);
+    } else {
+      structured.customerReplyPlan.templateKey = "zoom_link_pending_unavailable";
+      structured.reasonCodes.push(REASON_CODES.ZOOM_LINK_PENDING_UNAVAILABLE);
+    }
+
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requestedTime: proposedTime,
+      dateLabel,
+      zoomUrl: link.url || null,
+      preferredMeetingType:
+        context.knownFacts?.preferredMeetingType ||
+        context.appointment?.meetingType ||
+        "zoom",
+      meetingType:
+        context.knownFacts?.preferredMeetingType ||
+        context.appointment?.meetingType ||
+        "zoom"
+    };
+    structured.contextPatch = {
+      conversation: {
+        lastProspectIntent: INTENTS.MEETING_ACCESS_REQUEST,
+        lastQuestionAsked: proposedTime
+          ? "confirm_slot"
+          : context.conversation?.lastQuestionAsked || "ask_time_preference",
+        pendingClarification: null
+      },
+      attention: { needsHumanAttention: false, reason: null }
     };
     return structured;
   }

@@ -54,17 +54,41 @@ const COPY = Object.freeze({
     meeting_preference_zoom:
       "Got it — we can do the interview by Zoom. Do you prefer morning or afternoon?",
     meeting_preference_zoom_then_auth: null,
+    meeting_preference_zoom_confirm_slot:
+      "Of course — we'll do it by Zoom. Does {dateLabel} at {requestedTime} still work for you?",
+    meeting_preference_zoom_ask_time:
+      "Got it — we can do the interview by Zoom. What time works best after {earliestTime}?",
     meeting_preference_in_person:
       "Got it — we can do the interview in person. Do you prefer morning or afternoon?",
     meeting_preference_in_person_then_auth: null,
+    meeting_preference_in_person_confirm_slot:
+      "Perfect. Does {dateLabel} at {requestedTime} still work for an in-person interview?",
+    meeting_preference_in_person_office_confirm_slot:
+      "Perfect. That would be at our Doral office. Does {dateLabel} at {requestedTime} work for you?",
+    meeting_preference_in_person_ask_time:
+      "Got it — we can do the interview in person. What time works best after {earliestTime}?",
     confirm_in_person_travel_doral:
       "Of course. Our office is in Doral, at 2500 NW 79th Ave, Suite 189. Does coming to Doral work for you?",
     acknowledge_cancel_no_write:
       "Understood — I've noted your cancel request. A teammate will confirm any changes; nothing was changed automatically.",
     acknowledge_withdraw_no_write:
-      "Understood. We'll cancel the process for now. A teammate can reopen it if you change your mind later.",
+      "Understood. We'll cancel the process for now. Thanks for letting us know.",
     acknowledge_opt_out_no_write:
       "Understood — I've noted your request to stop messages. Nothing was changed automatically.",
+    acknowledge_known_availability:
+      "You're right — you already told me you're available after {earliestTime}. What time works best?",
+    acknowledge_known_availability_confirm_slot:
+      "You're right — you already told me you're available after {earliestTime}. Does {dateLabel} at {requestedTime} still work?",
+    ask_time_after_constraint:
+      "Got it — you're available after {earliestTime}. What time works best for you?",
+    zoom_link_after_confirm:
+      "Of course. The Zoom link is shared once we confirm the appointment. What day and time work for you?",
+    zoom_link_after_confirm_with_slot:
+      "Of course. The Zoom link is shared once we confirm the appointment. For now, does {dateLabel} at {requestedTime} work for you?",
+    zoom_link_canonical_share:
+      "Of course. Here is the Zoom link: {zoomUrl}",
+    zoom_link_pending_unavailable:
+      "Of course. The Zoom link is not available yet — we'll share it as soon as it's ready.",
     confirm_date_with_time:
       "Of course. Does {dateLabel} at {requestedTime} work for you?",
     acknowledge_date_ask_time:
@@ -125,17 +149,41 @@ const COPY = Object.freeze({
     meeting_preference_zoom:
       "Entendido — podemos hacer la entrevista por Zoom. ¿Prefieres en la mañana o en la tarde?",
     meeting_preference_zoom_then_auth: null,
+    meeting_preference_zoom_confirm_slot:
+      "Claro, lo hacemos por Zoom. ¿Te funciona todavía el {dateLabel} a las {requestedTime}?",
+    meeting_preference_zoom_ask_time:
+      "Entendido — podemos hacer la entrevista por Zoom. ¿Qué hora te funciona después de las {earliestTime}?",
     meeting_preference_in_person:
       "Entendido — podemos hacer la entrevista en persona. ¿Prefieres en la mañana o en la tarde?",
     meeting_preference_in_person_then_auth: null,
+    meeting_preference_in_person_confirm_slot:
+      "Perfecto. ¿Te funciona el {dateLabel} a las {requestedTime} para la entrevista en persona?",
+    meeting_preference_in_person_office_confirm_slot:
+      "Perfecto. Entonces sería en nuestra oficina de Doral. ¿Te funciona el {dateLabel} a las {requestedTime}?",
+    meeting_preference_in_person_ask_time:
+      "Entendido — podemos hacer la entrevista en persona. ¿Qué hora te funciona después de las {earliestTime}?",
     confirm_in_person_travel_doral:
       "Claro. Nuestra oficina está en Doral, en 2500 NW 79th Ave, Suite 189. ¿Te funciona venir hasta Doral?",
     acknowledge_cancel_no_write:
       "Entendido — anoté tu solicitud de cancelación. Un compañero confirmará cualquier cambio; no se modificó nada automáticamente.",
     acknowledge_withdraw_no_write:
-      "Entiendo. Cancelamos el proceso por ahora. Un compañero puede reabrirlo si cambias de idea más adelante.",
+      "Entiendo. Cancelamos el proceso por ahora. Gracias por avisarnos.",
     acknowledge_opt_out_no_write:
       "Entendido — anoté tu solicitud de no recibir más mensajes. No se modificó nada automáticamente.",
+    acknowledge_known_availability:
+      "Sí, tienes razón — me dijiste que puedes después de las {earliestTime}. ¿Qué hora te funciona mejor?",
+    acknowledge_known_availability_confirm_slot:
+      "Sí, tienes razón — me dijiste que puedes después de las {earliestTime}. ¿Te funciona el {dateLabel} a las {requestedTime}?",
+    ask_time_after_constraint:
+      "Entendido — puedes después de las {earliestTime}. ¿Qué hora te funciona mejor?",
+    zoom_link_after_confirm:
+      "Claro. El enlace se comparte cuando confirmemos la cita. ¿Qué día y hora te funcionan?",
+    zoom_link_after_confirm_with_slot:
+      "Claro. El enlace se comparte cuando confirmemos la cita. Por ahora, ¿te funciona el {dateLabel} a las {requestedTime}?",
+    zoom_link_canonical_share:
+      "Claro. Aquí está el enlace de Zoom: {zoomUrl}",
+    zoom_link_pending_unavailable:
+      "Claro. El enlace de Zoom aún no está disponible; te lo compartimos cuando esté listo.",
     confirm_date_with_time:
       "Claro. ¿El {dateLabel} a las {requestedTime} te funciona?",
     acknowledge_date_ask_time:
@@ -421,15 +469,20 @@ function renderCustomerReply(responsePlan) {
     entities.requestedDateLabel ||
     (language === LANGUAGES.SPANISH ? "ese día" : "that day");
 
-  // BR-085 / renderer safety — active Zoom must never mix Doral office address.
-  const activeZoom =
-    String(entities.preferredMeetingType || "").toLowerCase() === "zoom" ||
-    String(entities.meetingType || "").toLowerCase() === "zoom" ||
-    String(entities.coverage || "").toUpperCase() === "OUTSIDE";
+  // BR-085/087 — active Zoom must never mix Doral office address.
+  // Confirmed in-person (even OUTSIDE coverage after travel OK) may mention the office.
+  const meetingType = String(
+    entities.preferredMeetingType || entities.meetingType || ""
+  ).toLowerCase();
+  const forceZoomNoOffice =
+    meetingType === "zoom" ||
+    (String(entities.coverage || "").toUpperCase() === "OUTSIDE" &&
+      meetingType !== "in_person");
   if (
-    activeZoom &&
+    forceZoomNoOffice &&
     key !== "confirm_in_person_travel_doral" &&
-    /2500 NW 79th|oficinas ubicadas/i.test(String(template || ""))
+    key !== "meeting_preference_in_person_office_confirm_slot" &&
+    /2500 NW 79th|oficinas ubicadas|Doral office/i.test(String(template || ""))
   ) {
     template =
       language === LANGUAGES.SPANISH
@@ -437,11 +490,25 @@ function renderCustomerReply(responsePlan) {
         : pack.meeting_preference_zoom || pack.default;
   }
 
+  // Also apply earliestTime substitution for BR-087 templates.
+  if (
+    key === "acknowledge_known_availability" ||
+    key === "acknowledge_known_availability_confirm_slot" ||
+    key === "ask_time_after_constraint" ||
+    key === "meeting_preference_zoom_ask_time" ||
+    key === "meeting_preference_in_person_ask_time"
+  ) {
+    template = String(template || "").replace(/\{earliestTime\}/g, earliestLabel);
+  }
+
+  const zoomUrl = entities.zoomUrl || "";
+
   const rendered = String(template)
     .replace(/\{requestedTime\}/g, requestedTime)
     .replace(/\{earliestTime\}/g, earliestLabel)
     .replace(/\{ambiguousHour\}/g, ambiguousHour)
     .replace(/\{dateLabel\}/g, dateLabel)
+    .replace(/\{zoomUrl\}/g, zoomUrl)
     .replace(/\{city\}/g, city)
     .replace(/\{proposedStateName\}/g, proposed || "your state")
     .replace(/\{proposedState\}/g, entities.proposedState || "")

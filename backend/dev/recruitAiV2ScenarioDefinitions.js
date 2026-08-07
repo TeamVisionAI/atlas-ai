@@ -1359,6 +1359,171 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "long-scheduling-memory-modality-zoom-link",
+    name: "Long Scheduling Memory + Modality + Zoom Link",
+    category: "production_defect",
+    description:
+      "Preserve Tue 6:30 / after-5 across in-person↔Zoom; Zoom-link logistics; repetition; Wednesday date change; clean withdraw (BR-087).",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation",
+      currentStage: "scheduling",
+      timezone: "America/New_York",
+      testNow: "2026-08-07T15:00:00.000-04:00",
+      knownFacts: {
+        city: "Orlando",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        workAuthorization: true,
+        workAuthorizationStatus: "authorized",
+        preferredMeetingType: "zoom",
+        meetingPreferenceSource: "coverage_default",
+        meetingTypeConfirmed: true,
+        coverage: "OUTSIDE",
+        availabilityConstraint: {
+          type: "availability_constraint",
+          earliestTime: "17:00",
+          dayPart: "evening",
+          explicitCandidateTime: null,
+          raw: "despues de las 5"
+        },
+        preferredDayPart: "evening"
+      },
+      appointment: {
+        status: "proposed",
+        meetingType: "zoom",
+        proposedTime: "18:30",
+        proposedDate: "2026-08-11",
+        proposedDateLabel: "martes",
+        previouslyOfferedSlots: [],
+        location: null
+      },
+      conversation: {
+        lastQuestionAsked: "confirm_slot",
+        lastAtlasOutboundText:
+          "Entendido — prefieres el martes a las 6:30 PM. ¿Te funciona?"
+      }
+    },
+    turns: [
+      {
+        id: "sm01",
+        text: "Prefiero en persona",
+        inboundMessageId: "sim-wamid.sched-memory.t01",
+        expect: {
+          intent: "provide_meeting_preference",
+          meetingType: "zoom",
+          meetingTypeRequested: "in_person",
+          meetingTypeConfirmed: false,
+          proposedTime: "18:30",
+          proposedDate: "2026-08-11",
+          nextAction: "confirm_in_person_travel",
+          replyIncludes: ["Doral"],
+          replyExcludes: ["mañana o en la tarde", "12:00 AM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sm02",
+        text: "Sí, puedo ir a Doral",
+        inboundMessageId: "sim-wamid.sched-memory.t02",
+        expect: {
+          intent: "confirm_in_person_travel",
+          meetingType: "in_person",
+          meetingTypeConfirmed: true,
+          proposedTime: "18:30",
+          proposedDate: "2026-08-11",
+          replyIncludes: ["Doral", "6:30"],
+          replyExcludes: ["mañana o en la tarde", "12:00 AM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sm03",
+        text: "Actually, mejor Zoom",
+        inboundMessageId: "sim-wamid.sched-memory.t03",
+        expect: {
+          intent: "provide_meeting_preference",
+          meetingType: "zoom",
+          proposedTime: "18:30",
+          proposedDate: "2026-08-11",
+          replyIncludes: ["Zoom", "6:30"],
+          replyExcludes: ["2500 NW 79th", "mañana o en la tarde", "oficinas"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sm04",
+        text: "¿Me puedes mandar el link?",
+        inboundMessageId: "sim-wamid.sched-memory.t04",
+        expect: {
+          intent: "meeting_access_request",
+          nextAction: "acknowledge_meeting_access",
+          proposedTime: "18:30",
+          proposedDate: "2026-08-11",
+          proposedSideEffectsInclude: ["share_zoom_link"],
+          replyIncludes: ["confirmemos", "6:30"],
+          replyExcludes: ["zoom.us", "mañana o en la tarde", "dato que te acabo de pedir"],
+          authorizationAuthorized: false,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sm05",
+        text: "ya te dije que despues de las 5",
+        inboundMessageId: "sim-wamid.sched-memory.t05",
+        expect: {
+          availabilityConstraintEarliest: "17:00",
+          proposedTime: "18:30",
+          proposedDate: "2026-08-11",
+          replyIncludes: ["razón", "5"],
+          replyExcludes: ["mañana o en la tarde"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sm06",
+        text: "Cámbialo para el miércoles",
+        inboundMessageId: "sim-wamid.sched-memory.t06",
+        expect: {
+          intent: "scheduling_date_proposal",
+          proposedDate: "2026-08-12",
+          proposedTime: "18:30",
+          replyIncludes: ["miércoles", "6:30"],
+          replyExcludes: ["12:00 AM", "mañana o en la tarde"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sm07",
+        text: "Mejor cancélalo, cambié de idea",
+        inboundMessageId: "sim-wamid.sched-memory.t07",
+        expect: {
+          intent: "withdraw_interest",
+          stage: "withdrawn",
+          nextAction: "acknowledge_withdraw_no_write",
+          proposedSideEffectsInclude: ["withdraw_prospect", "cancel_appointment"],
+          replyIncludes: ["Cancelamos", "Gracias"],
+          replyExcludes: [
+            "Un compañero puede reabrirlo",
+            "reabrir",
+            "dato que te acabo de pedir",
+            "12:00 AM"
+          ],
+          authorizationAuthorized: false,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 

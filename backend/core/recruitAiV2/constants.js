@@ -5,6 +5,7 @@
  * BR-084 — scheduling constraints and direct-time resolution.
  * BR-085 — date-only scheduling, cancellation/withdraw, in-person travel confirm.
  * BR-086 — natural-language communication opt-out resolution.
+ * BR-087 — scheduling memory, meeting logistics, clean withdrawal.
  */
 
 const STAGES = Object.freeze({
@@ -55,6 +56,8 @@ const INTENTS = Object.freeze({
   OPT_OUT_REQUEST: "opt_out_request",
   CONFIRM_IN_PERSON_TRAVEL: "confirm_in_person_travel",
   SCHEDULING_DATE_PROPOSAL: "scheduling_date_proposal",
+  MEETING_ACCESS_REQUEST: "meeting_access_request",
+  REASSERT_KNOWN_FACT: "reassert_known_fact",
   SELECT_OPTION: "select_option",
   SCHEDULING_COUNTEROFFER: "scheduling_counteroffer",
   CLARIFY_AM_PM: "clarify_am_pm",
@@ -87,6 +90,8 @@ const NEXT_ACTIONS = Object.freeze({
   ACKNOWLEDGE_DATE_ASK_TIME: "acknowledge_date_ask_time",
   ACKNOWLEDGE_AND_CHECK_AVAILABILITY: "acknowledge_and_check_availability",
   ACKNOWLEDGE_AVAILABILITY_CONSTRAINT: "acknowledge_availability_constraint",
+  ACKNOWLEDGE_KNOWN_AVAILABILITY: "acknowledge_known_availability",
+  ACKNOWLEDGE_MEETING_ACCESS: "acknowledge_meeting_access",
   OFFER_ALTERNATIVES_OR_ESCALATE: "offer_alternatives_or_escalate",
   OFFER_ALTERNATIVES_NO_HANDOFF: "offer_alternatives_no_handoff",
   CLARIFY_AM_PM: "clarify_am_pm",
@@ -150,7 +155,16 @@ const REASON_CODES = Object.freeze({
   IN_PERSON_TRAVEL_CONFIRMATION_REQUIRED: "IN_PERSON_TRAVEL_CONFIRMATION_REQUIRED",
   IN_PERSON_TRAVEL_CONFIRMED: "IN_PERSON_TRAVEL_CONFIRMED",
   EXPLICIT_ZOOM_CLEARS_OFFICE: "EXPLICIT_ZOOM_CLEARS_OFFICE",
-  SCHEDULING_STOPPED: "SCHEDULING_STOPPED"
+  SCHEDULING_STOPPED: "SCHEDULING_STOPPED",
+  SCHEDULING_MEMORY_PRESERVED: "SCHEDULING_MEMORY_PRESERVED",
+  SKIP_REDUNDANT_DAY_PART: "SKIP_REDUNDANT_DAY_PART",
+  ASK_ONLY_MISSING_INFORMATION: "ASK_ONLY_MISSING_INFORMATION",
+  MEETING_ACCESS_REQUESTED: "MEETING_ACCESS_REQUESTED",
+  ZOOM_LINK_DEFERRED_UNTIL_CONFIRM: "ZOOM_LINK_DEFERRED_UNTIL_CONFIRM",
+  ZOOM_LINK_CANONICAL_PROPOSED: "ZOOM_LINK_CANONICAL_PROPOSED",
+  ZOOM_LINK_PENDING_UNAVAILABLE: "ZOOM_LINK_PENDING_UNAVAILABLE",
+  REPETITION_ACKNOWLEDGED: "REPETITION_ACKNOWLEDGED",
+  CLEAN_WITHDRAWAL_CLOSURE: "CLEAN_WITHDRAWAL_CLOSURE"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */
