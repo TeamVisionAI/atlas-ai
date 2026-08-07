@@ -196,14 +196,70 @@ function looksLikeOpportunityQuestion(text) {
   return looksLikeJobOpportunityQuestion(text);
 }
 
+/**
+ * Implements BR-098 — insurance FAQ detection must work on BR-095 comparisonText
+ * (punctuation stripped). Never require "?" to survive final routing.
+ */
 function looksLikeInsuranceQuestion(text) {
-  const t = String(text || "").trim();
+  const t = String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return false;
+  }
+  // Affirmative "seguro" / "si seguro" is not an insurance FAQ.
+  if (/^(si|yes|ok|okay)?\s*seguro$/.test(t)) {
+    return false;
+  }
   return (
-    /is this insurance/i.test(t) ||
-    /is it insurance/i.test(t) ||
-    /es (esto )?seguro/i.test(t) ||
-    /es para vender seguros/i.test(t) ||
-    /\bseguros\b/i.test(t) && /\?/.test(t)
+    /\bis this (about )?insurance\b/.test(t) ||
+    /\bis it insurance\b/.test(t) ||
+    /\bdo you sell insurance\b/.test(t) ||
+    /\bdoes this involve insurance\b/.test(t) ||
+    /\bes (esto |eso )?(de )?seguros\b/.test(t) ||
+    /\bes (esto |eso )?seguro\b/.test(t) ||
+    /\bes para vender seguros\b/.test(t) ||
+    /\bes vender seguros\b/.test(t) ||
+    /\btrabajan con seguros\b/.test(t) ||
+    /\bincluye seguros\b/.test(t) ||
+    /^seguros$/.test(t)
+  );
+}
+
+/**
+ * Implements BR-098 — experience FAQ before permissive location parsing.
+ */
+function looksLikeExperienceQuestion(text) {
+  const t = String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return false;
+  }
+  return (
+    /\b(necesito|se necesita|hay que tener|tengo que tener) (prior |previa )?experiencia\b/.test(
+      t
+    ) ||
+    /\bno tengo experiencia\b/.test(t) ||
+    /\bnunca he trabajado en esto\b/.test(t) ||
+    /\bexperiencia\b.*\b(importa|necesaria|requerida|previa)\b/.test(t) ||
+    /\bdo i need (prior |any )?experience\b/.test(t) ||
+    /\bis experience required\b/.test(t) ||
+    /\bi don'?t have (any |prior )?experience\b/.test(t) ||
+    /\bi have no experience\b/.test(t) ||
+    /\bi'?ve never done this before\b/.test(t) ||
+    /\bi have never done this before\b/.test(t) ||
+    /\bneed (prior |any )?experience\b/.test(t)
   );
 }
 
@@ -794,12 +850,17 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.employmentPreference = "fixed";
     }
   } else if (looksLikeCompensationQuestion(text)) {
-    // BR-088 — FAQ/business intents outrank scheduling parsing.
+    // BR-088/098 — FAQ/business intents outrank scheduling + location parsing.
     intent = INTENTS.COMPENSATION_QUESTION;
     confidence = 0.92;
-  } else if (looksLikeInsuranceQuestion(text)) {
+  } else if (looksLikeInsuranceQuestion(text) || looksLikeInsuranceQuestion(originalText)) {
+    // BR-098 — detector must survive comparisonText (no "?") and raw variants.
     intent = INTENTS.INSURANCE_QUESTION;
     confidence = 0.92;
+  } else if (looksLikeExperienceQuestion(text) || looksLikeExperienceQuestion(originalText)) {
+    // Implements BR-098 — experience FAQ before location/name/fragment handling.
+    intent = INTENTS.EXPERIENCE_QUESTION;
+    confidence = 0.93;
   } else if (looksLikeLicensePathDetailQuestion(text)) {
     // BR-089 — 2-14/2-15 path detail only when explicitly asked.
     intent = INTENTS.LICENSE_PATH_DETAIL_QUESTION;
@@ -1139,6 +1200,7 @@ module.exports = {
   looksLikeJobOverviewQuestion,
   looksLikeConversationClarificationRequest,
   looksLikeInsuranceQuestion,
+  looksLikeExperienceQuestion,
   looksLikeLicenseRequirementQuestion,
   looksLikeCompensationQuestion,
   looksLikeWorkAuthorizationAnswer,

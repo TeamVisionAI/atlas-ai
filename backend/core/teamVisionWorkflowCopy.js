@@ -138,6 +138,13 @@ function getInsuranceFaqAnswer(language) {
   );
 }
 
+/** BR-098 — concise experience FAQ (progressive disclosure; no license/pay stack). */
+function getExperienceFaqAnswer(language) {
+  return language === "es"
+    ? "No necesitas experiencia previa. Recibes entrenamiento para aprender el proceso."
+    : "You don't need prior experience. Training is provided so you can learn the process.";
+}
+
 function getLicenseRequirementFaqAnswer(language) {
   // BR-089 — ordinary requirement FAQ stays simple; never volunteer 2-14/2-15.
   return (
@@ -277,6 +284,7 @@ module.exports = {
   getJobOverviewFaqAnswer,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
+  getExperienceFaqAnswer,
   getLicenseRequirementFaqAnswer,
   getLicensePathKnowledge,
   getLicensePathDetailFaqAnswer,

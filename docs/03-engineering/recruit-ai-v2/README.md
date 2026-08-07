@@ -33,6 +33,7 @@
 | [23_INPUT_NORMALIZATION.md](./23_INPUT_NORMALIZATION.md) | BR-095 — deterministic inbound input normalization (case/accent/punctuation) |
 | [24_WORK_AUTH_STATUS_SHORTHAND.md](./24_WORK_AUTH_STATUS_SHORTHAND.md) | BR-096 — pending work-auth status shorthand (`residente` / `ciudadano`) |
 | [25_CONCISE_JOB_FAQ_OVERVIEW.md](./25_CONCISE_JOB_FAQ_OVERVIEW.md) | BR-097 — concise first-level job FAQ + progressive disclosure |
+| [26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md](./26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md) | BR-098 — experience FAQ + insurance routing priority before location |
 
 ## Regression fixture
 

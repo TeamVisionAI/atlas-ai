@@ -2036,6 +2036,115 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "faq-priority-experience-insurance",
+    name: "FAQ Priority — Experience + Insurance",
+    category: "production_defect",
+    description:
+      "BR-098 — experience/insurance FAQs outrank location; day-part preserved after overview.",
+    seed: {
+      preferredLanguage: "english",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "fe01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.faq-priority.t01",
+        expect: {
+          intent: "greeting",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fe02",
+        text: "Miami FL",
+        inboundMessageId: "sim-wamid.faq-priority.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          state: "FL",
+          cityCertainty: "confirmed",
+          stateCertainty: "confirmed",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fe03",
+        text: "residente",
+        inboundMessageId: "sim-wamid.faq-priority.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          shouldEscalate: false,
+          pendingQuestion: "ask_day_part",
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fe04",
+        text: "de que se trata",
+        inboundMessageId: "sim-wamid.faq-priority.t04",
+        expect: {
+          intent: "job_opportunity_question",
+          shouldEscalate: false,
+          pendingQuestion: "ask_day_part",
+          replyIncludes: ["servicios financieros"],
+          replyExcludes: ["asalariado", "No se requiere experiencia"],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fe05",
+        text: "necesito experiencia?",
+        inboundMessageId: "sim-wamid.faq-priority.t05",
+        expect: {
+          intent: "experience_question",
+          city: "Miami",
+          state: "FL",
+          shouldEscalate: false,
+          pendingQuestion: "ask_day_part",
+          replyIncludes: ["experiencia previa", "mañana o en la tarde"],
+          replyExcludes: [
+            "Necesito Experiencia",
+            "¿En qué estado",
+            "Con gusto te ayudo"
+          ],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "fe06",
+        text: "es de seguros?",
+        inboundMessageId: "sim-wamid.faq-priority.t06",
+        expect: {
+          intent: "insurance_question",
+          city: "Miami",
+          state: "FL",
+          shouldEscalate: false,
+          pendingQuestion: "ask_day_part",
+          replyExcludes: [
+            "Necesito Experiencia",
+            "Con gusto te ayudo",
+            "compañero de Team Vision te contactará"
+          ],
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
