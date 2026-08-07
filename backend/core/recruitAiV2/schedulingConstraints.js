@@ -92,13 +92,10 @@ function parseAvailabilityConstraint(text) {
     };
   }
 
-  // Bare "after 6" is a direct-time proposal; "después de las 5" / "after 5 works" are constraints.
-  if (/^after\s+\d{1,2}(:\d{2})?\??$/.test(t)) {
-    return null;
-  }
-
+  // Implements BR-102 — "después de la 5" / "a partir de las 5" / bare "after 5"
+  // are availability constraints (PM-biased via parseClockToken), not generic clarify.
   const after = t.match(
-    /\b(?:puedo\s+)?(?:despues de(?: las)?|after)\s+(\d{1,2})(?::(\d{2}))?\b/
+    /\b(?:(?:puedo|me sirve|cualquier hora|anytime|anything|i can(?: do)?)\s+)?(?:despues de(?: la[s]?)?|luego de(?: la[s]?)?|a partir de(?: la[s]?)?|after)\s+(\d{1,2})(?::(\d{2}))?\b(?:\s*(?:pm|p\.?m\.?))?/
   );
   if (after) {
     const clock = parseClockToken(after[1], after[2]);
@@ -141,7 +138,6 @@ function looksLikeDirectTimeProposal(text) {
   return (
     /^(\d{1,2})(:(\d{2}))?$/.test(t) ||
     /^(at|a las|como a las)\s+(\d{1,2})(:(\d{2}))?$/.test(t) ||
-    /^(after|despues de( las)?)\s+(\d{1,2})(:(\d{2}))?$/.test(t) ||
     /^(mejor|actually|prefiero|better)\s+(\d{1,2})(:(\d{2}))?$/.test(t)
   );
 }
@@ -187,7 +183,9 @@ function resolveCandidateTime(text, context = {}, scheduleNormalizedHour = null)
   const mejor = t.match(
     /^(?:mejor|actually|prefiero|better)\s+(\d{1,2})(?::(\d{2}))?$/
   );
-  const after = t.match(/^(?:after|despues de(?: las)?)\s+(\d{1,2})(?::(\d{2}))?$/);
+  const after = t.match(
+    /^(?:after|despues de(?: la[s]?)?|luego de(?: la[s]?)?|a partir de(?: la[s]?)?)\s+(\d{1,2})(?::(\d{2}))?$/
+  );
   const at = t.match(/^(?:at|a las|como a las)\s+(\d{1,2})(?::(\d{2}))?$/);
   const bare = t.match(/^(\d{1,2})(?::(\d{2}))?$/);
   const m = mejor || after || at || bare;

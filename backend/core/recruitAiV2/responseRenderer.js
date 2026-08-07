@@ -6,6 +6,8 @@
 
 const { LANGUAGES } = require("./constants");
 const { sanitizeCustomerCopy } = require("./sanitize");
+const { collapseRedundantAcknowledgements } = require("./acknowledgementStyle");
+const { stateDisplayName } = require("./locationFacts");
 const {
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
@@ -37,6 +39,7 @@ const COPY = Object.freeze({
       "Happy to help — could you share the detail I just asked for so we can keep moving?",
     confirm_location_proposal: "Perfect. {city}, {proposedStateName}?",
     ask_state: "Perfect. Which state is {city} in?",
+    ask_city: "Thanks. What city in {proposedStateName} do you live in?",
     continue_qualification: "Thanks — that helps. Let's continue.",
     continue_qualification_after_location:
       "Thanks. Do you have work authorization or legal documentation to work in the United States?",
@@ -162,6 +165,7 @@ const COPY = Object.freeze({
       "Con gusto te ayudo — ¿puedes compartir el dato que te acabo de pedir para continuar?",
     confirm_location_proposal: "Perfecto. ¿{city}, {proposedStateName}?",
     ask_state: "Perfecto. ¿En qué estado está {city}?",
+    ask_city: "Gracias. ¿En qué ciudad de {proposedStateName} vives?",
     continue_qualification: "Gracias — eso ayuda. Continuemos.",
     continue_qualification_after_location:
       "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?",
@@ -327,10 +331,11 @@ function formatRequestedTime(hhmm, language) {
 
 function proposedStateName(code, language) {
   const entry = STATE_DISPLAY[String(code || "").toUpperCase()];
-  if (!entry) {
-    return code || "";
+  if (entry) {
+    return language === LANGUAGES.SPANISH ? entry.es : entry.en;
   }
-  return language === LANGUAGES.SPANISH ? entry.es : entry.en;
+  // BR-102 — fall back to canonical U.S. state display for any USPS code.
+  return stateDisplayName(code, language === LANGUAGES.SPANISH ? "spanish" : "english");
 }
 
 function localeCode(language) {
@@ -351,6 +356,12 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
       return getStateQuestion(city, lang, { proposedState: proposed });
     case "ask_state":
       return getStateQuestion(city, lang, {});
+    case "ask_city": {
+      const stateName = proposedStateName(proposed || entities.state, language);
+      return language === LANGUAGES.SPANISH
+        ? `¿En qué ciudad de ${stateName} vives?`
+        : `What city in ${stateName} do you live in?`;
+    }
     case "continue_qualification_after_location":
       return getAuthorizationQuestion(lang);
     case "continue_qualification_after_authorization": {
@@ -513,8 +524,9 @@ function renderCustomerReply(responsePlan) {
   } else if (key === "acknowledge_current_not_fit_no_write") {
     template = getCurrentNotFitClosureMessage(lang);
   } else if (key === "continue_qualification_after_authorization") {
-    const ack =
-      language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
+    // Single acknowledgement — stack collapse also strips leading "Excelente." from
+    // canonical office/Zoom day-part copy (BR-102 conversation quality).
+    const ack = language === LANGUAGES.SPANISH ? "Perfecto." : "Perfect.";
     // Never emit Doral office copy when active modality is Zoom / OUTSIDE.
     const forceZoom =
       String(entities.coverage || "").toUpperCase() === "OUTSIDE" ||
@@ -524,8 +536,7 @@ function renderCustomerReply(responsePlan) {
       ? `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`
       : `${ack} ${getLocalOfficeDayPartMessage(lang)}`;
   } else if (key === "outside_zoom_day_part") {
-    const ack =
-      language === LANGUAGES.SPANISH ? "Perfecto, gracias." : "Perfect, thank you.";
+    const ack = language === LANGUAGES.SPANISH ? "Perfecto." : "Perfect.";
     template = `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`;
   } else if (key === "clarify_license_type") {
     template = getClarifyLicenseTypeMessage(lang);
@@ -665,9 +676,15 @@ function renderCustomerReply(responsePlan) {
     .replace(/\{resumeQuestion\}/g, entities.resumeQuestion || "");
 
   const fallback = pack.safe_failure_escalate || pack.default;
+  const sanitized = sanitizeCustomerCopy(rendered, fallback);
+  // Implements BR-102 — do not stack equivalent acknowledgements in one reply.
+  const text =
+    sanitized === fallback
+      ? sanitized
+      : collapseRedundantAcknowledgements(sanitized);
 
   return {
-    text: sanitizeCustomerCopy(rendered, fallback),
+    text,
     language,
     templateKey: key
   };
@@ -678,5 +695,6 @@ module.exports = {
   formatRequestedTime,
   composeValuePropThenQualify,
   resolveResumeQuestion,
+  collapseRedundantAcknowledgements,
   COPY
 };

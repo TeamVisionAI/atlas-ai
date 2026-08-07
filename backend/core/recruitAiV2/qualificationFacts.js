@@ -258,7 +258,7 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
       return null;
     }
     const lastQ = String(context?.conversation?.lastQuestionAsked || "");
-    const locationPending = /^(ask_location|confirm_location|ask_state)$/.test(
+    const locationPending = /^(ask_location|confirm_location|ask_state|ask_city)$/.test(
       lastQ
     );
     // Do not steal an active location turn unless auth was the pending ask.

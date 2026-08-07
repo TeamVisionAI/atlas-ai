@@ -504,10 +504,46 @@ function isCompleteCityStatePhrase(text) {
   return parsed?.completeness === "complete";
 }
 
+/** USPS code → canonical English display name (BR-102 ask-city copy). */
+const US_STATE_ABBR_TO_NAME = Object.freeze(
+  Object.entries(US_STATE_NAME_TO_ABBR).reduce((acc, [name, abbr]) => {
+    if (name.length === 2) {
+      return acc;
+    }
+    if (!acc[abbr] || name.length > acc[abbr].length) {
+      acc[abbr] = name
+        .split(" ")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    }
+    return acc;
+  }, {})
+);
+
+function stateDisplayName(code, language = "english") {
+  const abbr = String(code || "").toUpperCase();
+  const en = US_STATE_ABBR_TO_NAME[abbr] || abbr;
+  if (language === "spanish" || language === "es") {
+    const esOverrides = {
+      NY: "Nueva York",
+      NJ: "Nueva Jersey",
+      NC: "Carolina del Norte",
+      SC: "Carolina del Sur",
+      PA: "Pensilvania",
+      MI: "Míchigan",
+      OR: "Oregón",
+      DC: "Distrito de Columbia"
+    };
+    return esOverrides[abbr] || en;
+  }
+  return en;
+}
+
 module.exports = {
   FACT_CERTAINTY,
   CITY_TO_PROPOSED_STATE,
   US_STATE_NAME_TO_ABBR,
+  US_STATE_ABBR_TO_NAME,
   US_POSTAL_ABBREVIATIONS,
   STATE_NAMES,
   parseLocationAnswer,
@@ -519,5 +555,6 @@ module.exports = {
   normalizeStateToken,
   titleCaseCity,
   isCompleteCityStatePhrase,
-  hasLocationHedge
+  hasLocationHedge,
+  stateDisplayName
 };

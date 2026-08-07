@@ -135,7 +135,9 @@ function isAffirmative(text) {
   if (mentionsLicense(t) || /\b(tengo|have|permiso|autoriz)/i.test(t)) {
     return false;
   }
-  return /^(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro|por supuesto)(\s|$)/i.test(
+  // Bare affirmations only — "si soy ciudadano" / "yes I'm a citizen" must not
+  // classify as schedule_confirm via a leading si/yes (BR-100 / BR-102).
+  return /^(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro|por supuesto)$/i.test(
     t
   );
 }
@@ -1107,6 +1109,18 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.state = location.state;
       entities.completeness = "complete";
       entities.requiresClarification = false;
+    } else if (
+      // Implements BR-102 — state-only answers while asking city+state (no city yet).
+      location?.completeness === "state_only" &&
+      (locationCtx || lastQuestionImpliesLocation(context))
+    ) {
+      intent = INTENTS.PROVIDE_LOCATION;
+      confidence = 0.9;
+      entities.city = null;
+      entities.state = location.state;
+      entities.proposedState = null;
+      entities.completeness = "state_only";
+      entities.requiresClarification = true;
     } else if (location?.completeness === "complete") {
       intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
       confidence = 0.9;
@@ -1118,17 +1132,27 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     } else if (location?.completeness === "partial") {
       // Correction of city while state already confirmed + geographically compatible.
       const priorState = context?.knownFacts?.state || null;
+      const priorStateCertainty = context?.knownFacts?.stateCertainty || null;
       const priorStateOk =
-        context?.knownFacts?.stateCertainty === "confirmed" && priorState;
+        priorStateCertainty === "confirmed" && priorState;
+      // BR-102 — city after retained state-only partial completes Miami + Florida.
+      const priorStatePartial =
+        Boolean(priorState) &&
+        (priorStateCertainty === "partial" ||
+          context?.conversation?.lastQuestionAsked === "ask_city");
       const proposed = location.proposedState || proposeStateFromCity(location.city);
-      if (isCorrection && priorStateOk && proposed && proposed === priorState) {
-        intent = INTENTS.CORRECT_LOCATION;
+      if (
+        (isCorrection && priorStateOk && proposed && proposed === priorState) ||
+        (priorStatePartial &&
+          (!proposed || proposed === priorState || priorStateCertainty === "partial"))
+      ) {
+        intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
         confidence = 0.9;
         entities.city = location.city;
         entities.state = priorState;
         entities.completeness = "complete";
         entities.requiresClarification = false;
-        entities.correction = true;
+        entities.correction = isCorrection;
         entities.proposedState = null;
       } else {
         intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
@@ -1157,17 +1181,21 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   }
 
   // State token alone while awaiting location confirmation.
-  if (
-    intent === INTENTS.UNKNOWN &&
-    locationCtx &&
-    normalizeStateToken(text) &&
-    context?.knownFacts?.city
-  ) {
+  if (intent === INTENTS.UNKNOWN && locationCtx && normalizeStateToken(text)) {
     intent = INTENTS.PROVIDE_LOCATION;
     confidence = 0.9;
-    entities.city = context.knownFacts.city;
-    entities.state = normalizeStateToken(text);
-    entities.completeness = "complete";
+    if (context?.knownFacts?.city) {
+      entities.city = context.knownFacts.city;
+      entities.state = normalizeStateToken(text);
+      entities.completeness = "complete";
+      entities.requiresClarification = false;
+    } else {
+      // Implements BR-102 — state-only partial (ask city next).
+      entities.city = null;
+      entities.state = normalizeStateToken(text);
+      entities.completeness = "state_only";
+      entities.requiresClarification = true;
+    }
   }
 
   const explicitFromTurn =

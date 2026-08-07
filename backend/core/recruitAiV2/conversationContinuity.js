@@ -219,8 +219,19 @@ function resolvePendingExplanation(context = {}, language = "spanish") {
   if (
     lastQ.includes("location") ||
     lastQ === "ask_state" ||
+    lastQ === "ask_city" ||
     lastQ === "confirm_location"
   ) {
+    if (lastQ === "ask_city" && context.knownFacts?.state && !context.knownFacts?.city) {
+      return {
+        templateKey: "ask_city",
+        lastQuestionAsked: "ask_city",
+        entities: {
+          state: context.knownFacts.state,
+          proposedState: context.knownFacts.state
+        }
+      };
+    }
     return {
       templateKey: "explain_pending_location",
       lastQuestionAsked: lastQ || "ask_location",
