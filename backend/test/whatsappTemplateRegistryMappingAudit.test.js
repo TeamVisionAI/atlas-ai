@@ -90,7 +90,8 @@ test("2. confirmation EN/ES mapping", () => {
     prospect_first_name: "Maria",
     interview_when: "Monday 10:00 AM",
     meeting_type: "Zoom",
-    meeting_location: "Zoom"
+    // BR-093 — meeting details, not duplicate meeting type.
+    meeting_location: "Your Zoom link will be provided separately"
   };
   assert.equal(
     resolve("interview_confirmation", "english", vars).metaTemplateName,
@@ -107,7 +108,7 @@ test("3. details EN/ES mapping", () => {
     prospect_first_name: "Maria",
     interview_when: "Monday 10:00 AM",
     meeting_type: "Zoom",
-    meeting_location: "Zoom"
+    meeting_location: "Your Zoom link will be provided separately"
   };
   assert.equal(
     resolve("interview_details", "english", vars).metaTemplateName,
