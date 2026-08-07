@@ -1178,8 +1178,9 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **Status statements** — Possession/absence (“Tengo licencia” / “No tengo licencia”) describe prospect status. Unclear type (“Tengo licencia”) → clarify professional vs driver’s license (BR-083). Clear absence → status `none` without type clarify when grammar is unambiguous.
 3. **Ambiguity reserved** — `ambiguous_license_statement` is for fragments like “licencia”, “lo de la licencia”, “the license thing” — not for clear requirement grammar.
 4. **Priority** — Requirement FAQ outranks scheduling, date/day-part parsing, and generic ambiguity. After answering, resume the pending day-part question.
-5. **Renderer** — Use canonical licensing FAQ copy; no fabricated regulatory nomenclature, no exam-pass guarantees, no driver’s-license relevance claims.
-6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+5. **Florida path knowledge (do not volunteer)** — Canonical Team Vision background: primary path **2-14**; if not successfully completed/passed, Team Vision may offer **2-15**. Ordinary requirement FAQ stays simple and must not mention 2-14/2-15. Surface path detail only for explicit asks (`license_path_detail_question`). Source: `backend/knowledge/teamVisionLicensePath.json`.
+6. **Renderer** — Use canonical licensing FAQ copy; no exam-pass guarantees; no driver’s-license relevance claims; no inventing other license series.
+7. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
 
 ---
 

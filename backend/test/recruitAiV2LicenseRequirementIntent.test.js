@@ -94,7 +94,7 @@ function assertRequirement(text) {
     text
   );
   assert.equal(r.nextContext.conversation.lastQuestionAsked, "ask_day_part", text);
-  assert.doesNotMatch(r.rendered.text, /214|215|\$/i, text);
+  assert.doesNotMatch(r.rendered.text, /2-14|2-15|214|215|\$/i, text);
 }
 
 test("1. ¿Tengo que tener licencia?", () => {
@@ -184,9 +184,50 @@ test("15. mañana after requirement FAQ = morning", () => {
   assert.doesNotMatch(r.rendered.text, /sábado|domingo|lunes/i);
 });
 
-test("16. no fabricated licensing nomenclature", () => {
+test("16. no fabricated licensing nomenclature on ordinary FAQ", () => {
   const r = turn("¿Tengo que tener licencia?", dayPartPendingContext());
-  assert.doesNotMatch(r.rendered.text, /\b214\b|\b215\b|Series 6|Series 7/i);
+  assert.doesNotMatch(
+    r.rendered.text,
+    /\b2-14\b|\b2-15\b|\b214\b|\b215\b|Series 6|Series 7/i
+  );
+  assert.ok(
+    r.structuredDecision.reasonCodes.includes(
+      "LICENSE_PATH_DETAIL_NOT_VOLUNTEERED"
+    )
+  );
+});
+
+test("16b. path detail ask surfaces 2-14 primary and 2-15 fallback", () => {
+  const {
+    looksLikeLicensePathDetailQuestion,
+    getLicensePathKnowledge
+  } = require("../core/teamVisionWorkflowCopy");
+  assert.equal(looksLikeLicensePathDetailQuestion("¿Cuál licencia es?"), true);
+  assert.equal(looksLikeLicensePathDetailQuestion("2-14 vs 2-15"), true);
+  assert.equal(
+    looksLikeLicensePathDetailQuestion("what if I don't pass"),
+    true
+  );
+  const knowledge = getLicensePathKnowledge();
+  assert.equal(knowledge.primaryPath, "2-14");
+  assert.equal(knowledge.fallbackPath, "2-15");
+  const r = turn("¿Cuál es el 2-14 y el 2-15?", dayPartPendingContext());
+  assert.equal(r.interpretation.intent, "license_path_detail_question");
+  assert.match(r.rendered.text, /2-14/);
+  assert.match(r.rendered.text, /2-15/);
+  assert.equal(r.nextContext.conversation.lastQuestionAsked, "ask_day_part");
+});
+
+test("16c. ordinary requirement does not volunteer path detail", () => {
+  assert.equal(
+    require("../core/teamVisionWorkflowCopy").looksLikeLicensePathDetailQuestion(
+      "¿Tengo que tener licencia?"
+    ),
+    false
+  );
+  const r = turn("¿Tengo que tener licencia?", dayPartPendingContext());
+  assert.equal(r.interpretation.intent, "license_requirement_question");
+  assert.doesNotMatch(r.rendered.text, /2-14|2-15/);
 });
 
 test("17. no salary/income claims", () => {

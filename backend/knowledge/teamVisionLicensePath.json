@@ -1,0 +1,11 @@
+{
+  "organization": "Team Vision / Primerica",
+  "jurisdiction": "Florida",
+  "rule": "Do not volunteer path detail unless the prospect specifically asks which license, 2-14 vs 2-15, what happens if they do not pass, or licensing-path details.",
+  "primaryPath": "2-14",
+  "fallbackPath": "2-15",
+  "fallbackWhen": "If a recruit does not successfully complete/pass the primary 2-14 path, Team Vision may offer the 2-15 option.",
+  "simpleRequirementPolicy": "For ordinary questions like '¿Tengo que tener licencia?' / 'Do I need a license?', answer only that licensing training is part of the profession and resume the pending workflow — do not mention 2-14 or 2-15.",
+  "response_en": "In Florida, the primary licensing path is the 2-14. If that path is not completed or passed successfully, Team Vision may offer the 2-15 option. During the interview we'll explain how the process works and how we'll support you.",
+  "response_es": "En Florida, el camino principal de licencia es el 2-14. Si no se completa o no se aprueba ese camino, Team Vision puede ofrecer la opción del 2-15. Durante la entrevista te explican cómo funciona el proceso y cómo te acompañan."
+}

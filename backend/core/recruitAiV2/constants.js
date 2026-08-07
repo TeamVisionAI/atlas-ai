@@ -40,6 +40,7 @@ const INTENTS = Object.freeze({
   JOB_OPPORTUNITY_QUESTION: "job_opportunity_question",
   INSURANCE_QUESTION: "insurance_question",
   LICENSE_REQUIREMENT_QUESTION: "license_requirement_question",
+  LICENSE_PATH_DETAIL_QUESTION: "license_path_detail_question",
   COMPENSATION_QUESTION: "compensation_question",
   CONVERSATION_CLARIFICATION_REQUEST: "conversation_clarification_request",
   ECHO_OR_NOOP: "echo_or_noop",
@@ -75,6 +76,7 @@ const NEXT_ACTIONS = Object.freeze({
   ANSWER_JOB_OPPORTUNITY_THEN_RESUME: "answer_job_opportunity_then_resume",
   ANSWER_INSURANCE_FAQ_THEN_RESUME: "answer_insurance_faq_then_resume",
   ANSWER_LICENSE_REQUIREMENT_THEN_RESUME: "answer_license_requirement_then_resume",
+  ANSWER_LICENSE_PATH_DETAIL_THEN_RESUME: "answer_license_path_detail_then_resume",
   ANSWER_COMPENSATION_FAQ_THEN_RESUME: "answer_compensation_faq_then_resume",
   EXPLAIN_PENDING_THEN_ASK: "explain_pending_then_ask",
   ACKNOWLEDGE_DAY_PART_ASK_TIME: "acknowledge_day_part_ask_time",
@@ -180,6 +182,8 @@ const REASON_CODES = Object.freeze({
   NO_DEAD_END_CONTINUATION: "NO_DEAD_END_CONTINUATION",
   META_CONVERSATION_CLARIFIED: "META_CONVERSATION_CLARIFIED",
   LICENSE_REQUIREMENT_QUESTION_RECOGNIZED: "LICENSE_REQUIREMENT_QUESTION_RECOGNIZED",
+  LICENSE_PATH_DETAIL_ANSWERED: "LICENSE_PATH_DETAIL_ANSWERED",
+  LICENSE_PATH_DETAIL_NOT_VOLUNTEERED: "LICENSE_PATH_DETAIL_NOT_VOLUNTEERED",
   LICENSE_STATUS_STATEMENT: "LICENSE_STATUS_STATEMENT",
   LICENSE_AMBIGUITY_RESERVED: "LICENSE_AMBIGUITY_RESERVED"
 });

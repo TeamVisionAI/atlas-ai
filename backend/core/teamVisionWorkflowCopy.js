@@ -129,11 +129,60 @@ function getInsuranceFaqAnswer(language) {
 }
 
 function getLicenseRequirementFaqAnswer(language) {
+  // BR-089 — ordinary requirement FAQ stays simple; never volunteer 2-14/2-15.
   return (
     findFAQ("do I need a license", language === "es" ? "es" : "en") ||
     (language === "es"
       ? "Como es una profesión licenciada, todos realizan un curso de licencia. Durante la entrevista te explicarán cómo funciona el proceso y cómo te acompañaremos en cada paso."
       : "Since it's a licensed profession, everyone completes a licensing course. During the interview we'll explain how the process works and how we'll help you through it.")
+  );
+}
+
+/**
+ * BR-089 — Florida Team Vision licensing path background (2-14 primary, 2-15 fallback).
+ * Only for explicit path/detail questions — not ordinary "do I need a license?".
+ */
+function getLicensePathKnowledge() {
+  return require("../knowledge/teamVisionLicensePath.json");
+}
+
+function getLicensePathDetailFaqAnswer(language) {
+  const knowledge = getLicensePathKnowledge();
+  if (language === "es") {
+    return knowledge.response_es;
+  }
+  return knowledge.response_en;
+}
+
+/**
+ * Prospect is asking which license / 2-14 vs 2-15 / what if they don't pass / path details.
+ */
+function looksLikeLicensePathDetailQuestion(text) {
+  const t = String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (!t) {
+    return false;
+  }
+  return (
+    /\b(2[- ]?14|2[- ]?15|214|215)\b/.test(t) ||
+    /\b(cual licencia|que licencia|which license|what license)\b/.test(t) ||
+    /\b(2[- ]?14\s*(vs|versus|o|or)\s*2[- ]?15)\b/.test(t) ||
+    /\b(que pasa si no (paso|apruebo)|y si no (paso|apruebo)|si no paso la licencia)\b/.test(
+      t
+    ) ||
+    /\b(what if i (don'?t|do not) (pass|make it)|what happens if i (fail|don'?t pass))\b/.test(
+      t
+    ) ||
+    /\b(camino de licencia|licensing path|license path|ruta de licencia)\b/.test(
+      t
+    ) ||
+    /\bque licencia (hay|tengo) que sacar\b/.test(t) ||
+    /\bwhat license do i need\b/.test(t) ||
+    /\bdo i need a 215\b/.test(t) ||
+    /\bdo i need a 214\b/.test(t)
   );
 }
 
@@ -204,6 +253,9 @@ module.exports = {
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getLicenseRequirementFaqAnswer,
+  getLicensePathKnowledge,
+  getLicensePathDetailFaqAnswer,
+  looksLikeLicensePathDetailQuestion,
   getCompensationFaqAnswer,
   getClarifyLicenseTypeMessage,
   getClarifyWorkAuthAfterLicenseMessage,

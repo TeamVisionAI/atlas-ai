@@ -536,12 +536,26 @@ function decideConversationTurn({
     );
   }
 
+  if (intent === INTENTS.LICENSE_PATH_DETAIL_QUESTION) {
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_LICENSE_PATH_DETAIL_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.LICENSE_PATH_DETAIL_ANSWERED);
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "license_path_detail_faq_then_resume"
+    );
+  }
+
   if (intent === INTENTS.LICENSE_REQUIREMENT_QUESTION) {
     structured.decision.nextAction =
       NEXT_ACTIONS.ANSWER_LICENSE_REQUIREMENT_THEN_RESUME;
     structured.reasonCodes.push(
       REASON_CODES.LICENSE_REQUIREMENT_QUESTION_RECOGNIZED
     );
+    // Ordinary requirement FAQ must not volunteer 2-14/2-15 path detail.
+    structured.reasonCodes.push(REASON_CODES.LICENSE_PATH_DETAIL_NOT_VOLUNTEERED);
     return buildFaqResumeDecision(
       structured,
       context,

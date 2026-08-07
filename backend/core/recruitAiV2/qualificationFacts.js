@@ -99,6 +99,11 @@ function looksLikeLicenseRequirementQuestion(text) {
     return false;
   }
 
+  // Path-detail asks (2-14/2-15 / which license) are handled separately (BR-089).
+  if (/\b(2[- ]?14|2[- ]?15|214|215)\b/.test(t)) {
+    return false;
+  }
+
   return (
     /\b(tengo que tener|hay que tener|es obligatorio( tener)?|se necesita|necesito( una| estar)?|tengo que sacar|tengo que estar)\b/.test(
       t
@@ -111,7 +116,6 @@ function looksLikeLicenseRequirementQuestion(text) {
     /\bis licensing mandatory\b/.test(t) ||
     /\bneed a license( to start)?\b/.test(t) ||
     /\bhace falta licencia\b/.test(t) ||
-    /\bdo i need a 215\b/.test(t) ||
     /necesito una\??$/i.test(raw)
   );
 }

@@ -1728,6 +1728,8 @@ const RECRUIT_AI_V2_SCENARIOS = [
           replyExcludes: [
             "conducir",
             "Esa hora puede no estar disponible",
+            "2-14",
+            "2-15",
             "214",
             "215",
             "$"
