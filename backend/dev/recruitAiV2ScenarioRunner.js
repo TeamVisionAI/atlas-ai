@@ -63,7 +63,7 @@ function diffKnownFacts(before = {}, after = {}) {
   const changes = {};
   for (const key of keys) {
     if (
-      ["cityCertainty", "stateCertainty", "proposedState", "name", "city", "state", "preferredMeetingType", "fullName"].includes(
+      ["cityCertainty", "stateCertainty", "proposedState", "name", "city", "state", "preferredMeetingType", "fullName", "workAuthorization"].includes(
         key
       ) &&
       before?.[key] !== after?.[key]
@@ -107,6 +107,7 @@ function evaluateExpect(actual, expect = {}) {
   check("requiresClarification", actual.requiresClarification, expect.requiresClarification);
   check("stage", actual.stage, expect.stage);
   check("meetingType", actual.meetingType, expect.meetingType);
+  check("workAuthorization", actual.workAuthorization, expect.workAuthorization);
   check("authorizationAuthorized", actual.authorizationAuthorized, expect.authorizationAuthorized);
   check("contextAdvanced", actual.contextAdvanced, expect.contextAdvanced);
   check("idempotent", actual.idempotent, expect.idempotent);
@@ -312,6 +313,10 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
       nextContext.knownFacts?.preferredMeetingType ||
       nextContext.appointment?.meetingType ||
       null,
+    workAuthorization:
+      nextContext.knownFacts?.workAuthorization === undefined
+        ? null
+        : nextContext.knownFacts?.workAuthorization,
     authorizationAuthorized: authorization.authorized,
     contextAdvanced: true,
     idempotent: false,

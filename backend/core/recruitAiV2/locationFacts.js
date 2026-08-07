@@ -80,12 +80,82 @@ function proposeStateFromCity(city) {
   return CITY_TO_PROPOSED_STATE[key] || null;
 }
 
+const CORRECTION_OPENER =
+  /^(digo|mejor dicho|en realidad|realmente|perd[oó]n|quise decir|me equivoqu[eé]|actually|i mean|sorry|correction)[,:]?\s*/i;
+
+/**
+ * Strip correction / living preambles so "Digo, vivo en Doral" → "Doral".
+ */
+function extractLocationCandidateText(text) {
+  let t = String(text || "").trim();
+  if (!t) {
+    return "";
+  }
+
+  let strippedCorrection = false;
+  if (CORRECTION_OPENER.test(t)) {
+    t = t.replace(CORRECTION_OPENER, "").trim();
+    strippedCorrection = true;
+  }
+
+  // "No, Doral" / "No, vivo en ..."
+  if (/^no[,:]?\s+/i.test(t)) {
+    t = t.replace(/^no[,:]?\s+/i, "").trim();
+    strippedCorrection = true;
+  }
+
+  const live = t.match(
+    /^(?:vivo en|live in|i live in|estoy en|i(?:'?m| am) in)\s+(.+)$/i
+  );
+  if (live) {
+    t = String(live[1] || "").trim();
+    strippedCorrection = strippedCorrection || true;
+  }
+
+  return { text: t, correctionSignal: strippedCorrection };
+}
+
+function looksLikeLocationCorrection(text) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return false;
+  }
+  if (CORRECTION_OPENER.test(raw) || /^no[,:]?\s+/i.test(raw)) {
+    return true;
+  }
+  return /^(vivo en|live in|i live in|estoy en)\b/i.test(raw);
+}
+
 /**
  * Parse location from inbound text.
  * Completeness: complete | partial | none
  */
 function parseLocationAnswer(text) {
-  const raw = String(text || "").trim();
+  const rawOriginal = String(text || "").trim();
+  if (!rawOriginal) {
+    return null;
+  }
+
+  const extracted = extractLocationCandidateText(rawOriginal);
+  const candidates = [rawOriginal];
+  if (extracted.text && extracted.text !== rawOriginal) {
+    candidates.unshift(extracted.text);
+  }
+
+  for (const raw of candidates) {
+    const parsed = parseLocationAnswerCore(raw);
+    if (parsed) {
+      return {
+        ...parsed,
+        correction: Boolean(extracted.correctionSignal || looksLikeLocationCorrection(rawOriginal))
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseLocationAnswerCore(raw) {
   if (!raw) {
     return null;
   }
@@ -181,6 +251,9 @@ module.exports = {
   FACT_CERTAINTY,
   CITY_TO_PROPOSED_STATE,
   parseLocationAnswer,
+  parseLocationAnswerCore,
+  extractLocationCandidateText,
+  looksLikeLocationCorrection,
   proposeStateFromCity,
   normalizeStateToken,
   titleCaseCity

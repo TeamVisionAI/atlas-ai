@@ -150,6 +150,10 @@ function sanitizeContextSnapshot(context = {}, contextVersion = 1) {
       cityCertainty: context.knownFacts?.cityCertainty || null,
       stateCertainty: context.knownFacts?.stateCertainty || null,
       proposedState: context.knownFacts?.proposedState || null,
+      workAuthorization:
+        context.knownFacts?.workAuthorization === undefined
+          ? null
+          : context.knownFacts?.workAuthorization,
       preferredMeetingType: context.knownFacts?.preferredMeetingType || null
     },
     lastQuestion: context.conversation?.lastQuestionAsked || null,

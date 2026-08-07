@@ -272,12 +272,12 @@ test("25. phone/PII guard", () => {
   );
 });
 
-test("26. existing 16 simulator scenarios unchanged", async () => {
+test("26. existing simulator scenarios remain green", async () => {
   const listed = listRecruitAiV2Scenarios();
-  assert.equal(listed.length, 16);
+  assert.ok(listed.length >= 16);
   const suite = await runAllRecruitAiV2ScenarioPack();
-  assert.equal(suite.passed, 16);
   assert.equal(suite.failed, 0);
+  assert.ok(suite.passed >= 16);
 });
 
 test("playground meta lists expectations and prompts", () => {

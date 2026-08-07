@@ -12,7 +12,12 @@ const {
   normalizeLanguage,
   APPOINTMENT_STATUS
 } = require("./conversationContext");
-const { parseLocationAnswer, normalizeStateToken } = require("./locationFacts");
+const {
+  parseLocationAnswer,
+  normalizeStateToken,
+  looksLikeLocationCorrection,
+  proposeStateFromCity
+} = require("./locationFacts");
 const { resolveConversationalLanguage } = require("./languagePolicy");
 
 function detectMessageLanguageHint(text) {
@@ -26,14 +31,14 @@ function detectMessageLanguageHint(text) {
   }
 
   const spanishHints =
-    /\b(hola|gracias|entrevista|mañana|manana|buenos|buenas|lunes|quiero|prefiero|sí|si|tarde|estado|ciudad)\b/;
+    /\b(hola|gracias|entrevista|mañana|manana|buenos|buenas|lunes|quiero|prefiero|sí|si|tarde|estado|ciudad|digo|vivo|permiso)\b/;
   if (spanishHints.test(sample)) {
     return LANGUAGES.SPANISH;
   }
 
   const englishHints =
-    /\b(hello|hi|hey|thanks|morning|afternoon|evening|interview|prefer)\b/;
-  if (englishHints.test(sample)) {
+    /\b(hello|hi|hey|thanks|morning|afternoon|evening|interview|prefer|what is this about|how does this work)\b/;
+  if (englishHints.test(sample) || /^what\b.+\?$/.test(sample)) {
     return LANGUAGES.ENGLISH;
   }
 
@@ -107,9 +112,87 @@ function isEchoOfLastQuestion(text, context) {
 }
 
 function looksLikeOpportunityQuestion(text) {
-  return /\b(opportunity|what.*(about|is).*(job|role|position)|tell me more|que es esto|qué es esto)\b/i.test(
-    String(text || "")
+  const t = String(text || "").trim();
+  if (!t) {
+    return false;
+  }
+  return (
+    /what is this about/i.test(t) ||
+    /how does this work/i.test(t) ||
+    /is this insurance/i.test(t) ||
+    /do i need a license/i.test(t) ||
+    /de qu[eé] se trata/i.test(t) ||
+    /de qu[eé] trata/i.test(t) ||
+    /es para vender seguros/i.test(t) ||
+    /necesito licencia/i.test(t) ||
+    /\b(opportunity|tell me more|que es esto|qué es esto)\b/i.test(t) ||
+    /what.*(about|is).*(job|role|position|opportunity)/i.test(t)
   );
+}
+
+function looksLikeWorkAuthorizationAnswer(text, context) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return null;
+  }
+  const t = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const pendingAuth =
+    String(context?.conversation?.lastQuestionAsked || "") === "ask_authorization";
+
+  const yesAuth =
+    /^(si|sí|yes|yep|yeah)\b/.test(t) &&
+    /\b(permiso|autorizacion|authorization|documentacion|documentation|papeles|legal)\b/.test(
+      t
+    );
+  const yesShort =
+    pendingAuth &&
+    (/^(si|sí|yes|yep|yeah|claro|por supuesto)([.!]?)$/i.test(raw.trim()) ||
+      /^(si|sí|yes).{0,40}\b(tengo|have|cuento con)\b/i.test(raw));
+  const patternYes =
+    /\b(permiso de trabajo|work (permit|authorization)|authorized to work|green card|ciudadan[ií]a|citizenship|residencia)\b/i.test(
+      raw
+    ) && !/\b(no|not|sin)\b/i.test(t);
+
+  if (yesAuth || yesShort || patternYes) {
+    return true;
+  }
+
+  const noAuth =
+    pendingAuth &&
+    (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
+      /\b(no tengo permiso|not authorized|sin permiso|sin papeles)\b/i.test(t));
+  if (noAuth) {
+    return false;
+  }
+
+  return null;
+}
+
+function looksLikeExplicitLanguageSwitch(text) {
+  const t = String(text || "").trim();
+  if (!t) {
+    return null;
+  }
+  if (
+    /can we (continue|speak|talk) in english/i.test(t) ||
+    /prefiero ingl[eé]s/i.test(t) ||
+    /switch to english/i.test(t) ||
+    /in english please/i.test(t)
+  ) {
+    return LANGUAGES.ENGLISH;
+  }
+  if (
+    /can we (continue|speak|talk) in spanish/i.test(t) ||
+    /prefiero espa[nñ]ol/i.test(t) ||
+    /switch to spanish/i.test(t) ||
+    /en espa[nñ]ol por favor/i.test(t)
+  ) {
+    return LANGUAGES.SPANISH;
+  }
+  return null;
 }
 
 function looksLikeZoomPreference(text) {
@@ -231,12 +314,27 @@ function looksLikeName(text) {
   if (/\d/.test(trimmed)) {
     return false;
   }
+  // Never treat authorization / location / FAQ phrasing as a name.
+  if (
+    /\b(permiso|autoriz|authorization|vivo|live in|digo|insurance|licen[cs]ia|about)\b/i.test(
+      trimmed
+    )
+  ) {
+    return false;
+  }
+  if (isAffirmative(trimmed) || looksLikeOpportunityQuestion(trimmed)) {
+    return false;
+  }
   // Require at least first + last with each token length >= 2.
   const parts = trimmed.split(/\s+/).filter(Boolean);
   if (parts.length < 2) {
     return false;
   }
   if (parts.some((p) => p.length < 2)) {
+    return false;
+  }
+  // Cap at two/three name tokens — longer phrases are answers, not names.
+  if (parts.length > 3) {
     return false;
   }
   return /^[A-Za-zÁÉÍÓÚÑáéíóúñ.'\-\s]+$/.test(trimmed);
@@ -295,15 +393,27 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   const locationCtx = lastQuestionImpliesLocation(context);
   const dayPartParse = parseDayPart(text);
 
+  const languageSwitchTo = looksLikeExplicitLanguageSwitch(text);
+  const authAnswer = looksLikeWorkAuthorizationAnswer(text, context);
+
   if (isGreeting(text)) {
     intent = INTENTS.GREETING;
     confidence = 0.95;
+  } else if (languageSwitchTo) {
+    intent = INTENTS.REQUEST_LANGUAGE_SWITCH;
+    confidence = 0.93;
+    entities.requestedLanguage = languageSwitchTo;
   } else if (isEchoOfLastQuestion(text, context)) {
     intent = INTENTS.ECHO_OR_NOOP;
     confidence = 0.9;
   } else if (looksLikeOpportunityQuestion(text)) {
     intent = INTENTS.OPPORTUNITY_QUESTION;
-    confidence = 0.85;
+    confidence = 0.9;
+  } else if (authAnswer !== null) {
+    intent = INTENTS.PROVIDE_AUTHORIZATION;
+    confidence = 0.92;
+    entities.workAuthorization = authAnswer;
+    entities.requiresClarification = false;
   } else if (looksLikeCancelRequest(text) && isConfirmed) {
     intent = INTENTS.CANCEL_REQUEST;
     confidence = 0.88;
@@ -378,6 +488,8 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
         context?.knownFacts?.stateCertainty === "partial" ||
         context?.knownFacts?.stateCertainty === "proposed" ||
         context?.knownFacts?.stateCertainty === "unknown");
+    const isCorrection =
+      Boolean(location?.correction) || looksLikeLocationCorrection(text);
 
     if (location?.completeness === "state_only" && (awaitingState || context?.knownFacts?.city)) {
       intent = INTENTS.PROVIDE_LOCATION;
@@ -387,21 +499,44 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.completeness = "complete";
       entities.requiresClarification = false;
     } else if (location?.completeness === "complete") {
-      intent = INTENTS.PROVIDE_LOCATION;
+      intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
       confidence = 0.9;
       entities.city = location.city;
       entities.state = location.state;
       entities.completeness = "complete";
       entities.requiresClarification = false;
+      entities.correction = isCorrection;
     } else if (location?.completeness === "partial") {
-      intent = INTENTS.PROVIDE_LOCATION;
-      confidence = 0.86;
-      entities.city = location.city;
-      entities.state = null;
-      entities.proposedState = location.proposedState;
-      entities.completeness = "partial";
-      entities.requiresClarification = true;
-    } else if (looksLikeName(text) && !context?.knownFacts?.fullName && !dayPartCtx) {
+      // Correction of city while state already confirmed + geographically compatible.
+      const priorState = context?.knownFacts?.state || null;
+      const priorStateOk =
+        context?.knownFacts?.stateCertainty === "confirmed" && priorState;
+      const proposed = location.proposedState || proposeStateFromCity(location.city);
+      if (isCorrection && priorStateOk && proposed && proposed === priorState) {
+        intent = INTENTS.CORRECT_LOCATION;
+        confidence = 0.9;
+        entities.city = location.city;
+        entities.state = priorState;
+        entities.completeness = "complete";
+        entities.requiresClarification = false;
+        entities.correction = true;
+        entities.proposedState = null;
+      } else {
+        intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
+        confidence = 0.86;
+        entities.city = location.city;
+        entities.state = null;
+        entities.proposedState = location.proposedState;
+        entities.completeness = "partial";
+        entities.requiresClarification = true;
+        entities.correction = isCorrection;
+      }
+    } else if (
+      looksLikeName(text) &&
+      !context?.knownFacts?.fullName &&
+      !dayPartCtx &&
+      context?.conversation?.lastQuestionAsked !== "ask_authorization"
+    ) {
       intent = INTENTS.PROVIDE_NAME;
       confidence = 0.78;
       entities.name = text;
@@ -425,12 +560,17 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.completeness = "complete";
   }
 
+  const explicitFromTurn =
+    intent === INTENTS.REQUEST_LANGUAGE_SWITCH
+      ? entities.requestedLanguage
+      : options.explicitLanguagePreference || null;
+
   const languageResolution = resolveConversationalLanguage({
     context,
     messageLanguage,
     intent,
     text,
-    explicitPreference: options.explicitLanguagePreference || null
+    explicitPreference: explicitFromTurn
   });
 
   return {
@@ -458,5 +598,8 @@ module.exports = {
   isGreeting,
   looksLikeName,
   looksLikeAmbiguousFragment,
+  looksLikeOpportunityQuestion,
+  looksLikeWorkAuthorizationAnswer,
+  looksLikeExplicitLanguageSwitch,
   parseDayPart
 };

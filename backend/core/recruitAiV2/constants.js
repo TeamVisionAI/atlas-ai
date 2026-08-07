@@ -32,11 +32,14 @@ const INTENTS = Object.freeze({
   OPPORTUNITY_QUESTION: "opportunity_question",
   ECHO_OR_NOOP: "echo_or_noop",
   PROVIDE_LOCATION: "provide_location",
+  CORRECT_LOCATION: "correct_location",
+  PROVIDE_AUTHORIZATION: "provide_authorization",
   PROVIDE_NAME: "provide_name",
   PROVIDE_DAY_PART: "provide_day_part",
   INCOMPLETE_DAY_PART: "incomplete_day_part",
   AMBIGUOUS_FRAGMENT: "ambiguous_fragment",
   PROVIDE_MEETING_PREFERENCE: "provide_meeting_preference",
+  REQUEST_LANGUAGE_SWITCH: "request_language_switch",
   CANCEL_REQUEST: "cancel_request",
   SELECT_OPTION: "select_option",
   SCHEDULING_COUNTEROFFER: "scheduling_counteroffer",
@@ -52,7 +55,10 @@ const NEXT_ACTIONS = Object.freeze({
   CLARIFY_LOCATION: "clarify_location",
   CLARIFY_DAY_PART: "clarify_day_part",
   CONTINUE_QUALIFICATION: "continue_qualification",
+  ACKNOWLEDGE_CORRECTION_THEN_RESUME: "acknowledge_correction_then_resume",
+  CAPTURE_AUTHORIZATION_CONTINUE: "capture_authorization_continue",
   UPDATE_MEETING_PREFERENCE: "update_meeting_preference",
+  SWITCH_LANGUAGE_CONTINUE: "switch_language_continue",
   ACKNOWLEDGE_CANCEL_NO_WRITE: "acknowledge_cancel_no_write",
   ACKNOWLEDGE_AND_CHECK_AVAILABILITY: "acknowledge_and_check_availability",
   OFFER_ALTERNATIVES_OR_ESCALATE: "offer_alternatives_or_escalate",
@@ -84,7 +90,13 @@ const REASON_CODES = Object.freeze({
   RECOVERABLE_AMBIGUITY: "RECOVERABLE_AMBIGUITY",
   REPEATED_AMBIGUITY_ESCALATE: "REPEATED_AMBIGUITY_ESCALATE",
   GREETING_NO_ESCALATE: "GREETING_NO_ESCALATE",
-  FRAGMENT_NOT_NAME: "FRAGMENT_NOT_NAME"
+  FRAGMENT_NOT_NAME: "FRAGMENT_NOT_NAME",
+  FACT_CORRECTION: "FACT_CORRECTION",
+  PENDING_QUESTION_DEFERRED: "PENDING_QUESTION_DEFERRED",
+  DIRECT_QUESTION_ANSWERED: "DIRECT_QUESTION_ANSWERED",
+  HANDOFF_GUARD_SKIPPED: "HANDOFF_GUARD_SKIPPED",
+  AUTHORIZATION_CAPTURED: "AUTHORIZATION_CAPTURED",
+  LANGUAGE_EXPLICIT_SWITCH: "LANGUAGE_EXPLICIT_SWITCH"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */
