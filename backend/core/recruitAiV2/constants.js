@@ -4,6 +4,7 @@
  * BR-082 — conversational clarification and partial-fact resolution.
  * BR-084 — scheduling constraints and direct-time resolution.
  * BR-085 — date-only scheduling, cancellation/withdraw, in-person travel confirm.
+ * BR-086 — natural-language communication opt-out resolution.
  */
 
 const STAGES = Object.freeze({
@@ -145,6 +146,7 @@ const REASON_CODES = Object.freeze({
   CANCEL_INTENT_RECOGNIZED: "CANCEL_INTENT_RECOGNIZED",
   WITHDRAW_INTENT_RECOGNIZED: "WITHDRAW_INTENT_RECOGNIZED",
   OPT_OUT_INTENT_RECOGNIZED: "OPT_OUT_INTENT_RECOGNIZED",
+  NATURAL_LANGUAGE_OPT_OUT: "NATURAL_LANGUAGE_OPT_OUT",
   IN_PERSON_TRAVEL_CONFIRMATION_REQUIRED: "IN_PERSON_TRAVEL_CONFIRMATION_REQUIRED",
   IN_PERSON_TRAVEL_CONFIRMED: "IN_PERSON_TRAVEL_CONFIRMED",
   EXPLICIT_ZOOM_CLEARS_OFFICE: "EXPLICIT_ZOOM_CLEARS_OFFICE",

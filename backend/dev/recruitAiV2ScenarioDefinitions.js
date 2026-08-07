@@ -1283,6 +1283,82 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "natural-language-opt-out",
+    name: "Natural Language Opt-Out",
+    category: "production_defect",
+    description:
+      "Stop-contact phrases must become opt_out_request, never correct_location (BR-086).",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation",
+      currentStage: "greeting",
+      knownFacts: {},
+      appointment: { status: "none" },
+      conversation: {}
+    },
+    turns: [
+      {
+        id: "nl01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.nl-optout.t01",
+        expect: {
+          intent: "greeting",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "nl02",
+        text: "Miami, Florida",
+        inboundMessageId: "sim-wamid.nl-optout.t02",
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "nl03",
+        text: "Sí tengo permiso",
+        inboundMessageId: "sim-wamid.nl-optout.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "nl04",
+        text: "no more messages",
+        inboundMessageId: "sim-wamid.nl-optout.t04",
+        expect: {
+          intent: "opt_out_request",
+          stage: "withdrawn",
+          city: "Miami",
+          nextAction: "acknowledge_opt_out_no_write",
+          proposedSideEffectsInclude: ["communication_opt_out"],
+          replyExcludes: [
+            "mañana o en la tarde",
+            "dato que te acabo de pedir",
+            "city and state",
+            "¿Prefieres"
+          ],
+          authorizationAuthorized: false,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 

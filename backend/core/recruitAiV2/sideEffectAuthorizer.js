@@ -44,12 +44,17 @@ function authorizeSideEffects({
     });
   }
 
-  // BR-085 — cancel/withdraw proposals remain auditable and denied.
+  const kind = structuredDecision?.entities?.cancellationKind || null;
+  const alsoCancel = Boolean(structuredDecision?.entities?.alsoCancelAppointment);
+  const alsoWithdraw = Boolean(structuredDecision?.entities?.alsoWithdraw);
+
+  // BR-085/086 — cancel/withdraw/opt-out proposals remain auditable and denied.
   if (
     nextAction === "acknowledge_cancel_no_write" ||
     intent === "cancel_request" ||
-    (intent === "withdraw_interest" &&
-      structuredDecision?.entities?.cancellationKind === "withdraw_and_cancel")
+    alsoCancel ||
+    kind === "cancel_and_opt_out" ||
+    (intent === "withdraw_interest" && kind === "withdraw_and_cancel")
   ) {
     proposals.push({
       type: "cancel_appointment",
@@ -61,7 +66,8 @@ function authorizeSideEffects({
 
   if (
     nextAction === "acknowledge_withdraw_no_write" ||
-    intent === "withdraw_interest"
+    intent === "withdraw_interest" ||
+    alsoWithdraw
   ) {
     proposals.push({
       type: "withdraw_prospect",
@@ -73,7 +79,9 @@ function authorizeSideEffects({
 
   if (
     nextAction === "acknowledge_opt_out_no_write" ||
-    intent === "opt_out_request"
+    intent === "opt_out_request" ||
+    kind === "opt_out" ||
+    kind === "cancel_and_opt_out"
   ) {
     proposals.push({
       type: "communication_opt_out",

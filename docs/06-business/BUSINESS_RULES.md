@@ -1160,6 +1160,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-086 — Recruit AI Natural-Language Communication Opt-Out Resolution
+
+**Implements:** Deterministic natural-language stop-contact / opt-out detection (EN/ES) with priority over location correction, name extraction, FAQ, and scheduling; keep opt-out distinct from appointment cancel and withdraw interest; combined cancel+opt-out may propose both denied side effects  
+**Domain:** Recruit AI / Conversation / Communications consent  
+**Depends on:** BR-081, BR-085, BR-049  
+**Related:** BR-080 (read-only; no mutation from v2), Meta Review isolation  
+**Status:** Implemented in code (flags unchanged; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/interpreter.js` (`looksLikeCommunicationOptOut` / `classifyCancellationIntent`), decisionEngine, sideEffectAuthorizer, responseRenderer  
+**Tests:** `backend/test/recruitAiV2NaturalLanguageOptOut.test.js`  
+**Simulator:** `natural-language-opt-out`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/16_NATURAL_LANGUAGE_OPT_OUT.md`
+
+### Rules
+
+1. **Opt-out phrases** — Recognize common EN/ES stop-contact language (`no more messages`, `stop texting me`, `no me escribas más`, `unsubscribe`, `STOP`, etc.) as `opt_out_request`.
+2. **Priority** — Opt-out runs before location correction, name extraction, generic clarification, FAQ routing, and scheduling parsing. Never map clear stop-contact to `correct_location` / `provide_name` / `clarify_once`.
+3. **Taxonomy** — Keep `cancel_request`, `withdraw_interest`, and `opt_out_request` distinct. Combined cancel+opt-out may set both denied proposals (`cancel_appointment` + `communication_opt_out`) without collapsing STOP into appointment cancel.
+4. **Renderer** — Acknowledge briefly; do not continue qualification, ask another question, resume scheduling, or offer alternatives.
+5. **Execution** — Propose `communication_opt_out` only; SideEffectAuthorizer denies. No production opt-out mutation from v2 until cutover.
+6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-085 — Recruit AI Date Resolution, Cancellation, and Meeting-Mode Confirmation
 
 **Implements:** Weekday/date-only proposals (never midnight); preserve prior active time with date changes; relative date exclusions; organization-local calendar resolution (BR-079); cancel vs withdraw vs STOP; OUTSIDE/remote explicit in-person requires Doral travel confirmation before office modality  

@@ -64,7 +64,7 @@ const COPY = Object.freeze({
     acknowledge_withdraw_no_write:
       "Understood. We'll cancel the process for now. A teammate can reopen it if you change your mind later.",
     acknowledge_opt_out_no_write:
-      "Understood — I've noted your request to stop messages. A teammate will confirm; nothing was changed automatically.",
+      "Understood — I've noted your request to stop messages. Nothing was changed automatically.",
     confirm_date_with_time:
       "Of course. Does {dateLabel} at {requestedTime} work for you?",
     acknowledge_date_ask_time:
@@ -135,7 +135,7 @@ const COPY = Object.freeze({
     acknowledge_withdraw_no_write:
       "Entiendo. Cancelamos el proceso por ahora. Un compañero puede reabrirlo si cambias de idea más adelante.",
     acknowledge_opt_out_no_write:
-      "Entendido — anoté tu solicitud de no recibir más mensajes. Un compañero confirmará; no se modificó nada automáticamente.",
+      "Entendido — anoté tu solicitud de no recibir más mensajes. No se modificó nada automáticamente.",
     confirm_date_with_time:
       "Claro. ¿El {dateLabel} a las {requestedTime} te funciona?",
     acknowledge_date_ask_time:
