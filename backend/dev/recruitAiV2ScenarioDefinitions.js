@@ -1006,6 +1006,136 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "orlando-outside-clears-stale-office",
+    name: "Orlando Outside Clears Stale Office",
+    category: "production_defect",
+    description:
+      "Doral office path then location correction to Orlando must re-evaluate coverage to OUTSIDE/Zoom and never keep stale office modality.",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation",
+      currentStage: "qualification",
+      knownFacts: {
+        city: "Doral",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        workAuthorization: true,
+        workAuthorizationStatus: "authorized",
+        preferredMeetingType: "in_person",
+        meetingPreferenceSource: "coverage_default",
+        coverage: "LOCAL"
+      },
+      appointment: {
+        status: "none",
+        meetingType: "in_person"
+      },
+      conversation: {
+        lastQuestionAsked: "ask_day_part",
+        lastAtlasOutboundText:
+          "Excelente. Estamos realizando las entrevistas en nuestras oficinas ubicadas en 2500 NW 79th Ave, Suite 189, Doral, FL 33122. ¿Prefieres en la mañana o en la tarde?"
+      }
+    },
+    turns: [
+      {
+        id: "oo01",
+        text: "Digo, vivo en Orlando",
+        inboundMessageId: "sim-wamid.orlando-outside.t01",
+        expect: {
+          intent: "correct_location",
+          city: "Orlando",
+          state: "FL",
+          meetingType: "zoom",
+          shouldEscalate: false,
+          nextAction: "acknowledge_correction_then_resume",
+          replyIncludes: ["Zoom", "Orlando"],
+          replyExcludes: ["2500 NW 79th"],
+          sideEffectsDenied: true
+        }
+      }
+    ]
+  },
+  {
+    id: "orlando-clean-zoom-path",
+    name: "Orlando Clean Zoom Path",
+    category: "production_defect",
+    description: "Clean Orlando → FL → work auth must offer Zoom, never Doral office.",
+    seed: {
+      preferredLanguage: "english",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "oz01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.orlando-clean.t01",
+        expect: {
+          intent: "greeting",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "oz02",
+        text: "Orlando",
+        inboundMessageId: "sim-wamid.orlando-clean.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Orlando",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "oz03",
+        text: "sí",
+        inboundMessageId: "sim-wamid.orlando-clean.t03",
+        setup: {
+          lastQuestionAsked: "confirm_location",
+          lastAtlasOutboundText: "Perfecto. ¿Orlando, Florida?",
+          knownFacts: {
+            city: "Orlando",
+            proposedState: "FL",
+            cityCertainty: "partial",
+            stateCertainty: "proposed"
+          }
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Orlando",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "oz04",
+        text: "Sí tengo permiso de trabajo",
+        inboundMessageId: "sim-wamid.orlando-clean.t04",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          meetingType: "zoom",
+          shouldEscalate: false,
+          nextAction: "capture_authorization_continue",
+          replyIncludes: ["Zoom"],
+          replyExcludes: ["2500 NW 79th", "oficinas"],
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
