@@ -23,6 +23,7 @@
 | [13_PLAYGROUND_FEEDBACK_LICENSE_FAQ_MEETING_MODE.md](./13_PLAYGROUND_FEEDBACK_LICENSE_FAQ_MEETING_MODE.md) | BR-083 — work auth vs license, specific FAQs, Zoom modality |
 | [14_PLAYGROUND_FEEDBACK_SCHEDULING_CONSTRAINTS.md](./14_PLAYGROUND_FEEDBACK_SCHEDULING_CONSTRAINTS.md) | BR-084 — availability constraints + direct-time scheduling |
 | [15_PLAYGROUND_FEEDBACK_DATE_CANCEL_MEETING_MODE.md](./15_PLAYGROUND_FEEDBACK_DATE_CANCEL_MEETING_MODE.md) | BR-085 — date-only scheduling, cancellation taxonomy, OUTSIDE in-person travel confirm |
+| [16_NATURAL_LANGUAGE_OPT_OUT.md](./16_NATURAL_LANGUAGE_OPT_OUT.md) | BR-086 — natural-language communication opt-out (no more messages, etc.) |
 
 ## Regression fixture
 

@@ -258,7 +258,56 @@ function normalizeIntentText(text) {
 }
 
 /**
- * BR-085 — distinguish cancel appointment / withdraw interest / STOP opt-out.
+ * BR-086 — natural-language communication opt-out / stop-contact.
+ * Must win over location correction ("no …" openers) and name parsing.
+ */
+function looksLikeCommunicationOptOut(text) {
+  const t = normalizeIntentText(text);
+  if (!t) {
+    return false;
+  }
+
+  if (/^(stop|alto|unsubscribe|basta)$/.test(t)) {
+    return true;
+  }
+  if (/\b(opt[- ]?out|unsubscribe)\b/.test(t)) {
+    return true;
+  }
+
+  // English stop-contact
+  if (
+    /\bno more (messages|texts|emails|whatsapps?)\b/.test(t) ||
+    /\b(don'?t|do not|stop) (message|messaging|text|texting|contact)( me)?\b/.test(
+      t
+    ) ||
+    /\b(don'?t|do not) (message|text|contact) me\b/.test(t) ||
+    /\bstop (messaging|texting|contacting) me\b/.test(t) ||
+    /\bleave me alone\b/.test(t) ||
+    /\bremove me\b/.test(t) ||
+    /\bplease stop (messaging|texting|contacting)\b/.test(t)
+  ) {
+    return true;
+  }
+
+  // Spanish stop-contact
+  if (
+    /\bno me escribas mas\b/.test(t) ||
+    /\bno me mandes mas mensajes\b/.test(t) ||
+    /\bno me (escribas|escriban|mandes|textees|contactes)\b/.test(t) ||
+    /\bdeja de (escribirme|mandarme|textearme|contactarme)\b/.test(t) ||
+    /\bno quiero mas (mensajes|textos|whatsapps?)\b/.test(t) ||
+    /\b(eliminame|saquenme de la lista)\b/.test(t) ||
+    /\bcancelar mensajes\b/.test(t) ||
+    /\bno me escriban\b/.test(t)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * BR-085/086 — distinguish cancel appointment / withdraw interest / communication opt-out.
  */
 function classifyCancellationIntent(text) {
   const t = normalizeIntentText(text);
@@ -266,33 +315,48 @@ function classifyCancellationIntent(text) {
     return null;
   }
 
-  if (
-    /^(stop|alto|unsubscribe)$/.test(t) ||
-    /\b(opt[- ]?out|unsubscribe)\b/.test(t)
-  ) {
-    return {
-      intent: INTENTS.OPT_OUT_REQUEST,
-      cancellationKind: "opt_out"
-    };
-  }
+  const hasOptOut = looksLikeCommunicationOptOut(t);
 
   const hasAppointmentCancel =
     /\b(cancela(r)? la cita|cancel (the |my )?appointment|cancel (the )?interview)\b/.test(
       t
     );
-  const hasCancel =
-    hasAppointmentCancel ||
-    /\b(cancelalo|cancelarlo|cancelala|cancelar|cancela|cancel it|cancel)\b/.test(
+  // "cancelar mensajes" is opt-out, not appointment cancel.
+  const hasGenericCancel =
+    !/\bcancelar mensajes\b/.test(t) &&
+    (/\b(cancelalo|cancelarlo|cancelala|cancelar|cancela|cancel it|cancel)\b/.test(
       t
     ) ||
-    /\bmejor cancel/.test(t);
+      /\bmejor cancel/.test(t));
+  const hasCancel = hasAppointmentCancel || hasGenericCancel;
   const hasWithdraw =
-    /\b(cambie de idea|ya no quiero|ya no me interesa|no quiero seguir|dejalo asi|olvidalo|never mind|changed my mind|i don'?t want to continue|forget it)\b/.test(
+    /\b(cambie de idea|ya no me interesa|no quiero seguir|dejalo asi|olvidalo|never mind|changed my mind|i don'?t want to continue|forget it)\b/.test(
       t
     ) ||
+    // Bare "ya no quiero" is withdraw; "no quiero más mensajes" is opt-out (hasOptOut).
+    (/\bya no quiero\b/.test(t) && !hasOptOut) ||
     /\bno puedo ir\b/.test(t) ||
     /\bcan'?t make it\b/.test(t) ||
     /\bcannot make it\b/.test(t);
+
+  // Combined: appointment cancel/withdraw + stop-contact — keep both signals.
+  if (hasOptOut && (hasAppointmentCancel || hasCancel || hasWithdraw)) {
+    return {
+      intent: INTENTS.OPT_OUT_REQUEST,
+      cancellationKind: "cancel_and_opt_out",
+      alsoCancelAppointment: Boolean(hasAppointmentCancel || hasCancel),
+      alsoWithdraw: Boolean(hasWithdraw),
+      alsoOptOut: true
+    };
+  }
+
+  if (hasOptOut) {
+    return {
+      intent: INTENTS.OPT_OUT_REQUEST,
+      cancellationKind: "opt_out",
+      alsoOptOut: true
+    };
+  }
 
   if (hasAppointmentCancel) {
     return {
@@ -614,10 +678,13 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     intent = INTENTS.GREETING;
     confidence = 0.95;
   } else if (cancellation) {
-    // BR-085 — cancel/withdraw/STOP before location/name (cancelalo ≠ city).
+    // BR-085/086 — cancel/withdraw/opt-out before location/name ("no more…" ≠ city).
     intent = cancellation.intent;
-    confidence = 0.93;
+    confidence = 0.94;
     entities.cancellationKind = cancellation.cancellationKind;
+    entities.alsoCancelAppointment = Boolean(cancellation.alsoCancelAppointment);
+    entities.alsoWithdraw = Boolean(cancellation.alsoWithdraw);
+    entities.alsoOptOut = Boolean(cancellation.alsoOptOut);
   } else if (pendingTravelConfirm && looksLikeZoomPreference(text)) {
     intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
     confidence = 0.92;
@@ -922,6 +989,7 @@ module.exports = {
   detectMessageLanguageHint,
   formatTimeEntity,
   classifyCancellationIntent,
+  looksLikeCommunicationOptOut,
   isAffirmative,
   isOptionSelection,
   isEchoOfLastQuestion,

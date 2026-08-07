@@ -1007,14 +1007,31 @@ function decideConversationTurn({
     structured.decision.shouldEscalate = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
     structured.customerReplyPlan.templateKey = "acknowledge_opt_out_no_write";
+    // No follow-up question / no scheduling resume (BR-086).
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requiresHuman: false,
+      stopContact: true
+    };
     structured.reasonCodes.push(REASON_CODES.OPT_OUT_INTENT_RECOGNIZED);
+    structured.reasonCodes.push(REASON_CODES.NATURAL_LANGUAGE_OPT_OUT);
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_STOPPED);
+    if (
+      interpretation.entities?.alsoCancelAppointment ||
+      interpretation.entities?.cancellationKind === "cancel_and_opt_out"
+    ) {
+      structured.reasonCodes.push(REASON_CODES.CANCEL_INTENT_RECOGNIZED);
+    }
     structured.contextPatch = {
       currentStage: STAGES.WITHDRAWN,
+      appointment: interpretation.entities?.alsoCancelAppointment
+        ? { status: APPOINTMENT_STATUS.NONE }
+        : undefined,
       conversation: {
         lastProspectIntent: INTENTS.OPT_OUT_REQUEST,
         lastQuestionAsked: null,
-        pendingClarification: null
+        pendingClarification: null,
+        lastOfferMade: null
       },
       attention: { needsHumanAttention: false, reason: null }
     };
