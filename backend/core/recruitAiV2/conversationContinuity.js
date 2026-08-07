@@ -15,6 +15,47 @@ function normalizeText(text) {
 }
 
 /**
+ * BR-097 — first-level "what is this about?" overview (progressive disclosure).
+ * These stay job_opportunity_question for BR-088 priority, but render short copy.
+ */
+function looksLikeJobOverviewQuestion(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return false;
+  }
+  // Employment-structure asks need the longer BR-088 framing, not the overview.
+  if (
+    /\b(esto|eso) es un (trabajo|empleo)\b/.test(t) ||
+    /\bes (esto |eso )?un (trabajo|empleo)\b/.test(t) ||
+    /\bes un trabajo de verdad\b/.test(t) ||
+    /\bis this (a )?job\b/.test(t) ||
+    /\bis this employment\b/.test(t) ||
+    /\bis this a business opportunity\b/.test(t) ||
+    /\bes una oportunidad de negocio\b/.test(t) ||
+    /\bwhat kind of job\b/.test(t) ||
+    /\bque tipo de trabajo( es)?\b/.test(t) ||
+    /\b(part|full)[- ]?time\b/.test(t) ||
+    /\btiempo (parcial|completo)\b/.test(t) ||
+    /\btell me more\b/.test(t)
+  ) {
+    return false;
+  }
+
+  return (
+    /\bwhat is this about\b/.test(t) ||
+    /\bhow does this work\b/.test(t) ||
+    /\bde que se trata\b/.test(t) ||
+    /\bde que trata\b/.test(t) ||
+    /\bde q(ue)? (se )?trata\b/.test(t) ||
+    /\bde q(ue)? trata el (trabajo|empleo)\b/.test(t) ||
+    /\bde que es( el (trabajo|empleo))?\b/.test(t) ||
+    /\bque es esto\b/.test(t) ||
+    /\bque hacen\b/.test(t) ||
+    /\bwhat do you (all |guys )?do\b/.test(t)
+  );
+}
+
+/**
  * Job / employment / opportunity questions — must never collapse into scheduling.
  */
 function looksLikeJobOpportunityQuestion(text) {
@@ -32,6 +73,10 @@ function looksLikeJobOpportunityQuestion(text) {
     return false;
   }
 
+  if (looksLikeJobOverviewQuestion(raw)) {
+    return true;
+  }
+
   return (
     /\b(esto|eso) es un (trabajo|empleo)\b/.test(t) ||
     /\bes (esto |eso )?un (trabajo|empleo)\b/.test(t) ||
@@ -47,13 +92,6 @@ function looksLikeJobOpportunityQuestion(text) {
     /\bis this (part[- ]?time|full[- ]?time)\b/.test(t) ||
     /\bwhat kind of job\b/.test(t) ||
     /\bis this a business opportunity\b/.test(t) ||
-    /\bwhat is this about\b/.test(t) ||
-    /\bhow does this work\b/.test(t) ||
-    /\bde que se trata\b/.test(t) ||
-    /\bde que trata\b/.test(t) ||
-    // Informal abbreviation: "De q trata el trabajo?"
-    /\bde q(ue)? (se )?trata\b/.test(t) ||
-    /\bde q(ue)? trata el (trabajo|empleo)\b/.test(t) ||
     /\b(que es esto|what is the (job|role|position|opportunity))\b/.test(t) ||
     /\btell me more\b/.test(t)
   );
@@ -244,6 +282,7 @@ function resolveDayPartContinuation(dayPart, language = "spanish") {
 
 module.exports = {
   normalizeText,
+  looksLikeJobOverviewQuestion,
   looksLikeJobOpportunityQuestion,
   looksLikeConversationClarificationRequest,
   lastQuestionImpliesDate,

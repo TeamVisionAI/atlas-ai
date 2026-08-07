@@ -13,6 +13,7 @@ const {
 } = require("../teamVisionWorkflowCopy");
 const {
   looksLikeJobOpportunityQuestion,
+  looksLikeJobOverviewQuestion,
   looksLikeConversationClarificationRequest,
   lastQuestionImpliesDate,
   lastQuestionImpliesDayPart: continuityImpliesDayPart
@@ -811,6 +812,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (looksLikeJobOpportunityQuestion(text)) {
     intent = INTENTS.JOB_OPPORTUNITY_QUESTION;
     confidence = 0.93;
+    // Implements BR-097 — first-level overview vs employment-framing detail.
+    entities.jobFaqDetailLevel = looksLikeJobOverviewQuestion(text)
+      ? "overview"
+      : "employment_framing";
   } else if (looksLikeConversationClarificationRequest(text)) {
     intent = INTENTS.CONVERSATION_CLARIFICATION_REQUEST;
     confidence = 0.93;
@@ -1131,6 +1136,7 @@ module.exports = {
   looksLikeAmbiguousFragment,
   looksLikeOpportunityQuestion,
   looksLikeJobOpportunityQuestion,
+  looksLikeJobOverviewQuestion,
   looksLikeConversationClarificationRequest,
   looksLikeInsuranceQuestion,
   looksLikeLicenseRequirementQuestion,

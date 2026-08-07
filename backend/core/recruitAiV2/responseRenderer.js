@@ -8,6 +8,7 @@ const { LANGUAGES } = require("./constants");
 const { sanitizeCustomerCopy } = require("./sanitize");
 const {
   getCanonicalFaqAnswer,
+  getJobOverviewFaqAnswer,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getLicenseRequirementFaqAnswer,
@@ -70,6 +71,7 @@ const COPY = Object.freeze({
     license_path_detail_faq_then_resume: null,
     compensation_faq_then_resume: null,
     job_opportunity_faq_then_resume: null,
+    job_overview_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
     acknowledge_location_correction:
       "Perfect, thanks for clarifying. So you're in {city}, {proposedStateName}. {resumeQuestion}",
@@ -192,6 +194,7 @@ const COPY = Object.freeze({
     license_path_detail_faq_then_resume: null,
     compensation_faq_then_resume: null,
     job_opportunity_faq_then_resume: null,
+    job_overview_faq_then_resume: null,
     acknowledge_availability_then_resume: null,
     acknowledge_location_correction:
       "Perfecto, gracias por aclararlo. Entonces estás en {city}, {proposedStateName}. {resumeQuestion}",
@@ -390,13 +393,16 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
   }
 }
 
-function composeFaqThenResume(faqText, language, entities = {}) {
+function composeFaqThenResume(faqText, language, entities = {}, options = {}) {
   const resumeKey = entities.resumeTemplateKey || "greeting_ask_location";
   const resume =
     resumeKey === "continue_qualification_after_authorization" ||
     resumeKey === "outside_zoom_day_part"
       ? getDayPartQuestion(localeCode(language))
       : resolveResumeQuestion(resumeKey, language, entities);
+  if (options.omitBridge) {
+    return `${faqText} ${resume}`;
+  }
   const bridge =
     language === LANGUAGES.SPANISH ? "Por cierto" : "By the way";
   return `${faqText} ${bridge}, ${resume}`;
@@ -412,6 +418,16 @@ function composeJobOpportunityThenResume(language, entities = {}) {
       getCanonicalFaqAnswer(localeCode(language)),
     language,
     entities
+  );
+}
+
+/** BR-097 — short first-level overview + pending question, no caveat stack. */
+function composeJobOverviewThenResume(language, entities = {}) {
+  return composeFaqThenResume(
+    getJobOverviewFaqAnswer(localeCode(language)),
+    language,
+    entities,
+    { omitBridge: true }
   );
 }
 
@@ -446,6 +462,8 @@ function renderCustomerReply(responsePlan) {
     key === "job_opportunity_faq_then_resume"
   ) {
     template = composeJobOpportunityThenResume(language, entities);
+  } else if (key === "job_overview_faq_then_resume") {
+    template = composeJobOverviewThenResume(language, entities);
   } else if (key === "insurance_faq_then_resume") {
     template = composeFaqThenResume(
       getInsuranceFaqAnswer(lang),

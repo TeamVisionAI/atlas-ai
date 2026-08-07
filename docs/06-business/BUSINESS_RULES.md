@@ -1160,6 +1160,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-097 — Recruit AI Concise First-Level Job FAQ (Progressive Disclosure)
+
+**Implements:** First-level job/overview questions (`de que se trata`, `qué hacen`, `what is this about`, etc.) receive a short financial-services answer and resume the pending workflow question; do not volunteer salary/experience/license/employment caveats until specifically asked  
+**Domain:** Recruit AI / Conversation / FAQ  
+**Depends on:** BR-081, BR-083, BR-088  
+**Related:** BR-089 (license FAQ), BR-090 (job FAQ interrupt), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/conversationContinuity.js`, interpreter, decisionEngine, responseRenderer, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix9.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/25_CONCISE_JOB_FAQ_OVERVIEW.md`
+
+### Rules
+
+1. **First-level overview** — Recognize EN/ES overview asks (`de que se trata`, `de qué es`, `qué hacen`, `what is this about`, close variants) as `job_opportunity_question` with detail level `overview`.
+2. **Short canonical answer** — Overview replies use only: opportunity in financial services + details explained in the interview. Then resume the exact pending question (e.g. `ask_day_part`).
+3. **Progressive disclosure** — Do not volunteer salaried/hourly disclaimers, no-experience copy, licensing details, compensation caveats, or business-opportunity framing unless the prospect asks those specifics.
+4. **Specific FAQs unchanged** — Compensation, experience, insurance, licensing, and “is this a job?” / employment-structure asks keep their dedicated BR-083/BR-088/BR-089 copy.
+5. **BR-088 priority preserved** — Overview/job FAQ still outranks scheduling parsing; no time-unavailable collision; no bare Continuemos dead-end.
+6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-096 — Recruit AI Pending Work-Authorization Status Shorthand
 
 **Implements:** Recognize short legal-status answers (`residente`, `ciudadano`/`ciudadana`, and close variants) as affirmative work authorization when Atlas is specifically asking for work authorization  
@@ -1360,7 +1382,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Job/opportunity intent** — Recognize EN/ES job/employment/opportunity questions (with or without punctuation) as `job_opportunity_question`. Never collapse them into scheduling/time/unavailable.
-2. **Canonical answer** — Explain financial-services opportunity (not guaranteed salaried/hourly employment); no income guarantees; then resume the pending workflow question.
+2. **Canonical answer** — For employment-structure asks (“is this a job?”), explain financial-services opportunity (not guaranteed salaried/hourly employment); no income guarantees; then resume the pending workflow question. First-level overview asks use short progressive-disclosure copy per BR-097.
 3. **Intent priority** — Clear FAQ/business intents (job, insurance, license, compensation), opt-out/cancel/withdraw, corrections, and meeting logistics outrank time/day-part/date/availability/counteroffer parsing. Scheduling context is evidence, not permission to reinterpret unrelated language.
 4. **“mañana” disambiguation** — Pending morning/afternoon ask → day-part morning. Pending “what day” ask → date tomorrow.
 5. **Day-part advances** — After morning/afternoon is captured, immediately ask for a clock time. Never reply only “Continuemos.”

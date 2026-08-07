@@ -110,6 +110,16 @@ function getCanonicalFaqAnswer(language) {
     : "We work in financial advisory and distribution services. No experience is required, and you'll learn more during the interview.";
 }
 
+/**
+ * BR-097 — first-level overview only. Do not volunteer salary/experience/license
+ * caveats until the prospect asks those specifics.
+ */
+function getJobOverviewFaqAnswer(language) {
+  return language === "es"
+    ? "Es una oportunidad en servicios financieros. Te explicamos todos los detalles en la entrevista."
+    : "It's an opportunity in financial services. We'll explain all the details during the interview.";
+}
+
 /** BR-088 — job/employment/opportunity (not a guaranteed salaried/hourly job). */
 function getJobOpportunityFaqAnswer(language) {
   return (
@@ -264,6 +274,7 @@ module.exports = {
   getDayPartClarificationQuestion,
   getHandoffMessage,
   getCanonicalFaqAnswer,
+  getJobOverviewFaqAnswer,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getLicenseRequirementFaqAnswer,
