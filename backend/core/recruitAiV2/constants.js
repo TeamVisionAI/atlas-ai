@@ -7,6 +7,7 @@
  * BR-086 — natural-language communication opt-out resolution.
  * BR-087 — scheduling memory, meeting logistics, clean withdrawal.
  * BR-088 — intent priority, job/opportunity FAQ, contextual continuation.
+ * BR-089 — license requirement question vs ambiguous license statement.
  */
 
 const STAGES = Object.freeze({
@@ -177,7 +178,10 @@ const REASON_CODES = Object.freeze({
   MANANA_DATE_CONTEXT: "MANANA_DATE_CONTEXT",
   DAY_PART_ADVANCES_TO_TIME: "DAY_PART_ADVANCES_TO_TIME",
   NO_DEAD_END_CONTINUATION: "NO_DEAD_END_CONTINUATION",
-  META_CONVERSATION_CLARIFIED: "META_CONVERSATION_CLARIFIED"
+  META_CONVERSATION_CLARIFIED: "META_CONVERSATION_CLARIFIED",
+  LICENSE_REQUIREMENT_QUESTION_RECOGNIZED: "LICENSE_REQUIREMENT_QUESTION_RECOGNIZED",
+  LICENSE_STATUS_STATEMENT: "LICENSE_STATUS_STATEMENT",
+  LICENSE_AMBIGUITY_RESERVED: "LICENSE_AMBIGUITY_RESERVED"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */

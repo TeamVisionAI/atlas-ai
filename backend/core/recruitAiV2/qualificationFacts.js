@@ -1,6 +1,7 @@
 /**
- * Recruit AI v2 — qualification fact separation (BR-083).
+ * Recruit AI v2 — qualification fact separation (BR-083 / BR-089).
  * workAuthorization and financialLicense* are independent facts.
+ * BR-089 — license requirement questions ≠ ambiguous license statements.
  */
 
 const WORK_AUTHORIZATION = Object.freeze({
@@ -80,11 +81,72 @@ function looksLikeLicenseInProgress(text) {
 }
 
 /**
+ * BR-089 — "do I need a license?" style FAQ questions (not possession status).
+ */
+function looksLikeLicenseRequirementQuestion(text) {
+  const raw = String(text || "").trim();
+  const t = normalizeAscii(raw);
+  if (!t || !mentionsLicense(raw)) {
+    // Allow short "necesito una?" follow-ups without repeating "licencia".
+    return /necesito una\??$/i.test(raw);
+  }
+
+  // Possession / absence statements are not requirement questions.
+  if (
+    /^(si[, ]*)?(tengo|i have) (una )?(licencia|license)\b/.test(t) ||
+    /^(no tengo|i don'?t have|sin) (una )?(licencia|license)\b/.test(t)
+  ) {
+    return false;
+  }
+
+  return (
+    /\b(tengo que tener|hay que tener|es obligatorio( tener)?|se necesita|necesito( una| estar)?|tengo que sacar|tengo que estar)\b/.test(
+      t
+    ) ||
+    /\bnecesito licencia( para empezar)?\b/.test(t) ||
+    /\blicencia para empezar\b/.test(t) ||
+    /\bdo i need (a |to be )?licen/.test(t) ||
+    /\bis (a )?license required\b/.test(t) ||
+    /\bdo i have to get licen/.test(t) ||
+    /\bis licensing mandatory\b/.test(t) ||
+    /\bneed a license( to start)?\b/.test(t) ||
+    /\bhace falta licencia\b/.test(t) ||
+    /\bdo i need a 215\b/.test(t) ||
+    /necesito una\??$/i.test(raw)
+  );
+}
+
+function looksLikeLicenseAbsenceStatement(text) {
+  const t = normalizeAscii(text);
+  return (
+    /\b(no tengo (una )?(licencia|license)|i don'?t have (a )?(licencia|license)|sin licencia|no license)\b/.test(
+      t
+    ) && !looksLikeLicenseRequirementQuestion(text)
+  );
+}
+
+function looksLikeAmbiguousLicenseFragment(text) {
+  const t = normalizeAscii(text);
+  return (
+    /^(la )?licen[cs]ia([.!]?)?$/.test(t) ||
+    /^(the )?license( thing)?([.!]?)?$/.test(t) ||
+    /^lo de la licencia/.test(t) ||
+    /^sobre (la )?licen/.test(t)
+  );
+}
+
+/**
  * Parse a license-related statement. Does NOT imply work authorization.
+ * Requirement questions return null (handled as LICENSE_REQUIREMENT_QUESTION).
  */
 function parseLicenseStatement(text) {
   const raw = String(text || "").trim();
   if (!raw || !mentionsLicense(raw)) {
+    return null;
+  }
+
+  // BR-089 — requirement FAQ is not a possession/status statement.
+  if (looksLikeLicenseRequirementQuestion(raw)) {
     return null;
   }
 
@@ -129,7 +191,27 @@ function parseLicenseStatement(text) {
     };
   }
 
-  // Generic "tengo licencia" / "I have a license"
+  // BR-089 — clear absence is a status statement, not type-ambiguity.
+  if (looksLikeLicenseAbsenceStatement(raw)) {
+    return {
+      financialLicenseStatus: FINANCIAL_LICENSE_STATUS.NONE,
+      financialLicenseTypes: [],
+      ambiguous: false,
+      driversLicense: false
+    };
+  }
+
+  // Bare / fragmentary license mentions stay ambiguous (BR-083/089).
+  if (looksLikeAmbiguousLicenseFragment(raw)) {
+    return {
+      financialLicenseStatus: FINANCIAL_LICENSE_STATUS.UNCLEAR,
+      financialLicenseTypes: [FINANCIAL_LICENSE_TYPES.UNKNOWN],
+      ambiguous: true,
+      driversLicense: false
+    };
+  }
+
+  // Generic "tengo licencia" / "I have a license" — type unclear.
   return {
     financialLicenseStatus: FINANCIAL_LICENSE_STATUS.UNCLEAR,
     financialLicenseTypes: [FINANCIAL_LICENSE_TYPES.UNKNOWN],
@@ -201,6 +283,9 @@ module.exports = {
   mentionsWorkAuthorization,
   looksLikeDriversLicense,
   looksLikeFinancialLicense,
+  looksLikeLicenseRequirementQuestion,
+  looksLikeLicenseAbsenceStatement,
+  looksLikeAmbiguousLicenseFragment,
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
   toBooleanWorkAuthorization

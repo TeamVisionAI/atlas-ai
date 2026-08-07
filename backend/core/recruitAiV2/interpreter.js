@@ -29,6 +29,7 @@ const {
   parseWorkAuthorizationAnswer,
   looksLikeDriversLicense,
   looksLikeFinancialLicense,
+  looksLikeLicenseRequirementQuestion,
   mentionsLicense,
   mentionsWorkAuthorization,
   toBooleanWorkAuthorization,
@@ -176,18 +177,6 @@ function looksLikeInsuranceQuestion(text) {
     /es (esto )?seguro/i.test(t) ||
     /es para vender seguros/i.test(t) ||
     /\bseguros\b/i.test(t) && /\?/.test(t)
-  );
-}
-
-function looksLikeLicenseRequirementQuestion(text) {
-  const t = String(text || "").trim();
-  return (
-    /do i need a license/i.test(t) ||
-    /need a license/i.test(t) ||
-    /necesito (una )?licencia/i.test(t) ||
-    /necesito una\??$/i.test(t) ||
-    /do i need a 215/i.test(t) ||
-    /hace falta licencia/i.test(t)
   );
 }
 
