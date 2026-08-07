@@ -300,8 +300,8 @@ test("18. frustration does not automatically escalate", () => {
 test("19. cancellation closure has no companion-contact sentence", () => {
   const r = turn("Mejor cancélalo, cambié de idea", memoryContext());
   assert.equal(r.interpretation.intent, "withdraw_interest");
-  assert.match(r.rendered.text, /Cancelamos el proceso por ahora/i);
   assert.match(r.rendered.text, /Gracias por avisarnos/i);
+  assert.match(r.rendered.text, /[eé]xito/i);
   assert.doesNotMatch(r.rendered.text, /compañero puede reabrir|reabrirlo/i);
   assert.ok(
     r.structuredDecision.reasonCodes.includes("CLEAN_WITHDRAWAL_CLOSURE")

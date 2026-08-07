@@ -317,7 +317,44 @@ function looksLikeCommunicationOptOut(text) {
 }
 
 /**
- * BR-085/086 — distinguish cancel appointment / withdraw interest / communication opt-out.
+ * BR-091 — clear direct lack-of-interest / not-interested (EN/ES).
+ * Distinct from communication opt-out, fixed-employment preference, and current_not_fit.
+ */
+function looksLikeDirectLackOfInterest(text) {
+  const t = normalizeIntentText(text);
+  if (!t) {
+    return false;
+  }
+  // Never collapse stop-contact into withdraw.
+  if (looksLikeCommunicationOptOut(t)) {
+    return false;
+  }
+
+  // Spanish — bare "No me interesa" and close variants (no "ya" required).
+  if (
+    /\bno me interesa( esto)?\b/.test(t) ||
+    /\besto no me interesa\b/.test(t) ||
+    /\bno estoy interesad[oa]( en esto)?\b/.test(t) ||
+    /\bno quiero (seguir|continuar)\b/.test(t)
+  ) {
+    return true;
+  }
+
+  // English
+  if (
+    /\bi('?m| am) not interested( in this)?\b/.test(t) ||
+    /\bnot interested in this\b/.test(t) ||
+    /^not interested$/.test(t) ||
+    /\bi don'?t want to (continue|proceed)\b/.test(t)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * BR-085/086/091 — distinguish cancel appointment / withdraw interest / communication opt-out.
  */
 function classifyCancellationIntent(text) {
   const t = normalizeIntentText(text);
@@ -340,7 +377,8 @@ function classifyCancellationIntent(text) {
       /\bmejor cancel/.test(t));
   const hasCancel = hasAppointmentCancel || hasGenericCancel;
   const hasWithdraw =
-    /\b(cambie de idea|ya no me interesa|no quiero seguir|dejalo asi|olvidalo|never mind|changed my mind|i don'?t want to continue|forget it)\b/.test(
+    looksLikeDirectLackOfInterest(t) ||
+    /\b(cambie de idea|dejalo asi|olvidalo|never mind|changed my mind|forget it)\b/.test(
       t
     ) ||
     // Bare "ya no quiero" is withdraw; "no quiero más mensajes" is opt-out (hasOptOut).
@@ -377,7 +415,8 @@ function classifyCancellationIntent(text) {
   if (hasCancel && hasWithdraw) {
     return {
       intent: INTENTS.WITHDRAW_INTEREST,
-      cancellationKind: "withdraw_and_cancel"
+      cancellationKind: "withdraw_and_cancel",
+      directLackOfInterest: looksLikeDirectLackOfInterest(t)
     };
   }
   if (hasCancel) {
@@ -389,7 +428,8 @@ function classifyCancellationIntent(text) {
   if (hasWithdraw) {
     return {
       intent: INTENTS.WITHDRAW_INTEREST,
-      cancellationKind: "withdraw_interest"
+      cancellationKind: "withdraw_interest",
+      directLackOfInterest: looksLikeDirectLackOfInterest(t)
     };
   }
   return null;
@@ -692,13 +732,14 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     intent = INTENTS.GREETING;
     confidence = 0.95;
   } else if (cancellation) {
-    // BR-085/086 — cancel/withdraw/opt-out before location/name ("no more…" ≠ city).
+    // BR-085/086/091 — cancel/withdraw/opt-out before location/name/FAQ/scheduling.
     intent = cancellation.intent;
     confidence = 0.94;
     entities.cancellationKind = cancellation.cancellationKind;
     entities.alsoCancelAppointment = Boolean(cancellation.alsoCancelAppointment);
     entities.alsoWithdraw = Boolean(cancellation.alsoWithdraw);
     entities.alsoOptOut = Boolean(cancellation.alsoOptOut);
+    entities.directLackOfInterest = Boolean(cancellation.directLackOfInterest);
   } else if (pendingTravelConfirm && looksLikeZoomPreference(text)) {
     intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
     confidence = 0.92;
@@ -1054,6 +1095,7 @@ module.exports = {
   formatTimeEntity,
   classifyCancellationIntent,
   looksLikeCommunicationOptOut,
+  looksLikeDirectLackOfInterest,
   isAffirmative,
   isOptionSelection,
   isEchoOfLastQuestion,

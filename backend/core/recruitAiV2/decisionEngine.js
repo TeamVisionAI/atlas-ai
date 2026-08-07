@@ -1300,6 +1300,12 @@ function decideConversationTurn({
     structured.reasonCodes.push(REASON_CODES.WITHDRAW_INTENT_RECOGNIZED);
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_STOPPED);
     structured.reasonCodes.push(REASON_CODES.CLEAN_WITHDRAWAL_CLOSURE);
+    if (interpretation.entities?.directLackOfInterest) {
+      structured.reasonCodes.push(
+        REASON_CODES.DIRECT_LACK_OF_INTEREST_RECOGNIZED
+      );
+    }
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
     structured.contextPatch = {
       currentStage: STAGES.WITHDRAWN,
       appointment: {
