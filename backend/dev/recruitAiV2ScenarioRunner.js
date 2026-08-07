@@ -114,7 +114,37 @@ function evaluateExpect(actual, expect = {}) {
     expect.financialLicenseStatus
   );
   check("proposedTime", actual.proposedTime, expect.proposedTime);
+  check("proposedDate", actual.proposedDate, expect.proposedDate);
+  check("meetingTypeRequested", actual.meetingTypeRequested, expect.meetingTypeRequested);
+  check("meetingTypeConfirmed", actual.meetingTypeConfirmed, expect.meetingTypeConfirmed);
+  check("meetingPreferenceSource", actual.meetingPreferenceSource, expect.meetingPreferenceSource);
   check("pendingQuestion", actual.pendingQuestion, expect.pendingQuestion);
+  if (expect.proposedSideEffect != null) {
+    check("proposedSideEffect", actual.proposedSideEffects?.[0] || null, expect.proposedSideEffect);
+  }
+  if (Array.isArray(expect.proposedSideEffectsInclude)) {
+    for (const type of expect.proposedSideEffectsInclude) {
+      if (!(actual.proposedSideEffects || []).includes(type)) {
+        failures.push({
+          path: "proposedSideEffectsInclude",
+          expected: type,
+          actual: actual.proposedSideEffects || []
+        });
+      }
+    }
+  }
+  if (Array.isArray(expect.dateExclusions)) {
+    const got = actual.dateExclusions || [];
+    for (const iso of expect.dateExclusions) {
+      if (!got.includes(iso)) {
+        failures.push({
+          path: "dateExclusions",
+          expected: iso,
+          actual: got
+        });
+      }
+    }
+  }
   if (expect.availabilityConstraintEarliest !== undefined) {
     check(
       "availabilityConstraintEarliest",
@@ -184,7 +214,8 @@ function createEphemeralSession(seed = {}) {
     appointment: seed.appointment || {},
     conversation: seed.conversation || {},
     attention: seed.attention || {},
-    currentStage: seed.currentStage || "greeting"
+    currentStage: seed.currentStage || "greeting",
+    ...(seed.testNow ? { _testNow: new Date(seed.testNow) } : {})
   });
 
   return {
@@ -298,6 +329,7 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
     options: {
       flexible: true,
       env: forcedEnv,
+      ...(session.context?._testNow ? { now: session.context._testNow } : {}),
       ...(options.explicitLanguagePreference
         ? { explicitLanguagePreference: options.explicitLanguagePreference }
         : {}),
@@ -358,6 +390,15 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
     financialLicenseStatus:
       nextContext.knownFacts?.financialLicenseStatus || null,
     proposedTime: nextContext.appointment?.proposedTime || null,
+    proposedDate: nextContext.appointment?.proposedDate || null,
+    dateExclusions: nextContext.knownFacts?.dateExclusions || [],
+    meetingTypeRequested: nextContext.knownFacts?.meetingTypeRequested ?? null,
+    meetingTypeConfirmed:
+      nextContext.knownFacts?.meetingTypeConfirmed === undefined
+        ? null
+        : nextContext.knownFacts?.meetingTypeConfirmed,
+    meetingPreferenceSource:
+      nextContext.knownFacts?.meetingPreferenceSource || null,
     availabilityConstraintEarliest:
       nextContext.knownFacts?.availabilityConstraint?.earliestTime || null,
     preferredDayPart: nextContext.knownFacts?.preferredDayPart || null,

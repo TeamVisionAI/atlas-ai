@@ -3,6 +3,7 @@
  * Implements BR-081 (structured context + decision; side effects disabled).
  * BR-082 — conversational clarification and partial-fact resolution.
  * BR-084 — scheduling constraints and direct-time resolution.
+ * BR-085 — date-only scheduling, cancellation/withdraw, in-person travel confirm.
  */
 
 const STAGES = Object.freeze({
@@ -12,6 +13,7 @@ const STAGES = Object.freeze({
   PROPOSED: "proposed",
   CONFIRMED: "confirmed",
   RESCHEDULING: "rescheduling",
+  WITHDRAWN: "withdrawn",
   HUMAN_REQUIRED: "human_required"
 });
 
@@ -48,6 +50,10 @@ const INTENTS = Object.freeze({
   PROVIDE_AVAILABILITY_CONSTRAINT: "provide_availability_constraint",
   REQUEST_LANGUAGE_SWITCH: "request_language_switch",
   CANCEL_REQUEST: "cancel_request",
+  WITHDRAW_INTEREST: "withdraw_interest",
+  OPT_OUT_REQUEST: "opt_out_request",
+  CONFIRM_IN_PERSON_TRAVEL: "confirm_in_person_travel",
+  SCHEDULING_DATE_PROPOSAL: "scheduling_date_proposal",
   SELECT_OPTION: "select_option",
   SCHEDULING_COUNTEROFFER: "scheduling_counteroffer",
   CLARIFY_AM_PM: "clarify_am_pm",
@@ -73,6 +79,11 @@ const NEXT_ACTIONS = Object.freeze({
   UPDATE_MEETING_PREFERENCE: "update_meeting_preference",
   SWITCH_LANGUAGE_CONTINUE: "switch_language_continue",
   ACKNOWLEDGE_CANCEL_NO_WRITE: "acknowledge_cancel_no_write",
+  ACKNOWLEDGE_WITHDRAW_NO_WRITE: "acknowledge_withdraw_no_write",
+  ACKNOWLEDGE_OPT_OUT_NO_WRITE: "acknowledge_opt_out_no_write",
+  CONFIRM_IN_PERSON_TRAVEL: "confirm_in_person_travel",
+  CONFIRM_DATE_WITH_TIME: "confirm_date_with_time",
+  ACKNOWLEDGE_DATE_ASK_TIME: "acknowledge_date_ask_time",
   ACKNOWLEDGE_AND_CHECK_AVAILABILITY: "acknowledge_and_check_availability",
   ACKNOWLEDGE_AVAILABILITY_CONSTRAINT: "acknowledge_availability_constraint",
   OFFER_ALTERNATIVES_OR_ESCALATE: "offer_alternatives_or_escalate",
@@ -126,7 +137,18 @@ const REASON_CODES = Object.freeze({
   SLOT_UNAVAILABLE_OFFER_ALTERNATIVES: "SLOT_UNAVAILABLE_OFFER_ALTERNATIVES",
   SCHEDULING_HANDOFF_GUARD: "SCHEDULING_HANDOFF_GUARD",
   LOCATION_COVERAGE_REEVALUATED: "LOCATION_COVERAGE_REEVALUATED",
-  OUTSIDE_CLEARS_STALE_OFFICE: "OUTSIDE_CLEARS_STALE_OFFICE"
+  OUTSIDE_CLEARS_STALE_OFFICE: "OUTSIDE_CLEARS_STALE_OFFICE",
+  DATE_ONLY_PROPOSAL: "DATE_ONLY_PROPOSAL",
+  DATE_CANDIDATE_REPLACED: "DATE_CANDIDATE_REPLACED",
+  DATE_EXCLUSIONS_CAPTURED: "DATE_EXCLUSIONS_CAPTURED",
+  PRIOR_TIME_PRESERVED_WITH_DATE: "PRIOR_TIME_PRESERVED_WITH_DATE",
+  CANCEL_INTENT_RECOGNIZED: "CANCEL_INTENT_RECOGNIZED",
+  WITHDRAW_INTENT_RECOGNIZED: "WITHDRAW_INTENT_RECOGNIZED",
+  OPT_OUT_INTENT_RECOGNIZED: "OPT_OUT_INTENT_RECOGNIZED",
+  IN_PERSON_TRAVEL_CONFIRMATION_REQUIRED: "IN_PERSON_TRAVEL_CONFIRMATION_REQUIRED",
+  IN_PERSON_TRAVEL_CONFIRMED: "IN_PERSON_TRAVEL_CONFIRMED",
+  EXPLICIT_ZOOM_CLEARS_OFFICE: "EXPLICIT_ZOOM_CLEARS_OFFICE",
+  SCHEDULING_STOPPED: "SCHEDULING_STOPPED"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */

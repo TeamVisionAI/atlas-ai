@@ -32,9 +32,51 @@ function authorizeSideEffects({
   const executionEnabled = isExecutionEnabled(env);
   const proposals = [];
 
-  if (structuredDecision?.decision?.nextAction === "create_appointment") {
+  const nextAction = structuredDecision?.decision?.nextAction || null;
+  const intent = structuredDecision?.intent || null;
+
+  if (nextAction === "create_appointment") {
     proposals.push({
       type: "create_appointment",
+      status: "proposed",
+      authorized: false,
+      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
+    });
+  }
+
+  // BR-085 — cancel/withdraw proposals remain auditable and denied.
+  if (
+    nextAction === "acknowledge_cancel_no_write" ||
+    intent === "cancel_request" ||
+    (intent === "withdraw_interest" &&
+      structuredDecision?.entities?.cancellationKind === "withdraw_and_cancel")
+  ) {
+    proposals.push({
+      type: "cancel_appointment",
+      status: "proposed",
+      authorized: false,
+      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
+    });
+  }
+
+  if (
+    nextAction === "acknowledge_withdraw_no_write" ||
+    intent === "withdraw_interest"
+  ) {
+    proposals.push({
+      type: "withdraw_prospect",
+      status: "proposed",
+      authorized: false,
+      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
+    });
+  }
+
+  if (
+    nextAction === "acknowledge_opt_out_no_write" ||
+    intent === "opt_out_request"
+  ) {
+    proposals.push({
+      type: "communication_opt_out",
       status: "proposed",
       authorized: false,
       reason: REASON_CODES.SIDE_EFFECTS_DISABLED

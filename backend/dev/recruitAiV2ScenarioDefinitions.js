@@ -1136,6 +1136,153 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "orlando-scheduling-date-change-cancellation",
+    name: "Orlando Scheduling Date Change + Cancellation",
+    category: "production_defect",
+    description:
+      "OUTSIDE in-person travel confirm → after-5 → 7 PM → Monday (keep 7 PM, never 12 AM) → Tuesday → cancel/withdraw (BR-085).",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation",
+      currentStage: "scheduling",
+      timezone: "America/New_York",
+      testNow: "2026-08-07T15:00:00.000-04:00",
+      knownFacts: {
+        city: "Orlando",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        workAuthorization: true,
+        workAuthorizationStatus: "authorized",
+        preferredMeetingType: "zoom",
+        meetingPreferenceSource: "coverage_default",
+        coverage: "OUTSIDE",
+        availabilityConstraint: {
+          type: "availability_constraint",
+          earliestTime: "17:00",
+          dayPart: "evening",
+          explicitCandidateTime: null,
+          raw: "trabajo hasta las 5"
+        },
+        preferredDayPart: "evening"
+      },
+      appointment: {
+        status: "proposed",
+        meetingType: "zoom",
+        proposedTime: "19:00",
+        previouslyOfferedSlots: []
+      },
+      conversation: {
+        lastQuestionAsked: "confirm_slot",
+        lastAtlasOutboundText:
+          "Entendido — prefieres 7:00 PM. Voy a revisar disponibilidad."
+      }
+    },
+    turns: [
+      {
+        id: "od01",
+        text: "pensándolo mejor, prefiero en persona",
+        inboundMessageId: "sim-wamid.orlando-date.t01",
+        expect: {
+          intent: "provide_meeting_preference",
+          meetingType: "zoom",
+          meetingTypeRequested: "in_person",
+          meetingTypeConfirmed: false,
+          meetingPreferenceSource: "prospect_requested",
+          nextAction: "confirm_in_person_travel",
+          replyIncludes: ["Doral", "2500 NW 79th"],
+          replyExcludes: ["12:00 AM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "od02",
+        text: "sí, puedo ir a Doral",
+        inboundMessageId: "sim-wamid.orlando-date.t02",
+        expect: {
+          intent: "confirm_in_person_travel",
+          meetingType: "in_person",
+          meetingTypeConfirmed: true,
+          meetingPreferenceSource: "prospect_confirmed",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "od03",
+        text: "después de las 5",
+        inboundMessageId: "sim-wamid.orlando-date.t03",
+        expect: {
+          intent: "provide_availability_constraint",
+          availabilityConstraintEarliest: "17:00",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "od04",
+        text: "puede ser a las 7",
+        inboundMessageId: "sim-wamid.orlando-date.t04",
+        expect: {
+          intent: "scheduling_counteroffer",
+          proposedTime: "19:00",
+          replyExcludes: ["12:00 AM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "od05",
+        text: "no puedo ni hoy ni mañana, ¿puede ser el lunes?",
+        inboundMessageId: "sim-wamid.orlando-date.t05",
+        expect: {
+          intent: "scheduling_date_proposal",
+          proposedDate: "2026-08-10",
+          proposedTime: "19:00",
+          dateExclusions: ["2026-08-07", "2026-08-08"],
+          replyIncludes: ["lunes", "7:00 PM"],
+          replyExcludes: ["12:00 AM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "od06",
+        text: "mejor el martes",
+        inboundMessageId: "sim-wamid.orlando-date.t06",
+        expect: {
+          intent: "scheduling_date_proposal",
+          proposedDate: "2026-08-11",
+          proposedTime: "19:00",
+          replyIncludes: ["martes", "7:00 PM"],
+          replyExcludes: ["12:00 AM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "od07",
+        text: "mejor cancélalo, cambié de idea",
+        inboundMessageId: "sim-wamid.orlando-date.t07",
+        expect: {
+          intent: "withdraw_interest",
+          stage: "withdrawn",
+          nextAction: "acknowledge_withdraw_no_write",
+          proposedSideEffectsInclude: ["withdraw_prospect", "cancel_appointment"],
+          replyExcludes: [
+            "12:00 AM",
+            "dato que te acabo de pedir",
+            "Could you share the detail"
+          ],
+          authorizationAuthorized: false,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
