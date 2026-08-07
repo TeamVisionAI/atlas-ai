@@ -101,7 +101,7 @@ const COPY = Object.freeze({
     acknowledge_cancel_no_write:
       "Understood — I've noted your cancel request. A teammate will confirm any changes; nothing was changed automatically.",
     acknowledge_withdraw_no_write:
-      "Understood. We'll cancel the process for now. Thanks for letting us know.",
+      "I understand. Thanks for letting us know. I wish you every success.",
     acknowledge_opt_out_no_write:
       "Understood — I've noted your request to stop messages. Nothing was changed automatically.",
     acknowledge_fixed_employment_preference: null,
@@ -223,7 +223,7 @@ const COPY = Object.freeze({
     acknowledge_cancel_no_write:
       "Entendido — anoté tu solicitud de cancelación. Un compañero confirmará cualquier cambio; no se modificó nada automáticamente.",
     acknowledge_withdraw_no_write:
-      "Entiendo. Cancelamos el proceso por ahora. Gracias por avisarnos.",
+      "Entiendo. Gracias por avisarnos. Te deseo mucho éxito.",
     acknowledge_opt_out_no_write:
       "Entendido — anoté tu solicitud de no recibir más mensajes. No se modificó nada automáticamente.",
     acknowledge_fixed_employment_preference: null,

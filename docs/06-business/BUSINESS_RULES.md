@@ -1160,6 +1160,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-091 — Recruit AI Direct Lack-of-Interest Withdrawal Recognition
+
+**Implements:** Recognize clear direct lack-of-interest phrases (EN/ES) as `withdraw_interest` without requiring modifiers like “ya”; keep withdraw distinct from opt-out, fixed-employment preference, current_not_fit, cancel, and compensation FAQ; terminal respectful closure  
+**Domain:** Recruit AI / Conversation / Withdrawal  
+**Depends on:** BR-085, BR-086, BR-087, BR-090, BR-081, BR-049  
+**Related:** BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in code (flags unchanged; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/interpreter.js` (`looksLikeDirectLackOfInterest` / `classifyCancellationIntent`), decisionEngine, responseRenderer  
+**Tests:** `backend/test/recruitAiV2DirectNoInterestWithdrawal.test.js`  
+**Simulator:** `direct-no-interest-withdrawal`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/21_DIRECT_NO_INTEREST_WITHDRAWAL.md`
+
+### Rules
+
+1. **Spanish coverage** — Recognize at least: `No me interesa`, `No estoy interesado/a`, `No me interesa esto`, `No estoy interesado/a en esto`, `No gracias, no me interesa`, `Gracias, pero no me interesa`, `Esto no me interesa`, `No quiero seguir`, `No quiero continuar`.
+2. **English coverage** — Recognize at least: `I'm not interested`, `I am not interested`, `Not interested`, `I'm not interested in this`, `No thanks, I'm not interested`, `I don't want to continue`, `I don't want to proceed`.
+3. **State separation** — Direct lack-of-interest ≠ fixed-employment preference ≠ current_not_fit ≠ appointment cancel ≠ communication opt-out ≠ compensation FAQ.
+4. **Priority** — Clear lack-of-interest outranks scheduling, FAQ, location correction, name extraction, and generic clarification. Never map to `unknown` / `clarify_once` / scheduling / compensation.
+5. **Behavior** — Mark withdrawn, stop qualification/scheduling, no next recruiting question, no handoff, no appointment proposal, no opt-out unless explicitly requested. Side-effect proposals remain denied while execution is OFF.
+6. **Renderer** — Short respectful closure (e.g. “Entiendo. Gracias por avisarnos. Te deseo mucho éxito.”). No continued selling, why-ask, companion-contact, or opt-out implication.
+7. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no production opt-out mutation, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-090 — Recruit AI Puerto Rico Work Authorization and Fixed-Employment Preference
 
 **Implements:** Normalize explicit Puerto Rico origin/citizenship statements as sufficient work-authorization context; keep job FAQ interrupt behavior; recognize fixed-employment preference as distinct from compensation FAQ / withdraw / opt-out; acknowledge without pressure; polite current-not-fit closure on reinforcement  

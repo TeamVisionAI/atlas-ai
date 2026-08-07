@@ -226,7 +226,7 @@ test("16. clear cancellation never generic-clarify", () => {
   const r = turn("mejor cancélalo, cambié de idea", schedulingContext());
   assert.equal(r.interpretation.intent, "withdraw_interest");
   assert.doesNotMatch(r.rendered.text, /dato que te acabo de pedir/i);
-  assert.match(r.rendered.text, /Cancelamos el proceso|cancel/i);
+  assert.match(r.rendered.text, /Gracias por avisarnos|[eé]xito|success/i);
 });
 
 test("17. cancellation stops scheduling state", () => {

@@ -1511,7 +1511,7 @@ const RECRUIT_AI_V2_SCENARIOS = [
           stage: "withdrawn",
           nextAction: "acknowledge_withdraw_no_write",
           proposedSideEffectsInclude: ["withdraw_prospect", "cancel_appointment"],
-          replyIncludes: ["Cancelamos", "Gracias"],
+          replyIncludes: ["Gracias", "éxito"],
           replyExcludes: [
             "Un compañero puede reabrirlo",
             "reabrir",
@@ -1875,6 +1875,80 @@ const RECRUIT_AI_V2_SCENARIOS = [
             "compañero",
             "¿"
           ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
+  },
+  {
+    id: "direct-no-interest-withdrawal",
+    name: "Direct No-Interest Withdrawal",
+    category: "real_world_regression",
+    description:
+      "BR-091 — bare 'No me interesa' withdraws recruiting without opt-out or scheduling resume",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation"
+    },
+    turns: [
+      {
+        id: "ni01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.direct-no-interest.t01",
+        expect: {
+          intent: "greeting",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "ni02",
+        text: "Kissimmee, Florida",
+        inboundMessageId: "sim-wamid.direct-no-interest.t02",
+        expect: {
+          intent: "provide_location",
+          city: "Kissimmee",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "ni03",
+        text: "Sí tengo permiso de trabajo",
+        inboundMessageId: "sim-wamid.direct-no-interest.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "ni04",
+        text: "No me interesa",
+        inboundMessageId: "sim-wamid.direct-no-interest.t04",
+        expect: {
+          intent: "withdraw_interest",
+          stage: "withdrawn",
+          nextAction: "acknowledge_withdraw_no_write",
+          replyIncludes: ["Gracias", "éxito"],
+          replyExcludes: [
+            "mañana",
+            "tarde",
+            "permiso",
+            "no recibir más mensajes",
+            "compañero",
+            "conectarte",
+            "¿"
+          ],
+          proposedSideEffectsInclude: ["withdraw_prospect"],
           shouldEscalate: false,
           sideEffectsDenied: true
         }

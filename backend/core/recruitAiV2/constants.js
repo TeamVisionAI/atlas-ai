@@ -9,6 +9,7 @@
  * BR-088 — intent priority, job/opportunity FAQ, contextual continuation.
  * BR-089 — license requirement question vs ambiguous license statement.
  * BR-090 — Puerto Rico work-auth normalization + fixed-employment preference.
+ * BR-091 — direct lack-of-interest withdrawal ("No me interesa", etc.).
  */
 
 const STAGES = Object.freeze({
@@ -204,7 +205,8 @@ const REASON_CODES = Object.freeze({
   FIXED_EMPLOYMENT_NO_PRESSURE: "FIXED_EMPLOYMENT_NO_PRESSURE",
   CURRENT_NOT_FIT_RECOGNIZED: "CURRENT_NOT_FIT_RECOGNIZED",
   POLITE_CURRENT_NOT_FIT_CLOSURE: "POLITE_CURRENT_NOT_FIT_CLOSURE",
-  EMPLOYMENT_FIT_STATE_SEPARATED: "EMPLOYMENT_FIT_STATE_SEPARATED"
+  EMPLOYMENT_FIT_STATE_SEPARATED: "EMPLOYMENT_FIT_STATE_SEPARATED",
+  DIRECT_LACK_OF_INTEREST_RECOGNIZED: "DIRECT_LACK_OF_INTEREST_RECOGNIZED"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */
