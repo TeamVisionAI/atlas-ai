@@ -2145,6 +2145,97 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "sales-objection-not-location",
+    name: "Sales Objection Not Location",
+    category: "production_defect",
+    description:
+      "BR-099 — 'no se vender' is a sales objection, never city/correction Vender.",
+    seed: {
+      preferredLanguage: "english",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "so01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.sales-objection.t01",
+        expect: {
+          intent: "greeting",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "so02",
+        text: "Miami FL",
+        inboundMessageId: "sim-wamid.sales-objection.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "so03",
+        text: "residente",
+        inboundMessageId: "sim-wamid.sales-objection.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          pendingQuestion: "ask_day_part",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "so04",
+        text: "de que se trata",
+        inboundMessageId: "sim-wamid.sales-objection.t04",
+        expect: {
+          intent: "job_opportunity_question",
+          pendingQuestion: "ask_day_part",
+          replyIncludes: ["servicios financieros"],
+          replyExcludes: ["asalariado"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "so05",
+        text: "no se vender",
+        inboundMessageId: "sim-wamid.sales-objection.t05",
+        expect: {
+          intent: "sales_objection",
+          city: "Miami",
+          state: "FL",
+          pendingQuestion: "ask_day_part",
+          replyIncludes: ["saber vender", "mañana o en la tarde"],
+          replyExcludes: [
+            "Vender",
+            "corrección",
+            "¿En qué estado",
+            "esto no es ventas",
+            "compañero de Team Vision te contactará"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 

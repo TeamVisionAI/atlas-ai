@@ -48,6 +48,8 @@ const INTENTS = Object.freeze({
   COMPENSATION_QUESTION: "compensation_question",
   /** BR-098 — prior-experience FAQ. */
   EXPERIENCE_QUESTION: "experience_question",
+  /** BR-099 — sales skill / experience / aversion objection. */
+  SALES_OBJECTION: "sales_objection",
   /** BR-090 — seeking fixed/salaried/hourly traditional employment. */
   FIXED_EMPLOYMENT_PREFERENCE: "fixed_employment_preference",
   /** BR-090 — reinforced current non-fit / not-now after opportunity explained. */
@@ -89,6 +91,7 @@ const NEXT_ACTIONS = Object.freeze({
   ANSWER_LICENSE_PATH_DETAIL_THEN_RESUME: "answer_license_path_detail_then_resume",
   ANSWER_COMPENSATION_FAQ_THEN_RESUME: "answer_compensation_faq_then_resume",
   ANSWER_EXPERIENCE_FAQ_THEN_RESUME: "answer_experience_faq_then_resume",
+  ANSWER_SALES_OBJECTION_THEN_RESUME: "answer_sales_objection_then_resume",
   /** BR-090 — acknowledge fixed-employment preference without forcing scheduling. */
   ACKNOWLEDGE_FIXED_EMPLOYMENT_PREFERENCE:
     "acknowledge_fixed_employment_preference",
@@ -197,6 +200,8 @@ const REASON_CODES = Object.freeze({
   FAQ_OUTRANKS_LOCATION: "FAQ_OUTRANKS_LOCATION",
   EXPERIENCE_FAQ: "EXPERIENCE_FAQ",
   INSURANCE_FAQ_ROUTED: "INSURANCE_FAQ_ROUTED",
+  SALES_OBJECTION_RECOGNIZED: "SALES_OBJECTION_RECOGNIZED",
+  SALES_OBJECTION_OUTRANKS_CORRECTION: "SALES_OBJECTION_OUTRANKS_CORRECTION",
   MANANA_DAY_PART_CONTEXT: "MANANA_DAY_PART_CONTEXT",
   MANANA_DATE_CONTEXT: "MANANA_DATE_CONTEXT",
   DAY_PART_ADVANCES_TO_TIME: "DAY_PART_ADVANCES_TO_TIME",

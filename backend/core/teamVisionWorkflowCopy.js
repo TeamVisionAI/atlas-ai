@@ -145,6 +145,22 @@ function getExperienceFaqAnswer(language) {
     : "You don't need prior experience. Training is provided so you can learn the process.";
 }
 
+/**
+ * BR-099 — sales skill/experience vs aversion.
+ * Never claim "this is not sales" and never guarantee income/success.
+ */
+function getSalesObjectionFaqAnswer(language, kind = "skill") {
+  const aversion = String(kind || "") === "aversion";
+  if (aversion) {
+    return language === "es"
+      ? "Entiendo. En la entrevista te explicamos el proceso con claridad para que puedas decidir con calma."
+      : "I understand. During the interview we'll explain the process clearly so you can decide at your own pace.";
+  }
+  return language === "es"
+    ? "No te preocupes, no necesitas saber vender para empezar. Recibes entrenamiento y aprendes el proceso paso a paso."
+    : "You don't need sales experience to get started. Training is provided so you can learn the process step by step.";
+}
+
 function getLicenseRequirementFaqAnswer(language) {
   // BR-089 — ordinary requirement FAQ stays simple; never volunteer 2-14/2-15.
   return (
@@ -285,6 +301,7 @@ module.exports = {
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getExperienceFaqAnswer,
+  getSalesObjectionFaqAnswer,
   getLicenseRequirementFaqAnswer,
   getLicensePathKnowledge,
   getLicensePathDetailFaqAnswer,

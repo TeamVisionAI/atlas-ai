@@ -34,6 +34,7 @@
 | [24_WORK_AUTH_STATUS_SHORTHAND.md](./24_WORK_AUTH_STATUS_SHORTHAND.md) | BR-096 — pending work-auth status shorthand (`residente` / `ciudadano`) |
 | [25_CONCISE_JOB_FAQ_OVERVIEW.md](./25_CONCISE_JOB_FAQ_OVERVIEW.md) | BR-097 — concise first-level job FAQ + progressive disclosure |
 | [26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md](./26_FAQ_ROUTING_PRIORITY_EXPERIENCE_INSURANCE.md) | BR-098 — experience FAQ + insurance routing priority before location |
+| [27_SALES_OBJECTION_RECOGNITION.md](./27_SALES_OBJECTION_RECOGNITION.md) | BR-099 — sales skill/aversion objection ≠ location correction |
 
 ## Regression fixture
 

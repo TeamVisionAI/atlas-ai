@@ -656,6 +656,27 @@ function decideConversationTurn({
     );
   }
 
+  if (intent === INTENTS.SALES_OBJECTION) {
+    // Implements BR-099 — sales skill/aversion objection before correction/location.
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_SALES_OBJECTION_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.SALES_OBJECTION_RECOGNIZED);
+    structured.reasonCodes.push(REASON_CODES.SALES_OBJECTION_OUTRANKS_CORRECTION);
+    structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_LOCATION);
+    const salesFaq = buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "sales_objection_faq_then_resume"
+    );
+    salesFaq.customerReplyPlan.entities = {
+      ...salesFaq.customerReplyPlan.entities,
+      salesObjectionKind:
+        interpretation.entities?.salesObjectionKind || "skill"
+    };
+    return salesFaq;
+  }
+
   if (intent === INTENTS.LICENSE_PATH_DETAIL_QUESTION) {
     structured.decision.nextAction =
       NEXT_ACTIONS.ANSWER_LICENSE_PATH_DETAIL_THEN_RESUME;
