@@ -1,8 +1,13 @@
 /**
- * Recruit AI v2 — qualification fact separation (BR-083 / BR-089).
+ * Recruit AI v2 — qualification fact separation (BR-083 / BR-089 / BR-090).
  * workAuthorization and financialLicense* are independent facts.
  * BR-089 — license requirement questions ≠ ambiguous license statements.
+ * BR-090 — explicit Puerto Rico origin statements satisfy work authorization.
  */
+
+const {
+  looksLikePuertoRicoOriginStatement
+} = require("./employmentFit");
 
 const WORK_AUTHORIZATION = Object.freeze({
   AUTHORIZED: "authorized",
@@ -241,6 +246,26 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return null;
   }
 
+  // Implements BR-090 — explicit Puerto Rico origin/citizenship is sufficient.
+  if (looksLikePuertoRicoOriginStatement(raw)) {
+    const alreadyAuthorized =
+      context?.knownFacts?.workAuthorizationStatus ===
+        WORK_AUTHORIZATION.AUTHORIZED ||
+      context?.knownFacts?.workAuthorization === true;
+    if (alreadyAuthorized) {
+      return null;
+    }
+    const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+    const locationPending = /^(ask_location|confirm_location|ask_state)$/.test(
+      lastQ
+    );
+    // Do not steal an active location turn unless auth was the pending ask.
+    if (locationPending && !pendingAuth) {
+      return null;
+    }
+    return WORK_AUTHORIZATION.AUTHORIZED;
+  }
+
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);
   const yesShort =
@@ -292,5 +317,6 @@ module.exports = {
   looksLikeAmbiguousLicenseFragment,
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
-  toBooleanWorkAuthorization
+  toBooleanWorkAuthorization,
+  looksLikePuertoRicoOriginStatement
 };

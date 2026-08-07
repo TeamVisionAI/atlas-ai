@@ -43,7 +43,11 @@ function emptyKnownFacts() {
     dateExclusions: [],
     coverage: null,
     fullName: null,
-    name: null
+    name: null,
+    /** BR-090 — fixed | null */
+    employmentPreference: null,
+    /** BR-090 — exploring | not_now | null */
+    currentFit: null
   };
 }
 
@@ -82,7 +86,11 @@ function emptyConversationMeta() {
     unresolvedFields: [],
     confirmationVersion: 0,
     lastConfirmationSentVersion: 0,
-    lastCounterofferTime: null
+    lastCounterofferTime: null,
+    /** BR-090 — fixed-employment preference already acknowledged (no pressure). */
+    fixedEmploymentAcknowledged: false,
+    /** BR-090 — job/opportunity FAQ already answered in this thread. */
+    opportunityExplained: false
   };
 }
 

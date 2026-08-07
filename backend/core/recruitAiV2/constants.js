@@ -8,6 +8,7 @@
  * BR-087 — scheduling memory, meeting logistics, clean withdrawal.
  * BR-088 — intent priority, job/opportunity FAQ, contextual continuation.
  * BR-089 — license requirement question vs ambiguous license statement.
+ * BR-090 — Puerto Rico work-auth normalization + fixed-employment preference.
  */
 
 const STAGES = Object.freeze({
@@ -18,6 +19,8 @@ const STAGES = Object.freeze({
   CONFIRMED: "confirmed",
   RESCHEDULING: "rescheduling",
   WITHDRAWN: "withdrawn",
+  /** BR-090 — clear current non-fit; not opt-out / not withdraw side-effect. */
+  CURRENT_NOT_FIT: "current_not_fit",
   HUMAN_REQUIRED: "human_required"
 });
 
@@ -42,6 +45,10 @@ const INTENTS = Object.freeze({
   LICENSE_REQUIREMENT_QUESTION: "license_requirement_question",
   LICENSE_PATH_DETAIL_QUESTION: "license_path_detail_question",
   COMPENSATION_QUESTION: "compensation_question",
+  /** BR-090 — seeking fixed/salaried/hourly traditional employment. */
+  FIXED_EMPLOYMENT_PREFERENCE: "fixed_employment_preference",
+  /** BR-090 — reinforced current non-fit / not-now after opportunity explained. */
+  CURRENT_NOT_FIT: "current_not_fit",
   CONVERSATION_CLARIFICATION_REQUEST: "conversation_clarification_request",
   ECHO_OR_NOOP: "echo_or_noop",
   PROVIDE_LOCATION: "provide_location",
@@ -78,6 +85,11 @@ const NEXT_ACTIONS = Object.freeze({
   ANSWER_LICENSE_REQUIREMENT_THEN_RESUME: "answer_license_requirement_then_resume",
   ANSWER_LICENSE_PATH_DETAIL_THEN_RESUME: "answer_license_path_detail_then_resume",
   ANSWER_COMPENSATION_FAQ_THEN_RESUME: "answer_compensation_faq_then_resume",
+  /** BR-090 — acknowledge fixed-employment preference without forcing scheduling. */
+  ACKNOWLEDGE_FIXED_EMPLOYMENT_PREFERENCE:
+    "acknowledge_fixed_employment_preference",
+  /** BR-090 — polite terminal closure; no opt-out / handoff / appointment. */
+  ACKNOWLEDGE_CURRENT_NOT_FIT_NO_WRITE: "acknowledge_current_not_fit_no_write",
   EXPLAIN_PENDING_THEN_ASK: "explain_pending_then_ask",
   ACKNOWLEDGE_DAY_PART_ASK_TIME: "acknowledge_day_part_ask_time",
   CONTINUE_AFTER_GREETING: "continue_after_greeting",
@@ -185,7 +197,14 @@ const REASON_CODES = Object.freeze({
   LICENSE_PATH_DETAIL_ANSWERED: "LICENSE_PATH_DETAIL_ANSWERED",
   LICENSE_PATH_DETAIL_NOT_VOLUNTEERED: "LICENSE_PATH_DETAIL_NOT_VOLUNTEERED",
   LICENSE_STATUS_STATEMENT: "LICENSE_STATUS_STATEMENT",
-  LICENSE_AMBIGUITY_RESERVED: "LICENSE_AMBIGUITY_RESERVED"
+  LICENSE_AMBIGUITY_RESERVED: "LICENSE_AMBIGUITY_RESERVED",
+  PUERTO_RICO_WORK_AUTH_NORMALIZED: "PUERTO_RICO_WORK_AUTH_NORMALIZED",
+  FIXED_EMPLOYMENT_PREFERENCE_RECOGNIZED:
+    "FIXED_EMPLOYMENT_PREFERENCE_RECOGNIZED",
+  FIXED_EMPLOYMENT_NO_PRESSURE: "FIXED_EMPLOYMENT_NO_PRESSURE",
+  CURRENT_NOT_FIT_RECOGNIZED: "CURRENT_NOT_FIT_RECOGNIZED",
+  POLITE_CURRENT_NOT_FIT_CLOSURE: "POLITE_CURRENT_NOT_FIT_CLOSURE",
+  EMPLOYMENT_FIT_STATE_SEPARATED: "EMPLOYMENT_FIT_STATE_SEPARATED"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */

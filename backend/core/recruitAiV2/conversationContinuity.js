@@ -51,6 +51,9 @@ function looksLikeJobOpportunityQuestion(text) {
     /\bhow does this work\b/.test(t) ||
     /\bde que se trata\b/.test(t) ||
     /\bde que trata\b/.test(t) ||
+    // Informal abbreviation: "De q trata el trabajo?"
+    /\bde q(ue)? (se )?trata\b/.test(t) ||
+    /\bde q(ue)? trata el (trabajo|empleo)\b/.test(t) ||
     /\b(que es esto|what is the (job|role|position|opportunity))\b/.test(t) ||
     /\btell me more\b/.test(t)
   );

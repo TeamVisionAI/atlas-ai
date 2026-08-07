@@ -1160,6 +1160,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-090 — Recruit AI Puerto Rico Work Authorization and Fixed-Employment Preference
+
+**Implements:** Normalize explicit Puerto Rico origin/citizenship statements as sufficient work-authorization context; keep job FAQ interrupt behavior; recognize fixed-employment preference as distinct from compensation FAQ / withdraw / opt-out; acknowledge without pressure; polite current-not-fit closure on reinforcement  
+**Domain:** Recruit AI / Conversation / Qualification / Fit  
+**Depends on:** BR-083, BR-088, BR-086, BR-085, BR-081, BR-049  
+**Related:** BR-089 (license FAQ), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in code (flags unchanged; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/employmentFit.js`, qualificationFacts, interpreter, decisionEngine, responseRenderer, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2PuertoRicoFixedEmployment.test.js`  
+**Simulator:** `puerto-rico-fixed-employment-real-world`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/20_PUERTO_RICO_FIXED_EMPLOYMENT_PREFERENCE.md`
+
+### Rules
+
+1. **Puerto Rico work-auth** — Explicit origin/citizenship phrases (`Soy de PR`, `Soy de Puerto Rico`, `Nací en Puerto Rico`, `Soy puertorriqueño/a`, EN equivalents) satisfy work authorization for this recruiting flow. Do not re-ask work permit/documentation. Do not treat Puerto Rico as a foreign country. Conservative: only these explicit statements — not generic Caribbean/Latino/geographic phrases.
+2. **Job FAQ interrupt** — After auth resolves, “De q trata el trabajo?” (and BR-088 job/opportunity questions) answer directly and outrank pending workflow questions.
+3. **Fixed-employment preference** — Seeking fixed/salaried/hourly/traditional employment (`Estoy buscando empleo fijo`, `Quiero un sueldo fijo`, `I'm looking for a salaried job`, etc.) is `fixed_employment_preference`. Not opt-out, withdraw, cancel, compensation FAQ, or handoff.
+4. **First response** — Acknowledge accurately: opportunity is not a guaranteed salaried/hourly position; may note some people evaluate it alongside current employment. No argument, no earnings guarantees, no forced scheduling/day-part ask.
+5. **Reinforced non-fit** — After opportunity/preference explained, “Por el momento mi enfoque es encontrar trabajo” (or repeated fixed-employment preference) → `current_fit = not_now`, stop recruiting pressure, polite terminal closure. No morning/afternoon, licensing push, handoff, or communication opt-out unless separately requested.
+6. **State separation** — Keep distinct: fixed-employment preference; withdraw (“No me interesa”); cancel; opt-out (“No me escribas más”); compensation question (“Esto paga salario?”).
+7. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no production opt-out mutation, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-089 — Recruit AI License Requirement Intent Precision
 
 **Implements:** Distinguish license-requirement FAQ questions from license status statements and ambiguous generic license fragments; preserve pending scheduling/day-part when answering requirement FAQs  

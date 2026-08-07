@@ -1752,6 +1752,134 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "puerto-rico-fixed-employment-real-world",
+    name: "Puerto Rico Work Auth + Fixed-Employment Preference",
+    category: "real_world_regression",
+    description:
+      "BR-090 — Kissimmee/PR work-auth, job FAQ interrupt, fixed-employment preference, polite not-now closure",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation"
+    },
+    turns: [
+      {
+        id: "pr01",
+        text: "¡Hola! Quiero más información",
+        inboundMessageId: "sim-wamid.pr-fixed.t01",
+        expect: {
+          intent: "greeting",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "pr02",
+        text: "Kissimmee fl",
+        inboundMessageId: "sim-wamid.pr-fixed.t02",
+        expect: {
+          intent: "provide_location",
+          city: "Kissimmee",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "pr03",
+        text: "Si soy de PR",
+        inboundMessageId: "sim-wamid.pr-fixed.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          meetingType: "zoom",
+          replyIncludes: ["Zoom"],
+          replyExcludes: [
+            "permiso de trabajo",
+            "documentación legal",
+            "país extranjero",
+            "foreign"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "pr04",
+        text: "De q trata el trabajo?",
+        inboundMessageId: "sim-wamid.pr-fixed.t04",
+        expect: {
+          intent: "job_opportunity_question",
+          nextAction: "answer_job_opportunity_then_resume",
+          replyExcludes: [
+            "Esa hora puede no estar disponible",
+            "permiso de trabajo"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "pr05",
+        text: "No es un sueldo fijo",
+        inboundMessageId: "sim-wamid.pr-fixed.t05",
+        expect: {
+          intent: "compensation_question",
+          nextAction: "answer_compensation_faq_then_resume",
+          replyIncludes: ["sueldo"],
+          replyExcludes: ["$", "ganarás", "te garantizamos"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "pr06",
+        text: "Estoy buscando empleo fijo",
+        inboundMessageId: "sim-wamid.pr-fixed.t06",
+        expect: {
+          intent: "fixed_employment_preference",
+          nextAction: "acknowledge_fixed_employment_preference",
+          replyIncludes: ["sueldo fijo"],
+          replyExcludes: [
+            "mañana",
+            "tarde",
+            "te deseo mucho éxito",
+            "no recibir más mensajes",
+            "conectarte con"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "pr07",
+        text: "Por el momento mi enfoque es encontrar trabajo",
+        inboundMessageId: "sim-wamid.pr-fixed.t07",
+        expect: {
+          intent: "current_not_fit",
+          nextAction: "acknowledge_current_not_fit_no_write",
+          stage: "current_not_fit",
+          replyIncludes: ["éxito"],
+          replyExcludes: [
+            "mañana",
+            "tarde",
+            "licencia",
+            "no recibir más mensajes",
+            "conectarte con",
+            "compañero",
+            "¿"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
