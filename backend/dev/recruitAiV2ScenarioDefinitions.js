@@ -890,6 +890,122 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "work-until-5-direct-time-negotiation",
+    name: "Work Until 5 + Direct Time Negotiation",
+    category: "production_defect",
+    description:
+      "Availability constraint after 5 → 6? → 6:30? → Mejor 7 → Actually 6:30 → confirm; no handoff (BR-084).",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "active_conversation",
+      currentStage: "qualification",
+      knownFacts: {
+        city: "Orlando",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        workAuthorization: true,
+        workAuthorizationStatus: "authorized",
+        preferredMeetingType: "zoom",
+        coverage: "OUTSIDE"
+      },
+      appointment: {
+        status: "none",
+        meetingType: "zoom",
+        previouslyOfferedSlots: []
+      },
+      conversation: {
+        lastQuestionAsked: "ask_day_part",
+        lastAtlasOutboundText:
+          "Como estás en Orlando, podemos hacer la entrevista por Zoom. ¿Prefieres en la mañana o en la tarde?"
+      }
+    },
+    turns: [
+      {
+        id: "wt01",
+        text: "Trabajo hasta las 5",
+        inboundMessageId: "sim-wamid.work-until.t01",
+        expect: {
+          intent: "provide_availability_constraint",
+          availabilityConstraintEarliest: "17:00",
+          proposedTime: null,
+          shouldEscalate: false,
+          nextAction: "acknowledge_availability_constraint",
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "wt02",
+        text: "6?",
+        inboundMessageId: "sim-wamid.work-until.t02",
+        expect: {
+          intent: "scheduling_counteroffer",
+          proposedTime: "18:00",
+          shouldEscalate: false,
+          nextAction: "acknowledge_and_check_availability",
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "wt03",
+        text: "6:30?",
+        inboundMessageId: "sim-wamid.work-until.t03",
+        expect: {
+          intent: "scheduling_counteroffer",
+          proposedTime: "18:30",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "wt04",
+        text: "Mejor 7",
+        inboundMessageId: "sim-wamid.work-until.t04",
+        expect: {
+          intent: "scheduling_counteroffer",
+          proposedTime: "19:00",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "wt05",
+        text: "Actually 6:30",
+        inboundMessageId: "sim-wamid.work-until.t05",
+        expect: {
+          intent: "scheduling_counteroffer",
+          proposedTime: "18:30",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "wt06",
+        text: "Sí, 6:30 está bien",
+        inboundMessageId: "sim-wamid.work-until.t06",
+        setup: {
+          appointment: {
+            status: "proposed",
+            proposedTime: "18:30",
+            meetingType: "zoom"
+          },
+          conversation: {
+            lastQuestionAsked: "confirm_slot",
+            lastAtlasOutboundText:
+              "Entendido — prefieres 6:30 PM. Voy a revisar disponibilidad."
+          }
+        },
+        expect: {
+          intent: "schedule_confirm",
+          nextAction: "create_appointment",
+          shouldEscalate: false,
+          authorizationAuthorized: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 

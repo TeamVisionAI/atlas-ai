@@ -75,7 +75,7 @@ test("2. “6?” and “6:30?” counteroffers are parsed with flexibility", ()
   assert.equal(half.interpretation.entities.requestedTime, "18:30");
 });
 
-test("3. repeated counteroffer mismatches escalate instead of repeating the same menu", () => {
+test("3. unavailable counteroffer offers alternatives without human handoff (BR-084)", () => {
   const fx = loadFixture();
   const result = runTurn(fx, "t11", {
     availability: {
@@ -88,17 +88,17 @@ test("3. repeated counteroffer mismatches escalate instead of repeating the same
     }
   });
 
-  assert.equal(result.structuredDecision.decision.shouldEscalate, true);
+  assert.equal(result.structuredDecision.decision.shouldEscalate, false);
   assert.equal(
     result.structuredDecision.decision.nextAction,
-    NEXT_ACTIONS.OFFER_ALTERNATIVES_OR_ESCALATE
+    NEXT_ACTIONS.OFFER_ALTERNATIVES_NO_HANDOFF
   );
   assert.ok(
     result.structuredDecision.reasonCodes.includes(
-      REASON_CODES.ESCALATE_AFTER_REPEATED_MISMATCH
+      REASON_CODES.SLOT_UNAVAILABLE_OFFER_ALTERNATIVES
     )
   );
-  assert.doesNotMatch(result.rendered.text, /5:00 PM and 5:15 PM/);
+  assert.doesNotMatch(result.rendered.text, /teammate will follow up|compañero/i);
 });
 
 test("4. preferred language stays English for TV-000028 pattern", () => {

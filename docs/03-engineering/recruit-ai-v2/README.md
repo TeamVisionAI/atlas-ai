@@ -21,6 +21,7 @@
 | [11_CUSTOM_CONVERSATION_PLAYGROUND.md](./11_CUSTOM_CONVERSATION_PLAYGROUND.md) | Interactive custom conversation playground (ephemeral) |
 | [12_PLAYGROUND_FEEDBACK_FACT_CORRECTION.md](./12_PLAYGROUND_FEEDBACK_FACT_CORRECTION.md) | Fact correction, mid-flow questions, continuity |
 | [13_PLAYGROUND_FEEDBACK_LICENSE_FAQ_MEETING_MODE.md](./13_PLAYGROUND_FEEDBACK_LICENSE_FAQ_MEETING_MODE.md) | BR-083 — work auth vs license, specific FAQs, Zoom modality |
+| [14_PLAYGROUND_FEEDBACK_SCHEDULING_CONSTRAINTS.md](./14_PLAYGROUND_FEEDBACK_SCHEDULING_CONSTRAINTS.md) | BR-084 — availability constraints + direct-time scheduling |
 
 ## Regression fixture
 

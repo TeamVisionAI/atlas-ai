@@ -2,6 +2,7 @@
  * Recruit AI v2 — shared constants.
  * Implements BR-081 (structured context + decision; side effects disabled).
  * BR-082 — conversational clarification and partial-fact resolution.
+ * BR-084 — scheduling constraints and direct-time resolution.
  */
 
 const STAGES = Object.freeze({
@@ -44,10 +45,12 @@ const INTENTS = Object.freeze({
   INCOMPLETE_DAY_PART: "incomplete_day_part",
   AMBIGUOUS_FRAGMENT: "ambiguous_fragment",
   PROVIDE_MEETING_PREFERENCE: "provide_meeting_preference",
+  PROVIDE_AVAILABILITY_CONSTRAINT: "provide_availability_constraint",
   REQUEST_LANGUAGE_SWITCH: "request_language_switch",
   CANCEL_REQUEST: "cancel_request",
   SELECT_OPTION: "select_option",
   SCHEDULING_COUNTEROFFER: "scheduling_counteroffer",
+  CLARIFY_AM_PM: "clarify_am_pm",
   SCHEDULE_CONFIRM: "schedule_confirm",
   RESCHEDULE_REQUEST: "reschedule_request",
   UNKNOWN: "unknown"
@@ -71,7 +74,10 @@ const NEXT_ACTIONS = Object.freeze({
   SWITCH_LANGUAGE_CONTINUE: "switch_language_continue",
   ACKNOWLEDGE_CANCEL_NO_WRITE: "acknowledge_cancel_no_write",
   ACKNOWLEDGE_AND_CHECK_AVAILABILITY: "acknowledge_and_check_availability",
+  ACKNOWLEDGE_AVAILABILITY_CONSTRAINT: "acknowledge_availability_constraint",
   OFFER_ALTERNATIVES_OR_ESCALATE: "offer_alternatives_or_escalate",
+  OFFER_ALTERNATIVES_NO_HANDOFF: "offer_alternatives_no_handoff",
+  CLARIFY_AM_PM: "clarify_am_pm",
   ASK_EXPLICIT_CONFIRMATION: "ask_explicit_confirmation",
   CREATE_APPOINTMENT: "create_appointment",
   OFFER_RESCHEDULE_FLOW: "offer_reschedule_flow",
@@ -112,7 +118,13 @@ const REASON_CODES = Object.freeze({
   SPECIFIC_FAQ_ANSWERED: "SPECIFIC_FAQ_ANSWERED",
   OUTSIDE_COVERAGE_ZOOM_DEFAULT: "OUTSIDE_COVERAGE_ZOOM_DEFAULT",
   LOCAL_COVERAGE_OFFICE_DEFAULT: "LOCAL_COVERAGE_OFFICE_DEFAULT",
-  NO_INCOME_GUARANTEE: "NO_INCOME_GUARANTEE"
+  NO_INCOME_GUARANTEE: "NO_INCOME_GUARANTEE",
+  AVAILABILITY_CONSTRAINT_CAPTURED: "AVAILABILITY_CONSTRAINT_CAPTURED",
+  DIRECT_TIME_OVERRIDES_DAY_PART: "DIRECT_TIME_OVERRIDES_DAY_PART",
+  CANDIDATE_TIME_REPLACED: "CANDIDATE_TIME_REPLACED",
+  AMPM_CLARIFICATION_REQUIRED: "AMPM_CLARIFICATION_REQUIRED",
+  SLOT_UNAVAILABLE_OFFER_ALTERNATIVES: "SLOT_UNAVAILABLE_OFFER_ALTERNATIVES",
+  SCHEDULING_HANDOFF_GUARD: "SCHEDULING_HANDOFF_GUARD"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */

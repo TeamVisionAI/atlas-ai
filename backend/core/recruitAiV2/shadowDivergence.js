@@ -166,15 +166,31 @@ function resolveAppointmentStateAgreement({
   liveAppointmentStatus = null,
   v2AppointmentStatus = null
 } = {}) {
-  if (!liveAppointmentStatus && !v2AppointmentStatus) {
+  const normalize = (status) => {
+    const v = String(status || "")
+      .trim()
+      .toLowerCase();
+    if (!v || v === "none") {
+      return null;
+    }
+    return v;
+  };
+
+  const live = normalize(liveAppointmentStatus);
+  const v2 = normalize(v2AppointmentStatus);
+
+  if (!live && !v2) {
     return true;
   }
-  if (!liveAppointmentStatus || !v2AppointmentStatus) {
-    return liveAppointmentStatus == null || v2AppointmentStatus == null
-      ? true
-      : false;
+  // BR-084 — advancing none → proposed for a candidate time is expected during
+  // scheduling negotiation and is not a hard appointment-state mismatch.
+  if (!live && v2 === "proposed") {
+    return true;
   }
-  return String(liveAppointmentStatus) === String(v2AppointmentStatus);
+  if (!live || !v2) {
+    return live == null || v2 == null;
+  }
+  return live === v2;
 }
 
 function classifyDivergence({

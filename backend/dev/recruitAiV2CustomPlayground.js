@@ -164,6 +164,9 @@ function sanitizeContextSnapshot(context = {}, contextVersion = 1) {
         ? context.knownFacts.financialLicenseTypes
         : [],
       preferredMeetingType: context.knownFacts?.preferredMeetingType || null,
+      preferredDayPart: context.knownFacts?.preferredDayPart || null,
+      availabilityConstraint:
+        context.knownFacts?.availabilityConstraint || null,
       coverage: context.knownFacts?.coverage || null
     },
     lastQuestion: context.conversation?.lastQuestionAsked || null,
