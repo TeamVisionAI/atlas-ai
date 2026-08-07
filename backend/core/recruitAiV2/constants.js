@@ -50,6 +50,10 @@ const INTENTS = Object.freeze({
   EXPERIENCE_QUESTION: "experience_question",
   /** BR-099 — sales skill / experience / aversion objection. */
   SALES_OBJECTION: "sales_objection",
+  /** BR-103 — network / prospecting objection (no contacts / who to call). */
+  NETWORK_OBJECTION: "network_objection",
+  /** BR-103 — soft acknowledgement while availability is still pending. */
+  SOFT_ACKNOWLEDGEMENT: "soft_acknowledgement",
   /** BR-090 — seeking fixed/salaried/hourly traditional employment. */
   FIXED_EMPLOYMENT_PREFERENCE: "fixed_employment_preference",
   /** BR-090 — reinforced current non-fit / not-now after opportunity explained. */
@@ -92,6 +96,8 @@ const NEXT_ACTIONS = Object.freeze({
   ANSWER_COMPENSATION_FAQ_THEN_RESUME: "answer_compensation_faq_then_resume",
   ANSWER_EXPERIENCE_FAQ_THEN_RESUME: "answer_experience_faq_then_resume",
   ANSWER_SALES_OBJECTION_THEN_RESUME: "answer_sales_objection_then_resume",
+  ANSWER_NETWORK_OBJECTION_THEN_RESUME: "answer_network_objection_then_resume",
+  ACKNOWLEDGE_SOFT_CONTINUE: "acknowledge_soft_continue",
   /** BR-090 — acknowledge fixed-employment preference without forcing scheduling. */
   ACKNOWLEDGE_FIXED_EMPLOYMENT_PREFERENCE:
     "acknowledge_fixed_employment_preference",
@@ -203,6 +209,10 @@ const REASON_CODES = Object.freeze({
   INSURANCE_FAQ_ROUTED: "INSURANCE_FAQ_ROUTED",
   SALES_OBJECTION_RECOGNIZED: "SALES_OBJECTION_RECOGNIZED",
   SALES_OBJECTION_OUTRANKS_CORRECTION: "SALES_OBJECTION_OUTRANKS_CORRECTION",
+  NETWORK_OBJECTION_RECOGNIZED: "NETWORK_OBJECTION_RECOGNIZED",
+  SOFT_ACKNOWLEDGEMENT_ONLY: "SOFT_ACKNOWLEDGEMENT_ONLY",
+  CONFIRMATION_REQUIRES_CONCRETE_SLOT: "CONFIRMATION_REQUIRES_CONCRETE_SLOT",
+  PREMATURE_SCHEDULE_CONFIRM_BLOCKED: "PREMATURE_SCHEDULE_CONFIRM_BLOCKED",
   MANANA_DAY_PART_CONTEXT: "MANANA_DAY_PART_CONTEXT",
   MANANA_DATE_CONTEXT: "MANANA_DATE_CONTEXT",
   DAY_PART_CONTEXT_PRIORITY: "DAY_PART_CONTEXT_PRIORITY",

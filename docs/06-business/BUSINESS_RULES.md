@@ -1160,6 +1160,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-103 — Recruit AI Acknowledgement Semantics + Network Objection
+
+**Implements:** Soft acknowledgements (`ok` / `perfecto` / …) after preference capture or “I’ll review availability” are not appointment confirmations; `schedule_confirm` requires a concrete confirmable slot. Network/prospecting objections (`no conozco a nadie`, …) are answered briefly without lead/client guarantees and resume scheduling without generic fallback.  
+**Domain:** Recruit AI / Scheduling lifecycle + Objection handling  
+**Depends on:** BR-081, BR-084, BR-085, BR-087, BR-088, BR-095, BR-099, BR-102  
+**Related:** BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/schedulingConfirmation.js`, `networkObjection.js`, interpreter, decisionEngine, responseRenderer  
+**Tests:** `backend/test/recruitAiV2AckNetworkObjectionBr103.test.js`  
+**Simulator:** `acknowledgement-not-confirmation-network-objection`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/31_ACK_VS_CONFIRM_NETWORK_OBJECTION.md`
+
+### Rules
+
+1. **Acknowledgement ≠ confirmation** — Short acks (`ok`, `okay`, `dale`, `perfecto`, `está bien`, `gracias`, `sounds good`, `got it`, `thanks`) follow the immediately preceding Atlas action. They do not invent appointments or handoffs.
+2. **Confirmation object required** — `schedule_confirm` only when a concrete candidate was presented for acceptance (confirm ask / date+time / offered slot). “Voy a revisar disponibilidad…” is not confirmable.
+3. **Availability-pending state** — After preference capture without presented options, use `awaiting_availability`; soft acks stay non-terminal.
+4. **Network objection** — Map contact/network phrases to `network_objection`; concise truthful reassurance; no lead/client/success promises.
+5. **Interrupt + preserve** — Network objections during scheduling answer then preserve modality, day-part, preferred time; do not re-ask location/auth/day-part/time.
+6. **Opposite case** — Concrete “¿Te funciona?” + `ok`/`si` may confirm per BR-084/085.
+7. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-102 — Recruit AI Partial-State Location + After-Time Scheduling
 
 **Implements:** State-only answers (`Florida` / `Texas` / …) while city+state is pending are retained as partial state with an ask-city follow-up; city then completes with the retained state. Natural after-5 phrases (`despues de la 5`, `a partir de las 5`, `after 5`, …) under `ask_time` resolve as PM availability constraints (BR-084), not generic clarification.  

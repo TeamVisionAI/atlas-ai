@@ -22,6 +22,11 @@ const {
   looksLikeSalesObjection,
   classifySalesObjectionKind
 } = require("./salesObjection");
+const { looksLikeNetworkObjection } = require("./networkObjection");
+const {
+  isSoftAcknowledgement,
+  hasConfirmableAppointmentProposal
+} = require("./schedulingConfirmation");
 const {
   looksLikePuertoRicoOriginStatement,
   looksLikeFixedEmploymentPreference,
@@ -883,6 +888,13 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.salesObjectionKind =
       classifySalesObjectionKind(text) ||
       classifySalesObjectionKind(originalText);
+  } else if (
+    looksLikeNetworkObjection(text) ||
+    looksLikeNetworkObjection(originalText)
+  ) {
+    // Implements BR-103 — network/prospecting objection before clarify/confirm.
+    intent = INTENTS.NETWORK_OBJECTION;
+    confidence = 0.94;
   } else if (looksLikeExperienceQuestion(text) || looksLikeExperienceQuestion(originalText)) {
     // Implements BR-098 — experience FAQ before location/name/fragment handling.
     intent = INTENTS.EXPERIENCE_QUESTION;
@@ -1054,10 +1066,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.dayPart = dayPartParse.dayPart;
     entities.completeness = "complete";
   } else if (
-    (appointmentStatus === APPOINTMENT_STATUS.PROPOSED ||
-      context?.conversation?.lastQuestionAsked === "confirm_slot" ||
-      Boolean(context?.appointment?.proposedTime)) &&
+    // Implements BR-103 — only confirm when a concrete slot was presented.
+    hasConfirmableAppointmentProposal(context) &&
     (isAffirmative(text) ||
+      isSoftAcknowledgement(text) ||
       /\b(est[aá] bien|sounds good|that works|perfecto|de acuerdo)\b/i.test(text))
   ) {
     intent = INTENTS.SCHEDULE_CONFIRM;
@@ -1065,6 +1077,21 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     if (hasTimeEntity) {
       entities.requestedTime = requestedTime;
     }
+  } else if (
+    // Preference captured / availability pending — "ok" / "está bien" is soft ack only.
+    isSoftAcknowledgement(text) ||
+    (isAffirmative(text) &&
+      (appointmentStatus === APPOINTMENT_STATUS.PROPOSED ||
+        Boolean(context?.appointment?.proposedTime) ||
+        context?.conversation?.lastQuestionAsked === "awaiting_availability" ||
+        context?.conversation?.lastQuestionAsked === "confirm_slot")) ||
+    ((!hasConfirmableAppointmentProposal(context) &&
+      (context?.conversation?.lastQuestionAsked === "awaiting_availability" ||
+        Boolean(context?.appointment?.proposedTime)) &&
+      /\b(est[aá] bien|sounds good|that works|de acuerdo|perfecto)\b/i.test(text)))
+  ) {
+    intent = INTENTS.SOFT_ACKNOWLEDGEMENT;
+    confidence = 0.88;
   } else if (
     isAffirmative(text) &&
     (context?.conversation?.lastQuestionAsked === "confirm_location" ||
@@ -1174,9 +1201,12 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       confidence = 0.78;
       // Preserve original casing for names (BR-095 — do not store comparison form).
       entities.name = originalText;
-    } else if (isAffirmative(text)) {
-      intent = INTENTS.SCHEDULE_CONFIRM;
-      confidence = 0.55;
+    } else if (isSoftAcknowledgement(text) || isAffirmative(text)) {
+      // Implements BR-103 — bare affirmations are never auto-confirm without a slot.
+      intent = hasConfirmableAppointmentProposal(context)
+        ? INTENTS.SCHEDULE_CONFIRM
+        : INTENTS.SOFT_ACKNOWLEDGEMENT;
+      confidence = hasConfirmableAppointmentProposal(context) ? 0.7 : 0.55;
     }
   }
 
@@ -1242,6 +1272,9 @@ module.exports = {
   looksLikeCommunicationOptOut,
   looksLikeDirectLackOfInterest,
   isAffirmative,
+  isSoftAcknowledgement,
+  hasConfirmableAppointmentProposal,
+  looksLikeNetworkObjection,
   isOptionSelection,
   isEchoOfLastQuestion,
   isGreeting,

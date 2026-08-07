@@ -197,6 +197,16 @@ function resolvePendingExplanation(context = {}, language = "spanish") {
     };
   }
 
+  if (lastQ === "awaiting_availability" && hasTime) {
+    return {
+      templateKey: "acknowledge_preference_awaiting_availability",
+      lastQuestionAsked: "awaiting_availability",
+      entities: {
+        requestedTime: context.appointment.proposedTime
+      }
+    };
+  }
+
   if (lastQ === "confirm_slot" && hasTime) {
     return {
       templateKey: "explain_pending_confirm_slot",
