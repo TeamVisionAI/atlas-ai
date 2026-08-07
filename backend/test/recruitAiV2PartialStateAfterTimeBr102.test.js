@@ -295,6 +295,19 @@ test("acknowledgement collapse unit: Perfecto, gracias. Excelente.", () => {
     ),
     "Perfecto. Estamos realizando las entrevistas por Zoom."
   );
+  // Must not mangle Zoom / host dots (BR-076 URL proposals).
+  assert.equal(
+    collapseRedundantAcknowledgements(
+      "Claro. Aquí está tu enlace de Zoom: https://zoom.us/j/1234567890"
+    ),
+    "Claro. Aquí está tu enlace de Zoom: https://zoom.us/j/1234567890"
+  );
+  assert.equal(
+    collapseRedundantAcknowledgements(
+      "Perfecto, gracias. Excelente. Join https://zoom.us/j/1234567890"
+    ),
+    "Perfecto. Join https://zoom.us/j/1234567890"
+  );
 });
 
 test("work-auth confirmation → no stacked acknowledgements", () => {

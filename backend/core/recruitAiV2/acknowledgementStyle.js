@@ -1,6 +1,7 @@
 /**
  * Recruit AI v2 — conversation-quality acknowledgement stacking guard (BR-102).
  * Suppress consecutive equivalent affirmations; keep one natural acknowledgement.
+ * Must not split or mutate URLs (e.g. https://zoom.us/j/…).
  */
 
 function normalizeAscii(text) {
@@ -57,13 +58,34 @@ function simplifyAcknowledgementSentence(sentence) {
       continue;
     }
     if (new RegExp(`\\b${token}\\b`).test(t)) {
-      const pretty =
-        token.charAt(0).toUpperCase() + token.slice(1);
+      const pretty = token.charAt(0).toUpperCase() + token.slice(1);
       return `${pretty}.`;
     }
   }
   const trimmed = String(sentence || "").trim();
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/**
+ * Protect URLs so sentence splitting does not break on dots inside hosts/paths.
+ */
+function protectUrls(text) {
+  const urls = [];
+  const protectedText = String(text || "").replace(
+    /https?:\/\/[^\s<>"']+/gi,
+    (url) => {
+      const token = `__URL_${urls.length}__`;
+      urls.push(url);
+      return token;
+    }
+  );
+  return { protectedText, urls };
+}
+
+function restoreUrls(text, urls) {
+  return String(text || "").replace(/__URL_(\d+)__/g, (_, idx) => {
+    return urls[Number(idx)] || "";
+  });
 }
 
 function splitSentences(text) {
@@ -72,7 +94,9 @@ function splitSentences(text) {
     return [];
   }
   const parts = [];
-  const re = /[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g;
+  // Split only on sentence punctuation followed by whitespace (or end).
+  // Avoid consuming host dots inside protected URL tokens.
+  const re = /[^.!?]+(?:[.!?]+(?=\s|$)|$)/g;
   let match;
   while ((match = re.exec(raw)) !== null) {
     const piece = match[0].trim();
@@ -93,10 +117,11 @@ function collapseRedundantAcknowledgements(text) {
     return value;
   }
 
-  const sentences = splitSentences(value);
+  const { protectedText, urls } = protectUrls(value);
+  const sentences = splitSentences(protectedText);
   if (sentences.length <= 1) {
     if (sentences.length === 1 && isAcknowledgementOnlySentence(sentences[0])) {
-      return simplifyAcknowledgementSentence(sentences[0]);
+      return restoreUrls(simplifyAcknowledgementSentence(sentences[0]), urls);
     }
     return value;
   }
@@ -115,7 +140,7 @@ function collapseRedundantAcknowledgements(text) {
     out.push(sentence.replace(/^\s+/, "").replace(/\s+$/, ""));
   }
 
-  return out.join(" ").replace(/\s+/g, " ").trim();
+  return restoreUrls(out.join(" ").replace(/\s+/g, " ").trim(), urls);
 }
 
 module.exports = {
