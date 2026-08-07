@@ -31,8 +31,13 @@ const {
   parseLocationAnswer,
   normalizeStateToken,
   looksLikeLocationCorrection,
-  proposeStateFromCity
+  proposeStateFromCity,
+  isCompleteCityStatePhrase
 } = require("./locationFacts");
+const {
+  normalizeInboundText,
+  normalizeIntentText
+} = require("./inputNormalization");
 const {
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
@@ -254,17 +259,6 @@ function looksLikeInPersonPreference(text) {
   return /\b(in[- ]?person|office|oficina|presencial|en persona)\b/i.test(
     String(text || "")
   );
-}
-
-function normalizeIntentText(text) {
-  return String(text || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[?!¡¿.]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 /**
@@ -562,6 +556,19 @@ function looksLikeAmbiguousFragment(text) {
   if (isTimeLikeToken(trimmed)) {
     return false;
   }
+  // BR-094/095 — parseable locations (incl. corrections like "no, doral") are not fragments.
+  if (isCompleteCityStatePhrase(trimmed) || looksLikeLocationCorrection(trimmed)) {
+    return false;
+  }
+  const loc = parseLocationAnswer(trimmed);
+  if (
+    loc &&
+    (loc.completeness === "complete" ||
+      loc.completeness === "partial" ||
+      loc.completeness === "state_only")
+  ) {
+    return false;
+  }
   if (trimmed.length <= 2) {
     return true;
   }
@@ -622,7 +629,10 @@ function looksLikeName(text) {
  * Interpret one inbound message against canonical context.
  */
 function interpretInboundMessage({ message, context, options = {} } = {}) {
-  const text = String(message?.text || message || "").trim();
+  // BR-095 — raw preserved for audit; comparisonText used for deterministic matching.
+  const inbound = normalizeInboundText(message?.text ?? message ?? "");
+  const originalText = inbound.trimmedText;
+  const text = inbound.comparisonText;
   const flexible =
     options.flexible !== undefined
       ? Boolean(options.flexible)
@@ -687,7 +697,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     now: options.now || context?._testNow || undefined
   });
 
-  const messageLanguage = detectMessageLanguageHint(text);
+  const messageLanguage = detectMessageLanguageHint(originalText || text);
 
   let intent = INTENTS.UNKNOWN;
   let confidence = 0.4;
@@ -697,8 +707,11 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     resolvedDate: resolvedDate || null,
     dateExclusions: resolvedExclusions,
     appointmentType: null,
-    optionIndex: isOptionSelection(text) ? Number(text.trim()) : null,
-    rawText: text,
+    optionIndex: isOptionSelection(originalText) ? Number(originalText.trim()) : null,
+    rawText: inbound.rawText || originalText,
+    normalizedText: inbound.normalizedText,
+    accentFoldedText: inbound.accentFoldedText,
+    comparisonText: inbound.comparisonText,
     city: null,
     state: null,
     proposedState: null,
@@ -974,8 +987,13 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (isOptionSelection(text)) {
     intent = INTENTS.SELECT_OPTION;
     confidence = 0.86;
-  } else if (looksLikeAmbiguousFragment(text) && !normalizeStateToken(text)) {
+  } else if (
+    looksLikeAmbiguousFragment(text) &&
+    !normalizeStateToken(text) &&
+    !isCompleteCityStatePhrase(text)
+  ) {
     // Fragments must not become names or city-only locations (BR-082).
+    // BR-094 — do not treat "miami fl" / "Miami, FL" as ambiguous_fragment.
     intent = dayPartCtx ? INTENTS.INCOMPLETE_DAY_PART : INTENTS.AMBIGUOUS_FRAGMENT;
     confidence = 0.75;
     entities.requiresClarification = true;
@@ -1040,7 +1058,8 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     ) {
       intent = INTENTS.PROVIDE_NAME;
       confidence = 0.78;
-      entities.name = text;
+      // Preserve original casing for names (BR-095 — do not store comparison form).
+      entities.name = originalText;
     } else if (isAffirmative(text)) {
       intent = INTENTS.SCHEDULE_CONFIRM;
       confidence = 0.55;
@@ -1070,7 +1089,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     context,
     messageLanguage,
     intent,
-    text,
+    text: originalText || text,
     explicitPreference: explicitFromTurn
   });
 
@@ -1085,12 +1104,20 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     languageReason: languageResolution.reason,
     flexibleParsing: flexible,
     scheduleParse: schedule || null,
-    requiresClarification: Boolean(entities.requiresClarification)
+    requiresClarification: Boolean(entities.requiresClarification),
+    normalization: {
+      rawText: inbound.rawText,
+      trimmedText: inbound.trimmedText,
+      comparisonText: inbound.comparisonText,
+      tokenCount: inbound.tokens.length
+    }
   };
 }
 
 module.exports = {
   interpretInboundMessage,
+  normalizeInboundText,
+  normalizeIntentText,
   detectMessageLanguageHint,
   formatTimeEntity,
   classifyCancellationIntent,

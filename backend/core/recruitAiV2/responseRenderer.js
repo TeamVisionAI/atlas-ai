@@ -282,7 +282,20 @@ const STATE_DISPLAY = Object.freeze({
   GA: { en: "Georgia", es: "Georgia" },
   AZ: { en: "Arizona", es: "Arizona" },
   NC: { en: "North Carolina", es: "Carolina del Norte" },
-  IL: { en: "Illinois", es: "Illinois" }
+  IL: { en: "Illinois", es: "Illinois" },
+  NJ: { en: "New Jersey", es: "Nueva Jersey" },
+  PA: { en: "Pennsylvania", es: "Pensilvania" },
+  OH: { en: "Ohio", es: "Ohio" },
+  MI: { en: "Michigan", es: "Míchigan" },
+  VA: { en: "Virginia", es: "Virginia" },
+  WA: { en: "Washington", es: "Washington" },
+  MA: { en: "Massachusetts", es: "Massachusetts" },
+  CO: { en: "Colorado", es: "Colorado" },
+  NV: { en: "Nevada", es: "Nevada" },
+  OR: { en: "Oregon", es: "Oregón" },
+  SC: { en: "South Carolina", es: "Carolina del Sur" },
+  TN: { en: "Tennessee", es: "Tennessee" },
+  DC: { en: "District of Columbia", es: "Distrito de Columbia" }
 });
 
 function formatRequestedTime(hhmm, language) {
