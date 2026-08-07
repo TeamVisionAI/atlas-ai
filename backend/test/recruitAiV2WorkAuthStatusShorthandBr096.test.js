@@ -88,7 +88,14 @@ const SHORTHANDS = [
   "nací en USA",
   "born here",
   "I was born here",
-  "I was born in the US"
+  "I was born in the US",
+  "I was born in the USA",
+  "resident",
+  "permanent resident",
+  "citizen",
+  "US citizen",
+  "I'm a resident",
+  "I'm a citizen"
 ];
 
 for (const text of SHORTHANDS) {
@@ -148,6 +155,94 @@ test("license-only still does not satisfy work auth", () => {
     }),
     null
   );
+});
+
+test("negative status remains not authorized", () => {
+  const pending = { conversation: { lastQuestionAsked: "ask_authorization" } };
+  for (const text of [
+    "no tengo permiso",
+    "no tengo papeles",
+    "todavía no tengo permiso",
+    "estoy esperando el permiso",
+    "I don't have a work permit",
+    "I'm not authorized to work yet"
+  ]) {
+    assert.equal(
+      parseWorkAuthorizationAnswer(text, pending),
+      WORK_AUTHORIZATION.NOT_AUTHORIZED,
+      text
+    );
+    const r = turn(text, authPendingContext());
+    assert.equal(r.nextContext.knownFacts.workAuthorization, false);
+  }
+});
+
+test("ambiguous visa does not satisfy work authorization", () => {
+  assert.equal(
+    parseWorkAuthorizationAnswer("tengo visa", {
+      conversation: { lastQuestionAsked: "ask_authorization" }
+    }),
+    null
+  );
+  const r = turn("tengo visa", authPendingContext());
+  assert.notEqual(r.nextContext.knownFacts.workAuthorization, true);
+});
+
+test("regression conversation: miami fl then soy residente / naci aqui", () => {
+  let ctx = createConversationContext({
+    preferredLanguage: "spanish",
+    languageMeta: { source: "active_conversation" },
+    currentStage: "qualification",
+    _testNow: FIXED_NOW,
+    conversation: {
+      lastQuestionAsked: "ask_location",
+      lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+    }
+  });
+  let r = turn("miami fl", ctx);
+  assert.equal(r.nextContext.knownFacts.city, "Miami");
+  assert.equal(r.nextContext.knownFacts.state, "FL");
+  ctx = r.nextContext;
+  ctx.conversation.lastQuestionAsked = "ask_authorization";
+  ctx.conversation.lastAtlasOutboundText =
+    "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?";
+  r = turn("soy residente", ctx);
+  assert.equal(r.interpretation.intent, "provide_authorization");
+  assert.equal(r.nextContext.knownFacts.workAuthorization, true);
+  assert.doesNotMatch(r.rendered.text, /estado est[aá] Soy Residente|ciudad y estado/i);
+
+  ctx = createConversationContext({
+    preferredLanguage: "spanish",
+    languageMeta: { source: "active_conversation" },
+    currentStage: "qualification",
+    _testNow: FIXED_NOW,
+    knownFacts: {
+      city: "Miami",
+      state: "FL",
+      cityCertainty: "confirmed",
+      stateCertainty: "confirmed"
+    },
+    conversation: {
+      lastQuestionAsked: "ask_authorization",
+      lastAtlasOutboundText:
+        "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+    }
+  });
+  r = turn("naci aqui", ctx);
+  assert.equal(r.nextContext.knownFacts.workAuthorization, true);
+  assert.notEqual(r.interpretation.intent, "provide_location");
+});
+
+test("Puerto Rico origin still satisfies on pending auth", () => {
+  for (const text of ["soy de PR", "soy de Puerto Rico"]) {
+    assert.equal(
+      parseWorkAuthorizationAnswer(text, {
+        conversation: { lastQuestionAsked: "ask_authorization" }
+      }),
+      WORK_AUTHORIZATION.AUTHORIZED,
+      text
+    );
+  }
 });
 
 test("side effects denied; posture defaults fail-closed", () => {

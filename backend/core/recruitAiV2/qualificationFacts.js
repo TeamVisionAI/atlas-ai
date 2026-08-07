@@ -267,14 +267,31 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
+  // Negatives first while auth is pending — "estoy esperando el permiso" must not
+  // match the generic permiso affirmative path.
+  const noAuth =
+    pendingAuth &&
+    (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
+      /\b(no tengo (permiso|papeles)|todavia no tengo permiso|estoy esperando( el)? permiso|sin permiso|sin papeles)\b/.test(
+        t
+      ) ||
+      /\b(i don'?t have (a )?work permit|i am not authorized to work( yet)?|i'?m not authorized to work( yet)?|not authorized( to work)?( yet)?)\b/.test(
+        t
+      ));
+  if (noAuth) {
+    return WORK_AUTHORIZATION.NOT_AUTHORIZED;
+  }
+
   // Implements BR-096 — status / birthplace shorthand while ask_authorization is pending.
-  // Bare "residente" / "ciudadano" is enough; optional "soy …" also accepted.
+  // Bare "residente" / "ciudadano" / "resident" / "citizen" is enough; optional soy/I'm also accepted.
   const pendingStatusShorthand =
     pendingAuth &&
     !mentionsLicense(raw) &&
-    /^(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$/.test(
+    (/^(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$/.test(
       t
-    );
+    ) ||
+      /^(i'?m a |i am a )?(permanent )?resident([.!]?)?$/.test(t) ||
+      /^(i'?m a |i am a )?(us |u\.s\.? |american )?citizen([.!]?)?$/.test(t));
 
   // Birthplace affirmatives (EN/ES) — not a location correction when auth is pending.
   const pendingBornHereAffirmative =
@@ -298,7 +315,7 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
         mentionsWorkAuthorization(raw)));
   const patternYes =
     mentionsWorkAuthorization(raw) &&
-    !/\b(no|not|sin)\b/.test(t) &&
+    !/\b(no|not|sin|esperando|todavia)\b/.test(t) &&
     !mentionsLicense(raw);
 
   if (
@@ -311,13 +328,8 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
-  const noAuth =
-    pendingAuth &&
-    (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
-      /\b(no tengo permiso|not authorized|sin permiso|sin papeles)\b/.test(t));
-  if (noAuth) {
-    return WORK_AUTHORIZATION.NOT_AUTHORIZED;
-  }
+  // "tengo visa" / bare visa mentions intentionally fall through (null) so existing
+  // clarification behavior can run — never auto-satisfy work authorization.
 
   return null;
 }
