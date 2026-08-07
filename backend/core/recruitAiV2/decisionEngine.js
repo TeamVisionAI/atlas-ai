@@ -1,8 +1,10 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085.
  */
+
+const { formatDateLabel } = require("./dateResolution");
 
 const {
   INTENTS,
@@ -166,9 +168,10 @@ function resolveQualificationResume(context) {
 }
 
 /**
- * Re-evaluate coverage → meeting modality (BR-083 / location transition fix).
+ * Re-evaluate coverage → meeting modality (BR-083 / BR-085).
  * OUTSIDE defaults to Zoom and clears stale office/in_person coverage defaults.
- * Prospect-explicit Zoom is preserved; prospect in_person on OUTSIDE still defaults Zoom.
+ * Prospect Zoom is preserved. Confirmed OUTSIDE in-person (travel OK) is honored.
+ * Unconfirmed / coverage-default in_person on OUTSIDE still defaults Zoom.
  */
 function resolveMeetingModalityForLocation(facts = {}) {
   const coverage = evaluateCoverage({
@@ -178,19 +181,39 @@ function resolveMeetingModalityForLocation(facts = {}) {
   const outside = coverage.coverage === "OUTSIDE";
   const source = facts.meetingPreferenceSource || null;
   const prior = facts.preferredMeetingType || null;
+  const prospectZoom =
+    prior === "zoom" && (source === "prospect" || source === "prospect_confirmed");
 
   if (outside) {
+    if (source === "prospect_confirmed" && prior === "in_person") {
+      return {
+        coverage: "OUTSIDE",
+        meetingType: "in_person",
+        meetingPreferenceSource: "prospect_confirmed",
+        clearedStaleOffice: false
+      };
+    }
+    if (prospectZoom) {
+      return {
+        coverage: "OUTSIDE",
+        meetingType: "zoom",
+        meetingPreferenceSource: "prospect",
+        clearedStaleOffice: true
+      };
+    }
     return {
       coverage: "OUTSIDE",
       meetingType: "zoom",
-      meetingPreferenceSource:
-        source === "prospect" && prior === "zoom" ? "prospect" : "coverage_default",
-      clearedStaleOffice: prior === "in_person" || facts.coverage === "LOCAL"
+      meetingPreferenceSource: "coverage_default",
+      clearedStaleOffice:
+        prior === "in_person" ||
+        source === "prospect_requested" ||
+        facts.coverage === "LOCAL"
     };
   }
 
   if (coverage.coverage === "LOCAL") {
-    if (source === "prospect" && prior === "zoom") {
+    if (prospectZoom) {
       return {
         coverage: "LOCAL",
         meetingType: "zoom",
@@ -200,8 +223,11 @@ function resolveMeetingModalityForLocation(facts = {}) {
     }
     return {
       coverage: "LOCAL",
-      meetingType: prior === "zoom" && source === "prospect" ? "zoom" : "in_person",
-      meetingPreferenceSource: source === "prospect" ? "prospect" : "coverage_default",
+      meetingType: "in_person",
+      meetingPreferenceSource:
+        source === "prospect" || source === "prospect_confirmed"
+          ? source
+          : "coverage_default",
       clearedStaleOffice: false
     };
   }
@@ -803,7 +829,54 @@ function decideConversationTurn({
     const workAuthResolved =
       workAuth === "authorized" || workAuth === "not_authorized";
     const resume = resolvePendingResume(context);
-    // Capture Zoom/in-person preference, but do not skip unresolved work auth.
+    const coverageFact = String(context.knownFacts?.coverage || "").toUpperCase();
+    const hasLocation = Boolean(
+      context.knownFacts?.city && context.knownFacts?.state
+    );
+    const coverageEval = hasLocation
+      ? evaluateCoverage({
+          city: context.knownFacts.city,
+          state: context.knownFacts.state
+        })
+      : null;
+    // Only require travel confirm when coverage is known OUTSIDE (not unknown location).
+    const outsideCoverage =
+      coverageFact === "OUTSIDE" ||
+      (hasLocation && coverageEval?.coverage === "OUTSIDE");
+
+    // BR-085 — OUTSIDE/remote prospect requesting in-person must confirm Doral travel.
+    if (meetingType === "in_person" && outsideCoverage) {
+      structured.decision.nextAction = NEXT_ACTIONS.CONFIRM_IN_PERSON_TRAVEL;
+      structured.decision.mayCreateAppointment = false;
+      structured.customerReplyPlan.acknowledgeRequest = true;
+      structured.customerReplyPlan.templateKey = "confirm_in_person_travel_doral";
+      structured.reasonCodes.push(
+        REASON_CODES.IN_PERSON_TRAVEL_CONFIRMATION_REQUIRED
+      );
+      structured.contextPatch = {
+        knownFacts: {
+          meetingTypeRequested: "in_person",
+          meetingTypeConfirmed: false,
+          // Keep active Zoom/OUTSIDE modality until travel confirmed.
+          preferredMeetingType: context.knownFacts?.preferredMeetingType || "zoom",
+          meetingPreferenceSource: "prospect_requested"
+        },
+        appointment: {
+          meetingType: context.appointment?.meetingType || "zoom"
+        },
+        conversation: {
+          lastProspectIntent: INTENTS.PROVIDE_MEETING_PREFERENCE,
+          lastQuestionAsked: "confirm_in_person_travel",
+          pendingClarification: "confirm_in_person_travel"
+        }
+      };
+      return structured;
+    }
+
+    if (meetingType === "zoom") {
+      structured.reasonCodes.push(REASON_CODES.EXPLICIT_ZOOM_CLEARS_OFFICE);
+    }
+
     const nextQuestion = workAuthResolved
       ? "ask_day_part"
       : resume.lastQuestionAsked || "ask_authorization";
@@ -819,15 +892,21 @@ function decideConversationTurn({
     structured.customerReplyPlan.templateKey = templateKey;
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
-      resumeTemplateKey: resume.templateKey
+      resumeTemplateKey: resume.templateKey,
+      preferredMeetingType: meetingType,
+      meetingType,
+      coverage: context.knownFacts?.coverage || null
     };
     structured.contextPatch = {
       knownFacts: {
         preferredMeetingType: meetingType,
-        meetingPreferenceSource: "prospect"
+        meetingPreferenceSource: "prospect",
+        meetingTypeRequested: meetingType,
+        meetingTypeConfirmed: true
       },
       appointment: {
-        meetingType
+        meetingType,
+        location: meetingType === "zoom" ? null : context.appointment?.location
       },
       conversation: {
         lastProspectIntent: INTENTS.PROVIDE_MEETING_PREFERENCE,
@@ -839,16 +918,193 @@ function decideConversationTurn({
     return structured;
   }
 
+  if (intent === INTENTS.CONFIRM_IN_PERSON_TRAVEL) {
+    const workAuth = String(context.knownFacts?.workAuthorizationStatus || "").toLowerCase();
+    const workAuthResolved =
+      workAuth === "authorized" || workAuth === "not_authorized";
+    structured.decision.nextAction = NEXT_ACTIONS.UPDATE_MEETING_PREFERENCE;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = workAuthResolved
+      ? "meeting_preference_in_person"
+      : "meeting_preference_in_person_then_auth";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      preferredMeetingType: "in_person",
+      meetingType: "in_person",
+      coverage: context.knownFacts?.coverage || null
+    };
+    structured.reasonCodes.push(REASON_CODES.IN_PERSON_TRAVEL_CONFIRMED);
+    structured.contextPatch = {
+      knownFacts: {
+        preferredMeetingType: "in_person",
+        meetingPreferenceSource: "prospect_confirmed",
+        meetingTypeRequested: "in_person",
+        meetingTypeConfirmed: true
+      },
+      appointment: {
+        meetingType: "in_person",
+        location: "Doral office"
+      },
+      conversation: {
+        lastProspectIntent: INTENTS.CONFIRM_IN_PERSON_TRAVEL,
+        lastQuestionAsked: workAuthResolved ? "ask_day_part" : "ask_authorization",
+        pendingClarification: null
+      }
+    };
+    return structured;
+  }
+
   if (intent === INTENTS.CANCEL_REQUEST) {
     structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_CANCEL_NO_WRITE;
     structured.decision.mayCreateAppointment = false;
+    structured.decision.shouldEscalate = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
     structured.customerReplyPlan.templateKey = "acknowledge_cancel_no_write";
+    structured.reasonCodes.push(REASON_CODES.CANCEL_INTENT_RECOGNIZED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_STOPPED);
     structured.contextPatch = {
+      currentStage: STAGES.WITHDRAWN,
+      appointment: {
+        status: APPOINTMENT_STATUS.NONE
+      },
       conversation: {
         lastProspectIntent: INTENTS.CANCEL_REQUEST,
-        pendingClarification: "cancel_confirm"
-      }
+        lastQuestionAsked: null,
+        pendingClarification: null
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.WITHDRAW_INTEREST) {
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_WITHDRAW_NO_WRITE;
+    structured.decision.mayCreateAppointment = false;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = "acknowledge_withdraw_no_write";
+    structured.reasonCodes.push(REASON_CODES.WITHDRAW_INTENT_RECOGNIZED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_STOPPED);
+    structured.contextPatch = {
+      currentStage: STAGES.WITHDRAWN,
+      appointment: {
+        status: APPOINTMENT_STATUS.NONE
+      },
+      conversation: {
+        lastProspectIntent: INTENTS.WITHDRAW_INTEREST,
+        lastQuestionAsked: null,
+        pendingClarification: null
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.OPT_OUT_REQUEST) {
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_OPT_OUT_NO_WRITE;
+    structured.decision.mayCreateAppointment = false;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = "acknowledge_opt_out_no_write";
+    structured.reasonCodes.push(REASON_CODES.OPT_OUT_INTENT_RECOGNIZED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_STOPPED);
+    structured.contextPatch = {
+      currentStage: STAGES.WITHDRAWN,
+      conversation: {
+        lastProspectIntent: INTENTS.OPT_OUT_REQUEST,
+        lastQuestionAsked: null,
+        pendingClarification: null
+      },
+      attention: { needsHumanAttention: false, reason: null }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.SCHEDULING_DATE_PROPOSAL) {
+    const resolvedDate = interpretation.entities?.resolvedDate || null;
+    const priorTime =
+      interpretation.entities?.priorProposedTime ||
+      context.appointment?.proposedTime ||
+      null;
+    const priorDate = context.appointment?.proposedDate || null;
+    const dateHistory = Array.isArray(context.appointment?.proposedDateHistory)
+      ? [...context.appointment.proposedDateHistory]
+      : [];
+    if (priorDate && resolvedDate?.isoDate && priorDate !== resolvedDate.isoDate) {
+      dateHistory.push(priorDate);
+      structured.reasonCodes.push(REASON_CODES.DATE_CANDIDATE_REPLACED);
+    }
+    const exclusions = interpretation.entities?.dateExclusions || [];
+    if (exclusions.length) {
+      structured.reasonCodes.push(REASON_CODES.DATE_EXCLUSIONS_CAPTURED);
+    }
+    structured.reasonCodes.push(REASON_CODES.DATE_ONLY_PROPOSAL);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    structured.decision.shouldEscalate = false;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+
+    const language = structured.preferredLanguage;
+    const dateLabel = formatDateLabel(resolvedDate, language);
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requestedDate: resolvedDate?.isoDate || null,
+      dateLabel,
+      requestedTime: priorTime
+    };
+
+    if (priorTime) {
+      structured.decision.nextAction = NEXT_ACTIONS.CONFIRM_DATE_WITH_TIME;
+      structured.customerReplyPlan.templateKey = "confirm_date_with_time";
+      structured.reasonCodes.push(REASON_CODES.PRIOR_TIME_PRESERVED_WITH_DATE);
+      structured.contextPatch = {
+        currentStage: STAGES.SCHEDULING,
+        knownFacts: {
+          dateExclusions: exclusions.length
+            ? exclusions
+            : context.knownFacts?.dateExclusions || []
+        },
+        appointment: {
+          status: APPOINTMENT_STATUS.PROPOSED,
+          proposedDate: resolvedDate?.isoDate || null,
+          proposedDateLabel: dateLabel,
+          proposedDateHistory: dateHistory,
+          proposedTime: priorTime
+        },
+        conversation: {
+          clarificationCount: 0,
+          lastProspectIntent: INTENTS.SCHEDULING_DATE_PROPOSAL,
+          lastQuestionAsked: "confirm_slot",
+          pendingClarification: null
+        },
+        attention: { needsHumanAttention: false, reason: null }
+      };
+      return structured;
+    }
+
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_DATE_ASK_TIME;
+    structured.customerReplyPlan.templateKey = "acknowledge_date_ask_time";
+    structured.contextPatch = {
+      currentStage: STAGES.SCHEDULING,
+      knownFacts: {
+        dateExclusions: exclusions.length
+          ? exclusions
+          : context.knownFacts?.dateExclusions || []
+      },
+      appointment: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate: resolvedDate?.isoDate || null,
+        proposedDateLabel: dateLabel,
+        proposedDateHistory: dateHistory
+      },
+      conversation: {
+        clarificationCount: 0,
+        lastProspectIntent: INTENTS.SCHEDULING_DATE_PROPOSAL,
+        lastQuestionAsked: "ask_time_preference",
+        pendingClarification: null
+      },
+      attention: { needsHumanAttention: false, reason: null }
     };
     return structured;
   }

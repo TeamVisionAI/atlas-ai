@@ -95,6 +95,21 @@ function parseHourToken(token) {
 }
 
 function parseDayHint(text) {
+  // BR-085 — prefer weekday candidates over relative tokens that may appear
+  // in exclusion phrases ("no puedo hoy ni mañana, ¿puede ser el lunes?").
+  const dayMatch = EN_DAYS.concat(ES_DAYS).find((name) => {
+    const normalizedName = normalize(name);
+    return new RegExp(`\\b${normalizedName}\\b`).test(text);
+  });
+
+  if (dayMatch) {
+    return { kind: "weekday", dayName: normalize(dayMatch) };
+  }
+
+  if (/\b(next week|la proxima semana|proxima semana)\b/.test(text)) {
+    return { kind: "next_week" };
+  }
+
   if (/\b(day after tomorrow|pasado manana)\b/.test(text)) {
     return { kind: "offset", days: 2 };
   }
@@ -105,15 +120,6 @@ function parseDayHint(text) {
 
   if (/\b(today|hoy)\b/.test(text)) {
     return { kind: "offset", days: 0 };
-  }
-
-  const dayMatch = EN_DAYS.concat(ES_DAYS).find((name) => {
-    const normalizedName = normalize(name);
-    return new RegExp(`\\b${normalizedName}\\b`).test(text);
-  });
-
-  if (dayMatch) {
-    return { kind: "weekday", dayName: normalize(dayMatch) };
   }
 
   return null;

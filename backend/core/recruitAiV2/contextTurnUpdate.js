@@ -147,14 +147,83 @@ function buildNextContextFromInterpretation({
     interpretation.intent === "provide_meeting_preference" &&
     interpretation.entities?.appointmentType
   ) {
+    // BR-085 — do not silently apply in-person when travel confirmation is pending.
+    const pendingTravel =
+      String(nextContext.conversation?.pendingClarification || "") ===
+        "confirm_in_person_travel" ||
+      String(structuredDecision?.contextPatch?.conversation?.pendingClarification || "") ===
+        "confirm_in_person_travel";
+    if (
+      interpretation.entities.appointmentType === "in_person" &&
+      pendingTravel
+    ) {
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        meetingTypeRequested: "in_person",
+        meetingTypeConfirmed: false,
+        meetingPreferenceSource: "prospect_requested"
+      };
+    } else {
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        preferredMeetingType: interpretation.entities.appointmentType,
+        meetingTypeRequested: interpretation.entities.appointmentType,
+        meetingTypeConfirmed: true,
+        meetingPreferenceSource: "prospect"
+      };
+      nextContext.appointment = {
+        ...nextContext.appointment,
+        meetingType: interpretation.entities.appointmentType,
+        location:
+          interpretation.entities.appointmentType === "zoom"
+            ? null
+            : nextContext.appointment?.location
+      };
+    }
+  }
+
+  if (interpretation.intent === "confirm_in_person_travel") {
     nextContext.knownFacts = {
       ...nextContext.knownFacts,
-      preferredMeetingType: interpretation.entities.appointmentType
+      preferredMeetingType: "in_person",
+      meetingTypeRequested: "in_person",
+      meetingTypeConfirmed: true,
+      meetingPreferenceSource: "prospect_confirmed"
     };
     nextContext.appointment = {
       ...nextContext.appointment,
-      meetingType: interpretation.entities.appointmentType
+      meetingType: "in_person",
+      location: "Doral office"
     };
+  }
+
+  if (
+    interpretation.intent === "scheduling_date_proposal" &&
+    interpretation.entities?.resolvedDate?.isoDate
+  ) {
+    const priorDate = nextContext.appointment?.proposedDate || null;
+    const history = Array.isArray(nextContext.appointment?.proposedDateHistory)
+      ? [...nextContext.appointment.proposedDateHistory]
+      : [];
+    if (priorDate && priorDate !== interpretation.entities.resolvedDate.isoDate) {
+      history.push(priorDate);
+    }
+    nextContext.appointment = {
+      ...nextContext.appointment,
+      proposedDate: interpretation.entities.resolvedDate.isoDate,
+      proposedDateHistory: history,
+      proposedTime:
+        interpretation.entities.priorProposedTime ||
+        nextContext.appointment?.proposedTime ||
+        null,
+      status: nextContext.appointment?.status || "proposed"
+    };
+    if (Array.isArray(interpretation.entities.dateExclusions)) {
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        dateExclusions: interpretation.entities.dateExclusions
+      };
+    }
   }
 
   if (

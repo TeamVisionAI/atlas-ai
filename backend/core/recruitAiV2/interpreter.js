@@ -34,6 +34,13 @@ const {
   resolveCandidateTime,
   isTimeLikeToken
 } = require("./schedulingConstraints");
+const {
+  parseDateExclusions,
+  extractDateCandidateHint,
+  resolveDateCandidate,
+  resolveDateExclusions,
+  isDateOnlySchedule
+} = require("./dateResolution");
 const { resolveConversationalLanguage } = require("./languagePolicy");
 
 function detectMessageLanguageHint(text) {
@@ -66,10 +73,14 @@ function formatTimeEntity(schedule) {
     return null;
   }
 
-  const hour =
-    schedule.normalizedHour != null
-      ? Number(schedule.normalizedHour)
-      : Number(schedule.hour);
+  // BR-085 — never coerce null hour → 0 (weekday-only was becoming 12:00 AM).
+  const hourRaw =
+    schedule.normalizedHour != null ? schedule.normalizedHour : schedule.hour;
+  if (hourRaw == null) {
+    return null;
+  }
+
+  const hour = Number(hourRaw);
   const minute = Number(schedule.minute || 0);
   if (!Number.isFinite(hour)) {
     return null;
@@ -235,10 +246,127 @@ function looksLikeInPersonPreference(text) {
   );
 }
 
+function normalizeIntentText(text) {
+  return String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * BR-085 — distinguish cancel appointment / withdraw interest / STOP opt-out.
+ */
+function classifyCancellationIntent(text) {
+  const t = normalizeIntentText(text);
+  if (!t) {
+    return null;
+  }
+
+  if (
+    /^(stop|alto|unsubscribe)$/.test(t) ||
+    /\b(opt[- ]?out|unsubscribe)\b/.test(t)
+  ) {
+    return {
+      intent: INTENTS.OPT_OUT_REQUEST,
+      cancellationKind: "opt_out"
+    };
+  }
+
+  const hasAppointmentCancel =
+    /\b(cancela(r)? la cita|cancel (the |my )?appointment|cancel (the )?interview)\b/.test(
+      t
+    );
+  const hasCancel =
+    hasAppointmentCancel ||
+    /\b(cancelalo|cancelarlo|cancelala|cancelar|cancela|cancel it|cancel)\b/.test(
+      t
+    ) ||
+    /\bmejor cancel/.test(t);
+  const hasWithdraw =
+    /\b(cambie de idea|ya no quiero|ya no me interesa|no quiero seguir|dejalo asi|olvidalo|never mind|changed my mind|i don'?t want to continue|forget it)\b/.test(
+      t
+    ) ||
+    /\bno puedo ir\b/.test(t) ||
+    /\bcan'?t make it\b/.test(t) ||
+    /\bcannot make it\b/.test(t);
+
+  if (hasAppointmentCancel) {
+    return {
+      intent: INTENTS.CANCEL_REQUEST,
+      cancellationKind: "cancel_appointment"
+    };
+  }
+  if (hasCancel && hasWithdraw) {
+    return {
+      intent: INTENTS.WITHDRAW_INTEREST,
+      cancellationKind: "withdraw_and_cancel"
+    };
+  }
+  if (hasCancel) {
+    return {
+      intent: INTENTS.CANCEL_REQUEST,
+      cancellationKind: "cancel_appointment"
+    };
+  }
+  if (hasWithdraw) {
+    return {
+      intent: INTENTS.WITHDRAW_INTEREST,
+      cancellationKind: "withdraw_interest"
+    };
+  }
+  return null;
+}
+
 function looksLikeCancelRequest(text) {
-  return /\b(cancel|cancelar|no puedo ir|can'?t make it|cannot make it)\b/i.test(
-    String(text || "")
-  );
+  return Boolean(classifyCancellationIntent(text));
+}
+
+function looksLikeTravelConfirmation(text) {
+  const t = normalizeIntentText(text);
+  if (!t) {
+    return false;
+  }
+  if (
+    /^(si|yes|ok|okay|claro|perfecto|de acuerdo|dale|va)$/.test(t) ||
+    /\b(puedo ir|puedo venir|me funciona|works for me|i can (go|come)|puedo llegar)\b/.test(
+      t
+    ) ||
+    /\b(si[, ]+puedo|yes[, ]+i can)\b/.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * BR-085 — weekday/relative date without clock time is a date proposal, not midnight.
+ */
+function shouldTreatAsDateOnlyProposal(schedule, text, context) {
+  if (!isDateOnlySchedule(schedule) && !extractDateCandidateHint(text)) {
+    return false;
+  }
+  const dayHint = schedule?.dayHint || extractDateCandidateHint(text);
+  if (!dayHint) {
+    return false;
+  }
+
+  // Spanish "mañana" ambiguity: during bare day-part ask without active time, prefer day-part.
+  if (
+    dayHint.kind === "offset" &&
+    dayHint.days === 1 &&
+    lastQuestionImpliesDayPart(context) &&
+    !context?.appointment?.proposedTime &&
+    !/\b(puede ser|pasado|tomorrow|how about|mejor)\b/i.test(text) &&
+    parseDayPart(text)?.complete
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function looksLikeRescheduleRequest(text) {
@@ -422,14 +550,34 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     }
   }
   const hasTimeEntity = Boolean(requestedTime);
+  const dateOnlyProposal =
+    !availabilityConstraint &&
+    !hasTimeEntity &&
+    !needsAmPmClarification &&
+    shouldTreatAsDateOnlyProposal(schedule, text, context);
+  const dateCandidateHint =
+    schedule?.dayHint || (dateOnlyProposal ? extractDateCandidateHint(text) : null);
+  const dateExclusions = parseDateExclusions(text);
+  const resolvedDate = dateCandidateHint
+    ? resolveDateCandidate(dateCandidateHint, {
+        timeZone: context?.timezone || "America/New_York",
+        now: options.now || context?._testNow || undefined
+      })
+    : null;
+  const resolvedExclusions = resolveDateExclusions(dateExclusions, {
+    timeZone: context?.timezone || "America/New_York",
+    now: options.now || context?._testNow || undefined
+  });
 
   const messageLanguage = detectMessageLanguageHint(text);
 
   let intent = INTENTS.UNKNOWN;
   let confidence = 0.4;
   const entities = {
-    requestedDate: schedule?.dayHint || null,
-    requestedTime: requestedTime,
+    requestedDate: dateCandidateHint || schedule?.dayHint || null,
+    requestedTime: dateOnlyProposal ? null : requestedTime,
+    resolvedDate: resolvedDate || null,
+    dateExclusions: resolvedExclusions,
     appointmentType: null,
     optionIndex: isOptionSelection(text) ? Number(text.trim()) : null,
     rawText: text,
@@ -442,13 +590,18 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     name: null,
     availabilityConstraint: null,
     needsAmPmClarification: false,
-    ambiguousHour: null
+    ambiguousHour: null,
+    cancellationKind: null
   };
 
   const isConfirmed = appointmentStatus === APPOINTMENT_STATUS.CONFIRMED;
   const dayPartCtx = dayPartCtxEarly;
   const locationCtx = lastQuestionImpliesLocation(context);
   const dayPartParse = parseDayPart(text);
+  const cancellation = classifyCancellationIntent(text);
+  const pendingTravelConfirm =
+    String(context?.conversation?.pendingClarification || "") ===
+    "confirm_in_person_travel";
 
   const languageSwitchTo = looksLikeExplicitLanguageSwitch(text);
   const authAnswer = looksLikeWorkAuthorizationAnswer(text, context);
@@ -460,6 +613,20 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   if (isGreeting(text)) {
     intent = INTENTS.GREETING;
     confidence = 0.95;
+  } else if (cancellation) {
+    // BR-085 — cancel/withdraw/STOP before location/name (cancelalo ≠ city).
+    intent = cancellation.intent;
+    confidence = 0.93;
+    entities.cancellationKind = cancellation.cancellationKind;
+  } else if (pendingTravelConfirm && looksLikeZoomPreference(text)) {
+    intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
+    confidence = 0.92;
+    entities.appointmentType = "zoom";
+  } else if (pendingTravelConfirm && looksLikeTravelConfirmation(text)) {
+    intent = INTENTS.CONFIRM_IN_PERSON_TRAVEL;
+    confidence = 0.94;
+    entities.appointmentType = "in_person";
+    entities.meetingTypeConfirmed = true;
   } else if (languageSwitchTo) {
     intent = INTENTS.REQUEST_LANGUAGE_SWITCH;
     confidence = 0.93;
@@ -548,9 +715,6 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     confidence = 0.92;
     entities.workAuthorization = authAnswer;
     entities.requiresClarification = false;
-  } else if (looksLikeCancelRequest(text) && isConfirmed) {
-    intent = INTENTS.CANCEL_REQUEST;
-    confidence = 0.88;
   } else if (
     looksLikeRescheduleRequest(text) ||
     (isConfirmed && looksLikeRescheduleRequest(text))
@@ -578,6 +742,15 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.ambiguousHour = ambiguousHour;
     entities.requiresClarification = true;
     entities.requestedTime = null;
+  } else if (dateOnlyProposal && dateCandidateHint) {
+    // BR-085 — weekday/date-only never becomes a time candidate.
+    intent = INTENTS.SCHEDULING_DATE_PROPOSAL;
+    confidence = 0.93;
+    entities.requestedTime = null;
+    entities.requestedDate = dateCandidateHint;
+    entities.resolvedDate = resolvedDate;
+    entities.dateExclusions = resolvedExclusions;
+    entities.priorProposedTime = context?.appointment?.proposedTime || null;
   } else if (hasTimeEntity || looksLikeDirectTimeProposal(text)) {
     // Direct time overrides pending day-part (BR-084).
     if (isConfirmed) {
@@ -748,6 +921,7 @@ module.exports = {
   interpretInboundMessage,
   detectMessageLanguageHint,
   formatTimeEntity,
+  classifyCancellationIntent,
   isAffirmative,
   isOptionSelection,
   isEchoOfLastQuestion,

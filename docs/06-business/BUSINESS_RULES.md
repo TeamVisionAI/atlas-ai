@@ -1160,6 +1160,32 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-085 — Recruit AI Date Resolution, Cancellation, and Meeting-Mode Confirmation
+
+**Implements:** Weekday/date-only proposals (never midnight); preserve prior active time with date changes; relative date exclusions; organization-local calendar resolution (BR-079); cancel vs withdraw vs STOP; OUTSIDE/remote explicit in-person requires Doral travel confirmation before office modality  
+**Domain:** Recruit AI / Conversation / Scheduling dialogue  
+**Depends on:** BR-081, BR-082, BR-083, BR-084, BR-079, BR-018–021  
+**Related:** BR-049 (Conversation Engine), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in code (flags unchanged; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/dateResolution.js`, interpreter, decisionEngine, contextTurnUpdate, responseRenderer, sideEffectAuthorizer, `scheduleLanguageParser.js`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix5.test.js`  
+**Simulator:** `orlando-scheduling-date-change-cancellation`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/15_PLAYGROUND_FEEDBACK_DATE_CANCEL_MEETING_MODE.md`
+
+### Rules
+
+1. **Date-only proposals** — Weekday / relative-day phrases without a clock time set `dateCandidate` only. Never invent `00:00` / “12:00 AM” unless the prospect explicitly says midnight / 12 AM / medianoche.
+2. **Prior time preservation** — When an active candidate time exists (e.g. 7 PM) and the prospect proposes a new day (“el lunes”), keep the time and confirm “¿El lunes a las 7:00 PM te funciona?”
+3. **Date replacement** — One active `proposedDate`; Monday → Tuesday replaces the date and keeps coherent time; prior dates are history only.
+4. **Relative exclusions** — “No puedo hoy ni mañana, ¿puede ser el lunes?” captures unavailable today/tomorrow **and** Monday as the candidate.
+5. **Org-local resolution** — Resolve today/tomorrow/weekday/next week in the organization timezone (BR-079 / Team Vision America/New_York). Do not use Railway UTC calendar boundaries.
+6. **Cancellation taxonomy** — Distinguish `cancel_request` (appointment cancel), `withdraw_interest` (change of mind / stop recruiting), and `opt_out_request` (STOP). Clear cancel/withdraw never falls into generic clarification.
+7. **Denied side-effect proposals** — V2 may propose `cancel_appointment` / `withdraw_prospect` / `communication_opt_out` for audit; authorizer always denies execution.
+8. **OUTSIDE → in-person** — Explicit “prefiero en persona” from OUTSIDE/Zoom requests Doral travel confirmation first (`meetingTypeRequested=in_person`, `meetingTypeConfirmed=false`). Only after confirmation set confirmed in-person. Explicit Zoom clears office immediately.
+9. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-084 — Recruit AI Scheduling Constraint and Direct-Time Resolution
 
 **Implements:** Availability constraints vs appointment candidates; direct clock-time proposals that override pending day-part; AM/PM clarification without handoff; single active candidate with replacement history; unavailable-slot alternatives without human escalation  

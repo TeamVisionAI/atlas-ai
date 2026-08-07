@@ -28,13 +28,19 @@ function emptyKnownFacts() {
     preferredMeetingType: null,
     /**
      * BR-083/085 — who set meeting modality:
-     * coverage_default | prospect | null
+     * coverage_default | prospect | prospect_requested | prospect_confirmed | null
      */
     meetingPreferenceSource: null,
+    /** BR-085 — requested modality before travel/location confirmation */
+    meetingTypeRequested: null,
+    /** BR-085 — true only after explicit travel/location confirmation when required */
+    meetingTypeConfirmed: null,
     /** BR-084 — morning | afternoon | evening; independent of meeting type */
     preferredDayPart: null,
     /** BR-084 — { type, earliestTime, latestTime, dayPart, explicitCandidateTime, raw } */
     availabilityConstraint: null,
+    /** BR-085 — ISO dates the prospect said are unavailable */
+    dateExclusions: [],
     coverage: null,
     fullName: null,
     name: null
@@ -45,6 +51,9 @@ function emptyAppointment() {
   return {
     status: APPOINTMENT_STATUS.NONE,
     proposedDate: null,
+    /** BR-085 — prior candidate dates (history only; one active proposedDate) */
+    proposedDateHistory: [],
+    proposedDateLabel: null,
     proposedTime: null,
     /** BR-084 — prior candidate times (history only; one active proposedTime) */
     proposedTimeHistory: [],

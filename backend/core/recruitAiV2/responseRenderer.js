@@ -57,8 +57,18 @@ const COPY = Object.freeze({
     meeting_preference_in_person:
       "Got it — we can do the interview in person. Do you prefer morning or afternoon?",
     meeting_preference_in_person_then_auth: null,
+    confirm_in_person_travel_doral:
+      "Of course. Our office is in Doral, at 2500 NW 79th Ave, Suite 189. Does coming to Doral work for you?",
     acknowledge_cancel_no_write:
       "Understood — I've noted your cancel request. A teammate will confirm any changes; nothing was changed automatically.",
+    acknowledge_withdraw_no_write:
+      "Understood. We'll cancel the process for now. A teammate can reopen it if you change your mind later.",
+    acknowledge_opt_out_no_write:
+      "Understood — I've noted your request to stop messages. A teammate will confirm; nothing was changed automatically.",
+    confirm_date_with_time:
+      "Of course. Does {dateLabel} at {requestedTime} work for you?",
+    acknowledge_date_ask_time:
+      "Got it — {dateLabel} works. What time works best for you?",
     clarify_day_part:
       "I didn't catch that — do you prefer morning or afternoon?",
     clarify_day_part_alt:
@@ -118,8 +128,18 @@ const COPY = Object.freeze({
     meeting_preference_in_person:
       "Entendido — podemos hacer la entrevista en persona. ¿Prefieres en la mañana o en la tarde?",
     meeting_preference_in_person_then_auth: null,
+    confirm_in_person_travel_doral:
+      "Claro. Nuestra oficina está en Doral, en 2500 NW 79th Ave, Suite 189. ¿Te funciona venir hasta Doral?",
     acknowledge_cancel_no_write:
       "Entendido — anoté tu solicitud de cancelación. Un compañero confirmará cualquier cambio; no se modificó nada automáticamente.",
+    acknowledge_withdraw_no_write:
+      "Entiendo. Cancelamos el proceso por ahora. Un compañero puede reabrirlo si cambias de idea más adelante.",
+    acknowledge_opt_out_no_write:
+      "Entendido — anoté tu solicitud de no recibir más mensajes. Un compañero confirmará; no se modificó nada automáticamente.",
+    confirm_date_with_time:
+      "Claro. ¿El {dateLabel} a las {requestedTime} te funciona?",
+    acknowledge_date_ask_time:
+      "Entendido — el {dateLabel} nos sirve. ¿Qué hora te funciona mejor?",
     clarify_day_part:
       "No te entendí bien — ¿prefieres en la mañana o en la tarde?",
     clarify_day_part_alt:
@@ -396,10 +416,32 @@ function renderCustomerReply(responsePlan) {
     );
   }
 
+  const dateLabel =
+    entities.dateLabel ||
+    entities.requestedDateLabel ||
+    (language === LANGUAGES.SPANISH ? "ese día" : "that day");
+
+  // BR-085 / renderer safety — active Zoom must never mix Doral office address.
+  const activeZoom =
+    String(entities.preferredMeetingType || "").toLowerCase() === "zoom" ||
+    String(entities.meetingType || "").toLowerCase() === "zoom" ||
+    String(entities.coverage || "").toUpperCase() === "OUTSIDE";
+  if (
+    activeZoom &&
+    key !== "confirm_in_person_travel_doral" &&
+    /2500 NW 79th|oficinas ubicadas/i.test(String(template || ""))
+  ) {
+    template =
+      language === LANGUAGES.SPANISH
+        ? pack.meeting_preference_zoom || pack.default
+        : pack.meeting_preference_zoom || pack.default;
+  }
+
   const rendered = String(template)
     .replace(/\{requestedTime\}/g, requestedTime)
     .replace(/\{earliestTime\}/g, earliestLabel)
     .replace(/\{ambiguousHour\}/g, ambiguousHour)
+    .replace(/\{dateLabel\}/g, dateLabel)
     .replace(/\{city\}/g, city)
     .replace(/\{proposedStateName\}/g, proposed || "your state")
     .replace(/\{proposedState\}/g, entities.proposedState || "")
