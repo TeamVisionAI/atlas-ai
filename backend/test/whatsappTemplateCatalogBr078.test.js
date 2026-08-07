@@ -345,8 +345,15 @@ test("27-31. Suite 189 / public / zoom location and URL fail-closed", () => {
     },
     { name: "Ana", preferred_language: "english" }
   );
-  assert.equal(zoomConf.meeting_location, "Zoom");
+  // BR-093 — Zoom confirmation {{4}} is meeting-details copy, not bare "Zoom".
+  assert.equal(
+    zoomConf.meeting_location,
+    "Your Zoom link will be provided separately"
+  );
+  assert.equal(zoomConf.meeting_type, "Zoom");
+  assert.notEqual(zoomConf.meeting_location, zoomConf.meeting_type);
   assert.equal(zoomConf.meeting_location.includes("79th"), false);
+  assert.equal(zoomConf.meeting_location.includes("zoom.us"), false);
 
   assert.equal(buildZoomInvitationVariables({ name: "Ana" }, null).ok, false);
   assert.equal(buildOfficeLocationVariables({ meetingAddress: "Doral, FL" }, { name: "A" }).ok, false);

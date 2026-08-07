@@ -1,7 +1,8 @@
 /**
- * BR-078 / BR-092 — Canonical WhatsApp template variable builders.
+ * BR-078 / BR-092 / BR-093 — Canonical WhatsApp template variable builders.
  * Builds ordered parameter objects for approved Meta templates.
  * Zoom invitation button params are Meta dynamic URL suffixes (BR-092), not full URLs.
+ * Confirmation/details {{4}} meeting_location is real meeting details (BR-093), not meeting_type.
  */
 
 const {
@@ -40,6 +41,16 @@ const MEETING_TYPE_LABELS = Object.freeze({
     in_person: "En persona",
     public_location: "Lugar público"
   })
+});
+
+/**
+ * BR-093 — Canonical confirmation/details BODY {{4}} copy for Zoom meetings.
+ * Must not duplicate meeting_type ("Zoom") and must not embed the Zoom URL
+ * (atlas_zoom_invitation_* owns the join button).
+ */
+const ZOOM_MEETING_DETAILS_COPY = Object.freeze({
+  en: "Your Zoom link will be provided separately",
+  es: "Tu enlace de Zoom será enviado por separado"
 });
 
 function deriveProspectFirstName(prospect = {}, fallbackName = null) {
@@ -98,11 +109,20 @@ function resolveMeetingAddress(appointment = {}, options = {}) {
   return String(snapshotted).trim();
 }
 
+/**
+ * BR-093 — Resolve confirmation/details BODY {{4}} (meeting_location / meeting details).
+ * Zoom → language-specific “link provided separately” copy (never URL, never bare "Zoom").
+ * In-person / public location → canonical address (BR-077). Missing address → null (fail closed).
+ */
 function resolveMeetingLocationLabel(appointment = {}, prospect = {}) {
   if (isVirtualMeeting(appointment)) {
-    return "Zoom";
+    const languageCode = resolveLanguageCode(prospect);
+    return (
+      ZOOM_MEETING_DETAILS_COPY[languageCode] || ZOOM_MEETING_DETAILS_COPY.en
+    );
   }
 
+  // Office / public_location / other non-virtual: require canonical address details.
   return resolveMeetingAddress(appointment);
 }
 
@@ -262,6 +282,7 @@ function buildInterviewReminderVariables(appointment = {}, prospect = {}) {
 
 function buildInterviewConfirmationVariables(appointment = {}, prospect = {}) {
   const languageCode = resolveLanguageCode(prospect);
+  // Implements BR-093 — {{4}} meeting details distinct from {{3}} meeting type.
   const meetingLocation = resolveMeetingLocationLabel(appointment, prospect);
 
   return orderedObject(
@@ -270,6 +291,7 @@ function buildInterviewConfirmationVariables(appointment = {}, prospect = {}) {
       prospect_first_name: deriveProspectFirstName(prospect, appointment.metadata?.prospectName),
       interview_when: formatAppointmentWhen(appointment, languageCode),
       meeting_type: localizeMeetingType(appointment, prospect),
+      // null/empty → BR-075/078 template resolve fails closed (TEMPLATE_VARIABLES_INVALID).
       meeting_location: meetingLocation
     }
   );
@@ -323,6 +345,7 @@ function buildZoomInvitationVariables(prospect = {}, meetingUrl = null) {
 module.exports = {
   MEETING_TYPE_LABELS,
   META_ZOOM_INVITATION_URL_BUTTON_BASE,
+  ZOOM_MEETING_DETAILS_COPY,
   deriveProspectFirstName,
   localizeMeetingType,
   resolveMeetingAddress,

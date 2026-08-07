@@ -1118,7 +1118,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Meta WhatsApp template catalog semantics, intent→key mapping, parameters, and language rules  
 **Domain:** Communications / Recruit AI  
 **Depends on:** BR-075, BR-041, BR-012  
-**Related:** BR-076 (Zoom URL), BR-077 (office address), BR-092 (Zoom button suffix)  
+**Related:** BR-076 (Zoom URL), BR-077 (office address), BR-092 (Zoom button suffix), BR-093 (confirmation meeting details)  
 **Status:** Implemented in code (Phase 1) — catalog contracts + call-site wiring ready; templates remain inactive until Meta approval + explicit env authorization  
 **Engine target:** `whatsappApprovedTemplateRegistry.js`, `whatsappTemplateVariableBuilder.js`, outbound call sites, ops `WHATSAPP_APPROVED_TEMPLATES_JSON`  
 **Approval packet:** `docs/03-engineering/WHATSAPP_TEMPLATE_APPROVAL_PACKET.md`
@@ -1160,12 +1160,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-093 — WhatsApp Interview Confirmation Meeting Details Semantics
+
+**Implements:** Make `interview_confirmation` / `interview_details` BODY `{{4}}` (meeting details) distinct from `{{3}}` (meeting type); Zoom uses Meta-aligned “link provided separately” copy; in-person uses BR-077 address  
+**Domain:** Communications / WhatsApp Templates  
+**Depends on:** BR-075, BR-077, BR-078, BR-092  
+**Related:** Meta WABA exact structure audit (`atlas_interview_confirmation_en` / `_es`)  
+**Status:** Implemented in code — templates remain inactive until explicit `WHATSAPP_APPROVED_TEMPLATES_JSON` authorization  
+**Engine target:** `whatsappTemplateVariableBuilder.js` (`resolveMeetingLocationLabel` / `ZOOM_MEETING_DETAILS_COPY` / confirmation builders)  
+**Tests:** `backend/test/whatsappConfirmationMeetingDetailsBr093.test.js`  
+**Docs:** `docs/03-engineering/WHATSAPP_CONFIRMATION_MEETING_DETAILS.md`
+
+### Rules
+
+1. **Slot separation** — Confirmation/details BODY: `{{1}}` name, `{{2}}` when, `{{3}}` meeting type, `{{4}}` meeting details. Never duplicate meeting type into `{{4}}`.
+2. **Zoom confirmation** — `{{3}}` = `Zoom`. `{{4}}` EN = `Your Zoom link will be provided separately`; ES = `Tu enlace de Zoom será enviado por separado`. Never put the Zoom URL into confirmation/details.
+3. **Zoom invitation remains separate** — Actionable join uses `atlas_zoom_invitation_*` + BR-092 meeting-id button parameter.
+4. **In-person / public location** — `{{4}}` = canonical meeting address (BR-077 completeness). Incomplete address fails closed at template resolve.
+5. **Language** — Use prospect preferred language for Zoom details copy. No silent EN↔ES template locale fallback.
+6. **Boundaries** — Does not activate templates, change Railway variables, send WhatsApp, enable Recruit AI v2 execution, or mutate appointments/Calendar/BR-080.
+
+---
+
 ## BR-092 — WhatsApp Zoom Template Dynamic URL Parameter Normalization
 
 **Implements:** Normalize BR-076 canonical Zoom URLs into the Meta dynamic URL button suffix for `atlas_zoom_invitation_en` / `atlas_zoom_invitation_es`  
 **Domain:** Communications / WhatsApp Templates  
 **Depends on:** BR-075, BR-076, BR-078  
-**Related:** Meta WABA audit (approved URL pattern `https://zoom.us/j/{{1}}`)  
+**Related:** Meta WABA audit (approved URL pattern `https://zoom.us/j/{{1}}`), BR-093 (confirmation meeting details)  
 **Status:** Implemented in code — templates remain inactive until explicit `WHATSAPP_APPROVED_TEMPLATES_JSON` authorization  
 **Engine target:** `whatsappTemplateVariableBuilder.js` (`normalizeZoomDynamicUrlButtonParameter` / `buildZoomInvitationVariables`), `whatsappApprovedTemplateRegistry.js`, `whatsappOutboundPipeline.js`  
 **Tests:** `backend/test/whatsappZoomTemplateButtonParamBr092.test.js`  
