@@ -9,6 +9,12 @@ const {
 } = require("../scheduleLanguageParser");
 const { INTENTS, LANGUAGES } = require("./constants");
 const {
+  looksLikeJobOpportunityQuestion,
+  looksLikeConversationClarificationRequest,
+  lastQuestionImpliesDate,
+  lastQuestionImpliesDayPart: continuityImpliesDayPart
+} = require("./conversationContinuity");
+const {
   normalizeLanguage,
   APPOINTMENT_STATUS
 } = require("./conversationContext");
@@ -158,19 +164,8 @@ function isEchoOfLastQuestion(text, context) {
 }
 
 function looksLikeOpportunityQuestion(text) {
-  const t = String(text || "").trim();
-  if (!t) {
-    return false;
-  }
-  // Keep opportunity/about separate from insurance/license/compensation FAQs.
-  return (
-    /what is this about/i.test(t) ||
-    /how does this work/i.test(t) ||
-    /de qu[eé] se trata/i.test(t) ||
-    /de qu[eé] trata/i.test(t) ||
-    /\b(opportunity|tell me more|que es esto|qué es esto)\b/i.test(t) ||
-    /what.*(about|is).*(job|role|position|opportunity)/i.test(t)
-  );
+  // BR-088 — job/employment/opportunity phrases (statement or question).
+  return looksLikeJobOpportunityQuestion(text);
 }
 
 function looksLikeInsuranceQuestion(text) {
@@ -423,16 +418,29 @@ function shouldTreatAsDateOnlyProposal(schedule, text, context) {
     return false;
   }
 
-  // Spanish "mañana" ambiguity: during bare day-part ask without active time, prefer day-part.
+  // BR-088 — Spanish "mañana" ambiguity:
+  // pending day-part → morning; pending date question → tomorrow.
   if (
     dayHint.kind === "offset" &&
     dayHint.days === 1 &&
-    lastQuestionImpliesDayPart(context) &&
-    !context?.appointment?.proposedTime &&
-    !/\b(puede ser|pasado|tomorrow|how about|mejor)\b/i.test(text) &&
     parseDayPart(text)?.complete
   ) {
-    return false;
+    if (
+      lastQuestionImpliesDayPart(context) &&
+      !lastQuestionImpliesDate(context) &&
+      !/\b(puede ser|pasado|tomorrow|how about|mejor el|el dia)\b/i.test(text)
+    ) {
+      return false;
+    }
+    if (lastQuestionImpliesDate(context)) {
+      return true;
+    }
+    if (
+      lastQuestionImpliesDayPart(context) &&
+      !context?.appointment?.proposedTime
+    ) {
+      return false;
+    }
   }
 
   return true;
@@ -445,16 +453,7 @@ function looksLikeRescheduleRequest(text) {
 }
 
 function lastQuestionImpliesDayPart(context) {
-  const lastQ = String(context?.conversation?.lastQuestionAsked || "").toLowerCase();
-  const lastOut = String(context?.conversation?.lastAtlasOutboundText || "").toLowerCase();
-  if (
-    lastQ.includes("day_part") ||
-    lastQ.includes("daypart") ||
-    lastQ.includes("ask_day_part")
-  ) {
-    return true;
-  }
-  return /mañana|manana|tarde|morning|afternoon|evening/.test(lastOut);
+  return continuityImpliesDayPart(context);
 }
 
 function lastQuestionImpliesLocation(context) {
@@ -707,6 +706,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     intent = INTENTS.ECHO_OR_NOOP;
     confidence = 0.9;
   } else if (looksLikeCompensationQuestion(text)) {
+    // BR-088 — FAQ/business intents outrank scheduling parsing.
     intent = INTENTS.COMPENSATION_QUESTION;
     confidence = 0.92;
   } else if (looksLikeInsuranceQuestion(text)) {
@@ -715,9 +715,16 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (looksLikeLicenseRequirementQuestion(text)) {
     intent = INTENTS.LICENSE_REQUIREMENT_QUESTION;
     confidence = 0.92;
-  } else if (looksLikeOpportunityQuestion(text)) {
-    intent = INTENTS.OPPORTUNITY_QUESTION;
-    confidence = 0.9;
+  } else if (looksLikeJobOpportunityQuestion(text)) {
+    intent = INTENTS.JOB_OPPORTUNITY_QUESTION;
+    confidence = 0.93;
+  } else if (looksLikeConversationClarificationRequest(text)) {
+    intent = INTENTS.CONVERSATION_CLARIFICATION_REQUEST;
+    confidence = 0.93;
+  } else if (looksLikeMeetingAccessRequest(text)) {
+    // Keep meeting logistics ahead of modality/time parsing (also checked later).
+    intent = INTENTS.MEETING_ACCESS_REQUEST;
+    confidence = 0.94;
   } else if (
     pendingLicenseClarify &&
     mentionsWorkAuthorization(text) &&
@@ -793,10 +800,6 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   ) {
     intent = INTENTS.RESCHEDULE_REQUEST;
     confidence = 0.88;
-  } else if (looksLikeMeetingAccessRequest(text)) {
-    // BR-087 — Zoom link / join logistics (before Zoom modality preference).
-    intent = INTENTS.MEETING_ACCESS_REQUEST;
-    confidence = 0.94;
   } else if (looksLikeZoomPreference(text)) {
     intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
     confidence = 0.9;
@@ -1016,10 +1019,14 @@ module.exports = {
   looksLikeName,
   looksLikeAmbiguousFragment,
   looksLikeOpportunityQuestion,
+  looksLikeJobOpportunityQuestion,
+  looksLikeConversationClarificationRequest,
   looksLikeInsuranceQuestion,
   looksLikeLicenseRequirementQuestion,
   looksLikeCompensationQuestion,
   looksLikeWorkAuthorizationAnswer,
   looksLikeExplicitLanguageSwitch,
+  lastQuestionImpliesDate,
+  lastQuestionImpliesDayPart,
   parseDayPart
 };

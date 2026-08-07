@@ -158,7 +158,7 @@ test("7. What is this about answers and does not hand off", () => {
     conversation: { lastQuestionAsked: "ask_day_part", clarificationCount: 1 }
   });
   const result = turn("What is this about?", context);
-  assert.equal(result.interpretation.intent, "opportunity_question");
+  assert.equal(result.interpretation.intent, "job_opportunity_question");
   assert.equal(result.structuredDecision.decision.shouldEscalate, false);
   assert.match(result.rendered.text, /servicios financieros/i);
   assert.doesNotMatch(result.rendered.text, /compañero de Team Vision te contactará/);

@@ -1160,6 +1160,32 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-088 — Recruit AI Intent Priority and Contextual Conversation Continuity
+
+**Implements:** Job/employment/opportunity FAQ intent; FAQ/business intents outrank scheduling parsing; context-sensitive Spanish “mañana” (morning vs tomorrow); day-part answers advance to a time question; ban bare “Continuemos” dead-ends; meta-conversation clarification of the pending workflow question  
+**Domain:** Recruit AI / Conversation / Intent routing  
+**Depends on:** BR-081, BR-083, BR-084, BR-087, BR-049  
+**Related:** BR-086 (opt-out still early), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in code (flags unchanged; v2 execution remains off)  
+**Engine target:** `backend/core/recruitAiV2/conversationContinuity.js`, interpreter, decisionEngine, responseRenderer, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix7.test.js`  
+**Simulator:** `tampa-faq-day-part-continuity`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/18_PLAYGROUND_FEEDBACK_INTENT_PRIORITY.md`
+
+### Rules
+
+1. **Job/opportunity intent** — Recognize EN/ES job/employment/opportunity questions (with or without punctuation) as `job_opportunity_question`. Never collapse them into scheduling/time/unavailable.
+2. **Canonical answer** — Explain financial-services opportunity (not guaranteed salaried/hourly employment); no income guarantees; then resume the pending workflow question.
+3. **Intent priority** — Clear FAQ/business intents (job, insurance, license, compensation), opt-out/cancel/withdraw, corrections, and meeting logistics outrank time/day-part/date/availability/counteroffer parsing. Scheduling context is evidence, not permission to reinterpret unrelated language.
+4. **“mañana” disambiguation** — Pending morning/afternoon ask → day-part morning. Pending “what day” ask → date tomorrow.
+5. **Day-part advances** — After morning/afternoon is captured, immediately ask for a clock time. Never reply only “Continuemos.”
+6. **No dead-end continuation** — Every non-terminal reply must answer, ask the next relevant question, confirm state/action, or explain a next step.
+7. **Meta-conversation** — “continuemos con qué?” / “what do you still need?” explains the pending missing fact and re-asks it (not generic clarify).
+8. **Escalate remap safety** — Non-human uncertain escalate must not render scheduling “time unavailable” copy.
+9. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes, no ads/templates/Meta Review changes.
+
+---
+
 ## BR-087 — Recruit AI Scheduling Memory and Meeting Logistics Continuity
 
 **Implements:** Preserve independent scheduling dimensions across meeting-modality changes; ask only for missing information; Zoom-link / meeting-access logistics without fabricating URLs (BR-076); repetition/frustration acknowledgement without recapture; clean withdraw closure without companion-reopen copy  

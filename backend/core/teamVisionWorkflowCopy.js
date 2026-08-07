@@ -110,6 +110,17 @@ function getCanonicalFaqAnswer(language) {
     : "We work in financial advisory and distribution services. No experience is required, and you'll learn more during the interview.";
 }
 
+/** BR-088 — job/employment/opportunity (not a guaranteed salaried/hourly job). */
+function getJobOpportunityFaqAnswer(language) {
+  return (
+    findFAQ("is this a job", language === "es" ? "es" : "en") ||
+    findFAQ("what is the job", language === "es" ? "es" : "en") ||
+    (language === "es"
+      ? "Es una oportunidad en servicios financieros (asesoría y distribución), no un empleo asalariado u por hora garantizado. No se requiere experiencia; en la entrevista te explican cómo funciona para que decidas si te conviene."
+      : "This is an opportunity in financial services (advisory and distribution), not a guaranteed salaried or hourly job. No experience is required; during the interview you'll learn how it works so you can decide if it's a good fit.")
+  );
+}
+
 function getInsuranceFaqAnswer(language) {
   return (
     findFAQ("is this insurance", language === "es" ? "es" : "en") ||
@@ -190,6 +201,7 @@ module.exports = {
   getDayPartClarificationQuestion,
   getHandoffMessage,
   getCanonicalFaqAnswer,
+  getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getLicenseRequirementFaqAnswer,
   getCompensationFaqAnswer,

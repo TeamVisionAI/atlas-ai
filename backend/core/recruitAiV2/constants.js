@@ -6,6 +6,7 @@
  * BR-085 — date-only scheduling, cancellation/withdraw, in-person travel confirm.
  * BR-086 — natural-language communication opt-out resolution.
  * BR-087 — scheduling memory, meeting logistics, clean withdrawal.
+ * BR-088 — intent priority, job/opportunity FAQ, contextual continuation.
  */
 
 const STAGES = Object.freeze({
@@ -35,9 +36,11 @@ const LANGUAGES = Object.freeze({
 const INTENTS = Object.freeze({
   GREETING: "greeting",
   OPPORTUNITY_QUESTION: "opportunity_question",
+  JOB_OPPORTUNITY_QUESTION: "job_opportunity_question",
   INSURANCE_QUESTION: "insurance_question",
   LICENSE_REQUIREMENT_QUESTION: "license_requirement_question",
   COMPENSATION_QUESTION: "compensation_question",
+  CONVERSATION_CLARIFICATION_REQUEST: "conversation_clarification_request",
   ECHO_OR_NOOP: "echo_or_noop",
   PROVIDE_LOCATION: "provide_location",
   CORRECT_LOCATION: "correct_location",
@@ -68,9 +71,12 @@ const INTENTS = Object.freeze({
 
 const NEXT_ACTIONS = Object.freeze({
   ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY: "answer_brief_value_prop_then_qualify",
+  ANSWER_JOB_OPPORTUNITY_THEN_RESUME: "answer_job_opportunity_then_resume",
   ANSWER_INSURANCE_FAQ_THEN_RESUME: "answer_insurance_faq_then_resume",
   ANSWER_LICENSE_REQUIREMENT_THEN_RESUME: "answer_license_requirement_then_resume",
   ANSWER_COMPENSATION_FAQ_THEN_RESUME: "answer_compensation_faq_then_resume",
+  EXPLAIN_PENDING_THEN_ASK: "explain_pending_then_ask",
+  ACKNOWLEDGE_DAY_PART_ASK_TIME: "acknowledge_day_part_ask_time",
   CONTINUE_AFTER_GREETING: "continue_after_greeting",
   CLARIFY_ONCE: "clarify_once",
   CLARIFY_LOCATION: "clarify_location",
@@ -164,7 +170,14 @@ const REASON_CODES = Object.freeze({
   ZOOM_LINK_CANONICAL_PROPOSED: "ZOOM_LINK_CANONICAL_PROPOSED",
   ZOOM_LINK_PENDING_UNAVAILABLE: "ZOOM_LINK_PENDING_UNAVAILABLE",
   REPETITION_ACKNOWLEDGED: "REPETITION_ACKNOWLEDGED",
-  CLEAN_WITHDRAWAL_CLOSURE: "CLEAN_WITHDRAWAL_CLOSURE"
+  CLEAN_WITHDRAWAL_CLOSURE: "CLEAN_WITHDRAWAL_CLOSURE",
+  JOB_OPPORTUNITY_FAQ: "JOB_OPPORTUNITY_FAQ",
+  FAQ_OUTRANKS_SCHEDULING: "FAQ_OUTRANKS_SCHEDULING",
+  MANANA_DAY_PART_CONTEXT: "MANANA_DAY_PART_CONTEXT",
+  MANANA_DATE_CONTEXT: "MANANA_DATE_CONTEXT",
+  DAY_PART_ADVANCES_TO_TIME: "DAY_PART_ADVANCES_TO_TIME",
+  NO_DEAD_END_CONTINUATION: "NO_DEAD_END_CONTINUATION",
+  META_CONVERSATION_CLARIFIED: "META_CONVERSATION_CLARIFIED"
 });
 
 /** Feature flags — v2 decisions are auditable; execution stays off until cutover. */
