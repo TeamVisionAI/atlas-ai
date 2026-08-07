@@ -29,6 +29,7 @@
 | [19_LICENSE_REQUIREMENT_INTENT_PRECISION.md](./19_LICENSE_REQUIREMENT_INTENT_PRECISION.md) | BR-089 — license requirement question vs ambiguous license statement |
 | [20_PUERTO_RICO_FIXED_EMPLOYMENT_PREFERENCE.md](./20_PUERTO_RICO_FIXED_EMPLOYMENT_PREFERENCE.md) | BR-090 — Puerto Rico work-auth + fixed-employment preference / not-now closure |
 | [21_DIRECT_NO_INTEREST_WITHDRAWAL.md](./21_DIRECT_NO_INTEREST_WITHDRAWAL.md) | BR-091 — bare “No me interesa” / direct lack-of-interest withdrawal |
+| [22_CITY_STATE_ABBREVIATION_NORMALIZATION.md](./22_CITY_STATE_ABBREVIATION_NORMALIZATION.md) | BR-094 — U.S. city/state abbreviation normalization (`miami fl`) |
 
 ## Regression fixture
 

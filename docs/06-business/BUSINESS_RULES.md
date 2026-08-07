@@ -1160,6 +1160,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-094 — Recruit AI U.S. City-State Abbreviation Normalization
+
+**Implements:** Recognize informal U.S. city + state abbreviation / name replies (e.g. `miami fl`) as confirmed location facts when Atlas is collecting city/state; advance qualification without generic fragment clarification  
+**Domain:** Recruit AI / Qualification  
+**Depends on:** BR-081, BR-082  
+**Related:** BR-083 (qualification fact separation), BR-090 (Puerto Rico — not a USPS state pair), BR-091 (withdrawal)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/locationFacts.js`, `recruitAiV2/interpreter.js`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix8.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/22_CITY_STATE_ABBREVIATION_NORMALIZATION.md`  
+**Scenario:** `city-state-abbreviation-normalization`
+
+### Rules
+
+1. **USPS normalization** — Recognize common forms `City ST`, `City, ST`, `City StateName` (any casing) using a canonical U.S. postal abbreviation / state-name map. Do not hardcode Florida-only matching.
+2. **Confirmed pair** — When both city and recognized state are present, set city/state certainty to **confirmed** and do not re-ask location.
+3. **Pending-question priority** — While waiting for city/state, a complete city+state phrase must win over `ambiguous_fragment`, name, scheduling, and generic FAQ clarification.
+4. **BR-082 partial safety** — City-only (`Miami`) remains partial with optional proposed state. State-only (`FL`) remains incomplete without inventing a city. Regional phrases (`South Florida`) are not `city = South`. Hedged answers (`Miami maybe`) must not over-confirm.
+5. **Correction** — `actually orlando fl` (and equivalents) corrects location; coverage/modality must be re-evaluated; do not keep stale local-office modality.
+6. **Boundaries** — Does not enable Recruit AI v2 execution, change shadow/capture env, cut over live CE, send WhatsApp, or mutate appointments/Calendar/BR-080.
+
+---
+
 ## BR-093 — WhatsApp Interview Confirmation Meeting Details Semantics
 
 **Implements:** Make `interview_confirmation` / `interview_details` BODY `{{4}}` (meeting details) distinct from `{{3}}` (meeting type); Zoom uses Meta-aligned “link provided separately” copy; in-person uses BR-077 address  

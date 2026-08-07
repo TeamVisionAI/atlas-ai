@@ -31,7 +31,8 @@ const {
   parseLocationAnswer,
   normalizeStateToken,
   looksLikeLocationCorrection,
-  proposeStateFromCity
+  proposeStateFromCity,
+  isCompleteCityStatePhrase
 } = require("./locationFacts");
 const {
   parseLicenseStatement,
@@ -562,6 +563,10 @@ function looksLikeAmbiguousFragment(text) {
   if (isTimeLikeToken(trimmed)) {
     return false;
   }
+  // BR-094 — complete city + USPS state phrases are locations, not fragments ("miami fl").
+  if (isCompleteCityStatePhrase(trimmed)) {
+    return false;
+  }
   if (trimmed.length <= 2) {
     return true;
   }
@@ -974,8 +979,13 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   } else if (isOptionSelection(text)) {
     intent = INTENTS.SELECT_OPTION;
     confidence = 0.86;
-  } else if (looksLikeAmbiguousFragment(text) && !normalizeStateToken(text)) {
+  } else if (
+    looksLikeAmbiguousFragment(text) &&
+    !normalizeStateToken(text) &&
+    !isCompleteCityStatePhrase(text)
+  ) {
     // Fragments must not become names or city-only locations (BR-082).
+    // BR-094 — do not treat "miami fl" / "Miami, FL" as ambiguous_fragment.
     intent = dayPartCtx ? INTENTS.INCOMPLETE_DAY_PART : INTENTS.AMBIGUOUS_FRAGMENT;
     confidence = 0.75;
     entities.requiresClarification = true;

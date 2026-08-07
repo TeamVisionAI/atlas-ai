@@ -1954,6 +1954,88 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "city-state-abbreviation-normalization",
+    name: "City-State Abbreviation Normalization",
+    category: "production_defect",
+    description:
+      "BR-094 — Hola → miami fl (confirmed Miami/FL) → work auth; correction Miami FL → Orlando FL",
+    seed: {
+      preferredLanguage: "english",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "cs01",
+        text: "Hola",
+        inboundMessageId: "sim-wamid.city-state-abbr.t01",
+        expect: {
+          intent: "greeting",
+          messageLanguage: "spanish",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cs02",
+        text: "miami fl",
+        inboundMessageId: "sim-wamid.city-state-abbr.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          state: "FL",
+          cityCertainty: "confirmed",
+          stateCertainty: "confirmed",
+          requiresClarification: false,
+          shouldEscalate: false,
+          nextAction: "continue_qualification",
+          replyIncludes: ["permiso"],
+          replyExcludes: [
+            "Con gusto te ayudo",
+            "ciudad y estado",
+            "¿en qué ciudad"
+          ],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cs03",
+        text: "Sí tengo permiso de trabajo",
+        inboundMessageId: "sim-wamid.city-state-abbr.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cs04",
+        text: "Actually Orlando FL",
+        inboundMessageId: "sim-wamid.city-state-abbr.t04",
+        expect: {
+          intent: "correct_location",
+          city: "Orlando",
+          state: "FL",
+          cityCertainty: "confirmed",
+          stateCertainty: "confirmed",
+          preferredMeetingType: "zoom",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
