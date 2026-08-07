@@ -1,8 +1,9 @@
 /**
- * Recruit AI v2 — qualification fact separation (BR-083 / BR-089 / BR-090).
+ * Recruit AI v2 — qualification fact separation (BR-083 / BR-089 / BR-090 / BR-096).
  * workAuthorization and financialLicense* are independent facts.
  * BR-089 — license requirement questions ≠ ambiguous license statements.
  * BR-090 — explicit Puerto Rico origin statements satisfy work authorization.
+ * BR-096 — pending-auth status shorthand (residente / ciudadano) satisfies work auth.
  */
 
 const {
@@ -266,6 +267,15 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
+  // Implements BR-096 — status shorthand while ask_authorization is pending.
+  // Bare "residente" / "ciudadano" is enough; optional "soy …" also accepted.
+  const pendingStatusShorthand =
+    pendingAuth &&
+    !mentionsLicense(raw) &&
+    /^(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$/.test(
+      t
+    );
+
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);
   const yesShort =
@@ -279,7 +289,7 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     !/\b(no|not|sin)\b/.test(t) &&
     !mentionsLicense(raw);
 
-  if (yesAuth || yesShort || patternYes) {
+  if (pendingStatusShorthand || yesAuth || yesShort || patternYes) {
     return WORK_AUTHORIZATION.AUTHORIZED;
   }
 
