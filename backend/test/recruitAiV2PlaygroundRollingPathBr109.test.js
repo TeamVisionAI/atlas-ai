@@ -162,18 +162,52 @@ test("copy: por la mañana / solo puedo después del trabajo never use anoto", (
   }
 });
 
-test("playground read-agent resolution: sim-org stays unresolved; explicit agent wins", async () => {
+test("playground read-agent resolution: sim-org stays unresolved; fixture explicit agent wins", async () => {
   const unresolved = await resolvePlaygroundReadAgent({
     organizationId: "sim-org-team-vision"
   });
   assert.equal(unresolved.agentId, null);
 
+  // Fixture/sim may bind explicit agents without a persisted profile.
   const explicit = await resolvePlaygroundReadAgent({
     organizationId: DEFAULT_ORGANIZATION_ID,
-    agentId: "agent-explicit"
+    agentId: "agent-explicit",
+    availabilityFixture: FIXTURE_SLOTS
   });
   assert.equal(explicit.agentId, "agent-explicit");
   assert.equal(explicit.source, "assigned_owner");
+});
+
+test("BR-110: auto-bind refuses unconfigured candidate (no engine-default pretend)", async () => {
+  // Unknown user has no persisted appointmentProfile → must not bind.
+  const resolved = await resolvePlaygroundReadAgent({
+    organizationId: DEFAULT_ORGANIZATION_ID,
+    orgDefaultRecruiterUserId: "00000000-0000-4000-8000-000000000099"
+  });
+  assert.equal(resolved.agentId, null);
+  assert.equal(resolved.source, "unresolved");
+  assert.match(String(resolved.reason || ""), /unconfigured|no_configured/);
+});
+
+test("BR-110: configured override / fixture agent is accepted for Playground bind", async () => {
+  const resolved = await resolvePlaygroundReadAgent({
+    organizationId: DEFAULT_ORGANIZATION_ID,
+    agentId: "agent-configured-sim",
+    requireConfiguredProfile: false
+  });
+  assert.equal(resolved.agentId, "agent-configured-sim");
+  assert.equal(resolved.source, "assigned_owner");
+});
+
+test("BR-110: live org auto-bind never returns unconfigured profileConfigured=false agent", async () => {
+  const resolved = await resolvePlaygroundReadAgent({
+    organizationId: DEFAULT_ORGANIZATION_ID
+  });
+  if (resolved.agentId) {
+    assert.equal(resolved.profileConfigured, true);
+  } else {
+    assert.equal(resolved.source, "unresolved");
+  }
 });
 
 test("no-write + execution OFF posture", async () => {

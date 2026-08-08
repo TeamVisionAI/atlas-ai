@@ -24,10 +24,12 @@ Isolated smokes passed because they injected an explicit Team Vision owner/agent
 ## Fix
 
 - Resolve a Playground read-only agent at session start (and lazily on turn if needed):
-  - explicit agent / owner
-  - org default recruiter
-  - deterministic org operating RVP (`findActiveOrganizationRvp`)
-- Never mutate BR-080.
+  - explicit agent / owner (**configured**, or sim/fixture)
+  - org default recruiter **only if** `profileConfigured`
+  - deterministic org operating RVP **only if** `profileConfigured`
+- BR-110 — `profileConfigured` requires a persisted 7-day `appointmentProfile.workingSchedule`. Engine default Mon–Fri 09:00–17:00 is **not** configured.
+- MANAGEMENT (RVP / DL / RL) may open Settings → Appointments to configure **self** schedule (API already self-scoped).
+- Never mutate BR-080. Never copy Admin → RVP schedules automatically.
 - Remove “anoto…” narration from ordinary constraint acknowledgement copy.
 
 ## API (unchanged paths; session start is async)

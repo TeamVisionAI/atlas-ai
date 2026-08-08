@@ -44,7 +44,7 @@
 | [34_SHORT_PAY_MECHANICS.md](./34_SHORT_PAY_MECHANICS.md) | BR-106 — como pagan / pay-how short phrases |
 | [35_AVAILABLE_SLOT_OFFERING.md](./35_AVAILABLE_SLOT_OFFERING.md) | BR-107 — offer real spaced slots after constraints |
 | [36_ROLLING_AVAILABILITY_OFFER.md](./36_ROLLING_AVAILABILITY_OFFER.md) | BR-108 — rolling multi-date proactive availability offer |
-| [37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md](./37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md) | BR-109 — Playground read-agent bind + non-narrating constraint copy |
+| [37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md](./37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md) | BR-109 / BR-110 — Playground configured-agent bind + MANAGEMENT self Appointments + non-narrating copy |
 
 ## Regression fixture
 

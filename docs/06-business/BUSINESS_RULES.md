@@ -1160,11 +1160,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
+
+**Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  
+**Domain:** Identity / Settings UX + Recruit AI Playground availability  
+**Depends on:** Sprint 22 appointment profile; BR-109; BR-108  
+**Related:** BR-080 (unchanged; no ownership mutation)  
+**Status:** Implemented (execution remains OFF)  
+**Engine target:** `workspaceExperience.js` Settings gates; `appointmentProfileService.profileConfigured`; `recruitAiV2CustomPlayground.resolvePlaygroundReadAgent`  
+**Tests:** `frontend/src/config/settingsAppointmentsAccessBr110.test.js`; `backend/test/appointmentProfileConfiguredBr110.test.js`; `backend/test/recruitAiV2PlaygroundRollingPathBr109.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md`
+
+### Rules
+
+1. **Self only** — Appointments Settings UI for MANAGEMENT edits the authenticated user’s profile via existing `GET/PATCH /api/appointments/profile`. No other-user edit.
+2. **Not admin expansion** — Do not grant Review Users, subordinate schedule editing, or org-level Scheduling merely to open Appointments.
+3. **Representatives / Field Trainers** — Intentionally excluded from this Settings hub expansion (no MANAGEMENT workspace); backend self API remains available if reached.
+4. **Configured ≠ normalized default** — `profileConfigured` is true only when a persisted 7-day `workingSchedule` exists on `appointmentProfile`.
+5. **Playground auto-bind** — org_default / operating RVP only if `profileConfigured`; otherwise unresolved (BR-105). Production/shadow owner resolution unchanged.
+6. **No Admin→RVP copy** — Operators configure the RVP schedule manually after UI access exists.
+7. **Boundaries** — No Railway vars, no execution enablement, no BR-080 mutation, no schedule migration.
+
+---
+
 ## BR-109 — Recruit AI Playground Rolling Availability Path + Non-Narrating Constraint Copy
 
 **Implements:** Ops Center Playground must resolve a read-only scheduling agent for live Sprint 22 reads (without BR-080 mutation) so BR-108 rolling offers run on the real UI path; ordinary scheduling acknowledgements must not narrate internal note-taking (“anoto que puedes…”).  
 **Domain:** Recruit AI / Ops Playground + Scheduling UX  
-**Depends on:** BR-081, BR-084, BR-105, BR-107, BR-108; Sprint 22 read path  
+**Depends on:** BR-081, BR-084, BR-105, BR-107, BR-108; Sprint 22 read path; **BR-110** (configured-profile bind)  
 **Related:** BR-080 (read-only; no mutation from playground)  
 **Status:** Implemented in Recruit AI v2 playground wiring + response templates (execution remains OFF)  
 **Engine target:** `recruitAiV2CustomPlayground.js` read-agent bind → async `sendPlaygroundTurnAsync`; `responseRenderer` constraint copy  
@@ -1174,7 +1197,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Real Playground path** — Ops HTTP turns use async Sprint 22 reads; synthetic playground prospects still need a resolvable read agent.
-2. **Safe agent bind** — Precedence: explicit agent/owner → org default recruiter → deterministic org operating RVP. Never random RVP pick. Never create/claim/assign (no BR-080 writes).
+2. **Safe agent bind** — Precedence: explicit agent/owner (configured or fixture/sim) → org default recruiter **if configured** → deterministic org operating RVP **if configured**. Never random RVP pick. Never create/claim/assign (no BR-080 writes). Never treat engine-default 09:00–17:00 as configured (BR-110).
 3. **No-date constraint** — Missing `proposedDate` must not force ask-time when rolling search can run.
 4. **Copy** — Do not use “anoto que puedes / anoto tu disponibilidad / Entendido — anoto…” for ordinary scheduling facts; prefer action (“Tengo disponible…”) or a direct missing question.
 5. **Fallback priority** — 2 slots → offer 2; 1 → offer 1; successful zero → truthful no-availability; unread/missing agent/provider failure → BR-105 clarification (without robotic anoto).

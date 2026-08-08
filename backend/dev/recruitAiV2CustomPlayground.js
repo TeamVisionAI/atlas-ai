@@ -322,30 +322,92 @@ function toPublicSession(session) {
 }
 
 /**
- * BR-109 — Playground-only read-agent resolution for live Sprint 22 reads.
+ * BR-109 / BR-110 — Playground-only read-agent resolution for live Sprint 22 reads.
  * Never mutates BR-080 / assignments. Never picks an arbitrary recruiter.
- * Precedence: explicit agent → explicit owner → explicit/org-default recruiter
- * → deterministic org operating RVP (same preferred path as autonomous resolver).
+ *
+ * Auto-bind requires a persisted/configured appointmentProfile (BR-110).
+ * Engine default Mon–Fri 09:00–17:00 does NOT count as configured.
+ * Precedence: explicit (if configured or fixture/sim) → org_default (configured)
+ * → operating RVP (configured) → unresolved.
  */
+async function userHasConfiguredAppointmentProfile(userId) {
+  if (!userId) {
+    return false;
+  }
+  try {
+    const { findUserById } = require("../services/atlasUserService");
+    const {
+      isAppointmentProfileConfigured
+    } = require("../services/appointmentProfileService");
+    const user = await findUserById(userId);
+    return isAppointmentProfileConfigured(user?.profile_settings?.appointmentProfile);
+  } catch {
+    return false;
+  }
+}
+
 async function resolvePlaygroundReadAgent(options = {}) {
   const organizationId = options.organizationId || null;
-  if (options.agentId) {
+  const isSimOrFixture =
+    !organizationId ||
+    String(organizationId).startsWith("sim-org") ||
+    Boolean(options.availabilityFixture) ||
+    options.requireConfiguredProfile === false;
+
+  async function acceptIfConfigured(agentId, source) {
+    if (!agentId) {
+      return null;
+    }
+    if (isSimOrFixture) {
+      return {
+        agentId: String(agentId),
+        source,
+        profileConfigured: null
+      };
+    }
+    const profileConfigured = await userHasConfiguredAppointmentProfile(agentId);
+    if (!profileConfigured) {
+      return null;
+    }
     return {
-      agentId: String(options.agentId),
-      source: "assigned_owner"
+      agentId: String(agentId),
+      source,
+      profileConfigured: true
     };
+  }
+
+  if (options.agentId) {
+    return (
+      (await acceptIfConfigured(options.agentId, "assigned_owner")) || {
+        agentId: null,
+        source: "unresolved",
+        reason: "explicit_agent_unconfigured"
+      }
+    );
   }
   if (options.prospectOwnerUserId) {
-    return {
-      agentId: String(options.prospectOwnerUserId),
-      source: "existing_br080_owner"
-    };
+    return (
+      (await acceptIfConfigured(
+        options.prospectOwnerUserId,
+        "existing_br080_owner"
+      )) || {
+        agentId: null,
+        source: "unresolved",
+        reason: "owner_unconfigured"
+      }
+    );
   }
   if (options.orgDefaultRecruiterUserId) {
-    return {
-      agentId: String(options.orgDefaultRecruiterUserId),
-      source: "org_default"
-    };
+    return (
+      (await acceptIfConfigured(
+        options.orgDefaultRecruiterUserId,
+        "org_default"
+      )) || {
+        agentId: null,
+        source: "unresolved",
+        reason: "org_default_unconfigured"
+      }
+    );
   }
   if (!organizationId || organizationId.startsWith("sim-org")) {
     return { agentId: null, source: "unresolved" };
@@ -361,32 +423,42 @@ async function resolvePlaygroundReadAgent(options = {}) {
     const atlasUserService = require("../services/atlasUserService");
 
     const settings = await loadOrganizationSettingsRow(organizationId);
-    const configured = readConfiguredDefaultRecruiterId(settings);
-    if (configured) {
+    const defaultRecruiterId = readConfiguredDefaultRecruiterId(settings);
+    if (defaultRecruiterId) {
       const configuredUser = await atlasUserService
-        .findUserById(configured)
+        .findUserById(defaultRecruiterId)
         .catch(() => null);
       if (configuredUser && isEligibleScheduleAgent(configuredUser)) {
-        return {
-          agentId: String(configuredUser.id),
-          source: "org_default"
-        };
+        const accepted = await acceptIfConfigured(
+          configuredUser.id,
+          "org_default"
+        );
+        if (accepted) {
+          return accepted;
+        }
       }
     }
 
-    // Explicit Playground simulation config: deterministic preferred operating RVP.
+    // Deterministic operating RVP only when they have a persisted schedule.
     const rvp = await findActiveOrganizationRvp(organizationId);
     if (rvp?.id && isEligibleScheduleAgent(rvp)) {
-      return {
-        agentId: String(rvp.id),
-        source: "playground_org_operating_rvp"
-      };
+      const accepted = await acceptIfConfigured(
+        rvp.id,
+        "playground_org_operating_rvp"
+      );
+      if (accepted) {
+        return accepted;
+      }
     }
   } catch {
     // Unresolved → BR-105 fallback on the turn (still no writes).
   }
 
-  return { agentId: null, source: "unresolved" };
+  return {
+    agentId: null,
+    source: "unresolved",
+    reason: "no_configured_playground_agent"
+  };
 }
 
 function applyPlaygroundReadAgent(session, resolved) {
@@ -472,22 +544,27 @@ function createPlaygroundSession(options = {}) {
   return toPublicSession(session);
 }
 
-/** Ops Center entry — resolves read-only agent before turns (BR-109). */
+/** Ops Center entry — resolves read-only agent before turns (BR-109 / BR-110). */
 async function createPlaygroundSessionAsync(options = {}) {
   const live = options.liveAvailabilityRead !== false;
-  let resolved = {
-    agentId: options.agentId || options.prospectOwnerUserId || options.orgDefaultRecruiterUserId || null,
-    source: options.agentId
-      ? "assigned_owner"
-      : options.prospectOwnerUserId
-        ? "existing_br080_owner"
-        : options.orgDefaultRecruiterUserId
-          ? "org_default"
-          : null
-  };
-  if (live && !resolved.agentId) {
-    resolved = await resolvePlaygroundReadAgent(options);
-  }
+  // Always run bind resolver when live so configured-profile rules apply
+  // (explicit / org_default / RVP). Fixture/sim paths may skip the check.
+  const resolved = live
+    ? await resolvePlaygroundReadAgent(options)
+    : {
+        agentId:
+          options.agentId ||
+          options.prospectOwnerUserId ||
+          options.orgDefaultRecruiterUserId ||
+          null,
+        source: options.agentId
+          ? "assigned_owner"
+          : options.prospectOwnerUserId
+            ? "existing_br080_owner"
+            : options.orgDefaultRecruiterUserId
+              ? "org_default"
+              : null
+      };
   const sessionPublic = createPlaygroundSession({
     ...options,
     ...(resolved.agentId ? { agentId: resolved.agentId } : {}),
