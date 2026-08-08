@@ -14,6 +14,10 @@ const {
   resolveDurationMinutes
 } = require("../core/configuration/appointmentTypes");
 const { getSchedulingSettings } = require("./organizationService");
+const {
+  ATLAS_DEFAULT_TIMEZONE,
+  zonedTimeToUtcMs
+} = require("../core/organizationDateWindow");
 
 const SLOT_INTERVAL_MINUTES = 30;
 
@@ -124,7 +128,11 @@ async function getAvailableSlots({
       return {
         dateKey,
         timeKey,
-        startTimeISO: buildIsoTimestamp(dateKey, timeKey),
+        startTimeISO: buildIsoTimestamp(
+          dateKey,
+          timeKey,
+          ATLAS_DEFAULT_TIMEZONE
+        ),
         durationMinutes,
         appointmentType,
         isOpen: availability.isOpen,
@@ -151,11 +159,46 @@ async function getAvailableSlots({
   };
 }
 
-function buildIsoTimestamp(dateKey, timeKey) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const [hour, minute] = timeKey.split(":").map(Number);
-  const date = new Date(year, month - 1, day, hour, minute, 0, 0);
-  return date.toISOString();
+/**
+ * Convert appointment-profile wall clock (dateKey + timeKey) to UTC ISO.
+ *
+ * Implements BR-050 / BR-079 — host process TZ must never define the instant.
+ * Wall time is interpreted in `timeZone` (default America/New_York).
+ */
+function buildIsoTimestamp(
+  dateKey,
+  timeKey,
+  timeZone = ATLAS_DEFAULT_TIMEZONE
+) {
+  const zone =
+    timeZone && String(timeZone).trim()
+      ? String(timeZone).trim()
+      : ATLAS_DEFAULT_TIMEZONE;
+  const [year, month, day] = String(dateKey || "").split("-").map(Number);
+  const [hour, minute] = String(timeKey || "").split(":").map(Number);
+
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    !Number.isFinite(hour)
+  ) {
+    throw new Error(
+      "buildIsoTimestamp requires valid dateKey (YYYY-MM-DD) and timeKey (HH:mm)"
+    );
+  }
+
+  const utcMs = zonedTimeToUtcMs(
+    year,
+    month,
+    day,
+    hour,
+    Number.isFinite(minute) ? minute : 0,
+    0,
+    0,
+    zone
+  );
+  return new Date(utcMs).toISOString();
 }
 
 module.exports = {

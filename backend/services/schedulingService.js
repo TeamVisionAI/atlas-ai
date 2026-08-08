@@ -88,7 +88,8 @@ async function scheduleAppointment({
     };
   }
 
-  const startTimeISO = buildIsoTimestamp(dateKey, timeKey);
+  // BR-050 / BR-079 — wall clock in appointment timezone → UTC instant.
+  const startTimeISO = buildIsoTimestamp(dateKey, timeKey, timezone);
   const endTimeISO = new Date(
     new Date(startTimeISO).getTime() + durationMinutes * 60 * 1000
   ).toISOString();

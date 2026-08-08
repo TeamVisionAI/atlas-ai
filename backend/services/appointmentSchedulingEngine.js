@@ -214,7 +214,8 @@ async function getAvailableSlots({
           continue;
         }
 
-        const startTimeISO = buildIsoTimestamp(dateKey, timeKey);
+        // BR-079 — wall clock in profile timezone, never host TZ.
+        const startTimeISO = buildIsoTimestamp(dateKey, timeKey, timezone);
         const slotStartMs = new Date(startTimeISO).getTime();
         const slotEndMs = slotStartMs + duration * 60 * 1000;
 
@@ -226,15 +227,18 @@ async function getAvailableSlots({
           continue;
         }
 
-        const endDateObj = new Date(slotEndMs);
-        const endTimeKey = formatTimeKey(endDateObj.getHours(), endDateObj.getMinutes());
+        const endMinutes = startMinutes + duration;
+        const endTimeKey = formatTimeKey(
+          Math.floor(endMinutes / 60) % 24,
+          endMinutes % 60
+        );
 
         slots.push({
           dateKey,
           timeKey,
           endTimeKey,
           startTimeISO,
-          endTimeISO: endDateObj.toISOString(),
+          endTimeISO: new Date(slotEndMs).toISOString(),
           durationMinutes: duration,
           timezone,
           availabilitySource: busyRanges.some((r) => r.source === "google_calendar")
