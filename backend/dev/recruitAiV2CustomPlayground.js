@@ -321,6 +321,163 @@ function toPublicSession(session) {
   };
 }
 
+/**
+ * BR-109 / BR-110 — Playground-only read-agent resolution for live Sprint 22 reads.
+ * Never mutates BR-080 / assignments. Never picks an arbitrary recruiter.
+ *
+ * Auto-bind requires a persisted/configured appointmentProfile (BR-110).
+ * Engine default Mon–Fri 09:00–17:00 does NOT count as configured.
+ * Precedence: explicit (if configured or fixture/sim) → org_default (configured)
+ * → operating RVP (configured) → unresolved.
+ */
+async function userHasConfiguredAppointmentProfile(userId) {
+  if (!userId) {
+    return false;
+  }
+  try {
+    const { findUserById } = require("../services/atlasUserService");
+    const {
+      isAppointmentProfileConfigured
+    } = require("../services/appointmentProfileService");
+    const user = await findUserById(userId);
+    return isAppointmentProfileConfigured(user?.profile_settings?.appointmentProfile);
+  } catch {
+    return false;
+  }
+}
+
+async function resolvePlaygroundReadAgent(options = {}) {
+  const organizationId = options.organizationId || null;
+  const isSimOrFixture =
+    !organizationId ||
+    String(organizationId).startsWith("sim-org") ||
+    Boolean(options.availabilityFixture) ||
+    options.requireConfiguredProfile === false;
+
+  async function acceptIfConfigured(agentId, source) {
+    if (!agentId) {
+      return null;
+    }
+    if (isSimOrFixture) {
+      return {
+        agentId: String(agentId),
+        source,
+        profileConfigured: null
+      };
+    }
+    const profileConfigured = await userHasConfiguredAppointmentProfile(agentId);
+    if (!profileConfigured) {
+      return null;
+    }
+    return {
+      agentId: String(agentId),
+      source,
+      profileConfigured: true
+    };
+  }
+
+  if (options.agentId) {
+    return (
+      (await acceptIfConfigured(options.agentId, "assigned_owner")) || {
+        agentId: null,
+        source: "unresolved",
+        reason: "explicit_agent_unconfigured"
+      }
+    );
+  }
+  if (options.prospectOwnerUserId) {
+    return (
+      (await acceptIfConfigured(
+        options.prospectOwnerUserId,
+        "existing_br080_owner"
+      )) || {
+        agentId: null,
+        source: "unresolved",
+        reason: "owner_unconfigured"
+      }
+    );
+  }
+  if (options.orgDefaultRecruiterUserId) {
+    return (
+      (await acceptIfConfigured(
+        options.orgDefaultRecruiterUserId,
+        "org_default"
+      )) || {
+        agentId: null,
+        source: "unresolved",
+        reason: "org_default_unconfigured"
+      }
+    );
+  }
+  if (!organizationId || organizationId.startsWith("sim-org")) {
+    return { agentId: null, source: "unresolved" };
+  }
+
+  try {
+    const {
+      loadOrganizationSettingsRow,
+      readConfiguredDefaultRecruiterId,
+      findActiveOrganizationRvp,
+      isEligibleScheduleAgent
+    } = require("../core/autonomousScheduleAgentResolver");
+    const atlasUserService = require("../services/atlasUserService");
+
+    const settings = await loadOrganizationSettingsRow(organizationId);
+    const defaultRecruiterId = readConfiguredDefaultRecruiterId(settings);
+    if (defaultRecruiterId) {
+      const configuredUser = await atlasUserService
+        .findUserById(defaultRecruiterId)
+        .catch(() => null);
+      if (configuredUser && isEligibleScheduleAgent(configuredUser)) {
+        const accepted = await acceptIfConfigured(
+          configuredUser.id,
+          "org_default"
+        );
+        if (accepted) {
+          return accepted;
+        }
+      }
+    }
+
+    // Deterministic operating RVP only when they have a persisted schedule.
+    const rvp = await findActiveOrganizationRvp(organizationId);
+    if (rvp?.id && isEligibleScheduleAgent(rvp)) {
+      const accepted = await acceptIfConfigured(
+        rvp.id,
+        "playground_org_operating_rvp"
+      );
+      if (accepted) {
+        return accepted;
+      }
+    }
+  } catch {
+    // Unresolved → BR-105 fallback on the turn (still no writes).
+  }
+
+  return {
+    agentId: null,
+    source: "unresolved",
+    reason: "no_configured_playground_agent"
+  };
+}
+
+function applyPlaygroundReadAgent(session, resolved) {
+  if (!session?.ephemeral?.context || !resolved?.agentId) {
+    return;
+  }
+  session.ephemeral.context = {
+    ...session.ephemeral.context,
+    agentId: String(resolved.agentId),
+    playgroundReadAgentSource: resolved.source || null
+  };
+  if (resolved.source === "org_default") {
+    session.ephemeral.context.orgDefaultRecruiterUserId = String(resolved.agentId);
+  }
+  if (resolved.source === "existing_br080_owner") {
+    session.ephemeral.context.prospectOwnerUserId = String(resolved.agentId);
+  }
+}
+
 function createPlaygroundSession(options = {}) {
   pruneExpiredSessions();
 
@@ -361,8 +518,15 @@ function createPlaygroundSession(options = {}) {
       : {}),
     ...(options.availabilityFixture
       ? { availabilityFixture: options.availabilityFixture }
+      : {}),
+    ...(options.testNow || options._testNow
+      ? { testNow: options.testNow || options._testNow }
       : {})
   });
+
+  if (options.playgroundReadAgentSource && ephemeral.context) {
+    ephemeral.context.playgroundReadAgentSource = options.playgroundReadAgentSource;
+  }
 
   const session = {
     sessionId,
@@ -380,6 +544,39 @@ function createPlaygroundSession(options = {}) {
   return toPublicSession(session);
 }
 
+/** Ops Center entry — resolves read-only agent before turns (BR-109 / BR-110). */
+async function createPlaygroundSessionAsync(options = {}) {
+  const live = options.liveAvailabilityRead !== false;
+  // Always run bind resolver when live so configured-profile rules apply
+  // (explicit / org_default / RVP). Fixture/sim paths may skip the check.
+  const resolved = live
+    ? await resolvePlaygroundReadAgent(options)
+    : {
+        agentId:
+          options.agentId ||
+          options.prospectOwnerUserId ||
+          options.orgDefaultRecruiterUserId ||
+          null,
+        source: options.agentId
+          ? "assigned_owner"
+          : options.prospectOwnerUserId
+            ? "existing_br080_owner"
+            : options.orgDefaultRecruiterUserId
+              ? "org_default"
+              : null
+      };
+  const sessionPublic = createPlaygroundSession({
+    ...options,
+    ...(resolved.agentId ? { agentId: resolved.agentId } : {}),
+    ...(resolved.source ? { playgroundReadAgentSource: resolved.source } : {})
+  });
+  const session = sessions.get(sessionPublic.sessionId);
+  if (session && resolved.agentId) {
+    applyPlaygroundReadAgent(session, resolved);
+  }
+  return toPublicSession(session || sessionPublic);
+}
+
 function getPlaygroundSession(sessionId) {
   pruneExpiredSessions();
   const session = sessions.get(String(sessionId || ""));
@@ -392,14 +589,14 @@ function getPlaygroundSession(sessionId) {
   return toPublicSession(session);
 }
 
-function resetPlaygroundSession(sessionId, options = {}) {
+async function resetPlaygroundSession(sessionId, options = {}) {
   const existing = sessions.get(String(sessionId || ""));
   if (!existing) {
-    return createPlaygroundSession(options);
+    return createPlaygroundSessionAsync(options);
   }
 
   sessions.delete(sessionId);
-  return createPlaygroundSession({
+  return createPlaygroundSessionAsync({
     initialLanguage: options.initialLanguage || existing.initialLanguage,
     meetingContext: options.meetingContext || existing.meetingContext,
     organizationId:
@@ -408,6 +605,9 @@ function resetPlaygroundSession(sessionId, options = {}) {
     prospectOwnerUserId:
       options.prospectOwnerUserId ||
       existing.ephemeral?.context?.prospectOwnerUserId,
+    orgDefaultRecruiterUserId:
+      options.orgDefaultRecruiterUserId ||
+      existing.ephemeral?.context?.orgDefaultRecruiterUserId,
     liveAvailabilityRead:
       options.liveAvailabilityRead !== undefined
         ? options.liveAvailabilityRead
@@ -545,6 +745,20 @@ function sendPlaygroundTurn(sessionId, payload = {}) {
 async function sendPlaygroundTurnAsync(sessionId, payload = {}) {
   const { session, text, priorPreferredLanguage, turnNumber, turnId } =
     preparePlaygroundTurnInput(sessionId, payload);
+
+  // BR-109 — lazy read-agent bind for older sessions started without agent hints.
+  if (
+    session.liveAvailabilityRead !== false &&
+    !session.ephemeral.context?.agentId &&
+    !session.ephemeral.context?.prospectOwnerUserId &&
+    !session.ephemeral.context?.orgDefaultRecruiterUserId
+  ) {
+    const resolved = await resolvePlaygroundReadAgent({
+      organizationId: session.ephemeral.context?.organizationId,
+      agentId: payload.agentId || null
+    });
+    applyPlaygroundReadAgent(session, resolved);
+  }
 
   const turnReport = await runV2SimulatorTurnAsync(
     session.ephemeral,
@@ -707,6 +921,8 @@ module.exports = {
   EXPECTATION_KEYS,
   SUGGESTED_PROMPTS,
   createPlaygroundSession,
+  createPlaygroundSessionAsync,
+  resolvePlaygroundReadAgent,
   getPlaygroundSession,
   resetPlaygroundSession,
   sendPlaygroundTurn,

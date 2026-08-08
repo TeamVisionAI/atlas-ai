@@ -354,9 +354,9 @@ function createOperationsRoutes(deps = {}) {
     });
   });
 
-  router.post("/simulator/recruit-ai-v2/playground/sessions", (req, res) => {
+  router.post("/simulator/recruit-ai-v2/playground/sessions", async (req, res) => {
     try {
-      const session = operationsCenterService.startRecruitAiV2PlaygroundSession(
+      const session = await operationsCenterService.startRecruitAiV2PlaygroundSession(
         req.body || {}
       );
       res.status(201).json({ success: true, session });
@@ -386,9 +386,9 @@ function createOperationsRoutes(deps = {}) {
 
   router.post(
     "/simulator/recruit-ai-v2/playground/sessions/:sessionId/reset",
-    (req, res) => {
+    async (req, res) => {
       try {
-        const session = operationsCenterService.resetRecruitAiV2PlaygroundSession(
+        const session = await operationsCenterService.resetRecruitAiV2PlaygroundSession(
           req.params.sessionId,
           req.body || {}
         );

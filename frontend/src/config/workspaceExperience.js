@@ -410,8 +410,10 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ORG_READ
   },
+  // BR-110 — MANAGEMENT (RVP / DL / RL) may open self Appointments settings.
+  // API remains self-scoped; Review Users / org Scheduling stay admin-gated.
   "settings/appointments": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
   },
   "settings/whatsapp": {
@@ -620,7 +622,8 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "appointments",
     descriptionKey: "configurationHubAppointmentsDescription",
     icon: "scheduling",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    // BR-110 — self appointment profile for management recruiters (RVP/DL/RL).
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
   },
   {

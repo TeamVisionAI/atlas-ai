@@ -98,6 +98,18 @@ function normalizeWorkingDay(day = {}) {
   };
 }
 
+/**
+ * BR-110 — true only when a persisted appointmentProfile with a 7-day
+ * workingSchedule exists. Engine defaults applied during normalize must NOT
+ * count as deliberately configured recruiter availability.
+ */
+function isAppointmentProfileConfigured(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return false;
+  }
+  return Array.isArray(raw.workingSchedule) && raw.workingSchedule.length === 7;
+}
+
 function normalizeAppointmentProfile(raw = {}, userTimezone = "America/New_York") {
   const source = raw && typeof raw === "object" ? raw : {};
 
@@ -169,8 +181,10 @@ async function getAppointmentProfile(userId) {
   }
 
   const profileSettings = user.profile_settings || {};
+  const rawProfile = profileSettings.appointmentProfile;
+  const profileConfigured = isAppointmentProfileConfigured(rawProfile);
   const appointmentProfile = normalizeAppointmentProfile(
-    profileSettings.appointmentProfile,
+    rawProfile,
     user.timezone || "America/New_York"
   );
 
@@ -179,7 +193,9 @@ async function getAppointmentProfile(userId) {
     organizationId: user.organization_id,
     timezone: user.timezone || appointmentProfile.defaults.timezone,
     language: user.preferred_language || appointmentProfile.defaults.preferredLanguage,
-    appointmentProfile
+    appointmentProfile,
+    // BR-110 — distinguish persisted schedule vs engine default fallback.
+    profileConfigured
   };
 }
 
@@ -265,6 +281,7 @@ module.exports = {
   buildDefaultWeekSchedule,
   applySchedulePreset,
   normalizeAppointmentProfile,
+  isAppointmentProfileConfigured,
   resolveDurationForPurpose,
   getAppointmentProfile,
   updateAppointmentProfile

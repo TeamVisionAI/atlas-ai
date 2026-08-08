@@ -50,10 +50,10 @@ test("2. multi-turn context retention", () => {
   assert.ok(t2.context.contextVersion >= 2);
 });
 
-test("3. reset", () => {
+test("3. reset", async () => {
   const session = createPlaygroundSession({ initialLanguage: "english" });
   sendPlaygroundTurn(session.sessionId, { text: "Hi" });
-  const reset = resetPlaygroundSession(session.sessionId, {
+  const reset = await resetPlaygroundSession(session.sessionId, {
     initialLanguage: "english"
   });
   assert.notEqual(reset.sessionId, session.sessionId);
