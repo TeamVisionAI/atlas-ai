@@ -1871,11 +1871,9 @@ function decideConversationTurn({
   if (intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT) {
     const constraint = interpretation.entities?.availabilityConstraint || null;
     const prior = context.knownFacts?.availabilityConstraint || null;
-    const repetition =
-      Boolean(interpretation.entities?.repetitionSignal) ||
-      (prior?.earliestTime &&
-        constraint?.earliestTime &&
-        prior.earliestTime === constraint.earliestTime);
+    // Implements BR-117 — "tienes razón / me dijiste" only on genuine reassertion signals.
+    // Matching prior.earliestTime alone is NOT correction language (stale durable context).
+    const genuineRepetition = Boolean(interpretation.entities?.repetitionSignal);
     structured.decision.nextAction =
       NEXT_ACTIONS.ACKNOWLEDGE_AVAILABILITY_CONSTRAINT;
     structured.decision.shouldEscalate = false;
@@ -1883,10 +1881,16 @@ function decideConversationTurn({
 
     const proposedTime = context.appointment?.proposedTime || null;
     const hasConcreteDate = Boolean(context.appointment?.proposedDate);
+    const dateLabel = resolveDateLabel(
+      context,
+      structured.preferredLanguage || "spanish"
+    );
+    // Confirmable only when both wall-clock and a concrete day label/date exist.
+    const confirmableSlot = Boolean(proposedTime && (hasConcreteDate || dateLabel));
 
-    // Implements BR-107 / BR-108 — offer real slots from single-day or rolling search.
-    // Concrete date is no longer required when rolling availability was resolved.
-    if (!proposedTime) {
+    // Implements BR-107 / BR-108 / BR-117 — first-time (and non-confirmable stale
+    // proposedTime) may offer real slots same turn; do not treat ghost time-only as locked.
+    if (!confirmableSlot || !genuineRepetition) {
       const offeredFromConstraint = tryApplyAvailabilityOffer({
         structured,
         context,
@@ -1913,10 +1917,12 @@ function decideConversationTurn({
       structured.reasonCodes.push(REASON_CODES.AVAILABILITY_REQUIRES_CONCRETE_DATE);
     }
 
-    if (repetition) {
-      structured.customerReplyPlan.templateKey = proposedTime
+    if (genuineRepetition) {
+      structured.customerReplyPlan.templateKey = confirmableSlot
         ? "acknowledge_known_availability_confirm_slot"
-        : "acknowledge_known_availability";
+        : proposedTime
+          ? "acknowledge_known_availability_confirm_slot"
+          : "acknowledge_known_availability";
       structured.reasonCodes.push(REASON_CODES.REPETITION_ACKNOWLEDGED);
       structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
     } else {
@@ -1930,11 +1936,9 @@ function decideConversationTurn({
       ...structured.customerReplyPlan.entities,
       earliestTime: constraint?.earliestTime || prior?.earliestTime || null,
       dayPart: constraint?.dayPart || prior?.dayPart || null,
-      requestedTime: proposedTime,
-      dateLabel: resolveDateLabel(
-        context,
-        structured.preferredLanguage || "spanish"
-      )
+      // Only surface proposedTime for confirm when day is known — else renderer stays neutral.
+      requestedTime: confirmableSlot || genuineRepetition ? proposedTime : null,
+      dateLabel: confirmableSlot ? dateLabel : null
     };
     structured.contextPatch = {
       knownFacts: {
@@ -1952,7 +1956,10 @@ function decideConversationTurn({
         lastProspectIntent: INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT,
         // BR-087 — never bounce back to day-part after after-5 is known.
         // Without concrete date, BR-105 ask-time remains; date resolution continues separately.
-        lastQuestionAsked: proposedTime ? "confirm_slot" : "ask_time_preference"
+        lastQuestionAsked:
+          confirmableSlot && genuineRepetition
+            ? "confirm_slot"
+            : "ask_time_preference"
       },
       currentStage:
         context.currentStage === STAGES.GREETING
