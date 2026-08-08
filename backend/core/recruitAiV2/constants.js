@@ -278,7 +278,20 @@ const FEATURE_FLAGS = Object.freeze({
    * BR-112 — when true, authoritative live CE may pass allowExecution=true.
    * Independent from BR-111 mutation authorization. Fail-closed when absent.
    */
-  LIVE_EXECUTION_PATH_ENABLED_ENV: "RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED"
+  LIVE_EXECUTION_PATH_ENABLED_ENV: "RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED",
+  /**
+   * BR-114 — when true, one-user live WhatsApp turns may be authored by v2.
+   * Independent from BR-111 execution and BR-112 live execution path.
+   * Fail-closed when absent.
+   */
+  LIVE_AUTHORING_ENABLED_ENV: "RECRUIT_AI_V2_LIVE_AUTHORING_ENABLED",
+  /** Exact organization UUID allowlist for live authoring canary (BR-114). */
+  LIVE_AUTHORING_ORGANIZATION_IDS_ENV:
+    "RECRUIT_AI_V2_LIVE_AUTHORING_ORGANIZATION_IDS",
+  /** Exact atlas_users.id allowlist for live authoring canary (BR-114). */
+  LIVE_AUTHORING_USER_IDS_ENV: "RECRUIT_AI_V2_LIVE_AUTHORING_USER_IDS",
+  /** Optional timeout (ms) for live authoring before legacy CE fall-through. */
+  LIVE_AUTHORING_TIMEOUT_MS_ENV: "RECRUIT_AI_V2_LIVE_AUTHORING_TIMEOUT_MS"
 });
 
 /** BR-111 — only these mutation types may be authorized for the first canary. */

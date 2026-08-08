@@ -2,16 +2,20 @@
  * Sprint 11.4 Phase A — Communication Hub (transport layer).
  * Routes normalized channel messages to Conversation Engine and outbound adapters.
  * Conversation Engine remains channel-agnostic; this module handles delivery only.
+ *
+ * BR-114 — one-user live authoring canary may intercept before legacy CE so
+ * Recruit AI v2 authors the customer-facing reply. Canonical outbound remains here.
  */
 
-const { handleIncomingMessage } = require("./conversationEngine");
-const { sendAndPersistWhatsAppMessage } = require("./whatsappOutboundPipeline");
+const conversationEngine = require("./conversationEngine");
+const whatsappOutboundPipeline = require("./whatsappOutboundPipeline");
 const { buildNormalizedMessageFromWhatsApp } = require("./channelMessage");
 const { loadPersistedWorkflowState } = require("./workflowStateStore");
 const { loadAgentState } = require("./agentActionState");
 const { isWorkflowGateActive } = require("./agentActionEngine");
 const { OWNERSHIP } = require("./workflowConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
+const liveAuthoringBridge = require("./recruitAiV2/liveAuthoringBridge");
 
 function extractReplyText(engineResult) {
   if (!engineResult) {
@@ -65,7 +69,88 @@ function shouldDeliverAutomatedReply(prospect) {
  * @param {Object} context.prospect
  * @param {string} [context.contactName]
  */
-async function processNormalizedInboundMessage(normalized, { prospect, contactName } = {}) {
+async function deliverWhatsAppReply({
+  normalized,
+  prospect,
+  replyText,
+  engineResult,
+  outboundIntent = "CONVERSATION_ENGINE_REPLY"
+}) {
+  if (!shouldDeliverAutomatedReply(prospect)) {
+    logWhatsAppStage("conversation_engine_reply_suppressed", {
+      phone: normalized.phone,
+      reason: "BUSINESS_RULES_OR_HUMAN_OWNERSHIP"
+    });
+
+    return {
+      success: true,
+      replied: false,
+      reason: "REPLY_SUPPRESSED",
+      replyText,
+      engineResult
+    };
+  }
+
+  let templateKey = null;
+  let templateVariables = {};
+
+  // Implements BR-078 — outside-window confirmation uses interview_confirmation.
+  // Inside the care window, freeform body remains authorized by BR-075.
+  if (outboundIntent === "APPOINTMENT_CONFIRMATION") {
+    const {
+      buildInterviewConfirmationVariables
+    } = require("./whatsappTemplateVariableBuilder");
+    templateKey = "interview_confirmation";
+    templateVariables = buildInterviewConfirmationVariables(
+      engineResult?.confirmationAppointment || {},
+      prospect
+    );
+  } else if (
+    outboundIntent === "INTERVIEW_DETAILS" ||
+    outboundIntent === "RESCHEDULE_CONFIRMATION"
+  ) {
+    const {
+      buildInterviewDetailsVariables
+    } = require("./whatsappTemplateVariableBuilder");
+    templateKey = "interview_details";
+    templateVariables = buildInterviewDetailsVariables(
+      engineResult?.detailsAppointment || engineResult?.confirmationAppointment || {},
+      prospect
+    );
+  }
+
+  const delivery = await whatsappOutboundPipeline.sendAndPersistWhatsAppMessage({
+      to: normalized.phone,
+      message: replyText,
+      actor: "ATLAS",
+      intent: outboundIntent,
+      organizationId: prospect?.organization_id || null,
+      idempotencyKey: engineResult?.confirmationIdempotencyKey || null,
+      templateKey,
+      templateVariables
+  });
+
+  logWhatsAppStage("conversation_engine_reply_sent", {
+    phone: normalized.phone,
+    success: delivery.success,
+    simulated: delivery.simulated || false,
+    intent: outboundIntent,
+    idempotent: Boolean(engineResult?.confirmationIdempotencyKey)
+  });
+
+  return {
+    success: delivery.success,
+    replied: delivery.success,
+    replyText,
+    engineResult,
+    delivery
+  };
+}
+
+async function processNormalizedInboundMessage(
+  normalized,
+  { prospect, contactName, env = process.env, authoringDependencies = null } = {}
+) {
   if (!normalized?.phone || !normalized?.text) {
     return {
       success: false,
@@ -76,13 +161,44 @@ async function processNormalizedInboundMessage(normalized, { prospect, contactNa
 
   const name = contactName || normalized.contactName || prospect?.name || "Unknown";
 
+  // Implements BR-114 — one-user live authoring canary before legacy CE.
+  // Shadow/advisory never enter this path. Successful v2 reply skips CE entirely.
+  if (normalized.channel === "whatsapp" && prospect) {
+    const authoringAttempt = await liveAuthoringBridge.attemptLiveV2Authoring({
+      normalized,
+      prospect,
+      env,
+      dependencies: authoringDependencies || {},
+      logStage: logWhatsAppStage
+    });
+
+    if (authoringAttempt.authored && authoringAttempt.replyText) {
+      const engineResult = {
+        reply: authoringAttempt.replyText,
+        outboundIntent: "CONVERSATION_ENGINE_REPLY",
+        source: "recruit_ai_v2_live_authoring",
+        nextAction: authoringAttempt.nextAction,
+        v2Result: authoringAttempt.v2Result
+      };
+
+      return deliverWhatsAppReply({
+        normalized,
+        prospect,
+        replyText: authoringAttempt.replyText,
+        engineResult,
+        outboundIntent: "CONVERSATION_ENGINE_REPLY"
+      });
+    }
+    // Technical failure / empty / ineligible → fall through to legacy CE once.
+  }
+
   logWhatsAppStage("conversation_engine_invoked", {
     phone: normalized.phone,
     channel: normalized.channel,
     providerMessageId: normalized.providerMessageId
   });
 
-  const engineResult = await handleIncomingMessage(
+  const engineResult = await conversationEngine.handleIncomingMessage(
     normalized.phone,
     name,
     normalized.text,
@@ -121,21 +237,6 @@ async function processNormalizedInboundMessage(normalized, { prospect, contactNa
     };
   }
 
-  if (!shouldDeliverAutomatedReply(prospect)) {
-    logWhatsAppStage("conversation_engine_reply_suppressed", {
-      phone: normalized.phone,
-      reason: "BUSINESS_RULES_OR_HUMAN_OWNERSHIP"
-    });
-
-    return {
-      success: true,
-      replied: false,
-      reason: "REPLY_SUPPRESSED",
-      replyText,
-      engineResult
-    };
-  }
-
   if (normalized.channel === "whatsapp") {
     const outboundIntent =
       engineResult?.outboundIntent ||
@@ -143,60 +244,13 @@ async function processNormalizedInboundMessage(normalized, { prospect, contactNa
         ? "APPOINTMENT_CONFIRMATION"
         : "CONVERSATION_ENGINE_REPLY");
 
-    let templateKey = null;
-    let templateVariables = {};
-
-    // Implements BR-078 — outside-window confirmation uses interview_confirmation.
-    // Inside the care window, freeform body remains authorized by BR-075.
-    if (outboundIntent === "APPOINTMENT_CONFIRMATION") {
-      const {
-        buildInterviewConfirmationVariables
-      } = require("./whatsappTemplateVariableBuilder");
-      templateKey = "interview_confirmation";
-      templateVariables = buildInterviewConfirmationVariables(
-        engineResult?.confirmationAppointment || {},
-        prospect
-      );
-    } else if (
-      outboundIntent === "INTERVIEW_DETAILS" ||
-      outboundIntent === "RESCHEDULE_CONFIRMATION"
-    ) {
-      const {
-        buildInterviewDetailsVariables
-      } = require("./whatsappTemplateVariableBuilder");
-      templateKey = "interview_details";
-      templateVariables = buildInterviewDetailsVariables(
-        engineResult?.detailsAppointment || engineResult?.confirmationAppointment || {},
-        prospect
-      );
-    }
-
-    const delivery = await sendAndPersistWhatsAppMessage({
-      to: normalized.phone,
-      message: replyText,
-      actor: "ATLAS",
-      intent: outboundIntent,
-      organizationId: prospect?.organization_id || null,
-      idempotencyKey: engineResult?.confirmationIdempotencyKey || null,
-      templateKey,
-      templateVariables
-    });
-
-    logWhatsAppStage("conversation_engine_reply_sent", {
-      phone: normalized.phone,
-      success: delivery.success,
-      simulated: delivery.simulated || false,
-      intent: outboundIntent,
-      idempotent: Boolean(engineResult?.confirmationIdempotencyKey)
-    });
-
-    return {
-      success: delivery.success,
-      replied: delivery.success,
+    return deliverWhatsAppReply({
+      normalized,
+      prospect,
       replyText,
       engineResult,
-      delivery
-    };
+      outboundIntent
+    });
   }
 
   return {
