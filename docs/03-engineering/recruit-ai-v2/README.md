@@ -42,7 +42,8 @@
 | [32_COMPENSATION_FAQ_ROUTING.md](./32_COMPENSATION_FAQ_ROUTING.md) | BR-104 — compensation/earnings FAQ outranks ask_time / clarify |
 | [33_CONSTRAINT_PRESERVING_RESUME.md](./33_CONSTRAINT_PRESERVING_RESUME.md) | BR-105 — after-5 resume + direct compensation + no Por cierto |
 | [34_SHORT_PAY_MECHANICS.md](./34_SHORT_PAY_MECHANICS.md) | BR-106 — como pagan / pay-how short phrases |
-| [35_AVAILABLE_SLOT_OFFERING.md](./35_AVAILABLE_SLOT_OFFERING.md) | BR-107 — offer real spaced slots after constraints (blocked on read Tools) |
+| [35_AVAILABLE_SLOT_OFFERING.md](./35_AVAILABLE_SLOT_OFFERING.md) | BR-107 — offer real spaced slots after constraints |
+| [36_ROLLING_AVAILABILITY_OFFER.md](./36_ROLLING_AVAILABILITY_OFFER.md) | BR-108 — rolling multi-date proactive availability offer |
 
 ## Regression fixture
 

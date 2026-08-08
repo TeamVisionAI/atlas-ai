@@ -346,6 +346,55 @@ function formatRequestedTime(hhmm, language) {
   return `${hour12}:${mm} ${meridiem}`;
 }
 
+/**
+ * BR-108 — natural day wording from concrete dateKey (persist date separately).
+ * Uses org-local today/tomorrow relative to entities.now / timezone.
+ */
+function formatSlotDayPhrase(dateKey, language, { now = null, timezone = null } = {}) {
+  if (!dateKey) {
+    return null;
+  }
+  const { partsInZone, ATLAS_DEFAULT_TIMEZONE } = require("../organizationDateWindow");
+  const { WEEKDAY_LABELS } = require("./dateResolution");
+  const tz = timezone || ATLAS_DEFAULT_TIMEZONE;
+  const nowMs = now ? new Date(now).getTime() : Date.now();
+  const todayParts = partsInZone(nowMs, tz);
+  const todayKey = `${todayParts.year}-${String(todayParts.month).padStart(2, "0")}-${String(todayParts.day).padStart(2, "0")}`;
+  const tomorrowUtc = new Date(
+    Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day + 1, 12, 0, 0)
+  );
+  const tomorrowKey = `${tomorrowUtc.getUTCFullYear()}-${String(tomorrowUtc.getUTCMonth() + 1).padStart(2, "0")}-${String(tomorrowUtc.getUTCDate()).padStart(2, "0")}`;
+
+  const [y, m, d] = String(dateKey).split("-").map(Number);
+  const weekdayIndex = new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).getUTCDay();
+  const weekday =
+    language === LANGUAGES.SPANISH
+      ? WEEKDAY_LABELS.es[weekdayIndex]
+      : WEEKDAY_LABELS.en[weekdayIndex];
+
+  if (dateKey === todayKey) {
+    return language === LANGUAGES.SPANISH ? "hoy" : "today";
+  }
+  if (dateKey === tomorrowKey) {
+    return language === LANGUAGES.SPANISH
+      ? `mañana ${weekday}`
+      : `tomorrow (${weekday})`;
+  }
+  return language === LANGUAGES.SPANISH ? `el ${weekday}` : weekday;
+}
+
+function formatOfferedSlotPhrase(slot, language, options = {}) {
+  const time = formatRequestedTime(slot?.time || slot?.timeKey, language);
+  const day = formatSlotDayPhrase(slot?.date || slot?.dateKey, language, options);
+  if (!day) {
+    return language === LANGUAGES.SPANISH ? `a las ${time}` : `at ${time}`;
+  }
+  if (language === LANGUAGES.SPANISH) {
+    return `${day} a las ${time}`;
+  }
+  return `${day} at ${time}`;
+}
+
 function proposedStateName(code, language) {
   const entry = STATE_DISPLAY[String(code || "").toUpperCase()];
   if (entry) {
@@ -649,28 +698,73 @@ function renderCustomerReply(responsePlan) {
       .replace(/\{resumeQuestion\}/g, resume);
   }
 
-  // Implements BR-107 — build offer copy from real offeredSlots only (never invent times).
+  // Implements BR-107 / BR-108 — build offer copy from real offeredSlots only (never invent).
   if (key === "offer_available_slots") {
     const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
-    const slotA = formatRequestedTime(
-      entities.slotA || offered[0]?.time || offered[0]?.timeKey || null,
-      language
-    );
-    const slotBRaw = entities.slotB || offered[1]?.time || offered[1]?.timeKey || null;
-    if (offered.length >= 2 && slotBRaw) {
-      const slotB = formatRequestedTime(slotBRaw, language);
-      template =
-        language === LANGUAGES.SPANISH
-          ? `Tengo disponible a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
-          : `I have availability at ${slotA} and ${slotB}. Which works better for you?`;
+    const dayOptions = {
+      now: entities.now || null,
+      timezone: entities.timezone || offered[0]?.timezone || null
+    };
+    const dates = offered
+      .map((slot) => slot?.date || slot?.dateKey)
+      .filter(Boolean);
+    const multiDate =
+      Boolean(entities.rollingSearch) ||
+      (dates.length >= 2 && new Set(dates).size > 1);
+
+    if (offered.length >= 2) {
+      if (multiDate) {
+        const phraseA = formatOfferedSlotPhrase(offered[0], language, dayOptions);
+        const phraseB = formatOfferedSlotPhrase(offered[1], language, dayOptions);
+        template =
+          language === LANGUAGES.SPANISH
+            ? `Tengo disponible ${phraseA} y ${phraseB}. ¿Cuál te funciona mejor?`
+            : `I have availability ${phraseA} and ${phraseB}. Which works better for you?`;
+      } else {
+        const day = formatSlotDayPhrase(
+          offered[0]?.date || offered[0]?.dateKey,
+          language,
+          dayOptions
+        );
+        const slotA = formatRequestedTime(
+          offered[0]?.time || offered[0]?.timeKey || entities.slotA,
+          language
+        );
+        const slotB = formatRequestedTime(
+          offered[1]?.time || offered[1]?.timeKey || entities.slotB,
+          language
+        );
+        if (day) {
+          template =
+            language === LANGUAGES.SPANISH
+              ? `Tengo disponible ${day} a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
+              : `I have availability ${day} at ${slotA} and ${slotB}. Which works better for you?`;
+        } else {
+          template =
+            language === LANGUAGES.SPANISH
+              ? `Tengo disponible a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
+              : `I have availability at ${slotA} and ${slotB}. Which works better for you?`;
+        }
+      }
     } else if (offered.length >= 1 || entities.slotA) {
+      const phrase = offered[0]
+        ? formatOfferedSlotPhrase(offered[0], language, dayOptions)
+        : formatRequestedTime(entities.slotA, language);
       template =
         language === LANGUAGES.SPANISH
-          ? `Tengo disponible a las ${slotA}. ¿Te funciona?`
-          : `I have availability at ${slotA}. Does that work for you?`;
+          ? `Tengo disponible ${offered[0] ? phrase : `a las ${phrase}`}. ¿Te funciona?`
+          : `I have availability ${offered[0] ? phrase : `at ${phrase}`}. Does that work for you?`;
     } else {
       template = pack.acknowledge_no_qualifying_availability;
     }
+  }
+
+  if (key === "acknowledge_no_qualifying_availability" && entities.rollingSearch) {
+    const earliestLabel = formatRequestedTime(entities.earliestTime || null, language);
+    template =
+      language === LANGUAGES.SPANISH
+        ? `No tengo disponibilidad después de las ${earliestLabel} en los próximos días. ¿Te funcionaría en otro horario?`
+        : `I don't have availability after ${earliestLabel} in the coming days. Would a different time window work?`;
   }
 
   if (!template) {
@@ -693,7 +787,10 @@ function renderCustomerReply(responsePlan) {
       /\{ambiguousHour\}/g,
       ambiguousHour
     );
-  } else if (key === "acknowledge_no_qualifying_availability") {
+  } else if (
+    key === "acknowledge_no_qualifying_availability" &&
+    !entities.rollingSearch
+  ) {
     template = (pack.acknowledge_no_qualifying_availability || "").replace(
       /\{earliestTime\}/g,
       earliestLabel

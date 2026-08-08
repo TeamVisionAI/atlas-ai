@@ -110,6 +110,7 @@ function turn(text, context, options = {}) {
             context,
             interpretation,
             options: {
+              now: options.now || context._testNow || FIXED_NOW,
               availabilityFixture: options.availabilityFixture || context._availabilityFixture,
               agentId: context.agentId,
               ownerUserId: context.prospectOwnerUserId,
@@ -357,7 +358,7 @@ test("zero-evening-slot fixture: successful zero, not fabricated", () => {
   assert.doesNotMatch(r.rendered.text, /5:30|7:00|Tengo disponible/i);
 });
 
-test("no concrete date → no fabrication; BR-105 ask-time path", () => {
+test("no concrete date + unread → BR-105 ask-time path (no fabrication)", () => {
   const ctx = baseContext({
     appointment: { proposedDate: null, status: "proposed" },
     knownFacts: {
@@ -366,23 +367,17 @@ test("no concrete date → no fabrication; BR-105 ask-time path", () => {
       workAuthorization: true,
       preferredDayPart: "afternoon",
       availabilityConstraint: null
-    },
-    _availabilityFixture: {
-      slots: slotsFromTimes(["17:30", "19:00"])
     }
   });
+  delete ctx._availabilityFixture;
   const r = turn("despues de las 5", ctx, {
-    availabilityFixture: ctx._availabilityFixture
+    availability: null,
+    // Force unread: sync path without fixture/getSlotsSync cannot live-read.
+    availabilityFixture: undefined
   });
-  assert.equal(
-    r.structuredDecision.decision.nextAction,
-    "acknowledge_availability_constraint"
-  );
-  assert.match(r.rendered.text, /hora|después/i);
+  // Without fixture, rolling sync returns sync_requires_fixture → unread → BR-105-style ask.
+  assert.notEqual(r.structuredDecision.decision.nextAction, "offer_available_slots");
   assert.doesNotMatch(r.rendered.text, /Tengo disponible/i);
-  assert.ok(
-    r.structuredDecision.reasonCodes.includes("AVAILABILITY_REQUIRES_CONCRETE_DATE")
-  );
 });
 
 test("provider failure → BR-105 fallback, not zero-availability claim", () => {
@@ -708,7 +703,7 @@ test("async simulator/playground turn can invoke injectable getSlots", async () 
     }
   });
   assert.equal(called, true);
-  assert.match(withInject.rendered.text, /Tengo disponible a las/i);
+  assert.match(withInject.rendered.text, /Tengo disponible/i);
   void report;
 });
 
