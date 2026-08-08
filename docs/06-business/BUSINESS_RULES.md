@@ -1160,6 +1160,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-112 — Recruit AI v2 Live Execution Path Cutover Capability
+
+**Implements:** Smallest authoritative live Conversation Engine bridge so the live WhatsApp path can pass `options.allowExecution=true` under a fail-closed server-side live-path flag — without enabling BR-111 execution env vars or activating the canary.  
+**Domain:** Recruit AI / live path integration + execution cutover boundary  
+**Depends on:** BR-049, BR-050, BR-080, BR-081, BR-111  
+**Related:** Live `semanticConversationEngine.completeInterview` remains the booking site; shadow/advisory remain non-executing  
+**Status:** Implemented in code; **live path flag OFF** and **execution OFF** in production  
+**Engine target:** `recruitAiV2/liveExecutionPathConfig.js`; `liveExecutionBridge.js`; `semanticConversationEngine.completeInterview`  
+**Tests:** `backend/test/recruitAiV2LiveExecutionPathBr112.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/39_LIVE_EXECUTION_PATH_CUTOVER.md`
+
+### Rules
+
+1. **Live path ≠ authorization** — `RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED==="true"` only allows the live CE bridge to request `allowExecution`. BR-111 still independently grants or denies mutation.
+2. **Fail-closed live flag** — absent / malformed → live path disabled → `allowExecution` stays false from the live bridge.
+3. **Live CE only** — `resolveAllowExecutionForLiveTurn` returns true only for `invocationSource === "live_ce"`. Shadow / advisory / playground must never request allowExecution.
+4. **Booking-site intercept** — Bridge runs inside `completeInterview` before CE's direct `executeScheduleInterview`. On v2 execution success, CE uses the canonical mission result and still builds WhatsApp confirmation via `buildPersistedAppointmentConfirmation` (no v2 WhatsApp send).
+5. **Fall-through safety** — If live path is off, or v2 does not successfully execute, CE continues its existing booking path (non-canary behavior unchanged).
+6. **No hard-coded canary UUIDs in permission logic** — Exact org/user remain BR-111 env allowlists.
+7. **Boundaries** — Do not set Railway live-path or execution vars in this sprint. Do not cut all conversation routing to v2. Do not redesign BR-049/050/111.
+
+---
+
 ## BR-111 — Recruit AI v2 One-User Execution Canary Boundary
 
 **Implements:** Fail-closed server-side authorization + create-only side-effect executor so Recruit AI v2 may later mutate appointments for **exactly one** allowlisted Atlas user via canonical BR-049 / BR-050 services — without enabling Railway execution yet.  

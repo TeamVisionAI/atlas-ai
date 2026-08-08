@@ -233,7 +233,9 @@ function createShadowEvaluationService({
           inboundMessageId: inboundMessageId || null,
           persistContext: Boolean(persistenceService),
           prospectClosed: Boolean(reconstructionInput.prospectClosed),
-          env: options.env || process.env
+          env: options.env || process.env,
+          // BR-112 — shadow must never request live execution.
+          allowExecution: false
         },
         persistenceService
       });

@@ -353,7 +353,9 @@ async function processRecruitAiV2Turn({
       skipped: execution.skipped || [],
       success: Boolean(execution.success),
       idempotent: Boolean(execution.idempotent),
-      appointmentId: execution.appointmentId || null
+      appointmentId: execution.appointmentId || null,
+      // BR-112 — live CE bridge maps canonical mission response when present.
+      scheduleResult: execution.scheduleResult || null
     },
     audit: {
       at: new Date().toISOString(),

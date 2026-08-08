@@ -349,7 +349,7 @@ async function markAutonomousScheduleHumanAssist(prospect, organizationId, reaso
   });
 }
 
-async function completeInterview(prospect, profile, language) {
+async function completeInterview(prospect, profile, language, options = {}) {
   if (!prospect.appointment_date) {
     throw new Error("Interview slot must be selected before confirming.");
   }
@@ -404,40 +404,93 @@ async function completeInterview(prospect, profile, language) {
   }
 
   let scheduleResult;
+  let usedV2Execution = false;
 
+  // Implements BR-112 — live CE may ask v2 to execute; BR-111 remains final authority.
+  // Shadow/advisory never enter this bridge. No v2 WhatsApp send path.
   try {
-    scheduleResult = await missionExecutionApplicationService.executeScheduleInterview(
-      prospect.phone,
-      {
-        dateKey: schedulePayload.dateKey,
-        timeKey: schedulePayload.timeKey,
-        interviewType: schedulePayload.interviewType,
-        email: schedulePayload.email || profile.email || undefined
-      },
-      {
+    const {
+      attemptLiveV2AppointmentExecution
+    } = require("./recruitAiV2/liveExecutionBridge");
+
+    const liveAttempt = await attemptLiveV2AppointmentExecution({
+      prospect,
+      profile,
+      schedulePayload,
+      organizationId,
+      agentId,
+      language,
+      messageText: options.messageText || "si",
+      inboundMessageId: options.inboundMessageId || null,
+      env: options.env || process.env,
+      dependencies: options.dependencies || {},
+      processTurn: options.processTurn
+    });
+
+    if (liveAttempt.usedV2Execution && liveAttempt.scheduleResult) {
+      scheduleResult = liveAttempt.scheduleResult;
+      usedV2Execution = true;
+      logWhatsAppStage("recruit_ai_v2_live_execution_used", {
+        phone: prospect.phone,
         organizationId,
         agentId,
-        userId: agentId
-      }
-    );
-  } catch (error) {
-    logWhatsAppStage("autonomous_schedule_exception", {
-      level: "error",
-      error: error.message,
+        appointmentId: scheduleResult.appointmentId || null,
+        idempotent: Boolean(liveAttempt.v2Result?.execution?.idempotent)
+      });
+    } else if (liveAttempt.invoked) {
+      logWhatsAppStage("recruit_ai_v2_live_execution_not_used", {
+        level: "info",
+        phone: prospect.phone,
+        organizationId,
+        agentId,
+        reason: liveAttempt.reason || null,
+        authorized: Boolean(liveAttempt.v2Result?.authorization?.authorized)
+      });
+    }
+  } catch (liveBridgeError) {
+    logWhatsAppStage("recruit_ai_v2_live_execution_bridge_failed", {
+      level: "warn",
       phone: prospect.phone,
       organizationId,
-      agentSource: resolvedAgent.source
+      error: liveBridgeError.message
     });
+  }
 
-    await markAutonomousScheduleHumanAssist(prospect, organizationId, "schedule_exception", {
-      agentSource: resolvedAgent.source
-    });
+  if (!usedV2Execution) {
+    try {
+      scheduleResult = await missionExecutionApplicationService.executeScheduleInterview(
+        prospect.phone,
+        {
+          dateKey: schedulePayload.dateKey,
+          timeKey: schedulePayload.timeKey,
+          interviewType: schedulePayload.interviewType,
+          email: schedulePayload.email || profile.email || undefined
+        },
+        {
+          organizationId,
+          agentId,
+          userId: agentId
+        }
+      );
+    } catch (error) {
+      logWhatsAppStage("autonomous_schedule_exception", {
+        level: "error",
+        error: error.message,
+        phone: prospect.phone,
+        organizationId,
+        agentSource: resolvedAgent.source
+      });
 
-    return {
-      success: false,
-      reply: autonomousScheduleAgentResolver.buildSafeScheduleFailureReply(language),
-      humanAssist: true
-    };
+      await markAutonomousScheduleHumanAssist(prospect, organizationId, "schedule_exception", {
+        agentSource: resolvedAgent.source
+      });
+
+      return {
+        success: false,
+        reply: autonomousScheduleAgentResolver.buildSafeScheduleFailureReply(language),
+        humanAssist: true
+      };
+    }
   }
 
   if (!scheduleResult?.success) {
@@ -1205,7 +1258,9 @@ async function handleSemanticMessage({
     }
 
     if (isScheduleComplete(profile) && !postScheduleMissing.length) {
-      const completion = await completeInterview(prospect, profile, language);
+      const completion = await completeInterview(prospect, profile, language, {
+        messageText: cleanMessage
+      });
 
       await recordLog({
         phone,
@@ -1281,7 +1336,9 @@ async function handleSemanticMessage({
       prospect = await findProspect(phone);
       profile = buildProfileFromProspect(prospect, channel);
 
-      const completion = await completeInterview(prospect, profile, language);
+      const completion = await completeInterview(prospect, profile, language, {
+        messageText: cleanMessage
+      });
 
       await recordLog({
         phone,
@@ -1307,7 +1364,9 @@ async function handleSemanticMessage({
       prospect = await findProspect(phone);
       profile = buildProfileFromProspect(prospect, channel);
 
-      const completion = await completeInterview(prospect, profile, language);
+      const completion = await completeInterview(prospect, profile, language, {
+        messageText: cleanMessage
+      });
 
       await recordLog({
         phone,
