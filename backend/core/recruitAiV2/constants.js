@@ -273,7 +273,12 @@ const FEATURE_FLAGS = Object.freeze({
   /** Exact organization UUID allowlist for v2 execution canary (BR-111). */
   EXECUTION_ORGANIZATION_IDS_ENV: "RECRUIT_AI_V2_EXECUTION_ORGANIZATION_IDS",
   /** Exact atlas_users.id allowlist for v2 execution canary (BR-111). Role never authorizes. */
-  EXECUTION_USER_IDS_ENV: "RECRUIT_AI_V2_EXECUTION_USER_IDS"
+  EXECUTION_USER_IDS_ENV: "RECRUIT_AI_V2_EXECUTION_USER_IDS",
+  /**
+   * BR-112 — when true, authoritative live CE may pass allowExecution=true.
+   * Independent from BR-111 mutation authorization. Fail-closed when absent.
+   */
+  LIVE_EXECUTION_PATH_ENABLED_ENV: "RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED"
 });
 
 /** BR-111 — only these mutation types may be authorized for the first canary. */

@@ -411,7 +411,9 @@ test("13. live CE remains authoritative in inbound pipeline wiring", () => {
     /processConversationAfterInbound[\s\S]*markAiResponding[\s\S]*scheduleRecruitAiV2PostLiveAdvisory/
   );
   assert.doesNotMatch(hub, /processRecruitAiV2Turn|scheduleRecruitAiV2ShadowEvaluation/);
-  assert.doesNotMatch(ce, /processRecruitAiV2Turn|scheduleRecruitAiV2ShadowEvaluation/);
+  // BR-112 — live CE may bridge to v2 for canary execution; shadow still post-live only.
+  assert.doesNotMatch(ce, /scheduleRecruitAiV2ShadowEvaluation/);
+  assert.match(ce, /liveExecutionBridge|attemptLiveV2AppointmentExecution/);
   assert.match(hub, /handleIncomingMessage/);
 });
 

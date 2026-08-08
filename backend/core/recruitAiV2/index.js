@@ -28,6 +28,15 @@ const {
   isEligibleForExecution
 } = require("./executionConfig");
 const { executeAuthorizedSideEffects } = require("./sideEffectExecutor");
+const {
+  resolveLiveExecutionPathConfig,
+  isLiveExecutionPathEnabled,
+  resolveAllowExecutionForLiveTurn
+} = require("./liveExecutionPathConfig");
+const {
+  attemptLiveV2AppointmentExecution,
+  buildLiveConfirmContext
+} = require("./liveExecutionBridge");
 const { containsInternalDiagnostics, sanitizeCustomerCopy } = require("./sanitize");
 const {
   sanitizeContextForPersistence,
@@ -113,6 +122,11 @@ module.exports = {
   resolveExecutionConfig,
   isEligibleForExecution,
   executeAuthorizedSideEffects,
+  resolveLiveExecutionPathConfig,
+  isLiveExecutionPathEnabled,
+  resolveAllowExecutionForLiveTurn,
+  attemptLiveV2AppointmentExecution,
+  buildLiveConfirmContext,
   containsInternalDiagnostics,
   sanitizeCustomerCopy,
   sanitizeContextForPersistence,

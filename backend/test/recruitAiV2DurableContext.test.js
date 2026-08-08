@@ -370,7 +370,9 @@ test("23-24. side-effect authorizer still denies; no CE cutover", () => {
     "utf8"
   );
   assert.doesNotMatch(server, /processRecruitAiV2Turn/);
-  assert.doesNotMatch(ce, /processRecruitAiV2Turn|createContextPersistenceService/);
+  // BR-112 — CE may call liveExecutionBridge (not persistence / shadow).
+  assert.doesNotMatch(ce, /createContextPersistenceService|scheduleRecruitAiV2ShadowEvaluation/);
+  assert.match(ce, /liveExecutionBridge|attemptLiveV2AppointmentExecution/);
   assert.doesNotMatch(inbound, /processRecruitAiV2Turn|recruit_ai_conversation_contexts/);
 });
 

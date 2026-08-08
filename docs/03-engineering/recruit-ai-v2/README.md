@@ -73,7 +73,8 @@ Do **not** change without an explicit sprint:
 4. ~~Shadow-mode CE wiring + divergence telemetry (Phase 3)~~ — Team Vision 10% when configured; production CE remains authoritative
 5. ~~Continuous context capture (Phase 3B)~~ — separate flags; **defaults off** in code; 100% capture ≠ 10% shadow
 6. ~~Fail-closed one-user execution canary boundary (BR-111)~~ — authorizer + create-only executor; **Railway execution vars unset**
-7. Controlled cutover behind BR-075 + authorized appointment side effects (explicit sprint; enable env only after review)
+7. ~~Live CE execution-path cutover capability (BR-112)~~ — live bridge may pass `allowExecution`; **live-path + execution vars unset**
+8. Controlled canary activation (enable env only after review; exact one-user allowlists)
 
 ### Phase 2–3B notes
 
