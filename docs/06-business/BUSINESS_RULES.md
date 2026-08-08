@@ -1230,6 +1230,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-117 — Durable Context Temporal Sanitizer + Speak-Only Execution Readiness
+
+**Implements:** Persist Recruit AI v2 durable context without corrupting ISO dates/datetimes/UUIDs via phone masking; remove Spanish “el ese día” ghost-day copy; hydrate invitation email into `knownFacts` from canonical sources without blocking booking.  
+**Domain:** Recruit AI / durable context / speak-only readiness  
+**Depends on:** BR-081, BR-084, BR-087, BR-111, BR-112, BR-114, BR-115, BR-116  
+**Status:** Implemented in code; **execution remains OFF**  
+**Engine target:** `recruitAiV2/contextSanitizer.js`; `responseRenderer.js`; `decisionEngine.js` (genuine reassertion); `prospectEmail.js`; `shadowEvaluationService.buildReconstructionInput`  
+**Tests:** `backend/test/recruitAiV2DurableContextDateSanitizerBr117.test.js`
+
+### Rules
+
+1. **Phone masking stays on** — Unmasked phone-like values in durable context continue to mask to `+***####`.
+2. **ISO temporal grammar is never a phone** — `YYYY-MM-DD` and ISO-8601 date-times (Z / offsets / fractional seconds) must round-trip exactly through `sanitizeContextForPersistence`, including nested `previouslyOfferedSlots[].date`.
+3. **UUID identifiers are never phones** — `organizationId` / `prospectId` / `agentId` UUIDs must not be masked.
+4. **No silent production rewrite** — Corrupted canary rows are reset/archived via supported `archiveContext` (or equivalent), not invented corrected JSON patches, unless a canonical repair operation exists.
+5. **Ghost-day copy forbidden** — Never render Spanish `el ese día`. Unresolved day → neutral time-only wording (`¿Te funciona a las 7:30 PM?`).
+6. **Correction language only on genuine reassertion** — `tienes razón` / `me dijiste` requires explicit repetition signal (`ya te dije` / equivalent). Matching prior `earliestTime` alone is not correction language (stale durable context).
+7. **Email is invitation enrichment** — Not required for `executeScheduleInterview` booking. Hydrate `knownFacts.email` from `prospect.email` then notes `EMAIL:` token. Do not invent a parallel contact model. Do not block `create_appointment` when email is missing.
+8. **Boundaries** — Do not enable BR-111/112 execution. Do not change authoring allowlists. Do not continue live canary threads or create appointments from this rule.
+
+---
+
 ## BR-113 — Live Execution Attribution Telemetry
 
 **Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  

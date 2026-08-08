@@ -120,8 +120,9 @@ const COPY = Object.freeze({
     acknowledge_current_not_fit_no_write: null,
     acknowledge_known_availability:
       "You're right — you already told me you're available after {earliestTime}. What time works best?",
+    // Implements BR-117 — slotConfirmPhrase includes day only when concrete.
     acknowledge_known_availability_confirm_slot:
-      "You're right — you already told me you're available after {earliestTime}. Does {dateLabel} at {requestedTime} still work?",
+      "You're right — you already told me you're available after {earliestTime}. Does {slotConfirmPhrase} still work?",
     ask_time_after_constraint:
       "Got it — you're available after {earliestTime}. What time after {earliestTime} works best for you?",
     clarify_time_after_constraint:
@@ -262,8 +263,9 @@ const COPY = Object.freeze({
     acknowledge_current_not_fit_no_write: null,
     acknowledge_known_availability:
       "Sí, tienes razón — me dijiste que puedes después de las {earliestTime}. ¿Qué hora te funciona mejor?",
+    // Implements BR-117 — day phrase is injected only when dateLabel is concrete (never "el ese día").
     acknowledge_known_availability_confirm_slot:
-      "Sí, tienes razón — me dijiste que puedes después de las {earliestTime}. ¿Te funciona el {dateLabel} a las {requestedTime}?",
+      "Sí, tienes razón — me dijiste que puedes después de las {earliestTime}. ¿Te funciona {slotConfirmPhrase}?",
     ask_time_after_constraint:
       "Entendido — puedes después de las {earliestTime}. ¿Qué hora después de las {earliestTime} te funciona mejor?",
     clarify_time_after_constraint:
@@ -409,6 +411,33 @@ function formatOfferedSlotPhrase(slot, language, options = {}) {
     return `${day} a las ${time}`;
   }
   return `${day} at ${time}`;
+}
+
+/**
+ * BR-117 — concrete day+time confirmation, or neutral time-only when day unknown.
+ * Never returns "el ese día".
+ */
+function formatSlotConfirmPhrase(entities = {}, language = LANGUAGES.ENGLISH) {
+  const time = formatRequestedTime(entities.requestedTime, language);
+  const rawLabel = entities.dateLabel || entities.requestedDateLabel || null;
+  const neutral =
+    !rawLabel ||
+    rawLabel === "ese día" ||
+    rawLabel === "that day";
+
+  if (neutral) {
+    return language === LANGUAGES.SPANISH ? `a las ${time}` : `${time}`;
+  }
+
+  // Spanish weekday / relative labels: "hoy", "mañana domingo", "domingo", "el domingo"
+  if (language === LANGUAGES.SPANISH) {
+    const needsArticle =
+      !/^(hoy|mañana\b|el\s)/i.test(String(rawLabel).trim());
+    const day = needsArticle ? `el ${rawLabel}` : rawLabel;
+    return `${day} a las ${time}`;
+  }
+
+  return `${rawLabel} at ${time}`;
 }
 
 function proposedStateName(code, language) {
@@ -810,10 +839,47 @@ function renderCustomerReply(responsePlan) {
     );
   }
 
-  const dateLabel =
-    entities.dateLabel ||
-    entities.requestedDateLabel ||
-    (language === LANGUAGES.SPANISH ? "ese día" : "that day");
+  const dateLabelRaw =
+    entities.dateLabel || entities.requestedDateLabel || null;
+  const dateLabelIsNeutral =
+    !dateLabelRaw ||
+    dateLabelRaw === "ese día" ||
+    dateLabelRaw === "that day";
+  // Keep substitution for templates that still use {dateLabel}, but never invent
+  // "ese día" into Spanish "el {dateLabel}" slots without a concrete day.
+  const dateLabel = dateLabelIsNeutral
+    ? language === LANGUAGES.SPANISH
+      ? "ese día"
+      : "that day"
+    : dateLabelRaw;
+  const slotConfirmPhrase = formatSlotConfirmPhrase(
+    {
+      requestedTime: entities.requestedTime,
+      dateLabel: dateLabelIsNeutral ? null : dateLabelRaw
+    },
+    language
+  );
+
+  // BR-117 — rewrite Spanish templates that hard-code "el {dateLabel}" when day is unresolved.
+  if (dateLabelIsNeutral && language === LANGUAGES.SPANISH) {
+    template = String(template || "")
+      .replace(
+        /¿Te funciona el \{dateLabel\} a las \{requestedTime\}\?/g,
+        "¿Te funciona a las {requestedTime}?"
+      )
+      .replace(
+        /¿te funciona el \{dateLabel\} a las \{requestedTime\}\?/gi,
+        "¿te funciona a las {requestedTime}?"
+      )
+      .replace(
+        /¿El \{dateLabel\} a las \{requestedTime\} te funciona\?/g,
+        "¿A las {requestedTime} te funciona?"
+      )
+      .replace(
+        /Estaba confirmando el horario de la cita\. ¿Te funciona el \{dateLabel\} a las \{requestedTime\}\?/g,
+        "Estaba confirmando el horario de la cita. ¿Te funciona a las {requestedTime}?"
+      );
+  }
 
   // BR-085/087 — active Zoom must never mix Doral office address.
   // Confirmed in-person (even OUTSIDE coverage after travel OK) may mention the office.
@@ -855,6 +921,7 @@ function renderCustomerReply(responsePlan) {
     .replace(/\{earliestTime\}/g, earliestLabel)
     .replace(/\{ambiguousHour\}/g, ambiguousHour)
     .replace(/\{dateLabel\}/g, dateLabel)
+    .replace(/\{slotConfirmPhrase\}/g, slotConfirmPhrase)
     .replace(/\{zoomUrl\}/g, zoomUrl)
     .replace(/\{city\}/g, city)
     .replace(/\{proposedStateName\}/g, proposed || "your state")
@@ -879,6 +946,7 @@ function renderCustomerReply(responsePlan) {
 module.exports = {
   renderCustomerReply,
   formatRequestedTime,
+  formatSlotConfirmPhrase,
   composeValuePropThenQualify,
   resolveResumeQuestion,
   collapseRedundantAcknowledgements,

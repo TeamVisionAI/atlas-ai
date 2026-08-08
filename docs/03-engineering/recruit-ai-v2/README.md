@@ -92,6 +92,7 @@ Do **not** change without an explicit sprint:
 - Post-live advisory coordinator: `scheduleRecruitAiV2PostLiveAdvisory` (exactly-once context per inbound id)
 - Backend-only RLS (deny anon/authenticated; service_role only)
 - Optimistic `context_version` compare-and-set; duplicate `last_processed_message_id` is idempotent
-- Persisted JSON is sanitized (no tokens, stack traces, hidden reasoning, unmasked phones)
+- Persisted JSON is sanitized (no tokens, stack traces, hidden reasoning, unmasked phones). **BR-117:** ISO dates/datetimes and UUIDs are preserved (never phone-masked).
 - Customer-facing sends/booking/BR-080 writes remain denied
-- Production CE (`semanticConversationEngine`) is unchanged as the customer-visible authority
+- Production CE (`semanticConversationEngine`) is unchanged as the customer-visible authority unless BR-114 live authoring is enabled for the one-user allowlist
+- BR-117 readiness: genuine reassertion copy only; invite email hydrates into `knownFacts` without blocking booking

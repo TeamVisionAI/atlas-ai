@@ -20,6 +20,7 @@ const {
   DIVERGENCE
 } = require("./shadowDivergence");
 const { resolveProspectPreferredLanguage } = require("../prospectLanguage");
+const { resolveCanonicalProspectEmail } = require("./prospectEmail");
 
 function sanitizeFailureMessage(error) {
   const message = String(error?.message || error || "shadow_evaluation_failed");
@@ -81,7 +82,8 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
       cityCertainty: prospect.city && prospect.state ? "confirmed" : prospect.city ? "partial" : "unknown",
       stateCertainty: prospect.state ? "confirmed" : "unknown",
       proposedState: null,
-      email: null
+      // Implements BR-117 — hydrate invitation email from canonical sources only.
+      email: resolveCanonicalProspectEmail(prospect)
     },
     appointment: {
       status: prospect.appointment_date ? "confirmed" : "none",

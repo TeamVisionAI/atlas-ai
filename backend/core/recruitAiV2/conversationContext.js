@@ -44,6 +44,8 @@ function emptyKnownFacts() {
     coverage: null,
     fullName: null,
     name: null,
+    /** Invitation/contact enrichment — optional for booking (BR-117). */
+    email: null,
     /** BR-090 — fixed | null */
     employmentPreference: null,
     /** BR-090 — exploring | not_now | null */
