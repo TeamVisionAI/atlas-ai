@@ -1,6 +1,14 @@
 /**
  * Recruit AI v2 — compensation / earnings FAQ recognition (BR-104).
  * Must outrank ask_time / location / fragment / generic clarify.
+ *
+ * Broader intent remains `compensation_question`.
+ * Detail kinds (progressive disclosure):
+ * - commission_question
+ * - hourly_pay_question
+ * - salary_question
+ * - fixed_pay_question
+ * - how_much | pay_how | source | general
  */
 
 function normalizeCompensationText(text) {
@@ -16,7 +24,7 @@ function normalizeCompensationText(text) {
 
 /**
  * Progressive disclosure kinds (most specific first).
- * @returns {"commission"|"hourly"|"salary"|"how_much"|"pay_how"|"source"|"general"|null}
+ * @returns {string|null}
  */
 function classifyCompensationQuestionKind(text) {
   const t = normalizeCompensationText(text);
@@ -24,6 +32,7 @@ function classifyCompensationQuestionKind(text) {
     return null;
   }
 
+  // Commission
   if (
     /\bes por comision\b/.test(t) ||
     /\bes comision\b/.test(t) ||
@@ -33,30 +42,64 @@ function classifyCompensationQuestionKind(text) {
       t
     )
   ) {
-    return "commission";
+    return "commission_question";
   }
 
+  // Fixed pay (before bare salary/sueldo)
   if (
+    /\bes pago fijo\b/.test(t) ||
+    /\bel pago es fijo\b/.test(t) ||
+    /\bpagan fijo\b/.test(t) ||
+    /\bes sueldo fijo\b/.test(t) ||
+    /\bis it fixed pay\b/.test(t) ||
+    /\bis the pay fixed\b/.test(t) ||
+    /\bis it a fixed salary\b/.test(t) ||
+    /\bis (the )?pay fixed\b/.test(t)
+  ) {
+    return "fixed_pay_question";
+  }
+
+  // Hourly / rate-per-hour (before generic how_much)
+  if (
+    /\ba como la hora\b/.test(t) ||
+    /\bcuanto es la hora\b/.test(t) ||
+    /\bcuanto pagan la hora\b/.test(t) ||
+    /\bcuanto (pagan|es) por hora\b/.test(t) ||
     /\bpagan por hora\b/.test(t) ||
     /\bes por hora\b/.test(t) ||
     /\btrabajo por hora\b/.test(t) ||
+    /\bhow much per hour\b/.test(t) ||
+    /\bwhat'?s the hourly rate\b/.test(t) ||
+    /\bwhats the hourly rate\b/.test(t) ||
+    /\bwhat is the hourly rate\b/.test(t) ||
     /\bis it hourly\b/.test(t) ||
     /\bis this hourly\b/.test(t) ||
     /\bdo (you|they) pay (by the )?hour\b/.test(t)
   ) {
-    return "hourly";
+    return "hourly_pay_question";
   }
 
+  // Salary / sueldo questions
   if (
+    /\bes por salario\b/.test(t) ||
+    /\bes salario\b/.test(t) ||
     /\bhay salario\b/.test(t) ||
     /\btiene salario\b/.test(t) ||
     /\btengo salario\b/.test(t) ||
+    /\bes sueldo\b/.test(t) ||
     /\bhay sueldo\b/.test(t) ||
+    /\bcuanto es el sueldo\b/.test(t) ||
+    /\bcuanto es el salario\b/.test(t) ||
+    /\bis it salary\b/.test(t) ||
+    /\bis it a salary\b/.test(t) ||
     /\bis there a salary\b/.test(t) ||
     /\bis there a (fixed )?salary\b/.test(t) ||
+    /\bwhat'?s the salary\b/.test(t) ||
+    /\bwhats the salary\b/.test(t) ||
+    /\bwhat is the salary\b/.test(t) ||
     /\bdoes it (have|pay) (a )?salary\b/.test(t)
   ) {
-    return "salary";
+    return "salary_question";
   }
 
   if (

@@ -15,11 +15,17 @@ Root cause: `looksLikeCompensationQuestion` only covered narrow “cuánto pagan
 
 ## Fix
 
-1. Expand recognition in `compensationQuestion.js` (accent/case folded; BR-095).
+1. Expand recognition in `compensationQuestion.js` (accent/case folded; BR-095), including short-forms (`a como la hora`, `es por salario`, `es pago fijo`, …).
 2. Keep routing on existing `COMPENSATION_QUESTION` ahead of scheduling/location/fragment/clarify.
-3. Progressive disclosure via `compensationDetailKind` (`general`, `commission`, `hourly`, `salary`, `how_much`, `pay_how`, `source`).
-4. Concise canonical answers; no income guarantees / invented amounts.
-5. Resume exact pending question (e.g. afternoon `ask_time_preference`).
+3. Progressive disclosure via `compensationDetailKind`:
+   - `hourly_pay_question`
+   - `salary_question`
+   - `fixed_pay_question`
+   - `commission_question`
+   - plus `how_much` / `pay_how` / `source` / `general`
+4. Answer only the asked subtype; no stacked full compensation dump.
+5. Concise canonical answers; no income guarantees / invented amounts.
+6. Resume exact pending question (e.g. afternoon `ask_time_preference`).
 
 ## Safety
 

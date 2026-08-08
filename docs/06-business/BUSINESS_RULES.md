@@ -1176,7 +1176,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Reuse intent** — Use existing `compensation_question`; do not invent a parallel intent.
 2. **Priority** — Clear compensation FAQ outranks `ask_time` / day-part / date / location / name / fragment / generic clarify.
-3. **Progressive disclosure** — Broad earnings asks get a short structure answer; commission / hourly / salary / how-much get specific short answers without stacking every caveat.
+3. **Progressive disclosure** — Broad earnings asks get a short structure answer; subtypes (`hourly_pay_question`, `salary_question`, `fixed_pay_question`, `commission_question`, how-much) get specific short answers without stacking every caveat. Short-forms like `a como la hora` / `es pago fijo` are included.
 4. **Safety** — No income guarantees, unsupported dollar amounts, “unlimited income”, invented commission percentages, or false hourly/salary promises.
 5. **Continuity** — Preserve location, work auth, modality, day-part; resume the exact pending scheduling question after the FAQ.
 6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.

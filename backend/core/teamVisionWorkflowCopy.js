@@ -232,23 +232,28 @@ function looksLikeLicensePathDetailQuestion(text) {
 /**
  * Implements BR-104 — progressive compensation FAQ (no income guarantees / invented amounts).
  * @param {"es"|"en"} language
- * @param {"commission"|"hourly"|"salary"|"how_much"|"pay_how"|"source"|"general"|string} [detailKind]
+ * @param {string} [detailKind]
  */
 function getCompensationFaqAnswer(language, detailKind = "general") {
   const es = language === "es";
   const kind = String(detailKind || "general").toLowerCase();
 
-  if (kind === "commission") {
+  if (kind === "commission" || kind === "commission_question") {
     return es
       ? "La compensación se relaciona con la producción y el nivel de contrato; no es un sueldo fijo. En la entrevista te explican cómo funciona."
       : "Compensation is tied to production and contract level; it isn't a fixed salary. The interview explains how it works.";
   }
-  if (kind === "hourly") {
+  if (kind === "hourly" || kind === "hourly_pay_question") {
     return es
-      ? "No es un puesto por hora garantizado. En la entrevista te explican cómo funciona la compensación."
-      : "It isn't a guaranteed hourly position. The interview explains how compensation works.";
+      ? "No es un pago por hora garantizado. En la entrevista te explican cómo funciona la compensación."
+      : "It isn't guaranteed hourly pay. The interview explains how compensation works.";
   }
-  if (kind === "salary") {
+  if (kind === "fixed_pay" || kind === "fixed_pay_question") {
+    return es
+      ? "No es un pago fijo garantizado. La compensación depende de la producción y del nivel de contrato; en la entrevista te lo explican."
+      : "It isn't guaranteed fixed pay. Compensation depends on production and contract level; that's covered in the interview.";
+  }
+  if (kind === "salary" || kind === "salary_question") {
     return es
       ? "No es un salario fijo garantizado. La compensación depende de la producción y del nivel de contrato; en la entrevista te lo explican."
       : "It isn't a guaranteed fixed salary. Compensation depends on production and contract level; that's covered in the interview.";

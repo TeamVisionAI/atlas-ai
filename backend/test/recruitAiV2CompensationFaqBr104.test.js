@@ -85,7 +85,21 @@ const SPANISH_PHRASES = [
   "es por comisión",
   "pagan por hora",
   "hay salario",
-  "cuanto puedo ganar"
+  "cuanto puedo ganar",
+  "a como la hora",
+  "a cómo la hora",
+  "cuanto es la hora",
+  "cuánto pagan la hora",
+  "es por salario",
+  "es salario",
+  "es pago fijo",
+  "el pago es fijo",
+  "pagan fijo",
+  "es por hora",
+  "es sueldo",
+  "hay sueldo",
+  "es sueldo fijo",
+  "cuanto es el sueldo"
 ];
 
 const ENGLISH_PHRASES = [
@@ -95,7 +109,14 @@ const ENGLISH_PHRASES = [
   "is it commission",
   "is it hourly",
   "is there a salary",
-  "how much can I make"
+  "how much can I make",
+  "how much per hour",
+  "what's the hourly rate",
+  "is it salary",
+  "is it fixed pay",
+  "is the pay fixed",
+  "is it a fixed salary",
+  "what's the salary"
 ];
 
 for (const phrase of SPANISH_PHRASES) {
@@ -144,18 +165,39 @@ test("compensation intent outranks ask_time; no generic fallback", () => {
   assert.doesNotMatch(r.rendered.text, /Con gusto te ayudo/i);
 });
 
-test("progressive disclosure: commission vs salary vs how_much", () => {
+test("progressive disclosure subtypes: hourly / salary / fixed / commission", () => {
+  const hourly = turn("a como la hora", askTimeAfternoonContext());
+  assert.equal(
+    hourly.interpretation.entities.compensationDetailKind,
+    "hourly_pay_question"
+  );
+  assert.match(hourly.rendered.text, /hora/i);
+  assert.doesNotMatch(hourly.rendered.text, /\$\d|\/hora|\d+\s*usd/i);
+  assert.match(hourly.rendered.text, /hora en la tarde|tarde te funciona/i);
+
+  const salary = turn("es por salario?", askTimeAfternoonContext());
+  assert.equal(
+    salary.interpretation.entities.compensationDetailKind,
+    "salary_question"
+  );
+  assert.match(salary.rendered.text, /salario/i);
+  assert.doesNotMatch(salary.rendered.text, /\$\d{2,}/i);
+
+  const fixed = turn("es pago fijo?", askTimeAfternoonContext());
+  assert.equal(
+    fixed.interpretation.entities.compensationDetailKind,
+    "fixed_pay_question"
+  );
+  assert.match(fixed.rendered.text, /pago fijo|fijo garantizado/i);
+  assert.doesNotMatch(fixed.rendered.text, /\$\d{2,}/i);
+
   const commission = turn("es por comisión", askTimeAfternoonContext());
   assert.equal(
     commission.interpretation.entities.compensationDetailKind,
-    "commission"
+    "commission_question"
   );
   assert.match(commission.rendered.text, /producción|contrato/i);
   assert.doesNotMatch(commission.rendered.text, /%\d+|porcentaje fijo/i);
-
-  const salary = turn("hay salario", askTimeAfternoonContext());
-  assert.equal(salary.interpretation.entities.compensationDetailKind, "salary");
-  assert.match(salary.rendered.text, /salario|fijo/i);
 
   const howMuch = turn("cuanto pagan", askTimeAfternoonContext());
   assert.equal(howMuch.interpretation.entities.compensationDetailKind, "how_much");
