@@ -40,7 +40,7 @@ const {
   createPlaygroundSession,
   getPlaygroundSession,
   resetPlaygroundSession,
-  sendPlaygroundTurn,
+  sendPlaygroundTurnAsync,
   buildRegressionCandidate,
   listPlaygroundMeta
 } = require("./recruitAiV2CustomPlayground");
@@ -769,7 +769,16 @@ function getRecruitAiV2PlaygroundMeta() {
 }
 
 function startRecruitAiV2PlaygroundSession(payload = {}) {
-  const session = createPlaygroundSession(payload);
+  const {
+    DEFAULT_ORGANIZATION_ID
+  } = require("../modules/prospects/domain/constants");
+  // BR-107 — Ops playground sessions use Team Vision org for live read-only
+  // Sprint 22 availability (still sim-* prospect ids; no writes).
+  const session = createPlaygroundSession({
+    ...payload,
+    organizationId: payload.organizationId || DEFAULT_ORGANIZATION_ID,
+    liveAvailabilityRead: payload.liveAvailabilityRead !== false
+  });
   recordActivity({
     level: "info",
     category: "workflow_simulator",
@@ -788,7 +797,8 @@ function resetRecruitAiV2PlaygroundSession(sessionId, payload = {}) {
 }
 
 function sendRecruitAiV2PlaygroundTurn(sessionId, payload = {}) {
-  return sendPlaygroundTurn(sessionId, payload);
+  // BR-107 — Ops playground uses async Sprint 22 getSlots (read-only).
+  return sendPlaygroundTurnAsync(sessionId, payload);
 }
 
 function exportRecruitAiV2PlaygroundRegressionCandidate(sessionId) {

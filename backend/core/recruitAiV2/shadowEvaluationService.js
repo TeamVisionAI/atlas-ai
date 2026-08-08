@@ -50,6 +50,15 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
   const step = String(prospect.current_step || "").toUpperCase();
   const closed = step.includes("DO NOT CONTACT") || step === "CLOSED";
 
+  // BR-107 — read-only agent hints for Sprint 22 availability (never mutate BR-080).
+  const ownerUserId = prospect.owner_user_id || prospect.ownerUserId || null;
+  const assignedAgentId =
+    prospect.assigned_agent_id ||
+    prospect.assignedAgentId ||
+    prospect.assigned_rvp_id ||
+    prospect.assignedRvpId ||
+    null;
+
   return {
     organizationId: extras.organizationId || prospect.organization_id || null,
     prospectId: extras.prospectId || prospect.id || null,
@@ -62,6 +71,9 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
       lastMessageLanguage: "unknown"
     },
     timezone: extras.timezone || "America/New_York",
+    // Prefer assigned agent, else BR-080 owner for availability reads.
+    agentId: assignedAgentId || null,
+    prospectOwnerUserId: ownerUserId,
     knownFacts: {
       name: prospect.name || null,
       city: prospect.city || null,

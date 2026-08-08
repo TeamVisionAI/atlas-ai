@@ -1,6 +1,10 @@
 /**
- * Recruit AI v2 — availability constraints vs direct time proposals (BR-084).
+ * Recruit AI v2 — availability constraints vs direct time proposals (BR-084 / BR-102).
  * Constraints are not appointment candidates.
+ *
+ * Lower-bound inclusivity (BR-102 / BR-105 / BR-107):
+ * - exclusive: "después de las 5" / "after 5" → time > earliestTime
+ * - inclusive: "a partir de las 5" / "starting at 5" → time >= earliestTime
  */
 
 function normalizeAscii(text) {
@@ -36,6 +40,70 @@ function parseClockToken(rawHour, rawMinute) {
   return padTime(hour, Number.isFinite(minute) ? minute : 0);
 }
 
+function buildAvailabilityConstraint({
+  earliestTime = null,
+  latestTime = null,
+  dayPart = null,
+  explicitCandidateTime = null,
+  earliestTimeInclusive = true,
+  raw = null
+} = {}) {
+  return {
+    type: "availability_constraint",
+    earliestTime,
+    latestTime,
+    dayPart,
+    explicitCandidateTime,
+    // Implements BR-102 / BR-107 — explicit lower-bound semantics.
+    earliestTimeInclusive: earliestTimeInclusive !== false,
+    raw
+  };
+}
+
+/**
+ * Infer inclusivity for legacy constraints that only have raw text.
+ * Prefer the explicit earliestTimeInclusive field when present.
+ */
+function resolveEarliestTimeInclusive(constraint = {}) {
+  if (typeof constraint?.earliestTimeInclusive === "boolean") {
+    return constraint.earliestTimeInclusive;
+  }
+
+  const t = normalizeAscii(constraint?.raw || "");
+  if (!t) {
+    // Bare earliestTime without phrasing → inclusive (>=), historical filter default.
+    return true;
+  }
+
+  // Inclusive phrases (check before generic "after").
+  if (
+    /\ba partir de\b/.test(t) ||
+    /\bdesde\b/.test(t) ||
+    /\bstarting at\b/.test(t) ||
+    /\bfrom\b.+\bonward\b/.test(t) ||
+    /\bat or after\b/.test(t) ||
+    /\bor later\b/.test(t) ||
+    /\bor after\b/.test(t) ||
+    /\bo despues\b/.test(t) ||
+    /\ben adelante\b/.test(t)
+  ) {
+    return true;
+  }
+
+  // Exclusive phrases.
+  if (
+    /\bdespues de\b/.test(t) ||
+    /\bluego de\b/.test(t) ||
+    /\bmas tarde de\b/.test(t) ||
+    /\blater than\b/.test(t) ||
+    /\bafter\b/.test(t)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Detect availability constraints (not appointment proposals).
  */
@@ -51,27 +119,23 @@ function parseAvailabilityConstraint(text) {
       t
     )
   ) {
-    return {
-      type: "availability_constraint",
+    return buildAvailabilityConstraint({
       earliestTime: "17:00",
-      latestTime: null,
       dayPart: "evening",
-      explicitCandidateTime: null,
+      earliestTimeInclusive: true,
       raw
-    };
+    });
   }
 
   if (
     /\b(hasta tarde|until late|working until late|trabajo hasta tarde)\b/.test(t)
   ) {
-    return {
-      type: "availability_constraint",
+    return buildAvailabilityConstraint({
       earliestTime: "17:00",
-      latestTime: null,
       dayPart: "evening",
-      explicitCandidateTime: null,
+      earliestTimeInclusive: true,
       raw
-    };
+    });
   }
 
   const until =
@@ -82,31 +146,57 @@ function parseAvailabilityConstraint(text) {
 
   if (until) {
     const clock = parseClockToken(until[1], until[2]);
-    return {
-      type: "availability_constraint",
-      earliestTime: clock, // available after this bound
-      latestTime: null,
+    // Free after getting off → exclusive of the bound.
+    return buildAvailabilityConstraint({
+      earliestTime: clock,
       dayPart: "evening",
-      explicitCandidateTime: null,
+      earliestTimeInclusive: false,
       raw
-    };
+    });
   }
 
-  // Implements BR-102 — "después de la 5" / "a partir de las 5" / bare "after 5"
-  // are availability constraints (PM-biased via parseClockToken), not generic clarify.
-  const after = t.match(
-    /\b(?:(?:puedo|me sirve|cualquier hora|anytime|anything|i can(?: do)?)\s+)?(?:despues de(?: la[s]?)?|luego de(?: la[s]?)?|a partir de(?: la[s]?)?|after)\s+(\d{1,2})(?::(\d{2}))?\b(?:\s*(?:pm|p\.?m\.?))?/
-  );
-  if (after) {
-    const clock = parseClockToken(after[1], after[2]);
-    return {
-      type: "availability_constraint",
+  // Inclusive lower bound — "a partir de" / "desde" / "starting at" / "at or after" / "5 or later".
+  // Implements BR-102 — must outrank generic "after" matching.
+  const inclusive =
+    t.match(
+      /\b(?:(?:puedo|me sirve|cualquier hora|anytime|anything|i can(?: do)?)\s+)?(?:a partir de(?: la[s]?)?|desde(?: la[s]?)?)\s+(\d{1,2})(?::(\d{2}))?\b(?:\s*(?:pm|p\.?m\.?)|\s+en adelante)?/
+    ) ||
+    t.match(
+      /\bstarting at\s+(\d{1,2})(?::(\d{2}))?\b(?:\s*(?:pm|p\.?m\.?))?/
+    ) ||
+    t.match(
+      /\bfrom\s+(\d{1,2})(?::(\d{2}))?\b(?:\s*(?:pm|p\.?m\.?))?\s+onward\b/
+    ) ||
+    t.match(
+      /\bat or after\s+(\d{1,2})(?::(\d{2}))?\b(?:\s*(?:pm|p\.?m\.?))?/
+    ) ||
+    t.match(
+      /\b(\d{1,2})(?::(\d{2}))?\s*(?:pm|p\.?m\.?)?\s+(?:o despues|or later|or after)\b/
+    );
+
+  if (inclusive) {
+    const clock = parseClockToken(inclusive[1], inclusive[2]);
+    return buildAvailabilityConstraint({
       earliestTime: clock,
-      latestTime: null,
       dayPart: "evening",
-      explicitCandidateTime: null,
+      earliestTimeInclusive: true,
       raw
-    };
+    });
+  }
+
+  // Exclusive lower bound — "después de" / "luego de" / "más tarde de" / "after" / "later than".
+  // Implements BR-102 — "después de la 5" / bare "after 5" are constraints (PM-biased).
+  const exclusive = t.match(
+    /\b(?:(?:puedo|me sirve|cualquier hora|anytime|anything|i can(?: do)?)\s+)?(?:despues de(?: la[s]?)?|luego de(?: la[s]?)?|mas tarde de(?: la[s]?)?|later than|after)\s+(\d{1,2})(?::(\d{2}))?\b(?:\s*(?:pm|p\.?m\.?))?/
+  );
+  if (exclusive) {
+    const clock = parseClockToken(exclusive[1], exclusive[2]);
+    return buildAvailabilityConstraint({
+      earliestTime: clock,
+      dayPart: "evening",
+      earliestTimeInclusive: false,
+      raw
+    });
   }
 
   const beforeCant = t.match(
@@ -114,14 +204,13 @@ function parseAvailabilityConstraint(text) {
   );
   if (beforeCant) {
     const clock = parseClockToken(beforeCant[2], beforeCant[3]);
-    return {
-      type: "availability_constraint",
+    // "can't before 5" → available at/after 5.
+    return buildAvailabilityConstraint({
       earliestTime: clock,
-      latestTime: null,
       dayPart: null,
-      explicitCandidateTime: null,
+      earliestTimeInclusive: true,
       raw
-    };
+    });
   }
 
   return null;
@@ -284,7 +373,10 @@ function isTimeLikeToken(text) {
   return /^(\d{1,2})(:\d{2})?$/.test(t) || looksLikeDirectTimeProposal(text);
 }
 
-/** True when candidate HH:MM is strictly before earliestTime bound. */
+/**
+ * True when candidate HH:MM is strictly before earliestTime (legacy string API).
+ * Prefer violatesEarliestConstraint for inclusive/exclusive semantics.
+ */
 function isBeforeEarliestConstraint(candidateTime, earliestTime) {
   const c = String(candidateTime || "");
   const e = String(earliestTime || "");
@@ -294,12 +386,36 @@ function isBeforeEarliestConstraint(candidateTime, earliestTime) {
   return c < e;
 }
 
+/**
+ * True when candidate violates the normalized earliest bound.
+ * Exclusive → reject equality; inclusive → accept equality.
+ */
+function violatesEarliestConstraint(candidateTime, constraint = {}) {
+  const earliestTime =
+    typeof constraint === "string" ? constraint : constraint?.earliestTime;
+  const c = String(candidateTime || "");
+  const e = String(earliestTime || "");
+  if (!/^\d{2}:\d{2}$/.test(c) || !/^\d{2}:\d{2}$/.test(e)) {
+    return false;
+  }
+
+  const inclusive =
+    typeof constraint === "string"
+      ? true
+      : resolveEarliestTimeInclusive(constraint || {});
+
+  return inclusive ? c < e : c <= e;
+}
+
 module.exports = {
   parseAvailabilityConstraint,
+  buildAvailabilityConstraint,
+  resolveEarliestTimeInclusive,
   looksLikeDirectTimeProposal,
   resolveCandidateTime,
   applyDayPartToClock,
   isTimeLikeToken,
   isBeforeEarliestConstraint,
+  violatesEarliestConstraint,
   padTime
 };

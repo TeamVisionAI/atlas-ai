@@ -60,6 +60,7 @@ function afterFiveAfternoonContext(overrides = {}) {
       availabilityConstraint: {
         type: "availability_constraint",
         earliestTime: "17:00",
+        earliestTimeInclusive: false,
         latestTime: null,
         dayPart: "evening",
         explicitCandidateTime: null,
@@ -214,6 +215,47 @@ test("21. after 5 + 4 → conflict/clarification", () => {
   assert.equal(
     r.nextContext.knownFacts.availabilityConstraint.earliestTime,
     "17:00"
+  );
+});
+
+test("21b. after 5 + bare 5 → exclusive conflict (17:00 invalid)", () => {
+  const r = turn("5", afterFiveAfternoonContext());
+  assert.ok(
+    r.structuredDecision.reasonCodes.includes("AVAILABILITY_CONSTRAINT_CONFLICT")
+  );
+  assert.notEqual(r.nextContext.appointment?.proposedTime, "17:00");
+  assert.equal(
+    r.nextContext.knownFacts.availabilityConstraint.earliestTimeInclusive,
+    false
+  );
+});
+
+test("21c. a partir de las 5 + bare 5 → inclusive accept 17:00", () => {
+  const ctx = afterFiveAfternoonContext({
+    knownFacts: {
+      city: "Miami",
+      state: "FL",
+      cityCertainty: "confirmed",
+      stateCertainty: "confirmed",
+      coverage: "LOCAL",
+      workAuthorization: true,
+      preferredDayPart: "afternoon",
+      preferredMeetingType: "in_person",
+      availabilityConstraint: {
+        type: "availability_constraint",
+        earliestTime: "17:00",
+        earliestTimeInclusive: true,
+        latestTime: null,
+        dayPart: "evening",
+        explicitCandidateTime: null,
+        raw: "a partir de las 5"
+      }
+    }
+  });
+  const r = turn("5", ctx);
+  assert.equal(r.nextContext.appointment?.proposedTime, "17:00");
+  assert.ok(
+    !r.structuredDecision.reasonCodes.includes("AVAILABILITY_CONSTRAINT_CONFLICT")
   );
 });
 

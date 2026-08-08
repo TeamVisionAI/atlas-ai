@@ -23,6 +23,10 @@ const { renderCustomerReply } = require("./responseRenderer");
 const { authorizeSideEffects } = require("./sideEffectAuthorizer");
 const { containsInternalDiagnostics } = require("./sanitize");
 const { buildNextContextFromInterpretation } = require("./contextTurnUpdate");
+const {
+  resolveAvailabilityForTurn,
+  resolveAvailabilityForTurnSync
+} = require("./schedulingAvailabilityReader");
 
 /**
  * Run one Recruit AI v2 decision cycle.
@@ -77,6 +81,17 @@ async function processRecruitAiV2Turn({
     options
   });
 
+  // Implements BR-107 — read-only availability injection (never writes).
+  let resolvedAvailability = availability;
+  if (!options.forceSafeFailure && resolvedAvailability == null) {
+    resolvedAvailability = await resolveAvailabilityForTurn({
+      context: loaded,
+      interpretation,
+      availability: null,
+      options
+    });
+  }
+
   let structuredDecision;
 
   if (options.forceSafeFailure) {
@@ -89,7 +104,7 @@ async function processRecruitAiV2Turn({
     structuredDecision = decideConversationTurn({
       context: loaded,
       interpretation,
-      availability
+      availability: resolvedAvailability
     });
   }
 
@@ -205,6 +220,17 @@ function processRecruitAiV2TurnSync(args = {}) {
     options
   });
 
+  // Implements BR-107 — sync path uses fixtures / getSlotsSync only (no live Calendar).
+  let resolvedAvailability = availability;
+  if (!options.forceSafeFailure && resolvedAvailability == null) {
+    resolvedAvailability = resolveAvailabilityForTurnSync({
+      context: loaded,
+      interpretation,
+      availability: null,
+      options
+    });
+  }
+
   let structuredDecision = options.forceSafeFailure
     ? decideSafeFailure({
         context: loaded,
@@ -214,7 +240,7 @@ function processRecruitAiV2TurnSync(args = {}) {
     : decideConversationTurn({
         context: loaded,
         interpretation,
-        availability
+        availability: resolvedAvailability
       });
 
   let responsePlan = buildResponsePlan(structuredDecision);

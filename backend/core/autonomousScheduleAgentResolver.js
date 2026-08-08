@@ -227,5 +227,6 @@ module.exports = {
   isUnsafeCustomerScheduleMessage,
   isEligibleScheduleAgent,
   readConfiguredDefaultRecruiterId,
+  loadOrganizationSettingsRow,
   findActiveOrganizationRvp
 };
