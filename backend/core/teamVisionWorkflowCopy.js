@@ -269,9 +269,10 @@ function getCompensationFaqAnswer(language, detailKind = "general") {
     );
   }
   if (kind === "pay_how" || kind === "source") {
+    // Implements BR-106 — direct pay-mechanics answer (not bare Continuemos / interview-only evasion).
     return es
-      ? "La compensación depende de la producción y del nivel de contrato. En la entrevista te explican de forma clara cómo funciona."
-      : "Compensation depends on production and contract level. The interview explains clearly how it works.";
+      ? "La compensación es basada en producción y depende de tu nivel de contrato; no es un salario fijo por hora."
+      : "Compensation is production-based and depends on your contract level; it isn't fixed hourly pay.";
   }
 
   // Broad "cómo voy a ganar dinero" / "how do I make money"

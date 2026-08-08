@@ -1160,6 +1160,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-106 — Recruit AI Short Pay-Mechanics Compensation Phrase Recognition
+
+**Implements:** Recognize short pay-mechanics phrases (`como pagan`, `cómo es el pago`, `how do they pay`, pay structure, …) as existing `compensation_question` / `pay_how`; answer directly from canonical production-based compensation knowledge; never map to name/generic Continuemos; preserve `awaiting_availability` and preferred time when availability is unresolved.  
+**Domain:** Recruit AI / Conversation / FAQ routing  
+**Depends on:** BR-081, BR-088, BR-095, BR-104, BR-105  
+**Related:** BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/compensationQuestion.js`, interpreter name blocklist, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2ShortPayMechanicsBr106.test.js`  
+**Simulator:** `short-pay-mechanics-como-pagan`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/34_SHORT_PAY_MECHANICS.md`
+
+### Rules
+
+1. **Reuse intent** — `compensation_question` + `pay_how` subtype; no parallel top-level intent.
+2. **Priority** — Pay-mechanics phrases outrank name extraction, soft ack, fragment, and generic clarify.
+3. **Direct answer** — Production-based / not fixed hourly; no Continuemos; no fabricated amounts/%.
+4. **Lifecycle** — While `awaiting_availability`, answer FAQ without inventing a slot, confirmation, or handoff.
+5. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-105 — Recruit AI Constraint-Preserving Resume + Direct Compensation Answers
 
 **Implements:** After availability constraints (e.g. after 5 → `earliestTime=17:00`), FAQ/objection interruptions must resume the most specific pending time ask (after-5), not a degraded day-part-only prompt; answer compensation subtypes with direct yes/no supported by canonical FAQ; omit mechanical “Por cierto” on FAQ resume; reject bare hours before the earliest bound.  

@@ -669,7 +669,7 @@ function looksLikeName(text) {
   }
   // Never treat authorization / location / FAQ phrasing as a name.
   if (
-    /\b(permiso|autoriz|authorization|vivo|live in|digo|insurance|licen[cs]ia|about)\b/i.test(
+    /\b(permiso|autoriz|authorization|vivo|live in|digo|insurance|licen[cs]ia|about|pagan|pago|salario|sueldo|comision|comisión|compensacion|compensación)\b/i.test(
       trimmed
     )
   ) {

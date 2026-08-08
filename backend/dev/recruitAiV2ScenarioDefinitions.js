@@ -2713,6 +2713,161 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "short-pay-mechanics-como-pagan",
+    name: "Short Pay-Mechanics: como pagan",
+    category: "production_defect",
+    description:
+      "BR-106 — como pagan is pay_how compensation during awaiting_availability; no Continuemos; preserve 17:30 preference.",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "sp01",
+        text: "hola",
+        inboundMessageId: "sim-wamid.short-pay.t01",
+        expect: {
+          intent: "greeting",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp02",
+        text: "Miami",
+        inboundMessageId: "sim-wamid.short-pay.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp03",
+        text: "si",
+        inboundMessageId: "sim-wamid.short-pay.t03",
+        setup: {
+          lastQuestionAsked: "confirm_location",
+          lastAtlasOutboundText: "Perfecto. ¿Miami, Florida?"
+        },
+        expect: {
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp04",
+        text: "soy residente",
+        inboundMessageId: "sim-wamid.short-pay.t04",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp05",
+        text: "tarde",
+        inboundMessageId: "sim-wamid.short-pay.t05",
+        setup: {
+          lastQuestionAsked: "ask_day_part",
+          lastAtlasOutboundText: "¿Prefieres en la mañana o en la tarde?"
+        },
+        expect: {
+          intent: "provide_day_part",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp06",
+        text: "despues de las 5",
+        inboundMessageId: "sim-wamid.short-pay.t06",
+        expect: {
+          intent: "provide_availability_constraint",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp07",
+        text: "5:30",
+        inboundMessageId: "sim-wamid.short-pay.t07",
+        expect: {
+          intent: "scheduling_counteroffer",
+          proposedTime: "17:30",
+          pendingQuestion: "awaiting_availability",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp08",
+        text: "ok",
+        inboundMessageId: "sim-wamid.short-pay.t08",
+        expect: {
+          intent: "soft_acknowledgement",
+          proposedTime: "17:30",
+          pendingQuestion: "awaiting_availability",
+          shouldEscalate: false,
+          sideEffectsDenied: true,
+          replyExcludes: ["anoté tu confirmación", "compañero finalizará"]
+        }
+      },
+      {
+        id: "sp09",
+        text: "a como la hora?",
+        inboundMessageId: "sim-wamid.short-pay.t09",
+        expect: {
+          intent: "compensation_question",
+          proposedTime: "17:30",
+          pendingQuestion: "awaiting_availability",
+          replyIncludes: ["No."],
+          replyExcludes: ["Continuemos", "Por cierto", "$"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "sp10",
+        text: "como pagan?",
+        inboundMessageId: "sim-wamid.short-pay.t10",
+        expect: {
+          intent: "compensation_question",
+          proposedTime: "17:30",
+          pendingQuestion: "awaiting_availability",
+          replyIncludes: ["producción"],
+          replyExcludes: [
+            "Continuemos",
+            "Gracias — eso ayuda",
+            "Por cierto",
+            "anoté tu confirmación",
+            "$",
+            "%"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 
