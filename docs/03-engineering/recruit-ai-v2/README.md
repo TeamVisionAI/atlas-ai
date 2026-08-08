@@ -96,3 +96,4 @@ Do **not** change without an explicit sprint:
 - Customer-facing sends/booking/BR-080 writes remain denied
 - Production CE (`semanticConversationEngine`) is unchanged as the customer-visible authority unless BR-114 live authoring is enabled for the one-user allowlist
 - BR-117 readiness: genuine reassertion copy only; invite email hydrates into `knownFacts` without blocking booking
+- BR-118: non-text WhatsApp media soft-acks without reopen clarification / scheduling

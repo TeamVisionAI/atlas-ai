@@ -112,6 +112,11 @@ const {
   AGENT_RESOLUTION,
   READ_STATUS
 } = require("./schedulingAvailabilityReader");
+const {
+  classifyInboundMedia,
+  isPostConfirmDeferredSchedulingState,
+  decideNonTextMediaTurn
+} = require("./nonTextMedia");
 
 module.exports = {
   processRecruitAiV2Turn,
@@ -183,5 +188,8 @@ module.exports = {
   filterSlotsByConstraints,
   AGENT_RESOLUTION,
   READ_STATUS,
+  classifyInboundMedia,
+  isPostConfirmDeferredSchedulingState,
+  decideNonTextMediaTurn,
   ...constants
 };

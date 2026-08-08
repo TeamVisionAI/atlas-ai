@@ -1252,6 +1252,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-118 — Non-Text WhatsApp Media Dialogue Guard
+
+**Implements:** Non-text WhatsApp media (document/image/audio/video/sticker/location/…) must not enter the normal Recruit AI v2 text intent/clarification path merely because the transport normalized a placeholder like `[document message]`.  
+**Domain:** Recruit AI / live WhatsApp dialogue continuity  
+**Depends on:** BR-081, BR-111, BR-114, BR-117  
+**Status:** Implemented in code; **execution remains OFF**  
+**Engine target:** `recruitAiV2/nonTextMedia.js`; `orchestrator` early short-circuit; `liveAuthoringBridge` passes structured `messageType`; `responseRenderer.acknowledge_non_text_media`  
+**Tests:** `backend/test/recruitAiV2NonTextMediaDialogueGuardBr118.test.js`
+
+### Rules
+
+1. **Structured type first** — Classify from normalized WhatsApp `messageType`. Placeholder text `/^\[type message\]$/` is defensive fallback only.
+2. **Intent `non_text_media`** — Media is not prospect language; never invent `unknown` → `clarify_once` from the placeholder alone.
+3. **Soft ack** — Locale-aware short acknowledgment (e.g. “Recibí el archivo…”) may send; transport may still persist the inbound event.
+4. **State preserved** — Do not change `proposedDate` / `proposedTime` / offered slots, `lastQuestionAsked`, `lastOfferMade`, `lastProspectIntent`, `pendingClarification`, or `clarificationCount`.
+5. **Post-confirm / deferred** — When `lastOfferMade=appointment_confirm_deferred` (or equivalent confirmed proposed slot under execution-off handoff), media must not reopen scheduling or imply a missing field.
+6. **Pre-confirm** — Soft-ack and keep the pending question/state; do not bump ambiguity as if free-form unknown text arrived.
+7. **Text-like types unchanged** — `text` / `button` / `interactive` continue through the normal interpreter.
+8. **Boundaries** — Do not enable execution. Do not redesign WhatsApp parsing. Do not mutate appointments/Calendar/BR-080.
+
+---
+
 ## BR-113 — Live Execution Attribution Telemetry
 
 **Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  

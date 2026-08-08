@@ -116,6 +116,9 @@ const COPY = Object.freeze({
       "I understand. Thanks for letting us know. I wish you every success.",
     acknowledge_opt_out_no_write:
       "Understood — I've noted your request to stop messages. Nothing was changed automatically.",
+    // Implements BR-118 — soft media ack; do not ask for unrelated missing fields.
+    acknowledge_non_text_media:
+      "I received the file. A teammate can review it.",
     acknowledge_fixed_employment_preference: null,
     acknowledge_current_not_fit_no_write: null,
     acknowledge_known_availability:
@@ -259,6 +262,9 @@ const COPY = Object.freeze({
       "Entiendo. Gracias por avisarnos. Te deseo mucho éxito.",
     acknowledge_opt_out_no_write:
       "Entendido — anoté tu solicitud de no recibir más mensajes. No se modificó nada automáticamente.",
+    // Implements BR-118 — soft media ack; do not ask for unrelated missing fields.
+    acknowledge_non_text_media:
+      "Recibí el archivo. Un compañero podrá revisarlo.",
     acknowledge_fixed_employment_preference: null,
     acknowledge_current_not_fit_no_write: null,
     acknowledge_known_availability:
