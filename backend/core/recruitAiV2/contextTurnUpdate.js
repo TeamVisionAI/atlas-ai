@@ -38,15 +38,22 @@ function buildNextContextFromInterpretation({
       interpretation.intent === "reschedule_request") &&
     interpretation.entities?.requestedTime
   ) {
-    nextContext.appointment = {
-      ...nextContext.appointment,
-      proposedTime: interpretation.entities.requestedTime,
-      status:
-        interpretation.intent === "reschedule_request" ||
-        nextContext.appointment?.status === "confirmed"
-          ? "reschedule_requested"
-          : nextContext.appointment?.status || "proposed"
-    };
+    // Implements BR-105 — do not store times that conflict with earliestTime.
+    const reasonCodes = structuredDecision?.reasonCodes || [];
+    const constraintConflict = reasonCodes.includes(
+      "AVAILABILITY_CONSTRAINT_CONFLICT"
+    );
+    if (!constraintConflict) {
+      nextContext.appointment = {
+        ...nextContext.appointment,
+        proposedTime: interpretation.entities.requestedTime,
+        status:
+          interpretation.intent === "reschedule_request" ||
+          nextContext.appointment?.status === "confirmed"
+            ? "reschedule_requested"
+            : nextContext.appointment?.status || "proposed"
+      };
+    }
   }
 
   if (interpretation.preferredLanguage && interpretation.preferredLanguage !== "unknown") {
@@ -240,12 +247,13 @@ function buildNextContextFromInterpretation({
     interpretation.intent === "provide_availability_constraint" &&
     interpretation.entities?.availabilityConstraint
   ) {
+    // Implements BR-105 — keep confirmed day_part; do not overwrite afternoon→evening.
     nextContext.knownFacts = {
       ...nextContext.knownFacts,
       availabilityConstraint: interpretation.entities.availabilityConstraint,
       preferredDayPart:
-        interpretation.entities.availabilityConstraint.dayPart ||
         nextContext.knownFacts?.preferredDayPart ||
+        interpretation.entities.availabilityConstraint.dayPart ||
         null
     };
   }
@@ -265,19 +273,23 @@ function buildNextContextFromInterpretation({
       interpretation.intent === "reschedule_request") &&
     interpretation.entities?.requestedTime
   ) {
-    const prior = nextContext.appointment?.proposedTime || null;
-    const history = Array.isArray(nextContext.appointment?.proposedTimeHistory)
-      ? [...nextContext.appointment.proposedTimeHistory]
-      : [];
-    if (prior && prior !== interpretation.entities.requestedTime) {
-      history.push(prior);
+    // Implements BR-105 — skip conflicting times rejected by the decision engine.
+    const reasonCodes = structuredDecision?.reasonCodes || [];
+    if (!reasonCodes.includes("AVAILABILITY_CONSTRAINT_CONFLICT")) {
+      const prior = nextContext.appointment?.proposedTime || null;
+      const history = Array.isArray(nextContext.appointment?.proposedTimeHistory)
+        ? [...nextContext.appointment.proposedTimeHistory]
+        : [];
+      if (prior && prior !== interpretation.entities.requestedTime) {
+        history.push(prior);
+      }
+      nextContext.appointment = {
+        ...nextContext.appointment,
+        proposedTime: interpretation.entities.requestedTime,
+        proposedTimeHistory: history,
+        status: nextContext.appointment?.status || "proposed"
+      };
     }
-    nextContext.appointment = {
-      ...nextContext.appointment,
-      proposedTime: interpretation.entities.requestedTime,
-      proposedTimeHistory: history,
-      status: nextContext.appointment?.status || "proposed"
-    };
   }
 
   return nextContext;

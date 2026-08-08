@@ -1160,6 +1160,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-105 — Recruit AI Constraint-Preserving Resume + Direct Compensation Answers
+
+**Implements:** After availability constraints (e.g. after 5 → `earliestTime=17:00`), FAQ/objection interruptions must resume the most specific pending time ask (after-5), not a degraded day-part-only prompt; answer compensation subtypes with direct yes/no supported by canonical FAQ; omit mechanical “Por cierto” on FAQ resume; reject bare hours before the earliest bound.  
+**Domain:** Recruit AI / Scheduling lifecycle + FAQ continuity  
+**Depends on:** BR-081, BR-084, BR-088, BR-102, BR-103, BR-104  
+**Related:** BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `decisionEngine.resolvePendingResume`, `responseRenderer.composeFaqThenResume`, `schedulingConstraints`, `teamVisionWorkflowCopy`, `contextTurnUpdate`  
+**Tests:** `backend/test/recruitAiV2ConstraintPreservingResumeBr105.test.js`  
+**Simulator:** `constraint-preserving-resume-compensation`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/33_CONSTRAINT_PRESERVING_RESUME.md`
+
+### Rules
+
+1. **Most-specific resume** — `earliestTime` / `latestTime` outrank day-part-only prompts when asking for a specific time.
+2. **No degradation** — FAQ/objection interruptions preserve modality, day_part, constraints, and preferred time.
+3. **Direct compensation answers** — Yes/no where canonical knowledge supports it (production-based; not hourly; not guaranteed fixed salary); no invented rates/%.
+4. **Natural resume** — Do not mechanically prepend “Por cierto” / “By the way” on FAQ→workflow resume.
+5. **Constraint precedence** — Bare hours before `earliestTime` clarify; valid later hours inherit PM context (after 5 + 6 → 18:00).
+6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-104 — Recruit AI Compensation / Earnings FAQ Routing During Scheduling
 
 **Implements:** Recognize direct compensation/earnings questions (`entonces como voy a ganar dinero`, `cómo me pagan`, `how do I make money`, …) as existing `compensation_question` before pending `ask_time` / location / fragment / generic clarify; answer concisely with progressive disclosure; resume the exact pending scheduling question without income guarantees.  

@@ -2538,8 +2538,178 @@ const RECRUIT_AI_V2_SCENARIOS = [
             "ilimitad",
             "garantizado $",
             "compañero de Team Vision te contactará",
-            "mañana o en la tarde"
+            "mañana o en la tarde",
+            "Por cierto"
           ]
+        }
+      }
+    ]
+  },
+  {
+    id: "constraint-preserving-resume-compensation",
+    name: "Constraint-Preserving Resume + Direct Compensation",
+    category: "production_defect",
+    description:
+      "BR-105 — after-5 earliestTime survives FAQ interruptions; resume asks after-5 time; direct commission/salary/hourly answers; no Por cierto.",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "cp01",
+        text: "hola",
+        inboundMessageId: "sim-wamid.constraint-resume.t01",
+        expect: {
+          intent: "greeting",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp02",
+        text: "miami fl",
+        inboundMessageId: "sim-wamid.constraint-resume.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp03",
+        text: "si soy residente",
+        inboundMessageId: "sim-wamid.constraint-resume.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp04",
+        text: "de que se trata",
+        inboundMessageId: "sim-wamid.constraint-resume.t04",
+        expect: {
+          intent: "job_opportunity_question",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp05",
+        text: "no conozco a nadie",
+        inboundMessageId: "sim-wamid.constraint-resume.t05",
+        expect: {
+          intent: "network_objection",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp06",
+        text: "tarde",
+        inboundMessageId: "sim-wamid.constraint-resume.t06",
+        setup: {
+          lastQuestionAsked: "ask_day_part",
+          lastAtlasOutboundText: "¿Prefieres en la mañana o en la tarde?"
+        },
+        expect: {
+          intent: "provide_day_part",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp07",
+        text: "entonces como voy a ganar dinero?",
+        inboundMessageId: "sim-wamid.constraint-resume.t07",
+        expect: {
+          intent: "compensation_question",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          replyExcludes: ["Por cierto", "Con gusto te ayudo"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp08",
+        text: "despues de las 5",
+        inboundMessageId: "sim-wamid.constraint-resume.t08",
+        expect: {
+          intent: "provide_availability_constraint",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          replyIncludes: ["después de las 5"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp09",
+        text: "a como la hora?",
+        inboundMessageId: "sim-wamid.constraint-resume.t09",
+        expect: {
+          intent: "compensation_question",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          replyIncludes: ["No.", "después de las 5"],
+          replyExcludes: [
+            "Por cierto",
+            "hora en la tarde te funciona",
+            "$",
+            "Con gusto te ayudo"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp10",
+        text: "es salario fijo?",
+        inboundMessageId: "sim-wamid.constraint-resume.t10",
+        expect: {
+          intent: "compensation_question",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          replyIncludes: ["No.", "después de las 5"],
+          replyExcludes: ["Por cierto", "hora en la tarde te funciona"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cp11",
+        text: "es por comision?",
+        inboundMessageId: "sim-wamid.constraint-resume.t11",
+        expect: {
+          intent: "compensation_question",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          replyIncludes: ["Sí.", "producción", "después de las 5"],
+          replyExcludes: [
+            "Por cierto",
+            "hora en la tarde te funciona",
+            "%",
+            "ilimitad"
+          ],
+          shouldEscalate: false,
+          sideEffectsDenied: true
         }
       }
     ]
