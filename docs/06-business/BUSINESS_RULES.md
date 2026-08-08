@@ -1160,6 +1160,24 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-113 — Live Execution Attribution Telemetry
+
+**Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  
+**Domain:** Recruit AI / observability  
+**Depends on:** BR-111, BR-112  
+**Status:** Implemented (telemetry only; no execution behavior change)  
+**Engine target:** `recruitAiV2/liveExecutionAttribution.js`; `semanticConversationEngine.completeInterview`  
+**Tests:** `backend/test/recruitAiV2LiveExecutionAttributionBr113.test.js`
+
+### Rules
+
+1. **Telemetry only** — Do not change authorization, fallback, WhatsApp routing, or appointment lifecycle.
+2. **Stages** — `recruit_ai_v2_live_execution_not_attempted` (live path off); `recruit_ai_v2_live_execution_used` (v2 success); `recruit_ai_v2_live_execution_not_used` (v2 attempted, no mutation); `recruit_ai_v2_legacy_fallback_performed` (only after legacy CE `executeScheduleInterview` runs following a v2 attempt).
+3. **No shadow/advisory emission** of these live attribution stages.
+4. **Deterministic classification** — one booking attempt → one final `executionSource`.
+
+---
+
 ## BR-112 — Recruit AI v2 Live Execution Path Cutover Capability
 
 **Implements:** Smallest authoritative live Conversation Engine bridge so the live WhatsApp path can pass `options.allowExecution=true` under a fail-closed server-side live-path flag — without enabling BR-111 execution env vars or activating the canary.  

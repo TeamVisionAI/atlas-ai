@@ -37,6 +37,7 @@ const {
   attemptLiveV2AppointmentExecution,
   buildLiveConfirmContext
 } = require("./liveExecutionBridge");
+const liveExecutionAttribution = require("./liveExecutionAttribution");
 const { containsInternalDiagnostics, sanitizeCustomerCopy } = require("./sanitize");
 const {
   sanitizeContextForPersistence,
@@ -127,6 +128,7 @@ module.exports = {
   resolveAllowExecutionForLiveTurn,
   attemptLiveV2AppointmentExecution,
   buildLiveConfirmContext,
+  liveExecutionAttribution,
   containsInternalDiagnostics,
   sanitizeCustomerCopy,
   sanitizeContextForPersistence,
