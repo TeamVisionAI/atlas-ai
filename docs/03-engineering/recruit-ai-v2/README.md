@@ -45,6 +45,9 @@
 | [35_AVAILABLE_SLOT_OFFERING.md](./35_AVAILABLE_SLOT_OFFERING.md) | BR-107 — offer real spaced slots after constraints |
 | [36_ROLLING_AVAILABILITY_OFFER.md](./36_ROLLING_AVAILABILITY_OFFER.md) | BR-108 — rolling multi-date proactive availability offer |
 | [37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md](./37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md) | BR-109 / BR-110 — Playground configured-agent bind + MANAGEMENT self Appointments + non-narrating copy |
+| [38_EXECUTION_CANARY_BOUNDARY.md](./38_EXECUTION_CANARY_BOUNDARY.md) | BR-111 — fail-closed one-user execution canary |
+| [39_LIVE_EXECUTION_PATH_CUTOVER.md](./39_LIVE_EXECUTION_PATH_CUTOVER.md) | BR-112 — live CE may request allowExecution |
+| [40_LIVE_AUTHORING_CUTOVER.md](./40_LIVE_AUTHORING_CUTOVER.md) | BR-114 — one-user live WhatsApp reply authoring cutover |
 
 ## Regression fixture
 
@@ -74,7 +77,8 @@ Do **not** change without an explicit sprint:
 5. ~~Continuous context capture (Phase 3B)~~ — separate flags; **defaults off** in code; 100% capture ≠ 10% shadow
 6. ~~Fail-closed one-user execution canary boundary (BR-111)~~ — authorizer + create-only executor; **Railway execution vars unset**
 7. ~~Live CE execution-path cutover capability (BR-112)~~ — live bridge may pass `allowExecution`; **live-path + execution vars unset**
-8. Controlled canary activation (enable env only after review; exact one-user allowlists)
+8. ~~One-user live conversation authoring cutover (BR-114)~~ — hub may let v2 author replies; **authoring + execution vars unset**
+9. Controlled canary activation (enable authoring first with execution OFF; then execution after validation)
 
 ### Phase 2–3B notes
 

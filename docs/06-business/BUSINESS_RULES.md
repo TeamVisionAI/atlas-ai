@@ -1161,6 +1161,32 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-114 — Recruit AI v2 One-User Live Conversation Authoring Cutover
+
+**Implements:** Fail-closed hub-level gate so Recruit AI v2 may **author** customer-facing WhatsApp replies for exactly one allowlisted org + acting RVP — independent of BR-111 mutation authorization.  
+**Domain:** Recruit AI / live conversation authoring cutover  
+**Depends on:** BR-049, BR-050, BR-075, BR-079, BR-080, BR-081, BR-107, BR-108, BR-111, BR-112  
+**Related:** BR-113 attribution remains for booking attempts; shadow/advisory never author live  
+**Status:** Implemented in code; **live authoring OFF** and **execution OFF** in production  
+**Engine target:** `recruitAiV2/liveAuthoringConfig.js`; `liveAuthoringBridge.js`; `communicationHub.processNormalizedInboundMessage`  
+**Tests:** `backend/test/recruitAiV2LiveAuthoringBr114.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/40_LIVE_AUTHORING_CUTOVER.md`
+
+### Rules
+
+1. **Authoring ≠ execution** — `RECRUIT_AI_V2_LIVE_AUTHORING_ENABLED==="true"` only allows v2 to author the customer-facing reply. BR-111 still independently grants or denies appointment mutation. Authoring may be ON while execution remains OFF.
+2. **Fail-closed authoring gates (ALL required)** — authoring flag exact true; exact `organizationId` in `RECRUIT_AI_V2_LIVE_AUTHORING_ORGANIZATION_IDS`; exact acting `atlas_users.id` in `RECRUIT_AI_V2_LIVE_AUTHORING_USER_IDS`. Missing/malformed/empty/mismatched → legacy CE unchanged.
+3. **No role-derived permission** — Being RVP / DL / RL never authorizes authoring.
+4. **Hub intercept before legacy CE** — Eligible turns are authored in `communicationHub.processNormalizedInboundMessage` before `handleIncomingMessage`. Successful v2 replies skip legacy CE for that turn.
+5. **Canonical transport only** — Exactly one outbound via existing `sendAndPersistWhatsAppMessage`. No v2 WhatsApp sender.
+6. **Durable context continuity** — Live authoring loads/persists `recruit_ai_conversation_contexts` so every relevant turn (including name/email) continues the same scheduling flow — never an isolated late-stage message.
+7. **Canonical availability + timezone** — Offers use Sprint 22 `getSlots` / RVP `appointmentProfile` with BR-079/BR-050 wall-clock→UTC conversion. Legacy Mon–Fri-only `buildOfferedTimes` must not author canary scheduling offers. Org office hours must not truncate personal evening/weekend availability.
+8. **Fallback only on technical failure** — Valid v2 decisions (including `clarify_once`) remain v2-owned. Throw/timeout/empty/unsafe text may fall through to legacy CE once.
+9. **Shadow/advisory never author live** — Post-live advisory remains non-authoring.
+10. **Boundaries** — Do not enable Railway authoring/execution vars in this implementation sprint. Do not cut all users to v2. Do not redesign BR-049/050/111.
+
+---
+
 ## BR-113 — Live Execution Attribution Telemetry
 
 **Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  

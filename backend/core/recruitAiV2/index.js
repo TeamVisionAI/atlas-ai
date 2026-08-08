@@ -38,6 +38,16 @@ const {
   buildLiveConfirmContext
 } = require("./liveExecutionBridge");
 const liveExecutionAttribution = require("./liveExecutionAttribution");
+const {
+  resolveLiveAuthoringConfig,
+  isLiveAuthoringFlagEnabled,
+  isEligibleForLiveAuthoring,
+  resolveActingUserIdFromProspect
+} = require("./liveAuthoringConfig");
+const {
+  attemptLiveV2Authoring,
+  STAGES: LIVE_AUTHORING_STAGES
+} = require("./liveAuthoringBridge");
 const { containsInternalDiagnostics, sanitizeCustomerCopy } = require("./sanitize");
 const {
   sanitizeContextForPersistence,
@@ -129,6 +139,12 @@ module.exports = {
   attemptLiveV2AppointmentExecution,
   buildLiveConfirmContext,
   liveExecutionAttribution,
+  resolveLiveAuthoringConfig,
+  isLiveAuthoringFlagEnabled,
+  isEligibleForLiveAuthoring,
+  resolveActingUserIdFromProspect,
+  attemptLiveV2Authoring,
+  LIVE_AUTHORING_STAGES,
   containsInternalDiagnostics,
   sanitizeCustomerCopy,
   sanitizeContextForPersistence,
