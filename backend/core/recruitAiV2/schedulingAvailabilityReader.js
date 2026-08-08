@@ -5,11 +5,6 @@
  * Never books, reserves, creates, updates, deletes, or mutates BR-080 / Calendar / WhatsApp.
  */
 
-/**
- * Prefer ~3× 30-min interview grid so 17:30 pairs with 19:00, not 18:30.
- * If no slot meets spacing, fall back to the next later real slot.
- */
-const DEFAULT_SPACING_MINUTES = 90;
 const DEFAULT_MAX_CANDIDATES = 2;
 const DEFAULT_TIMEZONE = "America/New_York";
 
@@ -175,14 +170,17 @@ function sortSlotsChronologically(slots) {
 }
 
 /**
- * Slot A = first; Slot B = earliest ≥ spacingMinutes later, else next later real slot.
- * Never fabricates times.
+ * Diversity-of-choice heuristic (BR-107 correction):
+ * - Slot A = earliest valid real slot
+ * - Slot B = latest valid real slot when a distinct later slot exists
+ * This avoids adjacent near-duplicates when farther REAL options exist, without a
+ * hardcoded 60/90-minute (or Nx duration) minimum. If only adjacent slots exist,
+ * offer them. Never fabricate; never suppress the only valid second slot.
  */
 function selectCandidateSlots(
   slots,
   {
     maxCandidates = DEFAULT_MAX_CANDIDATES,
-    spacingMinutes = DEFAULT_SPACING_MINUTES,
     rejectTimes = []
   } = {}
 ) {
@@ -195,29 +193,17 @@ function selectCandidateSlots(
   }
 
   const first = ordered[0];
-  const selected = [first];
-  if (maxCandidates < 2) {
-    return selected;
+  if (maxCandidates < 2 || ordered.length === 1) {
+    return [first];
   }
 
-  const firstMinutes = timeKeyToMinutes(first.timeKey || first.time);
-  const spaced = ordered.find((slot) => {
-    if (slot === first) {
-      return false;
-    }
-    const minutes = timeKeyToMinutes(slot.timeKey || slot.time);
-    return minutes != null && firstMinutes != null && minutes >= firstMinutes + spacingMinutes;
-  });
-  if (spaced) {
-    selected.push(spaced);
-    return selected;
+  const last = ordered[ordered.length - 1];
+  const firstKey = `${first.dateKey || first.date}|${first.timeKey || first.time}`;
+  const lastKey = `${last.dateKey || last.date}|${last.timeKey || last.time}`;
+  if (firstKey === lastKey) {
+    return [first];
   }
-
-  const nextLater = ordered.find((slot) => slot !== first);
-  if (nextLater) {
-    selected.push(nextLater);
-  }
-  return selected;
+  return [first, last];
 }
 
 function buildUnavailableResult({
@@ -293,7 +279,6 @@ async function readCandidateSlots({
   constraints = {},
   purpose = "recruiting_interview",
   maxCandidates = DEFAULT_MAX_CANDIDATES,
-  spacingMinutes = DEFAULT_SPACING_MINUTES,
   rejectTimes = [],
   fixtureSlots = null,
   getSlots = null,
@@ -365,7 +350,6 @@ async function readCandidateSlots({
   const filtered = filterSlotsByConstraints(rawSlots, constraints);
   const offered = selectCandidateSlots(filtered, {
     maxCandidates,
-    spacingMinutes,
     rejectTimes
   });
 
@@ -462,7 +446,6 @@ async function resolveAvailabilityForTurn({
     fixtureSlots,
     getSlots: options.getSlots || null,
     rejectTimes: avoidPrevious ? rejectTimes : [],
-    spacingMinutes: options.spacingMinutes || DEFAULT_SPACING_MINUTES,
     maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
   });
 
@@ -483,7 +466,6 @@ function readCandidateSlotsSync(params = {}) {
     fixtureSlots = null,
     getSlotsSync = null,
     maxCandidates = DEFAULT_MAX_CANDIDATES,
-    spacingMinutes = DEFAULT_SPACING_MINUTES,
     rejectTimes = [],
     maxResults = 24,
     purpose = "recruiting_interview"
@@ -559,7 +541,6 @@ function readCandidateSlotsSync(params = {}) {
   const filtered = filterSlotsByConstraints(rawSlots, constraints);
   const offered = selectCandidateSlots(filtered, {
     maxCandidates,
-    spacingMinutes,
     rejectTimes
   });
 
@@ -629,7 +610,6 @@ function resolveAvailabilityForTurnSync(args = {}) {
             .map((slot) => slot.time || slot.timeKey)
             .filter(Boolean)
         : [],
-    spacingMinutes: options.spacingMinutes || DEFAULT_SPACING_MINUTES,
     maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
   });
 
@@ -639,7 +619,6 @@ function resolveAvailabilityForTurnSync(args = {}) {
 module.exports = {
   AGENT_RESOLUTION,
   READ_STATUS,
-  DEFAULT_SPACING_MINUTES,
   resolveAvailabilityAgent,
   resolveConcreteScheduleDate,
   resolveConstraints,

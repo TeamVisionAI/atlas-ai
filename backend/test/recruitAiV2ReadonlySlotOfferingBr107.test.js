@@ -114,15 +114,25 @@ function turn(text, context, options = {}) {
   return { interpretation, structuredDecision, nextContext, rendered, availability };
 }
 
-test("selection: 17:30/18:00/19:00 → 17:30 + 19:00", () => {
-  const offered = selectCandidateSlots(slotsFromTimes(["17:30", "18:00", "19:00"]));
+test("selection diversity: many slots → first + last (not adjacent)", () => {
+  const offered = selectCandidateSlots(
+    slotsFromTimes(["17:30", "17:45", "18:00", "18:30", "19:00"])
+  );
   assert.deepEqual(
     offered.map((s) => s.timeKey),
     ["17:30", "19:00"]
   );
 });
 
-test("selection: 17:30/18:00 only → adjacent pair fallback", () => {
+test("selection: only adjacent pair is still offered", () => {
+  const offered = selectCandidateSlots(slotsFromTimes(["17:30", "17:45"]));
+  assert.deepEqual(
+    offered.map((s) => s.timeKey),
+    ["17:30", "17:45"]
+  );
+});
+
+test("selection: 17:30/18:00 only → both offered", () => {
   const offered = selectCandidateSlots(slotsFromTimes(["17:30", "18:00"]));
   assert.deepEqual(
     offered.map((s) => s.timeKey),
@@ -152,24 +162,13 @@ test("filter: never offer before earliestTime", () => {
   );
 });
 
-test("selection: 17:30..19:30 prefers 17:30 + 19:00 (not 18:30)", () => {
-  const offered = selectCandidateSlots(
-    slotsFromTimes(["17:30", "18:00", "18:30", "19:00", "19:30"])
+test("selection: no fixed 60/90-minute threshold encoded", () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, "../core/recruitAiV2/schedulingAvailabilityReader.js"),
+    "utf8"
   );
-  assert.deepEqual(
-    offered.map((s) => s.timeKey),
-    ["17:30", "19:00"]
-  );
-});
-
-test("selection: prefer spaced over near-duplicate increments", () => {
-  const offered = selectCandidateSlots(
-    slotsFromTimes(["17:30", "17:45", "19:00"])
-  );
-  assert.deepEqual(
-    offered.map((s) => s.timeKey),
-    ["17:30", "19:00"]
-  );
+  assert.doesNotMatch(src, /DEFAULT_SPACING_MINUTES\s*=\s*(60|90)/);
+  assert.doesNotMatch(src, /spacingMinutes\s*=\s*(60|90)/);
 });
 
 test("agent resolution precedence + no random pick", () => {
@@ -198,7 +197,7 @@ test("agent resolution precedence + no random pick", () => {
 test("fixture offer: two slots render without anoto echo", () => {
   const ctx = baseContext({
     _availabilityFixture: {
-      slots: slotsFromTimes(["17:30", "18:00", "18:30", "19:00", "19:30"])
+      slots: slotsFromTimes(["17:30", "17:45", "18:00", "18:30", "19:00"])
     }
   });
   const r = turn("despues de las 5", ctx, {
@@ -207,7 +206,7 @@ test("fixture offer: two slots render without anoto echo", () => {
   assert.equal(r.structuredDecision.decision.nextAction, "offer_available_slots");
   assert.match(r.rendered.text, /5:30 PM/);
   assert.match(r.rendered.text, /7:00 PM/);
-  assert.doesNotMatch(r.rendered.text, /anoto que puedes/i);
+  assert.doesNotMatch(r.rendered.text, /anoto que puedes|5:45 PM/i);
   assert.equal(r.nextContext.appointment.previouslyOfferedSlots.length, 2);
   assert.equal(r.nextContext.appointment.previouslyOfferedSlots[0].time, "17:30");
   assert.equal(r.nextContext.appointment.previouslyOfferedSlots[1].time, "19:00");
@@ -322,11 +321,12 @@ test("explicit after-time not truncated at 18:00 by afternoon", () => {
     fixtureSlots: slotsFromTimes(["17:30", "18:00", "19:00", "19:30"])
   });
   assert.equal(read.status, READ_STATUS.AVAILABLE);
+  // Diversity heuristic: earliest + latest among filtered real slots.
   assert.deepEqual(
     read.offeredSlots.map((s) => s.timeKey),
-    ["17:30", "19:00"]
+    ["17:30", "19:30"]
   );
-  assert.ok(read.slots.some((s) => s.timeKey === "19:30"));
+  assert.ok(read.slots.some((s) => s.timeKey === "19:00"));
 });
 
 test("no-write / execution OFF / reader does not import legacy bookSlot", () => {

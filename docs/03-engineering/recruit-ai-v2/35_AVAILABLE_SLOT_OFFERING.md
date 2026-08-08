@@ -73,8 +73,7 @@ readCandidateSlots({
   date, dateEnd,     // org-local day keys (BR-079 / profile TZ)
   purpose: "recruiting_interview",
   constraints: { earliestTime, latestTime, dayPart }, // from knownFacts.availabilityConstraint
-  maxCandidates: 2,
-  spacingMinutes: 60 // default = 2 × SLOT_INTERVAL (30)
+  maxCandidates: 2
 }) → {
   ok: boolean,
   timezone,
@@ -105,13 +104,16 @@ Engine may return up to `maxResults` (default 8) on a 30-min grid. Reader then:
 
 1. **Filter** — keep slots with `timeKey >= earliestTime` (and `<= latestTime` if set).  
    - Do **not** rely solely on engine `timePreference: "afternoon"` for after-5: `AFTERNOON_RANGE` ends at **18:00**, which would drop 19:00. Use `timePreference: "any"` + post-filter.
-2. **Slot A** = first remaining slot chronologically.
-3. **Slot B** = earliest later slot with start ≥ Slot A + `spacingMinutes` (default **90** = 3×30). If none, take next later real slot rather than inventing.
-4. Cap at **2**. If 1 → offer one. If 0 → no-slot path.
+2. **Slot A** = earliest remaining real slot.
+3. **Slot B** = latest remaining distinct real slot (diversity-of-choice).  
+   - Avoids adjacent near-duplicates when farther real options exist.  
+   - If only two adjacent slots exist (e.g. 17:30 + 17:45), offer both.  
+   - **Not** a canonical 60/90-minute or Nx-duration minimum — those were examples only.
+4. Cap at **2**. If 1 → offer one. If 0 → no-slot path. Never fabricate; never suppress the only valid second slot.
 
 Example (real engine output only):  
-`17:30, 17:45*, 18:00, 19:00, 19:30` → prefer **17:30 + 19:00**  
-(\*17:45 would not appear on a strict 30-min Sprint 22 grid; included only to illustrate spacing intent.)
+`17:30, 17:45, 18:00, 18:30, 19:00` → **17:30 + 19:00** (not 17:30 + 17:45)  
+`17:30, 17:45` only → **17:30 + 17:45**
 
 ---
 
