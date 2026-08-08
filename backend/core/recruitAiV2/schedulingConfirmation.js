@@ -41,13 +41,23 @@ function hasConfirmableAppointmentProposal(context = {}) {
     : [];
 
   // Explicit non-confirmable states after preference capture.
+  // offer_time_choices: multi-option menus require a selection first;
+  // a single concrete offer with ¿Te funciona? is confirmable (BR-111 canary).
   if (
     lastQ === "awaiting_availability" ||
     lastQ === "check_availability" ||
     lastQ === "ask_time_preference" ||
-    lastQ === "ask_day_part" ||
-    lastQ === "offer_time_choices"
+    lastQ === "ask_day_part"
   ) {
+    return false;
+  }
+
+  if (lastQ === "offer_time_choices") {
+    const asksSingleConfirm =
+      /\b(te funciona|le funciona|does that work|does this work)\b/i.test(lastOut);
+    if (offered.length === 1 && asksSingleConfirm) {
+      return true;
+    }
     return false;
   }
 

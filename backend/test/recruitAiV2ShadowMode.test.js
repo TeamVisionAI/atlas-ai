@@ -418,15 +418,23 @@ test("13. live CE remains authoritative in inbound pipeline wiring", () => {
 test("14. side-effect authorizer still deny-all even when shadow enabled", () => {
   const auth = authorizeSideEffects({
     structuredDecision: {
-      decision: { nextAction: "create_appointment", shouldEscalate: true },
+      decision: {
+        nextAction: "create_appointment",
+        mayCreateAppointment: true,
+        shouldEscalate: true
+      },
       reasonCodes: []
     },
     responsePlan: { templateKey: "appointment_confirm_deferred" },
     env: {
       RECRUIT_AI_V2_SHADOW_ENABLED: "true",
       RECRUIT_AI_V2_EXECUTION_ENABLED: "true"
-    }
+    },
+    profileConfigured: true,
+    actingUserId: "user-1",
+    organizationId: "org-1"
   });
+  // Shadow + execution flag without allowlists remains fail-closed (BR-111).
   assert.equal(auth.authorized, false);
   assert.ok(auth.proposals.every((p) => p.authorized === false));
 });

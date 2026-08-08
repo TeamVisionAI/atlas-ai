@@ -425,7 +425,10 @@ test("30-32. no live provider calls; orchestrator persistence is context-only", 
     path.join(__dirname, "../core/recruitAiV2/orchestrator.js"),
     "utf8"
   );
-  assert.doesNotMatch(orch, /sendAndPersistWhatsAppMessage|executeScheduleInterview/);
+  assert.doesNotMatch(orch, /sendAndPersistWhatsAppMessage/);
+  // BR-111 — mutations only via sideEffectExecutor + allowExecution (shadow never sets it).
+  assert.match(orch, /allowExecution/);
+  assert.doesNotMatch(orch, /executeScheduleInterview/);
   assert.match(orch, /durable context persistence/i);
 
   const service = makeService();

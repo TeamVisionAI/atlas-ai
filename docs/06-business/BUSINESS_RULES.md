@@ -1160,6 +1160,33 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-111 — Recruit AI v2 One-User Execution Canary Boundary
+
+**Implements:** Fail-closed server-side authorization + create-only side-effect executor so Recruit AI v2 may later mutate appointments for **exactly one** allowlisted Atlas user via canonical BR-049 / BR-050 services — without enabling Railway execution yet.  
+**Domain:** Recruit AI / execution authorization + appointment mutation boundary  
+**Depends on:** BR-049, BR-050, BR-080, BR-081, BR-103, BR-107, BR-108, BR-110  
+**Related:** BR-075 (unchanged WhatsApp gate); live `semanticConversationEngine` remains customer-visible authority until a separate cutover  
+**Status:** Implemented in code; **execution remains OFF** in production (env unset)  
+**Engine target:** `recruitAiV2/executionConfig.js`; `sideEffectAuthorizer.js`; `sideEffectExecutor.js`; `orchestrator.js`  
+**Tests:** `backend/test/recruitAiV2ExecutionCanaryBr111.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/38_EXECUTION_CANARY_BOUNDARY.md`
+
+### Rules
+
+1. **Propose ≠ authorize ≠ performed** — `nextAction` / `mayCreateAppointment` are decision proposals only. `SideEffectAuthorizer` grants permission. `execution.performed` reports completed mutations. Never infer permission from `nextAction=create_appointment`.
+2. **Fail-closed gates (ALL required)** — `RECRUIT_AI_V2_EXECUTION_ENABLED==="true"`; exact `organizationId` in `RECRUIT_AI_V2_EXECUTION_ORGANIZATION_IDS`; exact `actingUserId` in `RECRUIT_AI_V2_EXECUTION_USER_IDS`; `profileConfigured===true`; action is an explicitly supported executable (`create_appointment` only for first canary). Missing/malformed/empty/mismatched → DENY.
+3. **No role-derived permission** — Being RVP / DL / RL / FT / Representative never authorizes. Another RVP in the same org remains denied unless their exact `atlas_users.id` is allowlisted.
+4. **Authorize immediately before mutation** — Re-run authorizer in the orchestrator immediately before `sideEffectExecutor`. Do not rely on a decision made only at conversation entry.
+5. **Canonical mutation only** — Executor delegates create to `missionExecutionApplicationService.executeScheduleInterview` (Calendar + appointment + lifecycle). No direct `atlas_appointments` inserts, no parallel lifecycle, no v2 WhatsApp send path.
+6. **Confirmation before write** — No appointment write before explicit prospect confirmation of a concrete slot. Re-check Sprint 22 availability immediately before write; stale slots fail closed.
+7. **Caller live gate** — Shadow/advisory must omit `options.allowExecution`. Mutations require `authorization.authorized && options.allowExecution===true`.
+8. **Idempotency** — Before create, if an active appointment already exists for the prospect, return that appointment (no second create). Prefer canonical active-appointment resolution over a parallel v2 duplicate store.
+9. **Ordering** — Canonical appointment success must precede any success confirmation copy. Never report booking success if the canonical write failed. Calendar writes remain inside the canonical mission path.
+10. **Availability source of truth** — Offered/executed slots use the acting user’s configured `appointmentProfile.workingSchedule` (BR-108/110). Organization office hours must not truncate personal evening/weekend availability.
+11. **Boundaries** — Do not set Railway execution variables in this rule’s implementation sprint. Context capture + shadow behavior unchanged. Do not redesign BR-049/050.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

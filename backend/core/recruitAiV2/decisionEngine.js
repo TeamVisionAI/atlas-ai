@@ -2132,15 +2132,27 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.SELECT_OPTION) {
+    const optionIndex = Number(interpretation.entities?.optionIndex) || 1;
+    const selected =
+      offered[Math.max(0, optionIndex - 1)] || offered[0] || null;
     structured.decision.nextAction = NEXT_ACTIONS.ASK_EXPLICIT_CONFIRMATION;
     structured.decision.requiresExplicitConfirmation = true;
     structured.decision.mayCreateAppointment = false;
     structured.customerReplyPlan.templateKey = "confirm_selected_slot";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requestedDate: selected?.date || selected?.dateKey || null,
+      requestedTime: selected?.time || selected?.timeKey || null,
+      dateLabel: selected?.date || selected?.dateKey || null
+    };
     structured.reasonCodes.push(REASON_CODES.EXPLICIT_CONFIRMATION_REQUIRED);
     structured.reasonCodes.push(REASON_CODES.PREMATURE_BOOKING_BLOCKED);
     structured.contextPatch = {
       appointment: {
-        status: APPOINTMENT_STATUS.PROPOSED
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate: selected?.date || selected?.dateKey || null,
+        proposedTime: selected?.time || selected?.timeKey || null,
+        previouslyOfferedSlots: offered
       },
       conversation: {
         lastQuestionAsked: "confirm_slot"
@@ -2437,14 +2449,50 @@ function decideConversationTurn({
       };
       return structured;
     }
+    // BR-111 contract:
+    // - nextAction / mayCreateAppointment = proposed desired action (not permission)
+    // - executionAuthorized stays false here; SideEffectAuthorizer owns permission
+    // - action performed is reported only by the executor after canonical success
+    const offeredSlots = context.appointment?.previouslyOfferedSlots || [];
+    const singleOffer = offeredSlots.length === 1 ? offeredSlots[0] : null;
+    const confirmDate =
+      context.appointment?.proposedDate ||
+      singleOffer?.date ||
+      singleOffer?.dateKey ||
+      null;
+    const confirmTime =
+      context.appointment?.proposedTime ||
+      singleOffer?.time ||
+      singleOffer?.timeKey ||
+      null;
+
     structured.decision.nextAction = NEXT_ACTIONS.CREATE_APPOINTMENT;
     structured.decision.requiresExplicitConfirmation = true;
-    structured.decision.mayCreateAppointment = false;
+    structured.decision.mayCreateAppointment = true;
+    structured.decision.executionAuthorized = false;
     structured.decision.maySendOutbound = false;
+    structured.decision.sideEffectsEnabled = false;
     structured.customerReplyPlan.templateKey = "appointment_confirm_deferred";
-    structured.reasonCodes.push(REASON_CODES.EXPLICIT_CONFIRMATION_REQUIRED);
-    structured.reasonCodes.push(REASON_CODES.PREMATURE_BOOKING_BLOCKED);
-    structured.reasonCodes.push(REASON_CODES.SIDE_EFFECTS_DISABLED);
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      requestedDate: confirmDate,
+      requestedTime: confirmTime
+    };
+    structured.reasonCodes.push(REASON_CODES.EXPLICIT_CONFIRMATION_RECEIVED);
+    structured.reasonCodes.push(REASON_CODES.APPOINTMENT_CREATE_PROPOSED);
+    structured.contextPatch = {
+      appointment: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate: confirmDate,
+        proposedTime: confirmTime,
+        previouslyOfferedSlots: offeredSlots
+      },
+      conversation: {
+        lastQuestionAsked: "confirm_slot",
+        lastProspectIntent: INTENTS.SCHEDULE_CONFIRM
+      },
+      currentStage: STAGES.PROPOSED
+    };
     return structured;
   }
 
