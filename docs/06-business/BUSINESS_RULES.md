@@ -1157,6 +1157,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Organization isolation** — Date windows must use the authenticated session’s organization (or authorized report scope). Never apply another organization’s timezone. Never accept client-supplied timezone overrides. Cross-organization super-admin reports must resolve windows per organization; do not silently aggregate multi-org metrics under one timezone unless a report explicitly documents that behavior.
 8. **Cache keys** — Any dashboard / Alpha Brief cache must include organization ID, effective timezone, and local date or resolved UTC window so a UTC-generated brief is never reused across organization-local days.
 9. **Boundaries** — Does not change WhatsApp intake, Recruit AI behavior, Railway server `TZ`, or database timestamp storage format.
+10. **Appointment wall clock → UTC** — Selected `dateKey` + `timeKey` for appointments are interpreted in the appointment profile / organization IANA timezone (default `America/New_York`) via `buildIsoTimestamp` → `zonedTimeToUtcMs`. Host/`Date` local constructors must never define the persisted `start_date_time` instant (BR-050).
 
 ---
 
