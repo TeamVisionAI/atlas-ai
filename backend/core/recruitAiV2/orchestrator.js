@@ -34,7 +34,240 @@ const {
   resolveAvailabilityForTurn,
   resolveAvailabilityForTurnSync
 } = require("./schedulingAvailabilityReader");
-const { APPOINTMENT_STATUS, STAGES } = require("./conversationContext");
+const { APPOINTMENT_STATUS, STAGES, mergeConversationContext } = require("./conversationContext");
+const {
+  classifyInboundMedia,
+  buildNonTextMediaInterpretation,
+  decideNonTextMediaTurn
+} = require("./nonTextMedia");
+const { INTENTS } = require("./constants");
+
+/**
+ * BR-118 — short-circuit non-text media before text interpretation.
+ * Preserves dialogue/scheduling state; soft-acks only.
+ */
+async function processNonTextMediaTurn({
+  message,
+  loaded,
+  media,
+  options = {},
+  persistenceService = null,
+  persistenceSource = "provided",
+  organizationId = null,
+  prospectId = null,
+  channel = "whatsapp",
+  inboundMessageId = null
+} = {}) {
+  const interpretation = buildNonTextMediaInterpretation({
+    context: loaded,
+    media,
+    message,
+    options
+  });
+  let structuredDecision = decideNonTextMediaTurn({
+    context: loaded,
+    interpretation,
+    media
+  });
+  let responsePlan = buildResponsePlan(structuredDecision);
+  let rendered = renderCustomerReply(responsePlan);
+
+  if (containsInternalDiagnostics(rendered.text)) {
+    structuredDecision = decideSafeFailure({
+      context: loaded,
+      interpretation,
+      failureReason: "renderer_diagnostic_blocked"
+    });
+    responsePlan = buildResponsePlan(structuredDecision);
+    rendered = renderCustomerReply(responsePlan);
+  }
+
+  const actingUserId = resolveActingUserId({ context: loaded, options });
+  const profileConfigured = await resolveProfileConfigured({
+    actingUserId,
+    options
+  });
+
+  const authorization = authorizeSideEffects({
+    structuredDecision,
+    responsePlan,
+    context: loaded,
+    env: options.env || process.env,
+    profileConfigured,
+    actingUserId,
+    organizationId: organizationId || loaded.organizationId,
+    options
+  });
+
+  // Preserve dialogue meta exactly — do not overwrite lastOfferMade / intent / clarification.
+  let nextContext = mergeConversationContext(loaded, {});
+  nextContext.conversation = {
+    ...nextContext.conversation,
+    lastQuestionAsked: loaded.conversation?.lastQuestionAsked ?? null,
+    lastOfferMade: loaded.conversation?.lastOfferMade ?? null,
+    lastProspectIntent: loaded.conversation?.lastProspectIntent ?? null,
+    pendingClarification: loaded.conversation?.pendingClarification ?? null,
+    clarificationCount: loaded.conversation?.clarificationCount ?? 0,
+    lastClarificationTemplateKey:
+      loaded.conversation?.lastClarificationTemplateKey ?? null
+  };
+  nextContext.appointment = {
+    ...(loaded.appointment || {}),
+    ...(nextContext.appointment || {})
+  };
+
+  let persistenceResult = null;
+  if (
+    persistenceService &&
+    organizationId &&
+    prospectId &&
+    options.persistContext !== false
+  ) {
+    persistenceResult = await persistenceService.compareAndSaveContext({
+      organizationId,
+      prospectId,
+      channel,
+      expectedVersion: loaded._persistence?.contextVersion,
+      nextContext,
+      inboundMessageId,
+      decisionCode: structuredDecision.decision?.nextAction || null,
+      prospectClosed: Boolean(options.prospectClosed)
+    });
+    if (persistenceResult?.context) {
+      nextContext = persistenceResult.context;
+    }
+  }
+
+  return {
+    context: loaded,
+    nextContext,
+    interpretation,
+    structuredDecision,
+    responsePlan,
+    rendered,
+    authorization,
+    persistence: {
+      attempted: Boolean(persistenceService && options.persistContext !== false),
+      source: persistenceSource,
+      result: persistenceResult
+        ? {
+            ok: persistenceResult.ok,
+            idempotent: Boolean(persistenceResult.idempotent),
+            code: persistenceResult.code || null,
+            contextVersion:
+              persistenceResult.context?._persistence?.contextVersion || null
+          }
+        : null
+    },
+    execution: {
+      attempted: false,
+      performed: [],
+      failed: [],
+      skipped: [],
+      success: false,
+      idempotent: false,
+      appointmentId: null,
+      scheduleResult: null
+    },
+    audit: {
+      at: new Date().toISOString(),
+      intent: INTENTS.NON_TEXT_MEDIA,
+      proposedAction: structuredDecision.decision.nextAction,
+      nextAction: structuredDecision.decision.nextAction,
+      reasonCodes: structuredDecision.reasonCodes,
+      mayCreateAppointment: false,
+      executionAuthorized: false,
+      actionPerformed: [],
+      sideEffectsAuthorized: false,
+      contextPersisted: Boolean(persistenceResult?.ok)
+    }
+  };
+}
+
+function processNonTextMediaTurnSync({ message, loaded, media, options = {} } = {}) {
+  const interpretation = buildNonTextMediaInterpretation({
+    context: loaded,
+    media,
+    message,
+    options
+  });
+  let structuredDecision = decideNonTextMediaTurn({
+    context: loaded,
+    interpretation,
+    media
+  });
+  let responsePlan = buildResponsePlan(structuredDecision);
+  let rendered = renderCustomerReply(responsePlan);
+
+  if (containsInternalDiagnostics(rendered.text)) {
+    structuredDecision = decideSafeFailure({
+      context: loaded,
+      interpretation,
+      failureReason: "renderer_diagnostic_blocked"
+    });
+    responsePlan = buildResponsePlan(structuredDecision);
+    rendered = renderCustomerReply(responsePlan);
+  }
+
+  const actingUserId = resolveActingUserId({ context: loaded, options });
+  const profileConfigured =
+    typeof options.profileConfigured === "boolean" ? options.profileConfigured : false;
+  const authorization = authorizeSideEffects({
+    structuredDecision,
+    responsePlan,
+    context: loaded,
+    env: options.env || process.env,
+    profileConfigured,
+    actingUserId,
+    organizationId: options.organizationId || loaded.organizationId,
+    options
+  });
+
+  const nextContext = mergeConversationContext(loaded, {});
+  nextContext.conversation = {
+    ...nextContext.conversation,
+    lastQuestionAsked: loaded.conversation?.lastQuestionAsked ?? null,
+    lastOfferMade: loaded.conversation?.lastOfferMade ?? null,
+    lastProspectIntent: loaded.conversation?.lastProspectIntent ?? null,
+    pendingClarification: loaded.conversation?.pendingClarification ?? null,
+    clarificationCount: loaded.conversation?.clarificationCount ?? 0,
+    lastClarificationTemplateKey:
+      loaded.conversation?.lastClarificationTemplateKey ?? null
+  };
+
+  return {
+    context: loaded,
+    nextContext,
+    interpretation,
+    structuredDecision,
+    responsePlan,
+    rendered,
+    authorization,
+    persistence: { attempted: false, source: "ephemeral", result: null },
+    execution: {
+      attempted: false,
+      performed: [],
+      failed: [],
+      skipped: [],
+      success: false,
+      idempotent: false,
+      appointmentId: null,
+      scheduleResult: null
+    },
+    audit: {
+      at: new Date().toISOString(),
+      intent: INTENTS.NON_TEXT_MEDIA,
+      proposedAction: structuredDecision.decision.nextAction,
+      nextAction: structuredDecision.decision.nextAction,
+      reasonCodes: structuredDecision.reasonCodes,
+      mayCreateAppointment: false,
+      executionAuthorized: false,
+      actionPerformed: [],
+      sideEffectsAuthorized: false,
+      contextPersisted: false
+    }
+  };
+}
 
 async function resolveProfileConfigured({ actingUserId, options = {} } = {}) {
   if (typeof options.profileConfigured === "boolean") {
@@ -178,6 +411,23 @@ async function processRecruitAiV2Turn({
   if (!loaded) {
     loaded = loadConversationContext(contextInput || {});
     persistenceSource = loaded.persistenceSource || "ephemeral";
+  }
+
+  // Implements BR-118 — non-text media never enters the text intent/clarification path.
+  const media = classifyInboundMedia(message, options);
+  if (media.isNonTextMedia && !options.forceSafeFailure) {
+    return processNonTextMediaTurn({
+      message,
+      loaded,
+      media,
+      options,
+      persistenceService,
+      persistenceSource,
+      organizationId,
+      prospectId,
+      channel,
+      inboundMessageId
+    });
   }
 
   const interpretation = interpretInboundMessage({
@@ -388,6 +638,13 @@ function processRecruitAiV2TurnSync(args = {}) {
   } = args;
 
   const loaded = context || loadConversationContext(contextInput || {});
+
+  // Implements BR-118 — non-text media never enters the text intent/clarification path.
+  const media = classifyInboundMedia(message, options);
+  if (media.isNonTextMedia && !options.forceSafeFailure) {
+    return processNonTextMediaTurnSync({ message, loaded, media, options });
+  }
+
   const interpretation = interpretInboundMessage({
     message,
     context: loaded,

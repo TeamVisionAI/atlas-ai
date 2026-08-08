@@ -60,6 +60,8 @@ const INTENTS = Object.freeze({
   CURRENT_NOT_FIT: "current_not_fit",
   CONVERSATION_CLARIFICATION_REQUEST: "conversation_clarification_request",
   ECHO_OR_NOOP: "echo_or_noop",
+  /** BR-118 — non-text WhatsApp media (document/image/audio/…); not prospect language. */
+  NON_TEXT_MEDIA: "non_text_media",
   PROVIDE_LOCATION: "provide_location",
   CORRECT_LOCATION: "correct_location",
   PROVIDE_AUTHORIZATION: "provide_authorization",
@@ -98,6 +100,8 @@ const NEXT_ACTIONS = Object.freeze({
   ANSWER_SALES_OBJECTION_THEN_RESUME: "answer_sales_objection_then_resume",
   ANSWER_NETWORK_OBJECTION_THEN_RESUME: "answer_network_objection_then_resume",
   ACKNOWLEDGE_SOFT_CONTINUE: "acknowledge_soft_continue",
+  /** BR-118 — soft media ack; do not reopen text clarification path. */
+  ACKNOWLEDGE_NON_TEXT_MEDIA: "acknowledge_non_text_media",
   /** BR-090 — acknowledge fixed-employment preference without forcing scheduling. */
   ACKNOWLEDGE_FIXED_EMPLOYMENT_PREFERENCE:
     "acknowledge_fixed_employment_preference",
@@ -254,6 +258,12 @@ const REASON_CODES = Object.freeze({
   DIRECT_LACK_OF_INTEREST_RECOGNIZED: "DIRECT_LACK_OF_INTEREST_RECOGNIZED",
   /** BR-111 — decision proposes create; authorization is independent. */
   APPOINTMENT_CREATE_PROPOSED: "APPOINTMENT_CREATE_PROPOSED",
+  /** BR-118 — inbound classified as non-text media (not free-form language). */
+  NON_TEXT_MEDIA_RECEIVED: "NON_TEXT_MEDIA_RECEIVED",
+  /** BR-118 — skipped text interpreter / clarify_once for media. */
+  NON_TEXT_MEDIA_DIALOGUE_SKIPPED: "NON_TEXT_MEDIA_DIALOGUE_SKIPPED",
+  /** BR-118 — media after appointment_confirm_deferred / confirmed proposed slot. */
+  NON_TEXT_MEDIA_POST_CONFIRM_HANDLED: "NON_TEXT_MEDIA_POST_CONFIRM_HANDLED",
   EXPLICIT_CONFIRMATION_RECEIVED: "EXPLICIT_CONFIRMATION_RECEIVED",
   EXECUTION_AUTHORIZED: "EXECUTION_AUTHORIZED",
   EXECUTION_DENIED: "EXECUTION_DENIED",
