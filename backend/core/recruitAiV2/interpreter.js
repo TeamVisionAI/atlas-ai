@@ -1038,6 +1038,19 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.resolvedDate = resolvedDate;
     entities.dateExclusions = resolvedExclusions;
     entities.priorProposedTime = context?.appointment?.proposedTime || null;
+  } else if (
+    // BR-115 — bare 1..N during offered-slot choice is menu selection, not an hour.
+    isOptionSelection(originalText) &&
+    Array.isArray(context?.appointment?.previouslyOfferedSlots) &&
+    context.appointment.previouslyOfferedSlots.length > 0 &&
+    Number(String(originalText || "").trim()) >= 1 &&
+    Number(String(originalText || "").trim()) <=
+      context.appointment.previouslyOfferedSlots.length
+  ) {
+    intent = INTENTS.SELECT_OPTION;
+    confidence = 0.9;
+    entities.optionIndex = Number(String(originalText || "").trim());
+    entities.requestedTime = null;
   } else if (hasTimeEntity || looksLikeDirectTimeProposal(text)) {
     // Direct time overrides pending day-part (BR-084).
     if (isConfirmed) {
