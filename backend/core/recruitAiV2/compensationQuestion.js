@@ -52,6 +52,7 @@ function classifyCompensationQuestionKind(text) {
     /\bel pago es fijo\b/.test(t) ||
     /\bpagan fijo\b/.test(t) ||
     /\bes sueldo fijo\b/.test(t) ||
+    /\bes salario fijo\b/.test(t) ||
     /\bis it fixed pay\b/.test(t) ||
     /\bis the pay fixed\b/.test(t) ||
     /\bis it a fixed salary\b/.test(t) ||

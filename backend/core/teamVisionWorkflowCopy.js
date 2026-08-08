@@ -238,25 +238,27 @@ function getCompensationFaqAnswer(language, detailKind = "general") {
   const es = language === "es";
   const kind = String(detailKind || "general").toLowerCase();
 
+  // Implements BR-105 — direct yes/no where canonical FAQ supports production-based pay.
+  // Source: backend/knowledge/faq.json (production / not hourly / not guaranteed salary).
   if (kind === "commission" || kind === "commission_question") {
     return es
-      ? "La compensación se relaciona con la producción y el nivel de contrato; no es un sueldo fijo. En la entrevista te explican cómo funciona."
-      : "Compensation is tied to production and contract level; it isn't a fixed salary. The interview explains how it works.";
+      ? "Sí. La compensación es basada en producción y depende de tu nivel de contrato; no es un sueldo fijo."
+      : "Yes. Compensation is production-based and depends on your contract level; it isn't a fixed salary.";
   }
   if (kind === "hourly" || kind === "hourly_pay_question") {
     return es
-      ? "No es un pago por hora garantizado. En la entrevista te explican cómo funciona la compensación."
-      : "It isn't guaranteed hourly pay. The interview explains how compensation works.";
+      ? "No. No hay una tarifa por hora garantizada. En la entrevista te explican cómo funciona la compensación."
+      : "No. There isn't a guaranteed hourly rate. The interview explains how compensation works.";
   }
   if (kind === "fixed_pay" || kind === "fixed_pay_question") {
     return es
-      ? "No es un pago fijo garantizado. La compensación depende de la producción y del nivel de contrato; en la entrevista te lo explican."
-      : "It isn't guaranteed fixed pay. Compensation depends on production and contract level; that's covered in the interview.";
+      ? "No. No es un pago fijo garantizado. La compensación depende de la producción y del nivel de contrato."
+      : "No. It isn't guaranteed fixed pay. Compensation depends on production and contract level.";
   }
   if (kind === "salary" || kind === "salary_question") {
     return es
-      ? "No es un salario fijo garantizado. La compensación depende de la producción y del nivel de contrato; en la entrevista te lo explican."
-      : "It isn't a guaranteed fixed salary. Compensation depends on production and contract level; that's covered in the interview.";
+      ? "No. No es un salario fijo garantizado. La compensación depende de la producción y del nivel de contrato."
+      : "No. It isn't a guaranteed fixed salary. Compensation depends on production and contract level.";
   }
   if (kind === "how_much") {
     return (

@@ -39,6 +39,9 @@ const {
 const {
   hasConfirmableAppointmentProposal
 } = require("./schedulingConfirmation");
+const {
+  isBeforeEarliestConstraint
+} = require("./schedulingConstraints");
 
 function buildBaseDecision({ context, interpretation }) {
   return {
@@ -290,12 +293,24 @@ function resolvePendingResume(context) {
       };
     }
   }
-  // BR-088 — resume time ask after day-part (never bare Continuemos).
+  // BR-088 / BR-105 — resume most-specific pending time ask (never bare Continuemos).
+  // Availability constraints outrank day-part-only prompts.
   if (
     lastQ === "ask_time_preference" ||
     lastQ === "ask_time_after_day_part" ||
     lastQ === "ask_time_after_constraint"
   ) {
+    if (hasAvailabilityConstraint(context)) {
+      return {
+        templateKey: "ask_time_after_constraint",
+        lastQuestionAsked: "ask_time_preference",
+        entities: {
+          earliestTime:
+            context.knownFacts?.availabilityConstraint?.earliestTime || null,
+          dayPart: context.knownFacts?.preferredDayPart || null
+        }
+      };
+    }
     const dayPart = String(context.knownFacts?.preferredDayPart || "").toLowerCase();
     if (dayPart === "morning") {
       return {
@@ -309,16 +324,6 @@ function resolvePendingResume(context) {
         templateKey: "acknowledge_afternoon_ask_time",
         lastQuestionAsked: "ask_time_preference",
         entities: { dayPart: dayPart === "evening" ? "evening" : "afternoon" }
-      };
-    }
-    if (hasAvailabilityConstraint(context)) {
-      return {
-        templateKey: "ask_time_after_constraint",
-        lastQuestionAsked: "ask_time_preference",
-        entities: {
-          earliestTime:
-            context.knownFacts?.availabilityConstraint?.earliestTime || null
-        }
       };
     }
     return {
@@ -430,6 +435,12 @@ function buildFaqResumeDecision(structured, context, intent, templateKey) {
   structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_SCHEDULING);
   structured.reasonCodes.push(REASON_CODES.SPECIFIC_FAQ_ANSWERED);
   structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+  if (
+    resume.templateKey === "ask_time_after_constraint" ||
+    resume.entities?.earliestTime
+  ) {
+    structured.reasonCodes.push(REASON_CODES.MOST_SPECIFIC_SCHEDULING_RESUME);
+  }
   structured.contextPatch = {
     currentStage: context.currentStage || STAGES.QUALIFICATION,
     conversation: {
@@ -1644,10 +1655,11 @@ function decideConversationTurn({
     structured.contextPatch = {
       knownFacts: {
         availabilityConstraint: constraint || prior,
+        // Implements BR-105 — keep confirmed day_part (afternoon) over constraint evening bias.
         preferredDayPart:
+          context.knownFacts?.preferredDayPart ||
           constraint?.dayPart ||
           prior?.dayPart ||
-          context.knownFacts?.preferredDayPart ||
           null
       },
       conversation: {
@@ -1944,6 +1956,44 @@ function decideConversationTurn({
         !dayPartPending &&
         pendingQ !== "ask_time_preference" &&
         pendingQ !== "confirm_slot");
+
+    // Implements BR-105 — reject times before confirmed earliestTime (e.g. after 5 + 4).
+    const earliestBound =
+      context.knownFacts?.availabilityConstraint?.earliestTime || null;
+    if (
+      requestedTime &&
+      earliestBound &&
+      isBeforeEarliestConstraint(requestedTime, earliestBound)
+    ) {
+      structured.decision.nextAction =
+        NEXT_ACTIONS.ACKNOWLEDGE_AVAILABILITY_CONSTRAINT;
+      structured.decision.shouldEscalate = false;
+      structured.decision.mayCreateAppointment = false;
+      structured.customerReplyPlan.acknowledgeRequest = true;
+      structured.customerReplyPlan.templateKey = "clarify_time_after_constraint";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        earliestTime: earliestBound,
+        requestedTime,
+        dayPart: context.knownFacts?.preferredDayPart || null
+      };
+      structured.reasonCodes.push(REASON_CODES.AVAILABILITY_CONSTRAINT_CONFLICT);
+      structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+      structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+      structured.contextPatch = {
+        conversation: {
+          lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER,
+          lastQuestionAsked: "ask_time_preference",
+          pendingClarification: null,
+          clarificationCount: 0
+        },
+        knownFacts: {
+          availabilityConstraint: context.knownFacts?.availabilityConstraint || null
+        },
+        attention: { needsHumanAttention: false, reason: null }
+      };
+      return structured;
+    }
 
     // Soft path only while work-auth/location still unresolved (not day-part).
     if (qualificationPending) {

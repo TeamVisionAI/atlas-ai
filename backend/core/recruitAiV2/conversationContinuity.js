@@ -168,6 +168,16 @@ function resolvePendingExplanation(context = {}, language = "spanish") {
     lastQ === "ask_time_after_day_part" ||
     lastQ === "ask_time_after_constraint"
   ) {
+    // Implements BR-105 — explain/resume using earliestTime when present.
+    const earliest =
+      context?.knownFacts?.availabilityConstraint?.earliestTime || null;
+    if (earliest) {
+      return {
+        templateKey: "ask_time_after_constraint",
+        lastQuestionAsked: "ask_time_preference",
+        entities: { earliestTime: earliest, dayPart: dayPart || null }
+      };
+    }
     if (dayPart === "morning") {
       return {
         templateKey: "explain_pending_morning_time",

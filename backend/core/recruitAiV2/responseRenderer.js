@@ -123,7 +123,9 @@ const COPY = Object.freeze({
     acknowledge_known_availability_confirm_slot:
       "You're right — you already told me you're available after {earliestTime}. Does {dateLabel} at {requestedTime} still work?",
     ask_time_after_constraint:
-      "Got it — you're available after {earliestTime}. What time works best for you?",
+      "Got it — you're available after {earliestTime}. What time after {earliestTime} works best for you?",
+    clarify_time_after_constraint:
+      "You'd said after {earliestTime}. What time from {earliestTime} onward works for you?",
     zoom_link_after_confirm:
       "Of course. The Zoom link is shared once we confirm the appointment. What day and time work for you?",
     zoom_link_after_confirm_with_slot:
@@ -145,7 +147,7 @@ const COPY = Object.freeze({
     acknowledge_counteroffer_check_availability:
       "Got it — you prefer {requestedTime}. Let me check availability for that time and share options that work.",
     acknowledge_availability_constraint:
-      "Got it — noted that you're available after {earliestTime}. What time works best for you?",
+      "Got it — noted that you're available after {earliestTime}. What time after {earliestTime} works best for you?",
     clarify_am_pm: "Do you mean {ambiguousHour} in the morning or {ambiguousHour} in the afternoon/evening?",
     offer_alternatives_no_handoff:
       "That time may not be available. I can offer nearby options — what other time works for you?",
@@ -251,7 +253,9 @@ const COPY = Object.freeze({
     acknowledge_known_availability_confirm_slot:
       "Sí, tienes razón — me dijiste que puedes después de las {earliestTime}. ¿Te funciona el {dateLabel} a las {requestedTime}?",
     ask_time_after_constraint:
-      "Entendido — puedes después de las {earliestTime}. ¿Qué hora te funciona mejor?",
+      "Entendido — puedes después de las {earliestTime}. ¿Qué hora después de las {earliestTime} te funciona mejor?",
+    clarify_time_after_constraint:
+      "Me habías indicado después de las {earliestTime}. ¿Te funciona alguna hora a partir de las {earliestTime}?",
     zoom_link_after_confirm:
       "Claro. El enlace se comparte cuando confirmemos la cita. ¿Qué día y hora te funcionan?",
     zoom_link_after_confirm_with_slot:
@@ -273,7 +277,7 @@ const COPY = Object.freeze({
     acknowledge_counteroffer_check_availability:
       "Entendido — prefieres {requestedTime}. Voy a revisar disponibilidad y te comparto opciones que funcionen.",
     acknowledge_availability_constraint:
-      "Entendido — anoto que puedes después de las {earliestTime}. ¿Qué hora te funciona mejor?",
+      "Entendido — anoto que puedes después de las {earliestTime}. ¿Qué hora después de las {earliestTime} te funciona mejor?",
     clarify_am_pm:
       "¿Te refieres a las {ambiguousHour} de la mañana o a las {ambiguousHour} de la tarde?",
     offer_alternatives_no_handoff:
@@ -396,6 +400,18 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
         ? "¿Qué hora en la tarde te funciona mejor?"
         : "What time in the afternoon works best for you?";
     case "ask_time_after_constraint":
+    case "clarify_time_after_constraint": {
+      // Implements BR-105 — resume with earliestTime, not day-part-only.
+      const label = formatRequestedTime(entities.earliestTime || null, language);
+      if (entities.earliestTime) {
+        return language === LANGUAGES.SPANISH
+          ? `¿Qué hora después de las ${label} te funciona mejor?`
+          : `What time after ${label} works best for you?`;
+      }
+      return language === LANGUAGES.SPANISH
+        ? "¿Qué hora te funciona mejor?"
+        : "What time works best for you?";
+    }
     case "ask_time_preference":
     case "explain_pending_time":
       return language === LANGUAGES.SPANISH
@@ -429,7 +445,9 @@ function composeFaqThenResume(faqText, language, entities = {}, options = {}) {
   if (!resumeText) {
     return String(faqText || "").trim();
   }
-  if (options.omitBridge) {
+  // Implements BR-105 — default no mechanical "Por cierto" / "By the way" on FAQ resume.
+  const omitBridge = options.omitBridge !== false;
+  if (omitBridge) {
     return `${faqText} ${resumeText}`;
   }
   const bridge =
@@ -671,11 +689,12 @@ function renderCustomerReply(responsePlan) {
         : pack.meeting_preference_zoom || pack.default;
   }
 
-  // Also apply earliestTime substitution for BR-087 templates.
+  // Also apply earliestTime substitution for BR-087 / BR-105 templates.
   if (
     key === "acknowledge_known_availability" ||
     key === "acknowledge_known_availability_confirm_slot" ||
     key === "ask_time_after_constraint" ||
+    key === "clarify_time_after_constraint" ||
     key === "meeting_preference_zoom_ask_time" ||
     key === "meeting_preference_in_person_ask_time"
   ) {

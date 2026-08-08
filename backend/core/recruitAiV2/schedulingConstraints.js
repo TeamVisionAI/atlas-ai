@@ -284,11 +284,22 @@ function isTimeLikeToken(text) {
   return /^(\d{1,2})(:\d{2})?$/.test(t) || looksLikeDirectTimeProposal(text);
 }
 
+/** True when candidate HH:MM is strictly before earliestTime bound. */
+function isBeforeEarliestConstraint(candidateTime, earliestTime) {
+  const c = String(candidateTime || "");
+  const e = String(earliestTime || "");
+  if (!/^\d{2}:\d{2}$/.test(c) || !/^\d{2}:\d{2}$/.test(e)) {
+    return false;
+  }
+  return c < e;
+}
+
 module.exports = {
   parseAvailabilityConstraint,
   looksLikeDirectTimeProposal,
   resolveCandidateTime,
   applyDayPartToClock,
   isTimeLikeToken,
+  isBeforeEarliestConstraint,
   padTime
 };
