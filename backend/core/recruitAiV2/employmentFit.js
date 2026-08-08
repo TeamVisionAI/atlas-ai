@@ -43,9 +43,9 @@ function looksLikeFixedEmploymentPreference(text) {
   if (!t) {
     return false;
   }
-  // Compensation / pay questions stay on the FAQ path.
+  // Compensation / pay questions stay on the FAQ path (BR-104).
   if (
-    /\b(esto paga|cuanto (pagan|se gana|gano)|how much|does it pay|is there a salary|is it commission)\b/.test(
+    /\b(esto paga|cuanto (pagan|se gana|gano|puedo ganar)|como (voy a )?ganar|como se gana|como me pagan|como funciona el pago|hay salario|es por comision|pagan por hora|how much|how do i (make money|get paid)|does it pay|is there a salary|is it (commission|hourly))\b/.test(
       t
     )
   ) {

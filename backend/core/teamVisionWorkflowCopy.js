@@ -229,13 +229,48 @@ function looksLikeLicensePathDetailQuestion(text) {
   );
 }
 
-function getCompensationFaqAnswer(language) {
-  return (
-    findFAQ("how much does it pay", language === "es" ? "es" : "en") ||
-    (language === "es"
-      ? "No es un trabajo por hora. Durante la entrevista te explicarán cómo funciona la compensación, responderán tus preguntas y podrás decidir si es una buena oportunidad para ti."
-      : "This isn't an hourly position. During the interview we'll explain how the compensation works, answer your questions, and you can decide if it's a good fit for you.")
-  );
+/**
+ * Implements BR-104 — progressive compensation FAQ (no income guarantees / invented amounts).
+ * @param {"es"|"en"} language
+ * @param {"commission"|"hourly"|"salary"|"how_much"|"pay_how"|"source"|"general"|string} [detailKind]
+ */
+function getCompensationFaqAnswer(language, detailKind = "general") {
+  const es = language === "es";
+  const kind = String(detailKind || "general").toLowerCase();
+
+  if (kind === "commission") {
+    return es
+      ? "La compensación se relaciona con la producción y el nivel de contrato; no es un sueldo fijo. En la entrevista te explican cómo funciona."
+      : "Compensation is tied to production and contract level; it isn't a fixed salary. The interview explains how it works.";
+  }
+  if (kind === "hourly") {
+    return es
+      ? "No es un puesto por hora garantizado. En la entrevista te explican cómo funciona la compensación."
+      : "It isn't a guaranteed hourly position. The interview explains how compensation works.";
+  }
+  if (kind === "salary") {
+    return es
+      ? "No es un salario fijo garantizado. La compensación depende de la producción y del nivel de contrato; en la entrevista te lo explican."
+      : "It isn't a guaranteed fixed salary. Compensation depends on production and contract level; that's covered in the interview.";
+  }
+  if (kind === "how_much") {
+    return (
+      findFAQ("how much does it pay", es ? "es" : "en") ||
+      (es
+        ? "No prometemos un ingreso específico. La compensación depende de la producción y del nivel de contrato; en la entrevista te explican la estructura."
+        : "We don't promise a specific income. Compensation depends on production and contract level; the interview explains the structure.")
+    );
+  }
+  if (kind === "pay_how" || kind === "source") {
+    return es
+      ? "La compensación depende de la producción y del nivel de contrato. En la entrevista te explican de forma clara cómo funciona."
+      : "Compensation depends on production and contract level. The interview explains clearly how it works.";
+  }
+
+  // Broad "cómo voy a ganar dinero" / "how do I make money"
+  return es
+    ? "La compensación depende de la producción y del nivel de contrato; no es un sueldo por hora garantizado. En la entrevista te explican cómo funciona."
+    : "Compensation depends on production and contract level; it isn't guaranteed hourly pay. The details are explained during the interview.";
 }
 
 /** BR-090 — first acknowledgement of fixed/salaried employment preference (no pressure). */

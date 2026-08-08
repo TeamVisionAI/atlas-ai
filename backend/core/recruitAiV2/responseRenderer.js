@@ -533,8 +533,9 @@ function renderCustomerReply(responsePlan) {
       entities
     );
   } else if (key === "compensation_faq_then_resume") {
+    // Implements BR-104 — progressive disclosure by compensationDetailKind.
     template = composeFaqThenResume(
-      getCompensationFaqAnswer(lang),
+      getCompensationFaqAnswer(lang, entities.compensationDetailKind || "general"),
       language,
       entities
     );

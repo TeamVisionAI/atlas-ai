@@ -24,6 +24,10 @@ const {
 } = require("./salesObjection");
 const { looksLikeNetworkObjection } = require("./networkObjection");
 const {
+  looksLikeCompensationQuestion,
+  classifyCompensationQuestionKind
+} = require("./compensationQuestion");
+const {
   isSoftAcknowledgement,
   hasConfirmableAppointmentProposal
 } = require("./schedulingConfirmation");
@@ -271,20 +275,6 @@ function looksLikeExperienceQuestion(text) {
     /\bi'?ve never done this before\b/.test(t) ||
     /\bi have never done this before\b/.test(t) ||
     /\bneed (prior |any )?experience\b/.test(t)
-  );
-}
-
-function looksLikeCompensationQuestion(text) {
-  const t = String(text || "").trim();
-  return (
-    /how much money do i make/i.test(t) ||
-    /how much (do|can) i make/i.test(t) ||
-    /how much does it pay/i.test(t) ||
-    /what'?s the compensation/i.test(t) ||
-    /is there a salary/i.test(t) ||
-    /is it commission/i.test(t) ||
-    /cu[aá]nto (pagan|se gana|gano)/i.test(t) ||
-    /\b(salary|sueldo|salario|commission|comisi[oó]n)\b/i.test(t)
   );
 }
 
@@ -870,10 +860,18 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       confidence = 0.94;
       entities.employmentPreference = "fixed";
     }
-  } else if (looksLikeCompensationQuestion(text)) {
-    // BR-088/098 — FAQ/business intents outrank scheduling + location parsing.
+  } else if (
+    looksLikeCompensationQuestion(text) ||
+    looksLikeCompensationQuestion(originalText)
+  ) {
+    // Implements BR-104 — compensation/earnings FAQ before scheduling/location/clarify.
+    // Reuses existing COMPENSATION_QUESTION intent (BR-088/098).
     intent = INTENTS.COMPENSATION_QUESTION;
-    confidence = 0.92;
+    confidence = 0.93;
+    entities.compensationDetailKind =
+      classifyCompensationQuestionKind(text) ||
+      classifyCompensationQuestionKind(originalText) ||
+      "general";
   } else if (looksLikeInsuranceQuestion(text) || looksLikeInsuranceQuestion(originalText)) {
     // BR-098 — detector must survive comparisonText (no "?") and raw variants.
     intent = INTENTS.INSURANCE_QUESTION;
@@ -1290,6 +1288,7 @@ module.exports = {
   classifySalesObjectionKind,
   looksLikeLicenseRequirementQuestion,
   looksLikeCompensationQuestion,
+  classifyCompensationQuestionKind,
   looksLikeWorkAuthorizationAnswer,
   looksLikeExplicitLanguageSwitch,
   looksLikePuertoRicoOriginStatement,

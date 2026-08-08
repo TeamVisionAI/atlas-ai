@@ -768,15 +768,22 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.COMPENSATION_QUESTION) {
+    // Implements BR-104 — answer compensation FAQ then resume exact pending ask_time/etc.
     structured.decision.nextAction =
       NEXT_ACTIONS.ANSWER_COMPENSATION_FAQ_THEN_RESUME;
     structured.reasonCodes.push(REASON_CODES.NO_INCOME_GUARANTEE);
+    const detailKind =
+      interpretation.entities?.compensationDetailKind || "general";
     const compensationFaq = buildFaqResumeDecision(
       structured,
       context,
       intent,
       "compensation_faq_then_resume"
     );
+    compensationFaq.customerReplyPlan.entities = {
+      ...compensationFaq.customerReplyPlan.entities,
+      compensationDetailKind: detailKind
+    };
     compensationFaq.contextPatch = {
       ...(compensationFaq.contextPatch || {}),
       conversation: {
