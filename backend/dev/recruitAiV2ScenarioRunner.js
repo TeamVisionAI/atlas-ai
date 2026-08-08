@@ -218,12 +218,24 @@ function createEphemeralSession(seed = {}) {
     conversation: seed.conversation || {},
     attention: seed.attention || {},
     currentStage: seed.currentStage || "greeting",
-    ...(seed.testNow ? { _testNow: new Date(seed.testNow) } : {})
+    ...(seed.testNow ? { _testNow: new Date(seed.testNow) } : {}),
+    // BR-107 — read-only agent hints / fixture slots (never mutate BR-080).
+    ...(seed.agentId ? { agentId: seed.agentId } : {}),
+    ...(seed.prospectOwnerUserId
+      ? { prospectOwnerUserId: seed.prospectOwnerUserId }
+      : {}),
+    ...(seed.orgDefaultRecruiterUserId
+      ? { orgDefaultRecruiterUserId: seed.orgDefaultRecruiterUserId }
+      : {}),
+    ...(seed.availabilityFixture
+      ? { _availabilityFixture: seed.availabilityFixture }
+      : {})
   });
 
   return {
     context,
     contextVersion: 1,
+    availabilityFixture: seed.availabilityFixture || null,
     seenInboundIds: new Map(),
     writes: {
       productionContextRows: 0,
@@ -326,6 +338,17 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
   };
 
   const startedAt = Date.now();
+  if (turn.setup?.availabilityFixture) {
+    session.context = {
+      ...session.context,
+      _availabilityFixture: turn.setup.availabilityFixture
+    };
+    session.availabilityFixture = turn.setup.availabilityFixture;
+  }
+  if (turn.setup?.agentId) {
+    session.context = { ...session.context, agentId: turn.setup.agentId };
+  }
+
   const result = processRecruitAiV2TurnSync({
     message: { id: inboundMessageId, text },
     context: session.context,
@@ -336,7 +359,22 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
       ...(options.explicitLanguagePreference
         ? { explicitLanguagePreference: options.explicitLanguagePreference }
         : {}),
-      ...(turn.options || {})
+      ...(turn.options || {}),
+      ...(session.availabilityFixture || session.context?._availabilityFixture
+        ? {
+            availabilityFixture:
+              turn.setup?.availabilityFixture ||
+              session.availabilityFixture ||
+              session.context._availabilityFixture
+          }
+        : {}),
+      ...(session.context?.agentId ? { agentId: session.context.agentId } : {}),
+      ...(session.context?.prospectOwnerUserId
+        ? { ownerUserId: session.context.prospectOwnerUserId }
+        : {}),
+      ...(session.context?.orgDefaultRecruiterUserId
+        ? { defaultRecruiterUserId: session.context.orgDefaultRecruiterUserId }
+        : {})
     },
     availability: turn.availability || null
   });
@@ -358,6 +396,19 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
   let nextContext = result.nextContext;
   nextContext = {
     ...nextContext,
+    // BR-107 — preserve read-only scheduling hints across ephemeral turns.
+    agentId: nextContext.agentId || session.context.agentId || null,
+    prospectOwnerUserId:
+      nextContext.prospectOwnerUserId || session.context.prospectOwnerUserId || null,
+    orgDefaultRecruiterUserId:
+      nextContext.orgDefaultRecruiterUserId ||
+      session.context.orgDefaultRecruiterUserId ||
+      null,
+    _availabilityFixture:
+      nextContext._availabilityFixture ||
+      session.availabilityFixture ||
+      session.context._availabilityFixture ||
+      null,
     conversation: {
       ...nextContext.conversation,
       lastAtlasOutboundText: result.rendered?.text || null
@@ -509,7 +560,13 @@ function runRecruitAiV2Scenario(definition, options = {}) {
     conversation: definition.seed?.conversation || {},
     attention: definition.seed?.attention || {},
     currentStage: definition.seed?.currentStage || "greeting",
-    timezone: definition.seed?.timezone || "America/New_York"
+    timezone: definition.seed?.timezone || "America/New_York",
+    // BR-107 fixture / read-only agent hints
+    testNow: definition.seed?.testNow || null,
+    agentId: definition.seed?.agentId || null,
+    prospectOwnerUserId: definition.seed?.prospectOwnerUserId || null,
+    orgDefaultRecruiterUserId: definition.seed?.orgDefaultRecruiterUserId || null,
+    availabilityFixture: definition.seed?.availabilityFixture || null
   };
 
   const session = createEphemeralSession(seed);

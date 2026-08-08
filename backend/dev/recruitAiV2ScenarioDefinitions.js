@@ -2868,6 +2868,68 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "readonly-slot-offering-after-constraint",
+    name: "BR-107 Read-only slot offering after constraint + date",
+    category: "scheduling",
+    description:
+      "BR-107 — after-5 without date does not fabricate slots; with concrete date + fixture, offer 17:30 + 19:00.",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "inferred",
+      agentId: "agent-fixture-br107",
+      testNow: "2026-08-07T15:00:00.000-04:00",
+      availabilityFixture: {
+        timezone: "America/New_York",
+        slots: [
+          { dateKey: "2026-08-11", timeKey: "17:30" },
+          { dateKey: "2026-08-11", timeKey: "18:00" },
+          { dateKey: "2026-08-11", timeKey: "19:00" }
+        ]
+      },
+      knownFacts: {
+        city: "Miami",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        workAuthorization: true,
+        preferredDayPart: "afternoon",
+        preferredMeetingType: "in_person"
+      },
+      currentStage: "scheduling",
+      conversation: {
+        lastQuestionAsked: "ask_time_preference",
+        lastAtlasOutboundText: "¿Qué hora en la tarde te funciona mejor?"
+      }
+    },
+    turns: [
+      {
+        id: "ro01",
+        text: "despues de las 5",
+        inboundMessageId: "sim-wamid.readonly-slots.t01",
+        expect: {
+          intent: "provide_availability_constraint",
+          replyIncludes: ["después de las"],
+          replyExcludes: ["Tengo disponible", "5:30 PM", "7:00 PM"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "ro02",
+        text: "el martes",
+        inboundMessageId: "sim-wamid.readonly-slots.t02",
+        expect: {
+          intent: "scheduling_date_proposal",
+          nextAction: "offer_available_slots",
+          replyIncludes: ["Tengo disponible", "5:30 PM", "7:00 PM"],
+          replyExcludes: ["anoto que puedes", "Continuemos"],
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      }
+    ]
   }
 ];
 

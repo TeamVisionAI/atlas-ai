@@ -148,6 +148,10 @@ const COPY = Object.freeze({
       "Got it — you prefer {requestedTime}. Let me check availability for that time and share options that work.",
     acknowledge_availability_constraint:
       "Got it — noted that you're available after {earliestTime}. What time after {earliestTime} works best for you?",
+    // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
+    offer_available_slots: null,
+    acknowledge_no_qualifying_availability:
+      "I don't have availability after {earliestTime} that day. What other day or time window works for you?",
     clarify_am_pm: "Do you mean {ambiguousHour} in the morning or {ambiguousHour} in the afternoon/evening?",
     offer_alternatives_no_handoff:
       "That time may not be available. I can offer nearby options — what other time works for you?",
@@ -278,6 +282,10 @@ const COPY = Object.freeze({
       "Entendido — prefieres {requestedTime}. Voy a revisar disponibilidad y te comparto opciones que funcionen.",
     acknowledge_availability_constraint:
       "Entendido — anoto que puedes después de las {earliestTime}. ¿Qué hora después de las {earliestTime} te funciona mejor?",
+    // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
+    offer_available_slots: null,
+    acknowledge_no_qualifying_availability:
+      "No tengo disponibilidad después de las {earliestTime} ese día. ¿Qué otro día o horario te funciona?",
     clarify_am_pm:
       "¿Te refieres a las {ambiguousHour} de la mañana o a las {ambiguousHour} de la tarde?",
     offer_alternatives_no_handoff:
@@ -641,6 +649,30 @@ function renderCustomerReply(responsePlan) {
       .replace(/\{resumeQuestion\}/g, resume);
   }
 
+  // Implements BR-107 — build offer copy from real offeredSlots only (never invent times).
+  if (key === "offer_available_slots") {
+    const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
+    const slotA = formatRequestedTime(
+      entities.slotA || offered[0]?.time || offered[0]?.timeKey || null,
+      language
+    );
+    const slotBRaw = entities.slotB || offered[1]?.time || offered[1]?.timeKey || null;
+    if (offered.length >= 2 && slotBRaw) {
+      const slotB = formatRequestedTime(slotBRaw, language);
+      template =
+        language === LANGUAGES.SPANISH
+          ? `Tengo disponible a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
+          : `I have availability at ${slotA} and ${slotB}. Which works better for you?`;
+    } else if (offered.length >= 1 || entities.slotA) {
+      template =
+        language === LANGUAGES.SPANISH
+          ? `Tengo disponible a las ${slotA}. ¿Te funciona?`
+          : `I have availability at ${slotA}. Does that work for you?`;
+    } else {
+      template = pack.acknowledge_no_qualifying_availability;
+    }
+  }
+
   if (!template) {
     template = pack.default;
   }
@@ -660,6 +692,11 @@ function renderCustomerReply(responsePlan) {
     template = (pack.clarify_am_pm || "").replace(
       /\{ambiguousHour\}/g,
       ambiguousHour
+    );
+  } else if (key === "acknowledge_no_qualifying_availability") {
+    template = (pack.acknowledge_no_qualifying_availability || "").replace(
+      /\{earliestTime\}/g,
+      earliestLabel
     );
   }
 

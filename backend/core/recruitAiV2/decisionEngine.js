@@ -42,6 +42,148 @@ const {
 const {
   isBeforeEarliestConstraint
 } = require("./schedulingConstraints");
+const { READ_STATUS } = require("./schedulingAvailabilityReader");
+
+/**
+ * BR-107 — apply read-only availability offer when orchestrator supplied facts.
+ * Returns structured decision when handled; null to continue normal path.
+ */
+function tryApplyAvailabilityOffer({
+  structured,
+  context,
+  interpretation,
+  availability,
+  constraintPatch = null
+}) {
+  if (!availability) {
+    return null;
+  }
+
+  const status = availability.status || null;
+  const alternatives = Array.isArray(availability.nearestAlternatives)
+    ? availability.nearestAlternatives
+    : [];
+  const earliestTime =
+    interpretation?.entities?.availabilityConstraint?.earliestTime ||
+    context.knownFacts?.availabilityConstraint?.earliestTime ||
+    null;
+  const dateLabel = resolveDateLabel(
+    {
+      ...context,
+      appointment: {
+        ...context.appointment,
+        proposedDate:
+          interpretation?.entities?.resolvedDate?.isoDate ||
+          context.appointment?.proposedDate ||
+          null
+      }
+    },
+    structured.preferredLanguage || "spanish"
+  );
+  const proposedDate =
+    interpretation?.entities?.resolvedDate?.isoDate ||
+    context.appointment?.proposedDate ||
+    null;
+
+  // Read failed / missing agent / no date in reader → BR-105 fallback (caller continues).
+  if (
+    availability.providerFailure === true ||
+    status === READ_STATUS.UNAVAILABLE ||
+    availability.checked === false
+  ) {
+    structured.reasonCodes.push(REASON_CODES.AVAILABILITY_READ_UNAVAILABLE);
+    return null;
+  }
+
+  if (status === READ_STATUS.ZERO_SLOTS || (availability.checked && alternatives.length === 0)) {
+    structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_NO_QUALIFYING_AVAILABILITY;
+    structured.decision.shouldEscalate = false;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = "acknowledge_no_qualifying_availability";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      earliestTime,
+      dateLabel,
+      requestedDate: proposedDate
+    };
+    structured.reasonCodes.push(REASON_CODES.ZERO_QUALIFYING_SLOTS);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    structured.contextPatch = {
+      ...(constraintPatch || {}),
+      knownFacts: {
+        ...(constraintPatch?.knownFacts || {}),
+        availabilityConstraint:
+          interpretation?.entities?.availabilityConstraint ||
+          context.knownFacts?.availabilityConstraint ||
+          null
+      },
+      appointment: {
+        ...(constraintPatch?.appointment || {}),
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate,
+        previouslyOfferedSlots: []
+      },
+      conversation: {
+        ...(constraintPatch?.conversation || {}),
+        lastQuestionAsked: "ask_date",
+        pendingClarification: null,
+        clarificationCount: 0,
+        lastProspectIntent: interpretation?.intent || null
+      },
+      attention: { needsHumanAttention: false, reason: null },
+      currentStage: STAGES.SCHEDULING
+    };
+    return structured;
+  }
+
+  if (status === READ_STATUS.AVAILABLE && alternatives.length > 0) {
+    structured.decision.nextAction = NEXT_ACTIONS.OFFER_AVAILABLE_SLOTS;
+    structured.decision.shouldEscalate = false;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = "offer_available_slots";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      earliestTime,
+      dateLabel,
+      requestedDate: proposedDate,
+      offeredSlots: alternatives,
+      slotA: alternatives[0]?.time || null,
+      slotB: alternatives[1]?.time || null
+    };
+    structured.reasonCodes.push(REASON_CODES.AVAILABLE_SLOTS_OFFERED);
+    structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    structured.contextPatch = {
+      ...(constraintPatch || {}),
+      knownFacts: {
+        ...(constraintPatch?.knownFacts || {}),
+        availabilityConstraint:
+          interpretation?.entities?.availabilityConstraint ||
+          context.knownFacts?.availabilityConstraint ||
+          null
+      },
+      appointment: {
+        ...(constraintPatch?.appointment || {}),
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate,
+        previouslyOfferedSlots: alternatives
+      },
+      conversation: {
+        ...(constraintPatch?.conversation || {}),
+        lastQuestionAsked: "offer_time_choices",
+        pendingClarification: null,
+        clarificationCount: 0,
+        lastProspectIntent: interpretation?.intent || null
+      },
+      attention: { needsHumanAttention: false, reason: null },
+      currentStage: STAGES.SCHEDULING
+    };
+    return structured;
+  }
+
+  return null;
+}
 
 function buildBaseDecision({ context, interpretation }) {
   return {
@@ -479,9 +621,15 @@ function decideConversationTurn({
 
   if (availability) {
     structured.availability = {
-      requestedSlotAvailable: Boolean(availability.requestedSlotAvailable),
+      requestedSlotAvailable:
+        availability.requestedSlotAvailable == null
+          ? null
+          : Boolean(availability.requestedSlotAvailable),
       nearestAlternatives: availability.nearestAlternatives || [],
-      checked: true
+      checked: availability.checked !== false,
+      status: availability.status || null,
+      providerFailure: Boolean(availability.providerFailure),
+      agentResolutionSource: availability.agentResolutionSource || null
     };
   }
 
@@ -1589,6 +1737,37 @@ function decideConversationTurn({
       return structured;
     }
 
+    // Implements BR-107 — with concrete date + prior constraint, offer real slots when read succeeds.
+    const dateConstraintPatch = {
+      knownFacts: {
+        dateExclusions: exclusions.length
+          ? exclusions
+          : context.knownFacts?.dateExclusions || []
+      },
+      appointment: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate: resolvedDate?.isoDate || null,
+        proposedDateLabel: dateLabel,
+        proposedDateHistory: dateHistory
+      }
+    };
+    const offeredFromDate = tryApplyAvailabilityOffer({
+      structured,
+      context,
+      interpretation,
+      availability,
+      constraintPatch: dateConstraintPatch
+    });
+    if (offeredFromDate) {
+      return offeredFromDate;
+    }
+    if (
+      !context.appointment?.proposedDate &&
+      !resolvedDate?.isoDate
+    ) {
+      structured.reasonCodes.push(REASON_CODES.AVAILABILITY_REQUIRES_CONCRETE_DATE);
+    }
+
     structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_DATE_ASK_TIME;
     structured.customerReplyPlan.templateKey = "acknowledge_date_ask_time";
     structured.contextPatch = {
@@ -1629,6 +1808,34 @@ function decideConversationTurn({
     structured.customerReplyPlan.acknowledgeRequest = true;
 
     const proposedTime = context.appointment?.proposedTime || null;
+    const hasConcreteDate = Boolean(context.appointment?.proposedDate);
+
+    // Implements BR-107 — offer real slots only when concrete date + successful read.
+    if (hasConcreteDate && !proposedTime) {
+      const offeredFromConstraint = tryApplyAvailabilityOffer({
+        structured,
+        context,
+        interpretation,
+        availability,
+        constraintPatch: {
+          knownFacts: {
+            availabilityConstraint: constraint || prior,
+            preferredDayPart:
+              context.knownFacts?.preferredDayPart ||
+              constraint?.dayPart ||
+              prior?.dayPart ||
+              null
+          }
+        }
+      });
+      if (offeredFromConstraint) {
+        structured.reasonCodes.push(REASON_CODES.AVAILABILITY_CONSTRAINT_CAPTURED);
+        return offeredFromConstraint;
+      }
+    } else if (!hasConcreteDate) {
+      structured.reasonCodes.push(REASON_CODES.AVAILABILITY_REQUIRES_CONCRETE_DATE);
+    }
+
     if (repetition) {
       structured.customerReplyPlan.templateKey = proposedTime
         ? "acknowledge_known_availability_confirm_slot"
@@ -1667,6 +1874,7 @@ function decideConversationTurn({
         pendingClarification: null,
         lastProspectIntent: INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT,
         // BR-087 — never bounce back to day-part after after-5 is known.
+        // Without concrete date, BR-105 ask-time remains; date resolution continues separately.
         lastQuestionAsked: proposedTime ? "confirm_slot" : "ask_time_preference"
       },
       currentStage:

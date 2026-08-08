@@ -1160,6 +1160,32 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-107 — Recruit AI Available-Slot Offering After a Time Constraint
+
+**Implements:** When a prospect supplies an availability constraint (`después de las 5`, day-part, before/after windows), preserve the constraint, read canonical real availability when safely available, filter violating slots, select up to two meaningfully spaced candidates, and offer them directly (“Tengo disponible…”) instead of echoing the constraint and asking the prospect to invent a time.  
+**Domain:** Recruit AI / Scheduling UX + availability Tools  
+**Depends on:** BR-081, BR-084, BR-102, BR-103, BR-105; Sprint 22 appointment scheduling engine (read path)  
+**Related:** BR-008 (Presence), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (read-only; execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/schedulingAvailabilityReader.js` → `appointmentApplicationService.getSlots` / Sprint 22; orchestrator injection; `decisionEngine` + `responseRenderer` offer templates  
+**Tests:** `backend/test/recruitAiV2ReadonlySlotOfferingBr107.test.js`  
+**Simulator:** `readonly-slot-offering-after-constraint` (fixture-injected availability only; no invented slots)  
+**Docs:** `docs/03-engineering/recruit-ai-v2/35_AVAILABLE_SLOT_OFFERING.md`
+
+### Rules
+
+1. **Read ≠ write** — Offering slots uses availability READ only. Never create/update appointments, Calendar events, WhatsApp, or BR-080 from this path while execution is OFF.
+2. **Canonical source only** — Sprint 22 engine (agent schedule + Atlas appointments + optional Google FreeBusy). Do not offer from legacy `capacity.json` while booking truth is Sprint 22.
+3. **Never fabricate** — Example times (5:30 / 7:00) are illustrative. If availability cannot be read safely, keep BR-105 ask-for-time / awaiting behavior and document the gap — do not invent slots.
+4. **Constraint first** — Preserve `earliestTime` / `latestTime` / day-part; filter out violating slots before selection.
+5. **Up to two candidates** — Prefer first valid slot + a meaningfully later valid slot (default spacing ≥ 90 minutes / 3× 30-min grid). If none meet spacing, fall back to the next later real slot.
+6. **One / zero / unread** — One → offer that time; successful zero → say no qualifying availability; read unavailable → BR-105 ask-time fallback (do not claim zero when unread).
+7. **Concrete date required** — Do not query or offer slots without a resolved date; store the constraint and continue date resolution.
+8. **Conversation style** — Prefer “Tengo disponible…”; avoid mechanical “anoto que puedes / me dijiste que…” when offering real options.
+9. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution enablement, no live CE cutover, no BR-080 mutation.
+
+---
+
 ## BR-106 — Recruit AI Short Pay-Mechanics Compensation Phrase Recognition
 
 **Implements:** Recognize short pay-mechanics phrases (`como pagan`, `cómo es el pago`, `how do they pay`, pay structure, …) as existing `compensation_question` / `pay_how`; answer directly from canonical production-based compensation knowledge; never map to name/generic Continuemos; preserve `awaiting_availability` and preferred time when availability is unresolved.  

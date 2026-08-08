@@ -77,6 +77,15 @@ const {
   DIVERGENCE
 } = require("./shadowDivergence");
 const constants = require("./constants");
+const {
+  readCandidateSlots,
+  readCandidateSlotsSync,
+  resolveAvailabilityAgent,
+  selectCandidateSlots,
+  filterSlotsByConstraints,
+  AGENT_RESOLUTION,
+  READ_STATUS
+} = require("./schedulingAvailabilityReader");
 
 module.exports = {
   processRecruitAiV2Turn,
@@ -126,5 +135,12 @@ module.exports = {
   classifyDivergence,
   extractLiveCeResponseIntent,
   DIVERGENCE,
+  readCandidateSlots,
+  readCandidateSlotsSync,
+  resolveAvailabilityAgent,
+  selectCandidateSlots,
+  filterSlotsByConstraints,
+  AGENT_RESOLUTION,
+  READ_STATUS,
   ...constants
 };
