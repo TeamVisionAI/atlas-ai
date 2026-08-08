@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -27,6 +27,9 @@ const {
 } = require("./constants");
 const {
   isTimeInOfferedSlots,
+  resolveUniqueOfferedSlotSelection,
+  slotDate,
+  slotTime,
   slotsEqual,
   APPOINTMENT_STATUS,
   STAGES
@@ -43,6 +46,63 @@ const {
   violatesEarliestConstraint
 } = require("./schedulingConstraints");
 const { READ_STATUS } = require("./schedulingAvailabilityReader");
+
+function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
+  if (!Array.isArray(offeredSlots) || offeredSlots.length === 0) {
+    return false;
+  }
+  return (
+    pendingQ === "offer_time_choices" ||
+    pendingQ === "offer_alternatives" ||
+    pendingQ === "offer_available_slots"
+  );
+}
+
+/**
+ * BR-115 / SELECT_OPTION — shared confirmation transition for an offered slot.
+ */
+function applySelectedOfferedSlotDecision(
+  structured,
+  selected,
+  offered,
+  { reasonCodes = [] } = {}
+) {
+  const selectedDate = slotDate(selected);
+  const selectedTime = slotTime(selected);
+  structured.decision.nextAction = NEXT_ACTIONS.ASK_EXPLICIT_CONFIRMATION;
+  structured.decision.requiresExplicitConfirmation = true;
+  structured.decision.mayCreateAppointment = false;
+  structured.decision.shouldEscalate = false;
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey = "confirm_selected_slot";
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    requestedDate: selectedDate,
+    requestedTime: selectedTime,
+    dateLabel: selectedDate,
+    timezone: selected?.timezone || null
+  };
+  for (const code of reasonCodes) {
+    structured.reasonCodes.push(code);
+  }
+  structured.reasonCodes.push(REASON_CODES.EXPLICIT_CONFIRMATION_REQUIRED);
+  structured.reasonCodes.push(REASON_CODES.PREMATURE_BOOKING_BLOCKED);
+  structured.contextPatch = {
+    appointment: {
+      status: APPOINTMENT_STATUS.PROPOSED,
+      proposedDate: selectedDate,
+      proposedTime: selectedTime,
+      previouslyOfferedSlots: offered
+    },
+    conversation: {
+      lastQuestionAsked: "confirm_slot",
+      pendingClarification: null,
+      clarificationCount: 0
+    },
+    currentStage: STAGES.PROPOSED
+  };
+  return structured;
+}
 
 /**
  * BR-107 — apply read-only availability offer when orchestrator supplied facts.
@@ -2135,31 +2195,7 @@ function decideConversationTurn({
     const optionIndex = Number(interpretation.entities?.optionIndex) || 1;
     const selected =
       offered[Math.max(0, optionIndex - 1)] || offered[0] || null;
-    structured.decision.nextAction = NEXT_ACTIONS.ASK_EXPLICIT_CONFIRMATION;
-    structured.decision.requiresExplicitConfirmation = true;
-    structured.decision.mayCreateAppointment = false;
-    structured.customerReplyPlan.templateKey = "confirm_selected_slot";
-    structured.customerReplyPlan.entities = {
-      ...structured.customerReplyPlan.entities,
-      requestedDate: selected?.date || selected?.dateKey || null,
-      requestedTime: selected?.time || selected?.timeKey || null,
-      dateLabel: selected?.date || selected?.dateKey || null
-    };
-    structured.reasonCodes.push(REASON_CODES.EXPLICIT_CONFIRMATION_REQUIRED);
-    structured.reasonCodes.push(REASON_CODES.PREMATURE_BOOKING_BLOCKED);
-    structured.contextPatch = {
-      appointment: {
-        status: APPOINTMENT_STATUS.PROPOSED,
-        proposedDate: selected?.date || selected?.dateKey || null,
-        proposedTime: selected?.time || selected?.timeKey || null,
-        previouslyOfferedSlots: offered
-      },
-      conversation: {
-        lastQuestionAsked: "confirm_slot"
-      },
-      currentStage: STAGES.PROPOSED
-    };
-    return structured;
+    return applySelectedOfferedSlotDecision(structured, selected, offered);
   }
 
   if (intent === INTENTS.RESCHEDULE_REQUEST) {
@@ -2274,6 +2310,62 @@ function decideConversationTurn({
     }
     if (dayPartPending) {
       structured.reasonCodes.push(REASON_CODES.DIRECT_TIME_OVERRIDES_DAY_PART);
+    }
+
+    // Implements BR-115 — unique natural-time match against offered slots = selection.
+    if (isPendingOfferedSlotChoice(pendingQ, offered) && requestedTime) {
+      const dateIso =
+        interpretation.entities?.resolvedDate?.isoDate ||
+        interpretation.entities?.requestedDate?.isoDate ||
+        null;
+      const match = resolveUniqueOfferedSlotSelection(offered, requestedTime, {
+        dateIso
+      });
+      if (match.kind === "unique" && match.selected) {
+        return applySelectedOfferedSlotDecision(
+          structured,
+          match.selected,
+          offered,
+          {
+            reasonCodes: [
+              REASON_CODES.COUNTEROFFER_DETECTED,
+              REASON_CODES.OFFERED_SLOT_NATURAL_TIME_SELECTED,
+              REASON_CODES.SCHEDULING_HANDOFF_GUARD
+            ]
+          }
+        );
+      }
+      if (match.kind === "ambiguous") {
+        structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
+        structured.decision.shouldEscalate = false;
+        structured.decision.mayCreateAppointment = false;
+        structured.customerReplyPlan.acknowledgeRequest = true;
+        structured.customerReplyPlan.templateKey = "clarify_offered_slot_day";
+        structured.customerReplyPlan.entities = {
+          ...structured.customerReplyPlan.entities,
+          requestedTime,
+          offeredSlots: match.matches
+        };
+        structured.reasonCodes.push(REASON_CODES.COUNTEROFFER_DETECTED);
+        structured.reasonCodes.push(REASON_CODES.OFFERED_SLOT_TIME_AMBIGUOUS);
+        structured.reasonCodes.push(REASON_CODES.RECOVERABLE_AMBIGUITY);
+        structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+        structured.contextPatch = {
+          appointment: {
+            status: APPOINTMENT_STATUS.PROPOSED,
+            previouslyOfferedSlots: offered
+          },
+          conversation: {
+            lastQuestionAsked: "offer_time_choices",
+            lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER,
+            pendingClarification: "clarify_offered_slot_day",
+            clarificationCount: 0
+          },
+          currentStage: STAGES.SCHEDULING,
+          attention: { needsHumanAttention: false, reason: null }
+        };
+        return structured;
+      }
     }
 
     const inOffered = isTimeInOfferedSlots(requestedTime, offered);

@@ -144,6 +144,8 @@ const COPY = Object.freeze({
       "No problem. Please reply morning or afternoon so we can continue.",
     confirm_selected_slot:
       "Thanks. Before we lock anything in, please reply YES to confirm that time, or suggest another time.",
+    clarify_offered_slot_day:
+      "I have {requestedTime} on more than one day. Which day works better for you?",
     acknowledge_counteroffer_check_availability:
       "Got it — you prefer {requestedTime}. Let me check availability for that time and share options that work.",
     // Implements BR-109 — ask the missing question; do not narrate internal note-taking.
@@ -284,6 +286,8 @@ const COPY = Object.freeze({
       "Sin problema. Responde mañana o tarde para continuar.",
     confirm_selected_slot:
       "Gracias. Antes de confirmar, responde SI para confirmar esa hora, o sugiere otra hora.",
+    clarify_offered_slot_day:
+      "Tengo {requestedTime} en más de un día. ¿Qué día te funciona mejor?",
     acknowledge_counteroffer_check_availability:
       "Entendido — prefieres {requestedTime}. Voy a revisar disponibilidad y te comparto opciones que funcionen.",
     // Implements BR-109 — ask the missing question; do not narrate internal note-taking.

@@ -202,12 +202,26 @@ function languageToLocaleCode(language) {
   return "en";
 }
 
+function slotDate(slot) {
+  if (!slot) {
+    return null;
+  }
+  return slot.date || slot.dateKey || null;
+}
+
+function slotTime(slot) {
+  if (!slot) {
+    return null;
+  }
+  return slot.time || slot.timeKey || null;
+}
+
 function slotKey(slot) {
   if (!slot) {
     return "";
   }
 
-  return `${slot.date || ""}|${slot.time || ""}|${slot.timezone || ""}`;
+  return `${slotDate(slot) || ""}|${slotTime(slot) || ""}|${slot.timezone || ""}`;
 }
 
 function slotsEqual(left = [], right = []) {
@@ -225,7 +239,57 @@ function isTimeInOfferedSlots(timeHhMm, offeredSlots = []) {
     return false;
   }
 
-  return offeredSlots.some((slot) => String(slot.time || "") === String(timeHhMm));
+  return offeredSlots.some(
+    (slot) => String(slotTime(slot) || "") === String(timeHhMm)
+  );
+}
+
+/**
+ * BR-115 — match a natural/spoken time against previously offered slots.
+ * Optional dateIso narrows to one calendar day (e.g. "domingo 7:30").
+ * @returns {{ kind: 'unique'|'ambiguous'|'none', selected: object|null, matches: object[] }}
+ */
+function resolveUniqueOfferedSlotSelection(
+  offeredSlots = [],
+  requestedTime = null,
+  { dateIso = null } = {}
+) {
+  if (!requestedTime || !Array.isArray(offeredSlots) || offeredSlots.length === 0) {
+    return { kind: "none", selected: null, matches: [] };
+  }
+
+  const time = String(requestedTime);
+  let matches = offeredSlots.filter(
+    (slot) => String(slotTime(slot) || "") === time
+  );
+
+  if (dateIso) {
+    const dateFiltered = matches.filter(
+      (slot) => String(slotDate(slot) || "") === String(dateIso)
+    );
+    if (dateFiltered.length > 0) {
+      matches = dateFiltered;
+    }
+  }
+
+  if (matches.length === 0) {
+    return { kind: "none", selected: null, matches: [] };
+  }
+
+  if (matches.length === 1) {
+    return { kind: "unique", selected: matches[0], matches };
+  }
+
+  // Same wall time on multiple dates → ambiguous unless date narrows it.
+  const distinctDates = new Set(
+    matches.map((slot) => String(slotDate(slot) || "")).filter(Boolean)
+  );
+  if (distinctDates.size <= 1) {
+    // Same date, duplicate times — treat first as unique.
+    return { kind: "unique", selected: matches[0], matches: [matches[0]] };
+  }
+
+  return { kind: "ambiguous", selected: null, matches };
 }
 
 module.exports = {
@@ -239,8 +303,11 @@ module.exports = {
   normalizeLanguage,
   languageToLocaleCode,
   slotKey,
+  slotDate,
+  slotTime,
   slotsEqual,
   isTimeInOfferedSlots,
+  resolveUniqueOfferedSlotSelection,
   STAGES,
   APPOINTMENT_STATUS,
   LANGUAGES

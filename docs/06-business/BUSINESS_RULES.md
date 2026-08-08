@@ -1187,6 +1187,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-115 — Natural-Time Selection of Previously Offered Slots
+
+**Implements:** When Recruit AI v2 has offered concrete slots and the prospect replies with a natural/spoken time that **uniquely** matches one offered slot, treat that reply as selection of that slot — not a free-form counteroffer that re-checks availability.  
+**Domain:** Recruit AI / scheduling conversation continuity  
+**Depends on:** BR-081, BR-084, BR-107, BR-108, BR-111, BR-114  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/decisionEngine.js`; `conversationContext.resolveUniqueOfferedSlotSelection`  
+**Tests:** `backend/test/recruitAiV2NaturalOfferedSlotSelectionBr115.test.js`
+
+### Rules
+
+1. **Unique offered-time match = selection** — After `offer_time_choices` (or equivalent offered-slot pending state), a `requestedTime` that uniquely matches `previouslyOfferedSlots` transitions via the same confirmation path as `SELECT_OPTION` (`confirm_selected_slot` / `confirm_slot`). Do **not** emit `acknowledge_and_check_availability`.
+2. **Ambiguous same-time multi-day** — If the same wall clock appears on more than one offered date and the reply does not name a day, clarify which day — do not guess.
+3. **Date + time disambiguates** — Phrases like `domingo 7:30` that resolve to one offered date+time select that slot.
+4. **Outside offered set** — Times not in `previouslyOfferedSlots` keep existing counteroffer / check-availability behavior.
+5. **Numbered menus unchanged** — Bare `1`/`2` within the offered set length remain `SELECT_OPTION`.
+6. **Execution independent** — Selection does not authorize mutations; BR-111 remains fail-closed.
+7. **Preserve durable state** — Keep selected date/time/timezone, retain `previouslyOfferedSlots`, and do not reset to `awaiting_availability`.
+
+---
+
 ## BR-113 — Live Execution Attribution Telemetry
 
 **Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  

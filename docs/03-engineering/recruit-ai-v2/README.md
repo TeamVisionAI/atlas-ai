@@ -49,6 +49,8 @@
 | [39_LIVE_EXECUTION_PATH_CUTOVER.md](./39_LIVE_EXECUTION_PATH_CUTOVER.md) | BR-112 — live CE may request allowExecution |
 | [40_LIVE_AUTHORING_CUTOVER.md](./40_LIVE_AUTHORING_CUTOVER.md) | BR-114 — one-user live WhatsApp reply authoring cutover |
 
+BR-115 — natural/spoken time uniquely matching `previouslyOfferedSlots` selects that slot (`confirm_selected_slot`); ambiguous multi-day same-time clarifies. Tests: `recruitAiV2NaturalOfferedSlotSelectionBr115.test.js`.
+
 ## Regression fixture
 
 `backend/test/fixtures/recruitAiV2/tv000028-scheduling-replay.json`  

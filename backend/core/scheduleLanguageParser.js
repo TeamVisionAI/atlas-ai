@@ -160,10 +160,21 @@ function resolveFlexibleFlag(context = {}) {
 function parseTimeHint(text, context = {}) {
   const flexible = resolveFlexibleFlag(context);
 
+  const weekday =
+    "lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday";
   const timePatterns = [
     /(?:prefer(?:ring)?|at|around|about|for|a las|como a las|can it be at|could it be at|puede ser a las|podria ser a las|seria a las|sería a las)\s+(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)?/i,
     /(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)\s*(?:mas o menos|más o menos|or so|ish)\b/i,
     /(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)/i,
+    // "domingo 7:30" / "7:30 domingo" — weekday + wall clock without requiring "a las".
+    new RegExp(
+      `(?:\\b(?:${weekday})\\b)\\s+(\\d{1,2})(?::(\\d{2}))?\\b`,
+      "i"
+    ),
+    new RegExp(
+      `(\\d{1,2})(?::(\\d{2}))?\\s+(?:\\b(?:${weekday})\\b)`,
+      "i"
+    ),
     /^(\d{1,2})$/i
   ];
 
