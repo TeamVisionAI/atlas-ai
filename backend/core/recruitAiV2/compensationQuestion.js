@@ -104,6 +104,32 @@ function classifyCompensationQuestionKind(text) {
     return "salary_question";
   }
 
+  // Implements BR-106 — short pay-mechanics phrases before amount-focused how_much.
+  if (
+    /\bcomo pagan\b/.test(t) ||
+    /\bcomo pagan ahi\b/.test(t) ||
+    /\bcomo es el pago\b/.test(t) ||
+    /\bcomo funciona el pago\b/.test(t) ||
+    /\bcomo funciona la compensacion\b/.test(t) ||
+    /\bcomo me pagan\b/.test(t) ||
+    /\bcomo me van a pagar\b/.test(t) ||
+    /\bcomo recibo el pago\b/.test(t) ||
+    /\bde que forma pagan\b/.test(t) ||
+    /\bcual es la forma de pago\b/.test(t) ||
+    /\bhow do (they|you) pay\b/.test(t) ||
+    /\bhow do i get paid\b/.test(t) ||
+    /\bhow do you get paid\b/.test(t) ||
+    /\bhow does (the )?pay(ment)? work\b/.test(t) ||
+    /\bhow does compensation work\b/.test(t) ||
+    /\bhow will i get paid\b/.test(t) ||
+    /\bhow am i paid\b/.test(t) ||
+    /\bwhat'?s the pay structure\b/.test(t) ||
+    /\bwhats the pay structure\b/.test(t) ||
+    /\bwhat is the pay(ment)? structure\b/.test(t)
+  ) {
+    return "pay_how";
+  }
+
   if (
     /\bcuanto pagan\b/.test(t) ||
     /\bcuanto se gana\b/.test(t) ||
@@ -117,18 +143,6 @@ function classifyCompensationQuestionKind(text) {
     /\bwhats the (pay|compensation)\b/.test(t)
   ) {
     return "how_much";
-  }
-
-  if (
-    /\bcomo me pagan\b/.test(t) ||
-    /\bcomo funciona el pago\b/.test(t) ||
-    /\bcomo funciona la compensacion\b/.test(t) ||
-    /\bhow do i get paid\b/.test(t) ||
-    /\bhow do you get paid\b/.test(t) ||
-    /\bhow does the pay work\b/.test(t) ||
-    /\bhow does compensation work\b/.test(t)
-  ) {
-    return "pay_how";
   }
 
   if (
