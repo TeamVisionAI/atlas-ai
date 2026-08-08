@@ -72,7 +72,8 @@ Do **not** change without an explicit sprint:
 3. ~~Durable conversation context store (Phase 2)~~ — migration `032` + `contextPersistenceService`
 4. ~~Shadow-mode CE wiring + divergence telemetry (Phase 3)~~ — Team Vision 10% when configured; production CE remains authoritative
 5. ~~Continuous context capture (Phase 3B)~~ — separate flags; **defaults off** in code; 100% capture ≠ 10% shadow
-6. Controlled cutover behind BR-075 + authorized appointment side effects (explicit sprint)
+6. ~~Fail-closed one-user execution canary boundary (BR-111)~~ — authorizer + create-only executor; **Railway execution vars unset**
+7. Controlled cutover behind BR-075 + authorized appointment side effects (explicit sprint; enable env only after review)
 
 ### Phase 2–3B notes
 

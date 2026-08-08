@@ -1,6 +1,7 @@
 /**
  * Recruit AI v2 public surface.
- * Side effects remain disabled; use processRecruitAiV2Turn for auditable decisions.
+ * Execution is fail-closed (BR-111); mutations require exact org+user canary gates
+ * plus options.allowExecution. Shadow/advisory must never set allowExecution.
  */
 
 const {
@@ -22,6 +23,11 @@ const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine"
 const { buildResponsePlan } = require("./responsePlan");
 const { renderCustomerReply } = require("./responseRenderer");
 const { authorizeSideEffects, isExecutionEnabled, isShadowEnabled } = require("./sideEffectAuthorizer");
+const {
+  resolveExecutionConfig,
+  isEligibleForExecution
+} = require("./executionConfig");
+const { executeAuthorizedSideEffects } = require("./sideEffectExecutor");
 const { containsInternalDiagnostics, sanitizeCustomerCopy } = require("./sanitize");
 const {
   sanitizeContextForPersistence,
@@ -104,6 +110,9 @@ module.exports = {
   authorizeSideEffects,
   isExecutionEnabled,
   isShadowEnabled,
+  resolveExecutionConfig,
+  isEligibleForExecution,
+  executeAuthorizedSideEffects,
   containsInternalDiagnostics,
   sanitizeCustomerCopy,
   sanitizeContextForPersistence,

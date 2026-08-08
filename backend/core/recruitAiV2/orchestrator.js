@@ -8,11 +8,14 @@
  *   → response plan
  *   → rendered copy
  *   → side-effect proposal
- *   → policy/authorization gate
- *   → optional execution (DISABLED this sprint)
- *   → durable context persistence (Phase 2; context write only)
+ *   → policy/authorization gate (BR-111; fail-closed)
+ *   → optional execution via sideEffectExecutor → canonical services
+ *   → durable context persistence (context write only unless execution authorized)
  *
- * Implements BR-081 / BR-049: decide and plan; do not reimplement booking engines.
+ * Implements BR-081 / BR-049 / BR-111: decide and plan; mutate only via
+ * canonical domain services after exact org+user authorization.
+ *
+ * Shadow / advisory callers must NOT set options.allowExecution.
  */
 
 const { loadConversationContext } = require("./contextLoader");
@@ -20,18 +23,118 @@ const { interpretInboundMessage } = require("./interpreter");
 const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine");
 const { buildResponsePlan } = require("./responsePlan");
 const { renderCustomerReply } = require("./responseRenderer");
-const { authorizeSideEffects } = require("./sideEffectAuthorizer");
+const {
+  authorizeSideEffects,
+  resolveActingUserId
+} = require("./sideEffectAuthorizer");
+const { executeAuthorizedSideEffects } = require("./sideEffectExecutor");
 const { containsInternalDiagnostics } = require("./sanitize");
 const { buildNextContextFromInterpretation } = require("./contextTurnUpdate");
 const {
   resolveAvailabilityForTurn,
   resolveAvailabilityForTurnSync
 } = require("./schedulingAvailabilityReader");
+const { APPOINTMENT_STATUS, STAGES } = require("./conversationContext");
+
+async function resolveProfileConfigured({ actingUserId, options = {} } = {}) {
+  if (typeof options.profileConfigured === "boolean") {
+    return options.profileConfigured;
+  }
+  if (!actingUserId) {
+    return false;
+  }
+  const getAppointmentProfile =
+    options.dependencies?.getAppointmentProfile ||
+    ((userId) =>
+      require("../../services/appointmentProfileService").getAppointmentProfile(userId));
+  try {
+    const profile = await getAppointmentProfile(actingUserId);
+    return profile?.profileConfigured === true;
+  } catch {
+    return false;
+  }
+}
+
+function applyExecutionOutcomeToReply({
+  structuredDecision,
+  responsePlan,
+  rendered,
+  execution
+}) {
+  if (!execution?.attempted) {
+    return { structuredDecision, responsePlan, rendered };
+  }
+
+  const entities = {
+    ...(responsePlan.entities || {}),
+    ...(structuredDecision.customerReplyPlan?.entities || {})
+  };
+
+  if (execution.success) {
+    const plan = {
+      ...responsePlan,
+      templateKey: "appointment_confirmed",
+      entities
+    };
+    const nextDecision = {
+      ...structuredDecision,
+      decision: {
+        ...structuredDecision.decision,
+        executionAuthorized: true,
+        sideEffectsEnabled: true
+      },
+      customerReplyPlan: {
+        ...structuredDecision.customerReplyPlan,
+        templateKey: "appointment_confirmed",
+        entities
+      }
+    };
+    return {
+      structuredDecision: nextDecision,
+      responsePlan: plan,
+      rendered: renderCustomerReply(plan)
+    };
+  }
+
+  const plan = {
+    ...responsePlan,
+    templateKey: "appointment_create_failed",
+    entities
+  };
+  return {
+    structuredDecision: {
+      ...structuredDecision,
+      customerReplyPlan: {
+        ...structuredDecision.customerReplyPlan,
+        templateKey: "appointment_create_failed"
+      }
+    },
+    responsePlan: plan,
+    rendered: renderCustomerReply(plan)
+  };
+}
+
+function applyExecutionToContext(nextContext, execution) {
+  if (!execution?.success || !execution.appointmentId) {
+    return nextContext;
+  }
+  const performed = execution.performed?.[0] || {};
+  return {
+    ...nextContext,
+    currentStage: STAGES.CONFIRMED,
+    appointment: {
+      ...nextContext.appointment,
+      status: APPOINTMENT_STATUS.CONFIRMED,
+      appointmentId: execution.appointmentId,
+      confirmedDate: performed.dateKey || nextContext.appointment?.proposedDate || null,
+      confirmedTime: performed.timeKey || nextContext.appointment?.proposedTime || null
+    }
+  };
+}
 
 /**
  * Run one Recruit AI v2 decision cycle.
- * Never sends WhatsApp or books appointments.
- * May persist sanitized context when a persistenceService is provided.
+ * Mutations require authorization + options.allowExecution === true.
  */
 async function processRecruitAiV2Turn({
   message,
@@ -44,6 +147,7 @@ async function processRecruitAiV2Turn({
   const organizationId =
     context?.organizationId ||
     contextInput?.organizationId ||
+    options.organizationId ||
     null;
   const prospectId =
     context?.prospectId ||
@@ -55,6 +159,7 @@ async function processRecruitAiV2Turn({
     message?.providerMessageId ||
     options.inboundMessageId ||
     null;
+  const env = options.env || process.env;
 
   let loaded = context || null;
   let persistenceSource = context?._persistence ? "persisted" : "provided";
@@ -121,11 +226,70 @@ async function processRecruitAiV2Turn({
     rendered = renderCustomerReply(responsePlan);
   }
 
-  const authorization = authorizeSideEffects({
+  const actingUserId = resolveActingUserId({ context: loaded, options });
+  const profileConfigured = await resolveProfileConfigured({
+    actingUserId,
+    options
+  });
+
+  // Re-authorize immediately before any mutation (BR-111).
+  let authorization = authorizeSideEffects({
     structuredDecision,
     responsePlan,
-    env: options.env || process.env
+    context: loaded,
+    env,
+    profileConfigured,
+    actingUserId,
+    organizationId: organizationId || loaded.organizationId,
+    options
   });
+
+  let execution = {
+    attempted: false,
+    performed: [],
+    failed: [],
+    skipped: authorization.proposals.map((p) => p.type),
+    success: false
+  };
+
+  // Shadow/advisory must omit allowExecution. Live canary sets allowExecution:true.
+  if (authorization.authorized === true && options.allowExecution === true) {
+    // Defense in depth — authorize again immediately before the write.
+    authorization = authorizeSideEffects({
+      structuredDecision,
+      responsePlan,
+      context: loaded,
+      env,
+      profileConfigured,
+      actingUserId,
+      organizationId: organizationId || loaded.organizationId,
+      options
+    });
+
+    if (authorization.authorized === true) {
+      execution = await executeAuthorizedSideEffects({
+        authorization,
+        structuredDecision,
+        context: loaded,
+        options: {
+          ...options,
+          inboundMessageId,
+          prospectPhone: options.prospectPhone || loaded.prospectPhone || null
+        },
+        dependencies: options.dependencies || {}
+      });
+
+      const applied = applyExecutionOutcomeToReply({
+        structuredDecision,
+        responsePlan,
+        rendered,
+        execution
+      });
+      structuredDecision = applied.structuredDecision;
+      responsePlan = applied.responsePlan;
+      rendered = applied.rendered;
+    }
+  }
 
   let nextContext = buildNextContextFromInterpretation({
     loaded,
@@ -136,6 +300,7 @@ async function processRecruitAiV2Turn({
     ...nextContext.conversation,
     lastOfferMade: responsePlan.templateKey || nextContext.conversation.lastOfferMade
   };
+  nextContext = applyExecutionToContext(nextContext, execution);
 
   let persistenceResult = null;
 
@@ -182,29 +347,36 @@ async function processRecruitAiV2Turn({
         : null
     },
     execution: {
-      attempted: false,
-      performed: [],
-      skipped: authorization.proposals.map((p) => p.type)
+      attempted: Boolean(execution.attempted),
+      performed: execution.performed || [],
+      failed: execution.failed || [],
+      skipped: execution.skipped || [],
+      success: Boolean(execution.success),
+      idempotent: Boolean(execution.idempotent),
+      appointmentId: execution.appointmentId || null
     },
     audit: {
       at: new Date().toISOString(),
       intent: interpretation.intent,
+      // Separate proposed vs authorized vs performed (BR-111).
+      proposedAction: structuredDecision.decision.nextAction,
       nextAction: structuredDecision.decision.nextAction,
       reasonCodes: structuredDecision.reasonCodes,
-      mayCreateAppointment: false,
-      sideEffectsAuthorized: false,
+      mayCreateAppointment: Boolean(structuredDecision.decision.mayCreateAppointment),
+      executionAuthorized: Boolean(authorization.authorized),
+      actionPerformed: (execution.performed || []).map((p) => p.type),
+      sideEffectsAuthorized: Boolean(authorization.authorized),
       contextPersisted: Boolean(persistenceResult?.ok)
     }
   };
 }
 
-/** Sync wrapper for callers that do not need persistence. */
+/** Sync wrapper for callers that do not need persistence or live execution. */
 function processRecruitAiV2TurnSync(args = {}) {
   if (args.persistenceService) {
     throw new Error("Use async processRecruitAiV2Turn when persistenceService is provided");
   }
 
-  // Preserve prior sync behavior for fixture tests without persistence.
   const {
     message,
     contextInput = null,
@@ -256,12 +428,22 @@ function processRecruitAiV2TurnSync(args = {}) {
     rendered = renderCustomerReply(responsePlan);
   }
 
+  const actingUserId = resolveActingUserId({ context: loaded, options });
+  const profileConfigured =
+    typeof options.profileConfigured === "boolean" ? options.profileConfigured : false;
+
   const authorization = authorizeSideEffects({
     structuredDecision,
     responsePlan,
-    env: options.env || process.env
+    context: loaded,
+    env: options.env || process.env,
+    profileConfigured,
+    actingUserId,
+    organizationId: options.organizationId || loaded.organizationId,
+    options
   });
 
+  // Sync path never mutates — execution requires async + allowExecution.
   const nextContext = buildNextContextFromInterpretation({
     loaded,
     interpretation,
@@ -284,15 +466,20 @@ function processRecruitAiV2TurnSync(args = {}) {
     execution: {
       attempted: false,
       performed: [],
-      skipped: authorization.proposals.map((p) => p.type)
+      failed: [],
+      skipped: authorization.proposals.map((p) => p.type),
+      success: false
     },
     audit: {
       at: new Date().toISOString(),
       intent: interpretation.intent,
+      proposedAction: structuredDecision.decision.nextAction,
       nextAction: structuredDecision.decision.nextAction,
       reasonCodes: structuredDecision.reasonCodes,
-      mayCreateAppointment: false,
-      sideEffectsAuthorized: false,
+      mayCreateAppointment: Boolean(structuredDecision.decision.mayCreateAppointment),
+      executionAuthorized: Boolean(authorization.authorized),
+      actionPerformed: [],
+      sideEffectsAuthorized: Boolean(authorization.authorized),
       contextPersisted: false
     }
   };

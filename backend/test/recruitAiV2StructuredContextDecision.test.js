@@ -191,7 +191,7 @@ test("10. opportunity question gets value-prop then qualify plan", () => {
   );
 });
 
-test("11. schedule confirm remains side-effect disabled (no premature book)", () => {
+test("11. schedule confirm proposes create but does not authorize mutation (BR-111)", () => {
   const fx = loadFixture();
   const idx = inboundIndex(fx, "t08");
   const context = loadContextFromReplayFixture(fx, idx);
@@ -203,9 +203,14 @@ test("11. schedule confirm remains side-effect disabled (no premature book)", ()
     options: { flexible: true }
   });
   assert.equal(result.interpretation.intent, INTENTS.SCHEDULE_CONFIRM);
-  assert.equal(result.structuredDecision.decision.mayCreateAppointment, false);
+  assert.equal(result.structuredDecision.decision.nextAction, NEXT_ACTIONS.CREATE_APPOINTMENT);
+  // Proposal flag only — never permission.
+  assert.equal(result.structuredDecision.decision.mayCreateAppointment, true);
+  assert.equal(result.structuredDecision.decision.executionAuthorized, false);
+  assert.equal(result.authorization.authorized, false);
+  assert.equal(result.execution.attempted, false);
   assert.ok(
-    result.structuredDecision.reasonCodes.includes(REASON_CODES.SIDE_EFFECTS_DISABLED)
+    result.structuredDecision.reasonCodes.includes(REASON_CODES.APPOINTMENT_CREATE_PROPOSED)
   );
 });
 
@@ -232,7 +237,7 @@ test("12. decideSafeFailure strips diagnostic phrases from customer path", () =>
   assert.equal(decision.decision.mayCreateAppointment, false);
 });
 
-test("13. module surface exports orchestrator without wiring live WhatsApp", () => {
+test("13. module surface exports orchestrator without wiring live WhatsApp send", () => {
   const indexSrc = fs.readFileSync(
     path.join(__dirname, "../core/recruitAiV2/index.js"),
     "utf8"
@@ -242,8 +247,10 @@ test("13. module surface exports orchestrator without wiring live WhatsApp", () 
     "utf8"
   );
   assert.match(indexSrc, /processRecruitAiV2Turn/);
-  assert.doesNotMatch(orchSrc, /sendAndPersistWhatsAppMessage|executeScheduleInterview/);
-  assert.match(orchSrc, /Side effects remain disabled|DISABLED this sprint/i);
+  // BR-111 — WhatsApp send remains outside v2; appointment mutate only via executor.
+  assert.doesNotMatch(orchSrc, /sendAndPersistWhatsAppMessage/);
+  assert.match(orchSrc, /sideEffectExecutor|executeAuthorizedSideEffects/);
+  assert.match(orchSrc, /allowExecution/);
 });
 
 test("14. Meta Review flexibility gate still consulted by interpreter path", () => {
@@ -259,10 +266,20 @@ test("14. Meta Review flexibility gate still consulted by interpreter path", () 
   assert.match(interpreter, /isConversationalScheduleFlexibilityEnabled/);
 });
 
-test("15. no production TV-000028 mutation helpers exist in v2 package", () => {
+test("15. v2 package does not own prospect claim / direct lifecycle helpers", () => {
   const dir = path.join(__dirname, "../core/recruitAiV2");
   for (const name of fs.readdirSync(dir)) {
     const src = fs.readFileSync(path.join(dir, name), "utf8");
-    assert.doesNotMatch(src, /updateProspect\(|executeScheduleInterview|claimLead\(/);
+    assert.doesNotMatch(src, /updateProspect\(|claimLead\(/);
+    // BR-111 — only sideEffectExecutor may name the canonical schedule entrypoint.
+    if (name !== "sideEffectExecutor.js") {
+      assert.doesNotMatch(src, /executeScheduleInterview/);
+    }
   }
+  const executorSrc = fs.readFileSync(
+    path.join(dir, "sideEffectExecutor.js"),
+    "utf8"
+  );
+  assert.match(executorSrc, /missionExecutionApplicationService/);
+  assert.doesNotMatch(executorSrc, /from\("atlas_appointments"\)|\.insert\(/);
 });

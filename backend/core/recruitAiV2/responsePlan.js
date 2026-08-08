@@ -15,9 +15,11 @@ function buildResponsePlan(structuredDecision) {
     templateKey: replyPlan.templateKey || null,
     acknowledgeRequest: Boolean(replyPlan.acknowledgeRequest),
     forbidInternalDiagnostics: replyPlan.forbidInternalDiagnostics !== false,
+    // Proposed / desired action only — never mutation permission (BR-111).
     nextAction: decision.nextAction || NEXT_ACTIONS.NOOP,
     shouldEscalate: Boolean(decision.shouldEscalate),
-    mayCreateAppointment: false,
+    mayCreateAppointment: Boolean(decision.mayCreateAppointment),
+    executionAuthorized: false,
     maySendOutbound: false,
     reasonCodes: [...(structuredDecision?.reasonCodes || [])],
     entities: {

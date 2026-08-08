@@ -385,15 +385,23 @@ test("23. 10% shadow preserved", () => {
   assert.equal(cfg.sampleRate, 0.1);
 });
 
-test("24. v2 sideEffectAuthorizer remains deny-all", () => {
+test("24. v2 sideEffectAuthorizer fail-closed without org/user allowlists", () => {
   const auth = authorizeSideEffects({
     structuredDecision: {
-      decision: { nextAction: "create_appointment", shouldEscalate: true },
+      decision: {
+        nextAction: "create_appointment",
+        mayCreateAppointment: true,
+        shouldEscalate: true
+      },
       reasonCodes: []
     },
     responsePlan: { templateKey: "x" },
-    env: { ...baseEnv(), RECRUIT_AI_V2_EXECUTION_ENABLED: "true" }
+    env: { ...baseEnv(), RECRUIT_AI_V2_EXECUTION_ENABLED: "true" },
+    profileConfigured: true,
+    actingUserId: "user-1",
+    organizationId: "org-1"
   });
+  // Flag alone must never authorize (BR-111).
   assert.equal(auth.authorized, false);
 });
 

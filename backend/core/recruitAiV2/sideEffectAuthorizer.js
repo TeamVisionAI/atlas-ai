@@ -1,13 +1,28 @@
 /**
- * Recruit AI v2 — SideEffectAuthorizer.
- * This sprint: always deny execution. Decisions remain auditable.
- * Implements BR-081.
+ * Recruit AI v2 — SideEffectAuthorizer (BR-111).
+ *
+ * Fail-closed server-side gate immediately before mutation.
+ * Decision intent (nextAction / mayCreateAppointment) never grants permission.
+ *
+ * Authorization requires ALL of:
+ * 1. RECRUIT_AI_V2_EXECUTION_ENABLED === "true"
+ * 2. organizationId in RECRUIT_AI_V2_EXECUTION_ORGANIZATION_IDS
+ * 3. actingUserId in RECRUIT_AI_V2_EXECUTION_USER_IDS
+ * 4. profileConfigured === true
+ * 5. requested action is an explicitly supported v2 executable action
+ *
+ * Role / being RVP never authorizes. Tenant allowlist alone never authorizes.
  */
 
-const { FEATURE_FLAGS, REASON_CODES } = require("./constants");
+const { FEATURE_FLAGS, REASON_CODES, V2_EXECUTABLE_ACTIONS } = require("./constants");
+const {
+  resolveExecutionConfig,
+  isEligibleForExecution,
+  isExecutionFlagEnabled
+} = require("./executionConfig");
 
 function isExecutionEnabled(env = process.env) {
-  return String(env[FEATURE_FLAGS.EXECUTION_ENABLED_ENV] || "").toLowerCase() === "true";
+  return isExecutionFlagEnabled(env);
 }
 
 function isShadowEnabled(env = process.env) {
@@ -21,34 +36,40 @@ function isShadowEnabled(env = process.env) {
   return String(env[FEATURE_FLAGS.SHADOW_ENABLED_LEGACY_ENV] || "").toLowerCase() === "true";
 }
 
-/**
- * Authorize proposed side effects. Returns proposals + hard deny in this sprint.
- */
-function authorizeSideEffects({
-  structuredDecision,
-  responsePlan,
-  env = process.env
-} = {}) {
-  const executionEnabled = isExecutionEnabled(env);
-  const proposals = [];
+function resolveActingUserId({ context, options } = {}) {
+  return (
+    options?.actingUserId ||
+    options?.agentId ||
+    options?.userId ||
+    context?.agentId ||
+    context?.prospectOwnerUserId ||
+    context?.ownerUserId ||
+    context?.identity?.ownerUserId ||
+    null
+  );
+}
 
+function resolveOrganizationId({ structuredDecision, context, options } = {}) {
+  return (
+    options?.organizationId ||
+    context?.organizationId ||
+    structuredDecision?.organizationId ||
+    null
+  );
+}
+
+function collectProposedMutationTypes(structuredDecision, responsePlan) {
+  const types = [];
   const nextAction = structuredDecision?.decision?.nextAction || null;
   const intent = structuredDecision?.intent || null;
-
-  if (nextAction === "create_appointment") {
-    proposals.push({
-      type: "create_appointment",
-      status: "proposed",
-      authorized: false,
-      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
-    });
-  }
-
   const kind = structuredDecision?.entities?.cancellationKind || null;
   const alsoCancel = Boolean(structuredDecision?.entities?.alsoCancelAppointment);
   const alsoWithdraw = Boolean(structuredDecision?.entities?.alsoWithdraw);
 
-  // BR-085/086 — cancel/withdraw/opt-out proposals remain auditable and denied.
+  if (nextAction === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT) {
+    types.push(V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT);
+  }
+
   if (
     nextAction === "acknowledge_cancel_no_write" ||
     intent === "cancel_request" ||
@@ -56,12 +77,7 @@ function authorizeSideEffects({
     kind === "cancel_and_opt_out" ||
     (intent === "withdraw_interest" && kind === "withdraw_and_cancel")
   ) {
-    proposals.push({
-      type: "cancel_appointment",
-      status: "proposed",
-      authorized: false,
-      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
-    });
+    types.push("cancel_appointment");
   }
 
   if (
@@ -69,12 +85,7 @@ function authorizeSideEffects({
     intent === "withdraw_interest" ||
     alsoWithdraw
   ) {
-    proposals.push({
-      type: "withdraw_prospect",
-      status: "proposed",
-      authorized: false,
-      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
-    });
+    types.push("withdraw_prospect");
   }
 
   if (
@@ -83,62 +94,144 @@ function authorizeSideEffects({
     kind === "opt_out" ||
     kind === "cancel_and_opt_out"
   ) {
-    proposals.push({
-      type: "communication_opt_out",
-      status: "proposed",
-      authorized: false,
-      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
-    });
+    types.push("communication_opt_out");
   }
 
-  // BR-087 — Zoom link share remains proposal-only (BR-076; never fabricate).
   if (
     nextAction === "acknowledge_meeting_access" ||
     intent === "meeting_access_request"
   ) {
-    proposals.push({
-      type: "share_zoom_link",
-      status: "proposed",
-      authorized: false,
-      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
-    });
+    types.push("share_zoom_link");
   }
 
   if (structuredDecision?.decision?.shouldEscalate) {
-    proposals.push({
-      type: "mark_human_attention",
-      status: "proposed",
-      authorized: false,
-      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
-    });
+    types.push("mark_human_attention");
   }
 
   if (responsePlan?.templateKey) {
+    types.push("send_whatsapp_reply");
+  }
+
+  return [...new Set(types)];
+}
+
+function isSupportedExecutableAction(type) {
+  return type === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT;
+}
+
+/**
+ * Authorize proposed side effects. Never infers permission from nextAction alone.
+ */
+function authorizeSideEffects({
+  structuredDecision,
+  responsePlan,
+  context = null,
+  env = process.env,
+  profileConfigured = false,
+  actingUserId = null,
+  organizationId = null,
+  options = {}
+} = {}) {
+  const executionEnabled = isExecutionEnabled(env);
+  const config = resolveExecutionConfig(env);
+  const orgId = organizationId || resolveOrganizationId({ structuredDecision, context, options });
+  const userId =
+    actingUserId || resolveActingUserId({ context, options });
+
+  const proposedTypes = collectProposedMutationTypes(structuredDecision, responsePlan);
+  const denyReasons = [];
+  const proposals = [];
+
+  const eligibility = isEligibleForExecution({
+    organizationId: orgId,
+    actingUserId: userId,
+    env
+  });
+
+  if (!executionEnabled || config.failClosed) {
+    denyReasons.push(
+      config.failClosedReason === "MALFORMED_EXECUTION_ENABLED"
+        ? REASON_CODES.EXECUTION_DENIED
+        : REASON_CODES.SIDE_EFFECTS_DISABLED
+    );
+  } else if (!eligibility.eligible) {
+    if (eligibility.reason === "ORG_ALLOWLIST_EMPTY" || eligibility.reason === "ORG_NOT_ALLOWLISTED") {
+      denyReasons.push(REASON_CODES.EXECUTION_ORG_NOT_ALLOWLISTED);
+    } else if (
+      eligibility.reason === "USER_ALLOWLIST_EMPTY" ||
+      eligibility.reason === "USER_NOT_ALLOWLISTED"
+    ) {
+      denyReasons.push(REASON_CODES.EXECUTION_USER_NOT_ALLOWLISTED);
+    } else {
+      denyReasons.push(REASON_CODES.EXECUTION_DENIED);
+    }
+  }
+
+  if (profileConfigured !== true) {
+    denyReasons.push(REASON_CODES.EXECUTION_PROFILE_NOT_CONFIGURED);
+  }
+
+  // mayCreateAppointment / nextAction are proposal signals only — never permission.
+  const decisionProposesCreate =
+    structuredDecision?.decision?.nextAction === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT;
+  const decisionMayCreate = structuredDecision?.decision?.mayCreateAppointment === true;
+
+  for (const type of proposedTypes) {
+    const supported = isSupportedExecutableAction(type);
+    let authorized = false;
+    let reason = REASON_CODES.SIDE_EFFECTS_DISABLED;
+
+    if (!supported) {
+      reason = REASON_CODES.EXECUTION_UNSUPPORTED_ACTION;
+    } else if (denyReasons.length > 0) {
+      reason = denyReasons[0];
+    } else if (!decisionProposesCreate || !decisionMayCreate) {
+      // Create must be an explicit confirmed proposal, not a bare nextAction string.
+      reason = REASON_CODES.PREMATURE_BOOKING_BLOCKED;
+    } else {
+      authorized = true;
+      reason = REASON_CODES.EXECUTION_AUTHORIZED;
+    }
+
     proposals.push({
-      type: "send_whatsapp_reply",
-      status: "proposed",
-      authorized: false,
-      reason: REASON_CODES.SIDE_EFFECTS_DISABLED
+      type,
+      status: authorized ? "authorized" : "proposed",
+      authorized,
+      reason
     });
   }
 
-  // Hard gate: even if env is flipped accidentally in this sprint's callers,
-  // callers must still pass an explicit allowExecution override (never set here).
-  const authorized = false;
+  const authorized =
+    proposals.some((p) => p.authorized === true) &&
+    denyReasons.length === 0 &&
+    eligibility.eligible === true &&
+    profileConfigured === true;
+
+  if (!authorized && denyReasons.length === 0) {
+    denyReasons.push(REASON_CODES.SIDE_EFFECTS_DISABLED);
+  }
 
   return {
     executionEnabled,
     shadowEnabled: isShadowEnabled(env),
     authorized,
     proposals,
-    denyReasons: [REASON_CODES.SIDE_EFFECTS_DISABLED],
-    note:
-      "Recruit AI v2 side effects are disabled for this sprint. Decisions and copy are auditable only."
+    denyReasons: [...new Set(denyReasons)],
+    organizationId: orgId,
+    actingUserId: userId,
+    profileConfigured: profileConfigured === true,
+    eligibilityReason: eligibility.reason,
+    note: authorized
+      ? "Recruit AI v2 execution authorized for supported canary action only."
+      : "Recruit AI v2 side effects denied (fail-closed). Decisions remain auditable."
   };
 }
 
 module.exports = {
   authorizeSideEffects,
   isExecutionEnabled,
-  isShadowEnabled
+  isShadowEnabled,
+  resolveActingUserId,
+  resolveOrganizationId,
+  V2_EXECUTABLE_ACTIONS
 };
