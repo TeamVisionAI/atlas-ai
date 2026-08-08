@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -2425,6 +2425,70 @@ function decideConversationTurn({
       return structured;
     }
 
+    // Implements BR-116 — same-turn canonical availability offer after preferred time.
+    // Prefer real Sprint 22 slots over the deferred "voy a revisar" ack.
+    const preferencePatch = {
+      appointment: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedTime: requestedTime,
+        proposedTimeHistory: history
+      },
+      conversation: {
+        counterofferMismatchCount:
+          priorCandidate && priorCandidate !== requestedTime ? 0 : mismatchCount,
+        clarificationCount: 0,
+        lastCounterofferTime: requestedTime,
+        lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER,
+        pendingClarification: null
+      }
+    };
+    if (
+      availability?.checked &&
+      !availability.providerFailure &&
+      Array.isArray(availability.nearestAlternatives) &&
+      availability.nearestAlternatives.length > 0
+    ) {
+      const offeredNow = tryApplyAvailabilityOffer({
+        structured,
+        context,
+        interpretation,
+        availability,
+        constraintPatch: preferencePatch
+      });
+      if (offeredNow) {
+        offeredNow.reasonCodes.push(REASON_CODES.COUNTEROFFER_DETECTED);
+        offeredNow.reasonCodes.push(REASON_CODES.REQUESTED_TIME_AVAILABILITY_OFFERED);
+        if (availability.requestedSlotAvailable === false) {
+          offeredNow.reasonCodes.push(
+            REASON_CODES.SLOT_UNAVAILABLE_OFFER_ALTERNATIVES
+          );
+        }
+        // Keep user's preferred time even when alternatives are offered.
+        offeredNow.contextPatch = {
+          ...offeredNow.contextPatch,
+          appointment: {
+            ...(offeredNow.contextPatch?.appointment || {}),
+            proposedTime: requestedTime,
+            proposedTimeHistory: history,
+            previouslyOfferedSlots:
+              offeredNow.contextPatch?.appointment?.previouslyOfferedSlots ||
+              availability.nearestAlternatives
+          },
+          conversation: {
+            ...(offeredNow.contextPatch?.conversation || {}),
+            lastCounterofferTime: requestedTime,
+            lastQuestionAsked: "offer_time_choices",
+            lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER
+          }
+        };
+        offeredNow.customerReplyPlan.entities = {
+          ...offeredNow.customerReplyPlan.entities,
+          requestedTime
+        };
+        return offeredNow;
+      }
+    }
+
     if (unavailable) {
       structured.reasonCodes.push(REASON_CODES.SLOT_UNAVAILABLE_OFFER_ALTERNATIVES);
       structured.decision.nextAction = NEXT_ACTIONS.OFFER_ALTERNATIVES_NO_HANDOFF;
@@ -2453,8 +2517,10 @@ function decideConversationTurn({
       return structured;
     }
 
-    // Provider hard failure may escalate — ordinary negotiation never does (BR-084).
-    if (availability?.providerFailure === true) {
+    // Provider hard failure may escalate after an active offered-slot negotiation.
+    // BR-116 — first preferred-time reads without a prior menu fall through to the
+    // deferred ack rather than forcing human escalate when agent/fixture is missing.
+    if (availability?.providerFailure === true && offered.length > 0) {
       structured.decision.nextAction = NEXT_ACTIONS.OFFER_ALTERNATIVES_OR_ESCALATE;
       structured.decision.shouldEscalate = true;
       structured.customerReplyPlan.templateKey = "escalate_after_counteroffer_mismatch";
