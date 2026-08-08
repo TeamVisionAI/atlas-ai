@@ -567,23 +567,110 @@ async function readCandidateSlots({
  */
 function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
   const constraints = resolveConstraints({ context, interpretation });
-  if (!constraints.earliestTime && !constraints.latestTime) {
+  const intent = interpretation?.intent || null;
+  const { INTENTS } = require("./constants");
+  const pendingQ = String(context?.conversation?.lastQuestionAsked || "");
+
+  // Implements BR-116 — preferred-time answers (before an offered menu exists, or
+  // while stuck awaiting_availability) must read slots same turn.
+  // Do not force a live read for every outside-menu counteroffer after slots
+  // were already offered — BR-115 / existing counteroffer paths own that case.
+  const priorOffered = context?.appointment?.previouslyOfferedSlots || [];
+  const noOfferedMenuYet = !Array.isArray(priorOffered) || priorOffered.length === 0;
+  const counterofferNeedsSlots =
+    intent === INTENTS.SCHEDULING_COUNTEROFFER &&
+    (pendingQ === "ask_time_preference" ||
+      pendingQ === "awaiting_availability" ||
+      (noOfferedMenuYet &&
+        Boolean(constraints.earliestTime || constraints.latestTime)));
+
+  if (
+    !constraints.earliestTime &&
+    !constraints.latestTime &&
+    !counterofferNeedsSlots
+  ) {
     return false;
   }
 
-  const intent = interpretation?.intent || null;
-  const { INTENTS } = require("./constants");
   const allowedIntent =
     intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT ||
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL ||
-    intent === INTENTS.REASSERT_KNOWN_FACT;
+    intent === INTENTS.REASSERT_KNOWN_FACT ||
+    counterofferNeedsSlots;
   if (!allowedIntent) {
     return false;
   }
 
   const date = resolveConcreteScheduleDate({ context, interpretation });
   // Concrete date → single-day BR-107 path. No date → BR-108 rolling path.
-  return Boolean(date) || intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT;
+  return (
+    Boolean(date) ||
+    intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT ||
+    counterofferNeedsSlots
+  );
+}
+
+/**
+ * BR-116 — mark whether the prospect's requested time is in the read result,
+ * and bias offered alternatives toward matching wall-clock slots when present.
+ */
+function enrichAvailabilityForRequestedTime(availability, requestedTime) {
+  if (!availability || !requestedTime || availability.checked !== true) {
+    return availability;
+  }
+
+  const time = String(requestedTime);
+  const rawSlots = availability.readResult?.slots || [];
+  const matching = rawSlots
+    .map((slot) => ({
+      date: slot.date || slot.dateKey || null,
+      time: slot.time || slot.timeKey || null,
+      timezone: slot.timezone || availability.readResult?.timezone || null
+    }))
+    .filter((slot) => slot.time && String(slot.time) === time);
+
+  const requestedSlotAvailable = matching.length > 0;
+  let nearestAlternatives = Array.isArray(availability.nearestAlternatives)
+    ? [...availability.nearestAlternatives]
+    : [];
+
+  if (requestedSlotAvailable) {
+    const preferred = [];
+    const seen = new Set();
+    for (const slot of matching) {
+      const key = `${slot.date || ""}|${slot.time}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      preferred.push(slot);
+      if (preferred.length >= 2) {
+        break;
+      }
+    }
+    for (const alt of nearestAlternatives) {
+      if (preferred.length >= 2) {
+        break;
+      }
+      const key = `${alt.date || ""}|${alt.time || ""}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      preferred.push(alt);
+    }
+    nearestAlternatives = preferred;
+  }
+
+  return {
+    ...availability,
+    requestedSlotAvailable,
+    nearestAlternatives,
+    status:
+      nearestAlternatives.length > 0
+        ? READ_STATUS.AVAILABLE
+        : availability.status
+  };
 }
 
 
@@ -1002,7 +1089,10 @@ async function resolveAvailabilityForTurn({
       maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
       now
     });
-    return toDecisionAvailability(readResult);
+    return enrichAvailabilityForRequestedTime(
+      toDecisionAvailability(readResult),
+      interpretation?.entities?.requestedTime || null
+    );
   }
 
   // BR-107 — concrete date → single-day read.
@@ -1019,7 +1109,10 @@ async function resolveAvailabilityForTurn({
     maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
   });
 
-  return toDecisionAvailability(readResult);
+  return enrichAvailabilityForRequestedTime(
+    toDecisionAvailability(readResult),
+    interpretation?.entities?.requestedTime || null
+  );
 }
 
 /**
@@ -1193,7 +1286,10 @@ function resolveAvailabilityForTurnSync(args = {}) {
       maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
       now
     });
-    return toDecisionAvailability(readResult);
+    return enrichAvailabilityForRequestedTime(
+      toDecisionAvailability(readResult),
+      interpretation?.entities?.requestedTime || null
+    );
   }
 
   const readResult = readCandidateSlotsSync({
@@ -1209,7 +1305,10 @@ function resolveAvailabilityForTurnSync(args = {}) {
     maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
   });
 
-  return toDecisionAvailability(readResult);
+  return enrichAvailabilityForRequestedTime(
+    toDecisionAvailability(readResult),
+    interpretation?.entities?.requestedTime || null
+  );
 }
 
 module.exports = {
@@ -1234,6 +1333,7 @@ module.exports = {
   readRollingCandidateSlots,
   readRollingCandidateSlotsSync,
   shouldAttemptAvailabilityOffer,
+  enrichAvailabilityForRequestedTime,
   resolveAvailabilityForTurn,
   resolveAvailabilityForTurnSync,
   dateKeyInZone,

@@ -1208,6 +1208,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-116 — Same-Turn Availability After Preferred Time
+
+**Implements:** When the prospect answers a preferred-time question (e.g. `7:30`) as `scheduling_counteroffer`, Recruit AI v2 must run the canonical availability read **in the same inbound turn** and render real offered slots — never defer with “voy a revisar disponibilidad” when Sprint 22 slots can be read now.  
+**Domain:** Recruit AI / scheduling conversation continuity  
+**Depends on:** BR-081, BR-084, BR-107, BR-108, BR-111, BR-114, BR-115  
+**Status:** Implemented  
+**Engine target:** `schedulingAvailabilityReader.shouldAttemptAvailabilityOffer`; `decisionEngine` counteroffer → `tryApplyAvailabilityOffer`  
+**Tests:** `backend/test/recruitAiV2SameTurnRequestedTimeAvailabilityBr116.test.js`
+
+### Rules
+
+1. **Same-turn lookup** — `SCHEDULING_COUNTEROFFER` with known availability constraint / scheduling pending state enables `resolveAvailabilityForTurn` (reader → `getSlots` → Sprint 22 engine → appointment profile).
+2. **Reuse offer path** — Successful reads apply `tryApplyAvailabilityOffer` / `offer_available_slots` (or zero-slot ack). Do not invent a parallel offer pipeline.
+3. **Prefer requested wall clock when available** — Bias `nearestAlternatives` toward matching `requestedTime` when present in the read result.
+4. **Unavailable requested time** — Still offer real nearby alternatives same turn; do not wait for “OK”.
+5. **State** — Retain `proposedTime` preference; persist `previouslyOfferedSlots`; set `lastQuestionAsked=offer_time_choices` so BR-115 selection works next.
+6. **Dead-end deferred ack is last resort** — `acknowledge_and_check_availability` only when availability cannot be checked (provider failure / no slots path unavailable).
+7. **Execution independent** — Authoring only; BR-111 remains fail-closed. No Calendar / appointment / BR-080 writes from this path.
+8. **Canonical path only** — No legacy `buildOfferedTimes`. Org office hours must not invent RVP truncation beyond Sprint 22 profile rules.
+
+---
+
 ## BR-113 — Live Execution Attribution Telemetry
 
 **Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  

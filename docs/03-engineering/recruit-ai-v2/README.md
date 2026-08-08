@@ -51,6 +51,8 @@
 
 BR-115 — natural/spoken time uniquely matching `previouslyOfferedSlots` selects that slot (`confirm_selected_slot`); ambiguous multi-day same-time clarifies. Tests: `recruitAiV2NaturalOfferedSlotSelectionBr115.test.js`.
 
+BR-116 — preferred/requested time (e.g. `7:30`) triggers same-turn `schedulingAvailabilityReader` → `offer_available_slots`; no deferred “voy a revisar” when slots are readable. Tests: `recruitAiV2SameTurnRequestedTimeAvailabilityBr116.test.js`.
+
 ## Regression fixture
 
 `backend/test/fixtures/recruitAiV2/tv000028-scheduling-replay.json`  
