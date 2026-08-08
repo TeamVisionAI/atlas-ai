@@ -405,6 +405,12 @@ async function completeInterview(prospect, profile, language, options = {}) {
 
   let scheduleResult;
   let usedV2Execution = false;
+  // BR-113 — telemetry attribution only (does not change booking behavior).
+  const emitStage = options.logStage || logWhatsAppStage;
+  const attribution = require("./recruitAiV2/liveExecutionAttribution");
+  let v2Attempted = false;
+  let v2PriorReason = null;
+  let v2Authorized = null;
 
   // Implements BR-112 — live CE may ask v2 to execute; BR-111 remains final authority.
   // Shadow/advisory never enter this bridge. No v2 WhatsApp send path.
@@ -430,25 +436,48 @@ async function completeInterview(prospect, profile, language, options = {}) {
     if (liveAttempt.usedV2Execution && liveAttempt.scheduleResult) {
       scheduleResult = liveAttempt.scheduleResult;
       usedV2Execution = true;
-      logWhatsAppStage("recruit_ai_v2_live_execution_used", {
-        phone: prospect.phone,
-        organizationId,
-        agentId,
-        appointmentId: scheduleResult.appointmentId || null,
-        idempotent: Boolean(liveAttempt.v2Result?.execution?.idempotent)
-      });
+      v2Attempted = true;
+      emitStage(
+        attribution.STAGES.USED,
+        attribution.buildUsedDetails({
+          phone: prospect.phone,
+          organizationId,
+          agentId,
+          appointmentId: scheduleResult.appointmentId || null,
+          idempotent: Boolean(liveAttempt.v2Result?.execution?.idempotent)
+        })
+      );
     } else if (liveAttempt.invoked) {
-      logWhatsAppStage("recruit_ai_v2_live_execution_not_used", {
-        level: "info",
-        phone: prospect.phone,
-        organizationId,
-        agentId,
-        reason: liveAttempt.reason || null,
-        authorized: Boolean(liveAttempt.v2Result?.authorization?.authorized)
-      });
+      v2Attempted = true;
+      v2PriorReason = liveAttempt.reason || null;
+      v2Authorized = Boolean(liveAttempt.v2Result?.authorization?.authorized);
+      emitStage(
+        attribution.STAGES.NOT_USED,
+        attribution.buildNotUsedDetails({
+          phone: prospect.phone,
+          organizationId,
+          agentId,
+          reason: v2PriorReason,
+          authorized: v2Authorized
+        })
+      );
+    } else {
+      // Live path disabled / not eligible — explicit NOT_ATTEMPTED (BR-113).
+      emitStage(
+        attribution.STAGES.NOT_ATTEMPTED,
+        attribution.buildNotAttemptedDetails({
+          phone: prospect.phone,
+          organizationId,
+          agentId,
+          reason: liveAttempt.reason || "LIVE_PATH_DISABLED"
+        })
+      );
     }
   } catch (liveBridgeError) {
-    logWhatsAppStage("recruit_ai_v2_live_execution_bridge_failed", {
+    v2Attempted = true;
+    v2PriorReason = "BRIDGE_FAILED";
+    v2Authorized = false;
+    emitStage(attribution.STAGES.BRIDGE_FAILED, {
       level: "warn",
       phone: prospect.phone,
       organizationId,
@@ -472,6 +501,23 @@ async function completeInterview(prospect, profile, language, options = {}) {
           userId: agentId
         }
       );
+
+      // BR-113 — only after legacy CE booking path actually executed, and only
+      // when a v2 attempt was made but did not perform the appointment.
+      if (v2Attempted) {
+        emitStage(
+          attribution.STAGES.LEGACY_FALLBACK,
+          attribution.buildLegacyFallbackDetails({
+            phone: prospect.phone,
+            organizationId,
+            agentId,
+            priorReason: v2PriorReason,
+            authorized: v2Authorized,
+            appointmentId: scheduleResult?.appointmentId || null,
+            legacySuccess: Boolean(scheduleResult?.success)
+          })
+        );
+      }
     } catch (error) {
       logWhatsAppStage("autonomous_schedule_exception", {
         level: "error",
