@@ -191,13 +191,20 @@ test("progressive disclosure subtypes: hourly / salary / fixed / commission", ()
   assert.match(fixed.rendered.text, /pago fijo|fijo garantizado/i);
   assert.doesNotMatch(fixed.rendered.text, /\$\d{2,}/i);
 
-  const commission = turn("es por comisión", askTimeAfternoonContext());
-  assert.equal(
-    commission.interpretation.entities.compensationDetailKind,
-    "commission_question"
-  );
-  assert.match(commission.rendered.text, /producción|contrato/i);
-  assert.doesNotMatch(commission.rendered.text, /%\d+|porcentaje fijo/i);
+  for (const phrase of [
+    "es por comisión",
+    "pagan comisión",
+    "is it commission based"
+  ]) {
+    const commission = turn(phrase, askTimeAfternoonContext());
+    assert.equal(
+      commission.interpretation.entities.compensationDetailKind,
+      "commission_question",
+      phrase
+    );
+    assert.match(commission.rendered.text, /producción|contrato/i);
+    assert.doesNotMatch(commission.rendered.text, /%\d+|porcentaje fijo/i);
+  }
 
   const howMuch = turn("cuanto pagan", askTimeAfternoonContext());
   assert.equal(howMuch.interpretation.entities.compensationDetailKind, "how_much");

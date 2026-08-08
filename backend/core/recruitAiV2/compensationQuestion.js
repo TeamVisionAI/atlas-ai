@@ -36,8 +36,9 @@ function classifyCompensationQuestionKind(text) {
   if (
     /\bes por comision\b/.test(t) ||
     /\bes comision\b/.test(t) ||
-    /\bis it commission\b/.test(t) ||
-    /\bis this commission\b/.test(t) ||
+    /\bpagan comision\b/.test(t) ||
+    /\bis it commission( based)?\b/.test(t) ||
+    /\bis this commission( based)?\b/.test(t) ||
     /\b(salary|sueldo|salario|commission|comision)\b.*\b(o|or)\b.*\b(commission|comision|salary|sueldo|salario)\b/.test(
       t
     )
