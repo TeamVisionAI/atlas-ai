@@ -77,7 +77,7 @@ function afterFiveAfternoonContext(overrides = {}) {
     conversation: {
       lastQuestionAsked: "ask_time_preference",
       lastAtlasOutboundText:
-        "Entendido — anoto que puedes después de las 5:00 PM. ¿Qué hora después de las 5:00 PM te funciona mejor?",
+        "¿Qué hora después de las 5:00 PM te funciona mejor?",
       ...(overrides.conversation || {})
     },
     ...overrides

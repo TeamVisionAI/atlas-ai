@@ -1160,12 +1160,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-109 — Recruit AI Playground Rolling Availability Path + Non-Narrating Constraint Copy
+
+**Implements:** Ops Center Playground must resolve a read-only scheduling agent for live Sprint 22 reads (without BR-080 mutation) so BR-108 rolling offers run on the real UI path; ordinary scheduling acknowledgements must not narrate internal note-taking (“anoto que puedes…”).  
+**Domain:** Recruit AI / Ops Playground + Scheduling UX  
+**Depends on:** BR-081, BR-084, BR-105, BR-107, BR-108; Sprint 22 read path  
+**Related:** BR-080 (read-only; no mutation from playground)  
+**Status:** Implemented in Recruit AI v2 playground wiring + response templates (execution remains OFF)  
+**Engine target:** `recruitAiV2CustomPlayground.js` read-agent bind → async `sendPlaygroundTurnAsync`; `responseRenderer` constraint copy  
+**Tests:** `backend/test/recruitAiV2PlaygroundRollingPathBr109.test.js`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/37_PLAYGROUND_ROLLING_AVAILABILITY_PATH.md`
+
+### Rules
+
+1. **Real Playground path** — Ops HTTP turns use async Sprint 22 reads; synthetic playground prospects still need a resolvable read agent.
+2. **Safe agent bind** — Precedence: explicit agent/owner → org default recruiter → deterministic org operating RVP. Never random RVP pick. Never create/claim/assign (no BR-080 writes).
+3. **No-date constraint** — Missing `proposedDate` must not force ask-time when rolling search can run.
+4. **Copy** — Do not use “anoto que puedes / anoto tu disponibilidad / Entendido — anoto…” for ordinary scheduling facts; prefer action (“Tengo disponible…”) or a direct missing question.
+5. **Fallback priority** — 2 slots → offer 2; 1 → offer 1; successful zero → truthful no-availability; unread/missing agent/provider failure → BR-105 clarification (without robotic anoto).
+6. **Boundaries** — No Railway flag changes, no execution enablement, no live CE cutover, no WhatsApp/Calendar/appointment writes from v2.
+
+---
+
 ## BR-108 — Recruit AI Rolling Multi-Date Availability Offer
 
 **Implements:** When a prospect supplies a useful time constraint (`después de las 5`, etc.) without a concrete date, Atlas proactively searches upcoming REAL Sprint 22 availability (org-local NOW → preferred 48h horizon, then bounded day-by-day expansion) and offers up to two useful day+time choices (“Tengo disponible…”), instead of asking the prospect to invent a day or a specific clock time.  
 **Domain:** Recruit AI / Scheduling UX + availability Tools  
 **Depends on:** BR-079, BR-081, BR-084, BR-102, BR-105, BR-107; Sprint 22 appointment scheduling engine (read path)  
-**Related:** BR-008 (Presence), BR-080 (read-only; no mutation from v2)  
+**Related:** BR-008 (Presence), BR-080 (read-only; no mutation from v2); **BR-109** (Playground path wiring)  
 **Status:** Implemented in Recruit AI v2 engines (read-only; execution remains OFF until separately authorized)  
 **Engine target:** `recruitAiV2/schedulingAvailabilityReader.js` rolling search → `getSlots` (`date`/`dateEnd`); `decisionEngine` + `responseRenderer` multi-date offer templates  
 **Tests:** `backend/test/recruitAiV2RollingAvailabilityBr108.test.js`  

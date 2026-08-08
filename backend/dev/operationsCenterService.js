@@ -37,7 +37,7 @@ const {
   getRecruitAiV2GoldenSuiteMeta
 } = require("./recruitAiV2ScenarioPack");
 const {
-  createPlaygroundSession,
+  createPlaygroundSessionAsync,
   getPlaygroundSession,
   resetPlaygroundSession,
   sendPlaygroundTurnAsync,
@@ -768,13 +768,13 @@ function getRecruitAiV2PlaygroundMeta() {
   return listPlaygroundMeta();
 }
 
-function startRecruitAiV2PlaygroundSession(payload = {}) {
+async function startRecruitAiV2PlaygroundSession(payload = {}) {
   const {
     DEFAULT_ORGANIZATION_ID
   } = require("../modules/prospects/domain/constants");
-  // BR-107 — Ops playground sessions use Team Vision org for live read-only
-  // Sprint 22 availability (still sim-* prospect ids; no writes).
-  const session = createPlaygroundSession({
+  // BR-107 / BR-109 — Ops playground sessions use Team Vision org + resolved
+  // read-only scheduling agent for live Sprint 22 availability (sim-* prospects; no writes).
+  const session = await createPlaygroundSessionAsync({
     ...payload,
     organizationId: payload.organizationId || DEFAULT_ORGANIZATION_ID,
     liveAvailabilityRead: payload.liveAvailabilityRead !== false
@@ -792,7 +792,7 @@ function getRecruitAiV2PlaygroundSession(sessionId) {
   return getPlaygroundSession(sessionId);
 }
 
-function resetRecruitAiV2PlaygroundSession(sessionId, payload = {}) {
+async function resetRecruitAiV2PlaygroundSession(sessionId, payload = {}) {
   return resetPlaygroundSession(sessionId, payload);
 }
 

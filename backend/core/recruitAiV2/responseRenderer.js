@@ -146,8 +146,9 @@ const COPY = Object.freeze({
       "Thanks. Before we lock anything in, please reply YES to confirm that time, or suggest another time.",
     acknowledge_counteroffer_check_availability:
       "Got it — you prefer {requestedTime}. Let me check availability for that time and share options that work.",
+    // Implements BR-109 — ask the missing question; do not narrate internal note-taking.
     acknowledge_availability_constraint:
-      "Got it — noted that you're available after {earliestTime}. What time after {earliestTime} works best for you?",
+      "What time after {earliestTime} works best for you?",
     // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
     offer_available_slots: null,
     acknowledge_no_qualifying_availability:
@@ -280,8 +281,9 @@ const COPY = Object.freeze({
       "Gracias. Antes de confirmar, responde SI para confirmar esa hora, o sugiere otra hora.",
     acknowledge_counteroffer_check_availability:
       "Entendido — prefieres {requestedTime}. Voy a revisar disponibilidad y te comparto opciones que funcionen.",
+    // Implements BR-109 — ask the missing question; do not narrate internal note-taking.
     acknowledge_availability_constraint:
-      "Entendido — anoto que puedes después de las {earliestTime}. ¿Qué hora después de las {earliestTime} te funciona mejor?",
+      "¿Qué hora después de las {earliestTime} te funciona mejor?",
     // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
     offer_available_slots: null,
     acknowledge_no_qualifying_availability:
@@ -643,18 +645,15 @@ function renderCustomerReply(responsePlan) {
       language,
       entities
     );
+    // Implements BR-109 — brief ack only; do not narrate "anoto"/note-taking.
     const ack =
       language === LANGUAGES.SPANISH
-        ? `Entendido — anoto tu preferencia de horario${
-            requestedTime && requestedTime !== "esa hora"
-              ? ` (${requestedTime})`
-              : ""
-          }.`
-        : `Got it — I've noted your time preference${
-            requestedTime && requestedTime !== "that time"
-              ? ` (${requestedTime})`
-              : ""
-          }.`;
+        ? requestedTime && requestedTime !== "esa hora"
+          ? `Entendido — ${requestedTime}.`
+          : "Entendido."
+        : requestedTime && requestedTime !== "that time"
+          ? `Got it — ${requestedTime}.`
+          : "Got it.";
     const bridge =
       language === LANGUAGES.SPANISH ? "Por cierto" : "By the way";
     template = `${ack} ${bridge}, ${resume}`;

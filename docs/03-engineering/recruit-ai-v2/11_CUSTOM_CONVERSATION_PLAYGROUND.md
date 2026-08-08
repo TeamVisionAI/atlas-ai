@@ -8,7 +8,7 @@
 
 Interactive turn-by-turn inspection of the Recruit AI v2 interpret → decide → plan → render → authorize pipeline.
 
-Uses the **same** sync pipeline as production shadow / deterministic scenarios (`processRecruitAiV2TurnSync` via `runV2SimulatorTurn`).
+Ops Center HTTP uses the **async** pipeline (`processRecruitAiV2Turn` via `runV2SimulatorTurnAsync` / `sendPlaygroundTurnAsync`) so BR-107/BR-108 can perform read-only Sprint 22 `getSlots` lookups. Sync `sendPlaygroundTurn` remains for offline unit tests/fixtures only.
 
 ## Safety
 
@@ -17,6 +17,7 @@ Uses the **same** sync pipeline as production shadow / deterministic scenarios (
 - No production context / shadow table writes
 - No WhatsApp / appointment / Calendar / BR-080 mutations
 - Rejects phone-like inbound text and non-simulator prospect IDs
+- BR-109 — binds a read-only scheduling agent (org default or deterministic operating RVP) for live availability reads; never assigns/claims leads
 
 ## API
 
