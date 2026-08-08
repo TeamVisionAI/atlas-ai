@@ -1160,6 +1160,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-104 — Recruit AI Compensation / Earnings FAQ Routing During Scheduling
+
+**Implements:** Recognize direct compensation/earnings questions (`entonces como voy a ganar dinero`, `cómo me pagan`, `how do I make money`, …) as existing `compensation_question` before pending `ask_time` / location / fragment / generic clarify; answer concisely with progressive disclosure; resume the exact pending scheduling question without income guarantees.  
+**Domain:** Recruit AI / Conversation / FAQ routing  
+**Depends on:** BR-081, BR-088, BR-095, BR-097, BR-098, BR-103  
+**Related:** BR-090 (fixed-employment preference distinct), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/compensationQuestion.js`, interpreter, decisionEngine, responseRenderer, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2CompensationFaqBr104.test.js`  
+**Simulator:** `compensation-faq-during-ask-time`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/32_COMPENSATION_FAQ_ROUTING.md`
+
+### Rules
+
+1. **Reuse intent** — Use existing `compensation_question`; do not invent a parallel intent.
+2. **Priority** — Clear compensation FAQ outranks `ask_time` / day-part / date / location / name / fragment / generic clarify.
+3. **Progressive disclosure** — Broad earnings asks get a short structure answer; subtypes (`hourly_pay_question`, `salary_question`, `fixed_pay_question`, `commission_question`, how-much) get specific short answers without stacking every caveat. Short-forms like `a como la hora` / `es pago fijo` are included.
+4. **Safety** — No income guarantees, unsupported dollar amounts, “unlimited income”, invented commission percentages, or false hourly/salary promises.
+5. **Continuity** — Preserve location, work auth, modality, day-part; resume the exact pending scheduling question after the FAQ.
+6. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution, no WhatsApp/appointment/Calendar/BR-080 writes.
+
+---
+
 ## BR-103 — Recruit AI Acknowledgement Semantics + Network Objection
 
 **Implements:** Soft acknowledgements (`ok` / `perfecto` / …) after preference capture or “I’ll review availability” are not appointment confirmations; `schedule_confirm` requires a concrete confirmable slot. Network/prospecting objections (`no conozco a nadie`, …) are answered briefly without lead/client guarantees and resume scheduling without generic fallback.  

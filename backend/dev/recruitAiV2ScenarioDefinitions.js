@@ -2403,6 +2403,146 @@ const RECRUIT_AI_V2_SCENARIOS = [
         }
       }
     ]
+  },
+  {
+    id: "compensation-faq-during-ask-time",
+    name: "Compensation FAQ During Ask Time",
+    category: "production_defect",
+    description:
+      "BR-104 — entonces como voy a ganar dinero during ask_time is compensation_question; resume afternoon time ask.",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "inferred"
+    },
+    turns: [
+      {
+        id: "cf01",
+        text: "hola",
+        inboundMessageId: "sim-wamid.comp-faq.t01",
+        expect: {
+          intent: "greeting",
+          preferredLanguage: "spanish",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cf02",
+        text: "Miami FL",
+        inboundMessageId: "sim-wamid.comp-faq.t02",
+        setup: {
+          lastQuestionAsked: "ask_location",
+          lastAtlasOutboundText: "Hola, ¿en qué ciudad y estado vives?"
+        },
+        expect: {
+          intent: "provide_location",
+          city: "Miami",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cf03",
+        text: "si",
+        inboundMessageId: "sim-wamid.comp-faq.t03",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cf04",
+        text: "si soy residente",
+        inboundMessageId: "sim-wamid.comp-faq.t04",
+        setup: {
+          lastQuestionAsked: "ask_authorization",
+          lastAtlasOutboundText:
+            "Gracias. ¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        expect: {
+          intent: "provide_authorization",
+          workAuthorization: true,
+          city: "Miami",
+          state: "FL",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cf05",
+        text: "de que se trata",
+        inboundMessageId: "sim-wamid.comp-faq.t05",
+        expect: {
+          intent: "job_opportunity_question",
+          shouldEscalate: false,
+          replyExcludes: ["Con gusto te ayudo"],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cf06",
+        text: "no conozco a nadie",
+        inboundMessageId: "sim-wamid.comp-faq.t06",
+        expect: {
+          intent: "network_objection",
+          city: "Miami",
+          state: "FL",
+          workAuthorization: true,
+          shouldEscalate: false,
+          replyExcludes: ["Con gusto te ayudo", "dato que te acabo"],
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cf07",
+        text: "tarde",
+        inboundMessageId: "sim-wamid.comp-faq.t07",
+        setup: {
+          lastQuestionAsked: "ask_day_part",
+          lastAtlasOutboundText:
+            "Excelente. Estamos realizando las entrevistas en nuestras oficinas ubicadas en 2500 NW 79th Ave, Suite 189, Doral, FL 33122. ¿Prefieres en la mañana o en la tarde?"
+        },
+        expect: {
+          intent: "provide_day_part",
+          dayPart: "afternoon",
+          pendingQuestion: "ask_time_preference",
+          shouldEscalate: false,
+          sideEffectsDenied: true
+        }
+      },
+      {
+        id: "cf08",
+        text: "entonces como voy a ganar dinero?",
+        inboundMessageId: "sim-wamid.comp-faq.t08",
+        expect: {
+          intent: "compensation_question",
+          nextAction: "answer_compensation_faq_then_resume",
+          city: "Miami",
+          state: "FL",
+          workAuthorization: true,
+          dayPart: "afternoon",
+          meetingType: "in_person",
+          pendingQuestion: "ask_time_preference",
+          shouldEscalate: false,
+          sideEffectsDenied: true,
+          replyIncludes: ["producción", "hora en la tarde"],
+          replyExcludes: [
+            "Con gusto te ayudo",
+            "dato que te acabo",
+            "ilimitad",
+            "garantizado $",
+            "compañero de Team Vision te contactará",
+            "mañana o en la tarde"
+          ]
+        }
+      }
+    ]
   }
 ];
 

@@ -43,9 +43,9 @@ function looksLikeFixedEmploymentPreference(text) {
   if (!t) {
     return false;
   }
-  // Compensation / pay questions stay on the FAQ path.
+  // Compensation / pay questions stay on the FAQ path (BR-104).
   if (
-    /\b(esto paga|cuanto (pagan|se gana|gano)|how much|does it pay|is there a salary|is it commission)\b/.test(
+    /\b(esto paga|cuanto (pagan|se gana|gano|puedo ganar|es la hora|es el sueldo|es el salario)|a como la hora|como (voy a )?ganar|como se gana|como me pagan|como funciona el pago|hay (salario|sueldo)|es (por )?(salario|sueldo|comision|hora)|es pago fijo|el pago es fijo|pagan fijo|es sueldo fijo|how much( per hour)?|hourly rate|how do i (make money|get paid)|does it pay|is there a salary|is it (commission|hourly|salary|fixed pay)|is the pay fixed|what'?s the salary)\b/.test(
       t
     )
   ) {
