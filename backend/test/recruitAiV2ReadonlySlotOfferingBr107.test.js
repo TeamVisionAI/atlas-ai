@@ -44,6 +44,10 @@ const {
   _resetPlaygroundStoreForTests
 } = require("../dev/recruitAiV2CustomPlayground");
 const { createEphemeralSession, runV2SimulatorTurnAsync } = require("../dev/recruitAiV2ScenarioRunner");
+const {
+  parseAvailabilityConstraint,
+  violatesEarliestConstraint
+} = require("../core/recruitAiV2/schedulingConstraints");
 
 const FIXED_NOW = new Date("2026-08-07T15:00:00.000-04:00");
 const DATE = "2026-08-10";
@@ -70,6 +74,7 @@ function baseContext(overrides = {}) {
       availabilityConstraint: {
         type: "availability_constraint",
         earliestTime: "17:00",
+        earliestTimeInclusive: false,
         latestTime: null,
         dayPart: "evening",
         raw: "despues de las 5"
@@ -172,6 +177,117 @@ test("filter: never offer before earliestTime", () => {
   assert.deepEqual(
     offered.map((s) => s.timeKey),
     ["17:30", "19:00"]
+  );
+});
+
+test("boundary: exclusive después/after rejects 17:00, accepts 17:30", () => {
+  for (const phrase of [
+    "después de las 5",
+    "despues de las 5",
+    "despues de la 5",
+    "luego de las 5",
+    "más tarde de las 5",
+    "after 5",
+    "after 5 PM",
+    "later than 5"
+  ]) {
+    const parsed = parseAvailabilityConstraint(phrase);
+    assert.equal(parsed.earliestTime, "17:00", phrase);
+    assert.equal(parsed.earliestTimeInclusive, false, phrase);
+    assert.equal(violatesEarliestConstraint("17:00", parsed), true, phrase);
+    assert.equal(violatesEarliestConstraint("17:30", parsed), false, phrase);
+  }
+
+  const exclusiveFiltered = filterSlotsByConstraints(
+    slotsFromTimes(["17:00", "17:30", "18:00", "20:00"]),
+    {
+      earliestTime: "17:00",
+      earliestTimeInclusive: false,
+      raw: "despues de las 5"
+    }
+  );
+  assert.deepEqual(
+    exclusiveFiltered.map((s) => s.timeKey),
+    ["17:30", "18:00", "20:00"]
+  );
+  assert.deepEqual(
+    selectCandidateSlots(exclusiveFiltered).map((s) => s.timeKey),
+    ["17:30", "20:00"]
+  );
+});
+
+test("boundary: inclusive a partir/desde/at or after accepts 17:00", () => {
+  for (const phrase of [
+    "a partir de las 5",
+    "desde las 5",
+    "desde las 5 en adelante",
+    "5 o después",
+    "starting at 5",
+    "from 5 onward",
+    "5 or later",
+    "at or after 5"
+  ]) {
+    const parsed = parseAvailabilityConstraint(phrase);
+    assert.ok(parsed, phrase);
+    assert.equal(parsed.earliestTime, "17:00", phrase);
+    assert.equal(parsed.earliestTimeInclusive, true, phrase);
+    assert.equal(violatesEarliestConstraint("17:00", parsed), false, phrase);
+    assert.equal(violatesEarliestConstraint("17:30", parsed), false, phrase);
+  }
+
+  const inclusiveFiltered = filterSlotsByConstraints(
+    slotsFromTimes(["16:30", "17:00", "17:30", "20:00"]),
+    {
+      earliestTime: "17:00",
+      earliestTimeInclusive: true,
+      raw: "a partir de las 5"
+    }
+  );
+  assert.deepEqual(
+    inclusiveFiltered.map((s) => s.timeKey),
+    ["17:00", "17:30", "20:00"]
+  );
+});
+
+test("boundary: exclusive constraint + bare 5 → conflict; + 5:30 → valid", () => {
+  const exclusiveCtx = baseContext();
+  const conflict = turn("5", exclusiveCtx);
+  assert.ok(
+    conflict.structuredDecision.reasonCodes.includes(
+      "AVAILABILITY_CONSTRAINT_CONFLICT"
+    )
+  );
+  assert.notEqual(conflict.nextContext.appointment?.proposedTime, "17:00");
+
+  const ok = turn("5:30", exclusiveCtx);
+  assert.equal(ok.nextContext.appointment?.proposedTime, "17:30");
+  assert.ok(
+    !ok.structuredDecision.reasonCodes.includes("AVAILABILITY_CONSTRAINT_CONFLICT")
+  );
+});
+
+test("boundary: inclusive constraint + bare 5 → valid 17:00", () => {
+  const inclusiveCtx = baseContext({
+    knownFacts: {
+      city: "Miami",
+      state: "FL",
+      workAuthorization: true,
+      preferredDayPart: "afternoon",
+      preferredMeetingType: "in_person",
+      availabilityConstraint: {
+        type: "availability_constraint",
+        earliestTime: "17:00",
+        earliestTimeInclusive: true,
+        latestTime: null,
+        dayPart: "evening",
+        raw: "a partir de las 5"
+      }
+    }
+  });
+  const r = turn("5", inclusiveCtx);
+  assert.equal(r.nextContext.appointment?.proposedTime, "17:00");
+  assert.ok(
+    !r.structuredDecision.reasonCodes.includes("AVAILABILITY_CONSTRAINT_CONFLICT")
   );
 });
 

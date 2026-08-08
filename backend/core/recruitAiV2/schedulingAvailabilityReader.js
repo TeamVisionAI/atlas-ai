@@ -174,27 +174,49 @@ function resolveConstraints({ context = {}, interpretation = null } = {}) {
   const fromIntent = interpretation?.entities?.availabilityConstraint || null;
   const fromContext = context.knownFacts?.availabilityConstraint || null;
   const constraint = fromIntent || fromContext || null;
+  const {
+    resolveEarliestTimeInclusive
+  } = require("./schedulingConstraints");
   return {
     earliestTime: constraint?.earliestTime || null,
     latestTime: constraint?.latestTime || null,
-    dayPart: constraint?.dayPart || null
+    dayPart: constraint?.dayPart || null,
+    // BR-107 consumes normalized inclusivity — never reparse raw here.
+    earliestTimeInclusive: constraint
+      ? resolveEarliestTimeInclusive(constraint)
+      : true,
+    raw: constraint?.raw || null
   };
 }
 
 /**
  * Explicit earliest/latest outrank day-part. Do not use engine afternoon (ends 18:00)
  * when earliestTime is set — pass timePreference "any" and filter here.
+ * Exclusive earliestTime → minutes > bound; inclusive → minutes >= bound.
  */
 function filterSlotsByConstraints(slots, constraints = {}) {
   const earliest = timeKeyToMinutes(constraints.earliestTime);
   const latest = timeKeyToMinutes(constraints.latestTime);
+  const {
+    resolveEarliestTimeInclusive
+  } = require("./schedulingConstraints");
+  const earliestInclusive =
+    typeof constraints.earliestTimeInclusive === "boolean"
+      ? constraints.earliestTimeInclusive
+      : resolveEarliestTimeInclusive(constraints);
   return (slots || []).filter((slot) => {
     const minutes = timeKeyToMinutes(slot.timeKey || slot.time);
     if (minutes == null) {
       return false;
     }
-    if (earliest != null && minutes < earliest) {
-      return false;
+    if (earliest != null) {
+      if (earliestInclusive) {
+        if (minutes < earliest) {
+          return false;
+        }
+      } else if (minutes <= earliest) {
+        return false;
+      }
     }
     if (latest != null && minutes > latest) {
       return false;
@@ -272,7 +294,11 @@ function buildUnavailableResult({
     timezone,
     constraints: {
       earliestTime: constraints.earliestTime || null,
-      latestTime: constraints.latestTime || null
+      latestTime: constraints.latestTime || null,
+      earliestTimeInclusive:
+        typeof constraints.earliestTimeInclusive === "boolean"
+          ? constraints.earliestTimeInclusive
+          : true
     },
     slots: [],
     offeredSlots: [],
@@ -410,7 +436,11 @@ async function readCandidateSlots({
     timezone: resolvedTimezone,
     constraints: {
       earliestTime: constraints.earliestTime || null,
-      latestTime: constraints.latestTime || null
+      latestTime: constraints.latestTime || null,
+      earliestTimeInclusive:
+        typeof constraints.earliestTimeInclusive === "boolean"
+          ? constraints.earliestTimeInclusive
+          : true
     },
     slots: filtered,
     offeredSlots: offered,
@@ -603,7 +633,11 @@ function readCandidateSlotsSync(params = {}) {
     timezone: resolvedTimezone,
     constraints: {
       earliestTime: constraints.earliestTime || null,
-      latestTime: constraints.latestTime || null
+      latestTime: constraints.latestTime || null,
+      earliestTimeInclusive:
+        typeof constraints.earliestTimeInclusive === "boolean"
+          ? constraints.earliestTimeInclusive
+          : true
     },
     slots: filtered,
     offeredSlots: offered,

@@ -1177,7 +1177,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 1. **Read ≠ write** — Offering slots uses availability READ only. Never create/update appointments, Calendar events, WhatsApp, or BR-080 from this path while execution is OFF.
 2. **Canonical source only** — Sprint 22 engine (agent schedule + Atlas appointments + optional Google FreeBusy). Do not offer from legacy `capacity.json` while booking truth is Sprint 22.
 3. **Never fabricate** — Example times (5:30 / 7:00) are illustrative. If availability cannot be read safely, keep BR-105 ask-for-time / awaiting behavior and document the gap — do not invent slots.
-4. **Constraint first** — Preserve `earliestTime` / `latestTime` / day-part; filter out violating slots before selection.
+4. **Constraint first** — Preserve `earliestTime` / `latestTime` / `earliestTimeInclusive` / day-part; filter out violating slots before selection. Exclusive phrases (`después de` / `after`) mean `time > earliestTime`; inclusive phrases (`a partir de` / `starting at` / `desde`) mean `time >= earliestTime`.
 5. **Up to two candidates** — Prefer diversity of choice among real slots (earliest + latest when distinct). Avoid adjacent near-duplicates when farther real options exist. If only adjacent slots exist, offer them. No hardcoded 60/90-minute (or Nx duration) minimum spacing.
 6. **One / zero / unread** — One → offer that time; successful zero → say no qualifying availability; read unavailable → BR-105 ask-time fallback (do not claim zero when unread).
 7. **Concrete date required** — Do not query or offer slots without a resolved date; store the constraint and continue date resolution.

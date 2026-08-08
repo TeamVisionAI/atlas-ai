@@ -37,7 +37,7 @@ function emptyKnownFacts() {
     meetingTypeConfirmed: null,
     /** BR-084 — morning | afternoon | evening; independent of meeting type */
     preferredDayPart: null,
-    /** BR-084 — { type, earliestTime, latestTime, dayPart, explicitCandidateTime, raw } */
+    /** BR-084/102 — { type, earliestTime, latestTime, earliestTimeInclusive, dayPart, explicitCandidateTime, raw } */
     availabilityConstraint: null,
     /** BR-085 — ISO dates the prospect said are unavailable */
     dateExclusions: [],

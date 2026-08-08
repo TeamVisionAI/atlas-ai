@@ -72,7 +72,7 @@ readCandidateSlots({
   agentId,           // required — from prospect owner / default recruiter (BR-080 read)
   date, dateEnd,     // org-local day keys (BR-079 / profile TZ)
   purpose: "recruiting_interview",
-  constraints: { earliestTime, latestTime, dayPart }, // from knownFacts.availabilityConstraint
+  constraints: { earliestTime, earliestTimeInclusive, latestTime, dayPart }, // from knownFacts.availabilityConstraint
   maxCandidates: 2
 }) → {
   ok: boolean,

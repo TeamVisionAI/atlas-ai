@@ -163,11 +163,21 @@ for (const text of AFTER_TIME_PHRASES) {
     const parsed = parseAvailabilityConstraint(text);
     assert.ok(parsed, `expected constraint for ${text}`);
     assert.equal(parsed.earliestTime, "17:00");
+    const inclusiveExpected = /\ba partir de\b/i.test(text);
+    assert.equal(
+      parsed.earliestTimeInclusive,
+      inclusiveExpected,
+      `inclusivity for ${text}`
+    );
     const r = turn(text, afternoonTimeContext());
     assert.equal(r.interpretation.intent, "provide_availability_constraint");
     assert.equal(
       r.nextContext.knownFacts.availabilityConstraint.earliestTime,
       "17:00"
+    );
+    assert.equal(
+      r.nextContext.knownFacts.availabilityConstraint.earliestTimeInclusive,
+      inclusiveExpected
     );
     assert.equal(r.interpretation.entities.needsAmPmClarification, false);
     assert.equal(r.nextContext.appointment?.proposedDate || null, null);

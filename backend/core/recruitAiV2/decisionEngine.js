@@ -40,7 +40,7 @@ const {
   hasConfirmableAppointmentProposal
 } = require("./schedulingConfirmation");
 const {
-  isBeforeEarliestConstraint
+  violatesEarliestConstraint
 } = require("./schedulingConstraints");
 const { READ_STATUS } = require("./schedulingAvailabilityReader");
 
@@ -2165,13 +2165,15 @@ function decideConversationTurn({
         pendingQ !== "ask_time_preference" &&
         pendingQ !== "confirm_slot");
 
-    // Implements BR-105 — reject times before confirmed earliestTime (e.g. after 5 + 4).
-    const earliestBound =
-      context.knownFacts?.availabilityConstraint?.earliestTime || null;
+    // Implements BR-105 — reject times that violate earliest bound
+    // (exclusive: after 5 + 5 → conflict; inclusive: a partir de 5 + 5 → ok).
+    const availabilityConstraint =
+      context.knownFacts?.availabilityConstraint || null;
+    const earliestBound = availabilityConstraint?.earliestTime || null;
     if (
       requestedTime &&
       earliestBound &&
-      isBeforeEarliestConstraint(requestedTime, earliestBound)
+      violatesEarliestConstraint(requestedTime, availabilityConstraint)
     ) {
       structured.decision.nextAction =
         NEXT_ACTIONS.ACKNOWLEDGE_AVAILABILITY_CONSTRAINT;
