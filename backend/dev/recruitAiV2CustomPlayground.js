@@ -3,7 +3,8 @@
  * Interactive ephemeral sessions for Ops Center developers/admins.
  *
  * Uses the SAME v2 pipeline as shadow/simulator scenarios
- * (`createEphemeralSession` + `runV2SimulatorTurn`).
+ * (`createEphemeralSession` + async `runV2SimulatorTurnAsync` for Ops HTTP).
+ * Sync `sendPlaygroundTurn` remains for unit tests / fixture scenarios.
  *
  * Never writes production context/shadow tables or executes providers.
  *
@@ -17,10 +18,10 @@ const {
   SIM_PROSPECT_PREFIX,
   createEphemeralSession,
   runV2SimulatorTurn,
+  runV2SimulatorTurnAsync,
   sanitizeInputText,
   assertSafeSimulatorIdentity
 } = require("./recruitAiV2ScenarioRunner");
-
 const PLAYGROUND_TTL_MS = 60 * 60 * 1000;
 const sessions = new Map();
 
@@ -335,9 +336,13 @@ function createPlaygroundSession(options = {}) {
   const meetingSeed = resolveMeetingSeed(options.meetingContext);
   const now = new Date().toISOString();
 
+  // Default sim-org keeps unit tests offline. Ops Center passes real org id
+  // (DEFAULT_ORGANIZATION_ID) so async org_default / Sprint 22 reads can resolve.
+  const organizationId = options.organizationId || "sim-org-team-vision";
+
   const ephemeral = createEphemeralSession({
     prospectId: `${SIM_PROSPECT_PREFIX}playground-${crypto.randomUUID().slice(0, 8)}`,
-    organizationId: "sim-org-team-vision",
+    organizationId,
     preferredLanguage: languageSeed.preferredLanguage,
     languageSource: languageSeed.languageSource,
     languageMeta: languageSeed.languageMeta,
@@ -346,7 +351,17 @@ function createPlaygroundSession(options = {}) {
     conversation: meetingSeed.conversation,
     attention: {},
     currentStage: meetingSeed.currentStage,
-    timezone: "America/New_York"
+    timezone: options.timezone || "America/New_York",
+    ...(options.agentId ? { agentId: options.agentId } : {}),
+    ...(options.prospectOwnerUserId
+      ? { prospectOwnerUserId: options.prospectOwnerUserId }
+      : {}),
+    ...(options.orgDefaultRecruiterUserId
+      ? { orgDefaultRecruiterUserId: options.orgDefaultRecruiterUserId }
+      : {}),
+    ...(options.availabilityFixture
+      ? { availabilityFixture: options.availabilityFixture }
+      : {})
   });
 
   const session = {
@@ -356,6 +371,7 @@ function createPlaygroundSession(options = {}) {
     initialLanguage: String(options.initialLanguage || "auto").toLowerCase(),
     meetingContext: String(options.meetingContext || "none").toLowerCase(),
     explicitLanguagePreference: languageSeed.explicitLanguagePreference,
+    liveAvailabilityRead: options.liveAvailabilityRead !== false,
     ephemeral,
     turns: []
   };
@@ -385,11 +401,21 @@ function resetPlaygroundSession(sessionId, options = {}) {
   sessions.delete(sessionId);
   return createPlaygroundSession({
     initialLanguage: options.initialLanguage || existing.initialLanguage,
-    meetingContext: options.meetingContext || existing.meetingContext
+    meetingContext: options.meetingContext || existing.meetingContext,
+    organizationId:
+      options.organizationId || existing.ephemeral?.context?.organizationId,
+    agentId: options.agentId || existing.ephemeral?.context?.agentId,
+    prospectOwnerUserId:
+      options.prospectOwnerUserId ||
+      existing.ephemeral?.context?.prospectOwnerUserId,
+    liveAvailabilityRead:
+      options.liveAvailabilityRead !== undefined
+        ? options.liveAvailabilityRead
+        : existing.liveAvailabilityRead
   });
 }
 
-function sendPlaygroundTurn(sessionId, payload = {}) {
+function preparePlaygroundTurnInput(sessionId, payload = {}) {
   pruneExpiredSessions();
   const session = sessions.get(String(sessionId || ""));
   if (!session) {
@@ -417,23 +443,30 @@ function sendPlaygroundTurn(sessionId, payload = {}) {
     throw error;
   }
 
+  // Optional per-turn read-only agent hint (never mutates BR-080).
+  if (payload.agentId) {
+    session.ephemeral.context = {
+      ...session.ephemeral.context,
+      agentId: String(payload.agentId)
+    };
+  }
+
   const priorPreferredLanguage = session.ephemeral.context.preferredLanguage;
   const turnNumber = session.turns.length + 1;
   const turnId = `pg-${turnNumber}`;
 
-  const turnReport = runV2SimulatorTurn(
-    session.ephemeral,
-    {
-      id: turnId,
-      turnNumber,
-      text,
-      inboundMessageId: `sim-wamid.playground.${session.sessionId}.${turnNumber}`
-    },
-    {
-      explicitLanguagePreference: session.explicitLanguagePreference
-    }
-  );
+  return { session, text, priorPreferredLanguage, turnNumber, turnId };
+}
 
+function finalizePlaygroundTurn(
+  session,
+  text,
+  turnNumber,
+  turnId,
+  turnReport,
+  payload,
+  priorPreferredLanguage
+) {
   const expectationResult = evaluateExpectation(
     payload.expectation || null,
     turnReport,
@@ -453,7 +486,8 @@ function sendPlaygroundTurn(sessionId, payload = {}) {
     failures: turnReport.failures || [],
     persistence: turnReport.persistence,
     execution: turnReport.execution,
-    idempotent: Boolean(turnReport.idempotent)
+    idempotent: Boolean(turnReport.idempotent),
+    liveAvailabilityRead: Boolean(turnReport.liveAvailabilityRead)
   };
 
   session.turns.push(publicTurn);
@@ -473,6 +507,68 @@ function sendPlaygroundTurn(sessionId, payload = {}) {
     writes: { ...session.ephemeral.writes },
     sideEffectsDenied: true
   };
+}
+
+/** Sync playground turn — fixture / getSlotsSync path (unit tests). */
+function sendPlaygroundTurn(sessionId, payload = {}) {
+  const { session, text, priorPreferredLanguage, turnNumber, turnId } =
+    preparePlaygroundTurnInput(sessionId, payload);
+
+  const turnReport = runV2SimulatorTurn(
+    session.ephemeral,
+    {
+      id: turnId,
+      turnNumber,
+      text,
+      inboundMessageId: `sim-wamid.playground.${session.sessionId}.${turnNumber}`
+    },
+    {
+      explicitLanguagePreference: session.explicitLanguagePreference
+    }
+  );
+
+  return finalizePlaygroundTurn(
+    session,
+    text,
+    turnNumber,
+    turnId,
+    turnReport,
+    payload,
+    priorPreferredLanguage
+  );
+}
+
+/**
+ * Async playground turn — Sprint 22 getSlots read-only when date+agent resolve.
+ * Used by Ops Center HTTP. Still deny-all writes.
+ */
+async function sendPlaygroundTurnAsync(sessionId, payload = {}) {
+  const { session, text, priorPreferredLanguage, turnNumber, turnId } =
+    preparePlaygroundTurnInput(sessionId, payload);
+
+  const turnReport = await runV2SimulatorTurnAsync(
+    session.ephemeral,
+    {
+      id: turnId,
+      turnNumber,
+      text,
+      inboundMessageId: `sim-wamid.playground.${session.sessionId}.${turnNumber}`
+    },
+    {
+      explicitLanguagePreference: session.explicitLanguagePreference,
+      allowLiveAvailabilityRead: session.liveAvailabilityRead !== false
+    }
+  );
+
+  return finalizePlaygroundTurn(
+    session,
+    text,
+    turnNumber,
+    turnId,
+    turnReport,
+    payload,
+    priorPreferredLanguage
+  );
 }
 
 function buildRegressionCandidate(sessionId) {
@@ -614,6 +710,7 @@ module.exports = {
   getPlaygroundSession,
   resetPlaygroundSession,
   sendPlaygroundTurn,
+  sendPlaygroundTurnAsync,
   buildRegressionCandidate,
   listPlaygroundMeta,
   sanitizeContextSnapshot,

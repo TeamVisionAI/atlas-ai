@@ -82,7 +82,11 @@ function loadConversationContext(input = {}) {
     attention = {},
     transcriptTail = [],
     schedulingState = null,
-    existingContext = null
+    existingContext = null,
+    // BR-107 — read-only scheduling agent hints (never mutate BR-080 here).
+    agentId = null,
+    prospectOwnerUserId = null,
+    orgDefaultRecruiterUserId = null
   } = input;
 
   const lastOutbound = [...transcriptTail]
@@ -150,7 +154,12 @@ function loadConversationContext(input = {}) {
         conversation.lastQuestionAsked ||
         (previouslyOfferedSlots.length ? "offer_time_choices" : conversation.lastQuestionAsked)
     },
-    attention
+    attention,
+    agentId: agentId || existingContext?.agentId || null,
+    prospectOwnerUserId:
+      prospectOwnerUserId || existingContext?.prospectOwnerUserId || null,
+    orgDefaultRecruiterUserId:
+      orgDefaultRecruiterUserId || existingContext?.orgDefaultRecruiterUserId || null
   });
 }
 

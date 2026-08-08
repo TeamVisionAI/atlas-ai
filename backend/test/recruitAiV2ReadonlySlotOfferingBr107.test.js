@@ -22,7 +22,10 @@ const { decideConversationTurn } = require("../core/recruitAiV2/decisionEngine")
 const { renderCustomerReply } = require("../core/recruitAiV2/responseRenderer");
 const { createConversationContext } = require("../core/recruitAiV2/conversationContext");
 const { buildNextContextFromInterpretation } = require("../core/recruitAiV2/contextTurnUpdate");
-const { processRecruitAiV2TurnSync } = require("../core/recruitAiV2/orchestrator");
+const {
+  processRecruitAiV2Turn,
+  processRecruitAiV2TurnSync
+} = require("../core/recruitAiV2/orchestrator");
 const {
   authorizeSideEffects,
   isExecutionEnabled
@@ -31,6 +34,16 @@ const {
   runRecruitAiV2ScenarioById,
   runAllRecruitAiV2ScenarioPack
 } = require("../dev/recruitAiV2ScenarioPack");
+const { loadConversationContext } = require("../core/recruitAiV2/contextLoader");
+const {
+  buildReconstructionInput
+} = require("../core/recruitAiV2/shadowEvaluationService");
+const {
+  createPlaygroundSession,
+  sendPlaygroundTurnAsync,
+  _resetPlaygroundStoreForTests
+} = require("../dev/recruitAiV2CustomPlayground");
+const { createEphemeralSession, runV2SimulatorTurnAsync } = require("../dev/recruitAiV2ScenarioRunner");
 
 const FIXED_NOW = new Date("2026-08-07T15:00:00.000-04:00");
 const DATE = "2026-08-10";
@@ -433,4 +446,169 @@ test("docs exist", () => {
     "utf8"
   );
   assert.match(br, /BR-107/);
+});
+
+test("async orchestrator uses live getSlots path (injectable)", async () => {
+  let called = false;
+  const ctx = baseContext({
+    _availabilityFixture: undefined,
+    appointment: { status: "proposed", proposedDate: DATE, previouslyOfferedSlots: [] }
+  });
+  delete ctx._availabilityFixture;
+  const result = await processRecruitAiV2Turn({
+    message: { id: "live-read-1", text: "despues de las 5" },
+    context: ctx,
+    options: {
+      flexible: true,
+      now: FIXED_NOW,
+      env: {
+        RECRUIT_AI_V2_EXECUTION_ENABLED: "false",
+        RECRUIT_AI_V2_SHADOW_ENABLED: "false"
+      },
+      getSlots: async () => {
+        called = true;
+        return {
+          timezone: "America/New_York",
+          slots: slotsFromTimes(["17:30", "19:00"]).map((s) => ({
+            ...s,
+            startTimeISO: `${DATE}T${s.time}:00.000-04:00`,
+            endTimeISO: `${DATE}T${s.time}:30.000-04:00`,
+            durationMinutes: 30
+          }))
+        };
+      }
+    }
+  });
+  assert.equal(called, true);
+  assert.equal(
+    result.structuredDecision.decision.nextAction,
+    "offer_available_slots"
+  );
+  assert.equal(result.authorization.authorized, false);
+  assert.equal(result.execution.attempted, false);
+});
+
+test("sync orchestrator does not call live getSlots without fixture", () => {
+  const ctx = baseContext();
+  delete ctx._availabilityFixture;
+  const result = processRecruitAiV2TurnSync({
+    message: { id: "sync-no-fixture", text: "despues de las 5" },
+    context: ctx,
+    options: {
+      flexible: true,
+      now: FIXED_NOW,
+      env: { RECRUIT_AI_V2_EXECUTION_ENABLED: "false" }
+    }
+  });
+  // Without fixture/getSlotsSync → availability unread → BR-105 ask-time path, not fabricated offer.
+  assert.notEqual(result.structuredDecision.decision.nextAction, "offer_available_slots");
+  assert.doesNotMatch(
+    String(result.rendered?.text || ""),
+    /Tengo disponible a las/i
+  );
+});
+
+test("shadow reconstruction carries read-only agent hints", () => {
+  const input = buildReconstructionInput({
+    id: "p1",
+    organization_id: "org-1",
+    owner_user_id: "owner-1",
+    assigned_agent_id: "agent-1"
+  });
+  assert.equal(input.agentId, "agent-1");
+  assert.equal(input.prospectOwnerUserId, "owner-1");
+  const loaded = loadConversationContext(input);
+  assert.equal(loaded.agentId, "agent-1");
+  assert.equal(loaded.prospectOwnerUserId, "owner-1");
+});
+
+test("async simulator/playground turn can invoke injectable getSlots", async () => {
+  let called = false;
+  const session = createEphemeralSession({
+    prospectId: "sim-v2-live-wire-1",
+    organizationId: "sim-org-team-vision",
+    agentId: "agent-fixture-1",
+    preferredLanguage: "spanish",
+    currentStage: "scheduling",
+    testNow: FIXED_NOW.toISOString(),
+    knownFacts: {
+      city: "Miami",
+      state: "FL",
+      workAuthorization: true,
+      availabilityConstraint: {
+        earliestTime: "17:00",
+        latestTime: null,
+        dayPart: "evening"
+      }
+    },
+    appointment: {
+      status: "proposed",
+      proposedDate: DATE,
+      previouslyOfferedSlots: []
+    },
+    conversation: { lastQuestionAsked: "ask_time_preference" }
+  });
+
+  const report = await runV2SimulatorTurnAsync(
+    session,
+    { id: "t1", text: "despues de las 5" },
+    {
+      allowLiveAvailabilityRead: true
+    }
+  );
+  // Without injected getSlots, live path attempts Sprint 22 and may fail offline → no fabricate.
+  assert.equal(report.execution.appointment, false);
+  assert.equal(report.execution.calendar, false);
+  assert.equal(report.execution.whatsapp, false);
+  assert.equal(report.execution.br080, false);
+
+  const session2 = createEphemeralSession({
+    prospectId: "sim-v2-live-wire-2",
+    organizationId: "sim-org-team-vision",
+    agentId: "agent-fixture-1",
+    preferredLanguage: "spanish",
+    currentStage: "scheduling",
+    testNow: FIXED_NOW.toISOString(),
+    knownFacts: {
+      availabilityConstraint: { earliestTime: "17:00" }
+    },
+    appointment: { status: "proposed", proposedDate: DATE, previouslyOfferedSlots: [] },
+    conversation: { lastQuestionAsked: "ask_time_preference" }
+  });
+  const withInject = await processRecruitAiV2Turn({
+    message: { id: "inj", text: "despues de las 5" },
+    context: session2.context,
+    options: {
+      flexible: true,
+      now: FIXED_NOW,
+      env: { RECRUIT_AI_V2_EXECUTION_ENABLED: "false" },
+      getSlots: async () => {
+        called = true;
+        return {
+          timezone: "America/New_York",
+          slots: slotsFromTimes(["17:30", "19:00"])
+        };
+      }
+    }
+  });
+  assert.equal(called, true);
+  assert.match(withInject.rendered.text, /Tengo disponible a las/i);
+  void report;
+});
+
+test("Ops playground async entry exports sendPlaygroundTurnAsync", async () => {
+  _resetPlaygroundStoreForTests();
+  const session = createPlaygroundSession({
+    organizationId: "sim-org-team-vision",
+    agentId: "agent-fixture-1",
+    initialLanguage: "spanish",
+    meetingContext: "appointment_proposed"
+  });
+  assert.equal(typeof sendPlaygroundTurnAsync, "function");
+  const result = await sendPlaygroundTurnAsync(session.sessionId, {
+    text: "Hola"
+  });
+  assert.equal(result.success, true);
+  assert.equal(result.sideEffectsDenied, true);
+  _resetPlaygroundStoreForTests();
 });

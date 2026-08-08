@@ -58,8 +58,8 @@ function normalizeSlot(raw, timezone = DEFAULT_TIMEZONE) {
 }
 
 /**
- * Read-only agent resolution. Never assigns or mutates BR-080.
- * Precedence: explicit context agent → BR-080 owner fields → org default recruiter.
+ * Read-only agent resolution (sync fields only). Never assigns or mutates BR-080.
+ * Precedence: explicit context agent → BR-080 owner fields → org default recruiter (if already on context).
  */
 function resolveAvailabilityAgent({ context = {}, options = {} } = {}) {
   const explicit =
@@ -108,6 +108,55 @@ function resolveAvailabilityAgent({ context = {}, options = {} } = {}) {
     agentId: null,
     agentResolutionSource: AGENT_RESOLUTION.UNRESOLVED
   };
+}
+
+/**
+ * Async read-only agent resolution. May load org default recruiter from settings.
+ * Never claims/assigns/acknowledges (no BR-080 mutation). Never picks arbitrary RVP.
+ */
+async function resolveAvailabilityAgentAsync({
+  context = {},
+  options = {},
+  loadOrganizationSettings = null
+} = {}) {
+  const sync = resolveAvailabilityAgent({ context, options });
+  if (sync.agentId) {
+    return sync;
+  }
+
+  if (options.skipOrgDefaultLookup === true) {
+    return sync;
+  }
+
+  const organizationId =
+    context.organizationId || options.organizationId || null;
+  if (!organizationId) {
+    return sync;
+  }
+
+  try {
+    const {
+      readConfiguredDefaultRecruiterId,
+      loadOrganizationSettingsRow
+    } = require("../autonomousScheduleAgentResolver");
+
+    const settings =
+      typeof loadOrganizationSettings === "function"
+        ? await loadOrganizationSettings(organizationId)
+        : await loadOrganizationSettingsRow(organizationId);
+
+    const defaultId = readConfiguredDefaultRecruiterId(settings);
+    if (defaultId) {
+      return {
+        agentId: String(defaultId),
+        agentResolutionSource: AGENT_RESOLUTION.ORG_DEFAULT
+      };
+    }
+  } catch {
+    // Read failure → unresolved (BR-105 fallback). Never invent an agent.
+  }
+
+  return sync;
 }
 
 function resolveConcreteScheduleDate({ context = {}, interpretation = null } = {}) {
@@ -414,9 +463,10 @@ async function resolveAvailabilityForTurn({
 
   const date = resolveConcreteScheduleDate({ context, interpretation });
   const constraints = resolveConstraints({ context, interpretation });
-  const { agentId, agentResolutionSource } = resolveAvailabilityAgent({
+  const { agentId, agentResolutionSource } = await resolveAvailabilityAgentAsync({
     context,
-    options
+    options,
+    loadOrganizationSettings: options.loadOrganizationSettings || null
   });
 
   const rejectTimes = (context.appointment?.previouslyOfferedSlots || [])
@@ -432,6 +482,7 @@ async function resolveAvailabilityForTurn({
     context._availabilityFixture?.slots ||
     null;
 
+  // Live Sprint 22 read when no fixture: appointmentApplicationService.getSlots (async).
   const readResult = await readCandidateSlots({
     organizationId: context.organizationId || options.organizationId || null,
     agentId,
@@ -620,6 +671,7 @@ module.exports = {
   AGENT_RESOLUTION,
   READ_STATUS,
   resolveAvailabilityAgent,
+  resolveAvailabilityAgentAsync,
   resolveConcreteScheduleDate,
   resolveConstraints,
   filterSlotsByConstraints,

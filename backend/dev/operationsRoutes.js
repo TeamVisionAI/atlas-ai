@@ -405,9 +405,9 @@ function createOperationsRoutes(deps = {}) {
 
   router.post(
     "/simulator/recruit-ai-v2/playground/sessions/:sessionId/turns",
-    (req, res) => {
+    async (req, res) => {
       try {
-        const result = operationsCenterService.sendRecruitAiV2PlaygroundTurn(
+        const result = await operationsCenterService.sendRecruitAiV2PlaygroundTurn(
           req.params.sessionId,
           req.body || {}
         );

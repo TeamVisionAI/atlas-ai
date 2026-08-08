@@ -8,6 +8,7 @@
  */
 
 const {
+  processRecruitAiV2Turn,
   processRecruitAiV2TurnSync,
   createConversationContext,
   authorizeSideEffects,
@@ -539,6 +540,319 @@ function runV2SimulatorTurn(session, turn = {}, options = {}) {
 }
 
 /**
+ * Async simulator turn — uses processRecruitAiV2Turn so Sprint 22 getSlots
+ * can run read-only when date+agent resolve (BR-107 live path).
+ * Still denies all writes via SideEffectAuthorizer.
+ *
+ * Setup/idempotency/report shape matches runV2SimulatorTurn; only the
+ * orchestrator entrypoint differs (async live read vs fixture/sync).
+ */
+async function runV2SimulatorTurnAsync(session, turn = {}, options = {}) {
+  if (!session?.context) {
+    throw new Error("ephemeral session required");
+  }
+
+  const text = sanitizeInputText(turn.text);
+  const inboundMessageId =
+    turn.inboundMessageId ||
+    `sim-wamid.${session.context.prospectId}.${turn.id || Date.now()}`;
+
+  if (!text) {
+    const error = new Error("Prospect message is required");
+    error.code = "SIMULATOR_EMPTY_MESSAGE";
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Apply setup through the sync helper path by running a private setup-only mutation.
+  // We reuse the same setup block as sync by invoking sync with a no-op process...
+  // Instead: call sync's setup via a one-shot clone of the setup logic through runV2SimulatorTurn
+  // with empty text blocked — so duplicate setup here matching sync exactly.
+  if (turn.setup) {
+    // Delegate setup by temporarily running sync against a throwaway text after setup:
+    // Apply identical mutations as runV2SimulatorTurn setup section.
+    const setupConversation = {
+      ...session.context.conversation,
+      ...(turn.setup.conversation || {})
+    };
+    if (turn.setup.lastQuestionAsked) {
+      setupConversation.lastQuestionAsked = turn.setup.lastQuestionAsked;
+    }
+    if (turn.setup.lastAtlasOutboundText) {
+      setupConversation.lastAtlasOutboundText = turn.setup.lastAtlasOutboundText;
+    }
+    if (
+      turn.setup.conversation &&
+      Object.prototype.hasOwnProperty.call(turn.setup.conversation, "clarificationCount")
+    ) {
+      setupConversation.clarificationCount = turn.setup.conversation.clarificationCount;
+    }
+    if (
+      turn.setup.conversation &&
+      Object.prototype.hasOwnProperty.call(turn.setup.conversation, "pendingClarification")
+    ) {
+      setupConversation.pendingClarification = turn.setup.conversation.pendingClarification;
+    }
+    if (
+      turn.setup.conversation &&
+      Object.prototype.hasOwnProperty.call(turn.setup.conversation, "counterofferMismatchCount")
+    ) {
+      setupConversation.counterofferMismatchCount =
+        turn.setup.conversation.counterofferMismatchCount;
+    }
+
+    session.context = {
+      ...session.context,
+      ...(turn.setup.currentStage ? { currentStage: turn.setup.currentStage } : {}),
+      knownFacts: {
+        ...session.context.knownFacts,
+        ...(turn.setup.knownFacts || {})
+      },
+      appointment: {
+        ...session.context.appointment,
+        ...(turn.setup.appointment || {})
+      },
+      conversation: setupConversation,
+      languageMeta: {
+        ...session.context.languageMeta,
+        ...(turn.setup.languageMeta || {})
+      },
+      ...(turn.setup.preferredLanguage
+        ? { preferredLanguage: turn.setup.preferredLanguage }
+        : {})
+    };
+  }
+
+  const prior = session.seenInboundIds.get(inboundMessageId);
+  if (prior) {
+    return {
+      ...prior,
+      idempotent: true,
+      contextAdvanced: false,
+      turnId: turn.id || null,
+      prospectInput: text
+    };
+  }
+
+  const beforeFacts = { ...(session.context.knownFacts || {}) };
+  const beforeVersion = session.contextVersion;
+  const forcedEnv = {
+    RECRUIT_AI_V2_EXECUTION_ENABLED: "false",
+    RECRUIT_AI_V2_SHADOW_ENABLED: "false"
+  };
+
+  if (turn.setup?.availabilityFixture) {
+    session.context = {
+      ...session.context,
+      _availabilityFixture: turn.setup.availabilityFixture
+    };
+    session.availabilityFixture = turn.setup.availabilityFixture;
+  }
+  if (turn.setup?.agentId) {
+    session.context = { ...session.context, agentId: turn.setup.agentId };
+  }
+
+  const startedAt = Date.now();
+  const result = await processRecruitAiV2Turn({
+    message: { id: inboundMessageId, text },
+    context: session.context,
+    options: {
+      flexible: true,
+      env: forcedEnv,
+      allowLiveAvailabilityRead: options.allowLiveAvailabilityRead !== false,
+      ...(session.context?._testNow ? { now: session.context._testNow } : {}),
+      ...(options.explicitLanguagePreference
+        ? { explicitLanguagePreference: options.explicitLanguagePreference }
+        : {}),
+      ...(turn.options || {}),
+      ...(session.availabilityFixture || session.context?._availabilityFixture
+        ? {
+            availabilityFixture:
+              turn.setup?.availabilityFixture ||
+              session.availabilityFixture ||
+              session.context._availabilityFixture
+          }
+        : {}),
+      ...(session.context?.agentId ? { agentId: session.context.agentId } : {}),
+      ...(session.context?.prospectOwnerUserId
+        ? { ownerUserId: session.context.prospectOwnerUserId }
+        : {}),
+      ...(session.context?.orgDefaultRecruiterUserId
+        ? { defaultRecruiterUserId: session.context.orgDefaultRecruiterUserId }
+        : {}),
+      ...(session.context?.organizationId
+        ? { organizationId: session.context.organizationId }
+        : {})
+    },
+    availability: turn.availability || null
+  });
+  const elapsedMs = Date.now() - startedAt;
+
+  const authorization = authorizeSideEffects({
+    structuredDecision: result.structuredDecision,
+    responsePlan: result.responsePlan,
+    env: forcedEnv
+  });
+
+  if (authorization.authorized === true) {
+    const error = new Error("Simulator safety violation: side effects authorized");
+    error.code = "SIMULATOR_SIDE_EFFECT_LEAK";
+    throw error;
+  }
+
+  let nextContext = result.nextContext;
+  nextContext = {
+    ...nextContext,
+    agentId: nextContext.agentId || session.context.agentId || null,
+    prospectOwnerUserId:
+      nextContext.prospectOwnerUserId || session.context.prospectOwnerUserId || null,
+    orgDefaultRecruiterUserId:
+      nextContext.orgDefaultRecruiterUserId ||
+      session.context.orgDefaultRecruiterUserId ||
+      null,
+    _availabilityFixture:
+      nextContext._availabilityFixture ||
+      session.availabilityFixture ||
+      session.context._availabilityFixture ||
+      null,
+    conversation: {
+      ...nextContext.conversation,
+      lastAtlasOutboundText: result.rendered?.text || null
+    }
+  };
+
+  session.context = nextContext;
+  session.contextVersion = beforeVersion + 1;
+
+  const actual = {
+    intent: result.interpretation?.intent || null,
+    confidence: result.interpretation?.confidence ?? null,
+    messageLanguage: result.interpretation?.messageLanguage || null,
+    preferredLanguage:
+      result.interpretation?.preferredLanguage || nextContext.preferredLanguage,
+    shouldEscalate: Boolean(result.structuredDecision?.decision?.shouldEscalate),
+    nextAction: result.structuredDecision?.decision?.nextAction || null,
+    city: nextContext.knownFacts?.city ?? null,
+    state: nextContext.knownFacts?.state ?? null,
+    cityCertainty: nextContext.knownFacts?.cityCertainty || null,
+    stateCertainty: nextContext.knownFacts?.stateCertainty || null,
+    proposedState: nextContext.knownFacts?.proposedState ?? null,
+    requiresClarification: Boolean(result.interpretation?.requiresClarification),
+    stage: nextContext.currentStage || null,
+    meetingType:
+      nextContext.knownFacts?.preferredMeetingType ||
+      nextContext.appointment?.meetingType ||
+      null,
+    workAuthorization:
+      nextContext.knownFacts?.workAuthorization === undefined
+        ? null
+        : nextContext.knownFacts?.workAuthorization,
+    financialLicenseStatus:
+      nextContext.knownFacts?.financialLicenseStatus || null,
+    proposedTime: nextContext.appointment?.proposedTime || null,
+    proposedDate: nextContext.appointment?.proposedDate || null,
+    dateExclusions: nextContext.knownFacts?.dateExclusions || [],
+    meetingTypeRequested: nextContext.knownFacts?.meetingTypeRequested ?? null,
+    meetingTypeConfirmed:
+      nextContext.knownFacts?.meetingTypeConfirmed === undefined
+        ? null
+        : nextContext.knownFacts?.meetingTypeConfirmed,
+    meetingPreferenceSource:
+      nextContext.knownFacts?.meetingPreferenceSource || null,
+    availabilityConstraintEarliest:
+      nextContext.knownFacts?.availabilityConstraint?.earliestTime || null,
+    preferredDayPart: nextContext.knownFacts?.preferredDayPart || null,
+    authorizationAuthorized: authorization.authorized,
+    contextAdvanced: true,
+    idempotent: false,
+    confirmationVersion: nextContext.conversation?.confirmationVersion ?? 0,
+    proposedSideEffects: (authorization.proposals || []).map((p) => p.type),
+    renderedText: String(result.rendered?.text || ""),
+    renderedPreview: String(result.rendered?.text || "").slice(0, 160),
+    templateKey: result.responsePlan?.templateKey || null,
+    reasonCodes: result.structuredDecision?.reasonCodes || [],
+    factChanges: diffKnownFacts(beforeFacts, nextContext.knownFacts),
+    humanAttention: Boolean(nextContext.attention?.needsHumanAttention),
+    pendingQuestion: nextContext.conversation?.lastQuestionAsked || null,
+    appointmentStatus: nextContext.appointment?.status || null,
+    elapsedMs
+  };
+
+  const assertion = evaluateExpect(actual, turn.expect || {});
+
+  const turnReport = {
+    turn: turn.id || null,
+    turnNumber: turn.turnNumber || null,
+    prospectInput: text,
+    inboundMessageIdTail: inboundMessageId.slice(-16),
+    preferredLanguage: actual.preferredLanguage,
+    interpretedIntent: actual.intent,
+    confidence: actual.confidence,
+    currentStage: actual.stage,
+    knownFactChanges: actual.factChanges,
+    clarificationRequired: actual.requiresClarification,
+    decision: actual.nextAction,
+    proposedSideEffect: actual.proposedSideEffects[0] || null,
+    proposedSideEffects: actual.proposedSideEffects,
+    authorizationResult: "denied",
+    expected: turn.expect || {},
+    actual,
+    pass: assertion.pass,
+    failures: assertion.failures,
+    renderedText: actual.renderedText,
+    renderedPreview: actual.renderedPreview,
+    pendingQuestion: actual.pendingQuestion,
+    appointmentStatus: actual.appointmentStatus,
+    reasonCodes: actual.reasonCodes,
+    elapsedMs: actual.elapsedMs,
+    detectedLanguage: actual.messageLanguage,
+    humanEscalation: actual.shouldEscalate || actual.humanAttention,
+    contextSnapshot: {
+      stage: nextContext.currentStage,
+      preferredLanguage: nextContext.preferredLanguage,
+      languageMetaSource: nextContext.languageMeta?.source || null,
+      knownFacts: {
+        city: nextContext.knownFacts?.city || null,
+        state: nextContext.knownFacts?.state || null,
+        cityCertainty: nextContext.knownFacts?.cityCertainty || null,
+        stateCertainty: nextContext.knownFacts?.stateCertainty || null,
+        proposedState: nextContext.knownFacts?.proposedState || null,
+        preferredMeetingType: nextContext.knownFacts?.preferredMeetingType || null
+      },
+      appointmentStatus: nextContext.appointment?.status || null,
+      lastQuestionAsked: nextContext.conversation?.lastQuestionAsked || null,
+      clarificationCount: nextContext.conversation?.clarificationCount || 0,
+      needsHumanAttention: Boolean(nextContext.attention?.needsHumanAttention)
+    },
+    idempotent: false,
+    contextAdvanced: true,
+    persistence: {
+      attempted: false,
+      productionContextRows: 0,
+      shadowEvaluationRows: 0
+    },
+    execution: {
+      attempted: false,
+      whatsapp: false,
+      appointment: false,
+      calendar: false,
+      br080: false
+    },
+    liveAvailabilityRead: Boolean(
+      !turn.availability &&
+        !(
+          turn.setup?.availabilityFixture ||
+          session.availabilityFixture ||
+          session.context?._availabilityFixture
+        )
+    )
+  };
+
+  session.seenInboundIds.set(inboundMessageId, turnReport);
+  return turnReport;
+}
+
+/**
  * Run a full scenario definition (ephemeral).
  */
 function runRecruitAiV2Scenario(definition, options = {}) {
@@ -646,6 +960,7 @@ module.exports = {
   assertSafeSimulatorIdentity,
   createEphemeralSession,
   runV2SimulatorTurn,
+  runV2SimulatorTurnAsync,
   runRecruitAiV2Scenario,
   runAllRecruitAiV2Scenarios,
   evaluateExpect,
