@@ -95,6 +95,8 @@ function tryApplyAvailabilityOffer({
     return null;
   }
 
+  const rolling = Boolean(availability.rolling || availability.readResult?.rolling);
+
   if (status === READ_STATUS.ZERO_SLOTS || (availability.checked && alternatives.length === 0)) {
     structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_NO_QUALIFYING_AVAILABILITY;
     structured.decision.shouldEscalate = false;
@@ -105,10 +107,14 @@ function tryApplyAvailabilityOffer({
       ...structured.customerReplyPlan.entities,
       earliestTime,
       dateLabel,
-      requestedDate: proposedDate
+      requestedDate: proposedDate,
+      rollingSearch: rolling
     };
     structured.reasonCodes.push(REASON_CODES.ZERO_QUALIFYING_SLOTS);
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    if (rolling) {
+      structured.reasonCodes.push(REASON_CODES.ROLLING_AVAILABILITY_SEARCH);
+    }
     structured.contextPatch = {
       ...(constraintPatch || {}),
       knownFacts: {
@@ -126,7 +132,8 @@ function tryApplyAvailabilityOffer({
       },
       conversation: {
         ...(constraintPatch?.conversation || {}),
-        lastQuestionAsked: "ask_date",
+        // Rolling zero → ask different time preference; single-day zero may ask date.
+        lastQuestionAsked: rolling ? "ask_time_preference" : "ask_date",
         pendingClarification: null,
         clarificationCount: 0,
         lastProspectIntent: interpretation?.intent || null
@@ -150,10 +157,16 @@ function tryApplyAvailabilityOffer({
       requestedDate: proposedDate,
       offeredSlots: alternatives,
       slotA: alternatives[0]?.time || null,
-      slotB: alternatives[1]?.time || null
+      slotB: alternatives[1]?.time || null,
+      rollingSearch: rolling,
+      now: context._testNow || null,
+      timezone: context.timezone || alternatives[0]?.timezone || null
     };
     structured.reasonCodes.push(REASON_CODES.AVAILABLE_SLOTS_OFFERED);
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+    if (rolling) {
+      structured.reasonCodes.push(REASON_CODES.ROLLING_AVAILABILITY_SEARCH);
+    }
     structured.contextPatch = {
       ...(constraintPatch || {}),
       knownFacts: {
@@ -166,6 +179,7 @@ function tryApplyAvailabilityOffer({
       appointment: {
         ...(constraintPatch?.appointment || {}),
         status: APPOINTMENT_STATUS.PROPOSED,
+        // Keep concrete date if already known; rolling offers carry dates on slots.
         proposedDate,
         previouslyOfferedSlots: alternatives
       },
@@ -1810,8 +1824,9 @@ function decideConversationTurn({
     const proposedTime = context.appointment?.proposedTime || null;
     const hasConcreteDate = Boolean(context.appointment?.proposedDate);
 
-    // Implements BR-107 — offer real slots only when concrete date + successful read.
-    if (hasConcreteDate && !proposedTime) {
+    // Implements BR-107 / BR-108 — offer real slots from single-day or rolling search.
+    // Concrete date is no longer required when rolling availability was resolved.
+    if (!proposedTime) {
       const offeredFromConstraint = tryApplyAvailabilityOffer({
         structured,
         context,
@@ -1832,7 +1847,9 @@ function decideConversationTurn({
         structured.reasonCodes.push(REASON_CODES.AVAILABILITY_CONSTRAINT_CAPTURED);
         return offeredFromConstraint;
       }
-    } else if (!hasConcreteDate) {
+    }
+    if (!hasConcreteDate && !availability) {
+      // No read attempted / unavailable injection — legacy date-needed signal only when unread.
       structured.reasonCodes.push(REASON_CODES.AVAILABILITY_REQUIRES_CONCRETE_DATE);
     }
 

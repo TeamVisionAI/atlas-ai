@@ -1160,12 +1160,37 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-108 — Recruit AI Rolling Multi-Date Availability Offer
+
+**Implements:** When a prospect supplies a useful time constraint (`después de las 5`, etc.) without a concrete date, Atlas proactively searches upcoming REAL Sprint 22 availability (org-local NOW → preferred 48h horizon, then bounded day-by-day expansion) and offers up to two useful day+time choices (“Tengo disponible…”), instead of asking the prospect to invent a day or a specific clock time.  
+**Domain:** Recruit AI / Scheduling UX + availability Tools  
+**Depends on:** BR-079, BR-081, BR-084, BR-102, BR-105, BR-107; Sprint 22 appointment scheduling engine (read path)  
+**Related:** BR-008 (Presence), BR-080 (read-only; no mutation from v2)  
+**Status:** Implemented in Recruit AI v2 engines (read-only; execution remains OFF until separately authorized)  
+**Engine target:** `recruitAiV2/schedulingAvailabilityReader.js` rolling search → `getSlots` (`date`/`dateEnd`); `decisionEngine` + `responseRenderer` multi-date offer templates  
+**Tests:** `backend/test/recruitAiV2RollingAvailabilityBr108.test.js`  
+**Simulator:** `rolling-availability-after-constraint`  
+**Docs:** `docs/03-engineering/recruit-ai-v2/36_ROLLING_AVAILABILITY_OFFER.md`
+
+### Rules
+
+1. **Read ≠ write** — Rolling search may call Sprint 22 availability for multiple dates; never reserve, book, Calendar-write, WhatsApp, or mutate BR-080 while execution is OFF.
+2. **Constraint-first proactive offer** — With a confirmed time constraint and no concrete date, do not default to “¿Qué día…?” / “¿Qué hora después de las 5…?”; search and offer real options.
+3. **Bounded search** — Preferred initial horizon **48 hours** from org-local NOW; if fewer than 2 useful slots, expand date-by-date up to **14 calendar days** from org-local today. Never unbounded search.
+4. **Cross-date selection** — Prefer earliest slot + earliest slot on a later date when real options exist; else same-day earliest+latest (BR-107). Never invent slots.
+5. **Past slots** — Never offer slots at/before NOW; skip exhausted current-day windows automatically.
+6. **Boundaries preserved** — BR-107 exclusive/inclusive earliestTime semantics apply on every searched date.
+7. **Zero vs unread** — Successful zero across the allowed horizon → truthful no-availability + ask different time preference; provider/agent failure → BR-105-style fallback (do not claim zero).
+8. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution enablement, no live CE cutover, no BR-080 mutation.
+
+---
+
 ## BR-107 — Recruit AI Available-Slot Offering After a Time Constraint
 
 **Implements:** When a prospect supplies an availability constraint (`después de las 5`, day-part, before/after windows), preserve the constraint, read canonical real availability when safely available, filter violating slots, select up to two meaningfully spaced candidates, and offer them directly (“Tengo disponible…”) instead of echoing the constraint and asking the prospect to invent a time.  
 **Domain:** Recruit AI / Scheduling UX + availability Tools  
 **Depends on:** BR-081, BR-084, BR-102, BR-103, BR-105; Sprint 22 appointment scheduling engine (read path)  
-**Related:** BR-008 (Presence), BR-080 (read-only; no mutation from v2)  
+**Related:** BR-008 (Presence), BR-080 (read-only; no mutation from v2); **BR-108** (rolling multi-date when no concrete date)  
 **Status:** Implemented in Recruit AI v2 engines (read-only; execution remains OFF until separately authorized)  
 **Engine target:** `recruitAiV2/schedulingAvailabilityReader.js` → `appointmentApplicationService.getSlots` / Sprint 22; orchestrator injection; `decisionEngine` + `responseRenderer` offer templates  
 **Tests:** `backend/test/recruitAiV2ReadonlySlotOfferingBr107.test.js`  
@@ -1180,7 +1205,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Constraint first** — Preserve `earliestTime` / `latestTime` / `earliestTimeInclusive` / day-part; filter out violating slots before selection. Exclusive phrases (`después de` / `after`) mean `time > earliestTime`; inclusive phrases (`a partir de` / `starting at` / `desde`) mean `time >= earliestTime`.
 5. **Up to two candidates** — Prefer diversity of choice among real slots (earliest + latest when distinct). Avoid adjacent near-duplicates when farther real options exist. If only adjacent slots exist, offer them. No hardcoded 60/90-minute (or Nx duration) minimum spacing.
 6. **One / zero / unread** — One → offer that time; successful zero → say no qualifying availability; read unavailable → BR-105 ask-time fallback (do not claim zero when unread).
-7. **Concrete date required** — Do not query or offer slots without a resolved date; store the constraint and continue date resolution.
+7. **Concrete date / rolling** — Single-day offer when a concrete date is known. When only a time constraint is known, **BR-108** performs bounded rolling search instead of forcing the prospect to pick a date first.
 8. **Conversation style** — Prefer “Tengo disponible…”; avoid mechanical “anoto que puedes / me dijiste que…” when offering real options.
 9. **Boundaries** — No Railway flag changes, no shadow increase, no v2 execution enablement, no live CE cutover, no BR-080 mutation.
 

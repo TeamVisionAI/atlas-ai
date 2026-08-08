@@ -1,12 +1,27 @@
 /**
- * Recruit AI v2 — SchedulingAvailabilityReader (BR-107).
+ * Recruit AI v2 — SchedulingAvailabilityReader (BR-107 / BR-108).
  *
  * Thin read-only adapter over Sprint 22 appointmentApplicationService.getSlots.
+ * BR-108 adds bounded rolling multi-date search when a time constraint is known
+ * without a concrete prospect date.
  * Never books, reserves, creates, updates, deletes, or mutates BR-080 / Calendar / WhatsApp.
  */
 
+const {
+  ATLAS_DEFAULT_TIMEZONE,
+  partsInZone,
+  zonedTimeToUtcMs
+} = require("../organizationDateWindow");
+
 const DEFAULT_MAX_CANDIDATES = 2;
-const DEFAULT_TIMEZONE = "America/New_York";
+const DEFAULT_TIMEZONE = ATLAS_DEFAULT_TIMEZONE || "America/New_York";
+/** Preferred initial search horizon from NOW (org-local). */
+const INITIAL_HORIZON_HOURS = 48;
+/**
+ * Maximum calendar days from org-local today (inclusive) for expansion.
+ * Bounded so reads stay finite (initial 48h, then day-by-day to this cap).
+ */
+const MAX_EXPANSION_DAYS = 14;
 
 const AGENT_RESOLUTION = Object.freeze({
   ASSIGNED_OWNER: "assigned_owner",
@@ -240,6 +255,99 @@ function sortSlotsChronologically(slots) {
   });
 }
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function dateKeyFromParts(year, month, day) {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function dateKeyInZone(ms, timeZone = DEFAULT_TIMEZONE) {
+  const parts = partsInZone(ms, timeZone);
+  return dateKeyFromParts(parts.year, parts.month, parts.day);
+}
+
+function addDaysToDateKey(dateKey, deltaDays) {
+  const [y, m, d] = String(dateKey).split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d + Number(deltaDays || 0), 12, 0, 0));
+  return dateKeyFromParts(utc.getUTCFullYear(), utc.getUTCMonth() + 1, utc.getUTCDate());
+}
+
+function daysBetweenDateKeys(startKey, endKey) {
+  const [ys, ms, ds] = String(startKey).split("-").map(Number);
+  const [ye, me, de] = String(endKey).split("-").map(Number);
+  const a = Date.UTC(ys, ms - 1, ds, 12);
+  const b = Date.UTC(ye, me - 1, de, 12);
+  return Math.round((b - a) / 86400000);
+}
+
+function slotStartMs(slot, timeZone = DEFAULT_TIMEZONE) {
+  if (slot?.startTimeISO) {
+    const ms = new Date(slot.startTimeISO).getTime();
+    if (Number.isFinite(ms)) {
+      return ms;
+    }
+  }
+  const dateKey = slot?.dateKey || slot?.date;
+  const timeKey = slot?.timeKey || slot?.time;
+  if (!dateKey || !timeKey || !String(timeKey).includes(":")) {
+    return null;
+  }
+  const [y, m, d] = String(dateKey).split("-").map(Number);
+  const [hh, mm] = String(timeKey).split(":").map(Number);
+  return zonedTimeToUtcMs(y, m, d, hh, mm || 0, 0, 0, timeZone);
+}
+
+/** Drop slots at/before now (org-local wall clock via ISO/zoned conversion). */
+function filterFutureSlots(slots, nowMs, timeZone = DEFAULT_TIMEZONE) {
+  const now = Number(nowMs) || Date.now();
+  return (slots || []).filter((slot) => {
+    const start = slotStartMs(slot, timeZone);
+    return start != null && start > now;
+  });
+}
+
+function slotIdentity(slot) {
+  return `${slot?.dateKey || slot?.date || ""}|${slot?.timeKey || slot?.time || ""}`;
+}
+
+/**
+ * BR-108 — prefer meaningful choice across dates when real options exist:
+ * Slot A = earliest qualifying slot
+ * Slot B = earliest slot on a later date when available; else same-day latest (BR-107)
+ */
+function selectCrossDateCandidateSlots(
+  slots,
+  {
+    maxCandidates = DEFAULT_MAX_CANDIDATES,
+    rejectIds = []
+  } = {}
+) {
+  const rejected = new Set((rejectIds || []).map((id) => String(id)));
+  const ordered = sortSlotsChronologically(slots).filter(
+    (slot) => !rejected.has(slotIdentity(slot))
+  );
+  if (!ordered.length) {
+    return [];
+  }
+
+  const first = ordered[0];
+  if (maxCandidates < 2 || ordered.length === 1) {
+    return [first];
+  }
+
+  const firstDate = String(first.dateKey || first.date || "");
+  const otherDate = ordered.find(
+    (slot) => String(slot.dateKey || slot.date || "") !== firstDate
+  );
+  if (otherDate) {
+    return [first, otherDate];
+  }
+
+  return selectCandidateSlots(ordered, { maxCandidates, rejectTimes: [] });
+}
+
 /**
  * Diversity-of-choice heuristic (BR-107 correction):
  * - Slot A = earliest valid real slot
@@ -336,6 +444,8 @@ function toDecisionAvailability(readResult) {
     providerFailure: false,
     agentResolutionSource: readResult.agentResolutionSource,
     failureReason: null,
+    rolling: Boolean(readResult.rolling),
+    searchMeta: readResult.searchMeta || null,
     readResult
   };
 }
@@ -452,13 +562,10 @@ async function readCandidateSlots({
 
 /**
  * Decide whether this turn should attempt a read-only availability offer.
- * Requires concrete date + explicit time constraint. Never invents a date.
+ * BR-108 — concrete date optional when an explicit time constraint exists
+ * (rolling multi-date search). Never invents slots.
  */
 function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
-  const date = resolveConcreteScheduleDate({ context, interpretation });
-  if (!date) {
-    return false;
-  }
   const constraints = resolveConstraints({ context, interpretation });
   if (!constraints.earliestTime && !constraints.latestTime) {
     return false;
@@ -466,17 +573,378 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
 
   const intent = interpretation?.intent || null;
   const { INTENTS } = require("./constants");
-  return (
+  const allowedIntent =
     intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT ||
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL ||
-    intent === INTENTS.REASSERT_KNOWN_FACT
-  );
+    intent === INTENTS.REASSERT_KNOWN_FACT;
+  if (!allowedIntent) {
+    return false;
+  }
+
+  const date = resolveConcreteScheduleDate({ context, interpretation });
+  // Concrete date → single-day BR-107 path. No date → BR-108 rolling path.
+  return Boolean(date) || intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT;
 }
 
+
 /**
- * Orchestrator helper: resolve agent + read (fixture or live) → decision availability.
- * Sync-friendly when fixtureSlots / precomputed availability provided.
+ * BR-108 — bounded rolling search from org-local NOW.
+ * 1) Read initial 48h window (date..dateEnd)
+ * 2) If fewer than maxCandidates, expand day-by-day until found or MAX_EXPANSION_DAYS
+ * Past slots excluded. Constraints applied per slot. Never fabricates.
  */
+async function readRollingCandidateSlots({
+  organizationId = null,
+  agentId = null,
+  agentResolutionSource = AGENT_RESOLUTION.UNRESOLVED,
+  timezone = DEFAULT_TIMEZONE,
+  constraints = {},
+  purpose = "recruiting_interview",
+  maxCandidates = DEFAULT_MAX_CANDIDATES,
+  rejectIds = [],
+  fixtureSlots = null,
+  getSlots = null,
+  getSlotsSync = null,
+  now = null,
+  sync = false
+} = {}) {
+  if (!agentId) {
+    return buildUnavailableResult({
+      organizationId,
+      agentId,
+      date: null,
+      timezone,
+      constraints,
+      agentResolutionSource,
+      failureReason: "missing_agent"
+    });
+  }
+
+  const nowMs = now ? new Date(now).getTime() : Date.now();
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const startDateKey = dateKeyInZone(nowMs, tz);
+  const horizonEndMs = nowMs + INITIAL_HORIZON_HOURS * 60 * 60 * 1000;
+  const initialEndDateKey = dateKeyInZone(horizonEndMs, tz);
+  const maxEndDateKey = addDaysToDateKey(startDateKey, MAX_EXPANSION_DAYS - 1);
+
+  const collectFromRaw = (rawSlots) => {
+    const normalized = (rawSlots || [])
+      .map((slot) => normalizeSlot(slot, tz))
+      .filter(Boolean);
+    const future = filterFutureSlots(normalized, nowMs, tz);
+    return filterSlotsByConstraints(future, constraints);
+  };
+
+  let qualifying = [];
+  let resolvedTimezone = tz;
+  let providerFailed = false;
+
+  try {
+    if (Array.isArray(fixtureSlots)) {
+      qualifying = collectFromRaw(fixtureSlots);
+    } else {
+      const getSlotsFn =
+        sync && typeof getSlotsSync === "function"
+          ? getSlotsSync
+          : getSlots ||
+            ((params) =>
+              require("../../application/appointmentApplicationService").getSlots(
+                params
+              ));
+
+      const initialResult = await Promise.resolve(
+        getSlotsFn({
+          agentId,
+          organizationId,
+          date: startDateKey,
+          dateEnd: initialEndDateKey,
+          purpose,
+          timePreference: "any",
+          maxResults: 0
+        })
+      );
+      resolvedTimezone = initialResult?.timezone || resolvedTimezone;
+      qualifying = collectFromRaw(initialResult?.slots || []);
+
+      let offeredProbe = selectCrossDateCandidateSlots(qualifying, {
+        maxCandidates,
+        rejectIds
+      });
+      let cursor = addDaysToDateKey(initialEndDateKey, 1);
+      while (
+        offeredProbe.length < maxCandidates &&
+        daysBetweenDateKeys(startDateKey, cursor) < MAX_EXPANSION_DAYS &&
+        cursor <= maxEndDateKey
+      ) {
+        const dayResult = await Promise.resolve(
+          getSlotsFn({
+            agentId,
+            organizationId,
+            date: cursor,
+            purpose,
+            timePreference: "any",
+            maxResults: 24
+          })
+        );
+        resolvedTimezone = dayResult?.timezone || resolvedTimezone;
+        const dayQualifying = collectFromRaw(dayResult?.slots || []);
+        const seen = new Set(qualifying.map(slotIdentity));
+        for (const slot of dayQualifying) {
+          const id = slotIdentity(slot);
+          if (!seen.has(id)) {
+            qualifying.push(slot);
+            seen.add(id);
+          }
+        }
+        offeredProbe = selectCrossDateCandidateSlots(qualifying, {
+          maxCandidates,
+          rejectIds
+        });
+        cursor = addDaysToDateKey(cursor, 1);
+      }
+    }
+  } catch (_error) {
+    providerFailed = true;
+  }
+
+  if (providerFailed) {
+    return buildUnavailableResult({
+      organizationId,
+      agentId,
+      date: null,
+      timezone: resolvedTimezone,
+      constraints,
+      agentResolutionSource,
+      failureReason: "provider_failure"
+    });
+  }
+
+  // Fixture path also expands conceptually within fixture dates only (no live calls).
+  if (Array.isArray(fixtureSlots)) {
+    qualifying = qualifying.filter((slot) => {
+      const dk = slot.dateKey || slot.date;
+      return dk && dk >= startDateKey && dk <= maxEndDateKey;
+    });
+  }
+
+  const offered = selectCrossDateCandidateSlots(qualifying, {
+    maxCandidates,
+    rejectIds
+  });
+
+  return {
+    status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+    organizationId,
+    agentId,
+    date: null,
+    dateStart: startDateKey,
+    dateEnd: offered.length
+      ? offered[offered.length - 1].dateKey || offered[offered.length - 1].date
+      : maxEndDateKey,
+    rolling: true,
+    timezone: resolvedTimezone,
+    constraints: {
+      earliestTime: constraints.earliestTime || null,
+      latestTime: constraints.latestTime || null,
+      earliestTimeInclusive:
+        typeof constraints.earliestTimeInclusive === "boolean"
+          ? constraints.earliestTimeInclusive
+          : true
+    },
+    slots: sortSlotsChronologically(qualifying),
+    offeredSlots: offered,
+    source: "sprint22",
+    agentResolutionSource,
+    failureReason: null,
+    searchMeta: {
+      initialHorizonHours: INITIAL_HORIZON_HOURS,
+      maxExpansionDays: MAX_EXPANSION_DAYS,
+      startDateKey,
+      initialEndDateKey,
+      maxEndDateKey
+    }
+  };
+}
+
+function readRollingCandidateSlotsSync(params = {}) {
+  const {
+    organizationId = null,
+    agentId = null,
+    agentResolutionSource = AGENT_RESOLUTION.UNRESOLVED,
+    timezone = DEFAULT_TIMEZONE,
+    constraints = {},
+    maxCandidates = DEFAULT_MAX_CANDIDATES,
+    rejectIds = [],
+    fixtureSlots = null,
+    getSlotsSync = null,
+    now = null
+  } = params;
+
+  if (!agentId) {
+    return buildUnavailableResult({
+      organizationId,
+      agentId,
+      date: null,
+      timezone,
+      constraints,
+      agentResolutionSource,
+      failureReason: "missing_agent"
+    });
+  }
+
+  if (!Array.isArray(fixtureSlots) && typeof getSlotsSync !== "function") {
+    return buildUnavailableResult({
+      organizationId,
+      agentId,
+      date: null,
+      timezone,
+      constraints,
+      agentResolutionSource,
+      failureReason: "sync_requires_fixture"
+    });
+  }
+
+  const nowMs = now ? new Date(now).getTime() : Date.now();
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const startDateKey = dateKeyInZone(nowMs, tz);
+  const horizonEndMs = nowMs + INITIAL_HORIZON_HOURS * 60 * 60 * 1000;
+  const initialEndDateKey = dateKeyInZone(horizonEndMs, tz);
+  const maxEndDateKey = addDaysToDateKey(startDateKey, MAX_EXPANSION_DAYS - 1);
+
+  const collect = (rawSlots) =>
+    filterSlotsByConstraints(
+      filterFutureSlots(
+        (rawSlots || []).map((s) => normalizeSlot(s, tz)).filter(Boolean),
+        nowMs,
+        tz
+      ),
+      constraints
+    );
+
+  if (Array.isArray(fixtureSlots)) {
+    const qualifying = collect(fixtureSlots).filter((slot) => {
+      const dk = slot.dateKey || slot.date;
+      return dk && dk >= startDateKey && dk <= maxEndDateKey;
+    });
+    const offered = selectCrossDateCandidateSlots(qualifying, {
+      maxCandidates,
+      rejectIds
+    });
+    return {
+      status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+      organizationId,
+      agentId,
+      date: null,
+      rolling: true,
+      timezone: tz,
+      constraints: {
+        earliestTime: constraints.earliestTime || null,
+        latestTime: constraints.latestTime || null,
+        earliestTimeInclusive:
+          typeof constraints.earliestTimeInclusive === "boolean"
+            ? constraints.earliestTimeInclusive
+            : true
+      },
+      slots: sortSlotsChronologically(qualifying),
+      offeredSlots: offered,
+      source: "sprint22",
+      agentResolutionSource,
+      failureReason: null,
+      searchMeta: {
+        initialHorizonHours: INITIAL_HORIZON_HOURS,
+        maxExpansionDays: MAX_EXPANSION_DAYS,
+        startDateKey,
+        initialEndDateKey,
+        maxEndDateKey
+      }
+    };
+  }
+
+  try {
+    let qualifying = collect(
+      getSlotsSync({
+        agentId,
+        organizationId,
+        date: startDateKey,
+        dateEnd: initialEndDateKey,
+        purpose: "recruiting_interview",
+        timePreference: "any",
+        maxResults: 0
+      })?.slots || []
+    );
+    let offered = selectCrossDateCandidateSlots(qualifying, {
+      maxCandidates,
+      rejectIds
+    });
+    let cursor = addDaysToDateKey(initialEndDateKey, 1);
+    while (
+      offered.length < maxCandidates &&
+      daysBetweenDateKeys(startDateKey, cursor) < MAX_EXPANSION_DAYS
+    ) {
+      const daySlots = collect(
+        getSlotsSync({
+          agentId,
+          organizationId,
+          date: cursor,
+          purpose: "recruiting_interview",
+          timePreference: "any",
+          maxResults: 24
+        })?.slots || []
+      );
+      const seen = new Set(qualifying.map(slotIdentity));
+      for (const slot of daySlots) {
+        if (!seen.has(slotIdentity(slot))) {
+          qualifying.push(slot);
+          seen.add(slotIdentity(slot));
+        }
+      }
+      offered = selectCrossDateCandidateSlots(qualifying, {
+        maxCandidates,
+        rejectIds
+      });
+      cursor = addDaysToDateKey(cursor, 1);
+    }
+    return {
+      status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+      organizationId,
+      agentId,
+      date: null,
+      rolling: true,
+      timezone: tz,
+      constraints: {
+        earliestTime: constraints.earliestTime || null,
+        latestTime: constraints.latestTime || null,
+        earliestTimeInclusive:
+          typeof constraints.earliestTimeInclusive === "boolean"
+            ? constraints.earliestTimeInclusive
+            : true
+      },
+      slots: sortSlotsChronologically(qualifying),
+      offeredSlots: offered,
+      source: "sprint22",
+      agentResolutionSource,
+      failureReason: null,
+      searchMeta: {
+        initialHorizonHours: INITIAL_HORIZON_HOURS,
+        maxExpansionDays: MAX_EXPANSION_DAYS,
+        startDateKey,
+        initialEndDateKey,
+        maxEndDateKey
+      }
+    };
+  } catch (_error) {
+    return buildUnavailableResult({
+      organizationId,
+      agentId,
+      date: null,
+      timezone: tz,
+      constraints,
+      agentResolutionSource,
+      failureReason: "provider_failure"
+    });
+  }
+}
+
 async function resolveAvailabilityForTurn({
   context,
   interpretation,
@@ -499,34 +967,55 @@ async function resolveAvailabilityForTurn({
     loadOrganizationSettings: options.loadOrganizationSettings || null
   });
 
-  const rejectTimes = (context.appointment?.previouslyOfferedSlots || [])
-    .map((slot) => slot.time || slot.timeKey)
-    .filter(Boolean);
-
-  // If prior offer was rejected and alternatives differ, still allow re-select from full set
-  // unless options.avoidPreviouslyOffered is true.
+  const priorOffered = context.appointment?.previouslyOfferedSlots || [];
   const avoidPrevious = options.avoidPreviouslyOffered === true;
+  const rejectIds = avoidPrevious
+    ? priorOffered.map((slot) => slotIdentity(slot)).filter((id) => !id.startsWith("|"))
+    : [];
+  const rejectTimes = avoidPrevious
+    ? priorOffered.map((slot) => slot.time || slot.timeKey).filter(Boolean)
+    : [];
 
   const fixtureSlots =
     options.availabilityFixture?.slots ||
     context._availabilityFixture?.slots ||
     null;
+  const timezone =
+    options.timezone ||
+    context.timezone ||
+    options.availabilityFixture?.timezone ||
+    DEFAULT_TIMEZONE;
+  const organizationId = context.organizationId || options.organizationId || null;
+  const now = options.now || context._testNow || null;
 
-  // Live Sprint 22 read when no fixture: appointmentApplicationService.getSlots (async).
+  // BR-108 — no concrete date → bounded rolling multi-date search.
+  if (!date) {
+    const readResult = await readRollingCandidateSlots({
+      organizationId,
+      agentId,
+      agentResolutionSource,
+      timezone,
+      constraints,
+      fixtureSlots,
+      getSlots: options.getSlots || null,
+      rejectIds,
+      maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
+      now
+    });
+    return toDecisionAvailability(readResult);
+  }
+
+  // BR-107 — concrete date → single-day read.
   const readResult = await readCandidateSlots({
-    organizationId: context.organizationId || options.organizationId || null,
+    organizationId,
     agentId,
     agentResolutionSource,
     date,
-    timezone:
-      options.timezone ||
-      context.timezone ||
-      options.availabilityFixture?.timezone ||
-      DEFAULT_TIMEZONE,
+    timezone,
     constraints,
     fixtureSlots,
     getSlots: options.getSlots || null,
-    rejectTimes: avoidPrevious ? rejectTimes : [],
+    rejectTimes,
     maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
   });
 
@@ -675,26 +1164,48 @@ function resolveAvailabilityForTurnSync(args = {}) {
     options.availabilityFixture?.slots ||
     context._availabilityFixture?.slots ||
     null;
+  const timezone =
+    options.timezone ||
+    context.timezone ||
+    options.availabilityFixture?.timezone ||
+    DEFAULT_TIMEZONE;
+  const organizationId = context.organizationId || options.organizationId || null;
+  const now = options.now || context._testNow || null;
+  const avoidPrevious = options.avoidPreviouslyOffered === true;
+  const priorOffered = context.appointment?.previouslyOfferedSlots || [];
+  const rejectIds = avoidPrevious
+    ? priorOffered.map((slot) => slotIdentity(slot)).filter((id) => !id.startsWith("|"))
+    : [];
+  const rejectTimes = avoidPrevious
+    ? priorOffered.map((slot) => slot.time || slot.timeKey).filter(Boolean)
+    : [];
+
+  if (!date) {
+    const readResult = readRollingCandidateSlotsSync({
+      organizationId,
+      agentId,
+      agentResolutionSource,
+      timezone,
+      constraints,
+      fixtureSlots,
+      getSlotsSync: options.getSlotsSync || null,
+      rejectIds,
+      maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
+      now
+    });
+    return toDecisionAvailability(readResult);
+  }
 
   const readResult = readCandidateSlotsSync({
-    organizationId: context.organizationId || options.organizationId || null,
+    organizationId,
     agentId,
     agentResolutionSource,
     date,
-    timezone:
-      options.timezone ||
-      context.timezone ||
-      options.availabilityFixture?.timezone ||
-      DEFAULT_TIMEZONE,
+    timezone,
     constraints,
     fixtureSlots,
     getSlotsSync: options.getSlotsSync || null,
-    rejectTimes:
-      options.avoidPreviouslyOffered === true
-        ? (context.appointment?.previouslyOfferedSlots || [])
-            .map((slot) => slot.time || slot.timeKey)
-            .filter(Boolean)
-        : [],
+    rejectTimes,
     maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
   });
 
@@ -704,20 +1215,28 @@ function resolveAvailabilityForTurnSync(args = {}) {
 module.exports = {
   AGENT_RESOLUTION,
   READ_STATUS,
+  INITIAL_HORIZON_HOURS,
+  MAX_EXPANSION_DAYS,
   resolveAvailabilityAgent,
   resolveAvailabilityAgentAsync,
   resolveConcreteScheduleDate,
   resolveConstraints,
   filterSlotsByConstraints,
+  filterFutureSlots,
   sortSlotsChronologically,
   selectCandidateSlots,
+  selectCrossDateCandidateSlots,
   normalizeSlot,
   buildUnavailableResult,
   toDecisionAvailability,
   readCandidateSlots,
   readCandidateSlotsSync,
+  readRollingCandidateSlots,
+  readRollingCandidateSlotsSync,
   shouldAttemptAvailabilityOffer,
   resolveAvailabilityForTurn,
   resolveAvailabilityForTurnSync,
+  dateKeyInZone,
+  addDaysToDateKey,
   timeKeyToMinutes
 };

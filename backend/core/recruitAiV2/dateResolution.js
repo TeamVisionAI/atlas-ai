@@ -218,6 +218,7 @@ function isDateOnlySchedule(schedule) {
 
 module.exports = {
   WEEKDAY_INDEX,
+  WEEKDAY_LABELS,
   parseDateExclusions,
   extractDateCandidateHint,
   resolveDateCandidate,

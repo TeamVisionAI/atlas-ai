@@ -2871,10 +2871,10 @@ const RECRUIT_AI_V2_SCENARIOS = [
   },
   {
     id: "readonly-slot-offering-after-constraint",
-    name: "BR-107 Read-only slot offering after constraint + date",
+    name: "BR-107/108 Read-only rolling slot offering after constraint",
     category: "scheduling",
     description:
-      "BR-107 — after-5 without date does not fabricate slots; with concrete date + fixture, offer 17:30 + 19:00.",
+      "BR-108 — after-5 without date uses rolling fixture search and offers real Tuesday slots.",
     seed: {
       preferredLanguage: "spanish",
       languageSource: "inferred",
@@ -2910,21 +2910,56 @@ const RECRUIT_AI_V2_SCENARIOS = [
         inboundMessageId: "sim-wamid.readonly-slots.t01",
         expect: {
           intent: "provide_availability_constraint",
-          replyIncludes: ["después de las"],
-          replyExcludes: ["Tengo disponible", "5:30 PM", "7:00 PM"],
+          nextAction: "offer_available_slots",
+          replyIncludes: ["Tengo disponible", "5:30 PM", "7:00 PM"],
+          replyExcludes: ["anoto que puedes", "Qué día", "Continuemos"],
           shouldEscalate: false,
           sideEffectsDenied: true
         }
+      }
+    ]
+  },
+  {
+    id: "rolling-availability-after-constraint",
+    name: "BR-108 Rolling Saturday + Monday offer",
+    category: "scheduling",
+    description:
+      "BR-108 — late Friday after-5 offers Saturday 18:00 + Monday 17:30 when Sunday empty.",
+    seed: {
+      preferredLanguage: "spanish",
+      languageSource: "inferred",
+      agentId: "agent-fixture-br108",
+      testNow: "2026-08-07T21:00:00.000-04:00",
+      availabilityFixture: {
+        timezone: "America/New_York",
+        slots: [
+          { dateKey: "2026-08-08", timeKey: "18:00" },
+          { dateKey: "2026-08-10", timeKey: "17:30" }
+        ]
       },
+      knownFacts: {
+        city: "Miami",
+        state: "FL",
+        cityCertainty: "confirmed",
+        stateCertainty: "confirmed",
+        workAuthorization: true,
+        preferredDayPart: "afternoon"
+      },
+      currentStage: "scheduling",
+      conversation: {
+        lastQuestionAsked: "ask_time_preference"
+      }
+    },
+    turns: [
       {
-        id: "ro02",
-        text: "el martes",
-        inboundMessageId: "sim-wamid.readonly-slots.t02",
+        id: "roll01",
+        text: "después de las 5",
+        inboundMessageId: "sim-wamid.rolling-slots.t01",
         expect: {
-          intent: "scheduling_date_proposal",
+          intent: "provide_availability_constraint",
           nextAction: "offer_available_slots",
-          replyIncludes: ["Tengo disponible", "5:30 PM", "7:00 PM"],
-          replyExcludes: ["anoto que puedes", "Continuemos"],
+          replyIncludes: ["Tengo disponible", "6:00 PM", "5:30 PM", "lunes"],
+          replyExcludes: ["anoto que puedes", "Qué día te funciona"],
           shouldEscalate: false,
           sideEffectsDenied: true
         }
