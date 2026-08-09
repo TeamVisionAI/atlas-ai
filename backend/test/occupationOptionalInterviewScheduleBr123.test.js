@@ -144,5 +144,6 @@ test("BR-123 docs present", () => {
   const rules = fs.readFileSync("docs/06-business/BUSINESS_RULES.md", "utf8");
   assert.match(rules, /## BR-123/);
   assert.match(rules, /Occupation Optional for Interview Scheduling/);
-  assert.match(rules, /occupation[`*]*.*not.*required/i);
+  assert.match(rules, /enrichment\s*\/\s*optional/i);
+  assert.match(rules, /not.*prerequisite/i);
 });

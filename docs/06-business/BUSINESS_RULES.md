@@ -1309,10 +1309,10 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ### Rules
 
-1. **Occupation is optional** for entering / validating `INTERVIEW_READY`, `INTERVIEW_SCHEDULED`, and `INTERVIEW_DUE`.
+1. **Occupation is enrichment / optional** — it is **not** a prerequisite for interview readiness, scheduling, or due-state processing (`INTERVIEW_READY`, `INTERVIEW_SCHEDULED`, `INTERVIEW_DUE`).
 2. **Do not prompt or fail closed** on missing occupation during schedule-interview mission advancement to `INTERVIEW_SCHEDULED`.
 3. **Qualification gates unchanged** for city / state / work authorization where still required by BR-037.
-4. **Capture still allowed** — occupation may be stored when provided; it is simply not a blocking required field.
+4. **Capture still allowed** — when occupation is already known or later provided, preserve/store it; absence alone must not block advancement or become a required clarification.
 5. **Boundaries** — Does not change prospect identity bridging, BR-111 execution gates, timezone behavior, live authoring allowlists, or BR-122 reconcile semantics.
 
 ---
@@ -2369,7 +2369,7 @@ Rules:
 3. Human Advancement (BR-035) must validate before changing milestones.
 4. Invalid transitions return structured validation errors (`VALIDATION_FAILED`, `INVALID_TRANSITION`).
 5. Valid transitions emit workflow events, update ownership (BR-036), update workflow state, and resume Atlas when appropriate.
-6. **BR-123** — `occupation` is **not** required for `INTERVIEW_READY`, `INTERVIEW_SCHEDULED`, or `INTERVIEW_DUE`.
+6. **BR-123** — `occupation` is enrichment/optional data and is **not** a prerequisite for `INTERVIEW_READY`, `INTERVIEW_SCHEDULED`, or `INTERVIEW_DUE`.
 
 ### API
 
