@@ -1297,6 +1297,170 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+# QR Channel
+
+**First implementation target (after these rules are accepted):** Car Magnet V1 (`car_recruiting_01`, source `car_magnet`, default conversation goal `interview`).
+
+**Global constraints for BR-128–BR-133:**
+
+1. **Canonical prospect identity required** — QR Channel must not bypass BR-120. Every QR-driven WhatsApp conversation resolves through the existing org-scoped prospect identity bridge before conversation context or appointments are written.
+2. **No QR-to-appointment mutation shortcut** — A scan, campaign token, or landing redirect must never create, confirm, cancel, or mutate appointments or Calendar objects. Scheduling remains the canonical appointment lifecycle (BR-039 / BR-049 / BR-050 / BR-111 family).
+3. **Do not weaken BR-120–BR-127** — Identity bridging, Calendar cancel/rollback, schedule reconcile, occupation optional rules, schedule-intent recovery, post-create ownership, deferred confirm continuity, and qualification-fact sync remain mandatory.
+4. **Recruit AI V2 execution remains OFF** until separately authorized Stage-1 rollout. QR Channel design and docs must not enable `RECRUIT_AI_V2_EXECUTION_ENABLED` or `RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED`.
+5. **Status of BR-128–BR-133** — Specified (docs only). No runtime, migrations, schema, prompts, routing, or telemetry emitters are required by this documentation change alone.
+
+---
+
+## BR-128 — QR Campaigns
+
+**Implements:** Org-scoped QR / entry campaigns as the durable configuration behind physical or digital QR destinations (name, type, opaque public token, source identity, default conversation goal, owner, active flag).  
+**Domain:** QR Channel / lead acquisition / campaign configuration  
+**Depends on:** BR-080, BR-120  
+**Related:** BR-129 (trusted attribution), BR-130 (conversationGoal), BR-131 (goal-aware first turn), BR-133 (funnel telemetry), Car Magnet V1 (`car_recruiting_01`)  
+**Status:** Specified (docs only; not implemented)  
+**Engine target (future):** QR campaign registry / Admin–RVP campaign management (not yet built)  
+**Tests:** Deferred until implementation
+
+### Rules
+
+1. **Org-scoped entity** — Every campaign belongs to exactly one `organizationId`. Cross-tenant campaign resolve or write is forbidden.
+2. **Owner / agent / RVP association** — Each campaign MUST associate an owning Atlas user (typically RVP or designated agent) used for BR-080 assignment precedence when campaign mapping is activated. Ownership must be an exact org-scoped user identity — not a role-derived guess.
+3. **Opaque public token** — Public QR destinations use a non-enumerable server-issued token (not sequential integer ids, not raw campaign names). Tokens resolve only through a server-side campaign lookup.
+4. **Active / inactive** — Inactive campaigns must fail closed at public entry (no scan→WhatsApp handoff that attributes to a dead campaign). Existing attributed prospects retain historical attribution.
+5. **Campaign / source identity** — Campaigns carry a stable campaign key (e.g. `car_recruiting_01`) and a source label (e.g. `car_magnet`) distinct from transport channel (`whatsapp`).
+6. **Default conversation goal** — Each campaign MAY declare a default `conversationGoal` per BR-130 (`interview` | `policy_review` | `unresolved`). Absence defaults to `unresolved`.
+7. **No PII in public QR URL** — Public entry URLs MUST NOT embed phones, names, emails, prospect ids, or other PII in path or query. Campaign token only (plus non-PII routing required by the host).
+8. **Configuration ≠ execution** — Creating or activating a campaign does not enable Recruit AI V2 execution, widen allowlists, or authorize appointment mutation.
+9. **Boundaries** — Does not implement Admin UI, QR image generation libraries, or migrations in this specification alone. Does not replace Facebook Lead Ads intake or Quick Capture manual sources.
+
+---
+
+## BR-129 — Trusted QR Attribution
+
+**Implements:** Forge-resistant first-touch attribution for QR Channel: public entry resolves an opaque server-side campaign token, records a scannable handoff, and stamps org-safe attribution onto the canonical prospect / conversation — never by trusting raw marketing query parameters alone.  
+**Domain:** QR Channel / attribution / tenancy / public entry  
+**Depends on:** BR-080, BR-120, BR-128  
+**Related:** BR-130 (goal from campaign default), BR-133 (funnel events), BR-113 (booking-path telemetry — distinct)  
+**Status:** Specified (docs only; not implemented)  
+**Engine target (future):** Public entry / redirect handler; prospect create attribution writer; optional short-lived scan correlation store  
+**Tests:** Deferred until implementation
+
+### Rules
+
+1. **Token-resolved attribution** — Campaign, source, owner, org, and default goal MUST be derived from a successful opaque token → campaign resolve on the server. Do not treat arbitrary `?campaign=`, `?source=`, `?goal=`, or UTM parameters as authoritative identity.
+2. **Fail closed on forged / invalid / inactive tokens** — Unknown, revoked, inactive, or cross-tenant tokens must not attribute a campaign. Prefer a safe non-attributed handoff or an explicit safe error — never invent attribution.
+3. **Tenant isolation** — Resolved campaign `organizationId` must match the WhatsApp / WABA inbound org binding used for prospect create. Mismatch → fail closed (no cross-tenant attribution).
+4. **Attribution survives the lifecycle** — Once stamped at first-touch create (or trusted resume attach), campaign/source/goal attribution MUST remain available through conversation, qualification, appointment, outcome, and recruit/client conversion events (BR-133). Later enrichment may add last-touch metadata; first-touch campaign must not be silently overwritten by forged inbound params.
+5. **Canonical prospect only** — Attribution attaches through BR-120 identity resolution / create. No parallel “QR prospect” store that bypasses legacy/core bridging.
+6. **Rate-limitable public entry** — The public entry / redirect endpoint MUST be designed for rate limiting (IP / token / org abuse controls). Scan flood must not imply appointment write capacity.
+7. **No mutation from entry** — Entry and attribution emit observability / correlators only. They do not call appointment create, Calendar, or Recruit AI side-effect executors.
+8. **Boundaries** — Optional Meta CTWA referral parsing remains complementary and must not override a stronger token-resolved QR first touch when both are present for the same create. Does not redefine BR-113 live-execution attribution stages.
+
+---
+
+## BR-130 — Canonical Conversation Goal
+
+**Implements:** A canonical `conversationGoal` that steers QR and WhatsApp conversations toward interview scheduling, policy-review scheduling, or an unresolved state until intent is known.  
+**Domain:** QR Channel / Conversation Engine / Recruit AI durable context  
+**Depends on:** BR-049, BR-081, BR-120, BR-128, BR-129  
+**Related:** BR-131 (first-turn behavior), BR-132 (policy-review scheduling); appointment `purpose` vocabulary (`recruiting_interview`, `policy_review`); Car Magnet V1 defaults to `interview`  
+**Status:** Specified (docs only; not implemented)  
+**Engine target (future):** Prospect attribution / durable `recruit_ai_conversation_contexts` acquisition slice; CE/V2 decision consumers (read-only relative to scheduling)  
+**Tests:** Deferred until implementation
+
+### Supported goals
+
+| `conversationGoal` | Meaning | Typical appointment `purpose` when booking |
+|--------------------|---------|--------------------------------------------|
+| `interview` | Recruiting interview conversion | `recruiting_interview` |
+| `policy_review` | Client / policy-review meeting conversion | `policy_review` |
+| `unresolved` | Goal not yet established | No appointment until resolved |
+
+### Rules
+
+1. **Persist the goal** — `conversationGoal` MUST be persisted in canonical prospect and/or conversation context as appropriate for the active architectures (legacy profile / core prospect / durable V2 context). Durable Recruit AI conversation context MUST carry the active goal when V2 context exists.
+2. **QR may establish the initial default** — An active QR campaign (BR-128) may set the initial `conversationGoal` via trusted attribution (BR-129).
+3. **Generic inbound may begin unresolved** — Non-QR or unknown-source inbound MAY start as `unresolved` and be inferred conversationally.
+4. **Default ≠ immutable** — A preselected QR goal is a **default**. Atlas MAY transition goals when **explicit user intent** proves another supported goal is appropriate.
+5. **Deterministic / auditable transitions** — Goal changes MUST be explicit, reason-coded, and auditable (who/what evidence). Silent goal flips from noise, forged query params, or cross-tenant signals are forbidden.
+6. **Identity / tenancy safety** — Goal transitions must not silently cross organizations, prospects, or appointments (BR-120). Wrong-identity updates fail closed.
+7. **Scheduling mapping** — When the active goal is `interview`, booking uses the recruiting interview path / `purpose=recruiting_interview`. When `policy_review`, booking uses `purpose=policy_review` under BR-132. `unresolved` must not create appointments.
+8. **Boundaries** — Does not implement inference classifiers in this specification. Does not merge PI document `PolicyReview` aggregates (BR-051+) with conversation goals. Does not enable execution.
+
+---
+
+## BR-131 — Goal-Aware First Turn and Progressive Conversion
+
+**Implements:** Replace universal forced city/state openers with context-aware first turns that answer immediate questions, open naturally from QR context, resume returning prospects, and still progress toward the active conversation goal’s appointment.  
+**Domain:** Conversation Engine / Recruit AI v2 authoring / QR Channel UX  
+**Depends on:** BR-049, BR-081, BR-114, BR-130  
+**Related:** BR-104/FAQ family; BR-124 schedule-intent recovery; teamVision / V2 greeting templates historically used forced location openers  
+**Status:** Specified (docs only; not implemented)  
+**Engine target (future):** CE first-turn / FAQ routing; V2 `interpret` + `decide` + response templates; no appointment executor changes  
+**Tests:** Deferred until implementation
+
+### Rules
+
+1. **No universal forced location opener** — Atlas MUST NOT universally open every fresh WhatsApp conversation with “Hola, ¿en qué ciudad y estado vives?” (or equivalent) solely because the chat is new. Location questions remain allowed when required for the **active goal’s** qualification path.
+2. **Understand before forcing qualification** — Classify / understand inbound context (QR source/goal, greeting vs substantive question, returning state) before forcing the next qualification field.
+3. **Answer immediate substantive questions** — When the prospect asks a substantive FAQ / opportunity question, Atlas SHOULD answer it (existing FAQ engines) and then continue progressive conversion — not discard the question in favor of an immediate city/state demand.
+4. **Natural greeting opener** — Pure greetings MAY receive a natural broad opener influenced by known QR campaign/source/goal context (BR-128–BR-130).
+5. **Returning prospects resume** — Returning prospects resume known context (durable V2 and/or legacy qualification) rather than restarting as brand-new QR leads when identity matches (BR-120 / BR-080 no-reassign rules remain).
+6. **Ask qualification only when needed** — Ask only the qualification fields required for the **active** `conversationGoal`. Do not run interview-only qualification for an established `policy_review` goal (and vice versa) without an audited goal transition (BR-130).
+7. **Natural ≠ abandon conversion** — Conversational flexibility does not remove the conversion objective. `interview` conversations MUST progressively move toward scheduling a recruiting interview. `policy_review` conversations MUST progressively move toward scheduling a policy-review appointment.
+8. **Mutation path unchanged** — This rule changes first-turn / routing / copy behavior only. It MUST NOT alter the accepted appointment mutation path (BR-039 / BR-050 / BR-111 / BR-112 / BR-121–BR-127). No QR shortcut to Calendar or `atlas_appointments`.
+9. **Boundaries** — Does not enable Recruit AI V2 execution. Does not widen Stage-1 allowlists. Does not rewrite BR-125 reply ownership. Copy changes require a separate implementation sprint after this rule is accepted.
+
+---
+
+## BR-132 — Policy Review Scheduling
+
+**Implements:** Treat appointment `purpose=policy_review` as a first-class **scheduling** outcome for client / policy-review conversations, distinct from Policy Intelligence document aggregates (`atlas_policy_reviews`), while reusing the canonical appointment lifecycle wherever safely possible.  
+**Domain:** Appointments / QR Channel / client conversion  
+**Depends on:** BR-039, BR-040, BR-049, BR-050, BR-120, BR-130  
+**Related:** BR-051–BR-061 (Policy Intelligence documents — separate); BR-044 outcomes; capacity/`appointmentTypes` alignment (future)  
+**Status:** Specified (docs only; not implemented)  
+**Engine target (future):** Purpose-scoped workflow branch on canonical appointment services; Conversation / Recruit AI goal consumers  
+**Tests:** Deferred until implementation
+
+### Rules
+
+1. **Purpose ≠ PI document** — Scheduling `purpose=policy_review` is an **appointment purpose**. It is **not** the same entity as Policy Intelligence `PolicyReview` (`atlas_policy_reviews` / BR-051+). Linking them later requires an explicit bridge rule; this rule does not invent that bridge.
+2. **Reuse canonical lifecycle** — Create / reschedule / cancel / complete / reminders / Calendar consistency MUST reuse canonical appointment services wherever safely possible. Do not invent a parallel policy-review booking store.
+3. **Purpose-scoped workflow** — Recruiting interview milestones and side effects (e.g. auto-advance to `INTERVIEW_SCHEDULED`) MUST NOT be applied blindly to policy-review appointments. Purpose-scoped workflow/state must distinguish recruiting interviews from client policy reviews.
+4. **Hard protections remain mandatory** — Identity (BR-120), tenancy, Calendar consistency, idempotency, rollback (BR-121), schedule reconcile (BR-122), and ownership protections (BR-125 family where applicable) remain mandatory for policy-review scheduling.
+5. **Goal coupling** — Bookings for policy review require active `conversationGoal=policy_review` (BR-130) or an equivalent audited agent-operated scheduling path with explicit purpose — not an accidental interview create.
+6. **No implementation in this documentation change** — This rule specifies architecture constraints only. No migrations, CE/V2 routing, Calendar writes, or UI in this docs change.
+7. **Boundaries** — Does not enable Recruit AI V2 execution. Does not redefine Financial Intelligence evaluation (BR-062+). Car Magnet V1 targets `interview` only and must not require BR-132 runtime to ship.
+
+---
+
+## BR-133 — QR Funnel Attribution and Telemetry
+
+**Implements:** Conceptual funnel instrumentation for QR Channel marketing attribution and conversion analytics — distinct from Recruit AI Stage-1 / BR-113 booking-path observability.  
+**Domain:** QR Channel / analytics / business events  
+**Depends on:** BR-128, BR-129, BR-130  
+**Related:** BR-113 (live execution attribution telemetry); Stage-1 `recruit_ai_v2.*` ops playbook; EVENT_CATALOG / business events  
+**Status:** Specified (docs only; event intent only — no telemetry runtime in this docs change)  
+**Engine target (future):** Business-events / analytics projections; public entry scan logger  
+**Tests:** Deferred until implementation
+
+### Conceptual funnel
+
+`scan` → WhatsApp entry/conversation → qualification / goal resolution → appointment scheduled → appointment outcome → recruit/client conversion (where available)
+
+### Rules
+
+1. **Event intent (documentation only here)** — Implementations MUST eventually emit org-scoped funnel signals covering the stages above, always carrying campaign/source attribution when known (BR-129).
+2. **Attribution retained** — Campaign/source (and active/default goal where relevant) remain available throughout the funnel for reporting. Metrics MUST be queryable by `organizationId` and `campaignId` / campaign key.
+3. **Distinct from BR-113 / Stage-1 ops telemetry** — QR marketing funnel telemetry MUST NOT be conflated with BR-113 `executionSource` stages or Stage-1 `recruit_ai_v2.*` booking-path observability. Separate event families / catalogs; shared correlation ids are allowed when useful.
+4. **No mutation coupling** — Funnel events are observational. Emitting or failing to emit telemetry must not create, alter, or roll back appointments.
+5. **PII minimization** — Prefer ids + opaque campaign tokens + hashed/minimal contact keys consistent with existing WhatsApp logging policy. Do not put raw PII in public scan URLs (BR-128).
+6. **No runtime in this docs change** — Defining event intent does not require adding emitters, warehouses, or Datadog integrations in this documentation change.
+7. **Boundaries** — Does not change Stage-1 operations playbook alert thresholds. Does not enable execution.
+
+---
+
 ## BR-120 — Canonical Prospect Identity Bridge (Legacy ↔ Core)
 
 **Implements:** One phone maps to one canonical core prospect UUID for cross-system FK/keys while legacy `prospects` remains the WhatsApp phone profile/cache  
@@ -2534,3 +2698,4 @@ Atlas works around them.
 | Agent Actions | `agentActionEngine.js` | Next Actions visibility and execution (BR-025 – BR-032) |
 | Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`, `milestoneValidationEngine.js`, `humanAdvancementEngine.js` | Milestones, ownership, stall detection, human advancement (BR-034 – BR-037) |
 | Events | `eventEngine.js`, `workflowEventService.js` | Structured auditable workflow events |
+| QR Channel (specified) | Future campaign registry + public entry (BR-128–BR-133) | Campaigns, trusted attribution, conversationGoal, funnel telemetry — **not implemented**; must not bypass BR-120 or appointment mutation path |
