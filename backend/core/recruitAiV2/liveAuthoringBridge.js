@@ -233,6 +233,64 @@ async function attemptLiveV2Authoring({
     const replyText = extractAuthoredReplyText(v2Result);
     const nextAction =
       v2Result?.structuredDecision?.decision?.nextAction || null;
+    const executionSuccess = Boolean(
+      v2Result?.execution?.success && v2Result?.execution?.appointmentId
+    );
+
+    // After successful V2 create, V2 owns outbound + durable — never fall through to CE.
+    if (executionSuccess) {
+      let confirmedReply = replyText;
+      if (!confirmedReply) {
+        const { renderCustomerReply } = require("./responseRenderer");
+        const performed = v2Result.execution.performed?.[0] || {};
+        const lang =
+          v2Result.nextContext?.preferredLanguage ||
+          v2Result.context?.preferredLanguage ||
+          "spanish";
+        confirmedReply = extractAuthoredReplyText({
+          rendered: renderCustomerReply({
+            templateKey: "appointment_confirmed",
+            language: lang,
+            entities: {
+              dateLabel:
+                performed.dateKey ||
+                v2Result.nextContext?.appointment?.confirmedDate ||
+                null,
+              requestedTime:
+                performed.timeKey ||
+                v2Result.nextContext?.appointment?.confirmedTime ||
+                null
+            }
+          })
+        });
+      }
+
+      if (typeof logStage === "function") {
+        logStage(STAGES.USED, {
+          phone: normalized.phone || prospect.phone || null,
+          organizationId,
+          agentId: actingUserId,
+          nextAction,
+          allowExecution,
+          executionOwned: true,
+          providerMessageId: normalized.providerMessageId || null
+        });
+      }
+
+      return {
+        eligible: true,
+        authored: true,
+        fallThrough: false,
+        reason: null,
+        replyText: confirmedReply,
+        v2Result,
+        actingUserId,
+        organizationId,
+        nextAction,
+        allowExecution,
+        stage: STAGES.USED
+      };
+    }
 
     if (!replyText) {
       if (typeof logStage === "function") {

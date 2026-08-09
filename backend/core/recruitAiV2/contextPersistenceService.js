@@ -186,6 +186,41 @@ function rowToContext(row, { canonicalProspectId = null } = {}) {
   };
 }
 
+/**
+ * Never let advisory/capture overwrite a confirmed booking back to proposed.
+ * Allows intentional reschedule_requested progression. Blocks confirmed → proposed.
+ */
+function protectConfirmedAppointmentFromDowngrade(previousContext, nextContext) {
+  const prev = previousContext?.appointment || {};
+  const next = nextContext?.appointment || {};
+  const prevConfirmed =
+    String(prev.status || "").toLowerCase() === "confirmed" && Boolean(prev.appointmentId);
+  const nextStatus = String(next.status || "").toLowerCase();
+  const nextKeepsAuthority =
+    (nextStatus === "confirmed" && Boolean(next.appointmentId)) ||
+    nextStatus === "reschedule_requested";
+
+  if (!prevConfirmed || nextKeepsAuthority) {
+    return nextContext;
+  }
+
+  return {
+    ...nextContext,
+    currentStage: previousContext.currentStage || nextContext.currentStage || "confirmed",
+    appointment: {
+      ...next,
+      status: "confirmed",
+      appointmentId: prev.appointmentId,
+      confirmedDate: prev.confirmedDate || next.confirmedDate || next.proposedDate || prev.proposedDate || null,
+      confirmedTime: prev.confirmedTime || next.confirmedTime || next.proposedTime || prev.proposedTime || null,
+      proposedDate: next.proposedDate || prev.proposedDate || prev.confirmedDate || null,
+      proposedTime: next.proposedTime || prev.proposedTime || prev.confirmedTime || null,
+      previouslyOfferedSlots:
+        next.previouslyOfferedSlots || prev.previouslyOfferedSlots || []
+    }
+  };
+}
+
 function createContextPersistenceService({
   repository = null,
   resolveIdentity = resolveCanonicalProspectIdentity
@@ -410,7 +445,10 @@ function createContextPersistenceService({
     });
 
     const sanitized = sanitizeContextForPersistence({
-      ...nextContext,
+      ...protectConfirmedAppointmentFromDowngrade(
+        row ? rowToContext(row, { canonicalProspectId }) : null,
+        nextContext
+      ),
       organizationId,
       prospectId: canonicalProspectId
     });
@@ -615,6 +653,7 @@ function createContextPersistenceService({
 module.exports = {
   createContextPersistenceService,
   rowToContext,
+  protectConfirmedAppointmentFromDowngrade,
   isMetaReviewScope,
   resolvePersistenceIdentityScope,
   findActiveRowByIdentity
