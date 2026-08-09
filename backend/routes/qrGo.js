@@ -83,6 +83,15 @@ function errorCopy(reasonCode) {
         title: "Sesión expirada",
         body: "Vuelve a escanear el código QR."
       };
+    case REASON_CODES.DESTINATION_CONFIG_MISSING:
+    case REASON_CODES.DESTINATION_CONFIG_MALFORMED:
+    case REASON_CODES.DESTINATION_NOT_ALLOWLISTED:
+    case REASON_CODES.REDIRECT_NOT_ALLOWLISTED:
+      return {
+        status: 503,
+        title: "Servicio no disponible",
+        body: "WhatsApp no está disponible en este momento. Inténtalo más tarde."
+      };
     default:
       return {
         status: 404,

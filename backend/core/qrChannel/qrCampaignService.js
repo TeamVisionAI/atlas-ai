@@ -21,7 +21,7 @@ const {
   generatePublicToken,
   tokenPrefix
 } = require("./tokenCrypto");
-const { buildWhatsAppRedirectUrl } = require("./whatsappRedirect");
+const { buildWhatsAppRedirectUrl, resolveAllowlistedWhatsAppE164 } = require("./whatsappRedirect");
 const { emitQrEvent, EVENTS } = require("./qrChannelTelemetry");
 
 function isExpired(scan, now = new Date()) {
@@ -129,6 +129,28 @@ function createQrCampaignService({ repository, env = process.env, nowFn = () => 
     if (!resolved.ok) {
       return resolved;
     }
+
+    // Fail closed before creating a scan if WhatsApp destination is not configured/allowlisted.
+    const destination = resolveAllowlistedWhatsAppE164({
+      campaignWhatsAppE164: resolved.campaign.whatsapp_e164,
+      env
+    });
+    if (!destination.ok) {
+      emitQrEvent(EVENTS.SCAN_INVALID, {
+        organizationId: resolved.campaign.org_id,
+        campaignId: resolved.campaign.id,
+        campaignKey: resolved.campaign.campaign_key,
+        source: resolved.campaign.source,
+        reasonCode: destination.reasonCode,
+        outcome: "destination_config_failed"
+      });
+      return {
+        ok: false,
+        reasonCode: destination.reasonCode,
+        campaign: resolved.campaign
+      };
+    }
+
     const begun = await beginScanForCampaign(resolved.campaign);
     emitQrEvent(EVENTS.SCAN_RESOLVED, {
       organizationId: resolved.campaign.org_id,
@@ -241,20 +263,7 @@ function createQrCampaignService({ repository, env = process.env, nowFn = () => 
       return { ok: false, reasonCode: REASON_CODES.PHONE_INVALID };
     }
 
-    await repository.supersedeOpenScansExcept({
-      orgId: scan.org_id,
-      phoneNormalized: normalized,
-      exceptScanId: scan.id
-    });
-
-    const boundAt = nowFn().toISOString();
-    const updated = await repository.updateScan(scan.id, {
-      bound_phone_normalized: normalized,
-      bound_at: boundAt,
-      status: SCAN_STATUS.PENDING_INBOUND,
-      redirect_result: "redirected"
-    });
-
+    // Validate destination BEFORE mutating/superseding scan state (fail closed, no attribution side effects).
     const redirect = buildWhatsAppRedirectUrl({
       campaignWhatsAppE164: campaign.whatsapp_e164,
       env,
@@ -268,10 +277,24 @@ function createQrCampaignService({ repository, env = process.env, nowFn = () => 
         correlationId: scan.correlation_id,
         scanId: scan.id,
         reasonCode: redirect.reasonCode,
-        outcome: "redirect_blocked"
+        outcome: "destination_config_failed"
       });
-      return { ok: false, reasonCode: redirect.reasonCode };
+      return { ok: false, reasonCode: redirect.reasonCode, scan };
     }
+
+    await repository.supersedeOpenScansExcept({
+      orgId: scan.org_id,
+      phoneNormalized: normalized,
+      exceptScanId: scan.id
+    });
+
+    const boundAt = nowFn().toISOString();
+    const updated = await repository.updateScan(scan.id, {
+      bound_phone_normalized: normalized,
+      bound_at: boundAt,
+      status: SCAN_STATUS.PENDING_INBOUND,
+      redirect_result: "redirected"
+    });
 
     emitQrEvent(EVENTS.PHONE_BIND_SUCCEEDED, {
       organizationId: campaign.org_id,

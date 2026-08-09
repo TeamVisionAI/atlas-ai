@@ -49,6 +49,18 @@ function createMemoryQrChannelRepository() {
       return { ...record };
     },
 
+    async updateCampaign(id, patch) {
+      const existing = campaigns.get(id);
+      if (!existing) return null;
+      const next = {
+        ...existing,
+        ...patch,
+        updated_at: nowIso()
+      };
+      campaigns.set(id, next);
+      return { ...next };
+    },
+
     async findScanById(id) {
       const s = scans.get(id);
       return s ? { ...s } : null;

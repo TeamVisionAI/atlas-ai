@@ -47,8 +47,12 @@ const SCAN_TTL_MS = 15 * 60 * 1000;
 const NATURAL_WHATSAPP_PREFILL =
   "Hola, quiero conocer más sobre la oportunidad.";
 
-/** Digits-only allowlist; env may override via QR_CHANNEL_WHATSAPP_E164. */
-const DEFAULT_WHATSAPP_E164 = "17867528080";
+/**
+ * Explicit hard allowlist of digits-only E.164 values permitted for QR → wa.me.
+ * Presence here does NOT imply an automatic destination fallback.
+ * Destination must still come from QR_CHANNEL_WHATSAPP_E164 and/or campaign.whatsapp_e164.
+ */
+const WHATSAPP_E164_HARD_ALLOWLIST = Object.freeze(["17867528080"]);
 
 const REASON_CODES = Object.freeze({
   OK: "OK",
@@ -62,6 +66,9 @@ const REASON_CODES = Object.freeze({
   BIND_MAC_INVALID: "BIND_MAC_INVALID",
   PHONE_INVALID: "PHONE_INVALID",
   ORG_MISMATCH: "ORG_MISMATCH",
+  DESTINATION_CONFIG_MISSING: "DESTINATION_CONFIG_MISSING",
+  DESTINATION_CONFIG_MALFORMED: "DESTINATION_CONFIG_MALFORMED",
+  DESTINATION_NOT_ALLOWLISTED: "DESTINATION_NOT_ALLOWLISTED",
   REDIRECT_NOT_ALLOWLISTED: "REDIRECT_NOT_ALLOWLISTED",
   RATE_LIMITED: "RATE_LIMITED"
 });
@@ -76,6 +83,6 @@ module.exports = {
   OPEN_SCAN_STATUSES,
   SCAN_TTL_MS,
   NATURAL_WHATSAPP_PREFILL,
-  DEFAULT_WHATSAPP_E164,
+  WHATSAPP_E164_HARD_ALLOWLIST,
   REASON_CODES
 };

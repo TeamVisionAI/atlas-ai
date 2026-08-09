@@ -1,11 +1,12 @@
 /**
  * Allowlisted WhatsApp deep-link builder for QR Channel Phase 1.
  * Never accepts arbitrary redirect targets from query params.
+ * Never silently falls back to a hardcoded production number.
  */
 
 const {
   NATURAL_WHATSAPP_PREFILL,
-  DEFAULT_WHATSAPP_E164,
+  WHATSAPP_E164_HARD_ALLOWLIST,
   REASON_CODES
 } = require("./constants");
 
@@ -13,24 +14,81 @@ function digitsOnly(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+function isWellFormedWhatsAppE164(digits) {
+  return /^\d{10,15}$/.test(digits) && !digits.startsWith("0");
+}
+
+/**
+ * Build the explicit allowlist:
+ * - hard-coded approved Team Vision production digit(s)
+ * - optional extra digits from QR_CHANNEL_WHATSAPP_ALLOWLIST (comma-separated)
+ */
+function buildWhatsAppE164Allowlist(env = process.env) {
+  const allow = new Set(WHATSAPP_E164_HARD_ALLOWLIST);
+  const extra = String(env.QR_CHANNEL_WHATSAPP_ALLOWLIST || "")
+    .split(",")
+    .map((p) => digitsOnly(p))
+    .filter(Boolean);
+  for (const d of extra) {
+    if (isWellFormedWhatsAppE164(d)) {
+      allow.add(d);
+    }
+  }
+  return allow;
+}
+
+/**
+ * Resolve destination from campaign override or env — never from allowlist alone.
+ *
+ * Priority:
+ *   1. campaign.whatsapp_e164 when present
+ *   2. QR_CHANNEL_WHATSAPP_E164
+ *
+ * Missing / malformed / not-allowlisted → fail closed.
+ */
 function resolveAllowlistedWhatsAppE164({
   campaignWhatsAppE164 = null,
   env = process.env
 } = {}) {
-  const fromEnv = digitsOnly(env.QR_CHANNEL_WHATSAPP_E164 || "");
-  const fromCampaign = digitsOnly(campaignWhatsAppE164 || "");
-  const fallback = digitsOnly(DEFAULT_WHATSAPP_E164);
+  const allowlist = buildWhatsAppE164Allowlist(env);
+  const campaignDigits = digitsOnly(campaignWhatsAppE164 || "");
+  const envDigits = digitsOnly(env.QR_CHANNEL_WHATSAPP_E164 || "");
+  const rawConfigured = campaignWhatsAppE164 || env.QR_CHANNEL_WHATSAPP_E164;
+  const preferred = campaignDigits || envDigits;
 
-  const allowlist = new Set(
-    [fromEnv, fromCampaign, fallback].filter((d) => d && d.length >= 10 && d.length <= 15)
-  );
-
-  // Prefer campaign override when present and allowlisted; else env; else default.
-  const preferred = fromCampaign || fromEnv || fallback;
-  if (!allowlist.has(preferred)) {
-    return { ok: false, reasonCode: REASON_CODES.REDIRECT_NOT_ALLOWLISTED, e164: null };
+  if (!String(rawConfigured || "").trim()) {
+    return {
+      ok: false,
+      reasonCode: REASON_CODES.DESTINATION_CONFIG_MISSING,
+      e164: null,
+      allowlist
+    };
   }
-  return { ok: true, reasonCode: REASON_CODES.OK, e164: preferred, allowlist };
+
+  if (!preferred || !isWellFormedWhatsAppE164(preferred)) {
+    return {
+      ok: false,
+      reasonCode: REASON_CODES.DESTINATION_CONFIG_MALFORMED,
+      e164: null,
+      allowlist
+    };
+  }
+
+  if (!allowlist.has(preferred)) {
+    return {
+      ok: false,
+      reasonCode: REASON_CODES.DESTINATION_NOT_ALLOWLISTED,
+      e164: null,
+      allowlist
+    };
+  }
+
+  return {
+    ok: true,
+    reasonCode: REASON_CODES.OK,
+    e164: preferred,
+    allowlist
+  };
 }
 
 function buildWhatsAppRedirectUrl({
@@ -40,12 +98,16 @@ function buildWhatsAppRedirectUrl({
 } = {}) {
   const resolved = resolveAllowlistedWhatsAppE164({ campaignWhatsAppE164, env });
   if (!resolved.ok) {
-    return resolved;
+    return {
+      ok: false,
+      reasonCode: resolved.reasonCode,
+      e164: null,
+      url: null
+    };
   }
 
   const text = String(prefill ?? NATURAL_WHATSAPP_PREFILL);
   if (text !== NATURAL_WHATSAPP_PREFILL) {
-    // Phase 1 Mode A: only the approved natural sentence.
     return {
       ok: false,
       reasonCode: REASON_CODES.REDIRECT_NOT_ALLOWLISTED,
@@ -66,6 +128,8 @@ function buildWhatsAppRedirectUrl({
 
 module.exports = {
   digitsOnly,
+  isWellFormedWhatsAppE164,
+  buildWhatsAppE164Allowlist,
   resolveAllowlistedWhatsAppE164,
   buildWhatsAppRedirectUrl,
   NATURAL_WHATSAPP_PREFILL

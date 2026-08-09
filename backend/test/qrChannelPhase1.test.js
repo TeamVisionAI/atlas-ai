@@ -24,10 +24,12 @@ const {
   NATURAL_WHATSAPP_PREFILL,
   TEAM_VISION_ORG_ID,
   PRIMARY_RVP_USER_ID,
-  SCAN_TTL_MS
+  SCAN_TTL_MS,
+  WHATSAPP_E164_HARD_ALLOWLIST
 } = require("../core/qrChannel/constants");
 const {
   buildWhatsAppRedirectUrl,
+  resolveAllowlistedWhatsAppE164,
   digitsOnly
 } = require("../core/qrChannel/whatsappRedirect");
 const {
@@ -40,8 +42,16 @@ const qrGoRouter = require("../routes/qrGo");
 const ORG_B = "00000000-0000-4000-8000-000000000099";
 const OTHER_OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
+const CONFIGURED_ENV = Object.freeze({
+  QR_CHANNEL_WHATSAPP_E164: "17867528080",
+  QR_CHANNEL_BIND_SECRET: "test-secret"
+});
+
 async function seedCarMagnet(repo, overrides = {}) {
-  const service = createQrCampaignService({ repository: repo });
+  const service = createQrCampaignService({
+    repository: repo,
+    env: CONFIGURED_ENV
+  });
   const result = await service.seedCampaign({
     orgId: CAR_MAGNET_V1.orgId,
     ownerUserId: CAR_MAGNET_V1.ownerUserId,
@@ -56,6 +66,10 @@ async function seedCarMagnet(repo, overrides = {}) {
   assert.equal(result.created, true);
   assert.ok(result.publicToken);
   return result;
+}
+
+function serviceFor(repo, env = CONFIGURED_ENV) {
+  return createQrCampaignService({ repository: repo, env });
 }
 
 test("token crypto: hash is stable 64-hex; plaintext not reversible", () => {
@@ -91,10 +105,88 @@ test("wa.me builder: rejects non-approved prefill mutation", () => {
   assert.equal(built.ok, false);
 });
 
+test("destination: configured + allowlisted succeeds", () => {
+  const resolved = resolveAllowlistedWhatsAppE164({
+    env: { QR_CHANNEL_WHATSAPP_E164: "17867528080" }
+  });
+  assert.equal(resolved.ok, true);
+  assert.equal(resolved.e164, "17867528080");
+  assert.ok(WHATSAPP_E164_HARD_ALLOWLIST.includes("17867528080"));
+});
+
+test("destination: missing config fails closed (no hardcoded fallback)", () => {
+  const resolved = resolveAllowlistedWhatsAppE164({ env: {} });
+  assert.equal(resolved.ok, false);
+  assert.equal(resolved.reasonCode, REASON_CODES.DESTINATION_CONFIG_MISSING);
+  assert.equal(resolved.e164, null);
+  const built = buildWhatsAppRedirectUrl({ env: {} });
+  assert.equal(built.ok, false);
+  assert.equal(built.reasonCode, REASON_CODES.DESTINATION_CONFIG_MISSING);
+});
+
+test("destination: malformed config fails closed", () => {
+  const resolved = resolveAllowlistedWhatsAppE164({
+    env: { QR_CHANNEL_WHATSAPP_E164: "12" }
+  });
+  assert.equal(resolved.ok, false);
+  assert.equal(resolved.reasonCode, REASON_CODES.DESTINATION_CONFIG_MALFORMED);
+});
+
+test("destination: configured but non-allowlisted fails closed", () => {
+  const resolved = resolveAllowlistedWhatsAppE164({
+    env: { QR_CHANNEL_WHATSAPP_E164: "15551234567" }
+  });
+  assert.equal(resolved.ok, false);
+  assert.equal(resolved.reasonCode, REASON_CODES.DESTINATION_NOT_ALLOWLISTED);
+});
+
+test("destination: hard allowlist entry alone is not used as destination", () => {
+  // Even though 17867528080 is allowlisted, missing env/campaign config must fail.
+  assert.ok(WHATSAPP_E164_HARD_ALLOWLIST.includes("17867528080"));
+  const resolved = resolveAllowlistedWhatsAppE164({ env: { QR_CHANNEL_WHATSAPP_ALLOWLIST: "17867528080" } });
+  assert.equal(resolved.ok, false);
+  assert.equal(resolved.reasonCode, REASON_CODES.DESTINATION_CONFIG_MISSING);
+});
+
+test("entry: missing destination blocks GET path before scan create", async () => {
+  const repo = createMemoryQrChannelRepository();
+  const seeded = await seedCarMagnet(repo);
+  const service = serviceFor(repo, { QR_CHANNEL_BIND_SECRET: "test-secret" });
+  const entry = await service.startPublicEntry(seeded.publicToken);
+  assert.equal(entry.ok, false);
+  assert.equal(entry.reasonCode, REASON_CODES.DESTINATION_CONFIG_MISSING);
+  assert.equal(repo._dump().scans.length, 0);
+});
+
+test("bind: destination failure leaves scan pending_phone (no supersede)", async () => {
+  const repo = createMemoryQrChannelRepository();
+  const seeded = await seedCarMagnet(repo, { whatsappE164: "17867528080" });
+  const serviceOk = serviceFor(repo, CONFIGURED_ENV);
+  const entry = await serviceOk.startPublicEntry(seeded.publicToken);
+  assert.equal(entry.ok, true);
+
+  await repo.updateCampaign(seeded.campaign.id, { whatsapp_e164: null });
+
+  const serviceBad = serviceFor(repo, {
+    QR_CHANNEL_BIND_SECRET: "test-secret"
+  });
+  const bind = await serviceBad.bindPhoneAndRedirect({
+    scanId: entry.scan.id,
+    bindMac: entry.bindMac,
+    rawPhone: "3055550199",
+    expectedOrgId: TEAM_VISION_ORG_ID
+  });
+  assert.equal(bind.ok, false);
+  assert.equal(bind.reasonCode, REASON_CODES.DESTINATION_CONFIG_MISSING);
+  const after = await repo.findScanById(entry.scan.id);
+  assert.equal(after.status, SCAN_STATUS.PENDING_PHONE);
+  assert.equal(after.bound_phone_normalized, null);
+});
+
 test("campaign: valid token resolves and creates pending_phone scan", async () => {
   const repo = createMemoryQrChannelRepository();
   const seeded = await seedCarMagnet(repo);
-  const service = createQrCampaignService({ repository: repo });
+  const service = serviceFor(repo);
   const entry = await service.startPublicEntry(seeded.publicToken);
   assert.equal(entry.ok, true);
   assert.equal(entry.scan.status, SCAN_STATUS.PENDING_PHONE);
@@ -110,7 +202,7 @@ test("campaign: valid token resolves and creates pending_phone scan", async () =
 test("campaign: unknown token fails closed (same class as invalid)", async () => {
   const repo = createMemoryQrChannelRepository();
   await seedCarMagnet(repo);
-  const service = createQrCampaignService({ repository: repo });
+  const service = serviceFor(repo);
   const entry = await service.startPublicEntry(generatePublicToken());
   assert.equal(entry.ok, false);
   assert.equal(entry.reasonCode, REASON_CODES.TOKEN_INVALID);
@@ -118,7 +210,7 @@ test("campaign: unknown token fails closed (same class as invalid)", async () =>
 
 test("campaign: inactive campaign fails safely", async () => {
   const repo = createMemoryQrChannelRepository();
-  const service = createQrCampaignService({ repository: repo });
+  const service = serviceFor(repo);
   const created = await service.seedCampaign({
     orgId: CAR_MAGNET_V1.orgId,
     ownerUserId: CAR_MAGNET_V1.ownerUserId,
@@ -151,7 +243,7 @@ test("campaign: owner missing fails closed", async () => {
     status: CAMPAIGN_STATUS.ACTIVE,
     destination_channel: "whatsapp"
   });
-  const service = createQrCampaignService({ repository: repo });
+  const service = serviceFor(repo);
   const entry = await service.startPublicEntry(token);
   assert.equal(entry.ok, false);
   assert.equal(entry.reasonCode, REASON_CODES.OWNER_MISSING);
@@ -160,7 +252,7 @@ test("campaign: owner missing fails closed", async () => {
 test("campaign: cross-org token cannot be rebound to another org", async () => {
   const repo = createMemoryQrChannelRepository();
   const seeded = await seedCarMagnet(repo);
-  const service = createQrCampaignService({ repository: repo });
+  const service = serviceFor(repo);
   const entry = await service.startPublicEntry(seeded.publicToken);
   const bind = await service.bindPhoneAndRedirect({
     scanId: entry.scan.id,
@@ -175,10 +267,7 @@ test("campaign: cross-org token cannot be rebound to another org", async () => {
 test("scan: bind valid phone → pending_inbound + wa.me redirect", async () => {
   const repo = createMemoryQrChannelRepository();
   const seeded = await seedCarMagnet(repo);
-  const service = createQrCampaignService({
-    repository: repo,
-    env: { QR_CHANNEL_WHATSAPP_E164: "17867528080", QR_CHANNEL_BIND_SECRET: "test-secret" }
-  });
+  const service = serviceFor(repo);
   const entry = await service.startPublicEntry(seeded.publicToken);
   const bind = await service.bindPhoneAndRedirect({
     scanId: entry.scan.id,
@@ -197,10 +286,7 @@ test("scan: bind valid phone → pending_inbound + wa.me redirect", async () => 
 test("scan: reject invalid phone", async () => {
   const repo = createMemoryQrChannelRepository();
   const seeded = await seedCarMagnet(repo);
-  const service = createQrCampaignService({
-    repository: repo,
-    env: { QR_CHANNEL_BIND_SECRET: "test-secret" }
-  });
+  const service = serviceFor(repo);
   const entry = await service.startPublicEntry(seeded.publicToken);
   const bind = await service.bindPhoneAndRedirect({
     scanId: entry.scan.id,
@@ -215,10 +301,7 @@ test("scan: reject invalid phone", async () => {
 test("scan: supersede previous pending for same org+phone", async () => {
   const repo = createMemoryQrChannelRepository();
   const seeded = await seedCarMagnet(repo);
-  const service = createQrCampaignService({
-    repository: repo,
-    env: { QR_CHANNEL_BIND_SECRET: "test-secret", QR_CHANNEL_WHATSAPP_E164: "17867528080" }
-  });
+  const service = serviceFor(repo);
   const first = await service.startPublicEntry(seeded.publicToken);
   await service.bindPhoneAndRedirect({
     scanId: first.scan.id,
@@ -242,10 +325,7 @@ test("scan: supersede previous pending for same org+phone", async () => {
 
 test("scan: does not supersede another org pending phone", async () => {
   const repo = createMemoryQrChannelRepository();
-  const service = createQrCampaignService({
-    repository: repo,
-    env: { QR_CHANNEL_BIND_SECRET: "test-secret", QR_CHANNEL_WHATSAPP_E164: "17867528080" }
-  });
+  const service = serviceFor(repo);
   const a = await service.seedCampaign({
     orgId: TEAM_VISION_ORG_ID,
     ownerUserId: PRIMARY_RVP_USER_ID,
@@ -292,7 +372,7 @@ test("scan: expired cannot bind", async () => {
   const seeded = await seedCarMagnet(repo);
   const service = createQrCampaignService({
     repository: repo,
-    env: { QR_CHANNEL_BIND_SECRET: "test-secret" },
+    env: CONFIGURED_ENV,
     nowFn: () => new Date(frozen)
   });
   const entry = await service.startPublicEntry(seeded.publicToken);
@@ -312,7 +392,7 @@ test("scan: expired cannot bind", async () => {
 test("security: forged query params ignored — resolve uses token only", async () => {
   const repo = createMemoryQrChannelRepository();
   const seeded = await seedCarMagnet(repo);
-  const service = createQrCampaignService({ repository: repo });
+  const service = serviceFor(repo);
   const entry = await service.startPublicEntry(seeded.publicToken);
   assert.equal(entry.campaign.source, "car_magnet");
   assert.equal(entry.campaign.campaign_key, "car_recruiting_01");
@@ -375,7 +455,7 @@ test("HTTP: GET /go/:token renders interstitial; POST bind redirects to wa.me", 
 
 test("HTTP: unknown token returns safe 404 page", async () => {
   const repo = createMemoryQrChannelRepository();
-  const service = createQrCampaignService({ repository: repo });
+  const service = serviceFor(repo);
   qrGoRouter.setTestService(service);
   const app = express();
   app.use("/go", qrGoRouter);

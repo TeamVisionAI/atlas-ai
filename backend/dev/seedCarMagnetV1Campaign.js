@@ -22,16 +22,33 @@ const {
 const {
   createSupabaseQrChannelRepository
 } = require("../core/qrChannel/supabaseQrChannelRepository");
-const { CAR_MAGNET_V1, DEFAULT_WHATSAPP_E164 } = require("../core/qrChannel/constants");
+const { CAR_MAGNET_V1 } = require("../core/qrChannel/constants");
+const { resolveAllowlistedWhatsAppE164 } = require("../core/qrChannel/whatsappRedirect");
 
 async function main() {
   const repo = createSupabaseQrChannelRepository();
   const service = createQrCampaignService({ repository: repo });
 
-  const whatsappE164 =
-    String(process.env.QR_CHANNEL_WHATSAPP_E164 || "")
-      .replace(/\D/g, "")
-      .trim() || DEFAULT_WHATSAPP_E164;
+  const destination = resolveAllowlistedWhatsAppE164({
+    env: process.env
+  });
+  if (!destination.ok) {
+    console.error(
+      JSON.stringify(
+        {
+          ok: false,
+          reasonCode: destination.reasonCode,
+          message:
+            "Set QR_CHANNEL_WHATSAPP_E164 to an allowlisted digits-only WhatsApp number before seeding. No silent production fallback is used."
+        },
+        null,
+        2
+      )
+    );
+    process.exit(1);
+  }
+
+  const whatsappE164 = destination.e164;
 
   const result = await service.seedCampaign({
     orgId: CAR_MAGNET_V1.orgId,
