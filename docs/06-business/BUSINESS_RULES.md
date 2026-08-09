@@ -1358,7 +1358,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 1. **Deferred preserves proposal** — `appointment_confirm_deferred` keeps `appointment.status=proposed`, exact `proposedDate`/`proposedTime`, `lastQuestionAsked=confirm_slot`, `lastProspectIntent=schedule_confirm`, and `lastOfferMade=appointment_confirm_deferred` (plus outbound text when authored).
 2. **Later affirmative resumes create** — With that durable state, bare `Si`/`Yes` classifies as `schedule_confirm` and decides `create_appointment` (execution still env-gated).
 3. **No CE fallthrough on confirmable proposed** — Authoring timeout/empty/technical failure or cancelled create rollback must not hand the turn to legacy CE while a confirmable proposal remains; V2 owns soft failure (`appointment_create_failed`) or successful reclaim (BR-125) instead.
-4. **Affirmatives are not cities** — Location extractors must not treat bare affirmatives as city names while confirmation is pending.
+4. **Affirmatives are not cities** — Location extractors must not treat bare affirmatives as city names while confirmation is pending. Soft-acks (`ok` / `okay`) while availability is pending remain `soft_acknowledgement` — they must not be forced into `schedule_confirm` solely because appointment status is `proposed`.
 5. **Exact slot authoritative** — Do not invent a different slot; reuse the proposed offered slot.
 6. **Execution OFF** — Deferred path still creates zero appointments / Calendar events.
 7. **Boundaries** — Does not broaden execution allowlists; does not auto-cleanup cancelled canary rows; Calendar rollback root causes remain separate from this continuity rule; does not change BR-127 qualification sync.
