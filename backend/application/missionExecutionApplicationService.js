@@ -241,6 +241,25 @@ async function rollbackScheduleBooking(bookingResult, organizationId, prospect, 
   } catch (error) {
     rollbackErrors.push(`calendar: ${error.message}`);
     console.error("[missionExecution] rollback calendar failed:", error.message, context);
+    try {
+      const {
+        EVENTS,
+        emitRecruitAiV2Signal
+      } = require("../core/recruitAiV2/stage1Observability");
+      emitRecruitAiV2Signal(EVENTS.CALENDAR_ROLLBACK_FAILED, {
+        organizationId: organizationId || context?.organizationId || null,
+        phone: prospect?.phone || context?.phone || null,
+        appointmentId: context?.appointmentId || null,
+        calendarEventId: bookingResult?.googleCalendarEventId || null,
+        phase: context?.phase || null,
+        reasonCodes: ["CALENDAR_ROLLBACK_FAILED"],
+        detail: String(error.message || "").slice(0, 200),
+        outcome: "failure",
+        level: "error"
+      });
+    } catch {
+      // ignore
+    }
   }
 
   try {
@@ -270,6 +289,29 @@ async function rollbackScheduleBooking(bookingResult, organizationId, prospect, 
 async function rollbackPersistedAppointment(appointmentRecord, organizationId, agentId, context = {}) {
   if (!appointmentRecord?.id) {
     return;
+  }
+
+  try {
+    const {
+      EVENTS,
+      emitRecruitAiV2Signal
+    } = require("../core/recruitAiV2/stage1Observability");
+    emitRecruitAiV2Signal(EVENTS.SCHEDULE_WORKFLOW_ROLLBACK, {
+      organizationId: organizationId || null,
+      agentId: agentId || null,
+      appointmentId: appointmentRecord.id,
+      calendarEventId:
+        appointmentRecord.calendar_event_id ||
+        appointmentRecord.calendarEventId ||
+        null,
+      phase: context.phase || null,
+      reasonCodes: [context.reason || "schedule_workflow_rollback"],
+      decisionCode: "create_appointment",
+      outcome: "rollback",
+      level: "warn"
+    });
+  } catch {
+    // ignore
   }
 
   try {
@@ -491,6 +533,25 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
       timezone: payload.timezone || "America/New_York"
     });
   } catch (calendarError) {
+    try {
+      const {
+        EVENTS,
+        emitRecruitAiV2Signal
+      } = require("../core/recruitAiV2/stage1Observability");
+      emitRecruitAiV2Signal(EVENTS.CALENDAR_CREATE_FAILED, {
+        organizationId,
+        agentId: scheduleAgentId || null,
+        phone,
+        prospectId: options.recruitAiV2CoreProspectId || null,
+        decisionCode: "create_appointment",
+        reasonCodes: ["CALENDAR_FAILED"],
+        detail: String(calendarError.message || "").slice(0, 200),
+        outcome: "failure",
+        level: "error"
+      });
+    } catch {
+      // ignore
+    }
     return buildActionError(
       ACTION_IDS.SCHEDULE,
       "CALENDAR_FAILED",
@@ -516,6 +577,26 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     await rollbackBooking(bookingResult, organizationId, prospect, {
       phase: "calendar_validation"
     });
+
+    try {
+      const {
+        EVENTS,
+        emitRecruitAiV2Signal
+      } = require("../core/recruitAiV2/stage1Observability");
+      emitRecruitAiV2Signal(EVENTS.CALENDAR_CREATE_FAILED, {
+        organizationId,
+        agentId: scheduleAgentId || null,
+        phone,
+        prospectId: options.recruitAiV2CoreProspectId || null,
+        decisionCode: "create_appointment",
+        reasonCodes: ["CALENDAR_FAILED"],
+        detail: "connected_but_missing_event_id",
+        outcome: "failure",
+        level: "error"
+      });
+    } catch {
+      // ignore
+    }
 
     return buildActionError(
       ACTION_IDS.SCHEDULE,

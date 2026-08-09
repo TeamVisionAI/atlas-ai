@@ -244,7 +244,11 @@ describe("BR-126 deferred confirm resumability", () => {
             };
           },
           findActiveAppointmentForProspect: async () => null,
-          getAppointmentProfile: async () => ({ profileConfigured: true })
+          getAppointmentProfile: async () => ({ profileConfigured: true }),
+          // Hermetic: do not depend on live Calendar availability for this unit path.
+          getSlots: async () => ({
+            slots: [{ date: DATE, time: TIME, dateKey: DATE, timeKey: TIME }]
+          })
         }
       }
     });

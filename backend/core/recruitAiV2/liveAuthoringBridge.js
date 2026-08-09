@@ -117,6 +117,18 @@ async function reclaimOwnershipAfterAuthoringLoss({
   findActiveAppointment = null,
   logStage = null
 } = {}) {
+  let EVENTS = null;
+  let emitRecruitAiV2Signal = () => false;
+  let resolveCalendarEventId = () => null;
+  try {
+    const obs = require("./stage1Observability");
+    EVENTS = obs.EVENTS;
+    emitRecruitAiV2Signal = obs.emitRecruitAiV2Signal;
+    resolveCalendarEventId = obs.resolveCalendarEventId;
+  } catch {
+    // Telemetry optional — reclaim ownership must continue.
+  }
+
   let late = v2Result;
   if (!late && typeof error?.awaitTracked === "function") {
     try {
@@ -159,20 +171,42 @@ async function reclaimOwnershipAfterAuthoringLoss({
     late?.context?.agentId ||
     prospect.owner_user_id ||
     null;
+  const phone = prospect.phone || normalized.phone || null;
+  const durableStatus =
+    late?.nextContext?.appointment?.status ||
+    late?.context?.appointment?.status ||
+    null;
+
+  emitRecruitAiV2Signal(
+    EVENTS?.BR125_RECLAIM_ATTEMPTED ||
+      "recruit_ai_v2.br125.reclaim.attempted",
+    {
+      organizationId,
+      agentId,
+      prospectId,
+      phone,
+      decisionCode: "create_appointment",
+      correlationId: normalized.providerMessageId || null,
+      allowExecution,
+      outcome: "attempted",
+      detail: error?.code || null
+    },
+    { logStage }
+  );
 
   const finder =
     findActiveAppointment ||
-    (async (phone, orgId, agent) => {
+    (async (phoneArg, orgId, agent) => {
       const {
         findActiveAppointmentForProspect
       } = require("../activeAppointmentResolver");
-      return findActiveAppointmentForProspect(phone, orgId, agent);
+      return findActiveAppointmentForProspect(phoneArg, orgId, agent);
     });
 
   const ownership = await resolvePostCreateOwnership({
     v2Result: late,
     findActiveAppointment: finder,
-    prospectPhone: prospect.phone || normalized.phone || null,
+    prospectPhone: phone,
     organizationId,
     prospectId,
     agentId,
@@ -184,7 +218,70 @@ async function reclaimOwnershipAfterAuthoringLoss({
   });
 
   if (!ownership.owned || !ownership.replyText) {
+    emitRecruitAiV2Signal(
+      EVENTS?.BR125_RECLAIM_FAILED || "recruit_ai_v2.br125.reclaim.failed",
+      {
+        organizationId,
+        agentId,
+        prospectId,
+        phone,
+        decisionCode: "create_appointment",
+        correlationId: normalized.providerMessageId || null,
+        reasonCodes: [ownership?.reason || "RECLAIM_FAILED"],
+        allowExecution,
+        outcome: "failed",
+        detail: ownership?.reason || null
+      },
+      { logStage }
+    );
+
+    if (
+      String(durableStatus).toLowerCase() === "confirmed" &&
+      (ownership?.reason === "NO_ACTIVE" || ownership?.reason === "LOOKUP_FAILED")
+    ) {
+      emitRecruitAiV2Signal(
+        EVENTS?.MISMATCH_DURABLE_CONFIRMED_NO_ACTIVE ||
+          "recruit_ai_v2.mismatch.durable_confirmed_no_active",
+        {
+          organizationId,
+          agentId,
+          prospectId,
+          phone,
+          appointmentId: late?.nextContext?.appointment?.appointmentId || null,
+          decisionCode: "create_appointment",
+          correlationId: normalized.providerMessageId || null,
+          reasonCodes: [ownership?.reason || "NO_ACTIVE"],
+          outcome: "mismatch"
+        },
+        { logStage }
+      );
+    }
+
     return null;
+  }
+
+  if (
+    ownership.source === "active_appointment_reconcile" &&
+    String(durableStatus || "").toLowerCase() !== "confirmed"
+  ) {
+    emitRecruitAiV2Signal(
+      EVENTS?.MISMATCH_ACTIVE_UNCONFIRMED_DURABLE ||
+        "recruit_ai_v2.mismatch.active_unconfirmed_durable",
+      {
+        organizationId,
+        agentId,
+        prospectId,
+        phone,
+        appointmentId: ownership.appointmentId,
+        calendarEventId: resolveCalendarEventId(ownership.appointment),
+        decisionCode: "create_appointment",
+        correlationId: normalized.providerMessageId || null,
+        reasonCodes: ["ACTIVE_PRESENT_DURABLE_NOT_CONFIRMED"],
+        outcome: "mismatch",
+        source: ownership.source
+      },
+      { logStage }
+    );
   }
 
   if (persistence && ownership.nextContext && organizationId) {
@@ -204,7 +301,7 @@ async function reclaimOwnershipAfterAuthoringLoss({
         nextContext: ownership.nextContext,
         inboundMessageId: normalized.providerMessageId || null,
         decisionCode: "create_appointment",
-        prospectPhone: prospect.phone || normalized.phone || null,
+        prospectPhone: phone,
         legacyProspectId: prospect.id || null,
         ensureCore: true
       });
@@ -213,9 +310,28 @@ async function reclaimOwnershipAfterAuthoringLoss({
     }
   }
 
+  emitRecruitAiV2Signal(
+    EVENTS?.BR125_RECLAIM_SUCCEEDED ||
+      "recruit_ai_v2.br125.reclaim.succeeded",
+    {
+      organizationId,
+      agentId,
+      prospectId,
+      phone,
+      appointmentId: ownership.appointmentId,
+      calendarEventId: resolveCalendarEventId(ownership.appointment),
+      decisionCode: "create_appointment",
+      correlationId: normalized.providerMessageId || null,
+      allowExecution,
+      outcome: "succeeded",
+      source: ownership.source
+    },
+    { logStage }
+  );
+
   if (typeof logStage === "function") {
     logStage(STAGES.OWNED_AFTER_MUTATION, {
-      phone: normalized.phone || prospect.phone || null,
+      phone,
       organizationId,
       agentId: actingUserId,
       allowExecution,
@@ -726,6 +842,27 @@ async function attemptLiveV2Authoring({
           nextAction
         });
       }
+      if (nextAction === "create_appointment") {
+        try {
+          const { EVENTS, emitRecruitAiV2Signal } = require("./stage1Observability");
+          emitRecruitAiV2Signal(
+            EVENTS.CE_FALLTHROUGH_AFTER_V2_OWNERSHIP,
+            {
+              organizationId,
+              agentId: actingUserId,
+              phone: normalized.phone || prospect.phone || null,
+              decisionCode: nextAction,
+              correlationId: normalized.providerMessageId || null,
+              allowExecution,
+              reasonCodes: ["EMPTY_OR_UNSAFE_REPLY"],
+              outcome: "ce_fallthrough"
+            },
+            { logStage }
+          );
+        } catch {
+          // ignore
+        }
+      }
       return {
         eligible: true,
         authored: false,
@@ -796,6 +933,34 @@ async function attemptLiveV2Authoring({
         reason,
         error: String(error?.message || error).slice(0, 200)
       });
+    }
+    try {
+      const lateNext =
+        (typeof error?.getLateResult === "function"
+          ? error.getLateResult()?.structuredDecision?.decision?.nextAction
+          : null) || null;
+      if (
+        reason === "LIVE_AUTHORING_TIMEOUT" ||
+        lateNext === "create_appointment"
+      ) {
+        const { EVENTS, emitRecruitAiV2Signal } = require("./stage1Observability");
+        emitRecruitAiV2Signal(
+          EVENTS.CE_FALLTHROUGH_AFTER_V2_OWNERSHIP,
+          {
+            organizationId,
+            agentId: actingUserId,
+            phone: normalized.phone || prospect.phone || null,
+            decisionCode: lateNext || "create_appointment",
+            correlationId: normalized.providerMessageId || null,
+            allowExecution,
+            reasonCodes: [reason],
+            outcome: "ce_fallthrough"
+          },
+          { logStage }
+        );
+      }
+    } catch {
+      // ignore
     }
 
     return {

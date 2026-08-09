@@ -570,6 +570,42 @@ async function processRecruitAiV2Turn({
       responsePlan = applied.responsePlan;
       rendered = applied.rendered;
     }
+  } else {
+    // Stage-1 telemetry only — gate vs authz (does not change execution semantics).
+    try {
+      const nextAction = structuredDecision?.decision?.nextAction || null;
+      if (nextAction === "create_appointment") {
+        const {
+          EVENTS,
+          emitRecruitAiV2Signal
+        } = require("./stage1Observability");
+        const base = {
+          organizationId: organizationId || loaded.organizationId || null,
+          agentId: actingUserId || null,
+          prospectId: prospectId || loaded.prospectId || null,
+          phone: prospectPhone || loaded.prospectPhone || null,
+          decisionCode: nextAction,
+          correlationId: inboundMessageId || null
+        };
+        if (options.allowExecution !== true) {
+          emitRecruitAiV2Signal(EVENTS.EXECUTION_GATE_DISABLED, {
+            ...base,
+            allowExecution: false,
+            reasonCodes: ["ALLOW_EXECUTION_FALSE_OR_LIVE_PATH_OFF"],
+            outcome: "gate_disabled"
+          });
+        } else if (authorization.authorized !== true) {
+          emitRecruitAiV2Signal(EVENTS.EXECUTION_AUTHZ_DENIED, {
+            ...base,
+            allowExecution: true,
+            reasonCodes: authorization.denyReasons || ["EXECUTION_DENIED"],
+            outcome: "authz_denied"
+          });
+        }
+      }
+    } catch {
+      // Telemetry must never affect turns.
+    }
   }
 
   let nextContext = buildNextContextFromInterpretation({
