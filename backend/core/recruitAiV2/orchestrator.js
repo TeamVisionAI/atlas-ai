@@ -123,6 +123,7 @@ async function processNonTextMediaTurn({
     prospectId &&
     options.persistContext !== false
   ) {
+    // Implements BR-120 — dual-load / core-keyed create via phone + legacy fallback.
     persistenceResult = await persistenceService.compareAndSaveContext({
       organizationId,
       prospectId,
@@ -131,7 +132,10 @@ async function processNonTextMediaTurn({
       nextContext,
       inboundMessageId,
       decisionCode: structuredDecision.decision?.nextAction || null,
-      prospectClosed: Boolean(options.prospectClosed)
+      prospectClosed: Boolean(options.prospectClosed),
+      prospectPhone: options.prospectPhone || loaded.prospectPhone || null,
+      legacyProspectId: options.legacyProspectId || null,
+      ensureCore: options.ensureCoreIdentity !== false
     });
     if (persistenceResult?.context) {
       nextContext = persistenceResult.context;
@@ -398,6 +402,16 @@ async function processRecruitAiV2Turn({
     options.inboundMessageId ||
     null;
   const env = options.env || process.env;
+  // Implements BR-120 — phone + legacy id enable dual-load of durable context.
+  const prospectPhone =
+    options.prospectPhone ||
+    context?.prospectPhone ||
+    contextInput?.prospectPhone ||
+    null;
+  const legacyProspectId =
+    options.legacyProspectId ||
+    contextInput?.legacyProspectId ||
+    null;
 
   let loaded = context || null;
   let persistenceSource = context?._persistence ? "persisted" : "provided";
@@ -407,7 +421,10 @@ async function processRecruitAiV2Turn({
       organizationId,
       prospectId,
       channel,
-      reconstructionInput: contextInput || {}
+      reconstructionInput: contextInput || {},
+      prospectPhone,
+      legacyProspectId,
+      ensureCore: options.ensureCoreIdentity === true
     });
     loaded = loadedOrRebuilt.context;
     persistenceSource = loadedOrRebuilt.source;
@@ -565,6 +582,7 @@ async function processRecruitAiV2Turn({
     prospectId &&
     options.persistContext !== false
   ) {
+    // Implements BR-120 — dual-load / core-keyed create via phone + legacy fallback.
     persistenceResult = await persistenceService.compareAndSaveContext({
       organizationId,
       prospectId,
@@ -573,7 +591,10 @@ async function processRecruitAiV2Turn({
       nextContext,
       inboundMessageId,
       decisionCode: structuredDecision.decision?.nextAction || null,
-      prospectClosed: Boolean(options.prospectClosed)
+      prospectClosed: Boolean(options.prospectClosed),
+      prospectPhone,
+      legacyProspectId,
+      ensureCore: options.ensureCoreIdentity !== false
     });
 
     if (persistenceResult?.context) {

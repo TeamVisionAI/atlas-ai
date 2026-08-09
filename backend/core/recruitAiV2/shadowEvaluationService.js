@@ -63,6 +63,9 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
   return {
     organizationId: extras.organizationId || prospect.organization_id || null,
     prospectId: extras.prospectId || prospect.id || null,
+    // Implements BR-120 — phone + legacy enable dual-load of durable context.
+    prospectPhone: extras.prospectPhone || prospect.phone || null,
+    legacyProspectId: extras.legacyProspectId || null,
     preferredLanguage,
     // Prospect-seeded language is inferred/default — mutable by active conversation (BR-082).
     languageMeta: {
@@ -208,6 +211,8 @@ function createShadowEvaluationService({
     const reconstructionInput = buildReconstructionInput(prospect, {
       organizationId: orgId,
       prospectId,
+      prospectPhone: prospect?.phone || null,
+      legacyProspectId: prospectId,
       needsHumanAttention: conversation?.humanAssist === true
     });
 
@@ -235,6 +240,9 @@ function createShadowEvaluationService({
           inboundMessageId: inboundMessageId || null,
           persistContext: Boolean(persistenceService),
           prospectClosed: Boolean(reconstructionInput.prospectClosed),
+          prospectPhone: prospect?.phone || null,
+          legacyProspectId: prospectId,
+          ensureCoreIdentity: false,
           env: options.env || process.env,
           // BR-112 — shadow must never request live execution.
           allowExecution: false

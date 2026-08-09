@@ -27,6 +27,9 @@ const {
   createContextPersistenceService
 } = require("./contextPersistenceService");
 const {
+  resolveCanonicalProspectIdentity
+} = require("../recruitingProspectBridge");
+const {
   createSupabaseContextRepository,
   createMemoryContextRepository
 } = require("./contextRepository");
@@ -158,9 +161,33 @@ async function attemptLiveV2Authoring({
     dependencies.persistenceService ||
     createDefaultPersistenceService();
 
+  // Implements BR-120 — durable context keys on core UUID; dual-load legacy-keyed actives.
+  const prospectPhone = prospect.phone || normalized.phone || null;
+  let canonicalProspectId = prospect.id || null;
+  let legacyProspectId = prospect.id || null;
+  try {
+    const identity = await resolveCanonicalProspectIdentity({
+      phone: prospectPhone,
+      organizationId,
+      displayName: prospect.name || null,
+      legacyProspectId: prospect.id || null,
+      ensureCore: true
+    });
+    if (identity.coreProspectId) {
+      canonicalProspectId = identity.coreProspectId;
+    }
+    if (identity.legacyProspectId) {
+      legacyProspectId = identity.legacyProspectId;
+    }
+  } catch {
+    // Fail soft to legacy id — persistence dual-load still helps when phone is present.
+  }
+
   const contextInput = buildReconstructionInput(prospect, {
     organizationId,
-    prospectId: prospect.id || null,
+    prospectId: canonicalProspectId,
+    prospectPhone,
+    legacyProspectId,
     timezone: "America/New_York"
   });
 
@@ -181,11 +208,13 @@ async function attemptLiveV2Authoring({
           flexible: true,
           allowExecution,
           persistContext: true,
+          ensureCoreIdentity: true,
           env,
           actingUserId,
           agentId: actingUserId,
           organizationId,
-          prospectPhone: prospect.phone || normalized.phone || null,
+          prospectPhone,
+          legacyProspectId,
           inboundMessageId: normalized.providerMessageId || null,
           messageType: normalized.messageType || null,
           dependencies: {

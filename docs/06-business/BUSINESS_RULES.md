@@ -1297,6 +1297,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-120 — Canonical Prospect Identity Bridge (Legacy ↔ Core)
+
+**Implements:** One phone maps to one canonical core prospect UUID for cross-system FK/keys while legacy `prospects` remains the WhatsApp phone profile/cache  
+**Domain:** Prospects / Recruit AI v2 durable context / Appointments  
+**Depends on:** BR-039, BR-049, BR-081  
+**Related:** BR-121 / BR-122 / BR-123 (incident exposed dual UUID; those rules defer identity bridging to BR-120)  
+**Status:** Implemented (map-only + dual-load; no mass DB rewrite)  
+**Engine target:** `recruitingProspectBridge.js` (`resolveCanonicalProspectIdentity`); `recruitAiV2/contextPersistenceService.js`; `appointmentApplicationService.createAppointment`  
+**Tests:** `backend/test/prospectIdentityBridgeBr120.test.js`
+
+### Rules
+
+1. **Core is system of record** — `atlas_core_prospects.id` is the canonical prospect identity for appointment `prospect_id` and **new** durable context rows.
+2. **Legacy remains phone profile/cache** — WhatsApp resolution and phone-keyed workflow may continue using legacy `prospects.id` / phone until LC2 consolidation.
+3. **Shared resolver** — Prefer `resolveCanonicalProspectIdentity({ phone, organizationId, … })` returning `{ coreProspectId, legacyProspectId, phone, organizationId }` rather than ad-hoc dual lookups.
+4. **Durable context dual-load** — Load active context by **core first, then legacy** for the same phone/org/channel. Prefer an existing active row over creating a second active for the same person.
+5. **New context creates use core** — First persist for a phone/org/channel writes `prospect_id = coreProspectId` when core can be resolved/ensured.
+6. **No mass rewrite in this rule** — Do not bulk-update existing `recruit_ai_conversation_contexts.prospect_id` from legacy→core. Compare-and-save continues updating the **loaded row id** (may remain legacy-keyed) while JSON `prospectId` may reflect core.
+7. **Appointment FK stays core** — Never rewrite `atlas_appointments.prospect_id` to legacy to “match” WhatsApp. If core is missing at create, `ensureCoreProspectForLegacyLead` then set FK.
+8. **Workflow remains phone-keyed** — `advanceProspectWorkflow` / schedule side effects continue on phone + legacy profile fields (occupation, city, etc.).
+9. **Boundaries** — Does not enable BR-111 execution, change live authoring allowlists, Calendar cancel semantics (BR-121), schedule reconcile (BR-122), or occupation optional rules (BR-123).
+
+---
+
 ## BR-123 — Occupation Optional for Interview Scheduling
 
 **Implements:** Correct BR-037 milestone field lists so missing occupation cannot block interview readiness, scheduling advancement, or schedule-interview mission completion  
@@ -1313,7 +1337,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **Do not prompt or fail closed** on missing occupation during schedule-interview mission advancement to `INTERVIEW_SCHEDULED`.
 3. **Qualification gates unchanged** for city / state / work authorization where still required by BR-037.
 4. **Capture still allowed** — when occupation is already known or later provided, preserve/store it; absence alone must not block advancement or become a required clarification.
-5. **Boundaries** — Does not change prospect identity bridging, BR-111 execution gates, timezone behavior, live authoring allowlists, or BR-122 reconcile semantics.
+5. **Boundaries** — Does not change prospect identity bridging (BR-120), BR-111 execution gates, timezone behavior, live authoring allowlists, or BR-122 reconcile semantics.
 
 ---
 
@@ -1336,7 +1360,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 6. **Atlas appointment is customer booking truth** — Calendar cancelled/absent/unknown does not revoke a live Atlas scheduled appointment for reconcile-vs-failure classification (Calendar cleanup remains BR-121).
 7. **No second lifecycle** — Do not create a replacement appointment during reconciliation.
 8. **Occupation unchanged** — Does not add or require occupation for scheduling (occupation BR-037 correction is a separate PR).
-9. **Boundaries** — Does not change prospect identity bridging, BR-111 allowlists, timezone conversion math, or live authoring. Execution remains env-gated OFF until separately authorized.
+9. **Boundaries** — Does not change prospect identity bridging (BR-120), BR-111 allowlists, timezone conversion math, or live authoring. Execution remains env-gated OFF until separately authorized.
 
 ---
 
@@ -1358,7 +1382,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Reconcile linkage** — On successful domain cancel, clear `calendar_event_id` / `calendarEventId` (and prospect schedule cache calendar fields) appropriately.
 5. **Single cancel lifecycle** — Do not invent a second cancellation lifecycle. Double-delete during rollback (mission calendar cleanup then appointment cancel cleanup) must be idempotent/harmless.
 6. **Central classification** — Reuse `googleCalendarAbsence.isMissingGoogleEventError` / `isAlreadyAbsentGoogleEventError`. Do not duplicate string/status parsing across services.
-7. **Boundaries** — Does not change prospect identity bridging, occupation/milestone validation, booking response reconciliation, live authoring allowlists, BR-111 execution gates, or timezone behavior.
+7. **Boundaries** — Does not change prospect identity bridging (BR-120), occupation/milestone validation, booking response reconciliation, live authoring allowlists, BR-111 execution gates, or timezone behavior.
 
 ---
 

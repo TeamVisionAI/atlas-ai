@@ -21,7 +21,10 @@ const meetingManagementService = require("../services/meetingManagementService")
 const { updateProspect, findProspectInOrganization } = require("../services/supabaseService");
 const { logConversation } = require("../services/logService");
 const { recordBusinessEvent } = require("../core/recruitingBusinessEventBridge");
-const { findCoreProspectIdByPhone } = require("../core/recruitingProspectBridge");
+const {
+  findCoreProspectIdByPhone,
+  ensureCoreProspectForLegacyLead
+} = require("../core/recruitingProspectBridge");
 const { onInterviewScheduled } = require("../core/recruitingWorkflowOrchestrator");
 const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
 const { APPOINTMENT_EVENTS } = require("../modules/business-events/domain/EventTypes");
@@ -462,7 +465,20 @@ async function createAppointment(input, context = {}) {
   const confirmationStatus =
     emailStatus === "missing" ? CONFIRMATION_STATUSES.MISSING_EMAIL : CONFIRMATION_STATUSES.PENDING;
 
-  const prospectId = await findCoreProspectIdByPhone(prospectPhone);
+  // Implements BR-120 — appointment FK must be core UUID; ensure when mapping missing.
+  let prospectId = await findCoreProspectIdByPhone(prospectPhone);
+  if (!prospectId) {
+    const ensured = await ensureCoreProspectForLegacyLead({
+      phone: prospectPhone,
+      displayName: contact?.firstName
+        ? [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim()
+        : null,
+      email: contact?.email || null,
+      organizationId,
+      actor: createdBy || agentId || "SYSTEM"
+    });
+    prospectId = ensured.prospectId || null;
+  }
   const timestamp = nowIso();
   const ownerRepId = input.ownerRepId || (await resolveOwnerRepId(agentId));
   const interviewAssignment = await resolveInterviewAssignmentForSchedule(input, {

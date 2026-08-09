@@ -1,5 +1,6 @@
 /**
  * Sprint 16.1 — Bridge legacy phone-based prospects to Atlas Core Prospect Engine.
+ * Implements BR-120 — canonical prospect identity (core UUID as system of record).
  */
 
 const { normalizePhoneNumber } = require("./phoneNormalizer");
@@ -93,11 +94,82 @@ async function ensureCoreProspectForLegacyLead({
   };
 }
 
+async function defaultFindLegacyProspectByPhone(phone, organizationId) {
+  if (!phone || !organizationId) {
+    return null;
+  }
+
+  try {
+    const { findProspectInOrganization } = require("../services/supabaseService");
+    return await findProspectInOrganization(phone, organizationId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve canonical (core) + legacy prospect identity for a phone / org.
+ * Core UUID is the system of record for appointment FK + new durable context keys.
+ * Legacy `prospects.id` remains the WhatsApp phone profile / workflow cache id.
+ *
+ * Implements BR-120.
+ */
+async function resolveCanonicalProspectIdentity({
+  phone = null,
+  organizationId = null,
+  displayName = null,
+  email = null,
+  legacyProspectId = null,
+  ensureCore = true,
+  findLegacyByPhone = null
+} = {}) {
+  const resolvedOrganizationId = organizationId || DEFAULT_ORGANIZATION_ID;
+  const storagePhone = phone ? normalizeStoragePhone(phone) : null;
+
+  let coreProspectId = storagePhone ? await findCoreProspectIdByPhone(storagePhone) : null;
+  let coreCreated = false;
+  let coreSkipped = false;
+
+  if (!coreProspectId && storagePhone && ensureCore) {
+    const ensured = await ensureCoreProspectForLegacyLead({
+      phone: storagePhone,
+      displayName,
+      email,
+      organizationId: resolvedOrganizationId
+    });
+    coreProspectId = ensured.prospectId || null;
+    coreCreated = Boolean(ensured.created);
+    coreSkipped = Boolean(ensured.skipped);
+  }
+
+  let resolvedLegacyId = legacyProspectId || null;
+  if (!resolvedLegacyId && storagePhone) {
+    const finder = typeof findLegacyByPhone === "function"
+      ? findLegacyByPhone
+      : defaultFindLegacyProspectByPhone;
+    const legacy = await finder(storagePhone, resolvedOrganizationId);
+    resolvedLegacyId = legacy?.id || null;
+  }
+
+  const identityIds = [...new Set([coreProspectId, resolvedLegacyId].filter(Boolean))];
+
+  return {
+    phone: storagePhone,
+    organizationId: resolvedOrganizationId,
+    coreProspectId,
+    legacyProspectId: resolvedLegacyId,
+    coreCreated,
+    coreSkipped,
+    identityIds
+  };
+}
+
 module.exports = {
   normalizeStoragePhone,
   rememberProspectMapping,
   findCoreProspectIdByPhone,
   ensureCoreProspectForLegacyLead,
+  resolveCanonicalProspectIdentity,
   clearProspectBridgeCacheForTests() {
     phoneToProspectId.clear();
   }
