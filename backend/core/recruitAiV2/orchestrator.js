@@ -308,6 +308,15 @@ function applyExecutionOutcomeToReply({
   };
 
   if (execution.success) {
+    // Populate slot entities from THIS execution so appointment_confirmed is concrete.
+    const performed = execution.performed?.[0] || {};
+    if (performed.dateKey && !entities.dateLabel && !entities.requestedDateLabel) {
+      entities.dateLabel = performed.dateKey;
+      entities.requestedDate = performed.dateKey;
+    }
+    if (performed.timeKey && !entities.requestedTime) {
+      entities.requestedTime = performed.timeKey;
+    }
     const plan = {
       ...responsePlan,
       templateKey: "appointment_confirmed",

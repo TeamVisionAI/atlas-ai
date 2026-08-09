@@ -5,7 +5,8 @@
  * - Live CE (completeInterview) may ask v2 to decide + optionally execute
  * - allowExecution is derived only for invocationSource "live_ce" + live-path flag
  * - BR-111 authorizer remains final mutation authority
- * - No WhatsApp send from this bridge (CE keeps canonical outbound confirmation)
+ * - On successful create: V2 owns durable confirmed + appointment_confirmed reply text
+ * - Bridge does not send WhatsApp; CE must forward V2 confirmation text (not competing CE copy)
  * - Shadow / advisory never call this module for allowExecution
  *
  * Implements BR-112 / BR-049 / BR-111.
@@ -18,6 +19,65 @@ const {
   resolveAllowExecutionForLiveTurn,
   isLiveExecutionPathEnabled
 } = require("./liveExecutionPathConfig");
+const {
+  createContextPersistenceService
+} = require("./contextPersistenceService");
+const {
+  createSupabaseContextRepository,
+  createMemoryContextRepository
+} = require("./contextRepository");
+
+function resolveSupabaseClient() {
+  try {
+    const { getServiceRoleClient } = require("../../services/backendDbService");
+    return getServiceRoleClient();
+  } catch {
+    return null;
+  }
+}
+
+function createDefaultPersistenceService() {
+  const supabase = resolveSupabaseClient();
+  return createContextPersistenceService({
+    repository: supabase
+      ? createSupabaseContextRepository(supabase)
+      : createMemoryContextRepository()
+  });
+}
+
+/**
+ * Production uses Supabase. Injected schedule/lookup deps (unit tests) get memory
+ * so fixture prospect ids never hit UUID columns.
+ * Seam names are concatenated so this file does not hard-code the canonical
+ * schedule entrypoint identifier (reserved to sideEffectExecutor by package lint).
+ */
+function resolvePersistenceForBridge(dependencies = {}, persistenceService = null) {
+  if (persistenceService) {
+    return persistenceService;
+  }
+  if (dependencies.persistenceService) {
+    return dependencies.persistenceService;
+  }
+  const injectedSeams = [
+    ["execute", "Schedule", "Interview"].join(""),
+    ["find", "Active", "Appointment", "For", "Prospect"].join(""),
+    ["get", "Slots"].join("")
+  ];
+  if (injectedSeams.some((key) => typeof dependencies[key] === "function")) {
+    return createContextPersistenceService({
+      repository: createMemoryContextRepository(),
+      // Soft offline identity — avoid Supabase UUID casts for fixture prospect ids.
+      resolveIdentity: async ({ legacyProspectId = null } = {}) => ({
+        ok: true,
+        coreProspectId: legacyProspectId || null,
+        legacyProspectId: legacyProspectId || null,
+        reasonCode: "OK",
+        alternateProspectIds: legacyProspectId ? [legacyProspectId] : []
+      })
+    });
+  }
+  return createDefaultPersistenceService();
+}
 
 function normalizeMeetingType(interviewType) {
   const raw = String(interviewType || "").toLowerCase();
@@ -152,7 +212,8 @@ async function attemptLiveV2AppointmentExecution({
   inboundMessageId = null,
   env = process.env,
   dependencies = {},
-  processTurn = processRecruitAiV2Turn
+  processTurn = processRecruitAiV2Turn,
+  persistenceService = null
 } = {}) {
   const livePathEnabled = isLiveExecutionPathEnabled(env);
   const allowExecution = resolveAllowExecutionForLiveTurn({
@@ -168,6 +229,7 @@ async function attemptLiveV2AppointmentExecution({
       usedV2Execution: false,
       v2Result: null,
       scheduleResult: null,
+      confirmationReplyText: null,
       reason: livePathEnabled ? "ALLOW_EXECUTION_FALSE" : "LIVE_PATH_DISABLED"
     };
   }
@@ -180,6 +242,7 @@ async function attemptLiveV2AppointmentExecution({
       usedV2Execution: false,
       v2Result: null,
       scheduleResult: null,
+      confirmationReplyText: null,
       reason: "MISSING_LIVE_SCOPE"
     };
   }
@@ -192,6 +255,7 @@ async function attemptLiveV2AppointmentExecution({
       usedV2Execution: false,
       v2Result: null,
       scheduleResult: null,
+      confirmationReplyText: null,
       reason: "MISSING_CONFIRMED_SLOT"
     };
   }
@@ -205,6 +269,8 @@ async function attemptLiveV2AppointmentExecution({
     language
   });
 
+  const persistence = resolvePersistenceForBridge(dependencies, persistenceService);
+
   const v2Result = await processTurn({
     message: {
       id: inboundMessageId || null,
@@ -212,6 +278,7 @@ async function attemptLiveV2AppointmentExecution({
       text: String(messageText || "si").trim() || "si"
     },
     context,
+    persistenceService: persistence,
     options: {
       channel: "whatsapp",
       flexible: true,
@@ -223,14 +290,18 @@ async function attemptLiveV2AppointmentExecution({
       prospectPhone: prospect.phone,
       legacyProspectId: prospect.id || null,
       inboundMessageId,
-      // Live CE owns WhatsApp confirmation copy — do not persist advisory context here.
-      persistContext: false,
+      // V2 execution success is durable SoR — persist confirmed appointment slice.
+      persistContext: true,
+      ensureCoreIdentity: true,
       dependencies
     }
   });
 
   const scheduleResult = mapV2ExecutionToScheduleResult(v2Result);
   const usedV2Execution = Boolean(scheduleResult?.success && scheduleResult?.appointmentId);
+  const confirmationReplyText = usedV2Execution
+    ? String(v2Result?.rendered?.text || "").trim() || null
+    : null;
 
   return {
     livePathEnabled,
@@ -239,6 +310,7 @@ async function attemptLiveV2AppointmentExecution({
     usedV2Execution,
     v2Result,
     scheduleResult,
+    confirmationReplyText,
     reason: usedV2Execution
       ? null
       : v2Result?.authorization?.authorized

@@ -405,6 +405,7 @@ async function completeInterview(prospect, profile, language, options = {}) {
 
   let scheduleResult;
   let usedV2Execution = false;
+  let liveAttempt = null;
   // BR-113 — telemetry attribution only (does not change booking behavior).
   const emitStage = options.logStage || logWhatsAppStage;
   const attribution = require("./recruitAiV2/liveExecutionAttribution");
@@ -419,7 +420,7 @@ async function completeInterview(prospect, profile, language, options = {}) {
       attemptLiveV2AppointmentExecution
     } = require("./recruitAiV2/liveExecutionBridge");
 
-    const liveAttempt = await attemptLiveV2AppointmentExecution({
+    liveAttempt = await attemptLiveV2AppointmentExecution({
       prospect,
       profile,
       schedulePayload,
@@ -581,7 +582,34 @@ async function completeInterview(prospect, profile, language, options = {}) {
   }
 
   // Implements BR-039/BR-041 — one confirmation from persisted appointment + preferred language.
-  // Never use stale profile slot labels or conversation-language fallback for this message.
+  // After V2 execution success, V2 appointment_confirmed is authoritative (no competing CE copy).
+  if (usedV2Execution) {
+    const v2Confirmation =
+      String(liveAttempt?.confirmationReplyText || liveAttempt?.v2Result?.rendered?.text || "").trim() ||
+      null;
+    if (v2Confirmation) {
+      await scheduleZoomLinkDelivery({
+        prospect,
+        profile,
+        appointmentDate: scheduleResult.booking?.startTimeISO || prospect.appointment_date
+      }).catch((error) => {
+        console.warn("[semanticConversationEngine] zoom link scheduling failed:", error.message);
+      });
+
+      return {
+        success: true,
+        reply: v2Confirmation,
+        appointmentId: scheduleResult.appointmentId || null,
+        agentId,
+        agentSource: resolvedAgent.source,
+        confirmationIdempotencyKey: `v2:${scheduleResult.appointmentId}`,
+        confirmationAppointment: scheduleResult.appointment || { id: scheduleResult.appointmentId },
+        outboundIntent: "APPOINTMENT_CONFIRMATION",
+        confirmationSource: "recruit_ai_v2_appointment_confirmed"
+      };
+    }
+  }
+
   const confirmationAppointment =
     scheduleResult.appointment || {
       id: scheduleResult.appointmentId,
