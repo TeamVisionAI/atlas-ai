@@ -13,7 +13,8 @@ const SYNC_REASON = Object.freeze({
   ORG_MISMATCH: "QUALIFICATION_SYNC_ORG_MISMATCH",
   IDENTITY_MISMATCH: "QUALIFICATION_SYNC_IDENTITY_MISMATCH",
   FACT_CONFLICT: "QUALIFICATION_FACT_CONFLICT",
-  NO_DURABLE_FACTS: "QUALIFICATION_SYNC_NO_DURABLE_FACTS"
+  NO_DURABLE_FACTS: "QUALIFICATION_SYNC_NO_DURABLE_FACTS",
+  WRITE_FAILED: "QUALIFICATION_SYNC_WRITE_FAILED"
 });
 
 function normalizeCity(value) {
@@ -98,8 +99,9 @@ function planQualificationFactSync({
     };
   }
 
+  // Exact organization required (BR-127 / BR-120) — never sync when org is unset or mismatched.
   const prospectOrg = prospect.organization_id || prospect.organizationId || null;
-  if (prospectOrg && prospectOrg !== organizationId) {
+  if (!prospectOrg || prospectOrg !== organizationId) {
     return {
       ok: false,
       reasonCode: SYNC_REASON.ORG_MISMATCH,
@@ -109,11 +111,8 @@ function planQualificationFactSync({
     };
   }
 
-  if (
-    expectedLegacyProspectId &&
-    prospect.id &&
-    String(prospect.id) !== String(expectedLegacyProspectId)
-  ) {
+  // Exact legacy + core mapping required when callers supply expected ids.
+  if (!expectedLegacyProspectId || String(prospect.id) !== String(expectedLegacyProspectId)) {
     return {
       ok: false,
       reasonCode: SYNC_REASON.IDENTITY_MISMATCH,
@@ -124,8 +123,8 @@ function planQualificationFactSync({
   }
 
   if (
-    expectedCoreProspectId &&
-    durableContext?.prospectId &&
+    !expectedCoreProspectId ||
+    !durableContext?.prospectId ||
     String(durableContext.prospectId) !== String(expectedCoreProspectId)
   ) {
     return {
@@ -193,6 +192,7 @@ function planQualificationFactSync({
     }
   }
 
+  // Any conflict invalidates the entire mutation set — never partial city/state/auth writes.
   if (conflicts.length > 0) {
     return {
       ok: false,
@@ -214,7 +214,8 @@ function planQualificationFactSync({
 }
 
 /**
- * Apply planned sync: write null legacy columns, return enriched capturedFields.
+ * Apply a previously validated plan (or plan first): single atomic prospect UPDATE
+ * for all legacy column hydrations. capturedFields enrichment is in-memory only.
  */
 async function synchronizeQualificationFactsForSchedule({
   durableContext = null,
@@ -223,15 +224,18 @@ async function synchronizeQualificationFactsForSchedule({
   expectedCoreProspectId = null,
   expectedLegacyProspectId = null,
   updateProspectFn = null,
-  baseCapturedFields = {}
+  baseCapturedFields = {},
+  plan: providedPlan = null
 } = {}) {
-  const plan = planQualificationFactSync({
-    durableContext,
-    prospect,
-    organizationId,
-    expectedCoreProspectId,
-    expectedLegacyProspectId
-  });
+  const plan =
+    providedPlan ||
+    planQualificationFactSync({
+      durableContext,
+      prospect,
+      organizationId,
+      expectedCoreProspectId,
+      expectedLegacyProspectId
+    });
 
   if (!plan.ok) {
     return {
@@ -247,11 +251,25 @@ async function synchronizeQualificationFactsForSchedule({
     prospect?.phone &&
     Object.keys(plan.legacyUpdates).length > 0
   ) {
-    await updateProspectFn(prospect.phone, plan.legacyUpdates);
-    nextProspect = {
-      ...prospect,
-      ...plan.legacyUpdates
-    };
+    try {
+      // Single UPDATE payload: city/state/work_authorized together (all-or-nothing row update).
+      await updateProspectFn(prospect.phone, { ...plan.legacyUpdates });
+      nextProspect = {
+        ...prospect,
+        ...plan.legacyUpdates
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        reasonCode: SYNC_REASON.WRITE_FAILED,
+        capturedPatch: {},
+        legacyUpdates: {},
+        conflicts: [],
+        capturedFields: { ...baseCapturedFields },
+        prospect,
+        error
+      };
+    }
   }
 
   return {

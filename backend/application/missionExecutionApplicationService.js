@@ -53,6 +53,7 @@ const {
   REASON_CODES: PROSPECT_IDENTITY_REASON_CODES
 } = require("../core/recruitingProspectBridge");
 const {
+  planQualificationFactSync,
   synchronizeQualificationFactsForSchedule
 } = require("../core/recruitAiV2/qualificationFactSync");
 const {
@@ -415,16 +416,55 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     );
   }
 
-  // Implements BR-127 / BR-120 — V2 core mapping must match schedule-time identity.
-  if (
-    options.recruitAiV2CoreProspectId &&
-    String(options.recruitAiV2CoreProspectId) !== String(identity.coreProspectId)
-  ) {
-    return buildActionError(
-      ACTION_IDS.SCHEDULE,
-      "QUALIFICATION_SYNC_IDENTITY_MISMATCH",
-      "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
-    );
+  // Implements BR-127 / BR-120 — V2 durable must match schedule-time identity before Calendar.
+  if (options.recruitAiV2Context || options.recruitAiV2CoreProspectId) {
+    const durableCoreId =
+      options.recruitAiV2CoreProspectId ||
+      options.recruitAiV2Context?.prospectId ||
+      null;
+
+    if (!durableCoreId || String(durableCoreId) !== String(identity.coreProspectId)) {
+      return buildActionError(
+        ACTION_IDS.SCHEDULE,
+        "QUALIFICATION_SYNC_IDENTITY_MISMATCH",
+        "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
+      );
+    }
+
+    if (
+      identity.legacyProspectId &&
+      prospect.id &&
+      String(identity.legacyProspectId) !== String(prospect.id)
+    ) {
+      return buildActionError(
+        ACTION_IDS.SCHEDULE,
+        "QUALIFICATION_SYNC_IDENTITY_MISMATCH",
+        "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
+      );
+    }
+  }
+
+  // Implements BR-127 — validate sync plan BEFORE Calendar / appointment mutation.
+  let qualificationSyncPlan = null;
+  if (options.recruitAiV2Context) {
+    qualificationSyncPlan = planQualificationFactSync({
+      durableContext: options.recruitAiV2Context,
+      prospect,
+      organizationId,
+      expectedCoreProspectId:
+        options.recruitAiV2CoreProspectId ||
+        options.recruitAiV2Context.prospectId ||
+        null,
+      expectedLegacyProspectId: prospect.id || null
+    });
+
+    if (!qualificationSyncPlan.ok) {
+      return buildActionError(
+        ACTION_IDS.SCHEDULE,
+        qualificationSyncPlan.reasonCode || "QUALIFICATION_SYNC_FAILED",
+        "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
+      );
+    }
   }
 
   let bookingResult;
@@ -551,10 +591,35 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     prospectUpdates.notes = nextNotes;
   }
 
-  await updateProspectFn(prospect.phone, prospectUpdates);
+  // Implements BR-127 — hydrate null legacy qual columns in the SAME prospect UPDATE as
+  // schedule confirmation fields (single atomic row update). capturedFields stay in-memory.
+  if (qualificationSyncPlan?.legacyUpdates) {
+    Object.assign(prospectUpdates, qualificationSyncPlan.legacyUpdates);
+  }
 
-  // Implements BR-127 — hydrate city/state/authorization from V2 durable before
-  // INTERVIEW_SCHEDULED validation. Only when explicitly provided by V2 execution.
+  try {
+    await updateProspectFn(prospect.phone, prospectUpdates);
+  } catch (error) {
+    await rollbackBooking(bookingResult, organizationId, prospect, {
+      phase: "qualification_fact_sync_write"
+    });
+    await rollbackPersisted(appointmentRecord, organizationId, scheduleAgentId, {
+      reason: "schedule_workflow_rollback",
+      phase: "qualification_fact_sync_write"
+    });
+
+    return buildActionError(
+      ACTION_IDS.SCHEDULE,
+      "QUALIFICATION_SYNC_WRITE_FAILED",
+      "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
+    );
+  }
+
+  if (qualificationSyncPlan?.legacyUpdates) {
+    Object.assign(prospect, qualificationSyncPlan.legacyUpdates);
+  }
+
+  // Implements BR-127 — enrichment for milestone validation (no second DB write).
   let advanceCapturedFields = {
     interviewDateTime: bookingResult.startTimeISO,
     interviewType,
@@ -564,40 +629,15 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     email: attendeeEmail || undefined,
     appointmentId: appointmentRecord.id
   };
-  let prospectForAdvance = prospect;
 
-  if (options.recruitAiV2Context) {
+  if (qualificationSyncPlan) {
     const sync = await synchronizeQualificationFactsForSchedule({
-      durableContext: options.recruitAiV2Context,
-      prospect,
-      organizationId,
-      expectedCoreProspectId:
-        options.recruitAiV2CoreProspectId ||
-        options.recruitAiV2Context.prospectId ||
-        null,
-      expectedLegacyProspectId: prospect.id || null,
-      updateProspectFn,
-      baseCapturedFields: advanceCapturedFields
+      plan: qualificationSyncPlan,
+      updateProspectFn: null,
+      baseCapturedFields: advanceCapturedFields,
+      prospect
     });
-
-    if (!sync.ok) {
-      await rollbackBooking(bookingResult, organizationId, prospect, {
-        phase: "qualification_fact_sync"
-      });
-      await rollbackPersisted(appointmentRecord, organizationId, scheduleAgentId, {
-        reason: "schedule_workflow_rollback",
-        phase: "qualification_fact_sync"
-      });
-
-      return buildActionError(
-        ACTION_IDS.SCHEDULE,
-        sync.reasonCode || "QUALIFICATION_SYNC_FAILED",
-        "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
-      );
-    }
-
     advanceCapturedFields = sync.capturedFields;
-    prospectForAdvance = sync.prospect || prospect;
   }
 
   const advanceResult = await advanceWorkflow(phone, {
@@ -607,11 +647,6 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     interactionNotes: payload.notes || null,
     interactionType: "agent_schedule"
   });
-
-  // Refresh local prospect snapshot after sync writes (city/state/auth).
-  if (prospectForAdvance && prospectForAdvance !== prospect) {
-    Object.assign(prospect, prospectForAdvance);
-  }
 
   if (!advanceResult.success) {
     await rollbackBooking(bookingResult, organizationId, prospect, {

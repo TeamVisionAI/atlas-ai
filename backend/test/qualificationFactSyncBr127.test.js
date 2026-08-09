@@ -396,4 +396,331 @@ describe("BR-127 qualification fact sync", () => {
     assert.deepEqual(plan.legacyUpdates, {});
     assert.equal(plan.capturedPatch.city, "Miami");
   });
+
+  test("10–11. city conflict clears entire mutation set (no partial state/auth)", () => {
+    const plan = planQualificationFactSync({
+      durableContext: marielenaDurable(),
+      prospect: sparseLegacy({ city: "Orlando", state: null, work_authorized: null }),
+      organizationId: ORG,
+      expectedCoreProspectId: CORE,
+      expectedLegacyProspectId: LEGACY
+    });
+    assert.equal(plan.ok, false);
+    assert.equal(plan.reasonCode, SYNC_REASON.FACT_CONFLICT);
+    assert.deepEqual(plan.legacyUpdates, {});
+    assert.deepEqual(plan.capturedPatch, {});
+  });
+
+  test("state conflict clears city/auth mutations", () => {
+    const plan = planQualificationFactSync({
+      durableContext: marielenaDurable(),
+      prospect: sparseLegacy({ city: null, state: "NY", work_authorized: null }),
+      organizationId: ORG,
+      expectedCoreProspectId: CORE,
+      expectedLegacyProspectId: LEGACY
+    });
+    assert.equal(plan.ok, false);
+    assert.deepEqual(plan.legacyUpdates, {});
+  });
+
+  test("authorization conflict clears city/state mutations", () => {
+    const plan = planQualificationFactSync({
+      durableContext: marielenaDurable(),
+      prospect: sparseLegacy({ city: null, state: null, work_authorized: false }),
+      organizationId: ORG,
+      expectedCoreProspectId: CORE,
+      expectedLegacyProspectId: LEGACY
+    });
+    assert.equal(plan.ok, false);
+    assert.deepEqual(plan.legacyUpdates, {});
+  });
+
+  test("fact conflict fails before Calendar create", async () => {
+    let calendarCreates = 0;
+    let prospectWrites = 0;
+    const result = await executeScheduleInterview(
+      PHONE,
+      {
+        dateKey: "2026-08-10",
+        timeKey: "13:00",
+        interviewType: "In Person",
+        timezone: "America/New_York"
+      },
+      {
+        organizationId: ORG,
+        agentId: AGENT,
+        userId: AGENT,
+        recruitAiV2Context: marielenaDurable(),
+        recruitAiV2CoreProspectId: CORE,
+        dependencies: {
+          resolveTenantProspect: async () => sparseLegacy({ city: "Orlando" }),
+          resolveCanonicalProspectIdentity: async () => ({
+            ok: true,
+            coreProspectId: CORE,
+            legacyProspectId: LEGACY
+          }),
+          resolveInterviewLocation: async () => ({
+            configured: true,
+            location: "Office",
+            meetingUrl: null
+          }),
+          scheduleAppointment: async () => {
+            calendarCreates += 1;
+            return { success: true };
+          },
+          updateProspect: async () => {
+            prospectWrites += 1;
+          }
+        }
+      }
+    );
+    assert.equal(result.success, false);
+    assert.equal(result.error, "QUALIFICATION_FACT_CONFLICT");
+    assert.equal(calendarCreates, 0);
+    assert.equal(prospectWrites, 0);
+  });
+
+  test("write failure returns QUALIFICATION_SYNC_WRITE_FAILED + rollback", async () => {
+    let rollbackCalls = 0;
+    const result = await executeScheduleInterview(
+      PHONE,
+      {
+        dateKey: "2026-08-10",
+        timeKey: "13:00",
+        interviewType: "In Person",
+        timezone: "America/New_York"
+      },
+      {
+        organizationId: ORG,
+        agentId: AGENT,
+        userId: AGENT,
+        recruitAiV2Context: marielenaDurable(),
+        recruitAiV2CoreProspectId: CORE,
+        dependencies: {
+          resolveTenantProspect: async () => sparseLegacy(),
+          resolveCanonicalProspectIdentity: async () => ({
+            ok: true,
+            coreProspectId: CORE,
+            legacyProspectId: LEGACY
+          }),
+          resolveInterviewLocation: async () => ({
+            configured: true,
+            location: "Office",
+            meetingUrl: null
+          }),
+          getGoogleCalendarIntegrationStatus: async () => ({ connected: true }),
+          scheduleAppointment: async () => ({
+            success: true,
+            googleCalendarEventId: "cal-br127-write-fail",
+            startTimeISO: "2026-08-10T17:00:00.000Z"
+          }),
+          updateProspect: async () => {
+            throw new Error("forced db failure");
+          },
+          createPersistedScheduleAppointment: async () => ({
+            id: "appt-br127-write-fail",
+            status: "scheduled",
+            calendarEventId: "cal-br127-write-fail"
+          }),
+          rollbackPersistedAppointment: async () => {
+            rollbackCalls += 1;
+          },
+          cancelAppointment: async () => ({ success: true }),
+          findAppointmentById: async () => null
+        }
+      }
+    );
+    assert.equal(result.success, false);
+    assert.equal(result.error, "QUALIFICATION_SYNC_WRITE_FAILED");
+    assert.equal(rollbackCalls, 1);
+  });
+
+  test("retry after successful sync is idempotent (no second qual write)", async () => {
+    const legacy = sparseLegacy({
+      city: "Miami",
+      state: "FL",
+      work_authorized: true
+    });
+    const qualWrites = [];
+    const result = await executeScheduleInterview(
+      PHONE,
+      {
+        dateKey: "2026-08-10",
+        timeKey: "13:00",
+        interviewType: "In Person",
+        timezone: "America/New_York"
+      },
+      {
+        organizationId: ORG,
+        agentId: AGENT,
+        userId: AGENT,
+        recruitAiV2Context: marielenaDurable(),
+        recruitAiV2CoreProspectId: CORE,
+        dependencies: {
+          resolveTenantProspect: async () => legacy,
+          resolveCanonicalProspectIdentity: async () => ({
+            ok: true,
+            coreProspectId: CORE,
+            legacyProspectId: LEGACY
+          }),
+          resolveInterviewLocation: async () => ({
+            configured: true,
+            location: "Office",
+            meetingUrl: null
+          }),
+          getGoogleCalendarIntegrationStatus: async () => ({ connected: true }),
+          scheduleAppointment: async () => ({
+            success: true,
+            googleCalendarEventId: "cal-br127-idem",
+            startTimeISO: "2026-08-10T17:00:00.000Z"
+          }),
+          updateProspect: async (_phone, patch) => {
+            if (patch.city !== undefined || patch.work_authorized !== undefined) {
+              qualWrites.push(patch);
+            }
+            Object.assign(legacy, patch);
+          },
+          createPersistedScheduleAppointment: async () => ({
+            id: "appt-br127-idem",
+            status: "scheduled",
+            calendarEventId: "cal-br127-idem"
+          }),
+          advanceProspectWorkflow: async () => ({
+            success: true,
+            workflow: { canonicalMilestone: "INTERVIEW_SCHEDULED" }
+          })
+        }
+      }
+    );
+    assert.equal(result.success, true);
+    assert.equal(qualWrites.length, 0);
+  });
+
+  test("non-V2 schedule path does not invoke sync hydration", async () => {
+    const legacy = sparseLegacy();
+    const patches = [];
+    let capturedSeen = null;
+    const result = await executeScheduleInterview(
+      PHONE,
+      {
+        dateKey: "2026-08-10",
+        timeKey: "13:00",
+        interviewType: "In Person",
+        timezone: "America/New_York"
+      },
+      {
+        organizationId: ORG,
+        agentId: AGENT,
+        userId: AGENT,
+        dependencies: {
+          resolveTenantProspect: async () =>
+            sparseLegacy({ city: "Miami", state: "FL", work_authorized: true }),
+          resolveCanonicalProspectIdentity: async () => ({
+            ok: true,
+            coreProspectId: CORE,
+            legacyProspectId: LEGACY
+          }),
+          resolveInterviewLocation: async () => ({
+            configured: true,
+            location: "Office",
+            meetingUrl: null
+          }),
+          getGoogleCalendarIntegrationStatus: async () => ({ connected: true }),
+          scheduleAppointment: async () => ({
+            success: true,
+            googleCalendarEventId: "cal-non-v2",
+            startTimeISO: "2026-08-10T17:00:00.000Z"
+          }),
+          updateProspect: async (_phone, patch) => {
+            patches.push(patch);
+          },
+          createPersistedScheduleAppointment: async () => ({
+            id: "appt-non-v2",
+            status: "scheduled",
+            calendarEventId: "cal-non-v2",
+            confirmationStatus: "missing_email"
+          }),
+          advanceProspectWorkflow: async (_phone, payload) => {
+            capturedSeen = payload.capturedFields;
+            return { success: true, workflow: { canonicalMilestone: "INTERVIEW_SCHEDULED" } };
+          }
+        }
+      }
+    );
+    assert.equal(result.success, true);
+    assert.ok(!patches.some((p) => p.city === "Miami" && Object.keys(p).length <= 3));
+    assert.equal(capturedSeen.city, undefined);
+    assert.equal(capturedSeen.authorization, undefined);
+    void legacy;
+  });
+
+  test("missing email still yields booking success + missing_email confirmation metadata", async () => {
+    let persistedContact = null;
+    const result = await executeScheduleInterview(
+      PHONE,
+      {
+        dateKey: "2026-08-10",
+        timeKey: "13:00",
+        interviewType: "In Person",
+        timezone: "America/New_York"
+      },
+      {
+        organizationId: ORG,
+        agentId: AGENT,
+        userId: AGENT,
+        recruitAiV2Context: marielenaDurable(),
+        recruitAiV2CoreProspectId: CORE,
+        dependencies: {
+          resolveTenantProspect: async () => sparseLegacy(),
+          resolveCanonicalProspectIdentity: async () => ({
+            ok: true,
+            coreProspectId: CORE,
+            legacyProspectId: LEGACY
+          }),
+          resolveInterviewLocation: async () => ({
+            configured: true,
+            location: "Office",
+            meetingUrl: null
+          }),
+          getGoogleCalendarIntegrationStatus: async () => ({ connected: true }),
+          scheduleAppointment: async () => ({
+            success: true,
+            googleCalendarEventId: "cal-br127-email",
+            startTimeISO: "2026-08-10T17:00:00.000Z"
+          }),
+          updateProspect: async () => ({}),
+          createPersistedScheduleAppointment: async (args) => {
+            persistedContact = args.attendeeEmail || null;
+            return {
+              id: "appt-br127-email",
+              status: "scheduled",
+              calendarEventId: "cal-br127-email",
+              confirmationStatus: persistedContact ? "pending" : "missing_email",
+              emailInvitationStatus: persistedContact ? "pending" : "missing"
+            };
+          },
+          advanceProspectWorkflow: async () => ({
+            success: true,
+            workflow: { canonicalMilestone: "INTERVIEW_SCHEDULED" }
+          })
+        }
+      }
+    );
+    assert.equal(result.success, true);
+    assert.equal(persistedContact, null);
+    assert.equal(result.appointment?.confirmationStatus || "missing_email", "missing_email");
+  });
+
+  test("missing prospect org fails closed with zero writes", () => {
+    const plan = planQualificationFactSync({
+      durableContext: marielenaDurable(),
+      prospect: sparseLegacy({ organization_id: null }),
+      organizationId: ORG,
+      expectedCoreProspectId: CORE,
+      expectedLegacyProspectId: LEGACY
+    });
+    assert.equal(plan.ok, false);
+    assert.equal(plan.reasonCode, SYNC_REASON.ORG_MISMATCH);
+    assert.deepEqual(plan.legacyUpdates, {});
+  });
 });
