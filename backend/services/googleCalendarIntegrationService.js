@@ -670,24 +670,37 @@ async function createCalendarEvent(organizationId, event) {
 
 async function deleteCalendarEvent(organizationId, eventId) {
   if (!eventId || shouldMockExternalComms()) {
-    return { deleted: true, simulated: shouldMockExternalComms() };
+    return { deleted: true, simulated: shouldMockExternalComms(), alreadyAbsent: false };
   }
 
   const { oauth2Client, integration } = await getAuthorizedClient(organizationId);
 
   if (!oauth2Client) {
-    return { deleted: false, reason: "NOT_CONNECTED" };
+    return { deleted: false, reason: "NOT_CONNECTED", alreadyAbsent: false };
   }
 
   const calendarId = integration?.config?.calendarId || "primary";
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-  await calendar.events.delete({
-    calendarId,
-    eventId
-  });
+  // Implements BR-121 — already-absent Calendar delete is successful absence.
+  const { isAlreadyAbsentGoogleEventError } = require("../core/googleCalendarAbsence");
 
-  return { deleted: true };
+  try {
+    await calendar.events.delete({
+      calendarId,
+      eventId
+    });
+    return { deleted: true, alreadyAbsent: false };
+  } catch (error) {
+    if (isAlreadyAbsentGoogleEventError(error)) {
+      return {
+        deleted: true,
+        alreadyAbsent: true,
+        absenceReason: String(error.message || "ALREADY_ABSENT").slice(0, 200)
+      };
+    }
+    throw error;
+  }
 }
 
 async function updateCalendarEvent(organizationId, eventId, event) {
