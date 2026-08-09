@@ -1297,6 +1297,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-122 — Schedule Result Reconciliation (No Failure With Live Appointment)
+
+**Implements:** Partial-write customer/system consistency — never tell the customer booking failed while an active `atlas_appointments` row remains  
+**Domain:** Appointments / Recruit AI v2 execution result semantics  
+**Depends on:** BR-039, BR-049, BR-050, BR-111, BR-121  
+**Status:** Implemented  
+**Engine target:** `missionExecutionApplicationService.executeScheduleInterview`; `recruitAiV2/sideEffectExecutor.js`  
+**Tests:** `backend/test/scheduleResultReconciliationBr122.test.js`
+
+### Rules
+
+1. **Clean rollback → failure OK** — If Calendar + appointment persist succeed but workflow advance fails, and rollback leaves the appointment **cancelled/terminal**, customer-facing failure (`appointment_create_failed`) is correct.
+2. **Orphan active → reconcile success** — If canonical scheduling reports failure **and** an active (non-terminal) appointment still exists for that prospect, treat the outcome as **success**, attach `appointmentId`, and never emit `appointment_create_failed`.
+3. **Mission path first** — After workflow-advance rollback, re-read the appointment by id. Active → return `buildScheduleExecutionResponse` success with reconcile markers; cancelled → return `WORKFLOW_ADVANCE_FAILED` (or original advance error).
+4. **Executor safety net** — If `executeScheduleInterview` returns `success=false`, re-check active appointment for phone/org; if present, return `execution.success=true` with `EXECUTION_RECONCILED_ACTIVE_APPOINTMENT`.
+5. **No second lifecycle** — Do not create a replacement appointment during reconciliation.
+6. **Boundaries** — Does not change occupation validation, prospect identity bridging, BR-111 allowlists, timezone behavior, or live authoring. Execution remains env-gated OFF until separately authorized.
+
+---
+
 ## BR-121 — Idempotent Calendar Cancellation + Domain Rollback Continuation
 
 **Implements:** Partial-write incident hardening — Calendar already-absent must not leave Atlas appointments `scheduled`  

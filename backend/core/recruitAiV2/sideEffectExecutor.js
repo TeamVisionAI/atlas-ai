@@ -9,6 +9,7 @@
  */
 
 const { REASON_CODES, V2_EXECUTABLE_ACTIONS } = require("./constants");
+const { isActiveAppointment } = require("../activeAppointmentResolver");
 
 function resolveProspectPhone({ context, options } = {}) {
   return (
@@ -290,6 +291,37 @@ async function executeAuthorizedSideEffects({
   }
 
   if (!scheduleResult?.success) {
+    // Implements BR-122 — safety net: if canonical path reported failure but an active
+    // appointment still exists, reconcile as success (never appointment_create_failed).
+    try {
+      const orphan = await findActive(phone, organizationId, agentId);
+      if (orphan?.id && isActiveAppointment(orphan)) {
+        performed.push({
+          type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
+          appointmentId: orphan.id,
+          idempotent: false,
+          inboundMessageId,
+          dateKey,
+          timeKey,
+          reconciled: true,
+          reconcileReason: "ACTIVE_APPOINTMENT_AFTER_CANONICAL_FAILURE"
+        });
+        return {
+          attempted: true,
+          performed,
+          failed: [],
+          skipped,
+          success: true,
+          appointmentId: orphan.id,
+          reason: REASON_CODES.EXECUTION_RECONCILED_ACTIVE_APPOINTMENT,
+          scheduleResult,
+          reconciledFromCanonicalFailure: true
+        };
+      }
+    } catch {
+      // Fall through to failure path if orphan lookup fails.
+    }
+
     failed.push({
       type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
       reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,

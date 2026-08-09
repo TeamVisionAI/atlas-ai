@@ -48,6 +48,10 @@ const {
 } = require("./agentActionApplicationService");
 const { logInterviewerTrace } = require("../dev/interviewerTrace");
 const { resolveRecruiterDisplayName } = require("../core/whatsappCommunicationEngine");
+const {
+  isActiveAppointment,
+  findAppointmentById
+} = require("../core/activeAppointmentResolver");
 
 function resolveScheduleAgentId(options = {}) {
   return options.userId || options.agentId || options.authorUserId || null;
@@ -508,6 +512,40 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
       reason: "schedule_workflow_rollback",
       phase: "workflow_advance"
     });
+
+    // Implements BR-122 — never advertise booking failure while a live scheduled appointment remains.
+    const postRollback = await findAppointmentById(appointmentRecord.id, organizationId).catch(
+      () => null
+    );
+
+    if (postRollback && isActiveAppointment(postRollback)) {
+      console.error("[missionExecution] BR-122 reconcile: workflow advance failed but appointment remains active", {
+        appointmentId: postRollback.id,
+        status: postRollback.status,
+        phone,
+        workflowError: advanceResult.error || "WORKFLOW_ADVANCE_FAILED"
+      });
+
+      return {
+        ...buildScheduleExecutionResponse({
+          bookingResult: {
+            ...bookingResult,
+            googleCalendarEventId:
+              postRollback.calendarEventId || bookingResult.googleCalendarEventId || null
+          },
+          meetingUrl,
+          appointmentRecord: postRollback,
+          advanceResult: {
+            success: false,
+            workflow: advanceResult.workflow || null,
+            reconciled: true,
+            reconcileReason: "ACTIVE_APPOINTMENT_AFTER_WORKFLOW_ROLLBACK"
+          }
+        }),
+        reconciledFromWorkflowFailure: true,
+        workflowAdvanceError: advanceResult.error || "WORKFLOW_ADVANCE_FAILED"
+      };
+    }
 
     return buildActionError(
       ACTION_IDS.SCHEDULE,

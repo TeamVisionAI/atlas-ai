@@ -746,5 +746,7 @@ function processRecruitAiV2TurnSync(args = {}) {
 
 module.exports = {
   processRecruitAiV2Turn,
-  processRecruitAiV2TurnSync
+  processRecruitAiV2TurnSync,
+  applyExecutionOutcomeToReply,
+  applyExecutionToContext
 };
