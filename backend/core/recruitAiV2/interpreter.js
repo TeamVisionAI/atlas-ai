@@ -1123,13 +1123,14 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.requestedTime = requestedTime;
     }
   } else if (
-    // Implements BR-126 — bare affirmatives never qualify as city/state while a
-    // proposed slot is awaiting confirmation (incl. deferred create).
+    // Implements BR-126 — bare create affirmatives (Si/Yes) resume confirm_slot /
+    // deferred create. Do NOT treat soft-acks (ok/okay) as schedule_confirm here:
+    // those stay soft_acknowledgement while availability is pending (BR-095+).
     isAffirmative(text) &&
+    !isSoftAcknowledgement(text) &&
     (String(context?.conversation?.lastQuestionAsked || "") === "confirm_slot" ||
       String(context?.conversation?.lastOfferMade || "") ===
-        "appointment_confirm_deferred" ||
-      String(context?.appointment?.status || "") === APPOINTMENT_STATUS.PROPOSED)
+        "appointment_confirm_deferred")
   ) {
     intent = INTENTS.SCHEDULE_CONFIRM;
     confidence = 0.9;

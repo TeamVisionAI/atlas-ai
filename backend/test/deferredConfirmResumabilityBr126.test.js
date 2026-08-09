@@ -187,6 +187,21 @@ describe("BR-126 deferred confirm resumability", () => {
     assert.equal(interpretation.entities?.city || null, null);
   });
 
+  test("availability-pending ok stays soft_acknowledgement (not schedule_confirm)", () => {
+    const pending = proposedAfterSlotSelect();
+    pending.appointment.status = APPOINTMENT_STATUS.PROPOSED;
+    pending.conversation.lastQuestionAsked = "awaiting_availability";
+    pending.conversation.lastOfferMade = "acknowledge_counteroffer_check_availability";
+    pending.conversation.lastAtlasOutboundText =
+      "Entendido — prefieres 10:00 AM. Voy a revisar disponibilidad y te comparto opciones que funcionen.";
+    const interpretation = interpretInboundMessage({
+      message: { text: "ok" },
+      context: pending
+    });
+    assert.equal(interpretation.intent, "soft_acknowledgement");
+    assert.notEqual(interpretation.intent, "schedule_confirm");
+  });
+
   test("Turn3: Si execution ON → create + confirmed + V2 appointment_confirmed", async () => {
     const deferredCtx = proposedAfterSlotSelect();
     deferredCtx.conversation.lastOfferMade = "appointment_confirm_deferred";
