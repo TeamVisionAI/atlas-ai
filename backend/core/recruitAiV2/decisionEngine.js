@@ -29,6 +29,7 @@ const {
   isTimeInOfferedSlots,
   resolveUniqueOfferedSlotSelection,
   resolveUniqueOfferedDaySelection,
+  isOfferedSetAlreadySameDay,
   slotDate,
   slotTime,
   slotsEqual,
@@ -131,6 +132,53 @@ function applyRestateNarrowedOfferedSlots(
   for (const code of reasonCodes) {
     structured.reasonCodes.push(code);
   }
+  structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+  structured.contextPatch = {
+    appointment: {
+      status: APPOINTMENT_STATUS.PROPOSED,
+      proposedDate: dateIso || slotDate(offered[0]) || null,
+      previouslyOfferedSlots: offered
+    },
+    conversation: {
+      lastQuestionAsked: "offer_time_choices",
+      pendingClarification: null,
+      clarificationCount: 0,
+      lastProspectIntent: interpretation?.intent || INTENTS.SCHEDULING_DATE_PROPOSAL
+    },
+    currentStage: STAGES.SCHEDULING,
+    attention: { needsHumanAttention: false, reason: null }
+  };
+  return structured;
+}
+
+/**
+ * BR-119 — same-day no-op: date already fixed on the offered set; ask which time.
+ * Do not re-render the full "Tengo disponible el lunes…" availability sentence.
+ */
+function applyAskWhichOfferedTime(
+  structured,
+  matches,
+  { reasonCodes = [], interpretation = null, dateIso = null } = {}
+) {
+  const offered = Array.isArray(matches) ? matches : [];
+  structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
+  structured.decision.requiresExplicitConfirmation = false;
+  structured.decision.mayCreateAppointment = false;
+  structured.decision.shouldEscalate = false;
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey = "clarify_offered_slot_time";
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    offeredSlots: offered,
+    requestedDate: dateIso || slotDate(offered[0]) || null,
+    slotA: slotTime(offered[0]) || null,
+    slotB: slotTime(offered[1]) || null,
+    timezone: offered[0]?.timezone || null
+  };
+  for (const code of reasonCodes) {
+    structured.reasonCodes.push(code);
+  }
+  structured.reasonCodes.push(REASON_CODES.OFFERED_SLOT_DAY_ALREADY_FIXED);
   structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
   structured.contextPatch = {
     appointment: {
@@ -1856,6 +1904,14 @@ function decideConversationTurn({
         );
       }
       if (dayMatch.kind === "ambiguous") {
+        // Same-day no-op: all offered slots already share this date → ask time only.
+        if (isOfferedSetAlreadySameDay(offeredSlots, resolvedDate.isoDate)) {
+          return applyAskWhichOfferedTime(structured, dayMatch.matches, {
+            interpretation,
+            dateIso: resolvedDate.isoDate,
+            reasonCodes: [REASON_CODES.OFFERED_SLOT_DAY_NARROWED_AMBIGUOUS]
+          });
+        }
         return applyRestateNarrowedOfferedSlots(structured, dayMatch.matches, {
           interpretation,
           dateIso: resolvedDate.isoDate,

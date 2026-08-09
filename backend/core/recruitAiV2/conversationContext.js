@@ -319,6 +319,19 @@ function resolveUniqueOfferedDaySelection(offeredSlots = [], dateIso = null) {
   return { kind: "ambiguous", selected: null, matches };
 }
 
+/**
+ * BR-119 — true when every offered slot already sits on dateIso (naming that day
+ * does not narrow the set further).
+ */
+function isOfferedSetAlreadySameDay(offeredSlots = [], dateIso = null) {
+  if (!dateIso || !Array.isArray(offeredSlots) || offeredSlots.length === 0) {
+    return false;
+  }
+  return offeredSlots.every(
+    (slot) => String(slotDate(slot) || "") === String(dateIso)
+  );
+}
+
 module.exports = {
   createConversationContext,
   mergeConversationContext,
@@ -336,6 +349,7 @@ module.exports = {
   isTimeInOfferedSlots,
   resolveUniqueOfferedSlotSelection,
   resolveUniqueOfferedDaySelection,
+  isOfferedSetAlreadySameDay,
   STAGES,
   APPOINTMENT_STATUS,
   LANGUAGES
