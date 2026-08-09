@@ -5,6 +5,10 @@
  */
 
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
+const {
+  isMissingGoogleEventError,
+  isAlreadyAbsentGoogleEventError
+} = require("./googleCalendarAbsence");
 
 const SYNC_STATUSES = Object.freeze({
   SYNCED: "synced",
@@ -12,21 +16,6 @@ const SYNC_STATUSES = Object.freeze({
   SKIPPED_NOT_CONNECTED: "skipped_not_connected",
   SKIPPED_MOCK: "skipped_mock"
 });
-
-function isMissingGoogleEventError(error) {
-  const status = error?.code || error?.response?.status || error?.statusCode;
-  const reason = String(
-    error?.errors?.[0]?.reason || error?.response?.data?.error?.errors?.[0]?.reason || ""
-  ).toLowerCase();
-  const message = String(error?.message || "").toLowerCase();
-
-  return (
-    status === 404 ||
-    reason === "notfound" ||
-    message.includes("not found") ||
-    message.includes("404")
-  );
-}
 
 function buildCalendarEventPayload(appointment, overrides = {}) {
   return {
@@ -147,6 +136,7 @@ async function syncAppointmentGoogleCalendar(appointment, options = {}) {
 module.exports = {
   SYNC_STATUSES,
   isMissingGoogleEventError,
+  isAlreadyAbsentGoogleEventError,
   buildCalendarEventPayload,
   syncAppointmentGoogleCalendar
 };

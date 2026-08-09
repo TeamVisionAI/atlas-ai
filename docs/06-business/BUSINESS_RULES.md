@@ -1297,6 +1297,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-121 — Idempotent Calendar Cancellation + Domain Rollback Continuation
+
+**Implements:** Partial-write incident hardening — Calendar already-absent must not leave Atlas appointments `scheduled`  
+**Domain:** Appointments / Google Calendar rollback  
+**Depends on:** BR-039, BR-050  
+**Related:** BR-049 (conversation scheduling remains delegated); BR-111 (execution architecture unchanged; execution remains OFF)  
+**Status:** Implemented  
+**Engine target:** `googleCalendarAbsence.js`; `googleCalendarIntegrationService.deleteCalendarEvent`; `schedulingService.cancelAppointment`; `appointmentApplicationService.cancelAppointment`  
+**Tests:** `backend/test/appointmentCancelIdempotentBr121.test.js`
+
+### Rules
+
+1. **Already-absent = success for cancel/rollback** — Google Calendar `404`, `410`, `"Resource has been deleted"`, and equivalent already-absent/deleted semantics MUST be treated as successful Calendar absence. Do not abort Atlas domain cancellation.
+2. **Domain cancel continues** — After attempting Calendar delete/cancel, Atlas MUST perform canonical appointment domain cancel + persist `cancelled` even when the Calendar object was already removed or cancelled.
+3. **Unexpected Calendar errors** — Auth/network/5xx and other non-absence failures are logged/reported, but cancel/rollback compensation MUST still continue domain cancel so Atlas does not remain `scheduled` solely because Calendar cleanup failed.
+4. **Reconcile linkage** — On successful domain cancel, clear `calendar_event_id` / `calendarEventId` (and prospect schedule cache calendar fields) appropriately.
+5. **Single cancel lifecycle** — Do not invent a second cancellation lifecycle. Double-delete during rollback (mission calendar cleanup then appointment cancel cleanup) must be idempotent/harmless.
+6. **Central classification** — Reuse `googleCalendarAbsence.isMissingGoogleEventError` / `isAlreadyAbsentGoogleEventError`. Do not duplicate string/status parsing across services.
+7. **Boundaries** — Does not change prospect identity bridging, occupation/milestone validation, booking response reconciliation, live authoring allowlists, BR-111 execution gates, or timezone behavior.
+
+---
+
 ## BR-113 — Live Execution Attribution Telemetry
 
 **Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  

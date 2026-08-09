@@ -138,14 +138,32 @@ async function cancelAppointment({ appointmentType, startTimeISO, googleCalendar
     releaseSlotByIso(startTimeISO, appointmentType);
   }
 
+  // Implements BR-121 — Calendar cleanup must not throw on already-absent events.
+  // Unexpected Calendar failures are reported but do not abort cancel/rollback callers.
+  let calendarResult = null;
+  let calendarError = null;
+
   if (googleCalendarEventId && organizationId) {
-    await googleCalendarIntegrationService.deleteCalendarEvent(
-      organizationId,
-      googleCalendarEventId
-    );
+    try {
+      calendarResult = await googleCalendarIntegrationService.deleteCalendarEvent(
+        organizationId,
+        googleCalendarEventId
+      );
+    } catch (error) {
+      calendarError = String(error?.message || "CALENDAR_DELETE_FAILED").slice(0, 200);
+      console.error("[schedulingService] calendar delete failed during cancel:", calendarError, {
+        organizationId,
+        googleCalendarEventId
+      });
+    }
   }
 
-  return { cancelled: true };
+  return {
+    cancelled: true,
+    calendarDeleted: Boolean(calendarResult?.deleted),
+    calendarAlreadyAbsent: Boolean(calendarResult?.alreadyAbsent),
+    calendarError
+  };
 }
 
 module.exports = {

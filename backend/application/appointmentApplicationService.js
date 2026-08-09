@@ -799,15 +799,34 @@ async function cancelAppointment(id, input, context = {}) {
     throw buildError("NOT_FOUND", "Appointment not found.", 404);
   }
 
-  await cancelCapacitySlot({
-    appointmentType:
-      appointment.purpose === APPOINTMENT_PURPOSES.RECRUITING_INTERVIEW
-        ? APPOINTMENT_TYPES.INTERVIEW
-        : APPOINTMENT_TYPES.MEETING,
-    startTimeISO: appointment.startDateTime,
-    googleCalendarEventId: appointment.calendarEventId,
-    organizationId: appointment.organizationId
-  });
+  // Implements BR-121 — Calendar already-absent / unexpected Calendar failures must not
+  // leave Atlas appointment scheduled. Domain cancel always continues after Calendar attempt.
+  let calendarCancelResult = null;
+  try {
+    calendarCancelResult = await cancelCapacitySlot({
+      appointmentType:
+        appointment.purpose === APPOINTMENT_PURPOSES.RECRUITING_INTERVIEW
+          ? APPOINTMENT_TYPES.INTERVIEW
+          : APPOINTMENT_TYPES.MEETING,
+      startTimeISO: appointment.startDateTime,
+      googleCalendarEventId: appointment.calendarEventId,
+      organizationId: appointment.organizationId
+    });
+  } catch (error) {
+    console.error(
+      "[appointments] calendar/capacity cancel failed; continuing domain cancel (BR-121):",
+      error.message,
+      { appointmentId: appointment.id, calendarEventId: appointment.calendarEventId }
+    );
+  }
+
+  if (calendarCancelResult?.calendarError) {
+    console.error(
+      "[appointments] calendar delete reported error; continuing domain cancel (BR-121):",
+      calendarCancelResult.calendarError,
+      { appointmentId: appointment.id, calendarEventId: appointment.calendarEventId }
+    );
+  }
 
   appointmentReminderEngine.cancelReminders(appointment.id);
 
@@ -819,6 +838,8 @@ async function cancelAppointment(id, input, context = {}) {
 
   const saved = await appointmentRepository.save({
     ...domainUpdated,
+    // BR-121 — reconcile Calendar linkage once domain cancel succeeds.
+    calendarEventId: null,
     reminderStatus: REMINDER_STATUSES.CANCELLED
   });
 
