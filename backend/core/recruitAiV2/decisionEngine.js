@@ -816,6 +816,79 @@ function decideConversationTurn({
     return structured;
   }
 
+  // Implements BR-124 — explicit schedule ask while no confirmed appointment recovers
+  // from stale clarification / DAY_PART-stall residue into the next real missing step.
+  if (intent === INTENTS.REQUEST_SCHEDULE_INTERVIEW) {
+    const status = String(context.appointment?.status || "").toLowerCase();
+    const appointmentId = context.appointment?.appointmentId || null;
+    const confirmed =
+      (status === String(APPOINTMENT_STATUS.CONFIRMED).toLowerCase() ||
+        status === "confirmed") &&
+      Boolean(appointmentId);
+
+    if (confirmed) {
+      // Keep existing confirmed-booking reschedule semantics unchanged.
+      structured.decision.nextAction = NEXT_ACTIONS.OFFER_RESCHEDULE_FLOW;
+      structured.decision.mayCreateAppointment = false;
+      structured.customerReplyPlan.acknowledgeRequest = true;
+      structured.customerReplyPlan.templateKey = "offer_reschedule_flow";
+      structured.reasonCodes.push(REASON_CODES.RESCHEDULE_AFTER_CONFIRMATION);
+      structured.reasonCodes.push(REASON_CODES.APPOINTMENT_ALREADY_CONFIRMED);
+      structured.contextPatch = {
+        appointment: {
+          status: APPOINTMENT_STATUS.RESCHEDULE_REQUESTED
+        },
+        currentStage: STAGES.RESCHEDULING,
+        conversation: {
+          lastProspectIntent: INTENTS.REQUEST_SCHEDULE_INTERVIEW,
+          clarificationCount: 0,
+          pendingClarification: null,
+          lastClarificationTemplateKey: null
+        }
+      };
+      return structured;
+    }
+
+    const resume = resolveQualificationResume(context);
+    const lastQuestionAsked = resume.lastQuestionAsked;
+    structured.decision.nextAction =
+      NEXT_ACTIONS.RESUME_SCHEDULING_AFTER_EXPLICIT_REQUEST;
+    structured.decision.shouldEscalate = false;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = resume.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ...(resume.entities || {})
+    };
+    structured.reasonCodes.push(
+      REASON_CODES.EXPLICIT_SCHEDULE_INTENT_RECOVERS_AMBIGUITY
+    );
+    structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+    structured.contextPatch = {
+      currentStage:
+        lastQuestionAsked === "ask_location" ||
+        lastQuestionAsked === "ask_state" ||
+        lastQuestionAsked === "ask_authorization" ||
+        lastQuestionAsked === "ask_city" ||
+        lastQuestionAsked === "confirm_location"
+          ? STAGES.QUALIFICATION
+          : STAGES.SCHEDULING,
+      attention: {
+        needsHumanAttention: false,
+        reason: null
+      },
+      conversation: {
+        clarificationCount: 0,
+        lastClarificationTemplateKey: null,
+        pendingClarification: null,
+        lastQuestionAsked,
+        lastProspectIntent: INTENTS.REQUEST_SCHEDULE_INTERVIEW
+      }
+    };
+    return structured;
+  }
+
   if (
     intent === INTENTS.JOB_OPPORTUNITY_QUESTION ||
     intent === INTENTS.OPPORTUNITY_QUESTION
@@ -2332,7 +2405,12 @@ function decideConversationTurn({
       structured.decision.nextAction = NEXT_ACTIONS.ESCALATE_TO_HUMAN;
       structured.decision.shouldEscalate = true;
       structured.customerReplyPlan.templateKey = "safe_uncertain_escalate";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        requiresHuman: true
+      };
       structured.reasonCodes.push(REASON_CODES.REPEATED_AMBIGUITY_ESCALATE);
+      structured.reasonCodes.push(REASON_CODES.ESCALATE_HANDOFF_CUSTOMER_ACK);
       structured.contextPatch = {
         attention: {
           needsHumanAttention: true,
@@ -2844,8 +2922,13 @@ function decideConversationTurn({
       structured.decision.nextAction = NEXT_ACTIONS.ESCALATE_TO_HUMAN;
       structured.decision.shouldEscalate = true;
       structured.customerReplyPlan.templateKey = "safe_uncertain_escalate";
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        requiresHuman: true
+      };
       structured.reasonCodes.push(REASON_CODES.LOW_CONFIDENCE);
       structured.reasonCodes.push(REASON_CODES.REPEATED_AMBIGUITY_ESCALATE);
+      structured.reasonCodes.push(REASON_CODES.ESCALATE_HANDOFF_CUSTOMER_ACK);
       structured.contextPatch = {
         attention: {
           needsHumanAttention: true,
@@ -2896,7 +2979,12 @@ function decideSafeFailure({ context, interpretation, failureReason = null } = {
   structured.decision.mayCreateAppointment = false;
   structured.customerReplyPlan.templateKey = "safe_failure_escalate";
   structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    requiresHuman: true
+  };
   structured.reasonCodes.push(REASON_CODES.FORBID_INTERNAL_DIAGNOSTICS);
+  structured.reasonCodes.push(REASON_CODES.ESCALATE_HANDOFF_CUSTOMER_ACK);
   if (failureReason) {
     structured.internalFailureReason = String(failureReason).slice(0, 120);
   }

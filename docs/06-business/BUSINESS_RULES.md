@@ -1343,6 +1343,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-124 — Explicit Schedule Intent Recovers Stale Pre-Appointment Ambiguity
+
+**Implements:** Strong renewed “schedule an interview” intent resumes qualification/scheduling when no active confirmed appointment exists; stale clarification counters must not escalate that ask into silence  
+**Domain:** Recruit AI v2 conversation / pre-booking recovery / escalation UX  
+**Depends on:** BR-081, BR-082, BR-088, BR-114  
+**Related:** BR-034 (human ownership delivery), BR-080 (attention read-only from v2), BR-111/112 (execution unchanged)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/interpreter.js`, `recruitAiV2/decisionEngine.js`, `communicationHub.js`  
+**Tests:** `backend/test/recruitAiV2ScheduleIntentRecoveryBr124.test.js`
+
+### Rules
+
+1. **Explicit schedule intent** — Phrases such as “quiero agendar una entrevista” / “I want to schedule an interview” classify as `request_schedule_interview` with high confidence (not `unknown`).
+2. **Pre-booking recovery** — When durable appointment is not confirmed (e.g. `none` / empty / proposed without confirmation authority) and no confirmed `appointmentId`, this intent **resets** `clarificationCount` / pending clarification and resumes the next missing qualification or scheduling step (ask only what is still needed).
+3. **Do not escalate solely on stale repeats** — Prior recoverable-ambiguity counts must not force `escalate_to_human` when the new message is an explicit schedule request under rule 2.
+4. **Confirmed appointment unchanged** — If durable appointment is already confirmed with an `appointmentId`, treat the ask as reschedule-flow semantics (existing BR-081 reschedule path); do not wipe confirmed booking state into day-part recovery.
+5. **Weak inputs still escalate** — Ambiguous fragments / incomplete day-part with repeated clarification in the same family still escalate after the existing BR-082 threshold.
+6. **Genuine escalate must speak** — When `escalate_to_human` / safe-failure escalate remains correct, customer copy uses the handoff template (`requiresHuman=true`). Delivery may still send that one acknowledgement even if workflow already shows AGENT human ownership — silence is not the product outcome for escalate.
+7. **Schedule-recovery delivery** — Live V2 authored resume replies after rule 2 may likewise be delivered despite prior AGENT ownership so the prospect is not left without a next question.
+8. **Boundaries** — No BR-080 ownership/attention writes from v2 persistence. Does not enable execution, change authoring allowlists, or alter PR #88 post-success confirmation ownership. No WhatsApp/appointment/Calendar mutations from this rule alone.
+
+---
+
 ## BR-122 — Schedule Result Reconciliation (No Failure With Live Appointment)
 
 **Implements:** Partial-write customer/system consistency — never tell the customer booking failed while an active `atlas_appointments` row remains  

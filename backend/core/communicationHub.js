@@ -31,10 +31,13 @@ function extractReplyText(engineResult) {
 
 /**
  * Business-rules gate before automated outbound delivery (BR-034 human ownership, workflow gate).
+ * BR-124 — optional allowHandoffAck delivers genuine V2 escalate / schedule-recovery replies
+ * even when workflowState already has AGENT human ownership (avoids customer silence).
  * @param {Object} prospect
+ * @param {{ allowHandoffAck?: boolean }} [options]
  * @returns {boolean}
  */
-function shouldDeliverAutomatedReply(prospect) {
+function shouldDeliverAutomatedReply(prospect, options = {}) {
   if (!prospect) {
     return false;
   }
@@ -56,6 +59,10 @@ function shouldDeliverAutomatedReply(prospect) {
     persisted.needsHumanAttention &&
     persisted.workflowOwnership === OWNERSHIP.AGENT
   ) {
+    // Implements BR-124 — still deliver one customer-facing handoff/recovery ack.
+    if (options.allowHandoffAck === true) {
+      return true;
+    }
     return false;
   }
 
@@ -76,7 +83,16 @@ async function deliverWhatsAppReply({
   engineResult,
   outboundIntent = "CONVERSATION_ENGINE_REPLY"
 }) {
-  if (!shouldDeliverAutomatedReply(prospect)) {
+  const nextAction = String(engineResult?.nextAction || "");
+  const isV2Authoring = engineResult?.source === "recruit_ai_v2_live_authoring";
+  const allowHandoffAck =
+    isV2Authoring &&
+    (nextAction === "escalate_to_human" ||
+      nextAction === "safe_failure_and_escalate" ||
+      nextAction === "resume_scheduling_after_explicit_request" ||
+      nextAction === "offer_alternatives_or_escalate");
+
+  if (!shouldDeliverAutomatedReply(prospect, { allowHandoffAck })) {
     logWhatsAppStage("conversation_engine_reply_suppressed", {
       phone: normalized.phone,
       reason: "BUSINESS_RULES_OR_HUMAN_OWNERSHIP"
