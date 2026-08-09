@@ -1343,12 +1343,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-126 — Deferred Create Remains Confirmable (No CE Qualification Hijack)
+
+**Implements:** After slot confirm + speak-only deferred handoff (`appointment_confirm_deferred` because execution was OFF), durable stays resumable; a later affirmative must resolve as `schedule_confirm` / `create_appointment`, never fall through to legacy CE city/state qualification  
+**Domain:** Recruit AI v2 live WhatsApp runtime / deferred confirmation continuity  
+**Depends on:** BR-111, BR-112, BR-114, BR-125  
+**Related:** BR-103 (confirmable proposal), BR-120, BR-127 (qualification sync on create — independent)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/liveAuthoringBridge.js`, `recruitAiV2/decisionEngine.js`, `recruitAiV2/orchestrator.js`, `recruitAiV2/interpreter.js`, `recruitAiV2/locationFacts.js`, `communicationHub.js`  
+**Tests:** `backend/test/deferredConfirmResumabilityBr126.test.js`
+
+### Rules
+
+1. **Deferred preserves proposal** — `appointment_confirm_deferred` keeps `appointment.status=proposed`, exact `proposedDate`/`proposedTime`, `lastQuestionAsked=confirm_slot`, `lastProspectIntent=schedule_confirm`, and `lastOfferMade=appointment_confirm_deferred` (plus outbound text when authored).
+2. **Later affirmative resumes create** — With that durable state, bare `Si`/`Yes` classifies as `schedule_confirm` and decides `create_appointment` (execution still env-gated).
+3. **No CE fallthrough on confirmable proposed** — Authoring timeout/empty/technical failure or cancelled create rollback must not hand the turn to legacy CE while a confirmable proposal remains; V2 owns soft failure (`appointment_create_failed`) or successful reclaim (BR-125) instead.
+4. **Affirmatives are not cities** — Location extractors must not treat bare affirmatives as city names while confirmation is pending.
+5. **Exact slot authoritative** — Do not invent a different slot; reuse the proposed offered slot.
+6. **Execution OFF** — Deferred path still creates zero appointments / Calendar events.
+7. **Boundaries** — Does not broaden execution allowlists; does not auto-cleanup cancelled canary rows; Calendar rollback root causes remain separate from this continuity rule; does not change BR-127 qualification sync.
+
+---
+
 ## BR-127 — Canonical Qualification Fact Synchronization for Interview Scheduling
 
 **Implements:** Before advancing to `INTERVIEW_SCHEDULED` from Recruit AI V2 execution, synchronize durable V2 qualification facts (`city` / `state` / `workAuthorization`) into the workflow validation layer so milestone checks do not fail on stale sparse legacy nulls  
 **Domain:** Recruit AI v2 execution / workflow advancement / qualification  
 **Depends on:** BR-037, BR-049, BR-111, BR-112, BR-120, BR-121  
-**Related:** BR-123 (occupation optional), BR-122 (schedule reconcile), BR-126 (deferred continuity — independent HOLD)  
+**Related:** BR-123 (occupation optional), BR-122 (schedule reconcile), BR-126 (deferred continuity — independent)  
 **Status:** Implemented  
 **Engine target:** `recruitAiV2/qualificationFactSync.js`, `missionExecutionApplicationService.js` (`executeScheduleInterview`), `recruitAiV2/sideEffectExecutor.js`, `milestoneValidationEngine.js`  
 **Tests:** `backend/test/qualificationFactSyncBr127.test.js`, `backend/test/scheduleWorkflowRollbackMissingQualFields.test.js`
@@ -1372,7 +1394,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** When live authoring decides `create_appointment` and a mutation succeeds (or an active Atlas appointment matches the proposed slot), V2 owns durable confirmed + `appointment_confirmed` reply; CE must not take create/reply ownership via timeout fallthrough or “already confirmed” stub  
 **Domain:** Recruit AI v2 live WhatsApp runtime / post-execution ownership  
 **Depends on:** BR-088 (PR #88 ownership), BR-111, BR-112, BR-114, BR-122  
-**Related:** BR-120, BR-121, BR-123, BR-124, BR-127  
+**Related:** BR-120, BR-121, BR-123, BR-124, BR-126, BR-127  
 **Status:** Implemented  
 **Engine target:** `recruitAiV2/liveAuthoringBridge.js`, `recruitAiV2/postCreateOwnership.js`, `communicationHub.js`, `semanticConversationEngine.js`  
 **Tests:** `backend/test/livePathPostCreateOwnershipBr125.test.js`

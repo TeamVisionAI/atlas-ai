@@ -577,9 +577,13 @@ async function processRecruitAiV2Turn({
     interpretation,
     structuredDecision
   });
+  const authoredOutbound = String(rendered?.text || "").trim();
   nextContext.conversation = {
     ...nextContext.conversation,
-    lastOfferMade: responsePlan.templateKey || nextContext.conversation.lastOfferMade
+    lastOfferMade: responsePlan.templateKey || nextContext.conversation.lastOfferMade,
+    // Implements BR-126 — keep outbound text so later affirmatives remain confirmable.
+    lastAtlasOutboundText:
+      authoredOutbound || nextContext.conversation.lastAtlasOutboundText || null
   };
   nextContext = applyExecutionToContext(nextContext, execution);
 

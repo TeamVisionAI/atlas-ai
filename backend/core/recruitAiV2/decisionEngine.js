@@ -2907,7 +2907,11 @@ function decideConversationTurn({
       },
       conversation: {
         lastQuestionAsked: "confirm_slot",
-        lastProspectIntent: INTENTS.SCHEDULE_CONFIRM
+        lastProspectIntent: INTENTS.SCHEDULE_CONFIRM,
+        // Implements BR-126 — deferred create must remain resumable.
+        lastOfferMade: "appointment_confirm_deferred",
+        pendingClarification: null,
+        clarificationCount: 0
       },
       currentStage: STAGES.PROPOSED
     };

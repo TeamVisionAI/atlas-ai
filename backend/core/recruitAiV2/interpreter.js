@@ -1123,6 +1123,17 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.requestedTime = requestedTime;
     }
   } else if (
+    // Implements BR-126 — bare affirmatives never qualify as city/state while a
+    // proposed slot is awaiting confirmation (incl. deferred create).
+    isAffirmative(text) &&
+    (String(context?.conversation?.lastQuestionAsked || "") === "confirm_slot" ||
+      String(context?.conversation?.lastOfferMade || "") ===
+        "appointment_confirm_deferred" ||
+      String(context?.appointment?.status || "") === APPOINTMENT_STATUS.PROPOSED)
+  ) {
+    intent = INTENTS.SCHEDULE_CONFIRM;
+    confidence = 0.9;
+  } else if (
     // Preference captured / availability pending — "ok" / "está bien" is soft ack only.
     isSoftAcknowledgement(text) ||
     (isAffirmative(text) &&

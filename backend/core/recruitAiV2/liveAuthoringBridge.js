@@ -34,13 +34,20 @@ const {
   createMemoryContextRepository
 } = require("./contextRepository");
 const { resolvePostCreateOwnership } = require("./postCreateOwnership");
+const {
+  hasConfirmableAppointmentProposal
+} = require("./schedulingConfirmation");
+const { renderCustomerReply } = require("./responseRenderer");
+const { APPOINTMENT_STATUS } = require("./conversationContext");
 
 const STAGES = Object.freeze({
   ATTEMPTED: "recruit_ai_v2_live_authoring_attempted",
   USED: "recruit_ai_v2_live_authoring_used",
   FALLBACK: "recruit_ai_v2_live_authoring_fallback_to_legacy",
   SKIPPED: "recruit_ai_v2_live_authoring_skipped",
-  OWNED_AFTER_MUTATION: "recruit_ai_v2_live_authoring_owned_after_mutation"
+  OWNED_AFTER_MUTATION: "recruit_ai_v2_live_authoring_owned_after_mutation",
+  // Implements BR-126 — protect confirmable proposed from CE fallthrough.
+  OWNED_CONFIRMABLE_PROPOSAL: "recruit_ai_v2_live_authoring_owned_confirmable_proposal"
 });
 
 /** Extra wait after soft timeout so in-flight mission creates can finish ownership. */
@@ -245,6 +252,238 @@ async function reclaimOwnershipAfterAuthoringLoss({
     stage: STAGES.OWNED_AFTER_MUTATION,
     ownershipSource: ownership.source
   };
+}
+
+/**
+ * Implements BR-126 — after deferred/create-attempt authoring loss, never hand a
+ * confirmable proposed slot to legacy CE (which may treat "Si" as a city name).
+ */
+function isConfirmableProposedDurable(context = null) {
+  if (!context) {
+    return false;
+  }
+  const status = String(context.appointment?.status || "");
+  const lastQ = String(context.conversation?.lastQuestionAsked || "");
+  const lastOffer = String(context.conversation?.lastOfferMade || "");
+  const lastIntent = String(context.conversation?.lastProspectIntent || "");
+  const proposed =
+    status === APPOINTMENT_STATUS.PROPOSED ||
+    status === "proposed" ||
+    Boolean(context.appointment?.proposedDate && context.appointment?.proposedTime);
+
+  if (!proposed) {
+    return false;
+  }
+  if (hasConfirmableAppointmentProposal(context)) {
+    return true;
+  }
+  if (lastQ === "confirm_slot") {
+    return true;
+  }
+  if (lastIntent === "schedule_confirm") {
+    return true;
+  }
+  if (
+    lastOffer === "appointment_confirm_deferred" ||
+    lastOffer === "appointment_create_failed" ||
+    lastOffer === "ask_confirm_slot"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+async function loadDurableForConfirmableGuard({
+  persistence = null,
+  organizationId = null,
+  prospect = {},
+  normalized = {},
+  late = null
+} = {}) {
+  const fromLate = late?.nextContext || late?.context || null;
+  if (fromLate && isConfirmableProposedDurable(fromLate)) {
+    return fromLate;
+  }
+  if (!persistence || !organizationId) {
+    return fromLate;
+  }
+  const prospectId =
+    late?.nextContext?.prospectId ||
+    late?.context?.prospectId ||
+    null;
+  try {
+    const loaded = await persistence.loadOrReconstruct({
+      organizationId,
+      prospectId: prospectId || prospect.id || null,
+      channel: "whatsapp",
+      reconstructionInput: {},
+      prospectPhone: prospect.phone || normalized.phone || null,
+      legacyProspectId: prospect.id || null,
+      ensureCore: true
+    });
+    return loaded?.context || fromLate;
+  } catch {
+    return fromLate;
+  }
+}
+
+async function ownConfirmableProposalAfterAuthoringLoss({
+  error = null,
+  v2Result = null,
+  prospect = {},
+  normalized = {},
+  organizationId = null,
+  actingUserId = null,
+  allowExecution = false,
+  persistence = null,
+  logStage = null
+} = {}) {
+  let late = v2Result;
+  if (!late && typeof error?.awaitTracked === "function") {
+    try {
+      late = await Promise.race([
+        error.awaitTracked(),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("POST_TIMEOUT_GRACE_EXCEEDED")), POST_TIMEOUT_GRACE_MS);
+        })
+      ]);
+    } catch {
+      late = typeof error.getLateResult === "function" ? error.getLateResult() : null;
+    }
+  } else if (!late && typeof error?.getLateResult === "function") {
+    late = error.getLateResult();
+  }
+
+  const durable = await loadDurableForConfirmableGuard({
+    persistence,
+    organizationId,
+    prospect,
+    normalized,
+    late
+  });
+
+  if (!isConfirmableProposedDurable(durable)) {
+    return null;
+  }
+
+  const language =
+    durable.preferredLanguage ||
+    late?.nextContext?.preferredLanguage ||
+    late?.context?.preferredLanguage ||
+    "spanish";
+
+  const lateFailed = Boolean(late?.execution?.attempted && !late?.execution?.success);
+  const lateFailedReply = extractAuthoredReplyText(late);
+  const templateKey =
+    lateFailed || allowExecution
+      ? "appointment_create_failed"
+      : "appointment_confirm_deferred";
+
+  let replyText = "";
+  if (lateFailed && lateFailedReply) {
+    replyText = lateFailedReply;
+  } else {
+    replyText = extractAuthoredReplyText({
+      rendered: renderCustomerReply({
+        templateKey,
+        language,
+        entities: {
+          dateLabel: durable.appointment?.proposedDate || null,
+          requestedDate: durable.appointment?.proposedDate || null,
+          requestedTime: durable.appointment?.proposedTime || null
+        }
+      })
+    });
+  }
+
+  if (!replyText) {
+    return null;
+  }
+
+  const nextContext = {
+    ...durable,
+    currentStage: durable.currentStage || "proposed",
+    appointment: {
+      ...durable.appointment,
+      status: APPOINTMENT_STATUS.PROPOSED,
+      appointmentId: null,
+      confirmedDate: null,
+      confirmedTime: null,
+      proposedDate: durable.appointment?.proposedDate || null,
+      proposedTime: durable.appointment?.proposedTime || null
+    },
+    conversation: {
+      ...durable.conversation,
+      lastQuestionAsked: "confirm_slot",
+      lastProspectIntent: "schedule_confirm",
+      lastOfferMade: templateKey,
+      lastAtlasOutboundText: replyText,
+      pendingClarification: null,
+      clarificationCount: 0
+    }
+  };
+
+  if (persistence && organizationId) {
+    try {
+      await persistence.compareAndSaveContext({
+        organizationId,
+        prospectId: durable.prospectId || late?.nextContext?.prospectId || null,
+        channel: "whatsapp",
+        expectedVersion: durable._persistence?.contextVersion || undefined,
+        nextContext,
+        inboundMessageId: normalized.providerMessageId || null,
+        decisionCode: "create_appointment",
+        prospectPhone: prospect.phone || normalized.phone || null,
+        legacyProspectId: prospect.id || null,
+        ensureCore: true
+      });
+    } catch {
+      // Soft: still own the customer reply.
+    }
+  }
+
+  if (typeof logStage === "function") {
+    logStage(STAGES.OWNED_CONFIRMABLE_PROPOSAL, {
+      phone: normalized.phone || prospect.phone || null,
+      organizationId,
+      agentId: actingUserId,
+      allowExecution,
+      templateKey,
+      providerMessageId: normalized.providerMessageId || null
+    });
+  }
+
+  return {
+    eligible: true,
+    authored: true,
+    fallThrough: false,
+    reason: null,
+    replyText,
+    v2Result: late || {
+      nextContext,
+      responsePlan: { templateKey },
+      structuredDecision: {
+        decision: { nextAction: "create_appointment" }
+      }
+    },
+    actingUserId,
+    organizationId,
+    nextAction: "create_appointment",
+    allowExecution,
+    stage: STAGES.OWNED_CONFIRMABLE_PROPOSAL,
+    ownershipSource: "confirmable_proposal_guard"
+  };
+}
+
+/**
+ * BR-125 success reclaim, else BR-126 confirmable-proposal guard (no CE).
+ */
+async function reclaimOrProtectConfirmableProposal(args = {}) {
+  const reclaimed = await reclaimOwnershipAfterAuthoringLoss(args);
+  if (reclaimed?.authored && reclaimed.replyText) {
+    return reclaimed;
+  }
+  return ownConfirmableProposalAfterAuthoringLoss(args);
 }
 
 function extractAuthoredReplyText(v2Result) {
@@ -462,7 +701,7 @@ async function attemptLiveV2Authoring({
     }
 
     if (!replyText) {
-      const reclaimed = await reclaimOwnershipAfterAuthoringLoss({
+      const protectedReply = await reclaimOrProtectConfirmableProposal({
         v2Result,
         prospect,
         normalized,
@@ -473,8 +712,8 @@ async function attemptLiveV2Authoring({
         findActiveAppointment: dependencies.findActiveAppointmentForProspect,
         logStage
       });
-      if (reclaimed) {
-        return reclaimed;
+      if (protectedReply) {
+        return protectedReply;
       }
 
       if (typeof logStage === "function") {
@@ -533,7 +772,7 @@ async function attemptLiveV2Authoring({
         ? "LIVE_AUTHORING_TIMEOUT"
         : "LIVE_AUTHORING_TECHNICAL_FAILURE";
 
-    const reclaimed = await reclaimOwnershipAfterAuthoringLoss({
+    const protectedReply = await reclaimOrProtectConfirmableProposal({
       error,
       prospect,
       normalized,
@@ -544,8 +783,8 @@ async function attemptLiveV2Authoring({
       findActiveAppointment: dependencies.findActiveAppointmentForProspect,
       logStage
     });
-    if (reclaimed) {
-      return reclaimed;
+    if (protectedReply) {
+      return protectedReply;
     }
 
     if (typeof logStage === "function") {
@@ -581,6 +820,9 @@ module.exports = {
   extractAuthoredReplyText,
   withTimeout,
   reclaimOwnershipAfterAuthoringLoss,
+  ownConfirmableProposalAfterAuthoringLoss,
+  reclaimOrProtectConfirmableProposal,
+  isConfirmableProposedDurable,
   createDefaultPersistenceService,
   isEligibleForLiveAuthoring,
   resolveActingUserIdFromProspect,

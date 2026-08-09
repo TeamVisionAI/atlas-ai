@@ -453,6 +453,10 @@ function parseLocationAnswerCore(raw) {
   }
 
   // Single-token alphabetic city candidate (unknown city → ask state, no invent).
+  // Implements BR-126 — bare affirmatives are never cities ("Si" / "Yes").
+  if (/^(si|sí|yes|yep|yeah|ok|okay|dale|claro)$/i.test(working)) {
+    return null;
+  }
   if (/^[A-Za-z][A-Za-z'-]{2,40}$/.test(working) && !/\s/.test(working)) {
     if (normalizeStateToken(working)) {
       return {

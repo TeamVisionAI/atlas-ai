@@ -219,39 +219,44 @@ async function processNormalizedInboundMessage(
       });
     }
 
-    // Implements BR-125 — never hand create ownership to CE if V2 already mutated
-    // or an active appointment matches this confirm turn after authoring loss.
+    // Implements BR-125 / BR-126 — never hand create/confirmable-proposed ownership to CE
+    // after authoring loss (timeout, empty reply, or cancelled create rollback).
     if (
       authoringAttempt?.fallThrough &&
       (authoringAttempt.nextAction === "create_appointment" ||
         authoringAttempt.reason === "LIVE_AUTHORING_TIMEOUT" ||
-        authoringAttempt.reason === "EMPTY_OR_UNSAFE_REPLY")
+        authoringAttempt.reason === "EMPTY_OR_UNSAFE_REPLY" ||
+        authoringAttempt.reason === "LIVE_AUTHORING_TECHNICAL_FAILURE")
     ) {
       try {
         const {
-          reclaimOwnershipAfterAuthoringLoss
+          reclaimOrProtectConfirmableProposal,
+          createDefaultPersistenceService
         } = require("./recruitAiV2/liveAuthoringBridge");
-        const reclaimed = await reclaimOwnershipAfterAuthoringLoss({
+        const protectedReply = await reclaimOrProtectConfirmableProposal({
           v2Result: authoringAttempt.v2Result,
           prospect,
           normalized,
           organizationId: prospect.organization_id || prospect.organizationId || null,
           actingUserId: authoringAttempt.actingUserId,
           allowExecution: authoringAttempt.allowExecution,
+          persistence:
+            authoringDependencies?.persistenceService ||
+            createDefaultPersistenceService(),
           findActiveAppointment: authoringDependencies?.findActiveAppointmentForProspect,
           logStage: logWhatsAppStage
         });
-        if (reclaimed?.authored && reclaimed.replyText) {
+        if (protectedReply?.authored && protectedReply.replyText) {
           return deliverWhatsAppReply({
             normalized,
             prospect,
-            replyText: reclaimed.replyText,
+            replyText: protectedReply.replyText,
             engineResult: {
-              reply: reclaimed.replyText,
+              reply: protectedReply.replyText,
               outboundIntent: "CONVERSATION_ENGINE_REPLY",
               source: "recruit_ai_v2_live_authoring",
-              nextAction: reclaimed.nextAction,
-              v2Result: reclaimed.v2Result
+              nextAction: protectedReply.nextAction,
+              v2Result: protectedReply.v2Result
             },
             outboundIntent: "CONVERSATION_ENGINE_REPLY"
           });
