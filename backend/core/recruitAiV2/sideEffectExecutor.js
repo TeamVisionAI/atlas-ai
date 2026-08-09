@@ -9,6 +9,8 @@
  */
 
 const { REASON_CODES, V2_EXECUTABLE_ACTIONS } = require("./constants");
+const { isActiveAppointment } = require("../activeAppointmentResolver");
+const { buildIsoTimestamp } = require("../../services/availabilityService");
 
 function resolveProspectPhone({ context, options } = {}) {
   return (
@@ -85,6 +87,50 @@ function slotsInclude(slots, dateKey, timeKey) {
     const t = slot.timeKey || slot.time;
     return String(d) === String(dateKey) && String(t) === String(timeKey);
   });
+}
+
+/**
+ * BR-122 — Authoritative orphan for THIS create attempt:
+ * active lifecycle + same org scope (caller) + start instant matches requested date/time.
+ * Rejects unrelated older active appointments for the same phone.
+ */
+function appointmentMatchesRequestedSlot(appointment, dateKey, timeKey, timezone = "America/New_York") {
+  if (!appointment?.id || !dateKey || !timeKey) {
+    return false;
+  }
+  if (!isActiveAppointment(appointment)) {
+    return false;
+  }
+
+  const start =
+    appointment.startDateTime ||
+    appointment.start_date_time ||
+    appointment.scheduledTime ||
+    null;
+  if (!start) {
+    return false;
+  }
+
+  let expectedIso;
+  try {
+    expectedIso = buildIsoTimestamp(dateKey, timeKey, timezone || "America/New_York");
+  } catch {
+    return false;
+  }
+
+  return new Date(start).getTime() === new Date(expectedIso).getTime();
+}
+
+/**
+ * Prefer the appointment id from THIS schedule attempt when present on a failure payload.
+ */
+function resolveAttemptAppointmentId(scheduleResult) {
+  return (
+    scheduleResult?.appointmentId ||
+    scheduleResult?.appointment?.id ||
+    scheduleResult?.id ||
+    null
+  );
 }
 
 /**
@@ -290,6 +336,55 @@ async function executeAuthorizedSideEffects({
   }
 
   if (!scheduleResult?.success) {
+    // Implements BR-122 — safety net: reconcile only an authoritative orphan for THIS slot.
+    try {
+      const timezone = context?.timezone || "America/New_York";
+      const attemptId = resolveAttemptAppointmentId(scheduleResult);
+      let orphan = null;
+
+      if (attemptId) {
+        const findById =
+          dependencies.findAppointmentById ||
+          ((id, orgId) =>
+            require("../activeAppointmentResolver").findAppointmentById(id, orgId));
+        orphan = await findById(attemptId, organizationId);
+      }
+
+      if (!orphan?.id) {
+        orphan = await findActive(phone, organizationId, agentId);
+      }
+
+      if (
+        orphan?.id &&
+        appointmentMatchesRequestedSlot(orphan, dateKey, timeKey, timezone)
+      ) {
+        performed.push({
+          type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
+          appointmentId: orphan.id,
+          idempotent: false,
+          inboundMessageId,
+          dateKey,
+          timeKey,
+          timezone,
+          reconciled: true,
+          reconcileReason: "ACTIVE_APPOINTMENT_AFTER_CANONICAL_FAILURE"
+        });
+        return {
+          attempted: true,
+          performed,
+          failed: [],
+          skipped,
+          success: true,
+          appointmentId: orphan.id,
+          reason: REASON_CODES.EXECUTION_RECONCILED_ACTIVE_APPOINTMENT,
+          scheduleResult,
+          reconciledFromCanonicalFailure: true
+        };
+      }
+    } catch {
+      // Fall through to failure path if orphan lookup fails.
+    }
+
     failed.push({
       type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
       reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
@@ -346,5 +441,7 @@ module.exports = {
   resolveConfirmedSlot,
   resolveProspectPhone,
   resolveInterviewType,
-  slotsInclude
+  slotsInclude,
+  appointmentMatchesRequestedSlot,
+  resolveAttemptAppointmentId
 };

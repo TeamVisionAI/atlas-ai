@@ -352,15 +352,20 @@ function applyExecutionToContext(nextContext, execution) {
     return nextContext;
   }
   const performed = execution.performed?.[0] || {};
+  const confirmedDate = performed.dateKey || nextContext.appointment?.proposedDate || null;
+  const confirmedTime = performed.timeKey || nextContext.appointment?.proposedTime || null;
   return {
     ...nextContext,
+    timezone: performed.timezone || nextContext.timezone || "America/New_York",
     currentStage: STAGES.CONFIRMED,
     appointment: {
       ...nextContext.appointment,
       status: APPOINTMENT_STATUS.CONFIRMED,
       appointmentId: execution.appointmentId,
-      confirmedDate: performed.dateKey || nextContext.appointment?.proposedDate || null,
-      confirmedTime: performed.timeKey || nextContext.appointment?.proposedTime || null
+      proposedDate: confirmedDate,
+      proposedTime: confirmedTime,
+      confirmedDate,
+      confirmedTime
     }
   };
 }
@@ -746,5 +751,7 @@ function processRecruitAiV2TurnSync(args = {}) {
 
 module.exports = {
   processRecruitAiV2Turn,
-  processRecruitAiV2TurnSync
+  processRecruitAiV2TurnSync,
+  applyExecutionOutcomeToReply,
+  applyExecutionToContext
 };
