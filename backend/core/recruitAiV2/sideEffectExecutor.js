@@ -383,7 +383,10 @@ async function executeAuthorizedSideEffects({
         organizationId,
         agentId,
         userId: agentId,
-        inboundMessageId
+        inboundMessageId,
+        // Implements BR-127 — pass durable knownFacts for workflow qual sync.
+        recruitAiV2Context: context || null,
+        recruitAiV2CoreProspectId: context?.prospectId || options.prospectId || null
       }
     );
   } catch (error) {

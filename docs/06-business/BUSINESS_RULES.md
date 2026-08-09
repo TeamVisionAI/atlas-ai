@@ -1343,12 +1343,35 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-127 — Canonical Qualification Fact Synchronization for Interview Scheduling
+
+**Implements:** Before advancing to `INTERVIEW_SCHEDULED` from Recruit AI V2 execution, synchronize durable V2 qualification facts (`city` / `state` / `workAuthorization`) into the workflow validation layer so milestone checks do not fail on stale sparse legacy nulls  
+**Domain:** Recruit AI v2 execution / workflow advancement / qualification  
+**Depends on:** BR-037, BR-049, BR-111, BR-112, BR-120, BR-121  
+**Related:** BR-123 (occupation optional), BR-122 (schedule reconcile), BR-126 (deferred continuity — independent HOLD)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/qualificationFactSync.js`, `missionExecutionApplicationService.js` (`executeScheduleInterview`), `recruitAiV2/sideEffectExecutor.js`, `milestoneValidationEngine.js`  
+**Tests:** `backend/test/qualificationFactSyncBr127.test.js`, `backend/test/scheduleWorkflowRollbackMissingQualFields.test.js`
+
+### Rules
+
+1. **V2 durable facts must reach workflow validation** — When V2 execution schedules an interview, city / state / workAuthorization collected in durable `knownFacts` must be available to `validateMilestoneAdvancement` (via `capturedFields` and null legacy column hydration). Do **not** require the prospect to repeat confirmed facts.
+2. **Sync point** — Run synchronization immediately before `advanceProspectWorkflow` → `INTERVIEW_SCHEDULED` inside `executeScheduleInterview`, **only** when `recruitAiV2Context` is explicitly provided by the V2 side-effect executor. Non-V2 mission schedule paths are unchanged.
+3. **Minimum sync fields** — `city`, `state`, `workAuthorization` / `authorization`. Occupation remains optional (BR-123).
+4. **Scoped identity** — Synchronization is organization-scoped and identity-safe (BR-120): org must match; expected legacy prospect id and core prospect id must match the schedule-time prospect / durable mapping. Wrong mapping → fail closed (no mutation).
+5. **Conflict precedence** — If legacy already holds a **non-null** value that normalizes differently from durable, **fail closed** (`QUALIFICATION_FACT_CONFLICT`) and trigger BR-121 schedule rollback. Do **not** silently overwrite. Equal/normalized-equal values are sync-noop for that column; null legacy columns may be filled from durable.
+6. **Validate authoritative synced facts** — Advancement must use the synchronized `capturedFields` (and updated prospect snapshot), not stale legacy nulls alone.
+7. **Email is invitation enrichment** — Missing email must **not** block `INTERVIEW_READY` / `INTERVIEW_SCHEDULED` / `INTERVIEW_DUE`. Booking and workflow advancement succeed; confirmation/invitation may still reflect missing email outside milestone gates.
+8. **Boundaries** — Does not redesign prospect storage; does not mass-migrate historical prospects; does not enable BR-111 execution; does not merge or depend on BR-126 continuity; Calendar cancel / BR-121 rollback must still fire on genuine advance failure after a successful sync.
+
+---
+
 ## BR-125 — Single Post-Create Ownership After Live V2 Mutation
 
 **Implements:** When live authoring decides `create_appointment` and a mutation succeeds (or an active Atlas appointment matches the proposed slot), V2 owns durable confirmed + `appointment_confirmed` reply; CE must not take create/reply ownership via timeout fallthrough or “already confirmed” stub  
 **Domain:** Recruit AI v2 live WhatsApp runtime / post-execution ownership  
 **Depends on:** BR-088 (PR #88 ownership), BR-111, BR-112, BR-114, BR-122  
-**Related:** BR-120, BR-121, BR-123, BR-124  
+**Related:** BR-120, BR-121, BR-123, BR-124, BR-127  
 **Status:** Implemented  
 **Engine target:** `recruitAiV2/liveAuthoringBridge.js`, `recruitAiV2/postCreateOwnership.js`, `communicationHub.js`, `semanticConversationEngine.js`  
 **Tests:** `backend/test/livePathPostCreateOwnershipBr125.test.js`
