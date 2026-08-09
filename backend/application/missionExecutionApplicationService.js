@@ -299,8 +299,11 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     return buildActionError(ACTION_IDS.SCHEDULE, "PROSPECT_NOT_FOUND", "Prospect not found.");
   }
 
+  const deps = options.dependencies || {};
+
   const organizationId = requireTenantOrganizationId(options.organizationId);
-  const prospect = await resolveTenantProspect(phone, options);
+  const resolveProspect = deps.resolveTenantProspect || resolveTenantProspect;
+  const prospect = await resolveProspect(phone, options);
 
   if (!prospect) {
     return buildActionError(ACTION_IDS.SCHEDULE, "PROSPECT_NOT_FOUND", "Prospect not found.");
@@ -312,14 +315,15 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   const isPublicLocation = interviewType === "Public Location";
   const attendeeEmail = resolveProspectEmail(prospect, payload);
 
-  const locationResult = await meetingManagementService.resolveInterviewLocation(
-    organizationId,
-    interviewType,
-    {
-      publicLocation: payload.publicLocation,
-      officeLocation: payload.officeLocation
-    }
-  );
+  const resolveLocation =
+    deps.resolveInterviewLocation ||
+    ((orgId, type, locs) =>
+      meetingManagementService.resolveInterviewLocation(orgId, type, locs));
+
+  const locationResult = await resolveLocation(organizationId, interviewType, {
+    publicLocation: payload.publicLocation,
+    officeLocation: payload.officeLocation
+  });
 
   if (!locationResult.configured) {
     const errorCode =
@@ -370,7 +374,11 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
 
   // Implements BR-120 — canonical core identity must resolve BEFORE Calendar create.
   // Never create Calendar / capacity when prospect identity cannot be ensured.
-  const identity = await resolveCanonicalProspectIdentity({
+  const resolveIdentity =
+    deps.resolveCanonicalProspectIdentity || resolveCanonicalProspectIdentity;
+  const scheduleAppt = deps.scheduleAppointment || scheduleAppointment;
+
+  const identity = await resolveIdentity({
     phone: prospect.phone || phone,
     organizationId,
     displayName: prospect.name || null,
@@ -390,7 +398,7 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   let bookingResult;
 
   try {
-    bookingResult = await scheduleAppointment({
+    bookingResult = await scheduleAppt({
       organizationId,
       appointmentType: APPOINTMENT_TYPES.INTERVIEW,
       dateKey: payload.dateKey,

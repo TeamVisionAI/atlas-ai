@@ -79,7 +79,9 @@ function mockDeps({ scheduleCalls }) {
             id: "appt-1",
             status: "scheduled",
             startDateTime: "2026-08-11T23:00:00.000Z",
-            organizationId: TEAM_VISION_ORG
+            organizationId: TEAM_VISION_ORG,
+            agentId: PRIMARY_RVP,
+            prospectId: "prospect-live-1"
           }
         : null,
     getSlots: async () => [{ dateKey: "2026-08-11", timeKey: "19:00" }],

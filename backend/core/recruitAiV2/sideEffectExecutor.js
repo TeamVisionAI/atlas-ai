@@ -90,16 +90,53 @@ function slotsInclude(slots, dateKey, timeKey) {
 }
 
 /**
- * BR-122 — Authoritative orphan for THIS create attempt:
- * active lifecycle + same org scope (caller) + start instant matches requested date/time.
- * Rejects unrelated older active appointments for the same phone.
+ * Exact-slot match for idempotency / BR-122 reconcile.
+ * Requires active lifecycle + same resolved start instant.
+ * When scope fields are provided, also requires org / agent / canonical prospect alignment.
+ * Does not guess across orgs — missing scoped identity fields fail closed.
  */
-function appointmentMatchesRequestedSlot(appointment, dateKey, timeKey, timezone = "America/New_York") {
+function appointmentMatchesRequestedSlot(
+  appointment,
+  dateKey,
+  timeKey,
+  timezone = "America/New_York",
+  scope = {}
+) {
   if (!appointment?.id || !dateKey || !timeKey) {
     return false;
   }
   if (!isActiveAppointment(appointment)) {
     return false;
+  }
+
+  const organizationId = scope.organizationId || null;
+  const agentId = scope.agentId || null;
+  const prospectId = scope.prospectId || null;
+
+  if (organizationId) {
+    const apptOrg = appointment.organizationId || appointment.organization_id || null;
+    if (!apptOrg || apptOrg !== organizationId) {
+      return false;
+    }
+  }
+
+  if (agentId) {
+    const apptAgent =
+      appointment.agentId ||
+      appointment.agent_id ||
+      appointment.ownerRepId ||
+      appointment.owner_rep_id ||
+      null;
+    if (!apptAgent || apptAgent !== agentId) {
+      return false;
+    }
+  }
+
+  if (prospectId) {
+    const apptProspect = appointment.prospectId || appointment.prospect_id || null;
+    if (!apptProspect || apptProspect !== prospectId) {
+      return false;
+    }
   }
 
   const start =
@@ -226,7 +263,12 @@ async function executeAuthorizedSideEffects({
     const existing = await findActive(phone, organizationId, agentId);
     if (existing?.id) {
       const timezone = context?.timezone || "America/New_York";
-      if (appointmentMatchesRequestedSlot(existing, dateKey, timeKey, timezone)) {
+      const matchScope = {
+        organizationId,
+        agentId,
+        prospectId: context?.prospectId || options.prospectId || null
+      };
+      if (appointmentMatchesRequestedSlot(existing, dateKey, timeKey, timezone, matchScope)) {
         performed.push({
           type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
           appointmentId: existing.id,
@@ -381,7 +423,11 @@ async function executeAuthorizedSideEffects({
 
       if (
         orphan?.id &&
-        appointmentMatchesRequestedSlot(orphan, dateKey, timeKey, timezone)
+        appointmentMatchesRequestedSlot(orphan, dateKey, timeKey, timezone, {
+          organizationId,
+          agentId,
+          prospectId: context?.prospectId || options.prospectId || null
+        })
       ) {
         performed.push({
           type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,

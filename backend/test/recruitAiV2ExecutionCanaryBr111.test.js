@@ -325,7 +325,9 @@ test("P. duplicate/replayed inbound event → one appointment maximum", async ()
             id: "appt-p-1",
             status: "scheduled",
             startDateTime: startIso,
-            organizationId: TEAM_VISION_ORG
+            organizationId: TEAM_VISION_ORG,
+            agentId: PRIMARY_RVP,
+            prospectId: "prospect-canary-1"
           }
         : null,
     getSlots: async () => [{ dateKey: "2026-08-11", timeKey: "19:00" }]
