@@ -28,23 +28,23 @@ const MILESTONE_REQUIRED_FIELDS = Object.freeze({
   [MILESTONES.INTERVIEW_READY]: [
     "city",
     "state",
-    "authorization",
-    "occupation"
+    "authorization"
+    // BR-123 — occupation is optional for interview readiness / scheduling
   ],
   [MILESTONES.INTERVIEW_SCHEDULED]: [
     "city",
     "state",
     "authorization",
-    "occupation",
     "interviewDateTime"
+    // BR-123 — occupation is optional for interview scheduling
   ],
   [MILESTONES.INTERVIEW_DUE]: [
     "city",
     "state",
     "authorization",
-    "occupation",
     "interviewDateTime",
     "confirmed"
+    // BR-123 — occupation is optional through interview due
   ],
   [MILESTONES.INTERVIEW_COMPLETED]: ["interviewDateTime"],
   [MILESTONES.INTERVIEW_RESULT_PENDING]: ["interviewDateTime", "outcome"],
@@ -262,6 +262,11 @@ function validateRequiredFields(targetMilestone, context) {
 
     for (const field of qualMissing) {
       if (field === "dayPart" && (fields.interviewDateTime || isScheduleComplete(profile))) {
+        continue;
+      }
+
+      // Implements BR-123 — occupation remains optional for interview milestones.
+      if (field === "occupation") {
         continue;
       }
 
