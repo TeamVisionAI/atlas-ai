@@ -170,6 +170,71 @@ function resolveAttemptAppointmentId(scheduleResult) {
   );
 }
 
+function telemetryBase({
+  authorization,
+  structuredDecision,
+  context,
+  options,
+  phone = null
+} = {}) {
+  return {
+    organizationId: authorization?.organizationId || context?.organizationId || null,
+    agentId: authorization?.actingUserId || null,
+    prospectId: context?.prospectId || options?.prospectId || null,
+    phone: phone || null,
+    decisionCode:
+      structuredDecision?.decision?.nextAction ||
+      V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
+    correlationId: options?.inboundMessageId || options?.messageId || null
+  };
+}
+
+function finishCreateResult(result, base, extras = {}) {
+  try {
+    const {
+      EVENTS,
+      emitRecruitAiV2Signal,
+      resolveCalendarEventId
+    } = require("./stage1Observability");
+    const calendarEventId =
+      extras.calendarEventId ||
+      resolveCalendarEventId(result?.scheduleResult) ||
+      resolveCalendarEventId(extras) ||
+      null;
+    const fields = {
+      ...base,
+      appointmentId: result?.appointmentId || extras.appointmentId || null,
+      calendarEventId,
+      reasonCodes: result?.reason
+        ? [result.reason]
+        : (result?.failed || []).map((f) => f.reason).filter(Boolean),
+      detail: extras.detail || result?.failed?.[0]?.detail || null,
+      idempotent: Boolean(result?.idempotent),
+      reconciled: Boolean(result?.reconciledFromCanonicalFailure),
+      outcome: result?.success ? "success" : "failure"
+    };
+
+    if (result?.success) {
+      emitRecruitAiV2Signal(EVENTS.CREATE_SUCCEEDED, {
+        ...fields,
+        outcome: result.idempotent ? "idempotent_success" : "success"
+      });
+    } else if (result?.attempted) {
+      if (result.reason === REASON_CODES.EXECUTION_ACTIVE_SLOT_CONFLICT) {
+        emitRecruitAiV2Signal(EVENTS.DUPLICATE_APPOINTMENT, {
+          ...fields,
+          outcome: "conflict",
+          detail: "active_appointment_exists_for_different_slot"
+        });
+      }
+      emitRecruitAiV2Signal(EVENTS.CREATE_FAILED, fields);
+    }
+  } catch {
+    // Telemetry must never affect booking.
+  }
+  return result;
+}
+
 /**
  * Execute authorized side effects. Call only after SideEffectAuthorizer grants.
  * Re-authorizes nothing itself — caller must re-authorize immediately before this.
@@ -201,6 +266,20 @@ async function executeAuthorizedSideEffects({
   );
 
   if (!createProposal) {
+    try {
+      const {
+        EVENTS,
+        emitRecruitAiV2Signal
+      } = require("./stage1Observability");
+      emitRecruitAiV2Signal(EVENTS.EXECUTION_UNSUPPORTED_MUTATION, {
+        ...telemetryBase({ authorization, structuredDecision, context, options }),
+        action: (authorization.proposals || []).map((p) => p.type).join(",") || null,
+        reasonCodes: [REASON_CODES.EXECUTION_UNSUPPORTED_ACTION],
+        outcome: "denied"
+      });
+    } catch {
+      // ignore
+    }
     return {
       attempted: false,
       performed,
@@ -219,6 +298,13 @@ async function executeAuthorizedSideEffects({
     options.inboundMessageId ||
     options.messageId ||
     null;
+  const base = telemetryBase({
+    authorization,
+    structuredDecision,
+    context,
+    options,
+    phone
+  });
 
   if (!organizationId || !agentId || !phone || !dateKey || !timeKey) {
     failed.push({
@@ -226,14 +312,29 @@ async function executeAuthorizedSideEffects({
       reason: REASON_CODES.EXECUTION_DENIED,
       detail: "missing_execution_scope_or_slot"
     });
-    return {
-      attempted: true,
-      performed,
-      failed,
-      skipped,
-      success: false,
-      reason: REASON_CODES.EXECUTION_DENIED
-    };
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_DENIED
+      },
+      base,
+      { detail: "missing_execution_scope_or_slot" }
+    );
+  }
+
+  try {
+    const { EVENTS, emitRecruitAiV2Signal } = require("./stage1Observability");
+    emitRecruitAiV2Signal(EVENTS.CREATE_ATTEMPTED, {
+      ...base,
+      outcome: "attempted",
+      detail: `${dateKey}T${timeKey}`
+    });
+  } catch {
+    // ignore
   }
 
   const findActive =
@@ -278,16 +379,23 @@ async function executeAuthorizedSideEffects({
           timeKey,
           timezone
         });
-        return {
-          attempted: true,
-          performed,
-          failed,
-          skipped,
-          success: true,
-          idempotent: true,
-          appointmentId: existing.id,
-          reason: REASON_CODES.EXECUTION_IDEMPOTENT_REPLAY
-        };
+        return finishCreateResult(
+          {
+            attempted: true,
+            performed,
+            failed,
+            skipped,
+            success: true,
+            idempotent: true,
+            appointmentId: existing.id,
+            reason: REASON_CODES.EXECUTION_IDEMPOTENT_REPLAY
+          },
+          base,
+          {
+            calendarEventId:
+              existing.calendar_event_id || existing.calendarEventId || null
+          }
+        );
       }
 
       failed.push({
@@ -298,15 +406,18 @@ async function executeAuthorizedSideEffects({
         dateKey,
         timeKey
       });
-      return {
-        attempted: true,
-        performed,
-        failed,
-        skipped,
-        success: false,
-        reason: REASON_CODES.EXECUTION_ACTIVE_SLOT_CONFLICT,
-        appointmentId: existing.id
-      };
+      return finishCreateResult(
+        {
+          attempted: true,
+          performed,
+          failed,
+          skipped,
+          success: false,
+          reason: REASON_CODES.EXECUTION_ACTIVE_SLOT_CONFLICT,
+          appointmentId: existing.id
+        },
+        base
+      );
     }
   } catch {
     // Active lookup failure must not invent a booking; fail closed.
@@ -315,14 +426,18 @@ async function executeAuthorizedSideEffects({
       reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
       detail: "active_appointment_lookup_failed"
     });
-    return {
-      attempted: true,
-      performed,
-      failed,
-      skipped,
-      success: false,
-      reason: REASON_CODES.EXECUTION_CANONICAL_FAILED
-    };
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_CANONICAL_FAILED
+      },
+      base,
+      { detail: "active_appointment_lookup_failed" }
+    );
   }
 
   // Stale-slot guard — re-read canonical availability immediately before write.
@@ -344,14 +459,17 @@ async function executeAuthorizedSideEffects({
         dateKey,
         timeKey
       });
-      return {
-        attempted: true,
-        performed,
-        failed,
-        skipped,
-        success: false,
-        reason: REASON_CODES.EXECUTION_SLOT_STALE
-      };
+      return finishCreateResult(
+        {
+          attempted: true,
+          performed,
+          failed,
+          skipped,
+          success: false,
+          reason: REASON_CODES.EXECUTION_SLOT_STALE
+        },
+        base
+      );
     }
   } catch {
     failed.push({
@@ -359,14 +477,18 @@ async function executeAuthorizedSideEffects({
       reason: REASON_CODES.EXECUTION_SLOT_STALE,
       detail: "availability_recheck_failed"
     });
-    return {
-      attempted: true,
-      performed,
-      failed,
-      skipped,
-      success: false,
-      reason: REASON_CODES.EXECUTION_SLOT_STALE
-    };
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_SLOT_STALE
+      },
+      base,
+      { detail: "availability_recheck_failed" }
+    );
   }
 
   let scheduleResult;
@@ -395,14 +517,18 @@ async function executeAuthorizedSideEffects({
       reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
       detail: error?.message || "executeScheduleInterview_threw"
     });
-    return {
-      attempted: true,
-      performed,
-      failed,
-      skipped,
-      success: false,
-      reason: REASON_CODES.EXECUTION_CANONICAL_FAILED
-    };
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_CANONICAL_FAILED
+      },
+      base,
+      { detail: error?.message || "executeScheduleInterview_threw" }
+    );
   }
 
   if (!scheduleResult?.success) {
@@ -443,17 +569,24 @@ async function executeAuthorizedSideEffects({
           reconciled: true,
           reconcileReason: "ACTIVE_APPOINTMENT_AFTER_CANONICAL_FAILURE"
         });
-        return {
-          attempted: true,
-          performed,
-          failed: [],
-          skipped,
-          success: true,
-          appointmentId: orphan.id,
-          reason: REASON_CODES.EXECUTION_RECONCILED_ACTIVE_APPOINTMENT,
-          scheduleResult,
-          reconciledFromCanonicalFailure: true
-        };
+        return finishCreateResult(
+          {
+            attempted: true,
+            performed,
+            failed: [],
+            skipped,
+            success: true,
+            appointmentId: orphan.id,
+            reason: REASON_CODES.EXECUTION_RECONCILED_ACTIVE_APPOINTMENT,
+            scheduleResult,
+            reconciledFromCanonicalFailure: true
+          },
+          base,
+          {
+            calendarEventId:
+              orphan.calendar_event_id || orphan.calendarEventId || null
+          }
+        );
       }
     } catch {
       // Fall through to failure path if orphan lookup fails.
@@ -464,15 +597,21 @@ async function executeAuthorizedSideEffects({
       reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
       detail: scheduleResult?.error || scheduleResult?.message || "canonical_failed"
     });
-    return {
-      attempted: true,
-      performed,
-      failed,
-      skipped,
-      success: false,
-      reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
-      scheduleResult
-    };
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
+        scheduleResult
+      },
+      base,
+      {
+        detail: scheduleResult?.error || scheduleResult?.message || "canonical_failed"
+      }
+    );
   }
 
   const appointmentId =
@@ -497,17 +636,20 @@ async function executeAuthorizedSideEffects({
     }
   }
 
-  return {
-    attempted: true,
-    performed,
-    failed,
-    skipped,
-    success: true,
-    idempotent: false,
-    appointmentId,
-    scheduleResult,
-    reason: null
-  };
+  return finishCreateResult(
+    {
+      attempted: true,
+      performed,
+      failed,
+      skipped,
+      success: true,
+      idempotent: false,
+      appointmentId,
+      scheduleResult,
+      reason: null
+    },
+    base
+  );
 }
 
 module.exports = {

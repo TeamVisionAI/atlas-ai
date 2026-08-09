@@ -159,13 +159,74 @@ async function deliverWhatsAppReply({
       templateVariables
   });
 
+  const isV2Owned =
+    engineResult?.source === "recruit_ai_v2_live_authoring" ||
+    engineResult?.owner === "v2";
+  const v2Result = engineResult?.v2Result || null;
+  const replyType =
+    v2Result?.responsePlan?.templateKey ||
+    engineResult?.templateKey ||
+    engineResult?.nextAction ||
+    null;
+  const appointmentId =
+    v2Result?.execution?.appointmentId ||
+    v2Result?.nextContext?.appointment?.appointmentId ||
+    engineResult?.appointmentId ||
+    null;
+  const prospectId =
+    v2Result?.nextContext?.prospectId ||
+    v2Result?.context?.prospectId ||
+    engineResult?.prospectId ||
+    null;
+  let calendarEventId = null;
+  try {
+    const {
+      resolveCalendarEventId
+    } = require("./recruitAiV2/stage1Observability");
+    calendarEventId = resolveCalendarEventId(v2Result?.execution?.scheduleResult);
+  } catch {
+    calendarEventId = null;
+  }
+
   logWhatsAppStage("conversation_engine_reply_sent", {
     phone: normalized.phone,
     success: delivery.success,
     simulated: delivery.simulated || false,
     intent: outboundIntent,
-    idempotent: Boolean(engineResult?.confirmationIdempotencyKey)
+    idempotent: Boolean(engineResult?.confirmationIdempotencyKey),
+    // Stage-1 attribution — owner unambiguous even if outboundIntent stays CE.
+    owner: isV2Owned ? "v2" : "ce",
+    decisionCode: engineResult?.nextAction || null,
+    replyType,
+    appointmentId,
+    prospectId
   });
+
+  try {
+    const {
+      EVENTS,
+      emitRecruitAiV2Signal
+    } = require("./recruitAiV2/stage1Observability");
+    emitRecruitAiV2Signal(EVENTS.REPLY_DELIVERED, {
+      organizationId: prospect?.organization_id || null,
+      agentId: prospect?.owner_user_id || null,
+      prospectId,
+      phone: normalized.phone,
+      decisionCode: engineResult?.nextAction || null,
+      appointmentId,
+      calendarEventId,
+      correlationId: normalized.providerMessageId || null,
+      owner: isV2Owned ? "v2" : "ce",
+      replyType,
+      templateKey: replyType,
+      outboundIntent,
+      deliverySuccess: Boolean(delivery.success),
+      outcome: delivery.success ? "delivered" : "delivery_failed",
+      source: engineResult?.source || null
+    });
+  } catch {
+    // Telemetry must never affect delivery.
+  }
 
   return {
     success: delivery.success,
@@ -206,6 +267,7 @@ async function processNormalizedInboundMessage(
         reply: authoringAttempt.replyText,
         outboundIntent: "CONVERSATION_ENGINE_REPLY",
         source: "recruit_ai_v2_live_authoring",
+        owner: "v2",
         nextAction: authoringAttempt.nextAction,
         v2Result: authoringAttempt.v2Result
       };
@@ -255,6 +317,7 @@ async function processNormalizedInboundMessage(
               reply: protectedReply.replyText,
               outboundIntent: "CONVERSATION_ENGINE_REPLY",
               source: "recruit_ai_v2_live_authoring",
+              owner: "v2",
               nextAction: protectedReply.nextAction,
               v2Result: protectedReply.v2Result
             },
@@ -358,6 +421,7 @@ async function processConversationAfterInbound({
 module.exports = {
   shouldDeliverAutomatedReply,
   computeAllowHandoffAck,
+  deliverWhatsAppReply,
   processNormalizedInboundMessage,
   processConversationAfterInbound,
   extractReplyText
