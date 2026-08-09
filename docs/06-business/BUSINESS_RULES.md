@@ -1486,7 +1486,8 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Depends on:** BR-111, BR-112  
 **Status:** Implemented (telemetry only; no execution behavior change)  
 **Engine target:** `recruitAiV2/liveExecutionAttribution.js`; `semanticConversationEngine.completeInterview`  
-**Tests:** `backend/test/recruitAiV2LiveExecutionAttributionBr113.test.js`
+**Tests:** `backend/test/recruitAiV2LiveExecutionAttributionBr113.test.js`  
+**Related ops (Stage-1):** `docs/06-business/RECRUIT_AI_V2_STAGE1_OPERATIONS.md` — monitoring cookbook for normalized `recruit_ai_v2.*` Stage-1 events (does not change BR-113 behavior)
 
 ### Rules
 
