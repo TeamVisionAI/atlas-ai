@@ -49,6 +49,10 @@ const {
 const { logInterviewerTrace } = require("../dev/interviewerTrace");
 const { resolveRecruiterDisplayName } = require("../core/whatsappCommunicationEngine");
 const {
+  resolveCanonicalProspectIdentity,
+  REASON_CODES: PROSPECT_IDENTITY_REASON_CODES
+} = require("../core/recruitingProspectBridge");
+const {
   isActiveAppointment,
   findAppointmentById
 } = require("../core/activeAppointmentResolver");
@@ -360,6 +364,25 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     return buildActionError(
       ACTION_IDS.SCHEDULE,
       "APPOINTMENT_PERSISTENCE_FAILED",
+      "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
+    );
+  }
+
+  // Implements BR-120 — canonical core identity must resolve BEFORE Calendar create.
+  // Never create Calendar / capacity when prospect identity cannot be ensured.
+  const identity = await resolveCanonicalProspectIdentity({
+    phone: prospect.phone || phone,
+    organizationId,
+    displayName: prospect.name || null,
+    email: attendeeEmail || null,
+    legacyProspectId: prospect.id || null,
+    ensureCore: true
+  });
+
+  if (!identity.ok || !identity.coreProspectId) {
+    return buildActionError(
+      ACTION_IDS.SCHEDULE,
+      identity.reasonCode || PROSPECT_IDENTITY_REASON_CODES.UNRESOLVED,
       "I'm sorry, I couldn't complete the appointment just now. A team member will help you confirm the time shortly."
     );
   }

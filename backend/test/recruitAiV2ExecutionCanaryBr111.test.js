@@ -309,13 +309,25 @@ test("O. confirmed valid appointment → canonical service called exactly once",
 
 test("P. duplicate/replayed inbound event → one appointment maximum", async () => {
   let scheduleCalls = 0;
+  const startIso = require("../services/availabilityService").buildIsoTimestamp(
+    "2026-08-11",
+    "19:00",
+    "America/New_York"
+  );
   const deps = {
     executeScheduleInterview: async () => {
       scheduleCalls += 1;
       return { success: true, appointmentId: "appt-p-1" };
     },
     findActiveAppointmentForProspect: async () =>
-      scheduleCalls > 0 ? { id: "appt-p-1", status: "scheduled" } : null,
+      scheduleCalls > 0
+        ? {
+            id: "appt-p-1",
+            status: "scheduled",
+            startDateTime: startIso,
+            organizationId: TEAM_VISION_ORG
+          }
+        : null,
     getSlots: async () => [{ dateKey: "2026-08-11", timeKey: "19:00" }]
   };
 

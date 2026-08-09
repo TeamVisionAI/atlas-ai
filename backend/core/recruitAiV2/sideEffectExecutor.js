@@ -220,25 +220,50 @@ async function executeAuthorizedSideEffects({
         opts
       ));
 
-  // Idempotency: active appointment already present → do not create a second one.
+  // Idempotency: reuse only an active appointment for THIS exact slot.
+  // Unrelated older actives must not be reported as a successful booking for a different time.
   try {
     const existing = await findActive(phone, organizationId, agentId);
     if (existing?.id) {
-      performed.push({
+      const timezone = context?.timezone || "America/New_York";
+      if (appointmentMatchesRequestedSlot(existing, dateKey, timeKey, timezone)) {
+        performed.push({
+          type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
+          appointmentId: existing.id,
+          idempotent: true,
+          inboundMessageId,
+          dateKey,
+          timeKey,
+          timezone
+        });
+        return {
+          attempted: true,
+          performed,
+          failed,
+          skipped,
+          success: true,
+          idempotent: true,
+          appointmentId: existing.id,
+          reason: REASON_CODES.EXECUTION_IDEMPOTENT_REPLAY
+        };
+      }
+
+      failed.push({
         type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
+        reason: REASON_CODES.EXECUTION_ACTIVE_SLOT_CONFLICT,
+        detail: "active_appointment_exists_for_different_slot",
         appointmentId: existing.id,
-        idempotent: true,
-        inboundMessageId
+        dateKey,
+        timeKey
       });
       return {
         attempted: true,
         performed,
         failed,
         skipped,
-        success: true,
-        idempotent: true,
-        appointmentId: existing.id,
-        reason: REASON_CODES.EXECUTION_IDEMPOTENT_REPLAY
+        success: false,
+        reason: REASON_CODES.EXECUTION_ACTIVE_SLOT_CONFLICT,
+        appointmentId: existing.id
       };
     }
   } catch {
