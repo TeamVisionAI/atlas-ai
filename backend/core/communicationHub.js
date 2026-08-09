@@ -10,7 +10,7 @@
 const conversationEngine = require("./conversationEngine");
 const whatsappOutboundPipeline = require("./whatsappOutboundPipeline");
 const { buildNormalizedMessageFromWhatsApp } = require("./channelMessage");
-const { loadPersistedWorkflowState } = require("./workflowStateStore");
+const workflowStateStore = require("./workflowStateStore");
 const { loadAgentState } = require("./agentActionState");
 const { isWorkflowGateActive } = require("./agentActionEngine");
 const { OWNERSHIP } = require("./workflowConstants");
@@ -48,7 +48,7 @@ function shouldDeliverAutomatedReply(prospect, options = {}) {
     return false;
   }
 
-  const persisted = loadPersistedWorkflowState(prospect.phone);
+  const persisted = workflowStateStore.loadPersistedWorkflowState(prospect.phone);
   const agentState = loadAgentState(prospect.phone);
 
   if (isWorkflowGateActive(prospect, agentState)) {
@@ -70,6 +70,26 @@ function shouldDeliverAutomatedReply(prospect, options = {}) {
 }
 
 /**
+ * BR-124 — compute whether this V2 turn may bypass AGENT human-ownership silence.
+ * Strict nextAction allowlist; never opens for Conversation Engine or arbitrary V2 actions.
+ * @param {Object} [engineResult]
+ * @returns {boolean}
+ */
+function computeAllowHandoffAck(engineResult) {
+  const nextAction = String(engineResult?.nextAction || "");
+  const isV2Authoring = engineResult?.source === "recruit_ai_v2_live_authoring";
+  if (!isV2Authoring) {
+    return false;
+  }
+  return (
+    nextAction === "escalate_to_human" ||
+    nextAction === "safe_failure_and_escalate" ||
+    nextAction === "resume_scheduling_after_explicit_request" ||
+    nextAction === "offer_alternatives_or_escalate"
+  );
+}
+
+/**
  * Conversation Engine (understanding) → optional outbound delivery (transport).
  * @param {import('./channelMessage').NormalizedChannelMessage} normalized
  * @param {Object} context
@@ -83,14 +103,7 @@ async function deliverWhatsAppReply({
   engineResult,
   outboundIntent = "CONVERSATION_ENGINE_REPLY"
 }) {
-  const nextAction = String(engineResult?.nextAction || "");
-  const isV2Authoring = engineResult?.source === "recruit_ai_v2_live_authoring";
-  const allowHandoffAck =
-    isV2Authoring &&
-    (nextAction === "escalate_to_human" ||
-      nextAction === "safe_failure_and_escalate" ||
-      nextAction === "resume_scheduling_after_explicit_request" ||
-      nextAction === "offer_alternatives_or_escalate");
+  const allowHandoffAck = computeAllowHandoffAck(engineResult);
 
   if (!shouldDeliverAutomatedReply(prospect, { allowHandoffAck })) {
     logWhatsAppStage("conversation_engine_reply_suppressed", {
@@ -297,6 +310,7 @@ async function processConversationAfterInbound({
 
 module.exports = {
   shouldDeliverAutomatedReply,
+  computeAllowHandoffAck,
   processNormalizedInboundMessage,
   processConversationAfterInbound,
   extractReplyText

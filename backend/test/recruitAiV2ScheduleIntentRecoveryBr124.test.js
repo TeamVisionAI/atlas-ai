@@ -14,7 +14,11 @@ const {
 } = require("../core/recruitAiV2/interpreter");
 const { decideConversationTurn } = require("../core/recruitAiV2/decisionEngine");
 const { renderCustomerReply } = require("../core/recruitAiV2/responseRenderer");
-const { shouldDeliverAutomatedReply } = require("../core/communicationHub");
+const {
+  shouldDeliverAutomatedReply,
+  computeAllowHandoffAck
+} = require("../core/communicationHub");
+const workflowStateStore = require("../core/workflowStateStore");
 const {
   INTENTS,
   NEXT_ACTIONS,
@@ -23,6 +27,32 @@ const {
   STAGES
 } = require("../core/recruitAiV2/constants");
 const { createConversationContext } = require("../core/recruitAiV2/conversationContext");
+const { OWNERSHIP } = require("../core/workflowConstants");
+
+const BOUNDARY_PHONE = "+17862967254";
+const BOUNDARY_PROSPECT = {
+  phone: BOUNDARY_PHONE,
+  current_step: "DAY_PART"
+};
+
+function withAgentOwnership(fn) {
+  const originalLoad = workflowStateStore.loadPersistedWorkflowState;
+  workflowStateStore.loadPersistedWorkflowState = (phone) => {
+    if (String(phone) === BOUNDARY_PHONE) {
+      return {
+        ...originalLoad(phone),
+        needsHumanAttention: true,
+        workflowOwnership: OWNERSHIP.AGENT
+      };
+    }
+    return originalLoad(phone);
+  };
+  try {
+    return fn();
+  } finally {
+    workflowStateStore.loadPersistedWorkflowState = originalLoad;
+  }
+}
 
 function buildAnaContext(overrides = {}) {
   const c = createConversationContext({
@@ -223,13 +253,12 @@ describe("BR-124 schedule intent recovery", () => {
       /companero|compañero|Team Vision/i
     );
 
-    assert.equal(
-      shouldDeliverAutomatedReply(
-        { phone: "+17862967254", current_step: "DAY_PART" },
-        { allowHandoffAck: true }
-      ),
-      true
-    );
+    withAgentOwnership(() => {
+      assert.equal(
+        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: true }),
+        true
+      );
+    });
   });
 
   test("docs: BR-124 documented", () => {
@@ -239,5 +268,157 @@ describe("BR-124 schedule intent recovery", () => {
     );
     assert.match(docs, /## BR-124/);
     assert.match(docs, /request_schedule_interview|Explicit Schedule Intent/i);
+  });
+});
+
+describe("BR-124 communicationHub ownership boundaries", () => {
+  test("B1. allowHandoffAck false under AGENT ownership → suppress", () => {
+    withAgentOwnership(() => {
+      assert.equal(shouldDeliverAutomatedReply(BOUNDARY_PROSPECT), false);
+      assert.equal(
+        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: false }),
+        false
+      );
+    });
+  });
+
+  test("B2. CE / non-V2 engineResult never unlocks allowHandoffAck", () => {
+    assert.equal(
+      computeAllowHandoffAck({
+        source: "conversation_engine",
+        nextAction: "escalate_to_human"
+      }),
+      false
+    );
+    assert.equal(
+      computeAllowHandoffAck({
+        nextAction: "escalate_to_human"
+      }),
+      false
+    );
+    assert.equal(
+      computeAllowHandoffAck({
+        source: "recruit_ai_v2_live_authoring",
+        nextAction: "ask_day_part"
+      }),
+      false
+    );
+    assert.equal(
+      computeAllowHandoffAck({
+        source: "recruit_ai_v2_live_authoring",
+        nextAction: "continue_after_greeting"
+      }),
+      false
+    );
+  });
+
+  test("B3. only deterministic V2 handoff/recovery nextActions unlock flag", () => {
+    const allowed = [
+      "escalate_to_human",
+      "safe_failure_and_escalate",
+      "resume_scheduling_after_explicit_request",
+      "offer_alternatives_or_escalate"
+    ];
+    for (const nextAction of allowed) {
+      assert.equal(
+        computeAllowHandoffAck({
+          source: "recruit_ai_v2_live_authoring",
+          nextAction
+        }),
+        true,
+        nextAction
+      );
+    }
+  });
+
+  test("B4. later arbitrary bot turn stays silenced under AGENT ownership", () => {
+    withAgentOwnership(() => {
+      const unlocked = computeAllowHandoffAck({
+        source: "recruit_ai_v2_live_authoring",
+        nextAction: "clarify_once"
+      });
+      assert.equal(unlocked, false);
+      assert.equal(
+        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, {
+          allowHandoffAck: unlocked
+        }),
+        false
+      );
+    });
+  });
+
+  test("B5. genuine escalate preserves requiresHuman + HUMAN_REQUIRED; recovery clears attention", () => {
+    const escalate = decideConversationTurn({
+      context: buildAnaContext({
+        conversation: { clarificationCount: 1, pendingClarification: "clarify_once" }
+      }),
+      interpretation: {
+        intent: INTENTS.UNKNOWN,
+        confidence: 0.4,
+        preferredLanguage: "spanish",
+        entities: {},
+        languageAdapted: false
+      }
+    });
+    assert.equal(escalate.decision.nextAction, NEXT_ACTIONS.ESCALATE_TO_HUMAN);
+    assert.equal(escalate.customerReplyPlan.entities.requiresHuman, true);
+    assert.equal(escalate.contextPatch.attention.needsHumanAttention, true);
+    assert.equal(escalate.contextPatch.currentStage, STAGES.HUMAN_REQUIRED);
+
+    const recovery = decideConversationTurn({
+      context: buildAnaContext(),
+      interpretation: interpret("Quiero agendar una entrevista", buildAnaContext())
+    });
+    assert.equal(
+      recovery.decision.nextAction,
+      NEXT_ACTIONS.RESUME_SCHEDULING_AFTER_EXPLICIT_REQUEST
+    );
+    assert.notEqual(recovery.decision.nextAction, NEXT_ACTIONS.ESCALATE_TO_HUMAN);
+    assert.equal(recovery.contextPatch.attention.needsHumanAttention, false);
+    assert.equal(
+      recovery.customerReplyPlan.entities?.requiresHuman === true,
+      false
+    );
+  });
+
+  test("B6. delivery gate does not mutate workflow ownership (read-only)", () => {
+    withAgentOwnership(() => {
+      const originalSave = workflowStateStore.savePersistedWorkflowState;
+      let saveCalls = 0;
+      workflowStateStore.savePersistedWorkflowState = (...args) => {
+        saveCalls += 1;
+        return originalSave(...args);
+      };
+      try {
+        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: true });
+        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: false });
+        assert.equal(saveCalls, 0);
+      } finally {
+        workflowStateStore.savePersistedWorkflowState = originalSave;
+      }
+    });
+  });
+
+  test("B7. confirmed appointment + schedule ask ≠ resume recovery path", () => {
+    const context = buildAnaContext({
+      appointment: {
+        status: APPOINTMENT_STATUS.CONFIRMED,
+        appointmentId: "appt-confirmed-boundary",
+        confirmedDate: "2026-08-12",
+        confirmedTime: "19:30"
+      }
+    });
+    const decision = decideConversationTurn({
+      context,
+      interpretation: interpret("Quiero agendar una entrevista", context)
+    });
+    assert.equal(decision.decision.nextAction, NEXT_ACTIONS.OFFER_RESCHEDULE_FLOW);
+    assert.equal(
+      computeAllowHandoffAck({
+        source: "recruit_ai_v2_live_authoring",
+        nextAction: decision.decision.nextAction
+      }),
+      false
+    );
   });
 });
