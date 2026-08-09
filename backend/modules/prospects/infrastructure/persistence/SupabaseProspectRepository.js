@@ -215,6 +215,73 @@ class ProspectRepository {
     return fromRow(data);
   }
 
+  /**
+   * BR-120 — list core prospects for a phone within one organization (fail-closed ambiguity).
+   */
+  async findAllByPhoneInOrganization(phone, organizationId) {
+    const normalized = PhoneNumber.normalize(phone);
+
+    if (!normalized || !organizationId) {
+      return [];
+    }
+
+    if (this.useMemory) {
+      return this.memory
+        .findAllByPhoneInOrganization(normalized, organizationId)
+        .map((row) => fromRow(row));
+    }
+
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("normalized_primary_phone", normalized)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null);
+
+    if (error) {
+      if (isMissingProspectTable(error)) {
+        activateMemoryFallback(this);
+        return this.findAllByPhoneInOrganization(phone, organizationId);
+      }
+
+      throw error;
+    }
+
+    return (data || []).map((row) => fromRow(row));
+  }
+
+  /**
+   * BR-120 — list core prospects for a phone across all orgs (mismatch detection only).
+   */
+  async findAllByPhone(phone) {
+    const normalized = PhoneNumber.normalize(phone);
+
+    if (!normalized) {
+      return [];
+    }
+
+    if (this.useMemory) {
+      return this.memory.findAllByPhone(normalized).map((row) => fromRow(row));
+    }
+
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("normalized_primary_phone", normalized)
+      .is("deleted_at", null);
+
+    if (error) {
+      if (isMissingProspectTable(error)) {
+        activateMemoryFallback(this);
+        return this.findAllByPhone(phone);
+      }
+
+      throw error;
+    }
+
+    return (data || []).map((row) => fromRow(row));
+  }
+
   async search(filters = {}) {
     const limit = Math.min(Number(filters.limit) || 50, 100);
     const offset = Math.max(Number(filters.offset) || 0, 0);

@@ -23,7 +23,8 @@ const { logConversation } = require("../services/logService");
 const { recordBusinessEvent } = require("../core/recruitingBusinessEventBridge");
 const {
   findCoreProspectIdByPhone,
-  ensureCoreProspectForLegacyLead
+  resolveCanonicalProspectIdentity,
+  REASON_CODES: PROSPECT_IDENTITY_REASON_CODES
 } = require("../core/recruitingProspectBridge");
 const { onInterviewScheduled } = require("../core/recruitingWorkflowOrchestrator");
 const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
@@ -201,7 +202,11 @@ async function enrichWithProspect(appointment) {
 }
 
 async function emitAppointmentEvent(phone, eventType, payload = {}, summary) {
-  const prospectId = await findCoreProspectIdByPhone(phone);
+  // Implements BR-120 — org-scoped core lookup when organizationId is known.
+  const prospectId = await findCoreProspectIdByPhone(
+    phone,
+    payload.organizationId || undefined
+  );
 
   await recordBusinessEvent({
     phone,
@@ -358,6 +363,29 @@ async function createAppointment(input, context = {}) {
     throw buildError("PROSPECT_NOT_FOUND", "Prospect not found.", 404);
   }
 
+  // Implements BR-120 — resolve/ensure canonical core BEFORE Calendar or appointment writes.
+  // Never persist atlas_appointments.prospect_id = null on the booking path.
+  const identity = await resolveCanonicalProspectIdentity({
+    phone: prospectPhone,
+    organizationId,
+    displayName: contact?.firstName
+      ? [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim()
+      : prospect.name || null,
+    email: contact?.email || null,
+    legacyProspectId: prospect.id || null,
+    ensureCore: true
+  });
+
+  if (!identity.ok || !identity.coreProspectId) {
+    throw buildError(
+      identity.reasonCode || PROSPECT_IDENTITY_REASON_CODES.UNRESOLVED,
+      "Canonical prospect identity could not be resolved for this organization.",
+      409
+    );
+  }
+
+  const prospectId = identity.coreProspectId;
+
   await syncProspectContact(prospectPhone, contact);
 
   const isVirtual = meeting.meetingType === MEETING_TYPES.VIRTUAL;
@@ -465,20 +493,6 @@ async function createAppointment(input, context = {}) {
   const confirmationStatus =
     emailStatus === "missing" ? CONFIRMATION_STATUSES.MISSING_EMAIL : CONFIRMATION_STATUSES.PENDING;
 
-  // Implements BR-120 — appointment FK must be core UUID; ensure when mapping missing.
-  let prospectId = await findCoreProspectIdByPhone(prospectPhone);
-  if (!prospectId) {
-    const ensured = await ensureCoreProspectForLegacyLead({
-      phone: prospectPhone,
-      displayName: contact?.firstName
-        ? [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim()
-        : null,
-      email: contact?.email || null,
-      organizationId,
-      actor: createdBy || agentId || "SYSTEM"
-    });
-    prospectId = ensured.prospectId || null;
-  }
   const timestamp = nowIso();
   const ownerRepId = input.ownerRepId || (await resolveOwnerRepId(agentId));
   const interviewAssignment = await resolveInterviewAssignmentForSchedule(input, {

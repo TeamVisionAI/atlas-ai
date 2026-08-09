@@ -173,12 +173,14 @@ async function attemptLiveV2Authoring({
       legacyProspectId: prospect.id || null,
       ensureCore: true
     });
-    if (identity.coreProspectId) {
+    if (identity.ok && identity.coreProspectId) {
       canonicalProspectId = identity.coreProspectId;
     }
     if (identity.legacyProspectId) {
       legacyProspectId = identity.legacyProspectId;
     }
+    // Soft: authoring can continue on unresolved; persistence dual-load still helps.
+    // Hard mismatch/ambiguity already encoded in identity.reasonCode — still prefer legacy.
   } catch {
     // Fail soft to legacy id — persistence dual-load still helps when phone is present.
   }

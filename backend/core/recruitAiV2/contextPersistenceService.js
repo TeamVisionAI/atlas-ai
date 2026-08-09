@@ -63,6 +63,23 @@ async function resolvePersistenceIdentityScope({
       legacyProspectId: resolvedLegacyId,
       ensureCore
     });
+
+    // Implements BR-120 — fail closed on mismatch / ambiguity / conflict (never guess).
+    const hardFail = new Set([
+      "PROSPECT_IDENTITY_ORG_MISMATCH",
+      "PROSPECT_IDENTITY_AMBIGUOUS",
+      "PROSPECT_IDENTITY_CONFLICT",
+      "PROSPECT_IDENTITY_SCOPE_REQUIRED"
+    ]);
+    if (identity && identity.ok === false && hardFail.has(identity.reasonCode)) {
+      const error = new Error(
+        identity.reasonCode || "PROSPECT_IDENTITY_UNRESOLVED"
+      );
+      error.code = identity.reasonCode;
+      error.statusCode = 409;
+      throw error;
+    }
+
     coreProspectId = identity.coreProspectId || null;
     resolvedLegacyId = identity.legacyProspectId || resolvedLegacyId;
   }
