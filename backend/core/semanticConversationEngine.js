@@ -1174,14 +1174,23 @@ async function handleSemanticMessage({
       } = require("./activeAppointmentResolver");
       const {
         resolvePostCreateOwnership,
-        persistOwnedConfirmedContext
+        persistOwnedConfirmedContext,
+        appointmentLocalSlot
       } = require("./recruitAiV2/postCreateOwnership");
       const orgId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
       const active = await findActiveAppointmentForProspect(phone, orgId);
+      const slot = appointmentLocalSlot(
+        active || {},
+        active?.timezone || "America/New_York"
+      );
       const ownership = await resolvePostCreateOwnership({
         findActiveAppointment: async () => active,
         prospectPhone: phone,
         organizationId: orgId,
+        prospectId: active?.prospect_id || prospect.id || null,
+        agentId: prospect.owner_user_id || active?.interviewer_user_id || null,
+        proposedDate: slot.dateKey,
+        proposedTime: slot.timeKey,
         timezone: active?.timezone || "America/New_York",
         language: language === "es" ? "spanish" : "english"
       });

@@ -3,10 +3,16 @@
  * durable confirmed + appointment_confirmed reply. Prevents CE fallthrough /
  * "already confirmed" stub ownership when live authoring times out or loses
  * the in-flight processTurn result after mission write success.
+ *
+ * Active-appointment reclaim is fail-closed: exact org + canonical prospect +
+ * exact slot + active lifecycle; agent when provided; never unrelated actives.
  */
 
 const { renderCustomerReply } = require("./responseRenderer");
 const { APPOINTMENT_STATUS, STAGES } = require("./conversationContext");
+const {
+  isActiveAppointment
+} = require("../activeAppointmentResolver");
 
 function appointmentLocalSlot(appointment = {}, timezone = "America/New_York") {
   const start = appointment.start_date_time || appointment.startDateTime || null;
@@ -45,10 +51,86 @@ function appointmentLocalSlot(appointment = {}, timezone = "America/New_York") {
 
 function slotMatchesProposed(appointment, proposedDate, proposedTime, timezone) {
   if (!appointment || !proposedDate || !proposedTime) {
-    return Boolean(appointment?.id);
+    return false;
   }
   const slot = appointmentLocalSlot(appointment, timezone);
   return slot.dateKey === proposedDate && slot.timeKey === proposedTime;
+}
+
+function appointmentOrgId(appointment = {}) {
+  return appointment.organizationId || appointment.organization_id || null;
+}
+
+function appointmentProspectId(appointment = {}) {
+  return appointment.prospectId || appointment.prospect_id || null;
+}
+
+function appointmentAgentIds(appointment = {}) {
+  return [
+    appointment.agentId,
+    appointment.agent_id,
+    appointment.ownerRepId,
+    appointment.owner_rep_id,
+    appointment.interviewerUserId,
+    appointment.interviewer_user_id,
+    appointment.metadata?.interviewerUserId
+  ]
+    .filter(Boolean)
+    .map((id) => String(id));
+}
+
+/**
+ * Fail-closed eligibility for active-appointment reclaim (BR-125).
+ */
+function appointmentEligibleForReclaim(
+  appointment,
+  {
+    organizationId = null,
+    prospectId = null,
+    agentId = null,
+    proposedDate = null,
+    proposedTime = null,
+    timezone = "America/New_York"
+  } = {}
+) {
+  if (!appointment?.id) {
+    return { ok: false, reason: "MISSING_APPOINTMENT" };
+  }
+  if (!organizationId || !prospectId || !proposedDate || !proposedTime) {
+    return { ok: false, reason: "MISSING_RECLAIM_SCOPE" };
+  }
+  if (!isActiveAppointment(appointment)) {
+    return { ok: false, reason: "INACTIVE_LIFECYCLE" };
+  }
+  if (appointmentOrgId(appointment) !== organizationId) {
+    return { ok: false, reason: "ORG_MISMATCH" };
+  }
+  if (appointmentProspectId(appointment) !== prospectId) {
+    return { ok: false, reason: "PROSPECT_MISMATCH" };
+  }
+  if (agentId) {
+    const agents = appointmentAgentIds(appointment);
+    if (!agents.includes(String(agentId))) {
+      return { ok: false, reason: "AGENT_MISMATCH" };
+    }
+  }
+  if (!slotMatchesProposed(appointment, proposedDate, proposedTime, timezone)) {
+    return { ok: false, reason: "SLOT_MISMATCH" };
+  }
+  return { ok: true, reason: null };
+}
+
+function normalizeActiveLookupResult(active) {
+  if (active == null) {
+    return { appointments: [], failClosed: false };
+  }
+  if (Array.isArray(active)) {
+    if (active.length > 1) {
+      return { appointments: active, failClosed: true, reason: "MULTIPLE_CANDIDATES" };
+    }
+    return { appointments: active.filter(Boolean), failClosed: false };
+  }
+  return { appointments: [active], failClosed: false };
 }
 
 function buildAppointmentConfirmedReply({
@@ -102,13 +184,15 @@ function buildConfirmedDurablePatch({
 
 /**
  * Prefer the late/in-flight V2 execution result; otherwise reconcile from an
- * active Atlas appointment that matches the durable proposed slot.
+ * active Atlas appointment that matches exact reclaim scope.
  */
 async function resolvePostCreateOwnership({
   v2Result = null,
   findActiveAppointment = null,
   prospectPhone = null,
   organizationId = null,
+  prospectId = null,
+  agentId = null,
   proposedDate = null,
   proposedTime = null,
   timezone = "America/New_York",
@@ -125,6 +209,22 @@ async function resolvePostCreateOwnership({
       performed.timeKey ||
       v2Result.nextContext?.appointment?.confirmedTime ||
       proposedTime;
+
+    // If a concrete proposed slot is known, refuse to own a different performed slot.
+    if (
+      proposedDate &&
+      proposedTime &&
+      dateKey &&
+      timeKey &&
+      (dateKey !== proposedDate || timeKey !== proposedTime)
+    ) {
+      return {
+        owned: false,
+        source: null,
+        reason: "V2_PERFORMED_SLOT_MISMATCH"
+      };
+    }
+
     const replyText =
       String(v2Result.rendered?.text || "").trim() ||
       buildAppointmentConfirmedReply({ language, dateKey, timeKey });
@@ -150,24 +250,47 @@ async function resolvePostCreateOwnership({
   }
 
   if (typeof findActiveAppointment !== "function" || !prospectPhone || !organizationId) {
-    return { owned: false, source: null };
+    return { owned: false, source: null, reason: "LOOKUP_UNAVAILABLE" };
+  }
+  if (!prospectId || !proposedDate || !proposedTime) {
+    return { owned: false, source: null, reason: "MISSING_RECLAIM_SCOPE" };
   }
 
-  let active = null;
+  let activeRaw = null;
   try {
-    active = await findActiveAppointment(prospectPhone, organizationId);
+    activeRaw = await findActiveAppointment(prospectPhone, organizationId, agentId);
   } catch {
-    return { owned: false, source: null };
+    return { owned: false, source: null, reason: "LOOKUP_FAILED" };
   }
+
+  const normalized = normalizeActiveLookupResult(activeRaw);
+  if (normalized.failClosed) {
+    return {
+      owned: false,
+      source: null,
+      reason: normalized.reason || "MULTIPLE_CANDIDATES"
+    };
+  }
+  const active = normalized.appointments[0] || null;
   if (!active?.id) {
-    return { owned: false, source: null };
+    return { owned: false, source: null, reason: "NO_ACTIVE" };
   }
-  if (
-    proposedDate &&
-    proposedTime &&
-    !slotMatchesProposed(active, proposedDate, proposedTime, timezone)
-  ) {
-    return { owned: false, source: null, mismatch: true };
+
+  const eligible = appointmentEligibleForReclaim(active, {
+    organizationId,
+    prospectId,
+    agentId,
+    proposedDate,
+    proposedTime,
+    timezone
+  });
+  if (!eligible.ok) {
+    return {
+      owned: false,
+      source: null,
+      reason: eligible.reason,
+      mismatch: true
+    };
   }
 
   const slot = appointmentLocalSlot(active, timezone);
@@ -253,6 +376,8 @@ async function persistOwnedConfirmedContext({
 module.exports = {
   appointmentLocalSlot,
   slotMatchesProposed,
+  appointmentEligibleForReclaim,
+  normalizeActiveLookupResult,
   buildAppointmentConfirmedReply,
   buildConfirmedDurablePatch,
   resolvePostCreateOwnership,

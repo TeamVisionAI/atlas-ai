@@ -128,24 +128,38 @@ async function reclaimOwnershipAfterAuthoringLoss({
 
   const proposedDate =
     late?.nextContext?.appointment?.proposedDate ||
+    late?.nextContext?.appointment?.confirmedDate ||
     late?.context?.appointment?.proposedDate ||
+    late?.context?.appointment?.confirmedDate ||
     null;
   const proposedTime =
     late?.nextContext?.appointment?.proposedTime ||
+    late?.nextContext?.appointment?.confirmedTime ||
     late?.context?.appointment?.proposedTime ||
+    late?.context?.appointment?.confirmedTime ||
     null;
   const language =
     late?.nextContext?.preferredLanguage ||
     late?.context?.preferredLanguage ||
     "spanish";
+  const prospectId =
+    late?.nextContext?.prospectId ||
+    late?.context?.prospectId ||
+    null;
+  const agentId =
+    actingUserId ||
+    late?.nextContext?.agentId ||
+    late?.context?.agentId ||
+    prospect.owner_user_id ||
+    null;
 
   const finder =
     findActiveAppointment ||
-    (async (phone, orgId) => {
+    (async (phone, orgId, agent) => {
       const {
         findActiveAppointmentForProspect
       } = require("../activeAppointmentResolver");
-      return findActiveAppointmentForProspect(phone, orgId);
+      return findActiveAppointmentForProspect(phone, orgId, agent);
     });
 
   const ownership = await resolvePostCreateOwnership({
@@ -153,6 +167,8 @@ async function reclaimOwnershipAfterAuthoringLoss({
     findActiveAppointment: finder,
     prospectPhone: prospect.phone || normalized.phone || null,
     organizationId,
+    prospectId,
+    agentId,
     proposedDate,
     proposedTime,
     timezone: late?.nextContext?.timezone || "America/New_York",

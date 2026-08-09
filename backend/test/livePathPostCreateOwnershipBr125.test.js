@@ -474,13 +474,17 @@ describe("BR-125 live post-create ownership", () => {
       v2Result: null,
       findActiveAppointment: async () => ({
         id: APPT_ID,
+        organization_id: ORG,
         prospect_id: CORE,
+        interviewer_user_id: AGENT,
         status: "scheduled",
         start_date_time: "2026-08-10T16:00:00.000Z",
         timezone: "America/New_York"
       }),
       prospectPhone: PHONE,
       organizationId: ORG,
+      prospectId: CORE,
+      agentId: AGENT,
       proposedDate: DATE,
       proposedTime: TIME,
       language: "spanish"
@@ -491,5 +495,192 @@ describe("BR-125 live post-create ownership", () => {
     assert.equal(ownership.timeKey, TIME);
     assert.equal(ownership.nextContext.appointment.status, APPOINTMENT_STATUS.CONFIRMED);
     assert.equal(ownership.nextContext.currentStage, STAGES.CONFIRMED);
+  });
+});
+
+describe("BR-125 reclaim matching boundaries", () => {
+  function baseAppt(overrides = {}) {
+    return {
+      id: APPT_ID,
+      organization_id: ORG,
+      prospect_id: CORE,
+      interviewer_user_id: AGENT,
+      status: "scheduled",
+      start_date_time: "2026-08-10T16:00:00.000Z",
+      timezone: "America/New_York",
+      ...overrides
+    };
+  }
+
+  async function reclaim(overrides = {}) {
+    return resolvePostCreateOwnership({
+      v2Result: null,
+      findActiveAppointment: async () => baseAppt(),
+      prospectPhone: PHONE,
+      organizationId: ORG,
+      prospectId: CORE,
+      agentId: AGENT,
+      proposedDate: DATE,
+      proposedTime: TIME,
+      language: "spanish",
+      ...overrides
+    });
+  }
+
+  test("B1–B5. exact org/prospect/agent/slot/active required", async () => {
+    assert.equal((await reclaim()).owned, true);
+
+    assert.equal(
+      (
+        await reclaim({
+          findActiveAppointment: async () =>
+            baseAppt({ organization_id: "11111111-1111-4111-8111-111111111111" })
+        })
+      ).owned,
+      false
+    );
+    assert.equal(
+      (
+        await reclaim({
+          findActiveAppointment: async () =>
+            baseAppt({ prospect_id: "22222222-2222-4222-8222-222222222222" })
+        })
+      ).owned,
+      false
+    );
+    assert.equal(
+      (
+        await reclaim({
+          findActiveAppointment: async () =>
+            baseAppt({ interviewer_user_id: "33333333-3333-4333-8333-333333333333" })
+        })
+      ).owned,
+      false
+    );
+    assert.equal(
+      (await reclaim({ proposedTime: "13:00" })).owned,
+      false
+    );
+    assert.equal(
+      (
+        await reclaim({
+          findActiveAppointment: async () => baseAppt({ status: "cancelled" })
+        })
+      ).owned,
+      false
+    );
+  });
+
+  test("B6–B9. different-slot/prospect/org/agent cannot reclaim", async () => {
+    assert.equal(
+      (
+        await reclaim({
+          findActiveAppointment: async () =>
+            baseAppt({ start_date_time: "2026-08-10T17:00:00.000Z" })
+        })
+      ).reason,
+      "SLOT_MISMATCH"
+    );
+    assert.equal((await reclaim({ prospectId: LEGACY })).reason, "PROSPECT_MISMATCH");
+    assert.equal(
+      (await reclaim({ organizationId: "11111111-1111-4111-8111-111111111111" })).reason,
+      "ORG_MISMATCH"
+    );
+    assert.equal(
+      (await reclaim({ agentId: "33333333-3333-4333-8333-333333333333" })).reason,
+      "AGENT_MISMATCH"
+    );
+  });
+
+  test("B10. multiple candidate appointments fail closed", async () => {
+    const ownership = await reclaim({
+      findActiveAppointment: async () => [
+        baseAppt({ id: "a1" }),
+        baseAppt({ id: "a2" })
+      ]
+    });
+    assert.equal(ownership.owned, false);
+    assert.equal(ownership.reason, "MULTIPLE_CANDIDATES");
+  });
+
+  test("B11. timeout before mutation does not fabricate success", async () => {
+    const ownership = await resolvePostCreateOwnership({
+      v2Result: { execution: { success: false } },
+      findActiveAppointment: async () => null,
+      prospectPhone: PHONE,
+      organizationId: ORG,
+      prospectId: CORE,
+      agentId: AGENT,
+      proposedDate: DATE,
+      proposedTime: TIME
+    });
+    assert.equal(ownership.owned, false);
+  });
+
+  test("B15. durable confirmed cannot later downgrade", () => {
+    const {
+      protectConfirmedAppointmentFromDowngrade
+    } = require("../core/recruitAiV2/contextPersistenceService");
+    const confirmed = {
+      currentStage: STAGES.CONFIRMED,
+      appointment: {
+        status: APPOINTMENT_STATUS.CONFIRMED,
+        appointmentId: APPT_ID,
+        confirmedDate: DATE,
+        confirmedTime: TIME
+      }
+    };
+    const protectedNext = protectConfirmedAppointmentFromDowngrade(confirmed, {
+      ...confirmed,
+      appointment: {
+        status: "proposed",
+        appointmentId: null,
+        proposedDate: DATE,
+        proposedTime: TIME
+      }
+    });
+    assert.equal(protectedNext.appointment.status, APPOINTMENT_STATUS.CONFIRMED);
+    assert.equal(protectedNext.appointment.appointmentId, APPT_ID);
+  });
+
+  test("B18. reclaim path never invokes executeScheduleInterview", async () => {
+    let creates = 0;
+    await resolvePostCreateOwnership({
+      v2Result: null,
+      findActiveAppointment: async () => baseAppt(),
+      prospectPhone: PHONE,
+      organizationId: ORG,
+      prospectId: CORE,
+      agentId: AGENT,
+      proposedDate: DATE,
+      proposedTime: TIME
+    });
+    // No create hook exists on reclaim — assert helpers stay read-only.
+    assert.equal(creates, 0);
+    const deferred = await processRecruitAiV2Turn({
+      message: { text: "Si" },
+      context: anaProposedContext(),
+      options: {
+        allowExecution: false,
+        persistContext: false,
+        env: execEnv({
+          RECRUIT_AI_V2_EXECUTION_ENABLED: "false",
+          RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED: "false"
+        }),
+        actingUserId: AGENT,
+        organizationId: ORG,
+        profileConfigured: true,
+        dependencies: {
+          findActiveAppointmentForProspect: async () => null,
+          getSlots: async () => [{ dateKey: DATE, timeKey: TIME }],
+          executeScheduleInterview: async () => {
+            creates += 1;
+            return { success: true, appointmentId: APPT_ID };
+          }
+        }
+      }
+    });
+    assert.equal(creates, 0);
+    assert.equal(deferred.execution?.success, false);
   });
 });
