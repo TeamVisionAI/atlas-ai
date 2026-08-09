@@ -181,6 +181,33 @@ function isGreeting(text) {
   );
 }
 
+/**
+ * BR-124 — explicit renewed ask to schedule an interview.
+ * Strong intent; must outrank stale ambiguity / unknown low-confidence escalation.
+ */
+function looksLikeExplicitScheduleRequest(text) {
+  const t = String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[¡!¿?.,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return false;
+  }
+  return (
+    /\b(quiero|quisiera|necesito|me gustaria|podriamos|podemos)\b.{0,40}\b(agendar|programar|coordinar)\b.{0,30}\b(entrevista|cita)\b/.test(
+      t
+    ) ||
+    /\b(agendar|programar|coordinar)\b.{0,20}\b(una\s+)?(entrevista|cita)\b/.test(t) ||
+    /\b(schedule|book)\b.{0,20}\b(an?\s+)?interview\b/.test(t) ||
+    /\b(i\s+)?(want|need|would like)\b.{0,30}\b(to\s+)?(schedule|book)\b.{0,20}\b(an?\s+)?interview\b/.test(
+      t
+    )
+  );
+}
+
 function isEchoOfLastQuestion(text, context) {
   const last = String(context?.conversation?.lastAtlasOutboundText || "")
     .trim()
@@ -822,6 +849,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.alsoWithdraw = Boolean(cancellation.alsoWithdraw);
     entities.alsoOptOut = Boolean(cancellation.alsoOptOut);
     entities.directLackOfInterest = Boolean(cancellation.directLackOfInterest);
+  } else if (looksLikeExplicitScheduleRequest(text)) {
+    // Implements BR-124 — explicit schedule ask recovers pre-booking flow.
+    intent = INTENTS.REQUEST_SCHEDULE_INTERVIEW;
+    confidence = 0.93;
   } else if (pendingTravelConfirm && looksLikeZoomPreference(text)) {
     intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
     confidence = 0.92;
@@ -1285,6 +1316,7 @@ module.exports = {
   classifyCancellationIntent,
   looksLikeCommunicationOptOut,
   looksLikeDirectLackOfInterest,
+  looksLikeExplicitScheduleRequest,
   isAffirmative,
   isSoftAcknowledgement,
   hasConfirmableAppointmentProposal,

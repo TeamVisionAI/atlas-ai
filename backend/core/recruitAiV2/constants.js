@@ -86,6 +86,8 @@ const INTENTS = Object.freeze({
   CLARIFY_AM_PM: "clarify_am_pm",
   SCHEDULE_CONFIRM: "schedule_confirm",
   RESCHEDULE_REQUEST: "reschedule_request",
+  /** BR-124 — explicit renewed ask to schedule an interview (pre-booking recovery). */
+  REQUEST_SCHEDULE_INTERVIEW: "request_schedule_interview",
   UNKNOWN: "unknown"
 });
 
@@ -116,6 +118,9 @@ const NEXT_ACTIONS = Object.freeze({
   CLARIFY_LICENSE_TYPE: "clarify_license_type",
   CLARIFY_WORK_AUTH_AFTER_LICENSE: "clarify_work_auth_after_license",
   CONTINUE_QUALIFICATION: "continue_qualification",
+  /** BR-124 — resume scheduling after explicit schedule request clears stale ambiguity. */
+  RESUME_SCHEDULING_AFTER_EXPLICIT_REQUEST:
+    "resume_scheduling_after_explicit_request",
   ACKNOWLEDGE_CORRECTION_THEN_RESUME: "acknowledge_correction_then_resume",
   CAPTURE_AUTHORIZATION_CONTINUE: "capture_authorization_continue",
   UPDATE_MEETING_PREFERENCE: "update_meeting_preference",
@@ -180,6 +185,11 @@ const REASON_CODES = Object.freeze({
   RECOVERABLE_AMBIGUITY: "RECOVERABLE_AMBIGUITY",
   REPEATED_AMBIGUITY_ESCALATE: "REPEATED_AMBIGUITY_ESCALATE",
   GREETING_NO_ESCALATE: "GREETING_NO_ESCALATE",
+  /** BR-124 — explicit schedule intent resets stale pre-appointment clarification. */
+  EXPLICIT_SCHEDULE_INTENT_RECOVERS_AMBIGUITY:
+    "EXPLICIT_SCHEDULE_INTENT_RECOVERS_AMBIGUITY",
+  /** BR-124 — customer-facing handoff copy delivered for genuine escalate. */
+  ESCALATE_HANDOFF_CUSTOMER_ACK: "ESCALATE_HANDOFF_CUSTOMER_ACK",
   FRAGMENT_NOT_NAME: "FRAGMENT_NOT_NAME",
   FACT_CORRECTION: "FACT_CORRECTION",
   PENDING_QUESTION_DEFERRED: "PENDING_QUESTION_DEFERRED",
