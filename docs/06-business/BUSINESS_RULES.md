@@ -1274,6 +1274,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-119 — Offered-Slot Day Narrowing Preserves Choice
+
+**Implements:** When Recruit AI v2 has already offered concrete slots and the prospect narrows by **day** (or day+time), preserve the matching offered slot(s) and move toward confirmation — do **not** broaden with a fresh availability menu unless the prospect asks outside the offered set (e.g. “más tarde”), rejects, or the narrowed set is empty. Day-part answers (e.g. “Tarde”) may proactively offer 1–2 real canonical slots instead of an open preferred-time question when availability is readable.  
+**Domain:** Recruit AI / scheduling conversation continuity  
+**Depends on:** BR-081, BR-084, BR-107, BR-108, BR-111, BR-114, BR-115, BR-116  
+**Status:** Implemented in code; **execution remains OFF**  
+**Engine target:** `conversationContext.resolveUniqueOfferedDaySelection`; `decisionEngine` date-proposal narrowing + day-part offer; `schedulingAvailabilityReader` dayPart filter / later-alternatives constraints  
+**Tests:** `backend/test/recruitAiV2OfferedSlotNarrowingBr119.test.js`
+
+### Rules
+
+1. **Day-only unique match = selection** — After offered slots (`offer_time_choices` / equivalents), a day-only reply (`El lunes`) that uniquely matches one offered date selects that slot via the same confirmation path as BR-115 / `SELECT_OPTION`. Do **not** re-query and add new times (e.g. do not introduce Monday 8:00 when only Monday 7:30 was offered).
+2. **Same-day ambiguous times** — If multiple offered times share the named day, restate **only those** offered times — never broaden the set.
+3. **BR-115 time narrowing unchanged** — Natural times (`7:30`) and exact day+time (`El lunes a las 7:30`) continue under BR-115.
+4. **Outside / later alternatives** — Phrases like `El lunes, pero más tarde` leave the offered set: push `REQUESTED_LATER_ALTERNATIVES`, set exclusive earliest after the latest same-day offered time, avoid prior offered identities, and offer real later slots via BR-107 / BR-116 paths.
+5. **Day-part proactive offer** — `PROVIDE_DAY_PART` (e.g. `Tarde`) attempts same-turn canonical availability filtered by dayPart (Spanish afternoon includes afternoon+evening ≥12:00). Offer ≤2 slots. Fall back to ask-preferred-time only when no useful slots are available.
+6. **State preservation** — Narrowing reduces the active candidate set (date/time/timezone/proposed slot/`previouslyOfferedSlots`). It must not reset to a broad fresh query unless Case D / rejection / empty match.
+7. **Stale availability** — Full live revalidation of a narrowed slot before confirmation remains deferred to confirm-time canonical recheck (Case E); this rule does not invent a parallel revalidation scheduler.
+8. **Execution independent** — Authoring/decision only; BR-111 remains fail-closed. No Calendar / appointment / BR-080 writes. No authoring-allowlist changes. No timezone behavior changes.
+
+---
+
 ## BR-113 — Live Execution Attribution Telemetry
 
 **Implements:** Explicit structured stage logs so every authoritative live appointment attempt is attributable to exactly one final execution source: `V2`, `LEGACY_FALLBACK`, or `LEGACY_NO_V2_ATTEMPT`.  

@@ -168,6 +168,23 @@ function looksLikeRepetitionSignal(text) {
   );
 }
 
+/**
+ * BR-119 — prospect wants alternatives later than / outside the current offered set.
+ * Ex: "El lunes, pero más tarde"
+ */
+function looksLikeRequestForLaterAlternatives(text) {
+  const t = String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return (
+    /\b(mas tarde|later|another time|otra hora|otro horario|algo mas tarde|un poco mas tarde)\b/.test(
+      t
+    ) || /\b(pero|but)\b[\s\S]{0,24}\b(mas tarde|later)\b/.test(t)
+  );
+}
+
 module.exports = {
   hasProposedTime,
   hasProposedDate,
@@ -177,5 +194,6 @@ module.exports = {
   resolveSchedulingQuestionSkip,
   resolveZoomLinkFromContext,
   looksLikeMeetingAccessRequest,
-  looksLikeRepetitionSignal
+  looksLikeRepetitionSignal,
+  looksLikeRequestForLaterAlternatives
 };

@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116 / BR-119.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -28,6 +28,7 @@ const {
 const {
   isTimeInOfferedSlots,
   resolveUniqueOfferedSlotSelection,
+  resolveUniqueOfferedDaySelection,
   slotDate,
   slotTime,
   slotsEqual,
@@ -100,6 +101,51 @@ function applySelectedOfferedSlotDecision(
       clarificationCount: 0
     },
     currentStage: STAGES.PROPOSED
+  };
+  return structured;
+}
+
+/**
+ * BR-119 — restate only the day-narrowed offered slots (do not broaden).
+ */
+function applyRestateNarrowedOfferedSlots(
+  structured,
+  matches,
+  { reasonCodes = [], interpretation = null, dateIso = null } = {}
+) {
+  const offered = Array.isArray(matches) ? matches : [];
+  structured.decision.nextAction = NEXT_ACTIONS.OFFER_AVAILABLE_SLOTS;
+  structured.decision.requiresExplicitConfirmation = false;
+  structured.decision.mayCreateAppointment = false;
+  structured.decision.shouldEscalate = false;
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey = "offer_available_slots";
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    offeredSlots: offered,
+    requestedDate: dateIso || slotDate(offered[0]) || null,
+    slotA: slotTime(offered[0]) || null,
+    slotB: slotTime(offered[1]) || null,
+    timezone: offered[0]?.timezone || null
+  };
+  for (const code of reasonCodes) {
+    structured.reasonCodes.push(code);
+  }
+  structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+  structured.contextPatch = {
+    appointment: {
+      status: APPOINTMENT_STATUS.PROPOSED,
+      proposedDate: dateIso || slotDate(offered[0]) || null,
+      previouslyOfferedSlots: offered
+    },
+    conversation: {
+      lastQuestionAsked: "offer_time_choices",
+      pendingClarification: null,
+      clarificationCount: 0,
+      lastProspectIntent: interpretation?.intent || INTENTS.SCHEDULING_DATE_PROPOSAL
+    },
+    currentStage: STAGES.SCHEDULING,
+    attention: { needsHumanAttention: false, reason: null }
   };
   return structured;
 }
@@ -1782,7 +1828,47 @@ function decideConversationTurn({
       requestedTime: priorTime
     };
 
-    if (priorTime) {
+    const pendingQ = String(context.conversation?.lastQuestionAsked || "");
+    const offeredSlots = context.appointment?.previouslyOfferedSlots || [];
+    const requestsLater = Boolean(
+      interpretation.entities?.requestsLaterAlternatives
+    );
+
+    // Implements BR-119 — day-only narrowing against previously offered slots.
+    // Do not re-query / broaden unless prospect asks for later alternatives.
+    if (
+      !requestsLater &&
+      isPendingOfferedSlotChoice(pendingQ, offeredSlots) &&
+      resolvedDate?.isoDate
+    ) {
+      const dayMatch = resolveUniqueOfferedDaySelection(
+        offeredSlots,
+        resolvedDate.isoDate
+      );
+      if (dayMatch.kind === "unique" && dayMatch.selected) {
+        return applySelectedOfferedSlotDecision(
+          structured,
+          dayMatch.selected,
+          offeredSlots,
+          {
+            reasonCodes: [REASON_CODES.OFFERED_SLOT_DAY_NARROWED]
+          }
+        );
+      }
+      if (dayMatch.kind === "ambiguous") {
+        return applyRestateNarrowedOfferedSlots(structured, dayMatch.matches, {
+          interpretation,
+          dateIso: resolvedDate.isoDate,
+          reasonCodes: [REASON_CODES.OFFERED_SLOT_DAY_NARROWED_AMBIGUOUS]
+        });
+      }
+    }
+
+    if (requestsLater) {
+      structured.reasonCodes.push(REASON_CODES.REQUESTED_LATER_ALTERNATIVES);
+    }
+
+    if (priorTime && !requestsLater) {
       structured.decision.nextAction = NEXT_ACTIONS.CONFIRM_DATE_WITH_TIME;
       structured.customerReplyPlan.templateKey = "confirm_date_with_time";
       structured.reasonCodes.push(REASON_CODES.PRIOR_TIME_PRESERVED_WITH_DATE);
@@ -1812,6 +1898,7 @@ function decideConversationTurn({
     }
 
     // Implements BR-107 — with concrete date + prior constraint, offer real slots when read succeeds.
+    // Implements BR-119 Case D — "más tarde" falls through here to query alternatives.
     const dateConstraintPatch = {
       knownFacts: {
         dateExclusions: exclusions.length
@@ -2079,6 +2166,38 @@ function decideConversationTurn({
 
   if (intent === INTENTS.PROVIDE_DAY_PART) {
     const dayPart = interpretation.entities?.dayPart || null;
+    // Implements BR-119 — when canonical availability is present, offer 1–2 real slots.
+    const dayPartConstraintPatch = {
+      knownFacts: {
+        preferredDayPart: dayPart,
+        availabilityConstraint: {
+          type: "availability_constraint",
+          dayPart,
+          earliestTime: null,
+          latestTime: null,
+          earliestTimeInclusive: true,
+          raw: interpretation.entities?.rawText || null
+        }
+      },
+      conversation: {
+        lastProspectIntent: INTENTS.PROVIDE_DAY_PART
+      },
+      currentStage: STAGES.SCHEDULING
+    };
+    const offeredFromDayPart = tryApplyAvailabilityOffer({
+      structured,
+      context,
+      interpretation,
+      availability,
+      constraintPatch: dayPartConstraintPatch
+    });
+    if (offeredFromDayPart) {
+      structured.reasonCodes.push(REASON_CODES.DAY_PART_ADVANCES_TO_TIME);
+      structured.reasonCodes.push(REASON_CODES.DAY_PART_OFFERED_AVAILABLE_SLOTS);
+      structured.reasonCodes.push(REASON_CODES.NO_DEAD_END_CONTINUATION);
+      return offeredFromDayPart;
+    }
+
     const cont = resolveDayPartContinuation(
       dayPart,
       structured.preferredLanguage || "spanish"

@@ -294,6 +294,31 @@ function resolveUniqueOfferedSlotSelection(
   return { kind: "ambiguous", selected: null, matches };
 }
 
+/**
+ * BR-119 — match a day-only reply against previously offered slots.
+ * Unique day → preserve that slot; multiple times same day → ambiguous (do not broaden).
+ * @returns {{ kind: 'unique'|'ambiguous'|'none', selected: object|null, matches: object[] }}
+ */
+function resolveUniqueOfferedDaySelection(offeredSlots = [], dateIso = null) {
+  if (!dateIso || !Array.isArray(offeredSlots) || offeredSlots.length === 0) {
+    return { kind: "none", selected: null, matches: [] };
+  }
+
+  const matches = offeredSlots.filter(
+    (slot) => String(slotDate(slot) || "") === String(dateIso)
+  );
+
+  if (matches.length === 0) {
+    return { kind: "none", selected: null, matches: [] };
+  }
+
+  if (matches.length === 1) {
+    return { kind: "unique", selected: matches[0], matches };
+  }
+
+  return { kind: "ambiguous", selected: null, matches };
+}
+
 module.exports = {
   createConversationContext,
   mergeConversationContext,
@@ -310,6 +335,7 @@ module.exports = {
   slotsEqual,
   isTimeInOfferedSlots,
   resolveUniqueOfferedSlotSelection,
+  resolveUniqueOfferedDaySelection,
   STAGES,
   APPOINTMENT_STATUS,
   LANGUAGES

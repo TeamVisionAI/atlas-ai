@@ -192,15 +192,58 @@ function resolveConstraints({ context = {}, interpretation = null } = {}) {
   const {
     resolveEarliestTimeInclusive
   } = require("./schedulingConstraints");
+
+  let earliestTime = constraint?.earliestTime || null;
+  let latestTime = constraint?.latestTime || null;
+  let earliestTimeInclusive = constraint
+    ? resolveEarliestTimeInclusive(constraint)
+    : true;
+
+  const dayPart =
+    interpretation?.entities?.dayPart ||
+    constraint?.dayPart ||
+    context.knownFacts?.preferredDayPart ||
+    null;
+
+  // Implements BR-119 — "más tarde" means after the current offered set on that day.
+  if (interpretation?.entities?.requestsLaterAlternatives) {
+    const date = resolveConcreteScheduleDate({ context, interpretation });
+    const offered = Array.isArray(context.appointment?.previouslyOfferedSlots)
+      ? context.appointment.previouslyOfferedSlots
+      : [];
+    const sameDay = date
+      ? offered.filter(
+          (slot) =>
+            String(slot.date || slot.dateKey || "") === String(date)
+        )
+      : [];
+    const pool = sameDay.length ? sameDay : offered;
+    let maxMinutes = null;
+    let maxTime = null;
+    for (const slot of pool) {
+      const t = slot.time || slot.timeKey || null;
+      const minutes = timeKeyToMinutes(t);
+      if (minutes == null) {
+        continue;
+      }
+      if (maxMinutes == null || minutes > maxMinutes) {
+        maxMinutes = minutes;
+        maxTime = t;
+      }
+    }
+    if (maxTime) {
+      earliestTime = maxTime;
+      earliestTimeInclusive = false;
+    }
+  }
+
   return {
-    earliestTime: constraint?.earliestTime || null,
-    latestTime: constraint?.latestTime || null,
-    dayPart: constraint?.dayPart || null,
+    earliestTime,
+    latestTime,
+    dayPart,
     // BR-107 consumes normalized inclusivity — never reparse raw here.
-    earliestTimeInclusive: constraint
-      ? resolveEarliestTimeInclusive(constraint)
-      : true,
-    raw: constraint?.raw || null
+    earliestTimeInclusive,
+    raw: constraint?.raw || interpretation?.entities?.rawText || null
   };
 }
 
@@ -208,10 +251,13 @@ function resolveConstraints({ context = {}, interpretation = null } = {}) {
  * Explicit earliest/latest outrank day-part. Do not use engine afternoon (ends 18:00)
  * when earliestTime is set — pass timePreference "any" and filter here.
  * Exclusive earliestTime → minutes > bound; inclusive → minutes >= bound.
+ * BR-119 — dayPart alone filters: morning <12; afternoon (tarde) ≥12 (afternoon+evening);
+ * evening ≥17.
  */
 function filterSlotsByConstraints(slots, constraints = {}) {
   const earliest = timeKeyToMinutes(constraints.earliestTime);
   const latest = timeKeyToMinutes(constraints.latestTime);
+  const dayPart = String(constraints.dayPart || "").toLowerCase();
   const {
     resolveEarliestTimeInclusive
   } = require("./schedulingConstraints");
@@ -235,6 +281,18 @@ function filterSlotsByConstraints(slots, constraints = {}) {
     }
     if (latest != null && minutes > latest) {
       return false;
+    }
+    // Day-part window only when no explicit earliest/latest bound.
+    if (earliest == null && latest == null && dayPart) {
+      if (dayPart === "morning" && minutes >= 12 * 60) {
+        return false;
+      }
+      if (dayPart === "afternoon" && minutes < 12 * 60) {
+        return false;
+      }
+      if (dayPart === "evening" && minutes < 17 * 60) {
+        return false;
+      }
     }
     return true;
   });
@@ -584,10 +642,22 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
       (noOfferedMenuYet &&
         Boolean(constraints.earliestTime || constraints.latestTime)));
 
+  // Implements BR-119 — day-part answers may proactively offer real slots.
+  const dayPartNeedsSlots =
+    intent === INTENTS.PROVIDE_DAY_PART &&
+    Boolean(constraints.dayPart || interpretation?.entities?.dayPart);
+
+  // Implements BR-119 Case D — leave the offered set for later alternatives.
+  const laterAlternatives =
+    intent === INTENTS.SCHEDULING_DATE_PROPOSAL &&
+    Boolean(interpretation?.entities?.requestsLaterAlternatives);
+
   if (
     !constraints.earliestTime &&
     !constraints.latestTime &&
-    !counterofferNeedsSlots
+    !counterofferNeedsSlots &&
+    !dayPartNeedsSlots &&
+    !laterAlternatives
   ) {
     return false;
   }
@@ -596,6 +666,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT ||
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL ||
     intent === INTENTS.REASSERT_KNOWN_FACT ||
+    intent === INTENTS.PROVIDE_DAY_PART ||
     counterofferNeedsSlots;
   if (!allowedIntent) {
     return false;
@@ -606,6 +677,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
   return (
     Boolean(date) ||
     intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT ||
+    dayPartNeedsSlots ||
     counterofferNeedsSlots
   );
 }
@@ -1055,7 +1127,9 @@ async function resolveAvailabilityForTurn({
   });
 
   const priorOffered = context.appointment?.previouslyOfferedSlots || [];
-  const avoidPrevious = options.avoidPreviouslyOffered === true;
+  const avoidPrevious =
+    options.avoidPreviouslyOffered === true ||
+    interpretation?.entities?.requestsLaterAlternatives === true;
   const rejectIds = avoidPrevious
     ? priorOffered.map((slot) => slotIdentity(slot)).filter((id) => !id.startsWith("|"))
     : [];
@@ -1264,7 +1338,9 @@ function resolveAvailabilityForTurnSync(args = {}) {
     DEFAULT_TIMEZONE;
   const organizationId = context.organizationId || options.organizationId || null;
   const now = options.now || context._testNow || null;
-  const avoidPrevious = options.avoidPreviouslyOffered === true;
+  const avoidPrevious =
+    options.avoidPreviouslyOffered === true ||
+    interpretation?.entities?.requestsLaterAlternatives === true;
   const priorOffered = context.appointment?.previouslyOfferedSlots || [];
   const rejectIds = avoidPrevious
     ? priorOffered.map((slot) => slotIdentity(slot)).filter((id) => !id.startsWith("|"))

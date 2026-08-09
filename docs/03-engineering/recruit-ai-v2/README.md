@@ -53,6 +53,8 @@ BR-115 — natural/spoken time uniquely matching `previouslyOfferedSlots` select
 
 BR-116 — preferred/requested time (e.g. `7:30`) triggers same-turn `schedulingAvailabilityReader` → `offer_available_slots`; no deferred “voy a revisar” when slots are readable. Tests: `recruitAiV2SameTurnRequestedTimeAvailabilityBr116.test.js`.
 
+BR-119 — day-only narrowing of `previouslyOfferedSlots` preserves the matching slot (no broaden); day-part (`Tarde`) may offer 1–2 real slots; “más tarde” leaves the offered set. Tests: `recruitAiV2OfferedSlotNarrowingBr119.test.js`.
+
 ## Regression fixture
 
 `backend/test/fixtures/recruitAiV2/tv000028-scheduling-replay.json`  
@@ -97,3 +99,4 @@ Do **not** change without an explicit sprint:
 - Production CE (`semanticConversationEngine`) is unchanged as the customer-visible authority unless BR-114 live authoring is enabled for the one-user allowlist
 - BR-117 readiness: genuine reassertion copy only; invite email hydrates into `knownFacts` without blocking booking
 - BR-118: non-text WhatsApp media soft-acks without reopen clarification / scheduling
+- BR-119: day narrowing preserves offered slots; day-part may offer real slots; execution stays OFF
