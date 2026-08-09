@@ -33,13 +33,18 @@ const {
   createSupabaseContextRepository,
   createMemoryContextRepository
 } = require("./contextRepository");
+const { resolvePostCreateOwnership } = require("./postCreateOwnership");
 
 const STAGES = Object.freeze({
   ATTEMPTED: "recruit_ai_v2_live_authoring_attempted",
   USED: "recruit_ai_v2_live_authoring_used",
   FALLBACK: "recruit_ai_v2_live_authoring_fallback_to_legacy",
-  SKIPPED: "recruit_ai_v2_live_authoring_skipped"
+  SKIPPED: "recruit_ai_v2_live_authoring_skipped",
+  OWNED_AFTER_MUTATION: "recruit_ai_v2_live_authoring_owned_after_mutation"
 });
+
+/** Extra wait after soft timeout so in-flight mission creates can finish ownership. */
+const POST_TIMEOUT_GRACE_MS = 12000;
 
 function resolveSupabaseClient() {
   try {
@@ -62,8 +67,20 @@ function createDefaultPersistenceService() {
 function withTimeout(promise, timeoutMs, code = "LIVE_AUTHORING_TIMEOUT") {
   const ms = Number(timeoutMs) > 0 ? Number(timeoutMs) : DEFAULT_TIMEOUT_MS;
   let timer = null;
+  let settled = null;
+  const tracked = Promise.resolve(promise).then(
+    (value) => {
+      settled = { ok: true, value };
+      return value;
+    },
+    (error) => {
+      settled = { ok: false, error };
+      throw error;
+    }
+  );
+
   return Promise.race([
-    Promise.resolve(promise).finally(() => {
+    tracked.finally(() => {
       if (timer) {
         clearTimeout(timer);
       }
@@ -72,10 +89,146 @@ function withTimeout(promise, timeoutMs, code = "LIVE_AUTHORING_TIMEOUT") {
       timer = setTimeout(() => {
         const error = new Error(code);
         error.code = code;
+        // Attach late settle so callers can reclaim ownership after mission write.
+        error.getLateResult = () => (settled?.ok ? settled.value : null);
+        error.awaitTracked = () => tracked;
         reject(error);
       }, ms);
     })
   ]);
+}
+
+async function reclaimOwnershipAfterAuthoringLoss({
+  error = null,
+  v2Result = null,
+  prospect = {},
+  normalized = {},
+  organizationId = null,
+  actingUserId = null,
+  allowExecution = false,
+  persistence = null,
+  findActiveAppointment = null,
+  logStage = null
+} = {}) {
+  let late = v2Result;
+  if (!late && typeof error?.awaitTracked === "function") {
+    try {
+      late = await Promise.race([
+        error.awaitTracked(),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("POST_TIMEOUT_GRACE_EXCEEDED")), POST_TIMEOUT_GRACE_MS);
+        })
+      ]);
+    } catch {
+      late = typeof error.getLateResult === "function" ? error.getLateResult() : null;
+    }
+  } else if (!late && typeof error?.getLateResult === "function") {
+    late = error.getLateResult();
+  }
+
+  const proposedDate =
+    late?.nextContext?.appointment?.proposedDate ||
+    late?.context?.appointment?.proposedDate ||
+    null;
+  const proposedTime =
+    late?.nextContext?.appointment?.proposedTime ||
+    late?.context?.appointment?.proposedTime ||
+    null;
+  const language =
+    late?.nextContext?.preferredLanguage ||
+    late?.context?.preferredLanguage ||
+    "spanish";
+
+  const finder =
+    findActiveAppointment ||
+    (async (phone, orgId) => {
+      const {
+        findActiveAppointmentForProspect
+      } = require("../activeAppointmentResolver");
+      return findActiveAppointmentForProspect(phone, orgId);
+    });
+
+  const ownership = await resolvePostCreateOwnership({
+    v2Result: late,
+    findActiveAppointment: finder,
+    prospectPhone: prospect.phone || normalized.phone || null,
+    organizationId,
+    proposedDate,
+    proposedTime,
+    timezone: late?.nextContext?.timezone || "America/New_York",
+    language,
+    baseContext: late?.nextContext || late?.context || null
+  });
+
+  if (!ownership.owned || !ownership.replyText) {
+    return null;
+  }
+
+  if (persistence && ownership.nextContext && organizationId) {
+    try {
+      await persistence.compareAndSaveContext({
+        organizationId,
+        prospectId:
+          late?.nextContext?.prospectId ||
+          late?.context?.prospectId ||
+          prospect.id ||
+          null,
+        channel: "whatsapp",
+        expectedVersion:
+          late?.nextContext?._persistence?.contextVersion ||
+          late?.context?._persistence?.contextVersion ||
+          undefined,
+        nextContext: ownership.nextContext,
+        inboundMessageId: normalized.providerMessageId || null,
+        decisionCode: "create_appointment",
+        prospectPhone: prospect.phone || normalized.phone || null,
+        legacyProspectId: prospect.id || null,
+        ensureCore: true
+      });
+    } catch {
+      // Soft: reply ownership still preferred even if durable reconcile races.
+    }
+  }
+
+  if (typeof logStage === "function") {
+    logStage(STAGES.OWNED_AFTER_MUTATION, {
+      phone: normalized.phone || prospect.phone || null,
+      organizationId,
+      agentId: actingUserId,
+      allowExecution,
+      appointmentId: ownership.appointmentId,
+      source: ownership.source,
+      providerMessageId: normalized.providerMessageId || null
+    });
+  }
+
+  return {
+    eligible: true,
+    authored: true,
+    fallThrough: false,
+    reason: null,
+    replyText: ownership.replyText,
+    v2Result: late || {
+      execution: {
+        success: true,
+        appointmentId: ownership.appointmentId,
+        performed: [
+          {
+            dateKey: ownership.dateKey,
+            timeKey: ownership.timeKey
+          }
+        ]
+      },
+      nextContext: ownership.nextContext,
+      responsePlan: { templateKey: "appointment_confirmed" }
+    },
+    actingUserId,
+    organizationId,
+    nextAction: "create_appointment",
+    allowExecution,
+    stage: STAGES.OWNED_AFTER_MUTATION,
+    ownershipSource: ownership.source
+  };
 }
 
 function extractAuthoredReplyText(v2Result) {
@@ -293,6 +446,21 @@ async function attemptLiveV2Authoring({
     }
 
     if (!replyText) {
+      const reclaimed = await reclaimOwnershipAfterAuthoringLoss({
+        v2Result,
+        prospect,
+        normalized,
+        organizationId,
+        actingUserId,
+        allowExecution,
+        persistence,
+        findActiveAppointment: dependencies.findActiveAppointmentForProspect,
+        logStage
+      });
+      if (reclaimed) {
+        return reclaimed;
+      }
+
       if (typeof logStage === "function") {
         logStage(STAGES.FALLBACK, {
           level: "warn",
@@ -349,6 +517,21 @@ async function attemptLiveV2Authoring({
         ? "LIVE_AUTHORING_TIMEOUT"
         : "LIVE_AUTHORING_TECHNICAL_FAILURE";
 
+    const reclaimed = await reclaimOwnershipAfterAuthoringLoss({
+      error,
+      prospect,
+      normalized,
+      organizationId,
+      actingUserId,
+      allowExecution,
+      persistence,
+      findActiveAppointment: dependencies.findActiveAppointmentForProspect,
+      logStage
+    });
+    if (reclaimed) {
+      return reclaimed;
+    }
+
     if (typeof logStage === "function") {
       logStage(STAGES.FALLBACK, {
         level: "warn",
@@ -381,6 +564,7 @@ module.exports = {
   attemptLiveV2Authoring,
   extractAuthoredReplyText,
   withTimeout,
+  reclaimOwnershipAfterAuthoringLoss,
   createDefaultPersistenceService,
   isEligibleForLiveAuthoring,
   resolveActingUserIdFromProspect,

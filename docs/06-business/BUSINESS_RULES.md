@@ -1343,6 +1343,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-125 — Single Post-Create Ownership After Live V2 Mutation
+
+**Implements:** When live authoring decides `create_appointment` and a mutation succeeds (or an active Atlas appointment matches the proposed slot), V2 owns durable confirmed + `appointment_confirmed` reply; CE must not take create/reply ownership via timeout fallthrough or “already confirmed” stub  
+**Domain:** Recruit AI v2 live WhatsApp runtime / post-execution ownership  
+**Depends on:** BR-088 (PR #88 ownership), BR-111, BR-112, BR-114, BR-122  
+**Related:** BR-120, BR-121, BR-123, BR-124  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/liveAuthoringBridge.js`, `recruitAiV2/postCreateOwnership.js`, `communicationHub.js`, `semanticConversationEngine.js`  
+**Tests:** `backend/test/livePathPostCreateOwnershipBr125.test.js`
+
+### Rules
+
+1. **One mutation owner** — For an authorized V2 `create_appointment` turn, mission create via V2 side-effect/execution is the booking owner; CE `completeInterview` must not create a second appointment after V2 already mutated.
+2. **Timeout must not abandon ownership** — Soft live-authoring timeout may not fall through to CE while an in-flight V2 create finishes; reclaim late `processTurn` result and/or reconcile from `findActive` matching the proposed slot before CE.
+3. **Durable confirmed** — Ownership reclaim persists `appointment.status=confirmed`, `appointmentId`, `confirmedDate`, `confirmedTime` consistent with the performed slot.
+4. **V2 reply** — Customer-facing copy is V2 `appointment_confirmed` with performed date/time — never the CE “ya está confirmada / already confirmed” stub as the success owner.
+5. **No confirmed → proposed** — Advisory/capture must not erase confirmed authority (existing protect); reclaim path writes confirmed SoR into durable.
+6. **Execution OFF unchanged** — Speak-only deferred path remains deferred with no mutation when gates are off.
+7. **Boundaries** — Does not cancel/reschedule existing live appointments; does not broaden execution allowlists; Ana/production bookings remain untouched by this code change alone.
+
+---
+
 ## BR-124 — Explicit Schedule Intent Recovers Stale Pre-Appointment Ambiguity
 
 **Implements:** Strong renewed “schedule an interview” intent resumes qualification/scheduling when no active confirmed appointment exists; stale clarification counters must not escalate that ask into silence  

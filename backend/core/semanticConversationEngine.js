@@ -1165,10 +1165,46 @@ async function handleSemanticMessage({
   });
 
   if (prospect.current_step === "CONFIRMED" && prospect.calendar_event_id) {
-    const confirmedReply =
-      language === "es"
-        ? "✅ Tu entrevista ya está confirmada. Un agente de Team Vision se comunicará contigo si es necesario realizar algún ajuste."
-        : "✅ Your interview is already confirmed. A Team Vision agent will contact you if any adjustment is needed.";
+    // Implements BR-125 — never own post-create with CE "already confirmed" stub
+    // when an Atlas appointment exists; V2 appointment_confirmed is authoritative.
+    let confirmedReply = null;
+    try {
+      const {
+        findActiveAppointmentForProspect
+      } = require("./activeAppointmentResolver");
+      const {
+        resolvePostCreateOwnership,
+        persistOwnedConfirmedContext
+      } = require("./recruitAiV2/postCreateOwnership");
+      const orgId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
+      const active = await findActiveAppointmentForProspect(phone, orgId);
+      const ownership = await resolvePostCreateOwnership({
+        findActiveAppointment: async () => active,
+        prospectPhone: phone,
+        organizationId: orgId,
+        timezone: active?.timezone || "America/New_York",
+        language: language === "es" ? "spanish" : "english"
+      });
+      if (ownership.owned && ownership.replyText) {
+        confirmedReply = ownership.replyText;
+        await persistOwnedConfirmedContext({
+          ownership,
+          organizationId: orgId,
+          prospectId: active?.prospect_id || prospect.id || null,
+          prospectPhone: phone,
+          legacyProspectId: prospect.id || null
+        });
+      }
+    } catch {
+      confirmedReply = null;
+    }
+
+    if (!confirmedReply) {
+      confirmedReply =
+        language === "es"
+          ? "✅ Tu entrevista ya está confirmada. Un agente de Team Vision se comunicará contigo si es necesario realizar algún ajuste."
+          : "✅ Your interview is already confirmed. A Team Vision agent will contact you if any adjustment is needed.";
+    }
 
     await recordLog({
       phone,

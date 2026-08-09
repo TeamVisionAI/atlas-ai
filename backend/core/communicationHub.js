@@ -218,6 +218,48 @@ async function processNormalizedInboundMessage(
         outboundIntent: "CONVERSATION_ENGINE_REPLY"
       });
     }
+
+    // Implements BR-125 — never hand create ownership to CE if V2 already mutated
+    // or an active appointment matches this confirm turn after authoring loss.
+    if (
+      authoringAttempt?.fallThrough &&
+      (authoringAttempt.nextAction === "create_appointment" ||
+        authoringAttempt.reason === "LIVE_AUTHORING_TIMEOUT" ||
+        authoringAttempt.reason === "EMPTY_OR_UNSAFE_REPLY")
+    ) {
+      try {
+        const {
+          reclaimOwnershipAfterAuthoringLoss
+        } = require("./recruitAiV2/liveAuthoringBridge");
+        const reclaimed = await reclaimOwnershipAfterAuthoringLoss({
+          v2Result: authoringAttempt.v2Result,
+          prospect,
+          normalized,
+          organizationId: prospect.organization_id || prospect.organizationId || null,
+          actingUserId: authoringAttempt.actingUserId,
+          allowExecution: authoringAttempt.allowExecution,
+          findActiveAppointment: authoringDependencies?.findActiveAppointmentForProspect,
+          logStage: logWhatsAppStage
+        });
+        if (reclaimed?.authored && reclaimed.replyText) {
+          return deliverWhatsAppReply({
+            normalized,
+            prospect,
+            replyText: reclaimed.replyText,
+            engineResult: {
+              reply: reclaimed.replyText,
+              outboundIntent: "CONVERSATION_ENGINE_REPLY",
+              source: "recruit_ai_v2_live_authoring",
+              nextAction: reclaimed.nextAction,
+              v2Result: reclaimed.v2Result
+            },
+            outboundIntent: "CONVERSATION_ENGINE_REPLY"
+          });
+        }
+      } catch {
+        // Fall through to legacy CE once.
+      }
+    }
     // Technical failure / empty / ineligible → fall through to legacy CE once.
   }
 
