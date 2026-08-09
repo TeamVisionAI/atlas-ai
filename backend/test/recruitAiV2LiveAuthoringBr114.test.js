@@ -267,6 +267,9 @@ test("7. shadow/advisory never author live responses", () => {
 });
 
 test("8–10. Sunday/Saturday/Monday 7 PM survive org 5 PM close via Sprint 22 slots", async () => {
+  // Deterministic fixture (America/New_York). Must inject getSlots/fixtureSlots at the
+  // readCandidateSlots top level — nested `options.getSlots` is ignored and would fall
+  // through to live Sprint 22 getSlots, which drops same-day evening times after wall clock.
   const slotsByDate = {
     "2026-08-08": [
       { dateKey: "2026-08-08", timeKey: "19:00", startTimeISO: "2026-08-08T23:00:00.000Z" },
@@ -282,18 +285,17 @@ test("8–10. Sunday/Saturday/Monday 7 PM survive org 5 PM close via Sprint 22 s
     ]
   };
 
-  for (const [date, expected] of Object.entries(slotsByDate)) {
+  for (const [date] of Object.entries(slotsByDate)) {
     const result = await readCandidateSlots({
       organizationId: TEAM_VISION_ORG,
       agentId: PRIMARY_RVP,
       date,
+      timezone: "America/New_York",
       constraints: { earliestTime: "17:00", earliestTimeInclusive: false },
-      options: {
-        getSlots: async ({ date: d }) => ({
-          slots: slotsByDate[d] || [],
-          timezone: "America/New_York"
-        })
-      }
+      getSlots: async ({ date: d }) => ({
+        slots: slotsByDate[d] || [],
+        timezone: "America/New_York"
+      })
     });
     const times = (result.slots || []).map((s) => s.timeKey || s.time);
     assert.ok(
