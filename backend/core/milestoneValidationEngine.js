@@ -270,6 +270,11 @@ function validateRequiredFields(targetMilestone, context) {
         continue;
       }
 
+      // Implements BR-127 — email is invitation enrichment; never block interview milestones.
+      if (field === "email") {
+        continue;
+      }
+
       if (!missingFields.includes(field)) {
         missingFields.push(field);
         errors.push({
