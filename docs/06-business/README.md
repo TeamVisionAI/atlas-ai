@@ -6,3 +6,4 @@
 | [MILESTONE_DEFINITIONS.md](./MILESTONE_DEFINITIONS.md) | Workflow milestones |
 | [EVENT_CATALOG.md](./EVENT_CATALOG.md) | Timeline event types |
 | [ATLAS_GLOSSARY.md](./ATLAS_GLOSSARY.md) | Terminology |
+| [RECRUIT_AI_V2_STAGE1_OPERATIONS.md](./RECRUIT_AI_V2_STAGE1_OPERATIONS.md) | Stage-1 monitoring, alerts, kill-switch, promotion gates |
