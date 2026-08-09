@@ -1286,7 +1286,8 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Day-only unique match = selection** — After offered slots (`offer_time_choices` / equivalents), a day-only reply (`El lunes`) that uniquely matches one offered date selects that slot via the same confirmation path as BR-115 / `SELECT_OPTION`. Do **not** re-query and add new times (e.g. do not introduce Monday 8:00 when only Monday 7:30 was offered).
-2. **Same-day ambiguous times** — If multiple offered times share the named day, restate **only those** offered times — never broaden the set.
+2. **Same-day ambiguous times** — If multiple offered times share the named day **and the offered set already spanned other dates**, restate **only those** offered times — never broaden the set.
+2b. **Same-day no-op** — If every previously offered slot already sits on the named day (e.g. Mon 7:30 + Mon 8:00 → `Lunes`), do **not** re-render the full availability sentence. Preserve both slots and ask time only (`clarify_offered_slot_time`: “¿Prefieres 7:30 PM u 8:00 PM?”). Reason: `OFFERED_SLOT_DAY_ALREADY_FIXED`.
 3. **BR-115 time narrowing unchanged** — Natural times (`7:30`) and exact day+time (`El lunes a las 7:30`) continue under BR-115.
 4. **Outside / later alternatives** — Phrases like `El lunes, pero más tarde` leave the offered set: push `REQUESTED_LATER_ALTERNATIVES`, set exclusive earliest after the latest same-day offered time, avoid prior offered identities, and offer real later slots via BR-107 / BR-116 paths.
 5. **Day-part proactive offer** — `PROVIDE_DAY_PART` (e.g. `Tarde`) attempts same-turn canonical availability filtered by dayPart (Spanish afternoon includes afternoon+evening ≥12:00). Offer ≤2 slots. Fall back to ask-preferred-time only when no useful slots are available.

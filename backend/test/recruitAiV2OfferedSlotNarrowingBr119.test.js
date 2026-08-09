@@ -525,6 +525,185 @@ test("12. BR-050 timezone behavior preserved on narrowed slot", () => {
   assert.equal(nextContext.appointment.proposedTime, "19:30");
 });
 
+test("A. Mon 7:30 + Mon 8:00 → Lunes asks time only (same-day no-op)", () => {
+  const offered = mondayTwoTimesOffers();
+  const availability = {
+    checked: true,
+    status: "available",
+    nearestAlternatives: [
+      { date: MONDAY, time: "19:30", timezone: "America/New_York" },
+      { date: MONDAY, time: "20:00", timezone: "America/New_York" },
+      { date: MONDAY, time: "21:00", timezone: "America/New_York" }
+    ]
+  };
+
+  const { interpretation, structuredDecision, nextContext, rendered } = turn(
+    "Lunes",
+    offeredContext(offered),
+    availability
+  );
+  assert.equal(interpretation.intent, INTENTS.SCHEDULING_DATE_PROPOSAL);
+  assert.equal(interpretation.entities.resolvedDate?.isoDate, MONDAY);
+  assert.ok(
+    structuredDecision.reasonCodes.includes(
+      REASON_CODES.OFFERED_SLOT_DAY_ALREADY_FIXED
+    )
+  );
+  assert.equal(
+    structuredDecision.customerReplyPlan.templateKey,
+    "clarify_offered_slot_time"
+  );
+  assert.equal(structuredDecision.decision.nextAction, NEXT_ACTIONS.CLARIFY_ONCE);
+  assert.deepEqual(
+    (nextContext.appointment.previouslyOfferedSlots || []).map((s) => s.time),
+    ["19:30", "20:00"]
+  );
+  assert.equal(nextContext.conversation.lastQuestionAsked, "offer_time_choices");
+  assert.match(rendered.text, /Prefieres|prefieres|7:30|8:00/i);
+  assert.doesNotMatch(rendered.text, /Tengo disponible el lunes/i);
+  assert.doesNotMatch(rendered.text, /21:00|9:00/);
+  assert.notEqual(
+    structuredDecision.decision.nextAction,
+    NEXT_ACTIONS.OFFER_AVAILABLE_SLOTS
+  );
+});
+
+test("B. Sun 7:30 + Mon 7:30 → Lunes narrows to Mon 7:30 confirm", () => {
+  const { structuredDecision, nextContext, rendered } = turn(
+    "Lunes",
+    offeredContext(sunMon730Offers()),
+    {
+      checked: true,
+      status: "available",
+      nearestAlternatives: [
+        { date: MONDAY, time: "19:30", timezone: "America/New_York" },
+        { date: MONDAY, time: "20:00", timezone: "America/New_York" }
+      ]
+    }
+  );
+  assert.ok(
+    structuredDecision.reasonCodes.includes(REASON_CODES.OFFERED_SLOT_DAY_NARROWED)
+  );
+  assert.equal(
+    structuredDecision.decision.nextAction,
+    NEXT_ACTIONS.ASK_EXPLICIT_CONFIRMATION
+  );
+  assert.equal(nextContext.appointment.proposedDate, MONDAY);
+  assert.equal(nextContext.appointment.proposedTime, "19:30");
+  assert.doesNotMatch(rendered.text, /8:00|Tengo disponible/i);
+});
+
+test("C. Mon 7:30 + Mon 8:00 → 8 selects 8:00 via BR-115", () => {
+  const { structuredDecision, nextContext } = turn(
+    "8",
+    offeredContext(mondayTwoTimesOffers(), {
+      appointment: {
+        proposedDate: MONDAY,
+        previouslyOfferedSlots: mondayTwoTimesOffers()
+      }
+    })
+  );
+  assert.ok(
+    structuredDecision.reasonCodes.includes(
+      REASON_CODES.OFFERED_SLOT_NATURAL_TIME_SELECTED
+    ) || structuredDecision.decision.nextAction === NEXT_ACTIONS.ASK_EXPLICIT_CONFIRMATION
+  );
+  assert.equal(nextContext.appointment.proposedTime, "20:00");
+  assert.equal(nextContext.appointment.proposedDate, MONDAY);
+});
+
+test("D. same-day Lunes does not need fresh getSlots / does not broaden", () => {
+  const context = offeredContext(mondayTwoTimesOffers());
+  const interpretation = interpretInboundMessage({
+    message: { text: "Lunes" },
+    context,
+    options: { flexible: true, now: FIXED_NOW, channel: "whatsapp" }
+  });
+  // Even if a read returns extra times, decision must preserve only offered set.
+  const availability = resolveAvailabilityForTurnSync({
+    context,
+    interpretation,
+    options: {
+      now: FIXED_NOW,
+      agentId: PRIMARY_RVP,
+      availabilityFixture: {
+        slots: [
+          { dateKey: MONDAY, timeKey: "19:30", startTimeISO: "2026-08-11T00:00:00.000Z" },
+          { dateKey: MONDAY, timeKey: "20:00", startTimeISO: "2026-08-11T00:30:00.000Z" },
+          { dateKey: MONDAY, timeKey: "21:00", startTimeISO: "2026-08-11T01:00:00.000Z" }
+        ],
+        timezone: "America/New_York"
+      }
+    }
+  });
+  const structuredDecision = decideConversationTurn({
+    context,
+    interpretation,
+    availability
+  });
+  const offered =
+    structuredDecision.customerReplyPlan.entities?.offeredSlots ||
+    structuredDecision.contextPatch?.appointment?.previouslyOfferedSlots ||
+    [];
+  assert.deepEqual(
+    offered.map((s) => s.time || s.timeKey),
+    ["19:30", "20:00"]
+  );
+  assert.equal(
+    structuredDecision.customerReplyPlan.templateKey,
+    "clarify_offered_slot_time"
+  );
+  assert.ok(
+    structuredDecision.reasonCodes.includes(
+      REASON_CODES.OFFERED_SLOT_DAY_ALREADY_FIXED
+    )
+  );
+  assert.ok(!availability || availability.nearestAlternatives); // read may exist; must not broaden
+});
+
+test("E. same-day no-op execution OFF → zero mutations", async () => {
+  const { structuredDecision, nextContext } = turn(
+    "Lunes",
+    offeredContext(mondayTwoTimesOffers())
+  );
+  const env = {
+    RECRUIT_AI_V2_EXECUTION_ENABLED: "false",
+    RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED: "false",
+    RECRUIT_AI_V2_EXECUTION_ORGANIZATION_IDS: TEAM_VISION_ORG,
+    RECRUIT_AI_V2_EXECUTION_USER_IDS: PRIMARY_RVP
+  };
+  let mutateCalls = 0;
+  const auth = authorizeSideEffects({
+    structuredDecision,
+    responsePlan: structuredDecision.customerReplyPlan,
+    context: nextContext,
+    env,
+    profileConfigured: true,
+    actingUserId: PRIMARY_RVP,
+    organizationId: TEAM_VISION_ORG,
+    options: { allowExecution: false }
+  });
+  assert.equal(auth.authorized, false);
+  await executeAuthorizedSideEffects({
+    authorization: auth,
+    structuredDecision,
+    context: nextContext,
+    options: {
+      allowExecution: false,
+      env,
+      actingUserId: PRIMARY_RVP,
+      organizationId: TEAM_VISION_ORG
+    },
+    dependencies: {
+      executeScheduleInterview: async () => {
+        mutateCalls += 1;
+        return { success: true, appointmentId: "should-not" };
+      }
+    }
+  });
+  assert.equal(mutateCalls, 0);
+});
+
 test("helper: resolveUniqueOfferedDaySelection unique vs ambiguous", () => {
   assert.equal(
     resolveUniqueOfferedDaySelection(sunMon730Offers(), MONDAY).kind,
@@ -540,41 +719,39 @@ test("helper: resolveUniqueOfferedDaySelection unique vs ambiguous", () => {
   );
 });
 
-test("ambiguous same-day offered times restates only those (no broaden)", () => {
-  const availability = {
-    checked: true,
-    status: "available",
-    nearestAlternatives: [
-      { date: MONDAY, time: "19:30", timezone: "America/New_York" },
-      { date: MONDAY, time: "20:00", timezone: "America/New_York" },
-      { date: MONDAY, time: "21:00", timezone: "America/New_York" }
-    ]
-  };
+test("multi-day ambiguous still restates narrowed day slots (not time-only no-op)", () => {
+  // Sun 7:30 + Mon 7:30 + Mon 8:00 → "Lunes" narrows to Mon times (date was new info).
   const offered = [
+    { date: SUNDAY, time: "19:30", timezone: "America/New_York" },
     { date: MONDAY, time: "19:30", timezone: "America/New_York" },
     { date: MONDAY, time: "20:00", timezone: "America/New_York" }
   ];
   const { structuredDecision, rendered } = turn(
     "El lunes",
-    offeredContext(offered, {
-      appointment: { proposedDate: null, previouslyOfferedSlots: offered }
-    }),
-    availability
+    offeredContext(offered),
+    {
+      checked: true,
+      status: "available",
+      nearestAlternatives: [
+        ...offered,
+        { date: MONDAY, time: "21:00", timezone: "America/New_York" }
+      ]
+    }
   );
   assert.ok(
     structuredDecision.reasonCodes.includes(
       REASON_CODES.OFFERED_SLOT_DAY_NARROWED_AMBIGUOUS
     )
   );
+  assert.ok(
+    !structuredDecision.reasonCodes.includes(
+      REASON_CODES.OFFERED_SLOT_DAY_ALREADY_FIXED
+    )
+  );
   assert.equal(
-    structuredDecision.decision.nextAction,
-    NEXT_ACTIONS.OFFER_AVAILABLE_SLOTS
+    structuredDecision.customerReplyPlan.templateKey,
+    "offer_available_slots"
   );
-  const slots =
-    structuredDecision.customerReplyPlan.entities?.offeredSlots || [];
-  assert.deepEqual(
-    slots.map((s) => s.time),
-    ["19:30", "20:00"]
-  );
-  assert.doesNotMatch(rendered.text, /9:00|21:00/);
+  assert.doesNotMatch(rendered.text, /21:00/);
+  assert.match(rendered.text, /lunes|7:30|8:00/i);
 });

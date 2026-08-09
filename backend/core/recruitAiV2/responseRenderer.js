@@ -150,6 +150,7 @@ const COPY = Object.freeze({
       "Thanks. Before we lock anything in, please reply YES to confirm that time, or suggest another time.",
     clarify_offered_slot_day:
       "I have {requestedTime} on more than one day. Which day works better for you?",
+    clarify_offered_slot_time: null,
     acknowledge_counteroffer_check_availability:
       "Got it — you prefer {requestedTime}. Let me check availability for that time and share options that work.",
     // Implements BR-109 — ask the missing question; do not narrate internal note-taking.
@@ -296,6 +297,7 @@ const COPY = Object.freeze({
       "Gracias. Antes de confirmar, responde SI para confirmar esa hora, o sugiere otra hora.",
     clarify_offered_slot_day:
       "Tengo {requestedTime} en más de un día. ¿Qué día te funciona mejor?",
+    clarify_offered_slot_time: null,
     acknowledge_counteroffer_check_availability:
       "Entendido — prefieres {requestedTime}. Voy a revisar disponibilidad y te comparto opciones que funcionen.",
     // Implements BR-109 — ask the missing question; do not narrate internal note-taking.
@@ -744,6 +746,35 @@ function renderCustomerReply(responsePlan) {
     );
     template = (pack.acknowledge_location_correction || "")
       .replace(/\{resumeQuestion\}/g, resume);
+  }
+
+  // Implements BR-119 — date already fixed on offered set; ask which time only.
+  if (key === "clarify_offered_slot_time") {
+    const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
+    const slotA = formatRequestedTime(
+      offered[0]?.time || offered[0]?.timeKey || entities.slotA,
+      language
+    );
+    const slotB = formatRequestedTime(
+      offered[1]?.time || offered[1]?.timeKey || entities.slotB,
+      language
+    );
+    if (slotA && slotB) {
+      template =
+        language === LANGUAGES.SPANISH
+          ? `Perfecto. ¿Prefieres ${slotA} u ${slotB}?`
+          : `Perfect. Do you prefer ${slotA} or ${slotB}?`;
+    } else if (slotA) {
+      template =
+        language === LANGUAGES.SPANISH
+          ? `Perfecto. ¿Te funciona a las ${slotA}?`
+          : `Perfect. Does ${slotA} work for you?`;
+    } else {
+      template =
+        language === LANGUAGES.SPANISH
+          ? "Perfecto. ¿Qué hora de las opciones te funciona mejor?"
+          : "Perfect. Which of the offered times works better for you?";
+    }
   }
 
   // Implements BR-107 / BR-108 — build offer copy from real offeredSlots only (never invent).

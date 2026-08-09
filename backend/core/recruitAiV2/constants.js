@@ -156,6 +156,8 @@ const REASON_CODES = Object.freeze({
   OFFERED_SLOT_DAY_NARROWED: "OFFERED_SLOT_DAY_NARROWED",
   /** BR-119 — day matched multiple offered times; keep those times only. */
   OFFERED_SLOT_DAY_NARROWED_AMBIGUOUS: "OFFERED_SLOT_DAY_NARROWED_AMBIGUOUS",
+  /** BR-119 — named day already fixed on all offered slots; ask time only. */
+  OFFERED_SLOT_DAY_ALREADY_FIXED: "OFFERED_SLOT_DAY_ALREADY_FIXED",
   /** BR-119 — prospect wants later alternatives outside the offered set. */
   REQUESTED_LATER_ALTERNATIVES: "REQUESTED_LATER_ALTERNATIVES",
   /** BR-119 — day-part answer offered real Sprint 22 slots instead of open time ask. */
