@@ -519,6 +519,21 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     );
 
     if (postRollback && isActiveAppointment(postRollback)) {
+      const postStart = postRollback.startDateTime || postRollback.start_date_time;
+      const expectedStart = bookingResult.startTimeISO;
+      const sameAttemptInstant =
+        postStart &&
+        expectedStart &&
+        new Date(postStart).getTime() === new Date(expectedStart).getTime();
+
+      if (!sameAttemptInstant) {
+        return buildActionError(
+          ACTION_IDS.SCHEDULE,
+          advanceResult.error || "WORKFLOW_ADVANCE_FAILED",
+          advanceResult.message || "Unable to advance workflow after scheduling."
+        );
+      }
+
       console.error("[missionExecution] BR-122 reconcile: workflow advance failed but appointment remains active", {
         appointmentId: postRollback.id,
         status: postRollback.status,

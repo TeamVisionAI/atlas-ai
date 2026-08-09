@@ -1309,11 +1309,14 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Clean rollback → failure OK** — If Calendar + appointment persist succeed but workflow advance fails, and rollback leaves the appointment **cancelled/terminal**, customer-facing failure (`appointment_create_failed`) is correct.
-2. **Orphan active → reconcile success** — If canonical scheduling reports failure **and** an active (non-terminal) appointment still exists for that prospect, treat the outcome as **success**, attach `appointmentId`, and never emit `appointment_create_failed`.
-3. **Mission path first** — After workflow-advance rollback, re-read the appointment by id. Active → return `buildScheduleExecutionResponse` success with reconcile markers; cancelled → return `WORKFLOW_ADVANCE_FAILED` (or original advance error).
-4. **Executor safety net** — If `executeScheduleInterview` returns `success=false`, re-check active appointment for phone/org; if present, return `execution.success=true` with `EXECUTION_RECONCILED_ACTIVE_APPOINTMENT`.
-5. **No second lifecycle** — Do not create a replacement appointment during reconciliation.
-6. **Boundaries** — Does not change occupation validation, prospect identity bridging, BR-111 allowlists, timezone behavior, or live authoring. Execution remains env-gated OFF until separately authorized.
+2. **Orphan active → reconcile success** — If canonical scheduling reports failure **and** an **authoritative** active appointment for **this create attempt** still exists, treat the outcome as **success**, attach `appointmentId`, and never emit `appointment_create_failed`.
+3. **Authoritative match (required)** — Reconcile only when ALL hold: active lifecycle status; same `organizationId`; same appointment id from this attempt when known (else phone+acting-agent active lookup); **start instant equals** requested `dateKey`+`timeKey` in conversation timezone (rejects older unrelated actives).
+4. **Mission path first** — After workflow-advance rollback, re-read **this** `appointmentRecord.id` in-org. Active + same start instant → success reconcile; cancelled → failure.
+5. **Executor safety net** — Prefer attempt appointment id from the schedule payload; else active lookup; always require slot instant match before success.
+6. **Atlas appointment is customer booking truth** — Calendar cancelled/absent/unknown does not revoke a live Atlas scheduled appointment for reconcile-vs-failure classification (Calendar cleanup remains BR-121).
+7. **No second lifecycle** — Do not create a replacement appointment during reconciliation.
+8. **Occupation unchanged** — Does not add or require occupation for scheduling (occupation BR-037 correction is a separate PR).
+9. **Boundaries** — Does not change prospect identity bridging, BR-111 allowlists, timezone conversion math, or live authoring. Execution remains env-gated OFF until separately authorized.
 
 ---
 
