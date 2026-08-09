@@ -35,6 +35,7 @@ function createContextCaptureService({ persistenceService } = {}) {
   } = {}) {
     const orgId = organizationId || prospect?.organization_id || null;
     const prospectId = prospect?.id || null;
+    const prospectPhone = prospect?.phone || null;
 
     if (!orgId || !prospectId) {
       const error = new Error("organizationId and prospectId are required");
@@ -53,7 +54,9 @@ function createContextCaptureService({ persistenceService } = {}) {
 
     const reconstructionInput = buildReconstructionInput(prospect, {
       organizationId: orgId,
-      prospectId
+      prospectId,
+      prospectPhone,
+      legacyProspectId: prospectId
     });
 
     if (reconstructionInput.prospectClosed) {
@@ -64,7 +67,10 @@ function createContextCaptureService({ persistenceService } = {}) {
       organizationId: orgId,
       prospectId,
       channel,
-      reconstructionInput
+      reconstructionInput,
+      prospectPhone,
+      legacyProspectId: prospectId,
+      ensureCore: false
     });
 
     const startedAt = Date.now();
@@ -98,6 +104,7 @@ function createContextCaptureService({ persistenceService } = {}) {
       : [];
 
     try {
+      // Implements BR-120 — dual-load legacy-keyed row; new creates prefer core via phone.
       const persistence = await persistenceService.compareAndSaveContext({
         organizationId: orgId,
         prospectId,
@@ -106,7 +113,10 @@ function createContextCaptureService({ persistenceService } = {}) {
         nextContext: computed.nextContext,
         inboundMessageId,
         decisionCode: computed.decisionCode,
-        prospectClosed: false
+        prospectClosed: false,
+        prospectPhone,
+        legacyProspectId: prospectId,
+        ensureCore: Boolean(prospectPhone)
       });
 
       return {

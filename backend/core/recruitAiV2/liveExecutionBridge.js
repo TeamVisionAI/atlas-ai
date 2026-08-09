@@ -56,8 +56,10 @@ function buildLiveConfirmContext({
 
   return createConversationContext({
     organizationId: organizationId || prospect.organization_id || null,
+    // Live confirm still seeds from legacy WhatsApp prospect; persistence dual-loads (BR-120).
     prospectId: prospect.id || null,
     prospectPhone: prospect.phone || null,
+    legacyProspectId: prospect.id || null,
     agentId: agentId || prospect.owner_user_id || null,
     prospectOwnerUserId: prospect.owner_user_id || agentId || null,
     preferredLanguage,
@@ -219,6 +221,7 @@ async function attemptLiveV2AppointmentExecution({
       agentId,
       organizationId,
       prospectPhone: prospect.phone,
+      legacyProspectId: prospect.id || null,
       inboundMessageId,
       // Live CE owns WhatsApp confirmation copy — do not persist advisory context here.
       persistContext: false,

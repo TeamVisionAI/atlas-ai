@@ -1,6 +1,7 @@
 /**
  * Recruit AI v2 — durable context persistence service.
  * Implements BR-081 Phase 2. Persists sanitized context only.
+ * Implements BR-120 — dual-load core/legacy prospect keys; new rows use core UUID.
  * Does not send WhatsApp, book appointments, or mutate BR-080 attention.
  */
 
@@ -15,6 +16,9 @@ const {
   assertNoForbiddenPayload
 } = require("./contextSanitizer");
 const { createMemoryContextRepository } = require("./contextRepository");
+const {
+  resolveCanonicalProspectIdentity
+} = require("../recruitingProspectBridge");
 
 const META_REVIEW_HINTS = ["meta review", "meta_review", "metareview", "reviewer@meta"];
 
@@ -35,7 +39,118 @@ function assertTenantScope({ organizationId, prospectId }) {
   }
 }
 
-function rowToContext(row) {
+/**
+ * Resolve core SoR + legacy cache ids for durable context scope (BR-120).
+ * Does not rewrite existing row.prospect_id columns.
+ */
+async function resolvePersistenceIdentityScope({
+  organizationId,
+  prospectId,
+  legacyProspectId = null,
+  prospectPhone = null,
+  displayName = null,
+  ensureCore = false,
+  resolveIdentity = resolveCanonicalProspectIdentity
+} = {}) {
+  let coreProspectId = null;
+  let resolvedLegacyId = legacyProspectId || null;
+
+  if (prospectPhone) {
+    const identity = await resolveIdentity({
+      phone: prospectPhone,
+      organizationId,
+      displayName,
+      legacyProspectId: resolvedLegacyId,
+      ensureCore
+    });
+
+    // Implements BR-120 — fail closed on mismatch / ambiguity / conflict (never guess).
+    const hardFail = new Set([
+      "PROSPECT_IDENTITY_ORG_MISMATCH",
+      "PROSPECT_IDENTITY_AMBIGUOUS",
+      "PROSPECT_IDENTITY_CONFLICT",
+      "PROSPECT_IDENTITY_SCOPE_REQUIRED"
+    ]);
+    if (identity && identity.ok === false && hardFail.has(identity.reasonCode)) {
+      const error = new Error(
+        identity.reasonCode || "PROSPECT_IDENTITY_UNRESOLVED"
+      );
+      error.code = identity.reasonCode;
+      error.statusCode = 409;
+      throw error;
+    }
+
+    coreProspectId = identity.coreProspectId || null;
+    resolvedLegacyId = identity.legacyProspectId || resolvedLegacyId;
+  }
+
+  if (prospectId && coreProspectId && prospectId !== coreProspectId) {
+    resolvedLegacyId = resolvedLegacyId || prospectId;
+  } else if (prospectId && !coreProspectId) {
+    // Caller may still be on legacy key with no phone resolve — keep as write key.
+    coreProspectId = prospectId;
+  } else if (!prospectId && coreProspectId) {
+    // fine
+  } else if (prospectId && coreProspectId && prospectId === coreProspectId) {
+    // already canonical
+  }
+
+  const writeProspectId = coreProspectId || prospectId || null;
+  const alternateProspectIds = [
+    ...new Set(
+      [writeProspectId, resolvedLegacyId, prospectId].filter(
+        (id) => id && id !== writeProspectId
+      )
+    )
+  ];
+
+  return {
+    organizationId,
+    coreProspectId: writeProspectId,
+    legacyProspectId:
+      resolvedLegacyId && resolvedLegacyId !== writeProspectId
+        ? resolvedLegacyId
+        : null,
+    alternateProspectIds,
+    prospectPhone: prospectPhone || null
+  };
+}
+
+async function findActiveRowByIdentity(repo, {
+  organizationId,
+  prospectId,
+  alternateProspectIds = [],
+  channel = "whatsapp"
+}) {
+  if (prospectId) {
+    const primary = await repo.findActiveByScope({
+      organizationId,
+      prospectId,
+      channel
+    });
+    if (primary) {
+      return primary;
+    }
+  }
+
+  for (const alternateId of alternateProspectIds) {
+    if (!alternateId || alternateId === prospectId) {
+      continue;
+    }
+    const found = await repo.findActiveByScope({
+      organizationId,
+      prospectId: alternateId,
+      channel
+    });
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+function rowToContext(row, { canonicalProspectId = null } = {}) {
   if (!row) {
     return null;
   }
@@ -47,7 +162,8 @@ function rowToContext(row) {
 
   return {
     ...context,
-    prospectId: context.prospectId || row.prospect_id,
+    // BR-120: in-memory JSON truth prefers core UUID without mutating row.prospect_id.
+    prospectId: canonicalProspectId || context.prospectId || row.prospect_id,
     organizationId: context.organizationId || row.organization_id,
     preferredLanguage: normalizeLanguage(
       context.preferredLanguage || row.last_language || "unknown"
@@ -64,12 +180,16 @@ function rowToContext(row) {
       needsHumanAttention: row.needs_human_attention,
       archivedAt: row.archived_at,
       updatedAt: row.updated_at,
-      source: row.source || "v2"
+      source: row.source || "v2",
+      rowProspectId: row.prospect_id
     }
   };
 }
 
-function createContextPersistenceService({ repository = null } = {}) {
+function createContextPersistenceService({
+  repository = null,
+  resolveIdentity = resolveCanonicalProspectIdentity
+} = {}) {
   const repo = repository || createMemoryContextRepository();
 
   async function createContext({
@@ -78,34 +198,62 @@ function createContextPersistenceService({ repository = null } = {}) {
     channel = "whatsapp",
     context = null,
     messageId = null,
-    source = "v2"
+    source = "v2",
+    legacyProspectId = null,
+    prospectPhone = null,
+    displayName = null,
+    ensureCore = true
   } = {}) {
-    assertTenantScope({ organizationId, prospectId });
+    const identity = await resolvePersistenceIdentityScope({
+      organizationId,
+      prospectId,
+      legacyProspectId,
+      prospectPhone,
+      displayName,
+      ensureCore,
+      resolveIdentity
+    });
+    const canonicalProspectId = identity.coreProspectId || prospectId;
+    assertTenantScope({ organizationId, prospectId: canonicalProspectId });
 
-    if (isMetaReviewScope({ organizationId, prospectId, channel })) {
+    if (isMetaReviewScope({ organizationId, prospectId: canonicalProspectId, channel })) {
       const error = new Error("Meta Review fixtures cannot persist Recruit AI v2 context");
       error.code = "CONTEXT_META_REVIEW_ISOLATED";
       error.statusCode = 403;
       throw error;
     }
 
+    // Prefer an existing active under an alternate identity (legacy↔core) rather than
+    // creating a second active for the same person (BR-120). Same-key duplicates still
+    // raise CONTEXT_UNIQUE_VIOLATION via repo.insert.
+    const existing = await findActiveRowByIdentity(repo, {
+      organizationId,
+      prospectId: null,
+      alternateProspectIds: identity.alternateProspectIds,
+      channel
+    });
+    if (existing) {
+      return rowToContext(existing, { canonicalProspectId });
+    }
+
     const base = sanitizeContextForPersistence(
       context ||
         createConversationContext({
           organizationId,
-          prospectId
+          prospectId: canonicalProspectId
         })
     );
     assertNoForbiddenPayload(base);
 
     const row = await repo.insert({
       organization_id: organizationId,
-      prospect_id: prospectId,
+      // BR-120: new durable rows key on core prospect UUID.
+      prospect_id: canonicalProspectId,
       channel,
       context_json: {
         ...base,
         organizationId,
-        prospectId,
+        prospectId: canonicalProspectId,
         persistenceSource: source
       },
       context_version: 1,
@@ -118,21 +266,36 @@ function createContextPersistenceService({ repository = null } = {}) {
       source
     });
 
-    return rowToContext(row);
+    return rowToContext(row, { canonicalProspectId });
   }
 
   async function loadContext({
     organizationId,
     prospectId,
-    channel = "whatsapp"
+    channel = "whatsapp",
+    legacyProspectId = null,
+    prospectPhone = null,
+    displayName = null,
+    ensureCore = false
   } = {}) {
     assertTenantScope({ organizationId, prospectId });
-    const row = await repo.findActiveByScope({
+    const identity = await resolvePersistenceIdentityScope({
       organizationId,
       prospectId,
+      legacyProspectId,
+      prospectPhone,
+      displayName,
+      ensureCore,
+      resolveIdentity
+    });
+    const canonicalProspectId = identity.coreProspectId || prospectId;
+    const row = await findActiveRowByIdentity(repo, {
+      organizationId,
+      prospectId: canonicalProspectId,
+      alternateProspectIds: identity.alternateProspectIds,
       channel
     });
-    return rowToContext(row);
+    return rowToContext(row, { canonicalProspectId });
   }
 
   /**
@@ -159,17 +322,40 @@ function createContextPersistenceService({ repository = null } = {}) {
     organizationId,
     prospectId,
     channel = "whatsapp",
-    reconstructionInput = null
+    reconstructionInput = null,
+    legacyProspectId = null,
+    prospectPhone = null,
+    displayName = null,
+    ensureCore = false
   } = {}) {
-    const existing = await loadContext({ organizationId, prospectId, channel });
+    const existing = await loadContext({
+      organizationId,
+      prospectId,
+      channel,
+      legacyProspectId,
+      prospectPhone,
+      displayName,
+      ensureCore
+    });
     if (existing) {
       return { context: existing, source: "persisted" };
     }
 
-    const reconstructed = reconstructContext({
+    const identity = await resolvePersistenceIdentityScope({
       organizationId,
       prospectId,
-      ...(reconstructionInput || {})
+      legacyProspectId,
+      prospectPhone,
+      displayName,
+      ensureCore,
+      resolveIdentity
+    });
+    const canonicalProspectId = identity.coreProspectId || prospectId;
+
+    const reconstructed = reconstructContext({
+      ...(reconstructionInput || {}),
+      organizationId,
+      prospectId: canonicalProspectId
     });
 
     return { context: reconstructed, source: "reconstructed" };
@@ -183,9 +369,23 @@ function createContextPersistenceService({ repository = null } = {}) {
     nextContext,
     inboundMessageId = null,
     decisionCode = null,
-    prospectClosed = false
+    prospectClosed = false,
+    legacyProspectId = null,
+    prospectPhone = null,
+    displayName = null,
+    ensureCore = true
   } = {}) {
-    assertTenantScope({ organizationId, prospectId });
+    const identity = await resolvePersistenceIdentityScope({
+      organizationId,
+      prospectId,
+      legacyProspectId,
+      prospectPhone,
+      displayName,
+      ensureCore,
+      resolveIdentity
+    });
+    const canonicalProspectId = identity.coreProspectId || prospectId;
+    assertTenantScope({ organizationId, prospectId: canonicalProspectId });
 
     if (prospectClosed) {
       const error = new Error("Closed prospect cannot accept active context writes");
@@ -194,23 +394,25 @@ function createContextPersistenceService({ repository = null } = {}) {
       throw error;
     }
 
-    if (isMetaReviewScope({ organizationId, prospectId, channel })) {
+    if (isMetaReviewScope({ organizationId, prospectId: canonicalProspectId, channel })) {
       const error = new Error("Meta Review fixtures cannot persist Recruit AI v2 context");
       error.code = "CONTEXT_META_REVIEW_ISOLATED";
       error.statusCode = 403;
       throw error;
     }
 
-    let row = await repo.findActiveByScope({
+    // Dual-load: prefer existing active under core OR legacy (never create a second active).
+    let row = await findActiveRowByIdentity(repo, {
       organizationId,
-      prospectId,
+      prospectId: canonicalProspectId,
+      alternateProspectIds: identity.alternateProspectIds,
       channel
     });
 
     const sanitized = sanitizeContextForPersistence({
       ...nextContext,
       organizationId,
-      prospectId
+      prospectId: canonicalProspectId
     });
     assertNoForbiddenPayload(sanitized);
 
@@ -224,18 +426,22 @@ function createContextPersistenceService({ repository = null } = {}) {
         ok: true,
         idempotent: true,
         code: "CONTEXT_IDEMPOTENT_REPLAY",
-        context: rowToContext(row)
+        context: rowToContext(row, { canonicalProspectId })
       };
     }
 
     if (!row) {
       const created = await createContext({
         organizationId,
-        prospectId,
+        prospectId: canonicalProspectId,
         channel,
         context: sanitized,
         messageId: inboundMessageId,
-        source: nextContext?.persistenceSource || "v2"
+        source: nextContext?.persistenceSource || "v2",
+        legacyProspectId: identity.legacyProspectId,
+        prospectPhone,
+        displayName,
+        ensureCore: false
       });
 
       // Mark processed message on first persist after evaluation.
@@ -248,7 +454,7 @@ function createContextPersistenceService({ repository = null } = {}) {
             context_json: {
               ...sanitized,
               organizationId,
-              prospectId
+              prospectId: canonicalProspectId
             },
             last_inbound_message_id: inboundMessageId,
             last_processed_message_id: inboundMessageId,
@@ -262,7 +468,7 @@ function createContextPersistenceService({ repository = null } = {}) {
           const error = new Error(updated.code || "CONTEXT_SAVE_FAILED");
           error.code = updated.code;
           error.statusCode = 409;
-          error.current = rowToContext(updated.row);
+          error.current = rowToContext(updated.row, { canonicalProspectId });
           throw error;
         }
 
@@ -270,7 +476,7 @@ function createContextPersistenceService({ repository = null } = {}) {
           ok: true,
           idempotent: false,
           code: null,
-          context: rowToContext(updated.row)
+          context: rowToContext(updated.row, { canonicalProspectId })
         };
       }
 
@@ -284,6 +490,7 @@ function createContextPersistenceService({ repository = null } = {}) {
       throw error;
     }
 
+    // Save targets the loaded row id (may still be legacy-keyed). Do not rewrite prospect_id.
     const result = await repo.compareAndUpdate({
       organizationId,
       id: row.id,
@@ -292,7 +499,7 @@ function createContextPersistenceService({ repository = null } = {}) {
         context_json: {
           ...sanitized,
           organizationId,
-          prospectId
+          prospectId: canonicalProspectId
         },
         last_inbound_message_id: inboundMessageId || row.last_inbound_message_id,
         last_processed_message_id: inboundMessageId || row.last_processed_message_id,
@@ -306,7 +513,7 @@ function createContextPersistenceService({ repository = null } = {}) {
       const error = new Error(result.code || "CONTEXT_VERSION_CONFLICT");
       error.code = result.code || "CONTEXT_VERSION_CONFLICT";
       error.statusCode = 409;
-      error.current = rowToContext(result.row);
+      error.current = rowToContext(result.row, { canonicalProspectId });
       throw error;
     }
 
@@ -314,7 +521,7 @@ function createContextPersistenceService({ repository = null } = {}) {
       ok: true,
       idempotent: false,
       code: null,
-      context: rowToContext(result.row)
+      context: rowToContext(result.row, { canonicalProspectId })
     };
   }
 
@@ -327,7 +534,9 @@ function createContextPersistenceService({ repository = null } = {}) {
     prospectId = null,
     id = null,
     channel = "whatsapp",
-    reason = "archived"
+    reason = "archived",
+    legacyProspectId = null,
+    prospectPhone = null
   } = {}) {
     if (!organizationId) {
       const error = new Error("organizationId is required");
@@ -337,10 +546,21 @@ function createContextPersistenceService({ repository = null } = {}) {
     }
 
     let targetId = id;
+    let canonicalProspectId = prospectId;
     if (!targetId) {
-      const active = await repo.findActiveByScope({
+      const identity = await resolvePersistenceIdentityScope({
         organizationId,
         prospectId,
+        legacyProspectId,
+        prospectPhone,
+        ensureCore: false,
+        resolveIdentity
+      });
+      canonicalProspectId = identity.coreProspectId || prospectId;
+      const active = await findActiveRowByIdentity(repo, {
+        organizationId,
+        prospectId: canonicalProspectId,
+        alternateProspectIds: identity.alternateProspectIds,
         channel
       });
       if (!active) {
@@ -359,7 +579,7 @@ function createContextPersistenceService({ repository = null } = {}) {
     }
 
     return {
-      ...rowToContext(archived),
+      ...rowToContext(archived, { canonicalProspectId }),
       archiveReason: reason
     };
   }
@@ -376,7 +596,7 @@ function createContextPersistenceService({ repository = null } = {}) {
     }
 
     const rows = await repo.listRecent({ organizationId, prospectId, limit });
-    return rows.map(rowToContext);
+    return rows.map((row) => rowToContext(row, { canonicalProspectId: prospectId }));
   }
 
   return {
@@ -395,5 +615,7 @@ function createContextPersistenceService({ repository = null } = {}) {
 module.exports = {
   createContextPersistenceService,
   rowToContext,
-  isMetaReviewScope
+  isMetaReviewScope,
+  resolvePersistenceIdentityScope,
+  findActiveRowByIdentity
 };

@@ -80,6 +80,33 @@ class InMemoryProspectStore {
     return null;
   }
 
+  findAllByPhone(normalizedPhone) {
+    if (!normalizedPhone) {
+      return [];
+    }
+
+    const matches = [];
+    for (const row of this.rows.values()) {
+      if (row.deleted_at) {
+        continue;
+      }
+      if (row.normalized_primary_phone === normalizedPhone) {
+        matches.push(row);
+      }
+    }
+    return matches;
+  }
+
+  findAllByPhoneInOrganization(normalizedPhone, organizationId) {
+    if (!normalizedPhone || !organizationId) {
+      return [];
+    }
+
+    return this.findAllByPhone(normalizedPhone).filter(
+      (row) => row.organization_id === organizationId
+    );
+  }
+
   search({ q, lifecycleState, limit = 50, offset = 0, organizationId }) {
     let results = [...this.rows.values()].filter((row) => !row.deleted_at);
 
