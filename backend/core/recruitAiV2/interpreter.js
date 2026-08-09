@@ -79,6 +79,7 @@ const {
 const {
   looksLikeMeetingAccessRequest,
   looksLikeRepetitionSignal,
+  looksLikeRequestForLaterAlternatives,
   hasAvailabilityConstraint
 } = require("./schedulingMemory");
 const { resolveConversationalLanguage } = require("./languagePolicy");
@@ -1038,6 +1039,8 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.resolvedDate = resolvedDate;
     entities.dateExclusions = resolvedExclusions;
     entities.priorProposedTime = context?.appointment?.proposedTime || null;
+    // Implements BR-119 — "más tarde" / later means leave offered set and re-read.
+    entities.requestsLaterAlternatives = looksLikeRequestForLaterAlternatives(text);
   } else if (
     // BR-115 — bare 1..N during offered-slot choice is menu selection, not an hour.
     isOptionSelection(originalText) &&
