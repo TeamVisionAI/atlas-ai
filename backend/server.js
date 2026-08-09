@@ -56,6 +56,7 @@ const { requireAtlasUser } = require("./middleware/requireAtlasUser");
 const { verifyMetaWebhookSignature } = require("./middleware/metaWebhookSignature");
 const { safeRequestLogger } = require("./middleware/safeRequestLogger");
 const contactRoutes = require("./routes/contact");
+const qrGoRoutes = require("./routes/qrGo");
 
 const {
   logMetaEnvironmentWarnings
@@ -160,6 +161,7 @@ app.use("/health", healthRoute);
 app.use("/api/info", infoRoute);
 app.use("/api/recruit", recruitRoute);
 app.use("/api/contact", contactRoutes);
+app.use("/go", qrGoRoutes);
 app.use("/api/recruiting", recruitingWorkflowRoutes);
 
 // Atlas application routes
