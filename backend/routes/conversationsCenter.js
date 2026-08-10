@@ -97,6 +97,50 @@ async function loadScopedProspect(phone, organizationId) {
   return prospect;
 }
 
+async function humanReplyHandler(req, res) {
+  if (!requirePilot(req, res)) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const phone = req.body?.phone || req.params.phone;
+    const result = await sendHumanComposerReply({
+      phone,
+      message: req.body?.message,
+      clientRequestId: req.body?.clientRequestId,
+      userId: req.atlasUser?.id,
+      organizationId
+    });
+
+    res.json(result);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) {
+      console.error("[conversations-center] human-reply", error.message);
+    }
+    res.status(status).json({
+      error: error.code || "HUMAN_REPLY_FAILED",
+      message:
+        status === 409 || status === 400 || status === 403 || status === 404
+          ? error.message
+          : "Failed to send human reply",
+      ownershipState: error.ownershipState || null,
+      retryable: Boolean(error.retryable),
+      delivery: error.delivery
+        ? {
+            status: error.delivery.status || null,
+            reason: error.delivery.reason || null,
+            windowOpen: error.delivery.window?.open ?? null
+          }
+        : null
+    });
+  }
+}
+
+// Preferred: phone in body (stable; avoids "+" phone path encoding issues).
+router.post("/human-reply", humanReplyHandler);
+
 router.get("/:phone", async (req, res) => {
   if (!requirePilot(req, res)) {
     return;
@@ -220,44 +264,7 @@ router.post("/:phone/return-to-atlas", async (req, res) => {
   }
 });
 
-router.post("/:phone/human-reply", async (req, res) => {
-  if (!requirePilot(req, res)) {
-    return;
-  }
-
-  try {
-    const organizationId = getTenantOrganizationId(req);
-    const result = await sendHumanComposerReply({
-      phone: req.params.phone,
-      message: req.body?.message,
-      clientRequestId: req.body?.clientRequestId,
-      userId: req.atlasUser?.id,
-      organizationId
-    });
-
-    res.json(result);
-  } catch (error) {
-    const status = error.statusCode || 500;
-    if (status >= 500) {
-      console.error("[conversations-center] human-reply", error.message);
-    }
-    res.status(status).json({
-      error: error.code || "HUMAN_REPLY_FAILED",
-      message:
-        status === 409 || status === 400 || status === 403 || status === 404
-          ? error.message
-          : "Failed to send human reply",
-      ownershipState: error.ownershipState || null,
-      retryable: Boolean(error.retryable),
-      delivery: error.delivery
-        ? {
-            status: error.delivery.status || null,
-            reason: error.delivery.reason || null,
-            windowOpen: error.delivery.window?.open ?? null
-          }
-        : null
-    });
-  }
-});
+// Backward-compatible path form.
+router.post("/:phone/human-reply", humanReplyHandler);
 
 module.exports = router;

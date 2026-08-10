@@ -62,9 +62,9 @@ export async function returnConversationToAtlas(phone) {
 }
 
 export async function sendHumanConversationReply(phone, { message, clientRequestId }) {
-  return wrap(`/api/conversations/${encodeURIComponent(phone)}/human-reply`, {
+  return wrap(`/api/conversations/human-reply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, clientRequestId })
+    body: JSON.stringify({ phone, message, clientRequestId })
   });
 }
