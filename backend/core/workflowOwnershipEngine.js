@@ -67,7 +67,9 @@ function applyStallTransition(phone, persisted, stallResult, computed) {
     stalledAt: stallResult.stallDetectedAt,
     stallEpisodeKey: stallResult.stallEpisodeKey,
     canonicalMilestone: computed.canonicalMilestone,
-    manualAgentOwnership: true
+    manualAgentOwnership: true,
+    handoffReason: "stall",
+    handoffAt: stallResult.stallDetectedAt || new Date().toISOString()
   });
 
   return {

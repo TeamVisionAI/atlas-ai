@@ -14,7 +14,11 @@ import SidebarUserFooter from "../components/layout/SidebarUserFooter";
 import { useLanguage } from "../i18n/LanguageContext";
 import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
+import { getConversationsAttentionCount } from "../services/conversationsCenterService";
 import "./MainLayout.css";
+
+const NIOVEL_USER_ID = "33ad243a-9d00-4a4d-810b-df2762c0f076";
+const TEAM_VISION_ORG_ID = "00000000-0000-4000-8000-000000000001";
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => getLayoutMode());
@@ -66,7 +70,8 @@ function SidebarNav({
   onCollapse,
   navItems,
   currentUser,
-  metaReviewMode = false
+  metaReviewMode = false,
+  conversationsAttentionCount = 0
 }) {
   return (
     <>
@@ -115,7 +120,12 @@ function SidebarNav({
             }
             onClick={onNavigate}
           >
-            {translate(item.labelKey)}
+            <span>{translate(item.labelKey)}</span>
+            {item.path.includes("/conversations") && conversationsAttentionCount > 0 ? (
+              <span className="atlas-layout__nav-badge" aria-label={`${conversationsAttentionCount} needing attention`}>
+                {conversationsAttentionCount}
+              </span>
+            ) : null}
           </NavLink>
         ))}
       </nav>
@@ -146,6 +156,7 @@ export default function MainLayout() {
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
   const [operationsAllowed, setOperationsAllowed] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [conversationsAttentionCount, setConversationsAttentionCount] = useState(0);
   const metaReviewMode = isMetaReviewWorkspaceActive(currentUser);
 
   const navItems = useMemo(
@@ -206,6 +217,41 @@ export default function MainLayout() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const isPilotUser =
+      currentUser?.id === NIOVEL_USER_ID &&
+      String(currentUser?.organization_id || "") === TEAM_VISION_ORG_ID;
+
+    if (!isPilotUser) {
+      setConversationsAttentionCount(0);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    function refreshBadge() {
+      getConversationsAttentionCount()
+        .then((payload) => {
+          if (!cancelled) {
+            setConversationsAttentionCount(Number(payload.needsAttentionCount) || 0);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setConversationsAttentionCount(0);
+          }
+        });
+    }
+
+    refreshBadge();
+    const timer = window.setInterval(refreshBadge, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [currentUser, location.pathname]);
 
   useEffect(() => {
     setPhoneNavOpen(false);
@@ -290,6 +336,7 @@ export default function MainLayout() {
             navItems={navItems}
             currentUser={currentUser}
             metaReviewMode={metaReviewMode}
+            conversationsAttentionCount={conversationsAttentionCount}
           />
         </aside>
 

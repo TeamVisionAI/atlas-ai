@@ -55,12 +55,20 @@ function shouldDeliverAutomatedReply(prospect, options = {}) {
     return false;
   }
 
-  if (
-    persisted.needsHumanAttention &&
-    persisted.workflowOwnership === OWNERSHIP.AGENT
-  ) {
-    // Implements BR-124 — still deliver one customer-facing handoff/recovery ack.
+  // Hard ownership guard — HUMAN (AGENT) or NEEDS_ATTENTION must not double-speak.
+  // Fail closed: suppress automated conversational replies unless BR-124 allowHandoffAck.
+  const humanOwned =
+    persisted.workflowOwnership === OWNERSHIP.AGENT ||
+    persisted.manualAgentOwnership === true;
+  const needsAttention = Boolean(persisted.needsHumanAttention);
+
+  if (humanOwned || needsAttention) {
     if (options.allowHandoffAck === true) {
+      // Take Over clears attention but keeps AGENT + manual — never auto-reply.
+      if (persisted.manualAgentOwnership && !needsAttention) {
+        return false;
+      }
+      // Implements BR-124 — customer-facing handoff/recovery ack may still deliver.
       return true;
     }
     return false;

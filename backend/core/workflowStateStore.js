@@ -25,7 +25,12 @@ function defaultWorkflowRecord() {
     /** Idempotency key for BR-034 stall episode (last Atlas outbound timestamp). */
     stallEpisodeKey: null,
     /** Sprint 8A.6 — idempotency key for time-based milestone reconciliation. */
-    reconcileEpisodeKey: null
+    reconcileEpisodeKey: null,
+    /** Conversations Center — persisted human handoff reason (pilot). */
+    handoffReason: null,
+    handoffAt: null,
+    humanTakenOverAt: null,
+    returnedToAtlasAt: null
   };
 }
 
