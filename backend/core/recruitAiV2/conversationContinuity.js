@@ -48,7 +48,10 @@ function looksLikeJobOverviewQuestion(text) {
     /\bde que trata\b/.test(t) ||
     /\bde q(ue)? (se )?trata\b/.test(t) ||
     /\bde q(ue)? trata el (trabajo|empleo)\b/.test(t) ||
+    /\bde que se trata el (trabajo|empleo)\b/.test(t) ||
     /\bde que es( el (trabajo|empleo))?\b/.test(t) ||
+    /\b(dime )?(como) es el (trabajo|empleo)\b/.test(t) ||
+    /\b(dime )?como funciona( el (trabajo|empleo))?\b/.test(t) ||
     /\bque es esto\b/.test(t) ||
     /\bque hacen\b/.test(t) ||
     /\bwhat do you (all |guys )?do\b/.test(t)
@@ -85,6 +88,8 @@ function looksLikeJobOpportunityQuestion(text) {
       t
     ) ||
     /\bde que es el trabajo\b/.test(t) ||
+    /\b(dime )?(como) es el (trabajo|empleo)\b/.test(t) ||
+    /\b(dime )?como funciona( el (trabajo|empleo))?\b/.test(t) ||
     /\bque tipo de trabajo( es)?\b/.test(t) ||
     /\bes una oportunidad de negocio\b/.test(t) ||
     /\bis this (a )?job\b/.test(t) ||

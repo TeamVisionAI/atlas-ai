@@ -289,18 +289,26 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
   // Implements BR-096 / BR-100 — status / birthplace shorthand while ask_authorization
   // is pending. Optional affirmative discourse prefix (sí/si/claro/yes) is ignored for
   // matching so "si soy ciudadano" never falls through to schedule_confirm/handoff.
+  // Compound mid-flow utterances ("Soy ciudadana dime como es el trabajo") require an
+  // explicit soy / I'm-a clause so bare "ciudadano/residente" mid-sentence never authorizes.
   const affirmPrefix = "((si|claro|correcto|por supuesto|yes|yeah|yep)[,:]?\\s+)?";
+  const statusNounEs =
+    "(residente( permanente)?|ciudadan[oa]( americano| americana)?)";
+  const statusNounEn =
+    "((permanent )?resident|(us |u\\.s\\.? |american )?citizen)";
   const pendingStatusShorthand =
     pendingAuth &&
     !mentionsLicense(raw) &&
     (new RegExp(
-      `^${affirmPrefix}(soy )?(residente( permanente)?|ciudadan[oa]( americano| americana)?)([.!]?)?$`
+      `^${affirmPrefix}(soy )?${statusNounEs}([.!]?)?$`
     ).test(t) ||
       new RegExp(
-        `^${affirmPrefix}(i'?m a |i am a )?(permanent )?resident([.!]?)?$`
+        `^${affirmPrefix}(i'?m a |i am a )?${statusNounEn}([.!]?)?$`
       ).test(t) ||
+      // Same-turn compound: require soy / I'm a … as a leading clause.
+      new RegExp(`^${affirmPrefix}soy ${statusNounEs}\\b`).test(t) ||
       new RegExp(
-        `^${affirmPrefix}(i'?m a |i am a )?(us |u\\.s\\.? |american )?citizen([.!]?)?$`
+        `^${affirmPrefix}(i'?m a |i am a )${statusNounEn}\\b`
       ).test(t));
 
   // Birthplace affirmatives (EN/ES) — not a location correction when auth is pending.

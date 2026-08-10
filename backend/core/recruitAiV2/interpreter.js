@@ -945,6 +945,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.jobFaqDetailLevel = looksLikeJobOverviewQuestion(text)
       ? "overview"
       : "employment_framing";
+    // Mid-flow compound (pending ask_authorization + job FAQ): keep same-turn auth.
+    if (authAnswer === true || authAnswer === false) {
+      entities.workAuthorization = authAnswer;
+    }
   } else if (looksLikeConversationClarificationRequest(text)) {
     intent = INTENTS.CONVERSATION_CLARIFICATION_REQUEST;
     confidence = 0.93;
