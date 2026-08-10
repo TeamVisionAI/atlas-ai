@@ -8,9 +8,17 @@ import {
   getConversation,
   takeOverConversation,
   returnConversationToAtlas,
+  sendHumanConversationReply,
   ConversationsCenterError
 } from "../services/conversationsCenterService";
 import "./ConversationsPage.css";
+
+function newClientRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 const FILTERS = [
   { id: "all", labelKey: "conversationsFilterAll" },
@@ -107,6 +115,10 @@ export default function ConversationsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [refreshSignal, setRefreshSignal] = useState(0);
+  const [composeText, setComposeText] = useState("");
+  const [composeSending, setComposeSending] = useState(false);
+  const [composeStatus, setComposeStatus] = useState(null);
+  const [composeRequestId, setComposeRequestId] = useState(() => newClientRequestId());
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -189,6 +201,12 @@ export default function ConversationsPage() {
     setSearchParams(next);
   }
 
+  useEffect(() => {
+    setComposeText("");
+    setComposeStatus(null);
+    setComposeRequestId(newClientRequestId());
+  }, [selectedPhone]);
+
   async function onTakeOver() {
     if (!selectedPhone || actionBusy) return;
     setActionBusy(true);
@@ -214,6 +232,59 @@ export default function ConversationsPage() {
       setError(err.message);
     } finally {
       setActionBusy(false);
+    }
+  }
+
+  async function onSendHumanReply(event) {
+    event.preventDefault();
+    const currentOwnership =
+      detail?.ownershipState ||
+      selectedItem?.ownershipState ||
+      null;
+    if (!selectedPhone || currentOwnership !== "HUMAN" || composeSending) {
+      return;
+    }
+
+    const text = composeText.trim();
+    if (!text) {
+      setComposeStatus({
+        type: "error",
+        message: translate("conversationsComposerEmpty")
+      });
+      return;
+    }
+
+    setComposeSending(true);
+    setComposeStatus(null);
+    const requestId = composeRequestId;
+
+    try {
+      const result = await sendHumanConversationReply(selectedPhone, {
+        message: text,
+        clientRequestId: requestId
+      });
+      setComposeText("");
+      setComposeRequestId(newClientRequestId());
+      setComposeStatus({
+        type: "success",
+        message: result.duplicateSuppressed
+          ? translate("conversationsComposerDuplicateOk")
+          : translate("conversationsComposerSent")
+      });
+      setRefreshSignal((n) => n + 1);
+      await loadList();
+      await loadDetail(selectedPhone);
+    } catch (err) {
+      const code = err instanceof ConversationsCenterError ? err.code : null;
+      const message =
+        code === "WHATSAPP_TEMPLATE_REQUIRED_OUTSIDE_WINDOW"
+          ? translate("conversationsComposerWindowClosed")
+          : code === "COMPOSER_REQUIRES_HUMAN_OWNERSHIP"
+            ? translate("conversationsComposerRequiresHuman")
+            : err.message || translate("conversationsComposerFailed");
+      setComposeStatus({ type: "error", message });
+    } finally {
+      setComposeSending(false);
     }
   }
 
@@ -360,6 +431,54 @@ export default function ConversationsPage() {
               ) : (
                 <p className="conversations-page__empty">{translate("conversationsNoTranscript")}</p>
               )}
+
+              <form className="conversations-composer" onSubmit={onSendHumanReply}>
+                <label className="conversations-composer__label" htmlFor="conversations-composer-input">
+                  {translate("conversationsComposerLabel")}
+                </label>
+                <textarea
+                  id="conversations-composer-input"
+                  className="conversations-composer__input"
+                  rows={3}
+                  value={composeText}
+                  disabled={ownershipState !== "HUMAN" || composeSending}
+                  placeholder={
+                    ownershipState === "HUMAN"
+                      ? translate("conversationsComposerPlaceholder")
+                      : translate("conversationsComposerDisabled")
+                  }
+                  onChange={(event) => setComposeText(event.target.value)}
+                />
+                <div className="conversations-composer__footer">
+                  {composeStatus ? (
+                    <p
+                      className={`conversations-composer__status conversations-composer__status--${composeStatus.type}`}
+                      role="status"
+                    >
+                      {composeStatus.message}
+                    </p>
+                  ) : (
+                    <span className="conversations-composer__hint">
+                      {ownershipState === "HUMAN"
+                        ? translate("conversationsComposerHint")
+                        : translate("conversationsComposerRequiresHuman")}
+                    </span>
+                  )}
+                  <button
+                    type="submit"
+                    className="conversations-thread__action conversations-thread__action--primary"
+                    disabled={
+                      ownershipState !== "HUMAN" ||
+                      composeSending ||
+                      !composeText.trim()
+                    }
+                  >
+                    {composeSending
+                      ? translate("conversationsComposerSending")
+                      : translate("conversationsComposerSend")}
+                  </button>
+                </div>
+              </form>
             </>
           )}
         </section>

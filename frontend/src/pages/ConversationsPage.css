@@ -261,6 +261,65 @@
   padding: 10px 12px;
 }
 
+.conversations-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.conversations-composer__label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.conversations-composer__input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.conversations-composer__input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.conversations-composer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.conversations-composer__hint,
+.conversations-composer__status {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  flex: 1;
+  min-width: 180px;
+}
+
+.conversations-composer__status--success {
+  color: #047857;
+}
+
+.conversations-composer__status--error {
+  color: #b91c1c;
+}
+
 @media (max-width: 900px) {
   .conversations-page__layout {
     grid-template-columns: 1fr;

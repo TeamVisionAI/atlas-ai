@@ -303,6 +303,15 @@ function mapConversationLog(row, context) {
   const directionRaw = String(row.direction || "").toLowerCase();
   const isInbound = directionRaw === "incoming" || directionRaw === "inbound";
   const direction = isInbound ? "inbound" : "outbound";
+  const pipeline = String(row.pipeline || "").toUpperCase();
+  const intent = String(row.intent || "").toUpperCase();
+  const isHumanOutbound =
+    !isInbound &&
+    !isAgentNote &&
+    (pipeline === "HUMAN" ||
+      pipeline.startsWith("HUMAN:") ||
+      intent === "HUMAN_COMPOSER_REPLY" ||
+      intent.startsWith("HUMAN_"));
   const text = isAgentNote
     ? message.slice("[Agent note]".length).trim()
     : message;
@@ -310,6 +319,10 @@ function mapConversationLog(row, context) {
 
   if (isAgentNote) {
     flags.push("agent_note");
+  }
+
+  if (isHumanOutbound) {
+    flags.push("human_reply");
   }
 
   if (context.markLegacyPhoneCorrelation) {
@@ -322,18 +335,22 @@ function mapConversationLog(row, context) {
       ? "note.agent"
       : isInbound
         ? "message.inbound"
-        : "message.outbound",
+        : isHumanOutbound
+          ? "message.outbound.human"
+          : "message.outbound",
     category: isAgentNote ? "note" : "message",
     timestampUtc: row.created_at,
     timezone: context.timezone,
     source: { system: "conversation_logs", recordId: String(row.id) },
     actor: {
-      type: isAgentNote ? "agent" : isInbound ? "prospect" : "atlas",
+      type: isAgentNote || isHumanOutbound ? "agent" : isInbound ? "prospect" : "atlas",
       displayName: isInbound
         ? context.prospectDisplayName
         : isAgentNote
           ? "Agent"
-          : "Atlas Recruit AI",
+          : isHumanOutbound
+            ? "Human"
+            : "Atlas Recruit AI",
       userId: null
     },
     direction: isAgentNote ? "system" : direction,

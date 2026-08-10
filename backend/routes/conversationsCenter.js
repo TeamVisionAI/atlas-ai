@@ -19,6 +19,9 @@ const {
   returnConversationToAtlas,
   resolveConversationOwnershipState
 } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
+const {
+  sendHumanComposerReply
+} = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 const { loadPersistedWorkflowState } = require("../core/workflowStateStore");
 const { findProspect } = require("../services/supabaseService");
 
@@ -213,6 +216,46 @@ router.post("/:phone/return-to-atlas", async (req, res) => {
     res.status(500).json({
       error: "CONVERSATIONS_CENTER_RETURN_FAILED",
       message: "Failed to return conversation to Atlas"
+    });
+  }
+});
+
+router.post("/:phone/human-reply", async (req, res) => {
+  if (!requirePilot(req, res)) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const result = await sendHumanComposerReply({
+      phone: req.params.phone,
+      message: req.body?.message,
+      clientRequestId: req.body?.clientRequestId,
+      userId: req.atlasUser?.id,
+      organizationId
+    });
+
+    res.json(result);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) {
+      console.error("[conversations-center] human-reply", error.message);
+    }
+    res.status(status).json({
+      error: error.code || "HUMAN_REPLY_FAILED",
+      message:
+        status === 409 || status === 400 || status === 403 || status === 404
+          ? error.message
+          : "Failed to send human reply",
+      ownershipState: error.ownershipState || null,
+      retryable: Boolean(error.retryable),
+      delivery: error.delivery
+        ? {
+            status: error.delivery.status || null,
+            reason: error.delivery.reason || null,
+            windowOpen: error.delivery.window?.open ?? null
+          }
+        : null
     });
   }
 });

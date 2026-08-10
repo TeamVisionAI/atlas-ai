@@ -60,3 +60,11 @@ export async function returnConversationToAtlas(phone) {
     body: JSON.stringify({})
   });
 }
+
+export async function sendHumanConversationReply(phone, { message, clientRequestId }) {
+  return wrap(`/api/conversations/${encodeURIComponent(phone)}/human-reply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, clientRequestId })
+  });
+}
