@@ -114,10 +114,8 @@ function buildNextContextFromInterpretation({
     }
   }
 
-  if (
-    interpretation.intent === "provide_authorization" &&
-    interpretation.entities?.workAuthorization != null
-  ) {
+  // provide_authorization, or same-turn auth captured beside job FAQ (pending compounds).
+  if (interpretation.entities?.workAuthorization != null) {
     nextContext.knownFacts = {
       ...nextContext.knownFacts,
       workAuthorization: Boolean(interpretation.entities.workAuthorization),

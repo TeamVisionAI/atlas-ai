@@ -580,10 +580,19 @@ function resolvePendingResume(context) {
     };
   }
   if (lastQ === "ask_authorization") {
-    return {
-      templateKey: "continue_qualification_after_location",
-      lastQuestionAsked: "ask_authorization"
-    };
+    const facts = context?.knownFacts || {};
+    const authKnown =
+      facts.workAuthorization === true ||
+      facts.workAuthorization === false ||
+      facts.workAuthorizationStatus === WORK_AUTHORIZATION.AUTHORIZED ||
+      facts.workAuthorizationStatus === WORK_AUTHORIZATION.NOT_AUTHORIZED;
+    // Same-turn auth captured beside FAQ (or already known) — resume next missing field.
+    if (!authKnown) {
+      return {
+        templateKey: "continue_qualification_after_location",
+        lastQuestionAsked: "ask_authorization"
+      };
+    }
   }
   // BR-087 — skip redundant day-part when constraint/slot already known.
   const skip = resolveSchedulingQuestionSkip(context);
@@ -714,7 +723,34 @@ function applyPostModalityScheduling(structured, context, meetingType) {
   return resume;
 }
 
-function buildFaqResumeDecision(structured, context, intent, templateKey) {
+/**
+ * Same-turn work-auth entity attached beside FAQ (pending ask_authorization compounds).
+ */
+function withSameTurnAuthorizationFacts(context, interpretation) {
+  const wa = interpretation?.entities?.workAuthorization;
+  if (wa !== true && wa !== false) {
+    return context;
+  }
+  return {
+    ...context,
+    knownFacts: {
+      ...(context?.knownFacts || {}),
+      workAuthorization: wa === true,
+      workAuthorizationStatus:
+        wa === true
+          ? WORK_AUTHORIZATION.AUTHORIZED
+          : WORK_AUTHORIZATION.NOT_AUTHORIZED
+    }
+  };
+}
+
+function buildFaqResumeDecision(
+  structured,
+  context,
+  intent,
+  templateKey,
+  interpretation = null
+) {
   const resume = resolvePendingResume(context);
   structured.decision.shouldEscalate = false;
   structured.customerReplyPlan.acknowledgeRequest = true;
@@ -751,8 +787,20 @@ function buildFaqResumeDecision(structured, context, intent, templateKey) {
   ) {
     structured.reasonCodes.push(REASON_CODES.MOST_SPECIFIC_SCHEDULING_RESUME);
   }
+  const waEntity = interpretation?.entities?.workAuthorization;
+  const knownFactsPatch =
+    waEntity === true || waEntity === false
+      ? {
+          workAuthorization: waEntity === true,
+          workAuthorizationStatus:
+            waEntity === true
+              ? WORK_AUTHORIZATION.AUTHORIZED
+              : WORK_AUTHORIZATION.NOT_AUTHORIZED
+        }
+      : null;
   structured.contextPatch = {
     currentStage: context.currentStage || STAGES.QUALIFICATION,
+    ...(knownFactsPatch ? { knownFacts: knownFactsPatch } : {}),
     conversation: {
       clarificationCount: 0,
       pendingClarification:
@@ -760,7 +808,17 @@ function buildFaqResumeDecision(structured, context, intent, templateKey) {
           ? "clarify_license_type"
           : null,
       lastQuestionAsked: resume.lastQuestionAsked,
-      lastProspectIntent: intent
+      lastProspectIntent: intent,
+      ...(knownFactsPatch
+        ? {
+            confirmedFields: Array.from(
+              new Set([
+                ...(context.conversation?.confirmedFields || []),
+                "workAuthorization"
+              ])
+            )
+          }
+        : {})
     }
   };
   return structured;
@@ -907,11 +965,12 @@ function decideConversationTurn({
     }
     const jobFaq = buildFaqResumeDecision(
       structured,
-      context,
+      withSameTurnAuthorizationFacts(context, interpretation),
       intent,
       overviewFaq
         ? "job_overview_faq_then_resume"
-        : "job_opportunity_faq_then_resume"
+        : "job_opportunity_faq_then_resume",
+      interpretation
     );
     jobFaq.customerReplyPlan.entities = {
       ...jobFaq.customerReplyPlan.entities,
