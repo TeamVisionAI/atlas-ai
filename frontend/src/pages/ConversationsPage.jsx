@@ -7,6 +7,7 @@ import { copyMessageToClipboard } from "../services/whatsappCommunicationService
 import {
   buildConversationHeaderModel,
   isHumanComposerEnabled,
+  resolveEffectiveOwnership,
   canTakeOverConversation,
   canReturnConversationToAtlas
 } from "../engines/conversationsCenterPresentation";
@@ -262,7 +263,8 @@ export default function ConversationsPage() {
       detail?.ownershipState ||
       selectedItem?.ownershipState ||
       null;
-    if (!selectedPhone || !isHumanComposerEnabled(currentOwnership) || composeSending) {
+    const effective = resolveEffectiveOwnership(currentOwnership);
+    if (!selectedPhone || !isHumanComposerEnabled(effective) || composeSending) {
       return;
     }
 
@@ -320,8 +322,12 @@ export default function ConversationsPage() {
 
   const ownershipState =
     detail?.ownershipState || selectedItem?.ownershipState || null;
+  // Attention (NEEDS_ATTENTION) is display-only; controls use effectiveOwnership only.
+  const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
   const handoffReason = detail?.handoffReason || selectedItem?.handoffReason || null;
-  const humanComposerEnabled = isHumanComposerEnabled(ownershipState);
+  const humanComposerEnabled = isHumanComposerEnabled(effectiveOwnership);
+  const showTakeOver = canTakeOverConversation(effectiveOwnership);
+  const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
   const headerModel = buildConversationHeaderModel({
     name: selectedItem?.name || detail?.conversation?.name || null,
     phone:
@@ -456,21 +462,29 @@ export default function ConversationsPage() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="conversations-thread__actions">
-                    {canTakeOverConversation(ownershipState) ? (
+                  <div
+                    className="conversations-thread__actions"
+                    data-effective-ownership={effectiveOwnership}
+                    data-attention-state={
+                      ownershipState === "NEEDS_ATTENTION" ? "NEEDS_ATTENTION" : "none"
+                    }
+                  >
+                    {showTakeOver ? (
                       <button
                         type="button"
                         className="conversations-thread__action conversations-thread__action--primary"
+                        data-testid="conversations-take-over"
                         disabled={actionBusy}
                         onClick={onTakeOver}
                       >
                         {translate("conversationsTakeOver")}
                       </button>
                     ) : null}
-                    {canReturnConversationToAtlas(ownershipState) ? (
+                    {showReturnToAtlas ? (
                       <button
                         type="button"
                         className="conversations-thread__action"
+                        data-testid="conversations-return-to-atlas"
                         disabled={actionBusy}
                         onClick={onReturnToAtlas}
                       >

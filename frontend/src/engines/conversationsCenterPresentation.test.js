@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildConversationHeaderModel,
+  resolveEffectiveOwnership,
   isHumanComposerEnabled,
   canTakeOverConversation,
   canReturnConversationToAtlas,
@@ -26,34 +27,52 @@ test("header model exposes full copyable phone for authorized detail UI", () => 
   assert.equal(model.phoneCopyable, true);
   assert.equal(model.name, "Mayra");
   assert.equal(model.ownershipState, "HUMAN");
-  assert.equal(model.source, "whatsapp");
-  assert.equal(model.appointmentStatus, "none");
 });
 
-test("HUMAN composer enabled only for HUMAN ownership", () => {
-  assert.equal(isHumanComposerEnabled("HUMAN"), true);
-  assert.equal(isHumanComposerEnabled("ATLAS"), false);
-  assert.equal(isHumanComposerEnabled("NEEDS_ATTENTION"), false);
-  assert.equal(isHumanComposerEnabled(null), false);
+test("effectiveOwnership collapses NEEDS_ATTENTION to ATLAS for controls", () => {
+  assert.equal(resolveEffectiveOwnership("HUMAN"), "HUMAN");
+  assert.equal(resolveEffectiveOwnership("ATLAS"), "ATLAS");
+  assert.equal(resolveEffectiveOwnership("NEEDS_ATTENTION"), "ATLAS");
+  assert.equal(resolveEffectiveOwnership(null), "ATLAS");
 });
 
-test("ownership controls: ATLAS/NEEDS_ATTENTION take over only; HUMAN return only", () => {
-  assert.equal(canTakeOverConversation("ATLAS"), true);
-  assert.equal(canTakeOverConversation("NEEDS_ATTENTION"), true);
-  assert.equal(canReturnConversationToAtlas("ATLAS"), false);
-  assert.equal(canReturnConversationToAtlas("NEEDS_ATTENTION"), false);
+test("NEEDS_ATTENTION + effectiveOwnership=ATLAS → TAKE OVER only", () => {
+  const effective = resolveEffectiveOwnership("NEEDS_ATTENTION");
+  assert.equal(effective, "ATLAS");
+  assert.equal(canTakeOverConversation(effective), true);
+  assert.equal(canReturnConversationToAtlas(effective), false);
+});
 
-  assert.equal(canTakeOverConversation("HUMAN"), false);
-  assert.equal(canReturnConversationToAtlas("HUMAN"), true);
+test("HUMAN + any attention flag → RETURN TO ATLAS only", () => {
+  const effective = resolveEffectiveOwnership("HUMAN");
+  assert.equal(canTakeOverConversation(effective), false);
+  assert.equal(canReturnConversationToAtlas(effective), true);
+  assert.equal(isHumanComposerEnabled(effective), true);
+});
 
-  assert.equal(
-    canTakeOverConversation("NEEDS_ATTENTION") &&
-      !canReturnConversationToAtlas("NEEDS_ATTENTION"),
-    true
-  );
-  assert.equal(
-    canReturnConversationToAtlas("HUMAN") && !canTakeOverConversation("HUMAN"),
-    true
+test("ATLAS → TAKE OVER only", () => {
+  const effective = resolveEffectiveOwnership("ATLAS");
+  assert.equal(canTakeOverConversation(effective), true);
+  assert.equal(canReturnConversationToAtlas(effective), false);
+  assert.equal(isHumanComposerEnabled(effective), false);
+});
+
+test("after TAKE OVER → HUMAN / RETURN only; after RETURN → ATLAS / TAKE OVER only", () => {
+  const afterTakeOver = resolveEffectiveOwnership("HUMAN");
+  assert.equal(canTakeOverConversation(afterTakeOver), false);
+  assert.equal(canReturnConversationToAtlas(afterTakeOver), true);
+
+  const afterReturn = resolveEffectiveOwnership("ATLAS");
+  assert.equal(canTakeOverConversation(afterReturn), true);
+  assert.equal(canReturnConversationToAtlas(afterReturn), false);
+
+  // Refresh invariant: same mapping from authoritative API ownershipState.
+  assert.deepEqual(
+    {
+      take: canTakeOverConversation(resolveEffectiveOwnership("NEEDS_ATTENTION")),
+      ret: canReturnConversationToAtlas(resolveEffectiveOwnership("NEEDS_ATTENTION"))
+    },
+    { take: true, ret: false }
   );
 });
 

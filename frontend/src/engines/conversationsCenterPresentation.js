@@ -1,5 +1,9 @@
 /**
  * Conversations Center pilot presentation helpers (UI/read-model only).
+ *
+ * Attention (NEEDS_ATTENTION) is not ownership. Button visibility must use
+ * effectiveOwnership ∈ { HUMAN, ATLAS } only — never attention_status,
+ * handoffReason, or stale manual flags.
  */
 
 export function buildConversationHeaderModel({
@@ -22,18 +26,30 @@ export function buildConversationHeaderModel({
   };
 }
 
-export function isHumanComposerEnabled(ownershipState) {
-  return ownershipState === "HUMAN";
+/**
+ * Normalize API ownership/attention presentation into authoritative ownership.
+ * NEEDS_ATTENTION → ATLAS for control purposes (attention is separate).
+ * Only explicit HUMAN remains HUMAN.
+ */
+export function resolveEffectiveOwnership(ownershipState) {
+  if (ownershipState === "HUMAN") {
+    return "HUMAN";
+  }
+  return "ATLAS";
 }
 
-/** TAKE OVER when Atlas owns or attention is escalated — never while HUMAN. */
-export function canTakeOverConversation(ownershipState) {
-  return ownershipState === "ATLAS" || ownershipState === "NEEDS_ATTENTION";
+export function isHumanComposerEnabled(effectiveOwnership) {
+  return effectiveOwnership === "HUMAN";
 }
 
-/** RETURN TO ATLAS only after authoritative HUMAN takeover (not NEEDS_ATTENTION alone). */
-export function canReturnConversationToAtlas(ownershipState) {
-  return ownershipState === "HUMAN";
+/** TAKE OVER only when effective ownership is ATLAS. */
+export function canTakeOverConversation(effectiveOwnership) {
+  return effectiveOwnership === "ATLAS";
+}
+
+/** RETURN TO ATLAS only when effective ownership is HUMAN. */
+export function canReturnConversationToAtlas(effectiveOwnership) {
+  return effectiveOwnership === "HUMAN";
 }
 
 /** Sticky operator strip order: controls → status → composer → timeline. */
