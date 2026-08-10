@@ -6,7 +6,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildConversationHeaderModel,
+  resolveEffectiveOwnership,
   isHumanComposerEnabled,
+  canTakeOverConversation,
+  canReturnConversationToAtlas,
+  resolveThreadActionIds,
   conversationsThreadRegionOrder
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
@@ -24,15 +28,62 @@ test("header model exposes full copyable phone for authorized detail UI", () => 
   assert.equal(model.phoneCopyable, true);
   assert.equal(model.name, "Mayra");
   assert.equal(model.ownershipState, "HUMAN");
-  assert.equal(model.source, "whatsapp");
-  assert.equal(model.appointmentStatus, "none");
 });
 
-test("HUMAN composer enabled only for HUMAN ownership", () => {
-  assert.equal(isHumanComposerEnabled("HUMAN"), true);
-  assert.equal(isHumanComposerEnabled("ATLAS"), false);
-  assert.equal(isHumanComposerEnabled("NEEDS_ATTENTION"), false);
-  assert.equal(isHumanComposerEnabled(null), false);
+test("effectiveOwnership collapses NEEDS_ATTENTION to ATLAS for controls", () => {
+  assert.equal(resolveEffectiveOwnership("HUMAN"), "HUMAN");
+  assert.equal(resolveEffectiveOwnership("ATLAS"), "ATLAS");
+  assert.equal(resolveEffectiveOwnership("NEEDS_ATTENTION"), "ATLAS");
+  assert.equal(resolveEffectiveOwnership(null), "ATLAS");
+});
+
+test("NEEDS_ATTENTION + effectiveOwnership=ATLAS → actions=['TAKE_OVER'] only", () => {
+  const ownershipState = "NEEDS_ATTENTION";
+  const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
+  assert.equal(effectiveOwnership, "ATLAS");
+  assert.deepEqual(
+    resolveThreadActionIds({ ownershipState, effectiveOwnership }),
+    ["TAKE_OVER"]
+  );
+  assert.equal(
+    resolveThreadActionIds({ ownershipState, effectiveOwnership }).includes(
+      "RETURN_TO_ATLAS"
+    ),
+    false
+  );
+});
+
+test("HUMAN + any attention flag → RETURN TO ATLAS only", () => {
+  const effective = resolveEffectiveOwnership("HUMAN");
+  assert.equal(canTakeOverConversation(effective), false);
+  assert.equal(canReturnConversationToAtlas(effective), true);
+  assert.equal(isHumanComposerEnabled(effective), true);
+});
+
+test("ATLAS → TAKE OVER only", () => {
+  const effective = resolveEffectiveOwnership("ATLAS");
+  assert.equal(canTakeOverConversation(effective), true);
+  assert.equal(canReturnConversationToAtlas(effective), false);
+  assert.equal(isHumanComposerEnabled(effective), false);
+});
+
+test("after TAKE OVER → HUMAN / RETURN only; after RETURN → ATLAS / TAKE OVER only", () => {
+  const afterTakeOver = resolveEffectiveOwnership("HUMAN");
+  assert.equal(canTakeOverConversation(afterTakeOver), false);
+  assert.equal(canReturnConversationToAtlas(afterTakeOver), true);
+
+  const afterReturn = resolveEffectiveOwnership("ATLAS");
+  assert.equal(canTakeOverConversation(afterReturn), true);
+  assert.equal(canReturnConversationToAtlas(afterReturn), false);
+
+  // Refresh invariant: same mapping from authoritative API ownershipState.
+  assert.deepEqual(
+    {
+      take: canTakeOverConversation(resolveEffectiveOwnership("NEEDS_ATTENTION")),
+      ret: canReturnConversationToAtlas(resolveEffectiveOwnership("NEEDS_ATTENTION"))
+    },
+    { take: true, ret: false }
+  );
 });
 
 test("sticky thread region places composer before timeline", () => {

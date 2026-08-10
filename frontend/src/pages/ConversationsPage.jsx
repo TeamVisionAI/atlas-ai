@@ -6,7 +6,11 @@ import CommunicationsCenterTimeline from "../features/prospect-workspace/compone
 import { copyMessageToClipboard } from "../services/whatsappCommunicationService";
 import {
   buildConversationHeaderModel,
-  isHumanComposerEnabled
+  isHumanComposerEnabled,
+  resolveEffectiveOwnership,
+  canTakeOverConversation,
+  canReturnConversationToAtlas,
+  resolveThreadActionIds
 } from "../engines/conversationsCenterPresentation";
 import {
   getConversations,
@@ -260,7 +264,8 @@ export default function ConversationsPage() {
       detail?.ownershipState ||
       selectedItem?.ownershipState ||
       null;
-    if (!selectedPhone || !isHumanComposerEnabled(currentOwnership) || composeSending) {
+    const effective = resolveEffectiveOwnership(currentOwnership);
+    if (!selectedPhone || !isHumanComposerEnabled(effective) || composeSending) {
       return;
     }
 
@@ -318,8 +323,17 @@ export default function ConversationsPage() {
 
   const ownershipState =
     detail?.ownershipState || selectedItem?.ownershipState || null;
+  // Attention (NEEDS_ATTENTION) is display-only; controls use effectiveOwnership only.
+  const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
   const handoffReason = detail?.handoffReason || selectedItem?.handoffReason || null;
-  const humanComposerEnabled = isHumanComposerEnabled(ownershipState);
+  const humanComposerEnabled = isHumanComposerEnabled(effectiveOwnership);
+  const showTakeOver = canTakeOverConversation(effectiveOwnership);
+  const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
+  // Defense in depth: one action list from effectiveOwnership; NEEDS_ATTENTION never unlocks RETURN.
+  const threadActionIds = resolveThreadActionIds({
+    ownershipState,
+    effectiveOwnership
+  });
   const headerModel = buildConversationHeaderModel({
     name: selectedItem?.name || detail?.conversation?.name || null,
     phone:
@@ -454,21 +468,30 @@ export default function ConversationsPage() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="conversations-thread__actions">
-                    {ownershipState === "NEEDS_ATTENTION" || ownershipState === "ATLAS" ? (
+                  <div
+                    className="conversations-thread__actions"
+                    data-effective-ownership={effectiveOwnership}
+                    data-attention-state={
+                      ownershipState === "NEEDS_ATTENTION" ? "NEEDS_ATTENTION" : "none"
+                    }
+                    data-thread-actions={threadActionIds.join(",")}
+                  >
+                    {threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
                       <button
                         type="button"
                         className="conversations-thread__action conversations-thread__action--primary"
+                        data-testid="conversations-take-over"
                         disabled={actionBusy}
                         onClick={onTakeOver}
                       >
                         {translate("conversationsTakeOver")}
                       </button>
                     ) : null}
-                    {ownershipState === "HUMAN" || ownershipState === "NEEDS_ATTENTION" ? (
+                    {threadActionIds.includes("RETURN_TO_ATLAS") && showReturnToAtlas ? (
                       <button
                         type="button"
                         className="conversations-thread__action"
+                        data-testid="conversations-return-to-atlas"
                         disabled={actionBusy}
                         onClick={onReturnToAtlas}
                       >
