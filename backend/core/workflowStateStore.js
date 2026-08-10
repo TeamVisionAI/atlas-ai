@@ -7,8 +7,14 @@
 const fs = require("fs");
 const path = require("path");
 const { OWNERSHIP, normalizeOwnership } = require("./workflowConstants");
+const {
+  normalizePhoneNumber,
+  formatPhoneForStorage
+} = require("./phoneNormalizer");
 
-const STATE_FILE = path.join(__dirname, "../data/workflowState.json");
+const STATE_FILE =
+  process.env.ATLAS_WORKFLOW_STATE_FILE ||
+  path.join(__dirname, "../data/workflowState.json");
 
 function defaultWorkflowRecord() {
   return {
@@ -34,6 +40,51 @@ function defaultWorkflowRecord() {
   };
 }
 
+/**
+ * Canonical storage key for ownership silence + TAKE OVER.
+ * Prevents +E.164 vs digits-only vs space-mangled path params from splitting HUMAN state.
+ */
+function workflowStateKey(phone) {
+  const raw = String(phone || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = normalizePhoneNumber(raw);
+  if (normalized) {
+    return formatPhoneForStorage(normalized);
+  }
+
+  return raw;
+}
+
+function candidateWorkflowKeys(phone) {
+  const keys = new Set();
+  const raw = String(phone || "").trim();
+  if (raw) {
+    keys.add(raw);
+  }
+
+  // Path-param "+" often arrives as leading space after decode.
+  const repaired = raw.replace(/^\s+/, "+");
+  if (repaired && repaired !== raw) {
+    keys.add(repaired);
+  }
+
+  const digits = raw.replace(/\D/g, "");
+  if (digits) {
+    keys.add(digits);
+    keys.add(`+${digits}`);
+  }
+
+  const canonical = workflowStateKey(phone);
+  if (canonical) {
+    keys.add(canonical);
+  }
+
+  return [...keys];
+}
+
 function readStore() {
   try {
     if (!fs.existsSync(STATE_FILE)) {
@@ -51,13 +102,24 @@ function writeStore(store) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(store, null, 2));
 }
 
+function resolveStoredRecord(store, phone) {
+  let merged = {};
+  for (const key of candidateWorkflowKeys(phone)) {
+    const row = store[key];
+    if (row && typeof row === "object") {
+      merged = { ...merged, ...row };
+    }
+  }
+  return merged;
+}
+
 function loadPersistedWorkflowState(phone) {
   if (!phone) {
     return defaultWorkflowRecord();
   }
 
   const store = readStore();
-  const raw = store[phone] || {};
+  const raw = resolveStoredRecord(store, phone);
   const normalized = {
     ...raw,
     workflowOwnership: raw.workflowOwnership
@@ -77,9 +139,10 @@ function savePersistedWorkflowState(phone, patch) {
   }
 
   const store = readStore();
+  const key = workflowStateKey(phone) || String(phone).trim();
   const current = {
     ...defaultWorkflowRecord(),
-    ...(store[phone] || {})
+    ...resolveStoredRecord(store, phone)
   };
 
   const next = {
@@ -90,7 +153,15 @@ function savePersistedWorkflowState(phone, patch) {
       : current.workflowOwnership
   };
 
-  store[phone] = next;
+  store[key] = next;
+
+  // Collapse alias keys so inbound storagePhone (+E.164) always sees TAKE OVER.
+  for (const alias of candidateWorkflowKeys(phone)) {
+    if (alias !== key && store[alias]) {
+      delete store[alias];
+    }
+  }
+
   writeStore(store);
   return next;
 }
@@ -148,15 +219,24 @@ function deletePersistedWorkflowState(phone) {
   }
 
   const store = readStore();
+  let changed = false;
 
-  if (store[phone]) {
-    delete store[phone];
+  for (const key of candidateWorkflowKeys(phone)) {
+    if (store[key]) {
+      delete store[key];
+      changed = true;
+    }
+  }
+
+  if (changed) {
     writeStore(store);
   }
 }
 
 module.exports = {
   defaultWorkflowRecord,
+  workflowStateKey,
+  candidateWorkflowKeys,
   loadPersistedWorkflowState,
   savePersistedWorkflowState,
   resolveWorkflowState,
