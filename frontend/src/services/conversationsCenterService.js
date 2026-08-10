@@ -25,9 +25,9 @@ async function wrap(path, options) {
   }
 }
 
-export async function getConversations({ filter = "all", search = "" } = {}) {
+export async function getConversations({ filter = "active", search = "" } = {}) {
   const params = new URLSearchParams();
-  if (filter && filter !== "all") {
+  if (filter && filter !== "active") {
     params.set("filter", filter);
   }
   if (search) {
@@ -66,5 +66,37 @@ export async function sendHumanConversationReply(phone, { message, clientRequest
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone, message, clientRequestId })
+  });
+}
+
+export async function archiveConversation(phone) {
+  return wrap(`/api/conversations/archive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone })
+  });
+}
+
+export async function restoreConversation(phone) {
+  return wrap(`/api/conversations/restore`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone })
+  });
+}
+
+export async function closeConversation(phone, reason = "OTHER") {
+  return wrap(`/api/conversations/close`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, reason })
+  });
+}
+
+export async function markConversationAsTest(phone) {
+  return wrap(`/api/conversations/mark-test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone })
   });
 }

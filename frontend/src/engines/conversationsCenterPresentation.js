@@ -4,6 +4,9 @@
  * Attention (NEEDS_ATTENTION) is not ownership. Button visibility must use
  * effectiveOwnership ∈ { HUMAN, ATLAS } only — never attention_status,
  * handoffReason, or stale manual flags.
+ *
+ * Inbox lifecycle (ACTIVE / SCHEDULED / CLOSED / TEST / ARCHIVED) is separate
+ * from ownership and drives which threads appear in the working inbox.
  */
 
 export function buildConversationHeaderModel({
@@ -12,7 +15,9 @@ export function buildConversationHeaderModel({
   source = null,
   ownershipState = null,
   appointmentStatus = null,
-  conversationGoal = null
+  conversationGoal = null,
+  inboxLifecycle = null,
+  inboxCloseReason = null
 } = {}) {
   const normalizedPhone = phone ? String(phone).trim() : null;
   return {
@@ -22,7 +27,9 @@ export function buildConversationHeaderModel({
     source: source || null,
     ownershipState: ownershipState || null,
     appointmentStatus: appointmentStatus || null,
-    conversationGoal: conversationGoal || null
+    conversationGoal: conversationGoal || null,
+    inboxLifecycle: inboxLifecycle || null,
+    inboxCloseReason: inboxCloseReason || null
   };
 }
 
@@ -66,6 +73,28 @@ export function resolveThreadActionIds({
     return ["RETURN_TO_ATLAS"];
   }
   return ["TAKE_OVER"];
+}
+
+/**
+ * Lifecycle actions for Active vs Archived/Test presentation.
+ * Does not alter TAKE OVER / RETURN ownership contract.
+ * @returns {("ARCHIVE"|"CLOSE"|"RESTORE"|"MARK_TEST")[]}
+ */
+export function resolveLifecycleActionIds({
+  inboxLifecycle = null
+} = {}) {
+  const lifecycle = String(inboxLifecycle || "ACTIVE").toUpperCase();
+  if (lifecycle === "ACTIVE") {
+    return ["ARCHIVE", "CLOSE", "MARK_TEST"];
+  }
+  if (lifecycle === "ARCHIVED" || lifecycle === "TEST") {
+    return ["RESTORE"];
+  }
+  // Derived SCHEDULED / CLOSED stay out of Active; viewable in Archived without soft restore.
+  if (lifecycle === "CLOSED") {
+    return ["RESTORE"];
+  }
+  return [];
 }
 
 /** Sticky operator strip order: controls → status → composer → timeline. */

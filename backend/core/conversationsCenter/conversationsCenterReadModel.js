@@ -1,6 +1,7 @@
 /**
  * Conversations Center list / badge read model.
  * Reuses production prospects + workflow state + Communications Center history endpoint for threads.
+ * Inbox lifecycle is DERIVED presentation — Active vs Scheduled/Closed/Test/Archived.
  */
 
 const { loadPersistedWorkflowState } = require("../workflowStateStore");
@@ -12,6 +13,12 @@ const {
 } = require("./constants");
 const { resolveConversationOwnershipState } = require("./conversationsCenterOwnershipService");
 const { isProspectInNiovelPilotScope } = require("./conversationsCenterAccess");
+const {
+  INBOX_LIFECYCLE,
+  resolveInboxLifecycle,
+  isActiveInboxLifecycle,
+  isArchivedInboxBucket
+} = require("./conversationsCenterLifecycle");
 
 function loadProductionProspectsSafe(organizationId) {
   const {
@@ -63,13 +70,16 @@ function activityMs(row) {
 function buildConversationListItem(prospect) {
   const persisted = loadPersistedWorkflowState(prospect.phone);
   const ownershipState = resolveConversationOwnershipState(persisted);
+  const lifecycleInfo = resolveInboxLifecycle({ prospect, persisted });
   const lastMessagePreview = prospect?.last_message
     ? String(prospect.last_message).slice(0, 160)
     : null;
 
+  const active = isActiveInboxLifecycle(lifecycleInfo.lifecycle);
   const unread =
-    ownershipState === CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION ||
-    prospect?.attention_status === "human_required";
+    active &&
+    (ownershipState === CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION ||
+      prospect?.attention_status === "human_required");
 
   return {
     id: prospect.id || null,
@@ -92,15 +102,40 @@ function buildConversationListItem(prospect) {
     handoffReason: persisted.handoffReason || null,
     handoffAt: persisted.handoffAt || null,
     ownerUserId: prospect.owner_user_id || null,
-    canonicalMilestone: null
+    canonicalMilestone: persisted.canonicalMilestone || null,
+    inboxLifecycle: lifecycleInfo.lifecycle,
+    inboxCloseReason: lifecycleInfo.closeReason,
+    inboxOutcome: lifecycleInfo.outcome,
+    inboxArchivedAt: persisted.inboxArchivedAt || null,
+    inboxClosedAt: persisted.inboxClosedAt || null
   };
 }
 
 function matchesFilter(item, filter) {
-  const active = filter || CONVERSATION_FILTERS.ALL;
+  const active = filter || CONVERSATION_FILTERS.ACTIVE;
+  const lifecycle = item.inboxLifecycle || INBOX_LIFECYCLE.ACTIVE;
 
+  // Default working inbox: Active only.
+  if (active === CONVERSATION_FILTERS.ACTIVE) {
+    return isActiveInboxLifecycle(lifecycle);
+  }
+
+  // Legacy "all" — every scoped thread (audit/search). Prefer explicit filters.
   if (active === CONVERSATION_FILTERS.ALL) {
     return true;
+  }
+
+  if (active === CONVERSATION_FILTERS.ARCHIVED) {
+    return isArchivedInboxBucket(lifecycle);
+  }
+
+  if (active === CONVERSATION_FILTERS.TEST) {
+    return lifecycle === INBOX_LIFECYCLE.TEST;
+  }
+
+  // Ownership tabs are Active-only.
+  if (!isActiveInboxLifecycle(lifecycle)) {
+    return false;
   }
 
   if (active === CONVERSATION_FILTERS.NEEDS_ATTENTION) {
@@ -131,7 +166,10 @@ function matchesSearch(item, query) {
     item.lastMessagePreview,
     item.source,
     item.conversationGoal,
-    item.handoffReason
+    item.handoffReason,
+    item.inboxLifecycle,
+    item.inboxCloseReason,
+    item.inboxOutcome
   ]
     .filter(Boolean)
     .map((value) => String(value).toLowerCase());
@@ -140,17 +178,26 @@ function matchesSearch(item, query) {
 }
 
 function buildFilterCounts(items) {
+  const activeItems = items.filter((item) =>
+    isActiveInboxLifecycle(item.inboxLifecycle)
+  );
   return {
-    all: items.length,
-    needs_attention: items.filter(
+    active: activeItems.length,
+    // Keep `all` key as Active count for older clients that still read counts.all.
+    all: activeItems.length,
+    needs_attention: activeItems.filter(
       (item) => item.ownershipState === CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION
     ).length,
-    atlas: items.filter(
+    atlas: activeItems.filter(
       (item) => item.ownershipState === CONVERSATION_OWNERSHIP_STATE.ATLAS
     ).length,
-    human: items.filter(
+    human: activeItems.filter(
       (item) => item.ownershipState === CONVERSATION_OWNERSHIP_STATE.HUMAN
-    ).length
+    ).length,
+    archived: items.filter((item) => isArchivedInboxBucket(item.inboxLifecycle))
+      .length,
+    test: items.filter((item) => item.inboxLifecycle === INBOX_LIFECYCLE.TEST)
+      .length
   };
 }
 
@@ -174,9 +221,11 @@ async function buildConversationsCenterReadModel(options = {}) {
   items.sort((left, right) => activityMs(right) - activityMs(left) || String(left.phone).localeCompare(String(right.phone)));
 
   const counts = buildFilterCounts(items);
-  const filter = options.filter || CONVERSATION_FILTERS.ALL;
+  const filter = options.filter || CONVERSATION_FILTERS.ACTIVE;
   const search = String(options.search || "").trim();
 
+  // Search across Archived/Test when query present and filter is Active — still Active-only
+  // unless user explicitly opens Archived/Test/All.
   items = items.filter((item) => matchesFilter(item, filter) && matchesSearch(item, search));
 
   return {
@@ -193,7 +242,7 @@ async function getConversationsAttentionCount(organizationId, prospects) {
   const model = await buildConversationsCenterReadModel({
     organizationId,
     prospects,
-    filter: CONVERSATION_FILTERS.ALL
+    filter: CONVERSATION_FILTERS.ACTIVE
   });
 
   return {
