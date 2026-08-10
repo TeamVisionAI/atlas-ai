@@ -362,3 +362,148 @@ test("derive helpers: closed outcome + scheduled milestone", () => {
     INBOX_LIFECYCLE.SCHEDULED
   );
 });
+
+/**
+ * PRE-MERGE invariant checks against canonical scheduling projection fields
+ * consumed by conversationsCenterLifecycle (no atlas_appointments join).
+ *
+ * Successful schedule paths (appointmentApplicationService.createAppointment /
+ * missionExecutionApplicationService.executeScheduleInterview) write:
+ *   prospect.current_step = "CONFIRMED"
+ *   workflow.canonicalMilestone = INTERVIEW_SCHEDULED (via advanceProspectWorkflow)
+ */
+test("invariant: CONFIRMED + INTERVIEW_SCHEDULED → SCHEDULED / excluded from Active", async () => {
+  await withTempStores(async () => {
+    const {
+      savePersistedWorkflowState
+    } = require("../core/workflowStateStore");
+    const {
+      buildConversationsCenterReadModel
+    } = require("../core/conversationsCenter/conversationsCenterReadModel");
+    const {
+      resolveInboxLifecycle,
+      INBOX_LIFECYCLE
+    } = require("../core/conversationsCenter/conversationsCenterLifecycle");
+    const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
+
+    const phone = "+17865551050";
+    savePersistedWorkflowState(phone, {
+      workflowOwnership: OWNERSHIP.WAITING_EVENT,
+      canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED
+    });
+
+    assert.equal(
+      resolveInboxLifecycle({
+        prospect: { phone, current_step: "CONFIRMED" },
+        persisted: {
+          canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED,
+          workflowOwnership: OWNERSHIP.WAITING_EVENT
+        }
+      }).lifecycle,
+      INBOX_LIFECYCLE.SCHEDULED
+    );
+
+    // current_step alone (CONFIRMED) is sufficient — matches createAppointment projection.
+    assert.equal(
+      resolveInboxLifecycle({
+        prospect: { phone, current_step: "CONFIRMED" },
+        persisted: { canonicalMilestone: null, workflowOwnership: OWNERSHIP.ATLAS }
+      }).lifecycle,
+      INBOX_LIFECYCLE.SCHEDULED
+    );
+
+    const active = await buildConversationsCenterReadModel({
+      organizationId: TEAM_VISION,
+      filter: "active",
+      prospects: [prospect({ phone, name: "Booked", current_step: "CONFIRMED" })]
+    });
+    assert.equal(active.items.length, 0);
+  });
+});
+
+test("invariant: appointment_confirm_deferred (execution OFF) remains ACTIVE", () => {
+  const {
+    resolveInboxLifecycle,
+    INBOX_LIFECYCLE
+  } = require("../core/conversationsCenter/conversationsCenterLifecycle");
+  const { OWNERSHIP, MILESTONES } = require("../core/workflowConstants");
+
+  // Deferred confirm has proposed slot in V2 context only — prospect step not CONFIRMED,
+  // milestone not INTERVIEW_SCHEDULED, no soft close.
+  const lifecycle = resolveInboxLifecycle({
+    prospect: {
+      phone: "+17865551051",
+      current_step: "QUALIFICATION",
+      appointment_status: null
+    },
+    persisted: {
+      workflowOwnership: OWNERSHIP.ATLAS,
+      canonicalMilestone: MILESTONES.QUALIFICATION || null,
+      lastOfferMade: undefined
+    }
+  });
+  assert.equal(lifecycle.lifecycle, INBOX_LIFECYCLE.ACTIVE);
+});
+
+test("invariant: TEST outranks SCHEDULED projection", () => {
+  const {
+    resolveInboxLifecycle,
+    INBOX_LIFECYCLE
+  } = require("../core/conversationsCenter/conversationsCenterLifecycle");
+  const { MILESTONES } = require("../core/workflowConstants");
+
+  assert.equal(
+    resolveInboxLifecycle({
+      prospect: {
+        phone: "+17865551052",
+        current_step: "CONFIRMED",
+        source: "TEST"
+      },
+      persisted: { canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED }
+    }).lifecycle,
+    INBOX_LIFECYCLE.TEST
+  );
+
+  assert.equal(
+    resolveInboxLifecycle({
+      prospect: { phone: "+17865551053", current_step: "CONFIRMED" },
+      persisted: {
+        canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED,
+        inboxMarkedTestAt: "2026-08-10T00:00:00.000Z"
+      }
+    }).lifecycle,
+    INBOX_LIFECYCLE.TEST
+  );
+});
+
+/**
+ * DOCUMENTED GAP (blocks READY TO MERGE until fixed elsewhere or here):
+ * cancelAppointment sets current_step=SCHEDULE but does NOT clear
+ * workflow.canonicalMilestone INTERVIEW_SCHEDULED. Mission Control applies
+ * appointmentMilestoneTruth; Conversations Center lifecycle does not.
+ * Result: cancelled interview still derives SCHEDULED.
+ */
+test(
+  "GAP: cancelled appointment with stale INTERVIEW_SCHEDULED still derives SCHEDULED",
+  () => {
+    const {
+      resolveInboxLifecycle,
+      INBOX_LIFECYCLE
+    } = require("../core/conversationsCenter/conversationsCenterLifecycle");
+    const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
+
+    const observed = resolveInboxLifecycle({
+      prospect: { phone: "+17865551054", current_step: "SCHEDULE" },
+      persisted: {
+        canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED,
+        workflowOwnership: OWNERSHIP.WAITING_EVENT
+      }
+    }).lifecycle;
+
+    // Current (incorrect for desired invariant #5):
+    assert.equal(observed, INBOX_LIFECYCLE.SCHEDULED);
+
+    // Desired after gap fix: ACTIVE or non-SCHEDULED projection (e.g. INTERVIEW_READY).
+    // Do not encode the desired assert here — architecture change is out of this verify pass.
+  }
+);
