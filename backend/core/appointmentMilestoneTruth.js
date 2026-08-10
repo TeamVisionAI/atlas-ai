@@ -73,9 +73,71 @@ async function resolveAppointmentMilestoneTruth({
   return applyAppointmentMilestoneTruth(milestone, activeAppointment);
 }
 
+/**
+ * Write-side companion to BR-039 read demotion.
+ * After a recruiting interview appointment is cancelled/rolled back, clear a stale
+ * INTERVIEW_SCHEDULED / INTERVIEW_DUE claim so durable workflow matches reality.
+ * Does not delete appointment history. Preserves HUMAN / manual ownership holds.
+ *
+ * @returns {{ demoted: boolean, previousMilestone: string|null, canonicalMilestone: string|null }}
+ */
+function demotePersistedScheduleClaimAfterCancel(phone) {
+  if (!phone) {
+    return { demoted: false, previousMilestone: null, canonicalMilestone: null };
+  }
+
+  const {
+    loadPersistedWorkflowState,
+    savePersistedWorkflowState
+  } = require("./workflowStateStore");
+  const { OWNERSHIP } = require("./workflowConstants");
+  const { deriveDefaultOwnership } = require("./milestoneMapper");
+  const { loadAgentState } = require("./agentActionState");
+
+  const persisted = loadPersistedWorkflowState(phone);
+  const previousMilestone = persisted.canonicalMilestone || null;
+
+  if (
+    previousMilestone !== MILESTONES.INTERVIEW_SCHEDULED &&
+    previousMilestone !== MILESTONES.INTERVIEW_DUE
+  ) {
+    return {
+      demoted: false,
+      previousMilestone,
+      canonicalMilestone: previousMilestone
+    };
+  }
+
+  const nextMilestone = MILESTONES.INTERVIEW_READY;
+  const humanHeld =
+    persisted.manualAgentOwnership === true ||
+    persisted.workflowOwnership === OWNERSHIP.AGENT;
+
+  const agentState = {
+    ...loadAgentState(phone),
+    manualAgentOwnership: Boolean(persisted.manualAgentOwnership)
+  };
+
+  const ownershipAfter = humanHeld
+    ? OWNERSHIP.AGENT
+    : deriveDefaultOwnership(nextMilestone, agentState);
+
+  savePersistedWorkflowState(phone, {
+    canonicalMilestone: nextMilestone,
+    workflowOwnership: ownershipAfter
+  });
+
+  return {
+    demoted: true,
+    previousMilestone,
+    canonicalMilestone: nextMilestone
+  };
+}
+
 module.exports = {
   APPOINTMENT_CLAIMING_MILESTONES,
   claimsScheduledInterview,
   applyAppointmentMilestoneTruth,
-  resolveAppointmentMilestoneTruth
+  resolveAppointmentMilestoneTruth,
+  demotePersistedScheduleClaimAfterCancel
 };
