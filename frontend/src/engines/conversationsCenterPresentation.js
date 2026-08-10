@@ -52,6 +52,22 @@ export function canReturnConversationToAtlas(effectiveOwnership) {
   return effectiveOwnership === "HUMAN";
 }
 
+/**
+ * Single source of truth for header action buttons.
+ * @returns {("TAKE_OVER"|"RETURN_TO_ATLAS")[]}
+ */
+export function resolveThreadActionIds({
+  ownershipState = null,
+  effectiveOwnership = null
+} = {}) {
+  const effective =
+    effectiveOwnership || resolveEffectiveOwnership(ownershipState);
+  if (effective === "HUMAN") {
+    return ["RETURN_TO_ATLAS"];
+  }
+  return ["TAKE_OVER"];
+}
+
 /** Sticky operator strip order: controls → status → composer → timeline. */
 export function conversationsThreadRegionOrder() {
   return ["sticky_controls", "composer", "timeline"];

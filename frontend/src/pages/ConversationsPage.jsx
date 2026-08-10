@@ -9,7 +9,8 @@ import {
   isHumanComposerEnabled,
   resolveEffectiveOwnership,
   canTakeOverConversation,
-  canReturnConversationToAtlas
+  canReturnConversationToAtlas,
+  resolveThreadActionIds
 } from "../engines/conversationsCenterPresentation";
 import {
   getConversations,
@@ -328,6 +329,11 @@ export default function ConversationsPage() {
   const humanComposerEnabled = isHumanComposerEnabled(effectiveOwnership);
   const showTakeOver = canTakeOverConversation(effectiveOwnership);
   const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
+  // Defense in depth: one action list from effectiveOwnership; NEEDS_ATTENTION never unlocks RETURN.
+  const threadActionIds = resolveThreadActionIds({
+    ownershipState,
+    effectiveOwnership
+  });
   const headerModel = buildConversationHeaderModel({
     name: selectedItem?.name || detail?.conversation?.name || null,
     phone:
@@ -468,8 +474,9 @@ export default function ConversationsPage() {
                     data-attention-state={
                       ownershipState === "NEEDS_ATTENTION" ? "NEEDS_ATTENTION" : "none"
                     }
+                    data-thread-actions={threadActionIds.join(",")}
                   >
-                    {showTakeOver ? (
+                    {threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
                       <button
                         type="button"
                         className="conversations-thread__action conversations-thread__action--primary"
@@ -480,7 +487,7 @@ export default function ConversationsPage() {
                         {translate("conversationsTakeOver")}
                       </button>
                     ) : null}
-                    {showReturnToAtlas ? (
+                    {threadActionIds.includes("RETURN_TO_ATLAS") && showReturnToAtlas ? (
                       <button
                         type="button"
                         className="conversations-thread__action"

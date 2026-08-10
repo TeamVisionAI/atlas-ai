@@ -10,6 +10,7 @@ import {
   isHumanComposerEnabled,
   canTakeOverConversation,
   canReturnConversationToAtlas,
+  resolveThreadActionIds,
   conversationsThreadRegionOrder
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
@@ -36,11 +37,20 @@ test("effectiveOwnership collapses NEEDS_ATTENTION to ATLAS for controls", () =>
   assert.equal(resolveEffectiveOwnership(null), "ATLAS");
 });
 
-test("NEEDS_ATTENTION + effectiveOwnership=ATLAS → TAKE OVER only", () => {
-  const effective = resolveEffectiveOwnership("NEEDS_ATTENTION");
-  assert.equal(effective, "ATLAS");
-  assert.equal(canTakeOverConversation(effective), true);
-  assert.equal(canReturnConversationToAtlas(effective), false);
+test("NEEDS_ATTENTION + effectiveOwnership=ATLAS → actions=['TAKE_OVER'] only", () => {
+  const ownershipState = "NEEDS_ATTENTION";
+  const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
+  assert.equal(effectiveOwnership, "ATLAS");
+  assert.deepEqual(
+    resolveThreadActionIds({ ownershipState, effectiveOwnership }),
+    ["TAKE_OVER"]
+  );
+  assert.equal(
+    resolveThreadActionIds({ ownershipState, effectiveOwnership }).includes(
+      "RETURN_TO_ATLAS"
+    ),
+    false
+  );
 });
 
 test("HUMAN + any attention flag → RETURN TO ATLAS only", () => {
