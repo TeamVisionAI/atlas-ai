@@ -162,10 +162,21 @@ function parseTimeHint(text, context = {}) {
 
   const weekday =
     "lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday";
+  const relativeDay =
+    "tomorrow|manana|hoy|today|pasado\\s+manana|day\\s+after\\s+tomorrow";
   const timePatterns = [
     /(?:prefer(?:ring)?|at|around|about|for|a las|como a las|can it be at|could it be at|puede ser a las|podria ser a las|seria a las|sería a las)\s+(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)?/i,
     /(\d{1,2}|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)\s*(?:mas o menos|más o menos|or so|ish)\b/i,
     /(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)/i,
+    // "mañana 12" / "hoy a las 3" — relative day + wall clock (BR-115 / offered-slot context).
+    new RegExp(
+      `(?:\\b(?:${relativeDay})\\b)\\s+(?:a\\s+las\\s+)?(\\d{1,2})(?::(\\d{2}))?\\b`,
+      "i"
+    ),
+    new RegExp(
+      `(\\d{1,2})(?::(\\d{2}))?\\s+(?:de\\s+)?(?:\\b(?:${relativeDay})\\b)`,
+      "i"
+    ),
     // "domingo 7:30" / "7:30 domingo" — weekday + wall clock without requiring "a las".
     new RegExp(
       `(?:\\b(?:${weekday})\\b)\\s+(\\d{1,2})(?::(\\d{2}))?\\b`,

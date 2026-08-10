@@ -30,6 +30,7 @@ const {
   resolveUniqueOfferedSlotSelection,
   resolveUniqueOfferedDaySelection,
   isOfferedSetAlreadySameDay,
+  filterOfferedSlotsByDayPart,
   slotDate,
   slotTime,
   slotsEqual,
@@ -67,7 +68,7 @@ function applySelectedOfferedSlotDecision(
   structured,
   selected,
   offered,
-  { reasonCodes = [] } = {}
+  { reasonCodes = [], context = null } = {}
 ) {
   const selectedDate = slotDate(selected);
   const selectedTime = slotTime(selected);
@@ -82,7 +83,8 @@ function applySelectedOfferedSlotDecision(
     requestedDate: selectedDate,
     requestedTime: selectedTime,
     dateLabel: selectedDate,
-    timezone: selected?.timezone || null
+    timezone: selected?.timezone || context?.timezone || null,
+    now: context?._testNow || null
   };
   for (const code of reasonCodes) {
     structured.reasonCodes.push(code);
@@ -2031,7 +2033,8 @@ function decideConversationTurn({
           dayMatch.selected,
           offeredSlots,
           {
-            reasonCodes: [REASON_CODES.OFFERED_SLOT_DAY_NARROWED]
+            reasonCodes: [REASON_CODES.OFFERED_SLOT_DAY_NARROWED],
+            context
           }
         );
       }
@@ -2354,6 +2357,37 @@ function decideConversationTurn({
 
   if (intent === INTENTS.PROVIDE_DAY_PART) {
     const dayPart = interpretation.entities?.dayPart || null;
+    const pendingQ = String(context.conversation?.lastQuestionAsked || "");
+    const offeredSlots = context.appointment?.previouslyOfferedSlots || [];
+
+    // Implements BR-119 — day-part against an active offered menu narrows first.
+    if (isPendingOfferedSlotChoice(pendingQ, offeredSlots) && dayPart) {
+      const dayPartMatches = filterOfferedSlotsByDayPart(offeredSlots, dayPart);
+      if (dayPartMatches.length === 1) {
+        return applySelectedOfferedSlotDecision(
+          structured,
+          dayPartMatches[0],
+          offeredSlots,
+          {
+            reasonCodes: [
+              REASON_CODES.DAY_PART_ADVANCES_TO_TIME,
+              REASON_CODES.OFFERED_SLOT_NATURAL_TIME_SELECTED
+            ],
+            context
+          }
+        );
+      }
+      if (dayPartMatches.length > 1) {
+        return applyRestateNarrowedOfferedSlots(structured, dayPartMatches, {
+          interpretation,
+          reasonCodes: [
+            REASON_CODES.DAY_PART_ADVANCES_TO_TIME,
+            REASON_CODES.OFFERED_SLOT_DAY_NARROWED_AMBIGUOUS
+          ]
+        });
+      }
+    }
+
     // Implements BR-119 — when canonical availability is present, offer 1–2 real slots.
     const dayPartConstraintPatch = {
       knownFacts: {
@@ -2514,7 +2548,9 @@ function decideConversationTurn({
     const optionIndex = Number(interpretation.entities?.optionIndex) || 1;
     const selected =
       offered[Math.max(0, optionIndex - 1)] || offered[0] || null;
-    return applySelectedOfferedSlotDecision(structured, selected, offered);
+    return applySelectedOfferedSlotDecision(structured, selected, offered, {
+      context
+    });
   }
 
   if (intent === INTENTS.RESCHEDULE_REQUEST) {
@@ -2650,7 +2686,8 @@ function decideConversationTurn({
               REASON_CODES.COUNTEROFFER_DETECTED,
               REASON_CODES.OFFERED_SLOT_NATURAL_TIME_SELECTED,
               REASON_CODES.SCHEDULING_HANDOFF_GUARD
-            ]
+            ],
+            context
           }
         );
       }

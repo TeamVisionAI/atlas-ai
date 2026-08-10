@@ -15,6 +15,23 @@ function normalizeAscii(text) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/**
+ * True clock meridiem only — do not treat date "mañana" / day-part "tarde" as AM/PM.
+ */
+function textHasClockMeridiem(text) {
+  const t = normalizeAscii(text);
+  if (!t) {
+    return false;
+  }
+  if (/\b(am|pm|a\.?m\.?|p\.?m\.?)\b/.test(t)) {
+    return true;
+  }
+  // "3 de la tarde" / "10 de la mañana" after a clock hour.
+  return /\b\d{1,2}(?::\d{2})?\s*(?:de\s+la\s+|por\s+la\s+)?(manana|tarde)\b/.test(
+    t
+  );
+}
+
 function padTime(hour, minute = 0) {
   if (!Number.isFinite(hour)) {
     return null;
@@ -285,9 +302,8 @@ function resolveCandidateTime(text, context = {}, scheduleNormalizedHour = null)
     /^\d{2}:\d{2}$/.test(scheduleNormalizedHour)
   ) {
     const [hh, mm] = scheduleNormalizedHour.split(":").map(Number);
-    const hasMeridiemEarly = /\b(am|pm|a\.?m\.?|p\.?m\.?|mañana|manana|tarde)\b/.test(
-      normalizeAscii(raw)
-    );
+    // Bare "mañana"/"tarde" are date/day-part tokens; only clock meridiem counts here.
+    const hasMeridiemEarly = textHasClockMeridiem(raw);
     const fromDayPart = applyDayPartToClock(hh > 12 ? hh - 12 : hh, mm, dayPart);
     if (!hasMeridiemEarly && fromDayPart) {
       return { time: fromDayPart, needsAmPmClarification: false };
@@ -327,9 +343,7 @@ function resolveCandidateTime(text, context = {}, scheduleNormalizedHour = null)
     return { time: null, needsAmPmClarification: false };
   }
 
-  const hasMeridiem = /\b(am|pm|a\.?m\.?|p\.?m\.?|mañana|manana|tarde)\b/.test(
-    normalizeAscii(raw)
-  );
+  const hasMeridiem = textHasClockMeridiem(raw);
   const constraintEarliest = constraint?.earliestTime || null;
 
   if (hasMeridiem) {

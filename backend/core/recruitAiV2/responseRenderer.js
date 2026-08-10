@@ -147,7 +147,7 @@ const COPY = Object.freeze({
     clarify_day_part_alt:
       "No problem. Please reply morning or afternoon so we can continue.",
     confirm_selected_slot:
-      "Thanks. Before we lock anything in, please reply YES to confirm that time, or suggest another time.",
+      "Perfect — {slotConfirmPhrase}. Reply YES to confirm that time.",
     clarify_offered_slot_day:
       "I have {requestedTime} on more than one day. Which day works better for you?",
     clarify_offered_slot_time: null,
@@ -294,7 +294,7 @@ const COPY = Object.freeze({
     clarify_day_part_alt:
       "Sin problema. Responde mañana o tarde para continuar.",
     confirm_selected_slot:
-      "Gracias. Antes de confirmar, responde SI para confirmar esa hora, o sugiere otra hora.",
+      "Perfecto, {slotConfirmPhrase}. Responde SI para confirmar esa hora.",
     clarify_offered_slot_day:
       "Tengo {requestedTime} en más de un día. ¿Qué día te funciona mejor?",
     clarify_offered_slot_time: null,
@@ -878,21 +878,36 @@ function renderCustomerReply(responsePlan) {
 
   const dateLabelRaw =
     entities.dateLabel || entities.requestedDateLabel || null;
+  // Only rewrite ISO dateLabels to hoy/mañana. Preserve weekday labels
+  // already set by formatDateLabel (e.g. "lunes") for confirm_date_with_time.
+  const isoDateCandidate = /^\d{4}-\d{2}-\d{2}$/.test(String(dateLabelRaw || ""))
+    ? dateLabelRaw
+    : !dateLabelRaw &&
+        /^\d{4}-\d{2}-\d{2}$/.test(String(entities.requestedDate || ""))
+      ? entities.requestedDate
+      : null;
+  const relativeDayLabel = isoDateCandidate
+    ? formatSlotDayPhrase(isoDateCandidate, language, {
+        now: entities.now || null,
+        timezone: entities.timezone || null
+      })
+    : null;
+  const effectiveDateLabel = relativeDayLabel || dateLabelRaw;
   const dateLabelIsNeutral =
-    !dateLabelRaw ||
-    dateLabelRaw === "ese día" ||
-    dateLabelRaw === "that day";
+    !effectiveDateLabel ||
+    effectiveDateLabel === "ese día" ||
+    effectiveDateLabel === "that day";
   // Keep substitution for templates that still use {dateLabel}, but never invent
   // "ese día" into Spanish "el {dateLabel}" slots without a concrete day.
   const dateLabel = dateLabelIsNeutral
     ? language === LANGUAGES.SPANISH
       ? "ese día"
       : "that day"
-    : dateLabelRaw;
+    : effectiveDateLabel;
   const slotConfirmPhrase = formatSlotConfirmPhrase(
     {
       requestedTime: entities.requestedTime,
-      dateLabel: dateLabelIsNeutral ? null : dateLabelRaw
+      dateLabel: dateLabelIsNeutral ? null : effectiveDateLabel
     },
     language
   );
