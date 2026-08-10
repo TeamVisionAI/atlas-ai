@@ -477,14 +477,14 @@ test("invariant: TEST outranks SCHEDULED projection", () => {
 });
 
 /**
- * DOCUMENTED GAP (blocks READY TO MERGE until fixed elsewhere or here):
- * cancelAppointment sets current_step=SCHEDULE but does NOT clear
- * workflow.canonicalMilestone INTERVIEW_SCHEDULED. Mission Control applies
- * appointmentMilestoneTruth; Conversations Center lifecycle does not.
- * Result: cancelled interview still derives SCHEDULED.
+ * Cancel / rollback projection (PR #103 write-side demotion):
+ * cancelAppointment resets current_step=SCHEDULE and demotes
+ * INTERVIEW_SCHEDULED / INTERVIEW_DUE → INTERVIEW_READY.
+ * Conversations Center derives SCHEDULED only from durable schedule claims;
+ * post-cancel INTERVIEW_READY + SCHEDULE must derive ACTIVE (no appointment join).
  */
 test(
-  "GAP: cancelled appointment with stale INTERVIEW_SCHEDULED still derives SCHEDULED",
+  "cancelled / rolled-back interview (SCHEDULE + INTERVIEW_READY) derives ACTIVE",
   () => {
     const {
       resolveInboxLifecycle,
@@ -492,18 +492,27 @@ test(
     } = require("../core/conversationsCenter/conversationsCenterLifecycle");
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
-    const observed = resolveInboxLifecycle({
-      prospect: { phone: "+17865551054", current_step: "SCHEDULE" },
-      persisted: {
-        canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED,
-        workflowOwnership: OWNERSHIP.WAITING_EVENT
-      }
-    }).lifecycle;
+    assert.equal(
+      resolveInboxLifecycle({
+        prospect: { phone: "+17865551054", current_step: "SCHEDULE" },
+        persisted: {
+          canonicalMilestone: MILESTONES.INTERVIEW_READY,
+          workflowOwnership: OWNERSHIP.WAITING_EVENT
+        }
+      }).lifecycle,
+      INBOX_LIFECYCLE.ACTIVE
+    );
 
-    // Current (incorrect for desired invariant #5):
-    assert.equal(observed, INBOX_LIFECYCLE.SCHEDULED);
-
-    // Desired after gap fix: ACTIVE or non-SCHEDULED projection (e.g. INTERVIEW_READY).
-    // Do not encode the desired assert here — architecture change is out of this verify pass.
+    // Rollback inherits the same cancelAppointment demotion path.
+    assert.equal(
+      resolveInboxLifecycle({
+        prospect: { phone: "+17865551055", current_step: "SCHEDULE" },
+        persisted: {
+          canonicalMilestone: MILESTONES.INTERVIEW_READY,
+          workflowOwnership: OWNERSHIP.ATLAS
+        }
+      }).lifecycle,
+      INBOX_LIFECYCLE.ACTIVE
+    );
   }
 );
