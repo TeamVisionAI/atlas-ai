@@ -38,6 +38,7 @@ const {
 } = require("./routes/communicationsCenter");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const followUpsRoutes = require("./routes/followUps");
+const conversationsCenterRoutes = require("./routes/conversationsCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
 const knowledgeRoutes = require("./routes/knowledge");
 const platformStatusRoutes = require("./routes/platformStatus");
@@ -176,6 +177,7 @@ app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/new-lead-attention", require("./routes/newLeadAttention"));
 app.use("/api/follow-ups", followUpsRoutes);
+app.use("/api/conversations", conversationsCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/platform-status", platformStatusRoutes);

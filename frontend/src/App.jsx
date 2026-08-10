@@ -31,6 +31,7 @@ import PolicyIntelligence from "./pages/PolicyIntelligence";
 import PolicyIntelligencePreviewPage from "./pages/PolicyIntelligencePreviewPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
+import ConversationsPage from "./pages/ConversationsPage";
 import Prospect from "./pages/Prospect";
 import Home from "./pages/Home";
 import AtlasLanding from "./pages/AtlasLanding";
@@ -120,15 +121,7 @@ export default function App() {
         <Route path="quick-capture" element={<QuickCapture />} />
         <Route path="prospect/:id" element={<Prospect />} />
         <Route path="pipeline" element={<Navigate to="/app/prospect-center" replace />} />
-        <Route
-          path="conversations"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderConversationsTitle"
-              descriptionKey="placeholderConversationsDescription"
-            />
-          }
-        />
+        <Route path="conversations" element={<ConversationsPage />} />
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="follow-ups" element={<FollowUpsPage />} />
         <Route

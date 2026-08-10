@@ -241,6 +241,7 @@ async function sendAndPersistWhatsAppMessage({
   templateButtonVariables = {},
   callerMetaTemplateName = null,
   idempotencyKey = null,
+  pipeline = null,
   now = new Date()
 } = {}) {
   if (!to) {
@@ -463,7 +464,7 @@ async function sendAndPersistWhatsAppMessage({
     direction: "outgoing",
     message: persistBody,
     intent,
-    pipeline: prospect?.current_step || "NEW",
+    pipeline: pipeline || prospect?.current_step || "NEW",
     currentStep: prospect?.current_step || "NEW",
     language: resolveProspectCommunicationCode(prospect),
     city: prospect?.city || null,

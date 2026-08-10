@@ -37,6 +37,34 @@ test("warning badges use plain-language labels", () => {
   assert.ok(badges.every((badge) => !badge.label.includes("_")));
 });
 
+test("orderCommunicationsForDisplay newest-first is presentation only and deterministic", async () => {
+  const { orderCommunicationsForDisplay } = await import(
+    "./communicationsCenterViewModel.js"
+  );
+  const items = [
+    { id: "a", timestampUtc: "2026-08-10T10:00:00.000Z" },
+    { id: "b", timestampUtc: "2026-08-10T12:00:00.000Z" },
+    { id: "c", timestampUtc: "2026-08-10T11:00:00.000Z" },
+    { id: "d", timestampUtc: "2026-08-10T12:00:00.000Z" }
+  ];
+
+  const ascending = orderCommunicationsForDisplay(items, { newestFirst: false });
+  assert.deepEqual(
+    ascending.map((item) => item.id),
+    ["a", "c", "b", "d"]
+  );
+
+  const newest = orderCommunicationsForDisplay(items, { newestFirst: true });
+  assert.deepEqual(
+    newest.map((item) => item.id),
+    ["d", "b", "c", "a"]
+  );
+  assert.deepEqual(
+    items.map((item) => item.id),
+    ["a", "b", "c", "d"]
+  );
+});
+
 test("cache key is prospect-id based, never phone", () => {
   const key = buildCommunicationsCacheKey(
     "00000000-0000-4000-8000-000000000001",

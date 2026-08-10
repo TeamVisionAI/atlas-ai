@@ -435,7 +435,10 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
 
       savePersistedWorkflowState(phone, {
         needsHumanAttention: true,
-        workflowOwnership: OWNERSHIP.AGENT
+        workflowOwnership: OWNERSHIP.AGENT,
+        manualAgentOwnership: true,
+        handoffReason: "recruiter_escalation",
+        handoffAt: new Date().toISOString()
       });
 
       await escalateConversationToHumanAssist({
