@@ -148,6 +148,18 @@ function lastQuestionImpliesDayPart(context) {
   const lastOut = String(
     context?.conversation?.lastAtlasOutboundText || ""
   ).toLowerCase();
+  // Offered-slot / confirm menus often say "mañana"/"tarde" as calendar/time
+  // wording — that is NOT a pending morning/afternoon preference question.
+  if (
+    lastQ === "offer_time_choices" ||
+    lastQ === "offer_alternatives" ||
+    lastQ === "offer_available_slots" ||
+    lastQ === "confirm_slot" ||
+    lastQ === "clarify_offered_slot_time" ||
+    lastQ === "clarify_offered_slot_day"
+  ) {
+    return false;
+  }
   if (
     lastQ.includes("day_part") ||
     lastQ.includes("daypart") ||

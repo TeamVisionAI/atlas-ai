@@ -539,6 +539,39 @@ function looksLikeTravelConfirmation(text) {
 /**
  * BR-085 — weekday/relative date without clock time is a date proposal, not midnight.
  */
+function isPendingOfferedSlotContext(context) {
+  const pendingQ = String(context?.conversation?.lastQuestionAsked || "");
+  const offered = context?.appointment?.previouslyOfferedSlots;
+  if (!Array.isArray(offered) || offered.length === 0) {
+    return false;
+  }
+  return (
+    pendingQ === "offer_time_choices" ||
+    pendingQ === "offer_alternatives" ||
+    pendingQ === "offer_available_slots" ||
+    pendingQ === "clarify_offered_slot_time" ||
+    pendingQ === "clarify_offered_slot_day"
+  );
+}
+
+/**
+ * "esa hora" / "sí esa hora" — referential confirm of the current proposed slot.
+ */
+function looksLikeReferentialSlotConfirmation(text) {
+  const t = normalizeIntentText(text)
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return false;
+  }
+  return (
+    /^(si|yes|ok|okay)?\s*(esa|esta|that)\s+(hora|time)$/.test(t) ||
+    /^(esa|esta)\s+(hora|time)$/.test(t) ||
+    /^(si|yes)\s+(esa|esta)$/.test(t)
+  );
+}
+
 function shouldTreatAsDateOnlyProposal(schedule, text, context) {
   if (!isDateOnlySchedule(schedule) && !extractDateCandidateHint(text)) {
     return false;
@@ -550,11 +583,24 @@ function shouldTreatAsDateOnlyProposal(schedule, text, context) {
 
   // BR-088 / BR-101 — Spanish "mañana" ambiguity is context-priority:
   // pending ask_day_part → morning (not tomorrow); pending date ask → tomorrow.
+  // Pending offered-slot choice → tomorrow (date narrows offered set; BR-119).
   if (dayHint.kind === "offset" && dayHint.days === 1) {
+    const t = normalizeIntentText(text)
+      .replace(/[?!¡¿.]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const explicitMorningFraming =
+      /\b(en la|por la|a la|in the)\s+manana\b/.test(t) ||
+      /^(en la manana|por la manana|a la manana|in the morning|morning)$/.test(t);
+
+    if (isPendingOfferedSlotContext(context) && !explicitMorningFraming) {
+      return true;
+    }
+
     const explicitDateFraming =
-      /\b(puede ser|pasado|tomorrow|how about|mejor el|el dia|que dia|which day|what day)\b/i.test(
+      /\b(puede ser|pasado|tomorrow|how about|mejor el|el dia|que dia|which day|what day|para\s+manana|mejor\s+manana)\b/i.test(
         text
-      );
+      ) || /^para\s+manana$/.test(t) || /^mejor\s+manana$/.test(t);
     if (
       lastQuestionImpliesDayPart(context) &&
       !lastQuestionImpliesDate(context) &&
@@ -1099,6 +1145,41 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       confidence = flexible ? 0.94 : 0.88;
     }
     entities.requestedTime = requestedTime;
+  } else if (
+    // Referential "esa hora" / "sí esa hora" against proposed/confirmable slot.
+    looksLikeReferentialSlotConfirmation(text) &&
+    (hasConfirmableAppointmentProposal(context) ||
+      String(context?.conversation?.lastQuestionAsked || "") === "confirm_slot" ||
+      (Boolean(context?.appointment?.proposedTime) &&
+        Boolean(context?.appointment?.proposedDate)))
+  ) {
+    intent = INTENTS.SCHEDULE_CONFIRM;
+    confidence = 0.93;
+    if (context?.appointment?.proposedTime) {
+      entities.requestedTime = context.appointment.proposedTime;
+    }
+  } else if (
+    // Pending offered slots: bare "mañana" is tomorrow (BR-119), not morning.
+    // Explicit "en la mañana" still remains morning day-part.
+    dayPartParse?.complete &&
+    dayPartParse.dayPart === "morning" &&
+    isPendingOfferedSlotContext(context) &&
+    extractDateCandidateHint(text)?.kind === "offset" &&
+    Number(extractDateCandidateHint(text)?.days) === 1 &&
+    !/\b(en la|por la|a la|in the)\s+manana\b/.test(normalizeIntentText(text)) &&
+    !/^(morning|en la manana|por la manana)$/.test(
+      normalizeIntentText(text).replace(/[?!¡¿.]+/g, "").trim()
+    )
+  ) {
+    intent = INTENTS.SCHEDULING_DATE_PROPOSAL;
+    confidence = 0.93;
+    entities.requestedTime = null;
+    entities.requestedDate = extractDateCandidateHint(text);
+    entities.resolvedDate = resolveDateCandidate(extractDateCandidateHint(text), {
+      timeZone: context?.timezone || "America/New_York",
+      now: options.now || context?._testNow || undefined
+    });
+    entities.priorProposedTime = context?.appointment?.proposedTime || null;
   } else if (dayPartCtx && dayPartParse?.complete) {
     intent = INTENTS.PROVIDE_DAY_PART;
     confidence = 0.9;

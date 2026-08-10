@@ -427,6 +427,28 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
+  // Scheduling-relative day / referential slot phrases are not cities.
+  const schedNorm = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (
+    /^(para\s+)?(manana|hoy|tomorrow|today)$/.test(schedNorm) ||
+    /^(mejor|better)\s+(manana|hoy|tomorrow|today)$/.test(schedNorm) ||
+    /^(si|yes|ok)?\s*(esa|esta|that)\s+(hora|time)$/.test(schedNorm) ||
+    /^(esa|esta)\s+(hora|time)$/.test(schedNorm) ||
+    /^(mejor|better)\s+(a\s+las\s+)?\d{1,2}(:\d{2})?\b/.test(schedNorm) ||
+    /^(manana|hoy|tomorrow|today)\s+(a\s+las\s+)?\d{1,2}(:\d{2})?\b/.test(
+      schedNorm
+    )
+  ) {
+    return null;
+  }
+
   const hedged = hasLocationHedge(raw);
   const working = hedged ? stripLocationHedge(raw) : raw;
   if (!working) {

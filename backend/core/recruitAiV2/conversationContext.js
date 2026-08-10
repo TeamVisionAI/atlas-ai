@@ -320,6 +320,30 @@ function resolveUniqueOfferedDaySelection(offeredSlots = [], dateIso = null) {
 }
 
 /**
+ * Filter previously offered slots by morning (<12) vs afternoon/evening (>=12).
+ */
+function filterOfferedSlotsByDayPart(offeredSlots = [], dayPart = null) {
+  const part = String(dayPart || "").toLowerCase();
+  if (!part || !Array.isArray(offeredSlots) || offeredSlots.length === 0) {
+    return [];
+  }
+  return offeredSlots.filter((slot) => {
+    const t = String(slotTime(slot) || "");
+    if (!/^\d{2}:\d{2}$/.test(t)) {
+      return false;
+    }
+    const hour = Number(t.slice(0, 2));
+    if (part === "morning") {
+      return hour < 12;
+    }
+    if (part === "afternoon" || part === "evening") {
+      return hour >= 12;
+    }
+    return false;
+  });
+}
+
+/**
  * BR-119 — true when every offered slot already sits on dateIso (naming that day
  * does not narrow the set further).
  */
@@ -349,6 +373,7 @@ module.exports = {
   isTimeInOfferedSlots,
   resolveUniqueOfferedSlotSelection,
   resolveUniqueOfferedDaySelection,
+  filterOfferedSlotsByDayPart,
   isOfferedSetAlreadySameDay,
   STAGES,
   APPOINTMENT_STATUS,
