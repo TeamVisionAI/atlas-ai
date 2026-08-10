@@ -138,8 +138,93 @@ async function humanReplyHandler(req, res) {
   }
 }
 
+async function takeOverHandler(req, res) {
+  if (!requirePilot(req, res)) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const phone = req.body?.phone || req.params.phone;
+    const prospect = await loadScopedProspect(phone, organizationId);
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: "CONVERSATION_NOT_FOUND",
+        message: "Conversation not found in Conversations Center scope"
+      });
+    }
+
+    // Persist under prospect.phone (storage truth), not the request encoding.
+    const result = takeOverConversation(prospect.phone, {
+      reason: req.body?.reason
+    });
+
+    res.json({
+      success: true,
+      action: "TAKE_OVER",
+      phone: prospect.phone,
+      ownershipState: result.ownershipState,
+      handoffReason: result.next.handoffReason || null,
+      workflow: {
+        workflowOwnership: result.next.workflowOwnership,
+        needsHumanAttention: Boolean(result.next.needsHumanAttention),
+        manualAgentOwnership: Boolean(result.next.manualAgentOwnership)
+      }
+    });
+  } catch (error) {
+    console.error("[conversations-center] take-over", error.message);
+    res.status(500).json({
+      error: "CONVERSATIONS_CENTER_TAKEOVER_FAILED",
+      message: "Failed to take over conversation"
+    });
+  }
+}
+
+async function returnToAtlasHandler(req, res) {
+  if (!requirePilot(req, res)) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const phone = req.body?.phone || req.params.phone;
+    const prospect = await loadScopedProspect(phone, organizationId);
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: "CONVERSATION_NOT_FOUND",
+        message: "Conversation not found in Conversations Center scope"
+      });
+    }
+
+    const result = returnConversationToAtlas(prospect.phone);
+
+    res.json({
+      success: true,
+      action: "RETURN_TO_ATLAS",
+      phone: prospect.phone,
+      ownershipState: result.ownershipState,
+      handoffReason: null,
+      workflow: {
+        workflowOwnership: result.next.workflowOwnership,
+        needsHumanAttention: Boolean(result.next.needsHumanAttention),
+        manualAgentOwnership: Boolean(result.next.manualAgentOwnership)
+      }
+    });
+  } catch (error) {
+    console.error("[conversations-center] return-to-atlas", error.message);
+    res.status(500).json({
+      error: "CONVERSATIONS_CENTER_RETURN_FAILED",
+      message: "Failed to return conversation to Atlas"
+    });
+  }
+}
+
 // Preferred: phone in body (stable; avoids "+" phone path encoding issues).
 router.post("/human-reply", humanReplyHandler);
+router.post("/take-over", takeOverHandler);
+router.post("/return-to-atlas", returnToAtlasHandler);
 
 router.get("/:phone", async (req, res) => {
   if (!requirePilot(req, res)) {
@@ -191,83 +276,9 @@ router.get("/:phone", async (req, res) => {
   }
 });
 
-router.post("/:phone/take-over", async (req, res) => {
-  if (!requirePilot(req, res)) {
-    return;
-  }
+router.post("/:phone/take-over", takeOverHandler);
 
-  try {
-    const organizationId = getTenantOrganizationId(req);
-    const prospect = await loadScopedProspect(req.params.phone, organizationId);
-
-    if (!prospect) {
-      return res.status(404).json({
-        error: "CONVERSATION_NOT_FOUND",
-        message: "Conversation not found in Conversations Center scope"
-      });
-    }
-
-    const result = takeOverConversation(prospect.phone, {
-      reason: req.body?.reason
-    });
-
-    res.json({
-      success: true,
-      action: "TAKE_OVER",
-      ownershipState: result.ownershipState,
-      handoffReason: result.next.handoffReason || null,
-      workflow: {
-        workflowOwnership: result.next.workflowOwnership,
-        needsHumanAttention: Boolean(result.next.needsHumanAttention),
-        manualAgentOwnership: Boolean(result.next.manualAgentOwnership)
-      }
-    });
-  } catch (error) {
-    console.error("[conversations-center] take-over", error.message);
-    res.status(500).json({
-      error: "CONVERSATIONS_CENTER_TAKEOVER_FAILED",
-      message: "Failed to take over conversation"
-    });
-  }
-});
-
-router.post("/:phone/return-to-atlas", async (req, res) => {
-  if (!requirePilot(req, res)) {
-    return;
-  }
-
-  try {
-    const organizationId = getTenantOrganizationId(req);
-    const prospect = await loadScopedProspect(req.params.phone, organizationId);
-
-    if (!prospect) {
-      return res.status(404).json({
-        error: "CONVERSATION_NOT_FOUND",
-        message: "Conversation not found in Conversations Center scope"
-      });
-    }
-
-    const result = returnConversationToAtlas(prospect.phone);
-
-    res.json({
-      success: true,
-      action: "RETURN_TO_ATLAS",
-      ownershipState: result.ownershipState,
-      handoffReason: null,
-      workflow: {
-        workflowOwnership: result.next.workflowOwnership,
-        needsHumanAttention: Boolean(result.next.needsHumanAttention),
-        manualAgentOwnership: Boolean(result.next.manualAgentOwnership)
-      }
-    });
-  } catch (error) {
-    console.error("[conversations-center] return-to-atlas", error.message);
-    res.status(500).json({
-      error: "CONVERSATIONS_CENTER_RETURN_FAILED",
-      message: "Failed to return conversation to Atlas"
-    });
-  }
-});
+router.post("/:phone/return-to-atlas", returnToAtlasHandler);
 
 // Backward-compatible path form.
 router.post("/:phone/human-reply", humanReplyHandler);

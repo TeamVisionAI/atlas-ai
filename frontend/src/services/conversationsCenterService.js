@@ -46,18 +46,18 @@ export async function getConversation(phone) {
 }
 
 export async function takeOverConversation(phone, body = {}) {
-  return wrap(`/api/conversations/${encodeURIComponent(phone)}/take-over`, {
+  return wrap(`/api/conversations/take-over`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ ...body, phone })
   });
 }
 
 export async function returnConversationToAtlas(phone) {
-  return wrap(`/api/conversations/${encodeURIComponent(phone)}/return-to-atlas`, {
+  return wrap(`/api/conversations/return-to-atlas`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({})
+    body: JSON.stringify({ phone })
   });
 }
 
