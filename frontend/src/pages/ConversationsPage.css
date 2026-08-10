@@ -105,6 +105,57 @@
   max-height: calc(100vh - 220px);
 }
 
+.conversations-thread__pilot-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: -16px -16px 0;
+  padding: 16px 16px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 8px 16px -16px rgba(15, 23, 42, 0.35);
+}
+
+.conversations-thread__identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.conversations-thread__phone-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.conversations-thread__phone {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.conversations-thread__copy {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.conversations-thread__copy:hover {
+  background: #f8fafc;
+}
+
 .conversations-page__empty {
   margin: 24px 16px;
   color: #64748b;
@@ -202,12 +253,6 @@
   color: #0f172a;
 }
 
-.conversations-thread__phone {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 13px;
-}
-
 .conversations-thread__actions {
   display: flex;
   flex-wrap: wrap;
@@ -265,9 +310,20 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  margin-top: 0;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.conversations-composer.is-human {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.conversations-composer.is-disabled {
+  opacity: 0.92;
 }
 
 .conversations-composer__label {

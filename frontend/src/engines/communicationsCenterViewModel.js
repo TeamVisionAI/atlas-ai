@@ -115,3 +115,25 @@ export function containsRawPhoneLeak(text) {
   const value = String(text || "");
   return /\+\d{10,15}\b/.test(value) || /\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/.test(value);
 }
+
+/**
+ * Presentation-only timeline order. Does not mutate persisted communications data.
+ * Default (newestFirst=false) keeps ascending chronological order for Prospect Workspace.
+ * Conversations Center pilot passes newestFirst=true so operators see the latest first.
+ */
+export function orderCommunicationsForDisplay(items = [], { newestFirst = false } = {}) {
+  const sorted = [...items].sort((a, b) => {
+    const aMs = Date.parse(a?.timestampUtc || "") || 0;
+    const bMs = Date.parse(b?.timestampUtc || "") || 0;
+    if (aMs !== bMs) {
+      return aMs - bMs;
+    }
+    return String(a?.id || "").localeCompare(String(b?.id || ""));
+  });
+
+  if (!newestFirst) {
+    return sorted;
+  }
+
+  return sorted.reverse();
+}

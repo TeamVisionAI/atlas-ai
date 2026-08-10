@@ -3,6 +3,11 @@ import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import StatusBadge from "../components/ui/StatusBadge";
 import CommunicationsCenterTimeline from "../features/prospect-workspace/components/CommunicationsCenterTimeline";
+import { copyMessageToClipboard } from "../services/whatsappCommunicationService";
+import {
+  buildConversationHeaderModel,
+  isHumanComposerEnabled
+} from "../engines/conversationsCenterPresentation";
 import {
   getConversations,
   getConversation,
@@ -119,6 +124,7 @@ export default function ConversationsPage() {
   const [composeSending, setComposeSending] = useState(false);
   const [composeStatus, setComposeStatus] = useState(null);
   const [composeRequestId, setComposeRequestId] = useState(() => newClientRequestId());
+  const [phoneCopyStatus, setPhoneCopyStatus] = useState(null);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -205,6 +211,7 @@ export default function ConversationsPage() {
     setComposeText("");
     setComposeStatus(null);
     setComposeRequestId(newClientRequestId());
+    setPhoneCopyStatus(null);
   }, [selectedPhone]);
 
   async function onTakeOver() {
@@ -235,13 +242,25 @@ export default function ConversationsPage() {
     }
   }
 
+  async function onCopyPhone(phone) {
+    if (!phone) return;
+    try {
+      await copyMessageToClipboard(phone);
+      setPhoneCopyStatus("ok");
+      window.setTimeout(() => setPhoneCopyStatus(null), 1800);
+    } catch {
+      setPhoneCopyStatus("error");
+      window.setTimeout(() => setPhoneCopyStatus(null), 2400);
+    }
+  }
+
   async function onSendHumanReply(event) {
     event.preventDefault();
     const currentOwnership =
       detail?.ownershipState ||
       selectedItem?.ownershipState ||
       null;
-    if (!selectedPhone || currentOwnership !== "HUMAN" || composeSending) {
+    if (!selectedPhone || !isHumanComposerEnabled(currentOwnership) || composeSending) {
       return;
     }
 
@@ -300,6 +319,26 @@ export default function ConversationsPage() {
   const ownershipState =
     detail?.ownershipState || selectedItem?.ownershipState || null;
   const handoffReason = detail?.handoffReason || selectedItem?.handoffReason || null;
+  const humanComposerEnabled = isHumanComposerEnabled(ownershipState);
+  const headerModel = buildConversationHeaderModel({
+    name: selectedItem?.name || detail?.conversation?.name || null,
+    phone:
+      detail?.phone ||
+      detail?.conversation?.phone ||
+      selectedItem?.phone ||
+      selectedPhone ||
+      null,
+    source: selectedItem?.source || detail?.conversation?.source || null,
+    ownershipState,
+    appointmentStatus:
+      selectedItem?.appointmentStatus ||
+      detail?.conversation?.appointmentStatus ||
+      null,
+    conversationGoal:
+      selectedItem?.conversationGoal ||
+      detail?.conversation?.conversationGoal ||
+      null
+  });
 
   return (
     <div className="conversations-page">
@@ -371,114 +410,162 @@ export default function ConversationsPage() {
             <p className="conversations-page__empty">{translate("conversationsLoading")}</p>
           ) : (
             <>
-              <div className="conversations-thread__header">
-                <div>
-                  <h2 className="conversations-thread__title">
-                    {selectedItem?.name || selectedPhone}
-                  </h2>
-                  <p className="conversations-thread__phone">{selectedPhone}</p>
+              <div className="conversations-thread__pilot-sticky">
+                <div className="conversations-thread__header">
+                  <div className="conversations-thread__identity">
+                    <h2 className="conversations-thread__title">
+                      {headerModel.name || headerModel.phone || selectedPhone}
+                    </h2>
+                    {headerModel.name && headerModel.phone ? (
+                      <div className="conversations-thread__phone-row">
+                        <p className="conversations-thread__phone" data-testid="conversations-full-phone">
+                          {headerModel.phone}
+                        </p>
+                        <button
+                          type="button"
+                          className="conversations-thread__copy"
+                          onClick={() => onCopyPhone(headerModel.phone)}
+                          aria-label={translate("conversationsCopyPhone")}
+                        >
+                          {phoneCopyStatus === "ok"
+                            ? translate("conversationsPhoneCopied")
+                            : phoneCopyStatus === "error"
+                              ? translate("conversationsPhoneCopyFailed")
+                              : translate("conversationsCopyPhone")}
+                        </button>
+                      </div>
+                    ) : headerModel.phone ? (
+                      <div className="conversations-thread__phone-row">
+                        <p className="conversations-thread__phone" data-testid="conversations-full-phone">
+                          {headerModel.phone}
+                        </p>
+                        <button
+                          type="button"
+                          className="conversations-thread__copy"
+                          onClick={() => onCopyPhone(headerModel.phone)}
+                          aria-label={translate("conversationsCopyPhone")}
+                        >
+                          {phoneCopyStatus === "ok"
+                            ? translate("conversationsPhoneCopied")
+                            : phoneCopyStatus === "error"
+                              ? translate("conversationsPhoneCopyFailed")
+                              : translate("conversationsCopyPhone")}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="conversations-thread__actions">
+                    {ownershipState === "NEEDS_ATTENTION" || ownershipState === "ATLAS" ? (
+                      <button
+                        type="button"
+                        className="conversations-thread__action conversations-thread__action--primary"
+                        disabled={actionBusy}
+                        onClick={onTakeOver}
+                      >
+                        {translate("conversationsTakeOver")}
+                      </button>
+                    ) : null}
+                    {ownershipState === "HUMAN" || ownershipState === "NEEDS_ATTENTION" ? (
+                      <button
+                        type="button"
+                        className="conversations-thread__action"
+                        disabled={actionBusy}
+                        onClick={onReturnToAtlas}
+                      >
+                        {translate("conversationsReturnToAtlas")}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="conversations-thread__actions">
-                  {ownershipState === "NEEDS_ATTENTION" || ownershipState === "ATLAS" ? (
+
+                <div className="conversations-thread__status">
+                  <StatusBadge variant={ownershipVariant(ownershipState)}>
+                    {ownershipLabel(ownershipState, translate)}
+                  </StatusBadge>
+                  {headerModel.appointmentStatus ? (
+                    <span className="conversations-thread__chip">
+                      {headerModel.appointmentStatus}
+                    </span>
+                  ) : null}
+                  {headerModel.source ? (
+                    <span className="conversations-thread__chip">{headerModel.source}</span>
+                  ) : null}
+                  {headerModel.conversationGoal ? (
+                    <span className="conversations-thread__chip">
+                      {headerModel.conversationGoal}
+                    </span>
+                  ) : null}
+                </div>
+
+                {handoffReason ? (
+                  <p className="conversations-thread__handoff">
+                    {translate("conversationsHandoffReason")}: <strong>{handoffReason}</strong>
+                  </p>
+                ) : null}
+
+                <form
+                  className={`conversations-composer${humanComposerEnabled ? " is-human" : " is-disabled"}`}
+                  onSubmit={onSendHumanReply}
+                  data-testid="conversations-human-composer"
+                  data-enabled={humanComposerEnabled ? "true" : "false"}
+                >
+                  <label className="conversations-composer__label" htmlFor="conversations-composer-input">
+                    {translate("conversationsComposerLabel")}
+                  </label>
+                  <textarea
+                    id="conversations-composer-input"
+                    className="conversations-composer__input"
+                    rows={3}
+                    value={composeText}
+                    disabled={!humanComposerEnabled || composeSending}
+                    placeholder={
+                      humanComposerEnabled
+                        ? translate("conversationsComposerPlaceholder")
+                        : translate("conversationsComposerDisabled")
+                    }
+                    onChange={(event) => setComposeText(event.target.value)}
+                  />
+                  <div className="conversations-composer__footer">
+                    {composeStatus ? (
+                      <p
+                        className={`conversations-composer__status conversations-composer__status--${composeStatus.type}`}
+                        role="status"
+                      >
+                        {composeStatus.message}
+                      </p>
+                    ) : (
+                      <span className="conversations-composer__hint">
+                        {humanComposerEnabled
+                          ? translate("conversationsComposerHint")
+                          : translate("conversationsComposerRequiresHuman")}
+                      </span>
+                    )}
                     <button
-                      type="button"
+                      type="submit"
                       className="conversations-thread__action conversations-thread__action--primary"
-                      disabled={actionBusy}
-                      onClick={onTakeOver}
+                      disabled={
+                        !humanComposerEnabled ||
+                        composeSending ||
+                        !composeText.trim()
+                      }
                     >
-                      {translate("conversationsTakeOver")}
+                      {composeSending
+                        ? translate("conversationsComposerSending")
+                        : translate("conversationsComposerSend")}
                     </button>
-                  ) : null}
-                  {ownershipState === "HUMAN" || ownershipState === "NEEDS_ATTENTION" ? (
-                    <button
-                      type="button"
-                      className="conversations-thread__action"
-                      disabled={actionBusy}
-                      onClick={onReturnToAtlas}
-                    >
-                      {translate("conversationsReturnToAtlas")}
-                    </button>
-                  ) : null}
-                </div>
+                  </div>
+                </form>
               </div>
-
-              <div className="conversations-thread__status">
-                <StatusBadge variant={ownershipVariant(ownershipState)}>
-                  {ownershipLabel(ownershipState, translate)}
-                </StatusBadge>
-                {selectedItem?.appointmentStatus ? (
-                  <span className="conversations-thread__chip">{selectedItem.appointmentStatus}</span>
-                ) : null}
-                {selectedItem?.source ? (
-                  <span className="conversations-thread__chip">{selectedItem.source}</span>
-                ) : null}
-                {selectedItem?.conversationGoal ? (
-                  <span className="conversations-thread__chip">{selectedItem.conversationGoal}</span>
-                ) : null}
-              </div>
-
-              {handoffReason ? (
-                <p className="conversations-thread__handoff">
-                  {translate("conversationsHandoffReason")}: <strong>{handoffReason}</strong>
-                </p>
-              ) : null}
 
               {detail?.prospectId ? (
                 <CommunicationsCenterTimeline
                   prospectId={detail.prospectId}
                   refreshSignal={refreshSignal}
+                  newestFirst
                 />
               ) : (
                 <p className="conversations-page__empty">{translate("conversationsNoTranscript")}</p>
               )}
-
-              <form className="conversations-composer" onSubmit={onSendHumanReply}>
-                <label className="conversations-composer__label" htmlFor="conversations-composer-input">
-                  {translate("conversationsComposerLabel")}
-                </label>
-                <textarea
-                  id="conversations-composer-input"
-                  className="conversations-composer__input"
-                  rows={3}
-                  value={composeText}
-                  disabled={ownershipState !== "HUMAN" || composeSending}
-                  placeholder={
-                    ownershipState === "HUMAN"
-                      ? translate("conversationsComposerPlaceholder")
-                      : translate("conversationsComposerDisabled")
-                  }
-                  onChange={(event) => setComposeText(event.target.value)}
-                />
-                <div className="conversations-composer__footer">
-                  {composeStatus ? (
-                    <p
-                      className={`conversations-composer__status conversations-composer__status--${composeStatus.type}`}
-                      role="status"
-                    >
-                      {composeStatus.message}
-                    </p>
-                  ) : (
-                    <span className="conversations-composer__hint">
-                      {ownershipState === "HUMAN"
-                        ? translate("conversationsComposerHint")
-                        : translate("conversationsComposerRequiresHuman")}
-                    </span>
-                  )}
-                  <button
-                    type="submit"
-                    className="conversations-thread__action conversations-thread__action--primary"
-                    disabled={
-                      ownershipState !== "HUMAN" ||
-                      composeSending ||
-                      !composeText.trim()
-                    }
-                  >
-                    {composeSending
-                      ? translate("conversationsComposerSending")
-                      : translate("conversationsComposerSend")}
-                  </button>
-                </div>
-              </form>
             </>
           )}
         </section>

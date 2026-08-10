@@ -310,6 +310,44 @@ test("filters isolate NEEDS_ATTENTION / ATLAS / HUMAN", async () => {
   });
 });
 
+test("detail list item includes full phone; unauthorized user remains forbidden", async () => {
+  await withTempWorkflowState(async () => {
+    const {
+      buildConversationListItem
+    } = require("../core/conversationsCenter/conversationsCenterReadModel");
+    const {
+      assertConversationsCenterPilotAccess
+    } = require("../core/conversationsCenter/conversationsCenterAccess");
+
+    const item = buildConversationListItem({
+      id: "p1",
+      phone: "+13473369274",
+      name: "Mayra",
+      organization_id: TEAM_VISION,
+      owner_user_id: NIOVEL,
+      source: "whatsapp",
+      appointment_status: "none",
+      updated_at: "2026-08-10T18:00:00.000Z"
+    });
+
+    assert.equal(item.phone, "+13473369274");
+    assert.equal(item.name, "Mayra");
+    assert.equal(item.source, "whatsapp");
+    assert.equal(item.appointmentStatus, "none");
+
+    assert.throws(
+      () =>
+        assertConversationsCenterPilotAccess({
+          userId: OTHER_USER,
+          organizationId: TEAM_VISION
+        }),
+      (error) =>
+        error.code === "CONVERSATIONS_CENTER_USER_FORBIDDEN" &&
+        error.statusCode === 403
+    );
+  });
+});
+
 test("execution flags remain disabled by default for this pilot phase", () => {
   const {
     isExecutionEnabled

@@ -6,6 +6,7 @@ import {
 import {
   COMMUNICATIONS_FILTERS,
   filterCommunicationsItems,
+  orderCommunicationsForDisplay,
   buildWarningBadges,
   actorLabel,
   directionLabel,
@@ -19,7 +20,8 @@ import "./CommunicationsCenterTimeline.css";
 export default function CommunicationsCenterTimeline({
   prospectId,
   organizationId = null,
-  refreshSignal = 0
+  refreshSignal = 0,
+  newestFirst = false
 }) {
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
@@ -64,10 +66,10 @@ export default function CommunicationsCenterTimeline({
     };
   }, [prospectId, refreshSignal]);
 
-  const filteredItems = useMemo(
-    () => filterCommunicationsItems(payload?.items || [], filterId),
-    [payload, filterId]
-  );
+  const filteredItems = useMemo(() => {
+    const filtered = filterCommunicationsItems(payload?.items || [], filterId);
+    return orderCommunicationsForDisplay(filtered, { newestFirst });
+  }, [payload, filterId, newestFirst]);
 
   const cacheKey = buildCommunicationsCacheKey(organizationId, prospectId);
 

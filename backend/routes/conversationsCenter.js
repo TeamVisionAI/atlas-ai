@@ -163,6 +163,7 @@ router.get("/:phone", async (req, res) => {
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
     res.json({
+      phone: prospect.phone || null,
       conversation: buildConversationListItem(prospect),
       ownershipState: resolveConversationOwnershipState(persisted),
       handoffReason: persisted.handoffReason || null,
@@ -175,7 +176,11 @@ router.get("/:phone", async (req, res) => {
       prospectId: prospect.id || null,
       communicationsPath: prospect.id
         ? `/api/prospects/${prospect.id}/communications`
-        : null
+        : null,
+      timelinePresentation: {
+        order: "newest_first",
+        persistedOrderUnchanged: true
+      }
     });
   } catch (error) {
     console.error("[conversations-center] detail", error.message);
