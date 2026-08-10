@@ -36,7 +36,15 @@ function defaultWorkflowRecord() {
     handoffReason: null,
     handoffAt: null,
     humanTakenOverAt: null,
-    returnedToAtlasAt: null
+    returnedToAtlasAt: null,
+    /**
+     * Conversations Center inbox soft state (presentation only).
+     * Does not mutate appointments or overwrite interview outcomes.
+     */
+    inboxArchivedAt: null,
+    inboxClosedAt: null,
+    inboxCloseReason: null,
+    inboxMarkedTestAt: null
   };
 }
 

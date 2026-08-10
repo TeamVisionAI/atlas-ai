@@ -10,7 +10,8 @@ import {
   resolveEffectiveOwnership,
   canTakeOverConversation,
   canReturnConversationToAtlas,
-  resolveThreadActionIds
+  resolveThreadActionIds,
+  resolveLifecycleActionIds
 } from "../engines/conversationsCenterPresentation";
 import {
   getConversations,
@@ -18,6 +19,10 @@ import {
   takeOverConversation,
   returnConversationToAtlas,
   sendHumanConversationReply,
+  archiveConversation,
+  restoreConversation,
+  closeConversation,
+  markConversationAsTest,
   ConversationsCenterError
 } from "../services/conversationsCenterService";
 import "./ConversationsPage.css";
@@ -30,10 +35,20 @@ function newClientRequestId() {
 }
 
 const FILTERS = [
-  { id: "all", labelKey: "conversationsFilterAll" },
+  { id: "active", labelKey: "conversationsFilterActive" },
   { id: "needs_attention", labelKey: "conversationsFilterNeedsAttention" },
   { id: "atlas", labelKey: "conversationsFilterAtlas" },
-  { id: "human", labelKey: "conversationsFilterHuman" }
+  { id: "human", labelKey: "conversationsFilterHuman" },
+  { id: "archived", labelKey: "conversationsFilterArchived" },
+  { id: "test", labelKey: "conversationsFilterTest" }
+];
+
+const CLOSE_REASONS = [
+  "NOT_INTERESTED",
+  "NOT_NOW",
+  "WRONG_NUMBER",
+  "DO_NOT_CONTACT",
+  "OTHER"
 ];
 
 function ownershipVariant(state) {
@@ -59,6 +74,23 @@ function ownershipLabel(state, translate) {
       return translate("conversationsOwnershipAtlas");
     default:
       return state || "—";
+  }
+}
+
+function lifecycleLabel(lifecycle, translate) {
+  switch (String(lifecycle || "").toUpperCase()) {
+    case "SCHEDULED":
+      return translate("conversationsLifecycleScheduled");
+    case "CLOSED":
+      return translate("conversationsLifecycleClosed");
+    case "TEST":
+      return translate("conversationsLifecycleTest");
+    case "ARCHIVED":
+      return translate("conversationsLifecycleArchived");
+    case "ACTIVE":
+      return translate("conversationsLifecycleActive");
+    default:
+      return lifecycle || "";
   }
 }
 
@@ -97,6 +129,11 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
         </StatusBadge>
       </div>
       <div className="conversations-row__phone">{item.phone}</div>
+      {item.inboxLifecycle && item.inboxLifecycle !== "ACTIVE" ? (
+        <div className="conversations-row__lifecycle">
+          {lifecycleLabel(item.inboxLifecycle, translate)}
+        </div>
+      ) : null}
       {item.lastMessagePreview ? (
         <p className="conversations-row__preview">{item.lastMessagePreview}</p>
       ) : null}
@@ -113,7 +150,7 @@ export default function ConversationsPage() {
   const { translate, language } = useLanguage();
   const locale = language === "es" ? "es-US" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeFilter = searchParams.get("filter") || "all";
+  const activeFilter = searchParams.get("filter") || "active";
 
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -188,10 +225,13 @@ export default function ConversationsPage() {
   }, [selectedPhone, loadDetail, refreshSignal]);
 
   const counts = payload?.counts || {
+    active: 0,
     all: 0,
     needs_attention: 0,
     atlas: 0,
-    human: 0
+    human: 0,
+    archived: 0,
+    test: 0
   };
 
   const items = payload?.items || [];
@@ -203,7 +243,7 @@ export default function ConversationsPage() {
 
   function setFilter(filterId) {
     const next = new URLSearchParams(searchParams);
-    if (filterId === "all") {
+    if (filterId === "active") {
       next.delete("filter");
     } else {
       next.set("filter", filterId);
@@ -237,6 +277,62 @@ export default function ConversationsPage() {
     setActionBusy(true);
     try {
       await returnConversationToAtlas(selectedPhone);
+      await loadList();
+      setRefreshSignal((n) => n + 1);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function onArchive() {
+    if (!selectedPhone || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await archiveConversation(selectedPhone);
+      await loadList();
+      setRefreshSignal((n) => n + 1);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function onRestore() {
+    if (!selectedPhone || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await restoreConversation(selectedPhone);
+      await loadList();
+      setRefreshSignal((n) => n + 1);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function onMarkTest() {
+    if (!selectedPhone || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await markConversationAsTest(selectedPhone);
+      await loadList();
+      setRefreshSignal((n) => n + 1);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function onClose(reason) {
+    if (!selectedPhone || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await closeConversation(selectedPhone, reason);
       await loadList();
       setRefreshSignal((n) => n + 1);
     } catch (err) {
@@ -334,6 +430,11 @@ export default function ConversationsPage() {
     ownershipState,
     effectiveOwnership
   });
+  const inboxLifecycle =
+    selectedItem?.inboxLifecycle ||
+    detail?.conversation?.inboxLifecycle ||
+    "ACTIVE";
+  const lifecycleActionIds = resolveLifecycleActionIds({ inboxLifecycle });
   const headerModel = buildConversationHeaderModel({
     name: selectedItem?.name || detail?.conversation?.name || null,
     phone:
@@ -351,6 +452,11 @@ export default function ConversationsPage() {
     conversationGoal:
       selectedItem?.conversationGoal ||
       detail?.conversation?.conversationGoal ||
+      null,
+    inboxLifecycle,
+    inboxCloseReason:
+      selectedItem?.inboxCloseReason ||
+      detail?.conversation?.inboxCloseReason ||
       null
   });
 
@@ -376,8 +482,8 @@ export default function ConversationsPage() {
           const countKey =
             filter.id === "needs_attention"
               ? "needs_attention"
-              : filter.id === "all"
-                ? "all"
+              : filter.id === "active"
+                ? "active"
                 : filter.id;
           return (
             <button
@@ -498,6 +604,63 @@ export default function ConversationsPage() {
                         {translate("conversationsReturnToAtlas")}
                       </button>
                     ) : null}
+                    {lifecycleActionIds.includes("ARCHIVE") ? (
+                      <button
+                        type="button"
+                        className="conversations-thread__action"
+                        data-testid="conversations-archive"
+                        disabled={actionBusy}
+                        onClick={onArchive}
+                      >
+                        {translate("conversationsArchive")}
+                      </button>
+                    ) : null}
+                    {lifecycleActionIds.includes("CLOSE") ? (
+                      <label className="conversations-thread__close">
+                        <span className="visually-hidden">{translate("conversationsClose")}</span>
+                        <select
+                          data-testid="conversations-close"
+                          disabled={actionBusy}
+                          defaultValue=""
+                          onChange={(event) => {
+                            const reason = event.target.value;
+                            if (reason) {
+                              onClose(reason);
+                              event.target.value = "";
+                            }
+                          }}
+                        >
+                          <option value="">{translate("conversationsClose")}</option>
+                          {CLOSE_REASONS.map((reason) => (
+                            <option key={reason} value={reason}>
+                              {translate(`conversationsCloseReason_${reason}`)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    {lifecycleActionIds.includes("MARK_TEST") ? (
+                      <button
+                        type="button"
+                        className="conversations-thread__action"
+                        data-testid="conversations-mark-test"
+                        disabled={actionBusy}
+                        onClick={onMarkTest}
+                      >
+                        {translate("conversationsMarkTest")}
+                      </button>
+                    ) : null}
+                    {lifecycleActionIds.includes("RESTORE") ? (
+                      <button
+                        type="button"
+                        className="conversations-thread__action conversations-thread__action--primary"
+                        data-testid="conversations-restore"
+                        disabled={actionBusy}
+                        onClick={onRestore}
+                      >
+                        {translate("conversationsRestore")}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -505,6 +668,11 @@ export default function ConversationsPage() {
                   <StatusBadge variant={ownershipVariant(ownershipState)}>
                     {ownershipLabel(ownershipState, translate)}
                   </StatusBadge>
+                  {headerModel.inboxLifecycle ? (
+                    <span className="conversations-thread__chip">
+                      {lifecycleLabel(headerModel.inboxLifecycle, translate)}
+                    </span>
+                  ) : null}
                   {headerModel.appointmentStatus ? (
                     <span className="conversations-thread__chip">
                       {headerModel.appointmentStatus}

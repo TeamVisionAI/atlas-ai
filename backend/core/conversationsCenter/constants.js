@@ -15,11 +15,20 @@ const CONVERSATION_OWNERSHIP_STATE = Object.freeze({
   NEEDS_ATTENTION: "NEEDS_ATTENTION"
 });
 
+/**
+ * List filters.
+ * Default working inbox is `active` (not scheduled/closed/test/archived).
+ * Ownership filters apply within Active only.
+ */
 const CONVERSATION_FILTERS = Object.freeze({
+  ACTIVE: "active",
+  /** @deprecated Prefer ACTIVE — kept for backward-compatible clients. */
   ALL: "all",
   NEEDS_ATTENTION: "needs_attention",
   ATLAS: "atlas",
-  HUMAN: "human"
+  HUMAN: "human",
+  ARCHIVED: "archived",
+  TEST: "test"
 });
 
 const HANDOFF_REASONS = Object.freeze({

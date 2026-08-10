@@ -11,6 +11,7 @@ import {
   canTakeOverConversation,
   canReturnConversationToAtlas,
   resolveThreadActionIds,
+  resolveLifecycleActionIds,
   conversationsThreadRegionOrder
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
@@ -84,6 +85,18 @@ test("after TAKE OVER → HUMAN / RETURN only; after RETURN → ATLAS / TAKE OVE
     },
     { take: true, ret: false }
   );
+});
+
+test("lifecycle actions: Active can archive/close/mark-test; Archived can restore", () => {
+  assert.deepEqual(resolveLifecycleActionIds({ inboxLifecycle: "ACTIVE" }), [
+    "ARCHIVE",
+    "CLOSE",
+    "MARK_TEST"
+  ]);
+  assert.deepEqual(resolveLifecycleActionIds({ inboxLifecycle: "ARCHIVED" }), [
+    "RESTORE"
+  ]);
+  assert.deepEqual(resolveLifecycleActionIds({ inboxLifecycle: "SCHEDULED" }), []);
 });
 
 test("sticky thread region places composer before timeline", () => {

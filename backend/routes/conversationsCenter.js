@@ -17,13 +17,20 @@ const {
 const {
   takeOverConversation,
   returnConversationToAtlas,
-  resolveConversationOwnershipState
+  resolveConversationOwnershipState,
+  archiveConversation,
+  closeConversation,
+  restoreConversation,
+  markConversationAsTest
 } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
 const {
   sendHumanComposerReply
 } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 const { loadPersistedWorkflowState } = require("../core/workflowStateStore");
 const { findProspect } = require("../services/supabaseService");
+const {
+  INBOX_CLOSE_REASONS
+} = require("../core/conversationsCenter/conversationsCenterLifecycle");
 
 const router = express.Router();
 
@@ -225,6 +232,69 @@ async function returnToAtlasHandler(req, res) {
 router.post("/human-reply", humanReplyHandler);
 router.post("/take-over", takeOverHandler);
 router.post("/return-to-atlas", returnToAtlasHandler);
+
+async function scopedLifecycleAction(req, res, actionName, run) {
+  if (!requirePilot(req, res)) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const phone = req.body?.phone || req.params.phone;
+    const prospect = await loadScopedProspect(phone, organizationId);
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: "CONVERSATION_NOT_FOUND",
+        message: "Conversation not found in Conversations Center scope"
+      });
+    }
+
+    const result = run(prospect.phone, req.body || {});
+    const {
+      buildConversationListItem
+    } = require("../core/conversationsCenter/conversationsCenterReadModel");
+
+    res.json({
+      success: true,
+      action: actionName,
+      phone: prospect.phone,
+      ownershipState: result.ownershipState,
+      closeReason: result.closeReason || null,
+      conversation: buildConversationListItem(prospect),
+      workflow: {
+        workflowOwnership: result.next.workflowOwnership,
+        needsHumanAttention: Boolean(result.next.needsHumanAttention),
+        manualAgentOwnership: Boolean(result.next.manualAgentOwnership),
+        inboxArchivedAt: result.next.inboxArchivedAt || null,
+        inboxClosedAt: result.next.inboxClosedAt || null,
+        inboxCloseReason: result.next.inboxCloseReason || null,
+        inboxMarkedTestAt: result.next.inboxMarkedTestAt || null
+      }
+    });
+  } catch (error) {
+    console.error(`[conversations-center] ${actionName}`, error.message);
+    res.status(500).json({
+      error: `CONVERSATIONS_CENTER_${actionName}_FAILED`,
+      message: `Failed to ${String(actionName).toLowerCase().replace(/_/g, " ")} conversation`
+    });
+  }
+}
+
+router.post("/archive", (req, res) =>
+  scopedLifecycleAction(req, res, "ARCHIVE", (phone) => archiveConversation(phone))
+);
+router.post("/restore", (req, res) =>
+  scopedLifecycleAction(req, res, "RESTORE", (phone) => restoreConversation(phone))
+);
+router.post("/close", (req, res) =>
+  scopedLifecycleAction(req, res, "CLOSE", (phone, body) =>
+    closeConversation(phone, body?.reason || INBOX_CLOSE_REASONS.OTHER)
+  )
+);
+router.post("/mark-test", (req, res) =>
+  scopedLifecycleAction(req, res, "MARK_TEST", (phone) => markConversationAsTest(phone))
+);
 
 router.get("/:phone", async (req, res) => {
   if (!requirePilot(req, res)) {
