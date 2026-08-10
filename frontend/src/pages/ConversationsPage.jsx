@@ -6,7 +6,9 @@ import CommunicationsCenterTimeline from "../features/prospect-workspace/compone
 import { copyMessageToClipboard } from "../services/whatsappCommunicationService";
 import {
   buildConversationHeaderModel,
-  isHumanComposerEnabled
+  isHumanComposerEnabled,
+  canTakeOverConversation,
+  canReturnConversationToAtlas
 } from "../engines/conversationsCenterPresentation";
 import {
   getConversations,
@@ -455,7 +457,7 @@ export default function ConversationsPage() {
                     ) : null}
                   </div>
                   <div className="conversations-thread__actions">
-                    {ownershipState === "NEEDS_ATTENTION" || ownershipState === "ATLAS" ? (
+                    {canTakeOverConversation(ownershipState) ? (
                       <button
                         type="button"
                         className="conversations-thread__action conversations-thread__action--primary"
@@ -465,7 +467,7 @@ export default function ConversationsPage() {
                         {translate("conversationsTakeOver")}
                       </button>
                     ) : null}
-                    {ownershipState === "HUMAN" || ownershipState === "NEEDS_ATTENTION" ? (
+                    {canReturnConversationToAtlas(ownershipState) ? (
                       <button
                         type="button"
                         className="conversations-thread__action"

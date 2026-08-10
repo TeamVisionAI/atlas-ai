@@ -276,6 +276,7 @@ function isPlausibleCityName(city) {
 
 /**
  * Parse "City ST" / "City, ST" / "City StateName" including multi-word cities (BR-094).
+ * Also accepts state-first natural order: "Florida Jacksonville", "FL Jacksonville".
  */
 function parseCityStatePhrase(raw) {
   const cleaned = String(raw || "")
@@ -291,10 +292,36 @@ function parseCityStatePhrase(raw) {
     return null;
   }
 
+  // Prefer conventional city → state first (Jacksonville Florida / Miami FL).
+  let parsed = splitCityThenState(parts);
+  // Fallback: state → city (Florida Jacksonville / North Carolina Charlotte).
+  if (!parsed) {
+    parsed = splitStateThenCity(parts);
+  }
+  return parsed;
+}
+
+function buildCompleteLocation(cityParts, state) {
+  if (!state || !cityParts || !cityParts.length) {
+    return null;
+  }
+  const city = titleCaseCity(cityParts.join(" "));
+  if (!isPlausibleCityName(city)) {
+    return null;
+  }
+  return {
+    city,
+    state,
+    proposedState: null,
+    completeness: "complete",
+    requiresClarification: false
+  };
+}
+
+function splitCityThenState(parts) {
   let state = null;
   let cityParts = null;
 
-  // Last two tokens as multi-word state name (North Carolina, New York, …)
   if (parts.length >= 3) {
     const twoWordState = normalizeStateToken(parts.slice(-2).join(" "));
     if (twoWordState) {
@@ -310,22 +337,29 @@ function parseCityStatePhrase(raw) {
     }
   }
 
-  if (!state || !cityParts || !cityParts.length) {
-    return null;
+  return buildCompleteLocation(cityParts, state);
+}
+
+function splitStateThenCity(parts) {
+  let state = null;
+  let cityParts = null;
+
+  if (parts.length >= 3) {
+    const twoWordState = normalizeStateToken(parts.slice(0, 2).join(" "));
+    if (twoWordState) {
+      state = twoWordState;
+      cityParts = parts.slice(2);
+    }
   }
 
-  const city = titleCaseCity(cityParts.join(" "));
-  if (!isPlausibleCityName(city)) {
-    return null;
+  if (!state) {
+    state = normalizeStateToken(parts[0]);
+    if (state) {
+      cityParts = parts.slice(1);
+    }
   }
 
-  return {
-    city,
-    state,
-    proposedState: null,
-    completeness: "complete",
-    requiresClarification: false
-  };
+  return buildCompleteLocation(cityParts, state);
 }
 
 /**
@@ -376,6 +410,18 @@ function parseLocationAnswerCore(raw) {
   if (
     /\b(licen[cs]ia|license|permiso|autoriz|seguro|seguros|driver|conducir|215|214|experiencia|experience|necesito|comision|comisión|salario|sueldo|ganar|dinero|pagan|pago|vender|vendiendo|vendedor|vendedora|ventas|selling|sales|salesperson|conozco|contactos|clientes|network)\b/i.test(
       raw
+    )
+  ) {
+    return null;
+  }
+
+  // Day-part preference fragments are not locations ("Tarde mejor", "Mañana mejor").
+  if (
+    /^(tarde|mañana|manana|morning|afternoon|evening|noche)(\s+(mejor|better|por\s+favor|prefiero))?$/i.test(
+      String(raw || "").trim()
+    ) ||
+    /^(mejor|better)\s+(tarde|mañana|manana|morning|afternoon|evening|noche)$/i.test(
+      String(raw || "").trim()
     )
   ) {
     return null;

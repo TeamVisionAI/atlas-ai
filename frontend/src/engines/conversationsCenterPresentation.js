@@ -26,6 +26,16 @@ export function isHumanComposerEnabled(ownershipState) {
   return ownershipState === "HUMAN";
 }
 
+/** TAKE OVER when Atlas owns or attention is escalated — never while HUMAN. */
+export function canTakeOverConversation(ownershipState) {
+  return ownershipState === "ATLAS" || ownershipState === "NEEDS_ATTENTION";
+}
+
+/** RETURN TO ATLAS only after authoritative HUMAN takeover (not NEEDS_ATTENTION alone). */
+export function canReturnConversationToAtlas(ownershipState) {
+  return ownershipState === "HUMAN";
+}
+
 /** Sticky operator strip order: controls → status → composer → timeline. */
 export function conversationsThreadRegionOrder() {
   return ["sticky_controls", "composer", "timeline"];

@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import {
   buildConversationHeaderModel,
   isHumanComposerEnabled,
+  canTakeOverConversation,
+  canReturnConversationToAtlas,
   conversationsThreadRegionOrder
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
@@ -33,6 +35,26 @@ test("HUMAN composer enabled only for HUMAN ownership", () => {
   assert.equal(isHumanComposerEnabled("ATLAS"), false);
   assert.equal(isHumanComposerEnabled("NEEDS_ATTENTION"), false);
   assert.equal(isHumanComposerEnabled(null), false);
+});
+
+test("ownership controls: ATLAS/NEEDS_ATTENTION take over only; HUMAN return only", () => {
+  assert.equal(canTakeOverConversation("ATLAS"), true);
+  assert.equal(canTakeOverConversation("NEEDS_ATTENTION"), true);
+  assert.equal(canReturnConversationToAtlas("ATLAS"), false);
+  assert.equal(canReturnConversationToAtlas("NEEDS_ATTENTION"), false);
+
+  assert.equal(canTakeOverConversation("HUMAN"), false);
+  assert.equal(canReturnConversationToAtlas("HUMAN"), true);
+
+  assert.equal(
+    canTakeOverConversation("NEEDS_ATTENTION") &&
+      !canReturnConversationToAtlas("NEEDS_ATTENTION"),
+    true
+  );
+  assert.equal(
+    canReturnConversationToAtlas("HUMAN") && !canTakeOverConversation("HUMAN"),
+    true
+  );
 });
 
 test("sticky thread region places composer before timeline", () => {
