@@ -72,6 +72,9 @@ const {
 } = require("./interviewOutcomeApplicationService");
 const { findActiveAppointmentForProspect } = require("../core/activeAppointmentResolver");
 const {
+  demotePersistedScheduleClaimAfterCancel
+} = require("../core/appointmentMilestoneTruth");
+const {
   syncAppointmentGoogleCalendar
 } = require("../core/appointmentGoogleSyncEngine");
 const {
@@ -881,6 +884,18 @@ async function cancelAppointment(id, input, context = {}) {
   }).catch((error) => {
     console.error("[appointments] cancel prospect sync failed:", error.message);
   });
+
+  // BR-039 write-side — cancel must not leave durable INTERVIEW_SCHEDULED claim.
+  // Rollback also enters here via missionExecutionApplicationService.rollbackPersistedAppointment.
+  try {
+    demotePersistedScheduleClaimAfterCancel(appointment.prospectPhone);
+  } catch (error) {
+    console.error(
+      "[appointments] cancel workflow schedule-claim demotion failed:",
+      error.message,
+      { phone: appointment.prospectPhone, appointmentId: appointment.id }
+    );
+  }
 
   return enrichWithProspect(saved);
 }
