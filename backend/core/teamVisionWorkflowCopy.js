@@ -134,12 +134,10 @@ function getJobOverviewFaqAnswer(language) {
 
 /** BR-088 — explicit employment-framing ask (job/salaried/hourly). */
 function getJobOpportunityFaqAnswer(language) {
-  return (
-    findFAQ("is this a job", language === "es" ? "es" : "en") ||
-    (language === "es"
-      ? "Es una oportunidad en servicios financieros (asesoría y distribución), no un empleo asalariado u por hora garantizado. No se requiere experiencia previa."
-      : "This is an opportunity in financial services (advisory and distribution), not a guaranteed salaried or hourly job. No prior experience is required.")
-  );
+  // Prefer concise Atlas copy over stale FAQ-catalog deferrals.
+  return language === "es"
+    ? "Es una oportunidad en servicios financieros (asesoría y distribución), no un empleo asalariado u por hora garantizado. No se requiere experiencia previa."
+    : "This is an opportunity in financial services (advisory and distribution), not a guaranteed salaried or hourly job. No prior experience is required.";
 }
 
 function getInsuranceFaqAnswer(language) {
