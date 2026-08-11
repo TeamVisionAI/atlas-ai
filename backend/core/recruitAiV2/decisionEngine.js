@@ -43,6 +43,9 @@ const {
   FINANCIAL_LICENSE_STATUS
 } = require("./qualificationFacts");
 const {
+  resolveFaqResumeTemplateKeyFromFacts
+} = require("../recruitConversationSequencing");
+const {
   hasConfirmableAppointmentProposal
 } = require("./schedulingConfirmation");
 const {
@@ -437,8 +440,12 @@ function shouldEscalateAfterClarifications(context, family = null) {
  */
 function resolveQualificationResume(context) {
   const facts = context?.knownFacts || {};
-  const cityOk = Boolean(facts.city) && facts.cityCertainty === "confirmed";
-  const stateOk = Boolean(facts.state) && facts.stateCertainty === "confirmed";
+  // Implements BR-131 — treat known non-unknown location facts as usable for resume
+  // (do not regress to city/state when values are already present).
+  const cityKnown =
+    Boolean(facts.city) && facts.cityCertainty !== "unknown";
+  const stateKnown =
+    Boolean(facts.state) && facts.stateCertainty !== "unknown";
 
   if (!facts.city || facts.cityCertainty === "unknown") {
     return {
@@ -446,7 +453,7 @@ function resolveQualificationResume(context) {
       lastQuestionAsked: "ask_location"
     };
   }
-  if (!stateOk) {
+  if (!stateKnown) {
     return {
       templateKey: facts.proposedState
         ? "confirm_location_proposal"
@@ -458,14 +465,39 @@ function resolveQualificationResume(context) {
       }
     };
   }
-  if (
-    facts.workAuthorization == null &&
-    facts.workAuthorizationStatus !== WORK_AUTHORIZATION.AUTHORIZED &&
-    facts.workAuthorizationStatus !== WORK_AUTHORIZATION.NOT_AUTHORIZED
-  ) {
+  if (!cityKnown) {
+    return {
+      templateKey: "greeting_ask_location",
+      lastQuestionAsked: "ask_location"
+    };
+  }
+  const authKnown =
+    facts.workAuthorization === true ||
+    facts.workAuthorization === false ||
+    facts.workAuthorizationStatus === WORK_AUTHORIZATION.AUTHORIZED ||
+    facts.workAuthorizationStatus === WORK_AUTHORIZATION.NOT_AUTHORIZED;
+
+  if (!authKnown) {
     return {
       templateKey: "continue_qualification_after_location",
       lastQuestionAsked: "ask_authorization"
+    };
+  }
+
+  // Implements BR-131 FAQ resume guard — never re-ask day-part when already known.
+  const dayPart = String(facts.preferredDayPart || "").toLowerCase();
+  if (dayPart === "morning") {
+    return {
+      templateKey: "acknowledge_morning_ask_time",
+      lastQuestionAsked: "ask_time_preference",
+      entities: { dayPart: "morning" }
+    };
+  }
+  if (dayPart === "afternoon" || dayPart === "evening") {
+    return {
+      templateKey: "acknowledge_afternoon_ask_time",
+      lastQuestionAsked: "ask_time_preference",
+      entities: { dayPart: dayPart === "evening" ? "evening" : "afternoon" }
     };
   }
 
@@ -753,7 +785,24 @@ function buildFaqResumeDecision(
   templateKey,
   interpretation = null
 ) {
-  const resume = resolvePendingResume(context);
+  let resume = resolvePendingResume(context);
+  // Implements BR-131 — never regress FAQ resume to location when later facts are known.
+  const guarded = resolveFaqResumeTemplateKeyFromFacts({
+    city: context.knownFacts?.city,
+    state: context.knownFacts?.state,
+    proposedState: context.knownFacts?.proposedState,
+    cityCertainty: context.knownFacts?.cityCertainty,
+    stateCertainty: context.knownFacts?.stateCertainty,
+    workAuthorization: context.knownFacts?.workAuthorization,
+    workAuthorizationStatus: context.knownFacts?.workAuthorizationStatus,
+    preferredDayPart: context.knownFacts?.preferredDayPart
+  });
+  if (
+    resume.templateKey === "greeting_ask_location" &&
+    guarded.templateKey !== "greeting_ask_location"
+  ) {
+    resume = guarded;
+  }
   structured.decision.shouldEscalate = false;
   structured.customerReplyPlan.acknowledgeRequest = true;
   structured.customerReplyPlan.templateKey = templateKey;
@@ -862,14 +911,47 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.GREETING) {
+    // Implements BR-131 — natural greeting + one next-needed question (no fact regression).
+    const resume = resolveQualificationResume(context);
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_AFTER_GREETING;
     structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey = "greeting_ask_location";
     structured.reasonCodes.push(REASON_CODES.GREETING_NO_ESCALATE);
+    structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+
+    if (resume.lastQuestionAsked === "ask_location") {
+      structured.customerReplyPlan.templateKey = "greeting_ask_location";
+      structured.contextPatch = {
+        currentStage: STAGES.QUALIFICATION,
+        conversation: {
+          lastQuestionAsked: "ask_location",
+          lastProspectIntent: INTENTS.GREETING
+        }
+      };
+      return structured;
+    }
+
+    structured.customerReplyPlan.templateKey = "greeting_then_resume";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      resumeTemplateKey: resume.templateKey,
+      ...(resume.entities || {}),
+      city: context.knownFacts?.city || resume.entities?.city || null,
+      proposedState:
+        context.knownFacts?.proposedState ||
+        resume.entities?.proposedState ||
+        null,
+      state: context.knownFacts?.state || null
+    };
     structured.contextPatch = {
-      currentStage: STAGES.QUALIFICATION,
+      currentStage:
+        resume.lastQuestionAsked === "ask_authorization" ||
+        resume.lastQuestionAsked === "ask_state" ||
+        resume.lastQuestionAsked === "confirm_location" ||
+        resume.lastQuestionAsked === "ask_city"
+          ? STAGES.QUALIFICATION
+          : context.currentStage || STAGES.QUALIFICATION,
       conversation: {
-        lastQuestionAsked: "ask_location",
+        lastQuestionAsked: resume.lastQuestionAsked,
         lastProspectIntent: INTENTS.GREETING
       }
     };

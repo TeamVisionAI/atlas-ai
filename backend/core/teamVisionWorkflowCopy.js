@@ -14,10 +14,22 @@ function getCanonicalOfficeAddress() {
 /** @deprecated Prefer getCanonicalOfficeAddress(); kept for call-site compatibility. */
 const OFFICE_ADDRESS = getCanonicalOfficeAddress();
 
+/**
+ * Implements BR-131 — natural greeting + one next qualification ask.
+ * Location remains the next needed fact for a blank recruiting lead; do not
+ * use this as a deflection when the prospect asked a substantive FAQ first.
+ */
 function getFirstMessage(language) {
   return language === "es"
-    ? "Hola, ¿en qué ciudad y estado vives?"
-    : "Hi! What city and state do you live in?";
+    ? "¡Hola! Gracias por escribirnos. ¿En qué ciudad y estado vives?"
+    : "Hi! Thanks for reaching out. What city and state do you live in?";
+}
+
+/** Greeting acknowledgement only (no stacked questions). */
+function getNaturalGreetingAck(language) {
+  return language === "es"
+    ? "¡Hola! Gracias por escribirnos."
+    : "Hi! Thanks for reaching out.";
 }
 
 function getStateQuestion(city, language, options = {}) {
@@ -111,24 +123,21 @@ function getCanonicalFaqAnswer(language) {
 }
 
 /**
- * BR-097 — first-level overview only. Do not volunteer salary/experience/license
- * caveats until the prospect asks those specifics.
+ * BR-097 / BR-131 — concise human overview. Answer the ask; light compliance only.
+ * Soft continuation question is appended by FAQ resume (one next missing fact).
  */
 function getJobOverviewFaqAnswer(language) {
   return language === "es"
-    ? "Es una oportunidad en servicios financieros. Te explicamos todos los detalles en la entrevista."
-    : "It's an opportunity in financial services. We'll explain all the details during the interview.";
+    ? "Es una oportunidad en servicios financieros: ayudas a familias con protección y planificación, con entrenamiento incluido. No es un empleo por hora garantizado."
+    : "It's an opportunity in financial services — you help families with protection and planning, and training is included. It's not a guaranteed hourly job.";
 }
 
-/** BR-088 — job/employment/opportunity (not a guaranteed salaried/hourly job). */
+/** BR-088 — explicit employment-framing ask (job/salaried/hourly). */
 function getJobOpportunityFaqAnswer(language) {
-  return (
-    findFAQ("is this a job", language === "es" ? "es" : "en") ||
-    findFAQ("what is the job", language === "es" ? "es" : "en") ||
-    (language === "es"
-      ? "Es una oportunidad en servicios financieros (asesoría y distribución), no un empleo asalariado u por hora garantizado. No se requiere experiencia; en la entrevista te explican cómo funciona para que decidas si te conviene."
-      : "This is an opportunity in financial services (advisory and distribution), not a guaranteed salaried or hourly job. No experience is required; during the interview you'll learn how it works so you can decide if it's a good fit.")
-  );
+  // Prefer concise Atlas copy over stale FAQ-catalog deferrals.
+  return language === "es"
+    ? "Es una oportunidad en servicios financieros (asesoría y distribución), no un empleo asalariado u por hora garantizado. No se requiere experiencia previa."
+    : "This is an opportunity in financial services (advisory and distribution), not a guaranteed salaried or hourly job. No prior experience is required.";
 }
 
 function getInsuranceFaqAnswer(language) {
@@ -338,6 +347,7 @@ module.exports = {
   OFFICE_ADDRESS,
   getCanonicalOfficeAddress,
   getFirstMessage,
+  getNaturalGreetingAck,
   getStateQuestion,
   getAuthorizationQuestion,
   getAuthorizationDeniedMessage,
