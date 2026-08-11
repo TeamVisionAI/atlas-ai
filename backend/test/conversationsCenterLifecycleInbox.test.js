@@ -14,33 +14,35 @@ const path = require("node:path");
 const TEAM_VISION = "00000000-0000-4000-8000-000000000001";
 const NIOVEL = "33ad243a-9d00-4a4d-810b-df2762c0f076";
 
-const WORKFLOW_FILE = path.join(__dirname, "../data/workflowState.json");
 const AGENT_FILE = path.join(__dirname, "../data/agentActionState.json");
 
 async function withTempStores(run) {
-  const prevWorkflow = fs.existsSync(WORKFLOW_FILE)
-    ? fs.readFileSync(WORKFLOW_FILE, "utf8")
-    : null;
+  const previousWorkflowEnv = process.env.ATLAS_WORKFLOW_STATE_FILE;
+  const tempDir = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "atlas-cc-life-"));
+  const tempWorkflow = path.join(tempDir, "workflowState.json");
+  fs.writeFileSync(tempWorkflow, "{}");
+  process.env.ATLAS_WORKFLOW_STATE_FILE = tempWorkflow;
+
   const prevAgent = fs.existsSync(AGENT_FILE)
     ? fs.readFileSync(AGENT_FILE, "utf8")
     : null;
-
-  fs.mkdirSync(path.dirname(WORKFLOW_FILE), { recursive: true });
-  fs.writeFileSync(WORKFLOW_FILE, "{}");
+  fs.mkdirSync(path.dirname(AGENT_FILE), { recursive: true });
   fs.writeFileSync(AGENT_FILE, "{}");
 
   try {
     return await run();
   } finally {
-    if (prevWorkflow == null) {
-      try {
-        fs.unlinkSync(WORKFLOW_FILE);
-      } catch {
-        /* ignore */
-      }
+    if (previousWorkflowEnv === undefined) {
+      delete process.env.ATLAS_WORKFLOW_STATE_FILE;
     } else {
-      fs.writeFileSync(WORKFLOW_FILE, prevWorkflow);
+      process.env.ATLAS_WORKFLOW_STATE_FILE = previousWorkflowEnv;
     }
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+
     if (prevAgent == null) {
       try {
         fs.unlinkSync(AGENT_FILE);
