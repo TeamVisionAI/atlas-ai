@@ -1,6 +1,9 @@
 import ActionCard from "../design-system/ActionCard";
 import MissionActionInlineForm from "./MissionActionInlineForm";
-import { resolvesToInlineForm, isImmediateMissionAction } from "./missionActionFormRegistry";
+import {
+  resolvesToInlineForm,
+  isImmediateMissionAction
+} from "./missionActionFormRegistry";
 import "./ExpandableMissionActionCard.css";
 
 export default function ExpandableMissionActionCard({
@@ -28,7 +31,7 @@ export default function ExpandableMissionActionCard({
   onQualificationDraftChange,
   onCancel
 }) {
-  const resolvedFormType = formType ?? resolvesToInlineForm(action.id, mission);
+  const resolvedFormType = formType || resolvesToInlineForm(action.id, mission);
 
   function handleHeaderClick() {
     if (isImmediateMissionAction(action.id)) {

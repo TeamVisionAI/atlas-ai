@@ -5,7 +5,10 @@ import ConversationOutcomeSection from "./ConversationOutcomeSection";
 import SchedulingForm, { isSchedulingFormValid } from "./SchedulingForm";
 import { isSchedulingSubmitBlocked, resolveProspectEmail } from "../../utils/prospectEmail";
 import MissionSemanticSection from "./MissionSemanticSection";
-import { INLINE_FORM_TYPES } from "./missionActionFormRegistry";
+import {
+  INLINE_FORM_TYPES,
+  resolvesToInlineForm
+} from "./missionActionInlineFormResolver";
 import { resolveInterviewOutcomeGate } from "./interviewOutcomeGateModel";
 import { useSchedulingFormController } from "./useSchedulingFormController";
 import "./MissionActionInlineForm.css";
@@ -147,11 +150,21 @@ export default function MissionActionInlineForm({
   onQualificationDraftChange,
   onCancel
 }) {
-  if (!formType) {
-    return <MissionActionFormDiagnostic actionId={actionId} formType={formType} translate={translate} />;
+  // Defensive re-resolve: parent may pass null if an older chunk / raw-id mismatch
+  // left formType unset while actionId is still close_not_interested.
+  const effectiveFormType = formType || resolvesToInlineForm(actionId, mission);
+
+  if (!effectiveFormType) {
+    return (
+      <MissionActionFormDiagnostic
+        actionId={actionId}
+        formType={effectiveFormType}
+        translate={translate}
+      />
+    );
   }
 
-  if (formType === INLINE_FORM_TYPES.SCHEDULING) {
+  if (effectiveFormType === INLINE_FORM_TYPES.SCHEDULING) {
     return (
       <MissionActionSchedulingForm
         active={active}
@@ -169,7 +182,7 @@ export default function MissionActionInlineForm({
     );
   }
 
-  if (formType === INLINE_FORM_TYPES.INTERVIEW_OUTCOME) {
+  if (effectiveFormType === INLINE_FORM_TYPES.INTERVIEW_OUTCOME) {
     const resolvedGate = resolveInterviewOutcomeGate({
       workflowGate,
       rawWorkflowGate,
@@ -198,12 +211,12 @@ export default function MissionActionInlineForm({
     );
   }
 
-  if (formType === INLINE_FORM_TYPES.QUALIFICATION) {
+  if (effectiveFormType === INLINE_FORM_TYPES.QUALIFICATION) {
     if (!conversationOutcome?.requiredInputs?.length) {
       return (
         <MissionActionFormDiagnostic
           actionId={actionId || "qualification"}
-          formType={formType}
+          formType={effectiveFormType}
           translate={translate}
         />
       );
@@ -230,7 +243,7 @@ export default function MissionActionInlineForm({
     );
   }
 
-  if (formType === INLINE_FORM_TYPES.CLOSE_NOT_INTERESTED) {
+  if (effectiveFormType === INLINE_FORM_TYPES.CLOSE_NOT_INTERESTED) {
     return (
       <div className="mission-action-inline-form mission-action-inline-form--close">
         <MissionSemanticSection variant="outcome">
@@ -254,5 +267,11 @@ export default function MissionActionInlineForm({
     );
   }
 
-  return <MissionActionFormDiagnostic actionId={actionId} formType={formType} translate={translate} />;
+  return (
+    <MissionActionFormDiagnostic
+      actionId={actionId}
+      formType={effectiveFormType}
+      translate={translate}
+    />
+  );
 }
