@@ -372,7 +372,18 @@ Operational milestones (`Pending IBA`, `Orientation Scheduled`, `Application Pen
 | **Follow Up Needed** | Continues follow-up workflow |
 | **Rescheduled** | Continues appointment scheduling workflow |
 | **No Show** | Continues no-show recovery workflow |
-| **Not Interested** | Continues objection / nurture workflow |
+| **Not Interested** | Closes interview operational work; advances to **CLOSED**; excluded from default Mission Control / Prospect Center operational queue |
+
+### Mission Control default queue (terminal close)
+
+Default Mission Control / Prospect Center / latest navigation must show unresolved operational work only:
+
+1. **Exclude from default queue:** `CLOSED` / `DO_NOT_CONTACT` milestones and terminal closed outcomes (`Not Interested`, `Not Qualified`, and other closed catalog outcomes). Prefer durable `workflow_state.canonicalMilestone`, recorded agent outcome, then durable appointment `outcome=not_interested` when ephemeral agent state was wiped.
+2. **Remain in queue when still actionable:** `No Show`, `Follow Up Needed`, `Rescheduled` / reschedule flows.
+3. **Leave interview-result work, keep post-interview tracks:** `Recruited` → licensing/orientation workflow may remain visible; `Became Client` → client workflow may remain visible. They must not linger as pending interview-result work.
+4. **Do not invent a new close flag.** Appointment Completed history remains under Appointments Completed.
+5. **Meta-safe:** Do not change Meta Review demo visibility rules (BR-136 posture for `META_REVIEW` subjects).
+6. **Conversations CLOSED / BR-136 TEST filtering unchanged.**
 
 ---
 
