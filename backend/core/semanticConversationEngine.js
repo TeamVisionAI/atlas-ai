@@ -441,12 +441,6 @@ async function completeInterview(prospect, profile, language, options = {}) {
     };
   }
 
-  // Conversation scheduling already reserved capacity with interview-type key; release before canonical booking.
-  capacityEngine.releaseSlotByIso(
-    prospect.appointment_date,
-    profile.interviewType || prospect.interview_type || schedulePayload.interviewType
-  );
-
   const organizationId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
   const resolvedAgent = await autonomousScheduleAgentResolver.resolveAutonomousScheduleAgentId({
     prospect,
@@ -465,6 +459,41 @@ async function completeInterview(prospect, profile, language, options = {}) {
       humanAssist: true
     };
   }
+
+  // BR-114 cohort + BR-111: speak-only canary must not CE-create before capacity/Calendar mutation.
+  const {
+    evaluateLegacyCeAppointmentMutation,
+    buildDeferredMutationDeniedReply,
+    DENY_REASON: CE_MUTATION_DENIED,
+    DENY_STAGE: CE_MUTATION_DENIED_STAGE
+  } = require("./recruitAiV2/legacyCeAppointmentMutationGate");
+  const emitStageEarly = options.logStage || logWhatsAppStage;
+  const mutationGate = evaluateLegacyCeAppointmentMutation({
+    organizationId,
+    actingUserId: prospect.owner_user_id || agentId,
+    env: options.env || process.env
+  });
+  if (!mutationGate.allowed) {
+    emitStageEarly(CE_MUTATION_DENIED_STAGE, {
+      phone: prospect.phone,
+      organizationId,
+      agentId,
+      reason: mutationGate.reason || CE_MUTATION_DENIED,
+      executionDenyReason: mutationGate.executionDenyReason || null
+    });
+    return {
+      success: false,
+      reply: buildDeferredMutationDeniedReply(language),
+      humanAssist: true,
+      reason: mutationGate.reason || CE_MUTATION_DENIED
+    };
+  }
+
+  // Conversation scheduling already reserved capacity with interview-type key; release before canonical booking.
+  capacityEngine.releaseSlotByIso(
+    prospect.appointment_date,
+    profile.interviewType || prospect.interview_type || schedulePayload.interviewType
+  );
 
   // Stamp ownership for autonomous WhatsApp leads so appointments and UI stay tenant-scoped.
   if (!prospect.owner_user_id) {

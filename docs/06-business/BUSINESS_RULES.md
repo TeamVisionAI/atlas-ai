@@ -1179,8 +1179,8 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Depends on:** BR-049, BR-050, BR-075, BR-079, BR-080, BR-081, BR-107, BR-108, BR-111, BR-112  
 **Related:** BR-113 attribution remains for booking attempts; shadow/advisory never author live  
 **Status:** Implemented in code; **live authoring OFF** and **execution OFF** in production  
-**Engine target:** `recruitAiV2/liveAuthoringConfig.js`; `liveAuthoringBridge.js`; `communicationHub.processNormalizedInboundMessage`  
-**Tests:** `backend/test/recruitAiV2LiveAuthoringBr114.test.js`  
+**Engine target:** `recruitAiV2/liveAuthoringConfig.js`; `liveAuthoringBridge.js`; `legacyCeAppointmentMutationGate.js`; `communicationHub.processNormalizedInboundMessage`; `semanticConversationEngine.completeInterview`  
+**Tests:** `backend/test/recruitAiV2LiveAuthoringBr114.test.js`; `backend/test/legacyCeAppointmentMutationGateAuthoringCanary.test.js`  
 **Docs:** `docs/03-engineering/recruit-ai-v2/40_LIVE_AUTHORING_CUTOVER.md`
 
 ### Rules
@@ -1192,9 +1192,10 @@ Production outside-window messaging requires firm-approved Meta templates config
 5. **Canonical transport only** — Exactly one outbound via existing `sendAndPersistWhatsAppMessage`. No v2 WhatsApp sender.
 6. **Durable context continuity** — Live authoring loads/persists `recruit_ai_conversation_contexts` so every relevant turn (including name/email) continues the same scheduling flow — never an isolated late-stage message.
 7. **Canonical availability + timezone** — Offers use Sprint 22 `getSlots` / RVP `appointmentProfile` with BR-079/BR-050 wall-clock→UTC conversion. Legacy Mon–Fri-only `buildOfferedTimes` must not author canary scheduling offers. Org office hours must not truncate personal evening/weekend availability.
-8. **Fallback only on technical failure** — Valid v2 decisions (including `clarify_once`) remain v2-owned. Throw/timeout/empty/unsafe text may fall through to legacy CE once.
-9. **Shadow/advisory never author live** — Post-live advisory remains non-authoring.
-10. **Boundaries** — Do not enable Railway authoring/execution vars in this implementation sprint. Do not cut all users to v2. Do not redesign BR-049/050/111.
+8. **Fallback only on technical failure** — Valid v2 decisions (including `clarify_once`) remain v2-owned. Throw/timeout/empty/unsafe text may fall through to legacy CE once for **conversation only**.
+9. **CE fallthrough respects BR-111** — For the LIVE_AUTHORING allowlisted org+acting user, legacy CE may converse and reach interview-ready/scheduling language, but MUST NOT create/reschedule/cancel appointments (no Calendar / `atlas_appointments` / `executeScheduleInterview`) while BR-111 execution eligibility is unauthorized. Gate: `legacyCeAppointmentMutationGate` inside `completeInterview` before capacity release. Outside the authoring cohort, legacy CE scheduling is unchanged. When BR-111 later authorizes the same org+user, CE mutation may proceed again.
+10. **Shadow/advisory never author live** — Post-live advisory remains non-authoring.
+11. **Boundaries** — Do not enable Railway authoring/execution vars in this implementation sprint. Do not cut all users to v2. Do not redesign BR-049/050/111.
 
 ---
 
@@ -1784,7 +1785,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **Fail-closed live flag** — absent / malformed → live path disabled → `allowExecution` stays false from the live bridge.
 3. **Live CE only** — `resolveAllowExecutionForLiveTurn` returns true only for `invocationSource === "live_ce"`. Shadow / advisory / playground must never request allowExecution.
 4. **Booking-site intercept** — Bridge runs inside `completeInterview` before CE's direct `executeScheduleInterview`. On v2 execution success, CE uses the canonical mission result and still builds WhatsApp confirmation via `buildPersistedAppointmentConfirmation` (no v2 WhatsApp send).
-5. **Fall-through safety** — If live path is off, or v2 does not successfully execute, CE continues its existing booking path (non-canary behavior unchanged).
+5. **Fall-through safety** — If live path is off, or v2 does not successfully execute, CE may continue its existing booking path **only when mutation is authorized**. For the BR-114 LIVE_AUTHORING cohort while BR-111 execution is unauthorized, CE fallthrough is conversational only (no `executeScheduleInterview` / Calendar / `atlas_appointments` write). Non–LIVE_AUTHORING cohorts keep prior CE booking behavior.
 6. **No hard-coded canary UUIDs in permission logic** — Exact org/user remain BR-111 env allowlists.
 7. **Boundaries** — Do not set Railway live-path or execution vars in this sprint. Do not cut all conversation routing to v2. Do not redesign BR-049/050/111.
 

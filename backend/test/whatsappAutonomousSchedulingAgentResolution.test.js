@@ -260,7 +260,9 @@ test("9. failed persistence path does not claim success or expose diagnostics", 
         })
       },
       { interviewType: "In Person", preferredTime: "Monday at 5:15 PM" },
-      "en"
+      "en",
+      // Keep legacy CE booking path under test (not LIVE_AUTHORING speak-only canary).
+      { env: { RECRUIT_AI_V2_LIVE_AUTHORING_ENABLED: "false" } }
     );
 
     assert.equal(result.success, false);
@@ -321,7 +323,8 @@ test("10. successful persistence returns appointment id and stamps owner", async
         })
       },
       { interviewType: "In Person", preferredTime: "Monday at 5:15 PM" },
-      "en"
+      "en",
+      { env: { RECRUIT_AI_V2_LIVE_AUTHORING_ENABLED: "false" } }
     );
 
     assert.equal(result.success, true);
