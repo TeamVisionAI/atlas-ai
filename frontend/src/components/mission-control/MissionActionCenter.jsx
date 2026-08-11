@@ -37,7 +37,7 @@ export default function MissionActionCenter({
   const actions = useMemo(
     () =>
       filterMissionActionsForInterviewWorkflow(
-        buildMissionActionList(mission, conversationOutcome, translate),
+        buildMissionActionList(mission, conversationOutcome, translate, workflowGate),
         workflowGate
       ),
     [mission, conversationOutcome, translate, workflowGate]

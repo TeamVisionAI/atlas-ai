@@ -131,15 +131,23 @@ function hasPendingRequiredInformation(conversationOutcome) {
   return (conversationOutcome?.requiredInputs || []).length > 0;
 }
 
-const RECRUITER_PROGRESSION_FIELDS = new Set(["dayPart", "schedule", "name", "email"]);
+const QUALIFICATION_FACT_FIELDS = new Set([
+  "city",
+  "state",
+  "authorization",
+  "interviewType"
+]);
 
 function hasIncompleteQualification({ brain, conversationOutcome }) {
+  // Prefer conversationOutcome.requiredInputs (Mission Control form SoR).
   if (hasPendingRequiredInformation(conversationOutcome)) {
     return true;
   }
 
+  // Desync guard — capturable facts still listed by brain when form inputs are empty.
+  // Occupation is excluded (BR-123). dayPart/schedule/name/email are progression fields.
   const missingFields = brain?.missingFields || [];
-  return missingFields.some((field) => !RECRUITER_PROGRESSION_FIELDS.has(field));
+  return missingFields.some((field) => QUALIFICATION_FACT_FIELDS.has(field));
 }
 
 function buildMissingInformationSummary({ brain, conversationOutcome }) {
@@ -393,8 +401,8 @@ function buildCompleteQualificationMission(context, createdAt) {
 
   const primaryActionId = resolvePrimaryActionId(
     availableActions,
-    [ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.NOTES],
-    ACTION_IDS.WHATSAPP
+    [ACTION_IDS.COMPLETE_QUALIFICATION, ACTION_IDS.WHATSAPP, ACTION_IDS.CALL, ACTION_IDS.NOTES],
+    ACTION_IDS.COMPLETE_QUALIFICATION
   );
 
   return buildMissionSkeleton({

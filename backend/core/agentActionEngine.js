@@ -310,6 +310,21 @@ function resolveAvailableActions({
     ).slice(0, MAX_VISIBLE_ACTIONS);
   }
 
+  // Implements BR-025 / BR-026 — QUALIFYING must expose executable resolve actions, not
+  // communication-only placeholders (Mission Action Center filters Call/WhatsApp/Notes).
+  if (milestone === MILESTONES.QUALIFYING) {
+    pushAction(actions, ACTION_IDS.COMPLETE_QUALIFICATION, "primary");
+    pushAction(actions, ACTION_IDS.CLOSE_NOT_INTERESTED, "secondary");
+
+    return enforceSinglePrimary(
+      applyCommunicationPriority(actions, {
+        milestone,
+        timing,
+        agentState
+      })
+    ).slice(0, MAX_VISIBLE_ACTIONS);
+  }
+
   const scheduleReady = isSchedulingReady(missingFields, currentStep);
   const confirmed = isConfirmedProspect(prospect, currentStep);
 

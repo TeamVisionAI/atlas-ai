@@ -1,6 +1,7 @@
 import AtlasButton from "../ui/AtlasButton";
 import WorkflowGatePanel from "../WorkflowGatePanel";
 import QualificationForm from "./QualificationForm";
+import ConversationOutcomeSection from "./ConversationOutcomeSection";
 import SchedulingForm, { isSchedulingFormValid } from "./SchedulingForm";
 import { isSchedulingSubmitBlocked, resolveProspectEmail } from "../../utils/prospectEmail";
 import MissionSemanticSection from "./MissionSemanticSection";
@@ -8,6 +9,8 @@ import { INLINE_FORM_TYPES } from "./missionActionFormRegistry";
 import { resolveInterviewOutcomeGate } from "./interviewOutcomeGateModel";
 import { useSchedulingFormController } from "./useSchedulingFormController";
 import "./MissionActionInlineForm.css";
+
+const PRE_INTERVIEW_CLOSE_OUTCOMES = Object.freeze(["Not Interested"]);
 
 function MissionActionFormDiagnostic({ actionId, formType, translate }) {
   return (
@@ -216,6 +219,30 @@ export default function MissionActionInlineForm({
             inline
             onSaved={onQualificationSaved}
             onDraftActiveChange={onQualificationDraftChange}
+          />
+        </MissionSemanticSection>
+        <div className="mission-action-inline-form__actions">
+          <AtlasButton variant="ghost" onClick={onCancel} disabled={submitting}>
+            {translate("missionExecutionCancel")}
+          </AtlasButton>
+        </div>
+      </div>
+    );
+  }
+
+  if (formType === INLINE_FORM_TYPES.CLOSE_NOT_INTERESTED) {
+    return (
+      <div className="mission-action-inline-form mission-action-inline-form--close">
+        <MissionSemanticSection variant="outcome">
+          <ConversationOutcomeSection
+            phone={phone}
+            conversationOutcome={conversationOutcome}
+            disabled={submitting}
+            onSaved={onQualificationSaved}
+            allowedOutcomes={PRE_INTERVIEW_CLOSE_OUTCOMES}
+            defaultOutcome="Not Interested"
+            title={translate("missionActionCloseNotInterested")}
+            description={translate("missionActionCloseNotInterestedDescription")}
           />
         </MissionSemanticSection>
         <div className="mission-action-inline-form__actions">

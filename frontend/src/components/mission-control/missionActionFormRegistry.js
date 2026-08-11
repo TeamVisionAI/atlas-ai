@@ -4,7 +4,8 @@ import { isPanelCommunicationAction } from "../../engines/communicationActionEng
 export const INLINE_FORM_TYPES = {
   SCHEDULING: "scheduling",
   INTERVIEW_OUTCOME: "interview_outcome",
-  QUALIFICATION: "qualification"
+  QUALIFICATION: "qualification",
+  CLOSE_NOT_INTERESTED: "close_not_interested"
 };
 
 const SCHEDULING_ACTIONS = new Set(["schedule", "reschedule"]);
@@ -19,6 +20,13 @@ const INTERVIEW_OUTCOME_ACTIONS = new Set([
 const INTERVIEW_OUTCOME_MISSION_TYPES = new Set([
   "EnterInterviewOutcome",
   "UpdateOutcome"
+]);
+
+const PRE_INTERVIEW_CLOSE_MISSION_TYPES = new Set([
+  "CompleteQualification",
+  "CallProspect",
+  "ReviewProspect",
+  "ScheduleInterview"
 ]);
 
 export function normalizeMissionActionId(actionId, mission) {
@@ -65,14 +73,19 @@ export function resolvesToInlineForm(actionId, mission = null) {
     return INLINE_FORM_TYPES.QUALIFICATION;
   }
 
+  if (normalizedId === "close_not_interested") {
+    return INLINE_FORM_TYPES.CLOSE_NOT_INTERESTED;
+  }
+
   if (
     mission?.missionType === "CompleteQualification" &&
     normalizedId === mission?.primaryAction?.id &&
     normalizedId !== "whatsapp" &&
     normalizedId !== "notes" &&
-    normalizedId !== "call"
+    normalizedId !== "call" &&
+    normalizedId !== "close_not_interested"
   ) {
-    return null;
+    return INLINE_FORM_TYPES.QUALIFICATION;
   }
 
   return null;
@@ -82,10 +95,45 @@ export function isImmediateMissionAction(actionId) {
   return isWhatsAppCopyAction(actionId);
 }
 
+function shouldExposeQualificationAction(_mission, conversationOutcome) {
+  return (conversationOutcome?.requiredInputs || []).length > 0;
+}
+
+function shouldExposePreInterviewClose(mission, conversationOutcome, workflowGate) {
+  if (workflowGate?.active) {
+    return false;
+  }
+
+  if (INTERVIEW_OUTCOME_MISSION_TYPES.has(mission?.missionType)) {
+    return false;
+  }
+
+  if (conversationOutcome?.recordedOutcome) {
+    const label = String(
+      conversationOutcome.recordedOutcome.label || conversationOutcome.recordedOutcome.key || ""
+    ).toLowerCase();
+
+    if (label.includes("not interested")) {
+      return false;
+    }
+  }
+
+  if ((conversationOutcome?.requiredInputs || []).length > 0) {
+    return true;
+  }
+
+  if (PRE_INTERVIEW_CLOSE_MISSION_TYPES.has(mission?.missionType)) {
+    return true;
+  }
+
+  return mission?.workflowState?.canonicalMilestone === "QUALIFICATION";
+}
+
 /**
- * Builds the mission action list, injecting qualification when required fields remain.
+ * Builds the mission action list, injecting qualification + pre-interview close when needed.
+ * Implements BR-025 / BR-026 / BR-044 terminal Not Interested for QUALIFYING.
  */
-export function buildMissionActionList(mission, conversationOutcome, translate) {
+export function buildMissionActionList(mission, conversationOutcome, translate, workflowGate = null) {
   const actions = [];
   const seen = new Set();
 
@@ -98,12 +146,19 @@ export function buildMissionActionList(mission, conversationOutcome, translate) 
     actions.push(action);
   }
 
-  const requiredInputs = conversationOutcome?.requiredInputs || [];
+  const exposeQualification = shouldExposeQualificationAction(mission, conversationOutcome);
 
-  if (requiredInputs.length > 0) {
+  if (exposeQualification) {
     addAction({
       id: "qualification",
       label: translate("missionActionQualification")
+    });
+  }
+
+  if (shouldExposePreInterviewClose(mission, conversationOutcome, workflowGate)) {
+    addAction({
+      id: "close_not_interested",
+      label: translate("missionActionCloseNotInterested")
     });
   }
 
@@ -125,7 +180,11 @@ export function buildMissionActionList(mission, conversationOutcome, translate) 
     }
 
     if (action.id === "qualification") {
-      return requiredInputs.length > 0;
+      return exposeQualification;
+    }
+
+    if (action.id === "close_not_interested") {
+      return true;
     }
 
     return true;

@@ -14,6 +14,8 @@ const ACTION_IDS = Object.freeze({
   SEND_MISSED_APPOINTMENT: "send_missed_appointment",
   LOG_WHATSAPP_OPEN: "log_whatsapp_open",
   ENTER_INTERVIEW_OUTCOME: "enter_interview_outcome",
+  COMPLETE_QUALIFICATION: "qualification",
+  CLOSE_NOT_INTERESTED: "close_not_interested",
   ESCALATE_TO_RECRUITER: "escalate_to_recruiter"
 });
 
@@ -28,6 +30,8 @@ const AGENT_ACTION_METADATA = Object.freeze({
   [ACTION_IDS.SEND_MISSED_APPOINTMENT]: { label: "Send missed appointment follow-up" },
   [ACTION_IDS.LOG_WHATSAPP_OPEN]: { label: "Continue on WhatsApp" },
   [ACTION_IDS.ENTER_INTERVIEW_OUTCOME]: { label: "Record outcome" },
+  [ACTION_IDS.COMPLETE_QUALIFICATION]: { label: "Complete Qualification" },
+  [ACTION_IDS.CLOSE_NOT_INTERESTED]: { label: "Close — Not Interested" },
   [ACTION_IDS.ESCALATE_TO_RECRUITER]: { label: "Escalate to recruiter" }
 });
 
