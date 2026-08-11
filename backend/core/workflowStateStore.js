@@ -2,6 +2,10 @@
  * Sprint 8A.1 — Workflow ownership and milestone persistence.
  * Stores per-prospect workflow state in backend/data/workflowState.json
  * (same pattern as agentActionState.json). Read/write only — no conversation side effects.
+ *
+ * Soft Conversations Center inbox fields (inboxArchivedAt / inboxClosedAt /
+ * inboxCloseReason / inboxMarkedTestAt) must survive unrelated ownership /
+ * milestone / stall writes unless an explicit Restore clears them.
  */
 
 const fs = require("fs");
@@ -12,9 +16,19 @@ const {
   formatPhoneForStorage
 } = require("./phoneNormalizer");
 
-const STATE_FILE =
-  process.env.ATLAS_WORKFLOW_STATE_FILE ||
-  path.join(__dirname, "../data/workflowState.json");
+const DEFAULT_STATE_FILE = path.join(__dirname, "../data/workflowState.json");
+
+/** Soft inbox presentation fields — preserve unless patch explicitly sets them. */
+const SOFT_INBOX_FIELDS = Object.freeze([
+  "inboxArchivedAt",
+  "inboxClosedAt",
+  "inboxCloseReason",
+  "inboxMarkedTestAt"
+]);
+
+function getStateFile() {
+  return process.env.ATLAS_WORKFLOW_STATE_FILE || DEFAULT_STATE_FILE;
+}
 
 function defaultWorkflowRecord() {
   return {
@@ -95,19 +109,23 @@ function candidateWorkflowKeys(phone) {
 
 function readStore() {
   try {
-    if (!fs.existsSync(STATE_FILE)) {
+    const file = getStateFile();
+    if (!fs.existsSync(file)) {
       return {};
     }
 
-    return JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+    return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {
     return {};
   }
 }
 
 function writeStore(store) {
-  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(store, null, 2));
+  const file = getStateFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
+  fs.renameSync(tmp, file);
 }
 
 function resolveStoredRecord(store, phone) {
@@ -119,6 +137,31 @@ function resolveStoredRecord(store, phone) {
     }
   }
   return merged;
+}
+
+/** Drop undefined so spreads cannot silently wipe soft/owned fields via JSON omit. */
+function sanitizeWorkflowPatch(patch = {}) {
+  const clean = {};
+  for (const [key, value] of Object.entries(patch || {})) {
+    if (value !== undefined) {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
+
+/**
+ * Soft inbox flags survive unrelated writes.
+ * Explicit `null` in patch (Restore) still clears.
+ */
+function preserveSoftInboxFields(baseRecord, cleanPatch, next) {
+  const out = { ...next };
+  for (const field of SOFT_INBOX_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(cleanPatch, field)) {
+      out[field] = baseRecord[field] ?? null;
+    }
+  }
+  return out;
 }
 
 function loadPersistedWorkflowState(phone) {
@@ -146,31 +189,44 @@ function savePersistedWorkflowState(phone, patch) {
     return defaultWorkflowRecord();
   }
 
-  const store = readStore();
+  const cleanPatch = sanitizeWorkflowPatch(patch);
   const key = workflowStateKey(phone) || String(phone).trim();
+
+  // Pass 1 — merge against current disk view.
+  const store = readStore();
   const current = {
     ...defaultWorkflowRecord(),
     ...resolveStoredRecord(store, phone)
   };
 
-  const next = {
+  let next = {
     ...current,
-    ...patch,
-    workflowOwnership: patch.workflowOwnership
-      ? normalizeOwnership(patch.workflowOwnership)
+    ...cleanPatch,
+    workflowOwnership: cleanPatch.workflowOwnership
+      ? normalizeOwnership(cleanPatch.workflowOwnership)
       : current.workflowOwnership
   };
+  next = preserveSoftInboxFields(current, cleanPatch, next);
 
-  store[key] = next;
+  // Pass 2 — re-read soft flags so concurrent ownership/stall writers cannot
+  // clobber an inbox TEST/CLOSED/ARCHIVED mark that landed between reads.
+  const latestStore = readStore();
+  const latest = {
+    ...defaultWorkflowRecord(),
+    ...resolveStoredRecord(latestStore, phone)
+  };
+  next = preserveSoftInboxFields(latest, cleanPatch, next);
+
+  latestStore[key] = next;
 
   // Collapse alias keys so inbound storagePhone (+E.164) always sees TAKE OVER.
   for (const alias of candidateWorkflowKeys(phone)) {
-    if (alias !== key && store[alias]) {
-      delete store[alias];
+    if (alias !== key && latestStore[alias]) {
+      delete latestStore[alias];
     }
   }
 
-  writeStore(store);
+  writeStore(latestStore);
   return next;
 }
 
@@ -205,6 +261,7 @@ function resolveWorkflowState(phone, computed) {
       initializedAt: new Date().toISOString(),
       manualAgentOwnership: persisted.manualAgentOwnership,
       doNotContact: persisted.doNotContact
+      // Soft inbox fields intentionally omitted — preserveSoftInboxFields keeps them.
     });
   }
 
@@ -242,7 +299,10 @@ function deletePersistedWorkflowState(phone) {
 }
 
 module.exports = {
+  SOFT_INBOX_FIELDS,
   defaultWorkflowRecord,
+  sanitizeWorkflowPatch,
+  preserveSoftInboxFields,
   workflowStateKey,
   candidateWorkflowKeys,
   loadPersistedWorkflowState,
