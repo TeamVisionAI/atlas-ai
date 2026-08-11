@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { getOrganizationSettings } from "../services/organizationService";
@@ -35,6 +35,11 @@ import {
   getNextPriorityProspect,
   getQueueNeighbors
 } from "../engines/queueEngine";
+import {
+  isTerminalMissionControlCloseResult,
+  resolvePostTerminalCloseQueueSelection,
+  shouldSuppressOperationalMissionActions
+} from "../engines/missionControlTerminalCloseNavigation";
 import {
   createDefaultWorkflowState,
   saveWorkflowState
@@ -209,7 +214,7 @@ export default function Dashboard() {
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
     if (!queueItems?.length) {
-      return;
+      return false;
     }
 
     setProspectLoading(true);
@@ -221,16 +226,17 @@ export default function Dashboard() {
 
       if (!loaded) {
         setLoadError({ key: "missionControlNoQueue" });
-        return;
+        return false;
       }
 
       setWorkspace(loaded.adapted);
       setCurrentIndex(loaded.index);
       setWorkflowComplete(null);
+      return true;
     } catch (err) {
       if (isMissionControlAccessDenied(err)) {
         setLoadError({ key: "missionControlLoadError" });
-        return;
+        return false;
       }
 
       console.error(err);
@@ -239,6 +245,7 @@ export default function Dashboard() {
           ? { key: "missionControlLoadError" }
           : { key: "missionControlProspectLoadError" }
       );
+      return false;
     } finally {
       setProspectLoading(false);
     }
@@ -414,6 +421,98 @@ export default function Dashboard() {
     return { dashboardData, sortedQueue };
   }, [executiveFilter]);
 
+  /**
+   * BR-044 post-save consistency — leave terminal-closed prospects out of default MC.
+   * Reloads authoritative queue, then selects the next eligible prospect (or empty state).
+   */
+  const advancePastTerminalClosedProspect = useCallback(
+    async (closedPhone, priorIndex = currentIndex) => {
+      setExpandedMissionActionId(null);
+      setExecutionError(null);
+      setPrimaryMission(null);
+      setWorkflowComplete(null);
+
+      const { dashboardData, sortedQueue } = await reloadMissionControlQueue();
+      const selection = resolvePostTerminalCloseQueueSelection({
+        sortedQueue,
+        closedPhone,
+        priorIndex
+      });
+
+      if (selection.empty) {
+        setQueue([]);
+        setWorkspace(null);
+        setCurrentIndex(0);
+        setLoadError({ key: "missionControlNoQueue" });
+        return { empty: true };
+      }
+
+      setLoadError(null);
+      setQueue(selection.eligibleQueue);
+
+      const loaded = await loadProspectAtIndex(
+        selection.nextIndex,
+        selection.eligibleQueue,
+        dashboardData
+      );
+
+      if (!loaded) {
+        setWorkspace(null);
+        setCurrentIndex(0);
+        setLoadError({ key: "missionControlNoQueue" });
+        return { empty: true };
+      }
+
+      return { empty: false, phone: selection.nextPhone };
+    },
+    [currentIndex, reloadMissionControlQueue, loadProspectAtIndex]
+  );
+
+  const terminalCloseNavRef = useRef(null);
+
+  // Direct-route / stale-selection safety: CLOSED must not keep operational Mission Actions.
+  useEffect(() => {
+    if (initialLoading || prospectLoading || !workspace?.phone) {
+      return undefined;
+    }
+
+    if (!shouldSuppressOperationalMissionActions(workspace)) {
+      terminalCloseNavRef.current = null;
+      return undefined;
+    }
+
+    const navKey = `${workspace.phone}:${String(
+      workspace?.workflow?.canonicalMilestone || "CLOSED"
+    )}`;
+
+    if (terminalCloseNavRef.current === navKey) {
+      setPrimaryMission(null);
+      return undefined;
+    }
+
+    terminalCloseNavRef.current = navKey;
+    let cancelled = false;
+
+    (async () => {
+      await advancePastTerminalClosedProspect(workspace.phone, currentIndex);
+      if (cancelled) {
+        return;
+      }
+    })().catch((error) => {
+      console.error("[MissionControl] terminal close navigation failed", error);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    initialLoading,
+    prospectLoading,
+    workspace,
+    currentIndex,
+    advancePastTerminalClosedProspect
+  ]);
+
   const { openAddNote, noteDialog, saving: noteSaving } = useUniversalNote({
     getContext: () =>
       resolveNoteContextFromMissionControl({
@@ -457,6 +556,15 @@ export default function Dashboard() {
 
   const handleConversationOutcomeSaved = useCallback(
     async (result) => {
+      const closedPhone = phone;
+      const priorIndex = currentIndex;
+
+      // Terminal close (Not Interested → CLOSED): refresh BR-044 queue and leave this prospect.
+      if (isTerminalMissionControlCloseResult(result)) {
+        await advancePastTerminalClosedProspect(closedPhone, priorIndex);
+        return;
+      }
+
       const currentItem = queue[currentIndex];
 
       if (result?.missionControl && currentItem) {
@@ -498,7 +606,16 @@ export default function Dashboard() {
       await refreshCurrentWorkspace();
       await evaluateMissionWorkflow();
     },
-    [phone, queue, currentIndex, dashboard, refreshCurrentWorkspace, refreshMissions, evaluateMissionWorkflow]
+    [
+      phone,
+      queue,
+      currentIndex,
+      dashboard,
+      refreshCurrentWorkspace,
+      refreshMissions,
+      evaluateMissionWorkflow,
+      advancePastTerminalClosedProspect
+    ]
   );
 
   useEffect(() => {
@@ -817,6 +934,14 @@ export default function Dashboard() {
         return;
       }
 
+      const closedPhone = phone;
+      const priorIndex = currentIndex;
+
+      if (isTerminalMissionControlCloseResult(result)) {
+        await advancePastTerminalClosedProspect(closedPhone, priorIndex);
+        return;
+      }
+
       const currentItem = queue[currentIndex];
 
       if (result?.missionControl && currentItem) {
@@ -886,7 +1011,8 @@ export default function Dashboard() {
       reloadMissionControlQueue,
       refreshMissions,
       translate,
-      evaluateMissionWorkflow
+      evaluateMissionWorkflow,
+      advancePastTerminalClosedProspect
     ]
   );
 
@@ -1014,7 +1140,10 @@ export default function Dashboard() {
   }
 
   const qualificationInputs = workspace?.conversationOutcome?.requiredInputs || [];
-  const hasMissionActions = Boolean(primaryMission) || qualificationInputs.length > 0;
+  const suppressOperationalMissions = shouldSuppressOperationalMissionActions(workspace);
+  const hasMissionActions =
+    !suppressOperationalMissions &&
+    (Boolean(primaryMission) || qualificationInputs.length > 0);
 
   const prospectEmail = workspaceContext.prospect.email || workspace?.conversationOutcome?.fields?.email || null;
   const nextAction =
