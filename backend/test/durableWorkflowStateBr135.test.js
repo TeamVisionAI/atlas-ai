@@ -97,63 +97,31 @@ test("file wipe simulates Railway ephemeral loss (TEST disappears)", async () =>
 
 test("database backend survives process-memory clear (restart simulation)", async () => {
   await withBackend("database", async (store) => {
-    const phone = "+17865559102";
-    const prospectId = "prospect-br135-test";
-    let row = {
-      id: prospectId,
-      phone,
-      organization_id: TEAM_VISION,
-      workflow_state: {}
-    };
-
-    const findById = async (id, orgId) =>
-      id === prospectId && orgId === TEAM_VISION ? { ...row } : null;
-
-    const scope = {
-      organizationId: TEAM_VISION,
-      prospectId,
-      findProspectByIdFn: findById,
-      supabaseClient: {
-        from() {
-          return {
-            update(payload) {
-              row = {
-                ...row,
-                workflow_state: payload.workflow_state
-              };
-              return {
-                eq() {
-                  return this;
-                },
-                select() {
-                  return this;
-                },
-                async maybeSingle() {
-                  return { data: { ...row }, error: null };
-                }
-              };
-            }
-          };
-        }
-      }
-    };
+    const {
+      createAtomicWorkflowStateDb
+    } = require("./helpers/atomicWorkflowStateDb");
+    const db = createAtomicWorkflowStateDb({
+      phone: "+17865559102",
+      prospectId: "prospect-br135-test",
+      organizationId: TEAM_VISION
+    });
+    const scope = db.scope();
 
     const {
       markConversationAsTest,
       takeOverConversation
     } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
 
-    await markConversationAsTest(phone, scope);
-    await takeOverConversation(phone, scope);
+    await markConversationAsTest(db.phone, scope);
+    await takeOverConversation(db.phone, scope);
 
-    // Memory process map clear must not affect database SoR.
     store.clearMemoryWorkflowStateStore();
 
-    const afterRestart = await store.loadPersistedWorkflowState(phone, scope);
+    const afterRestart = await store.loadPersistedWorkflowState(db.phone, scope);
     assert.ok(afterRestart.inboxMarkedTestAt, "TEST mark must survive restart");
     assert.equal(afterRestart.manualAgentOwnership, true);
     assert.equal(afterRestart.workflowOwnership, "AGENT");
-    assert.ok(row.workflow_state.inboxMarkedTestAt);
+    assert.ok(db.snapshot().inboxMarkedTestAt);
   });
 });
 

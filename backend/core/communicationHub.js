@@ -48,13 +48,24 @@ async function shouldDeliverAutomatedReply(prospect, options = {}) {
     return false;
   }
 
-  const persisted = await workflowStateStore.loadPersistedWorkflowState(
-    prospect.phone,
-    {
-      organizationId: prospect.organization_id || null,
-      prospectId: prospect.id || null
-    }
-  );
+  let persisted;
+  try {
+    persisted = await workflowStateStore.loadPersistedWorkflowState(
+      prospect.phone,
+      {
+        organizationId: prospect.organization_id || null,
+        prospectId: prospect.id || null
+      }
+    );
+  } catch (error) {
+    // BR-135 — fail closed: never auto-reply when durable ownership cannot be read.
+    logWhatsAppStage("automated_reply_suppressed_workflow_state_unavailable", {
+      phone: prospect.phone || null,
+      code: error?.code || null,
+      message: error?.message || null
+    });
+    return false;
+  }
   const agentState = loadAgentState(prospect.phone);
 
   if (isWorkflowGateActive(prospect, agentState)) {

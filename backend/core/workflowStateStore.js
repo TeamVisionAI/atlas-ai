@@ -330,6 +330,25 @@ async function loadFromDatabase(phone, options = {}) {
   return normalizeRecord(raw || {});
 }
 
+function normalizePatchForDatabase(cleanPatch = {}) {
+  const patch = { ...cleanPatch };
+  if (Object.prototype.hasOwnProperty.call(patch, "workflowOwnership")) {
+    patch.workflowOwnership = patch.workflowOwnership
+      ? normalizeOwnership(patch.workflowOwnership)
+      : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "needsHumanAttention")) {
+    patch.needsHumanAttention = Boolean(patch.needsHumanAttention);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "manualAgentOwnership")) {
+    patch.manualAgentOwnership = Boolean(patch.manualAgentOwnership);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "doNotContact")) {
+    patch.doNotContact = Boolean(patch.doNotContact);
+  }
+  return patch;
+}
+
 async function saveToDatabase(phone, next, options = {}) {
   const {
     resolveProspectForWorkflowState,
@@ -362,31 +381,36 @@ async function saveToDatabase(phone, next, options = {}) {
     throw error;
   }
 
-  // Re-fetch immediately before write to preserve concurrent durable fields.
-  const fresh = await resolveProspectForWorkflowState({
-    phone: prospect.phone || phone,
-    organizationId: prospect.organization_id,
-    prospectId: prospect.id,
-    findProspectByIdFn: options.findProspectByIdFn || null,
-    findProspectInOrganizationFn: options.findProspectInOrganizationFn || null,
-    findProspectFn: options.findProspectFn || null
-  });
-  const latest = normalizeRecord(fresh?.workflow_state || prospect.workflow_state || {});
-  const preserved = preserveDurableRuntimeFields(
-    latest,
-    options._cleanPatch || {},
-    next
-  );
-  const finalState = normalizeRecord(preserved);
+  const cleanPatch = options._cleanPatch || {};
 
-  await writeWorkflowStateToProspect({
+  // Wipe / explicit full replace only (deletePersistedWorkflowState).
+  if (options._replaceEntireState === true) {
+    const finalState = normalizeRecord(next);
+    await writeWorkflowStateToProspect({
+      prospectId: prospect.id,
+      organizationId: prospect.organization_id,
+      nextState: finalState,
+      mode: "replace",
+      supabaseClient: options.supabaseClient || null
+    });
+    return finalState;
+  }
+
+  // Concurrent-safe: only patched keys are written via DB-side JSONB || merge.
+  const patch = normalizePatchForDatabase(cleanPatch);
+  if (Object.keys(patch).length === 0) {
+    return normalizeRecord(prospect.workflow_state || next || {});
+  }
+
+  const written = await writeWorkflowStateToProspect({
     prospectId: prospect.id,
     organizationId: prospect.organization_id,
-    nextState: finalState,
+    patch,
+    mode: "merge",
     supabaseClient: options.supabaseClient || null
   });
 
-  return finalState;
+  return normalizeRecord(written?.workflow_state || {});
 }
 
 /**
@@ -531,7 +555,8 @@ async function deletePersistedWorkflowState(phone, options = {}) {
     const empty = defaultWorkflowRecord();
     await saveToDatabase(phone, empty, {
       ...options,
-      _cleanPatch: empty
+      _cleanPatch: empty,
+      _replaceEntireState: true
     });
   }
 }
