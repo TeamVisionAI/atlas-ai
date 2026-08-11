@@ -1,21 +1,22 @@
 import { isWhatsAppCopyAction } from "../../services/whatsappCommunicationService";
 import { isPanelCommunicationAction } from "../../engines/communicationActionEngine";
+import {
+  INLINE_FORM_TYPES,
+  INLINE_FORM_BY_ACTION_ID,
+  normalizeMissionActionId,
+  resolvesToInlineForm,
+  isCloseNotInterestedForm,
+  isRenderableInlineFormType
+} from "./missionActionInlineFormResolver";
 
-export const INLINE_FORM_TYPES = {
-  SCHEDULING: "scheduling",
-  INTERVIEW_OUTCOME: "interview_outcome",
-  QUALIFICATION: "qualification",
-  CLOSE_NOT_INTERESTED: "close_not_interested"
+export {
+  INLINE_FORM_TYPES,
+  INLINE_FORM_BY_ACTION_ID,
+  normalizeMissionActionId,
+  resolvesToInlineForm,
+  isCloseNotInterestedForm,
+  isRenderableInlineFormType
 };
-
-const SCHEDULING_ACTIONS = new Set(["schedule", "reschedule"]);
-
-const INTERVIEW_OUTCOME_ACTIONS = new Set([
-  "enter_interview_outcome",
-  "record_outcome",
-  "record-outcome",
-  "record interview outcome"
-]);
 
 const INTERVIEW_OUTCOME_MISSION_TYPES = new Set([
   "EnterInterviewOutcome",
@@ -28,68 +29,6 @@ const PRE_INTERVIEW_CLOSE_MISSION_TYPES = new Set([
   "ReviewProspect",
   "ScheduleInterview"
 ]);
-
-export function normalizeMissionActionId(actionId, mission) {
-  const normalized = String(actionId || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-
-  if (
-    INTERVIEW_OUTCOME_ACTIONS.has(normalized) ||
-    normalized.includes("interview_outcome") ||
-    normalized.includes("record_outcome")
-  ) {
-    return "enter_interview_outcome";
-  }
-
-  if (
-    mission?.missionType &&
-    INTERVIEW_OUTCOME_MISSION_TYPES.has(mission.missionType) &&
-    actionId === mission?.primaryAction?.id
-  ) {
-    return "enter_interview_outcome";
-  }
-
-  return actionId;
-}
-
-export function resolvesToInlineForm(actionId, mission = null) {
-  const normalizedId = normalizeMissionActionId(actionId, mission);
-
-  if (!normalizedId) {
-    return null;
-  }
-
-  if (SCHEDULING_ACTIONS.has(normalizedId)) {
-    return INLINE_FORM_TYPES.SCHEDULING;
-  }
-
-  if (normalizedId === "enter_interview_outcome") {
-    return INLINE_FORM_TYPES.INTERVIEW_OUTCOME;
-  }
-
-  if (normalizedId === "qualification") {
-    return INLINE_FORM_TYPES.QUALIFICATION;
-  }
-
-  if (normalizedId === "close_not_interested") {
-    return INLINE_FORM_TYPES.CLOSE_NOT_INTERESTED;
-  }
-
-  if (
-    mission?.missionType === "CompleteQualification" &&
-    normalizedId === mission?.primaryAction?.id &&
-    normalizedId !== "whatsapp" &&
-    normalizedId !== "notes" &&
-    normalizedId !== "call" &&
-    normalizedId !== "close_not_interested"
-  ) {
-    return INLINE_FORM_TYPES.QUALIFICATION;
-  }
-
-  return null;
-}
 
 export function isImmediateMissionAction(actionId) {
   return isWhatsAppCopyAction(actionId);
