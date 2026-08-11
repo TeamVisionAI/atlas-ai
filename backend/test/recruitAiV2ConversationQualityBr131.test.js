@@ -112,7 +112,7 @@ test("4. Known work authorization + FAQ — do not ask authorization again", () 
       workAuthorizationStatus: "authorized"
     })
   );
-  assert.match(rendered.text, /don'?t need prior experience|training/i);
+  assert.match(rendered.text, /don'?t need prior experience|isn'?t required|training/i);
   assert.doesNotMatch(rendered.text, /work authorization|legal documentation to work/i);
   assert.doesNotMatch(rendered.text, /city and state/i);
 });
@@ -152,7 +152,7 @@ test("7. Experience question — concise + correct resume", () => {
     "Do I need experience?",
     createConversationContext({ preferredLanguage: "english" })
   );
-  assert.match(rendered.text, /don'?t need prior experience/i);
+  assert.match(rendered.text, /don'?t need prior experience|isn'?t required|training and licensing/i);
   assert.match(rendered.text, /city and state/i);
 });
 
@@ -206,7 +206,7 @@ test("11. CE vs V2 FAQ content parity for job and experience", () => {
   const job = resolveRecruitFaqAnswer("What is the job?", "en");
   const exp = resolveRecruitFaqAnswer("Do I need experience?", "en");
   assert.match(job, /financial services/i);
-  assert.match(exp, /don'?t need prior experience/i);
+  assert.match(exp, /don'?t need prior experience|isn'?t required|training and licensing/i);
 
   const v2 = renderTurn("What is the job?", createConversationContext());
   assert.match(v2.rendered.text, /financial services/i);

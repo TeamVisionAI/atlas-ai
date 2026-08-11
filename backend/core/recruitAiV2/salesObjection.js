@@ -15,12 +15,29 @@ function normalizeSalesText(text) {
 }
 
 /**
- * @returns {"skill"|"experience"|"aversion"|null}
+ * @returns {"identity"|"skill"|"experience"|"aversion"|null}
  */
 function classifySalesObjectionKind(text) {
   const t = normalizeSalesText(text);
   if (!t) {
     return null;
+  }
+
+  // Implements BR-137 — identity framing ("is this sales?") before skill/aversion.
+  // Never answer with "we're not in sales."
+  if (
+    /\bis this (a )?sales\b/.test(t) ||
+    /\bis this selling\b/.test(t) ||
+    /\bis this (a )?sales (job|role|position|opportunity)\b/.test(t) ||
+    /\bis this about sales\b/.test(t) ||
+    /\bdo (i|you) (have to|need to) sell\b/.test(t) ||
+    /\bes (esto|esa|esta) (de )?ventas\b/.test(t) ||
+    /\besto es (de )?ventas\b/.test(t) ||
+    /\bes (un trabajo|una oportunidad) de ventas\b/.test(t) ||
+    /\bhay que vender\b/.test(t) ||
+    /\bse trata de ventas\b/.test(t)
+  ) {
+    return "identity";
   }
 
   // Preference / aversion — do not claim "this is not sales".

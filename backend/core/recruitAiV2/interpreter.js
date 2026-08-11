@@ -24,6 +24,12 @@ const {
 } = require("./salesObjection");
 const { looksLikeNetworkObjection } = require("./networkObjection");
 const {
+  looksLikeThinkAboutIt,
+  looksLikeLegitimacyTrust,
+  looksLikeDontWantToRecruit,
+  classifyProspectGoal
+} = require("./conversationObjections");
+const {
   looksLikeCompensationQuestion,
   classifyCompensationQuestionKind
 } = require("./compensationQuestion");
@@ -950,6 +956,24 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       classifyCompensationQuestionKind(text) ||
       classifyCompensationQuestionKind(originalText) ||
       "general";
+  } else if (looksLikeThinkAboutIt(text) || looksLikeThinkAboutIt(originalText)) {
+    // Implements BR-137 — hesitation before inventing location / name.
+    intent = INTENTS.THINK_ABOUT_IT;
+    confidence = 0.94;
+  } else if (
+    looksLikeLegitimacyTrust(text) ||
+    looksLikeLegitimacyTrust(originalText)
+  ) {
+    // Implements BR-137 — scam/legit trust before name/location.
+    intent = INTENTS.LEGITIMACY_TRUST;
+    confidence = 0.94;
+  } else if (
+    looksLikeDontWantToRecruit(text) ||
+    looksLikeDontWantToRecruit(originalText)
+  ) {
+    // Implements BR-137 — recruit-role aversion (not sales skill).
+    intent = INTENTS.RECRUIT_ROLE_OBJECTION;
+    confidence = 0.94;
   } else if (looksLikeInsuranceQuestion(text) || looksLikeInsuranceQuestion(originalText)) {
     // BR-098 — detector must survive comparisonText (no "?") and raw variants.
     intent = INTENTS.INSURANCE_QUESTION;
@@ -958,7 +982,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     looksLikeSalesObjection(text) ||
     looksLikeSalesObjection(originalText)
   ) {
-    // Implements BR-099 — before experience FAQ and correction/location parsing.
+    // Implements BR-099 / BR-137 — before experience FAQ and correction/location parsing.
     intent = INTENTS.SALES_OBJECTION;
     confidence = 0.94;
     entities.salesObjectionKind =
@@ -995,6 +1019,17 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     if (authAnswer === true || authAnswer === false) {
       entities.workAuthorization = authAnswer;
     }
+  } else if (
+    classifyProspectGoal(text) ||
+    classifyProspectGoal(originalText)
+  ) {
+    // Implements BR-137 — optional motivation capture AFTER FAQ detectors (not qualification).
+    const goal =
+      classifyProspectGoal(text) || classifyProspectGoal(originalText);
+    intent = INTENTS.PROSPECT_GOAL;
+    confidence = 0.9;
+    entities.prospectGoalTheme = goal.theme;
+    entities.prospectGoalHint = goal.rawHint;
   } else if (looksLikeConversationClarificationRequest(text)) {
     intent = INTENTS.CONVERSATION_CLARIFICATION_REQUEST;
     confidence = 0.93;
