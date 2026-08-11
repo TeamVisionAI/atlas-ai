@@ -1406,9 +1406,9 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Domain:** Conversation Engine / Recruit AI v2 authoring / QR Channel UX  
 **Depends on:** BR-049, BR-081, BR-114, BR-130  
 **Related:** BR-104/FAQ family; BR-124 schedule-intent recovery; teamVision / V2 greeting templates historically used forced location openers  
-**Status:** Specified (docs only; not implemented)  
-**Engine target (future):** CE first-turn / FAQ routing; V2 `interpret` + `decide` + response templates; no appointment executor changes  
-**Tests:** Deferred until implementation
+**Status:** Implemented (thin first-turn + FAQ resume guard + CE/V2 FAQ sequencing parity)  
+**Engine target:** CE first-turn / FAQ routing (`semanticConversationEngine.js`, `recruitConversationSequencing.js`); V2 `interpret` + `decide` + `responseRenderer`; no appointment executor changes  
+**Tests:** `backend/test/recruitAiV2ConversationQualityBr131.test.js`
 
 ### Rules
 

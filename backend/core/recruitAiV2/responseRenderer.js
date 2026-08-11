@@ -29,12 +29,20 @@ const {
   getAuthorizationDeniedMessage,
   getAuthorizationQuestion,
   getStateQuestion,
-  getDayPartQuestion
+  getDayPartQuestion,
+  getFirstMessage,
+  getNaturalGreetingAck
 } = require("../teamVisionWorkflowCopy");
+const {
+  composeAnswerThenOneQuestion,
+  resolveFaqResumeTemplateKeyFromFacts
+} = require("../recruitConversationSequencing");
 
 const COPY = Object.freeze({
   english: {
-    greeting_ask_location: "Hi! What city and state do you live in?",
+    greeting_ask_location:
+      "Hi! Thanks for reaching out. What city and state do you live in?",
+    greeting_then_resume: null, // composed: natural ack + one resume question
     value_prop_then_qualify: null, // composed dynamically
     clarify_once:
       "Happy to help — could you share the detail I just asked for so we can keep moving?",
@@ -181,7 +189,9 @@ const COPY = Object.freeze({
     default: "Thanks — a Team Vision teammate will follow up shortly."
   },
   spanish: {
-    greeting_ask_location: "Hola, ¿en qué ciudad y estado vives?",
+    greeting_ask_location:
+      "¡Hola! Gracias por escribirnos. ¿En qué ciudad y estado vives?",
+    greeting_then_resume: null,
     value_prop_then_qualify: null,
     clarify_once:
       "Con gusto te ayudo — ¿puedes compartir el dato que te acabo de pedir para continuar?",
@@ -545,24 +555,26 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
 }
 
 function composeFaqThenResume(faqText, language, entities = {}, options = {}) {
-  const resumeKey = entities.resumeTemplateKey || "greeting_ask_location";
+  // Implements BR-131 — never default back to location when later stage is known.
+  let resumeKey = entities.resumeTemplateKey || null;
+  if (!resumeKey) {
+    resumeKey = resolveFaqResumeTemplateKeyFromFacts({
+      city: entities.city || null,
+      state: entities.state || null,
+      proposedState: entities.proposedState || null,
+      cityCertainty: entities.city ? "confirmed" : null,
+      stateCertainty: entities.state || entities.proposedState ? "confirmed" : null,
+      workAuthorization: entities.workAuthorization,
+      workAuthorizationStatus: entities.workAuthorizationStatus,
+      preferredDayPart: entities.dayPart || entities.preferredDayPart || null
+    }).templateKey;
+  }
   const resume =
     resumeKey === "continue_qualification_after_authorization" ||
     resumeKey === "outside_zoom_day_part"
       ? getDayPartQuestion(localeCode(language))
       : resolveResumeQuestion(resumeKey, language, entities);
-  const resumeText = String(resume || "").trim();
-  if (!resumeText) {
-    return String(faqText || "").trim();
-  }
-  // Implements BR-105 — default no mechanical "Por cierto" / "By the way" on FAQ resume.
-  const omitBridge = options.omitBridge !== false;
-  if (omitBridge) {
-    return `${faqText} ${resumeText}`;
-  }
-  const bridge =
-    language === LANGUAGES.SPANISH ? "Por cierto" : "By the way";
-  return `${faqText} ${bridge}, ${resumeText}`;
+  return composeAnswerThenOneQuestion(faqText, resume);
 }
 
 function composeValuePropThenQualify(language, entities = {}) {
@@ -619,6 +631,31 @@ function renderCustomerReply(responsePlan) {
     key === "job_opportunity_faq_then_resume"
   ) {
     template = composeJobOpportunityThenResume(language, entities);
+  } else if (key === "greeting_then_resume") {
+    // Implements BR-131 — natural greeting ack + one next-needed question only.
+    const resumeKey =
+      entities.resumeTemplateKey ||
+      resolveFaqResumeTemplateKeyFromFacts({
+        city: entities.city,
+        state: entities.state,
+        proposedState: entities.proposedState,
+        cityCertainty: entities.city ? "confirmed" : null,
+        stateCertainty: entities.state || entities.proposedState ? "confirmed" : null,
+        workAuthorization: entities.workAuthorization,
+        workAuthorizationStatus: entities.workAuthorizationStatus,
+        preferredDayPart: entities.dayPart || entities.preferredDayPart
+      }).templateKey;
+    const resume =
+      resumeKey === "continue_qualification_after_authorization" ||
+      resumeKey === "outside_zoom_day_part"
+        ? getDayPartQuestion(lang)
+        : resolveResumeQuestion(resumeKey, language, entities);
+    template = composeAnswerThenOneQuestion(
+      getNaturalGreetingAck(lang),
+      resume
+    );
+  } else if (key === "greeting_ask_location") {
+    template = getFirstMessage(lang);
   } else if (key === "job_overview_faq_then_resume") {
     template = composeJobOverviewThenResume(language, entities);
   } else if (key === "insurance_faq_then_resume") {

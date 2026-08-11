@@ -69,6 +69,10 @@ const {
   getHandoffMessage,
   getCanonicalFaqAnswer
 } = require("./teamVisionWorkflowCopy");
+const {
+  composeAnswerThenOneQuestion,
+  resolveRecruitFaqAnswer
+} = require("./recruitConversationSequencing");
 const { evaluateCoverage } = require("./businessRulesEngine");
 const {
   extractInformation,
@@ -120,7 +124,11 @@ function isLikelyQuestion(message) {
 }
 
 function shouldAnswerFAQ(message) {
-  return isLikelyQuestion(message);
+  if (isLikelyQuestion(message)) {
+    return true;
+  }
+  // Implements BR-131 CE parity — objections / experience without "?" still answer-first.
+  return Boolean(resolveRecruitFaqAnswer(message, "en"));
 }
 
 function detectLanguage(prospect, message) {
@@ -166,8 +174,13 @@ function buildShortAcknowledgement(extracted, language) {
 }
 
 function resolveWorkflowFaq(message, language) {
-  const text = String(message || "").toLowerCase();
+  // Implements BR-131 — CE FAQ content parity with V2 answer-first routing.
+  const shared = resolveRecruitFaqAnswer(message, language);
+  if (shared) {
+    return shared;
+  }
 
+  const text = String(message || "").toLowerCase();
   if (
     /de qu[eé] se trata|de qu[eé] trata|what is it about|what is this about|necesito experiencia|need experience|\bexperiencia\b/i.test(
       text
@@ -177,6 +190,63 @@ function resolveWorkflowFaq(message, language) {
   }
 
   return findFAQ(message, language);
+}
+
+function buildInformationalWorkflowReply(
+  informationalReply,
+  nextField,
+  profile,
+  language,
+  prospect
+) {
+  // Implements BR-131 — answer first, then exactly one next-needed question.
+  // Never re-ask city/state/auth when already present on the profile.
+  let field = nextField;
+  if (field === "city" && profile?.city) {
+    field = profile.state ? "authorization" : "state";
+  }
+  if (field === "state" && profile?.state) {
+    field =
+      profile.authorization === true || profile.authorization === false
+        ? profile.dayPart
+          ? "schedule"
+          : "dayPart"
+        : "authorization";
+  }
+  if (
+    field === "authorization" &&
+    (profile?.authorization === true || profile?.authorization === false)
+  ) {
+    field = profile.dayPart ? "schedule" : "dayPart";
+  }
+  if (field === "dayPart" && profile?.dayPart) {
+    field = "schedule";
+  }
+  // Do not enter full schedule menus from an FAQ resume until pre-schedule complete.
+  if (field === "schedule" && !canBeginScheduling(profile, { notes: prospect?.notes })) {
+    field = getNextMissingField(profile, {
+      notes: prospect?.notes,
+      captureState: parseQualificationCapture(prospect?.notes)
+    });
+  }
+  if (field === "schedule") {
+    // Soft continuation only — avoid dumping day menus from FAQ turns.
+    const soft =
+      language === "es"
+        ? "¿Prefieres en la mañana o en la tarde?"
+        : "Do you prefer morning or afternoon?";
+    if (!profile?.dayPart) {
+      return composeAnswerThenOneQuestion(informationalReply, soft);
+    }
+  }
+
+  const question = buildQuestionForMissingField(
+    field,
+    profile,
+    language,
+    prospect
+  );
+  return composeAnswerThenOneQuestion(informationalReply, question);
 }
 
 function buildInterviewFormatQuestion(profile, language) {
@@ -246,11 +316,6 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
         ? "¿Podemos continuar con tu entrevista?"
         : "Can we continue scheduling your interview?";
   }
-}
-
-function buildInformationalWorkflowReply(informationalReply, nextField, profile, language, prospect) {
-  const question = buildQuestionForMissingField(nextField, profile, language, prospect);
-  return `${informationalReply}\n\n${question}`;
 }
 
 function hasWorkflowAdvancement(extracted) {
