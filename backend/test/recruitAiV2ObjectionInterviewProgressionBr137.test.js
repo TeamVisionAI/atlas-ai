@@ -253,6 +253,25 @@ test("12. CE/V2 parity — material equivalence for key objections", () => {
 });
 
 test("13. Spanish equivalents — same logic/compliance", () => {
+  const esSalesBare = renderTurn(
+    "¿Es ventas?",
+    createConversationContext({
+      preferredLanguage: "spanish",
+      knownFacts: {
+        city: "Miami",
+        state: "FL",
+        cityCertainty: FACT_CERTAINTY.CONFIRMED,
+        stateCertainty: FACT_CERTAINTY.CONFIRMED,
+        workAuthorization: true,
+        workAuthorizationStatus: "authorized"
+      }
+    })
+  );
+  assert.equal(esSalesBare.interpretation.intent, INTENTS.SALES_OBJECTION);
+  assert.equal(esSalesBare.interpretation.entities.salesObjectionKind, "identity");
+  assert.doesNotMatch(esSalesBare.rendered.text, /no es ventas|no somos ventas|Continuemos/i);
+  assert.match(esSalesBare.rendered.text, /servicios financieros|entrevista/i);
+
   const esSales = renderTurn(
     "¿Es esto ventas?",
     createConversationContext({
