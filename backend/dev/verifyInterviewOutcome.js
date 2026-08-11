@@ -32,7 +32,7 @@ async function snapshotProspect(phone) {
 }
 
 async function ensureGateActive(phone) {
-  savePersistedWorkflowState(phone, {
+  await savePersistedWorkflowState(phone, {
     canonicalMilestone: MILESTONES.INTERVIEW_RESULT_PENDING,
     workflowOwnership: "AGENT",
     needsHumanAttention: false,

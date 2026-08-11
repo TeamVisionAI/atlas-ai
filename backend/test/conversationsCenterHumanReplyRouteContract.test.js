@@ -157,7 +157,7 @@ test("POST succeeds for Niovel HUMAN-owned conversation", async () => {
     const {
       takeOverConversation
     } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
-    takeOverConversation(PHONE);
+    await takeOverConversation(PHONE);
 
     const app = buildTestApp();
     const { server, base } = await listen(app);
@@ -217,7 +217,7 @@ test("ATLAS-owned conversation cannot human-send (structured 409)", async () => 
     const {
       returnConversationToAtlas
     } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
-    returnConversationToAtlas(PHONE);
+    await returnConversationToAtlas(PHONE);
 
     const app = buildTestApp();
     const { server, base } = await listen(app);

@@ -84,7 +84,10 @@ async function sendHumanComposerReply(input = {}) {
     throw error;
   }
 
-  const persisted = loadPersistedWorkflowState(prospect.phone);
+  const persisted = await loadPersistedWorkflowState(prospect.phone, {
+    organizationId: prospect.organization_id || null,
+    prospectId: prospect.id || null
+  });
   const ownershipState = resolveConversationOwnershipState(persisted);
 
   if (ownershipState !== CONVERSATION_OWNERSHIP_STATE.HUMAN) {

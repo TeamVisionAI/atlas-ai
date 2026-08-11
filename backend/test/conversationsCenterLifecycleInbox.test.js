@@ -18,10 +18,12 @@ const AGENT_FILE = path.join(__dirname, "../data/agentActionState.json");
 
 async function withTempStores(run) {
   const previousWorkflowEnv = process.env.ATLAS_WORKFLOW_STATE_FILE;
+  const previousBackend = process.env.ATLAS_WORKFLOW_STATE_BACKEND;
   const tempDir = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "atlas-cc-life-"));
   const tempWorkflow = path.join(tempDir, "workflowState.json");
   fs.writeFileSync(tempWorkflow, "{}");
   process.env.ATLAS_WORKFLOW_STATE_FILE = tempWorkflow;
+  process.env.ATLAS_WORKFLOW_STATE_BACKEND = "file";
 
   const prevAgent = fs.existsSync(AGENT_FILE)
     ? fs.readFileSync(AGENT_FILE, "utf8")
@@ -36,6 +38,11 @@ async function withTempStores(run) {
       delete process.env.ATLAS_WORKFLOW_STATE_FILE;
     } else {
       process.env.ATLAS_WORKFLOW_STATE_FILE = previousWorkflowEnv;
+    }
+    if (previousBackend === undefined) {
+      delete process.env.ATLAS_WORKFLOW_STATE_BACKEND;
+    } else {
+      process.env.ATLAS_WORKFLOW_STATE_BACKEND = previousBackend;
     }
     try {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -81,16 +88,16 @@ test("A–C Active: ATLAS / NEEDS_ATTENTION / HUMAN stay Active", async () => {
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
     const { OWNERSHIP } = require("../core/workflowConstants");
 
-    savePersistedWorkflowState("+17865551001", {
+    await savePersistedWorkflowState("+17865551001", {
       workflowOwnership: OWNERSHIP.ATLAS,
       needsHumanAttention: false
     });
-    savePersistedWorkflowState("+17865551002", {
+    await savePersistedWorkflowState("+17865551002", {
       workflowOwnership: OWNERSHIP.AGENT,
       needsHumanAttention: true,
       manualAgentOwnership: true
     });
-    savePersistedWorkflowState("+17865551003", {
+    await savePersistedWorkflowState("+17865551003", {
       workflowOwnership: OWNERSHIP.AGENT,
       needsHumanAttention: false,
       manualAgentOwnership: true
@@ -124,7 +131,7 @@ test("D–E Scheduled interview leaves Active; remains in Archived", async () =>
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
-    savePersistedWorkflowState("+17865551010", {
+    await savePersistedWorkflowState("+17865551010", {
       workflowOwnership: OWNERSHIP.ATLAS,
       canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED
     });
@@ -157,7 +164,7 @@ test("F Interview completed + Not Interested leaves Active", async () => {
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
-    savePersistedWorkflowState("+17865551020", {
+    await savePersistedWorkflowState("+17865551020", {
       workflowOwnership: OWNERSHIP.CLOSED,
       canonicalMilestone: MILESTONES.CLOSED
     });
@@ -214,7 +221,7 @@ test("G Explicit close removes from Active; I findable in Archived; J restore", 
     const phone = "+17865551030";
     const prospects = [prospect({ phone, name: "Close Me" })];
 
-    closeConversation(phone, "NOT_INTERESTED");
+    await closeConversation(phone, "NOT_INTERESTED");
     let model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
       filter: "active",
@@ -230,7 +237,7 @@ test("G Explicit close removes from Active; I findable in Archived; J restore", 
     assert.equal(model.items.length, 1);
     assert.equal(model.items[0].inboxCloseReason, "NOT_INTERESTED");
 
-    restoreConversation(phone);
+    await restoreConversation(phone);
     model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
       filter: "active",
@@ -238,7 +245,7 @@ test("G Explicit close removes from Active; I findable in Archived; J restore", 
     });
     assert.equal(model.items.length, 1);
 
-    archiveConversation(phone);
+    await archiveConversation(phone);
     model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
       filter: "archived",
@@ -261,8 +268,8 @@ test("H TEST/CANARY excluded from Active and attention badge", async () => {
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
     const phone = "+17865551040";
-    markConversationNeedsAttention(phone, "stall");
-    markConversationAsTest(phone);
+    await markConversationNeedsAttention(phone, "stall");
+    await markConversationAsTest(phone);
 
     const prospects = [
       prospect({ phone, name: "Canary", source: "whatsapp" }),
@@ -389,7 +396,7 @@ test("invariant: CONFIRMED + INTERVIEW_SCHEDULED → SCHEDULED / excluded from A
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865551050";
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       workflowOwnership: OWNERSHIP.WAITING_EVENT,
       canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED
     });

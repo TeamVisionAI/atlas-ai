@@ -86,7 +86,7 @@ async function buildFullWorkflowState(phone) {
     brain: missionControl?.brain || null,
     workflow,
     agentState: loadAgentState(phone),
-    persistedWorkflow: loadPersistedWorkflowState(phone)
+    persistedWorkflow: await loadPersistedWorkflowState(phone)
   };
 }
 
@@ -431,7 +431,7 @@ async function reactivateSimulatorProspect(phone, body = {}) {
   return withSimulatorGuard(async () => {
     assertSimulatorPhone(phone);
 
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: MILESTONES.QUALIFICATION,
       workflowOwnership: OWNERSHIP.AGENT,
       needsHumanAttention: false,

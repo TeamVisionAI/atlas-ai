@@ -163,8 +163,10 @@ async function takeOverHandler(req, res) {
     }
 
     // Persist under prospect.phone (storage truth), not the request encoding.
-    const result = takeOverConversation(prospect.phone, {
-      reason: req.body?.reason
+    const result = await takeOverConversation(prospect.phone, {
+      reason: req.body?.reason,
+      organizationId: prospect.organization_id || organizationId || null,
+      prospectId: prospect.id || null
     });
 
     res.json({
@@ -205,7 +207,10 @@ async function returnToAtlasHandler(req, res) {
       });
     }
 
-    const result = returnConversationToAtlas(prospect.phone);
+    const result = await returnConversationToAtlas(prospect.phone, {
+      organizationId: prospect.organization_id || organizationId || null,
+      prospectId: prospect.id || null
+    });
 
     res.json({
       success: true,
@@ -250,7 +255,11 @@ async function scopedLifecycleAction(req, res, actionName, run) {
       });
     }
 
-    const result = run(prospect.phone, req.body || {});
+    const scope = {
+      organizationId: prospect.organization_id || organizationId || null,
+      prospectId: prospect.id || null
+    };
+    const result = await run(prospect.phone, req.body || {}, scope);
     const {
       buildConversationListItem
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
@@ -261,7 +270,7 @@ async function scopedLifecycleAction(req, res, actionName, run) {
       phone: prospect.phone,
       ownershipState: result.ownershipState,
       closeReason: result.closeReason || null,
-      conversation: buildConversationListItem(prospect),
+      conversation: await buildConversationListItem(prospect),
       workflow: {
         workflowOwnership: result.next.workflowOwnership,
         needsHumanAttention: Boolean(result.next.needsHumanAttention),
@@ -282,18 +291,24 @@ async function scopedLifecycleAction(req, res, actionName, run) {
 }
 
 router.post("/archive", (req, res) =>
-  scopedLifecycleAction(req, res, "ARCHIVE", (phone) => archiveConversation(phone))
+  scopedLifecycleAction(req, res, "ARCHIVE", (phone, _body, scope) =>
+    archiveConversation(phone, scope)
+  )
 );
 router.post("/restore", (req, res) =>
-  scopedLifecycleAction(req, res, "RESTORE", (phone) => restoreConversation(phone))
+  scopedLifecycleAction(req, res, "RESTORE", (phone, _body, scope) =>
+    restoreConversation(phone, scope)
+  )
 );
 router.post("/close", (req, res) =>
-  scopedLifecycleAction(req, res, "CLOSE", (phone, body) =>
-    closeConversation(phone, body?.reason || INBOX_CLOSE_REASONS.OTHER)
+  scopedLifecycleAction(req, res, "CLOSE", (phone, body, scope) =>
+    closeConversation(phone, body?.reason || INBOX_CLOSE_REASONS.OTHER, scope)
   )
 );
 router.post("/mark-test", (req, res) =>
-  scopedLifecycleAction(req, res, "MARK_TEST", (phone) => markConversationAsTest(phone))
+  scopedLifecycleAction(req, res, "MARK_TEST", (phone, _body, scope) =>
+    markConversationAsTest(phone, scope)
+  )
 );
 
 router.get("/:phone", async (req, res) => {
@@ -312,14 +327,17 @@ router.get("/:phone", async (req, res) => {
       });
     }
 
-    const persisted = loadPersistedWorkflowState(prospect.phone);
+    const persisted = await loadPersistedWorkflowState(prospect.phone, {
+      organizationId: prospect.organization_id || organizationId || null,
+      prospectId: prospect.id || null
+    });
     const {
       buildConversationListItem
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
     res.json({
       phone: prospect.phone || null,
-      conversation: buildConversationListItem(prospect),
+      conversation: await buildConversationListItem(prospect),
       ownershipState: resolveConversationOwnershipState(persisted),
       handoffReason: persisted.handoffReason || null,
       handoffAt: persisted.handoffAt || null,

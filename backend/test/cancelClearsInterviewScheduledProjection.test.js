@@ -45,17 +45,17 @@ test("A. demote helper: INTERVIEW_SCHEDULED → INTERVIEW_READY", async () => {
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865558001";
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED,
       workflowOwnership: OWNERSHIP.WAITING_EVENT
     });
 
-    const result = demotePersistedScheduleClaimAfterCancel(phone);
+    const result = await demotePersistedScheduleClaimAfterCancel(phone);
     assert.equal(result.demoted, true);
     assert.equal(result.previousMilestone, MILESTONES.INTERVIEW_SCHEDULED);
     assert.equal(result.canonicalMilestone, MILESTONES.INTERVIEW_READY);
 
-    const persisted = loadPersistedWorkflowState(phone);
+    const persisted = await loadPersistedWorkflowState(phone);
     assert.equal(persisted.canonicalMilestone, MILESTONES.INTERVIEW_READY);
     assert.notEqual(persisted.canonicalMilestone, MILESTONES.INTERVIEW_SCHEDULED);
   });
@@ -70,12 +70,12 @@ test("B. demote helper: INTERVIEW_DUE → INTERVIEW_READY", async () => {
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865558002";
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: MILESTONES.INTERVIEW_DUE,
       workflowOwnership: OWNERSHIP.WAITING_EVENT
     });
 
-    const result = demotePersistedScheduleClaimAfterCancel(phone);
+    const result = await demotePersistedScheduleClaimAfterCancel(phone);
     assert.equal(result.demoted, true);
     assert.equal(result.canonicalMilestone, MILESTONES.INTERVIEW_READY);
   });
@@ -93,15 +93,15 @@ test("B2. demote preserves HUMAN / manual ownership hold", async () => {
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865558003";
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED,
       workflowOwnership: OWNERSHIP.AGENT,
       manualAgentOwnership: true,
       needsHumanAttention: false
     });
 
-    demotePersistedScheduleClaimAfterCancel(phone);
-    const persisted = loadPersistedWorkflowState(phone);
+    await demotePersistedScheduleClaimAfterCancel(phone);
+    const persisted = await loadPersistedWorkflowState(phone);
     assert.equal(persisted.canonicalMilestone, MILESTONES.INTERVIEW_READY);
     assert.equal(persisted.workflowOwnership, OWNERSHIP.AGENT);
     assert.equal(persisted.manualAgentOwnership, true);
@@ -120,14 +120,14 @@ test("B3. non-scheduled milestones are untouched (CLOSED stays CLOSED)", async (
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865558004";
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: MILESTONES.CLOSED,
       workflowOwnership: OWNERSHIP.CLOSED
     });
 
-    const result = demotePersistedScheduleClaimAfterCancel(phone);
+    const result = await demotePersistedScheduleClaimAfterCancel(phone);
     assert.equal(result.demoted, false);
-    assert.equal(loadPersistedWorkflowState(phone).canonicalMilestone, MILESTONES.CLOSED);
+    assert.equal((await loadPersistedWorkflowState(phone)).canonicalMilestone, MILESTONES.CLOSED);
   });
 });
 
@@ -165,13 +165,13 @@ test("C. post-cancel projection fields imply Active for CC consumers", async () 
 
     // Simulate success projection then cancel demotion + current_step SCHEDULE.
     const phone = "+17865558005";
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED,
       workflowOwnership: OWNERSHIP.WAITING_EVENT
     });
-    demotePersistedScheduleClaimAfterCancel(phone);
+    await demotePersistedScheduleClaimAfterCancel(phone);
 
-    const persisted = require("../core/workflowStateStore").loadPersistedWorkflowState(
+    const persisted = await require("../core/workflowStateStore").loadPersistedWorkflowState(
       phone
     );
     const prospect = { phone, current_step: "SCHEDULE" };

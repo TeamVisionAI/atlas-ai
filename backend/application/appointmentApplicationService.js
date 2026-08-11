@@ -888,7 +888,10 @@ async function cancelAppointment(id, input, context = {}) {
   // BR-039 write-side — cancel must not leave durable INTERVIEW_SCHEDULED claim.
   // Rollback also enters here via missionExecutionApplicationService.rollbackPersistedAppointment.
   try {
-    demotePersistedScheduleClaimAfterCancel(appointment.prospectPhone);
+    await demotePersistedScheduleClaimAfterCancel(appointment.prospectPhone, {
+      organizationId: appointment.organizationId || organizationId || null,
+      prospectId: appointment.prospectId || null
+    });
   } catch (error) {
     console.error(
       "[appointments] cancel workflow schedule-claim demotion failed:",

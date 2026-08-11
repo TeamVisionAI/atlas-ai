@@ -1,12 +1,15 @@
 /**
- * Sprint 8A.1 — Workflow ownership and milestone persistence.
- * Stores per-prospect workflow state in backend/data/workflowState.json
- * (same pattern as agentActionState.json). Read/write only — no conversation side effects.
+ * Sprint 8A.1 + BR-135 — Workflow ownership / Conversations soft-state persistence.
  *
- * Soft Conversations Center inbox fields (inboxArchivedAt / inboxClosedAt /
- * inboxCloseReason / inboxMarkedTestAt) must survive unrelated ownership /
- * milestone / stall writes unless an explicit Restore clears them.
+ * Production SoR: prospects.workflow_state JSONB (org + prospect scoped).
+ * Local development may use an optional file backend when explicitly gated.
+ * Production never uses ephemeral JSON as SoR.
+ *
+ * Soft Conversations Center inbox fields and HUMAN ownership fields must survive
+ * unrelated patches and Railway deploy/restart.
  */
+
+"use strict";
 
 const fs = require("fs");
 const path = require("path");
@@ -26,35 +29,69 @@ const SOFT_INBOX_FIELDS = Object.freeze([
   "inboxMarkedTestAt"
 ]);
 
+/**
+ * Phase 1 durable runtime fields (BR-135).
+ * doNotContact excluded — not competing with other DNC sources in Phase 1.
+ */
+const DURABLE_RUNTIME_FIELDS = Object.freeze([
+  ...SOFT_INBOX_FIELDS,
+  "workflowOwnership",
+  "manualAgentOwnership",
+  "needsHumanAttention",
+  "handoffReason",
+  "handoffAt",
+  "humanTakenOverAt",
+  "returnedToAtlasAt"
+]);
+
+/** In-memory backend for tests / restart simulation. */
+const memoryStores = new Map();
+
 function getStateFile() {
   return process.env.ATLAS_WORKFLOW_STATE_FILE || DEFAULT_STATE_FILE;
 }
 
+function isProductionRuntime(env = process.env) {
+  return String(env.NODE_ENV || "").toLowerCase() === "production";
+}
+
+/**
+ * database = durable JSONB (default in production)
+ * memory = process map (tests)
+ * file = local JSON only when NOT production
+ */
+function resolveWorkflowStateBackend(env = process.env) {
+  const explicit = String(env.ATLAS_WORKFLOW_STATE_BACKEND || "")
+    .trim()
+    .toLowerCase();
+  if (explicit === "database" || explicit === "memory" || explicit === "file") {
+    if (explicit === "file" && isProductionRuntime(env)) {
+      const error = new Error(
+        "ATLAS_WORKFLOW_STATE_BACKEND=file is forbidden in production (BR-135)"
+      );
+      error.code = "WORKFLOW_STATE_EPHEMERAL_FORBIDDEN";
+      throw error;
+    }
+    return explicit;
+  }
+  return isProductionRuntime(env) ? "database" : "file";
+}
+
 function defaultWorkflowRecord() {
   return {
-    /** Persisted override; null = derive from milestoneMapper on read. */
     canonicalMilestone: null,
     workflowOwnership: null,
     needsHumanAttention: false,
     stalledAt: null,
-    /** ISO timestamp of last initialization from computed defaults. */
     initializedAt: null,
-    /** BR-035 manual agent hold (BR-015 alignment). */
     manualAgentOwnership: false,
     doNotContact: false,
-    /** Idempotency key for BR-034 stall episode (last Atlas outbound timestamp). */
     stallEpisodeKey: null,
-    /** Sprint 8A.6 — idempotency key for time-based milestone reconciliation. */
     reconcileEpisodeKey: null,
-    /** Conversations Center — persisted human handoff reason (pilot). */
     handoffReason: null,
     handoffAt: null,
     humanTakenOverAt: null,
     returnedToAtlasAt: null,
-    /**
-     * Conversations Center inbox soft state (presentation only).
-     * Does not mutate appointments or overwrite interview outcomes.
-     */
     inboxArchivedAt: null,
     inboxClosedAt: null,
     inboxCloseReason: null,
@@ -62,21 +99,15 @@ function defaultWorkflowRecord() {
   };
 }
 
-/**
- * Canonical storage key for ownership silence + TAKE OVER.
- * Prevents +E.164 vs digits-only vs space-mangled path params from splitting HUMAN state.
- */
 function workflowStateKey(phone) {
   const raw = String(phone || "").trim();
   if (!raw) {
     return null;
   }
-
   const normalized = normalizePhoneNumber(raw);
   if (normalized) {
     return formatPhoneForStorage(normalized);
   }
-
   return raw;
 }
 
@@ -86,41 +117,35 @@ function candidateWorkflowKeys(phone) {
   if (raw) {
     keys.add(raw);
   }
-
-  // Path-param "+" often arrives as leading space after decode.
   const repaired = raw.replace(/^\s+/, "+");
   if (repaired && repaired !== raw) {
     keys.add(repaired);
   }
-
   const digits = raw.replace(/\D/g, "");
   if (digits) {
     keys.add(digits);
     keys.add(`+${digits}`);
   }
-
   const canonical = workflowStateKey(phone);
   if (canonical) {
     keys.add(canonical);
   }
-
   return [...keys];
 }
 
-function readStore() {
+function readFileStore() {
   try {
     const file = getStateFile();
     if (!fs.existsSync(file)) {
       return {};
     }
-
     return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch {
     return {};
   }
 }
 
-function writeStore(store) {
+function writeFileStore(store) {
   const file = getStateFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
@@ -139,7 +164,6 @@ function resolveStoredRecord(store, phone) {
   return merged;
 }
 
-/** Drop undefined so spreads cannot silently wipe soft/owned fields via JSON omit. */
 function sanitizeWorkflowPatch(patch = {}) {
   const clean = {};
   for (const [key, value] of Object.entries(patch || {})) {
@@ -150,10 +174,23 @@ function sanitizeWorkflowPatch(patch = {}) {
   return clean;
 }
 
-/**
- * Soft inbox flags survive unrelated writes.
- * Explicit `null` in patch (Restore) still clears.
- */
+function preserveDurableRuntimeFields(baseRecord, cleanPatch, next) {
+  const out = { ...next };
+  for (const field of DURABLE_RUNTIME_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(cleanPatch, field)) {
+      if (field === "needsHumanAttention" || field === "manualAgentOwnership") {
+        out[field] = Boolean(baseRecord[field]);
+      } else if (field === "workflowOwnership") {
+        out[field] = baseRecord[field] || null;
+      } else {
+        out[field] = baseRecord[field] ?? null;
+      }
+    }
+  }
+  return out;
+}
+
+/** Backward-compatible alias used by existing preserve tests. */
 function preserveSoftInboxFields(baseRecord, cleanPatch, next) {
   const out = { ...next };
   for (const field of SOFT_INBOX_FIELDS) {
@@ -164,78 +201,281 @@ function preserveSoftInboxFields(baseRecord, cleanPatch, next) {
   return out;
 }
 
-function loadPersistedWorkflowState(phone) {
-  if (!phone) {
-    return defaultWorkflowRecord();
-  }
-
-  const store = readStore();
-  const raw = resolveStoredRecord(store, phone);
-  const normalized = {
+function normalizeRecord(raw = {}) {
+  return {
+    ...defaultWorkflowRecord(),
     ...raw,
     workflowOwnership: raw.workflowOwnership
       ? normalizeOwnership(raw.workflowOwnership)
-      : null
-  };
-
-  return {
-    ...defaultWorkflowRecord(),
-    ...normalized
+      : null,
+    needsHumanAttention: Boolean(raw.needsHumanAttention),
+    manualAgentOwnership: Boolean(raw.manualAgentOwnership),
+    doNotContact: Boolean(raw.doNotContact)
   };
 }
 
-function savePersistedWorkflowState(phone, patch) {
-  if (!phone) {
-    return defaultWorkflowRecord();
-  }
-
-  const cleanPatch = sanitizeWorkflowPatch(patch);
-  const key = workflowStateKey(phone) || String(phone).trim();
-
-  // Pass 1 — merge against current disk view.
-  const store = readStore();
-  const current = {
-    ...defaultWorkflowRecord(),
-    ...resolveStoredRecord(store, phone)
-  };
-
+function mergePatchIntoCurrent(current, cleanPatch) {
   let next = {
     ...current,
     ...cleanPatch,
-    workflowOwnership: cleanPatch.workflowOwnership
-      ? normalizeOwnership(cleanPatch.workflowOwnership)
-      : current.workflowOwnership
+    workflowOwnership: Object.prototype.hasOwnProperty.call(
+      cleanPatch,
+      "workflowOwnership"
+    )
+      ? cleanPatch.workflowOwnership
+        ? normalizeOwnership(cleanPatch.workflowOwnership)
+        : null
+      : current.workflowOwnership,
+    needsHumanAttention: Object.prototype.hasOwnProperty.call(
+      cleanPatch,
+      "needsHumanAttention"
+    )
+      ? Boolean(cleanPatch.needsHumanAttention)
+      : Boolean(current.needsHumanAttention),
+    manualAgentOwnership: Object.prototype.hasOwnProperty.call(
+      cleanPatch,
+      "manualAgentOwnership"
+    )
+      ? Boolean(cleanPatch.manualAgentOwnership)
+      : Boolean(current.manualAgentOwnership)
   };
-  next = preserveSoftInboxFields(current, cleanPatch, next);
+  next = preserveDurableRuntimeFields(current, cleanPatch, next);
+  return normalizeRecord(next);
+}
 
-  // Pass 2 — re-read soft flags so concurrent ownership/stall writers cannot
-  // clobber an inbox TEST/CLOSED/ARCHIVED mark that landed between reads.
-  const latestStore = readStore();
-  const latest = {
-    ...defaultWorkflowRecord(),
-    ...resolveStoredRecord(latestStore, phone)
-  };
-  next = preserveSoftInboxFields(latest, cleanPatch, next);
+function memoryBucketKey() {
+  return process.env.ATLAS_WORKFLOW_STATE_MEMORY_KEY || "default";
+}
 
+function getMemoryStore() {
+  const key = memoryBucketKey();
+  if (!memoryStores.has(key)) {
+    memoryStores.set(key, new Map());
+  }
+  return memoryStores.get(key);
+}
+
+function clearMemoryWorkflowStateStore() {
+  getMemoryStore().clear();
+}
+
+async function loadFromMemory(phone) {
+  const store = getMemoryStore();
+  for (const key of candidateWorkflowKeys(phone)) {
+    if (store.has(key)) {
+      return normalizeRecord(store.get(key));
+    }
+  }
+  return defaultWorkflowRecord();
+}
+
+async function saveToMemory(phone, next) {
+  const store = getMemoryStore();
+  const key = workflowStateKey(phone) || String(phone).trim();
+  for (const alias of candidateWorkflowKeys(phone)) {
+    store.delete(alias);
+  }
+  store.set(key, next);
+  return next;
+}
+
+async function loadFromFile(phone) {
+  const store = readFileStore();
+  return normalizeRecord(resolveStoredRecord(store, phone));
+}
+
+async function saveToFile(phone, next) {
+  const key = workflowStateKey(phone) || String(phone).trim();
+  const latestStore = readFileStore();
   latestStore[key] = next;
-
-  // Collapse alias keys so inbound storagePhone (+E.164) always sees TAKE OVER.
   for (const alias of candidateWorkflowKeys(phone)) {
     if (alias !== key && latestStore[alias]) {
       delete latestStore[alias];
     }
   }
-
-  writeStore(latestStore);
+  writeFileStore(latestStore);
   return next;
 }
 
+async function loadFromDatabase(phone, options = {}) {
+  const {
+    resolveProspectForWorkflowState,
+    readWorkflowStateFromProspect
+  } = require("./workflowStateDurableRepository");
+
+  const prospect = await resolveProspectForWorkflowState({
+    phone,
+    organizationId: options.organizationId || null,
+    prospectId: options.prospectId || null,
+    findProspectByIdFn: options.findProspectByIdFn || null,
+    findProspectInOrganizationFn: options.findProspectInOrganizationFn || null,
+    findProspectFn: options.findProspectFn || null
+  });
+
+  if (!prospect?.id || !prospect.organization_id) {
+    // Unknown prospect — empty defaults (not a silent file fallback).
+    return defaultWorkflowRecord();
+  }
+
+  if (
+    options.organizationId &&
+    String(prospect.organization_id) !== String(options.organizationId)
+  ) {
+    const error = new Error("Workflow state org mismatch");
+    error.code = "WORKFLOW_STATE_ORG_MISMATCH";
+    throw error;
+  }
+
+  const raw = await readWorkflowStateFromProspect(prospect);
+  return normalizeRecord(raw || {});
+}
+
+function normalizePatchForDatabase(cleanPatch = {}) {
+  const patch = { ...cleanPatch };
+  if (Object.prototype.hasOwnProperty.call(patch, "workflowOwnership")) {
+    patch.workflowOwnership = patch.workflowOwnership
+      ? normalizeOwnership(patch.workflowOwnership)
+      : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "needsHumanAttention")) {
+    patch.needsHumanAttention = Boolean(patch.needsHumanAttention);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "manualAgentOwnership")) {
+    patch.manualAgentOwnership = Boolean(patch.manualAgentOwnership);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "doNotContact")) {
+    patch.doNotContact = Boolean(patch.doNotContact);
+  }
+  return patch;
+}
+
+async function saveToDatabase(phone, next, options = {}) {
+  const {
+    resolveProspectForWorkflowState,
+    writeWorkflowStateToProspect
+  } = require("./workflowStateDurableRepository");
+
+  const prospect = await resolveProspectForWorkflowState({
+    phone,
+    organizationId: options.organizationId || null,
+    prospectId: options.prospectId || null,
+    findProspectByIdFn: options.findProspectByIdFn || null,
+    findProspectInOrganizationFn: options.findProspectInOrganizationFn || null,
+    findProspectFn: options.findProspectFn || null
+  });
+
+  if (!prospect?.id || !prospect.organization_id) {
+    const error = new Error(
+      "Cannot persist workflow state without org-scoped prospect"
+    );
+    error.code = "WORKFLOW_STATE_PROSPECT_NOT_FOUND";
+    throw error;
+  }
+
+  if (
+    options.organizationId &&
+    String(prospect.organization_id) !== String(options.organizationId)
+  ) {
+    const error = new Error("Workflow state org mismatch");
+    error.code = "WORKFLOW_STATE_ORG_MISMATCH";
+    throw error;
+  }
+
+  const cleanPatch = options._cleanPatch || {};
+
+  // Wipe / explicit full replace only (deletePersistedWorkflowState).
+  if (options._replaceEntireState === true) {
+    const finalState = normalizeRecord(next);
+    await writeWorkflowStateToProspect({
+      prospectId: prospect.id,
+      organizationId: prospect.organization_id,
+      nextState: finalState,
+      mode: "replace",
+      supabaseClient: options.supabaseClient || null
+    });
+    return finalState;
+  }
+
+  // Concurrent-safe: only patched keys are written via DB-side JSONB || merge.
+  const patch = normalizePatchForDatabase(cleanPatch);
+  if (Object.keys(patch).length === 0) {
+    return normalizeRecord(prospect.workflow_state || next || {});
+  }
+
+  const written = await writeWorkflowStateToProspect({
+    prospectId: prospect.id,
+    organizationId: prospect.organization_id,
+    patch,
+    mode: "merge",
+    supabaseClient: options.supabaseClient || null
+  });
+
+  return normalizeRecord(written?.workflow_state || {});
+}
+
 /**
- * Merge persisted state with computed defaults (read path).
- * Lazy-initializes storage on first access without changing conversation behavior.
+ * @param {string} phone
+ * @param {{ organizationId?: string, prospectId?: string, backend?: string }} [options]
  */
-function resolveWorkflowState(phone, computed) {
-  const persisted = loadPersistedWorkflowState(phone);
+async function loadPersistedWorkflowState(phone, options = {}) {
+  if (!phone) {
+    return defaultWorkflowRecord();
+  }
+
+  const backend = options.backend || resolveWorkflowStateBackend();
+
+  if (backend === "memory") {
+    return loadFromMemory(phone);
+  }
+  if (backend === "file") {
+    return loadFromFile(phone);
+  }
+  if (backend === "database") {
+    return loadFromDatabase(phone, options);
+  }
+
+  const error = new Error(`Unknown workflow state backend: ${backend}`);
+  error.code = "WORKFLOW_STATE_BACKEND_INVALID";
+  throw error;
+}
+
+/**
+ * @param {string} phone
+ * @param {object} patch
+ * @param {{ organizationId?: string, prospectId?: string, backend?: string }} [options]
+ */
+async function savePersistedWorkflowState(phone, patch, options = {}) {
+  if (!phone) {
+    return defaultWorkflowRecord();
+  }
+
+  const cleanPatch = sanitizeWorkflowPatch(patch);
+  const backend = options.backend || resolveWorkflowStateBackend();
+  const current = await loadPersistedWorkflowState(phone, options);
+  let next = mergePatchIntoCurrent(current, cleanPatch);
+
+  // Second pass for file/memory: re-load before write.
+  if (backend === "file" || backend === "memory") {
+    const latest = await loadPersistedWorkflowState(phone, options);
+    next = preserveDurableRuntimeFields(latest, cleanPatch, next);
+    next = normalizeRecord(next);
+    if (backend === "memory") {
+      return saveToMemory(phone, next);
+    }
+    return saveToFile(phone, next);
+  }
+
+  if (backend === "database") {
+    return saveToDatabase(phone, next, { ...options, _cleanPatch: cleanPatch });
+  }
+
+  const error = new Error(`Unknown workflow state backend: ${backend}`);
+  error.code = "WORKFLOW_STATE_BACKEND_INVALID";
+  throw error;
+}
+
+async function resolveWorkflowState(phone, computed, options = {}) {
+  const persisted = await loadPersistedWorkflowState(phone, options);
 
   const canonicalMilestone =
     persisted.canonicalMilestone || computed.canonicalMilestone;
@@ -253,16 +493,19 @@ function resolveWorkflowState(phone, computed) {
     workflowOwnership;
 
   if (shouldInitialize) {
-    savePersistedWorkflowState(phone, {
-      canonicalMilestone,
-      workflowOwnership,
-      needsHumanAttention,
-      stalledAt: persisted.stalledAt,
-      initializedAt: new Date().toISOString(),
-      manualAgentOwnership: persisted.manualAgentOwnership,
-      doNotContact: persisted.doNotContact
-      // Soft inbox fields intentionally omitted — preserveSoftInboxFields keeps them.
-    });
+    await savePersistedWorkflowState(
+      phone,
+      {
+        canonicalMilestone,
+        workflowOwnership,
+        needsHumanAttention,
+        stalledAt: persisted.stalledAt,
+        initializedAt: new Date().toISOString(),
+        manualAgentOwnership: persisted.manualAgentOwnership,
+        doNotContact: persisted.doNotContact
+      },
+      options
+    );
   }
 
   return {
@@ -278,33 +521,58 @@ function resolveWorkflowState(phone, computed) {
   };
 }
 
-function deletePersistedWorkflowState(phone) {
+async function deletePersistedWorkflowState(phone, options = {}) {
   if (!phone) {
     return;
   }
 
-  const store = readStore();
-  let changed = false;
+  const backend = options.backend || resolveWorkflowStateBackend();
 
-  for (const key of candidateWorkflowKeys(phone)) {
-    if (store[key]) {
-      delete store[key];
-      changed = true;
+  if (backend === "memory") {
+    const store = getMemoryStore();
+    for (const key of candidateWorkflowKeys(phone)) {
+      store.delete(key);
     }
+    return;
   }
 
-  if (changed) {
-    writeStore(store);
+  if (backend === "file") {
+    const store = readFileStore();
+    let changed = false;
+    for (const key of candidateWorkflowKeys(phone)) {
+      if (store[key]) {
+        delete store[key];
+        changed = true;
+      }
+    }
+    if (changed) {
+      writeFileStore(store);
+    }
+    return;
+  }
+
+  if (backend === "database") {
+    const empty = defaultWorkflowRecord();
+    await saveToDatabase(phone, empty, {
+      ...options,
+      _cleanPatch: empty,
+      _replaceEntireState: true
+    });
   }
 }
 
 module.exports = {
   SOFT_INBOX_FIELDS,
+  DURABLE_RUNTIME_FIELDS,
   defaultWorkflowRecord,
   sanitizeWorkflowPatch,
   preserveSoftInboxFields,
+  preserveDurableRuntimeFields,
   workflowStateKey,
   candidateWorkflowKeys,
+  resolveWorkflowStateBackend,
+  isProductionRuntime,
+  clearMemoryWorkflowStateStore,
   loadPersistedWorkflowState,
   savePersistedWorkflowState,
   resolveWorkflowState,

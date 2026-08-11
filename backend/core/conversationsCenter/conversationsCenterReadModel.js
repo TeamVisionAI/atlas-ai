@@ -67,8 +67,11 @@ function activityMs(row) {
   return 0;
 }
 
-function buildConversationListItem(prospect) {
-  const persisted = loadPersistedWorkflowState(prospect.phone);
+async function buildConversationListItem(prospect) {
+  const persisted = await loadPersistedWorkflowState(prospect.phone, {
+    organizationId: prospect.organization_id || null,
+    prospectId: prospect.id || null
+  });
   const ownershipState = resolveConversationOwnershipState(persisted);
   const lifecycleInfo = resolveInboxLifecycle({ prospect, persisted });
   const lastMessagePreview = prospect?.last_message
@@ -216,7 +219,9 @@ async function buildConversationsCenterReadModel(options = {}) {
     options.prospects ?? (await loadProductionProspectsSafe(options.organizationId));
 
   const scoped = prospects.filter(isProspectInNiovelPilotScope);
-  let items = scoped.map(buildConversationListItem).filter((item) => item.phone);
+  let items = (await Promise.all(scoped.map(buildConversationListItem))).filter(
+    (item) => item.phone
+  );
 
   items.sort((left, right) => activityMs(right) - activityMs(left) || String(left.phone).localeCompare(String(right.phone)));
 

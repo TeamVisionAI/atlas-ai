@@ -5,33 +5,40 @@
  */
 
 const { OWNERSHIP } = require("./workflowConstants");
-const {
-  loadPersistedWorkflowState,
-  savePersistedWorkflowState
-} = require("./workflowStateStore");
+const { savePersistedWorkflowState } = require("./workflowStateStore");
 
 /**
  * Clears BR-034 escalation when prospect replies after stall.
  */
-function applyStallClearance(phone, persisted, computed) {
-  return savePersistedWorkflowState(phone, {
-    workflowOwnership: computed.workflowOwnership,
-    needsHumanAttention: false,
-    stalledAt: null,
-    stallEpisodeKey: null,
-    canonicalMilestone: computed.canonicalMilestone
-  });
+async function applyStallClearance(phone, persisted, computed, options = {}) {
+  return savePersistedWorkflowState(
+    phone,
+    {
+      workflowOwnership: computed.workflowOwnership,
+      needsHumanAttention: false,
+      stalledAt: null,
+      stallEpisodeKey: null,
+      canonicalMilestone: computed.canonicalMilestone
+    },
+    options
+  );
 }
 
 /**
  * Applies BR-034 stall transition: ownership → AGENT, needsHumanAttention → true.
  * Idempotent per stallEpisodeKey.
  *
- * @returns {{ applied: boolean, previous: Object, next: Object, transition: string|null }}
+ * @returns {Promise<{ applied: boolean, previous: Object, next: Object, transition: string|null }>}
  */
-function applyStallTransition(phone, persisted, stallResult, computed) {
+async function applyStallTransition(
+  phone,
+  persisted,
+  stallResult,
+  computed,
+  options = {}
+) {
   if (stallResult.cleared && persisted.needsHumanAttention) {
-    const next = applyStallClearance(phone, persisted, computed);
+    const next = await applyStallClearance(phone, persisted, computed, options);
     return {
       applied: true,
       previous: persisted,
@@ -61,16 +68,20 @@ function applyStallTransition(phone, persisted, stallResult, computed) {
     };
   }
 
-  const next = savePersistedWorkflowState(phone, {
-    workflowOwnership: OWNERSHIP.AGENT,
-    needsHumanAttention: true,
-    stalledAt: stallResult.stallDetectedAt,
-    stallEpisodeKey: stallResult.stallEpisodeKey,
-    canonicalMilestone: computed.canonicalMilestone,
-    manualAgentOwnership: true,
-    handoffReason: "stall",
-    handoffAt: stallResult.stallDetectedAt || new Date().toISOString()
-  });
+  const next = await savePersistedWorkflowState(
+    phone,
+    {
+      workflowOwnership: OWNERSHIP.AGENT,
+      needsHumanAttention: true,
+      stalledAt: stallResult.stallDetectedAt,
+      stallEpisodeKey: stallResult.stallEpisodeKey,
+      canonicalMilestone: computed.canonicalMilestone,
+      manualAgentOwnership: true,
+      handoffReason: "stall",
+      handoffAt: stallResult.stallDetectedAt || new Date().toISOString()
+    },
+    options
+  );
 
   return {
     applied: true,

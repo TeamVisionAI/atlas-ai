@@ -35,9 +35,9 @@ function extractReplyText(engineResult) {
  * even when workflowState already has AGENT human ownership (avoids customer silence).
  * @param {Object} prospect
  * @param {{ allowHandoffAck?: boolean }} [options]
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-function shouldDeliverAutomatedReply(prospect, options = {}) {
+async function shouldDeliverAutomatedReply(prospect, options = {}) {
   if (!prospect) {
     return false;
   }
@@ -48,7 +48,24 @@ function shouldDeliverAutomatedReply(prospect, options = {}) {
     return false;
   }
 
-  const persisted = workflowStateStore.loadPersistedWorkflowState(prospect.phone);
+  let persisted;
+  try {
+    persisted = await workflowStateStore.loadPersistedWorkflowState(
+      prospect.phone,
+      {
+        organizationId: prospect.organization_id || null,
+        prospectId: prospect.id || null
+      }
+    );
+  } catch (error) {
+    // BR-135 — fail closed: never auto-reply when durable ownership cannot be read.
+    logWhatsAppStage("automated_reply_suppressed_workflow_state_unavailable", {
+      phone: prospect.phone || null,
+      code: error?.code || null,
+      message: error?.message || null
+    });
+    return false;
+  }
   const agentState = loadAgentState(prospect.phone);
 
   if (isWorkflowGateActive(prospect, agentState)) {
@@ -113,7 +130,7 @@ async function deliverWhatsAppReply({
 }) {
   const allowHandoffAck = computeAllowHandoffAck(engineResult);
 
-  if (!shouldDeliverAutomatedReply(prospect, { allowHandoffAck })) {
+  if (!(await shouldDeliverAutomatedReply(prospect, { allowHandoffAck }))) {
     logWhatsAppStage("conversation_engine_reply_suppressed", {
       phone: normalized.phone,
       reason: "BUSINESS_RULES_OR_HUMAN_OWNERSHIP"

@@ -92,7 +92,7 @@ test("list shows newest activity first and unread for NEEDS_ATTENTION", async ()
       buildConversationsCenterReadModel
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
-    markConversationNeedsAttention("+17865550111", "ambiguity");
+    await markConversationNeedsAttention("+17865550111", "ambiguity");
 
     const model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
@@ -182,29 +182,29 @@ test("take over stops Atlas ownership; inbound does not allow automated reply", 
     const phone = "+17865550130";
     const prospect = { phone, current_step: "QUALIFICATION" };
 
-    markConversationNeedsAttention(phone, "explicit_human_request");
+    await markConversationNeedsAttention(phone, "explicit_human_request");
     assert.equal(
-      resolveConversationOwnershipState(loadPersistedWorkflowState(phone)),
+      resolveConversationOwnershipState(await loadPersistedWorkflowState(phone)),
       "NEEDS_ATTENTION"
     );
-    assert.equal(shouldDeliverAutomatedReply(prospect), false);
+    assert.equal(await shouldDeliverAutomatedReply(prospect), false);
 
-    const taken = takeOverConversation(phone);
+    const taken = await takeOverConversation(phone);
     assert.equal(taken.ownershipState, "HUMAN");
-    assert.equal(loadPersistedWorkflowState(phone).workflowOwnership, OWNERSHIP.AGENT);
-    assert.equal(loadPersistedWorkflowState(phone).needsHumanAttention, false);
-    assert.equal(loadPersistedWorkflowState(phone).handoffReason, "explicit_human_request");
-    assert.equal(shouldDeliverAutomatedReply(prospect), false);
+    assert.equal((await loadPersistedWorkflowState(phone)).workflowOwnership, OWNERSHIP.AGENT);
+    assert.equal((await loadPersistedWorkflowState(phone)).needsHumanAttention, false);
+    assert.equal((await loadPersistedWorkflowState(phone)).handoffReason, "explicit_human_request");
+    assert.equal(await shouldDeliverAutomatedReply(prospect), false);
     assert.equal(
-      shouldDeliverAutomatedReply(prospect, { allowHandoffAck: true }),
+      await shouldDeliverAutomatedReply(prospect, { allowHandoffAck: true }),
       false
     );
 
-    const returned = returnConversationToAtlas(phone);
+    const returned = await returnConversationToAtlas(phone);
     assert.equal(returned.ownershipState, "ATLAS");
-    assert.equal(loadPersistedWorkflowState(phone).workflowOwnership, OWNERSHIP.ATLAS);
-    assert.equal(loadPersistedWorkflowState(phone).handoffReason, null);
-    assert.equal(shouldDeliverAutomatedReply(prospect), true);
+    assert.equal((await loadPersistedWorkflowState(phone)).workflowOwnership, OWNERSHIP.ATLAS);
+    assert.equal((await loadPersistedWorkflowState(phone)).handoffReason, null);
+    assert.equal(await shouldDeliverAutomatedReply(prospect), true);
   });
 });
 
@@ -218,16 +218,16 @@ test("return to Atlas preserves prospect phone / does not reset qualification fi
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865550140";
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: MILESTONES.QUALIFICATION,
       workflowOwnership: OWNERSHIP.ATLAS,
       needsHumanAttention: false
     });
 
-    takeOverConversation(phone, { reason: "take_over" });
-    returnConversationToAtlas(phone);
+    await takeOverConversation(phone, { reason: "take_over" });
+    await returnConversationToAtlas(phone);
 
-    const next = loadPersistedWorkflowState(phone);
+    const next = await loadPersistedWorkflowState(phone);
     assert.equal(next.canonicalMilestone, MILESTONES.QUALIFICATION);
     assert.equal(next.workflowOwnership, OWNERSHIP.ATLAS);
   });
@@ -243,8 +243,8 @@ test("filters isolate NEEDS_ATTENTION / ATLAS / HUMAN", async () => {
       buildConversationsCenterReadModel
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
-    markConversationNeedsAttention("+17865550151", "escalation");
-    takeOverConversation("+17865550152");
+    await markConversationNeedsAttention("+17865550151", "escalation");
+    await takeOverConversation("+17865550152");
 
     const prospects = [
       {
@@ -319,7 +319,7 @@ test("detail list item includes full phone; unauthorized user remains forbidden"
       assertConversationsCenterPilotAccess
     } = require("../core/conversationsCenter/conversationsCenterAccess");
 
-    const item = buildConversationListItem({
+    const item = await buildConversationListItem({
       id: "p1",
       phone: "+13473369274",
       name: "Mayra",

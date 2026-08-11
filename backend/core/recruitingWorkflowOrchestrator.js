@@ -121,11 +121,18 @@ async function processFacebookLead(input = {}) {
     actor: "SYSTEM"
   });
 
-  savePersistedWorkflowState(phone, {
-    canonicalMilestone: MILESTONES.NEW_LEAD,
-    workflowOwnership: "ATLAS",
-    needsHumanAttention: false
-  });
+  await savePersistedWorkflowState(
+    phone,
+    {
+      canonicalMilestone: MILESTONES.NEW_LEAD,
+      workflowOwnership: "ATLAS",
+      needsHumanAttention: false
+    },
+    {
+      organizationId: input.organizationId || bridge.organizationId || null,
+      prospectId: bridge.prospectId || null
+    }
+  );
 
   const welcomeMessage = input.welcomeMessage || buildWelcomeMessage({ displayName, language });
   const { buildLeadWelcomeVariables } = require("./whatsappTemplateVariableBuilder");

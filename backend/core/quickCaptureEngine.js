@@ -395,13 +395,20 @@ async function finalizeQuickCaptureProspect(prospect, context) {
     ? await findProspectInOrganization(prospect.phone, organizationId)
     : prospect;
 
-  savePersistedWorkflowState(prospect.phone, {
-    canonicalMilestone: MILESTONES.NEW_LEAD,
-    workflowOwnership: OWNERSHIP.ATLAS,
-    needsHumanAttention: false,
-    manualAgentOwnership: false,
-    doNotContact: false
-  });
+  await savePersistedWorkflowState(
+    prospect.phone,
+    {
+      canonicalMilestone: MILESTONES.NEW_LEAD,
+      workflowOwnership: OWNERSHIP.ATLAS,
+      needsHumanAttention: false,
+      manualAgentOwnership: false,
+      doNotContact: false
+    },
+    {
+      organizationId: prospect.organization_id || organizationId || null,
+      prospectId: prospect.id || null
+    }
+  );
 
   await emit(EVENT_TYPES.PROSPECT_CREATED, {
     prospectPhone: prospect.phone,
@@ -422,7 +429,7 @@ async function finalizeQuickCaptureProspect(prospect, context) {
   });
 
   const summary = buildProspectSummary(prospect, summaryOverrides);
-  const guidance = buildQuickCaptureGuidance(prospect);
+  const guidance = await buildQuickCaptureGuidance(prospect);
 
   return {
     ok: true,

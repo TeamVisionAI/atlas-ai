@@ -170,13 +170,20 @@ async function emitProspectLifecycleEvents(
   { created, reopened, correlationBase, organizationId }
 ) {
   if (created) {
-    savePersistedWorkflowState(prospect.phone, {
-      canonicalMilestone: MILESTONES.NEW_LEAD,
-      workflowOwnership: OWNERSHIP.ATLAS,
-      needsHumanAttention: false,
-      manualAgentOwnership: false,
-      doNotContact: false
-    });
+    await savePersistedWorkflowState(
+      prospect.phone,
+      {
+        canonicalMilestone: MILESTONES.NEW_LEAD,
+        workflowOwnership: OWNERSHIP.ATLAS,
+        needsHumanAttention: false,
+        manualAgentOwnership: false,
+        doNotContact: false
+      },
+      {
+        organizationId: organizationId || prospect.organization_id || null,
+        prospectId: prospect.id || null
+      }
+    );
 
     await eventEngine.emit(EVENT_TYPES.PROSPECT_CREATED, {
       prospectPhone: prospect.phone,

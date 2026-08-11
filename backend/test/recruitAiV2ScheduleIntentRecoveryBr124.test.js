@@ -3,6 +3,8 @@
  */
 "use strict";
 
+require("dotenv").config();
+
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
@@ -35,12 +37,12 @@ const BOUNDARY_PROSPECT = {
   current_step: "DAY_PART"
 };
 
-function withAgentOwnership(fn) {
+async function withAgentOwnership(fn) {
   const originalLoad = workflowStateStore.loadPersistedWorkflowState;
-  workflowStateStore.loadPersistedWorkflowState = (phone) => {
+  workflowStateStore.loadPersistedWorkflowState = async (phone) => {
     if (String(phone) === BOUNDARY_PHONE) {
       return {
-        ...originalLoad(phone),
+        ...(await originalLoad(phone)),
         needsHumanAttention: true,
         workflowOwnership: OWNERSHIP.AGENT
       };
@@ -48,7 +50,7 @@ function withAgentOwnership(fn) {
     return originalLoad(phone);
   };
   try {
-    return fn();
+    return await fn();
   } finally {
     workflowStateStore.loadPersistedWorkflowState = originalLoad;
   }
@@ -221,7 +223,7 @@ describe("BR-124 schedule intent recovery", () => {
     assert.equal(decision.decision.shouldEscalate, false);
   });
 
-  test("6. genuine escalate_to_human → customer-facing handoff reply + delivery ack allowed", () => {
+  test("6. genuine escalate_to_human → customer-facing handoff reply + delivery ack allowed", async () => {
     const decision = decideConversationTurn({
       context: buildAnaContext({
         conversation: {
@@ -253,9 +255,9 @@ describe("BR-124 schedule intent recovery", () => {
       /companero|compañero|Team Vision/i
     );
 
-    withAgentOwnership(() => {
+    await withAgentOwnership(async () => {
       assert.equal(
-        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: true }),
+        await shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: true }),
         true
       );
     });
@@ -272,11 +274,11 @@ describe("BR-124 schedule intent recovery", () => {
 });
 
 describe("BR-124 communicationHub ownership boundaries", () => {
-  test("B1. allowHandoffAck false under AGENT ownership → suppress", () => {
-    withAgentOwnership(() => {
-      assert.equal(shouldDeliverAutomatedReply(BOUNDARY_PROSPECT), false);
+  test("B1. allowHandoffAck false under AGENT ownership → suppress", async () => {
+    await withAgentOwnership(async () => {
+      assert.equal(await shouldDeliverAutomatedReply(BOUNDARY_PROSPECT), false);
       assert.equal(
-        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: false }),
+        await shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: false }),
         false
       );
     });
@@ -331,15 +333,15 @@ describe("BR-124 communicationHub ownership boundaries", () => {
     }
   });
 
-  test("B4. later arbitrary bot turn stays silenced under AGENT ownership", () => {
-    withAgentOwnership(() => {
+  test("B4. later arbitrary bot turn stays silenced under AGENT ownership", async () => {
+    await withAgentOwnership(async () => {
       const unlocked = computeAllowHandoffAck({
         source: "recruit_ai_v2_live_authoring",
         nextAction: "clarify_once"
       });
       assert.equal(unlocked, false);
       assert.equal(
-        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, {
+        await shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, {
           allowHandoffAck: unlocked
         }),
         false
@@ -381,8 +383,8 @@ describe("BR-124 communicationHub ownership boundaries", () => {
     );
   });
 
-  test("B6. delivery gate does not mutate workflow ownership (read-only)", () => {
-    withAgentOwnership(() => {
+  test("B6. delivery gate does not mutate workflow ownership (read-only)", async () => {
+    await withAgentOwnership(async () => {
       const originalSave = workflowStateStore.savePersistedWorkflowState;
       let saveCalls = 0;
       workflowStateStore.savePersistedWorkflowState = (...args) => {
@@ -390,8 +392,8 @@ describe("BR-124 communicationHub ownership boundaries", () => {
         return originalSave(...args);
       };
       try {
-        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: true });
-        shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: false });
+        await shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: true });
+        await shouldDeliverAutomatedReply(BOUNDARY_PROSPECT, { allowHandoffAck: false });
         assert.equal(saveCalls, 0);
       } finally {
         workflowStateStore.savePersistedWorkflowState = originalSave;

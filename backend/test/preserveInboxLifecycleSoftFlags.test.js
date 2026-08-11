@@ -13,12 +13,14 @@ const path = require("node:path");
 
 async function withTempWorkflowFile(run) {
   const previousEnv = process.env.ATLAS_WORKFLOW_STATE_FILE;
+  const previousBackend = process.env.ATLAS_WORKFLOW_STATE_BACKEND;
   const tempFile = path.join(
     fs.mkdtempSync(path.join(os.tmpdir(), "atlas-wf-soft-")),
     "workflowState.json"
   );
   fs.writeFileSync(tempFile, "{}");
   process.env.ATLAS_WORKFLOW_STATE_FILE = tempFile;
+  process.env.ATLAS_WORKFLOW_STATE_BACKEND = "file";
 
   try {
     return await run(tempFile);
@@ -27,6 +29,11 @@ async function withTempWorkflowFile(run) {
       delete process.env.ATLAS_WORKFLOW_STATE_FILE;
     } else {
       process.env.ATLAS_WORKFLOW_STATE_FILE = previousEnv;
+    }
+    if (previousBackend === undefined) {
+      delete process.env.ATLAS_WORKFLOW_STATE_BACKEND;
+    } else {
+      process.env.ATLAS_WORKFLOW_STATE_BACKEND = previousBackend;
     }
     try {
       fs.rmSync(path.dirname(tempFile), { recursive: true, force: true });
@@ -54,19 +61,19 @@ test("A–E mark TEST → unrelated ownership write → reload still TEST", asyn
     const { OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865559001";
-    markConversationAsTest(phone);
+    await markConversationAsTest(phone);
 
-    assert.ok(loadPersistedWorkflowState(phone).inboxMarkedTestAt);
+    assert.ok((await loadPersistedWorkflowState(phone)).inboxMarkedTestAt);
     assert.equal(
       resolveInboxLifecycle({
         prospect: { phone, current_step: "QUALIFICATION" },
-        persisted: loadPersistedWorkflowState(phone)
+        persisted: await loadPersistedWorkflowState(phone)
       }).lifecycle,
       INBOX_LIFECYCLE.TEST
     );
 
     // Unrelated workflowState updates (stall / attention / ownership).
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       needsHumanAttention: true,
       workflowOwnership: OWNERSHIP.AGENT,
       manualAgentOwnership: true,
@@ -75,22 +82,22 @@ test("A–E mark TEST → unrelated ownership write → reload still TEST", asyn
       stalledAt: new Date().toISOString(),
       stallEpisodeKey: "episode-1"
     });
-    takeOverConversation(phone);
-    returnConversationToAtlas(phone);
-    savePersistedWorkflowState(phone, {
+    await takeOverConversation(phone);
+    await returnConversationToAtlas(phone);
+    await savePersistedWorkflowState(phone, {
       canonicalMilestone: "QUALIFICATION",
       workflowOwnership: OWNERSHIP.ATLAS,
       needsHumanAttention: false
     });
     // Undefined in patch must not wipe soft flags.
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       workflowOwnership: OWNERSHIP.ATLAS,
       inboxMarkedTestAt: undefined,
       inboxClosedAt: undefined,
       inboxArchivedAt: undefined
     });
 
-    const after = loadPersistedWorkflowState(phone);
+    const after = await loadPersistedWorkflowState(phone);
     assert.ok(after.inboxMarkedTestAt, "inboxMarkedTestAt must survive");
     assert.equal(
       resolveInboxLifecycle({
@@ -119,15 +126,15 @@ test("ARCHIVED survives stall + system-style workflow writes", async () => {
     const { OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865559002";
-    archiveConversation(phone);
-    takeOverConversation(phone);
-    savePersistedWorkflowState(phone, {
+    await archiveConversation(phone);
+    await takeOverConversation(phone);
+    await savePersistedWorkflowState(phone, {
       needsHumanAttention: true,
       workflowOwnership: OWNERSHIP.AGENT,
       handoffReason: "WorkflowOwnershipChanged"
     });
 
-    const after = loadPersistedWorkflowState(phone);
+    const after = await loadPersistedWorkflowState(phone);
     assert.ok(after.inboxArchivedAt);
     assert.equal(
       resolveInboxLifecycle({
@@ -157,11 +164,11 @@ test("CLOSED survives TAKE OVER / RETURN TO ATLAS", async () => {
     } = require("../core/conversationsCenter/conversationsCenterLifecycle");
 
     const phone = "+17865559003";
-    closeConversation(phone, "NOT_INTERESTED");
-    takeOverConversation(phone);
-    returnConversationToAtlas(phone);
+    await closeConversation(phone, "NOT_INTERESTED");
+    await takeOverConversation(phone);
+    await returnConversationToAtlas(phone);
 
-    const afterClose = loadPersistedWorkflowState(phone);
+    const afterClose = await loadPersistedWorkflowState(phone);
     assert.ok(afterClose.inboxClosedAt);
     assert.equal(afterClose.inboxCloseReason, "NOT_INTERESTED");
     // closeConversation also stamps inboxArchivedAt → ARCHIVED bucket (still not Active).
@@ -174,16 +181,16 @@ test("CLOSED survives TAKE OVER / RETURN TO ATLAS", async () => {
 
     // Soft CLOSED-only mark (no archive stamp) also survives ownership churn.
     const phone2 = "+17865559033";
-    savePersistedWorkflowState(phone2, {
+    await savePersistedWorkflowState(phone2, {
       inboxClosedAt: "2026-08-10T12:00:00.000Z",
       inboxCloseReason: "NOT_INTERESTED",
       inboxArchivedAt: null
     });
-    takeOverConversation(phone2);
-    returnConversationToAtlas(phone2);
-    savePersistedWorkflowState(phone2, { needsHumanAttention: true });
+    await takeOverConversation(phone2);
+    await returnConversationToAtlas(phone2);
+    await savePersistedWorkflowState(phone2, { needsHumanAttention: true });
 
-    const afterSoftClose = loadPersistedWorkflowState(phone2);
+    const afterSoftClose = await loadPersistedWorkflowState(phone2);
     assert.ok(afterSoftClose.inboxClosedAt);
     assert.equal(
       resolveInboxLifecycle({
@@ -214,10 +221,10 @@ test("Restore explicitly clears soft flags; unrelated writes cannot", async () =
     } = require("../core/conversationsCenter/conversationsCenterLifecycle");
 
     const phone = "+17865559004";
-    markConversationAsTest(phone);
-    restoreConversation(phone);
+    await markConversationAsTest(phone);
+    await restoreConversation(phone);
 
-    const restored = loadPersistedWorkflowState(phone);
+    const restored = await loadPersistedWorkflowState(phone);
     assert.equal(restored.inboxMarkedTestAt, null);
     assert.equal(
       resolveInboxLifecycle({
@@ -255,8 +262,8 @@ test("Restore explicitly clears soft flags; unrelated writes cannot", async () =
     );
     assert.equal(cleared.inboxMarkedTestAt, null);
 
-    savePersistedWorkflowState(phone, { needsHumanAttention: false });
-    assert.equal(loadPersistedWorkflowState(phone).inboxMarkedTestAt, null);
+    await savePersistedWorkflowState(phone, { needsHumanAttention: false });
+    assert.equal((await loadPersistedWorkflowState(phone)).inboxMarkedTestAt, null);
   });
 });
 
@@ -274,17 +281,17 @@ test("Concurrent-style re-read keeps TEST when second writer omits soft fields",
     const { OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865559005";
-    markConversationAsTest(phone);
-    const markedAt = loadPersistedWorkflowState(phone).inboxMarkedTestAt;
+    await markConversationAsTest(phone);
+    const markedAt = (await loadPersistedWorkflowState(phone)).inboxMarkedTestAt;
 
     // Simulate ownership writer that never mentions soft fields.
-    savePersistedWorkflowState(phone, {
+    await savePersistedWorkflowState(phone, {
       workflowOwnership: OWNERSHIP.WAITING_EVENT,
       needsHumanAttention: false,
       canonicalMilestone: "INTERVIEW_READY"
     });
 
-    const after = loadPersistedWorkflowState(phone);
+    const after = await loadPersistedWorkflowState(phone);
     assert.equal(after.inboxMarkedTestAt, markedAt);
     assert.equal(
       resolveInboxLifecycle({

@@ -169,14 +169,14 @@ async function verifyBusinessRulesGateHelper() {
     current_step: "QUALIFYING"
   };
 
-  assert(shouldDeliverAutomatedReply(prospect) === true, "Default prospect allows automated reply");
+  assert(await shouldDeliverAutomatedReply(prospect) === true, "Default prospect allows automated reply");
 
   const closed = {
     ...prospect,
     current_step: "CLOSED"
   };
 
-  assert(shouldDeliverAutomatedReply(closed) === false, "Closed prospect blocks automated reply");
+  assert(await shouldDeliverAutomatedReply(closed) === false, "Closed prospect blocks automated reply");
   console.log("✓ Automated reply business-rules gate");
 }
 

@@ -59,7 +59,7 @@ test("HUMAN owner can send via composer", async () => {
       sendHumanComposerReply
     } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 
-    takeOverConversation(PHONE);
+    await takeOverConversation(PHONE);
 
     let sendArgs = null;
     const result = await sendHumanComposerReply({
@@ -100,7 +100,7 @@ test("ATLAS owner cannot use human composer", async () => {
       sendHumanComposerReply
     } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 
-    returnConversationToAtlas(PHONE);
+    await returnConversationToAtlas(PHONE);
 
     await assert.rejects(
       () =>
@@ -129,7 +129,7 @@ test("non-Niovel user forbidden", async () => {
       sendHumanComposerReply
     } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 
-    takeOverConversation(PHONE);
+    await takeOverConversation(PHONE);
 
     await assert.rejects(
       () =>
@@ -156,7 +156,7 @@ test("duplicate clientRequestId does not duplicate send (idempotent success)", a
       sendHumanComposerReply
     } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 
-    takeOverConversation(PHONE);
+    await takeOverConversation(PHONE);
     let calls = 0;
 
     const sendFn = async () => {
@@ -208,7 +208,7 @@ test("outside messaging window blocks free-form and does not send template", asy
       DELIVERY_STATUSES
     } = require("../core/whatsappOutboundAuthorizationGate");
 
-    takeOverConversation(PHONE);
+    await takeOverConversation(PHONE);
 
     await assert.rejects(
       () =>
@@ -248,7 +248,7 @@ test("send failure surfaces safely", async () => {
       sendHumanComposerReply
     } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 
-    takeOverConversation(PHONE);
+    await takeOverConversation(PHONE);
 
     await assert.rejects(
       () =>
@@ -303,7 +303,7 @@ test("Atlas auto-reply remains suppressed after human send ownership", async () 
       sendHumanComposerReply
     } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 
-    takeOverConversation(PHONE);
+    await takeOverConversation(PHONE);
     await sendHumanComposerReply({
       phone: PHONE,
       message: "Human spoke",
@@ -320,7 +320,7 @@ test("Atlas auto-reply remains suppressed after human send ownership", async () 
     });
 
     assert.equal(
-      shouldDeliverAutomatedReply({ phone: PHONE, current_step: "QUALIFICATION" }),
+      await shouldDeliverAutomatedReply({ phone: PHONE, current_step: "QUALIFICATION" }),
       false
     );
   });
