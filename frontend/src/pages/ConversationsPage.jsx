@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import StatusBadge from "../components/ui/StatusBadge";
@@ -13,6 +13,11 @@ import {
   resolveThreadActionIds,
   resolveLifecycleActionIds
 } from "../engines/conversationsCenterPresentation";
+import {
+  isConversationDetailCurrent,
+  resolveSelectedTranscriptProspectId,
+  shouldCommitConversationDetail
+} from "../engines/conversationsSelectionConsistency";
 import {
   getConversations,
   getConversation,
@@ -166,6 +171,8 @@ export default function ConversationsPage() {
   const [composeStatus, setComposeStatus] = useState(null);
   const [composeRequestId, setComposeRequestId] = useState(() => newClientRequestId());
   const [phoneCopyStatus, setPhoneCopyStatus] = useState(null);
+  const selectedPhoneRef = useRef(selectedPhone);
+  selectedPhoneRef.current = selectedPhone;
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -198,13 +205,31 @@ export default function ConversationsPage() {
     async (phone) => {
       if (!phone) {
         setDetail(null);
+        setDetailLoading(false);
         return;
       }
       setDetailLoading(true);
       try {
         const data = await getConversation(phone);
+        // Stale async guard — rapid A→B must never keep A's detail under B.
+        if (
+          !shouldCommitConversationDetail({
+            requestPhone: phone,
+            selectedPhone: selectedPhoneRef.current
+          })
+        ) {
+          return;
+        }
         setDetail(data);
       } catch (err) {
+        if (
+          !shouldCommitConversationDetail({
+            requestPhone: phone,
+            selectedPhone: selectedPhoneRef.current
+          })
+        ) {
+          return;
+        }
         setDetail(null);
         setError(
           err instanceof ConversationsCenterError
@@ -212,17 +237,36 @@ export default function ConversationsPage() {
             : err.message
         );
       } finally {
-        setDetailLoading(false);
+        if (selectedPhoneRef.current === phone) {
+          setDetailLoading(false);
+        }
       }
     },
     [translate]
   );
 
   useEffect(() => {
+    // Clear prior conversation detail immediately so header never pairs with
+    // another prospect's ownership/composer/transcript binding.
+    setDetail(null);
+    setComposeText("");
+    setComposeStatus(null);
+    setComposeRequestId(newClientRequestId());
+    setPhoneCopyStatus(null);
+
     if (selectedPhone) {
+      setDetailLoading(true);
+      loadDetail(selectedPhone);
+    } else {
+      setDetailLoading(false);
+    }
+  }, [selectedPhone, loadDetail]);
+
+  useEffect(() => {
+    if (selectedPhone && refreshSignal > 0) {
       loadDetail(selectedPhone);
     }
-  }, [selectedPhone, loadDetail, refreshSignal]);
+  }, [refreshSignal, selectedPhone, loadDetail]);
 
   const counts = payload?.counts || {
     active: 0,
@@ -236,9 +280,30 @@ export default function ConversationsPage() {
 
   const items = payload?.items || [];
 
-  const selectedItem = useMemo(
-    () => items.find((row) => row.phone === selectedPhone) || detail?.conversation || null,
-    [items, selectedPhone, detail]
+  const selectedItem = useMemo(() => {
+    const fromList = items.find((row) => row.phone === selectedPhone) || null;
+    if (fromList) {
+      return fromList;
+    }
+    if (isConversationDetailCurrent(detail, selectedPhone)) {
+      return detail.conversation || null;
+    }
+    return null;
+  }, [items, selectedPhone, detail]);
+
+  const matchedDetail = useMemo(
+    () => (isConversationDetailCurrent(detail, selectedPhone) ? detail : null),
+    [detail, selectedPhone]
+  );
+
+  const timelineProspectId = useMemo(
+    () =>
+      resolveSelectedTranscriptProspectId({
+        selectedPhone,
+        selectedItem,
+        detail: matchedDetail
+      }),
+    [selectedPhone, selectedItem, matchedDetail]
   );
 
   function setFilter(filterId) {
@@ -250,13 +315,6 @@ export default function ConversationsPage() {
     }
     setSearchParams(next);
   }
-
-  useEffect(() => {
-    setComposeText("");
-    setComposeStatus(null);
-    setComposeRequestId(newClientRequestId());
-    setPhoneCopyStatus(null);
-  }, [selectedPhone]);
 
   async function onTakeOver() {
     if (!selectedPhone || actionBusy) return;
@@ -357,7 +415,7 @@ export default function ConversationsPage() {
   async function onSendHumanReply(event) {
     event.preventDefault();
     const currentOwnership =
-      detail?.ownershipState ||
+      matchedDetail?.ownershipState ||
       selectedItem?.ownershipState ||
       null;
     const effective = resolveEffectiveOwnership(currentOwnership);
@@ -418,10 +476,11 @@ export default function ConversationsPage() {
   }
 
   const ownershipState =
-    detail?.ownershipState || selectedItem?.ownershipState || null;
+    matchedDetail?.ownershipState || selectedItem?.ownershipState || null;
   // Attention (NEEDS_ATTENTION) is display-only; controls use effectiveOwnership only.
   const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
-  const handoffReason = detail?.handoffReason || selectedItem?.handoffReason || null;
+  const handoffReason =
+    matchedDetail?.handoffReason || selectedItem?.handoffReason || null;
   const humanComposerEnabled = isHumanComposerEnabled(effectiveOwnership);
   const showTakeOver = canTakeOverConversation(effectiveOwnership);
   const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
@@ -432,31 +491,31 @@ export default function ConversationsPage() {
   });
   const inboxLifecycle =
     selectedItem?.inboxLifecycle ||
-    detail?.conversation?.inboxLifecycle ||
+    matchedDetail?.conversation?.inboxLifecycle ||
     "ACTIVE";
   const lifecycleActionIds = resolveLifecycleActionIds({ inboxLifecycle });
   const headerModel = buildConversationHeaderModel({
-    name: selectedItem?.name || detail?.conversation?.name || null,
+    name: selectedItem?.name || matchedDetail?.conversation?.name || null,
     phone:
-      detail?.phone ||
-      detail?.conversation?.phone ||
       selectedItem?.phone ||
+      matchedDetail?.phone ||
+      matchedDetail?.conversation?.phone ||
       selectedPhone ||
       null,
-    source: selectedItem?.source || detail?.conversation?.source || null,
+    source: selectedItem?.source || matchedDetail?.conversation?.source || null,
     ownershipState,
     appointmentStatus:
       selectedItem?.appointmentStatus ||
-      detail?.conversation?.appointmentStatus ||
+      matchedDetail?.conversation?.appointmentStatus ||
       null,
     conversationGoal:
       selectedItem?.conversationGoal ||
-      detail?.conversation?.conversationGoal ||
+      matchedDetail?.conversation?.conversationGoal ||
       null,
     inboxLifecycle,
     inboxCloseReason:
       selectedItem?.inboxCloseReason ||
-      detail?.conversation?.inboxCloseReason ||
+      matchedDetail?.conversation?.inboxCloseReason ||
       null
   });
 
@@ -526,8 +585,6 @@ export default function ConversationsPage() {
         <section className="conversations-page__thread" aria-label={translate("conversationsThreadLabel")}>
           {!selectedPhone ? (
             <p className="conversations-page__empty">{translate("conversationsSelectPrompt")}</p>
-          ) : detailLoading && !detail ? (
-            <p className="conversations-page__empty">{translate("conversationsLoading")}</p>
           ) : (
             <>
               <div className="conversations-thread__pilot-sticky">
@@ -748,12 +805,15 @@ export default function ConversationsPage() {
                 </form>
               </div>
 
-              {detail?.prospectId ? (
+              {timelineProspectId ? (
                 <CommunicationsCenterTimeline
-                  prospectId={detail.prospectId}
+                  key={`cc-timeline:${timelineProspectId}`}
+                  prospectId={timelineProspectId}
                   refreshSignal={refreshSignal}
                   newestFirst
                 />
+              ) : detailLoading ? (
+                <p className="conversations-page__empty">{translate("conversationsLoading")}</p>
               ) : (
                 <p className="conversations-page__empty">{translate("conversationsNoTranscript")}</p>
               )}

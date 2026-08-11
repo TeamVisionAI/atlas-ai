@@ -15,6 +15,7 @@ import {
   containsRawPhoneLeak,
   buildCommunicationsCacheKey
 } from "../../../engines/communicationsCenterViewModel";
+import { shouldCommitTimelinePayload } from "../../../engines/conversationsSelectionConsistency";
 import "./CommunicationsCenterTimeline.css";
 
 export default function CommunicationsCenterTimeline({
@@ -37,12 +38,24 @@ export default function CommunicationsCenterTimeline({
     }
 
     let cancelled = false;
+    const requestedProspectId = String(prospectId);
+    // Clear previous prospect transcript immediately so it cannot render under a new header.
+    setPayload(null);
     setStatus("loading");
     setError(null);
+    setOpenDiagnostics(new Set());
 
-    getProspectCommunications(prospectId, { limit: 200 })
+    getProspectCommunications(requestedProspectId, { limit: 200 })
       .then((data) => {
         if (cancelled) return;
+        if (
+          !shouldCommitTimelinePayload({
+            requestedProspectId,
+            payload: data
+          })
+        ) {
+          return;
+        }
         setPayload(data);
         setStatus("ready");
       })
@@ -67,9 +80,12 @@ export default function CommunicationsCenterTimeline({
   }, [prospectId, refreshSignal]);
 
   const filteredItems = useMemo(() => {
+    if (status !== "ready") {
+      return [];
+    }
     const filtered = filterCommunicationsItems(payload?.items || [], filterId);
     return orderCommunicationsForDisplay(filtered, { newestFirst });
-  }, [payload, filterId, newestFirst]);
+  }, [payload, filterId, newestFirst, status]);
 
   const cacheKey = buildCommunicationsCacheKey(organizationId, prospectId);
 
@@ -100,6 +116,8 @@ export default function CommunicationsCenterTimeline({
       className="cc-timeline"
       aria-label="Communications Center"
       data-cache-key={cacheKey}
+      data-prospect-id={prospectId}
+      data-timeline-status={status}
     >
       <header className="cc-timeline__header">
         <div>
