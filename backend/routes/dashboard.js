@@ -12,6 +12,9 @@ const {
   buildPrioritizedWorkflowQueue
 } = require("../core/missionControlPriorityEngine");
 const { filterProductionProspects } = require("../core/productionProspectFilter");
+const {
+  filterOutOperationalTestProspects
+} = require("../core/missionControlOperationalTestFilter");
 const { filterProspectsForAuthContext } = require("../security/authorizationService");
 const {
   buildExecutiveDashboard,
@@ -32,7 +35,9 @@ router.get("/", async (req, res) => {
     return res.status(500).json(error);
   }
 
-  const productionProspects = filterProductionProspects(data || []);
+  const productionProspects = filterOutOperationalTestProspects(
+    filterProductionProspects(data || [])
+  );
   const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
 
   const dashboard = {
@@ -100,7 +105,10 @@ router.get("/activity", async (req, res) => {
       .select("*")
       .eq("organization_id", organizationId);
     const productionProspects = filterProductionProspects(data || []);
-    const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
+    const prospects = filterProspectsForAuthContext(
+      req.authContext,
+      filterOutOperationalTestProspects(productionProspects)
+    );
     const phones = prospects.map((row) => row.phone);
     const activity = await buildRecentActivity(phones, limit);
 

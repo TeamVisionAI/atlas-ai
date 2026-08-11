@@ -53,6 +53,9 @@ const API_CONTRACTS = Object.freeze({
     load: async (organizationId) => {
       const { supabase } = require("../services/supabaseService");
       const { filterProductionProspects } = require("./productionProspectFilter");
+      const {
+        filterOutOperationalTestProspects
+      } = require("./missionControlOperationalTestFilter");
       const { buildPrioritizedWorkflowQueue } = require("./missionControlPriorityEngine");
 
       const { data, error } = await supabase
@@ -64,7 +67,9 @@ const API_CONTRACTS = Object.freeze({
         throw error;
       }
 
-      const prospects = filterProductionProspects(data || []);
+      const prospects = filterOutOperationalTestProspects(
+        filterProductionProspects(data || [])
+      );
 
       return {
         totalProspects: prospects.length,

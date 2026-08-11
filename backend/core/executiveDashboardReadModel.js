@@ -6,6 +6,9 @@
 const { supabase } = require("../services/supabaseService");
 const { filterProductionProspects } = require("./productionProspectFilter");
 const {
+  filterOutOperationalTestProspects
+} = require("./missionControlOperationalTestFilter");
+const {
   buildPrioritizedWorkflowQueue
 } = require("./missionControlPriorityEngine");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
@@ -70,7 +73,9 @@ async function loadProductionProspects(organizationId) {
     throw error;
   }
 
-  return filterProductionProspects(data || []);
+  return filterOutOperationalTestProspects(
+    filterProductionProspects(data || [])
+  );
 }
 
 function findProspectByPhone(prospects, phone) {
