@@ -52,33 +52,41 @@ async function buildWorkflowSummaryForProspect(prospect) {
 /**
  * Returns prospects sorted by missionControlPriority (rank 1 = highest).
  * Implements BR-136 — excludes operational TEST/CANARY/QA (not META_REVIEW demos).
+ * Implements BR-044 — excludes terminal closed interview outcomes from default queue.
  */
 async function buildPrioritizedWorkflowQueue(prospects = []) {
   const {
     filterOutOperationalTestProspects
   } = require("./missionControlOperationalTestFilter");
+  const {
+    filterOutTerminalClosedForMissionControl
+  } = require("./missionControlTerminalOutcomeFilter");
+
   const eligible = filterOutOperationalTestProspects(prospects);
 
   const summaries = await Promise.all(
     eligible.map((prospect) => buildWorkflowSummaryForProspect(prospect))
   );
 
-  return summaries
-    .filter(Boolean)
-    .sort((left, right) => {
-      if (left.missionControlPriority !== right.missionControlPriority) {
-        return left.missionControlPriority - right.missionControlPriority;
-      }
+  const openWork = await filterOutTerminalClosedForMissionControl(
+    eligible,
+    summaries.filter(Boolean)
+  );
 
-      const leftStall = left.stalledAt ? Date.parse(left.stalledAt) : Infinity;
-      const rightStall = right.stalledAt ? Date.parse(right.stalledAt) : Infinity;
+  return openWork.sort((left, right) => {
+    if (left.missionControlPriority !== right.missionControlPriority) {
+      return left.missionControlPriority - right.missionControlPriority;
+    }
 
-      if (leftStall !== rightStall) {
-        return leftStall - rightStall;
-      }
+    const leftStall = left.stalledAt ? Date.parse(left.stalledAt) : Infinity;
+    const rightStall = right.stalledAt ? Date.parse(right.stalledAt) : Infinity;
 
-      return String(left.phone).localeCompare(String(right.phone));
-    });
+    if (leftStall !== rightStall) {
+      return leftStall - rightStall;
+    }
+
+    return String(left.phone).localeCompare(String(right.phone));
+  });
 }
 
 module.exports = {

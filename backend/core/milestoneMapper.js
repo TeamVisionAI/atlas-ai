@@ -100,8 +100,21 @@ function mapToCanonicalMilestone({
     return MILESTONES.DO_NOT_CONTACT;
   }
 
-  if (agentState.outcome === "Not Interested") {
+  const closedOutcomes = new Set([
+    "Not Interested",
+    "Not Qualified",
+    "Already Working with Another Company",
+    "Unable to Contact"
+  ]);
+  if (
+    closedOutcomes.has(agentState.outcome) ||
+    closedOutcomes.has(agentState.interviewBusinessOutcome)
+  ) {
     return MILESTONES.CLOSED;
+  }
+
+  if (agentState.outcome === "Became Client") {
+    return MILESTONES.FAST_START;
   }
 
   if (agentState.outcome === "Recruited") {

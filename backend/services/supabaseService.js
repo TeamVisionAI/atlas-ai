@@ -151,7 +151,19 @@ async function findLatestActiveProspectInOrganization(organizationId) {
   const {
     filterOutOperationalTestProspects
   } = require("../core/missionControlOperationalTestFilter");
-  const eligibleProspects = filterOutOperationalTestProspects(productionProspects);
+  const {
+    isTerminalClosedForMissionControlQueue
+  } = require("../core/missionControlTerminalOutcomeFilter");
+  const eligibleProspects = filterOutOperationalTestProspects(productionProspects).filter(
+    (prospect) =>
+      !isTerminalClosedForMissionControlQueue({
+        prospect,
+        summary: {
+          phone: prospect.phone,
+          canonicalMilestone: prospect.workflow_state?.canonicalMilestone || null
+        }
+      })
+  );
 
   if (!eligibleProspects.length) {
     return null;
