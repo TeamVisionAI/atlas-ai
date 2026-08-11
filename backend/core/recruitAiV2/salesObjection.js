@@ -31,6 +31,8 @@ function classifySalesObjectionKind(text) {
     /\bis this (a )?sales (job|role|position|opportunity)\b/.test(t) ||
     /\bis this about sales\b/.test(t) ||
     /\bdo (i|you) (have to|need to) sell\b/.test(t) ||
+    // Bare Spanish canary entry: "¿Es ventas?" / "Es de ventas?"
+    /\bes (de )?ventas\b/.test(t) ||
     /\bes (esto|esa|esta) (de )?ventas\b/.test(t) ||
     /\besto es (de )?ventas\b/.test(t) ||
     /\bes (un trabajo|una oportunidad) de ventas\b/.test(t) ||

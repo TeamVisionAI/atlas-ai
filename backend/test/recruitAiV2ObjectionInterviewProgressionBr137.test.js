@@ -253,20 +253,58 @@ test("12. CE/V2 parity — material equivalence for key objections", () => {
 });
 
 test("13. Spanish equivalents — same logic/compliance", () => {
-  const esSales = renderTurn(
-    "¿Es esto ventas?",
-    createConversationContext({
-      preferredLanguage: "spanish",
-      knownFacts: {
-        city: "Miami",
-        state: "FL",
-        cityCertainty: FACT_CERTAINTY.CONFIRMED,
-        stateCertainty: FACT_CERTAINTY.CONFIRMED,
-        workAuthorization: true,
-        workAuthorizationStatus: "authorized"
-      }
-    })
-  );
+  const spanishQualified = createConversationContext({
+    preferredLanguage: "spanish",
+    knownFacts: {
+      city: "Miami",
+      state: "FL",
+      cityCertainty: FACT_CERTAINTY.CONFIRMED,
+      stateCertainty: FACT_CERTAINTY.CONFIRMED,
+      workAuthorization: true,
+      workAuthorizationStatus: "authorized"
+    }
+  });
+
+  // Focused Spanish identity canary variants → existing SALES_OBJECTION identity path.
+  const spanishIdentityVariants = [
+    "¿Es ventas?",
+    "Es ventas",
+    "es ventas",
+    "ES VENTAS",
+    "¿Esto es ventas?",
+    "Esto es ventas",
+    "¿De qué se trata, es ventas?"
+  ];
+  for (const msg of spanishIdentityVariants) {
+    const r = renderTurn(msg, spanishQualified);
+    assert.equal(
+      r.interpretation.intent,
+      INTENTS.SALES_OBJECTION,
+      `intent for ${msg}`
+    );
+    assert.equal(
+      r.interpretation.entities.salesObjectionKind,
+      "identity",
+      `kind for ${msg}`
+    );
+    assert.doesNotMatch(
+      r.rendered.text,
+      /no es ventas|no somos ventas|Continuemos/i,
+      `bad copy for ${msg}`
+    );
+    assert.match(
+      r.rendered.text,
+      /servicios financieros/i,
+      `truthful framing for ${msg}`
+    );
+    assert.match(
+      r.rendered.text,
+      /entrevista|mañana o en la tarde|siguiente paso/i,
+      `forward progression for ${msg}`
+    );
+  }
+
+  const esSales = renderTurn("¿Es esto ventas?", spanishQualified);
   assert.equal(esSales.interpretation.intent, INTENTS.SALES_OBJECTION);
   assert.doesNotMatch(esSales.rendered.text, /no es ventas|no somos ventas/i);
   assert.match(esSales.rendered.text, /servicios financieros|entrevista/i);
