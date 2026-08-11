@@ -1405,7 +1405,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Replace universal forced city/state openers with context-aware first turns that answer immediate questions, open naturally from QR context, resume returning prospects, and still progress toward the active conversation goal’s appointment.  
 **Domain:** Conversation Engine / Recruit AI v2 authoring / QR Channel UX  
 **Depends on:** BR-049, BR-081, BR-114, BR-130  
-**Related:** BR-104/FAQ family; BR-124 schedule-intent recovery; teamVision / V2 greeting templates historically used forced location openers  
+**Related:** BR-104/FAQ family; BR-124 schedule-intent recovery; BR-137 (objection → soft interview progression); teamVision / V2 greeting templates historically used forced location openers  
 **Status:** Implemented (thin first-turn + FAQ resume guard + CE/V2 FAQ sequencing parity)  
 **Engine target:** CE first-turn / FAQ routing (`semanticConversationEngine.js`, `recruitConversationSequencing.js`); V2 `interpret` + `decide` + `responseRenderer`; no appointment executor changes  
 **Tests:** `backend/test/recruitAiV2ConversationQualityBr131.test.js`
@@ -1604,6 +1604,32 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Restore restores eligibility** — Clearing durable `inboxMarkedTestAt` (and removing TEST/CANARY/QA markers) returns the prospect to MC eligibility; no new lifecycle state.
 5. **Meta session untouched** — No changes to Meta login flag, locker, route allowlist, reviewer permissions, Conversations access, webhooks, WhatsApp auth, or execution flags.
 6. **No execution enablement.**
+
+---
+
+## BR-137 — Objection Handling and Interview Conversion Progression
+
+**Implements:** First-class ACKNOWLEDGE → ANSWER/CLARIFY → CONTINUE objection handling that moves qualified prospects toward a recruiting interview using existing scheduling engines (no new scheduler).  
+**Domain:** Conversation Engine / Recruit AI v2 authoring  
+**Depends on:** BR-049, BR-081, BR-098–BR-106, BR-131, BR-091  
+**Related:** BR-090 (employment fit), BR-099 (sales skill/aversion), BR-104 (compensation), BR-107/108/115/116/119/124/125/127/134 (scheduling — unchanged mutation path)  
+**Status:** Implemented (thin objection slice + soft interview transition; execution gates remain OFF)  
+**Engine target:** `conversationObjections.js`, `salesObjection.js` (identity), CE/V2 FAQ sequencing (`recruitConversationSequencing.js`), `decisionEngine.js`, `responseRenderer.js`, `teamVisionWorkflowCopy.js`  
+**Tests:** `backend/test/recruitAiV2ObjectionInterviewProgressionBr137.test.js`
+
+### Rules
+
+1. **Acknowledge → Answer → Continue** — For each supported objection, Atlas MUST acknowledge the concern, give a concise truthful answer (or one clarifying question), then ask exactly ONE useful next question — never stack questions or restart qualification.
+2. **Supported objections (this slice)** — `is_this_sales` (identity), `no_experience`, `think_about_it`, `income_question`, `legitimacy_trust`, `dont_want_to_recruit`, plus optional prospect-goal capture.
+3. **Truthful sales framing** — Atlas MUST NOT claim “we're not in sales.” Identity answers describe financial-services / licensed product activity / educating families / training+licensing / not traditional employment.
+4. **No inventing compliance facts** — No income guarantees, salaries, workbook earnings/fees, fabricated ratings, or demographic recruiting scoring (age/marital/children/homeownership) as eligibility logic.
+5. **Recruit-role honesty** — Do not falsely claim recruiting has no role; clarify briefly and continue.
+6. **Think-about-it** — Do not pressure-close; ask what they want to think through; if already qualification-complete, soft-invite a short interview without forcing.
+7. **Soft interview transition** — Once required qualification facts are complete and there is no unresolved blocking objection/decline, FAQ/objection resumes SHOULD soft-invite the interview and delegate to the existing day-part / scheduling path (BR-049). Do not create appointments until existing scheduling rules authorize it.
+8. **Respect clear decline** — BR-091 withdraw / not-interested remains terminal; do not continue interview pressure.
+9. **Optional prospect goals** — Motivation themes MAY be stored as context only (not mandatory qualification) and referenced later only when the prospect stated them.
+10. **CE/V2 parity** — Shared sequencing/copy for objection answers; material behavioral equivalence required.
+11. **Boundaries** — Does not enable V2 execution or ads. Does not widen BR-114 allowlists. Does not redesign scheduling, Meta Reviewer, or follow-up-template systems beyond these flows. Does not implement demographic workbook scoring.
 
 ---
 

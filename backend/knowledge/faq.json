@@ -73,14 +73,35 @@
 
   "sales": {
     "keywords": [
+      "is this sales",
+      "is this selling",
+      "esto es de ventas",
+      "es esto ventas",
+      "es de ventas",
+      "se trata de ventas",
       "sell",
       "sales",
       "selling",
       "vender",
       "ventas"
     ],
-    "response_en": "We help families with financial services, and we provide the training before you begin. During the interview you'll see exactly how everything works.",
-    "response_es": "Ayudamos a las familias con servicios financieros y nosotros te enseñamos paso a paso. Durante la entrevista te mostrarán cómo funciona todo."
+    "response_en": "This is a financial-services business opportunity. Licensed representatives may offer financial products and services, and helping and educating families is a major part of the work. Training and licensing are part of the path — it isn't a traditional employee job.",
+    "response_es": "Es una oportunidad de negocio en servicios financieros. Los representantes licenciados pueden ofrecer productos y servicios financieros, y una parte importante del trabajo es ayudar y educar a las familias. Entrenamiento y licencia forman parte del camino; no es un empleo tradicional de empleado."
+  },
+
+  "legitimacy": {
+    "keywords": [
+      "scam",
+      "legit",
+      "legitimate",
+      "estafa",
+      "legitimo",
+      "legítimo",
+      "piramide",
+      "pirámide"
+    ],
+    "response_en": "I understand wanting to be careful. This is a real financial-services opportunity with training and licensing requirements — we don't invent ratings or guarantees. The interview is a good place to ask detailed questions.",
+    "response_es": "Entiendo la precaución. Es una oportunidad real de servicios financieros con entrenamiento y requisitos de licencia; no inventamos cifras ni promesas. La entrevista es el mejor lugar para hacer preguntas detalladas."
   },
 
   "clients": {

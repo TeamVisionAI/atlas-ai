@@ -18,10 +18,19 @@ const {
   looksLikeLicensePathDetailQuestion,
   getInsuranceFaqAnswer,
   getCompensationFaqAnswer,
-  getCanonicalFaqAnswer
+  getCanonicalFaqAnswer,
+  getLegitimacyTrustFaqAnswer,
+  getRecruitRoleObjectionFaqAnswer,
+  getThinkAboutItClarifyQuestion
 } = require("./teamVisionWorkflowCopy");
 const { classifySalesObjectionKind } = require("./recruitAiV2/salesObjection");
 const { looksLikeNetworkObjection } = require("./recruitAiV2/networkObjection");
+const {
+  looksLikeThinkAboutIt,
+  looksLikeLegitimacyTrust,
+  looksLikeDontWantToRecruit,
+  looksLikeIsThisSales
+} = require("./recruitAiV2/conversationObjections");
 
 /**
  * Compose FAQ/answer + exactly one resume question (no robotic bridges).
@@ -70,8 +79,24 @@ function resolveRecruitFaqAnswer(message, language = "en") {
     return getLicenseRequirementFaqAnswer(lang);
   }
 
+  if (looksLikeThinkAboutIt(message)) {
+    return getThinkAboutItClarifyQuestion(lang);
+  }
+
+  if (looksLikeLegitimacyTrust(message)) {
+    return getLegitimacyTrustFaqAnswer(lang);
+  }
+
+  if (looksLikeDontWantToRecruit(message)) {
+    return getRecruitRoleObjectionFaqAnswer(lang);
+  }
+
   if (looksLikeNetworkObjection(message)) {
     return getNetworkObjectionFaqAnswer(lang);
+  }
+
+  if (looksLikeIsThisSales(message)) {
+    return getSalesObjectionFaqAnswer(lang, "identity");
   }
 
   const salesKind = classifySalesObjectionKind(message);
@@ -80,10 +105,10 @@ function resolveRecruitFaqAnswer(message, language = "en") {
   }
 
   if (
-    /\b(experiencia|experience|no experience|sin experiencia|need experience|necesito experiencia)\b/.test(
+    /\b(experiencia|experience|no experience|sin experiencia|need experience|necesito experiencia|i have no experience|no tengo experiencia)\b/.test(
       t
     ) &&
-    /\b(need|necesito|require|required|sin|no |without|do i)\b/.test(t)
+    /\b(need|necesito|require|required|sin|no |without|do i|have no|tengo)\b/.test(t)
   ) {
     return getExperienceFaqAnswer(lang);
   }

@@ -31,7 +31,13 @@ const {
   getStateQuestion,
   getDayPartQuestion,
   getFirstMessage,
-  getNaturalGreetingAck
+  getNaturalGreetingAck,
+  getSoftInterviewTransitionQuestion,
+  getThinkAboutItClarifyQuestion,
+  getThinkAboutItInterviewOffer,
+  getLegitimacyTrustFaqAnswer,
+  getRecruitRoleObjectionFaqAnswer,
+  getProspectGoalAck
 } = require("../teamVisionWorkflowCopy");
 const {
   composeAnswerThenOneQuestion,
@@ -87,6 +93,11 @@ const COPY = Object.freeze({
     experience_faq_then_resume: null,
     sales_objection_faq_then_resume: null,
     network_objection_faq_then_resume: null,
+    legitimacy_trust_faq_then_resume: null,
+    recruit_role_objection_faq_then_resume: null,
+    think_about_it_clarify: null,
+    think_about_it_interview_offer: null,
+    prospect_goal_ack_then_resume: null,
     acknowledge_preference_awaiting_availability: "Perfect.",
     job_opportunity_faq_then_resume: null,
     job_overview_faq_then_resume: null,
@@ -236,6 +247,11 @@ const COPY = Object.freeze({
     experience_faq_then_resume: null,
     sales_objection_faq_then_resume: null,
     network_objection_faq_then_resume: null,
+    legitimacy_trust_faq_then_resume: null,
+    recruit_role_objection_faq_then_resume: null,
+    think_about_it_clarify: null,
+    think_about_it_interview_offer: null,
+    prospect_goal_ack_then_resume: null,
     acknowledge_preference_awaiting_availability: "Perfecto.",
     job_opportunity_faq_then_resume: null,
     job_overview_faq_then_resume: null,
@@ -569,6 +585,23 @@ function composeFaqThenResume(faqText, language, entities = {}, options = {}) {
       preferredDayPart: entities.dayPart || entities.preferredDayPart || null
     }).templateKey;
   }
+  // Implements BR-137 — when qualification is complete, soft-invite interview
+  // instead of a bare day-part ask after FAQ/objection.
+  if (
+    entities.softInterviewTransition &&
+    (resumeKey === "continue_qualification_after_authorization" ||
+      resumeKey === "outside_zoom_day_part" ||
+      resumeKey === "ask_day_part_simple" ||
+      resumeKey === "ask_day_part")
+  ) {
+    return composeAnswerThenOneQuestion(
+      faqText,
+      getSoftInterviewTransitionQuestion(
+        localeCode(language),
+        entities.prospectGoalTheme
+      )
+    );
+  }
   const resume =
     resumeKey === "continue_qualification_after_authorization" ||
     resumeKey === "outside_zoom_day_part"
@@ -681,6 +714,34 @@ function renderCustomerReply(responsePlan) {
   } else if (key === "network_objection_faq_then_resume") {
     template = composeFaqThenResume(
       getNetworkObjectionFaqAnswer(lang),
+      language,
+      entities,
+      { omitBridge: true }
+    );
+  } else if (key === "legitimacy_trust_faq_then_resume") {
+    // Implements BR-137
+    template = composeFaqThenResume(
+      getLegitimacyTrustFaqAnswer(lang),
+      language,
+      entities,
+      { omitBridge: true }
+    );
+  } else if (key === "recruit_role_objection_faq_then_resume") {
+    // Implements BR-137
+    template = composeFaqThenResume(
+      getRecruitRoleObjectionFaqAnswer(lang),
+      language,
+      entities,
+      { omitBridge: true }
+    );
+  } else if (key === "think_about_it_clarify") {
+    template = getThinkAboutItClarifyQuestion(lang);
+  } else if (key === "think_about_it_interview_offer") {
+    template = getThinkAboutItInterviewOffer(lang);
+  } else if (key === "prospect_goal_ack_then_resume") {
+    // Implements BR-137 — acknowledge stated goal, then one resume/soft invite.
+    template = composeFaqThenResume(
+      getProspectGoalAck(lang, entities.prospectGoalTheme),
       language,
       entities,
       { omitBridge: true }

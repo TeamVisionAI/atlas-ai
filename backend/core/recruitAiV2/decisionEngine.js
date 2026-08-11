@@ -17,6 +17,10 @@ const {
   resolvePendingExplanation,
   resolveDayPartContinuation
 } = require("./conversationContinuity");
+const {
+  shouldSoftInviteInterview,
+  isQualificationCompleteForInterview
+} = require("./conversationObjections");
 
 const {
   INTENTS,
@@ -826,12 +830,23 @@ function buildFaqResumeDecision(
     ),
     earliestTime:
       context.knownFacts?.availabilityConstraint?.earliestTime || null,
+    softInterviewTransition: shouldSoftInviteInterview(
+      context.knownFacts || {},
+      resume.lastQuestionAsked
+    ),
+    prospectGoalTheme: context.knownFacts?.prospectGoalTheme || null,
+    workAuthorization: context.knownFacts?.workAuthorization,
+    workAuthorizationStatus: context.knownFacts?.workAuthorizationStatus,
     ...resume.entities
   };
   structured.reasonCodes.push(REASON_CODES.DIRECT_QUESTION_ANSWERED);
   structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_SCHEDULING);
   structured.reasonCodes.push(REASON_CODES.SPECIFIC_FAQ_ANSWERED);
   structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+  structured.reasonCodes.push(REASON_CODES.OBJECTION_ACK_ANSWER_CONTINUE);
+  if (structured.customerReplyPlan.entities.softInterviewTransition) {
+    structured.reasonCodes.push(REASON_CODES.SOFT_INTERVIEW_TRANSITION);
+  }
   if (
     resume.templateKey === "ask_time_after_constraint" ||
     resume.entities?.earliestTime
@@ -1213,12 +1228,15 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.SALES_OBJECTION) {
-    // Implements BR-099 — sales skill/aversion objection before correction/location.
+    // Implements BR-099 / BR-137 — sales skill/aversion/identity before correction/location.
     structured.decision.nextAction =
       NEXT_ACTIONS.ANSWER_SALES_OBJECTION_THEN_RESUME;
     structured.reasonCodes.push(REASON_CODES.SALES_OBJECTION_RECOGNIZED);
     structured.reasonCodes.push(REASON_CODES.SALES_OBJECTION_OUTRANKS_CORRECTION);
     structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_LOCATION);
+    if (interpretation.entities?.salesObjectionKind === "identity") {
+      structured.reasonCodes.push(REASON_CODES.IS_THIS_SALES_IDENTITY);
+    }
     const salesFaq = buildFaqResumeDecision(
       structured,
       context,
@@ -1231,6 +1249,112 @@ function decideConversationTurn({
         interpretation.entities?.salesObjectionKind || "skill"
     };
     return salesFaq;
+  }
+
+  if (intent === INTENTS.THINK_ABOUT_IT) {
+    // Implements BR-137 — no pressure; clarify or soft-invite when already qualified.
+    const qualified = isQualificationCompleteForInterview(
+      context.knownFacts || {}
+    );
+    structured.decision.shouldEscalate = false;
+    structured.decision.mayCreateAppointment = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.reasonCodes.push(REASON_CODES.THINK_ABOUT_IT_CLARIFY);
+    structured.reasonCodes.push(REASON_CODES.OBJECTION_ACK_ANSWER_CONTINUE);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    if (qualified) {
+      structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_THINK_ABOUT_IT;
+      structured.customerReplyPlan.templateKey =
+        "think_about_it_interview_offer";
+      structured.reasonCodes.push(REASON_CODES.SOFT_INTERVIEW_TRANSITION);
+      structured.contextPatch = {
+        currentStage: context.currentStage || STAGES.QUALIFICATION,
+        conversation: {
+          clarificationCount: 0,
+          pendingClarification: null,
+          lastProspectIntent: intent,
+          lastQuestionAsked: "ask_day_part"
+        }
+      };
+      return structured;
+    }
+    structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_THINK_ABOUT_IT;
+    structured.customerReplyPlan.templateKey = "think_about_it_clarify";
+    structured.contextPatch = {
+      currentStage: context.currentStage || STAGES.QUALIFICATION,
+      conversation: {
+        clarificationCount: 0,
+        pendingClarification: "think_about_it",
+        lastProspectIntent: intent,
+        lastQuestionAsked: "think_about_it_clarify"
+      }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.LEGITIMACY_TRUST) {
+    // Implements BR-137 — calm factual trust response, then resume / soft interview.
+    structured.decision.nextAction = NEXT_ACTIONS.ANSWER_LEGITIMACY_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.LEGITIMACY_TRUST_ANSWERED);
+    structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_LOCATION);
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "legitimacy_trust_faq_then_resume"
+    );
+  }
+
+  if (intent === INTENTS.RECRUIT_ROLE_OBJECTION) {
+    // Implements BR-137 — truthful recruit-role clarification (no false denial).
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_RECRUIT_ROLE_OBJECTION_THEN_RESUME;
+    structured.reasonCodes.push(REASON_CODES.RECRUIT_ROLE_OBJECTION_ANSWERED);
+    structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_LOCATION);
+    return buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "recruit_role_objection_faq_then_resume"
+    );
+  }
+
+  if (intent === INTENTS.PROSPECT_GOAL) {
+    // Implements BR-137 — optional motivation capture; not a qualification field.
+    const theme =
+      interpretation.entities?.prospectGoalTheme ||
+      context.knownFacts?.prospectGoalTheme ||
+      "other";
+    const priorGoals = Array.isArray(context.knownFacts?.prospectGoals)
+      ? context.knownFacts.prospectGoals
+      : [];
+    const nextGoals = priorGoals.includes(theme)
+      ? priorGoals
+      : [...priorGoals, theme].slice(-5);
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ACKNOWLEDGE_PROSPECT_GOAL_THEN_CONTINUE;
+    structured.reasonCodes.push(REASON_CODES.PROSPECT_GOAL_CAPTURED);
+    structured.reasonCodes.push(REASON_CODES.FAQ_OUTRANKS_LOCATION);
+    const goalDecision = buildFaqResumeDecision(
+      structured,
+      context,
+      intent,
+      "prospect_goal_ack_then_resume",
+      interpretation
+    );
+    goalDecision.customerReplyPlan.entities = {
+      ...goalDecision.customerReplyPlan.entities,
+      prospectGoalTheme: theme
+    };
+    goalDecision.contextPatch = {
+      ...goalDecision.contextPatch,
+      knownFacts: {
+        ...(goalDecision.contextPatch?.knownFacts || {}),
+        prospectGoals: nextGoals,
+        prospectGoalTheme: theme
+      }
+    };
+    return goalDecision;
   }
 
   if (intent === INTENTS.NETWORK_OBJECTION) {

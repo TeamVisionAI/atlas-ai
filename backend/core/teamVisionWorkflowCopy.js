@@ -147,19 +147,18 @@ function getInsuranceFaqAnswer(language) {
   );
 }
 
-/** BR-098 — concise experience FAQ (progressive disclosure; no license/pay stack). */
-function getExperienceFaqAnswer(language) {
-  return language === "es"
-    ? "No necesitas experiencia previa. Recibes entrenamiento para aprender el proceso."
-    : "You don't need prior experience. Training is provided so you can learn the process.";
-}
-
 /**
- * BR-099 — sales skill/experience vs aversion.
+ * BR-099 / BR-137 — sales skill/experience/aversion + identity ("is this sales?").
  * Never claim "this is not sales" and never guarantee income/success.
  */
 function getSalesObjectionFaqAnswer(language, kind = "skill") {
-  const aversion = String(kind || "") === "aversion";
+  const k = String(kind || "skill");
+  if (k === "identity") {
+    return language === "es"
+      ? "Es una oportunidad de negocio en servicios financieros. Los representantes licenciados pueden ofrecer productos y servicios financieros, y una parte importante del trabajo es ayudar y educar a las familias. Entrenamiento y licencia forman parte del camino; no es un empleo tradicional de empleado."
+      : "This is a financial-services business opportunity. Licensed representatives may offer financial products and services, and helping and educating families is a major part of the work. Training and licensing are part of the path — it isn't a traditional employee job.";
+  }
+  const aversion = k === "aversion";
   if (aversion) {
     return language === "es"
       ? "Entiendo. En la entrevista te explicamos el proceso con claridad para que puedas decidir con calma."
@@ -168,6 +167,114 @@ function getSalesObjectionFaqAnswer(language, kind = "skill") {
   return language === "es"
     ? "No te preocupes, no necesitas saber vender para empezar. Recibes entrenamiento y aprendes el proceso paso a paso."
     : "You don't need sales experience to get started. Training is provided so you can learn the process step by step.";
+}
+
+/** BR-098 / BR-137 — experience FAQ (no acceptance/success promises). */
+function getExperienceFaqAnswer(language) {
+  return language === "es"
+    ? "No necesitas experiencia previa en servicios financieros para explorar la oportunidad. Entrenamiento y licencia forman parte del proceso."
+    : "Prior financial-services experience isn't required to explore the opportunity. Training and licensing are part of the process.";
+}
+
+/**
+ * BR-137 — soft interview transition (one question). Does not book.
+ * Optionally references a prospect-stated goal theme (never invented).
+ */
+function getSoftInterviewTransitionQuestion(language, prospectGoalTheme = null) {
+  const theme = String(prospectGoalTheme || "").toLowerCase();
+  if (theme === "flexibility") {
+    return language === "es"
+      ? "Como la flexibilidad te importa, el siguiente paso sería una entrevista corta para ver cómo funciona el camino de medio tiempo. ¿Prefieres en la mañana o en la tarde?"
+      : "Since flexibility is important to you, the next step would be a short interview so you can see how the part-time path works. Do you prefer morning or afternoon?";
+  }
+  if (theme === "extra_income") {
+    return language === "es"
+      ? "Como te interesa el potencial de ingreso adicional, el siguiente paso sería una entrevista corta para entender cómo funciona la compensación. ¿Prefieres en la mañana o en la tarde?"
+      : "Since extra income potential matters to you, the next step would be a short interview to see how compensation works. Do you prefer morning or afternoon?";
+  }
+  if (theme === "helping_families") {
+    return language === "es"
+      ? "Como te interesa ayudar a familias, el siguiente paso sería una entrevista corta para ver cómo se ve el trabajo en la práctica. ¿Prefieres en la mañana o en la tarde?"
+      : "Since helping families matters to you, the next step would be a short interview so you can see how the work looks in practice. Do you prefer morning or afternoon?";
+  }
+  return language === "es"
+    ? "Con lo que me has compartido, el siguiente paso sería una entrevista corta para que veas exactamente cómo funciona la oportunidad y puedas aclarar cualquier duda. ¿Prefieres en la mañana o en la tarde?"
+    : "Based on what you've shared, the next step would be a short interview so you can see exactly how the opportunity works and ask any questions you still have. Do you prefer morning or afternoon?";
+}
+
+/** BR-137 — think-about-it clarification (no pressure). */
+function getThinkAboutItClarifyQuestion(language) {
+  return language === "es"
+    ? "Claro. ¿Qué parte te gustaría pensar con más calma?"
+    : "Of course. What part would you like to think through?";
+}
+
+/**
+ * BR-137 — think-about-it when already qualified: soft interview offer as the one question.
+ */
+function getThinkAboutItInterviewOffer(language) {
+  return language === "es"
+    ? "Sin presión. Si te ayuda, una entrevista corta es una buena forma de aclarar dudas con calma. ¿Prefieres en la mañana o en la tarde?"
+    : "No pressure. If it helps, a short interview is a calm way to get your remaining questions answered. Do you prefer morning or afternoon?";
+}
+
+/** BR-137 — legitimacy / scam skepticism (no fabricated ratings). */
+function getLegitimacyTrustFaqAnswer(language) {
+  return language === "es"
+    ? "Entiendo la precaución. Es una oportunidad real de servicios financieros con entrenamiento y requisitos de licencia; no inventamos cifras ni promesas. La entrevista es el mejor lugar para hacer preguntas detalladas."
+    : "I understand wanting to be careful. This is a real financial-services opportunity with training and licensing requirements — we don't invent ratings or guarantees. The interview is a good place to ask detailed questions.";
+}
+
+/**
+ * BR-137 — don't want to recruit: truthful, brief; do not deny recruiting exists.
+ */
+function getRecruitRoleObjectionFaqAnswer(language) {
+  return language === "es"
+    ? "Entiendo. El modelo puede incluir desarrollo de equipo con el tiempo, pero no es lo único del trabajo: también hay atención a familias y servicios financieros con entrenamiento. No tienes que decidir eso de inmediato."
+    : "Understood. The model can include team development over time, but that isn't the whole job — helping families with financial services and training are central too. You don't have to decide that up front.";
+}
+
+/** BR-137 — acknowledge captured prospect goal, then one continue question. */
+function getProspectGoalAck(language, theme = "other") {
+  const t = String(theme || "other");
+  if (t === "flexibility") {
+    return language === "es"
+      ? "Entendido — la flexibilidad te importa."
+      : "Got it — flexibility matters to you.";
+  }
+  if (t === "extra_income") {
+    return language === "es"
+      ? "Entendido — te interesa el potencial de ingreso adicional."
+      : "Got it — you're interested in extra income potential.";
+  }
+  if (t === "business_ownership") {
+    return language === "es"
+      ? "Entendido — te interesa el camino de negocio propio."
+      : "Got it — business ownership is what you're exploring.";
+  }
+  if (t === "helping_families") {
+    return language === "es"
+      ? "Entendido — te motiva ayudar a familias."
+      : "Got it — helping families is important to you.";
+  }
+  if (t === "career_change") {
+    return language === "es"
+      ? "Entendido — estás evaluando un cambio de carrera."
+      : "Got it — you're evaluating a career change.";
+  }
+  if (t === "learning_finance") {
+    return language === "es"
+      ? "Entendido — te interesa aprender conceptos financieros."
+      : "Got it — you're interested in learning financial concepts.";
+  }
+  if (t === "leadership_growth") {
+    return language === "es"
+      ? "Entendido — te interesa el crecimiento y liderazgo."
+      : "Got it — growth and leadership matter to you.";
+  }
+  return language === "es"
+    ? "Gracias — eso me ayuda a orientarte mejor."
+    : "Thanks — that helps me point you in the right direction.";
 }
 
 /**
@@ -270,12 +377,10 @@ function getCompensationFaqAnswer(language, detailKind = "general") {
       : "No. It isn't a guaranteed fixed salary. Compensation depends on production and contract level.";
   }
   if (kind === "how_much") {
-    return (
-      findFAQ("how much does it pay", es ? "es" : "en") ||
-      (es
-        ? "No prometemos un ingreso específico. La compensación depende de la producción y del nivel de contrato; en la entrevista te explican la estructura."
-        : "We don't promise a specific income. Compensation depends on production and contract level; the interview explains the structure.")
-    );
+    // Implements BR-137 — prefer explicit non-guarantee copy over catalog phrasing.
+    return es
+      ? "No es un rol con sueldo fijo. La compensación depende de la actividad con licencia/productos y de la estructura aplicable; los detalles actuales se cubren mejor en la entrevista."
+      : "This isn't a salaried employee role. Compensation depends on licensed/product activity and the applicable compensation structure; current details are best covered in the interview.";
   }
   if (kind === "pay_how" || kind === "source") {
     // Implements BR-106 — direct pay-mechanics answer (not bare Continuemos / interview-only evasion).
@@ -366,6 +471,12 @@ module.exports = {
   getExperienceFaqAnswer,
   getSalesObjectionFaqAnswer,
   getNetworkObjectionFaqAnswer,
+  getSoftInterviewTransitionQuestion,
+  getThinkAboutItClarifyQuestion,
+  getThinkAboutItInterviewOffer,
+  getLegitimacyTrustFaqAnswer,
+  getRecruitRoleObjectionFaqAnswer,
+  getProspectGoalAck,
   getLicenseRequirementFaqAnswer,
   getLicensePathKnowledge,
   getLicensePathDetailFaqAnswer,

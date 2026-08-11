@@ -49,7 +49,15 @@ function emptyKnownFacts() {
     /** BR-090 — fixed | null */
     employmentPreference: null,
     /** BR-090 — exploring | not_now | null */
-    currentFit: null
+    currentFit: null,
+    /**
+     * BR-137 — optional prospect motivation themes (not qualification).
+     * e.g. flexibility | extra_income | business_ownership | career_change |
+     * learning_finance | helping_families | leadership_growth | other
+     */
+    prospectGoals: [],
+    /** BR-137 — primary theme when material for later copy; never invented. */
+    prospectGoalTheme: null
   };
 }
 

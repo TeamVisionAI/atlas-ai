@@ -52,6 +52,14 @@ const INTENTS = Object.freeze({
   SALES_OBJECTION: "sales_objection",
   /** BR-103 — network / prospecting objection (no contacts / who to call). */
   NETWORK_OBJECTION: "network_objection",
+  /** BR-137 — need time to think; clarify without pressure. */
+  THINK_ABOUT_IT: "think_about_it",
+  /** BR-137 — scam / legitimacy / trust skepticism. */
+  LEGITIMACY_TRUST: "legitimacy_trust",
+  /** BR-137 — does not want recruiting/team-building emphasis. */
+  RECRUIT_ROLE_OBJECTION: "recruit_role_objection",
+  /** BR-137 — optional prospect motivation / goal statement. */
+  PROSPECT_GOAL: "prospect_goal",
   /** BR-103 — soft acknowledgement while availability is still pending. */
   SOFT_ACKNOWLEDGEMENT: "soft_acknowledgement",
   /** BR-090 — seeking fixed/salaried/hourly traditional employment. */
@@ -101,6 +109,13 @@ const NEXT_ACTIONS = Object.freeze({
   ANSWER_EXPERIENCE_FAQ_THEN_RESUME: "answer_experience_faq_then_resume",
   ANSWER_SALES_OBJECTION_THEN_RESUME: "answer_sales_objection_then_resume",
   ANSWER_NETWORK_OBJECTION_THEN_RESUME: "answer_network_objection_then_resume",
+  /** BR-137 — clarify hesitation; no pressure close. */
+  CLARIFY_THINK_ABOUT_IT: "clarify_think_about_it",
+  ANSWER_LEGITIMACY_THEN_RESUME: "answer_legitimacy_then_resume",
+  ANSWER_RECRUIT_ROLE_OBJECTION_THEN_RESUME:
+    "answer_recruit_role_objection_then_resume",
+  ACKNOWLEDGE_PROSPECT_GOAL_THEN_CONTINUE:
+    "acknowledge_prospect_goal_then_continue",
   ACKNOWLEDGE_SOFT_CONTINUE: "acknowledge_soft_continue",
   /** BR-118 — soft media ack; do not reopen text clarification path. */
   ACKNOWLEDGE_NON_TEXT_MEDIA: "acknowledge_non_text_media",
@@ -252,6 +267,14 @@ const REASON_CODES = Object.freeze({
   INSURANCE_FAQ_ROUTED: "INSURANCE_FAQ_ROUTED",
   SALES_OBJECTION_RECOGNIZED: "SALES_OBJECTION_RECOGNIZED",
   SALES_OBJECTION_OUTRANKS_CORRECTION: "SALES_OBJECTION_OUTRANKS_CORRECTION",
+  /** BR-137 */
+  IS_THIS_SALES_IDENTITY: "IS_THIS_SALES_IDENTITY",
+  THINK_ABOUT_IT_CLARIFY: "THINK_ABOUT_IT_CLARIFY",
+  LEGITIMACY_TRUST_ANSWERED: "LEGITIMACY_TRUST_ANSWERED",
+  RECRUIT_ROLE_OBJECTION_ANSWERED: "RECRUIT_ROLE_OBJECTION_ANSWERED",
+  PROSPECT_GOAL_CAPTURED: "PROSPECT_GOAL_CAPTURED",
+  SOFT_INTERVIEW_TRANSITION: "SOFT_INTERVIEW_TRANSITION",
+  OBJECTION_ACK_ANSWER_CONTINUE: "OBJECTION_ACK_ANSWER_CONTINUE",
   NETWORK_OBJECTION_RECOGNIZED: "NETWORK_OBJECTION_RECOGNIZED",
   SOFT_ACKNOWLEDGEMENT_ONLY: "SOFT_ACKNOWLEDGEMENT_ONLY",
   CONFIRMATION_REQUIRES_CONCRETE_SLOT: "CONFIRMATION_REQUIRES_CONCRETE_SLOT",
