@@ -1053,6 +1053,11 @@ export const translations = {
     missionControlDashboardProspectsAction: "Prospectos que requieren acción",
     missionControlMissionActions: "Acciones de la misión",
     missionActionQualification: "Completar calificación",
+    missionActionQualificationSubtitle: "Actualiza los datos requeridos antes de agendar.",
+    missionActionCloseNotInterested: "Cerrar — No interesado",
+    missionActionCloseNotInterestedSubtitle: "Cierra este prospecto antes de la entrevista.",
+    missionActionCloseNotInterestedDescription:
+      "Esto marca al prospecto como No interesado y lo saca de Mission Control.",
     missionControlPermanentActionsLabel: "Acciones permanentes",
     missionControlCommunicationActionsLabel: "Comunicación",
     communicationWorkflowIntro:
@@ -2727,6 +2732,11 @@ export const translations = {
     missionControlDashboardProspectsAction: "Prospects Requiring Action",
     missionControlMissionActions: "Mission Actions",
     missionActionQualification: "Complete Qualification",
+    missionActionQualificationSubtitle: "Update required details before scheduling.",
+    missionActionCloseNotInterested: "Close — Not Interested",
+    missionActionCloseNotInterestedSubtitle: "Close this prospect before the interview.",
+    missionActionCloseNotInterestedDescription:
+      "This marks the prospect Not Interested and removes them from Mission Control.",
     missionControlPermanentActionsLabel: "Permanent Actions",
     missionControlCommunicationActionsLabel: "Communication",
     communicationWorkflowIntro:

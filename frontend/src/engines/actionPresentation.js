@@ -8,7 +8,8 @@ export const ACCENT_ACTIONS = new Set([
   "send_office_location",
   "schedule",
   "send_missed_appointment",
-  "enter_interview_outcome"
+  "enter_interview_outcome",
+  "qualification"
 ]);
 
 export const ACTION_PRESENTATION = {
@@ -61,6 +62,16 @@ export const ACTION_PRESENTATION = {
     icon: "✅",
     titleKey: "missionControlActionRecordOutcome",
     subtitleKey: "missionControlActionRecordOutcomeSubtitle"
+  },
+  qualification: {
+    icon: "📋",
+    titleKey: "missionActionQualification",
+    subtitleKey: "missionActionQualificationSubtitle"
+  },
+  close_not_interested: {
+    icon: "🚫",
+    titleKey: "missionActionCloseNotInterested",
+    subtitleKey: "missionActionCloseNotInterestedSubtitle"
   }
 };
 

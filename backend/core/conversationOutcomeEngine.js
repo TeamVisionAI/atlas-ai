@@ -403,9 +403,7 @@ function getQualificationFormGaps(prospect, profile, options = {}) {
     gaps.push("interviewType");
   }
 
-  if (!sanitizeText(profile.occupation)) {
-    gaps.push("occupation");
-  }
+  // Implements BR-123 — occupation is optional enrichment; never a qualification form gate.
 
   const structuralGaps = gaps.filter((field) => field !== "preferred_language");
 
@@ -620,11 +618,12 @@ function buildConversationOutcomeReadModel({
   }
 
   const profile = buildProfileFromProspect(prospect);
-  const missingFields = getMissingFields(profile);
+  const captureOptions = resolveQualificationCaptureOptions(prospect);
+  // Align missing-field assessment with explicit capture markers (same notes path as the form).
+  const missingFields = getMissingFields(profile, captureOptions);
   const latestInbound = getLatestInboundMessage(conversationMessages);
   const latestMessageText = latestInbound?.text || prospect.last_message || "";
   const draft = buildDraftFields(profile, latestMessageText);
-  const captureOptions = resolveQualificationCaptureOptions(prospect);
   const requiredInputs = buildRequiredInputs(prospect, profile, missingFields, captureOptions);
   const requiredInputKeys = new Set(requiredInputs.map((row) => row.key));
   const suggestedDefaults = buildSuggestedQualificationDefaults(
