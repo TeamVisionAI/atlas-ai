@@ -1534,7 +1534,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Before advancing to `INTERVIEW_SCHEDULED` from Recruit AI V2 execution, synchronize durable V2 qualification facts (`city` / `state` / `workAuthorization`) into the workflow validation layer so milestone checks do not fail on stale sparse legacy nulls  
 **Domain:** Recruit AI v2 execution / workflow advancement / qualification  
 **Depends on:** BR-037, BR-049, BR-111, BR-112, BR-120, BR-121  
-**Related:** BR-123 (occupation optional), BR-122 (schedule reconcile), BR-126 (deferred continuity — independent)  
+**Related:** BR-123 (occupation optional), BR-122 (schedule reconcile), BR-126 (deferred continuity — independent), BR-134 (mid-flow Mission Control hydration)  
 **Status:** Implemented  
 **Engine target:** `recruitAiV2/qualificationFactSync.js`, `missionExecutionApplicationService.js` (`executeScheduleInterview`), `recruitAiV2/sideEffectExecutor.js`, `milestoneValidationEngine.js`  
 **Tests:** `backend/test/qualificationFactSyncBr127.test.js`, `backend/test/scheduleWorkflowRollbackMissingQualFields.test.js`
@@ -1550,6 +1550,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Email is invitation enrichment** — Missing email must **not** block `INTERVIEW_READY` / `INTERVIEW_SCHEDULED` / `INTERVIEW_DUE`. Booking and workflow advancement succeed; appointment may retain `confirmation_status=missing_email` / invitation enrichment metadata outside milestone gates.
 8. **Atomicity** — Legacy column hydrations share one prospect row UPDATE with schedule fields (DB row update is all-or-nothing). `capturedFields` enrichment is in-memory for advancement (not a second store). Write failure → deterministic `QUALIFICATION_SYNC_WRITE_FAILED` + BR-121 rollback.
 9. **Boundaries** — Does not redesign prospect storage; does not mass-migrate historical prospects; does not enable BR-111 execution; does not merge or depend on BR-126 continuity; Calendar cancel / BR-121 rollback must still fire on genuine advance failure after a successful sync.
+
+---
+
+## BR-134 — Mid-Flow Qualification Fact Sync for Mission Control
+
+**Implements:** When Recruit AI V2 durably confirms `city` / `state` / `workAuthorization` during qualification (before schedule), synchronize those facts into null legacy prospect columns so Mission Control and conversation outcome no longer list already-accepted facts as missing  
+**Domain:** Recruit AI v2 conversation / Mission Control truth / qualification  
+**Depends on:** BR-037, BR-094, BR-096, BR-100, BR-114, BR-120, BR-127  
+**Related:** BR-049, BR-111 (execution unchanged), BR-123  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/qualificationFactSync.js` (`synchronizeQualificationFactsForMissionControl`), `recruitAiV2/orchestrator.js` (post-persist hook)  
+**Tests:** `backend/test/qualificationFactSyncBr134MissionControl.test.js`
+
+### Rules
+
+1. **Accepted facts must reach Mission Control** — Conversationally confirmed V2 `knownFacts` for city / state / workAuthorization MUST hydrate null legacy prospect columns (`city`, `state`, `work_authorized`) without waiting for `INTERVIEW_SCHEDULED` (BR-127 schedule path remains).
+2. **Sync after durable persist** — Run after a successful V2 context persist on the live authoring / orchestrator path when confirmed durable facts exist. CE remain skipped when V2 authors (BR-114); this sync replaces the missing CE `syncProfileToProspect` for these fields.
+3. **Confirmed-only location** — Do not write proposed / unconfirmed location fragments into legacy columns. Authorization uses canonical boolean representation (`work_authorized=true|false`).
+4. **Null-column hydration + fail closed on conflict** — Same BR-127 planner semantics: fill only null legacy columns; org/identity scoped; conflicting non-null legacy → no partial write.
+5. **Soft-fail for conversation** — Sync errors must not block V2 reply authorship or durable context persistence. Schedule-time BR-127 remains fail-closed around Calendar mutation.
+6. **No execution enablement** — Does not authorize appointment mutation, Calendar writes, or BR-111 execution gates.
+7. **Boundaries** — Does not mass-backfill historical rows; operators may re-confirm or wait for the next inbound V2 persist to hydrate. Does not change HUMAN suppression, lifecycle inbox, or Meta Review isolation.
 
 ---
 

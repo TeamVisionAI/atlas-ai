@@ -61,6 +61,13 @@ function citiesEqual(a, b) {
   );
 }
 
+function isConfirmedOrUnspecifiedCertainty(certainty) {
+  const token = String(certainty || "")
+    .trim()
+    .toLowerCase();
+  return !token || token === "confirmed";
+}
+
 function extractDurableQualificationFacts(durableContext = null) {
   const facts = durableContext?.knownFacts || {};
   const city = normalizeCity(facts.city);
@@ -75,6 +82,22 @@ function extractDurableQualificationFacts(durableContext = null) {
     authorization,
     cityCertainty: facts.cityCertainty || null,
     stateCertainty: facts.stateCertainty || null
+  };
+}
+
+/**
+ * BR-134 — Mission Control / prospect SoR hydration uses confirmed (or unspecified)
+ * durable facts only. Proposed location must not fill legacy columns.
+ */
+function extractConfirmedDurableQualificationFacts(durableContext = null) {
+  const facts = durableContext?.knownFacts || {};
+  const raw = extractDurableQualificationFacts(durableContext);
+  return {
+    city: isConfirmedOrUnspecifiedCertainty(facts.cityCertainty) ? raw.city : null,
+    state: isConfirmedOrUnspecifiedCertainty(facts.stateCertainty) ? raw.state : null,
+    authorization: raw.authorization,
+    cityCertainty: raw.cityCertainty,
+    stateCertainty: raw.stateCertainty
   };
 }
 
@@ -136,6 +159,9 @@ function planQualificationFactSync({
     };
   }
 
+  // Schedule path keeps historic extract (includes unspecified certainty).
+  // Callers that need confirmed-only should pass prefiltered durableContext
+  // or use synchronizeQualificationFactsForMissionControl.
   const durable = extractDurableQualificationFacts(durableContext);
   if (!durable.city && !durable.state && durable.authorization == null) {
     return {
@@ -286,12 +312,109 @@ async function synchronizeQualificationFactsForSchedule({
   };
 }
 
+/**
+ * BR-134 — After V2 confirms city / state / workAuthorization in durable knownFacts,
+ * hydrate null legacy prospect columns so Mission Control stops listing them as missing.
+ *
+ * Soft-fail: never throws into the conversation turn. Does not enable execution.
+ * Conflicts / identity mismatches leave columns unchanged (fail closed for writes).
+ */
+async function synchronizeQualificationFactsForMissionControl({
+  durableContext = null,
+  prospect = null,
+  organizationId = null,
+  expectedCoreProspectId = null,
+  expectedLegacyProspectId = null,
+  updateProspectFn = null,
+  loadProspectFn = null,
+  prospectPhone = null
+} = {}) {
+  try {
+    const confirmed = extractConfirmedDurableQualificationFacts(durableContext);
+    if (!confirmed.city && !confirmed.state && confirmed.authorization == null) {
+      return {
+        ok: false,
+        reasonCode: SYNC_REASON.NO_DURABLE_FACTS,
+        soft: true,
+        attempted: false,
+        legacyUpdates: {}
+      };
+    }
+
+    let nextProspect = prospect;
+    if (!nextProspect && typeof loadProspectFn === "function" && prospectPhone) {
+      nextProspect = await loadProspectFn(prospectPhone);
+    }
+    if (!nextProspect?.id) {
+      return {
+        ok: false,
+        reasonCode: SYNC_REASON.MISSING_SCOPE,
+        soft: true,
+        attempted: false,
+        legacyUpdates: {}
+      };
+    }
+
+    const coreId =
+      expectedCoreProspectId ||
+      durableContext?.prospectId ||
+      null;
+    const legacyId = expectedLegacyProspectId || nextProspect.id || null;
+
+    // Build a confirmed-only durable snapshot for planning (reuse BR-127 planner).
+    const confirmedDurableContext = {
+      ...(durableContext || {}),
+      prospectId: durableContext?.prospectId || coreId,
+      knownFacts: {
+        ...(durableContext?.knownFacts || {}),
+        city: confirmed.city,
+        state: confirmed.state,
+        workAuthorization: confirmed.authorization,
+        workAuthorizationStatus:
+          confirmed.authorization === true
+            ? "authorized"
+            : confirmed.authorization === false
+              ? "not_authorized"
+              : durableContext?.knownFacts?.workAuthorizationStatus || null,
+        cityCertainty: confirmed.city ? "confirmed" : null,
+        stateCertainty: confirmed.state ? "confirmed" : null
+      }
+    };
+
+    const result = await synchronizeQualificationFactsForSchedule({
+      durableContext: confirmedDurableContext,
+      prospect: nextProspect,
+      organizationId,
+      expectedCoreProspectId: coreId,
+      expectedLegacyProspectId: legacyId,
+      updateProspectFn
+    });
+
+    return {
+      ...result,
+      soft: true,
+      attempted: true
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reasonCode: SYNC_REASON.WRITE_FAILED,
+      soft: true,
+      attempted: true,
+      legacyUpdates: {},
+      error
+    };
+  }
+}
+
 module.exports = {
   SYNC_REASON,
   normalizeCity,
   normalizeState,
   normalizeAuthorization,
   extractDurableQualificationFacts,
+  extractConfirmedDurableQualificationFacts,
   planQualificationFactSync,
-  synchronizeQualificationFactsForSchedule
+  synchronizeQualificationFactsForSchedule,
+  synchronizeQualificationFactsForMissionControl
 };

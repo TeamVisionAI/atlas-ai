@@ -649,6 +649,45 @@ async function processRecruitAiV2Turn({
     if (persistenceResult?.context) {
       nextContext = persistenceResult.context;
     }
+
+    // Implements BR-134 — confirmed V2 qualification facts → null legacy columns for MC.
+    if (persistenceResult?.ok) {
+      try {
+        const {
+          synchronizeQualificationFactsForMissionControl
+        } = require("./qualificationFactSync");
+
+        const deps = options.dependencies || {};
+        const updateProspectFn =
+          deps.updateProspect ||
+          options.updateProspectFn ||
+          (async (phone, patch) => {
+            const { updateProspect } = require("../../services/supabaseService");
+            return updateProspect(phone, patch);
+          });
+        const loadProspectFn =
+          deps.findProspect ||
+          options.loadProspectFn ||
+          (async (phone) => {
+            const { findProspect } = require("../../services/supabaseService");
+            return findProspect(phone);
+          });
+
+        await synchronizeQualificationFactsForMissionControl({
+          durableContext: nextContext,
+          organizationId,
+          expectedCoreProspectId:
+            prospectId || nextContext.prospectId || null,
+          expectedLegacyProspectId: legacyProspectId || null,
+          prospectPhone:
+            prospectPhone || options.prospectPhone || loaded.prospectPhone || null,
+          updateProspectFn,
+          loadProspectFn
+        });
+      } catch {
+        // Soft — Mission Control hydration must never break the authored turn.
+      }
+    }
   }
 
   return {
