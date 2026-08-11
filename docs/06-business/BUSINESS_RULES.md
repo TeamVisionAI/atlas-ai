@@ -1575,6 +1575,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-136 — Mission Control Operational TEST Exclusion (Meta-safe)
+
+**Implements:** Default Mission Control / Prospect Center / executive queue counts exclude durable operational TEST and explicit TEST/CANARY/QA markers without hiding Meta App Review demo subjects  
+**Domain:** Mission Control / Prospect Center / executive navigation  
+**Depends on:** BR-135 (`inboxMarkedTestAt`), Meta Review session isolation  
+**Related:** Conversations Center lifecycle TEST (separate helper — do not reuse `isTestProspect`), BR-111 (execution unchanged)  
+**Status:** Implemented  
+**Engine target:** `missionControlOperationalTestFilter.js`, `missionControlPriorityEngine.buildPrioritizedWorkflowQueue`, `loadProductionProspects`, `findLatestActiveProspectInOrganization`  
+**Tests:** `backend/test/missionControlOperationalTestFilterBr136.test.js`, Meta Review workspace / boundary suites
+
+### Rules
+
+1. **Operational exclusion** — Exclude prospects with durable `workflow_state.inboxMarkedTestAt` or exact source/entry `TEST` / `CANARY` / `QA` from default MC queue, executive/Prospect Center counts, and “latest” navigation.
+2. **Meta Review demos remain visible** — Never treat `META_REVIEW` / `META_REVIEW_DEMO` (source or entry_method) as ordinary operational TEST for Mission Control visibility.
+3. **Separate from Conversations** — Do not call Conversations `isTestProspect()`; Conversations may continue to bucket Meta demos as TEST for the Niovel inbox only.
+4. **Restore restores eligibility** — Clearing durable `inboxMarkedTestAt` (and removing TEST/CANARY/QA markers) returns the prospect to MC eligibility; no new lifecycle state.
+5. **Meta session untouched** — No changes to Meta login flag, locker, route allowlist, reviewer permissions, Conversations access, webhooks, WhatsApp auth, or execution flags.
+6. **No execution enablement.**
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

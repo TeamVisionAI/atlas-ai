@@ -148,7 +148,12 @@ async function findLatestActiveProspectInOrganization(organizationId) {
     isProductionProspect(prospect.phone)
   );
 
-  if (!productionProspects.length) {
+  const {
+    filterOutOperationalTestProspects
+  } = require("../core/missionControlOperationalTestFilter");
+  const eligibleProspects = filterOutOperationalTestProspects(productionProspects);
+
+  if (!eligibleProspects.length) {
     return null;
   }
 
@@ -160,7 +165,7 @@ async function findLatestActiveProspectInOrganization(organizationId) {
 
   if (!logError && logs?.length) {
     const activeByPhone = new Map(
-      productionProspects.map((prospect) => [prospect.phone, prospect])
+      eligibleProspects.map((prospect) => [prospect.phone, prospect])
     );
 
     for (const log of logs) {
@@ -171,7 +176,7 @@ async function findLatestActiveProspectInOrganization(organizationId) {
     }
   }
 
-  return productionProspects[productionProspects.length - 1];
+  return eligibleProspects[eligibleProspects.length - 1];
 }
 
 async function findLatestActiveProspect() {

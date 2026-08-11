@@ -51,10 +51,16 @@ async function buildWorkflowSummaryForProspect(prospect) {
 
 /**
  * Returns prospects sorted by missionControlPriority (rank 1 = highest).
+ * Implements BR-136 — excludes operational TEST/CANARY/QA (not META_REVIEW demos).
  */
 async function buildPrioritizedWorkflowQueue(prospects = []) {
+  const {
+    filterOutOperationalTestProspects
+  } = require("./missionControlOperationalTestFilter");
+  const eligible = filterOutOperationalTestProspects(prospects);
+
   const summaries = await Promise.all(
-    prospects.map((prospect) => buildWorkflowSummaryForProspect(prospect))
+    eligible.map((prospect) => buildWorkflowSummaryForProspect(prospect))
   );
 
   return summaries
