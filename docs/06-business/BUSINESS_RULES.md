@@ -1575,6 +1575,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
+
+**Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
+**Domain:** Conversations Center / workflow ownership / Human take-over silence  
+**Depends on:** BR-034, soft inbox lifecycle (PR #102/#105), Conversations ownership presentation  
+**Related:** BR-041 (language out of Phase 1), BR-049, BR-080, BR-111 (execution unchanged)  
+**Status:** Implemented (Phase 1)  
+**Engine target:** `workflowStateStore.js` (async adapter), `workflowStateDurableRepository.js`, `conversationsCenterOwnershipService.js`, `communicationHub.shouldDeliverAutomatedReply`  
+**Tests:** `backend/test/durableWorkflowStateBr135.test.js`, `preserveInboxLifecycleSoftFlags.test.js`, Conversations lifecycle / HUMAN silence regressions
+
+### Rules
+
+1. **Production SoR** — Durable state lives in `prospects.workflow_state` JSONB, scoped by `organization_id` + prospect `id`. Phone is lookup only.
+2. **Phase 1 durable fields** — Soft inbox: `inboxMarkedTestAt`, `inboxArchivedAt`, `inboxClosedAt`, `inboxCloseReason`. Human/runtime: `workflowOwnership`, `manualAgentOwnership`, `needsHumanAttention`, `handoffReason`, `handoffAt`, `humanTakenOverAt`, `returnedToAtlasAt`.
+3. **Exclude competing DNC** — Do not treat `doNotContact` as Phase 1 durable SoR (no `do_not_contact` column competition).
+4. **Preserve-on-write** — Unrelated patches omit durable keys; adapters re-read and preserve those fields (same semantics as #105). Explicit null/value in a patch (e.g. Restore) may clear.
+5. **Production fail closed** — Production default backend is `database`. File backend is forbidden in production. No silent fallback to ephemeral JSON after DB errors.
+6. **Non-prod backends** — Local may use `file`; tests may use `memory` via `ATLAS_WORKFLOW_STATE_BACKEND`.
+7. **Async adapter** — Load/save are awaited at call sites (including HUMAN silence gate).
+8. **No mass backfill** — After deploy, operators re-mark TEST/CLOSED/ARCHIVED / HUMAN as needed. Do not invent historical marks.
+9. **Out of Phase 1** — Preferred language, occupation, interview type, receipts, wholesale `agentActionState`, and BR-111 execution enablement.
+
+---
+
 ## BR-125 — Single Post-Create Ownership After Live V2 Mutation
 
 **Implements:** When live authoring decides `create_appointment` and a mutation succeeds (or an active Atlas appointment matches the proposed slot), V2 owns durable confirmed + `appointment_confirmed` reply; CE must not take create/reply ownership via timeout fallthrough or “already confirmed” stub  

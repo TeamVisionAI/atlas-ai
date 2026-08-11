@@ -126,7 +126,7 @@ async function main() {
   assert(loadAgentState(PHONE).outcome == null, "Reschedule clears outcome");
   console.log("✓ Saving Rescheduled returns to scheduled/waiting state");
 
-  savePersistedWorkflowState(PHONE, {
+  await savePersistedWorkflowState(PHONE, {
     canonicalMilestone: MILESTONES.INTERVIEW_RESULT_PENDING,
     workflowOwnership: OWNERSHIP.AGENT,
     needsHumanAttention: false,

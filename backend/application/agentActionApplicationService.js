@@ -433,13 +433,20 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
       const { OWNERSHIP } = require("../core/workflowConstants");
       const { escalateConversationToHumanAssist } = require("../core/appointmentHumanAssistBridge");
 
-      savePersistedWorkflowState(phone, {
-        needsHumanAttention: true,
-        workflowOwnership: OWNERSHIP.AGENT,
-        manualAgentOwnership: true,
-        handoffReason: "recruiter_escalation",
-        handoffAt: new Date().toISOString()
-      });
+      await savePersistedWorkflowState(
+        phone,
+        {
+          needsHumanAttention: true,
+          workflowOwnership: OWNERSHIP.AGENT,
+          manualAgentOwnership: true,
+          handoffReason: "recruiter_escalation",
+          handoffAt: new Date().toISOString()
+        },
+        {
+          organizationId: organizationId || prospect.organization_id || null,
+          prospectId: prospect.id || null
+        }
+      );
 
       await escalateConversationToHumanAssist({
         phone,

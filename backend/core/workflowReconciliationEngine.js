@@ -150,7 +150,11 @@ async function applyTimeBasedReconciliation({
   prospect,
   agentState = {}
 }) {
-  const persisted = loadPersistedWorkflowState(phone);
+  const scope = {
+    organizationId: prospect?.organization_id || null,
+    prospectId: prospect?.id || null
+  };
+  const persisted = await loadPersistedWorkflowState(phone, scope);
 
   if (
     !shouldReconcile({
@@ -180,19 +184,23 @@ async function applyTimeBasedReconciliation({
 
   const shouldEmitEvents = persisted.reconcileEpisodeKey !== episodeKey;
 
-  savePersistedWorkflowState(phone, {
-    canonicalMilestone: milestoneAfter,
-    workflowOwnership: ownershipAfter,
-    reconcileEpisodeKey: episodeKey,
-    needsHumanAttention:
-      milestoneAfter === MILESTONES.INTERVIEW_RESULT_PENDING
-        ? false
-        : persisted.needsHumanAttention,
-    manualAgentOwnership:
-      milestoneAfter === MILESTONES.INTERVIEW_RESULT_PENDING
-        ? false
-        : persisted.manualAgentOwnership
-  });
+  await savePersistedWorkflowState(
+    phone,
+    {
+      canonicalMilestone: milestoneAfter,
+      workflowOwnership: ownershipAfter,
+      reconcileEpisodeKey: episodeKey,
+      needsHumanAttention:
+        milestoneAfter === MILESTONES.INTERVIEW_RESULT_PENDING
+          ? false
+          : persisted.needsHumanAttention,
+      manualAgentOwnership:
+        milestoneAfter === MILESTONES.INTERVIEW_RESULT_PENDING
+          ? false
+          : persisted.manualAgentOwnership
+    },
+    scope
+  );
 
   if (shouldEmitEvents) {
     await emitTimeReconciliationEvents({

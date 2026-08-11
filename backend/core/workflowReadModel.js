@@ -114,7 +114,11 @@ async function evaluateWorkflowState({
   agentState,
   messageHints
 }) {
-  const persisted = loadPersistedWorkflowState(phone);
+  const scope = {
+    organizationId: prospect?.organization_id || null,
+    prospectId: prospect?.id || null
+  };
+  const persisted = await loadPersistedWorkflowState(phone, scope);
 
   const mergedAgentState = {
     ...agentState,
@@ -169,11 +173,12 @@ async function evaluateWorkflowState({
   const ownershipBefore =
     persisted.workflowOwnership || effectiveOwnership;
 
-  const transition = applyStallTransition(
+  const transition = await applyStallTransition(
     phone,
     persisted,
     stallResult,
-    computed
+    computed,
+    scope
   );
 
   if (transition.applied) {
@@ -194,16 +199,20 @@ async function evaluateWorkflowState({
     }
   }
 
-  const refreshed = loadPersistedWorkflowState(phone);
+  const refreshed = await loadPersistedWorkflowState(phone, scope);
 
-  const resolved = resolveWorkflowState(phone, {
-    ...computed,
-    needsHumanAttention: refreshed.needsHumanAttention,
-    stalledAt: refreshed.stalledAt,
-    workflowOwnership: refreshed.needsHumanAttention
-      ? OWNERSHIP.AGENT
-      : refreshed.workflowOwnership || computed.workflowOwnership
-  });
+  const resolved = await resolveWorkflowState(
+    phone,
+    {
+      ...computed,
+      needsHumanAttention: refreshed.needsHumanAttention,
+      stalledAt: refreshed.stalledAt,
+      workflowOwnership: refreshed.needsHumanAttention
+        ? OWNERSHIP.AGENT
+        : refreshed.workflowOwnership || computed.workflowOwnership
+    },
+    scope
+  );
 
   // Implements BR-039 — persisted/computed INTERVIEW_SCHEDULED cannot outrank
   // atlas_appointments. Workflow cache must not impersonate a scheduled interview.
@@ -226,9 +235,13 @@ async function evaluateWorkflowState({
     };
 
     if (phone && claimsScheduledInterview(refreshed.canonicalMilestone)) {
-      savePersistedWorkflowState(phone, {
-        canonicalMilestone: MILESTONES.INTERVIEW_READY
-      });
+      await savePersistedWorkflowState(
+        phone,
+        {
+          canonicalMilestone: MILESTONES.INTERVIEW_READY
+        },
+        scope
+      );
     }
   }
 

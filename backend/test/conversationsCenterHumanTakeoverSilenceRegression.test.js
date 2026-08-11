@@ -77,12 +77,12 @@ async function simulateAutomatedOutboundAttempt(phone, outbound) {
   };
 
   assert.equal(
-    shouldDeliverAutomatedReply(prospect),
+    await shouldDeliverAutomatedReply(prospect),
     false,
     `${phone}: gate must suppress before delivery`
   );
   assert.equal(
-    shouldDeliverAutomatedReply(prospect, { allowHandoffAck: true }),
+    await shouldDeliverAutomatedReply(prospect, { allowHandoffAck: true }),
     false,
     `${phone}: TAKE OVER must not reopen via allowHandoffAck`
   );
@@ -136,12 +136,12 @@ test("Andrea + Wajairo: independent HUMAN takeovers keep automated outbound at 0
 
     try {
       for (const person of [ANDREA, WAJAIRO]) {
-        const taken = takeOverConversation(person.aliasPathPhone, {
+        const taken = await takeOverConversation(person.aliasPathPhone, {
           reason: "take_over"
         });
         assert.equal(taken.ownershipState, "HUMAN", person.name);
 
-        const stored = loadPersistedWorkflowState(person.phone);
+        const stored = await loadPersistedWorkflowState(person.phone);
         assert.equal(
           resolveConversationOwnershipState(stored),
           "HUMAN",
@@ -182,20 +182,20 @@ test("phone-key alias after TAKE OVER still silences inbound storagePhone", asyn
     } = require("../core/workflowStateStore");
     const { OWNERSHIP } = require("../core/workflowConstants");
 
-    savePersistedWorkflowState("17865551999", {
+    await savePersistedWorkflowState("17865551999", {
       workflowOwnership: OWNERSHIP.ATLAS,
       needsHumanAttention: false,
       manualAgentOwnership: false
     });
 
-    takeOverConversation("+17865551999");
+    await takeOverConversation("+17865551999");
     assert.equal(workflowStateKey("17865551999"), "+17865551999");
     assert.equal(
-      loadPersistedWorkflowState("17865551999").manualAgentOwnership,
+      (await loadPersistedWorkflowState("17865551999")).manualAgentOwnership,
       true
     );
     assert.equal(
-      shouldDeliverAutomatedReply({
+      await shouldDeliverAutomatedReply({
         phone: "+17865551999",
         current_step: "QUALIFICATION"
       }),

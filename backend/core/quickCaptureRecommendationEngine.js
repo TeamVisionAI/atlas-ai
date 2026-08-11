@@ -30,12 +30,15 @@ const ESTIMATED_MINUTES = Object.freeze({
   [RECOMMENDED_ACTIONS.SEND_ZOOM_LINK]: 1
 });
 
-function resolveQuickCaptureRecommendedAction(prospect) {
+async function resolveQuickCaptureRecommendedAction(prospect) {
   const assessment = assessQualificationFromProspect(prospect);
   const profile = buildProfileFromProspect(prospect);
   const missingFields = getMissingFields(profile);
   const requiredInputs = buildRequiredInputs(prospect, profile, missingFields);
-  const workflow = loadPersistedWorkflowState(prospect.phone);
+  const workflow = await loadPersistedWorkflowState(prospect.phone, {
+    organizationId: prospect.organization_id || null,
+    prospectId: prospect.id || null
+  });
   const milestone = workflow?.canonicalMilestone || MILESTONES.NEW_LEAD;
 
   if (requiredInputs.length > 0 || assessment.preScheduleFields?.length > 0) {
@@ -65,8 +68,8 @@ function resolveQuickCaptureRecommendedAction(prospect) {
   return RECOMMENDED_ACTIONS.CONVERSATION_OUTCOME;
 }
 
-function buildQuickCaptureGuidance(prospect) {
-  const recommendedAction = resolveQuickCaptureRecommendedAction(prospect);
+async function buildQuickCaptureGuidance(prospect) {
+  const recommendedAction = await resolveQuickCaptureRecommendedAction(prospect);
 
   return {
     recommendedAction,

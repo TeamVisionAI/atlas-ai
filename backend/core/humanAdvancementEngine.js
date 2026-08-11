@@ -198,7 +198,10 @@ async function advanceProspectWorkflow(phone, payload = {}) {
   }
 
   const agentState = loadAgentState(phone);
-  const persisted = loadPersistedWorkflowState(phone);
+  const persisted = await loadPersistedWorkflowState(phone, {
+    organizationId: prospect.organization_id || null,
+    prospectId: prospect.id || null
+  });
   const messageHints = await fetchMessageHints(phone);
 
   const missionControl = await getMissionControlState(phone);
@@ -296,16 +299,23 @@ async function advanceProspectWorkflow(phone, payload = {}) {
 
   const ownershipAfter = deriveDefaultOwnership(targetMilestone, workflowAgentState);
 
-  savePersistedWorkflowState(phone, {
-    canonicalMilestone: targetMilestone,
-    workflowOwnership: ownershipAfter,
-    needsHumanAttention: false,
-    stalledAt: null,
-    stallEpisodeKey: null,
-    reconcileEpisodeKey: null,
-    manualAgentOwnership: false,
-    doNotContact: targetMilestone === MILESTONES.DO_NOT_CONTACT
-  });
+  await savePersistedWorkflowState(
+    phone,
+    {
+      canonicalMilestone: targetMilestone,
+      workflowOwnership: ownershipAfter,
+      needsHumanAttention: false,
+      stalledAt: null,
+      stallEpisodeKey: null,
+      reconcileEpisodeKey: null,
+      manualAgentOwnership: false,
+      doNotContact: targetMilestone === MILESTONES.DO_NOT_CONTACT
+    },
+    {
+      organizationId: prospect.organization_id || null,
+      prospectId: prospect.id || null
+    }
+  );
 
   const interviewScheduled =
     targetMilestone === MILESTONES.INTERVIEW_SCHEDULED ||

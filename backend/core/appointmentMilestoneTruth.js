@@ -79,9 +79,9 @@ async function resolveAppointmentMilestoneTruth({
  * INTERVIEW_SCHEDULED / INTERVIEW_DUE claim so durable workflow matches reality.
  * Does not delete appointment history. Preserves HUMAN / manual ownership holds.
  *
- * @returns {{ demoted: boolean, previousMilestone: string|null, canonicalMilestone: string|null }}
+ * @returns {Promise<{ demoted: boolean, previousMilestone: string|null, canonicalMilestone: string|null }>}
  */
-function demotePersistedScheduleClaimAfterCancel(phone) {
+async function demotePersistedScheduleClaimAfterCancel(phone, options = {}) {
   if (!phone) {
     return { demoted: false, previousMilestone: null, canonicalMilestone: null };
   }
@@ -94,7 +94,7 @@ function demotePersistedScheduleClaimAfterCancel(phone) {
   const { deriveDefaultOwnership } = require("./milestoneMapper");
   const { loadAgentState } = require("./agentActionState");
 
-  const persisted = loadPersistedWorkflowState(phone);
+  const persisted = await loadPersistedWorkflowState(phone, options);
   const previousMilestone = persisted.canonicalMilestone || null;
 
   if (
@@ -122,10 +122,14 @@ function demotePersistedScheduleClaimAfterCancel(phone) {
     ? OWNERSHIP.AGENT
     : deriveDefaultOwnership(nextMilestone, agentState);
 
-  savePersistedWorkflowState(phone, {
-    canonicalMilestone: nextMilestone,
-    workflowOwnership: ownershipAfter
-  });
+  await savePersistedWorkflowState(
+    phone,
+    {
+      canonicalMilestone: nextMilestone,
+      workflowOwnership: ownershipAfter
+    },
+    options
+  );
 
   return {
     demoted: true,

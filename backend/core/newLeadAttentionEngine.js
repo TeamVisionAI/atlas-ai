@@ -229,11 +229,18 @@ async function markHumanAttentionRequired(prospect, reason, actor = {}) {
 
   await updateProspectAttention(prospect.phone, updates);
 
-  savePersistedWorkflowState(prospect.phone, {
-    needsHumanAttention: true,
-    workflowOwnership: OWNERSHIP.AGENT,
-    manualAgentOwnership: true
-  });
+  await savePersistedWorkflowState(
+    prospect.phone,
+    {
+      needsHumanAttention: true,
+      workflowOwnership: OWNERSHIP.AGENT,
+      manualAgentOwnership: true
+    },
+    {
+      organizationId: prospect.organization_id || null,
+      prospectId: prospect.id || null
+    }
+  );
 
   await writeSafeAudit({
     organizationId: prospect.organization_id,
@@ -498,10 +505,17 @@ async function applyEscalation(prospect, decision) {
   if (decision.level >= ESCALATION_LEVELS.HUMAN_REQUIRED) {
     updates.attention_status = ATTENTION_STATUS.HUMAN_REQUIRED;
     updates.human_attention_reason = sanitizeReason(decision.reason);
-    savePersistedWorkflowState(prospect.phone, {
-      needsHumanAttention: true,
-      workflowOwnership: OWNERSHIP.AGENT
-    });
+    await savePersistedWorkflowState(
+      prospect.phone,
+      {
+        needsHumanAttention: true,
+        workflowOwnership: OWNERSHIP.AGENT
+      },
+      {
+        organizationId: prospect.organization_id || null,
+        prospectId: prospect.id || null
+      }
+    );
   }
 
   await updateProspectAttention(prospect.phone, updates);

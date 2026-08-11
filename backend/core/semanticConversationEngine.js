@@ -333,15 +333,22 @@ async function handleScheduleMessage(prospect, message, language, personality) {
 
 async function markAutonomousScheduleHumanAssist(prospect, organizationId, reason, details = {}) {
   // Implements Conversations Center handoff — persist NEEDS_ATTENTION + reason.
-  workflowStateStore.savePersistedWorkflowState(prospect.phone, {
-    canonicalMilestone: MILESTONES.INTERVIEW_READY,
-    workflowOwnership: OWNERSHIP.AGENT,
-    needsHumanAttention: true,
-    manualAgentOwnership: true,
-    doNotContact: false,
-    handoffReason: reason || "scheduling_issue",
-    handoffAt: new Date().toISOString()
-  });
+  await workflowStateStore.savePersistedWorkflowState(
+    prospect.phone,
+    {
+      canonicalMilestone: MILESTONES.INTERVIEW_READY,
+      workflowOwnership: OWNERSHIP.AGENT,
+      needsHumanAttention: true,
+      manualAgentOwnership: true,
+      doNotContact: false,
+      handoffReason: reason || "scheduling_issue",
+      handoffAt: new Date().toISOString()
+    },
+    {
+      organizationId: organizationId || prospect.organization_id || null,
+      prospectId: prospect.id || null
+    }
+  );
 
   logWhatsAppStage("autonomous_schedule_human_assist", {
     level: "warn",
