@@ -90,6 +90,35 @@ function createSupabaseQrChannelRepository(client = supabase) {
       return data || [];
     },
 
+    /** Phase 2 — consumable handoffs only (pending_inbound). */
+    async listPendingInboundScansForOrgPhone(orgId, phoneNormalized) {
+      const { data, error } = await client
+        .from("qr_scans")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("bound_phone_normalized", phoneNormalized)
+        .eq("status", SCAN_STATUS.PENDING_INBOUND)
+        .is("consumed_at", null);
+      if (error) throw error;
+      return data || [];
+    },
+
+    async markScansAmbiguousConflict(scanIds = []) {
+      const ids = (scanIds || []).filter(Boolean);
+      if (!ids.length) return 0;
+      const { data, error } = await client
+        .from("qr_scans")
+        .update({
+          status: SCAN_STATUS.AMBIGUOUS_CONFLICT,
+          updated_at: new Date().toISOString()
+        })
+        .in("id", ids)
+        .eq("status", SCAN_STATUS.PENDING_INBOUND)
+        .select("id");
+      if (error) throw error;
+      return (data || []).length;
+    },
+
     async supersedeOpenScansExcept({ orgId, phoneNormalized, exceptScanId }) {
       const { data, error } = await client
         .from("qr_scans")

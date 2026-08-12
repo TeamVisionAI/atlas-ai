@@ -218,18 +218,47 @@ test("7. unknown sender insert payload includes organization and allows missing 
 
   let inserted = null;
   prospectNumberService.generateNextProspectNumber = async () => "TV-TEST-ORG";
-  supabaseService.supabase.from = () => ({
-    insert(row) {
-      inserted = row;
+  supabaseService.supabase.from = (table) => {
+    if (table === "prospects") {
       return {
-        select() {
+        insert(row) {
+          inserted = row;
           return {
-            single: async () => ({ data: { ...row, id: "prospect-test-1" }, error: null })
+            select() {
+              return {
+                single: async () => ({ data: { ...row, id: "prospect-test-1" }, error: null })
+              };
+            }
           };
         }
       };
     }
-  });
+    // BR-080 assignment may query atlas_users / org settings — return empty safely.
+    return {
+      select() {
+        return {
+          eq() {
+            return this;
+          },
+          in() {
+            return this;
+          },
+          is() {
+            return this;
+          },
+          order() {
+            return this;
+          },
+          limit() {
+            return this;
+          },
+          maybeSingle: async () => ({ data: null, error: null }),
+          single: async () => ({ data: null, error: null }),
+          then: undefined
+        };
+      }
+    };
+  };
 
   try {
     const row = await insertWhatsAppProspectRow({
@@ -393,6 +422,17 @@ test("13. locateOrCreate is idempotent for existing phone (no second insert)", a
         organizationId: ORG_A,
         source: "explicit"
       });
+      resolver.setQrAttributionServiceForTests({
+        matchEligiblePendingInboundScan: async () => ({
+          ok: false,
+          outcome: "MISS",
+          reasonCode: "NO_PENDING_SCAN",
+          scan: null,
+          campaign: null
+        }),
+        buildAttributionTouch: () => null,
+        consumeMatchedScan: async () => ({ ok: true })
+      });
 
       try {
         const result = await resolver.locateOrCreateWhatsAppProspect({
@@ -412,6 +452,7 @@ test("13. locateOrCreate is idempotent for existing phone (no second insert)", a
         supabaseService.updateProspect = originalUpdate;
         hooks.onLegacyProspectCreated = originalHook;
         orgResolver.resolveWhatsAppInboundOrganizationId = originalResolve;
+        resolver.setQrAttributionServiceForTests(null);
       }
     }
   );
