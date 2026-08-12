@@ -1,5 +1,6 @@
 /**
  * Sprint 11.1 — Normalize Meta WhatsApp Cloud API webhook payloads.
+ * Inbound messages and delivery status updates (observability).
  */
 
 function normalizeMessageBody(message) {
@@ -28,20 +29,68 @@ function normalizeMessageBody(message) {
   return `[${message.type || "unknown"} message]`;
 }
 
+function extractStatusFailure(statusItem) {
+  const errors = Array.isArray(statusItem?.errors) ? statusItem.errors : [];
+  const first = errors[0] || null;
+  if (!first) {
+    return { failureCode: null, failureReason: null };
+  }
+
+  return {
+    failureCode: first.code != null ? String(first.code) : null,
+    failureReason:
+      String(
+        first.title ||
+          first.message ||
+          first.error_data?.details ||
+          first.href ||
+          ""
+      ).trim() || null
+  };
+}
+
+function normalizeStatusItem(statusItem, value, wabaId) {
+  if (!statusItem?.id || !statusItem?.status) {
+    return null;
+  }
+
+  const { failureCode, failureReason } = extractStatusFailure(statusItem);
+  const phoneNumberId = value?.metadata?.phone_number_id
+    ? String(value.metadata.phone_number_id)
+    : null;
+
+  return {
+    providerMessageId: String(statusItem.id),
+    status: String(statusItem.status).toLowerCase(),
+    timestampSeconds: statusItem.timestamp || null,
+    timestampIso: statusItem.timestamp
+      ? new Date(Number(statusItem.timestamp) * 1000).toISOString()
+      : new Date().toISOString(),
+    recipientId: statusItem.recipient_id ? String(statusItem.recipient_id) : null,
+    conversation: statusItem.conversation || null,
+    pricing: statusItem.pricing || null,
+    phoneNumberId,
+    wabaId,
+    failureCode,
+    failureReason,
+    rawStatus: statusItem
+  };
+}
+
 /**
  * @param {Object} body — Meta webhook JSON body
- * @returns {Array<Object>} normalized inbound messages
+ * @returns {{ messages: Array<Object>, statuses: Array<Object> }}
  */
-function parseWhatsAppWebhookBody(body) {
+function parseWhatsAppWebhookPayload(body) {
   const messages = [];
+  const statuses = [];
 
   for (const entry of body?.entry || []) {
     const wabaId = entry?.id ? String(entry.id) : null;
 
     for (const change of entry?.changes || []) {
       const value = change?.value;
-
-      if (!value?.messages?.length) {
+      if (!value) {
         continue;
       }
 
@@ -50,7 +99,7 @@ function parseWhatsAppWebhookBody(body) {
         ? String(value.metadata.phone_number_id)
         : null;
 
-      for (const message of value.messages) {
+      for (const message of value.messages || []) {
         if (!message?.from || !message?.id) {
           continue;
         }
@@ -70,13 +119,30 @@ function parseWhatsAppWebhookBody(body) {
           rawValue: value
         });
       }
+
+      for (const statusItem of value.statuses || []) {
+        const normalized = normalizeStatusItem(statusItem, value, wabaId);
+        if (normalized) {
+          statuses.push(normalized);
+        }
+      }
     }
   }
 
-  return messages;
+  return { messages, statuses };
+}
+
+/**
+ * @param {Object} body — Meta webhook JSON body
+ * @returns {Array<Object>} normalized inbound messages
+ */
+function parseWhatsAppWebhookBody(body) {
+  return parseWhatsAppWebhookPayload(body).messages;
 }
 
 module.exports = {
   parseWhatsAppWebhookBody,
-  normalizeMessageBody
+  parseWhatsAppWebhookPayload,
+  normalizeMessageBody,
+  normalizeStatusItem
 };

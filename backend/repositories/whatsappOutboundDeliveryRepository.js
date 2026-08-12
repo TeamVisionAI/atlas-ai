@@ -1,8 +1,13 @@
 /**
- * Durable WhatsApp outbound delivery attempts (BR-075).
+ * Durable WhatsApp outbound delivery attempts (BR-075) + Meta lifecycle (observability).
+ * BR-075 `status` and Meta `meta_delivery_status` are distinct columns — never conflate.
  */
 
 const { supabase } = require("../services/supabaseService");
+const {
+  planMetaDeliveryLifecycleUpdate
+} = require("../core/whatsappMetaDeliveryLifecycle");
+const { logWhatsAppStage } = require("../core/whatsappStructuredLogger");
 
 const SUCCESS_STATUSES = new Set(["sent_freeform", "sent_template"]);
 
@@ -16,6 +21,12 @@ function isTableMissingError(error) {
     /does not exist/i.test(message) ||
     /Could not find the table/i.test(message) ||
     /schema cache/i.test(message)
+  );
+}
+
+function isMetaLifecycleColumnError(error) {
+  return /meta_delivery_status|sent_at|delivered_at|read_at|failed_at|failure_code|failure_reason/i.test(
+    String(error?.message || error?.details || "")
   );
 }
 
@@ -54,7 +65,31 @@ async function findSuccessfulDeliveryByIdempotencyKey({
   return Array.isArray(data) ? data[0] || null : data;
 }
 
+async function findDeliveryByProviderMessageId(providerMessageId, client = supabase) {
+  const wamid = String(providerMessageId || "").trim();
+  if (!wamid) {
+    return null;
+  }
+
+  const { data, error } = await client
+    .from("whatsapp_outbound_deliveries")
+    .select("*")
+    .eq("provider_message_id", wamid)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    if (isTableMissingError(error)) {
+      return null;
+    }
+    throw new Error(`DELIVERY_LOOKUP_BY_WAMID_FAILED:${error.message}`);
+  }
+
+  return Array.isArray(data) ? data[0] || null : data;
+}
+
 async function recordOutboundDelivery(record, client = supabase) {
+  const nowIso = new Date().toISOString();
   const row = {
     organization_id: record.organizationId || null,
     prospect_phone: record.prospectPhone,
@@ -70,8 +105,17 @@ async function recordOutboundDelivery(record, client = supabase) {
     provider_message_id: record.providerMessageId || null,
     conversation_log_id: record.conversationLogId || null,
     metadata: record.metadata || {},
-    updated_at: new Date().toISOString()
+    updated_at: nowIso
   };
+
+  // Initial Meta lifecycle when Graph API accepted the send (observability only).
+  if (
+    record.providerMessageId &&
+    (record.status === "sent_freeform" || record.status === "sent_template")
+  ) {
+    row.meta_delivery_status = "sent";
+    row.sent_at = nowIso;
+  }
 
   const { data, error } = await client
     .from("whatsapp_outbound_deliveries")
@@ -105,10 +149,99 @@ async function recordOutboundDelivery(record, client = supabase) {
       };
     }
 
+    // Pre-migration deploy skew: retry without new columns.
+    if (isMetaLifecycleColumnError(error)) {
+      const legacyRow = { ...row };
+      delete legacyRow.meta_delivery_status;
+      delete legacyRow.sent_at;
+      const retry = await client
+        .from("whatsapp_outbound_deliveries")
+        .insert([legacyRow])
+        .select()
+        .single();
+      if (!retry.error) {
+        return { success: true, row: retry.data, duplicate: false };
+      }
+    }
+
     return { success: false, error, row: null };
   }
 
   return { success: true, row: data, duplicate: false };
+}
+
+/**
+ * Apply one Meta status webhook item by exact wamid.
+ * Observability only — no ownership / follow-up / retry side effects.
+ */
+async function applyMetaDeliveryStatusEvent(event, client = supabase) {
+  const providerMessageId = String(event?.providerMessageId || "").trim();
+  if (!providerMessageId) {
+    logWhatsAppStage("meta_delivery_status_ignored", {
+      reason: "MISSING_PROVIDER_MESSAGE_ID"
+    });
+    return { success: false, ignored: true, reason: "MISSING_PROVIDER_MESSAGE_ID" };
+  }
+
+  const existing = await findDeliveryByProviderMessageId(providerMessageId, client);
+
+  if (!existing) {
+    logWhatsAppStage("meta_delivery_status_unknown_wamid", {
+      providerMessageId,
+      status: event.status || null
+    });
+    return {
+      success: true,
+      ignored: true,
+      reason: "UNKNOWN_WAMID",
+      providerMessageId
+    };
+  }
+
+  const merge = planMetaDeliveryLifecycleUpdate(existing, event);
+  if (!merge.apply) {
+    logWhatsAppStage("meta_delivery_status_ignored", {
+      providerMessageId,
+      reason: merge.reason,
+      status: event.status || null
+    });
+    return { success: false, ignored: true, reason: merge.reason, providerMessageId };
+  }
+
+  const { data, error } = await client
+    .from("whatsapp_outbound_deliveries")
+    .update(merge.patch)
+    .eq("id", existing.id)
+    .select()
+    .single();
+
+  if (error) {
+    if (isTableMissingError(error)) {
+      return { success: false, skipped: true, reason: "TABLE_MISSING" };
+    }
+    if (isMetaLifecycleColumnError(error)) {
+      logWhatsAppStage("meta_delivery_status_schema_pending", {
+        providerMessageId,
+        level: "warn"
+      });
+      return { success: false, skipped: true, reason: "SCHEMA_PENDING" };
+    }
+    throw new Error(`META_DELIVERY_UPDATE_FAILED:${error.message}`);
+  }
+
+  logWhatsAppStage("meta_delivery_status_applied", {
+    providerMessageId,
+    status: merge.patch.meta_delivery_status || existing.meta_delivery_status,
+    deliveryId: existing.id
+  });
+
+  return {
+    success: true,
+    ignored: false,
+    row: data,
+    previous: existing,
+    patch: merge.patch
+  };
 }
 
 function isSuccessfulDeliveryStatus(status) {
@@ -117,7 +250,9 @@ function isSuccessfulDeliveryStatus(status) {
 
 module.exports = {
   findSuccessfulDeliveryByIdempotencyKey,
+  findDeliveryByProviderMessageId,
   recordOutboundDelivery,
+  applyMetaDeliveryStatusEvent,
   isSuccessfulDeliveryStatus,
   isTableMissingError,
   SUCCESS_STATUSES

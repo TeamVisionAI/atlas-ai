@@ -95,6 +95,25 @@
   color: #64748b;
 }
 
+.cc-timeline__meta-tick {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.cc-timeline__meta-tick--delivered {
+  color: #475569;
+}
+
+.cc-timeline__meta-tick--read {
+  color: #1d4ed8;
+}
+
+.cc-timeline__meta-tick--failed {
+  color: #b45309;
+}
+
 .cc-timeline__body {
   margin: 0;
   font-size: 14px;

@@ -18,6 +18,34 @@ import {
 import { shouldCommitTimelinePayload } from "../../../engines/conversationsSelectionConsistency";
 import "./CommunicationsCenterTimeline.css";
 
+function metaDeliveryTick(delivery, { direction, channel } = {}) {
+  if (String(direction || "").toLowerCase() !== "outbound") {
+    return null;
+  }
+  if (String(channel || "").toLowerCase() !== "whatsapp") {
+    return null;
+  }
+
+  const status = String(delivery?.metaDeliveryStatus || "").toLowerCase();
+  if (!status) {
+    return null;
+  }
+
+  if (status === "sent") {
+    return { mark: "✓", label: "Sent", tone: "sent" };
+  }
+  if (status === "delivered") {
+    return { mark: "✓✓", label: "Delivered", tone: "delivered" };
+  }
+  if (status === "read") {
+    return { mark: "✓✓", label: "Read", tone: "read" };
+  }
+  if (status === "failed") {
+    return { mark: "⚠", label: "Failed", tone: "failed" };
+  }
+  return null;
+}
+
 export default function CommunicationsCenterTimeline({
   prospectId,
   organizationId = null,
@@ -207,6 +235,10 @@ export default function CommunicationsCenterTimeline({
             const safeBody = containsRawPhoneLeak(body)
               ? body.replace(/\+\d{10,15}\b/g, "***").replace(/\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g, "***")
               : body;
+            const metaTick = metaDeliveryTick(item.delivery, {
+              direction: item.direction,
+              channel: item.channel
+            });
 
             return (
               <li key={item.id} className="cc-timeline__item">
@@ -217,6 +249,15 @@ export default function CommunicationsCenterTimeline({
                   <span>{actorLabel(item)}</span>
                   <span>{directionLabel(item)}</span>
                   <span>{item.channel || "—"}</span>
+                  {metaTick ? (
+                    <span
+                      className={`cc-timeline__meta-tick cc-timeline__meta-tick--${metaTick.tone}`}
+                      title={metaTick.label}
+                      aria-label={metaTick.label}
+                    >
+                      <span aria-hidden="true">{metaTick.mark}</span> {metaTick.label}
+                    </span>
+                  ) : null}
                 </div>
 
                 <p className="cc-timeline__body">{safeBody || item.eventType}</p>
@@ -272,6 +313,58 @@ export default function CommunicationsCenterTimeline({
                       <dt>Correlation</dt>
                       <dd>{correlationLabel(item)}</dd>
                     </div>
+                    {item.delivery?.providerMessageId ? (
+                      <div>
+                        <dt>Provider message id</dt>
+                        <dd>{item.delivery.providerMessageId}</dd>
+                      </div>
+                    ) : null}
+                    {item.delivery?.status ? (
+                      <div>
+                        <dt>BR-075 delivery status</dt>
+                        <dd>{item.delivery.status}</dd>
+                      </div>
+                    ) : null}
+                    {item.delivery?.metaDeliveryStatus ? (
+                      <div>
+                        <dt>Meta lifecycle status</dt>
+                        <dd>{item.delivery.metaDeliveryStatus}</dd>
+                      </div>
+                    ) : null}
+                    {item.delivery?.sentAt ? (
+                      <div>
+                        <dt>Sent at</dt>
+                        <dd>{item.delivery.sentAt}</dd>
+                      </div>
+                    ) : null}
+                    {item.delivery?.deliveredAt ? (
+                      <div>
+                        <dt>Delivered at</dt>
+                        <dd>{item.delivery.deliveredAt}</dd>
+                      </div>
+                    ) : null}
+                    {item.delivery?.readAt ? (
+                      <div>
+                        <dt>Read at</dt>
+                        <dd>{item.delivery.readAt}</dd>
+                      </div>
+                    ) : null}
+                    {item.delivery?.failedAt ? (
+                      <div>
+                        <dt>Failed at</dt>
+                        <dd>{item.delivery.failedAt}</dd>
+                      </div>
+                    ) : null}
+                    {item.delivery?.failureCode || item.delivery?.failureReason ? (
+                      <div>
+                        <dt>Failure</dt>
+                        <dd>
+                          {[item.delivery.failureCode, item.delivery.failureReason]
+                            .filter(Boolean)
+                            .join(" — ")}
+                        </dd>
+                      </div>
+                    ) : null}
                     <div>
                       <dt>Flags</dt>
                       <dd>
