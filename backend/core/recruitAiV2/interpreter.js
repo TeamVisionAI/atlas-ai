@@ -15,6 +15,7 @@ const {
   looksLikeJobOpportunityQuestion,
   looksLikeJobOverviewQuestion,
   looksLikeSpanishInfoRequest,
+  looksLikeEnglishInfoRequest,
   looksLikeCompanyIdentityQuestion,
   looksLikeConversationClarificationRequest,
   lastQuestionImpliesDate,
@@ -185,7 +186,11 @@ function isGreeting(text) {
   }
   // Real-world opener: greeting + brief interest without a substantive info ask.
   // Substantive "quiero más información" is handled as job overview (BR-131), not greeting-only.
-  if (looksLikeSpanishInfoRequest(raw) || looksLikeCompanyIdentityQuestion(raw)) {
+  if (
+    looksLikeSpanishInfoRequest(raw) ||
+    looksLikeEnglishInfoRequest(raw) ||
+    looksLikeCompanyIdentityQuestion(raw)
+  ) {
     return false;
   }
   return /^(hola|hi|hello|hey)\b.{0,40}\b(me interesa|looking for (more )?info)\b/.test(
@@ -917,6 +922,8 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     !looksLikeSalesObjection(originalText) &&
     (looksLikeSpanishInfoRequest(text) ||
       looksLikeSpanishInfoRequest(originalText) ||
+      looksLikeEnglishInfoRequest(text) ||
+      looksLikeEnglishInfoRequest(originalText) ||
       looksLikeJobOpportunityQuestion(text) ||
       looksLikeJobOpportunityQuestion(originalText))
   ) {
@@ -928,7 +935,9 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       looksLikeJobOverviewQuestion(text) ||
       looksLikeJobOverviewQuestion(originalText) ||
       looksLikeSpanishInfoRequest(text) ||
-      looksLikeSpanishInfoRequest(originalText)
+      looksLikeSpanishInfoRequest(originalText) ||
+      looksLikeEnglishInfoRequest(text) ||
+      looksLikeEnglishInfoRequest(originalText)
         ? "overview"
         : "employment_framing";
     if (authAnswer === true || authAnswer === false) {
@@ -1487,6 +1496,7 @@ module.exports = {
   looksLikeJobOpportunityQuestion,
   looksLikeJobOverviewQuestion,
   looksLikeSpanishInfoRequest,
+  looksLikeEnglishInfoRequest,
   looksLikeCompanyIdentityQuestion,
   looksLikeConversationClarificationRequest,
   looksLikeInsuranceQuestion,
