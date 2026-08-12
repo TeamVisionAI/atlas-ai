@@ -8,5 +8,6 @@ export const SETTINGS_SECTIONS = Object.freeze({
   whatsapp: "WhatsApp",
   scheduling: "Scheduling",
   appointments: "Appointments",
+  qrCampaigns: "QR Campaigns",
   reviewUsers: "Review Users"
 });

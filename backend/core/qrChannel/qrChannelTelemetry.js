@@ -13,7 +13,12 @@ const EVENTS = Object.freeze({
   REDIRECT_WHATSAPP: "qr.redirect.whatsapp",
   ATTRIBUTION_ATTACHED: "qr.whatsapp.attribution_attached",
   ATTRIBUTION_MISSED: "qr.whatsapp.attribution_missed",
-  SCAN_CONSUMED: "qr.whatsapp.scan_consumed"
+  SCAN_CONSUMED: "qr.whatsapp.scan_consumed",
+  CAMPAIGN_CREATED: "qr.campaign.created",
+  CAMPAIGN_ACTIVATED: "qr.campaign.activated",
+  CAMPAIGN_DEACTIVATED: "qr.campaign.deactivated",
+  CAMPAIGN_QR_DOWNLOADED: "qr.campaign.qr_downloaded",
+  CAMPAIGN_PUBLIC_URL_ACCESSED: "qr.campaign.public_url_accessed"
 });
 
 function emitQrEvent(eventName, fields = {}) {

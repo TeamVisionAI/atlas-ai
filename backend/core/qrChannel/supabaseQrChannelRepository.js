@@ -48,6 +48,32 @@ function createSupabaseQrChannelRepository(client = supabase) {
       return data;
     },
 
+    async updateCampaign(id, patch) {
+      const { data, error } = await client
+        .from("qr_campaigns")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("*")
+        .maybeSingle();
+      if (error) throw error;
+      return data || null;
+    },
+
+    async listCampaignsByOrg({ orgId, ownerUserId = null } = {}) {
+      let query = client
+        .from("qr_campaigns")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("created_at", { ascending: false });
+      if (ownerUserId) {
+        query = query.eq("owner_user_id", ownerUserId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+
     async findScanById(id) {
       const { data, error } = await client
         .from("qr_scans")

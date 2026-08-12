@@ -205,6 +205,7 @@ app.use("/api/account", accountRoutes);
 app.use("/api/configuration", configurationRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/interview-assignment", interviewAssignmentRoutes);
+app.use("/api/qr-campaigns", require("./routes/qrCampaigns"));
 app.use("/api/missions", missionRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use("/timeline", timelineRoutes);
