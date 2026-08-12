@@ -22,7 +22,8 @@ const {
 } = require("./whatsappOutboundAuthorizationGate");
 const {
   findSuccessfulDeliveryByIdempotencyKey,
-  recordOutboundDelivery
+  recordOutboundDelivery,
+  linkOutboundDeliveryConversationLog
 } = require("../repositories/whatsappOutboundDeliveryRepository");
 const { recordBusinessEvent } = require("./recruitingBusinessEventBridge");
 const { COMMUNICATION_EVENTS } = require("../modules/business-events/domain/EventTypes");
@@ -453,6 +454,51 @@ async function sendAndPersistWhatsAppMessage({
     sendResult.providerMessageId || providerMessageIdSeed
   );
 
+  const deliveryMetadata = {
+    simulated: Boolean(sendResult.simulated),
+    window: authorization.window,
+    category: authorization.category || null,
+    version: authorization.version || null,
+    languageCode: authorization.languageCode || null,
+    sanitized: true
+  };
+
+  // A — Persist delivery SoR immediately after wamid so Meta status webhooks can match.
+  // conversation_log_id is linked after transcript persistence (same row, no duplicate).
+  let earlyDelivery = await recordOutboundDelivery({
+    organizationId: resolvedOrgId,
+    prospectPhone: prospect?.phone || storagePhone,
+    intent,
+    idempotencyKey,
+    status,
+    deliveryMode: mode,
+    templateKey: authorization.templateKey || null,
+    metaTemplateName: authorization.metaTemplateName || null,
+    language: authorization.language || null,
+    retryable: false,
+    reason: authorization.reason || status,
+    providerMessageId: sendResult.providerMessageId,
+    conversationLogId: null,
+    metadata: deliveryMetadata
+  }).catch((error) => {
+    logWhatsAppStage("outbound_delivery_row_early_persist_failed", {
+      to,
+      level: "warn",
+      providerMessageId: sendResult.providerMessageId || null,
+      error: error.message || "unknown"
+    });
+    return { success: false, error };
+  });
+
+  if (!earlyDelivery?.success) {
+    logWhatsAppStage("outbound_delivery_row_early_persist_failed", {
+      to,
+      level: "warn",
+      providerMessageId: sendResult.providerMessageId || null,
+      error: earlyDelivery?.error?.message || earlyDelivery?.error || "insert_failed"
+    });
+  }
+
   const persistBody =
     mode === "template"
       ? `[whatsapp_template:${authorization.metaTemplateName}] intent=${intent}`
@@ -478,7 +524,9 @@ async function sendAndPersistWhatsAppMessage({
     logWhatsAppStage("outbound_persist_failed", {
       to,
       level: "error",
-      error: logResult.error?.message || "unknown"
+      error: logResult.error?.message || "unknown",
+      providerMessageId: sendResult.providerMessageId || null,
+      deliveryRowId: earlyDelivery?.row?.id || null
     });
   } else {
     logWhatsAppStage("message_persisted", {
@@ -491,6 +539,51 @@ async function sendAndPersistWhatsAppMessage({
       eventType: "MessageSent"
     });
 
+    if (earlyDelivery?.success && (earlyDelivery.row?.id || sendResult.providerMessageId)) {
+      const linked = await linkOutboundDeliveryConversationLog({
+        deliveryId: earlyDelivery.row?.id || null,
+        providerMessageId: sendResult.providerMessageId,
+        conversationLogId: logResult.log?.id
+      }).catch((error) => {
+        logWhatsAppStage("outbound_delivery_log_link_failed", {
+          to,
+          level: "warn",
+          providerMessageId: sendResult.providerMessageId || null,
+          conversationLogId: logResult.log?.id || null,
+          error: error.message || "unknown"
+        });
+        return { success: false };
+      });
+
+      if (!linked?.success) {
+        logWhatsAppStage("outbound_delivery_log_link_failed", {
+          to,
+          level: "warn",
+          providerMessageId: sendResult.providerMessageId || null,
+          conversationLogId: logResult.log?.id || null,
+          reason: linked?.reason || "link_failed"
+        });
+      }
+    } else {
+      // Early insert failed — best-effort single late insert (no Graph resend).
+      await recordOutboundDelivery({
+        organizationId: resolvedOrgId,
+        prospectPhone: prospect?.phone || storagePhone,
+        intent,
+        idempotencyKey,
+        status,
+        deliveryMode: mode,
+        templateKey: authorization.templateKey || null,
+        metaTemplateName: authorization.metaTemplateName || null,
+        language: authorization.language || null,
+        retryable: false,
+        reason: authorization.reason || status,
+        providerMessageId: sendResult.providerMessageId,
+        conversationLogId: logResult.log?.id || null,
+        metadata: deliveryMetadata
+      }).catch(() => ({ success: false }));
+    }
+
     await onMessageSent({
       phone: prospect?.phone || storagePhone,
       message: persistBody,
@@ -500,36 +593,13 @@ async function sendAndPersistWhatsAppMessage({
     });
   }
 
-  await recordOutboundDelivery({
-    organizationId: resolvedOrgId,
-    prospectPhone: prospect?.phone || storagePhone,
-    intent,
-    idempotencyKey,
-    status,
-    deliveryMode: mode,
-    templateKey: authorization.templateKey || null,
-    metaTemplateName: authorization.metaTemplateName || null,
-    language: authorization.language || null,
-    retryable: false,
-    reason: authorization.reason || status,
-    providerMessageId: sendResult.providerMessageId,
-    conversationLogId: logResult.log?.id || null,
-    metadata: {
-      simulated: Boolean(sendResult.simulated),
-      window: authorization.window,
-      category: authorization.category || null,
-      version: authorization.version || null,
-      languageCode: authorization.languageCode || null,
-      sanitized: true
-    }
-  }).catch(() => ({ success: false }));
-
   return {
     success: true,
     status,
     simulated: Boolean(sendResult.simulated),
     providerMessageId: sendResult.providerMessageId,
     conversationLogId: logResult.log?.id || null,
+    deliveryId: earlyDelivery?.row?.id || null,
     retryable: false,
     delivery: buildDeliveryResult({
       status,

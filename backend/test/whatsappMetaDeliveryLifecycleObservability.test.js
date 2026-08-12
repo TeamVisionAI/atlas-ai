@@ -20,10 +20,12 @@ const {
 } = require("../services/whatsappWebhookParser");
 const {
   applyWhatsAppMetaDeliveryStatus,
-  applyWhatsAppMetaDeliveryStatuses
+  applyWhatsAppMetaDeliveryStatuses,
+  UNKNOWN_WAMID_RETRY_DELAYS_MS
 } = require("../core/whatsappMetaDeliveryStatusService");
 const {
   recordOutboundDelivery,
+  linkOutboundDeliveryConversationLog,
   applyMetaDeliveryStatusEvent,
   findDeliveryByProviderMessageId
 } = require("../repositories/whatsappOutboundDeliveryRepository");
@@ -330,7 +332,7 @@ test("A. outbound send persists provider_message_id / wamid + initial Meta sent"
   assert.equal(result.row.status, "sent_freeform");
 });
 
-test("I. unknown wamid → safe ignore / no corruption", async () => {
+test("I. unknown wamid → bounded retry then safe ignore / no corruption", async () => {
   const client = createMemoryClient([
     {
       id: "d1",
@@ -343,10 +345,12 @@ test("I. unknown wamid → safe ignore / no corruption", async () => {
 
   const result = await applyWhatsAppMetaDeliveryStatus(
     event("delivered", "wamid.UNKNOWN"),
-    client
+    client,
+    { retryDelaysMs: [1, 1], sleepFn: async () => {} }
   );
   assert.equal(result.ignored, true);
   assert.equal(result.reason, "UNKNOWN_WAMID");
+  assert.equal(result.attempts, 3);
   assert.equal(client.rows[0].meta_delivery_status, "sent");
   assert.equal(client.rows[0].delivered_at, undefined);
 });
@@ -613,7 +617,11 @@ test("R–T/U/V/W. ownership + execution + Meta Reviewer + CE gate paths unchang
   assert.match(webhookSrc, /statuses/);
 
   assert.match(pipelineSrc, /recordOutboundDelivery/);
+  assert.match(pipelineSrc, /linkOutboundDeliveryConversationLog/);
+  assert.match(pipelineSrc, /conversationLogId:\s*null/);
   assert.match(pipelineSrc, /providerMessageId/);
+  assert.match(serviceSrc, /UNKNOWN_WAMID_RETRY_DELAYS_MS/);
+  assert.deepEqual([...UNKNOWN_WAMID_RETRY_DELAYS_MS], [100, 250, 500, 900]);
 
   assert.match(migrationSrc, /meta_delivery_status/);
   assert.match(migrationSrc, /idx_whatsapp_outbound_deliveries_provider_message_id/);
@@ -654,4 +662,203 @@ test("applyMetaDeliveryStatusEvent uses exact provider_message_id lookup only", 
 
   assert.equal(result.reason, "UNKNOWN_WAMID");
   assert.equal(client.rows[0].meta_delivery_status, "sent");
+});
+
+// ─── Race hotfix: early persist + bounded UNKNOWN_WAMID retry ───────────────
+
+test("1–2. early delivery row then link conversation_log_id (no duplicate)", async () => {
+  const client = createMemoryClient();
+  const early = await recordOutboundDelivery(
+    {
+      organizationId: "org-1",
+      prospectPhone: "+15551234567",
+      intent: "HUMAN_COMPOSER_REPLY",
+      status: "sent_freeform",
+      deliveryMode: "freeform",
+      providerMessageId: "wamid.EARLY1",
+      conversationLogId: null
+    },
+    client
+  );
+  assert.equal(early.success, true);
+  assert.equal(early.row.conversation_log_id, null);
+  assert.equal(early.row.meta_delivery_status, "sent");
+  assert.equal(client.rows.length, 1);
+
+  const linked = await linkOutboundDeliveryConversationLog(
+    {
+      deliveryId: early.row.id,
+      providerMessageId: "wamid.EARLY1",
+      conversationLogId: "log-early-1"
+    },
+    client
+  );
+  assert.equal(linked.success, true);
+  assert.equal(client.rows.length, 1);
+  assert.equal(client.rows[0].conversation_log_id, "log-early-1");
+  assert.equal(client.rows[0].status, "sent_freeform");
+});
+
+test("3. sent callback after row applies normally", async () => {
+  const client = createMemoryClient([
+    {
+      id: "d-after",
+      provider_message_id: "wamid.AFTER",
+      meta_delivery_status: "sent",
+      status: "sent_freeform",
+      created_at: "t0"
+    }
+  ]);
+  const result = await applyWhatsAppMetaDeliveryStatus(
+    event("delivered", "wamid.AFTER"),
+    client,
+    { retryDelaysMs: [] }
+  );
+  assert.equal(result.ignored, false);
+  assert.equal(result.attempts, 1);
+  assert.equal(client.rows[0].meta_delivery_status, "delivered");
+});
+
+test("4–5. sent/delivered callback before row → retry finds row", async () => {
+  const client = createMemoryClient();
+  let inserts = 0;
+  const sleepFn = async () => {
+    inserts += 1;
+    if (inserts === 1) {
+      await recordOutboundDelivery(
+        {
+          organizationId: "org-1",
+          prospectPhone: "+15550001111",
+          intent: "HUMAN_COMPOSER_REPLY",
+          status: "sent_freeform",
+          deliveryMode: "freeform",
+          providerMessageId: "wamid.RACE_DELIV",
+          conversationLogId: null
+        },
+        client
+      );
+    }
+  };
+
+  const result = await applyWhatsAppMetaDeliveryStatus(
+    event("delivered", "wamid.RACE_DELIV"),
+    client,
+    { retryDelaysMs: [1, 1, 1], sleepFn }
+  );
+  assert.equal(result.reason, undefined);
+  assert.equal(result.ignored, false);
+  assert.ok(result.attempts >= 2);
+  assert.equal(client.rows[0].meta_delivery_status, "delivered");
+  assert.equal(client.rows[0].status, "sent_freeform");
+});
+
+test("6. read callback before row → retry → READ", async () => {
+  const client = createMemoryClient();
+  let ready = false;
+  const sleepFn = async () => {
+    if (!ready) {
+      ready = true;
+      await recordOutboundDelivery(
+        {
+          organizationId: "org-1",
+          prospectPhone: "+15550002222",
+          intent: "LIVE_AUTHORING_REPLY",
+          status: "sent_freeform",
+          deliveryMode: "freeform",
+          providerMessageId: "wamid.RACE_READ",
+          conversationLogId: null
+        },
+        client
+      );
+    }
+  };
+
+  const result = await applyWhatsAppMetaDeliveryStatus(
+    event("read", "wamid.RACE_READ"),
+    client,
+    { retryDelaysMs: [1, 1], sleepFn }
+  );
+  assert.equal(result.ignored, false);
+  assert.equal(client.rows[0].meta_delivery_status, "read");
+  assert.equal(client.rows[0].delivered_at, undefined);
+});
+
+test("7. early sent + delivered before/around row → final DELIVERED", async () => {
+  const client = createMemoryClient();
+  let inserted = false;
+  const sleepFn = async () => {
+    if (!inserted) {
+      inserted = true;
+      await recordOutboundDelivery(
+        {
+          organizationId: "org-1",
+          prospectPhone: "+15550003333",
+          intent: "TEMPLATE_REMINDER",
+          status: "sent_template",
+          deliveryMode: "template",
+          providerMessageId: "wamid.RACE_SD",
+          conversationLogId: null
+        },
+        client
+      );
+    }
+  };
+
+  await applyWhatsAppMetaDeliveryStatus(event("sent", "wamid.RACE_SD"), client, {
+    retryDelaysMs: [1],
+    sleepFn
+  });
+  await applyWhatsAppMetaDeliveryStatus(
+    event("delivered", "wamid.RACE_SD"),
+    client,
+    { retryDelaysMs: [] }
+  );
+  const row = await findDeliveryByProviderMessageId("wamid.RACE_SD", client);
+  assert.equal(row.meta_delivery_status, "delivered");
+  assert.equal(row.status, "sent_template");
+});
+
+test("8. early delivered + read → final READ", async () => {
+  const client = createMemoryClient();
+  let inserted = false;
+  const sleepFn = async () => {
+    if (!inserted) {
+      inserted = true;
+      await recordOutboundDelivery(
+        {
+          organizationId: "org-1",
+          prospectPhone: "+15550004444",
+          intent: "HUMAN_COMPOSER_REPLY",
+          status: "sent_freeform",
+          deliveryMode: "freeform",
+          providerMessageId: "wamid.RACE_DR",
+          conversationLogId: null
+        },
+        client
+      );
+    }
+  };
+
+  await applyWhatsAppMetaDeliveryStatus(
+    event("delivered", "wamid.RACE_DR"),
+    client,
+    { retryDelaysMs: [1], sleepFn }
+  );
+  await applyWhatsAppMetaDeliveryStatus(event("read", "wamid.RACE_DR"), client, {
+    retryDelaysMs: []
+  });
+  assert.equal(client.rows[0].meta_delivery_status, "read");
+});
+
+test("pipeline source: early persist before transcript; link after", () => {
+  const pipelineSrc = fs.readFileSync(OUTBOUND_PIPELINE, "utf8");
+  const earlyIdx = pipelineSrc.indexOf(
+    "Persist delivery SoR immediately after wamid"
+  );
+  const successPath = pipelineSrc.slice(earlyIdx);
+  const logIdx = successPath.indexOf("await logConversation(");
+  const linkIdx = successPath.indexOf("linkOutboundDeliveryConversationLog");
+  assert.ok(earlyIdx > 0);
+  assert.ok(logIdx > 0, "logConversation must follow early delivery persist");
+  assert.ok(linkIdx > logIdx, "conversation_log_id link must follow transcript");
 });
