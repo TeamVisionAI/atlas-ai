@@ -1,7 +1,10 @@
 const express = require("express");
 const { verifyMetaWebhookSignature } = require("../middleware/metaWebhookSignature");
-const { parseWhatsAppWebhookBody } = require("../services/whatsappWebhookParser");
+const { parseWhatsAppWebhookPayload } = require("../services/whatsappWebhookParser");
 const { processInboundWhatsAppMessage } = require("../core/whatsappInboundPipeline");
+const {
+  applyWhatsAppMetaDeliveryStatus
+} = require("../core/whatsappMetaDeliveryStatusService");
 const { logWhatsAppStage } = require("../core/whatsappStructuredLogger");
 
 const router = express.Router();
@@ -39,11 +42,23 @@ router.post("/", verifyMetaWebhookSignature, async (req, res) => {
     entryCount: body.entry?.length || 0
   });
 
-  const messages = parseWhatsAppWebhookBody(body);
+  const { messages, statuses } = parseWhatsAppWebhookPayload(body);
 
-  if (!messages.length) {
-    logWhatsAppStage("webhook_ignored", { reason: "no_messages" });
+  if (!messages.length && !statuses.length) {
+    logWhatsAppStage("webhook_ignored", { reason: "no_messages_or_statuses" });
     return;
+  }
+
+  for (const statusEvent of statuses) {
+    try {
+      await applyWhatsAppMetaDeliveryStatus(statusEvent);
+    } catch (error) {
+      logWhatsAppStage("meta_delivery_status_failed", {
+        providerMessageId: statusEvent.providerMessageId,
+        level: "error",
+        error: error.message
+      });
+    }
   }
 
   for (const inbound of messages) {

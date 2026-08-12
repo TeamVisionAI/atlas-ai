@@ -284,7 +284,7 @@ function baseItem({
     direction: direction || null,
     channel: channel || null,
     content: content || { text: null, redacted: false },
-    delivery: delivery || { status: null, providerMessageId: null },
+    delivery: delivery || emptyDeliveryFacts(),
     ai: ai || { intent: null, confidence: null, decisionId: null },
     workflow: workflow || { before: null, after: null },
     appointment: appointment || {
@@ -416,10 +416,7 @@ function mapDelivery(row, context, linkedLogIds) {
       text: row.reason || row.template_key || status || null,
       redacted: false
     },
-    delivery: {
-      status,
-      providerMessageId: maskProviderMessageId(row.provider_message_id)
-    },
+    delivery: buildDeliveryFactsFromRow({ ...row, status }),
     ai: { intent: row.intent || null, confidence: null, decisionId: null },
     flags,
     metadata: {
@@ -589,6 +586,36 @@ function mapTimelineEntry(row, context) {
   });
 }
 
+function emptyDeliveryFacts() {
+  return {
+    // BR-075 gate status (sent_freeform / sent_template / provider_failed / …)
+    status: null,
+    providerMessageId: null,
+    // Meta Cloud API lifecycle (sent / delivered / read / failed) — observability only
+    metaDeliveryStatus: null,
+    sentAt: null,
+    deliveredAt: null,
+    readAt: null,
+    failedAt: null,
+    failureCode: null,
+    failureReason: null
+  };
+}
+
+function buildDeliveryFactsFromRow(row) {
+  return {
+    status: row.status || null,
+    providerMessageId: maskProviderMessageId(row.provider_message_id),
+    metaDeliveryStatus: row.meta_delivery_status || null,
+    sentAt: row.sent_at || null,
+    deliveredAt: row.delivered_at || null,
+    readAt: row.read_at || null,
+    failedAt: row.failed_at || null,
+    failureCode: row.failure_code || null,
+    failureReason: row.failure_reason || null
+  };
+}
+
 function attachDeliveriesToMessages(items, deliveries) {
   const byLogId = new Map();
 
@@ -624,16 +651,17 @@ function attachDeliveriesToMessages(items, deliveries) {
       flags.add("delivery_attention");
     }
 
+    if (/failed/i.test(String(latest.meta_delivery_status || ""))) {
+      flags.add("delivery_attention");
+    }
+
     if (/br-?075|window|template/i.test(String(latest.reason || ""))) {
       flags.add("br075_decision");
     }
 
     return {
       ...item,
-      delivery: {
-        status: latest.status || null,
-        providerMessageId: maskProviderMessageId(latest.provider_message_id)
-      },
+      delivery: buildDeliveryFactsFromRow(latest),
       flags: [...flags],
       metadata: {
         ...item.metadata,
@@ -1215,6 +1243,8 @@ module.exports = {
   mapDelivery,
   mapWorkflowEvent,
   mapAppointment,
+  attachDeliveriesToMessages,
+  buildDeliveryFactsFromRow,
   filterPhoneKeyedRows,
   COUNTEROFFER_PATTERNS,
   DEFAULT_TIMEZONE
