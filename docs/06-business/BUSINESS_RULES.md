@@ -1634,6 +1634,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-138 — WhatsApp Inbound Provider-Message Atomic Claim
+
+**Implements:** One Meta/provider inbound message id may produce at most one conversational processing path.  
+**Domain:** WhatsApp inbound pipeline / workflow events  
+**Depends on:** existing inbound org/WABA fail-closed, BR-120, BR-129 (consume remains idempotent; this rule does not change QR matching)  
+**Related:** BR-075 (outbound unchanged), BR-114 (CE fallback still available for a single legitimate turn)  
+**Status:** Implemented  
+**Engine target:** `whatsappInboundPipeline.js`, `workflowEventService.claimWhatsAppInboundCorrelation`, partial unique index `idx_workflow_events_whatsapp_inbound_claim`  
+**Tests:** `backend/test/whatsappInboundAtomicIdempotency.test.js`
+
+### Rules
+
+1. **Canonical claim key** — `whatsapp:inbound:{providerMessageId}`. Meta wamids are globally unique; the claim is per provider message id, not a new org-scoped key. Org/WABA fail-closed runs first (read-only) so a mismatched asset cannot poison the claim.
+2. **Claim before side effects** — After a successful atomic claim, the pipeline may locate/create, attribute QR, log, hub, author, and send. Unique conflict / already claimed MUST return `DUPLICATE_PROVIDER_MESSAGE` with no prospect mutation, QR lastTouch update, conversation log, hub, V2/CE, outbound, or BR-080 attention write.
+3. **Uniqueness scope** — Only canonical inbound claim keys are unique. `stall:` / `reconcile:` / `advance:` and suffixed inbound keys (`:prospect_created`, `:conversation_started`) MUST remain non-unique.
+4. **Historical duplicates** — Existing duplicate claim rows are retained and relabeled; they must not be deleted and must not cause runtime lookup failures.
+5. **Boundaries** — Does not change QR matching/consume semantics, first-turn copy, CE fallback policy, appointment execution, ads, Meta Reviewer, or HUMAN takeover.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
@@ -2806,5 +2826,5 @@ Atlas works around them.
 | Capacity | `capacityEngine.js` | Per-slot capacity (BR-006, BR-007) |
 | Agent Actions | `agentActionEngine.js` | Next Actions visibility and execution (BR-025 – BR-032) |
 | Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`, `milestoneValidationEngine.js`, `humanAdvancementEngine.js` | Milestones, ownership, stall detection, human advancement (BR-034 – BR-037) |
-| Events | `eventEngine.js`, `workflowEventService.js` | Structured auditable workflow events |
+| Events | `eventEngine.js`, `workflowEventService.js` | Structured auditable workflow events; WhatsApp inbound claim (BR-138) |
 | QR Channel (Phase 1–2 live) | `qrChannel/*`, `routes/qrGo.js`, `whatsappProspectResolver` (BR-128 / BR-129 / BR-130 hydrate) | Phase 1 entry + Phase 2 attribution/`conversationGoal` stamp. Phase 3 QR-aware first-turn **not** implemented. Must not bypass BR-120 or appointment mutation path |

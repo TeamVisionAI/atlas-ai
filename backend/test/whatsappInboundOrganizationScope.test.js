@@ -323,27 +323,35 @@ test("8. Prospect Center org filter includes lead for correct org and excludes o
 
 test("9. duplicate provider message short-circuits before second create (idempotency contract)", async () => {
   const { processInboundWhatsAppMessage } = require("../core/whatsappInboundPipeline");
-  const workflowEventService = require("../services/workflowEventService");
-  const original = workflowEventService.findWorkflowEventByCorrelationId;
+  let locateCalls = 0;
 
-  workflowEventService.findWorkflowEventByCorrelationId = async () => ({
-    id: "existing-event"
-  });
-
-  try {
-    const result = await processInboundWhatsAppMessage({
+  const result = await processInboundWhatsAppMessage(
+    {
       providerMessageId: "wamid.DUP1",
       phone: "17865530001",
       contactName: "Dup",
       body: "hi",
       phoneNumberId: PHONE_ID,
       wabaId: WABA_ID
-    });
-    assert.equal(result.skipped, true);
-    assert.equal(result.reason, "DUPLICATE_PROVIDER_MESSAGE");
-  } finally {
-    workflowEventService.findWorkflowEventByCorrelationId = original;
-  }
+    },
+    {
+      resolveWhatsAppInboundOrganizationId: async () => ({
+        organizationId: ORG_A,
+        source: "explicit"
+      }),
+      claimWhatsAppInboundCorrelation: async () => ({
+        claimed: false,
+        reason: "DUPLICATE_PROVIDER_MESSAGE"
+      }),
+      locateOrCreateWhatsAppProspect: async () => {
+        locateCalls += 1;
+        throw new Error("locateOrCreate must not run on duplicate claim");
+      }
+    }
+  );
+  assert.equal(result.skipped, true);
+  assert.equal(result.reason, "DUPLICATE_PROVIDER_MESSAGE");
+  assert.equal(locateCalls, 0);
 });
 
 test("10. BR-075 outbound gate remains active (unchanged)", async () => {
