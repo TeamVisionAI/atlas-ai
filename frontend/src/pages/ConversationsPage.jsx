@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import StatusBadge from "../components/ui/StatusBadge";
 import CommunicationsCenterTimeline from "../features/prospect-workspace/components/CommunicationsCenterTimeline";
@@ -19,6 +19,7 @@ import {
   resolveSelectedTranscriptProspectId,
   shouldCommitConversationDetail
 } from "../engines/conversationsSelectionConsistency";
+import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import {
   getConversations,
   getConversation,
@@ -672,6 +673,18 @@ export default function ConversationsPage() {
                         {translate("conversationsReturnToAtlas")}
                       </button>
                     ) : null}
+                    {timelineProspectId ? (
+                      <Link
+                        to={buildMissionControlPath({
+                          prospectId: timelineProspectId,
+                          ...(selectedPhone ? { phone: selectedPhone } : {})
+                        })}
+                        className="conversations-thread__action conversations-thread__action--link"
+                        data-testid="conversations-open-mission-control"
+                      >
+                        {translate("conversationsOpenInMissionControl")}
+                      </Link>
+                    ) : null}
                     {lifecycleActionIds.includes("ARCHIVE") ? (
                       <button
                         type="button"
@@ -829,7 +842,7 @@ export default function ConversationsPage() {
                   key={`cc-timeline:${timelineProspectId}`}
                   prospectId={timelineProspectId}
                   refreshSignal={refreshSignal}
-                  newestFirst
+                  layout="conversation"
                 />
               ) : detailLoading ? (
                 <p className="conversations-page__empty">{translate("conversationsLoading")}</p>

@@ -5,7 +5,10 @@ import {
 } from "../../../services/communicationsCenterApi";
 import {
   COMMUNICATIONS_FILTERS,
+  CONVERSATION_LAYOUT_FILTERS,
   filterCommunicationsItems,
+  filterConversationLayoutItems,
+  isTechnicalCommunicationsItem,
   orderCommunicationsForDisplay,
   buildWarningBadges,
   actorLabel,
@@ -13,7 +16,8 @@ import {
   correlationLabel,
   labelForFlag,
   containsRawPhoneLeak,
-  buildCommunicationsCacheKey
+  buildCommunicationsCacheKey,
+  resolveConversationBubbleSide
 } from "../../../engines/communicationsCenterViewModel";
 import { shouldCommitTimelinePayload } from "../../../engines/conversationsSelectionConsistency";
 import "./CommunicationsCenterTimeline.css";
@@ -46,16 +50,150 @@ function metaDeliveryTick(delivery, { direction, channel } = {}) {
   return null;
 }
 
+function safeMessageBody(item) {
+  const body = String(item.content?.text || "");
+  if (!containsRawPhoneLeak(body)) {
+    return body;
+  }
+  return body
+    .replace(/\+\d{10,15}\b/g, "***")
+    .replace(/\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g, "***");
+}
+
+function ItemDiagnostics({ item, open, onToggle, badges = [] }) {
+  return (
+    <details
+      className="cc-timeline__diagnostics"
+      open={open}
+      onToggle={(event) => {
+        if (event.target.open !== open) {
+          onToggle(item.id);
+        }
+      }}
+    >
+      <summary>Diagnostics</summary>
+      {badges.length ? (
+        <ul className="cc-timeline__badges cc-timeline__badges--diagnostics">
+          {badges.map((badge) => (
+            <li key={badge.id}>{badge.label}</li>
+          ))}
+        </ul>
+      ) : null}
+      <dl>
+        <div>
+          <dt>Source</dt>
+          <dd>
+            {item.source?.system} / {item.source?.recordId}
+          </dd>
+        </div>
+        <div>
+          <dt>Event type</dt>
+          <dd>{item.eventType}</dd>
+        </div>
+        <div>
+          <dt>Correlation</dt>
+          <dd>{correlationLabel(item)}</dd>
+        </div>
+        {item.delivery?.status ? (
+          <div>
+            <dt>Delivery</dt>
+            <dd>{item.delivery.status}</dd>
+          </div>
+        ) : null}
+        {item.workflow?.before || item.workflow?.after ? (
+          <div>
+            <dt>Workflow transition</dt>
+            <dd>
+              {item.workflow.before || "—"} → {item.workflow.after || "—"}
+            </dd>
+          </div>
+        ) : null}
+        {item.appointment?.appointmentId ? (
+          <div>
+            <dt>Appointment</dt>
+            <dd>
+              {item.appointment.status || "record"}
+              {item.metadata?.calendarEventId ? " · Calendar linked" : ""}
+            </dd>
+          </div>
+        ) : null}
+        {item.delivery?.providerMessageId ? (
+          <div>
+            <dt>Provider message id</dt>
+            <dd>{item.delivery.providerMessageId}</dd>
+          </div>
+        ) : null}
+        {item.delivery?.status ? (
+          <div>
+            <dt>BR-075 delivery status</dt>
+            <dd>{item.delivery.status}</dd>
+          </div>
+        ) : null}
+        {item.delivery?.metaDeliveryStatus ? (
+          <div>
+            <dt>Meta lifecycle status</dt>
+            <dd>{item.delivery.metaDeliveryStatus}</dd>
+          </div>
+        ) : null}
+        {item.delivery?.sentAt ? (
+          <div>
+            <dt>Sent at</dt>
+            <dd>{item.delivery.sentAt}</dd>
+          </div>
+        ) : null}
+        {item.delivery?.deliveredAt ? (
+          <div>
+            <dt>Delivered at</dt>
+            <dd>{item.delivery.deliveredAt}</dd>
+          </div>
+        ) : null}
+        {item.delivery?.readAt ? (
+          <div>
+            <dt>Read at</dt>
+            <dd>{item.delivery.readAt}</dd>
+          </div>
+        ) : null}
+        {item.delivery?.failedAt ? (
+          <div>
+            <dt>Failed at</dt>
+            <dd>{item.delivery.failedAt}</dd>
+          </div>
+        ) : null}
+        {item.delivery?.failureCode || item.delivery?.failureReason ? (
+          <div>
+            <dt>Failure</dt>
+            <dd>
+              {[item.delivery.failureCode, item.delivery.failureReason]
+                .filter(Boolean)
+                .join(" — ")}
+            </dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>Flags</dt>
+          <dd>
+            {(item.flags || []).length
+              ? (item.flags || []).map((flag) => labelForFlag(flag)).join(", ")
+              : "None"}
+          </dd>
+        </div>
+      </dl>
+    </details>
+  );
+}
+
 export default function CommunicationsCenterTimeline({
   prospectId,
   organizationId = null,
   refreshSignal = 0,
-  newestFirst = false
+  newestFirst = false,
+  layout = "timeline"
 }) {
+  const isConversationLayout = layout === "conversation";
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
   const [payload, setPayload] = useState(null);
-  const [filterId, setFilterId] = useState("all");
+  const [filterId, setFilterId] = useState(isConversationLayout ? "messages" : "all");
   const [openDiagnostics, setOpenDiagnostics] = useState(() => new Set());
 
   useEffect(() => {
@@ -111,11 +249,30 @@ export default function CommunicationsCenterTimeline({
     if (status !== "ready") {
       return [];
     }
-    const filtered = filterCommunicationsItems(payload?.items || [], filterId);
-    return orderCommunicationsForDisplay(filtered, { newestFirst });
-  }, [payload, filterId, newestFirst, status]);
+    const source = payload?.items || [];
+    const filtered = isConversationLayout
+      ? filterConversationLayoutItems(source, filterId)
+      : filterCommunicationsItems(source, filterId);
+    return orderCommunicationsForDisplay(filtered, {
+      newestFirst: isConversationLayout ? false : newestFirst
+    });
+  }, [payload, filterId, newestFirst, status, isConversationLayout]);
 
+  const technicalItems = useMemo(() => {
+    if (!isConversationLayout || status !== "ready") {
+      return [];
+    }
+    return orderCommunicationsForDisplay(
+      (payload?.items || []).filter((item) => isTechnicalCommunicationsItem(item)),
+      { newestFirst: false }
+    );
+  }, [payload, status, isConversationLayout]);
+
+  const filters = isConversationLayout ? CONVERSATION_LAYOUT_FILTERS : COMMUNICATIONS_FILTERS;
   const cacheKey = buildCommunicationsCacheKey(organizationId, prospectId);
+  const hasDataQuality =
+    Boolean(payload?.gaps?.length) ||
+    Boolean(payload?.dataQuality?.legacyPhoneCorrelations > 0);
 
   function toggleDiagnostics(id) {
     setOpenDiagnostics((prev) => {
@@ -141,17 +298,24 @@ export default function CommunicationsCenterTimeline({
 
   return (
     <section
-      className="cc-timeline"
+      className={
+        isConversationLayout ? "cc-timeline cc-timeline--conversation" : "cc-timeline"
+      }
       aria-label="Communications Center"
       data-cache-key={cacheKey}
       data-prospect-id={prospectId}
       data-timeline-status={status}
+      data-layout={layout}
     >
       <header className="cc-timeline__header">
         <div>
-          <h3 className="cc-timeline__title">Communications Center</h3>
+          <h3 className="cc-timeline__title">
+            {isConversationLayout ? "Conversation" : "Communications Center"}
+          </h3>
           <p className="cc-timeline__subtitle">
-            Unified prospect timeline — loaded by prospect ID, not phone.
+            {isConversationLayout
+              ? "Message transcript"
+              : "Unified prospect timeline — loaded by prospect ID, not phone."}
           </p>
         </div>
         {payload?.prospect?.currentContact?.maskedAddress ? (
@@ -162,7 +326,7 @@ export default function CommunicationsCenterTimeline({
         ) : null}
       </header>
 
-      {(payload?.gaps?.length || payload?.dataQuality?.legacyPhoneCorrelations > 0) && (
+      {!isConversationLayout && hasDataQuality ? (
         <div className="cc-timeline__quality" role="status">
           <strong>Partial data notice.</strong>{" "}
           Some events use legacy phone correlation because prior channel history is
@@ -175,10 +339,10 @@ export default function CommunicationsCenterTimeline({
             </span>
           ) : null}
         </div>
-      )}
+      ) : null}
 
       <div className="cc-timeline__filters" role="tablist" aria-label="Timeline filters">
-        {COMMUNICATIONS_FILTERS.map((filter) => (
+        {filters.map((filter) => (
           <button
             key={filter.id}
             type="button"
@@ -226,15 +390,67 @@ export default function CommunicationsCenterTimeline({
         </p>
       ) : null}
 
-      {status === "ready" && filteredItems.length > 0 ? (
+      {status === "ready" && filteredItems.length > 0 && isConversationLayout ? (
+        <ol className="cc-timeline__chat" data-testid="cc-conversation-chat">
+          {filteredItems.map((item) => {
+            const open = openDiagnostics.has(item.id);
+            const safeBody = safeMessageBody(item);
+            const metaTick = metaDeliveryTick(item.delivery, {
+              direction: item.direction,
+              channel: item.channel
+            });
+            const side =
+              String(item.category || "") === "appointment"
+                ? "system"
+                : resolveConversationBubbleSide(item);
+            const badges = buildWarningBadges(item);
+
+            return (
+              <li
+                key={item.id}
+                className={`cc-timeline__bubble-row cc-timeline__bubble-row--${side}`}
+                data-direction={item.direction || "system"}
+                data-category={item.category || ""}
+              >
+                <div className={`cc-timeline__bubble cc-timeline__bubble--${side}`}>
+                  <div className="cc-timeline__bubble-meta">
+                    <time dateTime={item.timestampUtc}>
+                      {item.timestampLocal || item.timestampUtc}
+                    </time>
+                    <span>{actorLabel(item)}</span>
+                    <span>{item.channel || "—"}</span>
+                    {metaTick ? (
+                      <span
+                        className={`cc-timeline__meta-tick cc-timeline__meta-tick--${metaTick.tone}`}
+                        title={metaTick.label}
+                        aria-label={metaTick.label}
+                      >
+                        <span aria-hidden="true">{metaTick.mark}</span> {metaTick.label}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="cc-timeline__bubble-body">
+                    {safeBody || item.eventType}
+                  </p>
+                  <ItemDiagnostics
+                    item={item}
+                    open={open}
+                    onToggle={toggleDiagnostics}
+                    badges={badges}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+
+      {status === "ready" && filteredItems.length > 0 && !isConversationLayout ? (
         <ol className="cc-timeline__list">
           {filteredItems.map((item) => {
             const badges = buildWarningBadges(item);
             const open = openDiagnostics.has(item.id);
-            const body = String(item.content?.text || "");
-            const safeBody = containsRawPhoneLeak(body)
-              ? body.replace(/\+\d{10,15}\b/g, "***").replace(/\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g, "***")
-              : body;
+            const safeBody = safeMessageBody(item);
             const metaTick = metaDeliveryTick(item.delivery, {
               direction: item.direction,
               channel: item.channel
@@ -288,97 +504,63 @@ export default function CommunicationsCenterTimeline({
                   </ul>
                 ) : null}
 
-                <details
-                  className="cc-timeline__diagnostics"
-                  open={open}
-                  onToggle={(event) => {
-                    if (event.target.open !== open) {
-                      toggleDiagnostics(item.id);
-                    }
-                  }}
-                >
-                  <summary>Diagnostics</summary>
-                  <dl>
-                    <div>
-                      <dt>Source</dt>
-                      <dd>
-                        {item.source?.system} / {item.source?.recordId}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Event type</dt>
-                      <dd>{item.eventType}</dd>
-                    </div>
-                    <div>
-                      <dt>Correlation</dt>
-                      <dd>{correlationLabel(item)}</dd>
-                    </div>
-                    {item.delivery?.providerMessageId ? (
-                      <div>
-                        <dt>Provider message id</dt>
-                        <dd>{item.delivery.providerMessageId}</dd>
-                      </div>
-                    ) : null}
-                    {item.delivery?.status ? (
-                      <div>
-                        <dt>BR-075 delivery status</dt>
-                        <dd>{item.delivery.status}</dd>
-                      </div>
-                    ) : null}
-                    {item.delivery?.metaDeliveryStatus ? (
-                      <div>
-                        <dt>Meta lifecycle status</dt>
-                        <dd>{item.delivery.metaDeliveryStatus}</dd>
-                      </div>
-                    ) : null}
-                    {item.delivery?.sentAt ? (
-                      <div>
-                        <dt>Sent at</dt>
-                        <dd>{item.delivery.sentAt}</dd>
-                      </div>
-                    ) : null}
-                    {item.delivery?.deliveredAt ? (
-                      <div>
-                        <dt>Delivered at</dt>
-                        <dd>{item.delivery.deliveredAt}</dd>
-                      </div>
-                    ) : null}
-                    {item.delivery?.readAt ? (
-                      <div>
-                        <dt>Read at</dt>
-                        <dd>{item.delivery.readAt}</dd>
-                      </div>
-                    ) : null}
-                    {item.delivery?.failedAt ? (
-                      <div>
-                        <dt>Failed at</dt>
-                        <dd>{item.delivery.failedAt}</dd>
-                      </div>
-                    ) : null}
-                    {item.delivery?.failureCode || item.delivery?.failureReason ? (
-                      <div>
-                        <dt>Failure</dt>
-                        <dd>
-                          {[item.delivery.failureCode, item.delivery.failureReason]
-                            .filter(Boolean)
-                            .join(" — ")}
-                        </dd>
-                      </div>
-                    ) : null}
-                    <div>
-                      <dt>Flags</dt>
-                      <dd>
-                        {(item.flags || []).length
-                          ? (item.flags || []).map((flag) => labelForFlag(flag)).join(", ")
-                          : "None"}
-                      </dd>
-                    </div>
-                  </dl>
-                </details>
+                <ItemDiagnostics item={item} open={open} onToggle={toggleDiagnostics} />
               </li>
             );
           })}
         </ol>
+      ) : null}
+
+      {isConversationLayout && status === "ready" && (hasDataQuality || technicalItems.length) ? (
+        <details className="cc-timeline__panel-diagnostics" data-testid="cc-conversation-diagnostics">
+          <summary>
+            Diagnostics
+            {technicalItems.length ? ` (${technicalItems.length})` : ""}
+          </summary>
+          {hasDataQuality ? (
+            <div className="cc-timeline__quality" role="status">
+              <strong>Partial data notice.</strong>{" "}
+              Some events use legacy phone correlation because prior channel history is
+              not stored yet.
+              {payload?.dataQuality ? (
+                <span>
+                  {" "}
+                  Legacy correlations: {payload.dataQuality.legacyPhoneCorrelations}. Excluded
+                  ambiguous: {payload.dataQuality.ambiguousRecordsExcluded}.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {technicalItems.length ? (
+            <ol className="cc-timeline__tech-list">
+              {technicalItems.map((item) => (
+                <li key={item.id} className="cc-timeline__tech-item">
+                  <div className="cc-timeline__meta">
+                    <time dateTime={item.timestampUtc}>
+                      {item.timestampLocal || item.timestampUtc}
+                    </time>
+                    <span>{item.category || "event"}</span>
+                    <span>{item.eventType}</span>
+                  </div>
+                  {item.workflow?.before || item.workflow?.after ? (
+                    <p className="cc-timeline__body">
+                      Workflow: {item.workflow.before || "—"} → {item.workflow.after || "—"}
+                    </p>
+                  ) : (
+                    <p className="cc-timeline__body">
+                      {safeMessageBody(item) || correlationLabel(item)}
+                    </p>
+                  )}
+                  <ItemDiagnostics
+                    item={item}
+                    open={openDiagnostics.has(item.id)}
+                    onToggle={toggleDiagnostics}
+                  />
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </details>
       ) : null}
     </section>
   );

@@ -9,7 +9,11 @@ import {
   buildMissionControlQuery
 } from "./missionControlRouteEngine.js";
 
-export { MISSION_CONTROL_QUERY_KEYS, buildMissionControlQuery } from "./missionControlRouteEngine.js";
+export {
+  MISSION_CONTROL_QUERY_KEYS,
+  buildMissionControlQuery,
+  resolveMissionControlFocusPhone
+} from "./missionControlRouteEngine.js";
 
 export const EXECUTIVE_FILTERS = {
   INTERVIEWS_TODAY: "interviews-today",

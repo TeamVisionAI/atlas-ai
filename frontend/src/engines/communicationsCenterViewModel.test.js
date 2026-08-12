@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   filterCommunicationsItems,
+  filterConversationLayoutItems,
+  isConversationBubbleItem,
+  isTechnicalCommunicationsItem,
+  resolveConversationBubbleSide,
   buildWarningBadges,
   labelForFlag,
   containsRawPhoneLeak,
@@ -25,6 +29,38 @@ test("filters isolate messages, workflow, appointments, and system/errors", () =
   );
   assert.ok(
     filterCommunicationsItems(items, "system").some((item) => item.id === "5")
+  );
+});
+
+test("conversation layout hides technical events from the default transcript", () => {
+  const items = [
+    { id: "1", category: "message", direction: "inbound", actor: { type: "prospect" } },
+    { id: "2", category: "workflow", workflow: { before: "A", after: "B" } },
+    { id: "3", category: "note", direction: "outbound", actor: { type: "agent" } },
+    { id: "4", category: "appointment" },
+    { id: "5", category: "delivery", flags: ["delivery_attention"] }
+  ];
+
+  assert.equal(filterConversationLayoutItems(items, "messages").length, 2);
+  assert.deepEqual(
+    filterConversationLayoutItems(items, "messages").map((item) => item.id),
+    ["1", "3"]
+  );
+  assert.equal(filterConversationLayoutItems(items, "appointments").length, 1);
+  assert.deepEqual(
+    filterConversationLayoutItems(items, "all").map((item) => item.id),
+    ["1", "3", "4"]
+  );
+
+  assert.equal(isConversationBubbleItem(items[0]), true);
+  assert.equal(isTechnicalCommunicationsItem(items[1]), true);
+  assert.equal(isTechnicalCommunicationsItem(items[4]), true);
+
+  assert.equal(resolveConversationBubbleSide(items[0]), "inbound");
+  assert.equal(resolveConversationBubbleSide(items[2]), "outbound");
+  assert.equal(
+    resolveConversationBubbleSide({ actor: { type: "atlas" } }),
+    "outbound"
   );
 });
 

@@ -117,6 +117,62 @@ export function containsRawPhoneLeak(text) {
 }
 
 /**
+ * Conversations transcript (WhatsApp-like): messages/notes belong in the bubble stream.
+ * Workflow / delivery / system / timeline noise stays available via Diagnostics only.
+ * Presentation-only — does not mutate stored communications.
+ */
+export function isConversationBubbleItem(item) {
+  const category = String(item?.category || "");
+  return category === "message" || category === "note";
+}
+
+export function isTechnicalCommunicationsItem(item) {
+  return !isConversationBubbleItem(item);
+}
+
+/**
+ * inbound → left (prospect); outbound / agent / atlas → right.
+ */
+export function resolveConversationBubbleSide(item) {
+  const direction = String(item?.direction || "").toLowerCase();
+  if (direction === "inbound") {
+    return "inbound";
+  }
+  if (direction === "outbound") {
+    return "outbound";
+  }
+  if (item?.actor?.type === "prospect") {
+    return "inbound";
+  }
+  return "outbound";
+}
+
+export const CONVERSATION_LAYOUT_FILTERS = [
+  { id: "messages", label: "Messages" },
+  { id: "appointments", label: "Appointments" },
+  { id: "all", label: "All visible" }
+];
+
+/**
+ * Conversation layout list: default/messages show bubbles only.
+ * Appointments filter shows appointment rows; "all" still excludes technical categories
+ * (those remain in the Diagnostics panel).
+ */
+export function filterConversationLayoutItems(items = [], filterId = "messages") {
+  const list = Array.isArray(items) ? items : [];
+  if (filterId === "appointments") {
+    return list.filter((item) => String(item?.category || "") === "appointment");
+  }
+  if (filterId === "all") {
+    return list.filter(
+      (item) =>
+        isConversationBubbleItem(item) || String(item?.category || "") === "appointment"
+    );
+  }
+  return list.filter((item) => isConversationBubbleItem(item));
+}
+
+/**
  * Presentation-only timeline order. Does not mutate persisted communications data.
  * Default (newestFirst=false) keeps ascending chronological order for Prospect Workspace.
  * Conversations Center pilot passes newestFirst=true so operators see the latest first.
