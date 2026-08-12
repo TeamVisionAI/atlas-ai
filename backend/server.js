@@ -5,7 +5,10 @@ assertProductionPlatformConfig();
 
 const express = require("express");
 const cors = require("cors");
-const { buildCorsOptions } = require("./config/corsOptions");
+const {
+  buildCorsOptions,
+  createDisallowedOriginRejector
+} = require("./config/corsOptions");
 
 const healthRoute = require("./routes/health");
 const infoRoute = require("./routes/info");
@@ -106,8 +109,10 @@ const prospectModule = createProspectModule({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// General middleware — production allowlist includes teamvisionfinancial.com (+ www, localhost dev)
+// General middleware — production allowlist includes teamvisionfinancial.com (+ www, localhost
+// dev) and the normalized ATLAS_PUBLIC_URL origin (required for public QR /go form POSTs).
 app.use(cors(buildCorsOptions()));
+app.use(createDisallowedOriginRejector());
 app.use(safeRequestLogger);
 
 // Meta webhook must receive the raw body before express.json().
