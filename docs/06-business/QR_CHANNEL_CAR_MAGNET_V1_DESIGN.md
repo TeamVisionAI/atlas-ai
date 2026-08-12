@@ -1,6 +1,6 @@
 # Car Magnet V1 — Design Document
 
-**Status:** Phase 1 entry runtime implemented + production dark-launched · Phase 2 attribution consume / Phase 3 QR-aware conversation **not** implemented · design refined after review (channel-hop + multi-touch)  
+**Status:** Phase 1 entry + Phase 2 attribution/goal hydration implemented · Phase 3 QR-aware conversation **not** implemented · design refined after review (channel-hop + multi-touch)  
 **Canonical rules:** BR-128 … BR-133 (on `main`)  
 **Campaign key:** `car_recruiting_01`  
 **Source label:** `car_magnet`  

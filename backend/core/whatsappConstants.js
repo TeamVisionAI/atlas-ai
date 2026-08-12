@@ -3,11 +3,13 @@
  */
 
 const WHATSAPP_ENTRY_METHOD = Object.freeze({
-  CLICK_TO_WHATSAPP: "CLICK_TO_WHATSAPP"
+  CLICK_TO_WHATSAPP: "CLICK_TO_WHATSAPP",
+  QR: "QR"
 });
 
 const WHATSAPP_SOURCE = Object.freeze({
-  FACEBOOK: "FACEBOOK"
+  FACEBOOK: "FACEBOOK",
+  CAR_MAGNET: "car_magnet"
 });
 
 const WHATSAPP_CORRELATION_PREFIX = Object.freeze({

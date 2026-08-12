@@ -1319,7 +1319,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **No QR-to-appointment mutation shortcut** — A scan, campaign token, or landing redirect must never create, confirm, cancel, or mutate appointments or Calendar objects. Scheduling remains the canonical appointment lifecycle (BR-039 / BR-049 / BR-050 / BR-111 family).
 3. **Do not weaken BR-120–BR-127** — Identity bridging, Calendar cancel/rollback, schedule reconcile, occupation optional rules, schedule-intent recovery, post-create ownership, deferred confirm continuity, and qualification-fact sync remain mandatory.
 4. **Recruit AI V2 execution remains OFF** until separately authorized Stage-1 rollout. QR Channel design and docs must not enable `RECRUIT_AI_V2_EXECUTION_ENABLED` or `RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED`.
-5. **Status of BR-128–BR-133** — Rules are specified. **Phase 1 entry primitives are implemented** (`/go/:token`, phone-bind, `qr_campaigns` / `qr_scans`, Car Magnet seed). **Phase 2 inbound attribution consume / first-last touch / conversationGoal hydrate is not implemented.** **Phase 3 QR-aware first-turn behavior is not implemented.** Do not treat QR Channel as fully complete.
+5. **Status of BR-128–BR-133** — Rules are specified. **Phase 1 entry primitives are implemented** (`/go/:token`, phone-bind, `qr_campaigns` / `qr_scans`, Car Magnet seed). **Phase 2 inbound attribution consume + `conversationGoal` hydration are implemented** (match `pending_inbound` → stamp core `lead_source` → consume). **Phase 3 QR-aware first-turn behavior is not implemented.** Do not treat QR Channel as fully complete.
 
 ---
 
@@ -1353,9 +1353,9 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Domain:** QR Channel / attribution / tenancy / public entry  
 **Depends on:** BR-080, BR-120, BR-128  
 **Related:** BR-130 (goal from campaign default), BR-133 (funnel events), BR-113 (booking-path telemetry — distinct)  
-**Status:** Phase 1 partial — public token resolve + phone-bind scan handoff implemented; **inbound consume / prospect first-touch stamp not implemented**  
-**Engine target:** `backend/core/qrChannel/*`, `backend/routes/qrGo.js` (inbound attribution writer still future / Phase 2)  
-**Tests:** Phase 1 covered in `backend/test/qrChannelPhase1.test.js`; inbound consume tests deferred
+**Status:** Phase 2 implemented — public token resolve + phone-bind + inbound consume + core `lead_source` first/last-touch stamp  
+**Engine target:** `backend/core/qrChannel/*`, `backend/routes/qrGo.js`, `whatsappProspectResolver.js`  
+**Tests:** `backend/test/qrChannelPhase1.test.js`, `backend/test/qrChannelPhase2Attribution.test.js`
 
 ### Rules
 
@@ -1376,9 +1376,9 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Domain:** QR Channel / Conversation Engine / Recruit AI durable context  
 **Depends on:** BR-049, BR-081, BR-120, BR-128, BR-129  
 **Related:** BR-131 (first-turn behavior), BR-132 (policy-review scheduling); appointment `purpose` vocabulary (`recruiting_interview`, `policy_review`); Car Magnet V1 defaults to `interview`  
-**Status:** Specified (docs only; not implemented)  
-**Engine target (future):** Prospect attribution / durable `recruit_ai_conversation_contexts` acquisition slice; CE/V2 decision consumers (read-only relative to scheduling)  
-**Tests:** Deferred until implementation
+**Status:** Phase 2 partial — QR inbound hydrates `conversationGoal` on core `lead_source` (default `interview` for Car Magnet). Goal-aware first-turn copy (BR-131) and goal transition classifiers remain future. Does **not** enable appointment execution.  
+**Engine target:** `whatsappProspectResolver` + `qrInboundAttribution` → `atlas_core_prospects.lead_source`; CE/V2 consumers read-only for Phase 2  
+**Tests:** `backend/test/qrChannelPhase2Attribution.test.js`
 
 ### Supported goals
 
@@ -1453,9 +1453,9 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Domain:** QR Channel / analytics / business events  
 **Depends on:** BR-128, BR-129, BR-130  
 **Related:** BR-113 (live execution attribution telemetry); Stage-1 `recruit_ai_v2.*` ops playbook; EVENT_CATALOG / business events  
-**Status:** Phase 1 partial — scan/bind/redirect `qr.*` log emitters only; full funnel + inbound attribution events not implemented  
-**Engine target:** `backend/core/qrChannel/qrChannelTelemetry.js` (broader business-events projections still future)  
-**Tests:** Phase 1 emitters exercised indirectly via `qrChannelPhase1` route tests; full funnel deferred
+**Status:** Phase 1–2 partial — scan/bind/redirect + inbound attribution_attached/missed/scan_consumed emitters. Full funnel through appointment/conversion not implemented.  
+**Engine target:** `backend/core/qrChannel/qrChannelTelemetry.js`  
+**Tests:** Phase 1–2 covered via `qrChannelPhase1` / `qrChannelPhase2Attribution`
 
 ### Conceptual funnel
 
@@ -2807,4 +2807,4 @@ Atlas works around them.
 | Agent Actions | `agentActionEngine.js` | Next Actions visibility and execution (BR-025 – BR-032) |
 | Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`, `milestoneValidationEngine.js`, `humanAdvancementEngine.js` | Milestones, ownership, stall detection, human advancement (BR-034 – BR-037) |
 | Events | `eventEngine.js`, `workflowEventService.js` | Structured auditable workflow events |
-| QR Channel (Phase 1 live) | `qrChannel/*`, `routes/qrGo.js` (BR-128 / BR-129 entry; BR-133 scan telemetry subset) | Phase 1: campaigns, `/go` phone-bind, allowlisted `wa.me`. Phase 2 attribution consume + Phase 3 QR-aware first-turn **not** implemented. Must not bypass BR-120 or appointment mutation path |
+| QR Channel (Phase 1–2 live) | `qrChannel/*`, `routes/qrGo.js`, `whatsappProspectResolver` (BR-128 / BR-129 / BR-130 hydrate) | Phase 1 entry + Phase 2 attribution/`conversationGoal` stamp. Phase 3 QR-aware first-turn **not** implemented. Must not bypass BR-120 or appointment mutation path |

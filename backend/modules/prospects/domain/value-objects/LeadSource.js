@@ -1,23 +1,34 @@
 /**
  * Sprint 14.1 — Lead source value object.
+ * Phase 2: preserves QR attribution extensions on lead_source JSONB (BR-129 / BR-130).
  */
 
 const { LEAD_SOURCE_TYPES } = require("../constants");
 const { ProspectDomainError } = require("../errors/ProspectDomainError");
 
+const CORE_KEYS = new Set([
+  "sourceType",
+  "sourceDetail",
+  "sourceConnectorId",
+  "acquiredAt"
+]);
+
 class LeadSource {
   /**
    * @param {Object} props
-   * @param {string} props.sourceType
-   * @param {string|null} [props.sourceDetail]
-   * @param {string|null} [props.sourceConnectorId]
-   * @param {string} props.acquiredAt
    */
-  constructor({ sourceType, sourceDetail, sourceConnectorId, acquiredAt }) {
-    this.sourceType = sourceType;
-    this.sourceDetail = sourceDetail;
-    this.sourceConnectorId = sourceConnectorId;
-    this.acquiredAt = acquiredAt;
+  constructor(props = {}) {
+    this.sourceType = props.sourceType;
+    this.sourceDetail = props.sourceDetail ?? null;
+    this.sourceConnectorId = props.sourceConnectorId ?? null;
+    this.acquiredAt = props.acquiredAt;
+    this.extensions = {};
+
+    for (const [key, value] of Object.entries(props)) {
+      if (!CORE_KEYS.has(key) && value !== undefined) {
+        this.extensions[key] = value;
+      }
+    }
   }
 
   /**
@@ -34,6 +45,7 @@ class LeadSource {
     }
 
     return new LeadSource({
+      ...input,
       sourceType,
       sourceDetail: input.sourceDetail || null,
       sourceConnectorId: input.sourceConnectorId || null,
@@ -46,7 +58,8 @@ class LeadSource {
       sourceType: this.sourceType,
       sourceDetail: this.sourceDetail,
       sourceConnectorId: this.sourceConnectorId,
-      acquiredAt: this.acquiredAt
+      acquiredAt: this.acquiredAt,
+      ...this.extensions
     };
   }
 }

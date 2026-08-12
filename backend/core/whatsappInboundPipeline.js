@@ -46,7 +46,8 @@ async function processInboundWhatsAppMessage(inbound) {
       firstMessage: body,
       correlationBase: correlationId,
       phoneNumberId: inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
-      wabaId: inbound.wabaId || null
+      wabaId: inbound.wabaId || null,
+      providerMessageId: inbound.providerMessageId || null
     });
 
   logWhatsAppStage("inbound_prospect_ready", {

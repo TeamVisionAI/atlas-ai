@@ -105,6 +105,37 @@ function createMemoryQrChannelRepository() {
       return out;
     },
 
+    async listPendingInboundScansForOrgPhone(orgId, phoneNormalized) {
+      const out = [];
+      for (const s of scans.values()) {
+        if (
+          s.org_id === orgId &&
+          s.bound_phone_normalized === phoneNormalized &&
+          s.status === SCAN_STATUS.PENDING_INBOUND &&
+          !s.consumed_at
+        ) {
+          out.push({ ...s });
+        }
+      }
+      return out;
+    },
+
+    async markScansAmbiguousConflict(scanIds = []) {
+      let count = 0;
+      for (const id of scanIds || []) {
+        const s = scans.get(id);
+        if (s && s.status === SCAN_STATUS.PENDING_INBOUND) {
+          scans.set(id, {
+            ...s,
+            status: SCAN_STATUS.AMBIGUOUS_CONFLICT,
+            updated_at: nowIso()
+          });
+          count += 1;
+        }
+      }
+      return count;
+    },
+
     async supersedeOpenScansExcept({ orgId, phoneNormalized, exceptScanId }) {
       let count = 0;
       for (const [id, s] of scans.entries()) {

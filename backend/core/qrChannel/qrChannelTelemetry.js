@@ -10,7 +10,10 @@ const EVENTS = Object.freeze({
   SCAN_INACTIVE: "qr.scan.inactive",
   PHONE_BIND_SUCCEEDED: "qr.phone_bind.succeeded",
   PHONE_BIND_FAILED: "qr.phone_bind.failed",
-  REDIRECT_WHATSAPP: "qr.redirect.whatsapp"
+  REDIRECT_WHATSAPP: "qr.redirect.whatsapp",
+  ATTRIBUTION_ATTACHED: "qr.whatsapp.attribution_attached",
+  ATTRIBUTION_MISSED: "qr.whatsapp.attribution_missed",
+  SCAN_CONSUMED: "qr.whatsapp.scan_consumed"
 });
 
 function emitQrEvent(eventName, fields = {}) {
@@ -29,6 +32,8 @@ function emitQrEvent(eventName, fields = {}) {
     if (fields.reasonCode) payload.reasonCode = fields.reasonCode;
     if (fields.campaignKey) payload.campaignKey = fields.campaignKey;
     if (fields.scanId) payload.scanId = fields.scanId;
+    if (fields.phoneTail) payload.phoneTail = fields.phoneTail;
+    if (fields.conversationGoal) payload.conversationGoal = fields.conversationGoal;
     console.log(JSON.stringify(payload));
   } catch {
     // best-effort
