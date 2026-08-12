@@ -1657,6 +1657,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 9. **No mass backfill** — After deploy, operators re-mark TEST/CLOSED/ARCHIVED / HUMAN as needed. Do not invent historical marks.
 10. **Out of Phase 1** — Preferred language, occupation, interview type, receipts, wholesale `agentActionState`, and BR-111 execution enablement. V2 mid-flow knownFacts continuity remains `recruit_ai_conversation_contexts` (BR-081+), not this JSONB.
 11. **Sticky TAKE OVER vs attention / advancement (clarification)** — Manual TAKE OVER (`manualAgentOwnership=true` + `humanTakenOverAt`) is authoritative Conversations ownership (**HUMAN**) until explicit RETURN TO ATLAS (or another explicit human ownership release). It must survive BR-034 stall/attention evaluation, BR-035 human advancement / Complete Qualification, Mission Control / Prospect Center workflow evaluation, and page refresh. `needsHumanAttention` / stall / follow-up metadata may coexist as an attention warning but must not demote or mask HUMAN, disable the composer, or re-offer TAKE OVER. BR-035 must not write `manualAgentOwnership=false` or derive `workflowOwnership=ATLAS` while the sticky hold is active. Atlas automated outbound (including `allowHandoffAck`) stays suppressed while the sticky hold is active. Stall-only escalations without `humanTakenOverAt` continue to present as **NEEDS_ATTENTION**.
+12. **TAKE OVER acknowledges the current BR-080 attention episode** — Explicit TAKE OVER means the human is handling the prospect and therefore acknowledges the **current** BR-080 episode via the canonical `acknowledgeLead` path (`acknowledged_at`, `acknowledged_by_user_id`, `attention_status=acknowledged`). This clears Prospect Center New / unacknowledged and BR-080-driven Human Attention for that episode and resolves `NewLeadAttention` as acknowledged. It does **not** Return to Atlas, clear sticky HUMAN, or permanently suppress future alerts. A later genuine BR-034 stall / new `human_required` episode may warn again while HUMAN remains sticky; it must not resurrect the old unacknowledged New episode.
 
 ---
 
@@ -2575,6 +2576,7 @@ Only these clear New:
 
 - Explicit **Acknowledge** API action by an authorized owner/Admin/RVP/DL
 - Explicit **Claim & Acknowledge** on an unassigned lead by Admin/RVP/DL
+- Explicit Conversations **TAKE OVER** (acknowledges the current episode via canonical `acknowledgeLead`; does not Return to Atlas; sticky HUMAN remains)
 
 Not automatic in v1: page open, AI reply, mission list render, schedule booking (booking may stamp owner if null but does not acknowledge).
 

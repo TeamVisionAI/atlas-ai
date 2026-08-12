@@ -21,6 +21,7 @@ const {
   normalizeCloseReason,
   INBOX_CLOSE_REASONS
 } = require("./conversationsCenterLifecycle");
+const { logWhatsAppStage } = require("../whatsappStructuredLogger");
 
 /**
  * Active manual TAKE OVER seal. Return-to-Atlas nulls humanTakenOverAt + manualAgentOwnership.
@@ -102,6 +103,8 @@ async function markConversationNeedsAttention(
 
 /**
  * TAKE OVER — human owns the thread; Atlas must not auto-reply.
+ * Also acknowledges the current BR-080 attention episode (canonical acknowledgeLead)
+ * when a prospect row + acting user are supplied. Does not Return to Atlas.
  */
 async function takeOverConversation(phone, options = {}) {
   const scope = scopeOptions(phone, options);
@@ -124,11 +127,58 @@ async function takeOverConversation(phone, options = {}) {
     scope
   );
 
+  // Implements BR-080 + BR-135: TAKE OVER acknowledges the current attention episode.
+  const attentionAck = await acknowledgeCurrentBr080EpisodeOnTakeOver(options);
+
   return {
     previous,
     next,
-    ownershipState: resolveConversationOwnershipState(next)
+    ownershipState: resolveConversationOwnershipState(next),
+    attentionAck
   };
+}
+
+/**
+ * Soft-fail BR-080 ack so sticky HUMAN seal is never rolled back by attention writes.
+ * @param {Object} options
+ * @param {Object} [options.prospect]
+ * @param {{ userId?: string, userEmail?: string }} [options.actor]
+ * @param {Function} [options.acknowledgeLeadFn] — injectable for tests
+ */
+async function acknowledgeCurrentBr080EpisodeOnTakeOver(options = {}) {
+  const prospect = options.prospect || null;
+  if (!prospect?.phone) {
+    return { attempted: false, reason: "PROSPECT_NOT_PROVIDED" };
+  }
+
+  const actor = {
+    userId: options.actor?.userId || options.userId || null,
+    userEmail: options.actor?.userEmail || options.userEmail || null
+  };
+
+  try {
+    const acknowledgeLeadFn =
+      options.acknowledgeLeadFn ||
+      require("../newLeadAttentionEngine").acknowledgeLead;
+    const result = await acknowledgeLeadFn(prospect, actor);
+    return {
+      attempted: true,
+      alreadyAcknowledged: Boolean(result?.alreadyAcknowledged),
+      acknowledgedAt: result?.prospect?.acknowledged_at || null,
+      attentionStatus: result?.prospect?.attention_status || null
+    };
+  } catch (error) {
+    logWhatsAppStage("takeover_br080_acknowledge_failed", {
+      level: "warn",
+      phone: prospect.phone,
+      error: error.message
+    });
+    return {
+      attempted: true,
+      failed: true,
+      reason: error.message || "ACKNOWLEDGE_FAILED"
+    };
+  }
 }
 
 /**
@@ -248,6 +298,7 @@ module.exports = {
   resolveConversationOwnershipState,
   markConversationNeedsAttention,
   takeOverConversation,
+  acknowledgeCurrentBr080EpisodeOnTakeOver,
   returnConversationToAtlas,
   archiveConversation,
   closeConversation,
