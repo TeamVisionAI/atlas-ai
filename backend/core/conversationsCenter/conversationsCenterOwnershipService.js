@@ -2,6 +2,10 @@
  * Conversations Center ownership presentation + transitions.
  * Persists via workflowStateStore (BR-135 durable). Product HUMAN maps to OWNERSHIP.AGENT.
  * Soft archive/close are presentation-only (do not mutate appointments).
+ *
+ * Ownership and attention are separate dimensions (BR-135 clarification):
+ * sticky TAKE OVER (manualAgentOwnership + humanTakenOverAt) remains HUMAN even when
+ * needsHumanAttention / stall metadata is also true. Return-to-Atlas clears the seal.
  */
 
 const { OWNERSHIP } = require("../workflowConstants");
@@ -18,7 +22,24 @@ const {
   INBOX_CLOSE_REASONS
 } = require("./conversationsCenterLifecycle");
 
+/**
+ * Active manual TAKE OVER seal. Return-to-Atlas nulls humanTakenOverAt + manualAgentOwnership.
+ * Stall-only escalations may set manualAgentOwnership without humanTakenOverAt — those stay
+ * NEEDS_ATTENTION (not sticky HUMAN).
+ */
+function hasActiveStickyHumanHold(persisted = {}) {
+  return (
+    persisted.manualAgentOwnership === true &&
+    Boolean(persisted.humanTakenOverAt)
+  );
+}
+
 function resolveConversationOwnershipState(persisted = {}) {
+  // Sticky TAKE OVER wins over stall/attention metadata.
+  if (hasActiveStickyHumanHold(persisted)) {
+    return CONVERSATION_OWNERSHIP_STATE.HUMAN;
+  }
+
   if (persisted.needsHumanAttention) {
     return CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION;
   }
@@ -223,6 +244,7 @@ async function markConversationAsTest(phone, options = {}) {
 }
 
 module.exports = {
+  hasActiveStickyHumanHold,
   resolveConversationOwnershipState,
   markConversationNeedsAttention,
   takeOverConversation,

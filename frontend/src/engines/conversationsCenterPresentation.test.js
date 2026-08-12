@@ -12,7 +12,8 @@ import {
   canReturnConversationToAtlas,
   resolveThreadActionIds,
   resolveLifecycleActionIds,
-  conversationsThreadRegionOrder
+  conversationsThreadRegionOrder,
+  shouldShowAttentionWarning
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
 
@@ -54,11 +55,23 @@ test("NEEDS_ATTENTION + effectiveOwnership=ATLAS → actions=['TAKE_OVER'] only"
   );
 });
 
-test("HUMAN + any attention flag → RETURN TO ATLAS only", () => {
-  const effective = resolveEffectiveOwnership("HUMAN");
+test("HUMAN + stall attention warning coexists; RETURN only; composer on", () => {
+  const ownershipState = "HUMAN";
+  const effective = resolveEffectiveOwnership(ownershipState);
   assert.equal(canTakeOverConversation(effective), false);
   assert.equal(canReturnConversationToAtlas(effective), true);
   assert.equal(isHumanComposerEnabled(effective), true);
+  assert.equal(
+    shouldShowAttentionWarning({
+      ownershipState,
+      needsHumanAttention: true
+    }),
+    true
+  );
+  assert.deepEqual(
+    resolveThreadActionIds({ ownershipState, effectiveOwnership: effective }),
+    ["RETURN_TO_ATLAS"]
+  );
 });
 
 test("ATLAS → TAKE OVER only", () => {
@@ -77,7 +90,7 @@ test("after TAKE OVER → HUMAN / RETURN only; after RETURN → ATLAS / TAKE OVE
   assert.equal(canTakeOverConversation(afterReturn), true);
   assert.equal(canReturnConversationToAtlas(afterReturn), false);
 
-  // Refresh invariant: same mapping from authoritative API ownershipState.
+  // Atlas-owned stall (no sticky HUMAN) still offers TAKE OVER.
   assert.deepEqual(
     {
       take: canTakeOverConversation(resolveEffectiveOwnership("NEEDS_ATTENTION")),

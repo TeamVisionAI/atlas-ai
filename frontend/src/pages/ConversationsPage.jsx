@@ -11,7 +11,8 @@ import {
   canTakeOverConversation,
   canReturnConversationToAtlas,
   resolveThreadActionIds,
-  resolveLifecycleActionIds
+  resolveLifecycleActionIds,
+  shouldShowAttentionWarning
 } from "../engines/conversationsCenterPresentation";
 import {
   isConversationDetailCurrent,
@@ -477,14 +478,23 @@ export default function ConversationsPage() {
 
   const ownershipState =
     matchedDetail?.ownershipState || selectedItem?.ownershipState || null;
-  // Attention (NEEDS_ATTENTION) is display-only; controls use effectiveOwnership only.
+  const needsHumanAttention = Boolean(
+    matchedDetail?.needsHumanAttention ??
+      matchedDetail?.conversation?.needsHumanAttention ??
+      selectedItem?.needsHumanAttention
+  );
+  // Sticky HUMAN remains HUMAN for controls; stall attention is a separate badge.
   const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
   const handoffReason =
     matchedDetail?.handoffReason || selectedItem?.handoffReason || null;
   const humanComposerEnabled = isHumanComposerEnabled(effectiveOwnership);
   const showTakeOver = canTakeOverConversation(effectiveOwnership);
   const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
-  // Defense in depth: one action list from effectiveOwnership; NEEDS_ATTENTION never unlocks RETURN.
+  const showAttentionWarning = shouldShowAttentionWarning({
+    ownershipState,
+    needsHumanAttention
+  });
+  // Defense in depth: one action list from effectiveOwnership.
   const threadActionIds = resolveThreadActionIds({
     ownershipState,
     effectiveOwnership
@@ -516,7 +526,8 @@ export default function ConversationsPage() {
     inboxCloseReason:
       selectedItem?.inboxCloseReason ||
       matchedDetail?.conversation?.inboxCloseReason ||
-      null
+      null,
+    needsHumanAttention
   });
 
   return (
@@ -725,6 +736,14 @@ export default function ConversationsPage() {
                   <StatusBadge variant={ownershipVariant(ownershipState)}>
                     {ownershipLabel(ownershipState, translate)}
                   </StatusBadge>
+                  {showAttentionWarning && ownershipState === "HUMAN" ? (
+                    <StatusBadge
+                      variant="danger"
+                      data-testid="conversations-attention-warning"
+                    >
+                      {translate("conversationsAttentionWarning")}
+                    </StatusBadge>
+                  ) : null}
                   {headerModel.inboxLifecycle ? (
                     <span className="conversations-thread__chip">
                       {lifecycleLabel(headerModel.inboxLifecycle, translate)}
