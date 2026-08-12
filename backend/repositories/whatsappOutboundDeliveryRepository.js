@@ -88,6 +88,51 @@ async function findDeliveryByProviderMessageId(providerMessageId, client = supab
   return Array.isArray(data) ? data[0] || null : data;
 }
 
+/**
+ * Link conversation_log_id onto an existing outbound delivery (exact id or wamid).
+ * Does not insert a second row.
+ */
+async function linkOutboundDeliveryConversationLog(
+  { deliveryId = null, providerMessageId = null, conversationLogId },
+  client = supabase
+) {
+  const logId = conversationLogId ? String(conversationLogId) : "";
+  if (!logId) {
+    return { success: false, reason: "MISSING_CONVERSATION_LOG_ID" };
+  }
+
+  const patch = {
+    conversation_log_id: logId,
+    updated_at: new Date().toISOString()
+  };
+
+  let query = client.from("whatsapp_outbound_deliveries").update(patch);
+
+  if (deliveryId) {
+    query = query.eq("id", deliveryId);
+  } else if (providerMessageId) {
+    query = query.eq("provider_message_id", String(providerMessageId).trim());
+  } else {
+    return { success: false, reason: "MISSING_DELIVERY_KEY" };
+  }
+
+  const { data, error } = await query.select().limit(1);
+
+  if (error) {
+    if (isTableMissingError(error)) {
+      return { success: false, skipped: true, reason: "TABLE_MISSING" };
+    }
+    throw new Error(`DELIVERY_LOG_LINK_FAILED:${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] || null : data;
+  if (!row) {
+    return { success: false, reason: "DELIVERY_NOT_FOUND" };
+  }
+
+  return { success: true, row };
+}
+
 async function recordOutboundDelivery(record, client = supabase) {
   const nowIso = new Date().toISOString();
   const row = {
@@ -173,8 +218,11 @@ async function recordOutboundDelivery(record, client = supabase) {
 /**
  * Apply one Meta status webhook item by exact wamid.
  * Observability only — no ownership / follow-up / retry side effects.
+ * @param {Object} event
+ * @param {Object} [client]
+ * @param {{ quietUnknownLog?: boolean }} [options]
  */
-async function applyMetaDeliveryStatusEvent(event, client = supabase) {
+async function applyMetaDeliveryStatusEvent(event, client = supabase, options = {}) {
   const providerMessageId = String(event?.providerMessageId || "").trim();
   if (!providerMessageId) {
     logWhatsAppStage("meta_delivery_status_ignored", {
@@ -186,10 +234,12 @@ async function applyMetaDeliveryStatusEvent(event, client = supabase) {
   const existing = await findDeliveryByProviderMessageId(providerMessageId, client);
 
   if (!existing) {
-    logWhatsAppStage("meta_delivery_status_unknown_wamid", {
-      providerMessageId,
-      status: event.status || null
-    });
+    if (!options.quietUnknownLog) {
+      logWhatsAppStage("meta_delivery_status_unknown_wamid", {
+        providerMessageId,
+        status: event.status || null
+      });
+    }
     return {
       success: true,
       ignored: true,
@@ -252,6 +302,7 @@ module.exports = {
   findSuccessfulDeliveryByIdempotencyKey,
   findDeliveryByProviderMessageId,
   recordOutboundDelivery,
+  linkOutboundDeliveryConversationLog,
   applyMetaDeliveryStatusEvent,
   isSuccessfulDeliveryStatus,
   isTableMissingError,
