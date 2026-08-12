@@ -1,38 +1,90 @@
 /**
  * Sprint 11.1 + 11.4 Phase A — Inbound WhatsApp message pipeline.
  * Webhook → prospect resolve → persist → event engine → Conversation Engine → outbound.
+ *
+ * Inbound provider-message idempotency: org/WABA fail-closed (read-only), then
+ * atomic claim of whatsapp:inbound:{providerMessageId} BEFORE locateOrCreate,
+ * QR attribution, logConversation, hub, V2/CE, or outbound.
  */
 
 const workflowEventService = require("../services/workflowEventService");
 const { logConversation } = require("../services/logService");
 const whatsappProspectResolver = require("./whatsappProspectResolver");
-const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
+const {
+  resolveWhatsAppInboundOrganizationId
+} = require("./whatsappInboundOrganizationResolver");
+const { buildInboundCorrelationId } = require("./whatsappInboundClaim");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { processConversationAfterInbound } = require("./communicationHub");
 const recruitingWorkflowHooks = require("./recruitingWorkflowHooks");
 const { resolveProspectCommunicationCode } = require("./prospectLanguage");
 
-function buildInboundCorrelationId(providerMessageId) {
-  return `${WHATSAPP_CORRELATION_PREFIX.INBOUND}${providerMessageId}`;
+function duplicateSkipResult(correlationId, providerMessageId, phone) {
+  logWhatsAppStage("message_duplicate_skipped", {
+    providerMessageId,
+    phone
+  });
+
+  return {
+    success: true,
+    skipped: true,
+    reason: "DUPLICATE_PROVIDER_MESSAGE",
+    correlationId
+  };
 }
 
 /**
  * @param {Object} inbound — normalized message from whatsappWebhookParser
+ * @param {Object} [dependencies] — test seams only
  */
-async function processInboundWhatsAppMessage(inbound) {
-  const correlationId = buildInboundCorrelationId(inbound.providerMessageId);
-  const existing = await workflowEventService.findWorkflowEventByCorrelationId(correlationId);
-
-  if (existing) {
-    logWhatsAppStage("message_duplicate_skipped", {
-      providerMessageId: inbound.providerMessageId,
-      phone: inbound.phone
-    });
-
+async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
+  const providerMessageId = String(inbound?.providerMessageId || "").trim();
+  if (!providerMessageId) {
     return {
-      success: true,
-      skipped: true,
-      reason: "DUPLICATE_PROVIDER_MESSAGE",
+      success: false,
+      skipped: false,
+      error: "MISSING_PROVIDER_MESSAGE_ID"
+    };
+  }
+
+  const correlationId = buildInboundCorrelationId(providerMessageId);
+  const resolveOrg =
+    dependencies.resolveWhatsAppInboundOrganizationId ||
+    resolveWhatsAppInboundOrganizationId;
+  const claimInbound =
+    dependencies.claimWhatsAppInboundCorrelation ||
+    workflowEventService.claimWhatsAppInboundCorrelation;
+  const locateOrCreate =
+    dependencies.locateOrCreateWhatsAppProspect ||
+    ((args) => whatsappProspectResolver.locateOrCreateWhatsAppProspect(args));
+  const persistInboundLog = dependencies.logConversation || logConversation;
+  const runHub =
+    dependencies.processConversationAfterInbound ||
+    processConversationAfterInbound;
+
+  // Read-only org/WABA fail-closed MUST precede claim so a mismatched asset
+  // cannot poison the provider-message lock (replay with the correct WABA still works).
+  const { organizationId: claimedOrganizationId } = await resolveOrg({
+    phoneNumberId:
+      inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
+    wabaId: inbound.wabaId || null
+  });
+
+  const claim = await claimInbound({
+    correlationId,
+    providerMessageId,
+    prospectPhone: inbound.phone,
+    organizationId: claimedOrganizationId || null
+  });
+
+  if (!claim?.claimed) {
+    if (claim?.reason === "DUPLICATE_PROVIDER_MESSAGE") {
+      return duplicateSkipResult(correlationId, providerMessageId, inbound.phone);
+    }
+    return {
+      success: false,
+      skipped: false,
+      error: claim?.reason || "INBOUND_CLAIM_FAILED",
       correlationId
     };
   }
@@ -40,7 +92,7 @@ async function processInboundWhatsAppMessage(inbound) {
   const body = inbound.body || `[${inbound.messageType} message]`;
 
   const { prospect, created, storagePhone, organizationId } =
-    await whatsappProspectResolver.locateOrCreateWhatsAppProspect({
+    await locateOrCreate({
       phone: inbound.phone,
       name: inbound.contactName,
       firstMessage: body,
@@ -56,7 +108,7 @@ async function processInboundWhatsAppMessage(inbound) {
     organizationId: organizationId || prospect?.organization_id || null
   });
 
-  const logResult = await logConversation({
+  const logResult = await persistInboundLog({
     phone: storagePhone,
     name: prospect.name || inbound.contactName,
     direction: "incoming",
@@ -121,7 +173,7 @@ async function processInboundWhatsAppMessage(inbound) {
   let conversation = null;
 
   try {
-    conversation = await processConversationAfterInbound({
+    conversation = await runHub({
       inbound,
       storagePhone,
       prospect,

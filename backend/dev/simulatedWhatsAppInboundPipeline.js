@@ -7,7 +7,7 @@
 const crypto = require("crypto");
 const { findProspect } = require("../services/supabaseService");
 const { logConversation } = require("../services/logService");
-const { findWorkflowEventByCorrelationId } = require("../services/workflowEventService");
+const { claimWhatsAppInboundCorrelation } = require("../services/workflowEventService");
 const {
   buildInboundCorrelationId
 } = require("../core/whatsappInboundPipeline");
@@ -88,9 +88,14 @@ async function processSimulatedWhatsAppInbound(payload = {}) {
     });
 
     const correlationId = buildInboundCorrelationId(inbound.providerMessageId);
-    const existing = await findWorkflowEventByCorrelationId(correlationId);
+    const claim = await claimWhatsAppInboundCorrelation({
+      correlationId,
+      providerMessageId: inbound.providerMessageId,
+      prospectPhone: phone,
+      organizationId: prospect.organization_id || null
+    });
 
-    if (existing) {
+    if (!claim.claimed) {
       pushTrace("inbound_dedup", "skipped", correlationId);
       return {
         success: true,
