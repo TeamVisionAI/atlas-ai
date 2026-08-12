@@ -661,6 +661,8 @@ export const translations = {
     configurationHubWhatsAppDescription: "Conexión de la cuenta comercial.",
     configurationHubSchedulingDescription: "Calendario y preferencias de programación.",
     configurationHubAppointmentsDescription: "Horario, reuniones y preferencias de citas.",
+    configurationHubQrCampaignsDescription:
+      "Crea y descarga códigos QR de reclutamiento para ti o tu equipo.",
     configurationLoading: "Cargando…",
     configurationSaved: "Configuración guardada.",
     configurationSave: "Guardar",
@@ -2340,6 +2342,8 @@ export const translations = {
     configurationHubWhatsAppDescription: "Business account connection.",
     configurationHubSchedulingDescription: "Calendar and scheduling preferences.",
     configurationHubAppointmentsDescription: "Schedule, meetings, and appointment preferences.",
+    configurationHubQrCampaignsDescription:
+      "Create and download recruiting QR codes for yourself or your team.",
     configurationLoading: "Loading…",
     configurationSaved: "Configuration saved.",
     configurationSave: "Save",

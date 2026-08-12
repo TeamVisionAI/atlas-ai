@@ -1,0 +1,100 @@
+.qr-campaigns__toolbar {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.qr-campaigns__lede {
+  margin: 0;
+  max-width: 42rem;
+  line-height: 1.45;
+}
+
+.qr-campaigns__form {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.qr-campaigns__hint {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.qr-campaigns__list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.qr-campaigns__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.qr-campaigns__meta dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.qr-campaigns__meta dd {
+  margin: 0.15rem 0 0;
+}
+
+.qr-campaigns__status {
+  text-transform: capitalize;
+  font-weight: 600;
+}
+
+.qr-campaigns__status--active {
+  color: #0f7b4b;
+}
+
+.qr-campaigns__status--inactive {
+  color: #8a4b12;
+}
+
+.qr-campaigns__preview-wrap {
+  margin: 0.75rem 0 1rem;
+}
+
+.qr-campaigns__preview {
+  width: min(220px, 100%);
+  height: auto;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.qr-campaigns__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.qr-campaigns__legacy {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 0.9rem;
+  background: rgba(138, 75, 18, 0.08);
+  border-radius: 0.5rem;
+}
+
+.qr-campaigns__created {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(15, 123, 75, 0.25);
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.configuration-message--muted {
+  opacity: 0.7;
+}

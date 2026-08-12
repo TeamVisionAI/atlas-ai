@@ -61,6 +61,18 @@ function createMemoryQrChannelRepository() {
       return { ...next };
     },
 
+    async listCampaignsByOrg({ orgId, ownerUserId = null } = {}) {
+      const out = [];
+      for (const c of campaigns.values()) {
+        if (c.org_id !== orgId) continue;
+        if (c.archived_at) continue;
+        if (ownerUserId && c.owner_user_id !== ownerUserId) continue;
+        out.push({ ...c });
+      }
+      out.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      return out;
+    },
+
     async findScanById(id) {
       const s = scans.get(id);
       return s ? { ...s } : null;

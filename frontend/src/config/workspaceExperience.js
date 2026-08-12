@@ -182,8 +182,11 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "settings",
     path: appPath("settings"),
     labelKey: "navSettings",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ]
   },
   adminUsers: {
     id: "admin-users",
@@ -313,7 +316,7 @@ const LEADERSHIP_EXTENSION_NAV = Object.freeze({
 const ADMINISTRATION_NAV = Object.freeze({
   [WORKSPACE_TYPES.ADMINISTRATOR]: ["settings", "adminUsers", "operationsCenter"],
   [WORKSPACE_TYPES.MANAGEMENT]: ["settings"],
-  [WORKSPACE_TYPES.REPRESENTATIVE]: []
+  [WORKSPACE_TYPES.REPRESENTATIVE]: ["settings"]
 });
 
 function buildNavOrderForWorkspace(workspaceType) {
@@ -394,8 +397,11 @@ export const ROUTE_ACCESS = Object.freeze({
   knowledge: { permission: PERMISSIONS.PROSPECT_READ },
   "policy-intelligence": { permission: PERMISSIONS.POLICY_READ },
   settings: {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ]
   },
   "settings/profile": {},
   "settings/integrations": {
@@ -415,6 +421,14 @@ export const ROUTE_ACCESS = Object.freeze({
   "settings/appointments": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
+  },
+  "settings/qr-campaigns": {
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.PROSPECT_WRITE
   },
   "settings/whatsapp": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
@@ -512,6 +526,10 @@ export function canAccessRoute(routeKey, user, { operationsAllowed = false } = {
 
     if (routeKey.startsWith("settings/whatsapp")) {
       return true;
+    }
+
+    if (routeKey === "settings/qr-campaigns") {
+      return false;
     }
 
     if (!isRouteAllowedInMetaReview(routeKey)) {
@@ -625,6 +643,20 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     // BR-110 — self appointment profile for management recruiters (RVP/DL/RL).
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ORG_READ
+  },
+  {
+    id: "qr-campaigns",
+    routeKey: "settings/qr-campaigns",
+    path: appPath("settings/qr-campaigns"),
+    titleKey: "qrCampaigns",
+    descriptionKey: "configurationHubQrCampaignsDescription",
+    icon: "integrations",
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.PROSPECT_WRITE
   },
   {
     id: "review-users",
