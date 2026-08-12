@@ -44,6 +44,26 @@ function looksLikeSpanishInfoRequest(text) {
 }
 
 /**
+ * English BR-131 / QR bilingual parity — substantive info request.
+ * Same overview path as Spanish; no dedicated QR intent.
+ * Do not broaden bare "i want" / "i'm interested" / "i like".
+ */
+function looksLikeEnglishInfoRequest(text) {
+  const t = normalizeText(text).replace(/[\u2018\u2019`]/g, "'");
+  if (!t) {
+    return false;
+  }
+  return (
+    /\bi want to learn more about the opportunity\b/.test(t) ||
+    /\bi would like more information\b/.test(t) ||
+    /\bi'?d like more information\b/.test(t) ||
+    /\btell me about the opportunity\b/.test(t) ||
+    /\bi saw the (qr code|qr)\b/.test(t) ||
+    /\bi scanned the (qr code|qr)\b/.test(t)
+  );
+}
+
+/**
  * Spanish company / opportunity identity questions — never locations.
  */
 function looksLikeCompanyIdentityQuestion(text) {
@@ -90,7 +110,7 @@ function looksLikeJobOverviewQuestion(text) {
     return false;
   }
 
-  if (looksLikeSpanishInfoRequest(text) || looksLikeCompanyIdentityQuestion(text)) {
+  if (looksLikeSpanishInfoRequest(text) || looksLikeEnglishInfoRequest(text) || looksLikeCompanyIdentityQuestion(text)) {
     return true;
   }
 
@@ -108,7 +128,8 @@ function looksLikeJobOverviewQuestion(text) {
     /\bque es esto\b/.test(t) ||
     /\bque hacen\b/.test(t) ||
     /\bwhat do you (all |guys )?do\b/.test(t) ||
-    /\btell me more\b/.test(t)
+    /\btell me more\b/.test(t) ||
+    /\bcan you tell me more\b/.test(t)
   );
 }
 
@@ -385,6 +406,7 @@ function resolveDayPartContinuation(dayPart, language = "spanish") {
 module.exports = {
   normalizeText,
   looksLikeSpanishInfoRequest,
+  looksLikeEnglishInfoRequest,
   looksLikeCompanyIdentityQuestion,
   looksLikeJobOverviewQuestion,
   looksLikeJobOpportunityQuestion,
