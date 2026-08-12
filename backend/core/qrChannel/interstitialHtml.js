@@ -1,9 +1,14 @@
 /**
  * Minimal mobile-first phone-bind interstitial HTML (Phase 1).
  * Not a recruiting form — phone only.
+ * Presentation: Team Vision / Atlas navy + gold (see qrInterstitialBranding.js).
  */
 
 const { NATURAL_WHATSAPP_PREFILL } = require("./constants");
+const {
+  resolveQrInterstitialBranding,
+  brandingCssVariables
+} = require("./qrInterstitialBranding");
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -14,14 +19,131 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function sharedPublicPageStyles(branding) {
+  return `
+    :root {
+      ${brandingCssVariables(branding)}
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(900px 480px at 18% -8%, var(--qi-bg-glow) 0%, transparent 58%),
+        var(--qi-bg);
+      color: var(--qi-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+      -webkit-text-size-adjust: 100%;
+    }
+    main {
+      width: 100%;
+      max-width: 400px;
+      background: var(--qi-surface);
+      border: 1px solid var(--qi-border);
+      border-radius: 18px;
+      padding: 28px 22px 22px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 1.375rem;
+      font-weight: 650;
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+      color: var(--qi-text);
+    }
+    p.lead {
+      margin: 0 0 22px;
+      color: var(--qi-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    label {
+      display: block;
+      font-size: 0.875rem;
+      margin-bottom: 8px;
+      color: var(--qi-text);
+      font-weight: 500;
+    }
+    input[type="tel"] {
+      width: 100%;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--qi-border);
+      background: var(--qi-input-bg);
+      color: var(--qi-text);
+      font-size: 1.05rem;
+      margin-bottom: 16px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input[type="tel"]::placeholder {
+      color: #64748b;
+    }
+    input[type="tel"]:focus {
+      outline: 2px solid var(--qi-focus);
+      outline-offset: 1px;
+      border-color: var(--qi-accent);
+    }
+    button[type="submit"] {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 15px 16px;
+      min-height: 52px;
+      background: var(--qi-accent);
+      color: var(--qi-accent-contrast);
+      font-weight: 700;
+      font-size: 1.02rem;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button[type="submit"]:hover {
+      background: var(--qi-accent-press);
+    }
+    button[type="submit"]:active {
+      background: var(--qi-accent-press);
+      transform: translateY(1px);
+    }
+    button[type="submit"]:focus-visible {
+      outline: 2px solid var(--qi-focus);
+      outline-offset: 3px;
+    }
+    .brand {
+      margin-top: 20px;
+      text-align: center;
+      color: var(--qi-muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.02em;
+    }
+    .err {
+      color: var(--qi-err);
+      font-size: 0.9rem;
+      margin: 0 0 14px;
+      line-height: 1.4;
+    }
+  `;
+}
+
 function renderPhoneBindInterstitial({
   token,
   scanId,
   bindMac,
-  campaignName = "Team Vision",
-  errorMessage = null
+  campaignName,
+  errorMessage = null,
+  branding: brandingOverrides = null
 }) {
+  const branding = resolveQrInterstitialBranding(brandingOverrides || {});
+  const orgName = campaignName || branding.organizationDisplayName;
   const title = "Continuar por WhatsApp";
+  const lead =
+    "Ingresa tu número de WhatsApp para continuar. Te llevaremos directamente a WhatsApp con un mensaje listo para enviar.";
   const err = errorMessage
     ? `<p class="err" role="alert">${escapeHtml(errorMessage)}</p>`
     : "";
@@ -30,109 +152,18 @@ function renderPhoneBindInterstitial({
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="${escapeHtml(branding.colors.background)}" />
   <title>${escapeHtml(title)}</title>
   <style>
-    :root {
-      --bg: #0f1c17;
-      --card: #16261f;
-      --text: #f3f7f4;
-      --muted: #a8b5ae;
-      --accent: #2f9e6b;
-      --accent-press: #27855a;
-      --err: #f0a5a0;
-      --border: #2a3d34;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      background:
-        radial-gradient(1200px 600px at 20% -10%, #1d3a2c 0%, transparent 55%),
-        var(--bg);
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px 16px;
-    }
-    main {
-      width: 100%;
-      max-width: 420px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px 22px 24px;
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 1.35rem;
-      font-weight: 650;
-      letter-spacing: -0.02em;
-    }
-    p.lead {
-      margin: 0 0 22px;
-      color: var(--muted);
-      font-size: 0.95rem;
-      line-height: 1.45;
-    }
-    label {
-      display: block;
-      font-size: 0.85rem;
-      margin-bottom: 8px;
-      color: var(--muted);
-    }
-    input[type="tel"] {
-      width: 100%;
-      padding: 14px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #101a16;
-      color: var(--text);
-      font-size: 1.05rem;
-      margin-bottom: 16px;
-    }
-    input[type="tel"]:focus {
-      outline: 2px solid rgba(47, 158, 107, 0.55);
-      border-color: var(--accent);
-    }
-    button {
-      width: 100%;
-      border: 0;
-      border-radius: 10px;
-      padding: 14px 16px;
-      background: var(--accent);
-      color: #04140c;
-      font-weight: 700;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-    button:active { background: var(--accent-press); }
-    .brand {
-      margin-top: 18px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.8rem;
-    }
-    .err {
-      color: var(--err);
-      font-size: 0.9rem;
-      margin: 0 0 14px;
-    }
-    .hint {
-      margin: 12px 0 0;
-      color: var(--muted);
-      font-size: 0.75rem;
-      line-height: 1.4;
-    }
+${sharedPublicPageStyles(branding)}
   </style>
 </head>
 <body>
   <main>
     <h1>${escapeHtml(title)}</h1>
-    <p class="lead">Usa tu número de WhatsApp para continuar. No pedimos más datos aquí.</p>
+    <p class="lead">${escapeHtml(lead)}</p>
     ${err}
     <form method="POST" action="/go/${escapeHtml(token)}/bind" autocomplete="tel">
       <input type="hidden" name="scanId" value="${escapeHtml(scanId)}" />
@@ -150,35 +181,37 @@ function renderPhoneBindInterstitial({
       />
       <button type="submit">Continuar por WhatsApp</button>
     </form>
-    <p class="hint">Al continuar abrirás WhatsApp con un mensaje listo para enviar.</p>
-    <p class="brand">${escapeHtml(campaignName)} · Atlas</p>
+    <p class="brand">${escapeHtml(orgName)} · ${escapeHtml(branding.productName)}</p>
   </main>
 </body>
 </html>`;
 }
 
-function renderSafeErrorPage({ title = "Enlace no disponible", body = "Este enlace no está disponible." } = {}) {
+function renderSafeErrorPage({
+  title = "Enlace no disponible",
+  body = "Este enlace no está disponible.",
+  branding: brandingOverrides = null
+} = {}) {
+  const branding = resolveQrInterstitialBranding(brandingOverrides || {});
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="${escapeHtml(branding.colors.background)}" />
   <title>${escapeHtml(title)}</title>
   <style>
-    body {
-      margin: 0; min-height: 100vh; display:flex; align-items:center; justify-content:center;
-      font-family: system-ui, sans-serif; background:#0f1c17; color:#f3f7f4; padding:24px;
-    }
-    main { max-width: 420px; text-align:center; }
-    h1 { font-size: 1.25rem; margin-bottom: 8px; }
-    p { color:#a8b5ae; }
+${sharedPublicPageStyles(branding)}
+    main { text-align: center; padding-bottom: 28px; }
+    p.lead { margin-bottom: 0; }
   </style>
 </head>
 <body>
   <main>
     <h1>${escapeHtml(title)}</h1>
-    <p>${escapeHtml(body)}</p>
+    <p class="lead">${escapeHtml(body)}</p>
+    <p class="brand">${escapeHtml(branding.organizationDisplayName)} · ${escapeHtml(branding.productName)}</p>
   </main>
 </body>
 </html>`;
