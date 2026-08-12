@@ -406,6 +406,31 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
+  // Never invent cities from company-identity / info-request / FAQ phrasing.
+  const folded = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (
+    /\b(empresa|compania|companias)\b/.test(folded) ||
+    /\b(quiero|dame|quisiera|necesito)\b.{0,40}\b(informacion|detalles)\b/.test(
+      folded
+    ) ||
+    /\bme interesa saber\b/.test(folded) ||
+    /\b(que|cual|como)\b.{0,40}\b(empresa|compania)\b/.test(folded) ||
+    /\bcon que (empresa|compania)\b/.test(folded) ||
+    /\bpara que (empresa|compania)\b/.test(folded) ||
+    /\bwhat company\b/.test(folded) ||
+    /\bwhich company\b/.test(folded) ||
+    /\bwho do you work for\b/.test(folded)
+  ) {
+    return null;
+  }
+
   // Never invent cities from license / authorization / FAQ phrasing (BR-083/098/099).
   if (
     /\b(licen[cs]ia|license|permiso|autoriz|seguro|seguros|driver|conducir|215|214|experiencia|experience|necesito|comision|comisión|salario|sueldo|ganar|dinero|pagan|pago|vender|vendiendo|vendedor|vendedora|ventas|selling|sales|salesperson|conozco|contactos|clientes|network)\b/i.test(

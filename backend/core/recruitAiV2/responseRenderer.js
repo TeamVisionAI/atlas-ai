@@ -625,12 +625,12 @@ function composeJobOpportunityThenResume(language, entities = {}) {
 
 /** BR-097 — short first-level overview + pending question, no caveat stack. */
 function composeJobOverviewThenResume(language, entities = {}) {
-  return composeFaqThenResume(
-    getJobOverviewFaqAnswer(localeCode(language)),
-    language,
-    entities,
-    { omitBridge: true }
-  );
+  const lang = localeCode(language);
+  const faqText =
+    entities.jobFaqDetailLevel === "company_identity"
+      ? getCanonicalFaqAnswer(lang)
+      : getJobOverviewFaqAnswer(lang);
+  return composeFaqThenResume(faqText, language, entities, { omitBridge: true });
 }
 
 function renderCustomerReply(responsePlan) {

@@ -325,10 +325,17 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
 
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);
+  // Pending ask_authorization only: "si tengo" / "sí tengo" means yes to the
+  // work-permit question just asked — do not invent auth without that context.
+  const yesTengoShorthand =
+    pendingAuth &&
+    !mentionsLicense(raw) &&
+    /^(si|yes|yep|yeah)[,:]?\s+(tengo|have)([.!]?)?$/i.test(raw.trim());
   const yesShort =
     pendingAuth &&
     !mentionsLicense(raw) &&
     (/^(si|yes|yep|yeah|claro|por supuesto)([.!]?)$/i.test(raw.trim()) ||
+      yesTengoShorthand ||
       (/^(si|yes).{0,40}\b(tengo|have|cuento con)\b/i.test(raw) &&
         mentionsWorkAuthorization(raw)));
   const patternYes =

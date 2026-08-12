@@ -14,6 +14,8 @@ const {
 const {
   looksLikeJobOpportunityQuestion,
   looksLikeJobOverviewQuestion,
+  looksLikeSpanishInfoRequest,
+  looksLikeCompanyIdentityQuestion,
   looksLikeConversationClarificationRequest,
   lastQuestionImpliesDate,
   lastQuestionImpliesDayPart: continuityImpliesDayPart
@@ -181,8 +183,12 @@ function isGreeting(text) {
   ) {
     return true;
   }
-  // Real-world opener: greeting + brief interest (still begin qualification).
-  return /^(hola|hi|hello|hey)\b.{0,40}\b(quiero mas informacion|me interesa|quisiera (mas )?informacion|looking for (more )?info)\b/.test(
+  // Real-world opener: greeting + brief interest without a substantive info ask.
+  // Substantive "quiero más información" is handled as job overview (BR-131), not greeting-only.
+  if (looksLikeSpanishInfoRequest(raw) || looksLikeCompanyIdentityQuestion(raw)) {
+    return false;
+  }
+  return /^(hola|hi|hello|hey)\b.{0,40}\b(me interesa|looking for (more )?info)\b/.test(
     t
   );
 }
@@ -889,10 +895,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     String(context?.conversation?.lastQuestionAsked || "") ===
     "clarify_license_type";
 
-  if (isGreeting(text)) {
-    intent = INTENTS.GREETING;
-    confidence = 0.95;
-  } else if (cancellation) {
+  if (cancellation) {
     // BR-085/086/091 — cancel/withdraw/opt-out before location/name/FAQ/scheduling.
     intent = cancellation.intent;
     confidence = 0.94;
@@ -901,6 +904,39 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.alsoWithdraw = Boolean(cancellation.alsoWithdraw);
     entities.alsoOptOut = Boolean(cancellation.alsoOptOut);
     entities.directLackOfInterest = Boolean(cancellation.directLackOfInterest);
+  } else if (
+    looksLikeCompanyIdentityQuestion(text) ||
+    looksLikeCompanyIdentityQuestion(originalText)
+  ) {
+    // Spanish live-canary — company identity outranks greeting and location.
+    intent = INTENTS.JOB_OPPORTUNITY_QUESTION;
+    confidence = 0.94;
+    entities.jobFaqDetailLevel = "company_identity";
+  } else if (
+    !looksLikeSalesObjection(text) &&
+    !looksLikeSalesObjection(originalText) &&
+    (looksLikeSpanishInfoRequest(text) ||
+      looksLikeSpanishInfoRequest(originalText) ||
+      looksLikeJobOpportunityQuestion(text) ||
+      looksLikeJobOpportunityQuestion(originalText))
+  ) {
+    // BR-131 — substantive info / opportunity asks outrank greeting-only openers.
+    // Sales-identity compounds ("de qué se trata, es ventas?") stay sales_objection.
+    intent = INTENTS.JOB_OPPORTUNITY_QUESTION;
+    confidence = 0.93;
+    entities.jobFaqDetailLevel =
+      looksLikeJobOverviewQuestion(text) ||
+      looksLikeJobOverviewQuestion(originalText) ||
+      looksLikeSpanishInfoRequest(text) ||
+      looksLikeSpanishInfoRequest(originalText)
+        ? "overview"
+        : "employment_framing";
+    if (authAnswer === true || authAnswer === false) {
+      entities.workAuthorization = authAnswer;
+    }
+  } else if (isGreeting(text)) {
+    intent = INTENTS.GREETING;
+    confidence = 0.95;
   } else if (looksLikeExplicitScheduleRequest(text)) {
     // Implements BR-124 — explicit schedule ask recovers pre-booking flow.
     intent = INTENTS.REQUEST_SCHEDULE_INTERVIEW;
@@ -1008,17 +1044,6 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     intent = INTENTS.LICENSE_REQUIREMENT_QUESTION;
     confidence = 0.92;
     entities.licensePathDetail = false;
-  } else if (looksLikeJobOpportunityQuestion(text)) {
-    intent = INTENTS.JOB_OPPORTUNITY_QUESTION;
-    confidence = 0.93;
-    // Implements BR-097 — first-level overview vs employment-framing detail.
-    entities.jobFaqDetailLevel = looksLikeJobOverviewQuestion(text)
-      ? "overview"
-      : "employment_framing";
-    // Mid-flow compound (pending ask_authorization + job FAQ): keep same-turn auth.
-    if (authAnswer === true || authAnswer === false) {
-      entities.workAuthorization = authAnswer;
-    }
   } else if (
     classifyProspectGoal(text) ||
     classifyProspectGoal(originalText)
@@ -1461,6 +1486,8 @@ module.exports = {
   looksLikeOpportunityQuestion,
   looksLikeJobOpportunityQuestion,
   looksLikeJobOverviewQuestion,
+  looksLikeSpanishInfoRequest,
+  looksLikeCompanyIdentityQuestion,
   looksLikeConversationClarificationRequest,
   looksLikeInsuranceQuestion,
   looksLikeExperienceQuestion,
