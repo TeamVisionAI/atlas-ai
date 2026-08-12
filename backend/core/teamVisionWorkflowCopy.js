@@ -125,10 +125,12 @@ function getCanonicalFaqAnswer(language) {
 /**
  * BR-097 / BR-131 — concise human overview. Answer the ask; light compliance only.
  * Soft continuation question is appended by FAQ resume (one next missing fact).
+ * QR Phase 3 Spanish: canonical recruiting overview without unsolicited hourly /
+ * negocio / IC disclaimers (those stay on employment-framing / compensation paths).
  */
 function getJobOverviewFaqAnswer(language) {
   return language === "es"
-    ? "Es una oportunidad en servicios financieros: ayudas a familias con protección y planificación, con entrenamiento incluido. No es un empleo por hora garantizado."
+    ? "Es una oportunidad en servicios financieros donde ayudamos a las familias con protección y planificación financiera. Ofrecemos entrenamiento y capacitación."
     : "It's an opportunity in financial services — you help families with protection and planning, and training is included. It's not a guaranteed hourly job.";
 }
 

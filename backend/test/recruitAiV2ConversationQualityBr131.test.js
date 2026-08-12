@@ -230,3 +230,104 @@ test("sync turn path remains non-mutating when allowExecution true", () => {
   assert.notEqual(process.env.RECRUIT_AI_V2_EXECUTION_ENABLED, "true");
   assert.equal(isExecutionEnabled({ env: process.env }), false);
 });
+
+const SPANISH_OVERVIEW =
+  "Es una oportunidad en servicios financieros donde ayudamos a las familias con protección y planificación financiera. Ofrecemos entrenamiento y capacitación.";
+
+function spanishBlank() {
+  return createConversationContext({ preferredLanguage: "spanish" });
+}
+
+function assertSpanishOverviewThenCity(message) {
+  const { interpretation, plan, rendered } = renderTurn(message, spanishBlank());
+  assert.equal(interpretation.intent, INTENTS.JOB_OPPORTUNITY_QUESTION);
+  assert.equal(plan.templateKey, "job_overview_faq_then_resume");
+  assert.equal(
+    rendered.text,
+    `${SPANISH_OVERVIEW} ¿En qué ciudad y estado vives?`
+  );
+  assert.doesNotMatch(rendered.text, /empleo por hora/i);
+  assert.doesNotMatch(rendered.text, /\bcampaign\b|\bcódigo QR\b|QR campaign/i);
+  assert.doesNotMatch(rendered.text, /\bnegocio\b|\bcontratista\b|\bsalario\b|\bcomisi[oó]n\b/i);
+}
+
+test("13. Spanish QR prefill maps to job overview (not prospect_goal)", () => {
+  assertSpanishOverviewThenCity(
+    "Hola, quiero conocer más sobre la oportunidad."
+  );
+});
+
+test("14. Quiero conocer más sobre la oportunidad → overview", () => {
+  assertSpanishOverviewThenCity("Quiero conocer más sobre la oportunidad");
+});
+
+test("15. Vi el código QR → overview, not clarify_once", () => {
+  assertSpanishOverviewThenCity("Vi el código QR");
+});
+
+test("16. Vi el QR → overview", () => {
+  assertSpanishOverviewThenCity("Vi el QR");
+});
+
+test("17. Escaneé el código → overview", () => {
+  assertSpanishOverviewThenCity("Escaneé el código");
+});
+
+test("18. Escaneé el código QR → overview", () => {
+  assertSpanishOverviewThenCity("Escaneé el código QR");
+});
+
+test("19. Quiero más información / ¿De qué se trata? still overview", () => {
+  assertSpanishOverviewThenCity("Quiero más información");
+  assertSpanishOverviewThenCity("¿De qué se trata?");
+});
+
+test("20. Hola remains greeting-only (no unsolicited overview)", () => {
+  const { interpretation, plan, rendered } = renderTurn("Hola", spanishBlank());
+  assert.equal(interpretation.intent, INTENTS.GREETING);
+  assert.equal(plan.templateKey, "greeting_ask_location");
+  assert.equal(
+    rendered.text,
+    "¡Hola! Gracias por escribirnos. ¿En qué ciudad y estado vives?"
+  );
+  assert.doesNotMatch(rendered.text, /servicios financieros/i);
+});
+
+test("21. Me interesa stays prospect_goal (not stolen by info detector)", () => {
+  const { interpretation, plan } = renderTurn("Me interesa", spanishBlank());
+  assert.equal(interpretation.intent, INTENTS.PROSPECT_GOAL);
+  assert.equal(plan.templateKey, "prospect_goal_ack_then_resume");
+});
+
+test("22. Me interesa flexibilidad / Quiero ganar más dinero not stolen", () => {
+  const flex = renderTurn("Me interesa flexibilidad", spanishBlank());
+  assert.equal(flex.interpretation.intent, INTENTS.PROSPECT_GOAL);
+  assert.notEqual(flex.plan.templateKey, "job_overview_faq_then_resume");
+
+  const money = renderTurn("Quiero ganar más dinero", spanishBlank());
+  assert.notEqual(money.interpretation.intent, INTENTS.JOB_OPPORTUNITY_QUESTION);
+  assert.notEqual(money.plan.templateKey, "job_overview_faq_then_resume");
+});
+
+test("23. ¿Cuánto pagan? compensation unchanged", () => {
+  const { interpretation, plan } = renderTurn("¿Cuánto pagan?", spanishBlank());
+  assert.equal(interpretation.intent, INTENTS.COMPENSATION_QUESTION);
+  assert.equal(plan.templateKey, "compensation_faq_then_resume");
+});
+
+test("24. ¿Es ventas? stays BR-137 sales path", () => {
+  const { interpretation, plan } = renderTurn("¿Es ventas?", spanishBlank());
+  assert.equal(interpretation.intent, INTENTS.SALES_OBJECTION);
+  assert.match(String(plan.templateKey || ""), /sales/i);
+});
+
+test("25. No me interesa withdraw unchanged", () => {
+  const { interpretation, plan } = renderTurn("No me interesa", spanishBlank());
+  assert.equal(interpretation.intent, INTENTS.WITHDRAW_INTEREST);
+  assert.match(String(plan.templateKey || ""), /withdraw/i);
+});
+
+test("26. Spanish job overview exact canonical copy (no hourly disclaimer)", () => {
+  assert.equal(getJobOverviewFaqAnswer("es"), SPANISH_OVERVIEW);
+  assert.doesNotMatch(getJobOverviewFaqAnswer("es"), /empleo por hora/i);
+});

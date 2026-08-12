@@ -17,6 +17,8 @@ function normalizeText(text) {
 /**
  * Spanish live-canary — substantive info request (BR-131 answer-first).
  * Outranks greeting-only openers even when combined with "Hola".
+ * QR Phase 3: map natural QR-adjacent info phrases into the same overview path
+ * (no dedicated QR intent). Do not broaden bare "quiero" / "me interesa".
  */
 function looksLikeSpanishInfoRequest(text) {
   const t = normalizeText(text);
@@ -27,12 +29,17 @@ function looksLikeSpanishInfoRequest(text) {
     /\bquiero mas informacion\b/.test(t) ||
     /\bquiero informacion\b/.test(t) ||
     /\bquiero mas detalles\b/.test(t) ||
+    // QR Phase 1 prefill / natural "tell me about the opportunity" (not bare "quiero").
+    /\bquiero conocer mas (sobre|de) la oportunidad\b/.test(t) ||
     /\bdame (mas )?informacion\b/.test(t) ||
     /\bquisiera (saber )?mas\b/.test(t) ||
     /\bquisiera (mas )?informacion\b/.test(t) ||
     /\bme interesa saber de que se trata\b/.test(t) ||
     /\bme interesa (saber )?mas\b/.test(t) ||
-    /\bnecesito (mas )?informacion\b/.test(t)
+    /\bnecesito (mas )?informacion\b/.test(t) ||
+    // QR-adjacent scan mentions → same job-overview FAQ path (not clarify_once).
+    /\bvi el (codigo )?qr\b/.test(t) ||
+    /\bescanee el codigo( qr)?\b/.test(t)
   );
 }
 
