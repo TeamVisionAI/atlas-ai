@@ -902,6 +902,7 @@ module.exports = {
   recalculateMissions,
   buildMissionContext,
   shouldGenerateScheduleInterviewMission,
+  shouldGenerateNewLeadAttentionMission,
   hasIncompleteQualification,
   hasPendingRequiredInformation
 };

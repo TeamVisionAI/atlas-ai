@@ -163,10 +163,20 @@ async function takeOverHandler(req, res) {
     }
 
     // Persist under prospect.phone (storage truth), not the request encoding.
+    // TAKE OVER also acknowledges the current BR-080 attention episode (canonical).
     const result = await takeOverConversation(prospect.phone, {
       reason: req.body?.reason,
       organizationId: prospect.organization_id || organizationId || null,
-      prospectId: prospect.id || null
+      prospectId: prospect.id || null,
+      prospect,
+      actor: {
+        userId: req.atlasUser?.id || req.authContext?.userId || null,
+        userEmail:
+          req.atlasUser?.email ||
+          req.authContext?.email ||
+          req.user?.email ||
+          null
+      }
     });
 
     res.json({
@@ -178,7 +188,17 @@ async function takeOverHandler(req, res) {
       workflow: {
         workflowOwnership: result.next.workflowOwnership,
         needsHumanAttention: Boolean(result.next.needsHumanAttention),
-        manualAgentOwnership: Boolean(result.next.manualAgentOwnership)
+        manualAgentOwnership: Boolean(result.next.manualAgentOwnership),
+        humanTakenOverAt: result.next.humanTakenOverAt || null
+      },
+      attention: {
+        acknowledged: Boolean(
+          result.attentionAck?.acknowledgedAt ||
+            result.attentionAck?.alreadyAcknowledged
+        ),
+        alreadyAcknowledged: Boolean(result.attentionAck?.alreadyAcknowledged),
+        attentionStatus: result.attentionAck?.attentionStatus || null,
+        acknowledgedAt: result.attentionAck?.acknowledgedAt || null
       }
     });
   } catch (error) {

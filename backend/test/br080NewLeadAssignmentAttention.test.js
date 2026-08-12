@@ -3,6 +3,8 @@
  * No live provider calls. No production writes.
  */
 
+require("dotenv").config({ path: require("node:path").join(__dirname, "../../.env") });
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -271,6 +273,10 @@ test("20-21. acknowledgement helper semantics; page-view is not an acknowledge p
   const routes = read("../routes/newLeadAttention.js");
   assert.match(routes, /acknowledgeLead/);
   assert.match(routes, /claimLead/);
+
+  // Conversations TAKE OVER reuses canonical acknowledgeLead for the current episode.
+  const ownership = read("../core/conversationsCenter/conversationsCenterOwnershipService.js");
+  assert.match(ownership, /acknowledgeLead/);
 });
 
 test("22-23. claim permission and concurrent claim conflict codes", () => {
