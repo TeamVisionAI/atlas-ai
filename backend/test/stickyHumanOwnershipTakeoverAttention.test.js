@@ -18,7 +18,8 @@ function clearWorkflowModules() {
       key.includes(`${path.sep}conversationsCenterOwnershipService.js`) ||
       key.includes(`${path.sep}workflowOwnershipEngine.js`) ||
       key.includes(`${path.sep}communicationHub.js`) ||
-      key.includes(`${path.sep}conversationsCenterHumanReplyService.js`)
+      key.includes(`${path.sep}conversationsCenterHumanReplyService.js`) ||
+      key.includes(`${path.sep}humanAdvancementEngine.js`)
     ) {
       delete require.cache[key];
     }
@@ -262,6 +263,195 @@ test("J. Non-stalled HUMAN prospect unchanged", async () => {
     const stored = await loadPersistedWorkflowState("+17865550902");
     assert.equal(stored.needsHumanAttention, false);
     assert.equal(resolveConversationOwnershipState(stored), "HUMAN");
+  });
+});
+
+const RUTH_PHONE = "+17879398651";
+
+async function withAdvancementStubs(phone, prospectOverrides, run) {
+  const supabaseService = require("../services/supabaseService");
+  const milestoneValidation = require("../core/milestoneValidationEngine");
+  const humanAdvancementEvents = require("../core/humanAdvancementEvents");
+  const missionControlReadModel = require("../core/missionControlReadModel");
+  const workflowReadModel = require("../core/workflowReadModel");
+  const { buildProfileFromProspect } = require("../core/informationModel");
+
+  const prospect = {
+    id: "e2ca5108-d6ad-4654-b9b4-f1a6184e3c56",
+    phone,
+    name: "Ruth Dismary Vizcaíno",
+    organization_id: "00000000-0000-4000-8000-000000000001",
+    city: "Tampa",
+    state: "FL",
+    work_authorized: true,
+    interview_type: "Zoom",
+    current_step: "DAY_PART",
+    notes: null,
+    ...prospectOverrides
+  };
+
+  const originalFind = supabaseService.findProspect;
+  const originalUpdate = supabaseService.updateProspect;
+  const originalValidate = milestoneValidation.validateMilestoneAdvancement;
+  const originalEmit = humanAdvancementEvents.emitHumanAdvancementEvents;
+  const originalMc = missionControlReadModel.getMissionControlState;
+  const originalHints = workflowReadModel.fetchMessageHints;
+
+  supabaseService.findProspect = async () => ({ ...prospect });
+  supabaseService.updateProspect = async (_phone, updates) => {
+    Object.assign(prospect, updates);
+    return { ...prospect };
+  };
+  milestoneValidation.validateMilestoneAdvancement = ({
+    targetMilestone,
+    prospect: p,
+    capturedFields
+  }) => ({
+    valid: true,
+    mergedProfile: {
+      ...buildProfileFromProspect(p),
+      authorization:
+        capturedFields.authorization !== undefined
+          ? capturedFields.authorization
+          : buildProfileFromProspect(p).authorization,
+      interviewType:
+        capturedFields.interviewType || buildProfileFromProspect(p).interviewType,
+      city: capturedFields.city || buildProfileFromProspect(p).city,
+      state: capturedFields.state || buildProfileFromProspect(p).state
+    }
+  });
+  humanAdvancementEvents.emitHumanAdvancementEvents = async () => [];
+  missionControlReadModel.getMissionControlState = async () => ({
+    brain: { currentStep: prospect.current_step, missingFields: [] }
+  });
+  workflowReadModel.fetchMessageHints = async () => ({});
+
+  // Force humanAdvancementEngine to pick up stubs via already-loaded deps —
+  // it binds findProspect at require time, so clear and re-require after stubs.
+  delete require.cache[require.resolve("../core/humanAdvancementEngine.js")];
+
+  try {
+    return await run({ prospect });
+  } finally {
+    supabaseService.findProspect = originalFind;
+    supabaseService.updateProspect = originalUpdate;
+    milestoneValidation.validateMilestoneAdvancement = originalValidate;
+    humanAdvancementEvents.emitHumanAdvancementEvents = originalEmit;
+    missionControlReadModel.getMissionControlState = originalMc;
+    workflowReadModel.fetchMessageHints = originalHints;
+    delete require.cache[require.resolve("../core/humanAdvancementEngine.js")];
+  }
+}
+
+test("Ruth-1. TAKE OVER → Complete Qualification auth+interview → BR-035 stays HUMAN", async () => {
+  await withIsolatedWorkflowState(async () => {
+    await withAdvancementStubs(RUTH_PHONE, {}, async () => {
+      const {
+        takeOverConversation,
+        resolveConversationOwnershipState
+      } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
+      const { loadPersistedWorkflowState } = require("../core/workflowStateStore");
+      const { shouldDeliverAutomatedReply } = require("../core/communicationHub");
+      const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
+      const { OWNERSHIP, MILESTONES } = require("../core/workflowConstants");
+
+      const taken = await takeOverConversation(RUTH_PHONE, { reason: "take_over" });
+      assert.equal(taken.ownershipState, "HUMAN");
+      const seal = (await loadPersistedWorkflowState(RUTH_PHONE)).humanTakenOverAt;
+
+      const result = await advanceProspectWorkflow(RUTH_PHONE, {
+        targetMilestone: MILESTONES.QUALIFICATION,
+        capturedFields: {
+          authorization: true,
+          interviewType: "Zoom"
+        },
+        interactionNotes: "Required information updated: Work Authorization, Interview Type.",
+        interactionType: "phone"
+      });
+
+      assert.equal(result.success, true, result.error || result.message);
+      const after = await loadPersistedWorkflowState(RUTH_PHONE);
+      assert.equal(after.manualAgentOwnership, true);
+      assert.equal(after.workflowOwnership, OWNERSHIP.AGENT);
+      assert.equal(after.humanTakenOverAt, seal);
+      assert.equal(resolveConversationOwnershipState(after), "HUMAN");
+      assert.equal(
+        await shouldDeliverAutomatedReply({
+          phone: RUTH_PHONE,
+          current_step: "DAY_PART",
+          organization_id: "00000000-0000-4000-8000-000000000001"
+        }),
+        false
+      );
+      assert.equal(
+        await shouldDeliverAutomatedReply(
+          {
+            phone: RUTH_PHONE,
+            current_step: "DAY_PART",
+            organization_id: "00000000-0000-4000-8000-000000000001"
+          },
+          { allowHandoffAck: true }
+        ),
+        false
+      );
+    });
+  });
+});
+
+test("Ruth-2. HUMAN + City/State qualification submit → remains HUMAN", async () => {
+  await withIsolatedWorkflowState(async () => {
+    await withAdvancementStubs(RUTH_PHONE, {}, async () => {
+      const {
+        takeOverConversation,
+        resolveConversationOwnershipState
+      } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
+      const { loadPersistedWorkflowState } = require("../core/workflowStateStore");
+      const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
+      const { OWNERSHIP, MILESTONES } = require("../core/workflowConstants");
+
+      await takeOverConversation(RUTH_PHONE, { reason: "take_over" });
+      const result = await advanceProspectWorkflow(RUTH_PHONE, {
+        targetMilestone: MILESTONES.QUALIFICATION,
+        capturedFields: { city: "Tampa", state: "FL" },
+        interactionNotes: "Required information updated: City, State.",
+        interactionType: "phone"
+      });
+
+      assert.equal(result.success, true, result.error || result.message);
+      const after = await loadPersistedWorkflowState(RUTH_PHONE);
+      assert.equal(after.manualAgentOwnership, true);
+      assert.equal(after.workflowOwnership, OWNERSHIP.AGENT);
+      assert.equal(resolveConversationOwnershipState(after), "HUMAN");
+    });
+  });
+});
+
+test("11. Non-HUMAN qualification advancement → BR-035 still resumes ATLAS", async () => {
+  await withIsolatedWorkflowState(async () => {
+    await withAdvancementStubs("+17865550911", {}, async () => {
+      const { savePersistedWorkflowState, loadPersistedWorkflowState } = require("../core/workflowStateStore");
+      const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
+      const { OWNERSHIP, MILESTONES } = require("../core/workflowConstants");
+
+      await savePersistedWorkflowState("+17865550911", {
+        workflowOwnership: OWNERSHIP.ATLAS,
+        manualAgentOwnership: false,
+        needsHumanAttention: false,
+        humanTakenOverAt: null,
+        canonicalMilestone: MILESTONES.NEW_LEAD
+      });
+
+      const result = await advanceProspectWorkflow("+17865550911", {
+        targetMilestone: MILESTONES.QUALIFICATION,
+        capturedFields: { authorization: true, interviewType: "Zoom" },
+        interactionType: "phone"
+      });
+
+      assert.equal(result.success, true, result.error || result.message);
+      const after = await loadPersistedWorkflowState("+17865550911");
+      assert.equal(after.manualAgentOwnership, false);
+      assert.equal(after.workflowOwnership, OWNERSHIP.ATLAS);
+    });
   });
 });
 

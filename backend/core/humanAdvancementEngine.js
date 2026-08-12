@@ -291,13 +291,22 @@ async function advanceProspectWorkflow(phone, payload = {}) {
   const updatedAgentState = loadAgentState(phone);
   const updatedProspect = await findProspect(phone);
 
+  // BR-135 — Manual TAKE OVER is sticky through BR-035 advancement.
+  // Only explicit RETURN TO ATLAS (or equivalent release) may clear HUMAN ownership.
+  const {
+    hasActiveStickyHumanHold
+  } = require("./conversationsCenter/conversationsCenterOwnershipService");
+  const stickyHumanHold = hasActiveStickyHumanHold(persisted);
+
   const workflowAgentState = {
     ...updatedAgentState,
     doNotContact: targetMilestone === MILESTONES.DO_NOT_CONTACT,
-    manualAgentOwnership: false
+    manualAgentOwnership: stickyHumanHold ? true : false
   };
 
-  const ownershipAfter = deriveDefaultOwnership(targetMilestone, workflowAgentState);
+  const ownershipAfter = stickyHumanHold
+    ? OWNERSHIP.AGENT
+    : deriveDefaultOwnership(targetMilestone, workflowAgentState);
 
   await savePersistedWorkflowState(
     phone,
@@ -308,7 +317,11 @@ async function advanceProspectWorkflow(phone, payload = {}) {
       stalledAt: null,
       stallEpisodeKey: null,
       reconcileEpisodeKey: null,
-      manualAgentOwnership: false,
+      manualAgentOwnership: stickyHumanHold,
+      // Preserve TAKE OVER seal timestamps; do not invent returnedToAtlasAt.
+      ...(stickyHumanHold
+        ? { humanTakenOverAt: persisted.humanTakenOverAt }
+        : {}),
       doNotContact: targetMilestone === MILESTONES.DO_NOT_CONTACT
     },
     {
