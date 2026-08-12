@@ -72,20 +72,25 @@ async function shouldDeliverAutomatedReply(prospect, options = {}) {
     return false;
   }
 
-  // Hard ownership guard — HUMAN (AGENT) or NEEDS_ATTENTION must not double-speak.
-  // Fail closed: suppress automated conversational replies unless BR-124 allowHandoffAck.
-  const humanOwned =
-    persisted.workflowOwnership === OWNERSHIP.AGENT ||
-    persisted.manualAgentOwnership === true;
+  // Sticky TAKE OVER / manual human hold — Atlas is absolutely silent until Return to Atlas.
+  // Closes allowHandoffAck hole: no V2/CE/escalation/recovery ack while manual hold is active.
+  if (
+    persisted.manualAgentOwnership === true ||
+    Boolean(persisted.humanTakenOverAt)
+  ) {
+    return false;
+  }
+
+  // Hard ownership guard — AGENT ownership or NEEDS_ATTENTION must not double-speak.
+  // Fail closed: suppress automated conversational replies unless BR-124 allowHandoffAck
+  // (only when there is no sticky/manual TAKE OVER hold above).
+  const humanOwned = persisted.workflowOwnership === OWNERSHIP.AGENT;
   const needsAttention = Boolean(persisted.needsHumanAttention);
 
   if (humanOwned || needsAttention) {
     if (options.allowHandoffAck === true) {
-      // Take Over clears attention but keeps AGENT + manual — never auto-reply.
-      if (persisted.manualAgentOwnership && !needsAttention) {
-        return false;
-      }
-      // Implements BR-124 — customer-facing handoff/recovery ack may still deliver.
+      // Implements BR-124 — customer-facing handoff/recovery ack may still deliver
+      // for stall/escalate without an active TAKE OVER seal.
       return true;
     }
     return false;

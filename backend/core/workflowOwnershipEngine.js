@@ -68,6 +68,11 @@ async function applyStallTransition(
     };
   }
 
+  // BR-034 may record stall/attention metadata. Sticky TAKE OVER seals must not be cleared
+  // or demoted — Conversations ownership stays HUMAN via humanTakenOverAt + manualAgentOwnership.
+  const stickyTakeOver =
+    persisted.manualAgentOwnership === true && Boolean(persisted.humanTakenOverAt);
+
   const next = await savePersistedWorkflowState(
     phone,
     {
@@ -77,8 +82,20 @@ async function applyStallTransition(
       stallEpisodeKey: stallResult.stallEpisodeKey,
       canonicalMilestone: computed.canonicalMilestone,
       manualAgentOwnership: true,
-      handoffReason: "stall",
-      handoffAt: stallResult.stallDetectedAt || new Date().toISOString()
+      // Preserve TAKE OVER seal; do not invent a return.
+      ...(stickyTakeOver
+        ? {
+            humanTakenOverAt: persisted.humanTakenOverAt,
+            handoffReason: persisted.handoffReason || "stall",
+            handoffAt:
+              persisted.handoffAt ||
+              stallResult.stallDetectedAt ||
+              new Date().toISOString()
+          }
+        : {
+            handoffReason: "stall",
+            handoffAt: stallResult.stallDetectedAt || new Date().toISOString()
+          })
     },
     options
   );

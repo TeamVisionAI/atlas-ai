@@ -79,9 +79,11 @@ async function buildConversationListItem(prospect) {
     : null;
 
   const active = isActiveInboxLifecycle(lifecycleInfo.lifecycle);
+  const needsHumanAttention = Boolean(persisted.needsHumanAttention);
   const unread =
     active &&
     (ownershipState === CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION ||
+      needsHumanAttention ||
       prospect?.attention_status === "human_required");
 
   return {
@@ -101,7 +103,9 @@ async function buildConversationListItem(prospect) {
     appointmentStatus: prospect.appointment_status || prospect.current_step || null,
     ownershipState,
     workflowOwnership: persisted.workflowOwnership || OWNERSHIP.ATLAS,
-    needsHumanAttention: Boolean(persisted.needsHumanAttention),
+    needsHumanAttention,
+    manualAgentOwnership: Boolean(persisted.manualAgentOwnership),
+    humanTakenOverAt: persisted.humanTakenOverAt || null,
     handoffReason: persisted.handoffReason || null,
     handoffAt: persisted.handoffAt || null,
     ownerUserId: prospect.owner_user_id || null,

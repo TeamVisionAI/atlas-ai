@@ -1656,6 +1656,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 8. **Async adapter** — Load/save are awaited at call sites (including HUMAN silence gate).
 9. **No mass backfill** — After deploy, operators re-mark TEST/CLOSED/ARCHIVED / HUMAN as needed. Do not invent historical marks.
 10. **Out of Phase 1** — Preferred language, occupation, interview type, receipts, wholesale `agentActionState`, and BR-111 execution enablement. V2 mid-flow knownFacts continuity remains `recruit_ai_conversation_contexts` (BR-081+), not this JSONB.
+11. **Sticky TAKE OVER vs attention / advancement (clarification)** — Manual TAKE OVER (`manualAgentOwnership=true` + `humanTakenOverAt`) is authoritative Conversations ownership (**HUMAN**) until explicit RETURN TO ATLAS (or another explicit human ownership release). It must survive BR-034 stall/attention evaluation, BR-035 human advancement / Complete Qualification, Mission Control / Prospect Center workflow evaluation, and page refresh. `needsHumanAttention` / stall / follow-up metadata may coexist as an attention warning but must not demote or mask HUMAN, disable the composer, or re-offer TAKE OVER. BR-035 must not write `manualAgentOwnership=false` or derive `workflowOwnership=ATLAS` while the sticky hold is active. Atlas automated outbound (including `allowHandoffAck`) stays suppressed while the sticky hold is active. Stall-only escalations without `humanTakenOverAt` continue to present as **NEEDS_ATTENTION**.
 
 ---
 

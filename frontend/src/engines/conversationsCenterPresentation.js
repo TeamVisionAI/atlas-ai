@@ -1,9 +1,10 @@
 /**
  * Conversations Center pilot presentation helpers (UI/read-model only).
  *
- * Attention (NEEDS_ATTENTION) is not ownership. Button visibility must use
- * effectiveOwnership ∈ { HUMAN, ATLAS } only — never attention_status,
- * handoffReason, or stale manual flags.
+ * Ownership and attention are separate dimensions (BR-135):
+ * - ownershipState ∈ { HUMAN, ATLAS, NEEDS_ATTENTION } from API
+ * - sticky HUMAN may also carry needsHumanAttention (stall warning) without demoting ownership
+ * - Button visibility uses effectiveOwnership ∈ { HUMAN, ATLAS } only
  *
  * Inbox lifecycle (ACTIVE / SCHEDULED / CLOSED / TEST / ARCHIVED) is separate
  * from ownership and drives which threads appear in the working inbox.
@@ -17,7 +18,8 @@ export function buildConversationHeaderModel({
   appointmentStatus = null,
   conversationGoal = null,
   inboxLifecycle = null,
-  inboxCloseReason = null
+  inboxCloseReason = null,
+  needsHumanAttention = false
 } = {}) {
   const normalizedPhone = phone ? String(phone).trim() : null;
   return {
@@ -29,20 +31,34 @@ export function buildConversationHeaderModel({
     appointmentStatus: appointmentStatus || null,
     conversationGoal: conversationGoal || null,
     inboxLifecycle: inboxLifecycle || null,
-    inboxCloseReason: inboxCloseReason || null
+    inboxCloseReason: inboxCloseReason || null,
+    needsHumanAttention: Boolean(needsHumanAttention)
   };
 }
 
 /**
- * Normalize API ownership/attention presentation into authoritative ownership.
- * NEEDS_ATTENTION → ATLAS for control purposes (attention is separate).
- * Only explicit HUMAN remains HUMAN.
+ * Normalize API ownership presentation into authoritative ownership for controls.
+ * NEEDS_ATTENTION (Atlas-owned stall) → ATLAS for TAKE OVER.
+ * Sticky HUMAN remains HUMAN even when a stall attention badge is also shown.
  */
 export function resolveEffectiveOwnership(ownershipState) {
   if (ownershipState === "HUMAN") {
     return "HUMAN";
   }
   return "ATLAS";
+}
+
+/**
+ * Stall/attention warning may coexist with HUMAN ownership (not mutually exclusive).
+ */
+export function shouldShowAttentionWarning({
+  ownershipState = null,
+  needsHumanAttention = false
+} = {}) {
+  if (ownershipState === "NEEDS_ATTENTION") {
+    return true;
+  }
+  return ownershipState === "HUMAN" && Boolean(needsHumanAttention);
 }
 
 export function isHumanComposerEnabled(effectiveOwnership) {
