@@ -6,6 +6,7 @@
 export const MISSION_CONTROL_QUERY_KEYS = Object.freeze({
   FILTER: "filter",
   PHONE: "phone",
+  PROSPECT_ID: "prospectId",
   SORT: "sort",
   AUTOSELECT: "autoselect",
   OWNER: "owner",
@@ -16,6 +17,7 @@ export const MISSION_CONTROL_QUERY_KEYS = Object.freeze({
 export function buildMissionControlQuery({
   filter,
   phone,
+  prospectId,
   sort,
   autoselect,
   owner,
@@ -30,6 +32,10 @@ export function buildMissionControlQuery({
 
   if (phone) {
     params.set(MISSION_CONTROL_QUERY_KEYS.PHONE, phone);
+  }
+
+  if (prospectId) {
+    params.set(MISSION_CONTROL_QUERY_KEYS.PROSPECT_ID, String(prospectId));
   }
 
   if (sort) {
@@ -53,4 +59,28 @@ export function buildMissionControlQuery({
   }
 
   return params.toString();
+}
+
+/**
+ * Resolve which phone Mission Control should focus from deep-link params.
+ * Prefer explicit phone; otherwise map canonical prospectId → phone via dashboard prospects
+ * (already tenant/RVP filtered by getDashboard). Presentation/routing only.
+ */
+export function resolveMissionControlFocusPhone({
+  phone = null,
+  prospectId = null,
+  prospects = []
+} = {}) {
+  if (phone) {
+    return phone;
+  }
+
+  if (!prospectId || !Array.isArray(prospects) || !prospects.length) {
+    return null;
+  }
+
+  const match = prospects.find(
+    (prospect) => String(prospect?.id || "") === String(prospectId)
+  );
+  return match?.phone || null;
 }

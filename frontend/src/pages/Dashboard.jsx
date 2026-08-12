@@ -46,7 +46,9 @@ import {
 } from "../engines/workflowEngine";
 import {
   EXECUTIVE_FILTER_LABEL_KEYS,
-  filterQueueForExecutiveFilter
+  filterQueueForExecutiveFilter,
+  MISSION_CONTROL_QUERY_KEYS,
+  resolveMissionControlFocusPhone
 } from "../engines/executiveFilterEngine";
 import { useLanguage } from "../i18n/LanguageContext";
 import { subscribeProspectProfileUpdated } from "../utils/prospectRefreshBus";
@@ -191,7 +193,9 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const { translate } = useLanguage();
   const executiveFilter = searchParams.get("filter");
-  const deepLinkPhone = routePhone || searchParams.get("phone");
+  const deepLinkPhone =
+    routePhone || searchParams.get(MISSION_CONTROL_QUERY_KEYS.PHONE);
+  const deepLinkProspectId = searchParams.get(MISSION_CONTROL_QUERY_KEYS.PROSPECT_ID);
   const [dashboard, setDashboard] = useState(null);
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -272,14 +276,30 @@ export default function Dashboard() {
             )
           : fullQueue;
         const sortedQueue = filteredQueue.length ? filteredQueue : fullQueue;
-        const targetPhone = deepLinkPhone || sortedQueue[0]?.phone;
-        const preferredIndex = findQueueIndex(sortedQueue, targetPhone);
+        const focusPhone = resolveMissionControlFocusPhone({
+          phone: deepLinkPhone,
+          prospectId: deepLinkProspectId,
+          prospects: dashboardData.prospects
+        });
+        let queueForLoad = sortedQueue;
+        let preferredIndex = 0;
+        if (focusPhone) {
+          preferredIndex = findQueueIndex(sortedQueue, focusPhone);
+          const sortedMatch = sortedQueue[preferredIndex]?.phone === focusPhone;
+          if (!sortedMatch) {
+            const fullIndex = findQueueIndex(fullQueue, focusPhone);
+            if (fullQueue[fullIndex]?.phone === focusPhone) {
+              queueForLoad = fullQueue;
+              preferredIndex = fullIndex;
+            }
+          }
+        }
 
         setDashboard(dashboardData);
         setOrganizationSettings(orgSettings);
-        setQueue(sortedQueue);
+        setQueue(queueForLoad);
 
-        if (!sortedQueue.length) {
+        if (!queueForLoad.length) {
           const filterLabelKey = EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter];
           setLoadError(
             executiveFilter
@@ -297,7 +317,7 @@ export default function Dashboard() {
         }
 
         const loaded = await loadWorkspaceAtQueueIndex(
-          sortedQueue,
+          queueForLoad,
           dashboardData,
           preferredIndex
         );
@@ -323,7 +343,7 @@ export default function Dashboard() {
     }
 
     loadDashboard();
-  }, [executiveFilter, deepLinkPhone, translate]);
+  }, [executiveFilter, deepLinkPhone, deepLinkProspectId, translate]);
 
   const phone = workspace?.phone;
 
