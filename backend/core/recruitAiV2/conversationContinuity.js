@@ -15,6 +15,49 @@ function normalizeText(text) {
 }
 
 /**
+ * Spanish live-canary — substantive info request (BR-131 answer-first).
+ * Outranks greeting-only openers even when combined with "Hola".
+ */
+function looksLikeSpanishInfoRequest(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return false;
+  }
+  return (
+    /\bquiero mas informacion\b/.test(t) ||
+    /\bquiero informacion\b/.test(t) ||
+    /\bquiero mas detalles\b/.test(t) ||
+    /\bdame (mas )?informacion\b/.test(t) ||
+    /\bquisiera (saber )?mas\b/.test(t) ||
+    /\bquisiera (mas )?informacion\b/.test(t) ||
+    /\bme interesa saber de que se trata\b/.test(t) ||
+    /\bme interesa (saber )?mas\b/.test(t) ||
+    /\bnecesito (mas )?informacion\b/.test(t)
+  );
+}
+
+/**
+ * Spanish company / opportunity identity questions — never locations.
+ */
+function looksLikeCompanyIdentityQuestion(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return false;
+  }
+  return (
+    /\bque empresa (eres|es|son)\b/.test(t) ||
+    /\bcual es la empresa\b/.test(t) ||
+    /\bcomo se llama la (empresa|compania)\b/.test(t) ||
+    /\bpara que (empresa|compania) (es|trabajan|trabaja)\b/.test(t) ||
+    /\bcon que (empresa|compania) trabajan\b/.test(t) ||
+    /\bde que empresa (eres|es|son)\b/.test(t) ||
+    /\bwhat company (are you|is this|do you)\b/.test(t) ||
+    /\bwhich company\b/.test(t) ||
+    /\bwho do you work for\b/.test(t)
+  );
+}
+
+/**
  * BR-097 — first-level "what is this about?" overview (progressive disclosure).
  * These stay job_opportunity_question for BR-088 priority, but render short copy.
  */
@@ -35,10 +78,13 @@ function looksLikeJobOverviewQuestion(text) {
     /\bwhat kind of job\b/.test(t) ||
     /\bque tipo de trabajo( es)?\b/.test(t) ||
     /\b(part|full)[- ]?time\b/.test(t) ||
-    /\btiempo (parcial|completo)\b/.test(t) ||
-    /\btell me more\b/.test(t)
+    /\btiempo (parcial|completo)\b/.test(t)
   ) {
     return false;
+  }
+
+  if (looksLikeSpanishInfoRequest(text) || looksLikeCompanyIdentityQuestion(text)) {
+    return true;
   }
 
   return (
@@ -54,7 +100,8 @@ function looksLikeJobOverviewQuestion(text) {
     /\b(dime )?como funciona( el (trabajo|empleo))?\b/.test(t) ||
     /\bque es esto\b/.test(t) ||
     /\bque hacen\b/.test(t) ||
-    /\bwhat do you (all |guys )?do\b/.test(t)
+    /\bwhat do you (all |guys )?do\b/.test(t) ||
+    /\btell me more\b/.test(t)
   );
 }
 
@@ -330,6 +377,8 @@ function resolveDayPartContinuation(dayPart, language = "spanish") {
 
 module.exports = {
   normalizeText,
+  looksLikeSpanishInfoRequest,
+  looksLikeCompanyIdentityQuestion,
   looksLikeJobOverviewQuestion,
   looksLikeJobOpportunityQuestion,
   looksLikeConversationClarificationRequest,

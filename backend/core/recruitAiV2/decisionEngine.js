@@ -1055,7 +1055,8 @@ function decideConversationTurn({
     structured.reasonCodes.push(REASON_CODES.JOB_OPPORTUNITY_FAQ);
     // Implements BR-097 — progressive disclosure for first-level overview asks.
     const overviewFaq =
-      interpretation.entities?.jobFaqDetailLevel === "overview";
+      interpretation.entities?.jobFaqDetailLevel === "overview" ||
+      interpretation.entities?.jobFaqDetailLevel === "company_identity";
     if (overviewFaq) {
       structured.reasonCodes.push(REASON_CODES.JOB_OVERVIEW_FAQ);
       structured.reasonCodes.push(REASON_CODES.JOB_FAQ_PROGRESSIVE_DISCLOSURE);
@@ -1073,7 +1074,9 @@ function decideConversationTurn({
     );
     jobFaq.customerReplyPlan.entities = {
       ...jobFaq.customerReplyPlan.entities,
-      jobFaqDetailLevel: overviewFaq ? "overview" : "employment_framing"
+      jobFaqDetailLevel:
+        interpretation.entities?.jobFaqDetailLevel ||
+        (overviewFaq ? "overview" : "employment_framing")
     };
     jobFaq.contextPatch = {
       ...(jobFaq.contextPatch || {}),
