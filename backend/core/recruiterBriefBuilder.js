@@ -4,6 +4,7 @@
  */
 
 const { isFollowUpDue } = require("./agentActionEngine");
+const { isQualificationCompleteByCanonicalMilestone } = require("./missionControlMilestoneProjection");
 
 const MAX_ITEMS = 5;
 
@@ -287,11 +288,19 @@ function buildRecruiterBrief({
 
   addItem(items, seen, resolveMissionCoaching(primaryMission, context));
 
-  if (primaryMission?.missionType === "CompleteQualification") {
+  const skipQualificationCoaching = isQualificationCompleteByCanonicalMilestone(workflow);
+
+  if (
+    primaryMission?.missionType === "CompleteQualification" &&
+    !skipQualificationCoaching
+  ) {
     for (const line of buildFieldCoaching(context)) {
       addItem(items, seen, line);
     }
-  } else if (!primaryMission || primaryMission.missionType === "ReviewProspect") {
+  } else if (
+    !skipQualificationCoaching &&
+    (!primaryMission || primaryMission.missionType === "ReviewProspect")
+  ) {
     for (const line of buildFieldCoaching(context)) {
       addItem(items, seen, line);
     }

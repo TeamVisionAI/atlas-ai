@@ -1,5 +1,9 @@
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const { ACTION_IDS, buildAvailableAction } = require("./agentActionRegistry");
+const { MILESTONES: WORKFLOW_MILESTONES } = require("./workflowConstants");
+const {
+  isQualificationCompleteByCanonicalMilestone
+} = require("./missionControlMilestoneProjection");
 
 const MILESTONES = {
   NEW_LEAD: "New Lead",
@@ -226,7 +230,8 @@ function resolveAvailableActions({
   missingFields,
   interviewType,
   agentState,
-  organizationSettings
+  organizationSettings,
+  canonicalMilestone = null
 }) {
   if (!prospect) {
     return [];
@@ -236,7 +241,12 @@ function resolveAvailableActions({
     return [];
   }
 
-  const milestone = deriveMilestoneLabel(currentStep, missingFields, agentState);
+  let milestone = deriveMilestoneLabel(currentStep, missingFields, agentState);
+
+  // Durable INTERVIEW_READY is MC SoR — stale QUAL_CAPTURE gaps are not QUALIFYING.
+  if (canonicalMilestone === WORKFLOW_MILESTONES.INTERVIEW_READY) {
+    milestone = "Interview Ready";
+  }
   const timing = getInterviewTimingPhase(prospect);
   const normalizedType = normalizeInterviewType(interviewType);
   const flags = agentState.flags || {};
@@ -312,7 +322,10 @@ function resolveAvailableActions({
 
   // Implements BR-025 / BR-026 — QUALIFYING must expose executable resolve actions, not
   // communication-only placeholders (Mission Action Center filters Call/WhatsApp/Notes).
-  if (milestone === MILESTONES.QUALIFYING) {
+  if (
+    milestone === MILESTONES.QUALIFYING &&
+    !isQualificationCompleteByCanonicalMilestone({ canonicalMilestone })
+  ) {
     pushAction(actions, ACTION_IDS.COMPLETE_QUALIFICATION, "primary");
     pushAction(actions, ACTION_IDS.CLOSE_NOT_INTERESTED, "secondary");
 
@@ -325,7 +338,9 @@ function resolveAvailableActions({
     ).slice(0, MAX_VISIBLE_ACTIONS);
   }
 
-  const scheduleReady = isSchedulingReady(missingFields, currentStep);
+  const scheduleReady =
+    canonicalMilestone === WORKFLOW_MILESTONES.INTERVIEW_READY ||
+    isSchedulingReady(missingFields, currentStep);
   const confirmed = isConfirmedProspect(prospect, currentStep);
 
   if (scheduleReady && !confirmed) {

@@ -32,6 +32,7 @@ const {
 const { advanceProspectWorkflow } = require("./humanAdvancementEngine");
 const { loadAgentState } = require("./agentActionState");
 const { MILESTONES } = require("./workflowConstants");
+const { isQualificationCompleteByCanonicalMilestone } = require("./missionControlMilestoneProjection");
 const { isProductionProspect } = require("./productionProspectFilter");
 
 const CONVERSATION_OUTCOMES = Object.freeze([
@@ -670,7 +671,8 @@ function resolveRecordedConversationOutcome(prospect) {
 function buildConversationOutcomeReadModel({
   prospect,
   brain,
-  conversationMessages = []
+  conversationMessages = [],
+  workflow = null
 }) {
   if (!prospect) {
     return null;
@@ -683,7 +685,10 @@ function buildConversationOutcomeReadModel({
   const latestInbound = getLatestInboundMessage(conversationMessages);
   const latestMessageText = latestInbound?.text || prospect.last_message || "";
   const draft = buildDraftFields(profile, latestMessageText);
-  const requiredInputs = buildRequiredInputs(prospect, profile, missingFields, captureOptions);
+  // Durable INTERVIEW_READY+ outranks stale QUAL_CAPTURE for MC requiredInputs.
+  const requiredInputs = isQualificationCompleteByCanonicalMilestone(workflow)
+    ? []
+    : buildRequiredInputs(prospect, profile, missingFields, captureOptions);
   const requiredInputKeys = new Set(requiredInputs.map((row) => row.key));
   const suggestedDefaults = buildSuggestedQualificationDefaults(
     prospect,
