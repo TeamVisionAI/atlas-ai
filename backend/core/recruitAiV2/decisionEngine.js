@@ -15,7 +15,12 @@ const {
 } = require("./schedulingMemory");
 const {
   resolvePendingExplanation,
-  resolveDayPartContinuation
+  resolveDayPartContinuation,
+  hasConcretePriorAtlasQuestion,
+  looksLikeSpanishInfoRequest,
+  looksLikeEnglishInfoRequest,
+  looksLikeJobOverviewQuestion,
+  looksLikeJobOpportunityQuestion
 } = require("./conversationContinuity");
 const {
   shouldSoftInviteInterview,
@@ -764,6 +769,74 @@ function applyPostModalityScheduling(structured, context, meetingType) {
 /**
  * Same-turn work-auth entity attached beside FAQ (pending ask_authorization compounds).
  */
+function inboundTextFromInterpretation(interpretation) {
+  return String(
+    interpretation?.entities?.rawText ||
+      interpretation?.normalization?.rawText ||
+      interpretation?.rawText ||
+      ""
+  );
+}
+
+/**
+ * BR-131 — first-turn precedence. Resume / clarify_once copy that claims
+ * Atlas already asked something is impossible without conversation evidence.
+ */
+function applyFirstTurnWhenNoPriorAtlasQuestion(
+  structured,
+  context,
+  interpretation
+) {
+  if (hasConcretePriorAtlasQuestion(context)) {
+    return false;
+  }
+
+  const text = inboundTextFromInterpretation(interpretation);
+  const looksInfo =
+    looksLikeSpanishInfoRequest(text) ||
+    looksLikeEnglishInfoRequest(text) ||
+    looksLikeJobOverviewQuestion(text) ||
+    looksLikeJobOpportunityQuestion(text);
+
+  if (looksInfo) {
+    buildFaqResumeDecision(
+      structured,
+      context,
+      INTENTS.JOB_OPPORTUNITY_QUESTION,
+      "job_overview_faq_then_resume",
+      interpretation
+    );
+    structured.decision.nextAction =
+      NEXT_ACTIONS.ANSWER_JOB_OPPORTUNITY_THEN_RESUME;
+    structured.reasonCodes.push(
+      REASON_CODES.FIRST_TURN_PRECEDENCE_NO_PRIOR_QUESTION
+    );
+    structured.reasonCodes.push(REASON_CODES.JOB_OVERVIEW_FAQ);
+    return true;
+  }
+
+  structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_AFTER_GREETING;
+  structured.decision.shouldEscalate = false;
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey = "greeting_ask_location";
+  structured.reasonCodes.push(
+    REASON_CODES.FIRST_TURN_PRECEDENCE_NO_PRIOR_QUESTION
+  );
+  structured.reasonCodes.push(REASON_CODES.GREETING_NO_ESCALATE);
+  structured.reasonCodes.push(REASON_CODES.ASK_ONLY_MISSING_INFORMATION);
+  structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+  structured.contextPatch = {
+    currentStage: STAGES.QUALIFICATION,
+    conversation: {
+      lastQuestionAsked: "ask_location",
+      lastProspectIntent: interpretation?.intent || INTENTS.UNKNOWN,
+      clarificationCount: 0,
+      pendingClarification: null
+    }
+  };
+  return true;
+}
+
 function withSameTurnAuthorizationFacts(context, interpretation) {
   const wa = interpretation?.entities?.workAuthorization;
   if (wa !== true && wa !== false) {
@@ -1171,6 +1244,9 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.CONVERSATION_CLARIFICATION_REQUEST) {
+    if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
+      return structured;
+    }
     const explanation = resolvePendingExplanation(
       context,
       structured.preferredLanguage || "spanish"
@@ -1590,6 +1666,9 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.ECHO_OR_NOOP) {
+    if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
+      return structured;
+    }
     structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
     structured.customerReplyPlan.templateKey = "clarify_once";
     structured.reasonCodes.push(REASON_CODES.ECHO_DETECTED);
@@ -2683,6 +2762,12 @@ function decideConversationTurn({
     intent === INTENTS.INCOMPLETE_DAY_PART ||
     intent === INTENTS.AMBIGUOUS_FRAGMENT
   ) {
+    if (
+      intent === INTENTS.AMBIGUOUS_FRAGMENT &&
+      applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)
+    ) {
+      return structured;
+    }
     structured.reasonCodes.push(REASON_CODES.RECOVERABLE_AMBIGUITY);
     if (intent === INTENTS.AMBIGUOUS_FRAGMENT) {
       structured.reasonCodes.push(REASON_CODES.FRAGMENT_NOT_NAME);
@@ -3225,7 +3310,11 @@ function decideConversationTurn({
 
   // Recoverable unknown — clarify first; escalate only after repeats.
   // Never use human-handoff copy for ordinary mid-flow unknowns on first pass.
+  // BR-131 — first-turn with no prior Atlas question cannot use resume/clarify_once.
   if (interpretation.confidence < 0.5) {
+    if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
+      return structured;
+    }
     structured.reasonCodes.push(REASON_CODES.RECOVERABLE_AMBIGUITY);
     if (shouldEscalateAfterClarifications(context)) {
       structured.decision.nextAction = NEXT_ACTIONS.ESCALATE_TO_HUMAN;
@@ -3259,6 +3348,10 @@ function decideConversationTurn({
         lastProspectIntent: intent
       }
     };
+    return structured;
+  }
+
+  if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
     return structured;
   }
 

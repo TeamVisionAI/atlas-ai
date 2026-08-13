@@ -32,11 +32,19 @@ function looksLikeSpanishInfoRequest(text) {
     // QR Phase 1 prefill / natural "tell me about the opportunity" (not bare "quiero").
     /\bquiero conocer mas (sobre|de) la oportunidad\b/.test(t) ||
     /\bdame (mas )?informacion\b/.test(t) ||
+    /\bdame (mas )?(info|detalles)\b/.test(t) ||
     /\bquisiera (saber )?mas\b/.test(t) ||
     /\bquisiera (mas )?informacion\b/.test(t) ||
     /\bme interesa saber de que se trata\b/.test(t) ||
     /\bme interesa (saber )?mas\b/.test(t) ||
     /\bnecesito (mas )?informacion\b/.test(t) ||
+    /\bpuedo (obtener|tener|recibir|pedir) (mas )?(info|informacion|detalles)\b/.test(
+      t
+    ) ||
+    /\bme (puedes|puede|podrias) (dar|enviar|compartir) (mas )?(info|informacion|detalles)\b/.test(
+      t
+    ) ||
+    /\bmas (info|informacion|detalles) (de|sobre) (esto|esta|eso)\b/.test(t) ||
     // QR-adjacent scan mentions → same job-overview FAQ path (not clarify_once).
     /\bvi el (codigo )?qr\b/.test(t) ||
     /\bescanee el codigo( qr)?\b/.test(t)
@@ -53,13 +61,31 @@ function looksLikeEnglishInfoRequest(text) {
   if (!t) {
     return false;
   }
+  // Do not steal earnings / compensation / theme-interest phrases.
+  if (
+    /\b(make more money|earn more|how much|salary|commission|compensat|pay)\b/.test(
+      t
+    )
+  ) {
+    return false;
+  }
   return (
     /\bi want to learn more about the opportunity\b/.test(t) ||
     /\bi would like more information\b/.test(t) ||
     /\bi'?d like more information\b/.test(t) ||
     /\btell me about the opportunity\b/.test(t) ||
     /\bi saw the (qr code|qr)\b/.test(t) ||
-    /\bi scanned the (qr code|qr)\b/.test(t)
+    /\bi scanned the (qr code|qr)\b/.test(t) ||
+    // Natural first-turn / ad-click openers (Camila: "Can I get more info on this?")
+    /\bcan i (get|have|receive) (more )?(info|information|details)\b/.test(t) ||
+    /\bcould i (get|have|receive) (more )?(info|information|details)\b/.test(t) ||
+    /\b(get|give me|send me|share) (more )?(info|information|details)\b/.test(
+      t
+    ) ||
+    /\bi want more (info|information|details)\b/.test(t) ||
+    /\bi'?d like more (info|details)\b/.test(t) ||
+    /\bi would like more (info|details)\b/.test(t) ||
+    /\bmore (info|information|details)( on| about)?( this| that)?\b/.test(t)
   );
 }
 
@@ -129,8 +155,56 @@ function looksLikeJobOverviewQuestion(text) {
     /\bque hacen\b/.test(t) ||
     /\bwhat do you (all |guys )?do\b/.test(t) ||
     /\btell me more\b/.test(t) ||
-    /\bcan you tell me more\b/.test(t)
+    /\bcan you tell me more\b/.test(t) ||
+    /\bcan i get more info\b/.test(t) ||
+    /\bmore info on this\b/.test(t)
   );
+}
+
+/**
+ * BR-131 — resume / "I just asked" copy requires conversation evidence.
+ * lastQuestionAsked ask-keys or lastAtlasOutboundText from THIS prospect's
+ * current V2 conversation count. current_step / missingFields / milestone /
+ * unresolvedFields / qualification cursor alone do NOT.
+ */
+const PRIOR_ATLAS_ASK_KEYS = new Set([
+  "ask_location",
+  "ask_city",
+  "ask_state",
+  "confirm_location",
+  "ask_authorization",
+  "ask_day_part",
+  "ask_time_preference",
+  "ask_time_after_day_part",
+  "ask_time_after_constraint",
+  "confirm_slot",
+  "awaiting_availability",
+  "offer_time_choices",
+  "clarify_license_type",
+  "clarify_am_pm",
+  "ask_date",
+  "confirm_in_person_travel",
+  "think_about_it_clarify"
+]);
+
+function hasConcretePriorAtlasQuestion(context) {
+  const lastOut = String(
+    context?.conversation?.lastAtlasOutboundText || ""
+  ).trim();
+  if (lastOut) {
+    return true;
+  }
+  const lastQ = String(context?.conversation?.lastQuestionAsked || "")
+    .trim()
+    .toLowerCase();
+  if (!lastQ || lastQ === "clarify" || lastQ === "clarify_once") {
+    return false;
+  }
+  // Internal qualification tokens (DAY_PART, CITY, …) are not V2 ask-keys.
+  if (PRIOR_ATLAS_ASK_KEYS.has(lastQ)) {
+    return true;
+  }
+  return lastQ.startsWith("ask_") || lastQ.startsWith("explain_pending");
 }
 
 /**
@@ -411,6 +485,7 @@ module.exports = {
   looksLikeJobOverviewQuestion,
   looksLikeJobOpportunityQuestion,
   looksLikeConversationClarificationRequest,
+  hasConcretePriorAtlasQuestion,
   lastQuestionImpliesDate,
   lastQuestionImpliesDayPart,
   resolvePendingExplanation,
