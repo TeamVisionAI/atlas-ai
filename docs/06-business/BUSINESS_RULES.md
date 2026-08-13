@@ -1407,9 +1407,9 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Domain:** Conversation Engine / Recruit AI v2 authoring / QR Channel UX  
 **Depends on:** BR-049, BR-081, BR-114, BR-130  
 **Related:** BR-104/FAQ family; BR-124 schedule-intent recovery; BR-137 (objection → soft interview progression); teamVision / V2 greeting templates historically used forced location openers  
-**Status:** Implemented (thin first-turn + FAQ resume guard + CE/V2 FAQ sequencing parity)  
+**Status:** Implemented (thin first-turn + FAQ resume guard + CE/V2 FAQ sequencing parity + first-turn resume-evidence guard)  
 **Engine target:** CE first-turn / FAQ routing (`semanticConversationEngine.js`, `recruitConversationSequencing.js`); V2 `interpret` + `decide` + `responseRenderer`; no appointment executor changes  
-**Tests:** `backend/test/recruitAiV2ConversationQualityBr131.test.js`
+**Tests:** `backend/test/recruitAiV2ConversationQualityBr131.test.js`, `backend/test/recruitAiV2FirstTurnInfoRequestGuard.test.js`
 
 ### Rules
 
@@ -1422,6 +1422,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Natural ≠ abandon conversion** — Conversational flexibility does not remove the conversion objective. `interview` conversations MUST progressively move toward scheduling a recruiting interview. `policy_review` conversations MUST progressively move toward scheduling a policy-review appointment.
 8. **Mutation path unchanged** — This rule changes first-turn / routing / copy behavior only. It MUST NOT alter the accepted appointment mutation path (BR-039 / BR-050 / BR-111 / BR-112 / BR-121–BR-127). No QR shortcut to Calendar or `atlas_appointments`.
 9. **Boundaries** — Does not enable Recruit AI V2 execution. Does not widen Stage-1 allowlists. Does not rewrite BR-125 reply ownership. Copy changes require a separate implementation sprint after this rule is accepted.
+10. **Resume requires conversation evidence** — Copy that claims Atlas already asked something (e.g. `clarify_once` / “the detail I just asked for”) MAY only be used when **this prospect’s current conversation** has concrete evidence: V2 `lastAtlasOutboundText` and/or a V2 `lastQuestionAsked` ask-key from a prior Atlas turn. Do **not** infer a pending question from `current_step`, `missingFields`, qualification cursor, workflow milestone, or default state. No prior Atlas question → resume path is impossible → use canonical first-turn / info-request response (overview + next missing fact, typically city/state). Mid-flow FAQ still answers first and resumes a **real** pending ask. First-turn precedence outranks resume/clarify.
 
 ---
 

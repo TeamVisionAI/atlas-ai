@@ -31,6 +31,9 @@ const {
   looksLikeDontWantToRecruit,
   looksLikeIsThisSales
 } = require("./recruitAiV2/conversationObjections");
+const {
+  looksLikeJobOverviewQuestion
+} = require("./recruitAiV2/conversationContinuity");
 
 /**
  * Compose FAQ/answer + exactly one resume question (no robotic bridges).
@@ -111,6 +114,10 @@ function resolveRecruitFaqAnswer(message, language = "en") {
     /\b(need|necesito|require|required|sin|no |without|do i|have no|tengo)\b/.test(t)
   ) {
     return getExperienceFaqAnswer(lang);
+  }
+
+  if (looksLikeJobOverviewQuestion(message)) {
+    return getJobOverviewFaqAnswer(lang);
   }
 
   if (

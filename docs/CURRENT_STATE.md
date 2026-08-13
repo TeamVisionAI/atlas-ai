@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-08-13:** **BR-131 first-turn resume guard** — Brand-new info asks (e.g. “Hello! Can I get more info on this?”) must use canonical overview + city/state, not `clarify_once`. Resume/`clarify_once` requires conversation evidence (`lastAtlasOutboundText` / V2 ask-key), not `current_step` / missingFields.
 - **2026-08-13:** **Conversations status badge** — Third header badge is allowlisted lifecycle/status only. `current_step` qualification tokens (e.g. `DAY_PART`) must not leak. `appointment_status` is no longer silently substituted with `current_step`.
 - **2026-08-13:** **BR-080 ≠ BR-034** — Attention must not trigger stall clearance or false Conversations HUMAN. Durable stall = `stalledAt`/`stallEpisodeKey`. Read paths (MC/dashboard/queue) do not persist ownership. HUMAN requires sticky seal (`manualAgentOwnership` + `humanTakenOverAt`).
 - **2026-08-13:** **BR-139** — Canonical `INTERVIEW_READY` outranks stale QUAL_CAPTURE / brain gaps on Mission Control (Schedule Interview, no Complete Qualification contradiction). Read-time only; no QUAL_CAPTURE backfill.
