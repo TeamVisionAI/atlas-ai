@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 
 const {
@@ -32,6 +33,18 @@ test("staging baseline lists 001–038, both 010 files, and never 039", () => {
     }),
     true
   );
+});
+
+test("014 does not COMMENT on Supabase-managed storage catalog tables", () => {
+  const sql = fs.readFileSync(
+    path.join(MIGRATIONS_DIR, "014_profile_avatars_storage.sql"),
+    "utf8"
+  );
+
+  assert.match(sql, /INSERT INTO storage\.buckets/);
+  assert.match(sql, /CREATE POLICY avatars_public_read ON storage\.objects/);
+  assert.doesNotMatch(sql, /COMMENT ON TABLE storage\./i);
+  assert.doesNotMatch(sql, /COMMENT ON COLUMN storage\./i);
 });
 
 test("staging migrator refuses non-staging and production Supabase", () => {

@@ -9,8 +9,8 @@ const {
 } = require("../dev/environment/verifyStagingBaseline");
 const { PRODUCTION_SUPABASE_PROJECT_REF } = require("../config/atlasEnvironment");
 
-test("staging verifier expects jmobhvoscivanvsqpnwk and forbids 039 objects", () => {
-  assert.equal(EXPECTED_STAGING_REF, "jmobhvoscivanvsqpnwk");
+test("staging verifier expects jmobhvosciwanvsqpnwk and forbids 039 objects", () => {
+  assert.equal(EXPECTED_STAGING_REF, "jmobhvosciwanvsqpnwk");
   assert.notEqual(EXPECTED_STAGING_REF, PRODUCTION_SUPABASE_PROJECT_REF);
   assert.ok(FORBIDDEN_TABLES.includes("communication_media"));
   assert.ok(FORBIDDEN_BUCKETS.includes("communication-media"));

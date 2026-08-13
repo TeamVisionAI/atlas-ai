@@ -59,6 +59,12 @@ Production Supabase project ref:
 
 Never use this ref when `ATLAS_ENV=staging`. Backend startup hard-fails if staging points at it. `ATLAS_EXPECTED_SUPABASE_REF` must be the staging project ref.
 
+Live staging Supabase project ref:
+
+**`jmobhvosciwanvsqpnwk`**
+
+Do not use the incorrect spelling `jmobhvoscivanvsqpnwk`.
+
 ---
 
 ## Local
@@ -91,7 +97,7 @@ npm run dev -- --mode staging
 
 ## Staging
 
-- Separate Supabase project (preferred name: `atlas-staging`)
+- Separate Supabase project (preferred name: `atlas-staging`, ref **`jmobhvosciwanvsqpnwk`**)
 - Railway: same project, environment `staging`, `ATLAS_ENV=staging`, `NODE_ENV=production`
 - Vercel Preview / staging branch: `VITE_ATLAS_ENV=staging` and explicit `VITE_API_BASE_URL` to Railway staging
 - Synthetic users/prospects only — no production data, phones, sessions, or conversation logs

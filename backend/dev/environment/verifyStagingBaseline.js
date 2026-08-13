@@ -13,7 +13,7 @@ const {
   PRODUCTION_SUPABASE_PROJECT_REF
 } = require("../../config/atlasEnvironment");
 
-const EXPECTED_STAGING_REF = "jmobhvoscivanvsqpnwk";
+const EXPECTED_STAGING_REF = "jmobhvosciwanvsqpnwk";
 const FORBIDDEN_TABLES = ["communication_media"];
 const FORBIDDEN_BUCKETS = ["communication-media"];
 const PRODUCTION_EMAIL_MARKERS = ["@teamvisionfinancial.com", "@teamvision.ai"];

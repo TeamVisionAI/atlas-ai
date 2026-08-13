@@ -19,4 +19,7 @@ CREATE POLICY avatars_public_read ON storage.objects
   FOR SELECT
   USING (bucket_id = 'avatars');
 
-COMMENT ON TABLE storage.buckets IS 'Supabase Storage buckets (avatars added Sprint 19.1)';
+-- Do not COMMENT ON storage.buckets / storage.objects: those catalog tables are
+-- owned by Supabase Storage. The Atlas migration role cannot comment on them
+-- (staging/production replay via DATABASE_URL). Bucket upsert + policy above
+-- remain the functional contract. Sprint 19.1 avatars bucket.
