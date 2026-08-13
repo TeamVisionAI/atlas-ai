@@ -6,6 +6,7 @@
  */
 
 const { findProspectInOrganization, loadProspectsForOrganization } = require("../services/supabaseService");
+const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
 const { getOrganizationSettings } = require("./organizationSettingsEngine");
 const { getMissionControlState } = require("./missionControlReadModel");
 const { buildWorkflowReadModel } = require("./workflowReadModel");
@@ -21,6 +22,10 @@ const {
 } = require("./agentActionEngine");
 const { getAgentActionLabel, toMissionAction } = require("./agentActionRegistry");
 const { MILESTONES } = require("./workflowConstants");
+const {
+  isQualificationCompleteByCanonicalMilestone,
+  isInterviewReadyWithoutScheduledInterview
+} = require("./missionControlMilestoneProjection");
 const {
   MISSION_TYPES,
   MISSION_STATUS,
@@ -138,7 +143,11 @@ const QUALIFICATION_FACT_FIELDS = new Set([
   "interviewType"
 ]);
 
-function hasIncompleteQualification({ brain, conversationOutcome }) {
+function hasIncompleteQualification({ brain, conversationOutcome, workflow } = {}) {
+  if (isQualificationCompleteByCanonicalMilestone(workflow)) {
+    return false;
+  }
+
   // Prefer conversationOutcome.requiredInputs (Mission Control form SoR).
   if (hasPendingRequiredInformation(conversationOutcome)) {
     return true;
@@ -208,13 +217,20 @@ function shouldGenerateScheduleInterviewMission({
     return false;
   }
 
-  if (hasIncompleteQualification({ brain, conversationOutcome })) {
+  if (
+    hasIncompleteQualification({
+      brain,
+      conversationOutcome,
+      workflow,
+      activeAppointment
+    })
+  ) {
     return false;
   }
 
   // Durable INTERVIEW_READY means pre-schedule qualification is complete — expose
   // Schedule Interview immediately without waiting for another inbound event.
-  if (workflow?.canonicalMilestone === MILESTONES.INTERVIEW_READY) {
+  if (isInterviewReadyWithoutScheduledInterview(workflow, activeAppointment)) {
     return true;
   }
 
@@ -391,7 +407,14 @@ function buildEnterInterviewOutcomeMission(context, createdAt) {
 function buildCompleteQualificationMission(context, createdAt) {
   const { prospect, brain, conversationOutcome, workflow, availableActions, agentState } = context;
 
-  if (!hasIncompleteQualification({ brain, conversationOutcome })) {
+  if (
+    !hasIncompleteQualification({
+      brain,
+      conversationOutcome,
+      workflow,
+      activeAppointment: context.activeAppointment
+    })
+  ) {
     return null;
   }
 
@@ -816,16 +839,21 @@ async function buildMissionContext(phone, organizationId) {
   const organizationSettings = getOrganizationSettings();
   const brain = missionControl.brain;
 
-  const [workflow, conversationOutcome] = await Promise.all([
-    buildWorkflowReadModel({ prospect, brain, agentState }),
-    Promise.resolve(
-      buildConversationOutcomeReadModel({
-        prospect,
-        brain,
-        conversationMessages: []
-      })
-    )
-  ]);
+  const workflow = await buildWorkflowReadModel({ prospect, brain, agentState });
+
+  let activeAppointment = null;
+  try {
+    activeAppointment = await findPersistedAppointmentForProspect(phone, organizationId);
+  } catch {
+    activeAppointment = null;
+  }
+
+  const conversationOutcome = buildConversationOutcomeReadModel({
+    prospect,
+    brain,
+    conversationMessages: [],
+    workflow
+  });
 
   const availableActions = resolveAvailableActions({
     prospect,
@@ -833,7 +861,8 @@ async function buildMissionContext(phone, organizationId) {
     missingFields: brain.missingFields,
     interviewType: brain.interviewType,
     agentState,
-    organizationSettings
+    organizationSettings,
+    canonicalMilestone: workflow?.canonicalMilestone
   });
 
   return {
@@ -842,7 +871,8 @@ async function buildMissionContext(phone, organizationId) {
     agentState,
     conversationOutcome,
     workflow,
-    availableActions
+    availableActions,
+    activeAppointment
   };
 }
 
@@ -910,5 +940,6 @@ module.exports = {
   shouldGenerateScheduleInterviewMission,
   shouldGenerateNewLeadAttentionMission,
   hasIncompleteQualification,
-  hasPendingRequiredInformation
+  hasPendingRequiredInformation,
+  isInterviewReadyWithoutScheduledInterview
 };

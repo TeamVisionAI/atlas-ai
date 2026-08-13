@@ -1654,6 +1654,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-139 — Canonical Milestone Outranks Derived Mission Control Qualification Projection
+
+**Implements:** Durable `canonicalMilestone` is Mission Control SoR for next action, missions, available actions, and recruiter brief. Stale QUAL_CAPTURE / brain `missingFields` / `requiredInputs` must not keep Complete Qualification after the prospect is already `INTERVIEW_READY` (or a later interview milestone).  
+**Domain:** Mission Control / workflow projection / qualification  
+**Depends on:** BR-037, BR-039, BR-135 (`prospects.workflow_state.canonicalMilestone`)  
+**Related:** BR-025/026 (QUALIFYING actions), BR-123 (occupation optional), BR-127/BR-134 (fact sync — independent), qualification-complete → `INTERVIEW_READY` save advance (PR #131)  
+**Status:** Implemented  
+**Engine target:** `missionControlMilestoneProjection.js`, `missionEngine.js`, `conversationOutcomeEngine.js`, `agentActionEngine.js`, `recruiterBriefBuilder.js`, `missionControlLiveReadModel.js`, `agentActionApplicationService.js`  
+**Tests:** `backend/test/interviewReadyMissionControlReconciliation.test.js`
+
+### Rules
+
+1. **Canonical milestone is MC SoR** — If `canonicalMilestone` is `INTERVIEW_READY`, `INTERVIEW_SCHEDULED`, `INTERVIEW_DUE`, `INTERVIEW_COMPLETED`, or `INTERVIEW_RESULT_PENDING`, Mission Control MUST NOT project Complete Qualification from stale QUAL_CAPTURE, brain `missingFields`, `requiredInputs`, or legacy qualification notes.
+2. **Interview Ready + no appointment** — If `canonicalMilestone === INTERVIEW_READY` and there is no active appointment, MC MUST project Current Milestone Interview Ready, Next Action Schedule Interview, primary mission Schedule Interview, and MUST NOT show Complete Qualification mission or Complete Qualification recruiter brief.
+3. **Scheduled interview unchanged** — An active appointment continues to suppress Schedule Interview (BR-039). Complete Qualification must not reappear.
+4. **True QUALIFICATION unchanged** — Prospects still on `QUALIFICATION` with missing required fields remain Complete Qualification. This rule must not invent an `INTERVIEW_READY` advance.
+5. **Invalidation is an explicit transition** — If qualification is truly invalid, roll back via an explicit canonical milestone transition. Never contradict the durable milestone in a read-model projection.
+6. **Read-time reconciliation** — A fresh Mission Control / dashboard read is sufficient. Do not rewrite historical QUAL_CAPTURE notes or require the operator to Save qualification fields.
+7. **Human-entered facts preserved** — Do not overwrite durable city/state/work authorization/interview type, notes, owner, org, or phone.
+8. **Boundaries** — Does not change PR #131 save/advance, appointment creation, Recruit AI execution, HUMAN sticky ownership, Archive/Close, WhatsApp composer, calendar reconnect, Meta Reviewer, or tenant/RVP authorization. Execution gates remain OFF.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
@@ -2824,7 +2847,7 @@ Atlas works around them.
 | Copy | `conversationCopy.js` | User-facing wording from rule decisions |
 | Scheduling | `schedulingEngine.js` | Available times and slot logic |
 | Capacity | `capacityEngine.js` | Per-slot capacity (BR-006, BR-007) |
-| Agent Actions | `agentActionEngine.js` | Next Actions visibility and execution (BR-025 – BR-032) |
-| Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`, `milestoneValidationEngine.js`, `humanAdvancementEngine.js` | Milestones, ownership, stall detection, human advancement (BR-034 – BR-037) |
+| Agent Actions | `agentActionEngine.js` | Next Actions visibility and execution (BR-025 – BR-032); BR-139 canonical milestone SoR |
+| Workflow | `milestoneMapper.js`, `workflowReadModel.js`, `workflowStateStore.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`, `milestoneValidationEngine.js`, `humanAdvancementEngine.js`, `missionControlMilestoneProjection.js` | Milestones, ownership, stall detection, human advancement (BR-034 – BR-037); MC projection SoR (BR-139) |
 | Events | `eventEngine.js`, `workflowEventService.js` | Structured auditable workflow events; WhatsApp inbound claim (BR-138) |
 | QR Channel (Phase 1–2 live) | `qrChannel/*`, `routes/qrGo.js`, `whatsappProspectResolver` (BR-128 / BR-129 / BR-130 hydrate) | Phase 1 entry + Phase 2 attribution/`conversationGoal` stamp. Phase 3 QR-aware first-turn **not** implemented. Must not bypass BR-120 or appointment mutation path |

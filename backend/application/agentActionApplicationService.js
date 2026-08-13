@@ -534,25 +534,10 @@ async function getMissionControlWithActions(phone, options = {}) {
   const agentState = loadAgentState(resolvedPhone);
   const organizationSettings = getOrganizationSettings();
 
-  let availableActions = resolveAvailableActions({
-    prospect,
-    currentStep: missionControl.brain.currentStep,
-    missingFields: missionControl.brain.missingFields,
-    interviewType: missionControl.brain.interviewType,
-    agentState,
-    organizationSettings
-  });
-
   const workflow = await buildWorkflowReadModel({
     prospect,
     brain: missionControl.brain,
     agentState
-  });
-
-  const conversationOutcome = buildConversationOutcomeReadModel({
-    prospect,
-    brain: missionControl.brain,
-    conversationMessages
   });
 
   let activeAppointment = null;
@@ -567,10 +552,27 @@ async function getMissionControlWithActions(phone, options = {}) {
     console.error("[mission-control/activeAppointment]", error.message);
   }
 
+  let availableActions = resolveAvailableActions({
+    prospect,
+    currentStep: missionControl.brain.currentStep,
+    missingFields: missionControl.brain.missingFields,
+    interviewType: missionControl.brain.interviewType,
+    agentState,
+    organizationSettings,
+    canonicalMilestone: workflow?.canonicalMilestone
+  });
+
   // Implements BR-039 — do not offer Schedule interview when an active appointment exists.
   if (activeAppointment) {
     availableActions = availableActions.filter((action) => action.id !== ACTION_IDS.SCHEDULE);
   }
+
+  const conversationOutcome = buildConversationOutcomeReadModel({
+    prospect,
+    brain: missionControl.brain,
+    conversationMessages,
+    workflow
+  });
 
   const primaryMission = getPrimaryMissionFromContext({
     prospect,

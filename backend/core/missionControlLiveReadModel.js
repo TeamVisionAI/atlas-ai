@@ -5,6 +5,10 @@
 
 const { MILESTONES } = require("./workflowConstants");
 const { getAgentActionLabel } = require("./agentActionRegistry");
+const {
+  isInterviewReadyWithoutScheduledInterview,
+  isQualificationCompleteByCanonicalMilestone
+} = require("./missionControlMilestoneProjection");
 
 const WORKFLOW_ONLY_MISSING_FIELDS = new Set(["schedule", "email", "interviewType"]);
 const TERMINAL_WORKFLOW_MILESTONES = new Set([
@@ -148,19 +152,28 @@ function buildActionReason({ workflow, brain, conversationMessages }) {
     return "Human attention required for this workflow state.";
   }
 
+  if (isInterviewReadyWithoutScheduledInterview(workflow)) {
+    return "Prospect is qualified and ready to schedule an interview.";
+  }
+
   const missingFields = brain?.missingFields || [];
   const workflowOnlyMissing = missingFields.filter((field) =>
     WORKFLOW_ONLY_MISSING_FIELDS.has(field)
   );
+  const qualificationComplete = isQualificationCompleteByCanonicalMilestone(workflow);
 
   if (
+    !qualificationComplete &&
     workflowOnlyMissing.includes("schedule") &&
     missingFields.every((field) => WORKFLOW_ONLY_MISSING_FIELDS.has(field))
   ) {
     return "Prospect is qualified and ready to schedule an interview.";
   }
 
-  if (missingFields.includes("schedule") || brain?.currentStep === "SCHEDULE") {
+  if (
+    !qualificationComplete &&
+    (missingFields.includes("schedule") || brain?.currentStep === "SCHEDULE")
+  ) {
     return "Prospect is qualified and ready to schedule an interview.";
   }
 
@@ -168,11 +181,11 @@ function buildActionReason({ workflow, brain, conversationMessages }) {
     (field) => !WORKFLOW_ONLY_MISSING_FIELDS.has(field)
   );
 
-  if (brain?.nextField) {
+  if (!qualificationComplete && brain?.nextField) {
     return `Qualification in progress — waiting for ${brain.nextField}.`;
   }
 
-  if (missingProspectFacts.length) {
+  if (!qualificationComplete && missingProspectFacts.length) {
     return `Qualification in progress — waiting for: ${missingProspectFacts.join(", ")}.`;
   }
 
