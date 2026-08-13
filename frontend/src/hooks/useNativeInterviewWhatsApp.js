@@ -117,8 +117,15 @@ export function useNativeInterviewWhatsApp({
             phone: resolvedPhone,
             appointmentId: persistedId,
             language: outbound.language || preview.language,
-            preferredLanguage: workspace?.capture?.preferredLanguage,
-            communicationLanguage: workspace?.capture?.communicationLanguage,
+            preferredLanguage:
+              workspace?.capture?.preferredLanguage ||
+              workspace?.prospect?.preferred_language ||
+              workspace?.raw?.prospect?.preferred_language ||
+              null,
+            communicationLanguage:
+              workspace?.capture?.communicationLanguage ||
+              workspace?.prospect?.communication_language ||
+              null,
             customerCareWindow
           }),
           previewMessage: outbound.message || preview.message || null,

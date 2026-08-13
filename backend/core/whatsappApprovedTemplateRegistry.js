@@ -8,10 +8,7 @@
  * until WHATSAPP_APPROVED_TEMPLATES_JSON is explicitly authorized after Meta approval.
  */
 
-const {
-  normalizePreferredLanguage,
-  DEFAULT_PREFERRED_LANGUAGE
-} = require("./prospectLanguage");
+const { resolveProspectPreferredLanguage } = require("./prospectLanguage");
 const {
   normalizeZoomDynamicUrlButtonParameter
 } = require("./whatsappTemplateVariableBuilder");
@@ -441,13 +438,9 @@ function listRegistryKeys(registry = getApprovedTemplateRegistry()) {
 }
 
 function resolveTemplateLanguage(prospect = {}) {
-  const preferred = normalizePreferredLanguage((prospect || {}).preferred_language);
-
-  if (preferred) {
-    return preferred;
-  }
-
-  return DEFAULT_PREFERRED_LANGUAGE;
+  // Use full prospect language resolution (skips stale DB-default english when
+  // communication_language/language are Spanish). Implements BR-041 + BR-078.
+  return resolveProspectPreferredLanguage(prospect || {});
 }
 
 function resolveRegistryKeyForIntent(intent, explicitKey = null, registry = getApprovedTemplateRegistry()) {

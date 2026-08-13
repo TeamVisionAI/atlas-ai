@@ -304,15 +304,19 @@ async function updateProspectCommunicationLanguage(phone, communicationLanguage)
     };
   }
 
-  const updated = await updateProspect(phone, {
-    communication_language: normalized,
-    language: normalized
-  }).catch(async (error) => {
+  // Operator-selected communication language is authoritative — sync preferred_language too.
+  const { syncProspectLanguageFields } = require("./prospectLanguage");
+  const languageFields = syncProspectLanguageFields(normalized);
+
+  const updated = await updateProspect(phone, languageFields).catch(async (error) => {
     if (!isMissingCommunicationLanguageColumn(error)) {
       throw error;
     }
 
-    return updateProspect(phone, { language: normalized });
+    return updateProspect(phone, {
+      preferred_language: languageFields.preferred_language,
+      language: languageFields.language
+    });
   });
 
   return {
@@ -320,7 +324,8 @@ async function updateProspectCommunicationLanguage(phone, communicationLanguage)
     status: 200,
     body: {
       success: true,
-      communication_language: updated.communication_language || normalized
+      communication_language: updated.communication_language || normalized,
+      preferred_language: updated.preferred_language || languageFields.preferred_language
     }
   };
 }

@@ -40,6 +40,7 @@ const {
   ensureCoreProspectForLegacyLead,
   findCoreProspectIdByPhone
 } = require("./recruitingProspectBridge");
+const { resolveWhatsAppCreateLanguageFields } = require("./prospectLanguage");
 
 const { supabase } = supabaseService;
 const { EVENT_TYPES } = eventEngine;
@@ -138,6 +139,8 @@ async function insertWhatsAppProspectRow({
   const prospectNumber = await prospectNumberService.generateNextProspectNumber();
   const fullName = String(name || "Unknown").trim() || "Unknown";
   const sourceFields = resolveCreateSourceFields(qrTouch);
+  // Always set preferred_language — DB DEFAULT 'english' must not override Spanish WhatsApp leads.
+  const languageFields = resolveWhatsAppCreateLanguageFields(firstMessage);
 
   // Implements BR-080 — deterministic owner or durable Unassigned at create.
   // QR: campaignAgentId feeds campaign_mapping (primary RVP for Car Magnet).
@@ -158,8 +161,7 @@ async function insertWhatsAppProspectRow({
     organization_id: organizationId,
     current_step: "NEW",
     status: "NEW",
-    language: "es",
-    communication_language: "es",
+    ...languageFields,
     source: sourceFields.source,
     entry_method: sourceFields.entryMethod,
     preferred_communication_channel: "WHATSAPP",
@@ -178,7 +180,8 @@ async function insertWhatsAppProspectRow({
         organization_id: organizationId,
         owner_user_id: attentionFields.owner_user_id,
         current_step: "NEW",
-        language: "es",
+        preferred_language: languageFields.preferred_language,
+        language: languageFields.language,
         last_message: firstMessage || "",
         notes: JSON.stringify({
           source: sourceFields.source,

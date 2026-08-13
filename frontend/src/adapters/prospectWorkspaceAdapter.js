@@ -78,7 +78,11 @@ export function adaptProspectWorkspaceResponse(workspacePayload) {
       source: workspacePayload.prospect?.source || null,
       entryMethod: workspacePayload.prospect?.entry_method || null,
       preferredChannel: workspacePayload.prospect?.preferred_communication_channel || null,
-      communicationLanguage: workspacePayload.prospect?.communication_language || null
+      communicationLanguage: workspacePayload.prospect?.communication_language || null,
+      preferredLanguage:
+        workspacePayload.prospect?.preferred_language ||
+        workspacePayload.editorProfile?.preferred_language ||
+        null
     },
     journey: workspacePayload.journey || null,
     interview,
