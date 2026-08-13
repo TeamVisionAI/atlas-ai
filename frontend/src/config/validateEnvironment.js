@@ -1,10 +1,23 @@
 /**
  * Production environment validation — warn only, never crash.
+ * Staging builds fail closed when API routing is missing or points at production.
  */
 
 import { getMetaReviewModeRawValue, isMetaReviewModeEnabled } from "./metaReviewMode";
+import { resolveApiBaseUrl } from "./apiBaseUrl";
+import { isStagingUi } from "./atlasUiEnv";
+
+export function validateStagingEnvironment(env) {
+  if (!isStagingUi(env)) {
+    return;
+  }
+
+  resolveApiBaseUrl(env);
+}
 
 export function validateProductionEnvironment() {
+  validateStagingEnvironment();
+
   if (import.meta.env.DEV) {
     return;
   }

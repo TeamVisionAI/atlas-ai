@@ -1,4 +1,22 @@
-require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+
+const explicitStagingFile = process.env.ATLAS_STAGING_ENV_FILE
+  ? path.resolve(process.env.ATLAS_STAGING_ENV_FILE)
+  : null;
+const defaultStagingFile = path.resolve(process.cwd(), ".env.staging.local");
+
+if (explicitStagingFile && fs.existsSync(explicitStagingFile)) {
+  dotenv.config({ path: explicitStagingFile });
+} else if (process.env.ATLAS_ENV === "staging" && fs.existsSync(defaultStagingFile)) {
+  dotenv.config({ path: defaultStagingFile });
+} else {
+  dotenv.config();
+}
+
+const { assertStagingSupabaseIsolation } = require("./config/atlasEnvironment");
+assertStagingSupabaseIsolation();
 
 const { assertProductionPlatformConfig } = require("./core/platformProductionGuard");
 assertProductionPlatformConfig();

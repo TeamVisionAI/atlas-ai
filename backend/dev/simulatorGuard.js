@@ -3,6 +3,7 @@
  */
 
 const { AsyncLocalStorage } = require("async_hooks");
+const { isStagingOutboundBlocked } = require("../config/stagingOutboundGuard");
 
 const storage = new AsyncLocalStorage();
 
@@ -11,6 +12,10 @@ function isSimulatorActive() {
 }
 
 function shouldMockExternalComms() {
+  if (isStagingOutboundBlocked()) {
+    return true;
+  }
+
   const store = storage.getStore();
   if (!store?.active) {
     return false;

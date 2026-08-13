@@ -4,6 +4,7 @@
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 const { resolveFrontendBaseUrl } = require("../config/frontendBaseUrl");
+const { isStagingOutboundBlocked } = require("../config/stagingOutboundGuard");
 
 function getEmailConfig() {
   return {
@@ -20,6 +21,11 @@ function getFrontendBaseUrl() {
 }
 
 async function sendEmail({ to, subject, text, html }) {
+  if (isStagingOutboundBlocked()) {
+    console.warn("[email] staging outbound blocked — email not sent", { to, subject });
+    return { delivered: false, mode: "staging-blocked" };
+  }
+
   const { apiKey, fromEmail } = getEmailConfig();
 
   if (!apiKey) {

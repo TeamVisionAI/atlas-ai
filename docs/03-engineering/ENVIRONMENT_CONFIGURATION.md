@@ -2,7 +2,7 @@
 
 ## AI Summary
 
-Atlas frontend API calls use an empty base URL in local development (Vite proxy to `localhost:3000`) and `VITE_API_BASE_URL` in production. Never hard-code Railway or other production URLs in application code. Backend secrets stay in the repository root `.env`; public frontend vars use the `VITE_` prefix in `frontend/.env`.
+Atlas frontend API calls use an empty base URL in local development (Vite proxy to `localhost:3000`), an explicit `VITE_API_BASE_URL` in staging, and `VITE_API_BASE_URL` (with documented production fallback) in production. Never hard-code Railway or other production URLs in application code. Backend secrets stay in the repository root `.env`; public frontend vars use the `VITE_` prefix in `frontend/.env`. Staging uses `.env.staging.local` intentionally and must never silently replace the default local `.env`.
 
 ## Purpose
 
@@ -41,6 +41,31 @@ http://localhost:3000
 
 **Why the proxy:** Avoids CORS and mixed-content issues (HTTPS Vite → HTTP backend). Keeps local dev off production Railway.
 
+**WARNING:** The default local `.env` currently points at production Supabase (`gjuheeztwxbnscjobkzm`). Do not overwrite it automatically. To use staging Supabase from local, copy `.env.staging.example` → `.env.staging.local` and run `ATLAS_STAGING_ENV_FILE=.env.staging.local npm run dev`.
+
+### Staging flow
+
+```
+Frontend (Vercel Preview or Vite --mode staging)
+        ↓
+   fetch("${VITE_API_BASE_URL}/api/...")
+        ↓
+Backend (Railway environment=staging)
+        ↓
+Supabase staging project (not gjuheeztwxbnscjobkzm)
+```
+
+| Setting | Value |
+|---------|-------|
+| `VITE_ATLAS_ENV` | `staging` |
+| `VITE_API_BASE_URL` | **Required** — Railway staging URL, no trailing slash |
+| `ATLAS_ENV` | `staging` |
+| `ATLAS_EXPECTED_SUPABASE_REF` | staging project ref only |
+| `STAGING_OUTBOUND_COMMUNICATION_ENABLED` | `false` unless explicitly testing delivery |
+| Execution gates | `RECRUIT_AI_V2_EXECUTION_ENABLED=false`, `RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED=false` |
+
+Staging builds fail closed if `VITE_API_BASE_URL` is missing or equals production Railway `atlas-ai-production-01de.up.railway.app`.
+
 ### Production flow
 
 ```
@@ -64,7 +89,8 @@ See [frontend/.env.example](../../frontend/.env.example).
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_API_BASE_URL` | Production only | API base URL |
+| `VITE_ATLAS_ENV` | Staging builds | Must be `staging` for Preview/staging |
+| `VITE_API_BASE_URL` | Production + staging | API base URL; required for staging |
 | `VITE_ATLAS_BOOTSTRAP_TOKEN` | Local + prod `/app` | Session bootstrap; must match backend `ATLAS_BOOTSTRAP_TOKEN` |
 | `VITE_META_APP_ID` | WhatsApp Connect UI | Public Meta App ID |
 | `VITE_META_EMBEDDED_SIGNUP_CONFIG_ID` | WhatsApp Connect UI | Embedded Signup config ID |
@@ -83,8 +109,10 @@ See root [.env.example](../../.env.example). Key pairs:
 ### Implementation
 
 - `frontend/src/services/apiClient.js` — `API_BASE` resolution
-- `frontend/src/config/validateEnvironment.js` — production warning if `VITE_API_BASE_URL` missing
+- `frontend/src/config/apiBaseUrl.js` — production fallback; staging fail-closed
+- `frontend/src/config/validateEnvironment.js` — production warning if `VITE_API_BASE_URL` missing; staging throws
 - `frontend/vite.config.js` — `/api` proxy target
+- `backend/config/atlasEnvironment.js` — `ATLAS_ENV` + staging Supabase hard guard
 
 ### Production validation
 
@@ -129,3 +157,4 @@ See [WHATSAPP_TEMPLATE_APPROVAL_PACKET.md](./WHATSAPP_TEMPLATE_APPROVAL_PACKET.m
 |------|----------|
 | 2026-07-24 | Removed hard-coded Railway URL from `apiClient.js` |
 | 2026-07-24 | Local dev always uses Vite proxy (`API_BASE=""`) |
+| 2026-08-13 | Staging fail-closed API routing + ATLAS_ENV Supabase guards |

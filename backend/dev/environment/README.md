@@ -12,6 +12,9 @@ All scripts live under `backend/dev/environment/` and compose existing Atlas Cor
 
 | Script | Purpose |
 |--------|---------|
+| `applyStagingBaselineMigrations.js` | Staging only — apply empty legacy pre-baseline + migrations 001–038 (never 039, never production Supabase) |
+| `seedStagingSyntheticData.js` | Staging only — synthetic SUPER_ADMIN / RVP / agent / reviewer + test prospects |
+| `verifyStagingBaseline.js` | Staging only — confirm 001–038 tables, no 039 / communication_media, no production rows |
 | `applyAtlasCoreMigrations.js` | Apply migrations 002 (prerequisite) + 003–007 via Postgres |
 | `verifyDatabaseBaseline.js` | Verify tables, indexes, and constraints exist |
 | `certifyRC1.js` | Full RC1 certification pipeline (migrate → seed → verify) |
@@ -28,6 +31,7 @@ All scripts live under `backend/dev/environment/` and compose existing Atlas Cor
 - **Required:** Atlas database migrations `002`–`007` applied in Supabase
 - **For automated apply:** `DATABASE_URL` or `SUPABASE_DB_PASSWORD` (Supabase → Project Settings → Database)
 - `NODE_ENV` must **not** be `production`
+- **Staging:** `ATLAS_ENV=staging` plus `.env.staging.local`; use `npm run staging:migrate` / `npm run staging:seed`. Never target production Supabase `gjuheeztwxbnscjobkzm`.
 
 Manual alternative: paste `atlas-core-baseline.sql` in the Supabase SQL editor.
 

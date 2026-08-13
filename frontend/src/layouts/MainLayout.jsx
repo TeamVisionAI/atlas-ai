@@ -7,6 +7,7 @@ import {
   resolveWorkspaceType
 } from "../config/workspaceExperience";
 import { isMetaReviewWorkspaceActive, META_REVIEW_BANNER_TEXT } from "../config/metaReviewMode";
+import { isStagingUi } from "../config/atlasUiEnv";
 import "../components/meta-review/metaReviewDesign.css";
 import { WorkspaceContext } from "../contexts/WorkspaceContext";
 import RequireWorkspaceAccess from "../components/RequireWorkspaceAccess";
@@ -341,6 +342,11 @@ export default function MainLayout() {
         </aside>
 
         <div className="atlas-layout__frame">
+          {isStagingUi() ? (
+            <div className="atlas-layout__staging-banner" role="status" data-atlas-env="staging">
+              STAGING
+            </div>
+          ) : null}
           {metaReviewMode ? (
             <div className="atlas-layout__meta-review-banner" role="status">
               {META_REVIEW_BANNER_TEXT}

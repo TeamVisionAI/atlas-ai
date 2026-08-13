@@ -199,6 +199,19 @@
   flex-direction: column;
 }
 
+.atlas-layout__staging-banner {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #111827;
+  background: #fbbf24;
+  border-bottom: 1px solid #d97706;
+}
+
 .atlas-layout__meta-review-banner {
   flex-shrink: 0;
   padding: 10px 20px;

@@ -38,6 +38,18 @@ Release
 | **Knowledge Hub** | Verify in `/app/knowledge`; update [CURRENT_STATE.md](../CURRENT_STATE.md) |
 | **Release** | Changelog, deploy, sprint record in `docs/09-releases/` |
 
+### Promotion path
+
+```
+LOCAL → STAGING → PRODUCTION
+```
+
+Staging is the required validation layer before production for database migrations, RLS, storage buckets, backend integrations, media infrastructure, and risky workflow/state changes. Copy, CSS, and isolated frontend presentation fixes may skip staging only when the risk is clearly presentation-only.
+
+Protected production Supabase ref: **`gjuheeztwxbnscjobkzm`**. Never use it when `ATLAS_ENV=staging`.
+
+See [ENVIRONMENT_STRATEGY.md](./ENVIRONMENT_STRATEGY.md).
+
 ---
 
 ## Business Rules as architecture

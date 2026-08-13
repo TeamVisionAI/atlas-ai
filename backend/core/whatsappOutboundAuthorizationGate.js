@@ -6,6 +6,7 @@
 const { evaluateCustomerCareWindow } = require("./whatsappCustomerCareWindow");
 const { resolveApprovedTemplate } = require("./whatsappApprovedTemplateRegistry");
 const { isProspectOptedOut } = require("./whatsappTemplateVariableBuilder");
+const { isStagingOutboundBlocked } = require("../config/stagingOutboundGuard");
 
 const DELIVERY_STATUSES = Object.freeze({
   SENT_FREEFORM: "sent_freeform",
@@ -13,6 +14,7 @@ const DELIVERY_STATUSES = Object.freeze({
   BLOCKED_WINDOW_CLOSED: "blocked_window_closed",
   BLOCKED_TEMPLATE_MISSING: "blocked_template_missing",
   BLOCKED_TEMPLATE_UNAPPROVED: "blocked_template_unapproved",
+  BLOCKED_STAGING_OUTBOUND: "blocked_staging_outbound",
   RETRY_REQUIRED: "retry_required",
   PROVIDER_FAILED: "provider_failed",
   DUPLICATE_SUPPRESSED: "duplicate_suppressed"
@@ -78,6 +80,19 @@ async function authorizeWhatsAppOutbound({
 } = {}) {
   const safeProspect = prospect || {};
   const text = message == null ? "" : String(message).trim();
+
+  if (isStagingOutboundBlocked()) {
+    return buildDeliveryResult({
+      status: DELIVERY_STATUSES.BLOCKED_STAGING_OUTBOUND,
+      intent,
+      prospectPhone: phone,
+      organizationId,
+      permittedDeliveryMode: null,
+      retryable: false,
+      reason: "STAGING_OUTBOUND_DISABLED",
+      extras: { authorized: false }
+    });
+  }
 
   if (isProspectOptedOut(safeProspect)) {
     return buildDeliveryResult({
