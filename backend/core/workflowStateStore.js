@@ -30,11 +30,20 @@ const SOFT_INBOX_FIELDS = Object.freeze([
 ]);
 
 /**
+ * Conversations messaging unread cursor — not BR-080 / ownership / inbox lifecycle.
+ */
+const CONVERSATIONS_READ_CURSOR_FIELDS = Object.freeze([
+  "conversationsLastReadInboundAt",
+  "conversationsLastSeenInboundMessageId"
+]);
+
+/**
  * Phase 1 durable runtime fields (BR-135).
  * doNotContact excluded — not competing with other DNC sources in Phase 1.
  */
 const DURABLE_RUNTIME_FIELDS = Object.freeze([
   ...SOFT_INBOX_FIELDS,
+  ...CONVERSATIONS_READ_CURSOR_FIELDS,
   "workflowOwnership",
   "manualAgentOwnership",
   "needsHumanAttention",
@@ -95,7 +104,9 @@ function defaultWorkflowRecord() {
     inboxArchivedAt: null,
     inboxClosedAt: null,
     inboxCloseReason: null,
-    inboxMarkedTestAt: null
+    inboxMarkedTestAt: null,
+    conversationsLastReadInboundAt: null,
+    conversationsLastSeenInboundMessageId: null
   };
 }
 
@@ -563,6 +574,7 @@ async function deletePersistedWorkflowState(phone, options = {}) {
 
 module.exports = {
   SOFT_INBOX_FIELDS,
+  CONVERSATIONS_READ_CURSOR_FIELDS,
   DURABLE_RUNTIME_FIELDS,
   defaultWorkflowRecord,
   sanitizeWorkflowPatch,

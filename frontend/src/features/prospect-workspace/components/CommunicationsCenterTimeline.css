@@ -176,6 +176,23 @@
   background: #f0f2f5;
 }
 
+.cc-timeline--conversation .cc-timeline__header {
+  padding-bottom: 4px;
+}
+
+.cc-timeline--conversation .cc-timeline__title {
+  font-size: 13px;
+}
+
+.cc-timeline--conversation .cc-timeline__subtitle {
+  display: none;
+}
+
+.cc-timeline--conversation .cc-timeline__chat {
+  max-height: none;
+  overflow: visible;
+}
+
 .cc-timeline__chat {
   list-style: none;
   margin: 0;

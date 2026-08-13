@@ -6,10 +6,12 @@ import { fileURLToPath } from "node:url";
 import {
   buildHumanWhatsAppSendRequest,
   canSubmitHumanWhatsAppSend,
+  clampComposerTextareaHeight,
   isFreeformWhatsAppWindowOpen,
   isNativeHumanWhatsAppComposerAction,
   normalizeCustomerCareWindow,
   openingHumanWhatsAppComposerChangesOwnership,
+  resolveComposerTextareaRows,
   resolveHumanWhatsAppComposerEnabled,
   resolveHumanWhatsAppComposerPhone,
   shouldBlockFreeformWhatsAppSend
@@ -50,6 +52,21 @@ test("composer binds to canonical prospect phone", () => {
 
 test("opening the composer never changes ownership", () => {
   assert.equal(openingHumanWhatsAppComposerChangesOwnership(), false);
+});
+
+test("sticky Conversations composer starts compact and auto-grows with a max", () => {
+  assert.equal(resolveComposerTextareaRows("sticky"), 2);
+  assert.equal(resolveComposerTextareaRows("inline"), 3);
+  assert.equal(clampComposerTextareaHeight(10), 44);
+  assert.equal(clampComposerTextareaHeight(200), 128);
+  assert.equal(clampComposerTextareaHeight(90), 90);
+
+  const composer = fs.readFileSync(
+    path.join(root, "components/communication/HumanWhatsAppComposer.jsx"),
+    "utf8"
+  );
+  assert.match(composer, /resolveComposerTextareaRows/);
+  assert.match(composer, /human-whatsapp-composer__input--compact/);
 });
 
 test("empty message disables send; HUMAN ownership required", () => {

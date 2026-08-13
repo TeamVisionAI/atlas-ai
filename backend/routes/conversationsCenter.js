@@ -27,6 +27,9 @@ const {
   sendHumanComposerReply
 } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
 const { loadPersistedWorkflowState } = require("../core/workflowStateStore");
+const {
+  markConversationRead
+} = require("../core/conversationsCenter/conversationsReadCursorService");
 const { findProspect } = require("../services/supabaseService");
 const {
   INBOX_CLOSE_REASONS
@@ -330,6 +333,65 @@ router.post("/mark-test", (req, res) =>
     markConversationAsTest(phone, scope)
   )
 );
+
+/**
+ * Messaging unread only. Must not acknowledge BR-080, mutate ownership,
+ * or change inbox lifecycle.
+ */
+router.post("/mark-read", async (req, res) => {
+  if (!requirePilot(req, res)) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const phone = req.body?.phone || req.params.phone;
+    const prospect = await loadScopedProspect(phone, organizationId);
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: "CONVERSATION_NOT_FOUND",
+        message: "Conversation not found in Conversations Center scope"
+      });
+    }
+
+    const result = await markConversationRead({
+      phone: prospect.phone,
+      organizationId: prospect.organization_id || organizationId || null,
+      prospectId: prospect.id || null,
+      lastReadInboundAt: req.body?.lastReadInboundAt || null,
+      lastSeenInboundMessageId: req.body?.lastSeenInboundMessageId || null
+    });
+
+    const {
+      buildConversationListItem
+    } = require("../core/conversationsCenter/conversationsCenterReadModel");
+
+    res.json({
+      success: true,
+      action: "MARK_READ",
+      phone: prospect.phone,
+      lastReadInboundAt: result.lastReadInboundAt,
+      lastSeenInboundMessageId: result.lastSeenInboundMessageId,
+      ownershipUnchanged: result.ownershipUnchanged,
+      conversation: await buildConversationListItem(prospect),
+      workflow: {
+        workflowOwnership: result.next.workflowOwnership,
+        needsHumanAttention: Boolean(result.next.needsHumanAttention),
+        manualAgentOwnership: Boolean(result.next.manualAgentOwnership),
+        humanTakenOverAt: result.next.humanTakenOverAt || null,
+        stalledAt: result.next.stalledAt || null,
+        stallEpisodeKey: result.next.stallEpisodeKey || null
+      }
+    });
+  } catch (error) {
+    console.error("[conversations-center] mark-read", error.message);
+    res.status(error.statusCode || 500).json({
+      error: error.code || "CONVERSATIONS_CENTER_MARK_READ_FAILED",
+      message: "Failed to mark conversation read"
+    });
+  }
+});
 
 router.get("/:phone", async (req, res) => {
   if (!requirePilot(req, res)) {

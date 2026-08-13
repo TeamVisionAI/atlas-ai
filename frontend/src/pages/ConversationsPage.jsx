@@ -17,13 +17,22 @@ import {
   shouldShowAttentionWarning,
   isUserFacingConversationGoal,
   conversationsThreadHeaderRegionOrder,
-  conversationsThreadRegionOrder
+  conversationsThreadRegionOrder,
+  resolveConversationUnreadPresentation
 } from "../engines/conversationsCenterPresentation";
 import {
   isConversationDetailCurrent,
   resolveSelectedTranscriptProspectId,
   shouldCommitConversationDetail
 } from "../engines/conversationsSelectionConsistency";
+import {
+  accumulateNewMessageCount,
+  CONVERSATIONS_POLL_MS,
+  formatNewMessageIndicatorLabel,
+  isTranscriptNearBottom,
+  nextNewMessageIndicatorCount,
+  shouldForceScrollToLatest
+} from "../engines/conversationsTranscriptAnchor";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import {
   getConversations,
@@ -34,6 +43,7 @@ import {
   restoreConversation,
   closeConversation,
   markConversationAsTest,
+  markConversationRead,
   ConversationsCenterError
 } from "../services/conversationsCenterService";
 import "./ConversationsPage.css";
@@ -115,10 +125,11 @@ function formatActivity(iso, locale) {
 }
 
 function ConversationRow({ item, selected, onSelect, translate, locale }) {
+  const unreadUi = resolveConversationUnreadPresentation(item);
   return (
     <button
       type="button"
-      className={`conversations-row${selected ? " is-selected" : ""}${item.unread ? " is-unread" : ""}`}
+      className={`conversations-row${selected ? " is-selected" : ""}${unreadUi.unread ? " is-unread" : ""}`}
       onClick={() => onSelect(item)}
     >
       <div className="conversations-row__top">
@@ -126,7 +137,17 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
           <strong className="conversations-row__name">
             {item.name || item.phone}
           </strong>
-          {item.unread ? <span className="conversations-row__dot" aria-hidden="true" /> : null}
+          {unreadUi.showDot ? (
+            <span className="conversations-row__dot" aria-hidden="true" />
+          ) : null}
+          {unreadUi.displayCount ? (
+            <span
+              className="conversations-row__unread-count"
+              data-testid="conversations-unread-count"
+            >
+              {unreadUi.displayCount}
+            </span>
+          ) : null}
         </div>
         <StatusBadge variant={ownershipVariant(item.ownershipState)}>
           {ownershipLabel(item.ownershipState, translate)}
@@ -139,10 +160,16 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
         </div>
       ) : null}
       {item.lastMessagePreview ? (
-        <p className="conversations-row__preview">{item.lastMessagePreview}</p>
+        <p
+          className={`conversations-row__preview${unreadUi.boldPreview ? " is-unread" : ""}`}
+        >
+          {item.lastMessagePreview}
+        </p>
       ) : null}
       <div className="conversations-row__meta">
-        <span>{formatActivity(item.lastActivityAt, locale)}</span>
+        <span>
+          {formatActivity(item.lastCommunicationAt || item.lastActivityAt, locale)}
+        </span>
         {item.source ? <span>{item.source}</span> : null}
         {isUserFacingConversationGoal(item.conversationGoal) ? (
           <span>{item.conversationGoal}</span>
@@ -168,21 +195,45 @@ export default function ConversationsPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [phoneCopyStatus, setPhoneCopyStatus] = useState(null);
+  const [newMessageCount, setNewMessageCount] = useState(0);
   const selectedPhoneRef = useRef(selectedPhone);
   selectedPhoneRef.current = selectedPhone;
+  const transcriptRef = useRef(null);
+  const nearBottomRef = useRef(true);
+  const openingThreadRef = useRef(false);
+  const inboundCountRef = useRef(0);
+  const lastCommunicationAtRef = useRef(null);
+  const loadListRef = useRef(null);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setForbidden(false);
+  const loadList = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+      setForbidden(false);
+    }
     try {
       const data = await getConversations({ filter: activeFilter });
       setPayload(data);
+      const selected = (data?.items || []).find(
+        (row) => row.phone === selectedPhoneRef.current
+      );
+      const nextCommAt = selected?.lastCommunicationAt || null;
+      if (
+        selectedPhoneRef.current &&
+        nextCommAt &&
+        lastCommunicationAtRef.current &&
+        nextCommAt !== lastCommunicationAtRef.current
+      ) {
+        setRefreshSignal((n) => n + 1);
+      }
+      if (nextCommAt) {
+        lastCommunicationAtRef.current = nextCommAt;
+      }
     } catch (err) {
       if (err instanceof ConversationsCenterError && err.status === 403) {
         setForbidden(true);
         setPayload(null);
-      } else {
+      } else if (!quiet) {
         setError(
           err instanceof ConversationsCenterError
             ? translate("conversationsLoadError")
@@ -190,13 +241,23 @@ export default function ConversationsPage() {
         );
       }
     } finally {
-      setLoading(false);
+      if (!quiet) {
+        setLoading(false);
+      }
     }
   }, [activeFilter, translate]);
+  loadListRef.current = loadList;
 
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      loadListRef.current?.({ quiet: true });
+    }, CONVERSATIONS_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [activeFilter]);
 
   const loadDetail = useCallback(
     async (phone) => {
@@ -247,14 +308,100 @@ export default function ConversationsPage() {
     // another prospect's ownership/composer/transcript binding.
     setDetail(null);
     setPhoneCopyStatus(null);
+    setNewMessageCount(0);
+    openingThreadRef.current = Boolean(selectedPhone);
+    nearBottomRef.current = true;
+    inboundCountRef.current = 0;
 
     if (selectedPhone) {
       setDetailLoading(true);
       loadDetail(selectedPhone);
     } else {
       setDetailLoading(false);
+      lastCommunicationAtRef.current = null;
     }
   }, [selectedPhone, loadDetail]);
+
+  function scrollTranscriptToLatest() {
+    const el = transcriptRef.current;
+    if (!el) {
+      return;
+    }
+    el.scrollTop = el.scrollHeight;
+    nearBottomRef.current = true;
+    setNewMessageCount(0);
+  }
+
+  function onTranscriptScroll() {
+    nearBottomRef.current = isTranscriptNearBottom(transcriptRef.current);
+  }
+
+  const onConversationItemsChange = useCallback((snapshot) => {
+    if (!selectedPhoneRef.current || snapshot?.status !== "ready") {
+      return;
+    }
+    const opening = openingThreadRef.current;
+    const nearBottom = nearBottomRef.current;
+    const previousInbound = inboundCountRef.current;
+    const nextInbound = Number(snapshot.inboundCount || 0);
+    const delta = nextNewMessageIndicatorCount({
+      previousInboundCount: previousInbound,
+      nextInboundCount: nextInbound,
+      nearBottom,
+      opening
+    });
+
+    if (opening) {
+      openingThreadRef.current = false;
+      inboundCountRef.current = nextInbound;
+      window.requestAnimationFrame(() => scrollTranscriptToLatest());
+      return;
+    }
+
+    inboundCountRef.current = nextInbound;
+    if (delta > 0 && !nearBottom) {
+      setNewMessageCount((count) => accumulateNewMessageCount(count, delta));
+      return;
+    }
+
+    if (
+      shouldForceScrollToLatest({ opening: false, nearBottom }) &&
+      nextInbound > previousInbound
+    ) {
+      window.requestAnimationFrame(() => scrollTranscriptToLatest());
+      markConversationRead(selectedPhoneRef.current)
+        .then(() => loadListRef.current?.({ quiet: true }))
+        .catch(() => {});
+    }
+  }, []);
+
+  async function onSelectConversation(row) {
+    lastCommunicationAtRef.current = row?.lastCommunicationAt || null;
+    setSelectedPhone(row.phone);
+    try {
+      await markConversationRead(row.phone, {
+        lastReadInboundAt: new Date().toISOString()
+      });
+      await loadListRef.current?.({ quiet: true });
+    } catch {
+      /* unread persist failure must not block opening */
+    }
+  }
+
+  async function onJumpToLatest() {
+    scrollTranscriptToLatest();
+    if (!selectedPhoneRef.current) {
+      return;
+    }
+    try {
+      await markConversationRead(selectedPhoneRef.current, {
+        lastReadInboundAt: new Date().toISOString()
+      });
+      await loadListRef.current?.({ quiet: true });
+    } catch {
+      /* ignore */
+    }
+  }
 
   useEffect(() => {
     if (selectedPhone && refreshSignal > 0) {
@@ -275,7 +422,7 @@ export default function ConversationsPage() {
   const items = payload?.items || [];
 
   const selectedItem = useMemo(() => {
-    const fromList = items.find((row) => row.phone === selectedPhone) || null;
+    const fromList = (payload?.items || []).find((row) => row.phone === selectedPhone) || null;
     if (fromList) {
       return fromList;
     }
@@ -283,7 +430,7 @@ export default function ConversationsPage() {
       return detail.conversation || null;
     }
     return null;
-  }, [items, selectedPhone, detail]);
+  }, [payload, selectedPhone, detail]);
 
   const matchedDetail = useMemo(
     () => (isConversationDetailCurrent(detail, selectedPhone) ? detail : null),
@@ -542,7 +689,7 @@ export default function ConversationsPage() {
                 key={item.phone}
                 item={item}
                 selected={item.phone === selectedPhone}
-                onSelect={(row) => setSelectedPhone(row.phone)}
+                onSelect={onSelectConversation}
                 translate={translate}
                 locale={locale}
               />
@@ -734,8 +881,10 @@ export default function ConversationsPage() {
                 </div>
 
                 <div
+                  ref={transcriptRef}
                   className="conversations-thread__transcript"
                   data-testid="conversations-thread-transcript"
+                  onScroll={onTranscriptScroll}
                 >
                   {timelineProspectId ? (
                     <CommunicationsCenterTimeline
@@ -743,6 +892,7 @@ export default function ConversationsPage() {
                       prospectId={timelineProspectId}
                       refreshSignal={refreshSignal}
                       layout="conversation"
+                      onConversationItemsChange={onConversationItemsChange}
                     />
                   ) : detailLoading ? (
                     <p className="conversations-page__empty">
@@ -753,6 +903,19 @@ export default function ConversationsPage() {
                       {translate("conversationsNoTranscript")}
                     </p>
                   )}
+                  {newMessageCount > 0 ? (
+                    <button
+                      type="button"
+                      className="conversations-thread__new-message"
+                      data-testid="conversations-new-message"
+                      onClick={onJumpToLatest}
+                    >
+                      {formatNewMessageIndicatorLabel(newMessageCount, {
+                        one: translate("conversationsNewMessage"),
+                        many: translate("conversationsNewMessages")
+                      })}
+                    </button>
+                  ) : null}
                 </div>
 
                 <div

@@ -105,3 +105,16 @@ export async function markConversationAsTest(phone) {
     body: JSON.stringify({ phone })
   });
 }
+
+/** Messaging unread only — does not acknowledge BR-080 or mutate ownership. */
+export async function markConversationRead(phone, body = {}) {
+  return wrap(`/api/conversations/mark-read`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      phone,
+      lastReadInboundAt: body.lastReadInboundAt || null,
+      lastSeenInboundMessageId: body.lastSeenInboundMessageId || null
+    })
+  });
+}

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import AtlasButton from "../ui/AtlasButton";
 import {
   getConversation,
@@ -8,8 +8,10 @@ import {
 import {
   buildHumanWhatsAppSendRequest,
   canSubmitHumanWhatsAppSend,
+  clampComposerTextareaHeight,
   isFreeformWhatsAppWindowOpen,
   normalizeCustomerCareWindow,
+  resolveComposerTextareaRows,
   resolveHumanWhatsAppComposerEnabled,
   resolveHumanWhatsAppComposerPhone,
   shouldBlockFreeformWhatsAppSend
@@ -80,6 +82,21 @@ export default function HumanWhatsAppComposer({
   const [clientRequestId, setClientRequestId] = useState(() => newClientRequestId());
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState(null);
+  const textareaRef = useRef(null);
+  const stickyComposer = variant === "sticky";
+  const textareaRows = resolveComposerTextareaRows(variant);
+
+  useEffect(() => {
+    if (!stickyComposer) {
+      return;
+    }
+    const el = textareaRef.current;
+    if (!el) {
+      return;
+    }
+    el.style.height = "auto";
+    el.style.height = `${clampComposerTextareaHeight(el.scrollHeight)}px`;
+  }, [message, stickyComposer]);
 
   useEffect(() => {
     setMessage(String(initialMessage || ""));
@@ -269,9 +286,12 @@ export default function HumanWhatsAppComposer({
         </label>
         <textarea
           id={inputId}
-          className="human-whatsapp-composer__input"
+          ref={textareaRef}
+          className={`human-whatsapp-composer__input${
+            stickyComposer ? " human-whatsapp-composer__input--compact" : ""
+          }`}
           data-testid={`${testId}-input`}
-          rows={3}
+          rows={textareaRows}
           value={message}
           disabled={inputDisabled}
           placeholder={
