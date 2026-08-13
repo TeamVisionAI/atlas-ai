@@ -2,23 +2,51 @@
  * Sprint 8A.2 — BR-036 workflow ownership transitions.
  * Applies ownership changes from stall detection and prospect replies.
  * Persists via workflowStateStore; does not emit events (see workflowTransitionEvents).
+ *
+ * BR-080 attention is not a BR-034 stall. Clearance requires a durable stall episode.
  */
 
 const { OWNERSHIP } = require("./workflowConstants");
+const { deriveDefaultOwnership } = require("./milestoneMapper");
 const { savePersistedWorkflowState } = require("./workflowStateStore");
+const { hasActiveStickyHumanHold } = require("./conversationsCenter/conversationsCenterOwnershipService");
 
 /**
- * Clears BR-034 escalation when prospect replies after stall.
+ * Canonical BR-034 stall evidence. BR-080 needsHumanAttention alone is not a stall.
+ */
+function hasDurableStallEpisode(persisted = {}) {
+  return Boolean(persisted?.stalledAt || persisted?.stallEpisodeKey);
+}
+
+/**
+ * Clears BR-034 escalation when prospect replies after a real stall episode.
+ * Does not acknowledge BR-080. Preserves sticky TAKE OVER.
  */
 async function applyStallClearance(phone, persisted, computed, options = {}) {
+  const stickyTakeOver = hasActiveStickyHumanHold(persisted);
+  const milestone = computed.canonicalMilestone || persisted.canonicalMilestone;
+  const ownershipAfter = stickyTakeOver
+    ? OWNERSHIP.AGENT
+    : deriveDefaultOwnership(milestone, {
+        ...(options.agentState || {}),
+        manualAgentOwnership: false
+      });
+
   return savePersistedWorkflowState(
     phone,
     {
-      workflowOwnership: computed.workflowOwnership,
+      workflowOwnership: ownershipAfter,
       needsHumanAttention: false,
       stalledAt: null,
       stallEpisodeKey: null,
-      canonicalMilestone: computed.canonicalMilestone
+      canonicalMilestone: milestone,
+      ...(stickyTakeOver
+        ? {}
+        : {
+            manualAgentOwnership: false,
+            handoffReason: null,
+            handoffAt: null
+          })
     },
     options
   );
@@ -37,7 +65,8 @@ async function applyStallTransition(
   computed,
   options = {}
 ) {
-  if (stallResult.cleared && persisted.needsHumanAttention) {
+  // BR-080 human_required / needsHumanAttention is not a stall episode.
+  if (stallResult.cleared && hasDurableStallEpisode(persisted)) {
     const next = await applyStallClearance(phone, persisted, computed, options);
     return {
       applied: true,
@@ -109,6 +138,7 @@ async function applyStallTransition(
 }
 
 module.exports = {
+  hasDurableStallEpisode,
   applyStallTransition,
   applyStallClearance
 };

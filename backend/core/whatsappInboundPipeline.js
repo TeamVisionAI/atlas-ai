@@ -150,6 +150,17 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     conversationLogId: logResult.log?.id || null
   });
 
+  try {
+    const { reconcileStallAfterProspectReply } = require("./workflowReadModel");
+    await reconcileStallAfterProspectReply(prospect);
+  } catch (stallError) {
+    logWhatsAppStage("br034_inbound_stall_reconcile_failed", {
+      level: "warn",
+      phone: storagePhone,
+      error: stallError.message
+    });
+  }
+
   await recruitingWorkflowHooks
     .onMessageReceived({
       phone: storagePhone,

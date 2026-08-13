@@ -148,7 +148,8 @@ async function applyTimeBasedReconciliation({
   computedMilestone,
   computedOwnership,
   prospect,
-  agentState = {}
+  agentState = {},
+  persist = true
 }) {
   const scope = {
     organizationId: prospect?.organization_id || null,
@@ -176,6 +177,15 @@ async function applyTimeBasedReconciliation({
 
   const milestoneAfter = computedMilestone;
   const ownershipAfter = deriveDefaultOwnership(milestoneAfter, agentState);
+
+  if (!persist) {
+    return {
+      applied: false,
+      milestone: milestoneAfter,
+      ownership: ownershipAfter
+    };
+  }
+
   const episodeKey = buildReconcileEpisodeKey(milestoneAfter, prospect);
   const ownershipBefore =
     persisted.workflowOwnership ||

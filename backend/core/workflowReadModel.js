@@ -1,7 +1,7 @@
 /**
  * Sprint 8A.2 — Assembles the Mission Control workflow read model.
- * Evaluates stall detection, ownership transitions, and events on read (BR-034).
- * Does not alter conversation pipeline or UI.
+ * Derives stall/ownership for display. Ordinary reads do not persist transitions.
+ * Explicit inbound/command paths may persist real BR-034 stall clearance only.
  */
 
 const {
@@ -15,7 +15,7 @@ const {
   savePersistedWorkflowState
 } = require("./workflowStateStore");
 const { detectConversationStall } = require("./stallDetectionEngine");
-const { applyStallTransition } = require("./workflowOwnershipEngine");
+const { applyStallTransition, hasDurableStallEpisode } = require("./workflowOwnershipEngine");
 const {
   emitStallEscalationEvents,
   emitStallClearanceEvents
@@ -105,14 +105,16 @@ async function fetchLatestConversationEntry(phone) {
 }
 
 /**
- * Sprint 8A.2/8A.6 pipeline: reconcile → detect → transition → emit → resolve → priority.
+ * Sprint 8A.2/8A.6 pipeline: derive (always) → persist stall/time only when explicitly requested.
+ * Ordinary MC/dashboard/queue reads must pass persistTransitions=false (default).
  */
 async function evaluateWorkflowState({
   phone,
   prospect,
   brain,
   agentState,
-  messageHints
+  messageHints,
+  persistTransitions = false
 }) {
   const scope = {
     organizationId: prospect?.organization_id || null,
@@ -144,7 +146,8 @@ async function evaluateWorkflowState({
     computedMilestone: canonicalMilestone,
     computedOwnership: workflowOwnership,
     prospect,
-    agentState: mergedAgentState
+    agentState: mergedAgentState,
+    persist: persistTransitions === true
   });
 
   const effectiveMilestone = reconciliation.milestone;
@@ -173,46 +176,73 @@ async function evaluateWorkflowState({
   const ownershipBefore =
     persisted.workflowOwnership || effectiveOwnership;
 
-  const transition = await applyStallTransition(
-    phone,
-    persisted,
-    stallResult,
-    computed,
-    scope
-  );
+  let transition = {
+    applied: false,
+    previous: persisted,
+    next: persisted,
+    transition: null
+  };
+  let refreshed = persisted;
 
-  if (transition.applied) {
-    if (transition.transition === "br_034_stall") {
-      await emitStallEscalationEvents({
-        phone,
-        milestone: effectiveMilestone,
-        ownershipBefore,
-        stallResult
-      });
-    } else if (transition.transition === "stall_cleared_prospect_reply") {
-      await emitStallClearanceEvents({
-        phone,
-        milestone: effectiveMilestone,
-        ownershipBefore,
-        ownershipAfter: transition.next.workflowOwnership
-      });
+  if (persistTransitions === true) {
+    transition = await applyStallTransition(
+      phone,
+      persisted,
+      stallResult,
+      computed,
+      scope
+    );
+
+    if (transition.applied) {
+      if (transition.transition === "br_034_stall") {
+        await emitStallEscalationEvents({
+          phone,
+          milestone: effectiveMilestone,
+          ownershipBefore,
+          stallResult
+        });
+      } else if (transition.transition === "stall_cleared_prospect_reply") {
+        await emitStallClearanceEvents({
+          phone,
+          milestone: effectiveMilestone,
+          ownershipBefore,
+          ownershipAfter: transition.next.workflowOwnership
+        });
+      }
     }
+
+    refreshed = await loadPersistedWorkflowState(phone, scope);
   }
 
-  const refreshed = await loadPersistedWorkflowState(phone, scope);
+  const displayAttention =
+    Boolean(refreshed.needsHumanAttention) ||
+    Boolean(stallResult.isStalled && !stallResult.cleared);
+  const displayOwnership = displayAttention
+    ? OWNERSHIP.AGENT
+    : refreshed.workflowOwnership || computed.workflowOwnership;
 
-  const resolved = await resolveWorkflowState(
-    phone,
-    {
-      ...computed,
-      needsHumanAttention: refreshed.needsHumanAttention,
+  let resolved;
+  if (persistTransitions === true) {
+    resolved = await resolveWorkflowState(
+      phone,
+      {
+        ...computed,
+        needsHumanAttention: displayAttention,
+        stalledAt: refreshed.stalledAt,
+        workflowOwnership: displayOwnership
+      },
+      scope
+    );
+  } else {
+    resolved = {
+      canonicalMilestone: refreshed.canonicalMilestone || effectiveMilestone,
+      workflowOwnership: displayOwnership,
+      needsHumanAttention: displayAttention,
       stalledAt: refreshed.stalledAt,
-      workflowOwnership: refreshed.needsHumanAttention
-        ? OWNERSHIP.AGENT
-        : refreshed.workflowOwnership || computed.workflowOwnership
-    },
-    scope
-  );
+      mappedFrom: computed.mappedFrom,
+      source: "persisted"
+    };
+  }
 
   // Implements BR-039 — persisted/computed INTERVIEW_SCHEDULED cannot outrank
   // atlas_appointments. Workflow cache must not impersonate a scheduled interview.
@@ -234,7 +264,11 @@ async function evaluateWorkflowState({
       appointmentMissing: true
     };
 
-    if (phone && claimsScheduledInterview(refreshed.canonicalMilestone)) {
+    if (
+      persistTransitions === true &&
+      phone &&
+      claimsScheduledInterview(refreshed.canonicalMilestone)
+    ) {
       await savePersistedWorkflowState(
         phone,
         {
@@ -270,7 +304,8 @@ async function evaluateWorkflowState({
       reason: stallResult.reason || null,
       recommendedAction: stallResult.recommendedAction || null,
       lastAtlasOutboundAt: stallResult.lastAtlasOutboundAt || null
-    }
+    },
+    transition: persistTransitions === true ? transition : { applied: false }
   };
 }
 
@@ -289,13 +324,73 @@ async function buildWorkflowReadModel({ prospect, brain, agentState }) {
     prospect,
     brain,
     agentState,
-    messageHints
+    messageHints,
+    persistTransitions: false
   });
+}
+
+/**
+ * Explicit inbound command: clear a real BR-034 stall after prospect reply.
+ * No-op when there is no durable stall episode (BR-080 attention must not clear).
+ */
+async function reconcileStallAfterProspectReply(prospect, options = {}) {
+  const phone = prospect?.phone;
+  if (!phone) {
+    return { applied: false, reason: "NO_PHONE" };
+  }
+
+  const { loadAgentState } = require("./agentActionState");
+  const scope = {
+    organizationId: prospect.organization_id || options.organizationId || null,
+    prospectId: prospect.id || options.prospectId || null
+  };
+  const persisted = await loadPersistedWorkflowState(phone, scope);
+
+  if (!hasDurableStallEpisode(persisted)) {
+    return { applied: false, reason: "NO_DURABLE_STALL_EPISODE", previous: persisted, next: persisted };
+  }
+
+  const messageHints = options.messageHints || (await fetchMessageHints(phone));
+  const agentState = options.agentState || loadAgentState(phone);
+  const mergedAgentState = {
+    ...agentState,
+    manualAgentOwnership: persisted.manualAgentOwnership,
+    doNotContact: persisted.doNotContact
+  };
+  const milestone = persisted.canonicalMilestone || MILESTONES.NEW_LEAD;
+  const computedOwnership = deriveDefaultOwnership(milestone, mergedAgentState);
+  const stallResult = detectConversationStall({
+    messageHints,
+    milestone,
+    prospect,
+    defaultOwnership: computedOwnership,
+    agentState: mergedAgentState
+  });
+
+  const transition = await applyStallTransition(
+    phone,
+    persisted,
+    stallResult,
+    { canonicalMilestone: milestone, workflowOwnership: computedOwnership },
+    scope
+  );
+
+  if (transition.applied && transition.transition === "stall_cleared_prospect_reply") {
+    await emitStallClearanceEvents({
+      phone,
+      milestone,
+      ownershipBefore: persisted.workflowOwnership || computedOwnership,
+      ownershipAfter: transition.next.workflowOwnership
+    });
+  }
+
+  return transition;
 }
 
 module.exports = {
   buildWorkflowReadModel,
   evaluateWorkflowState,
+  reconcileStallAfterProspectReply,
   fetchMessageHints,
   fetchLatestConversationEntry
 };
