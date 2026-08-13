@@ -960,13 +960,29 @@ async function handleSemanticMessage({
   name,
   message,
   channel = "whatsapp",
-  skipConversationLogging = false
+  skipConversationLogging = false,
+  messageType = null
 }) {
   const recordLog = skipConversationLogging
     ? async () => ({ success: true, skipped: true })
     : logConversation;
 
   const cleanMessage = String(message || "").trim();
+
+  // BR-140 / BR-118 — never interpret non-text media placeholders as qualification text.
+  try {
+    const { classifyInboundMedia } = require("./recruitAiV2/nonTextMedia");
+    const mediaClass = classifyInboundMedia({
+      text: cleanMessage,
+      messageType
+    });
+    if (mediaClass.isNonTextMedia) {
+      return "";
+    }
+  } catch {
+    // Classification must never crash CE; fall through only if helper is unavailable.
+  }
+
   const intent = detectIntent(cleanMessage);
   let prospect = await findProspect(phone);
   const wasNewProspect = !prospect;

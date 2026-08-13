@@ -211,7 +211,8 @@ test("TV-000028 synthetic timeline is prospect-canonical with forensic flags", a
       loadWorkflowEvents: async () => sources.workflowEvents,
       loadAppointments: async () => sources.appointments,
       loadBusinessEvents: async () => ({ rows: sources.businessEvents, gap: null }),
-      loadTimelineEntries: async () => ({ rows: sources.timelineEntries, gap: null })
+      loadTimelineEntries: async () => ({ rows: sources.timelineEntries, gap: null }),
+      loadCommunicationMedia: async () => []
     }
   });
 

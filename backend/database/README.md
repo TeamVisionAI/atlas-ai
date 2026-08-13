@@ -461,3 +461,24 @@ Contract tests: `backend/test/recruitAiV2DurableContext.test.js`
 **Do not apply in production until an authorized migration/deploy window.**
 
 **Rollback warning:** down migration drops both tables.
+
+## Migration 039 — communication_media (WhatsApp audio Phase 1 + 1B)
+
+```
+backend/database/migrations/039_communication_media.sql
+backend/database/migrations/039_communication_media_down.sql
+```
+
+Creates org-scoped `communication_media` plus private Storage bucket `communication-media`.
+
+- Unique `(organization_id, provider_message_id, media_kind)`
+- Fetch lifecycle: `pending | fetching | stored | failed`
+- Transcode lifecycle: `pending | processing | ready | failed | not_required`
+- Playback derivative mime/path (`playback.mp3`); original always preserved
+- Nullable STT columns reserved (not used in Phase 1/1B)
+- Backend-only RLS (deny anon + authenticated; grant service_role)
+- Path contract: `organizationId/prospectId/wamid/original.<ext>` and `.../playback.mp3`
+
+**Do not apply in production until an authorized migration/deploy window.** Local Phase 0+1+1B only.
+
+Contract tests: `backend/test/whatsappAudioPhase1.test.js`, `backend/test/whatsappAudioPhase1b.test.js`

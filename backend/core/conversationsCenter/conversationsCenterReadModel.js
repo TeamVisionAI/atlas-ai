@@ -189,6 +189,9 @@ async function buildConversationListItem(prospect, options = {}) {
   const lastMessagePreview =
     lastCommunication.lastMessagePreview ||
     (fallbackIsRealCommunication ? fallbackLastMessage.slice(0, 160) : null);
+  const lastMessagePreviewKind =
+    lastCommunication.lastMessagePreviewKind ||
+    (fallbackIsRealCommunication ? "text" : null);
   const lastCommunicationAt =
     lastCommunication.lastCommunicationAt ||
     (fallbackIsRealCommunication ? prospect.last_message_at || null : null);
@@ -207,6 +210,7 @@ async function buildConversationListItem(prospect, options = {}) {
     name: prospect.name || null,
     prospectNumber: prospect.prospect_number || null,
     lastMessagePreview,
+    lastMessagePreviewKind,
     lastCommunicationAt,
     lastActivityAt,
     lastDirection: lastCommunication.lastDirection,

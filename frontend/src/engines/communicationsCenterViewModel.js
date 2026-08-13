@@ -2,6 +2,13 @@
  * Communications Center presentation helpers (Prospect Workspace).
  */
 
+import {
+  INTERNAL_MESSAGE_INTENTS,
+  isAudioCommunicationItem,
+  isMediaPlaceholderText,
+  isOperationalCommunicationText
+} from "./communicationClassification.js";
+
 export function buildCommunicationsCacheKey(organizationId, prospectId) {
   return `communications:${organizationId || "org"}:${prospectId}`;
 }
@@ -122,13 +129,6 @@ export function containsRawPhoneLeak(text) {
  * brackets, and system events stay in Diagnostics only.
  * Presentation-only — does not mutate stored communications.
  */
-const INTERNAL_MESSAGE_INTENTS = new Set([
-  "REQUIRED_INFORMATION",
-  "CONVERSATION_OUTCOME",
-  "AGENT_ACTION",
-  "REQUIRED_INFORMATION_UPDATED"
-]);
-
 export function isConversationBubbleItem(item) {
   const category = String(item?.category || "");
   if (category !== "message") {
@@ -160,8 +160,10 @@ export function isConversationBubbleItem(item) {
   }
 
   const text = String(item?.content?.text || item?.content?.body || "").trim();
-  // Bracketed operational logs e.g. [Required Information Updated] …
-  if (/^\[[^\]]+\]/.test(text)) {
+  if (isAudioCommunicationItem(item) || isMediaPlaceholderText(text)) {
+    return true;
+  }
+  if (isOperationalCommunicationText(text)) {
     return false;
   }
 

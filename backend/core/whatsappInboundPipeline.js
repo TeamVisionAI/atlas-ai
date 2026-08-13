@@ -150,6 +150,28 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     conversationLogId: logResult.log?.id || null
   });
 
+  // BR-140 — persist structured audio metadata immediately; fetch bytes asynchronously.
+  // Must not block webhook completion or change ownership / BR-080 / qualification.
+  try {
+    const persistMedia =
+      dependencies.persistInboundAudioMedia ||
+      require("./communicationMedia/whatsappMediaFetchService").persistInboundAudioMedia;
+    await persistMedia({
+      organizationId: organizationId || prospect?.organization_id || claimedOrganizationId || null,
+      prospectId: prospect?.id || null,
+      conversationLogId: logResult.log?.id || null,
+      inbound,
+      repository: dependencies.communicationMediaRepository || null
+    });
+  } catch (mediaError) {
+    logWhatsAppStage("communication_media_persist_failed", {
+      level: "warn",
+      phone: storagePhone,
+      providerMessageId: inbound.providerMessageId,
+      error: mediaError?.publicCode || mediaError?.message || "unknown"
+    });
+  }
+
   try {
     const { reconcileStallAfterProspectReply } = require("./workflowReadModel");
     await reconcileStallAfterProspectReply(prospect);

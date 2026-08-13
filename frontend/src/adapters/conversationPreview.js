@@ -1,4 +1,5 @@
 import { formatAtlasDateTime } from "../utils/dateFormatter";
+import { isMediaPlaceholderText } from "../engines/communicationClassification.js";
 
 const CANONICAL_MILESTONE_LABELS = {
   NEW_LEAD: "New Lead",
@@ -45,21 +46,35 @@ export function formatWorkflowOwnershipLabel(ownership) {
   return ownership;
 }
 
+function friendlyPreviewText(text, messageType, media) {
+  const kind = String(media?.mediaKind || media?.kind || messageType || "").toLowerCase();
+  if (kind === "audio" || kind === "ptt" || isMediaPlaceholderText(text)) {
+    return "Voice message";
+  }
+  return text || null;
+}
+
 export function buildConversationPreview(latestConversation, dashboardProspect) {
-  if (latestConversation?.text) {
+  if (latestConversation?.text || latestConversation?.media || latestConversation?.messageType) {
     return {
-      text: latestConversation.text,
+      text: friendlyPreviewText(
+        latestConversation.text,
+        latestConversation.messageType,
+        latestConversation.media
+      ),
       direction: latestConversation.direction || "unknown",
       timestamp: latestConversation.timestamp
         ? formatAtlasDateTime(new Date(latestConversation.timestamp))
         : null,
-      source: "conversation_logs"
+      source: "conversation_logs",
+      media: latestConversation.media || null,
+      messageType: latestConversation.messageType || null
     };
   }
 
   if (dashboardProspect?.last_message) {
     return {
-      text: dashboardProspect.last_message,
+      text: friendlyPreviewText(dashboardProspect.last_message),
       direction: "incoming",
       timestamp: null,
       source: "prospect_last_message"

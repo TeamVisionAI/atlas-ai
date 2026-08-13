@@ -29,6 +29,35 @@ function normalizeMessageBody(message) {
   return `[${message.type || "unknown"} message]`;
 }
 
+/**
+ * Structured WhatsApp media metadata. Phase 1 extracts audio only.
+ * Keep rawMessage separately; never include provider tokens.
+ */
+function extractWhatsAppMedia(message) {
+  if (!message) {
+    return null;
+  }
+
+  const messageType = String(message.type || "").toLowerCase();
+  if (messageType !== "audio") {
+    return null;
+  }
+
+  const audio = message.audio || {};
+  if (!audio.id) {
+    return null;
+  }
+
+  return {
+    kind: "audio",
+    metaMediaId: String(audio.id),
+    mimeType: audio.mime_type || null,
+    isVoiceNote: audio.voice === true || audio.voice === "true",
+    sha256: audio.sha256 || null,
+    fileSize: audio.file_size != null ? Number(audio.file_size) : null
+  };
+}
+
 function extractStatusFailure(statusItem) {
   const errors = Array.isArray(statusItem?.errors) ? statusItem.errors : [];
   const first = errors[0] || null;
@@ -115,6 +144,7 @@ function parseWhatsAppWebhookPayload(body) {
             : new Date().toISOString(),
           phoneNumberId,
           wabaId,
+          media: extractWhatsAppMedia(message),
           rawMessage: message,
           rawValue: value
         });
@@ -144,5 +174,6 @@ module.exports = {
   parseWhatsAppWebhookBody,
   parseWhatsAppWebhookPayload,
   normalizeMessageBody,
+  extractWhatsAppMedia,
   normalizeStatusItem
 };

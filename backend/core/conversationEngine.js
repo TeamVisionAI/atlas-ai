@@ -63,7 +63,8 @@ async function handleIncomingMessage(phone, name, message, options = {}) {
     name,
     message,
     channel: options.channel || "whatsapp",
-    skipConversationLogging: Boolean(options.skipConversationLogging)
+    skipConversationLogging: Boolean(options.skipConversationLogging),
+    messageType: options.messageType || null
   });
 
   return finalizeReply(phone, reply);

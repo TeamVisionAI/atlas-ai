@@ -10,7 +10,8 @@
  * @property {string} phone — storage-normalized prospect phone
  * @property {string|null} contactName
  * @property {string} text — message body for Conversation Engine
- * @property {string} messageType — text, button, interactive, etc.
+ * @property {string} messageType — text, button, interactive, audio, etc.
+ * @property {object|null} media — structured inbound media metadata (no tokens)
  * @property {string} timestamp — ISO-8601
  */
 
@@ -27,6 +28,7 @@ function buildNormalizedMessageFromWhatsApp(inbound, storagePhone) {
     contactName: inbound.contactName || null,
     text: String(inbound.body || "").trim(),
     messageType: inbound.messageType || "text",
+    media: inbound.media || null,
     timestamp: inbound.timestamp || new Date().toISOString()
   };
 }

@@ -57,6 +57,9 @@ const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const {
   prospectCommunicationsStack
 } = require("./routes/communicationsCenter");
+const {
+  communicationMediaPlaybackStack
+} = require("./routes/communicationMedia");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const followUpsRoutes = require("./routes/followUps");
 const conversationsCenterRoutes = require("./routes/conversationsCenter");
@@ -217,6 +220,10 @@ app.get(
   timelineModule.prospectTimelineHandler
 );
 app.get("/api/prospects/:id/communications", ...prospectCommunicationsStack);
+app.get(
+  "/api/prospects/:id/communications/media/:mediaId/playback",
+  ...communicationMediaPlaybackStack
+);
 app.use("/api/prospects", prospectModule.routes);
 app.use("/api", setupRoutes);
 app.use("/api", authRoutes);
@@ -317,6 +324,10 @@ async function main() {
   startReminderPoller(60_000);
   const { startNewLeadEscalationPoller } = require("./core/newLeadAttentionEngine");
   startNewLeadEscalationPoller(60_000);
+  const {
+    startWhatsAppMediaFetchPoller
+  } = require("./core/communicationMedia/whatsappMediaFetchPoller");
+  startWhatsAppMediaFetchPoller();
 }
 
 main().catch((error) => {
