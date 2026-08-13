@@ -334,6 +334,7 @@ test("detail list item includes full phone; unauthorized user remains forbidden"
     assert.equal(item.name, "Mayra");
     assert.equal(item.source, "whatsapp");
     assert.equal(item.appointmentStatus, "none");
+    assert.equal(item.currentStep, null);
 
     assert.throws(
       () =>
@@ -345,6 +346,30 @@ test("detail list item includes full phone; unauthorized user remains forbidden"
         error.code === "CONVERSATIONS_CENTER_USER_FORBIDDEN" &&
         error.statusCode === 403
     );
+  });
+});
+
+test("current_step qualification tokens are not appointmentStatus", async () => {
+  await withTempWorkflowState(async () => {
+    const {
+      buildConversationListItem
+    } = require("../core/conversationsCenter/conversationsCenterReadModel");
+
+    const item = await buildConversationListItem({
+      id: "p-day-part",
+      phone: "+17879398651",
+      name: "Qualification In Progress",
+      organization_id: TEAM_VISION,
+      owner_user_id: NIOVEL,
+      source: "FACEBOOK",
+      current_step: "DAY_PART",
+      appointment_status: null,
+      updated_at: "2026-08-13T14:00:00.000Z"
+    });
+
+    assert.equal(item.appointmentStatus, null);
+    assert.equal(item.currentStep, "DAY_PART");
+    assert.notEqual(item.appointmentStatus, "DAY_PART");
   });
 });
 

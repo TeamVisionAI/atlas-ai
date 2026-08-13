@@ -464,6 +464,14 @@ export default function ConversationsPage() {
       selectedItem?.appointmentStatus ||
       matchedDetail?.conversation?.appointmentStatus ||
       null,
+    canonicalMilestone:
+      selectedItem?.canonicalMilestone ||
+      matchedDetail?.conversation?.canonicalMilestone ||
+      null,
+    currentStep:
+      selectedItem?.currentStep ||
+      matchedDetail?.conversation?.currentStep ||
+      null,
     conversationGoal:
       selectedItem?.conversationGoal ||
       matchedDetail?.conversation?.conversationGoal ||
@@ -610,9 +618,9 @@ export default function ConversationsPage() {
                             {lifecycleLabel(headerModel.inboxLifecycle, translate)}
                           </StatusBadge>
                         ) : null}
-                        {headerModel.appointmentStatus ? (
+                        {headerModel.statusBadge ? (
                           <StatusBadge variant="info">
-                            {headerModel.appointmentStatus}
+                            {headerModel.statusBadge}
                           </StatusBadge>
                         ) : null}
                         {headerModel.source ? (
