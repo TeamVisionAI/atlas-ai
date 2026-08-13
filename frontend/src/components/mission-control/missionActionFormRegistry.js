@@ -1,5 +1,6 @@
 import { isWhatsAppCopyAction } from "../../services/whatsappCommunicationService";
 import { isPanelCommunicationAction } from "../../engines/communicationActionEngine";
+import { isNativeHumanWhatsAppComposerAction } from "../../engines/humanWhatsAppComposer";
 import {
   INLINE_FORM_TYPES,
   INLINE_FORM_BY_ACTION_ID,
@@ -31,7 +32,9 @@ const PRE_INTERVIEW_CLOSE_MISSION_TYPES = new Set([
 ]);
 
 export function isImmediateMissionAction(actionId) {
-  return isWhatsAppCopyAction(actionId);
+  return (
+    isWhatsAppCopyAction(actionId) || isNativeHumanWhatsAppComposerAction(actionId)
+  );
 }
 
 function shouldExposeQualificationAction(_mission, conversationOutcome) {

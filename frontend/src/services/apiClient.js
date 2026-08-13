@@ -32,6 +32,9 @@ export async function apiFetch(path, options = {}) {
     error.status = response.status;
     error.code = payload.error || payload.code || null;
     error.reconnectRequired = Boolean(payload.reconnectRequired);
+    if (payload.delivery) {
+      error.delivery = payload.delivery;
+    }
     throw error;
   }
 

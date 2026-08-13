@@ -14,7 +14,6 @@ import {
 } from "./missionControlService";
 
 export const WHATSAPP_COPY_ACTIONS = new Set([
-  "whatsapp",
   "send_missed_appointment"
 ]);
 

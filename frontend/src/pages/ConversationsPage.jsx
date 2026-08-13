@@ -4,11 +4,11 @@ import { useLanguage } from "../i18n/LanguageContext";
 import AtlasButton from "../components/ui/AtlasButton";
 import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
+import HumanWhatsAppComposer from "../components/communication/HumanWhatsAppComposer";
 import CommunicationsCenterTimeline from "../features/prospect-workspace/components/CommunicationsCenterTimeline";
 import { copyMessageToClipboard } from "../services/whatsappCommunicationService";
 import {
   buildConversationHeaderModel,
-  isHumanComposerEnabled,
   resolveEffectiveOwnership,
   canTakeOverConversation,
   canReturnConversationToAtlas,
@@ -16,7 +16,8 @@ import {
   resolveLifecycleActionIds,
   shouldShowAttentionWarning,
   isUserFacingConversationGoal,
-  conversationsThreadHeaderRegionOrder
+  conversationsThreadHeaderRegionOrder,
+  conversationsThreadRegionOrder
 } from "../engines/conversationsCenterPresentation";
 import {
   isConversationDetailCurrent,
@@ -29,7 +30,6 @@ import {
   getConversation,
   takeOverConversation,
   returnConversationToAtlas,
-  sendHumanConversationReply,
   archiveConversation,
   restoreConversation,
   closeConversation,
@@ -37,13 +37,6 @@ import {
   ConversationsCenterError
 } from "../services/conversationsCenterService";
 import "./ConversationsPage.css";
-
-function newClientRequestId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 const FILTERS = [
   { id: "active", labelKey: "conversationsFilterActive" },
@@ -174,10 +167,6 @@ export default function ConversationsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [refreshSignal, setRefreshSignal] = useState(0);
-  const [composeText, setComposeText] = useState("");
-  const [composeSending, setComposeSending] = useState(false);
-  const [composeStatus, setComposeStatus] = useState(null);
-  const [composeRequestId, setComposeRequestId] = useState(() => newClientRequestId());
   const [phoneCopyStatus, setPhoneCopyStatus] = useState(null);
   const selectedPhoneRef = useRef(selectedPhone);
   selectedPhoneRef.current = selectedPhone;
@@ -257,9 +246,6 @@ export default function ConversationsPage() {
     // Clear prior conversation detail immediately so header never pairs with
     // another prospect's ownership/composer/transcript binding.
     setDetail(null);
-    setComposeText("");
-    setComposeStatus(null);
-    setComposeRequestId(newClientRequestId());
     setPhoneCopyStatus(null);
 
     if (selectedPhone) {
@@ -420,57 +406,11 @@ export default function ConversationsPage() {
     }
   }
 
-  async function onSendHumanReply(event) {
-    event.preventDefault();
-    const currentOwnership =
-      matchedDetail?.ownershipState ||
-      selectedItem?.ownershipState ||
-      null;
-    const effective = resolveEffectiveOwnership(currentOwnership);
-    if (!selectedPhone || !isHumanComposerEnabled(effective) || composeSending) {
-      return;
-    }
-
-    const text = composeText.trim();
-    if (!text) {
-      setComposeStatus({
-        type: "error",
-        message: translate("conversationsComposerEmpty")
-      });
-      return;
-    }
-
-    setComposeSending(true);
-    setComposeStatus(null);
-    const requestId = composeRequestId;
-
-    try {
-      const result = await sendHumanConversationReply(selectedPhone, {
-        message: text,
-        clientRequestId: requestId
-      });
-      setComposeText("");
-      setComposeRequestId(newClientRequestId());
-      setComposeStatus({
-        type: "success",
-        message: result.duplicateSuppressed
-          ? translate("conversationsComposerDuplicateOk")
-          : translate("conversationsComposerSent")
-      });
-      setRefreshSignal((n) => n + 1);
-      await loadList();
+  async function onComposerSent() {
+    setRefreshSignal((n) => n + 1);
+    await loadList();
+    if (selectedPhone) {
       await loadDetail(selectedPhone);
-    } catch (err) {
-      const code = err instanceof ConversationsCenterError ? err.code : null;
-      const message =
-        code === "WHATSAPP_TEMPLATE_REQUIRED_OUTSIDE_WINDOW"
-          ? translate("conversationsComposerWindowClosed")
-          : code === "COMPOSER_REQUIRES_HUMAN_OWNERSHIP"
-            ? translate("conversationsComposerRequiresHuman")
-            : err.message || translate("conversationsComposerFailed");
-      setComposeStatus({ type: "error", message });
-    } finally {
-      setComposeSending(false);
     }
   }
 
@@ -492,7 +432,6 @@ export default function ConversationsPage() {
   );
   // Sticky HUMAN remains HUMAN for controls; stall attention is a separate badge.
   const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
-  const humanComposerEnabled = isHumanComposerEnabled(effectiveOwnership);
   const showTakeOver = canTakeOverConversation(effectiveOwnership);
   const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
   const showAttentionWarning = shouldShowAttentionWarning({
@@ -505,6 +444,7 @@ export default function ConversationsPage() {
     effectiveOwnership
   });
   const headerRegions = conversationsThreadHeaderRegionOrder();
+  const threadRegions = conversationsThreadRegionOrder();
   const inboxLifecycle =
     selectedItem?.inboxLifecycle ||
     matchedDetail?.conversation?.inboxLifecycle ||
@@ -607,255 +547,224 @@ export default function ConversationsPage() {
             <p className="conversations-page__empty">{translate("conversationsSelectPrompt")}</p>
           ) : (
             <>
-              <div className="conversations-thread__pilot-sticky">
-                <div
-                  className="conversations-thread__header"
-                  data-header-regions={headerRegions.join(",")}
-                  data-testid="conversations-thread-header"
-                >
+              <div
+                className="conversations-thread__pane"
+                data-thread-regions={threadRegions.join(",")}
+                data-testid="conversations-thread-pane"
+              >
+                <div className="conversations-thread__header-sticky">
                   <div
-                    className="conversations-thread__identity"
-                    data-testid="conversations-thread-identity"
+                    className="conversations-thread__header"
+                    data-header-regions={headerRegions.join(",")}
+                    data-testid="conversations-thread-header"
                   >
-                    <h2
-                      className="conversations-thread__title"
-                      data-testid="conversations-thread-name"
-                    >
-                      {headerModel.name || headerModel.phone || selectedPhone}
-                    </h2>
-                    {headerModel.name && headerModel.phone ? (
-                      <div className="conversations-thread__phone-row">
-                        <p className="conversations-thread__phone" data-testid="conversations-full-phone">
-                          {headerModel.phone}
-                        </p>
-                        <button
-                          type="button"
-                          className="conversations-thread__copy"
-                          onClick={() => onCopyPhone(headerModel.phone)}
-                          aria-label={translate("conversationsCopyPhone")}
-                        >
-                          {phoneCopyStatus === "ok"
-                            ? translate("conversationsPhoneCopied")
-                            : phoneCopyStatus === "error"
-                              ? translate("conversationsPhoneCopyFailed")
-                              : translate("conversationsCopyPhone")}
-                        </button>
-                      </div>
-                    ) : headerModel.phone ? (
-                      <div className="conversations-thread__phone-row">
-                        <p className="conversations-thread__phone" data-testid="conversations-full-phone">
-                          {headerModel.phone}
-                        </p>
-                        <button
-                          type="button"
-                          className="conversations-thread__copy"
-                          onClick={() => onCopyPhone(headerModel.phone)}
-                          aria-label={translate("conversationsCopyPhone")}
-                        >
-                          {phoneCopyStatus === "ok"
-                            ? translate("conversationsPhoneCopied")
-                            : phoneCopyStatus === "error"
-                              ? translate("conversationsPhoneCopyFailed")
-                              : translate("conversationsCopyPhone")}
-                        </button>
-                      </div>
-                    ) : null}
                     <div
-                      className="conversations-thread__status"
-                      data-testid="conversations-thread-badges"
+                      className="conversations-thread__identity"
+                      data-testid="conversations-thread-identity"
                     >
-                      <StatusBadge variant={ownershipVariant(ownershipState)}>
-                        {ownershipLabel(ownershipState, translate)}
-                      </StatusBadge>
-                      {showAttentionWarning && ownershipState === "HUMAN" ? (
-                        <StatusBadge
-                          variant="danger"
-                          data-testid="conversations-attention-warning"
+                      <h2
+                        className="conversations-thread__title"
+                        data-testid="conversations-thread-name"
+                      >
+                        {headerModel.name || headerModel.phone || selectedPhone}
+                      </h2>
+                      {headerModel.phone ? (
+                        <div className="conversations-thread__phone-row">
+                          <p
+                            className="conversations-thread__phone"
+                            data-testid="conversations-full-phone"
+                          >
+                            {headerModel.phone}
+                          </p>
+                          <button
+                            type="button"
+                            className="conversations-thread__copy"
+                            onClick={() => onCopyPhone(headerModel.phone)}
+                            aria-label={translate("conversationsCopyPhone")}
+                          >
+                            {phoneCopyStatus === "ok"
+                              ? translate("conversationsPhoneCopied")
+                              : phoneCopyStatus === "error"
+                                ? translate("conversationsPhoneCopyFailed")
+                                : translate("conversationsCopyPhone")}
+                          </button>
+                        </div>
+                      ) : null}
+                      <div
+                        className="conversations-thread__status"
+                        data-testid="conversations-thread-badges"
+                      >
+                        <StatusBadge variant={ownershipVariant(ownershipState)}>
+                          {ownershipLabel(ownershipState, translate)}
+                        </StatusBadge>
+                        {showAttentionWarning && ownershipState === "HUMAN" ? (
+                          <StatusBadge
+                            variant="danger"
+                            data-testid="conversations-attention-warning"
+                          >
+                            {translate("conversationsAttentionWarning")}
+                          </StatusBadge>
+                        ) : null}
+                        {headerModel.inboxLifecycle ? (
+                          <StatusBadge variant="neutral">
+                            {lifecycleLabel(headerModel.inboxLifecycle, translate)}
+                          </StatusBadge>
+                        ) : null}
+                        {headerModel.appointmentStatus ? (
+                          <StatusBadge variant="info">
+                            {headerModel.appointmentStatus}
+                          </StatusBadge>
+                        ) : null}
+                        {headerModel.source ? (
+                          <StatusBadge variant="neutral">{headerModel.source}</StatusBadge>
+                        ) : null}
+                        {showConversationGoalChip ? (
+                          <StatusBadge variant="info">
+                            {headerModel.conversationGoal}
+                          </StatusBadge>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div
+                      className="conversations-thread__actions"
+                      data-testid="conversations-thread-actions"
+                      data-effective-ownership={effectiveOwnership}
+                      data-attention-state={
+                        ownershipState === "NEEDS_ATTENTION"
+                          ? "NEEDS_ATTENTION"
+                          : "none"
+                      }
+                      data-thread-actions={threadActionIds.join(",")}
+                    >
+                      {threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
+                        <AtlasButton
+                          variant="primary"
+                          data-testid="conversations-take-over"
+                          disabled={actionBusy}
+                          onClick={onTakeOver}
                         >
-                          {translate("conversationsAttentionWarning")}
-                        </StatusBadge>
+                          {translate("conversationsTakeOver")}
+                        </AtlasButton>
                       ) : null}
-                      {headerModel.inboxLifecycle ? (
-                        <StatusBadge variant="neutral">
-                          {lifecycleLabel(headerModel.inboxLifecycle, translate)}
-                        </StatusBadge>
+                      {threadActionIds.includes("RETURN_TO_ATLAS") &&
+                      showReturnToAtlas ? (
+                        <AtlasButton
+                          variant="secondary"
+                          data-testid="conversations-return-to-atlas"
+                          disabled={actionBusy}
+                          onClick={onReturnToAtlas}
+                        >
+                          {translate("conversationsReturnToAtlas")}
+                        </AtlasButton>
                       ) : null}
-                      {headerModel.appointmentStatus ? (
-                        <StatusBadge variant="info">
-                          {headerModel.appointmentStatus}
-                        </StatusBadge>
+                      {timelineProspectId ? (
+                        <Link
+                          to={buildMissionControlPath({
+                            prospectId: timelineProspectId,
+                            ...(selectedPhone ? { phone: selectedPhone } : {})
+                          })}
+                          className="atlas-ui-button atlas-ui-button--secondary"
+                          data-testid="conversations-open-mission-control"
+                        >
+                          {translate("conversationsOpenInMissionControl")}
+                        </Link>
                       ) : null}
-                      {headerModel.source ? (
-                        <StatusBadge variant="neutral">{headerModel.source}</StatusBadge>
+                      {lifecycleActionIds.includes("ARCHIVE") ? (
+                        <AtlasButton
+                          variant="secondary"
+                          data-testid="conversations-archive"
+                          disabled={actionBusy}
+                          onClick={onArchive}
+                        >
+                          {translate("conversationsArchive")}
+                        </AtlasButton>
                       ) : null}
-                      {showConversationGoalChip ? (
-                        <StatusBadge variant="info">
-                          {headerModel.conversationGoal}
-                        </StatusBadge>
+                      {lifecycleActionIds.includes("CLOSE") ? (
+                        <div
+                          className={`conversations-thread__close${
+                            actionBusy ? " is-disabled" : ""
+                          }`}
+                          data-testid="conversations-close"
+                        >
+                          <AtlasSelect
+                            value=""
+                            placeholder={translate("conversationsClose")}
+                            options={CLOSE_REASONS.map((reason) => ({
+                              value: reason,
+                              label: translate(`conversationsCloseReason_${reason}`)
+                            }))}
+                            onChange={(reason) => {
+                              if (reason) {
+                                onClose(reason);
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                      {lifecycleActionIds.includes("MARK_TEST") ? (
+                        <AtlasButton
+                          variant="secondary"
+                          data-testid="conversations-mark-test"
+                          disabled={actionBusy}
+                          onClick={onMarkTest}
+                        >
+                          {translate("conversationsMarkTest")}
+                        </AtlasButton>
+                      ) : null}
+                      {lifecycleActionIds.includes("RESTORE") ? (
+                        <AtlasButton
+                          variant="primary"
+                          data-testid="conversations-restore"
+                          disabled={actionBusy}
+                          onClick={onRestore}
+                        >
+                          {translate("conversationsRestore")}
+                        </AtlasButton>
                       ) : null}
                     </div>
                   </div>
-                  <div
-                    className="conversations-thread__actions"
-                    data-testid="conversations-thread-actions"
-                    data-effective-ownership={effectiveOwnership}
-                    data-attention-state={
-                      ownershipState === "NEEDS_ATTENTION" ? "NEEDS_ATTENTION" : "none"
-                    }
-                    data-thread-actions={threadActionIds.join(",")}
-                  >
-                    {threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
-                      <AtlasButton
-                        variant="primary"
-                        data-testid="conversations-take-over"
-                        disabled={actionBusy}
-                        onClick={onTakeOver}
-                      >
-                        {translate("conversationsTakeOver")}
-                      </AtlasButton>
-                    ) : null}
-                    {threadActionIds.includes("RETURN_TO_ATLAS") && showReturnToAtlas ? (
-                      <AtlasButton
-                        variant="secondary"
-                        data-testid="conversations-return-to-atlas"
-                        disabled={actionBusy}
-                        onClick={onReturnToAtlas}
-                      >
-                        {translate("conversationsReturnToAtlas")}
-                      </AtlasButton>
-                    ) : null}
-                    {timelineProspectId ? (
-                      <Link
-                        to={buildMissionControlPath({
-                          prospectId: timelineProspectId,
-                          ...(selectedPhone ? { phone: selectedPhone } : {})
-                        })}
-                        className="atlas-ui-button atlas-ui-button--secondary"
-                        data-testid="conversations-open-mission-control"
-                      >
-                        {translate("conversationsOpenInMissionControl")}
-                      </Link>
-                    ) : null}
-                    {lifecycleActionIds.includes("ARCHIVE") ? (
-                      <AtlasButton
-                        variant="secondary"
-                        data-testid="conversations-archive"
-                        disabled={actionBusy}
-                        onClick={onArchive}
-                      >
-                        {translate("conversationsArchive")}
-                      </AtlasButton>
-                    ) : null}
-                    {lifecycleActionIds.includes("CLOSE") ? (
-                      <div
-                        className={`conversations-thread__close${actionBusy ? " is-disabled" : ""}`}
-                        data-testid="conversations-close"
-                      >
-                        <AtlasSelect
-                          value=""
-                          placeholder={translate("conversationsClose")}
-                          options={CLOSE_REASONS.map((reason) => ({
-                            value: reason,
-                            label: translate(`conversationsCloseReason_${reason}`)
-                          }))}
-                          onChange={(reason) => {
-                            if (reason) {
-                              onClose(reason);
-                            }
-                          }}
-                        />
-                      </div>
-                    ) : null}
-                    {lifecycleActionIds.includes("MARK_TEST") ? (
-                      <AtlasButton
-                        variant="secondary"
-                        data-testid="conversations-mark-test"
-                        disabled={actionBusy}
-                        onClick={onMarkTest}
-                      >
-                        {translate("conversationsMarkTest")}
-                      </AtlasButton>
-                    ) : null}
-                    {lifecycleActionIds.includes("RESTORE") ? (
-                      <AtlasButton
-                        variant="primary"
-                        data-testid="conversations-restore"
-                        disabled={actionBusy}
-                        onClick={onRestore}
-                      >
-                        {translate("conversationsRestore")}
-                      </AtlasButton>
-                    ) : null}
-                  </div>
                 </div>
 
-                <form
-                  className={`conversations-composer${humanComposerEnabled ? " is-human" : " is-disabled"}`}
-                  onSubmit={onSendHumanReply}
-                  data-testid="conversations-human-composer"
-                  data-enabled={humanComposerEnabled ? "true" : "false"}
+                <div
+                  className="conversations-thread__transcript"
+                  data-testid="conversations-thread-transcript"
                 >
-                  <label className="conversations-composer__label" htmlFor="conversations-composer-input">
-                    {translate("conversationsComposerLabel")}
-                  </label>
-                  <textarea
-                    id="conversations-composer-input"
-                    className="conversations-composer__input"
-                    rows={3}
-                    value={composeText}
-                    disabled={!humanComposerEnabled || composeSending}
-                    placeholder={
-                      humanComposerEnabled
-                        ? translate("conversationsComposerPlaceholder")
-                        : translate("conversationsComposerDisabled")
-                    }
-                    onChange={(event) => setComposeText(event.target.value)}
-                  />
-                  <div className="conversations-composer__footer">
-                    {composeStatus ? (
-                      <p
-                        className={`conversations-composer__status conversations-composer__status--${composeStatus.type}`}
-                        role="status"
-                      >
-                        {composeStatus.message}
-                      </p>
-                    ) : (
-                      <span className="conversations-composer__hint">
-                        {humanComposerEnabled
-                          ? translate("conversationsComposerHint")
-                          : translate("conversationsComposerRequiresHuman")}
-                      </span>
-                    )}
-                    <AtlasButton
-                      type="submit"
-                      variant="primary"
-                      busy={composeSending}
-                      disabled={
-                        !humanComposerEnabled ||
-                        composeSending ||
-                        !composeText.trim()
-                      }
-                    >
-                      {composeSending
-                        ? translate("conversationsComposerSending")
-                        : translate("conversationsComposerSend")}
-                    </AtlasButton>
-                  </div>
-                </form>
-              </div>
+                  {timelineProspectId ? (
+                    <CommunicationsCenterTimeline
+                      key={`cc-timeline:${timelineProspectId}`}
+                      prospectId={timelineProspectId}
+                      refreshSignal={refreshSignal}
+                      layout="conversation"
+                    />
+                  ) : detailLoading ? (
+                    <p className="conversations-page__empty">
+                      {translate("conversationsLoading")}
+                    </p>
+                  ) : (
+                    <p className="conversations-page__empty">
+                      {translate("conversationsNoTranscript")}
+                    </p>
+                  )}
+                </div>
 
-              {timelineProspectId ? (
-                <CommunicationsCenterTimeline
-                  key={`cc-timeline:${timelineProspectId}`}
-                  prospectId={timelineProspectId}
-                  refreshSignal={refreshSignal}
-                  layout="conversation"
-                />
-              ) : detailLoading ? (
-                <p className="conversations-page__empty">{translate("conversationsLoading")}</p>
-              ) : (
-                <p className="conversations-page__empty">{translate("conversationsNoTranscript")}</p>
-              )}
+                <div
+                  className="conversations-thread__composer-sticky"
+                  data-testid="conversations-composer-sticky"
+                >
+                  <HumanWhatsAppComposer
+                    phone={selectedPhone}
+                    controlled
+                    ownershipState={ownershipState}
+                    customerCareWindow={matchedDetail?.customerCareWindow ?? null}
+                    variant="sticky"
+                    showHeader={false}
+                    showPhone={false}
+                    titleKey="conversationsComposerLabel"
+                    testId="conversations-human-composer"
+                    onSent={onComposerSent}
+                  />
+                </div>
+              </div>
             </>
           )}
         </section>

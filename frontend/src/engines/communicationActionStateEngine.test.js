@@ -192,7 +192,7 @@ test("resolveCommunicationActions always returns the full communication catalog"
   );
 });
 
-test("enabled actions keep the one-click hint subtitle", () => {
+test("custom WhatsApp uses native composer hint subtitle", () => {
   const actions = resolveCommunicationActions(buildWorkspace(), {
     translate,
     organizationSettings
@@ -201,7 +201,7 @@ test("enabled actions keep the one-click hint subtitle", () => {
   const custom = findAction(actions, COMMUNICATION_ACTION_IDS.CUSTOM);
 
   assert.equal(custom.enabled, true);
-  assert.equal(custom.subtitle, "whatsappActionOneClickHint");
+  assert.equal(custom.subtitle, "whatsappActionNativeComposerHint");
 });
 
 test("result pending gate keeps follow-up communications and hides pre-interview invitations", () => {
