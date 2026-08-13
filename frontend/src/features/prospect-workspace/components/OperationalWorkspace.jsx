@@ -3,6 +3,7 @@ import { useLanguage } from "../../../i18n/LanguageContext";
 import QuickActionsPanel from "./QuickActionsPanel";
 import CommunicationActionsPanel from "../../../components/communication/CommunicationActionsPanel";
 import HumanWhatsAppComposer from "../../../components/communication/HumanWhatsAppComposer";
+import InterviewWhatsAppTemplateConfirm from "../../../components/communication/InterviewWhatsAppTemplateConfirm";
 import OperationalInterviewPanel from "./OperationalInterviewPanel";
 import WorkflowGatePanel from "../../../components/WorkflowGatePanel";
 import WorkflowCompleteBanner from "../../../components/WorkflowCompleteBanner";
@@ -32,7 +33,17 @@ function OperationalWorkspace({
   onCloseCustomWhatsAppComposer = null,
   onCustomWhatsAppSent = null,
   onCustomWhatsAppSuccessToast = null,
-  onCustomWhatsAppErrorToast = null
+  onCustomWhatsAppErrorToast = null,
+  interviewComposerSession = null,
+  onCloseInterviewComposer = null,
+  onInterviewComposerSent = null,
+  onInterviewComposerSuccessToast = null,
+  onInterviewComposerErrorToast = null,
+  interviewTemplateSession = null,
+  interviewTemplateBusy = false,
+  interviewTemplateError = null,
+  onCloseInterviewTemplate = null,
+  onConfirmInterviewTemplate = null
 }) {
   const { translate } = useLanguage();
 
@@ -96,6 +107,31 @@ function OperationalWorkspace({
             onSuccessToast={onCustomWhatsAppSuccessToast}
             onErrorToast={onCustomWhatsAppErrorToast}
             onSent={onCustomWhatsAppSent}
+          />
+        ) : null}
+
+        {interviewComposerSession ? (
+          <HumanWhatsAppComposer
+            phone={interviewComposerSession.phone || workspace?.phone}
+            workspace={workspace}
+            initialMessage={interviewComposerSession.message}
+            variant="inline"
+            titleKey={interviewComposerSession.titleKey}
+            testId="workspace-interview-whatsapp-composer"
+            onClose={onCloseInterviewComposer}
+            onSuccessToast={onInterviewComposerSuccessToast}
+            onErrorToast={onInterviewComposerErrorToast}
+            onSent={onInterviewComposerSent}
+          />
+        ) : null}
+
+        {interviewTemplateSession ? (
+          <InterviewWhatsAppTemplateConfirm
+            session={interviewTemplateSession}
+            busy={interviewTemplateBusy}
+            error={interviewTemplateError}
+            onCancel={onCloseInterviewTemplate}
+            onConfirm={onConfirmInterviewTemplate}
           />
         ) : null}
 

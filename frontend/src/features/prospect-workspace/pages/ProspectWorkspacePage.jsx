@@ -30,6 +30,7 @@ import { useConfirmDialog } from "../hooks/useConfirmDialog";
 import { usePromptDialog } from "../../../hooks/usePromptDialog";
 import { useUniversalNote } from "../../../hooks/useUniversalNote";
 import { useCommunicationPreview } from "../../../hooks/useCommunicationPreview";
+import { useNativeInterviewWhatsApp } from "../../../hooks/useNativeInterviewWhatsApp";
 import CommunicationPreviewDialog from "../../../components/communication/CommunicationPreviewDialog";
 import { resolveNoteContextFromWorkspace } from "../../../engines/notesEngine";
 import { useWorkspaceKeyboardShortcuts } from "../hooks/useWorkspaceKeyboardShortcuts";
@@ -113,6 +114,12 @@ export default function ProspectWorkspacePage() {
     onRecorded: refreshWorkspace
   });
 
+  const nativeInterviewWhatsApp = useNativeInterviewWhatsApp({
+    translate,
+    showToast,
+    onRecorded: refreshWorkspace
+  });
+
   const actions = useWorkspaceActions({
     workspace,
     prospectCoreId,
@@ -121,7 +128,8 @@ export default function ProspectWorkspacePage() {
     showToast,
     confirm,
     prompt,
-    communicationPreview
+    communicationPreview,
+    nativeInterviewWhatsApp
   });
 
   useWorkspaceKeyboardShortcuts({
@@ -271,6 +279,20 @@ export default function ProspectWorkspacePage() {
           await refreshWorkspace();
           setActivityRefreshSignal((n) => n + 1);
         }}
+        interviewComposerSession={nativeInterviewWhatsApp.composerSession}
+        onCloseInterviewComposer={nativeInterviewWhatsApp.closeComposer}
+        onInterviewComposerSent={async () => {
+          nativeInterviewWhatsApp.closeComposer();
+          await refreshWorkspace();
+          setActivityRefreshSignal((n) => n + 1);
+        }}
+        interviewTemplateSession={nativeInterviewWhatsApp.templateSession}
+        interviewTemplateBusy={nativeInterviewWhatsApp.busy}
+        interviewTemplateError={nativeInterviewWhatsApp.error}
+        onCloseInterviewTemplate={nativeInterviewWhatsApp.closeTemplateSession}
+        onConfirmInterviewTemplate={nativeInterviewWhatsApp.confirmApprovedTemplateSend}
+        onInterviewComposerSuccessToast={showToast?.showSuccess}
+        onInterviewComposerErrorToast={showToast?.showError}
       />
 
       <CommunicationHistorySection

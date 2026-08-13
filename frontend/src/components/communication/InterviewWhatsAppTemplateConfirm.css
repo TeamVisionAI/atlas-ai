@@ -1,0 +1,67 @@
+.interview-wa-template-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+}
+
+.interview-wa-template-confirm__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.interview-wa-template-confirm__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7f1d1d;
+}
+
+.interview-wa-template-confirm__subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #9f1239;
+  font-weight: 600;
+}
+
+.interview-wa-template-confirm__meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.interview-wa-template-confirm__meta dt {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.interview-wa-template-confirm__meta dd {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.interview-wa-template-confirm__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.interview-wa-template-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}

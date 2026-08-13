@@ -150,6 +150,8 @@ test("24-hour window: open allows freeform; closed blocks and warns", () => {
   );
   assert.match(composer, /conversationsComposerWindowClosed/);
   assert.match(composer, /window-warning/);
+  assert.match(composer, /translate\("commonCancel"\)/);
+  assert.doesNotMatch(composer, /commonCancel"\) \|\|/);
   assert.doesNotMatch(composer, /invalid_grant|GRAPH_API|access token/i);
 });
 

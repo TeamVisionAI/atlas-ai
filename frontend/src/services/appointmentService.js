@@ -272,6 +272,13 @@ async function executeSendAppointmentCommunication({
     return { success: false, message: result?.message };
   }
 
+  // Outside-window native Meta template delivery — stay in Atlas (no wa.me).
+  if (result.deliveryMode === "automatic" || result.opensWaMe === false) {
+    showSuccess?.(translate(result.toastKey || "whatsappNativeTemplateSent"));
+    await onRecorded?.(result);
+    return { success: true, ...result };
+  }
+
   try {
     await copyMessageToClipboard(result.message);
   } catch {
