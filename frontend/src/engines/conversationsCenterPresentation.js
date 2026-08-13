@@ -16,6 +16,8 @@ export function buildConversationHeaderModel({
   source = null,
   ownershipState = null,
   appointmentStatus = null,
+  canonicalMilestone = null,
+  currentStep = null,
   conversationGoal = null,
   inboxLifecycle = null,
   inboxCloseReason = null,
@@ -29,6 +31,13 @@ export function buildConversationHeaderModel({
     source: source || null,
     ownershipState: ownershipState || null,
     appointmentStatus: appointmentStatus || null,
+    canonicalMilestone: canonicalMilestone || null,
+    currentStep: currentStep || null,
+    statusBadge: resolveConversationsStatusBadge(
+      appointmentStatus,
+      canonicalMilestone,
+      currentStep
+    ),
     // Retained for diagnostics/API consumers; not shown in normal Conversations header.
     conversationGoal: conversationGoal || null,
     inboxLifecycle: inboxLifecycle || null,
@@ -38,15 +47,107 @@ export function buildConversationHeaderModel({
 }
 
 /**
- * Internal workflow goals (e.g. DAY_PART) must not appear as user-facing header chips.
+ * Qualification-brain / engine field tokens. Never render in Conversations RVP UI.
+ * Not Ruth-specific — any current_step / appointmentStatus / goal using these is internal.
+ */
+export const INTERNAL_QUALIFICATION_TOKENS = Object.freeze([
+  "DAY_PART",
+  "CITY",
+  "STATE",
+  "NAME",
+  "EMAIL",
+  "OCCUPATION",
+  "AUTHORIZATION",
+  "WORK_AUTHORIZATION",
+  "INTERVIEW_TYPE",
+  "SCHEDULE",
+  "PREFERRED_TIME",
+  "LANGUAGE",
+  "PREFERRED_LANGUAGE"
+]);
+
+/**
+ * Allowlisted Conversations status-badge tokens → compact RVP label.
+ * Fail closed: unknown enums do not render.
+ */
+export const CONVERSATION_STATUS_BADGE_LABELS = Object.freeze({
+  NEW: "NEW",
+  NEW_LEAD: "NEW",
+  GREETING: "GREETING",
+  GREETING_SENT: "GREETING",
+  QUALIFICATION: "QUALIFICATION",
+  QUALIFYING: "QUALIFICATION",
+  INTERVIEW_READY: "INTERVIEW_READY",
+  INTERVIEW_SCHEDULED: "INTERVIEW_SCHEDULED",
+  SCHEDULED: "SCHEDULED",
+  CONFIRMED: "CONFIRMED",
+  INTERVIEW_DUE: "INTERVIEW_DUE",
+  INTERVIEW_COMPLETED: "INTERVIEW_COMPLETED",
+  COMPLETED: "COMPLETED",
+  INTERVIEW_RESULT_PENDING: "INTERVIEW_RESULT_PENDING",
+  FOLLOW_UP: "FOLLOW_UP",
+  ORIENTATION: "ORIENTATION",
+  LICENSING: "LICENSING",
+  FAST_START: "FAST_START",
+  CLOSED: "CLOSED",
+  DO_NOT_CONTACT: "DO_NOT_CONTACT",
+  CANCELLED: "CANCELLED",
+  CANCELED: "CANCELLED",
+  NO_SHOW: "NO_SHOW",
+  RESCHEDULED: "RESCHEDULED",
+  PENDING_CONFIRMATION: "PENDING_CONFIRMATION",
+  IN_PROGRESS: "IN_PROGRESS"
+});
+
+export function normalizeConversationToken(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+export function isInternalQualificationToken(value) {
+  const token = normalizeConversationToken(value);
+  if (!token) {
+    return false;
+  }
+  if (token.includes("DAY_PART")) {
+    return true;
+  }
+  return INTERNAL_QUALIFICATION_TOKENS.includes(token);
+}
+
+/**
+ * Third Conversations header badge: user-facing lifecycle/status only.
+ * Tries appointment status, then canonical milestone, then current_step.
+ * Raw qualification tokens (DAY_PART, CITY, …) never win.
+ */
+export function resolveConversationsStatusBadge(...candidates) {
+  for (const candidate of candidates) {
+    const token = normalizeConversationToken(candidate);
+    if (!token || token === "NONE" || token === "NULL" || token === "UNDEFINED") {
+      continue;
+    }
+    if (isInternalQualificationToken(token)) {
+      continue;
+    }
+    const label = CONVERSATION_STATUS_BADGE_LABELS[token];
+    if (label) {
+      return label;
+    }
+  }
+  return null;
+}
+
+/**
+ * Campaign / conversation goals may be freeform, but internal field tokens must not chip.
  */
 export function isUserFacingConversationGoal(goal) {
   const value = String(goal || "").trim();
   if (!value) {
     return false;
   }
-  const normalized = value.toUpperCase().replace(/\s+/g, "_");
-  if (normalized === "DAY_PART" || normalized.includes("DAY_PART")) {
+  if (isInternalQualificationToken(value)) {
     return false;
   }
   return true;

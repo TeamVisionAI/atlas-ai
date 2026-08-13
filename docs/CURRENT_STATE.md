@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-08-13:** **Conversations status badge** — Third header badge is allowlisted lifecycle/status only. `current_step` qualification tokens (e.g. `DAY_PART`) must not leak. `appointment_status` is no longer silently substituted with `current_step`.
 - **2026-08-13:** **BR-080 ≠ BR-034** — Attention must not trigger stall clearance or false Conversations HUMAN. Durable stall = `stalledAt`/`stallEpisodeKey`. Read paths (MC/dashboard/queue) do not persist ownership. HUMAN requires sticky seal (`manualAgentOwnership` + `humanTakenOverAt`).
 - **2026-08-13:** **BR-139** — Canonical `INTERVIEW_READY` outranks stale QUAL_CAPTURE / brain gaps on Mission Control (Schedule Interview, no Complete Qualification contradiction). Read-time only; no QUAL_CAPTURE backfill.
 - **2026-08-12:** **BR-138** — WhatsApp inbound provider-message atomic claim (partial unique on `whatsapp:inbound:{wamid}` only; claim before locate/log/hub). Phase 3 QR first-turn still paused.

@@ -16,7 +16,9 @@ import {
   conversationsThreadHeaderRegionOrder,
   shouldShowAttentionWarning,
   isUserFacingConversationGoal,
-  shouldShowHandoffReasonInHeader
+  shouldShowHandoffReasonInHeader,
+  resolveConversationsStatusBadge,
+  isInternalQualificationToken
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
 import { translations } from "../i18n/translations.js";
@@ -201,14 +203,61 @@ test("OPEN IN MC / ABRIR EN MC labels; MC deep-link still uses prospectId", () =
     pageJsx,
     /buildMissionControlPath\(\{\s*prospectId:\s*timelineProspectId/
   );
+  assert.match(pageJsx, /headerModel\.statusBadge/);
+  assert.doesNotMatch(
+    pageJsx,
+    /headerModel\.appointmentStatus\s*\?\s*\(\s*<StatusBadge/
+  );
 });
 
 test("DAY_PART and handoff reason stay out of the normal Conversations header", () => {
   assert.equal(isUserFacingConversationGoal("DAY_PART"), false);
   assert.equal(isUserFacingConversationGoal("day_part"), false);
+  assert.equal(isUserFacingConversationGoal("CITY"), false);
   assert.equal(isUserFacingConversationGoal("Interview Ready"), true);
   assert.equal(shouldShowHandoffReasonInHeader(), false);
   assert.equal(shouldShowHandoffReasonInHeader("take_over"), false);
+});
+
+test("status badge allowlists lifecycle tokens and never leaks qualification fields", () => {
+  assert.equal(isInternalQualificationToken("DAY_PART"), true);
+  assert.equal(isInternalQualificationToken("WORK_AUTHORIZATION"), true);
+  assert.equal(resolveConversationsStatusBadge("NEW"), "NEW");
+  assert.equal(resolveConversationsStatusBadge("NEW_LEAD"), "NEW");
+  assert.equal(
+    resolveConversationsStatusBadge("DAY_PART", "QUALIFICATION", "NEW"),
+    "QUALIFICATION"
+  );
+  assert.equal(
+    resolveConversationsStatusBadge("DAY_PART", null, "CITY"),
+    null
+  );
+  assert.equal(resolveConversationsStatusBadge("none", "DAY_PART"), null);
+  assert.equal(resolveConversationsStatusBadge("confirmed"), "CONFIRMED");
+
+  const ruthLike = buildConversationHeaderModel({
+    name: "Ruth Dismary Vizcaíno",
+    phone: "+17879398651",
+    source: "FACEBOOK",
+    ownershipState: "HUMAN",
+    appointmentStatus: "DAY_PART",
+    canonicalMilestone: "QUALIFICATION",
+    currentStep: "DAY_PART",
+    inboxLifecycle: "ACTIVE"
+  });
+  assert.equal(ruthLike.statusBadge, "QUALIFICATION");
+  assert.notEqual(ruthLike.statusBadge, "DAY_PART");
+
+  const yasmanyLike = buildConversationHeaderModel({
+    name: "Yasmany",
+    source: "FACEBOOK",
+    ownershipState: "HUMAN",
+    appointmentStatus: null,
+    canonicalMilestone: "NEW_LEAD",
+    currentStep: "NEW",
+    inboxLifecycle: "ACTIVE"
+  });
+  assert.equal(yasmanyLike.statusBadge, "NEW");
 });
 
 test("Conversations Center newest-first keeps older messages deterministic below", () => {
