@@ -202,9 +202,68 @@ function resolveTargetMilestone(outcome, capturedFields = {}) {
         : MILESTONES.QUALIFICATION;
     case "Information Collected":
     case "Interested":
+      // When MC qualification facts are already complete, land on interview-ready.
+      if (
+        capturedFields.authorization !== false &&
+        capturedFields.city &&
+        capturedFields.state &&
+        (capturedFields.interviewType || capturedFields.interview_type)
+      ) {
+        return MILESTONES.INTERVIEW_READY;
+      }
+      return MILESTONES.QUALIFICATION;
     default:
       return MILESTONES.QUALIFICATION;
   }
+}
+
+/**
+ * After Mission Control required-information save: stay in QUALIFICATION while form
+ * gaps remain; advance to INTERVIEW_READY when pre-schedule qualification is complete
+ * and work auth is not denied. Does not invent a new milestone.
+ */
+function resolveRequiredInformationTargetMilestone({
+  prospect,
+  fields = {},
+  captureState = null
+} = {}) {
+  const authorization =
+    fields.work_authorization_status !== undefined
+      ? fields.work_authorization_status
+      : prospect?.work_authorized;
+
+  if (authorization === false) {
+    return MILESTONES.QUALIFICATION;
+  }
+
+  const simulatedProspect = {
+    ...prospect,
+    city: fields.city !== undefined ? fields.city : prospect?.city,
+    state: fields.state !== undefined ? fields.state : prospect?.state,
+    work_authorized: authorization,
+    interview_type:
+      fields.interview_type !== undefined
+        ? mapUiInterviewTypeToBackend(fields.interview_type) || fields.interview_type
+        : prospect?.interview_type,
+    preferred_language:
+      fields.preferred_language !== undefined
+        ? fields.preferred_language
+        : prospect?.preferred_language,
+    occupation:
+      fields.occupation !== undefined ? fields.occupation : prospect?.occupation
+  };
+
+  const profile = buildProfileFromProspect(simulatedProspect);
+  const gaps = getQualificationFormGaps(simulatedProspect, profile, {
+    notes: prospect?.notes || null,
+    captureState: captureState || parseQualificationCapture(prospect?.notes)
+  });
+
+  if (gaps.length > 0) {
+    return MILESTONES.QUALIFICATION;
+  }
+
+  return MILESTONES.INTERVIEW_READY;
 }
 
 function mapOutcomeToAgentState(outcome) {
@@ -894,8 +953,45 @@ async function saveRequiredInformation(phone, body = {}) {
   const explicitProfileFields = resolveExplicitProfileFields(fields);
   const interactionNotes = buildRequiredInformationNotes(fieldKeysToLabels(changedKeys));
 
+  // Persist QUAL_CAPTURE markers before advancement so form-gap / INTERVIEW_READY
+  // checks and the post-save Mission Control read model see explicit facts.
+  let captureState = markCapturedFields(parseQualificationCapture(prospect.notes), {
+    city: fields.city,
+    state: fields.state,
+    authorization: fields.work_authorization_status,
+    interviewType: fields.interview_type
+  });
+
+  if (fields.interview_type) {
+    captureState = { ...captureState, dayPart: true };
+  }
+
+  const notesWithCapture = mergeNotesWithQualificationCapture(prospect.notes, captureState);
+  await updateProspect(prospect.phone, { notes: notesWithCapture });
+
+  const prospectForAdvance = {
+    ...prospect,
+    notes: notesWithCapture,
+    city: fields.city !== undefined ? fields.city : prospect.city,
+    state: fields.state !== undefined ? fields.state : prospect.state,
+    work_authorized:
+      fields.work_authorization_status !== undefined
+        ? fields.work_authorization_status
+        : prospect.work_authorized,
+    interview_type:
+      fields.interview_type !== undefined
+        ? mapUiInterviewTypeToBackend(fields.interview_type) || fields.interview_type
+        : prospect.interview_type
+  };
+
+  const targetMilestone = resolveRequiredInformationTargetMilestone({
+    prospect: prospectForAdvance,
+    fields,
+    captureState
+  });
+
   const advanceResult = await advanceProspectWorkflow(phone, {
-    targetMilestone: MILESTONES.QUALIFICATION,
+    targetMilestone,
     capturedFields,
     explicitProfileFields,
     interactionNotes,
@@ -907,23 +1003,6 @@ async function saveRequiredInformation(phone, body = {}) {
   }
 
   const updatedProspect = await findProspect(phone);
-
-  if (updatedProspect) {
-    let captureState = markCapturedFields(parseQualificationCapture(updatedProspect.notes), {
-      city: fields.city,
-      state: fields.state,
-      authorization: fields.work_authorization_status,
-      interviewType: fields.interview_type
-    });
-
-    if (fields.interview_type) {
-      captureState.dayPart = true;
-    }
-
-    await updateProspect(updatedProspect.phone, {
-      notes: mergeNotesWithQualificationCapture(updatedProspect.notes, captureState)
-    });
-  }
 
   await logConversation({
     phone,
@@ -1156,6 +1235,7 @@ module.exports = {
   buildSuggestedQualificationDefaults,
   getQualificationFormGaps,
   resolveExplicitProfileFields,
+  resolveRequiredInformationTargetMilestone,
   saveRequiredInformation,
   saveConversationOutcome
 };

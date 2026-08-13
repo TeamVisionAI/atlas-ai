@@ -212,6 +212,12 @@ function shouldGenerateScheduleInterviewMission({
     return false;
   }
 
+  // Durable INTERVIEW_READY means pre-schedule qualification is complete — expose
+  // Schedule Interview immediately without waiting for another inbound event.
+  if (workflow?.canonicalMilestone === MILESTONES.INTERVIEW_READY) {
+    return true;
+  }
+
   if (!needsInterviewSchedule({ conversationOutcome, brain })) {
     return false;
   }
