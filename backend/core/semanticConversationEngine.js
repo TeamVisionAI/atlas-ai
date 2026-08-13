@@ -866,8 +866,26 @@ async function syncProfileToProspect(prospect, profile, options = {}) {
   };
 
   if (options.language === "es" || options.language === "en") {
-    updates.language = options.language;
-    updates.communication_language = options.language;
+    const {
+      resolvePersistedLanguageUpdate,
+      hasAuthoritativePreferredLanguage
+    } = require("./prospectLanguage");
+
+    // Strong conversation language may sync preferred_language when not human-authoritative.
+    const languagePatch = resolvePersistedLanguageUpdate(prospect, options.language, {
+      message: options.message || prospect.last_message || null,
+      requireStrongSignal: true
+    });
+    if (languagePatch) {
+      Object.assign(updates, languagePatch);
+    } else if (hasAuthoritativePreferredLanguage(prospect)) {
+      // Keep preferred sticky; still mirror pipeline codes for CE continuity.
+      updates.language = options.language;
+      updates.communication_language = options.language;
+    } else {
+      updates.language = options.language;
+      updates.communication_language = options.language;
+    }
   }
 
   if (profile.city) {
@@ -1073,7 +1091,7 @@ async function handleSemanticMessage({
   }
 
   if (extracted.authorizationAmbiguous) {
-    await syncProfileToProspect(prospect, profile, { language, captureState });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
     const handoffReply = getHandoffMessage(language);
 
     await recordLog({
@@ -1115,7 +1133,7 @@ async function handleSemanticMessage({
 
   if (extracted.authorization === false) {
     captureState.authorization = true;
-    await syncProfileToProspect(prospect, profile, { language, captureState });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
     const deniedReply = getAuthorizationDeniedMessage(language);
 
     await recordLog({
@@ -1215,7 +1233,7 @@ async function handleSemanticMessage({
 
   if (rulesResult.escalation?.needsHumanCoordinator) {
     prospect.last_message = cleanMessage;
-    await syncProfileToProspect(prospect, profile, { language, captureState });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
@@ -1344,7 +1362,7 @@ async function handleSemanticMessage({
   const informationalReply = interruptionReply;
 
   prospect.last_message = cleanMessage;
-  await syncProfileToProspect(prospect, profile, { language, captureState });
+  await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
   prospect = await findProspect(phone);
   profile = buildProfileFromProspect(prospect, channel);
   captureState = parseQualificationCapture(prospect.notes);
@@ -1362,7 +1380,7 @@ async function handleSemanticMessage({
   }
 
   if (postSyncRules.escalation?.needsHumanCoordinator) {
-    await syncProfileToProspect(prospect, profile, { language, captureState });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     await recordLog({
@@ -1382,7 +1400,7 @@ async function handleSemanticMessage({
   }
 
   if (postSyncRules.profile.interviewType !== prospect.interview_type) {
-    await syncProfileToProspect(prospect, profile, { language, captureState });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
     prospect = await findProspect(phone);
     profile = buildProfileFromProspect(prospect, channel);
     captureState = parseQualificationCapture(prospect.notes);
@@ -1462,7 +1480,7 @@ async function handleSemanticMessage({
         localZoomSwitch: false
       });
 
-      await syncProfileToProspect(prospect, profile, { language, captureState });
+      await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
 
       await recordLog({
         phone,
@@ -1619,7 +1637,7 @@ async function handleSemanticMessage({
       localZoomSwitch
     });
 
-    await syncProfileToProspect(prospect, profile, { language, captureState });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
 
     await recordLog({
       phone,
@@ -1651,7 +1669,7 @@ async function handleSemanticMessage({
     dayPartMiss
   });
 
-  await syncProfileToProspect(prospect, profile, { language, captureState });
+  await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
   prospect = await findProspect(phone);
 
   await recordLog({
