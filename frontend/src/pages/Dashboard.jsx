@@ -13,6 +13,7 @@ import {
 } from "../adapters/missionControlAdapter";
 import WorkflowCompleteBanner from "../components/WorkflowCompleteBanner";
 import CommunicationActionsPanel from "../components/communication/CommunicationActionsPanel";
+import HumanWhatsAppComposer from "../components/communication/HumanWhatsAppComposer";
 import MissionActionCenter from "../components/mission-control/MissionActionCenter";
 import MissionControlWorkspaceHeader from "../components/mission-control/MissionControlWorkspaceHeader";
 import MissionControlExecutionPanel from "../components/mission-control/MissionControlExecutionPanel";
@@ -23,6 +24,7 @@ import {
   isWhatsAppCopyAction
 } from "../services/whatsappCommunicationService";
 import { executeCommunicationAction } from "../engines/communicationActionEngine";
+import { isNativeHumanWhatsAppComposerAction } from "../engines/humanWhatsAppComposer";
 import { executeScheduleInterview } from "../services/missionExecutionService";
 import {
   fetchProspectMissions,
@@ -208,6 +210,7 @@ export default function Dashboard() {
   const [actionError, setActionError] = useState(null);
   const [organizationSettings, setOrganizationSettings] = useState(null);
   const [expandedMissionActionId, setExpandedMissionActionId] = useState(null);
+  const [customWhatsAppComposerOpen, setCustomWhatsAppComposerOpen] = useState(false);
   const [executionSubmitting, setExecutionSubmitting] = useState(false);
   const [executionError, setExecutionError] = useState(null);
   const [qualificationDraftActive, setQualificationDraftActive] = useState(false);
@@ -365,6 +368,7 @@ export default function Dashboard() {
   useEffect(() => {
     setExpandedMissionActionId(null);
     setQualificationDraftActive(false);
+    setCustomWhatsAppComposerOpen(false);
     refreshMissions(phone);
   }, [phone, refreshMissions]);
 
@@ -790,6 +794,12 @@ export default function Dashboard() {
         return;
       }
 
+      if (isNativeHumanWhatsAppComposerAction(actionId)) {
+        // UI-only open — never TAKE OVER / mutate ownership.
+        setCustomWhatsAppComposerOpen(true);
+        return;
+      }
+
       if (isWhatsAppCopyAction(actionId)) {
         await runCommunicationAction(actionId);
         return;
@@ -821,6 +831,11 @@ export default function Dashboard() {
   const handleMissionActionImmediate = useCallback(
     async (actionId) => {
       setActionError(null);
+
+      if (isNativeHumanWhatsAppComposerAction(actionId)) {
+        setCustomWhatsAppComposerOpen(true);
+        return;
+      }
 
       if (isWhatsAppCopyAction(actionId)) {
         if (!phone) {
@@ -1261,6 +1276,23 @@ export default function Dashboard() {
               noteSaving={noteSaving}
               busy={executionSubmitting || prospectLoading || noteSaving}
             />
+
+            {customWhatsAppComposerOpen ? (
+              <HumanWhatsAppComposer
+                phone={phone}
+                workspace={workspace}
+                variant="inline"
+                testId="mc-custom-whatsapp-composer"
+                onClose={() => setCustomWhatsAppComposerOpen(false)}
+                onSuccessToast={showSuccess}
+                onErrorToast={showError}
+                onSent={async () => {
+                  await refreshCurrentWorkspace();
+                  await refreshMissions(phone);
+                  await recalculateMissions({ prospectPhone: phone }).catch(() => {});
+                }}
+              />
+            ) : null}
 
             <MissionControlExecutionPanel
               workspace={workspace}

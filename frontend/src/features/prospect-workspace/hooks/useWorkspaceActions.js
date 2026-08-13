@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   MissionControlError,
   postMissionControlAction
@@ -15,6 +15,7 @@ import {
   isWhatsAppCopyAction
 } from "../../../services/whatsappCommunicationService";
 import { executeCommunicationAction } from "../../../engines/communicationActionEngine";
+import { isNativeHumanWhatsAppComposerAction } from "../../../engines/humanWhatsAppComposer";
 import { updateProspectCommunicationLanguage, ProspectWorkspaceError } from "../services/prospectWorkspaceApi";
 import {
   archiveProspect,
@@ -46,6 +47,20 @@ export function useWorkspaceActions({
   const [scheduleError, setScheduleError] = useState(null);
   const [rescheduleAppointment, setRescheduleAppointment] = useState(null);
   const [scheduleActionBusy, setScheduleActionBusy] = useState(false);
+  const [customWhatsAppComposerOpen, setCustomWhatsAppComposerOpen] = useState(false);
+
+  const openCustomWhatsAppComposer = useCallback(() => {
+    // UI-only — never TAKE OVER / mutate ownership.
+    setCustomWhatsAppComposerOpen(true);
+  }, []);
+
+  const closeCustomWhatsAppComposer = useCallback(() => {
+    setCustomWhatsAppComposerOpen(false);
+  }, []);
+
+  useEffect(() => {
+    setCustomWhatsAppComposerOpen(false);
+  }, [workspace?.phone]);
 
   const handleOrganizationResourceMissing = useCallback(
     (resourceKey) => {
@@ -132,6 +147,12 @@ export function useWorkspaceActions({
           onOrganizationResourceMissing: handleOrganizationResourceMissing,
           onRecorded: refreshWorkspace
         });
+        setPendingActionId(null);
+        return;
+      }
+
+      if (isNativeHumanWhatsAppComposerAction(actionId)) {
+        openCustomWhatsAppComposer();
         setPendingActionId(null);
         return;
       }
@@ -231,7 +252,7 @@ export function useWorkspaceActions({
         setPendingActionId(null);
       }
     },
-    [workspace?.phone, workspace?.interview?.appointmentId, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer, communicationPreview]
+    [workspace?.phone, workspace?.interview?.appointmentId, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer, communicationPreview, openCustomWhatsAppComposer]
   );
 
   const runLifecycleAction = useCallback(
@@ -533,6 +554,9 @@ export function useWorkspaceActions({
     handleLifecycleAction,
     handleCommunicationLanguageChange,
     handleOrganizationResourceMissing,
+    customWhatsAppComposerOpen,
+    openCustomWhatsAppComposer,
+    closeCustomWhatsAppComposer,
     prospectEditorOpen,
     handleProspectEditorClose,
     handleProspectEditorSaved,

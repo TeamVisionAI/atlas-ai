@@ -2,6 +2,7 @@ import { memo } from "react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import QuickActionsPanel from "./QuickActionsPanel";
 import CommunicationActionsPanel from "../../../components/communication/CommunicationActionsPanel";
+import HumanWhatsAppComposer from "../../../components/communication/HumanWhatsAppComposer";
 import OperationalInterviewPanel from "./OperationalInterviewPanel";
 import WorkflowGatePanel from "../../../components/WorkflowGatePanel";
 import WorkflowCompleteBanner from "../../../components/WorkflowCompleteBanner";
@@ -26,7 +27,12 @@ function OperationalWorkspace({
   onGateComplete,
   onAddNote,
   onRefresh,
-  noteSaving = false
+  noteSaving = false,
+  customWhatsAppComposerOpen = false,
+  onCloseCustomWhatsAppComposer = null,
+  onCustomWhatsAppSent = null,
+  onCustomWhatsAppSuccessToast = null,
+  onCustomWhatsAppErrorToast = null
 }) {
   const { translate } = useLanguage();
 
@@ -79,6 +85,19 @@ function OperationalWorkspace({
           busy={Boolean(pendingActionId) || noteSaving}
           cardOrder={WORKSPACE_GENERAL_COMMUNICATION_ORDER}
         />
+
+        {customWhatsAppComposerOpen ? (
+          <HumanWhatsAppComposer
+            phone={workspace?.phone}
+            workspace={workspace}
+            variant="inline"
+            testId="workspace-custom-whatsapp-composer"
+            onClose={onCloseCustomWhatsAppComposer}
+            onSuccessToast={onCustomWhatsAppSuccessToast}
+            onErrorToast={onCustomWhatsAppErrorToast}
+            onSent={onCustomWhatsAppSent}
+          />
+        ) : null}
 
         {showGate ? (
           <WorkflowGatePanel

@@ -354,6 +354,15 @@ router.get("/:phone", async (req, res) => {
     const {
       buildConversationListItem
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
+    // Implements BR-075 — expose canonical customer-care window for composer UX
+    // (read-only; does not change send authorization, which still runs in the gate).
+    const {
+      evaluateCustomerCareWindow
+    } = require("../core/whatsappCustomerCareWindow");
+    const careWindow = await evaluateCustomerCareWindow({
+      phone: prospect.phone,
+      organizationId: prospect.organization_id || organizationId || null
+    });
 
     res.json({
       phone: prospect.phone || null,
@@ -361,6 +370,13 @@ router.get("/:phone", async (req, res) => {
       ownershipState: resolveConversationOwnershipState(persisted),
       handoffReason: persisted.handoffReason || null,
       handoffAt: persisted.handoffAt || null,
+      customerCareWindow: {
+        open: Boolean(careWindow?.open),
+        reason: careWindow?.reason || null,
+        latestInboundAt: careWindow?.latestInboundAt || null,
+        expiresAt: careWindow?.expiresAt || null,
+        windowMs: careWindow?.windowMs || null
+      },
       workflow: {
         workflowOwnership: persisted.workflowOwnership,
         needsHumanAttention: Boolean(persisted.needsHumanAttention),

@@ -367,7 +367,7 @@ export function resolveCommunicationActions(workspace, { translate, organization
       id: COMMUNICATION_ACTION_IDS.CUSTOM,
       icon: "💬",
       titleKey: "whatsappActionCustomMessage",
-      subtitleKey: "whatsappActionOneClickHint",
+      subtitleKey: "whatsappActionNativeComposerHint",
       variant: "default",
       evaluate: () => null
     }

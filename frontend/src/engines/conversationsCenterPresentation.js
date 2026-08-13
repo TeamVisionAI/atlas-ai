@@ -144,7 +144,7 @@ export function resolveLifecycleActionIds({
   return [];
 }
 
-/** Sticky operator strip order: identity+actions → composer → timeline. */
+/** Thread pane order: sticky header → scrollable transcript → sticky bottom composer. */
 export function conversationsThreadRegionOrder() {
-  return ["sticky_controls", "composer", "timeline"];
+  return ["sticky_controls", "timeline", "composer"];
 }

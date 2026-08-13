@@ -263,6 +263,14 @@ export default function ProspectWorkspacePage() {
         onAddNote={openAddNote}
         onRefresh={refreshWorkspace}
         noteSaving={noteSaving}
+        customWhatsAppComposerOpen={actions.customWhatsAppComposerOpen}
+        onCloseCustomWhatsAppComposer={actions.closeCustomWhatsAppComposer}
+        onCustomWhatsAppSuccessToast={showToast?.showSuccess}
+        onCustomWhatsAppErrorToast={showToast?.showError}
+        onCustomWhatsAppSent={async () => {
+          await refreshWorkspace();
+          setActivityRefreshSignal((n) => n + 1);
+        }}
       />
 
       <CommunicationHistorySection

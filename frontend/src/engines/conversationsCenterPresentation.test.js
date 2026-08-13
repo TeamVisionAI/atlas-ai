@@ -125,12 +125,32 @@ test("lifecycle actions: Active can archive/close/mark-test; Archived can restor
   assert.deepEqual(resolveLifecycleActionIds({ inboxLifecycle: "SCHEDULED" }), []);
 });
 
-test("sticky thread region places composer before timeline", () => {
+test("sticky thread region places composer after scrollable transcript", () => {
   assert.deepEqual(conversationsThreadRegionOrder(), [
     "sticky_controls",
-    "composer",
-    "timeline"
+    "timeline",
+    "composer"
   ]);
+
+  const pageJsx = fs.readFileSync(
+    path.join(__dirname, "../pages/ConversationsPage.jsx"),
+    "utf8"
+  );
+  const stickyIdx = pageJsx.indexOf('data-testid="conversations-composer-sticky"');
+  const transcriptIdx = pageJsx.indexOf('data-testid="conversations-thread-transcript"');
+  assert.ok(transcriptIdx > 0);
+  assert.ok(stickyIdx > transcriptIdx);
+  assert.match(pageJsx, /HumanWhatsAppComposer/);
+  assert.match(pageJsx, /variant="sticky"/);
+
+  const pageCss = fs.readFileSync(
+    path.join(__dirname, "../pages/ConversationsPage.css"),
+    "utf8"
+  );
+  assert.match(pageCss, /\.conversations-thread__composer-sticky\s*\{[^}]*position:\s*sticky/s);
+  assert.match(pageCss, /\.conversations-thread__composer-sticky\s*\{[^}]*bottom:\s*0/s);
+  assert.match(pageCss, /\.conversations-thread__transcript\s*\{[^}]*overflow:\s*auto/s);
+  assert.match(pageCss, /\.conversations-thread__transcript\s*\{[^}]*padding:[^}]*24px/s);
 });
 
 test("thread header stacks identity above actions so long names do not collide", () => {

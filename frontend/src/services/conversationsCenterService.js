@@ -17,11 +17,16 @@ async function wrap(path, options) {
   try {
     return await apiFetch(path, options);
   } catch (error) {
-    throw new ConversationsCenterError(
+    const wrapped = new ConversationsCenterError(
       error.message || "Conversations Center request failed",
       error.status || 500,
       error.code || null
     );
+    // Preserve sanitized delivery/window fields from human-reply failures (BR-075).
+    if (error.delivery) {
+      wrapped.delivery = error.delivery;
+    }
+    throw wrapped;
   }
 }
 
