@@ -186,6 +186,74 @@ test("19. unread cursor persists across a fresh load", async () => {
   });
 });
 
+test("preview ignores blocked_template_missing and keeps prior prospect message", () => {
+  const realAt = "2026-08-13T12:00:00.000Z";
+  const blockedAt = "2026-08-13T18:00:00.000Z";
+  const result = computeLastCommunication([
+    inbound(realAt, "Hola Santander, quiero info"),
+    outbound(blockedAt, "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY; reason=NO_TEMPLATE_FOR_INTENT", {
+      intent: "WHATSAPP_OUTBOUND_BLOCKED_TEMPLATE_MISSING",
+      pipeline: "NEW",
+      status: "blocked_template_missing"
+    })
+  ]);
+
+  assert.equal(isRealWhatsAppCommunication({
+    direction: "outgoing",
+    message: "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY; reason=NO_TEMPLATE_FOR_INTENT",
+    intent: "WHATSAPP_OUTBOUND_BLOCKED_TEMPLATE_MISSING",
+    pipeline: "NEW"
+  }), false);
+  assert.equal(result.lastMessagePreview, "Hola Santander, quiero info");
+  assert.equal(result.lastDirection, "inbound");
+  assert.equal(result.lastCommunicationAt, realAt);
+});
+
+test("preview ignores workflow/system events and keeps prior human message", () => {
+  const humanAt = "2026-08-13T14:00:00.000Z";
+  const result = computeLastCommunication([
+    inbound("2026-08-13T13:00:00.000Z", "buenos dias"),
+    outbound(humanAt, "Te escribo yo, Niovel", { pipeline: "HUMAN" }),
+    {
+      direction: "outgoing",
+      message: "[workflow] milestone saved",
+      pipeline: "WORKFLOW",
+      created_at: "2026-08-13T19:00:00.000Z"
+    },
+    {
+      direction: "incoming",
+      message: "[Required Information Updated] City",
+      intent: "REQUIRED_INFORMATION_UPDATED",
+      created_at: "2026-08-13T19:05:00.000Z"
+    }
+  ]);
+
+  assert.equal(result.lastMessagePreview, "Te escribo yo, Niovel");
+  assert.equal(result.lastDirection, "outbound");
+  assert.equal(result.lastCommunicationAt, humanAt);
+});
+
+test("operational events do not change lastCommunicationAt or unread", () => {
+  const inboundAt = "2026-08-13T11:00:00.000Z";
+  const outboundAt = "2026-08-13T11:10:00.000Z";
+  const logs = [
+    inbound(inboundAt, "necesito ayuda", { id: "in-1" }),
+    outbound(outboundAt, "Claro, te ayudo", { id: "out-1" }),
+    outbound("2026-08-13T20:00:00.000Z", "[whatsapp_outbound:blocked_window_closed] intent=HUMAN_COMPOSER_REPLY; reason=WINDOW_CLOSED", {
+      intent: "WHATSAPP_OUTBOUND_BLOCKED_WINDOW_CLOSED",
+      pipeline: "NEW"
+    })
+  ];
+
+  const last = computeLastCommunication(logs);
+  assert.equal(last.lastCommunicationAt, outboundAt);
+  assert.equal(last.lastMessagePreview, "Claro, te ayudo");
+
+  const unread = computeUnreadState({ logs, lastReadInboundAt: outboundAt });
+  assert.equal(unread.unread, false);
+  assert.equal(unread.unreadCount, 0);
+});
+
 test("9–11. lastCommunicationAt sorts real WhatsApp; system events ignored", () => {
   const older = computeLastCommunication([
     inbound("2026-08-13T09:00:00.000Z", "ayer")
@@ -273,9 +341,67 @@ test("read model: inbound unread + sort + system event does not reorder", async 
     assert.equal(model.items[0].unreadCount, 2);
     assert.equal(model.items[0].lastMessagePreview, "¿Me pueden llamar?");
     assert.equal(model.items[0].lastDirection, "inbound");
+    assert.equal(model.items[0].lastCommunicationAt, "2026-08-13T11:10:00.000Z");
     assert.equal(model.items[1].phone, "+17865558110");
     assert.equal(model.items[1].unread, false);
     assert.equal(model.items[1].unreadCount, 0);
+  });
+});
+
+test("read model: blocked_template_missing does not become preview or sort key", async () => {
+  await withMemoryWorkflow(async () => {
+    const {
+      buildConversationsCenterReadModel
+    } = require("../core/conversationsCenter/conversationsCenterReadModel");
+
+    const model = await buildConversationsCenterReadModel({
+      organizationId: TEAM_VISION,
+      prospects: [
+        {
+          id: "p-block",
+          phone: "+17865558130",
+          name: "Santander Sweets",
+          organization_id: TEAM_VISION,
+          owner_user_id: NIOVEL,
+          last_message:
+            "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY; reason=NO_TEMPLATE_FOR_INTENT",
+          last_message_at: "2026-08-13T21:00:00.000Z",
+          updated_at: "2026-08-13T21:00:00.000Z"
+        },
+        {
+          id: "p-real-later",
+          phone: "+17865558131",
+          name: "Later Real",
+          organization_id: TEAM_VISION,
+          owner_user_id: NIOVEL,
+          last_message: "ok gracias",
+          updated_at: "2026-08-13T08:00:00.000Z"
+        }
+      ],
+      conversationLogsByPhone: {
+        "+17865558130": [
+          inbound("2026-08-13T15:00:00.000Z", "Quiero una cita", { id: "s-in" }),
+          outbound(
+            "2026-08-13T21:00:00.000Z",
+            "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY; reason=NO_TEMPLATE_FOR_INTENT",
+            {
+              intent: "WHATSAPP_OUTBOUND_BLOCKED_TEMPLATE_MISSING",
+              pipeline: "NEW"
+            }
+          )
+        ],
+        "+17865558131": [
+          inbound("2026-08-13T16:00:00.000Z", "ok gracias", { id: "l-in" })
+        ]
+      }
+    });
+
+    assert.equal(model.items[0].phone, "+17865558131");
+    assert.equal(model.items[0].lastMessagePreview, "ok gracias");
+    assert.equal(model.items[1].phone, "+17865558130");
+    assert.equal(model.items[1].lastMessagePreview, "Quiero una cita");
+    assert.equal(model.items[1].lastCommunicationAt, "2026-08-13T15:00:00.000Z");
+    assert.equal(model.items[1].unread, true);
   });
 });
 

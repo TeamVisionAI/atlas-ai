@@ -13,6 +13,43 @@ const INTERNAL_INTENTS = new Set([
   "REQUIRED_INFORMATION_UPDATED"
 ]);
 
+const BLOCKED_OUTBOUND_STATUSES = new Set([
+  "blocked_template_missing",
+  "blocked_window_closed",
+  "blocked_template_unapproved",
+  "retry_required",
+  "provider_failed"
+]);
+
+/**
+ * Same communication-only rule as Conversations transcript
+ * (`isConversationBubbleItem`): bracketed operational / provider / diagnostic
+ * text is never a list preview or lastCommunicationAt source.
+ */
+function isOperationalCommunicationText(text) {
+  const value = String(text || "").trim();
+  if (!value) {
+    return false;
+  }
+  if (value.startsWith("[Agent note]")) {
+    return true;
+  }
+  if (/^\[[^\]]+\]/.test(value)) {
+    return true;
+  }
+  if (/whatsapp_outbound:/i.test(value)) {
+    return true;
+  }
+  if (
+    /blocked_template_missing|blocked_window_closed|blocked_template_unapproved/i.test(
+      value
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function normalizeDirection(direction) {
   const value = String(direction || "").toLowerCase();
   if (value === "incoming" || value === "inbound") {
@@ -35,7 +72,9 @@ function logText(row) {
 
 /**
  * Prospect / Atlas / Human WhatsApp only.
- * System logs, qualification saves, workflow events, and internal notes do not count.
+ * Aligns with frontend `isConversationBubbleItem` (Conversations transcript).
+ * System logs, qualification saves, workflow events, provider errors, and
+ * internal notes do not count for preview, lastCommunicationAt, or unread.
  */
 function isRealWhatsAppCommunication(row) {
   const direction = normalizeDirection(row?.direction);
@@ -44,18 +83,20 @@ function isRealWhatsAppCommunication(row) {
   }
 
   const text = logText(row);
-  if (text.startsWith("[Agent note]")) {
-    return false;
-  }
-  if (/^\[Required Information/i.test(text)) {
-    return false;
-  }
-  if (/^\[[^\]]+\]/.test(text) && /updated|workflow|qualification|diagnostic/i.test(text)) {
+  if (isOperationalCommunicationText(text)) {
     return false;
   }
 
   const intent = String(row?.intent || row?.ai?.intent || "").toUpperCase();
   if (INTERNAL_INTENTS.has(intent)) {
+    return false;
+  }
+  if (intent.startsWith("WHATSAPP_OUTBOUND_")) {
+    return false;
+  }
+
+  const status = String(row?.status || row?.delivery_status || "").toLowerCase();
+  if (BLOCKED_OUTBOUND_STATUSES.has(status)) {
     return false;
   }
 
@@ -183,6 +224,7 @@ function activitySortMs({ lastCommunicationAt = null, lastActivityAt = null } = 
 
 module.exports = {
   normalizeDirection,
+  isOperationalCommunicationText,
   isRealWhatsAppCommunication,
   isProspectInbound,
   computeLastCommunication,
