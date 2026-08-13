@@ -4,6 +4,7 @@ import {
   filterCommunicationsItems,
   filterConversationLayoutItems,
   isConversationBubbleItem,
+  selectConversationLayoutBubbles,
   isTechnicalCommunicationsItem,
   resolveConversationBubbleSide,
   buildWarningBadges,
@@ -107,6 +108,10 @@ test("conversation layout hides technical events and internal operational notes 
   assert.equal(isConversationBubbleItem(items[2]), false);
   assert.equal(isConversationBubbleItem(items[7]), false);
   assert.equal(isConversationBubbleItem(items[8]), false);
+  assert.deepEqual(
+    selectConversationLayoutBubbles(items).map((item) => item.id),
+    ["1", "6", "7"]
+  );
   assert.equal(isTechnicalCommunicationsItem(items[1]), true);
   assert.equal(isTechnicalCommunicationsItem(items[4]), true);
   assert.equal(isTechnicalCommunicationsItem(items[7]), true);

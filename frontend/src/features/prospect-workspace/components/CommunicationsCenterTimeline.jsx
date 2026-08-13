@@ -10,6 +10,7 @@ import {
   filterConversationLayoutItems,
   isTechnicalCommunicationsItem,
   orderCommunicationsForDisplay,
+  selectConversationLayoutBubbles,
   buildWarningBadges,
   actorLabel,
   directionLabel,
@@ -281,10 +282,7 @@ export default function CommunicationsCenterTimeline({
     if (!isConversationLayout || status !== "ready") {
       return [];
     }
-    return orderCommunicationsForDisplay(
-      (payload?.items || []).filter((item) => isConversationBubbleItem(item)),
-      { newestFirst: false }
-    );
+    return selectConversationLayoutBubbles(payload?.items || []);
   }, [isConversationLayout, payload, status]);
 
   useEffect(() => {
