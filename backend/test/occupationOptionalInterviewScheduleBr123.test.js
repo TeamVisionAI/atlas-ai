@@ -77,16 +77,17 @@ test("BR-123 advance to INTERVIEW_READY never fails for occupation=null", () => 
     targetMilestone: MILESTONES.INTERVIEW_READY,
     prospect: {
       ...anthonyLikeProspect,
-      calendar_event_id: "cal-placeholder",
-      interview_time: "2026-08-11T00:00:00.000Z",
-      appointment_date: "2026-08-11T00:00:00.000Z"
+      calendar_event_id: null,
+      interview_time: null,
+      appointment_date: null
     },
     capturedFields: {
       city: "Miami",
       state: "FL",
       authorization: true,
       interviewType: "In Person"
-    }
+    },
+    explicitProfileFields: ["city", "state", "authorization", "interviewType"]
   });
 
   assert.equal((result.missingFields || []).includes("occupation"), false);
@@ -94,6 +95,7 @@ test("BR-123 advance to INTERVIEW_READY never fails for occupation=null", () => 
     (result.errors || []).some((e) => e.field === "occupation"),
     false
   );
+  assert.equal((result.missingFields || []).includes("schedule"), false);
   assert.equal(result.valid, true);
 });
 

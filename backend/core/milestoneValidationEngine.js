@@ -30,6 +30,7 @@ const MILESTONE_REQUIRED_FIELDS = Object.freeze({
     "state",
     "authorization"
     // BR-123 — occupation is optional for interview readiness / scheduling
+    // interviewType checked separately in validateRequiredFields (not schedule/dayPart)
   ],
   [MILESTONES.INTERVIEW_SCHEDULED]: [
     "city",
@@ -253,8 +254,24 @@ function validateRequiredFields(targetMilestone, context) {
     }
   }
 
-  if (
-    targetMilestone === MILESTONES.INTERVIEW_READY ||
+  if (targetMilestone === MILESTONES.INTERVIEW_READY) {
+    // Pre-schedule qualification only. schedule / dayPart / name / email are
+    // progression fields for booking — not blockers for INTERVIEW_READY.
+    const interviewType =
+      fields.interviewType ||
+      profile?.interviewType ||
+      getEffectiveInterviewType(profile) ||
+      null;
+
+    if (!interviewType) {
+      missingFields.push("interviewType");
+      errors.push({
+        code: "QUALIFICATION_INCOMPLETE",
+        field: "interviewType",
+        message: `Qualification field "interviewType" is required before ${targetMilestone}.`
+      });
+    }
+  } else if (
     targetMilestone === MILESTONES.INTERVIEW_SCHEDULED ||
     targetMilestone === MILESTONES.INTERVIEW_DUE
   ) {
@@ -272,6 +289,11 @@ function validateRequiredFields(targetMilestone, context) {
 
       // Implements BR-127 — email is invitation enrichment; never block interview milestones.
       if (field === "email") {
+        continue;
+      }
+
+      // schedule is satisfied by interviewDateTime for INTERVIEW_SCHEDULED / DUE below.
+      if (field === "schedule") {
         continue;
       }
 
