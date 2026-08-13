@@ -212,6 +212,12 @@
   border-bottom: 1px solid #d97706;
 }
 
+@media print {
+  .atlas-layout__staging-banner {
+    display: none !important;
+  }
+}
+
 .atlas-layout__meta-review-banner {
   flex-shrink: 0;
   padding: 10px 20px;

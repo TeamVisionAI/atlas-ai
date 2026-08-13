@@ -30,4 +30,5 @@ test("authenticated layout shows STAGING banner only via isStagingUi", () => {
   assert.match(layout, /data-atlas-env="staging"/);
   assert.match(layout, /STAGING/);
   assert.match(css, /\.atlas-layout__staging-banner/);
+  assert.match(css, /@media print/);
 });

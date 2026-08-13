@@ -100,6 +100,7 @@ npm run dev -- --mode staging
 - Separate Supabase project (preferred name: `atlas-staging`, ref **`jmobhvosciwanvsqpnwk`**)
 - Railway: same project, environment `staging`, `ATLAS_ENV=staging`, `NODE_ENV=production`
 - Vercel Preview / staging branch: `VITE_ATLAS_ENV=staging` and explicit `VITE_API_BASE_URL` to Railway staging
+- Preview builds use Vite `--mode staging` when `VERCEL_ENV=preview` (see `frontend/scripts/viteBuild.mjs` + committed `.env.staging`). Production Vercel stays `--mode production`.
 - Synthetic users/prospects only — no production data, phones, sessions, or conversation logs
 - Execution gates remain off:
   - `RECRUIT_AI_V2_EXECUTION_ENABLED=false`

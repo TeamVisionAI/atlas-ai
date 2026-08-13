@@ -61,4 +61,12 @@ test("staging build accepts an explicit non-production API URL", () => {
     }),
     "https://atlas-ai-staging.up.railway.app"
   );
+  assert.equal(
+    resolveApiBaseUrl({
+      DEV: false,
+      VITE_ATLAS_ENV: "staging",
+      VITE_API_BASE_URL: "https://atlas-ai-staging-staging.up.railway.app/"
+    }),
+    "https://atlas-ai-staging-staging.up.railway.app"
+  );
 });
