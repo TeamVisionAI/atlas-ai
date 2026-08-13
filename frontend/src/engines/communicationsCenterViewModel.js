@@ -209,6 +209,14 @@ export function filterConversationLayoutItems(items = [], filterId = "messages")
   return list.filter((item) => isConversationBubbleItem(item));
 }
 
+/** Conversations detail: real WhatsApp bubbles only, oldest → newest. */
+export function selectConversationLayoutBubbles(items = []) {
+  return orderCommunicationsForDisplay(
+    (Array.isArray(items) ? items : []).filter((item) => isConversationBubbleItem(item)),
+    { newestFirst: false }
+  );
+}
+
 /**
  * Presentation-only timeline order. Does not mutate persisted communications data.
  * Default (newestFirst=false) keeps ascending chronological order for Prospect Workspace.
