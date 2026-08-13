@@ -48,6 +48,8 @@ export default function HumanWhatsAppComposer({
   customerCareWindow: windowProp = undefined,
   /** When true, skip getConversation and use parent-provided ownership/window. */
   controlled = false,
+  /** Prefill editable freeform body (interview actions inside 24h window). */
+  initialMessage = "",
   variant = "inline",
   showHeader = true,
   showPhone = true,
@@ -74,10 +76,14 @@ export default function HumanWhatsAppComposer({
   );
   const [metaLoading, setMetaLoading] = useState(!controlled && Boolean(phone));
   const [metaError, setMetaError] = useState(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() => String(initialMessage || ""));
   const [clientRequestId, setClientRequestId] = useState(() => newClientRequestId());
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    setMessage(String(initialMessage || ""));
+  }, [initialMessage, phone]);
 
   useEffect(() => {
     if (!controlled) return;
@@ -241,7 +247,7 @@ export default function HumanWhatsAppComposer({
           </div>
           {onClose ? (
             <AtlasButton type="button" variant="ghost" onClick={onClose}>
-              {translate("commonCancel") || "Cancel"}
+              {translate("commonCancel")}
             </AtlasButton>
           ) : null}
         </header>

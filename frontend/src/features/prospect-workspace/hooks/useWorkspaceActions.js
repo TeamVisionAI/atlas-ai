@@ -34,7 +34,8 @@ export function useWorkspaceActions({
   showToast,
   confirm,
   prompt,
-  communicationPreview
+  communicationPreview,
+  nativeInterviewWhatsApp = null
 }) {
   const [actionError, setActionError] = useState(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
@@ -121,6 +122,18 @@ export function useWorkspaceActions({
 
       if (isAppointmentCommunicationAction(actionId)) {
         const appointmentId = resolvePersistedAppointmentId(workspace.interview?.appointmentId);
+
+        if (nativeInterviewWhatsApp?.isNativeInterviewWhatsAppAction?.(actionId)) {
+          await nativeInterviewWhatsApp.openInterviewWhatsAppAction({
+            actionId,
+            appointmentId,
+            phone: workspace.phone,
+            workspace
+          });
+          setPendingActionId(null);
+          return;
+        }
+
         const purpose = resolveAppointmentCommunicationPurpose(actionId);
         const previewOpened = await communicationPreview?.requestPreviewIfEnabled?.({
           type: "appointment",
@@ -252,7 +265,7 @@ export function useWorkspaceActions({
         setPendingActionId(null);
       }
     },
-    [workspace?.phone, workspace?.interview?.appointmentId, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer, communicationPreview, openCustomWhatsAppComposer]
+    [workspace, refreshWorkspace, showToast, translate, handleOrganizationResourceMissing, handleWhatsAppFallbackOffer, communicationPreview, openCustomWhatsAppComposer, nativeInterviewWhatsApp]
   );
 
   const runLifecycleAction = useCallback(

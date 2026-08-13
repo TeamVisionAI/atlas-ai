@@ -14,6 +14,7 @@ import {
 import WorkflowCompleteBanner from "../components/WorkflowCompleteBanner";
 import CommunicationActionsPanel from "../components/communication/CommunicationActionsPanel";
 import HumanWhatsAppComposer from "../components/communication/HumanWhatsAppComposer";
+import InterviewWhatsAppTemplateConfirm from "../components/communication/InterviewWhatsAppTemplateConfirm";
 import MissionActionCenter from "../components/mission-control/MissionActionCenter";
 import MissionControlWorkspaceHeader from "../components/mission-control/MissionControlWorkspaceHeader";
 import MissionControlExecutionPanel from "../components/mission-control/MissionControlExecutionPanel";
@@ -25,6 +26,7 @@ import {
 } from "../services/whatsappCommunicationService";
 import { executeCommunicationAction } from "../engines/communicationActionEngine";
 import { isNativeHumanWhatsAppComposerAction } from "../engines/humanWhatsAppComposer";
+import { useNativeInterviewWhatsApp } from "../hooks/useNativeInterviewWhatsApp";
 import { executeScheduleInterview } from "../services/missionExecutionService";
 import {
   fetchProspectMissions,
@@ -417,6 +419,12 @@ export default function Dashboard() {
     onRecorded: refreshMissionControlProspect
   });
 
+  const nativeInterviewWhatsApp = useNativeInterviewWhatsApp({
+    translate,
+    showToast: { showSuccess, showError, showInfo },
+    onRecorded: refreshMissionControlProspect
+  });
+
   const handleCommunicationPreviewClose = useCallback(async () => {
     communicationPreview.closePreview();
     await refreshMissionControlProspect();
@@ -777,6 +785,16 @@ export default function Dashboard() {
       if (isAppointmentCommunicationAction(actionId)) {
         const appointmentId = resolvePersistedAppointmentId(workspace?.interview?.appointmentId);
 
+        if (nativeInterviewWhatsApp.isNativeInterviewWhatsAppAction(actionId)) {
+          await nativeInterviewWhatsApp.openInterviewWhatsAppAction({
+            actionId,
+            appointmentId,
+            phone,
+            workspace
+          });
+          return;
+        }
+
         if (appointmentId) {
           const previewOpened = await communicationPreview.requestPreviewIfEnabled({
             type: "appointment",
@@ -825,7 +843,7 @@ export default function Dashboard() {
         setActionError(translate("missionControlActionFailed"));
       }
     },
-    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, runCommunicationAction, workspace?.interview?.appointmentId, communicationPreview]
+    [phone, queue, currentIndex, refreshCurrentWorkspace, refreshMissions, translate, runCommunicationAction, workspace, communicationPreview, nativeInterviewWhatsApp]
   );
 
   const handleMissionActionImmediate = useCallback(
@@ -1274,8 +1292,41 @@ export default function Dashboard() {
               onAction={handleMissionAction}
               onAddNote={openAddNote}
               noteSaving={noteSaving}
-              busy={executionSubmitting || prospectLoading || noteSaving}
+              busy={
+                executionSubmitting ||
+                prospectLoading ||
+                noteSaving ||
+                nativeInterviewWhatsApp.busy
+              }
             />
+
+            {nativeInterviewWhatsApp.composerSession ? (
+              <HumanWhatsAppComposer
+                phone={nativeInterviewWhatsApp.composerSession.phone || phone}
+                workspace={workspace}
+                initialMessage={nativeInterviewWhatsApp.composerSession.message}
+                variant="inline"
+                titleKey={nativeInterviewWhatsApp.composerSession.titleKey}
+                testId="mc-interview-whatsapp-composer"
+                onClose={nativeInterviewWhatsApp.closeComposer}
+                onSuccessToast={showSuccess}
+                onErrorToast={showError}
+                onSent={async () => {
+                  nativeInterviewWhatsApp.closeComposer();
+                  await refreshMissionControlProspect();
+                }}
+              />
+            ) : null}
+
+            {nativeInterviewWhatsApp.templateSession ? (
+              <InterviewWhatsAppTemplateConfirm
+                session={nativeInterviewWhatsApp.templateSession}
+                busy={nativeInterviewWhatsApp.busy}
+                error={nativeInterviewWhatsApp.error}
+                onCancel={nativeInterviewWhatsApp.closeTemplateSession}
+                onConfirm={nativeInterviewWhatsApp.confirmApprovedTemplateSend}
+              />
+            ) : null}
 
             {customWhatsAppComposerOpen ? (
               <HumanWhatsAppComposer

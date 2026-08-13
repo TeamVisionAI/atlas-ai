@@ -1110,6 +1110,11 @@ export const translations = {
     missionExecutionNotes: "Notas",
     missionExecutionNotesPlaceholder: "Notas opcionales para la invitación",
     missionExecutionCancel: "Cancelar",
+    commonCancel: "Cancelar",
+    whatsappNativeTemplateSent: "Plantilla de WhatsApp enviada por Atlas.",
+    whatsappNativeTemplateConfirm: "Enviar plantilla por WhatsApp",
+    whatsappNativeTemplateSubtitle:
+      "Fuera de la ventana de 24 horas. Atlas enviará la plantilla aprobada de Meta.",
     missionExecutionConfirmSchedule: "Confirmar entrevista",
     missionExecutionScheduling: "Programando…",
     missionExecutionFailed: "No se pudo programar la entrevista. Inténtalo de nuevo.",
@@ -2795,6 +2800,11 @@ export const translations = {
     missionExecutionNotes: "Notes",
     missionExecutionNotesPlaceholder: "Optional notes for the calendar invitation",
     missionExecutionCancel: "Cancel",
+    commonCancel: "Cancel",
+    whatsappNativeTemplateSent: "WhatsApp template sent through Atlas.",
+    whatsappNativeTemplateConfirm: "Send WhatsApp template",
+    whatsappNativeTemplateSubtitle:
+      "Outside the 24-hour window. Atlas will send the approved Meta template.",
     missionExecutionConfirmSchedule: "Confirm Interview",
     missionExecutionScheduling: "Scheduling…",
     missionExecutionFailed: "Unable to schedule the interview. Please try again.",
