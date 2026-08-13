@@ -120,8 +120,11 @@
 }
 
 .conversations-thread__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
-  flex: 1;
+  width: 100%;
 }
 
 .conversations-thread__phone-row {
@@ -129,7 +132,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 4px;
+  margin: 0;
 }
 
 .conversations-thread__phone {
@@ -241,61 +244,53 @@
 
 .conversations-thread__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .conversations-thread__title {
   margin: 0;
   font-size: 20px;
   color: #0f172a;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .conversations-thread__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
-.conversations-thread__action {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #fff;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 12px;
-  cursor: pointer;
-}
-
-.conversations-thread__action:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.conversations-thread__action--primary {
-  border-color: #0f766e;
-  background: #0f766e;
-  color: #fff;
-}
-
-.conversations-thread__action--link {
+/* Align AtlasSelect trigger to AtlasButton dimensions in the action row */
+.conversations-thread__close {
   display: inline-flex;
   align-items: center;
-  text-decoration: none;
 }
 
-.conversations-thread__close select {
-  border: 1px solid #cbd5e1;
+.conversations-thread__close.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.conversations-thread__close .atlas-ui-select {
+  width: auto;
+}
+
+.conversations-thread__close .atlas-ui-select__trigger {
+  width: auto;
+  min-height: 0;
+  padding: 8px 14px;
   border-radius: 8px;
-  background: #fff;
-  color: #0f172a;
+  border: 1px solid #1e3a8a;
+  color: #1e3a8a;
   font-size: 13px;
   font-weight: 600;
-  padding: 8px 12px;
-  cursor: pointer;
+  line-height: 1.2;
 }
 
 .conversations-row__lifecycle {
@@ -324,14 +319,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.conversations-thread__chip {
-  font-size: 12px;
-  color: #475569;
-  background: #f1f5f9;
-  border-radius: 6px;
-  padding: 4px 8px;
+  width: 100%;
 }
 
 .conversations-thread__handoff {

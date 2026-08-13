@@ -29,11 +29,42 @@ export function buildConversationHeaderModel({
     source: source || null,
     ownershipState: ownershipState || null,
     appointmentStatus: appointmentStatus || null,
+    // Retained for diagnostics/API consumers; not shown in normal Conversations header.
     conversationGoal: conversationGoal || null,
     inboxLifecycle: inboxLifecycle || null,
     inboxCloseReason: inboxCloseReason || null,
     needsHumanAttention: Boolean(needsHumanAttention)
   };
+}
+
+/**
+ * Internal workflow goals (e.g. DAY_PART) must not appear as user-facing header chips.
+ */
+export function isUserFacingConversationGoal(goal) {
+  const value = String(goal || "").trim();
+  if (!value) {
+    return false;
+  }
+  const normalized = value.toUpperCase().replace(/\s+/g, "_");
+  if (normalized === "DAY_PART" || normalized.includes("DAY_PART")) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Handoff reason strings stay in storage/API; never render in the normal header.
+ */
+export function shouldShowHandoffReasonInHeader() {
+  return false;
+}
+
+/**
+ * Thread sticky header stacks identity above actions so long names never collide.
+ * @returns {("identity"|"actions")[]}
+ */
+export function conversationsThreadHeaderRegionOrder() {
+  return ["identity", "actions"];
 }
 
 /**
@@ -113,7 +144,7 @@ export function resolveLifecycleActionIds({
   return [];
 }
 
-/** Sticky operator strip order: controls → status → composer → timeline. */
+/** Sticky operator strip order: identity+actions → composer → timeline. */
 export function conversationsThreadRegionOrder() {
   return ["sticky_controls", "composer", "timeline"];
 }

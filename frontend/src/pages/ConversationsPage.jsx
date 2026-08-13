@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import AtlasButton from "../components/ui/AtlasButton";
+import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
 import CommunicationsCenterTimeline from "../features/prospect-workspace/components/CommunicationsCenterTimeline";
 import { copyMessageToClipboard } from "../services/whatsappCommunicationService";
@@ -12,7 +14,9 @@ import {
   canReturnConversationToAtlas,
   resolveThreadActionIds,
   resolveLifecycleActionIds,
-  shouldShowAttentionWarning
+  shouldShowAttentionWarning,
+  isUserFacingConversationGoal,
+  conversationsThreadHeaderRegionOrder
 } from "../engines/conversationsCenterPresentation";
 import {
   isConversationDetailCurrent,
@@ -147,7 +151,9 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
       <div className="conversations-row__meta">
         <span>{formatActivity(item.lastActivityAt, locale)}</span>
         {item.source ? <span>{item.source}</span> : null}
-        {item.conversationGoal ? <span>{item.conversationGoal}</span> : null}
+        {isUserFacingConversationGoal(item.conversationGoal) ? (
+          <span>{item.conversationGoal}</span>
+        ) : null}
       </div>
     </button>
   );
@@ -486,8 +492,6 @@ export default function ConversationsPage() {
   );
   // Sticky HUMAN remains HUMAN for controls; stall attention is a separate badge.
   const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
-  const handoffReason =
-    matchedDetail?.handoffReason || selectedItem?.handoffReason || null;
   const humanComposerEnabled = isHumanComposerEnabled(effectiveOwnership);
   const showTakeOver = canTakeOverConversation(effectiveOwnership);
   const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
@@ -500,6 +504,7 @@ export default function ConversationsPage() {
     ownershipState,
     effectiveOwnership
   });
+  const headerRegions = conversationsThreadHeaderRegionOrder();
   const inboxLifecycle =
     selectedItem?.inboxLifecycle ||
     matchedDetail?.conversation?.inboxLifecycle ||
@@ -530,6 +535,9 @@ export default function ConversationsPage() {
       null,
     needsHumanAttention
   });
+  const showConversationGoalChip = isUserFacingConversationGoal(
+    headerModel.conversationGoal
+  );
 
   return (
     <div className="conversations-page">
@@ -600,9 +608,19 @@ export default function ConversationsPage() {
           ) : (
             <>
               <div className="conversations-thread__pilot-sticky">
-                <div className="conversations-thread__header">
-                  <div className="conversations-thread__identity">
-                    <h2 className="conversations-thread__title">
+                <div
+                  className="conversations-thread__header"
+                  data-header-regions={headerRegions.join(",")}
+                  data-testid="conversations-thread-header"
+                >
+                  <div
+                    className="conversations-thread__identity"
+                    data-testid="conversations-thread-identity"
+                  >
+                    <h2
+                      className="conversations-thread__title"
+                      data-testid="conversations-thread-name"
+                    >
                       {headerModel.name || headerModel.phone || selectedPhone}
                     </h2>
                     {headerModel.name && headerModel.phone ? (
@@ -642,9 +660,44 @@ export default function ConversationsPage() {
                         </button>
                       </div>
                     ) : null}
+                    <div
+                      className="conversations-thread__status"
+                      data-testid="conversations-thread-badges"
+                    >
+                      <StatusBadge variant={ownershipVariant(ownershipState)}>
+                        {ownershipLabel(ownershipState, translate)}
+                      </StatusBadge>
+                      {showAttentionWarning && ownershipState === "HUMAN" ? (
+                        <StatusBadge
+                          variant="danger"
+                          data-testid="conversations-attention-warning"
+                        >
+                          {translate("conversationsAttentionWarning")}
+                        </StatusBadge>
+                      ) : null}
+                      {headerModel.inboxLifecycle ? (
+                        <StatusBadge variant="neutral">
+                          {lifecycleLabel(headerModel.inboxLifecycle, translate)}
+                        </StatusBadge>
+                      ) : null}
+                      {headerModel.appointmentStatus ? (
+                        <StatusBadge variant="info">
+                          {headerModel.appointmentStatus}
+                        </StatusBadge>
+                      ) : null}
+                      {headerModel.source ? (
+                        <StatusBadge variant="neutral">{headerModel.source}</StatusBadge>
+                      ) : null}
+                      {showConversationGoalChip ? (
+                        <StatusBadge variant="info">
+                          {headerModel.conversationGoal}
+                        </StatusBadge>
+                      ) : null}
+                    </div>
                   </div>
                   <div
                     className="conversations-thread__actions"
+                    data-testid="conversations-thread-actions"
                     data-effective-ownership={effectiveOwnership}
                     data-attention-state={
                       ownershipState === "NEEDS_ATTENTION" ? "NEEDS_ATTENTION" : "none"
@@ -652,26 +705,24 @@ export default function ConversationsPage() {
                     data-thread-actions={threadActionIds.join(",")}
                   >
                     {threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
-                      <button
-                        type="button"
-                        className="conversations-thread__action conversations-thread__action--primary"
+                      <AtlasButton
+                        variant="primary"
                         data-testid="conversations-take-over"
                         disabled={actionBusy}
                         onClick={onTakeOver}
                       >
                         {translate("conversationsTakeOver")}
-                      </button>
+                      </AtlasButton>
                     ) : null}
                     {threadActionIds.includes("RETURN_TO_ATLAS") && showReturnToAtlas ? (
-                      <button
-                        type="button"
-                        className="conversations-thread__action"
+                      <AtlasButton
+                        variant="secondary"
                         data-testid="conversations-return-to-atlas"
                         disabled={actionBusy}
                         onClick={onReturnToAtlas}
                       >
                         {translate("conversationsReturnToAtlas")}
-                      </button>
+                      </AtlasButton>
                     ) : null}
                     {timelineProspectId ? (
                       <Link
@@ -679,109 +730,64 @@ export default function ConversationsPage() {
                           prospectId: timelineProspectId,
                           ...(selectedPhone ? { phone: selectedPhone } : {})
                         })}
-                        className="conversations-thread__action conversations-thread__action--link"
+                        className="atlas-ui-button atlas-ui-button--secondary"
                         data-testid="conversations-open-mission-control"
                       >
                         {translate("conversationsOpenInMissionControl")}
                       </Link>
                     ) : null}
                     {lifecycleActionIds.includes("ARCHIVE") ? (
-                      <button
-                        type="button"
-                        className="conversations-thread__action"
+                      <AtlasButton
+                        variant="secondary"
                         data-testid="conversations-archive"
                         disabled={actionBusy}
                         onClick={onArchive}
                       >
                         {translate("conversationsArchive")}
-                      </button>
+                      </AtlasButton>
                     ) : null}
                     {lifecycleActionIds.includes("CLOSE") ? (
-                      <label className="conversations-thread__close">
-                        <span className="visually-hidden">{translate("conversationsClose")}</span>
-                        <select
-                          data-testid="conversations-close"
-                          disabled={actionBusy}
-                          defaultValue=""
-                          onChange={(event) => {
-                            const reason = event.target.value;
+                      <div
+                        className={`conversations-thread__close${actionBusy ? " is-disabled" : ""}`}
+                        data-testid="conversations-close"
+                      >
+                        <AtlasSelect
+                          value=""
+                          placeholder={translate("conversationsClose")}
+                          options={CLOSE_REASONS.map((reason) => ({
+                            value: reason,
+                            label: translate(`conversationsCloseReason_${reason}`)
+                          }))}
+                          onChange={(reason) => {
                             if (reason) {
                               onClose(reason);
-                              event.target.value = "";
                             }
                           }}
-                        >
-                          <option value="">{translate("conversationsClose")}</option>
-                          {CLOSE_REASONS.map((reason) => (
-                            <option key={reason} value={reason}>
-                              {translate(`conversationsCloseReason_${reason}`)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                        />
+                      </div>
                     ) : null}
                     {lifecycleActionIds.includes("MARK_TEST") ? (
-                      <button
-                        type="button"
-                        className="conversations-thread__action"
+                      <AtlasButton
+                        variant="secondary"
                         data-testid="conversations-mark-test"
                         disabled={actionBusy}
                         onClick={onMarkTest}
                       >
                         {translate("conversationsMarkTest")}
-                      </button>
+                      </AtlasButton>
                     ) : null}
                     {lifecycleActionIds.includes("RESTORE") ? (
-                      <button
-                        type="button"
-                        className="conversations-thread__action conversations-thread__action--primary"
+                      <AtlasButton
+                        variant="primary"
                         data-testid="conversations-restore"
                         disabled={actionBusy}
                         onClick={onRestore}
                       >
                         {translate("conversationsRestore")}
-                      </button>
+                      </AtlasButton>
                     ) : null}
                   </div>
                 </div>
-
-                <div className="conversations-thread__status">
-                  <StatusBadge variant={ownershipVariant(ownershipState)}>
-                    {ownershipLabel(ownershipState, translate)}
-                  </StatusBadge>
-                  {showAttentionWarning && ownershipState === "HUMAN" ? (
-                    <StatusBadge
-                      variant="danger"
-                      data-testid="conversations-attention-warning"
-                    >
-                      {translate("conversationsAttentionWarning")}
-                    </StatusBadge>
-                  ) : null}
-                  {headerModel.inboxLifecycle ? (
-                    <span className="conversations-thread__chip">
-                      {lifecycleLabel(headerModel.inboxLifecycle, translate)}
-                    </span>
-                  ) : null}
-                  {headerModel.appointmentStatus ? (
-                    <span className="conversations-thread__chip">
-                      {headerModel.appointmentStatus}
-                    </span>
-                  ) : null}
-                  {headerModel.source ? (
-                    <span className="conversations-thread__chip">{headerModel.source}</span>
-                  ) : null}
-                  {headerModel.conversationGoal ? (
-                    <span className="conversations-thread__chip">
-                      {headerModel.conversationGoal}
-                    </span>
-                  ) : null}
-                </div>
-
-                {handoffReason ? (
-                  <p className="conversations-thread__handoff">
-                    {translate("conversationsHandoffReason")}: <strong>{handoffReason}</strong>
-                  </p>
-                ) : null}
 
                 <form
                   className={`conversations-composer${humanComposerEnabled ? " is-human" : " is-disabled"}`}
@@ -820,9 +826,10 @@ export default function ConversationsPage() {
                           : translate("conversationsComposerRequiresHuman")}
                       </span>
                     )}
-                    <button
+                    <AtlasButton
                       type="submit"
-                      className="conversations-thread__action conversations-thread__action--primary"
+                      variant="primary"
+                      busy={composeSending}
                       disabled={
                         !humanComposerEnabled ||
                         composeSending ||
@@ -832,7 +839,7 @@ export default function ConversationsPage() {
                       {composeSending
                         ? translate("conversationsComposerSending")
                         : translate("conversationsComposerSend")}
-                    </button>
+                    </AtlasButton>
                   </div>
                 </form>
               </div>
