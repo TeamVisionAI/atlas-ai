@@ -112,6 +112,32 @@ function toPublicMedia(row) {
   };
 }
 
+/**
+ * Attach canonical public media to WhatsApp thread messages keyed by conversation_log id.
+ * Same toPublicMedia() used by Communications Center. No second fetch/storage path.
+ */
+function attachPublicMediaToConversationMessages(messages = [], mediaRows = []) {
+  const byLogId = new Map();
+  for (const row of mediaRows || []) {
+    if (!row?.conversation_log_id) {
+      continue;
+    }
+    byLogId.set(String(row.conversation_log_id), toPublicMedia(row));
+  }
+
+  return (messages || []).map((message) => {
+    const attached = byLogId.get(String(message?.id)) || message?.media || null;
+    if (!attached) {
+      return message;
+    }
+    return {
+      ...message,
+      media: attached,
+      messageType: attached.mediaKind || message.messageType || null
+    };
+  });
+}
+
 function createMemoryCommunicationMediaRepository(seed = []) {
   const rows = seed.map((row) => toRow(row));
 
@@ -457,6 +483,7 @@ function getCommunicationMediaRepository(options = {}) {
 module.exports = {
   toRow,
   toPublicMedia,
+  attachPublicMediaToConversationMessages,
   createMemoryCommunicationMediaRepository,
   createSupabaseCommunicationMediaRepository,
   getCommunicationMediaRepository

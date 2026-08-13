@@ -166,3 +166,140 @@ test("pending, preparing, failed, and ready derivative bubbles render safely", a
     await server.close();
   }
 });
+
+test("upper WhatsApp panel and Communications Center share ready/pending/failed audio states", async () => {
+  const server = await createServer({
+    root: frontendRoot,
+    server: { middlewareMode: true },
+    appType: "custom",
+    logLevel: "error"
+  });
+
+  try {
+    const bubbleModule = await server.ssrLoadModule(
+      "/src/components/communication/CommunicationAudioBubble.jsx"
+    );
+    const panelModule = await server.ssrLoadModule("/src/components/ConversationPanel.jsx");
+    const languageModule = await server.ssrLoadModule("/src/i18n/LanguageContext.jsx");
+    const CommunicationAudioBubble = bubbleModule.default;
+    const ConversationPanel = panelModule.default;
+    const { LanguageProvider } = languageModule;
+
+    const readyMedia = {
+      id: "media-ready-1",
+      mediaKind: "audio",
+      mimeType: "audio/mpeg",
+      fetchStatus: "stored",
+      transcodeStatus: "ready",
+      playbackAvailable: true
+    };
+    const pendingMedia = {
+      id: "media-pending-1",
+      mediaKind: "audio",
+      fetchStatus: "pending",
+      playbackAvailable: false
+    };
+    const failedMedia = {
+      id: "media-failed-1",
+      mediaKind: "audio",
+      fetchStatus: "failed",
+      playbackAvailable: false
+    };
+
+    function wrap(node) {
+      return React.createElement(LanguageProvider, null, node);
+    }
+
+    const placeholderOnly = renderToString(
+      wrap(
+        React.createElement(ConversationPanel, {
+          prospectId: "prospect-1",
+          messages: [
+            {
+              id: "log-audio",
+              text: "[audio message]",
+              direction: "incoming",
+              timestamp: "2026-08-13T23:07:56.317Z"
+            }
+          ]
+        })
+      )
+    );
+    assert.match(placeholderOnly, /Voice message unavailable|Mensaje de voz no disponible|voiceMessageUnavailable/);
+    assert.doesNotMatch(placeholderOnly, /<audio/);
+
+    const upperReady = renderToString(
+      wrap(
+        React.createElement(ConversationPanel, {
+          prospectId: "prospect-1",
+          messages: [
+            {
+              id: "log-audio",
+              text: "[audio message]",
+              direction: "incoming",
+              messageType: "audio",
+              media: readyMedia,
+              timestamp: "2026-08-13T23:07:56.317Z"
+            }
+          ]
+        })
+      )
+    );
+    const lowerReady = renderToString(
+      wrap(
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: readyMedia,
+          initialPlayback: { url: "https://signed.example/playback.mp3", mimeType: "audio/mpeg" },
+          testId: "cc-audio-bubble"
+        })
+      )
+    );
+    assert.match(upperReady, /communication-audio-bubble/);
+    assert.doesNotMatch(upperReady, /Voice message unavailable|Mensaje de voz no disponible|voiceMessageUnavailable/);
+    assert.match(lowerReady, /<audio/);
+    assert.match(lowerReady, /playback\.mp3/);
+
+    const upperPending = renderToString(
+      wrap(
+        React.createElement(ConversationPanel, {
+          prospectId: "prospect-1",
+          messages: [{ id: "log-p", text: "[audio message]", direction: "incoming", media: pendingMedia }]
+        })
+      )
+    );
+    const lowerPending = renderToString(
+      wrap(
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: pendingMedia,
+          testId: "cc-audio-bubble"
+        })
+      )
+    );
+    assert.match(upperPending, /Loading voice message|Cargando mensaje de voz|voiceMessagePending/);
+    assert.match(lowerPending, /Loading voice message|Cargando mensaje de voz|voiceMessagePending/);
+
+    const upperFailed = renderToString(
+      wrap(
+        React.createElement(ConversationPanel, {
+          prospectId: "prospect-1",
+          messages: [{ id: "log-f", text: "[audio message]", direction: "incoming", media: failedMedia }]
+        })
+      )
+    );
+    const lowerFailed = renderToString(
+      wrap(
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: failedMedia,
+          testId: "cc-audio-bubble"
+        })
+      )
+    );
+    assert.match(upperFailed, /Voice message unavailable|Mensaje de voz no disponible|voiceMessageUnavailable/);
+    assert.match(lowerFailed, /Voice message unavailable|Mensaje de voz no disponible|voiceMessageUnavailable/);
+  } finally {
+    await server.close();
+  }
+});

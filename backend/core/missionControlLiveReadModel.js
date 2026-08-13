@@ -53,9 +53,10 @@ function resolveSender(direction) {
 /**
  * @param {string} phone
  * @param {number} [limit]
- * @returns {Promise<Array<{ id: string, text: string, direction: string, sender: string, timestamp: string }>>}
+ * @param {{ organizationId?: string, prospectId?: string, repository?: object }} [context]
+ * @returns {Promise<Array<{ id: string, text: string, direction: string, sender: string, timestamp: string, media?: object, messageType?: string }>>}
  */
-async function fetchConversationThread(phone, limit = 50) {
+async function fetchConversationThread(phone, limit = 50, context = {}) {
   if (!phone) {
     return [];
   }
@@ -73,7 +74,7 @@ async function fetchConversationThread(phone, limit = 50) {
       return [];
     }
 
-    return data.map((row) => {
+    const messages = data.map((row) => {
       const direction = normalizeDirection(row.direction);
 
       return {
@@ -84,8 +85,52 @@ async function fetchConversationThread(phone, limit = 50) {
         timestamp: row.created_at
       };
     });
+
+    return attachCanonicalAudioMedia(messages, phone, context);
   } catch {
     return [];
+  }
+}
+
+// Implements BR-140 — WhatsApp thread uses the same public media as Communications Center.
+
+async function attachCanonicalAudioMedia(messages, phone, context = {}) {
+  let organizationId = context.organizationId || null;
+  let prospectId = context.prospectId || null;
+
+  if (!organizationId || !prospectId) {
+    try {
+      const { supabase } = require("../services/supabaseService");
+      let query = supabase.from("prospects").select("id, organization_id").eq("phone", phone);
+      if (organizationId) {
+        query = query.eq("organization_id", organizationId);
+      }
+      const { data: prospect, error } = await query.maybeSingle();
+      if (!error && prospect) {
+        organizationId = organizationId || prospect.organization_id || null;
+        prospectId = prospectId || prospect.id || null;
+      }
+    } catch {
+      return messages;
+    }
+  }
+
+  if (!organizationId || !prospectId) {
+    return messages;
+  }
+
+  try {
+    const {
+      getCommunicationMediaRepository,
+      attachPublicMediaToConversationMessages
+    } = require("./communicationMedia/communicationMediaRepository");
+    const rows = await getCommunicationMediaRepository(context).listForProspect({
+      organizationId,
+      prospectId
+    });
+    return attachPublicMediaToConversationMessages(messages, rows);
+  } catch {
+    return messages;
   }
 }
 

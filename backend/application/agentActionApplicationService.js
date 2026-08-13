@@ -517,7 +517,10 @@ async function getMissionControlWithActions(phone, options = {}) {
   }
 
   const resolvedPhone = initialState.prospect.phone;
-  const conversationMessages = await fetchConversationThread(resolvedPhone);
+  const conversationMessages = await fetchConversationThread(resolvedPhone, 50, {
+    organizationId: organizationId || null,
+    prospectId: initialState.prospect?.id || null
+  });
   const latestMessage = conversationMessages[conversationMessages.length - 1] || null;
 
   const missionControl = latestMessage
