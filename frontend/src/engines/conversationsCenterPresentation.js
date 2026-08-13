@@ -249,3 +249,28 @@ export function resolveLifecycleActionIds({
 export function conversationsThreadRegionOrder() {
   return ["sticky_controls", "timeline", "composer"];
 }
+
+/**
+ * Messaging unread presentation. Separate from NEEDS_ATTENTION / BR-080.
+ */
+export function resolveConversationUnreadPresentation({
+  unread = false,
+  unreadCount = 0
+} = {}) {
+  const count = Math.max(0, Number(unreadCount) || 0);
+  const isUnread = Boolean(unread) || count > 0;
+  return {
+    unread: isUnread,
+    unreadCount: count,
+    showDot: isUnread,
+    showCount: count > 1,
+    displayCount: count > 1 ? count : count === 1 ? 1 : null,
+    boldName: isUnread,
+    boldPreview: isUnread
+  };
+}
+
+/** Unread ≠ attention. Both may coexist. */
+export function unreadIsNeedsAttention() {
+  return false;
+}

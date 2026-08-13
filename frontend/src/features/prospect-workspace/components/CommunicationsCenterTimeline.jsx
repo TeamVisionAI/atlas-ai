@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getProspectCommunications,
   CommunicationsCenterError
@@ -187,7 +187,8 @@ export default function CommunicationsCenterTimeline({
   organizationId = null,
   refreshSignal = 0,
   newestFirst = false,
-  layout = "timeline"
+  layout = "timeline",
+  onConversationItemsChange = null
 }) {
   const isConversationLayout = layout === "conversation";
   const [status, setStatus] = useState("idle");
@@ -195,21 +196,27 @@ export default function CommunicationsCenterTimeline({
   const [payload, setPayload] = useState(null);
   const [filterId, setFilterId] = useState(isConversationLayout ? "messages" : "all");
   const [openDiagnostics, setOpenDiagnostics] = useState(() => new Set());
+  const loadedProspectIdRef = useRef(null);
 
   useEffect(() => {
     if (!prospectId) {
       setStatus("missing_id");
       setPayload(null);
+      loadedProspectIdRef.current = null;
       return undefined;
     }
 
     let cancelled = false;
     const requestedProspectId = String(prospectId);
-    // Clear previous prospect transcript immediately so it cannot render under a new header.
-    setPayload(null);
-    setStatus("loading");
-    setError(null);
-    setOpenDiagnostics(new Set());
+    const prospectChanged = loadedProspectIdRef.current !== requestedProspectId;
+    if (prospectChanged) {
+      // Clear previous prospect transcript immediately so it cannot render under a new header.
+      setPayload(null);
+      setStatus("loading");
+      setError(null);
+      setOpenDiagnostics(new Set());
+      loadedProspectIdRef.current = requestedProspectId;
+    }
 
     getProspectCommunications(requestedProspectId, { limit: 200 })
       .then((data) => {
@@ -227,7 +234,9 @@ export default function CommunicationsCenterTimeline({
       })
       .catch((err) => {
         if (cancelled) return;
-        setPayload(null);
+        if (prospectChanged) {
+          setPayload(null);
+        }
         if (err instanceof CommunicationsCenterError && err.status === 401) {
           setStatus("unauthorized");
         } else if (err instanceof CommunicationsCenterError && err.status === 403) {
@@ -267,6 +276,41 @@ export default function CommunicationsCenterTimeline({
       { newestFirst: false }
     );
   }, [payload, status, isConversationLayout]);
+
+  const conversationBubbles = useMemo(() => {
+    if (!isConversationLayout || status !== "ready") {
+      return [];
+    }
+    return orderCommunicationsForDisplay(
+      (payload?.items || []).filter((item) => isConversationBubbleItem(item)),
+      { newestFirst: false }
+    );
+  }, [isConversationLayout, payload, status]);
+
+  useEffect(() => {
+    if (!isConversationLayout || typeof onConversationItemsChange !== "function") {
+      return;
+    }
+    onConversationItemsChange({
+      prospectId,
+      status,
+      items: conversationBubbles,
+      inboundCount: conversationBubbles.filter((item) => {
+        const direction = String(item?.direction || "").toLowerCase();
+        return direction === "inbound" || direction === "incoming";
+      }).length,
+      latestTimestamp:
+        conversationBubbles.length > 0
+          ? conversationBubbles[conversationBubbles.length - 1]?.timestampUtc || null
+          : null
+    });
+  }, [
+    isConversationLayout,
+    onConversationItemsChange,
+    prospectId,
+    status,
+    conversationBubbles
+  ]);
 
   const filters = isConversationLayout ? CONVERSATION_LAYOUT_FILTERS : COMMUNICATIONS_FILTERS;
   const cacheKey = buildCommunicationsCacheKey(organizationId, prospectId);

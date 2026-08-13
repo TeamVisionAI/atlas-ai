@@ -425,6 +425,8 @@ export const translations = {
     conversationsComposerWindowClosed:
       "Fuera de la ventana de 24 horas de WhatsApp. No se puede enviar un mensaje normal.",
     conversationsComposerWindowClosedShort: "Fuera de la ventana de 24 horas",
+    conversationsNewMessage: "Mensaje nuevo ↓",
+    conversationsNewMessages: "{count} mensajes nuevos ↓",
     placeholderAppointmentsTitle: "Citas",
     placeholderAppointmentsDescription: "Calendario de entrevistas y citas próximamente.",
     appointmentsSubtitle: "Gestiona entrevistas, confirmaciones y excepciones.",
@@ -2114,6 +2116,8 @@ export const translations = {
     conversationsComposerWindowClosed:
       "Outside the 24-hour WhatsApp window. A regular message can’t be sent.",
     conversationsComposerWindowClosedShort: "Outside the 24-hour WhatsApp window",
+    conversationsNewMessage: "New message ↓",
+    conversationsNewMessages: "{count} new messages ↓",
     placeholderAppointmentsTitle: "Appointments",
     placeholderAppointmentsDescription: "Interview calendar and appointments coming soon.",
     appointmentsSubtitle: "Manage interviews, confirmations, and exceptions.",

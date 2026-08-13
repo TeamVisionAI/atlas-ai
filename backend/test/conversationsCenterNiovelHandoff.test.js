@@ -83,7 +83,7 @@ test("pilot access allows only Niovel in Team Vision", () => {
   );
 });
 
-test("list shows newest activity first and unread for NEEDS_ATTENTION", async () => {
+test("list shows newest activity first; NEEDS_ATTENTION is not messaging unread", async () => {
   await withTempWorkflowState(async () => {
     const {
       markConversationNeedsAttention
@@ -122,7 +122,8 @@ test("list shows newest activity first and unread for NEEDS_ATTENTION", async ()
 
     assert.equal(model.items[0].phone, "+17865550111");
     assert.equal(model.items[0].ownershipState, "NEEDS_ATTENTION");
-    assert.equal(model.items[0].unread, true);
+    assert.equal(model.items[0].unread, false);
+    assert.equal(model.items[0].unreadCount, 0);
     assert.equal(model.items[0].handoffReason, "ambiguity");
     assert.equal(model.items[0].conversationGoal, "interview");
     assert.equal(model.items[0].lastMessagePreview.includes("necesito"), true);

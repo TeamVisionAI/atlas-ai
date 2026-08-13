@@ -19,6 +19,12 @@ const {
   isActiveInboxLifecycle,
   isArchivedInboxBucket
 } = require("./conversationsCenterLifecycle");
+const {
+  computeLastCommunication,
+  computeUnreadState,
+  activitySortMs
+} = require("./conversationsUnreadEngine");
+const { normalizePhoneNumber, formatPhoneForStorage } = require("../phoneNormalizer");
 
 function loadProductionProspectsSafe(organizationId) {
   const {
@@ -49,42 +55,143 @@ function extractSource(prospect) {
   return prospect?.source || lead.source || prospect?.entry_method || null;
 }
 
-function activityMs(row) {
-  const candidates = [
-    row?.lastActivityAt,
-    row?.updated_at,
-    row?.last_message_at,
-    row?.created_at
-  ];
-
-  for (const value of candidates) {
-    const ms = Date.parse(value || "");
-    if (!Number.isNaN(ms)) {
-      return ms;
-    }
+function phoneLookupKeys(phone) {
+  const keys = new Set();
+  const raw = String(phone || "").trim();
+  if (raw) {
+    keys.add(raw);
   }
-
-  return 0;
+  const digits = raw.replace(/\D/g, "");
+  if (digits) {
+    keys.add(digits);
+    keys.add(`+${digits}`);
+  }
+  const normalized = normalizePhoneNumber(raw);
+  if (normalized) {
+    keys.add(formatPhoneForStorage(normalized));
+  }
+  return [...keys];
 }
 
-async function buildConversationListItem(prospect) {
+function logsForPhone(logsByPhone, phone) {
+  if (!logsByPhone) {
+    return [];
+  }
+  for (const key of phoneLookupKeys(phone)) {
+    if (logsByPhone instanceof Map && logsByPhone.has(key)) {
+      return logsByPhone.get(key) || [];
+    }
+    if (!(logsByPhone instanceof Map) && logsByPhone[key]) {
+      return logsByPhone[key] || [];
+    }
+  }
+  return [];
+}
+
+async function fetchConversationLogsByPhones(phones = [], organizationId = null) {
+  const unique = [...new Set((phones || []).flatMap((phone) => phoneLookupKeys(phone)))];
+  if (!unique.length) {
+    return new Map();
+  }
+
+  const { supabase } = require("../../services/supabaseService");
+  let query = supabase
+    .from("conversation_logs")
+    .select(
+      "id, prospect_phone, direction, message, intent, pipeline, created_at, organization_id"
+    )
+    .in("prospect_phone", unique)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(2000, unique.length * 80));
+
+  if (organizationId) {
+    query = query.or(
+      `organization_id.eq.${organizationId},organization_id.is.null`
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  const grouped = new Map();
+  for (const row of data || []) {
+    const phone = row.prospect_phone;
+    if (!phone) {
+      continue;
+    }
+    if (
+      organizationId &&
+      row.organization_id &&
+      String(row.organization_id) !== String(organizationId)
+    ) {
+      continue;
+    }
+    const list = grouped.get(phone) || [];
+    list.push(row);
+    grouped.set(phone, list);
+    for (const alias of phoneLookupKeys(phone)) {
+      if (!grouped.has(alias)) {
+        grouped.set(alias, list);
+      }
+    }
+  }
+  return grouped;
+}
+
+async function resolveConversationLogsByPhone(phones, organizationId, injected) {
+  if (injected) {
+    return injected instanceof Map ? injected : new Map(Object.entries(injected));
+  }
+  try {
+    return await fetchConversationLogsByPhones(phones, organizationId);
+  } catch {
+    return new Map();
+  }
+}
+
+function activityMs(row) {
+  return activitySortMs({
+    lastCommunicationAt: row?.lastCommunicationAt,
+    lastActivityAt:
+      row?.lastActivityAt ||
+      row?.updated_at ||
+      row?.last_message_at ||
+      row?.created_at ||
+      null
+  });
+}
+
+async function buildConversationListItem(prospect, options = {}) {
   const persisted = await loadPersistedWorkflowState(prospect.phone, {
     organizationId: prospect.organization_id || null,
     prospectId: prospect.id || null
   });
   const ownershipState = resolveConversationOwnershipState(persisted);
   const lifecycleInfo = resolveInboxLifecycle({ prospect, persisted });
-  const lastMessagePreview = prospect?.last_message
-    ? String(prospect.last_message).slice(0, 160)
-    : null;
+  const logs = options.logs || logsForPhone(options.logsByPhone, prospect.phone);
+  const lastCommunication = computeLastCommunication(logs);
+  const unreadState = computeUnreadState({
+    logs,
+    lastReadInboundAt: persisted.conversationsLastReadInboundAt || null
+  });
 
-  const active = isActiveInboxLifecycle(lifecycleInfo.lifecycle);
+  const lastMessagePreview =
+    lastCommunication.lastMessagePreview ||
+    (prospect?.last_message ? String(prospect.last_message).slice(0, 160) : null);
+  const lastCommunicationAt =
+    lastCommunication.lastCommunicationAt ||
+    prospect.last_message_at ||
+    null;
+  const lastActivityAt =
+    lastCommunicationAt ||
+    prospect.updated_at ||
+    prospect.created_at ||
+    null;
+
   const needsHumanAttention = Boolean(persisted.needsHumanAttention);
-  const unread =
-    active &&
-    (ownershipState === CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION ||
-      needsHumanAttention ||
-      prospect?.attention_status === "human_required");
+  const unread = unreadState.unreadCount > 0;
 
   return {
     id: prospect.id || null,
@@ -92,12 +199,12 @@ async function buildConversationListItem(prospect) {
     name: prospect.name || null,
     prospectNumber: prospect.prospect_number || null,
     lastMessagePreview,
-    lastActivityAt:
-      prospect.updated_at ||
-      prospect.last_message_at ||
-      prospect.created_at ||
-      null,
+    lastCommunicationAt,
+    lastActivityAt,
+    lastDirection: lastCommunication.lastDirection,
     unread,
+    unreadCount: unreadState.unreadCount,
+    lastReadInboundAt: persisted.conversationsLastReadInboundAt || null,
     source: extractSource(prospect),
     conversationGoal: extractConversationGoal(prospect),
     appointmentStatus: prospect.appointment_status || null,
@@ -224,11 +331,26 @@ async function buildConversationsCenterReadModel(options = {}) {
     options.prospects ?? (await loadProductionProspectsSafe(options.organizationId));
 
   const scoped = prospects.filter(isProspectInNiovelPilotScope);
-  let items = (await Promise.all(scoped.map(buildConversationListItem))).filter(
-    (item) => item.phone
+  const logsByPhone = await resolveConversationLogsByPhone(
+    scoped.map((row) => row.phone).filter(Boolean),
+    options.organizationId,
+    options.conversationLogsByPhone
   );
+  let items = (
+    await Promise.all(
+      scoped.map((prospect) =>
+        buildConversationListItem(prospect, {
+          logs: logsForPhone(logsByPhone, prospect.phone)
+        })
+      )
+    )
+  ).filter((item) => item.phone);
 
-  items.sort((left, right) => activityMs(right) - activityMs(left) || String(left.phone).localeCompare(String(right.phone)));
+  items.sort(
+    (left, right) =>
+      activityMs(right) - activityMs(left) ||
+      String(left.phone).localeCompare(String(right.phone))
+  );
 
   const counts = buildFilterCounts(items);
   const filter = options.filter || CONVERSATION_FILTERS.ACTIVE;
@@ -267,5 +389,7 @@ module.exports = {
   buildConversationListItem,
   matchesFilter,
   extractConversationGoal,
-  extractSource
+  extractSource,
+  fetchConversationLogsByPhones,
+  logsForPhone
 };

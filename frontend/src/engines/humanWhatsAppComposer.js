@@ -84,6 +84,24 @@ export function shouldBlockFreeformWhatsAppSend(windowState) {
   return normalizeCustomerCareWindow(windowState)?.open === false;
 }
 
+export const STICKY_COMPOSER_MIN_HEIGHT_PX = 44;
+export const STICKY_COMPOSER_MAX_HEIGHT_PX = 128;
+
+export function resolveComposerTextareaRows(variant) {
+  return variant === "sticky" ? 2 : 3;
+}
+
+export function clampComposerTextareaHeight(
+  scrollHeight,
+  {
+    min = STICKY_COMPOSER_MIN_HEIGHT_PX,
+    max = STICKY_COMPOSER_MAX_HEIGHT_PX
+  } = {}
+) {
+  const n = Number(scrollHeight) || 0;
+  return Math.min(max, Math.max(min, n));
+}
+
 export function canSubmitHumanWhatsAppSend({
   phone,
   message,

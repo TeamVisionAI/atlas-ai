@@ -18,7 +18,9 @@ import {
   isUserFacingConversationGoal,
   shouldShowHandoffReasonInHeader,
   resolveConversationsStatusBadge,
-  isInternalQualificationToken
+  isInternalQualificationToken,
+  resolveConversationUnreadPresentation,
+  unreadIsNeedsAttention
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
 import { translations } from "../i18n/translations.js";
@@ -258,6 +260,24 @@ test("status badge allowlists lifecycle tokens and never leaks qualification fie
     inboxLifecycle: "ACTIVE"
   });
   assert.equal(yasmanyLike.statusBadge, "NEW");
+});
+
+test("messaging unread is not NEEDS_ATTENTION", () => {
+  assert.equal(unreadIsNeedsAttention(), false);
+  const unread = resolveConversationUnreadPresentation({
+    unread: true,
+    unreadCount: 2
+  });
+  assert.equal(unread.showDot, true);
+  assert.equal(unread.displayCount, 2);
+  assert.equal(unread.boldPreview, true);
+  assert.equal(
+    shouldShowAttentionWarning({
+      ownershipState: "NEEDS_ATTENTION",
+      needsHumanAttention: true
+    }),
+    true
+  );
 });
 
 test("Conversations Center newest-first keeps older messages deterministic below", () => {
