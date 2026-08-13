@@ -22,7 +22,8 @@ const {
 const {
   computeLastCommunication,
   computeUnreadState,
-  activitySortMs
+  activitySortMs,
+  isRealWhatsAppCommunication
 } = require("./conversationsUnreadEngine");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../phoneNormalizer");
 
@@ -177,13 +178,20 @@ async function buildConversationListItem(prospect, options = {}) {
     lastReadInboundAt: persisted.conversationsLastReadInboundAt || null
   });
 
+  const fallbackLastMessage = String(prospect?.last_message || "").trim();
+  const fallbackIsRealCommunication =
+    Boolean(fallbackLastMessage) &&
+    isRealWhatsAppCommunication({
+      direction: "outbound",
+      message: fallbackLastMessage
+    });
+
   const lastMessagePreview =
     lastCommunication.lastMessagePreview ||
-    (prospect?.last_message ? String(prospect.last_message).slice(0, 160) : null);
+    (fallbackIsRealCommunication ? fallbackLastMessage.slice(0, 160) : null);
   const lastCommunicationAt =
     lastCommunication.lastCommunicationAt ||
-    prospect.last_message_at ||
-    null;
+    (fallbackIsRealCommunication ? prospect.last_message_at || null : null);
   const lastActivityAt =
     lastCommunicationAt ||
     prospect.updated_at ||

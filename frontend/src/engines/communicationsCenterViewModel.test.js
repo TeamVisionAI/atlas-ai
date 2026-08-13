@@ -89,6 +89,18 @@ test("conversation layout hides technical events and internal operational notes 
       actor: { type: "atlas" },
       ai: { intent: "CONVERSATION_OUTCOME" },
       content: { text: "[Conversation outcome] Interested" }
+    },
+    {
+      id: "10",
+      category: "message",
+      direction: "outbound",
+      channel: "whatsapp",
+      actor: { type: "agent" },
+      flags: ["human_reply"],
+      ai: { intent: "WHATSAPP_OUTBOUND_BLOCKED_TEMPLATE_MISSING" },
+      content: {
+        text: "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY; reason=NO_TEMPLATE_FOR_INTENT"
+      }
     }
   ];
 
@@ -108,6 +120,7 @@ test("conversation layout hides technical events and internal operational notes 
   assert.equal(isConversationBubbleItem(items[2]), false);
   assert.equal(isConversationBubbleItem(items[7]), false);
   assert.equal(isConversationBubbleItem(items[8]), false);
+  assert.equal(isConversationBubbleItem(items[9]), false);
   assert.deepEqual(
     selectConversationLayoutBubbles(items).map((item) => item.id),
     ["1", "6", "7"]
