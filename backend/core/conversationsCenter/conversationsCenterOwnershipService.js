@@ -45,13 +45,8 @@ function resolveConversationOwnershipState(persisted = {}) {
     return CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION;
   }
 
-  if (
-    persisted.workflowOwnership === OWNERSHIP.AGENT ||
-    persisted.manualAgentOwnership === true
-  ) {
-    return CONVERSATION_OWNERSHIP_STATE.HUMAN;
-  }
-
+  // workflowOwnership=AGENT without a sticky seal is not Conversations HUMAN
+  // (BR-080 leftover / stall-cleared without TAKE OVER → ATLAS presentation).
   return CONVERSATION_OWNERSHIP_STATE.ATLAS;
 }
 

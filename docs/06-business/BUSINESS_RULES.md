@@ -1699,7 +1699,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 8. **Async adapter** — Load/save are awaited at call sites (including HUMAN silence gate).
 9. **No mass backfill** — After deploy, operators re-mark TEST/CLOSED/ARCHIVED / HUMAN as needed. Do not invent historical marks.
 10. **Out of Phase 1** — Preferred language, occupation, interview type, receipts, wholesale `agentActionState`, and BR-111 execution enablement. V2 mid-flow knownFacts continuity remains `recruit_ai_conversation_contexts` (BR-081+), not this JSONB.
-11. **Sticky TAKE OVER vs attention / advancement (clarification)** — Manual TAKE OVER (`manualAgentOwnership=true` + `humanTakenOverAt`) is authoritative Conversations ownership (**HUMAN**) until explicit RETURN TO ATLAS (or another explicit human ownership release). It must survive BR-034 stall/attention evaluation, BR-035 human advancement / Complete Qualification, Mission Control / Prospect Center workflow evaluation, and page refresh. `needsHumanAttention` / stall / follow-up metadata may coexist as an attention warning but must not demote or mask HUMAN, disable the composer, or re-offer TAKE OVER. BR-035 must not write `manualAgentOwnership=false` or derive `workflowOwnership=ATLAS` while the sticky hold is active. Atlas automated outbound (including `allowHandoffAck`) stays suppressed while the sticky hold is active. Stall-only escalations without `humanTakenOverAt` continue to present as **NEEDS_ATTENTION**.
+11. **Sticky TAKE OVER vs attention / advancement (clarification)** — Manual TAKE OVER (`manualAgentOwnership=true` + `humanTakenOverAt`) is authoritative Conversations ownership (**HUMAN**) until explicit RETURN TO ATLAS (or another explicit human ownership release). It must survive BR-034 stall/attention evaluation, BR-035 human advancement / Complete Qualification, Mission Control / Prospect Center workflow evaluation, and page refresh. `needsHumanAttention` / stall / follow-up metadata may coexist as an attention warning but must not demote or mask HUMAN, disable the composer, or re-offer TAKE OVER. BR-035 must not write `manualAgentOwnership=false` or derive `workflowOwnership=ATLAS` while the sticky hold is active. Atlas automated outbound (including `allowHandoffAck`) stays suppressed while the sticky hold is active. Stall-only escalations without `humanTakenOverAt` continue to present as **NEEDS_ATTENTION**. `workflowOwnership=AGENT` without the sticky seal is **not** Conversations HUMAN — use NEEDS_ATTENTION when `needsHumanAttention` is true, otherwise ATLAS. BR-080 `human_required` without TAKE OVER is NEEDS_ATTENTION.
 12. **TAKE OVER acknowledges the current BR-080 attention episode** — Explicit TAKE OVER means the human is handling the prospect and therefore acknowledges the **current** BR-080 episode via the canonical `acknowledgeLead` path (`acknowledged_at`, `acknowledged_by_user_id`, `attention_status=acknowledged`). This clears Prospect Center New / unacknowledged and BR-080-driven Human Attention for that episode and resolves `NewLeadAttention` as acknowledged. It does **not** Return to Atlas, clear sticky HUMAN, or permanently suppress future alerts. A later genuine BR-034 stall / new `human_required` episode may warn again while HUMAN remains sticky; it must not resurrect the old unacknowledged New episode.
 
 ---
@@ -2604,7 +2604,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 1. **Deterministic owner or durable Unassigned** — Every new canonical prospect receives either an eligible `owner_user_id` at create or `assignment_status = unassigned` visible to Admin/RVP (and Division Leader when hierarchy permits).
 2. **Create-time assignment precedence** — (1) valid explicit same-org agent, (2) campaign/form mapping when provided, (3) organization `defaultRecruiterUserId`, (4) active organization RVP fallback, (5) authenticated creator when preferred (Quick Capture/manual), (6) Unassigned queue. Reject disabled, deleted, wrong-org, operations/support, and Meta Review fixtures. Never use ATLAS workflow ownership as CRM ownership. Never pick an arbitrary first user.
 3. **AI ownership ≠ human CRM ownership** — `workflowOwnership = ATLAS` and Recruit AI replies do not assign `owner_user_id` and do not acknowledge.
-4. **New persists until acknowledgement** — `attention_status` remains new/ai_responding/waiting/human_required until explicit Acknowledge or Claim & Acknowledge. Page open, card render, dashboard load, and AI reply do **not** clear New.
+4. **New persists until acknowledgement** — `attention_status` remains new/ai_responding/waiting/human_required until explicit Acknowledge or Claim & Acknowledge. Page open, card render, dashboard load, AI reply, prospect inbound, and workflow read-model rebuild do **not** clear New or silently resolve `human_required`. BR-080 attention is not a BR-034 stall and must not be cleared by stall-clearance / `WorkflowResumed` logic.
 5. **New Lead mission** — Mission type `NewLeadAttention` surfaces for unassigned, assigned-unacknowledged, and human-required leads. Priority: Unassigned new and unresolved Update Outcome share CRITICAL rank 1 (Update Outcome not weakened); Human Attention / assigned-unacknowledged at rank 2.
 6. **Blocked/failed AI creates human-visible attention** — Conversation engine failure and humanAssist paths set Human Attention Required with sanitized reason and durable mission visibility. BR-075/078 blocked sends remain fail-closed and must not mark sent/handled.
 7. **Escalation** — Elapsed UTC SLA: 5 minutes unassigned → escalation level 1; 15 minutes unassigned or unacknowledged → level 2 + Human Attention Required. Idempotent. Acknowledged/closed leads stop escalating. No email/SMS/Slack/browser push in v1.
@@ -2621,7 +2621,7 @@ Only these clear New:
 - Explicit **Claim & Acknowledge** on an unassigned lead by Admin/RVP/DL
 - Explicit Conversations **TAKE OVER** (acknowledges the current episode via canonical `acknowledgeLead`; does not Return to Atlas; sticky HUMAN remains)
 
-Not automatic in v1: page open, AI reply, mission list render, schedule booking (booking may stamp owner if null but does not acknowledge).
+Not automatic in v1: page open, AI reply, prospect inbound, mission list render, Mission Control / dashboard / Prospect Center / Follow-ups / queue reads, schedule booking (booking may stamp owner if null but does not acknowledge).
 
 ---
 
@@ -2708,7 +2708,8 @@ Rules:
 ## BR-034 — Conversation Stalled / Intelligent Human Escalation
 
 **Implements:** Sprint 8A principles 4, 9, 11, 12, 13  
-**Engine:** `workflowReadModel.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`
+**Engine:** `workflowReadModel.js`, `stallDetectionEngine.js`, `workflowOwnershipEngine.js`  
+**Related:** BR-080 (attention ≠ stall), BR-135 (sticky HUMAN seal)
 
 ### Trigger (all required)
 
@@ -2717,19 +2718,30 @@ Rules:
 3. Prospect is not awaiting a scheduled event where `WAITING_EVENT` applies.
 4. Milestone is not terminal.
 
+### Durable stall episode
+
+Canonical evidence is `stalledAt` and/or `stallEpisodeKey` on `prospects.workflow_state`. Detector `cleared: true` (inbound after outbound) is not authorization to clear. Only a real durable stall episode may execute stall clearance / `WorkflowResumed`. BR-080 `needsHumanAttention` / `human_required` alone is not a stall.
+
+### Read vs write
+
+Mission Control, Dashboard, Prospect Center, Follow-ups, Executive dashboard, and prioritized queue builders are **read-only**. They must not persist ownership/stall transitions or emit stall-clear events merely by being opened. Inbound prospect reply may clear a **real** stall via `reconcileStallAfterProspectReply`.
+
 ### Behavior
 
 - Pause automated progression.
 - Set `workflowOwnership = AGENT`.
 - Set `needsHumanAttention = true`.
+- Persist `stalledAt` / `stallEpisodeKey`.
 - Create Mission Control priority item **after** Pending Interview Results (rank 2).
 - Recommend appropriate human action (early milestones → phone call).
 - Preserve current milestone and collected data.
-- Resume automatically after agent records interaction and advances milestone (BR-035). No separate "Resume Atlas" button.
+- Resume automatically after agent records interaction and advances milestone (BR-035), or after prospect inbound **when a durable stall episode exists**. No separate "Resume Atlas" button.
+- Conversations **HUMAN** requires sticky TAKE OVER (`manualAgentOwnership=true` + `humanTakenOverAt`). Stall-only AGENT ownership presents as **NEEDS_ATTENTION**.
 
 ### Events
 
-`ConversationStalled`, `WorkflowOwnershipChanged`, `WorkflowPaused`
+`ConversationStalled`, `WorkflowOwnershipChanged`, `WorkflowPaused`  
+Clearance (real episode + prospect reply): `WorkflowOwnershipChanged` (`reason=prospect_reply`), `WorkflowResumed`
 
 ---
 
@@ -2774,7 +2786,7 @@ Rules:
 |------|-----|---------|
 | `ATLAS` | `AGENT` | BR-034 stall, BR-015 manual takeover, BR-024 coordinator handoff |
 | `ATLAS` | `WAITING_EVENT` | Interview scheduled, reminder scheduled, awaiting scheduled event |
-| `AGENT` | `ATLAS` | BR-035 human save; prospect inbound after stall (8A.2) |
+| `AGENT` | `ATLAS` | BR-035 human save; prospect inbound after a **durable BR-034 stall episode** (8A.2). Not BR-080 attention. |
 | `AGENT` | `WAITING_EVENT` | Human schedules interview — automated wait until event |
 | `*` | `CLOSED` | Closed or Do Not Contact milestone |
 | `CLOSED` | `ATLAS` | **Invalid** without explicit reopen rule |

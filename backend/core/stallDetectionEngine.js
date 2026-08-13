@@ -1,6 +1,8 @@
 /**
  * Sprint 8A.2 — BR-034 stall detection (read/evaluate only).
  * Detects 24h silence after Atlas's last outbound message.
+ * `cleared: true` is a detector hint only. Durable clearance requires
+ * stalledAt / stallEpisodeKey via applyStallTransition (not BR-080 attention).
  * Does not mutate state or emit events — see workflowOwnershipEngine.
  */
 

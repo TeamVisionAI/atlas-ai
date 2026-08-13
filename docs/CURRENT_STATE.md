@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-08-13:** **BR-080 ≠ BR-034** — Attention must not trigger stall clearance or false Conversations HUMAN. Durable stall = `stalledAt`/`stallEpisodeKey`. Read paths (MC/dashboard/queue) do not persist ownership. HUMAN requires sticky seal (`manualAgentOwnership` + `humanTakenOverAt`).
 - **2026-08-13:** **BR-139** — Canonical `INTERVIEW_READY` outranks stale QUAL_CAPTURE / brain gaps on Mission Control (Schedule Interview, no Complete Qualification contradiction). Read-time only; no QUAL_CAPTURE backfill.
 - **2026-08-12:** **BR-138** — WhatsApp inbound provider-message atomic claim (partial unique on `whatsapp:inbound:{wamid}` only; claim before locate/log/hub). Phase 3 QR first-turn still paused.
 - **2026-08-04:** **RC3 production APPROVED WITH MINOR LIMITATIONS** — migration 025 live; deploy `4e49e6f` (+ print fix `355abec`); live formula/projection/print acceptance; see `RC3_PRODUCTION_ACCEPTANCE.md`
@@ -123,4 +124,4 @@ Facebook Lead
 
 ## Last Updated
 
-2026-08-04
+2026-08-13

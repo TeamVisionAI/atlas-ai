@@ -100,7 +100,8 @@ test("A–C Active: ATLAS / NEEDS_ATTENTION / HUMAN stay Active", async () => {
     await savePersistedWorkflowState("+17865551003", {
       workflowOwnership: OWNERSHIP.AGENT,
       needsHumanAttention: false,
-      manualAgentOwnership: true
+      manualAgentOwnership: true,
+      humanTakenOverAt: "2026-08-10T12:00:00.000Z"
     });
 
     const model = await buildConversationsCenterReadModel({
