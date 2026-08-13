@@ -32,32 +32,87 @@ test("filters isolate messages, workflow, appointments, and system/errors", () =
   );
 });
 
-test("conversation layout hides technical events from the default transcript", () => {
+test("conversation layout hides technical events and internal operational notes from transcript", () => {
   const items = [
-    { id: "1", category: "message", direction: "inbound", actor: { type: "prospect" } },
+    {
+      id: "1",
+      category: "message",
+      direction: "inbound",
+      channel: "whatsapp",
+      actor: { type: "prospect" },
+      content: { text: "Hola" }
+    },
     { id: "2", category: "workflow", workflow: { before: "A", after: "B" } },
-    { id: "3", category: "note", direction: "outbound", actor: { type: "agent" } },
+    {
+      id: "3",
+      category: "note",
+      direction: "system",
+      channel: "note",
+      actor: { type: "agent" },
+      flags: ["agent_note"],
+      content: { text: "Internal note" }
+    },
     { id: "4", category: "appointment" },
-    { id: "5", category: "delivery", flags: ["delivery_attention"] }
+    { id: "5", category: "delivery", flags: ["delivery_attention"] },
+    {
+      id: "6",
+      category: "message",
+      direction: "outbound",
+      channel: "whatsapp",
+      actor: { type: "atlas" },
+      content: { text: "Thanks — we can schedule soon." }
+    },
+    {
+      id: "7",
+      category: "message",
+      direction: "outbound",
+      channel: "whatsapp",
+      actor: { type: "agent" },
+      flags: ["human_reply"],
+      content: { text: "Can we talk tomorrow?" }
+    },
+    {
+      id: "8",
+      category: "message",
+      direction: "outbound",
+      channel: "whatsapp",
+      actor: { type: "atlas" },
+      ai: { intent: "REQUIRED_INFORMATION" },
+      content: { text: "[Required Information Updated] City, State" }
+    },
+    {
+      id: "9",
+      category: "message",
+      direction: "outbound",
+      channel: "whatsapp",
+      actor: { type: "atlas" },
+      ai: { intent: "CONVERSATION_OUTCOME" },
+      content: { text: "[Conversation outcome] Interested" }
+    }
   ];
 
-  assert.equal(filterConversationLayoutItems(items, "messages").length, 2);
   assert.deepEqual(
     filterConversationLayoutItems(items, "messages").map((item) => item.id),
-    ["1", "3"]
+    ["1", "6", "7"]
   );
   assert.equal(filterConversationLayoutItems(items, "appointments").length, 1);
   assert.deepEqual(
     filterConversationLayoutItems(items, "all").map((item) => item.id),
-    ["1", "3", "4"]
+    ["1", "6", "7"]
   );
 
   assert.equal(isConversationBubbleItem(items[0]), true);
+  assert.equal(isConversationBubbleItem(items[5]), true);
+  assert.equal(isConversationBubbleItem(items[6]), true);
+  assert.equal(isConversationBubbleItem(items[2]), false);
+  assert.equal(isConversationBubbleItem(items[7]), false);
+  assert.equal(isConversationBubbleItem(items[8]), false);
   assert.equal(isTechnicalCommunicationsItem(items[1]), true);
   assert.equal(isTechnicalCommunicationsItem(items[4]), true);
+  assert.equal(isTechnicalCommunicationsItem(items[7]), true);
 
   assert.equal(resolveConversationBubbleSide(items[0]), "inbound");
-  assert.equal(resolveConversationBubbleSide(items[2]), "outbound");
+  assert.equal(resolveConversationBubbleSide(items[6]), "outbound");
   assert.equal(
     resolveConversationBubbleSide({ actor: { type: "atlas" } }),
     "outbound"

@@ -117,13 +117,55 @@ export function containsRawPhoneLeak(text) {
 }
 
 /**
- * Conversations transcript (WhatsApp-like): messages/notes belong in the bubble stream.
- * Workflow / delivery / system / timeline noise stays available via Diagnostics only.
+ * Conversations transcript (WhatsApp-like): only real Prospect / Atlas / Human
+ * WhatsApp communication. Internal notes, qualification-save logs, workflow
+ * brackets, and system events stay in Diagnostics only.
  * Presentation-only — does not mutate stored communications.
  */
+const INTERNAL_MESSAGE_INTENTS = new Set([
+  "REQUIRED_INFORMATION",
+  "CONVERSATION_OUTCOME",
+  "AGENT_ACTION",
+  "REQUIRED_INFORMATION_UPDATED"
+]);
+
 export function isConversationBubbleItem(item) {
   const category = String(item?.category || "");
-  return category === "message" || category === "note";
+  if (category !== "message") {
+    return false;
+  }
+
+  const flags = item?.flags || [];
+  if (flags.includes("agent_note")) {
+    return false;
+  }
+
+  const channel = String(item?.channel || "").toLowerCase();
+  if (channel === "note") {
+    return false;
+  }
+
+  const direction = String(item?.direction || "").toLowerCase();
+  if (direction !== "inbound" && direction !== "outbound") {
+    return false;
+  }
+
+  if (channel && channel !== "whatsapp") {
+    return false;
+  }
+
+  const intent = String(item?.ai?.intent || "").toUpperCase();
+  if (INTERNAL_MESSAGE_INTENTS.has(intent)) {
+    return false;
+  }
+
+  const text = String(item?.content?.text || item?.content?.body || "").trim();
+  // Bracketed operational logs e.g. [Required Information Updated] …
+  if (/^\[[^\]]+\]/.test(text)) {
+    return false;
+  }
+
+  return true;
 }
 
 export function isTechnicalCommunicationsItem(item) {
@@ -150,25 +192,20 @@ export function resolveConversationBubbleSide(item) {
 export const CONVERSATION_LAYOUT_FILTERS = [
   { id: "messages", label: "Messages" },
   { id: "appointments", label: "Appointments" },
-  { id: "all", label: "All visible" }
+  { id: "all", label: "All messages" }
 ];
 
 /**
- * Conversation layout list: default/messages show bubbles only.
- * Appointments filter shows appointment rows; "all" still excludes technical categories
- * (those remain in the Diagnostics panel).
+ * Conversation layout list: default/messages show WhatsApp bubbles only.
+ * Appointments filter shows appointment rows; "all" remains communication-only
+ * (technical categories stay in the Diagnostics panel).
  */
 export function filterConversationLayoutItems(items = [], filterId = "messages") {
   const list = Array.isArray(items) ? items : [];
   if (filterId === "appointments") {
     return list.filter((item) => String(item?.category || "") === "appointment");
   }
-  if (filterId === "all") {
-    return list.filter(
-      (item) =>
-        isConversationBubbleItem(item) || String(item?.category || "") === "appointment"
-    );
-  }
+  // "all" and "messages" — communication bubbles only (no system/workflow/notes).
   return list.filter((item) => isConversationBubbleItem(item));
 }
 

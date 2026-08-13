@@ -13,9 +13,22 @@ import {
   resolveThreadActionIds,
   resolveLifecycleActionIds,
   conversationsThreadRegionOrder,
-  shouldShowAttentionWarning
+  conversationsThreadHeaderRegionOrder,
+  shouldShowAttentionWarning,
+  isUserFacingConversationGoal,
+  shouldShowHandoffReasonInHeader
 } from "./conversationsCenterPresentation.js";
 import { orderCommunicationsForDisplay } from "./communicationsCenterViewModel.js";
+import { translations } from "../i18n/translations.js";
+import {
+  MISSION_CONTROL_QUERY_KEYS,
+  buildMissionControlQuery
+} from "./missionControlRouteEngine.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test("header model exposes full copyable phone for authorized detail UI", () => {
   const model = buildConversationHeaderModel({
@@ -118,6 +131,64 @@ test("sticky thread region places composer before timeline", () => {
     "composer",
     "timeline"
   ]);
+});
+
+test("thread header stacks identity above actions so long names do not collide", () => {
+  assert.deepEqual(conversationsThreadHeaderRegionOrder(), ["identity", "actions"]);
+
+  const pageCss = fs.readFileSync(
+    path.join(__dirname, "../pages/ConversationsPage.css"),
+    "utf8"
+  );
+  assert.match(pageCss, /\.conversations-thread__header\s*\{[^}]*flex-direction:\s*column/s);
+  assert.match(pageCss, /\.conversations-thread__identity\s*\{[^}]*width:\s*100%/s);
+  assert.match(pageCss, /\.conversations-thread__actions\s*\{[^}]*flex-wrap:\s*wrap/s);
+  assert.match(pageCss, /\.conversations-thread__title\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+
+  const pageJsx = fs.readFileSync(
+    path.join(__dirname, "../pages/ConversationsPage.jsx"),
+    "utf8"
+  );
+  assert.match(pageJsx, /data-testid="conversations-thread-identity"/);
+  assert.match(pageJsx, /data-testid="conversations-thread-actions"/);
+  assert.doesNotMatch(pageJsx, /conversationsHandoffReason/);
+  assert.doesNotMatch(pageJsx, /handoffReason \?/);
+});
+
+test("OPEN IN MC / ABRIR EN MC labels; MC deep-link still uses prospectId", () => {
+  assert.equal(translations.en.conversationsOpenInMissionControl, "OPEN IN MC");
+  assert.equal(translations.es.conversationsOpenInMissionControl, "ABRIR EN MC");
+  assert.doesNotMatch(
+    translations.en.conversationsOpenInMissionControl,
+    /MISSION CONTROL/i
+  );
+
+  const query = buildMissionControlQuery({
+    prospectId: "29853100-f151-4ca8-b07d-624fd20c6685",
+    phone: "+15555550100"
+  });
+  assert.match(
+    query,
+    new RegExp(`${MISSION_CONTROL_QUERY_KEYS.PROSPECT_ID}=29853100-f151-4ca8-b07d-624fd20c6685`)
+  );
+  assert.match(query, new RegExp(`${MISSION_CONTROL_QUERY_KEYS.PHONE}=%2B15555550100`));
+
+  const pageJsx = fs.readFileSync(
+    path.join(__dirname, "../pages/ConversationsPage.jsx"),
+    "utf8"
+  );
+  assert.match(
+    pageJsx,
+    /buildMissionControlPath\(\{\s*prospectId:\s*timelineProspectId/
+  );
+});
+
+test("DAY_PART and handoff reason stay out of the normal Conversations header", () => {
+  assert.equal(isUserFacingConversationGoal("DAY_PART"), false);
+  assert.equal(isUserFacingConversationGoal("day_part"), false);
+  assert.equal(isUserFacingConversationGoal("Interview Ready"), true);
+  assert.equal(shouldShowHandoffReasonInHeader(), false);
+  assert.equal(shouldShowHandoffReasonInHeader("take_over"), false);
 });
 
 test("Conversations Center newest-first keeps older messages deterministic below", () => {
