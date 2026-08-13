@@ -35,6 +35,17 @@ test("staging baseline lists 001–038, both 010 files, and never 039", () => {
   );
 });
 
+test("staging PostgREST grant script is service_role only", () => {
+  const sql = fs.readFileSync(
+    path.join(__dirname, "../database/staging/001_postgrest_service_role_grants.sql"),
+    "utf8"
+  );
+
+  assert.match(sql, /GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role/);
+  assert.doesNotMatch(sql, /GRANT ALL ON ALL TABLES IN SCHEMA public TO anon/i);
+  assert.doesNotMatch(sql, /GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated/i);
+});
+
 test("014 does not COMMENT on Supabase-managed storage catalog tables", () => {
   const sql = fs.readFileSync(
     path.join(MIGRATIONS_DIR, "014_profile_avatars_storage.sql"),

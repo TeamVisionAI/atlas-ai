@@ -113,7 +113,7 @@ npm run dev -- --mode staging
 Apply baseline migrations on staging only:
 
 ```bash
-npm run staging:migrate   # 001–038 only; never 039
+npm run staging:migrate   # pre-baseline + 001–038 + PostgREST service_role grants; never 039
 npm run staging:seed      # synthetic personas/prospects
 ```
 

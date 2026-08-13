@@ -39,6 +39,10 @@ const STAGING_PRE_BASELINE = path.join(
   __dirname,
   "../../database/staging/000_legacy_pre_baseline.sql"
 );
+const STAGING_POSTGREST_GRANTS = path.join(
+  __dirname,
+  "../../database/staging/001_postgrest_service_role_grants.sql"
+);
 const MAX_BASELINE_VERSION = 38;
 
 function loadSql(filePath) {
@@ -112,6 +116,10 @@ async function applyStagingBaselineMigrations() {
       await client.query(loadSql(path.join(MIGRATIONS_DIR, fileName)));
       applied.push(fileName);
     }
+
+    console.log("Applying staging PostgREST service_role grants");
+    await client.query(loadSql(STAGING_POSTGREST_GRANTS));
+    applied.push("001_postgrest_service_role_grants");
   });
 
   return applied;
@@ -127,7 +135,7 @@ async function main() {
 
   console.log("");
   console.log("Applied:", applied.join(", "));
-  console.log("Staging baseline 001–038 complete. Migration 039 was not applied.");
+  console.log("Staging baseline 001–038 complete, including PostgREST service_role grants. Migration 039 was not applied.");
 }
 
 if (require.main === module) {
