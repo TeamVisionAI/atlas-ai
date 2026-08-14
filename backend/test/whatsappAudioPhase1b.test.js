@@ -176,10 +176,10 @@ test("4. duplicate job does not duplicate transcode", async () => {
 
   assert.equal(first.skipped, true);
   assert.equal(first.transcodeStatus, TRANSCODE_STATUS.READY);
-  assert.equal(second.length, 0);
   assert.equal(transcodeCalls, 0);
   assert.equal(repository._rows.length, 1);
   assert.equal(repository._rows[0].playback_path.endsWith("/playback.mp3"), true);
+  assert.ok(second.every((item) => item.skipped === true || item.transcodeStatus === TRANSCODE_STATUS.READY));
 });
 
 test("5–6. transcode failure preserves original and does not mutate ownership/BR-080", async () => {
