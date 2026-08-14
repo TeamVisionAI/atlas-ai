@@ -51,14 +51,30 @@ Same poller lifecycle. After original store:
 
 Do not depend on system ffmpeg. Frontend does not use Safari OGG `canPlayType` on the derivative path.
 
+## Phase 2 — Spanish-first STT + semantic replay (BR-141, staging)
+
+```
+audio → private original → MP3 derivative → OpenAI gpt-transcribe
+     → durable transcript → Recruit AI V2 text path → one Atlas reply
+```
+
+- STT input is the Atlas MP3 playback derivative after `transcode_status=ready|not_required`.
+- Semantic replay id is `audio-stt:{communicationMediaId}`. Original wamid is linkage only.
+- Webhook does not BR-118-ack. Fast STT → one semantic reply. Slow/fail → one soft ack or type-please.
+- Do not insert a second inbound conversation log. Do not enable execution gates.
+- UI: player + transcript (pending / ready / unavailable). Audio remains `messageType=audio`.
+
 ## Out of scope (do not build now)
 
-- Transcription / Whisper / OpenAI audio
-- SMS / email / live voice calling
+- Production STT migrate/deploy
+- whisper-1 / chat/completions / realtime live transcription
+- Deepgram unless OpenAI staging Spanish eval fails
+- SMS / email / live voice calling / live transfer
 - Public media URLs or Meta token exposure
 
 ## Related
 
 - [BR-140](../../06-business/BUSINESS_RULES.md)
+- [BR-141](../../06-business/BUSINESS_RULES.md)
 - [COMMUNICATION_CONNECTORS.md](./COMMUNICATION_CONNECTORS.md)
 - [BR-118](../../06-business/BUSINESS_RULES.md) non-text media dialogue guard

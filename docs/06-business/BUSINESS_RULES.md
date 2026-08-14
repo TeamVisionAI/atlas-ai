@@ -1696,9 +1696,35 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Do not treat all `[…]` as operational** — Media placeholders (`[audio message]`, `[image message]`, …) are real communication fallbacks only. Operational brackets remain hidden from preview/unread/transcript.
 5. **Async media fetch** — Webhook parse + persist log + structured `communication_media` row must return fast. Meta download uses server-side WhatsApp credentials only. Private tenant-scoped storage (`organizationId/prospectId/wamid/original.<ext>`). No public URLs. No Meta temp URLs in the browser.
 6. **Signed playback** — Authorized Atlas user + org guard + prospect access. Short-lived signed URL. Wrong-org denied. Phone is never the authorization key. Prefer `playback_path` MP3 derivative; serve original only when transcode is `not_required`.
-7. **Pre-STT Recruit AI** — Keep BR-118: no semantic interpretation of audio. V2 eligible path may send the existing soft media ack. Legacy CE must not consume `[audio message]` as qualification text (no clarify_once, no fake city/state/work-auth). Freeze qualification. No TAKE OVER. No BR-080 change from media fetch or transcode failure.
-8. **Safari-safe derivative (Phase 1B)** — Always keep the original. Transcode OGG/Opus (and other non-native formats) to MP3 via `ffmpeg-static` in the same fetch poller. Transcode failure must not lose the original, mutate ownership, acknowledge BR-080, or change qualification. UI: preparing / unavailable in this browser — never ffmpeg/provider internals.
-9. **Boundaries** — No Whisper/OpenAI STT, no English-only transcription runtime, no execution enablement, no appointment/scheduling/ads/voice-calling changes, no HUMAN sticky ownership change, no BR-075/BR-080 rewrite.
+7. **Webhook vs STT** — Webhook must not semantically interpret audio or send BR-118 immediately. Persist log + `communication_media`, return fast, background fetch/transcode. Phase 2 STT + semantic replay is **BR-141**. Legacy CE must not consume `[audio message]` as qualification text. Freeze qualification until transcript replay. No TAKE OVER. No BR-080 change from media fetch, transcode, or STT failure.
+8. **Safari-safe derivative (Phase 1B)** — Always keep the original. Transcode OGG/Opus (and other non-native formats) to MP3 via `ffmpeg-static` in the same fetch poller. Transcode failure must not lose the original, mutate ownership, acknowledge BR-080, or change qualification. UI: preparing / unavailable in this browser — never ffmpeg/provider internals. MP3 derivative is the STT input after `transcode_status=ready|not_required`.
+9. **Boundaries** — Execution gates stay independent and OFF. No appointment/scheduling/ads/voice-calling changes from media processing. No HUMAN sticky ownership change from transport=audio. STT itself is BR-141 (staging first). Do not edit applied production 039.
+
+---
+
+## BR-141 — Spanish-First Audio STT + Semantic Replay
+
+**Implements:** WhatsApp voice notes become normal Recruit AI V2 text turns after durable transcription; one voice note → one inbound log → one media row → one transcript → one semantic V2 turn → at most one semantic Atlas reply  
+**Domain:** WhatsApp audio / STT / Recruit AI V2  
+**Depends on:** BR-140, BR-118, BR-049, BR-081, BR-111, BR-112, BR-114, BR-137  
+**Related:** BR-080 (must not fire from STT success/failure), BR-075  
+**Status:** Implemented (Phase 2, STAGING ONLY)  
+**Engine target:** `communication/audio/stt/`, `whatsappAudioTranscriptService.js`, `whatsappMediaFetchService.js` (same poller), `processWhatsAppAudioTranscriptTurn`, `CommunicationAudioBubble`  
+**Tests:** `backend/test/whatsappAudioPhase2Stt.test.js`, `frontend/src/components/communication/communicationAudioBubbleMount.ssr.test.js`
+
+### Rules
+
+1. **Artifact chain** — Original audio is the immutable source. The MP3 derivative is playback/STT input. The transcript is a derived semantic artifact. Never replace audio with transcript. Never overwrite `conversation_logs.message` from audio to text. `messageType` stays `audio`.
+2. **Same Recruit AI V2 path** — Transcript text enters normal Recruit AI V2 interpretation (`processRecruitAiV2Turn` with `messageType=text`). Audio does not get its own qualification engine. Objections/location/work-auth use existing BRs (including BR-137).
+3. **Idempotent semantic replay** — `transcript_turn_id = audio-stt:{communicationMediaId}`. Do not reuse original wamid (`whatsapp:inbound:{wamid}` is already consumed). Do not call `processInboundWhatsAppMessage` again. Do not insert a second inbound `conversation_logs` row. Duplicate poller workers no-op. Persist turn id before/around authoring.
+4. **Webhook** — Persist inbound audio + `communication_media`, return quickly, trigger background media processing. Do not send BR-118 immediately. Fast STT → one semantic reply. Slow STT (~8–12s) or delay → one soft acknowledgement. Fail → one safe request to type/re-record. No ack spam.
+5. **Lifecycle** — Same media row and poller. After `fetch_status=stored` AND `transcode_status=ready|not_required`: `transcript_status` pending → processing → ready | failed | skipped. Max STT duration 3 minutes. Max 3 attempts with bounded backoff.
+6. **Language** — Spanish-first, not Spanish-only. Hint from canonical `preferred_language` (spanish → ES, english → EN, unknown/mixed → ES/EN). A 1-second “sí” must not flip the prospect to English. Do not mutate canonical `preferred_language` because STT guessed a language. Transcript language is metadata.
+7. **Provider** — OpenAI `gpt-transcribe` via `POST /v1/audio/transcriptions` on private MP3 bytes. Server-side only. Do not reuse chat/completions. Do not use whisper-1, realtime, public Supabase URLs, or frontend keys. Do not leak provider internals into UI.
+8. **Execution gates** — `RECRUIT_AI_V2_EXECUTION_ENABLED` and `RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED` remain independent and OFF. STT success must not create appointments or execute scheduled actions.
+9. **Ownership** — `transport=audio` alone never causes HUMAN ownership. Fetch/transcode/STT failure does not TAKE OVER, rewrite BR-080, or mutate `workflowOwnership` / `manualAgentOwnership` / `humanTakenOverAt` / `needsHumanAttention` / `canonicalMilestone` / appointment. Only normal semantic V2 logic may progress qualification from transcript meaning.
+10. **UI** — Same `CommunicationAudioBubble` everywhere. Player stays. Ready shows transcript; pending shows preparing; failed shows unavailable. Confidence/provider errors stay diagnostics-only.
+11. **Staging** — Migration 040 is staging-only additive audit columns. Do not apply 040 to production. Do not edit applied production 039.
 
 ---
 

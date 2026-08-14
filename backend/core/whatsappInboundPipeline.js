@@ -152,6 +152,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
   // BR-140 — persist structured audio metadata immediately; fetch bytes asynchronously.
   // Must not block webhook completion or change ownership / BR-080 / qualification.
+  const isAudioInbound = String(inbound.messageType || "").toLowerCase() === "audio";
   try {
     const persistMedia =
       dependencies.persistInboundAudioMedia ||
@@ -169,6 +170,32 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       phone: storagePhone,
       providerMessageId: inbound.providerMessageId,
       error: mediaError?.publicCode || mediaError?.message || "unknown"
+    });
+  }
+
+  if (isAudioInbound) {
+    const schedule =
+      dependencies.scheduleMediaProcessing ||
+      ((work) => {
+        setImmediate(() => {
+          Promise.resolve(work()).catch((error) => {
+            logWhatsAppStage("communication_media_background_failed", {
+              level: "warn",
+              phone: storagePhone,
+              providerMessageId: inbound.providerMessageId,
+              error: error?.publicCode || error?.message || "unknown"
+            });
+          });
+        });
+      });
+    schedule(() => {
+      const {
+        processPendingWhatsAppMediaFetches
+      } = require("./communicationMedia/whatsappMediaFetchService");
+      return processPendingWhatsAppMediaFetches({
+        repository: dependencies.communicationMediaRepository || undefined,
+        ...(dependencies.mediaProcessingDependencies || {})
+      });
     });
   }
 
@@ -260,27 +287,30 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   // continuous context capture (flag-gated, target 100%) + shadow eval (10%).
   // Live CE / WhatsApp / appointments / BR-080 remain authoritative. Failures never interrupt.
   // Ordering: post-live CE + BR-080 snapshot (canonical production state).
-  try {
-    const {
-      scheduleRecruitAiV2PostLiveAdvisory
-    } = require("./recruitAiV2/advisoryTurnRunner");
+  // BR-141 — audio inbound is not semantic text; advisory runs after STT replay instead.
+  if (!isAudioInbound) {
+    try {
+      const {
+        scheduleRecruitAiV2PostLiveAdvisory
+      } = require("./recruitAiV2/advisoryTurnRunner");
 
-    scheduleRecruitAiV2PostLiveAdvisory({
-      prospect,
-      organizationId: organizationId || prospect?.organization_id || null,
-      inbound,
-      storagePhone,
-      conversation,
-      inboundMessageId: inbound.providerMessageId || null,
-      messageText: body,
-      channel: "whatsapp"
-    });
-  } catch (advisoryError) {
-    logWhatsAppStage("recruit_ai_v2_advisory_schedule_failed", {
-      level: "warn",
-      phone: storagePhone,
-      error: advisoryError.message
-    });
+      scheduleRecruitAiV2PostLiveAdvisory({
+        prospect,
+        organizationId: organizationId || prospect?.organization_id || null,
+        inbound,
+        storagePhone,
+        conversation,
+        inboundMessageId: inbound.providerMessageId || null,
+        messageText: body,
+        channel: "whatsapp"
+      });
+    } catch (advisoryError) {
+      logWhatsAppStage("recruit_ai_v2_advisory_schedule_failed", {
+        level: "warn",
+        phone: storagePhone,
+        error: advisoryError.message
+      });
+    }
   }
 
   return {

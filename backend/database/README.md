@@ -482,3 +482,22 @@ Creates org-scoped `communication_media` plus private Storage bucket `communicat
 **Do not apply in production until an authorized migration/deploy window.** Local Phase 0+1+1B only.
 
 Contract tests: `backend/test/whatsappAudioPhase1.test.js`, `backend/test/whatsappAudioPhase1b.test.js`
+
+## Migration 040 — communication_media STT audit (WhatsApp audio Phase 2)
+
+```
+backend/database/migrations/040_communication_media_transcript_audit.sql
+backend/database/migrations/040_communication_media_transcript_audit_down.sql
+```
+
+Additive STT audit columns on existing `communication_media` (does not rewrite 039):
+
+- `transcript_attempts`, `transcript_provider`, `transcript_model`, `transcript_billed_ms`, `transcript_turn_id`
+- Unique index on `transcript_turn_id` where not null
+- CHECK on `transcript_status`
+
+**STAGING ONLY.** Apply with `backend/dev/environment/applyStagingMigration040.js`.  
+**Do not apply in production. Do not edit already-applied production 039.**
+
+Contract tests: `backend/test/whatsappAudioPhase2Stt.test.js`
+

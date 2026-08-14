@@ -31,3 +31,22 @@
 .communication-audio-bubble.is-unsupported .communication-audio-bubble__label {
   font-weight: 500;
 }
+
+.communication-audio-bubble__transcript {
+  margin: 0;
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: inherit;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.communication-audio-bubble__transcript-label {
+  font-weight: 600;
+}
+
+.communication-audio-bubble__transcript-text {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}

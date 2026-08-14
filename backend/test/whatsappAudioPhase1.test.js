@@ -140,11 +140,12 @@ function createPipelineHarness(repository) {
       processConversationAfterInbound: async () => ({
         success: true,
         replied: false,
-        reason: "NON_TEXT_MEDIA_NO_STT"
+        reason: "AUDIO_STT_PENDING"
       }),
       persistInboundAudioMedia: (input) =>
         persistInboundAudioMedia({ ...input, repository }),
-      communicationMediaRepository: repository
+      communicationMediaRepository: repository,
+      scheduleMediaProcessing: () => {}
     }
   };
 }
@@ -288,7 +289,7 @@ test("9–10. no qualification mutation; legacy CE does not interpret audio plac
     assert.equal(ceCalled, false);
     assert.equal(result.success, true);
     assert.equal(result.replied, false);
-    assert.equal(result.reason, "NON_TEXT_MEDIA_NO_STT");
+    assert.equal(result.reason, "AUDIO_STT_PENDING");
   } finally {
     conversationEngine.handleIncomingMessage = originalHandle;
   }
