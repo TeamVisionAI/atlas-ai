@@ -2,120 +2,26 @@
  * Conversations unread + latest real communication (messaging inbox).
  * Unread ≠ NEEDS_ATTENTION / BR-080 / ownership.
  * Pure helpers — no I/O, no workflow mutations.
+ *
+ * Classification SoT: communicationClassification.js (BR-140).
  */
 
 "use strict";
 
-const INTERNAL_INTENTS = new Set([
-  "REQUIRED_INFORMATION",
-  "CONVERSATION_OUTCOME",
-  "AGENT_ACTION",
-  "REQUIRED_INFORMATION_UPDATED"
-]);
-
-const BLOCKED_OUTBOUND_STATUSES = new Set([
-  "blocked_template_missing",
-  "blocked_window_closed",
-  "blocked_template_unapproved",
-  "retry_required",
-  "provider_failed"
-]);
-
-/**
- * Same communication-only rule as Conversations transcript
- * (`isConversationBubbleItem`): bracketed operational / provider / diagnostic
- * text is never a list preview or lastCommunicationAt source.
- */
-function isOperationalCommunicationText(text) {
-  const value = String(text || "").trim();
-  if (!value) {
-    return false;
-  }
-  if (value.startsWith("[Agent note]")) {
-    return true;
-  }
-  if (/^\[[^\]]+\]/.test(value)) {
-    return true;
-  }
-  if (/whatsapp_outbound:/i.test(value)) {
-    return true;
-  }
-  if (
-    /blocked_template_missing|blocked_window_closed|blocked_template_unapproved/i.test(
-      value
-    )
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function normalizeDirection(direction) {
-  const value = String(direction || "").toLowerCase();
-  if (value === "incoming" || value === "inbound") {
-    return "inbound";
-  }
-  if (value === "outgoing" || value === "outbound") {
-    return "outbound";
-  }
-  return null;
-}
+const {
+  INTERNAL_INTENTS,
+  BLOCKED_OUTBOUND_STATUSES,
+  logText,
+  normalizeDirection,
+  isOperationalCommunicationText,
+  isRealWhatsAppCommunication,
+  isAudioCommunication,
+  friendlyCommunicationPreview
+} = require("../communicationClassification");
 
 function logTimestampMs(row) {
   const ms = Date.parse(row?.created_at || row?.timestampUtc || "");
   return Number.isNaN(ms) ? null : ms;
-}
-
-function logText(row) {
-  return String(row?.message || row?.text || row?.content?.text || "").trim();
-}
-
-/**
- * Prospect / Atlas / Human WhatsApp only.
- * Aligns with frontend `isConversationBubbleItem` (Conversations transcript).
- * System logs, qualification saves, workflow events, provider errors, and
- * internal notes do not count for preview, lastCommunicationAt, or unread.
- */
-function isRealWhatsAppCommunication(row) {
-  const direction = normalizeDirection(row?.direction);
-  if (!direction) {
-    return false;
-  }
-
-  const text = logText(row);
-  if (isOperationalCommunicationText(text)) {
-    return false;
-  }
-
-  const intent = String(row?.intent || row?.ai?.intent || "").toUpperCase();
-  if (INTERNAL_INTENTS.has(intent)) {
-    return false;
-  }
-  if (intent.startsWith("WHATSAPP_OUTBOUND_")) {
-    return false;
-  }
-
-  const status = String(row?.status || row?.delivery_status || "").toLowerCase();
-  if (BLOCKED_OUTBOUND_STATUSES.has(status)) {
-    return false;
-  }
-
-  const pipeline = String(row?.pipeline || "").toUpperCase();
-  if (
-    pipeline === "SYSTEM" ||
-    pipeline === "WORKFLOW" ||
-    pipeline === "QUALIFICATION" ||
-    pipeline === "DIAGNOSTIC"
-  ) {
-    return false;
-  }
-
-  const channel = String(row?.channel || "whatsapp").toLowerCase();
-  if (channel && channel !== "whatsapp") {
-    return false;
-  }
-
-  return true;
 }
 
 function isProspectInbound(row) {
@@ -144,18 +50,18 @@ function computeLastCommunication(logs = []) {
     return {
       lastCommunicationAt: null,
       lastMessagePreview: null,
+      lastMessagePreviewKind: null,
       lastDirection: null,
       lastMessageId: null
     };
   }
 
-  const preview = logText(latest.row)
-    .replace(/^\[Agent note\]\s*/i, "")
-    .slice(0, 160);
+  const friendly = friendlyCommunicationPreview(latest.row, "en");
 
   return {
     lastCommunicationAt: new Date(latest.ms).toISOString(),
-    lastMessagePreview: preview || null,
+    lastMessagePreview: friendly.text,
+    lastMessagePreviewKind: friendly.previewKind,
     lastDirection: normalizeDirection(latest.row.direction),
     lastMessageId: latest.row.id || latest.row.source?.recordId || null
   };
@@ -223,9 +129,13 @@ function activitySortMs({ lastCommunicationAt = null, lastActivityAt = null } = 
 }
 
 module.exports = {
+  INTERNAL_INTENTS,
+  BLOCKED_OUTBOUND_STATUSES,
   normalizeDirection,
+  logText,
   isOperationalCommunicationText,
   isRealWhatsAppCommunication,
+  isAudioCommunication,
   isProspectInbound,
   computeLastCommunication,
   computeUnreadState,

@@ -361,6 +361,25 @@ async function processNormalizedInboundMessage(
     // Technical failure / empty / ineligible → fall through to legacy CE once.
   }
 
+  // BR-118 / BR-140 — non-text media must not enter legacy CE as semantic text.
+  // V2 eligible path already authored above. Pre-STT: freeze qualification, no clarify_once.
+  const { classifyInboundMedia } = require("./recruitAiV2/nonTextMedia");
+  const mediaClass = classifyInboundMedia(normalized);
+  if (mediaClass.isNonTextMedia) {
+    logWhatsAppStage("legacy_ce_non_text_media_skipped", {
+      phone: normalized.phone,
+      messageType: mediaClass.mediaType,
+      detection: mediaClass.detection,
+      providerMessageId: normalized.providerMessageId || null
+    });
+    return {
+      success: true,
+      replied: false,
+      reason: "NON_TEXT_MEDIA_NO_STT",
+      mediaType: mediaClass.mediaType
+    };
+  }
+
   logWhatsAppStage("conversation_engine_invoked", {
     phone: normalized.phone,
     channel: normalized.channel,
@@ -373,7 +392,8 @@ async function processNormalizedInboundMessage(
     normalized.text,
     {
       channel: normalized.channel,
-      skipConversationLogging: normalized.channel === "whatsapp"
+      skipConversationLogging: normalized.channel === "whatsapp",
+      messageType: normalized.messageType || null
     }
   );
 

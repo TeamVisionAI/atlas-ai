@@ -21,6 +21,8 @@ import {
   resolveConversationBubbleSide
 } from "../../../engines/communicationsCenterViewModel";
 import { shouldCommitTimelinePayload } from "../../../engines/conversationsSelectionConsistency";
+import { isAudioCommunicationItem } from "../../../engines/communicationClassification.js";
+import CommunicationAudioBubble from "../../../components/communication/CommunicationAudioBubble";
 import "./CommunicationsCenterTimeline.css";
 
 function metaDeliveryTick(delivery, { direction, channel } = {}) {
@@ -152,6 +154,12 @@ function ItemDiagnostics({ item, open, onToggle, badges = [] }) {
           <div>
             <dt>Read at</dt>
             <dd>{item.delivery.readAt}</dd>
+          </div>
+        ) : null}
+        {item.content?.media?.fetchStatus ? (
+          <div>
+            <dt>Media fetch</dt>
+            <dd>{item.content.media.fetchStatus}</dd>
           </div>
         ) : null}
         {item.delivery?.failedAt ? (
@@ -471,9 +479,17 @@ export default function CommunicationsCenterTimeline({
                       </span>
                     ) : null}
                   </div>
-                  <p className="cc-timeline__bubble-body">
-                    {safeBody || item.eventType}
-                  </p>
+                  {isAudioCommunicationItem(item) ? (
+                    <CommunicationAudioBubble
+                      prospectId={prospectId}
+                      media={item.content?.media}
+                      testId="cc-audio-bubble"
+                    />
+                  ) : (
+                    <p className="cc-timeline__bubble-body">
+                      {safeBody || item.eventType}
+                    </p>
+                  )}
                   <ItemDiagnostics
                     item={item}
                     open={open}
@@ -518,7 +534,15 @@ export default function CommunicationsCenterTimeline({
                   ) : null}
                 </div>
 
-                <p className="cc-timeline__body">{safeBody || item.eventType}</p>
+                {isAudioCommunicationItem(item) ? (
+                  <CommunicationAudioBubble
+                    prospectId={prospectId}
+                    media={item.content?.media}
+                    testId="cc-audio-bubble-workspace"
+                  />
+                ) : (
+                  <p className="cc-timeline__body">{safeBody || item.eventType}</p>
+                )}
 
                 <div className="cc-timeline__facts">
                   {item.delivery?.status ? (

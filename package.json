@@ -9,7 +9,10 @@
   "scripts": {
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
-    "test": "node --test backend/test/*.test.js && npm run test --prefix frontend"
+    "test": "node --test backend/test/*.test.js && npm run test --prefix frontend",
+    "staging:migrate": "node backend/dev/environment/applyStagingBaselineMigrations.js",
+    "staging:seed": "node backend/dev/environment/seedStagingSyntheticData.js",
+    "staging:verify": "node backend/dev/environment/verifyStagingBaseline.js"
   },
   "repository": {
     "type": "git",
@@ -31,6 +34,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "ffmpeg-static": "^5.3.0",
     "googleapis": "^173.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",

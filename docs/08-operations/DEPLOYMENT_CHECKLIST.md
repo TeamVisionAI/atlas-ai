@@ -43,7 +43,9 @@ Approved — Sprint 13.1.1
 | `SUPABASE_URL` / keys | Yes | App data |
 | Meta / WhatsApp vars | Per feature | See `.env.example` |
 
-See [ENVIRONMENT_CONFIGURATION.md](../03-engineering/ENVIRONMENT_CONFIGURATION.md).
+See [ENVIRONMENT_CONFIGURATION.md](../03-engineering/ENVIRONMENT_CONFIGURATION.md) and [ENVIRONMENT_STRATEGY.md](../03-engineering/ENVIRONMENT_STRATEGY.md).
+
+Staging (Railway environment `staging` + separate Supabase + Vercel Preview) is required before production for migrations, RLS, storage, integrations, media, and risky workflow changes. Do not apply migration 039 or audio work until staging isolation is verified.
 
 ### Deploy
 

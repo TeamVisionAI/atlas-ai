@@ -8,7 +8,7 @@
 | [KNOWLEDGE_HUB.md](./KNOWLEDGE_HUB.md) | In-app Knowledge Hub (`/app/knowledge`) |
 | [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md) | Canonical doc template |
 | [ENVIRONMENT_CONFIGURATION.md](./ENVIRONMENT_CONFIGURATION.md) | Dev vs prod API routing |
-| [ENVIRONMENT_STRATEGY.md](./ENVIRONMENT_STRATEGY.md) | Local / production / future staging |
+| [ENVIRONMENT_STRATEGY.md](./ENVIRONMENT_STRATEGY.md) | Local → staging → production |
 | [DAILY_WORKFLOW.md](./DAILY_WORKFLOW.md) | Daily session operating procedure |
 | [WORKFLOW_SIMULATOR_SPEC.md](./WORKFLOW_SIMULATOR_SPEC.md) | Dev workflow simulator |
 | [WHATSAPP_OUTBOUND_AUTHORIZATION.md](./WHATSAPP_OUTBOUND_AUTHORIZATION.md) | BR-075 customer-care window + approved-template gate |

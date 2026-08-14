@@ -12,6 +12,7 @@ import {
   containsRawPhoneLeak,
   buildCommunicationsCacheKey
 } from "./communicationsCenterViewModel.js";
+import { isAudioCommunicationItem } from "./communicationClassification.js";
 
 test("filters isolate messages, workflow, appointments, and system/errors", () => {
   const items = [
@@ -101,17 +102,36 @@ test("conversation layout hides technical events and internal operational notes 
       content: {
         text: "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY; reason=NO_TEMPLATE_FOR_INTENT"
       }
+    },
+    {
+      id: "11",
+      category: "message",
+      direction: "inbound",
+      channel: "whatsapp",
+      actor: { type: "prospect" },
+      content: {
+        text: "[audio message]",
+        messageType: "audio",
+        media: {
+          id: "media-1",
+          mediaKind: "audio",
+          fetchStatus: "stored",
+          transcodeStatus: "ready",
+          playbackAvailable: true,
+          mimeType: "audio/mpeg"
+        }
+      }
     }
   ];
 
   assert.deepEqual(
     filterConversationLayoutItems(items, "messages").map((item) => item.id),
-    ["1", "6", "7"]
+    ["1", "6", "7", "11"]
   );
   assert.equal(filterConversationLayoutItems(items, "appointments").length, 1);
   assert.deepEqual(
     filterConversationLayoutItems(items, "all").map((item) => item.id),
-    ["1", "6", "7"]
+    ["1", "6", "7", "11"]
   );
 
   assert.equal(isConversationBubbleItem(items[0]), true);
@@ -121,9 +141,11 @@ test("conversation layout hides technical events and internal operational notes 
   assert.equal(isConversationBubbleItem(items[7]), false);
   assert.equal(isConversationBubbleItem(items[8]), false);
   assert.equal(isConversationBubbleItem(items[9]), false);
+  assert.equal(isConversationBubbleItem(items[10]), true);
+  assert.equal(isAudioCommunicationItem(items[10]), true);
   assert.deepEqual(
     selectConversationLayoutBubbles(items).map((item) => item.id),
-    ["1", "6", "7"]
+    ["1", "11", "6", "7"]
   );
   assert.equal(isTechnicalCommunicationsItem(items[1]), true);
   assert.equal(isTechnicalCommunicationsItem(items[4]), true);
@@ -184,6 +206,57 @@ test("cache key is prospect-id based, never phone", () => {
     "communications:00000000-0000-4000-8000-000000000001:29853100-f151-4ca8-b07d-624fd20c6685"
   );
   assert.doesNotMatch(key, /\+\d{10}/);
+});
+
+test("audio pending/failed states are distinct from operational brackets", () => {
+  const pending = {
+    category: "message",
+    direction: "inbound",
+    channel: "whatsapp",
+    content: {
+      text: "[audio message]",
+      media: { id: "m1", mediaKind: "audio", fetchStatus: "pending" }
+    }
+  };
+  const failed = {
+    category: "message",
+    direction: "inbound",
+    channel: "whatsapp",
+    content: {
+      text: "[audio message]",
+      media: { id: "m2", mediaKind: "audio", fetchStatus: "failed" }
+    }
+  };
+  const operational = {
+    category: "message",
+    direction: "outbound",
+    channel: "whatsapp",
+    content: {
+      text: "[whatsapp_outbound:blocked_template_missing] Graph 190 invalid token"
+    }
+  };
+  assert.equal(isConversationBubbleItem(pending), true);
+  assert.equal(isConversationBubbleItem(failed), true);
+  assert.equal(isConversationBubbleItem(operational), false);
+  assert.equal(isAudioCommunicationItem(pending), true);
+
+  const preparing = {
+    category: "message",
+    direction: "inbound",
+    channel: "whatsapp",
+    content: {
+      text: "[audio message]",
+      media: {
+        id: "m3",
+        mediaKind: "audio",
+        fetchStatus: "stored",
+        transcodeStatus: "processing",
+        playbackPreparing: true
+      }
+    }
+  };
+  assert.equal(isConversationBubbleItem(preparing), true);
+  assert.equal(isConversationBubbleItem(operational), false);
 });
 
 test("UI leak detector catches E.164 and formatted phones", () => {

@@ -50,6 +50,29 @@ const BUBBLE_ITEMS = [
     flags: ["agent_note"],
     content: { text: "[Agent note] internal" },
     timestampUtc: "2026-08-13T16:03:00.000Z"
+  },
+  {
+    id: "audio-1",
+    category: "message",
+    channel: "whatsapp",
+    direction: "inbound",
+    content: {
+      text: "[audio message]",
+      messageType: "audio",
+      media: { id: "media-1", mediaKind: "audio", fetchStatus: "stored" }
+    },
+    timestampUtc: "2026-08-13T16:04:00.000Z"
+  },
+  {
+    id: "blocked-1",
+    category: "message",
+    channel: "whatsapp",
+    direction: "outbound",
+    ai: { intent: "WHATSAPP_OUTBOUND_BLOCKED_TEMPLATE_MISSING" },
+    content: {
+      text: "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY"
+    },
+    timestampUtc: "2026-08-13T16:05:00.000Z"
   }
 ];
 
@@ -90,6 +113,8 @@ test("Conversations detail transcript executes bubble filter without ReferenceEr
     assert.equal(isConversationBubbleItem(BUBBLE_ITEMS[1]), true);
     assert.equal(isConversationBubbleItem(BUBBLE_ITEMS[2]), false);
     assert.equal(isConversationBubbleItem(BUBBLE_ITEMS[3]), false);
+    assert.equal(isConversationBubbleItem(BUBBLE_ITEMS[4]), true);
+    assert.equal(isConversationBubbleItem(BUBBLE_ITEMS[5]), false);
 
     let bubbles;
     try {
@@ -101,7 +126,7 @@ test("Conversations detail transcript executes bubble filter without ReferenceEr
     }
     assert.deepEqual(
       bubbles.map((item) => item.id),
-      ["in-1", "out-1"]
+      ["in-1", "out-1", "audio-1"]
     );
 
     const timelineHtml = renderToString(

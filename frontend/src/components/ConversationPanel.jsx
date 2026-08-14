@@ -1,6 +1,8 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatTextWithDates } from "../utils/dateFormatter";
 import UserAvatar from "./ui/UserAvatar";
+import CommunicationAudioBubble from "./communication/CommunicationAudioBubble";
+import { isAudioCommunicationItem } from "../engines/communicationClassification.js";
 import "./ui/ProfilePhotoEditor.css";
 
 function formatMessageTime(timestamp, language) {
@@ -42,7 +44,8 @@ export default function ConversationPanel({
   direction,
   timestamp,
   atlasAvatar = null,
-  prospectAvatar = null
+  prospectAvatar = null,
+  prospectId = null
 }) {
   const { translate, language } = useLanguage();
 
@@ -146,9 +149,18 @@ export default function ConversationPanel({
                       <span>{formatMessageTime(message.timestamp, language)}</span>
                     ) : null}
                   </div>
-                  <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
-                    {formatTextWithDates(message.text)}
-                  </p>
+                  {isAudioCommunicationItem(message) ||
+                  isAudioCommunicationItem({ content: { text: message.text, media: message.media } }) ? (
+                    <CommunicationAudioBubble
+                      prospectId={prospectId}
+                      media={message.media || message.content?.media}
+                      testId="mc-audio-bubble"
+                    />
+                  ) : (
+                    <p style={{ margin: 0, lineHeight: 1.7, fontSize: 16, whiteSpace: "pre-wrap" }}>
+                      {formatTextWithDates(message.text)}
+                    </p>
+                  )}
                 </div>
               </div>
             );

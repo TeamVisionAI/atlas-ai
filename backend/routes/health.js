@@ -1,14 +1,22 @@
 const express = require("express");
 const { evaluateProductionReadiness } = require("../core/productionReadiness");
+const { resolveAtlasEnv } = require("../config/atlasEnvironment");
 
 const router = express.Router();
 
 router.get("/", (req, res) => {
-  res.json({
+  const payload = {
     status: "healthy",
     service: "Atlas AI",
     uptime: process.uptime()
-  });
+  };
+  const atlasEnv = resolveAtlasEnv();
+
+  if (atlasEnv) {
+    payload.atlasEnv = atlasEnv;
+  }
+
+  res.json(payload);
 });
 
 router.get("/production", async (req, res) => {

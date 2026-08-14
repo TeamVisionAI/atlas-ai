@@ -19,6 +19,7 @@ Approved — Sprint 14.0.2
 | [prospect-engine/PROSPECT_MODEL.md](./prospect-engine/PROSPECT_MODEL.md) | Entity schema |
 | [prospect-engine/PROSPECT_LIFECYCLE.md](./prospect-engine/PROSPECT_LIFECYCLE.md) | State machine |
 | [prospect-engine/COMMUNICATION_CONNECTORS.md](./prospect-engine/COMMUNICATION_CONNECTORS.md) | Connector philosophy |
+| [prospect-engine/COMMUNICATION_MODALITIES.md](./prospect-engine/COMMUNICATION_MODALITIES.md) | Modalities plug into one canonical communication model (BR-140; WhatsApp audio first) |
 | [prospect-engine/PROSPECT_TIMELINE.md](./prospect-engine/PROSPECT_TIMELINE.md) | Chronological history |
 | [prospect-engine/BUSINESS_EVENTS.md](./prospect-engine/BUSINESS_EVENTS.md) | Official event language |
 | [prospect-engine/PROSPECT_PERMISSIONS.md](./prospect-engine/PROSPECT_PERMISSIONS.md) | Roles, ownership, audit |

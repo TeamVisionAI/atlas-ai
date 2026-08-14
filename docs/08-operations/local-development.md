@@ -2,6 +2,20 @@
 
 This guide covers how to run Atlas locally and how to diagnose common startup and connectivity issues.
 
+## Environment warning
+
+The default repository-root `.env` currently targets **production Supabase** (`gjuheeztwxbnscjobkzm`).
+
+Do **not** silently replace `.env` with staging credentials. To run local backend against staging Supabase intentionally:
+
+1. Copy `.env.staging.example` → `.env.staging.local`
+2. Fill staging-only Supabase URL/keys, JWT/bootstrap secrets, and `ATLAS_EXPECTED_SUPABASE_REF`
+3. Start with `ATLAS_STAGING_ENV_FILE=.env.staging.local npm run dev`
+
+Frontend staging UI: `cd frontend && npm run dev -- --mode staging` after copying `frontend/.env.staging.example` → `frontend/.env.staging.local`.
+
+See [ENVIRONMENT_STRATEGY.md](../03-engineering/ENVIRONMENT_STRATEGY.md).
+
 ## Required terminals
 
 Atlas requires **two terminals** — one for the backend API and one for the frontend dev server.

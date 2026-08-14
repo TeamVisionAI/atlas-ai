@@ -16,6 +16,13 @@ const {
 const {
   sanitizeCommunicationsCenterResponse
 } = require("./communicationsCenterSanitizer");
+const {
+  resolveMediaKind,
+  isAudioCommunication
+} = require("./communicationClassification");
+const {
+  toPublicMedia
+} = require("./communicationMedia/communicationMediaRepository");
 
 const CONVERSATION_LOG_CORRELATION_PREFIX = "conversation_log:";
 
@@ -315,6 +322,26 @@ function mapConversationLog(row, context) {
   const text = isAgentNote
     ? message.slice("[Agent note]".length).trim()
     : message;
+  const inferredMediaKind = resolveMediaKind({
+    message: text,
+    messageType: row.message_type || row.messageType || null,
+    media_kind: row.media_kind || null
+  });
+  const inferredMedia =
+    inferredMediaKind === "audio"
+      ? {
+          id: null,
+          mediaKind: "audio",
+          mimeType: null,
+          isVoiceNote: true,
+          durationMs: null,
+          fetchStatus: "missing",
+          transcodeStatus: null,
+          playbackAvailable: false,
+          playbackPreparing: false,
+          playbackFailed: false
+        }
+      : null;
   const flags = isInbound ? detectInboundFlags(text) : detectOutboundFlags(text);
 
   if (isAgentNote) {
@@ -355,7 +382,12 @@ function mapConversationLog(row, context) {
     },
     direction: isAgentNote ? "system" : direction,
     channel: isAgentNote ? "note" : "whatsapp",
-    content: { text, redacted: false },
+    content: {
+      text,
+      redacted: false,
+      messageType: inferredMediaKind || row.message_type || row.messageType || null,
+      media: inferredMedia
+    },
     ai: {
       intent: row.intent || null,
       confidence: null,
@@ -917,6 +949,65 @@ async function defaultLoadBusinessEvents(prospectId, organizationId) {
   return { rows: data || [], gap: null };
 }
 
+async function defaultLoadCommunicationMedia(query) {
+  if (!query.organizationId || !query.prospectId) {
+    return [];
+  }
+
+  try {
+    const { getCommunicationMediaRepository } = require("./communicationMedia/communicationMediaRepository");
+    const repository = getCommunicationMediaRepository();
+    return await repository.listForProspect({
+      organizationId: query.organizationId,
+      prospectId: query.prospectId
+    });
+  } catch (error) {
+    if (isMissingRelationError(error)) {
+      return [];
+    }
+    // Fail soft: missing env/table must not break Communications Center.
+    return [];
+  }
+}
+
+function attachCommunicationMediaToItems(items, mediaRows = []) {
+  if (!Array.isArray(items) || !mediaRows.length) {
+    return items;
+  }
+
+  const byLogId = new Map();
+  const byProvider = new Map();
+  for (const row of mediaRows) {
+    const publicMedia = toPublicMedia(row);
+    if (row.conversation_log_id) {
+      byLogId.set(String(row.conversation_log_id), publicMedia);
+    }
+    if (row.provider_message_id) {
+      byProvider.set(String(row.provider_message_id), publicMedia);
+    }
+  }
+
+  return items.map((item) => {
+    const logId = String(item?.source?.recordId || "").replace(/^log:/, "");
+    const providerId = item?.delivery?.providerMessageId || item?.metadata?.providerMessageId || null;
+    const attached =
+      (logId && byLogId.get(logId)) ||
+      (providerId && byProvider.get(String(providerId))) ||
+      null;
+    if (!attached && !isAudioCommunication(item)) {
+      return item;
+    }
+    return {
+      ...item,
+      content: {
+        ...(item.content || {}),
+        messageType: attached?.mediaKind || item.content?.messageType || "audio",
+        media: attached || item.content?.media || null
+      }
+    };
+  });
+}
+
 async function defaultLoadTimelineEntries(prospectId, organizationId) {
   if (!prospectId) {
     return { rows: [], gap: "missing_prospect_id" };
@@ -1056,7 +1147,8 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     workflowEvents,
     appointments,
     businessResult,
-    timelineResult
+    timelineResult,
+    communicationMedia
   ] = await Promise.all([
     (loaders.loadConversationLogs || defaultLoadConversationLogs)(phoneQuery),
     (loaders.loadOutboundDeliveries || defaultLoadOutboundDeliveries)(phoneQuery),
@@ -1069,7 +1161,11 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     (loaders.loadTimelineEntries || defaultLoadTimelineEntries)(
       prospectId,
       organizationId
-    )
+    ),
+    (loaders.loadCommunicationMedia || defaultLoadCommunicationMedia)({
+      organizationId,
+      prospectId
+    })
   ]);
 
   const nullOrgLogs = conversationLogs.filter((row) => !row.organization_id);
@@ -1182,6 +1278,7 @@ async function buildCommunicationsCenterTimeline(input = {}) {
   ];
 
   items = attachDeliveriesToMessages(items, deliveries);
+  items = attachCommunicationMediaToItems(items, communicationMedia || []);
   items = annotateSequenceFlags(items);
 
   for (const item of items) {
@@ -1244,6 +1341,7 @@ module.exports = {
   mapWorkflowEvent,
   mapAppointment,
   attachDeliveriesToMessages,
+  attachCommunicationMediaToItems,
   buildDeliveryFactsFromRow,
   filterPhoneKeyedRows,
   COUNTEROFFER_PATTERNS,

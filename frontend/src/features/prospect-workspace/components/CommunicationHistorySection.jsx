@@ -45,6 +45,7 @@ export default function CommunicationHistorySection({
             lastMessage={conversation.lastMessage}
             direction={conversation.direction}
             timestamp={conversation.timestamp}
+            prospectId={prospectCoreId}
             prospectAvatar={{
               photoUrl: null,
               name: translate("missionControlConversationProspect")

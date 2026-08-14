@@ -25,6 +25,7 @@ import {
   resolveSelectedTranscriptProspectId,
   shouldCommitConversationDetail
 } from "../engines/conversationsSelectionConsistency";
+import { localizeCommunicationPreview } from "../engines/communicationClassification.js";
 import {
   accumulateNewMessageCount,
   CONVERSATIONS_POLL_MS,
@@ -159,11 +160,11 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
           {lifecycleLabel(item.inboxLifecycle, translate)}
         </div>
       ) : null}
-      {item.lastMessagePreview ? (
+      {localizeCommunicationPreview(item, translate) ? (
         <p
           className={`conversations-row__preview${unreadUi.boldPreview ? " is-unread" : ""}`}
         >
-          {item.lastMessagePreview}
+          {localizeCommunicationPreview(item, translate)}
         </p>
       ) : null}
       <div className="conversations-row__meta">

@@ -1,4 +1,22 @@
-require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+
+const explicitStagingFile = process.env.ATLAS_STAGING_ENV_FILE
+  ? path.resolve(process.env.ATLAS_STAGING_ENV_FILE)
+  : null;
+const defaultStagingFile = path.resolve(process.cwd(), ".env.staging.local");
+
+if (explicitStagingFile && fs.existsSync(explicitStagingFile)) {
+  dotenv.config({ path: explicitStagingFile });
+} else if (process.env.ATLAS_ENV === "staging" && fs.existsSync(defaultStagingFile)) {
+  dotenv.config({ path: defaultStagingFile });
+} else {
+  dotenv.config();
+}
+
+const { assertStagingSupabaseIsolation } = require("./config/atlasEnvironment");
+assertStagingSupabaseIsolation();
 
 const { assertProductionPlatformConfig } = require("./core/platformProductionGuard");
 assertProductionPlatformConfig();
@@ -39,6 +57,9 @@ const prospectWorkspaceRoutes = require("./routes/prospectWorkspace");
 const {
   prospectCommunicationsStack
 } = require("./routes/communicationsCenter");
+const {
+  communicationMediaPlaybackStack
+} = require("./routes/communicationMedia");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const followUpsRoutes = require("./routes/followUps");
 const conversationsCenterRoutes = require("./routes/conversationsCenter");
@@ -199,6 +220,10 @@ app.get(
   timelineModule.prospectTimelineHandler
 );
 app.get("/api/prospects/:id/communications", ...prospectCommunicationsStack);
+app.get(
+  "/api/prospects/:id/communications/media/:mediaId/playback",
+  ...communicationMediaPlaybackStack
+);
 app.use("/api/prospects", prospectModule.routes);
 app.use("/api", setupRoutes);
 app.use("/api", authRoutes);
@@ -299,6 +324,10 @@ async function main() {
   startReminderPoller(60_000);
   const { startNewLeadEscalationPoller } = require("./core/newLeadAttentionEngine");
   startNewLeadEscalationPoller(60_000);
+  const {
+    startWhatsAppMediaFetchPoller
+  } = require("./core/communicationMedia/whatsappMediaFetchPoller");
+  startWhatsAppMediaFetchPoller();
 }
 
 main().catch((error) => {

@@ -7,11 +7,11 @@ const { maskPhoneLast4, maskProviderMessageId } = require("./communicationsCente
 
 const MAX_DEPTH = 8;
 const SENSITIVE_KEY =
-  /(?:^|_)(phone|email|token|secret|password|authorization|api[_-]?key|bearer|prompt|stack|wa_id|recipient|normalized.?address|idempotency_key)(?:$|_)/i;
+  /(?:^|_)(phone|email|token|secret|password|authorization|api[_-]?key|bearer|prompt|stack|wa_id|recipient|normalized.?address|idempotency_key|storage_path|playback_path|meta_media_id|fetch_error|transcode_error|access_token)(?:$|_)/i;
 const PHONE_KEY = /(?:^|_)(phone|wa_id|recipient|normalized.?address)(?:$|_)/i;
 const EMAIL_KEY = /(?:^|_)email(?:$|_)/i;
-const SECRET_KEY = /(?:^|_)(token|secret|password|authorization|api[_-]?key|bearer)(?:$|_)/i;
-const DIAGNOSTIC_KEY = /(?:^|_)(stack|prompt|raw.?error)(?:$|_)/i;
+const SECRET_KEY = /(?:^|_)(token|secret|password|authorization|api[_-]?key|bearer|access_token|meta_media_id|storage_path|playback_path)(?:$|_)/i;
+const DIAGNOSTIC_KEY = /(?:^|_)(stack|prompt|raw.?error|fetch_error|transcode_error)(?:$|_)/i;
 
 const E164_RE = /\+\d{10,15}\b/g;
 const US_FORMATTED_RE = /\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g;

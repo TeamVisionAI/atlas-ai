@@ -1678,6 +1678,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-140 — Canonical Communication Modalities
+
+**Implements:** Every inbound/outbound modality (text, WhatsApp audio/media, future SMS/email/voice/live-transfer) must plug into the same canonical prospect, org/tenant, conversation, ownership, qualification, Mission Control, Prospect Workspace, and outcome model. WhatsApp audio is the first media modality. Do not create a parallel audio CRM or workflow.  
+**Domain:** Communications / Conversations / Mission Control / Prospect Workspace  
+**Depends on:** BR-049, BR-075, BR-080, BR-118, BR-135, BR-138  
+**Related:** BR-034 (ownership unchanged), BR-114 (V2 authoring canary unchanged)  
+**Status:** Implemented (Phase 0 + Phase 1 + Phase 1B — persist/play audio + Safari-safe MP3 derivative; no STT)  
+**Engine target:** `communicationClassification.js`, `whatsappWebhookParser.js`, `communication_media`, `whatsappMediaFetchService.js`, `audioTranscodeService.js`, `CommunicationAudioBubble`  
+**Tests:** `backend/test/whatsappAudioPhase1.test.js`, `backend/test/whatsappAudioPhase1b.test.js`, Conversations unread/preview, Communications Center view-model / timeline SSR
+
+### Rules
+
+1. **One communication model** — Audio lives on the same prospect, organization, conversation log, ownership, qualification, and outcome records as WhatsApp text. Future channels extend this model; they must not invent a second inbox or milestone machine.
+2. **Real vs operational** — Classify with structured fields (`direction`, `channel`, `intent`, `messageType`, `media_kind`) before bracket text. Inbound/outbound WhatsApp text and inbound WhatsApp audio/media are REAL communication. `[whatsapp_outbound:…]`, workflow, qualification saves, diagnostics, provider failures, internal notes, and system events are OPERATIONAL.
+3. **Audio is real communication** — Inbound voice notes count for `lastCommunicationAt`, Conversations unread, list preview, and transcript bubbles. Preview label is “Voice message” / “Mensaje de voz”, never `[audio message]`.
+4. **Do not treat all `[…]` as operational** — Media placeholders (`[audio message]`, `[image message]`, …) are real communication fallbacks only. Operational brackets remain hidden from preview/unread/transcript.
+5. **Async media fetch** — Webhook parse + persist log + structured `communication_media` row must return fast. Meta download uses server-side WhatsApp credentials only. Private tenant-scoped storage (`organizationId/prospectId/wamid/original.<ext>`). No public URLs. No Meta temp URLs in the browser.
+6. **Signed playback** — Authorized Atlas user + org guard + prospect access. Short-lived signed URL. Wrong-org denied. Phone is never the authorization key. Prefer `playback_path` MP3 derivative; serve original only when transcode is `not_required`.
+7. **Pre-STT Recruit AI** — Keep BR-118: no semantic interpretation of audio. V2 eligible path may send the existing soft media ack. Legacy CE must not consume `[audio message]` as qualification text (no clarify_once, no fake city/state/work-auth). Freeze qualification. No TAKE OVER. No BR-080 change from media fetch or transcode failure.
+8. **Safari-safe derivative (Phase 1B)** — Always keep the original. Transcode OGG/Opus (and other non-native formats) to MP3 via `ffmpeg-static` in the same fetch poller. Transcode failure must not lose the original, mutate ownership, acknowledge BR-080, or change qualification. UI: preparing / unavailable in this browser — never ffmpeg/provider internals.
+9. **Boundaries** — No Whisper/OpenAI STT, no English-only transcription runtime, no execution enablement, no appointment/scheduling/ads/voice-calling changes, no HUMAN sticky ownership change, no BR-075/BR-080 rewrite.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
