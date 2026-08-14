@@ -7,7 +7,64 @@
 
 const { randomUUID } = require("crypto");
 const { isMissingTableError } = require("../supabaseTableErrors");
-const { FETCH_STATUS, TRANSCODE_STATUS } = require("./constants");
+const { FETCH_STATUS, TRANSCODE_STATUS, TRANSCRIPT_STATUS } = require("./constants");
+
+function isTerminalTranscriptStatus(status) {
+  const value = String(status || "");
+  return (
+    value === TRANSCRIPT_STATUS.READY ||
+    value === TRANSCRIPT_STATUS.FAILED ||
+    value === TRANSCRIPT_STATUS.SKIPPED
+  );
+}
+
+function rowNeedsPollerWork(row, now, staleMs) {
+  if (!row) {
+    return false;
+  }
+  if (row.fetch_status === FETCH_STATUS.PENDING) {
+    return true;
+  }
+  if (row.fetch_status === FETCH_STATUS.FETCHING) {
+    const updated = Date.parse(row.updated_at || "") || 0;
+    return now - updated >= staleMs;
+  }
+  if (row.fetch_status === FETCH_STATUS.FAILED) {
+    return !isTerminalTranscriptStatus(row.transcript_status);
+  }
+  if (row.fetch_status !== FETCH_STATUS.STORED) {
+    return false;
+  }
+  if (row.transcode_status === TRANSCODE_STATUS.PENDING) {
+    return true;
+  }
+  if (row.transcode_status === TRANSCODE_STATUS.PROCESSING) {
+    const updated = Date.parse(row.updated_at || "") || 0;
+    return now - updated >= staleMs;
+  }
+  if (row.transcode_status === TRANSCODE_STATUS.FAILED) {
+    return !isTerminalTranscriptStatus(row.transcript_status);
+  }
+  if (
+    row.transcode_status === TRANSCODE_STATUS.READY ||
+    row.transcode_status === TRANSCODE_STATUS.NOT_REQUIRED
+  ) {
+    if (isTerminalTranscriptStatus(row.transcript_status)) {
+      return false;
+    }
+    if (
+      !row.transcript_status ||
+      row.transcript_status === TRANSCRIPT_STATUS.PENDING
+    ) {
+      return true;
+    }
+    if (row.transcript_status === TRANSCRIPT_STATUS.PROCESSING) {
+      const updated = Date.parse(row.updated_at || "") || 0;
+      return now - updated >= staleMs || Boolean(row.transcript_text);
+    }
+  }
+  return false;
+}
 
 function getSupabase() {
   return require("../../services/supabaseService").supabase;
@@ -78,6 +135,21 @@ function toRow(input = {}) {
           ? Number(input.transcript_confidence)
           : null,
     transcript_error: input.transcriptError || input.transcript_error || null,
+    transcript_attempts:
+      input.transcriptAttempts != null
+        ? Number(input.transcriptAttempts)
+        : input.transcript_attempts != null
+          ? Number(input.transcript_attempts)
+          : 0,
+    transcript_provider: input.transcriptProvider || input.transcript_provider || null,
+    transcript_model: input.transcriptModel || input.transcript_model || null,
+    transcript_billed_ms:
+      input.transcriptBilledMs != null
+        ? Number(input.transcriptBilledMs)
+        : input.transcript_billed_ms != null
+          ? Number(input.transcript_billed_ms)
+          : null,
+    transcript_turn_id: input.transcriptTurnId || input.transcript_turn_id || null,
     created_at: input.createdAt || input.created_at || created,
     updated_at: input.updatedAt || input.updated_at || created
   };
@@ -108,7 +180,12 @@ function toPublicMedia(row) {
       (transcodeStatus === TRANSCODE_STATUS.PENDING ||
         transcodeStatus === TRANSCODE_STATUS.PROCESSING),
     playbackFailed:
-      fetchStatus === FETCH_STATUS.STORED && transcodeStatus === TRANSCODE_STATUS.FAILED
+      fetchStatus === FETCH_STATUS.STORED && transcodeStatus === TRANSCODE_STATUS.FAILED,
+    transcriptStatus: row.transcript_status || null,
+    transcriptText:
+      String(row.transcript_status || "") === TRANSCRIPT_STATUS.READY
+        ? row.transcript_text || null
+        : null
   };
 }
 
@@ -191,25 +268,7 @@ function createMemoryCommunicationMediaRepository(seed = []) {
     },
     async listPending({ limit = 20, now = Date.now(), staleMs = 5 * 60 * 1000 } = {}) {
       return rows
-        .filter((row) => {
-          if (row.fetch_status === FETCH_STATUS.PENDING) {
-            return true;
-          }
-          if (row.fetch_status === FETCH_STATUS.FETCHING) {
-            const updated = Date.parse(row.updated_at || "") || 0;
-            return now - updated >= staleMs;
-          }
-          if (row.fetch_status === FETCH_STATUS.STORED) {
-            if (row.transcode_status === TRANSCODE_STATUS.PENDING) {
-              return true;
-            }
-            if (row.transcode_status === TRANSCODE_STATUS.PROCESSING) {
-              const updated = Date.parse(row.updated_at || "") || 0;
-              return now - updated >= staleMs;
-            }
-          }
-          return false;
-        })
+        .filter((row) => rowNeedsPollerWork(row, now, staleMs))
         .sort((a, b) => Date.parse(a.updated_at || 0) - Date.parse(b.updated_at || 0))
         .slice(0, limit);
     },
@@ -252,7 +311,46 @@ function createMemoryCommunicationMediaRepository(seed = []) {
               patch.fileSize != null ? patch.fileSize : patch.file_size,
             duration_ms:
               patch.durationMs != null ? patch.durationMs : patch.duration_ms,
-            sha256: patch.sha256
+            sha256: patch.sha256,
+            transcript_status: patch.transcriptStatus || patch.transcript_status,
+            transcript_text:
+              patch.transcriptText !== undefined
+                ? patch.transcriptText
+                : patch.transcript_text,
+            transcript_language:
+              patch.transcriptLanguage !== undefined
+                ? patch.transcriptLanguage
+                : patch.transcript_language,
+            transcript_confidence:
+              patch.transcriptConfidence != null
+                ? patch.transcriptConfidence
+                : patch.transcript_confidence,
+            transcript_error:
+              patch.transcriptError !== undefined
+                ? patch.transcriptError
+                : patch.transcript_error !== undefined
+                  ? patch.transcript_error
+                  : undefined,
+            transcript_attempts:
+              patch.transcriptAttempts != null
+                ? patch.transcriptAttempts
+                : patch.transcript_attempts,
+            transcript_provider:
+              patch.transcriptProvider !== undefined
+                ? patch.transcriptProvider
+                : patch.transcript_provider,
+            transcript_model:
+              patch.transcriptModel !== undefined
+                ? patch.transcriptModel
+                : patch.transcript_model,
+            transcript_billed_ms:
+              patch.transcriptBilledMs != null
+                ? patch.transcriptBilledMs
+                : patch.transcript_billed_ms,
+            transcript_turn_id:
+              patch.transcriptTurnId !== undefined
+                ? patch.transcriptTurnId
+                : patch.transcript_turn_id
           }).filter(([, value]) => value !== undefined)
         ),
         updated_at: nowIso(patch.now)
@@ -345,7 +443,7 @@ function createSupabaseCommunicationMediaRepository() {
       const { data, error } = await getSupabase()
         .from("communication_media")
         .select(
-          "id, organization_id, prospect_id, conversation_log_id, provider_message_id, channel, media_kind, mime_type, is_voice_note, duration_ms, fetch_status, transcode_status, playback_mime_type, playback_path, storage_path, created_at"
+          "id, organization_id, prospect_id, conversation_log_id, provider_message_id, channel, media_kind, mime_type, is_voice_note, duration_ms, fetch_status, transcode_status, playback_mime_type, playback_path, storage_path, transcript_status, transcript_text, created_at"
         )
         .eq("organization_id", organizationId)
         .eq("prospect_id", prospectId);
@@ -365,7 +463,8 @@ function createSupabaseCommunicationMediaRepository() {
         .in("fetch_status", [
           FETCH_STATUS.PENDING,
           FETCH_STATUS.FETCHING,
-          FETCH_STATUS.STORED
+          FETCH_STATUS.STORED,
+          FETCH_STATUS.FAILED
         ])
         .order("updated_at", { ascending: true })
         .limit(Math.max(limit * 4, 40));
@@ -378,25 +477,7 @@ function createSupabaseCommunicationMediaRepository() {
       }
 
       return (data || [])
-        .filter((row) => {
-          if (row.fetch_status === FETCH_STATUS.PENDING) {
-            return true;
-          }
-          if (row.fetch_status === FETCH_STATUS.FETCHING) {
-            const updated = Date.parse(row.updated_at || "") || 0;
-            return now - updated >= staleMs;
-          }
-          if (row.fetch_status === FETCH_STATUS.STORED) {
-            if (row.transcode_status === TRANSCODE_STATUS.PENDING) {
-              return true;
-            }
-            if (row.transcode_status === TRANSCODE_STATUS.PROCESSING) {
-              const updated = Date.parse(row.updated_at || "") || 0;
-              return now - updated >= staleMs;
-            }
-          }
-          return false;
-        })
+        .filter((row) => rowNeedsPollerWork(row, now, staleMs))
         .slice(0, limit);
     },
     async update(id, organizationId, patch = {}) {
@@ -447,6 +528,53 @@ function createSupabaseCommunicationMediaRepository() {
       if (patch.sha256) {
         updates.sha256 = patch.sha256;
       }
+      if (patch.transcriptStatus || patch.transcript_status) {
+        updates.transcript_status = patch.transcriptStatus || patch.transcript_status;
+      }
+      if (patch.transcriptText !== undefined || patch.transcript_text !== undefined) {
+        updates.transcript_text =
+          patch.transcriptText !== undefined ? patch.transcriptText : patch.transcript_text;
+      }
+      if (patch.transcriptLanguage !== undefined || patch.transcript_language !== undefined) {
+        updates.transcript_language =
+          patch.transcriptLanguage !== undefined
+            ? patch.transcriptLanguage
+            : patch.transcript_language;
+      }
+      if (patch.transcriptConfidence != null || patch.transcript_confidence != null) {
+        updates.transcript_confidence =
+          patch.transcriptConfidence != null
+            ? patch.transcriptConfidence
+            : patch.transcript_confidence;
+      }
+      if (patch.transcriptError !== undefined || patch.transcript_error !== undefined) {
+        updates.transcript_error =
+          patch.transcriptError !== undefined ? patch.transcriptError : patch.transcript_error;
+      }
+      if (patch.transcriptAttempts != null || patch.transcript_attempts != null) {
+        updates.transcript_attempts =
+          patch.transcriptAttempts != null ? patch.transcriptAttempts : patch.transcript_attempts;
+      }
+      if (patch.transcriptProvider !== undefined || patch.transcript_provider !== undefined) {
+        updates.transcript_provider =
+          patch.transcriptProvider !== undefined
+            ? patch.transcriptProvider
+            : patch.transcript_provider;
+      }
+      if (patch.transcriptModel !== undefined || patch.transcript_model !== undefined) {
+        updates.transcript_model =
+          patch.transcriptModel !== undefined ? patch.transcriptModel : patch.transcript_model;
+      }
+      if (patch.transcriptBilledMs != null || patch.transcript_billed_ms != null) {
+        updates.transcript_billed_ms =
+          patch.transcriptBilledMs != null ? patch.transcriptBilledMs : patch.transcript_billed_ms;
+      }
+      if (patch.transcriptTurnId !== undefined || patch.transcript_turn_id !== undefined) {
+        updates.transcript_turn_id =
+          patch.transcriptTurnId !== undefined
+            ? patch.transcriptTurnId
+            : patch.transcript_turn_id;
+      }
 
       const { data, error } = await getSupabase()
         .from("communication_media")
@@ -484,6 +612,7 @@ module.exports = {
   toRow,
   toPublicMedia,
   attachPublicMediaToConversationMessages,
+  rowNeedsPollerWork,
   createMemoryCommunicationMediaRepository,
   createSupabaseCommunicationMediaRepository,
   getCommunicationMediaRepository

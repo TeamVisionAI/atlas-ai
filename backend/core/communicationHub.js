@@ -281,6 +281,23 @@ async function processNormalizedInboundMessage(
 
   const name = contactName || normalized.contactName || prospect?.name || "Unknown";
 
+  // Implements BR-141 — webhook audio must not BR-118-ack or enter V2/CE.
+  // Persist already happened; STT + semantic replay run on the media poller.
+  const { classifyInboundMedia } = require("./recruitAiV2/nonTextMedia");
+  const inboundMedia = classifyInboundMedia(normalized);
+  if (inboundMedia.isNonTextMedia && String(inboundMedia.mediaType || normalized.messageType || "").toLowerCase() === "audio") {
+    logWhatsAppStage("audio_stt_pending_skip_live_authoring", {
+      phone: normalized.phone,
+      providerMessageId: normalized.providerMessageId || null
+    });
+    return {
+      success: true,
+      replied: false,
+      reason: "AUDIO_STT_PENDING",
+      mediaType: inboundMedia.mediaType
+    };
+  }
+
   // Implements BR-114 — one-user live authoring canary before legacy CE.
   // Shadow/advisory never enter this path. Successful v2 reply skips CE entirely.
   if (normalized.channel === "whatsapp" && prospect) {
@@ -361,22 +378,19 @@ async function processNormalizedInboundMessage(
     // Technical failure / empty / ineligible → fall through to legacy CE once.
   }
 
-  // BR-118 / BR-140 — non-text media must not enter legacy CE as semantic text.
-  // V2 eligible path already authored above. Pre-STT: freeze qualification, no clarify_once.
-  const { classifyInboundMedia } = require("./recruitAiV2/nonTextMedia");
-  const mediaClass = classifyInboundMedia(normalized);
-  if (mediaClass.isNonTextMedia) {
+  // BR-118 / BR-140 — remaining non-text media (image/video/document) must not enter legacy CE.
+  if (inboundMedia.isNonTextMedia) {
     logWhatsAppStage("legacy_ce_non_text_media_skipped", {
       phone: normalized.phone,
-      messageType: mediaClass.mediaType,
-      detection: mediaClass.detection,
+      messageType: inboundMedia.mediaType,
+      detection: inboundMedia.detection,
       providerMessageId: normalized.providerMessageId || null
     });
     return {
       success: true,
       replied: false,
       reason: "NON_TEXT_MEDIA_NO_STT",
-      mediaType: mediaClass.mediaType
+      mediaType: inboundMedia.mediaType
     };
   }
 

@@ -68,6 +68,8 @@ export default function CommunicationAudioBubble({
   const playbackFailed =
     Boolean(media?.playbackFailed) || (stored && transcodeStatus === "failed");
   const playbackAvailable = Boolean(media?.playbackAvailable);
+  const transcriptStatus = String(media?.transcriptStatus || "").toLowerCase();
+  const transcriptText = String(media?.transcriptText || "").trim();
 
   useEffect(() => {
     if (!stored || !prospectId || !mediaId || playbackPreparing || playbackFailed) {
@@ -170,6 +172,24 @@ export default function CommunicationAudioBubble({
       {media?.durationMs ? (
         <p className="communication-audio-bubble__meta">
           {Math.max(1, Math.round(Number(media.durationMs) / 1000))}s
+        </p>
+      ) : null}
+      {transcriptStatus === "ready" && transcriptText ? (
+        <div className="communication-audio-bubble__transcript" data-testid={`${testId}-transcript`}>
+          <span className="communication-audio-bubble__transcript-label">
+            {translate("voiceTranscriptLabel")}
+          </span>
+          <p className="communication-audio-bubble__transcript-text">“{transcriptText}”</p>
+        </div>
+      ) : null}
+      {transcriptStatus === "pending" || transcriptStatus === "processing" ? (
+        <p className="communication-audio-bubble__hint" data-testid={`${testId}-transcript-pending`}>
+          {translate("voiceTranscriptPending")}
+        </p>
+      ) : null}
+      {transcriptStatus === "failed" || transcriptStatus === "skipped" ? (
+        <p className="communication-audio-bubble__hint" data-testid={`${testId}-transcript-failed`}>
+          {translate("voiceTranscriptUnavailable")}
         </p>
       ) : null}
     </div>

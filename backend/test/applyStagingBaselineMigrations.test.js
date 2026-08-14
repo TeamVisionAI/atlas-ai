@@ -25,6 +25,7 @@ test("staging baseline lists 001–038, both 010 files, and never 039", () => {
       files.indexOf("010_prospect_preferred_language.sql")
   );
   assert.ok(!files.some((name) => name.startsWith("039_")));
+  assert.ok(!files.some((name) => name.startsWith("040_")));
   assert.ok(!files.some((name) => /_down\.sql$/i.test(name)));
   assert.equal(
     files.every((name) => {

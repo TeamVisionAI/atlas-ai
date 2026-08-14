@@ -1,7 +1,7 @@
 /**
- * Async Meta media fetch + Safari-safe MP3 transcode (BR-140 Phase 1+1B).
- * One poller lifecycle. Original always preserved. No STT.
- * Failure updates fetch/transcode status only — never ownership, BR-080, or TAKE OVER.
+ * Async Meta media fetch + Safari-safe MP3 transcode + Phase 2 STT (BR-140 / BR-141).
+ * One poller lifecycle. Original always preserved.
+ * Failure updates media status only — never ownership, BR-080, or TAKE OVER.
  */
 
 "use strict";
@@ -15,7 +15,8 @@ const {
   MAX_TRANSCODE_ATTEMPTS,
   MAX_COMMUNICATION_MEDIA_BYTES,
   FETCH_LOCK_STALE_MS,
-  PLAYBACK_FORMAT
+  PLAYBACK_FORMAT,
+  TRANSCRIPT_STATUS
 } = require("./constants");
 const {
   isAllowedAudioMime,
@@ -217,7 +218,8 @@ async function processOneCommunicationMediaTranscode(row, dependencies = {}) {
       transcodeAttempts: attempts + 1,
       transcodeError: null,
       playbackPath: stored.storagePath,
-      playbackMimeType: stored.mimeType || PLAYBACK_FORMAT.mimeType
+      playbackMimeType: stored.mimeType || PLAYBACK_FORMAT.mimeType,
+      transcriptStatus: TRANSCRIPT_STATUS.PENDING
     });
 
     logWhatsAppStage("communication_media_transcoded", {
@@ -227,11 +229,13 @@ async function processOneCommunicationMediaTranscode(row, dependencies = {}) {
       mediaKind: row.media_kind
     });
 
-    return {
+    const transcoded = {
       status: FETCH_STATUS.STORED,
       transcodeStatus: TRANSCODE_STATUS.READY,
       id: row.id
     };
+    const transcript = await maybeProcessTranscript(row, { ...dependencies, repository });
+    return transcript ? { ...transcoded, transcript } : transcoded;
   } catch (error) {
     const nextAttempts = attempts + 1;
     const terminal = nextAttempts >= MAX_TRANSCODE_ATTEMPTS;
@@ -251,14 +255,51 @@ async function processOneCommunicationMediaTranscode(row, dependencies = {}) {
       code: error.publicCode || null
     });
 
-    return {
+    const failed = {
       status: FETCH_STATUS.STORED,
       transcodeStatus: terminal ? TRANSCODE_STATUS.FAILED : TRANSCODE_STATUS.PENDING,
       reason: error.publicCode || "TRANSCODE_FAILED",
       id: row.id,
       retryAfterMs: terminal ? null : backoffMs(nextAttempts)
     };
+    if (terminal) {
+      const transcript = await maybeProcessTranscript(row, { ...dependencies, repository });
+      return transcript ? { ...failed, transcript } : failed;
+    }
+    return failed;
   }
+}
+
+async function maybeProcessTranscript(row, dependencies = {}) {
+  const repository =
+    dependencies.repository || getCommunicationMediaRepository(dependencies);
+  const skipAutomaticStt =
+    !dependencies.transcribeFn &&
+    dependencies.enableStt !== true &&
+    (dependencies.skipTranscript === true ||
+      repository?.backend === "memory" ||
+      process.env.ATLAS_COMMUNICATION_MEDIA_BACKEND === "memory");
+  if (skipAutomaticStt) {
+    return null;
+  }
+  const {
+    needsTranscriptWork,
+    processOneCommunicationMediaTranscript
+  } = require("./whatsappAudioTranscriptService");
+  const current =
+    (await repository.findById(row.id, row.organization_id)) || row;
+  if (
+    !needsTranscriptWork(current, {
+      now: dependencies.now || Date.now(),
+      staleMs: dependencies.staleMs || FETCH_LOCK_STALE_MS
+    })
+  ) {
+    return null;
+  }
+  return processOneCommunicationMediaTranscript(current, {
+    ...dependencies,
+    repository
+  });
 }
 
 async function processOneCommunicationMediaFetch(row, dependencies = {}) {
@@ -268,6 +309,16 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
   const attempts = Number(row.fetch_attempts || 0);
 
   if (isFetchComplete(row)) {
+    if (isTranscodeComplete(row)) {
+      const transcript = await maybeProcessTranscript(row, { ...dependencies, repository });
+      return {
+        status: FETCH_STATUS.STORED,
+        transcodeStatus: row.transcode_status,
+        skipped: true,
+        id: row.id,
+        transcript
+      };
+    }
     return processOneCommunicationMediaTranscode(row, { ...dependencies, repository });
   }
 
@@ -277,7 +328,9 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
       fetchError: publicStatusError("MAX_ATTEMPTS", "MAX_ATTEMPTS"),
       fetchAttempts: attempts
     });
-    return { status: FETCH_STATUS.FAILED, reason: "MAX_ATTEMPTS", id: row.id };
+    const failed = { status: FETCH_STATUS.FAILED, reason: "MAX_ATTEMPTS", id: row.id };
+    const transcript = await maybeProcessTranscript(row, { ...dependencies, repository });
+    return transcript ? { ...failed, transcript } : failed;
   }
 
   await repository.update(row.id, organizationId, {
@@ -330,7 +383,8 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
         : TRANSCODE_STATUS.PENDING,
       playbackPath: nativePlayback ? stored.storagePath : null,
       playbackMimeType: nativePlayback ? mimeType : null,
-      transcodeError: null
+      transcodeError: null,
+      transcriptStatus: nativePlayback ? TRANSCRIPT_STATUS.PENDING : null
     });
 
     logWhatsAppStage("communication_media_stored", {
@@ -351,15 +405,21 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
         : TRANSCODE_STATUS.PENDING,
       playback_path: nativePlayback ? stored.storagePath : null,
       playback_mime_type: nativePlayback ? mimeType : null,
-      transcode_attempts: Number(row.transcode_attempts || 0)
+      transcode_attempts: Number(row.transcode_attempts || 0),
+      transcript_status: nativePlayback ? TRANSCRIPT_STATUS.PENDING : row.transcript_status || null
     };
 
     if (nativePlayback) {
-      return {
+      const storedResult = {
         status: FETCH_STATUS.STORED,
         transcodeStatus: TRANSCODE_STATUS.NOT_REQUIRED,
         id: row.id
       };
+      const transcript = await maybeProcessTranscript(storedRow, {
+        ...dependencies,
+        repository
+      });
+      return transcript ? { ...storedResult, transcript } : storedResult;
     }
 
     return processOneCommunicationMediaTranscode(storedRow, {
@@ -386,12 +446,20 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
       code: error.publicCode || null
     });
 
-    return {
+    const failed = {
       status: terminal ? FETCH_STATUS.FAILED : FETCH_STATUS.PENDING,
       reason: error.publicCode || "MEDIA_FETCH_FAILED",
       id: row.id,
       retryAfterMs: terminal ? null : backoffMs(nextAttempts)
     };
+    if (terminal) {
+      const transcript = await maybeProcessTranscript(
+        { ...row, fetch_status: FETCH_STATUS.FAILED },
+        { ...dependencies, repository }
+      );
+      return transcript ? { ...failed, transcript } : failed;
+    }
+    return failed;
   }
 }
 
@@ -460,5 +528,6 @@ module.exports = {
   processOneCommunicationMediaTranscode,
   processOneCommunicationMediaFetch,
   processPendingWhatsAppMediaFetches,
-  persistInboundAudioMedia
+  persistInboundAudioMedia,
+  maybeProcessTranscript
 };

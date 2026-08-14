@@ -1,6 +1,7 @@
 /**
- * Communication media constants (BR-140). WhatsApp audio Phase 1.
- * No STT. Private storage only.
+ * Communication media constants (BR-140 / BR-141).
+ * WhatsApp audio Phase 1+1B playback + Phase 2 STT.
+ * Private storage only.
  */
 
 "use strict";
@@ -48,6 +49,18 @@ const MAX_TRANSCODE_ATTEMPTS = 3;
 const TRANSCODE_TIMEOUT_MS = 30_000;
 const MAX_TRANSCODE_DURATION_SECONDS = 15 * 60;
 
+const TRANSCRIPT_STATUS = Object.freeze({
+  PENDING: "pending",
+  PROCESSING: "processing",
+  READY: "ready",
+  FAILED: "failed",
+  SKIPPED: "skipped"
+});
+
+const MAX_STT_ATTEMPTS = 3;
+const MAX_STT_DURATION_MS = 3 * 60 * 1000;
+const STT_SOFT_ACK_MS = 10_000;
+
 const MEDIA_KINDS = Object.freeze({
   AUDIO: "audio",
   IMAGE: "image",
@@ -82,6 +95,10 @@ module.exports = {
   MAX_TRANSCODE_ATTEMPTS,
   TRANSCODE_TIMEOUT_MS,
   MAX_TRANSCODE_DURATION_SECONDS,
+  TRANSCRIPT_STATUS,
+  MAX_STT_ATTEMPTS,
+  MAX_STT_DURATION_MS,
+  STT_SOFT_ACK_MS,
   MEDIA_KINDS,
   ALLOWED_AUDIO_MIME_BASES
 };

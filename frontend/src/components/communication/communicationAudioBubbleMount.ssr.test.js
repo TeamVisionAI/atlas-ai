@@ -162,6 +162,96 @@ test("pending, preparing, failed, and ready derivative bubbles render safely", a
     assert.match(readyHtml, /playback\.mp3/);
     assert.match(readyHtml, /Voice message|Mensaje de voz|voiceMessage/);
     assert.doesNotMatch(readyHtml, /canPlayType|audio\/ogg/i);
+
+    const transcriptPendingHtml = renderToString(
+      React.createElement(
+        LanguageProvider,
+        null,
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: {
+            id: "m-tr-pending",
+            mediaKind: "audio",
+            mimeType: "audio/mpeg",
+            fetchStatus: "stored",
+            transcodeStatus: "ready",
+            playbackAvailable: true,
+            transcriptStatus: "pending"
+          },
+          initialPlayback: {
+            url: "https://signed.example/playback.mp3",
+            mimeType: "audio/mpeg"
+          },
+          testId: "audio-transcript-pending"
+        })
+      )
+    );
+    assert.match(transcriptPendingHtml, /<audio/);
+    assert.match(
+      transcriptPendingHtml,
+      /Preparing transcript|Preparando transcripci[oó]n|voiceTranscriptPending/
+    );
+    assert.doesNotMatch(transcriptPendingHtml, /openai|gpt-transcribe|invalid_request/i);
+
+    const transcriptReadyHtml = renderToString(
+      React.createElement(
+        LanguageProvider,
+        null,
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: {
+            id: "m-tr-ready",
+            mediaKind: "audio",
+            mimeType: "audio/mpeg",
+            fetchStatus: "stored",
+            transcodeStatus: "ready",
+            playbackAvailable: true,
+            transcriptStatus: "ready",
+            transcriptText: "Vivo en Cape Coral, Florida y sí tengo permiso de trabajo."
+          },
+          initialPlayback: {
+            url: "https://signed.example/playback.mp3",
+            mimeType: "audio/mpeg"
+          },
+          testId: "audio-transcript-ready"
+        })
+      )
+    );
+    assert.match(transcriptReadyHtml, /<audio/);
+    assert.match(transcriptReadyHtml, /Cape Coral/);
+    assert.match(transcriptReadyHtml, /Transcript:|Transcripci[oó]n:|voiceTranscriptLabel/);
+    assert.doesNotMatch(transcriptReadyHtml, /0\.91|gpt-transcribe|req_/i);
+
+    const transcriptFailedHtml = renderToString(
+      React.createElement(
+        LanguageProvider,
+        null,
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: {
+            id: "m-tr-fail",
+            mediaKind: "audio",
+            mimeType: "audio/mpeg",
+            fetchStatus: "stored",
+            transcodeStatus: "ready",
+            playbackAvailable: true,
+            transcriptStatus: "failed",
+            transcriptError: "OpenAI 429 rate limit req_abc"
+          },
+          initialPlayback: {
+            url: "https://signed.example/playback.mp3",
+            mimeType: "audio/mpeg"
+          },
+          testId: "audio-transcript-failed"
+        })
+      )
+    );
+    assert.match(transcriptFailedHtml, /<audio/);
+    assert.match(
+      transcriptFailedHtml,
+      /Transcript unavailable|Transcripci[oó]n no disponible|voiceTranscriptUnavailable/
+    );
+    assert.doesNotMatch(transcriptFailedHtml, /429|rate limit|req_abc|OpenAI/i);
   } finally {
     await server.close();
   }
