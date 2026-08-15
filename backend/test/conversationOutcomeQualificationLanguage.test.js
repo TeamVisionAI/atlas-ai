@@ -51,7 +51,7 @@ test("qualification form omits preferred_language when language was established 
   const gaps = getQualificationFormGaps(prospect, profile);
 
   assert.ok(keys.includes("city"));
-  assert.ok(keys.includes("occupation"));
+  assert.ok(!keys.includes("occupation"), "occupation is optional (BR-123)");
   assert.ok(!keys.includes("preferred_language"), `Expected no language field, got ${JSON.stringify(keys)}`);
   assert.ok(!gaps.includes("preferred_language"));
 });

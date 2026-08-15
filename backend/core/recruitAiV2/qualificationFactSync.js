@@ -7,6 +7,12 @@
 
 "use strict";
 
+const {
+  parseQualificationCapture,
+  markCapturedFields,
+  mergeNotesWithQualificationCapture
+} = require("../qualificationCaptureState");
+
 const SYNC_REASON = Object.freeze({
   OK: null,
   MISSING_SCOPE: "QUALIFICATION_SYNC_SCOPE_REQUIRED",
@@ -239,6 +245,75 @@ function planQualificationFactSync({
   };
 }
 
+function buildCaptureNotesPatch(prospect, confirmed = {}) {
+  const captureState = markCapturedFields(parseQualificationCapture(prospect?.notes), {
+    city: confirmed.city || prospect?.city || null,
+    state: confirmed.state || prospect?.state || null,
+    authorization:
+      confirmed.authorization !== undefined && confirmed.authorization !== null
+        ? confirmed.authorization
+        : prospect?.work_authorized,
+    interviewType: prospect?.interview_type || null
+  });
+  const notes = mergeNotesWithQualificationCapture(prospect?.notes, captureState);
+  if (notes === (prospect?.notes || null) || notes === prospect?.notes) {
+    return {};
+  }
+  return { notes };
+}
+
+async function persistInterviewReadyIfQualificationComplete(prospect, options = {}) {
+  if (!prospect?.phone) {
+    return { advanced: false };
+  }
+
+  const saveFn =
+    typeof options.saveWorkflowFn === "function"
+      ? options.saveWorkflowFn
+      : options.allowWorkflowPersist === true
+        ? require("../workflowStateStore").savePersistedWorkflowState
+        : null;
+
+  if (!saveFn) {
+    return { advanced: false, skipped: true };
+  }
+
+  const current = String(prospect.workflow_state?.canonicalMilestone || "");
+  const later = new Set([
+    "INTERVIEW_READY",
+    "INTERVIEW_SCHEDULED",
+    "INTERVIEW_DUE",
+    "INTERVIEW_COMPLETED",
+    "INTERVIEW_RESULT_PENDING",
+    "CLOSED",
+    "DO_NOT_CONTACT"
+  ]);
+  if (later.has(current)) {
+    return { advanced: false };
+  }
+
+  const { buildProfileFromProspect } = require("../informationModel");
+  const { getQualificationFormGaps } = require("../conversationOutcomeEngine");
+  const { MILESTONES } = require("../workflowConstants");
+
+  const profile = buildProfileFromProspect(prospect);
+  const gaps = getQualificationFormGaps(prospect, profile);
+  if (gaps.length > 0) {
+    return { advanced: false, gaps };
+  }
+
+  await saveFn(
+    prospect.phone,
+    { canonicalMilestone: MILESTONES.INTERVIEW_READY },
+    {
+      organizationId: prospect.organization_id || prospect.organizationId || null,
+      prospectId: prospect.id || null
+    }
+  );
+
+  return { advanced: true };
+}
+
 /**
  * Apply a previously validated plan (or plan first): single atomic prospect UPDATE
  * for all legacy column hydrations. capturedFields enrichment is in-memory only.
@@ -327,7 +402,9 @@ async function synchronizeQualificationFactsForMissionControl({
   expectedLegacyProspectId = null,
   updateProspectFn = null,
   loadProspectFn = null,
-  prospectPhone = null
+  prospectPhone = null,
+  allowWorkflowPersist = false,
+  saveWorkflowFn = null
 } = {}) {
   try {
     const confirmed = extractConfirmedDurableQualificationFacts(durableContext);
@@ -390,6 +467,26 @@ async function synchronizeQualificationFactsForMissionControl({
       updateProspectFn
     });
 
+    if (result.ok && result.prospect && updateProspectFn && result.prospect.phone) {
+      const notesPatch = buildCaptureNotesPatch(result.prospect, confirmed);
+      if (Object.keys(notesPatch).length > 0) {
+        try {
+          await updateProspectFn(result.prospect.phone, notesPatch);
+          result.prospect = { ...result.prospect, ...notesPatch };
+        } catch {
+          // Notes marker is best-effort; columns already hydrated.
+        }
+      }
+      try {
+        await persistInterviewReadyIfQualificationComplete(result.prospect, {
+          allowWorkflowPersist,
+          saveWorkflowFn
+        });
+      } catch {
+        // Milestone persist must never break the authored turn.
+      }
+    }
+
     return {
       ...result,
       soft: true,
@@ -416,5 +513,6 @@ module.exports = {
   extractConfirmedDurableQualificationFacts,
   planQualificationFactSync,
   synchronizeQualificationFactsForSchedule,
-  synchronizeQualificationFactsForMissionControl
+  synchronizeQualificationFactsForMissionControl,
+  persistInterviewReadyIfQualificationComplete
 };
