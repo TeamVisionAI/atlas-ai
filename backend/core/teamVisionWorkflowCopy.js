@@ -134,6 +134,23 @@ function getJobOverviewFaqAnswer(language) {
     : "It's an opportunity in financial services where we help families with protection and financial planning. We provide training and support.";
 }
 
+/**
+ * Copy-only Spanish ad-lead first touch (BR-131). English unchanged.
+ * Used when the next ask is still location; does not change qualification logic.
+ */
+function getAdLeadFirstTouchMessage(language, facts = {}) {
+  if (language !== "es") {
+    return null;
+  }
+  if (facts.city || facts.state || facts.proposedState) {
+    return null;
+  }
+  if (facts.jobFaqDetailLevel === "company_identity") {
+    return null;
+  }
+  return "¡Hola! Claro 😊 Es una oportunidad en servicios financieros y con gusto te explicamos cómo funciona. ¿En qué ciudad estás?";
+}
+
 /** BR-088 — explicit employment-framing ask (job/salaried/hourly). */
 function getJobOpportunityFaqAnswer(language) {
   // Prefer concise Atlas copy over stale FAQ-catalog deferrals.
@@ -468,6 +485,7 @@ module.exports = {
   getHandoffMessage,
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
+  getAdLeadFirstTouchMessage,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getExperienceFaqAnswer,
