@@ -690,7 +690,8 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
       date: dateKey,
       purpose: appointment.purpose,
       durationMinutes: appointment.durationMinutes,
-      maxResults: 50
+      maxResults: 50,
+      excludeAppointmentId: appointment.id
     });
 
     matchedSlot = slotCheck.slots.find(

@@ -18,6 +18,9 @@ const {
   ATLAS_DEFAULT_TIMEZONE,
   zonedTimeToUtcMs
 } = require("../core/organizationDateWindow");
+const {
+  FULL_DAY_MAX_SLOT_RESULTS
+} = require("../core/configuration/appointmentDomain");
 
 const SLOT_INTERVAL_MINUTES = 30;
 
@@ -74,7 +77,7 @@ async function getAvailableSlots({
   duration,
   appointmentType,
   organizationId,
-  maxResults = 8
+  maxResults = FULL_DAY_MAX_SLOT_RESULTS
 }) {
   if (!isValidAppointmentType(appointmentType)) {
     const error = new Error("Invalid appointment type.");

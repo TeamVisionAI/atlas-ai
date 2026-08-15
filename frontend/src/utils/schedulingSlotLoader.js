@@ -7,7 +7,7 @@ import {
 
 export const SCHEDULING_WINDOW_HOURS = 48;
 export const SCHEDULING_RECOMMENDED_MAX = 6;
-export const SCHEDULING_DAY_FETCH_MAX = 12;
+export const SCHEDULING_DAY_FETCH_MAX = 48;
 export const SCHEDULING_MAX_SCAN_DAYS = 21;
 
 export function getSlotTimestamp(slot) {

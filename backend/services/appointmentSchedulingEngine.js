@@ -9,6 +9,7 @@ const {
 } = require("../core/capacityEngine");
 const {
   SLOT_INTERVAL_MINUTES,
+  FULL_DAY_MAX_SLOT_RESULTS,
   MORNING_RANGE,
   AFTERNOON_RANGE
 } = require("../core/configuration/appointmentDomain");
@@ -97,6 +98,17 @@ function isSlotBlocked(slotStartMs, slotEndMs, busyRanges) {
   return busyRanges.some((range) => rangesOverlap(slotStartMs, slotEndMs, range.start, range.end));
 }
 
+function isOwnBusyWindow(range, excludedWindow) {
+  if (!excludedWindow) {
+    return false;
+  }
+
+  return (
+    Math.abs(range.start - excludedWindow.start) <= 60_000 &&
+    Math.abs(range.end - excludedWindow.end) <= 120_000
+  );
+}
+
 async function fetchGoogleBusyRanges(organizationId, timeMin, timeMax, timezone) {
   const busy = await googleCalendarIntegrationService.queryFreeBusy(
     organizationId,
@@ -122,6 +134,8 @@ async function fetchGoogleBusyRanges(organizationId, timeMin, timeMax, timezone)
  * @param {number} [params.durationMinutes]
  * @param {string} [params.timePreference] - morning | afternoon | any
  * @param {number} [params.maxResults]
+ * @param {string} [params.excludeAppointmentId] - reschedule: ignore this appointment's own block
+ * @param {Object} [params.dependencies] - test seams only
  */
 async function getAvailableSlots({
   agentId,
@@ -131,9 +145,22 @@ async function getAvailableSlots({
   purpose = "recruiting_interview",
   durationMinutes,
   timePreference = "any",
-  maxResults = 8
-}) {
-  const profileResult = await getAppointmentProfile(agentId);
+  maxResults = FULL_DAY_MAX_SLOT_RESULTS,
+  excludeAppointmentId = null,
+  dependencies = {}
+} = {}) {
+  const loadProfile =
+    dependencies.getAppointmentProfileFn || getAppointmentProfile;
+  const searchAppointments =
+    dependencies.searchAppointmentsFn ||
+    ((filters) => appointmentRepository.search(filters));
+  const loadScheduling =
+    dependencies.getSchedulingSettingsFn || getSchedulingSettings;
+  const loadGoogleBusy =
+    dependencies.queryFreeBusyFn || fetchGoogleBusyRanges;
+  const now = Number.isFinite(dependencies.nowMs) ? dependencies.nowMs : Date.now();
+
+  const profileResult = await loadProfile(agentId);
   const profile = profileResult.appointmentProfile;
   const timezone = profile.defaults.timezone || profileResult.timezone || "America/New_York";
   const duration =
@@ -149,12 +176,12 @@ async function getAvailableSlots({
   const slotLimit = multiDayRange ? 0 : maxResults;
 
   const scheduling = organizationId
-    ? await getSchedulingSettings(organizationId)
+    ? await loadScheduling(organizationId)
     : { respectPersonalCalendar: true };
 
-  const now = Date.now();
   const slots = [];
   let conflictExplanation = null;
+  const excludedId = excludeAppointmentId ? String(excludeAppointmentId) : null;
 
   const cursor = new Date(startDate);
 
@@ -170,7 +197,7 @@ async function getAvailableSlots({
     const dayStart = new Date(`${dateKey}T00:00:00`);
     const dayEnd = new Date(`${dateKey}T23:59:59`);
 
-    const { items: dayAppointments } = await appointmentRepository.search({
+    const { items: dayAppointments } = await searchAppointments({
       organizationId,
       agentId,
       from: dayStart.toISOString(),
@@ -178,17 +205,32 @@ async function getAvailableSlots({
       status: ["scheduled", "confirmed", "pending_confirmation", "in_progress"]
     });
 
-    const busyRanges = buildBusyRanges(dayAppointments, bufferBefore, bufferAfter);
+    const conflictingAppointments = (dayAppointments || []).filter(
+      (appointment) => !excludedId || String(appointment.id) !== excludedId
+    );
+    const excludedAppointment = (dayAppointments || []).find(
+      (appointment) => excludedId && String(appointment.id) === excludedId
+    );
+    const excludedWindow = excludedAppointment
+      ? {
+          start: new Date(excludedAppointment.startDateTime).getTime(),
+          end: new Date(excludedAppointment.endDateTime).getTime()
+        }
+      : null;
+
+    const busyRanges = buildBusyRanges(conflictingAppointments, bufferBefore, bufferAfter);
 
     if (scheduling.respectPersonalCalendar !== false && organizationId) {
       try {
-        const googleBusy = await fetchGoogleBusyRanges(
+        const googleBusy = await loadGoogleBusy(
           organizationId,
           dayStart.toISOString(),
           dayEnd.toISOString(),
           timezone
         );
-        busyRanges.push(...googleBusy);
+        busyRanges.push(
+          ...googleBusy.filter((range) => !isOwnBusyWindow(range, excludedWindow))
+        );
       } catch {
         // Graceful fallback when calendar not connected
       }
@@ -199,7 +241,7 @@ async function getAvailableSlots({
       const blockEnd = parseTimeKey(block.end);
       const candidateTimes = generateTimeKeys(
         blockStart,
-        blockEnd - duration,
+        blockEnd - duration + SLOT_INTERVAL_MINUTES,
         SLOT_INTERVAL_MINUTES
       );
 
@@ -286,5 +328,6 @@ module.exports = {
   getDaySchedule,
   matchesTimePreference,
   buildBusyRanges,
-  isSlotBlocked
+  isSlotBlocked,
+  isOwnBusyWindow
 };

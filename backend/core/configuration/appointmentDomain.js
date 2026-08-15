@@ -112,6 +112,9 @@ const AFTERNOON_RANGE = Object.freeze({ start: "12:00", end: "18:00" });
 
 const SLOT_INTERVAL_MINUTES = 30;
 
+/** Full working-day half-hour coverage (9 AM–9 PM = 24 starts; 48 covers 24h). */
+const FULL_DAY_MAX_SLOT_RESULTS = 48;
+
 function isValidPurpose(value) {
   return Object.values(APPOINTMENT_PURPOSES).includes(value);
 }
@@ -173,6 +176,7 @@ module.exports = {
   MORNING_RANGE,
   AFTERNOON_RANGE,
   SLOT_INTERVAL_MINUTES,
+  FULL_DAY_MAX_SLOT_RESULTS,
   isValidPurpose,
   isValidStatus,
   isValidOutcome,
