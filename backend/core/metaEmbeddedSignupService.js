@@ -16,18 +16,119 @@ const {
   compareAuthorizationCodes,
   traceAuthorizationCode
 } = require("./meta/authorizationCodeTrace");
+const { readConfiguredFrontendUrl } = require("../config/frontendBaseUrl");
 
-/**
- * OAuth dialog `redirect_uri` used by Facebook JS SDK `FB.login` (popup / XD).
- * WhatsAppConnect does not pass `redirect_uri`; the SDK sets this arbiter URL
- * (hash fragment is client-only and must not be sent to Graph).
- * Graph error_subcode 36008 requires the token exchange to send this exact URI.
- */
-const META_JS_SDK_OAUTH_REDIRECT_URI =
-  "https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46";
+const WHATSAPP_CONNECT_PATH = "/app/settings/whatsapp";
+const STAGING_CONNECT_REDIRECT_URI = `https://atlas-ai-git-feature-atlas-staging-teamvisionfinancial.vercel.app${WHATSAPP_CONNECT_PATH}`;
 
-function resolveEmbeddedSignupOAuthRedirectUri() {
-  return META_JS_SDK_OAUTH_REDIRECT_URI;
+function collectAllowedFrontendOrigins(env = process.env) {
+  const origins = new Set([
+    "http://localhost:5173",
+    "https://localhost:5173",
+    "https://teamvisionfinancial.com",
+    "https://www.teamvisionfinancial.com"
+  ]);
+  const configured = readConfiguredFrontendUrl(env);
+
+  if (configured) {
+    try {
+      origins.add(new URL(configured).origin);
+    } catch {
+      // ignore unparseable FRONTEND_URL
+    }
+  }
+
+  for (const part of String(env.ATLAS_CORS_ORIGINS || "").split(",")) {
+    const trimmed = part.trim();
+
+    if (!trimmed) {
+      continue;
+    }
+
+    try {
+      const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)
+        ? trimmed
+        : `https://${trimmed}`;
+      origins.add(new URL(withScheme).origin);
+    } catch {
+      // ignore unparseable CORS origin
+    }
+  }
+
+  return origins;
+}
+
+function isAtlasOwnedVercelPreviewOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && url.hostname.endsWith("-teamvisionfinancial.vercel.app");
+  } catch {
+    return false;
+  }
+}
+
+function normalizeConnectRedirectUri(raw) {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return null;
+  }
+
+  try {
+    const url = new URL(raw.trim());
+
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
+      return null;
+    }
+
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+    if (pathname !== WHATSAPP_CONNECT_PATH) {
+      return null;
+    }
+
+    return `${url.origin}${WHATSAPP_CONNECT_PATH}`;
+  } catch {
+    return null;
+  }
+}
+
+function isAllowlistedConnectRedirectUri(redirectUri, env = process.env) {
+  const normalized = normalizeConnectRedirectUri(redirectUri);
+
+  if (!normalized) {
+    return false;
+  }
+
+  const origin = new URL(normalized).origin;
+  return collectAllowedFrontendOrigins(env).has(origin) || isAtlasOwnedVercelPreviewOrigin(origin);
+}
+
+function resolveEmbeddedSignupOAuthRedirectUri(candidate, env = process.env) {
+  if (candidate != null && String(candidate).trim()) {
+    const normalized = normalizeConnectRedirectUri(candidate);
+
+    if (!normalized || !isAllowlistedConnectRedirectUri(normalized, env)) {
+      throw Object.assign(new Error("Invalid OAuth redirect URI."), {
+        statusCode: 400,
+        publicCode: "INVALID_REDIRECT_URI"
+      });
+    }
+
+    return normalized;
+  }
+
+  const configured = readConfiguredFrontendUrl(env);
+
+  if (configured) {
+    const fromEnv = normalizeConnectRedirectUri(
+      `${String(configured).replace(/\/$/, "")}${WHATSAPP_CONNECT_PATH}`
+    );
+
+    if (fromEnv) {
+      return fromEnv;
+    }
+  }
+
+  return STAGING_CONNECT_REDIRECT_URI;
 }
 
 function describeOAuthRedirectUriForLogs(redirectUri) {
@@ -161,7 +262,7 @@ function sanitizeMetaError(error) {
   };
 }
 
-async function exchangeAuthorizationCodeForToken(code) {
+async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
   validateMetaEmbeddedSignupEnvironment({ strict: true });
 
   const appId = getMetaAppId();
@@ -169,7 +270,7 @@ async function exchangeAuthorizationCodeForToken(code) {
   const version = getGraphVersion();
   const graphUrl = `https://graph.facebook.com/${version}/oauth/access_token`;
   const envSnapshot = getMetaExchangeEnvSnapshot();
-  const redirectUri = resolveEmbeddedSignupOAuthRedirectUri();
+  const redirectUri = resolveEmbeddedSignupOAuthRedirectUri(redirectUriInput);
   const requestParams = ["client_id", "client_secret", "code", "redirect_uri"];
   const redirectUriLog = describeOAuthRedirectUriForLogs(redirectUri);
 
@@ -451,7 +552,7 @@ async function completeEmbeddedSignupExchange(input) {
   let accessToken;
 
   try {
-    accessToken = await exchangeAuthorizationCodeForToken(code);
+    accessToken = await exchangeAuthorizationCodeForToken(code, input.redirectUri);
   } catch (error) {
     const graphDetails = extractGraphErrorDetails(error);
 
@@ -544,7 +645,8 @@ async function getEmbeddedSignupStatus(organizationId) {
 
 module.exports = {
   COMPLETION_STAGES,
-  META_JS_SDK_OAUTH_REDIRECT_URI,
+  WHATSAPP_CONNECT_PATH,
+  STAGING_CONNECT_REDIRECT_URI,
   completeEmbeddedSignupExchange,
   getEmbeddedSignupStatus,
   sanitizeMetaError,
