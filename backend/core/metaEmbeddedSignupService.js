@@ -17,6 +17,36 @@ const {
   traceAuthorizationCode
 } = require("./meta/authorizationCodeTrace");
 
+/**
+ * OAuth dialog `redirect_uri` used by Facebook JS SDK `FB.login` (popup / XD).
+ * WhatsAppConnect does not pass `redirect_uri`; the SDK sets this arbiter URL
+ * (hash fragment is client-only and must not be sent to Graph).
+ * Graph error_subcode 36008 requires the token exchange to send this exact URI.
+ */
+const META_JS_SDK_OAUTH_REDIRECT_URI =
+  "https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46";
+
+function resolveEmbeddedSignupOAuthRedirectUri() {
+  return META_JS_SDK_OAUTH_REDIRECT_URI;
+}
+
+function describeOAuthRedirectUriForLogs(redirectUri) {
+  try {
+    const parsed = new URL(redirectUri);
+    return {
+      redirectUriHost: parsed.host,
+      redirectUriPath: parsed.pathname,
+      redirectUriQuery: parsed.search || ""
+    };
+  } catch {
+    return {
+      redirectUriHost: null,
+      redirectUriPath: null,
+      redirectUriQuery: null
+    };
+  }
+}
+
 function getGraphVersion() {
   return getMetaGraphApiVersion();
 }
@@ -139,13 +169,17 @@ async function exchangeAuthorizationCodeForToken(code) {
   const version = getGraphVersion();
   const graphUrl = `https://graph.facebook.com/${version}/oauth/access_token`;
   const envSnapshot = getMetaExchangeEnvSnapshot();
+  const redirectUri = resolveEmbeddedSignupOAuthRedirectUri();
+  const requestParams = ["client_id", "client_secret", "code", "redirect_uri"];
+  const redirectUriLog = describeOAuthRedirectUriForLogs(redirectUri);
 
   metaLogger.info(
     "authorization_code_trace",
     traceAuthorizationCode("graph_api_request", code, {
       graphEndpoint: graphUrl,
       httpMethod: "GET",
-      requestParams: ["client_id", "client_secret", "code"]
+      requestParams,
+      ...redirectUriLog
     })
   );
 
@@ -158,7 +192,8 @@ async function exchangeAuthorizationCodeForToken(code) {
     configIdPresent: envSnapshot.configIdPresent,
     appAccessTokenPresent: envSnapshot.appAccessTokenPresent,
     codeLength: String(code || "").length,
-    requestParams: ["client_id", "client_secret", "code"]
+    requestParams,
+    ...redirectUriLog
   });
 
   let response;
@@ -168,7 +203,8 @@ async function exchangeAuthorizationCodeForToken(code) {
       params: {
         client_id: appId,
         client_secret: appSecret,
-        code
+        code,
+        redirect_uri: redirectUri
       },
       timeout: 15000
     });
@@ -188,7 +224,8 @@ async function exchangeAuthorizationCodeForToken(code) {
       graphErrorSubcode: graphDetails.graphErrorSubcode,
       graphErrorMessage: graphDetails.graphErrorMessage,
       graphErrorType: graphDetails.graphErrorType,
-      graphErrorUserMsg: graphDetails.graphErrorUserMsg
+      graphErrorUserMsg: graphDetails.graphErrorUserMsg,
+      ...redirectUriLog
     });
     throw error;
   }
@@ -507,12 +544,15 @@ async function getEmbeddedSignupStatus(organizationId) {
 
 module.exports = {
   COMPLETION_STAGES,
+  META_JS_SDK_OAUTH_REDIRECT_URI,
   completeEmbeddedSignupExchange,
   getEmbeddedSignupStatus,
   sanitizeMetaError,
   extractGraphErrorDetails,
   getMetaExchangeEnvSnapshot,
   exchangeAuthorizationCodeForToken,
+  resolveEmbeddedSignupOAuthRedirectUri,
+  describeOAuthRedirectUriForLogs,
   resolveConnectionAssets,
   subscribeWabaToApp
 };
