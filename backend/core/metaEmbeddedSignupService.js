@@ -302,9 +302,10 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
   try {
     const graphUrlParsed = new URL(graphUrl);
 
-    // TEMPORARY production runtime trace — safe fields only; no secret/code/token.
-    metaLogger.info("embedded_signup_oauth_runtime_trace", {
-      redirect_uri: redirectUri,
+    // TEMPORARY production runtime trace — stderr + redirectUri= so Railway error view finds it.
+    metaLogger.error("embedded_signup_oauth_runtime_trace", {
+      message: `redirectUri=${redirectUri}`,
+      redirectUri,
       appId,
       codeLength: String(code || "").length,
       graphHost: graphUrlParsed.host,
