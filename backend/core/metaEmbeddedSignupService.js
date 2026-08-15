@@ -300,6 +300,17 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
   let response;
 
   try {
+    const graphUrlParsed = new URL(graphUrl);
+
+    // TEMPORARY production runtime trace — safe fields only; no secret/code/token.
+    metaLogger.info("embedded_signup_oauth_runtime_trace", {
+      redirect_uri: redirectUri,
+      appId,
+      codeLength: String(code || "").length,
+      graphHost: graphUrlParsed.host,
+      graphPath: graphUrlParsed.pathname
+    });
+
     response = await axios.get(graphUrl, {
       params: {
         client_id: appId,
