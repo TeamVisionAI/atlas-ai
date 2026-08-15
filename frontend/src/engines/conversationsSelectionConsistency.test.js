@@ -180,6 +180,9 @@ test("CommunicationsCenterTimeline clears payload and gates stale responses", as
   assert.match(src, /shouldCommitTimelinePayload/);
   assert.match(src, /status === "loading"/);
   assert.match(src, /selectConversationLayoutBubbles/);
+  assert.match(src, /useTranscriptRefreshPoll/);
+  assert.match(src, /quietTranscriptRefresh/);
+  assert.match(src, /collectionNeedsTranscriptRefresh/);
   assert.match(
     src,
     /import \{[\s\S]*selectConversationLayoutBubbles[\s\S]*\} from ["']\.\.\/\.\.\/\.\.\/engines\/communicationsCenterViewModel["']/
