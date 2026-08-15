@@ -11,6 +11,7 @@ const { stateDisplayName } = require("./locationFacts");
 const {
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
+  getAdLeadFirstTouchMessage,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
   getExperienceFaqAnswer,
@@ -626,6 +627,10 @@ function composeJobOpportunityThenResume(language, entities = {}) {
 /** BR-097 — short first-level overview + pending question, no caveat stack. */
 function composeJobOverviewThenResume(language, entities = {}) {
   const lang = localeCode(language);
+  const firstTouch = getAdLeadFirstTouchMessage(lang, entities);
+  if (firstTouch) {
+    return firstTouch;
+  }
   const faqText =
     entities.jobFaqDetailLevel === "company_identity"
       ? getCanonicalFaqAnswer(lang)

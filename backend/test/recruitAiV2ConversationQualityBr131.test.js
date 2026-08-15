@@ -231,6 +231,9 @@ test("sync turn path remains non-mutating when allowExecution true", () => {
   assert.equal(isExecutionEnabled({ env: process.env }), false);
 });
 
+const SPANISH_FIRST_TOUCH =
+  "¡Hola! Claro 😊 Es una oportunidad en servicios financieros y con gusto te explicamos cómo funciona. ¿En qué ciudad estás?";
+
 const SPANISH_OVERVIEW =
   "Es una oportunidad en servicios financieros donde ayudamos a las familias con protección y planificación financiera. Ofrecemos entrenamiento y capacitación.";
 
@@ -242,10 +245,7 @@ function assertSpanishOverviewThenCity(message) {
   const { interpretation, plan, rendered } = renderTurn(message, spanishBlank());
   assert.equal(interpretation.intent, INTENTS.JOB_OPPORTUNITY_QUESTION);
   assert.equal(plan.templateKey, "job_overview_faq_then_resume");
-  assert.equal(
-    rendered.text,
-    `${SPANISH_OVERVIEW} ¿En qué ciudad y estado vives?`
-  );
+  assert.equal(rendered.text, SPANISH_FIRST_TOUCH);
   assert.doesNotMatch(rendered.text, /empleo por hora/i);
   assert.doesNotMatch(rendered.text, /\bcampaign\b|\bcódigo QR\b|QR campaign/i);
   assert.doesNotMatch(rendered.text, /\bnegocio\b|\bcontratista\b|\bsalario\b|\bcomisi[oó]n\b/i);
