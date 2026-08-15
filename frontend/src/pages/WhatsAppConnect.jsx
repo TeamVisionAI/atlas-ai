@@ -286,6 +286,15 @@ export default function WhatsAppConnect() {
     setStatus("connecting");
     armCompletionTimeout();
 
+    // TEMPORARY production runtime trace — parent window only; popup closes too fast to inspect.
+    console.info("[atlas-embedded-signup-runtime]", {
+      "window.location.origin": window.location.origin,
+      "window.location.pathname": window.location.pathname,
+      "window.location.href": window.location.href,
+      config_id: configId,
+      "document.domain": document.domain
+    });
+
     window.FB.login(fbLoginCallback, {
       config_id: configId,
       response_type: "code",
