@@ -1,5 +1,6 @@
 /**
- * Graph oauth/access_token redirect_uri must equal the frontend FB.login redirect_uri.
+ * Graph oauth/access_token must send the JS SDK xd_arbiter redirect_uri.
+ * FB.login must not set redirect_uri (SDK uses its internal arbiter).
  */
 
 require("dotenv").config();
@@ -12,19 +13,18 @@ const axios = require("axios");
 
 const { exchangeAuthorizationCodeForToken } = require("../core/metaEmbeddedSignupService");
 
-test("exchange redirect_uri equals frontend FB.login redirect_uri", async () => {
+const SDK_OAUTH_REDIRECT_URI =
+  "https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46";
+
+test("FB.login omits redirect_uri and Graph exchange sends the SDK xd_arbiter URI", async () => {
   const connectSrc = fs.readFileSync(
     path.join(__dirname, "../../frontend/src/pages/WhatsAppConnect.jsx"),
     "utf8"
   );
-  const frontendMatch = connectSrc.match(
-    /export const META_EMBEDDED_SIGNUP_REDIRECT_URI =\s*"([^"]+)"/
-  );
 
-  assert.ok(frontendMatch, "frontend exports META_EMBEDDED_SIGNUP_REDIRECT_URI");
-  assert.match(connectSrc, /redirect_uri: META_EMBEDDED_SIGNUP_REDIRECT_URI/);
+  assert.match(connectSrc, /window\.FB\.login\(fbLoginCallback/);
+  assert.doesNotMatch(connectSrc, /redirect_uri/);
 
-  const frontendRedirectUri = frontendMatch[1];
   const originalGet = axios.get;
   const savedEnv = {
     META_APP_ID: process.env.META_APP_ID,
@@ -45,7 +45,7 @@ test("exchange redirect_uri equals frontend FB.login redirect_uri", async () => 
 
     assert.ok(captured);
     assert.match(captured.url, /\/oauth\/access_token$/);
-    assert.equal(captured.params.redirect_uri, frontendRedirectUri);
+    assert.equal(captured.params.redirect_uri, SDK_OAUTH_REDIRECT_URI);
   } finally {
     axios.get = originalGet;
 

@@ -29,8 +29,6 @@ const FINISH_EVENTS = new Set([
   "FINISH_GRANT_ONLY_API_ACCESS"
 ]);
 const COMPLETION_TIMEOUT_MS = 60_000;
-export const META_EMBEDDED_SIGNUP_REDIRECT_URI =
-  "https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46";
 
 function navigateToError(navigate, details) {
   navigate(appPath("settings/whatsapp/error"), {
@@ -291,7 +289,6 @@ export default function WhatsAppConnect() {
       config_id: configId,
       response_type: "code",
       override_default_response_type: true,
-      redirect_uri: META_EMBEDDED_SIGNUP_REDIRECT_URI,
       extras: {
         setup: {},
         featureType: "whatsapp_business_app_onboarding",
