@@ -35,8 +35,13 @@ test("shared audio bubble is wired into Conversations, MC, and Workspace", () =>
   assert.match(timeline, /CommunicationAudioBubble/);
   assert.match(timeline, /cc-audio-bubble/);
   assert.match(timeline, /cc-audio-bubble-workspace/);
+  assert.match(timeline, /useTranscriptRefreshPoll/);
+  assert.match(timeline, /quietTranscriptRefresh/);
+  assert.match(timeline, /data-transcript-refresh/);
   assert.match(panel, /CommunicationAudioBubble/);
   assert.match(panel, /mc-audio-bubble/);
+  assert.match(panel, /useTranscriptRefreshPoll/);
+  assert.match(panel, /applyMediaOverlay/);
   assert.match(history, /prospectId=\{prospectCoreId\}/);
 });
 
@@ -252,6 +257,71 @@ test("pending, preparing, failed, and ready derivative bubbles render safely", a
       /Transcript unavailable|Transcripci[oó]n no disponible|voiceTranscriptUnavailable/
     );
     assert.doesNotMatch(transcriptFailedHtml, /429|rate limit|req_abc|OpenAI/i);
+
+    const canaryPendingHtml = renderToString(
+      React.createElement(
+        LanguageProvider,
+        null,
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: {
+            id: "012fb6cc-9c19-4617-a3c1-3a4de843ff1e",
+            mediaKind: "audio",
+            mimeType: "audio/mpeg",
+            fetchStatus: "stored",
+            transcodeStatus: "ready",
+            playbackAvailable: true,
+            transcriptStatus: "pending"
+          },
+          initialPlayback: {
+            url: "https://signed.example/playback.mp3",
+            mimeType: "audio/mpeg"
+          },
+          testId: "audio-canary"
+        })
+      )
+    );
+    assert.match(canaryPendingHtml, /<audio/);
+    assert.match(
+      canaryPendingHtml,
+      /Preparing transcript|Preparando transcripci[oó]n|voiceTranscriptPending/
+    );
+    assert.doesNotMatch(canaryPendingHtml, /Hola, estoy interesada/);
+
+    const canaryReadyHtml = renderToString(
+      React.createElement(
+        LanguageProvider,
+        null,
+        React.createElement(CommunicationAudioBubble, {
+          prospectId: "prospect-1",
+          media: {
+            id: "012fb6cc-9c19-4617-a3c1-3a4de843ff1e",
+            mediaKind: "audio",
+            mimeType: "audio/mpeg",
+            fetchStatus: "stored",
+            transcodeStatus: "ready",
+            playbackAvailable: true,
+            transcriptStatus: "ready",
+            transcriptText: "Hola, estoy interesada en buscar trabajo."
+          },
+          initialPlayback: {
+            url: "https://signed.example/playback.mp3",
+            mimeType: "audio/mpeg"
+          },
+          testId: "audio-canary"
+        })
+      )
+    );
+    assert.match(canaryReadyHtml, /<audio/);
+    assert.match(canaryReadyHtml, /Hola, estoy interesada en buscar trabajo/);
+    assert.doesNotMatch(
+      canaryReadyHtml,
+      /Preparing transcript|Preparando transcripci[oó]n|voiceTranscriptPending/
+    );
+    assert.equal((canaryPendingHtml.match(/data-testid="audio-canary"/g) || []).length, 1);
+    assert.equal((canaryReadyHtml.match(/data-testid="audio-canary"/g) || []).length, 1);
+    assert.equal((canaryReadyHtml.match(/data-testid="audio-canary-transcript"/g) || []).length, 1);
+    assert.equal((canaryPendingHtml.match(/data-testid="audio-canary-transcript"/g) || []).length, 0);
   } finally {
     await server.close();
   }

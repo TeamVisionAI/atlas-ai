@@ -1,8 +1,17 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { formatTextWithDates } from "../utils/dateFormatter";
 import UserAvatar from "./ui/UserAvatar";
 import CommunicationAudioBubble from "./communication/CommunicationAudioBubble";
 import { isAudioCommunicationItem } from "../engines/communicationClassification.js";
+import {
+  applyMediaOverlay,
+  collectionNeedsTranscriptRefresh,
+  collectMediaById
+} from "../engines/communicationTranscriptRefresh.js";
+import { useTranscriptRefreshPoll } from "../hooks/useTranscriptRefreshPoll.js";
+import { getProspectCommunications } from "../services/communicationsCenterApi";
+import { shouldCommitTimelinePayload } from "../engines/conversationsSelectionConsistency.js";
 import "./ui/ProfilePhotoEditor.css";
 
 function formatMessageTime(timestamp, language) {
@@ -48,20 +57,59 @@ export default function ConversationPanel({
   prospectId = null
 }) {
   const { translate, language } = useLanguage();
+  const [mediaOverlay, setMediaOverlay] = useState(() => new Map());
 
-  const thread =
-    messages.length > 0
-      ? messages
-      : lastMessage
-        ? [
-            {
-              id: "latest",
-              text: lastMessage,
-              direction: direction || "unknown",
-              timestamp
-            }
-          ]
-        : [];
+  useEffect(() => {
+    setMediaOverlay(new Map());
+  }, [prospectId]);
+
+  const sourceThread = useMemo(() => {
+    if (messages.length > 0) {
+      return messages;
+    }
+    if (lastMessage) {
+      return [
+        {
+          id: "latest",
+          text: lastMessage,
+          direction: direction || "unknown",
+          timestamp
+        }
+      ];
+    }
+    return [];
+  }, [messages, lastMessage, direction, timestamp]);
+
+  const thread = useMemo(
+    () => applyMediaOverlay(sourceThread, mediaOverlay),
+    [sourceThread, mediaOverlay]
+  );
+
+  const shouldPollTranscripts =
+    Boolean(prospectId) && collectionNeedsTranscriptRefresh(thread);
+
+  const quietTranscriptRefresh = useCallback(async () => {
+    if (!prospectId) {
+      return;
+    }
+    const requestedProspectId = String(prospectId);
+    const data = await getProspectCommunications(requestedProspectId, { limit: 200 });
+    if (
+      !shouldCommitTimelinePayload({
+        requestedProspectId,
+        payload: data
+      })
+    ) {
+      return;
+    }
+    setMediaOverlay(collectMediaById(data.items || []));
+  }, [prospectId]);
+
+  useTranscriptRefreshPoll({
+    prospectId,
+    shouldPoll: shouldPollTranscripts,
+    refresh: quietTranscriptRefresh
+  });
 
   function resolveAvatar(messageDirection) {
     if (messageDirection === "outgoing") {
@@ -86,6 +134,7 @@ export default function ConversationPanel({
 
   return (
     <div
+      data-transcript-refresh={shouldPollTranscripts ? "active" : "idle"}
       style={{
         background: "#111827",
         border: "1px solid #374151",

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getProspectCommunications,
   CommunicationsCenterError
 } from "../../../services/communicationsCenterApi";
+import { collectionNeedsTranscriptRefresh } from "../../../engines/communicationTranscriptRefresh.js";
+import { useTranscriptRefreshPoll } from "../../../hooks/useTranscriptRefreshPoll.js";
 import {
   COMMUNICATIONS_FILTERS,
   CONVERSATION_LAYOUT_FILTERS,
@@ -263,6 +265,35 @@ export default function CommunicationsCenterTimeline({
     };
   }, [prospectId, refreshSignal]);
 
+  // Implements BR-141 UI: quiet revalidation while a visible transcript is pending/processing.
+  const quietTranscriptRefresh = useCallback(async () => {
+    if (!prospectId) {
+      return;
+    }
+    const requestedProspectId = String(prospectId);
+    const data = await getProspectCommunications(requestedProspectId, { limit: 200 });
+    if (
+      !shouldCommitTimelinePayload({
+        requestedProspectId,
+        payload: data
+      })
+    ) {
+      return;
+    }
+    setPayload(data);
+  }, [prospectId]);
+
+  const shouldPollTranscripts =
+    Boolean(prospectId) &&
+    status === "ready" &&
+    collectionNeedsTranscriptRefresh(payload?.items || []);
+
+  useTranscriptRefreshPoll({
+    prospectId,
+    shouldPoll: shouldPollTranscripts,
+    refresh: quietTranscriptRefresh
+  });
+
   const filteredItems = useMemo(() => {
     if (status !== "ready") {
       return [];
@@ -355,6 +386,7 @@ export default function CommunicationsCenterTimeline({
       data-cache-key={cacheKey}
       data-prospect-id={prospectId}
       data-timeline-status={status}
+      data-transcript-refresh={shouldPollTranscripts ? "active" : "idle"}
       data-layout={layout}
     >
       <header className="cc-timeline__header">
