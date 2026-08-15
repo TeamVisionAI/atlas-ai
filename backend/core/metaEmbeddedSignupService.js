@@ -17,6 +17,7 @@ const {
   traceAuthorizationCode
 } = require("./meta/authorizationCodeTrace");
 const { readConfiguredFrontendUrl } = require("../config/frontendBaseUrl");
+const { resolveAtlasEnv } = require("../config/atlasEnvironment");
 
 const WHATSAPP_CONNECT_PATH = "/app/settings/whatsapp";
 const STAGING_CONNECT_REDIRECT_URI = `https://atlas-ai-git-feature-atlas-staging-teamvisionfinancial.vercel.app${WHATSAPP_CONNECT_PATH}`;
@@ -298,6 +299,28 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
   });
 
   let response;
+
+  if (resolveAtlasEnv() === "staging") {
+    let requestHost = null;
+    let requestPath = null;
+
+    try {
+      const parsed = new URL(graphUrl);
+      requestHost = parsed.host;
+      requestPath = parsed.pathname;
+    } catch {
+      requestHost = null;
+      requestPath = null;
+    }
+
+    metaLogger.info("oauth_access_token_redirect_uri_diagnostic", {
+      redirectUri,
+      requestHost,
+      requestPath,
+      appId: envSnapshot.appId,
+      codeLength: String(code || "").length
+    });
+  }
 
   try {
     response = await axios.get(graphUrl, {
