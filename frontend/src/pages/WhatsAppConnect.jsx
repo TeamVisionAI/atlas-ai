@@ -104,7 +104,8 @@ export default function WhatsAppConnect() {
       code,
       wabaId: onboardingAssetsRef.current.wabaId || undefined,
       phoneNumberId: onboardingAssetsRef.current.phoneNumberId || undefined,
-      onboardingType: "whatsapp_business_app"
+      onboardingType: "whatsapp_business_app",
+      redirectUri: `${window.location.origin}${window.location.pathname}`
     };
 
     try {
