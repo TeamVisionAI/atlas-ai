@@ -86,6 +86,14 @@ function isUnassigned(prospect = {}) {
   );
 }
 
+function isHealthyAtlasWaitingAttention(prospect = {}) {
+  const attention = prospect.attention_status;
+  return (
+    attention === ATTENTION_STATUS.AI_RESPONDING ||
+    attention === ATTENTION_STATUS.WAITING_FOR_PROSPECT
+  );
+}
+
 function isNewLeadAttentionOpen(prospect = {}) {
   if (isAcknowledged(prospect)) {
     return false;
@@ -505,17 +513,22 @@ async function applyEscalation(prospect, decision) {
   if (decision.level >= ESCALATION_LEVELS.HUMAN_REQUIRED) {
     updates.attention_status = ATTENTION_STATUS.HUMAN_REQUIRED;
     updates.human_attention_reason = sanitizeReason(decision.reason);
-    await savePersistedWorkflowState(
-      prospect.phone,
-      {
-        needsHumanAttention: true,
-        workflowOwnership: OWNERSHIP.AGENT
-      },
-      {
-        organizationId: prospect.organization_id || null,
-        prospectId: prospect.id || null
-      }
-    );
+
+    // Implements BR-080 — 15m SLA is CRM Human Attention metadata, not conversational TAKE OVER.
+    // Healthy Atlas-waiting conversations must keep ATLAS ownership so the next inbound still replies.
+    if (!isHealthyAtlasWaitingAttention(prospect)) {
+      await savePersistedWorkflowState(
+        prospect.phone,
+        {
+          needsHumanAttention: true,
+          workflowOwnership: OWNERSHIP.AGENT
+        },
+        {
+          organizationId: prospect.organization_id || null,
+          prospectId: prospect.id || null
+        }
+      );
+    }
   }
 
   await updateProspectAttention(prospect.phone, updates);
