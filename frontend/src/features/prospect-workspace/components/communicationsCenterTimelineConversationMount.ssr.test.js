@@ -82,7 +82,9 @@ test("Conversations detail transcript executes bubble filter without ReferenceEr
     src,
     /import \{[\s\S]*selectConversationLayoutBubbles[\s\S]*\} from ["']\.\.\/\.\.\/\.\.\/engines\/communicationsCenterViewModel["']/
   );
-  assert.doesNotMatch(src, /isConversationBubbleItem\s*\(/);
+    assert.doesNotMatch(src, /isConversationBubbleItem\s*\(/);
+    assert.match(src, /useTranscriptRefreshPoll/);
+    assert.match(src, /quietTranscriptRefresh/);
 
   const server = await createServer({
     root: frontendRoot,

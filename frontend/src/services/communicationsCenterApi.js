@@ -17,6 +17,8 @@ export class CommunicationsCenterError extends Error {
 
 export { buildCommunicationsCacheKey } from "../engines/communicationsCenterViewModel";
 
+const inFlightCommunications = new Map();
+
 export async function getProspectCommunications(prospectId, options = {}) {
   if (!prospectId) {
     throw new CommunicationsCenterError("Prospect id is required.", 400);
@@ -33,20 +35,33 @@ export async function getProspectCommunications(prospectId, options = {}) {
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  const headers = await getAuthHeaders();
-  const response = await apiRequest(
-    `/api/prospects/${encodeURIComponent(prospectId)}/communications${suffix}`,
-    { headers }
-  );
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new CommunicationsCenterError(
-      payload.message || "Failed to load communications timeline.",
-      response.status,
-      payload.error || null
-    );
+  const cacheKey = `${prospectId}:${suffix}`;
+  const existing = inFlightCommunications.get(cacheKey);
+  if (existing) {
+    return existing;
   }
 
-  return response.json();
+  const pending = (async () => {
+    const headers = await getAuthHeaders();
+    const response = await apiRequest(
+      `/api/prospects/${encodeURIComponent(prospectId)}/communications${suffix}`,
+      { headers }
+    );
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new CommunicationsCenterError(
+        payload.message || "Failed to load communications timeline.",
+        response.status,
+        payload.error || null
+      );
+    }
+
+    return response.json();
+  })().finally(() => {
+    inFlightCommunications.delete(cacheKey);
+  });
+
+  inFlightCommunications.set(cacheKey, pending);
+  return pending;
 }
