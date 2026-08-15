@@ -682,7 +682,8 @@ async function processRecruitAiV2Turn({
           prospectPhone:
             prospectPhone || options.prospectPhone || loaded.prospectPhone || null,
           updateProspectFn,
-          loadProspectFn
+          loadProspectFn,
+          allowWorkflowPersist: true
         });
       } catch {
         // Soft — Mission Control hydration must never break the authored turn.

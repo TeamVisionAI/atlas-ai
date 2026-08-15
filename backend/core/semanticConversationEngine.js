@@ -953,6 +953,18 @@ async function syncProfileToProspect(prospect, profile, options = {}) {
   }
 
   await updateProspect(prospect.phone, updates);
+
+  try {
+    const {
+      persistInterviewReadyIfQualificationComplete
+    } = require("./recruitAiV2/qualificationFactSync");
+    const refreshed = { ...prospect, ...updates };
+    await persistInterviewReadyIfQualificationComplete(refreshed, {
+      allowWorkflowPersist: true
+    });
+  } catch {
+    // Qualification milestone persist must never break the conversation turn.
+  }
 }
 
 async function handleSemanticMessage({

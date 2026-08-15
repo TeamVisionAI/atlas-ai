@@ -41,7 +41,6 @@ test("3. Spanish established + short Si → remains Spanish (no flip)", () => {
     communication_language: "es",
     language: "es"
   };
-  assert.equal(hasAuthoritativePreferredLanguage(prospect), true);
   assert.equal(
     resolvePersistedLanguageUpdate(prospect, "en", { message: "Si" }),
     null
@@ -140,6 +139,20 @@ test("7. native interview WhatsApp routing uses spanish/english canonical langua
     }),
     "english"
   );
+});
+
+test("create-time English is not operator-authoritative — strong Spanish may persist", () => {
+  const prospect = {
+    preferred_language: "english",
+    communication_language: "en",
+    language: "en"
+  };
+  assert.equal(hasAuthoritativePreferredLanguage(prospect), false);
+  const patch = resolvePersistedLanguageUpdate(prospect, "es", {
+    message: "Soy ciudadano y vivo en Fort Lauderdale"
+  });
+  assert.ok(patch);
+  assert.equal(patch.preferred_language, "spanish");
 });
 
 test("8. tenant isolation unchanged — language helpers are prospect-row scoped", () => {
