@@ -305,8 +305,15 @@ async function updateProspectCommunicationLanguage(phone, communicationLanguage)
   }
 
   // Operator-selected communication language is authoritative — sync preferred_language too.
-  const { syncProspectLanguageFields } = require("./prospectLanguage");
+  const {
+    syncProspectLanguageFields,
+    mergeQuickCapturePreferredLanguage
+  } = require("./prospectLanguage");
   const languageFields = syncProspectLanguageFields(normalized);
+  languageFields.notes = mergeQuickCapturePreferredLanguage(
+    prospect.notes,
+    languageFields.preferred_language
+  );
 
   const updated = await updateProspect(phone, languageFields).catch(async (error) => {
     if (!isMissingCommunicationLanguageColumn(error)) {
@@ -411,6 +418,14 @@ async function updateProspectWorkspaceProfile(phone, input = {}) {
       email: fields.email,
       internalNotes: fields.internal_notes
     });
+  }
+
+  if (fields.preferred_language) {
+    const { mergeQuickCapturePreferredLanguage } = require("./prospectLanguage");
+    updates.notes = mergeQuickCapturePreferredLanguage(
+      updates.notes !== undefined ? updates.notes : prospect.notes,
+      fields.preferred_language
+    );
   }
 
   if (!Object.keys(updates).length) {

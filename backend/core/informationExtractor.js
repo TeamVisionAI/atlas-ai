@@ -131,6 +131,27 @@ function trimAtClause(value) {
     .trim();
 }
 
+function extractBareUsState(message) {
+  const text = trimAtClause(String(message || "").trim());
+  if (!text || /\s/.test(text)) {
+    return null;
+  }
+
+  if (US_STATE_NAMES[normalize(text)]) {
+    return US_STATE_NAMES[normalize(text)];
+  }
+
+  const upper = text.toUpperCase();
+  if (/^[A-Z]{2}$/.test(upper)) {
+    const known = new Set(Object.values(US_STATE_NAMES));
+    if (known.has(upper)) {
+      return upper;
+    }
+  }
+
+  return null;
+}
+
 function inferStateFromCity(city) {
   if (!city) {
     return null;
@@ -228,6 +249,13 @@ function extractLocation(message, options = {}) {
     options.forceLocation === true;
 
   if (!text || isGreetingOrSmallTalk(text)) {
+    return result;
+  }
+
+  // A lone US state name is state, never city ("Florida" ≠ city).
+  const bareState = extractBareUsState(text);
+  if (bareState) {
+    result.state = bareState;
     return result;
   }
 

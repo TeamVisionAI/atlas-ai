@@ -54,22 +54,15 @@ function isStaleDefaultPreferredLanguage(prospect = {}) {
 
 /**
  * Human/operator (or Quick Capture) language that must not be overwritten by detection.
+ * WhatsApp create-time inference is NOT authoritative — durable conversation evidence
+ * may establish preferred_language when no operator/QC choice exists.
  */
 function hasAuthoritativePreferredLanguage(prospect = {}) {
   if (readQuickCapturePreferredLanguage(prospect.notes)) {
     return true;
   }
 
-  const preferred = normalizePreferredLanguage(prospect.preferred_language);
-  if (!preferred) {
-    return false;
-  }
-
-  if (isStaleDefaultPreferredLanguage(prospect)) {
-    return false;
-  }
-
-  return true;
+  return false;
 }
 
 function resolveProspectPreferredLanguage(prospect = {}) {
@@ -235,6 +228,37 @@ function readQuickCapturePreferredLanguage(notes) {
 }
 
 /**
+ * Stamp operator/QC preferred language so conversation detection cannot overwrite it.
+ */
+function mergeQuickCapturePreferredLanguage(notes, preferredLanguage) {
+  const preferred = normalizePreferredLanguage(preferredLanguage);
+  if (!preferred) {
+    return notes || null;
+  }
+
+  const source = String(notes || "");
+  const match = source.match(/QUICK_CAPTURE:({[\s\S]*?})/);
+  let parsed = {};
+
+  if (match) {
+    try {
+      parsed = JSON.parse(match[1]) || {};
+    } catch {
+      parsed = {};
+    }
+  }
+
+  parsed.preferred_language = preferred;
+  const encoded = `QUICK_CAPTURE:${JSON.stringify(parsed)}`;
+
+  if (match) {
+    return source.replace(/QUICK_CAPTURE:{[\s\S]*?}/, encoded);
+  }
+
+  return source ? `${encoded}|${source}` : encoded;
+}
+
+/**
  * True when the prospect already has a stored language from capture or profile data.
  * Unlike resolveProspectPreferredLanguage(), this does not default to English.
  * Stale DB-default english + Spanish pipeline fields do not count as stored preferred.
@@ -274,5 +298,6 @@ module.exports = {
   hasAuthoritativePreferredLanguage,
   isStrongPersistedLanguageSignal,
   readQuickCapturePreferredLanguage,
+  mergeQuickCapturePreferredLanguage,
   hasStoredPreferredLanguage
 };

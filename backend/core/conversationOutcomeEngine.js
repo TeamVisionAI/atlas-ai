@@ -434,6 +434,9 @@ function resolveQualificationCaptureOptions(prospect) {
 
 /**
  * All unresolved recruiter-capturable gaps for Mission Control — no sequential gating.
+ * Canonical prospect columns are SoT for the operator form (BR-134): do not require
+ * Continue to re-save city/state/auth already stored on the prospect row.
+ * Conversation QUAL_CAPTURE still gates Atlas asking the prospect (Sprint 21.3).
  */
 function getQualificationFormGaps(prospect, profile, options = {}) {
   if (profile.calendarEventId) {
@@ -444,11 +447,11 @@ function getQualificationFormGaps(prospect, profile, options = {}) {
   const captureState = options.captureState || parseQualificationCapture(notes);
   const gaps = [];
 
-  if (!isCityExplicitlyCaptured(profile, captureState, notes)) {
+  if (!profile.city) {
     gaps.push("city");
   }
 
-  if (!isStateExplicitlyCaptured(profile, captureState, notes)) {
+  if (!profile.state) {
     gaps.push("state");
   }
 
@@ -458,6 +461,7 @@ function getQualificationFormGaps(prospect, profile, options = {}) {
 
   if (
     profile.authorization !== false &&
+    !profile.interviewType &&
     !isInterviewTypeExplicitlyCaptured(profile, captureState, notes)
   ) {
     gaps.push("interviewType");
@@ -1071,6 +1075,11 @@ async function persistIdentityAndLanguageFields(prospect, fields) {
     if (mayUpdateLanguage && synced.preferred_language !== existingPreferred) {
       Object.assign(updates, synced);
       changed.push("preferred_language");
+      const { mergeQuickCapturePreferredLanguage } = require("./prospectLanguage");
+      updates.notes = mergeQuickCapturePreferredLanguage(
+        prospect.notes,
+        synced.preferred_language
+      );
     }
   }
 
