@@ -5,6 +5,9 @@
 const appointmentApplicationService = require("../application/appointmentApplicationService");
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
 const { resolveAppointmentViewFilters } = require("../core/appointmentListQuery");
+const {
+  FULL_DAY_MAX_SLOT_RESULTS
+} = require("../core/configuration/appointmentDomain");
 
 function auditMeta(req) {
   return {
@@ -94,7 +97,10 @@ async function getAvailableSlots(req, res) {
       purpose: req.query.purpose,
       durationMinutes: req.query.duration ? Number(req.query.duration) : undefined,
       timePreference: req.query.timePreference || "any",
-      maxResults: req.query.maxResults ? Number(req.query.maxResults) : 8
+      maxResults: req.query.maxResults
+        ? Number(req.query.maxResults)
+        : FULL_DAY_MAX_SLOT_RESULTS,
+      excludeAppointmentId: req.query.excludeAppointmentId || null
     });
 
     res.json(result);

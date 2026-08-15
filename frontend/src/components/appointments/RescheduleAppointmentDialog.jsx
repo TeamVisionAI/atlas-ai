@@ -55,7 +55,8 @@ export default function RescheduleAppointmentDialog({ open, appointment, onClose
       const result = await fetchAppointmentAvailability({
         date: dateKey,
         purpose: appointment.purpose,
-        duration: appointment.durationMinutes
+        duration: appointment.durationMinutes,
+        excludeAppointmentId: appointment.id
       });
       setSlots(result.slots || []);
     } catch (requestError) {
