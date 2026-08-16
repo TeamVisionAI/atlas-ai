@@ -262,7 +262,7 @@ function sanitizeMetaError(error) {
   };
 }
 
-async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
+async function exchangeAuthorizationCodeForToken(code) {
   validateMetaEmbeddedSignupEnvironment({ strict: true });
 
   const appId = getMetaAppId();
@@ -270,17 +270,15 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
   const version = getGraphVersion();
   const graphUrl = `https://graph.facebook.com/${version}/oauth/access_token`;
   const envSnapshot = getMetaExchangeEnvSnapshot();
-  const redirectUri = resolveEmbeddedSignupOAuthRedirectUri(redirectUriInput);
-  const requestParams = ["client_id", "client_secret", "code", "redirect_uri"];
-  const redirectUriLog = describeOAuthRedirectUriForLogs(redirectUri);
+  // Implements Meta Embedded Signup Tech Provider contract: client_id, client_secret, code only.
+  const requestParams = ["client_id", "client_secret", "code"];
 
   metaLogger.info(
     "authorization_code_trace",
     traceAuthorizationCode("graph_api_request", code, {
       graphEndpoint: graphUrl,
       httpMethod: "GET",
-      requestParams,
-      ...redirectUriLog
+      requestParams
     })
   );
 
@@ -293,8 +291,7 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
     configIdPresent: envSnapshot.configIdPresent,
     appAccessTokenPresent: envSnapshot.appAccessTokenPresent,
     codeLength: String(code || "").length,
-    requestParams,
-    ...redirectUriLog
+    requestParams
   });
 
   let response;
@@ -302,10 +299,9 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
   try {
     const graphUrlParsed = new URL(graphUrl);
 
-    // TEMPORARY production runtime trace — stderr + redirectUri= so Railway error view finds it.
     metaLogger.error("embedded_signup_oauth_runtime_trace", {
-      message: `redirectUri=${redirectUri}`,
-      redirectUri,
+      message: "redirect_uri omitted",
+      requestParams,
       appId,
       codeLength: String(code || "").length,
       graphHost: graphUrlParsed.host,
@@ -316,8 +312,7 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
       params: {
         client_id: appId,
         client_secret: appSecret,
-        code,
-        redirect_uri: redirectUri
+        code
       },
       timeout: 15000
     });
@@ -338,7 +333,7 @@ async function exchangeAuthorizationCodeForToken(code, redirectUriInput) {
       graphErrorMessage: graphDetails.graphErrorMessage,
       graphErrorType: graphDetails.graphErrorType,
       graphErrorUserMsg: graphDetails.graphErrorUserMsg,
-      ...redirectUriLog
+      requestParams
     });
     throw error;
   }
@@ -564,7 +559,7 @@ async function completeEmbeddedSignupExchange(input) {
   let accessToken;
 
   try {
-    accessToken = await exchangeAuthorizationCodeForToken(code, input.redirectUri);
+    accessToken = await exchangeAuthorizationCodeForToken(code);
   } catch (error) {
     const graphDetails = extractGraphErrorDetails(error);
 
