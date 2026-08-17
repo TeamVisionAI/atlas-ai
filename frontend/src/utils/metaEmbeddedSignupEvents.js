@@ -34,12 +34,14 @@ export function parseEmbeddedSignupPostMessage(rawData) {
   const payload = data.data || {};
   const wabaId = payload.waba_id || payload.wabaId || null;
   const phoneNumberId = payload.phone_number_id || payload.phoneNumberId || null;
+  const businessId = payload.business_id || payload.businessId || null;
 
   return {
     type: data.type,
     event: data.event || null,
     wabaId,
     phoneNumberId,
+    businessId,
     errorMessage: data.data?.error_message || data.data?.errorMessage || null,
     raw: data
   };
@@ -48,6 +50,7 @@ export function parseEmbeddedSignupPostMessage(rawData) {
 export function mergeEmbeddedSignupIds(current, next) {
   return {
     wabaId: next?.wabaId || current?.wabaId || null,
-    phoneNumberId: next?.phoneNumberId || current?.phoneNumberId || null
+    phoneNumberId: next?.phoneNumberId || current?.phoneNumberId || null,
+    businessId: next?.businessId || current?.businessId || null
   };
 }
