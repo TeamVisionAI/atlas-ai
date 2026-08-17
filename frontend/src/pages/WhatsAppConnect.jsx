@@ -53,7 +53,7 @@ export default function WhatsAppConnect() {
   const [reviewError, setReviewError] = useState(false);
 
   const authorizationCodeRef = useRef(null);
-  const onboardingAssetsRef = useRef({ wabaId: null, phoneNumberId: null });
+  const onboardingAssetsRef = useRef({ wabaId: null, phoneNumberId: null, businessId: null });
   const exchangeSubmittedRef = useRef(false);
   const exchangeInFlightRef = useRef(false);
   const completionTimeoutRef = useRef(null);
@@ -68,7 +68,7 @@ export default function WhatsAppConnect() {
   const resetAttempt = useCallback(() => {
     clearCompletionTimeout();
     authorizationCodeRef.current = null;
-    onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null };
+    onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null, businessId: null };
     exchangeSubmittedRef.current = false;
     exchangeInFlightRef.current = false;
     setLaunching(false);
@@ -89,8 +89,9 @@ export default function WhatsAppConnect() {
 
   const attemptCompletion = useCallback(async () => {
     const code = authorizationCodeRef.current;
+    const wabaId = onboardingAssetsRef.current.wabaId;
 
-    if (!code || exchangeSubmittedRef.current || exchangeInFlightRef.current) {
+    if (!code || !wabaId || exchangeSubmittedRef.current || exchangeInFlightRef.current) {
       return;
     }
 
@@ -102,8 +103,9 @@ export default function WhatsAppConnect() {
 
     const payload = {
       code,
-      wabaId: onboardingAssetsRef.current.wabaId || undefined,
+      wabaId,
       phoneNumberId: onboardingAssetsRef.current.phoneNumberId || undefined,
+      businessId: onboardingAssetsRef.current.businessId || undefined,
       onboardingType: "whatsapp_business_app",
       redirectUri: `${window.location.origin}${window.location.pathname}`
     };
@@ -112,7 +114,7 @@ export default function WhatsAppConnect() {
       const result = await exchangeEmbeddedSignupCode(payload);
 
       authorizationCodeRef.current = null;
-      onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null };
+      onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null, businessId: null };
       exchangeInFlightRef.current = false;
       setLaunching(false);
 
@@ -285,15 +287,6 @@ export default function WhatsAppConnect() {
     setLaunching(true);
     setStatus("connecting");
     armCompletionTimeout();
-
-    // TEMPORARY production runtime trace — parent window only; popup closes too fast to inspect.
-    console.info("[atlas-embedded-signup-runtime]", {
-      "window.location.origin": window.location.origin,
-      "window.location.pathname": window.location.pathname,
-      "window.location.href": window.location.href,
-      config_id: configId,
-      "document.domain": document.domain
-    });
 
     window.FB.login(fbLoginCallback, {
       config_id: configId,

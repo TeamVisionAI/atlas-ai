@@ -102,6 +102,7 @@ router.post("/embedded-signup/exchange", async (req, res) => {
     const phoneNumberId = req.body?.phoneNumberId
       ? String(req.body.phoneNumberId).trim()
       : undefined;
+    const businessId = req.body?.businessId ? String(req.body.businessId).trim() : undefined;
     const onboardingType = req.body?.onboardingType
       ? String(req.body.onboardingType).trim()
       : "whatsapp_business_app";
@@ -123,6 +124,7 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       code,
       wabaId,
       phoneNumberId,
+      businessId,
       onboardingType,
       redirectUri
     });

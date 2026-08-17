@@ -33,12 +33,14 @@ function parseEmbeddedSignupPostMessage(rawData) {
   const payload = data.data || {};
   const wabaId = payload.waba_id || payload.wabaId || null;
   const phoneNumberId = payload.phone_number_id || payload.phoneNumberId || null;
+  const businessId = payload.business_id || payload.businessId || null;
 
   return {
     type: data.type,
     event: data.event || null,
     wabaId,
     phoneNumberId,
+    businessId,
     raw: data
   };
 }

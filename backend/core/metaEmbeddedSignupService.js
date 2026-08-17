@@ -187,6 +187,85 @@ function extractGraphErrorDetails(error) {
   };
 }
 
+const SECRET_LOG_KEY_PATTERN =
+  /^(access_token|token|client_secret|app_secret|authorization|refresh_token|password)$/i;
+const SECRET_LOG_VALUE_PATTERN = /\bEAA[A-Za-z0-9]{10,}\b/;
+
+function redactSecretsFromLogDetails(value, depth = 0) {
+  if (value == null || depth > 8) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    if (SECRET_LOG_VALUE_PATTERN.test(value)) {
+      return value.replace(SECRET_LOG_VALUE_PATTERN, "[redacted]");
+    }
+
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSecretsFromLogDetails(item, depth + 1));
+  }
+
+  if (typeof value === "object") {
+    const out = {};
+
+    for (const [key, nested] of Object.entries(value)) {
+      if (SECRET_LOG_KEY_PATTERN.test(key)) {
+        out[key] = "[redacted]";
+      } else {
+        out[key] = redactSecretsFromLogDetails(nested, depth + 1);
+      }
+    }
+
+    return out;
+  }
+
+  return value;
+}
+
+function graphRequestMetaFromAxiosError(error) {
+  const url = error?.config?.url || error?.graphUrl || "";
+
+  if (!url) {
+    return {
+      graphHost: error?.graphHost || null,
+      graphPath: error?.graphPath || null
+    };
+  }
+
+  try {
+    const parsed = new URL(url, "https://graph.facebook.com");
+    return {
+      graphHost: parsed.host,
+      graphPath: parsed.pathname
+    };
+  } catch {
+    return { graphHost: null, graphPath: null };
+  }
+}
+
+function buildAssetDiscoveryFailureLogDetails(error, context = {}) {
+  const graphDetails = extractGraphErrorDetails(error);
+  const requestMeta = graphRequestMetaFromAxiosError(error);
+
+  return redactSecretsFromLogDetails({
+    message: graphDetails.graphErrorMessage || error?.message || null,
+    graphErrorCode: graphDetails.graphErrorCode,
+    graphErrorSubcode: graphDetails.graphErrorSubcode,
+    graphErrorType: graphDetails.graphErrorType,
+    graphErrorUserMsg: graphDetails.graphErrorUserMsg,
+    responseStatus: graphDetails.graphStatus,
+    graphResponseBody: graphDetails.graphResponseBody,
+    graphHost: requestMeta.graphHost,
+    graphPath: requestMeta.graphPath,
+    wabaId: context.wabaId || null,
+    phoneNumberId: context.phoneNumberId || null,
+    wabaIdPresent: Boolean(context.wabaId)
+  });
+}
+
 const COMPLETION_STAGES = Object.freeze({
   OAUTH_EXCHANGE_FAILED: "OAUTH_EXCHANGE_FAILED",
   ASSET_DISCOVERY_FAILED: "ASSET_DISCOVERY_FAILED",
@@ -327,7 +406,7 @@ async function exchangeAuthorizationCodeForToken(code) {
       configIdPresent: envSnapshot.configIdPresent,
       appAccessTokenPresent: envSnapshot.appAccessTokenPresent,
       responseStatus: graphDetails.graphStatus,
-      graphResponseBody: graphDetails.graphResponseBody,
+      graphResponseBody: redactSecretsFromLogDetails(graphDetails.graphResponseBody),
       graphErrorCode: graphDetails.graphErrorCode,
       graphErrorSubcode: graphDetails.graphErrorSubcode,
       graphErrorMessage: graphDetails.graphErrorMessage,
@@ -345,7 +424,7 @@ async function exchangeAuthorizationCodeForToken(code) {
       graphEndpoint: graphUrl,
       graphVersion: version,
       appId: envSnapshot.appId,
-      graphResponseBody: response.data ?? null
+      graphResponseBody: redactSecretsFromLogDetails(response.data ?? null)
     });
 
     throw Object.assign(new Error("Meta did not return an access token."), {
@@ -363,79 +442,53 @@ async function exchangeAuthorizationCodeForToken(code) {
   return accessToken;
 }
 
-async function fetchPhoneNumberDetails(phoneNumberId, accessToken) {
-  const version = getGraphVersion();
+function pickWabaPhoneNumber(phoneNumbers, preferredPhoneNumberId) {
+  const list = Array.isArray(phoneNumbers) ? phoneNumbers.filter((row) => row?.id) : [];
 
-  const response = await axios.get(`https://graph.facebook.com/${version}/${phoneNumberId}`, {
-    params: {
-      fields: "id,display_phone_number,verified_name,quality_rating",
-      access_token: accessToken
-    },
-    timeout: 15000
-  });
+  if (preferredPhoneNumberId) {
+    const matched = list.find((row) => String(row.id) === String(preferredPhoneNumberId));
 
-  return response.data;
-}
-
-async function fetchWabaDetails(wabaId, accessToken) {
-  const version = getGraphVersion();
-
-  const response = await axios.get(`https://graph.facebook.com/${version}/${wabaId}`, {
-    params: {
-      fields: "id,name,account_review_status",
-      access_token: accessToken
-    },
-    timeout: 15000
-  });
-
-  return response.data;
-}
-
-async function discoverWhatsAppAssets(accessToken) {
-  const version = getGraphVersion();
-
-  const response = await axios.get(`https://graph.facebook.com/${version}/me`, {
-    params: {
-      fields:
-        "businesses{owned_whatsapp_business_accounts{id,name,phone_numbers{id,display_phone_number,verified_name}}}",
-      access_token: accessToken
-    },
-    timeout: 15000
-  });
-
-  const businesses = response.data?.businesses?.data || [];
-
-  for (const business of businesses) {
-    const wabas = business?.owned_whatsapp_business_accounts?.data || [];
-
-    for (const waba of wabas) {
-      const phoneNumbers = waba?.phone_numbers?.data || [];
-
-      if (phoneNumbers.length) {
-        return {
-          businessId: business.id || null,
-          wabaId: waba.id,
-          phoneNumberId: phoneNumbers[0].id,
-          displayPhoneNumber: phoneNumbers[0].display_phone_number || null,
-          verifiedName: phoneNumbers[0].verified_name || waba.name || null,
-          businessName: waba.name || business.name || phoneNumbers[0].verified_name || null
-        };
-      }
-
-      if (waba.id) {
-        return {
-          businessId: business.id || null,
-          wabaId: waba.id,
-          phoneNumberId: null,
-          displayPhoneNumber: null,
-          verifiedName: waba.name || null,
-          businessName: waba.name || business.name || null
-        };
-      }
+    if (matched) {
+      return matched;
     }
+
+    throw Object.assign(
+      new Error("FINISH phone_number_id was not found on the WhatsApp Business Account."),
+      { stage: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED }
+    );
   }
 
-  return null;
+  if (list.length === 1) {
+    return list[0];
+  }
+
+  if (list.length === 0) {
+    throw Object.assign(new Error("No WhatsApp phone numbers were found for this WABA."), {
+      stage: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED
+    });
+  }
+
+  throw Object.assign(
+    new Error("Multiple WhatsApp phone numbers found; FINISH phone_number_id is required."),
+    { stage: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED }
+  );
+}
+
+// Prefer Embedded Signup FINISH WABA ID, then GET /{waba_id}/phone_numbers.
+// Never GET /me — business-integration system-user tokens reject it (ASSET_DISCOVERY_FAILED Graph 400).
+async function fetchWabaPhoneNumbers(wabaId, accessToken) {
+  const version = getGraphVersion();
+  const graphUrl = `https://graph.facebook.com/${version}/${encodeURIComponent(wabaId)}/phone_numbers`;
+
+  const response = await axios.get(graphUrl, {
+    params: {
+      fields: "id,display_phone_number,verified_name",
+      access_token: accessToken
+    },
+    timeout: 15000
+  });
+
+  return Array.isArray(response.data?.data) ? response.data.data : [];
 }
 
 async function subscribeWabaToApp(wabaId, accessToken) {
@@ -455,45 +508,33 @@ async function subscribeWabaToApp(wabaId, accessToken) {
   metaLogger.info("waba_subscribed", { wabaId });
 }
 
-async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId }) {
-  let resolvedBusinessId = null;
-  let resolvedWabaId = wabaId || null;
-  let resolvedPhoneNumberId = phoneNumberId || null;
-  let displayPhoneNumber = null;
-  let verifiedName = null;
-  let businessName = null;
-
-  if (resolvedWabaId) {
-    const wabaDetails = await fetchWabaDetails(resolvedWabaId, accessToken);
-    businessName = wabaDetails?.name || businessName;
-  }
-
-  if (resolvedPhoneNumberId) {
-    const phone = await fetchPhoneNumberDetails(resolvedPhoneNumberId, accessToken);
-    resolvedPhoneNumberId = phone.id;
-    displayPhoneNumber = phone.display_phone_number || null;
-    verifiedName = phone.verified_name || null;
-    businessName = businessName || phone.verified_name || null;
-  }
-
-  if (!resolvedWabaId || !resolvedPhoneNumberId) {
-    const discovered = await discoverWhatsAppAssets(accessToken);
-
-    if (discovered) {
-      resolvedBusinessId = discovered.businessId || resolvedBusinessId;
-      resolvedWabaId = resolvedWabaId || discovered.wabaId;
-      resolvedPhoneNumberId = resolvedPhoneNumberId || discovered.phoneNumberId;
-      displayPhoneNumber = displayPhoneNumber || discovered.displayPhoneNumber;
-      verifiedName = verifiedName || discovered.verifiedName;
-      businessName = businessName || discovered.businessName || discovered.verifiedName;
-    }
-  }
+async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId, businessId }) {
+  const resolvedWabaId = String(wabaId || "").trim() || null;
+  const preferredPhoneNumberId = String(phoneNumberId || "").trim() || null;
+  const resolvedBusinessId = String(businessId || "").trim() || null;
 
   if (!resolvedWabaId) {
-    throw Object.assign(new Error("Unable to determine WhatsApp Business Account ID."), {
+    throw Object.assign(
+      new Error("WhatsApp Business Account ID is required from Embedded Signup FINISH."),
+      {
+        stage: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED,
+        statusCode: 422,
+        publicCode: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED
+      }
+    );
+  }
+
+  if (!accessToken) {
+    throw Object.assign(new Error("Access token is required to resolve WhatsApp assets."), {
       stage: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED
     });
   }
+
+  const phoneNumbers = await fetchWabaPhoneNumbers(resolvedWabaId, accessToken);
+  const phone = pickWabaPhoneNumber(phoneNumbers, preferredPhoneNumberId);
+  const resolvedPhoneNumberId = String(phone.id || "").trim();
+  const displayPhoneNumber = phone.display_phone_number || null;
+  const verifiedName = phone.verified_name || null;
 
   if (!resolvedPhoneNumberId) {
     throw Object.assign(new Error("Unable to determine phone number ID."), {
@@ -507,15 +548,25 @@ async function resolveConnectionAssets({ accessToken, wabaId, phoneNumberId }) {
     phoneNumberId: resolvedPhoneNumberId,
     displayPhoneNumber,
     verifiedName,
-    businessName: businessName || verifiedName || null
+    businessName: verifiedName || null
   };
 }
 
 /**
- * @param {{ organizationId: string, code: string, wabaId?: string, phoneNumberId?: string, onboardingType?: string }} input
+ * @param {{
+ *   organizationId: string,
+ *   code: string,
+ *   wabaId?: string,
+ *   phoneNumberId?: string,
+ *   businessId?: string,
+ *   onboardingType?: string,
+ *   redirectUri?: string,
+ *   connectionRepository?: object
+ * }} input
  */
 async function completeEmbeddedSignupExchange(input) {
   const organizationId = String(input.organizationId || "").trim();
+  const connectionRepository = input.connectionRepository || repository;
 
   if (!organizationId) {
     throw Object.assign(new Error("Organization context is required."), {
@@ -525,6 +576,9 @@ async function completeEmbeddedSignupExchange(input) {
   }
   const rawCode = String(input.code || "");
   const code = rawCode.trim();
+  const wabaId = String(input.wabaId || "").trim();
+  const phoneNumberId = String(input.phoneNumberId || "").trim();
+  const businessId = String(input.businessId || "").trim();
   const trimComparison = compareAuthorizationCodes(rawCode, code, "service_trim");
 
   metaLogger.info("authorization_code_trace", trimComparison);
@@ -534,6 +588,26 @@ async function completeEmbeddedSignupExchange(input) {
       statusCode: 400,
       publicCode: "CODE_REQUIRED"
     });
+  }
+
+  if (!wabaId) {
+    logCompletionStageFailure(COMPLETION_STAGES.ASSET_DISCOVERY_FAILED, {
+      message: "WhatsApp Business Account ID is required from Embedded Signup FINISH.",
+      responseStatus: null,
+      graphResponseBody: null,
+      wabaId: null,
+      phoneNumberId: phoneNumberId || null,
+      wabaIdPresent: false
+    });
+    throw Object.assign(
+      new Error("WhatsApp Business Account ID is required from Embedded Signup FINISH."),
+      {
+        statusCode: 422,
+        publicCode: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED,
+        stage: COMPLETION_STAGES.ASSET_DISCOVERY_FAILED,
+        recoverable: true
+      }
+    );
   }
 
   metaLogger.info(
@@ -553,7 +627,8 @@ async function completeEmbeddedSignupExchange(input) {
   metaLogger.info("embedded_signup_exchange_started", {
     onboardingType: input.onboardingType || "whatsapp_business_app",
     ...getMetaExchangeEnvSnapshot(),
-    codeLength: code.length
+    codeLength: code.length,
+    wabaIdPresent: true
   });
 
   let accessToken;
@@ -567,7 +642,7 @@ async function completeEmbeddedSignupExchange(input) {
       message: graphDetails.graphErrorMessage || error.message,
       graphErrorCode: graphDetails.graphErrorCode,
       graphErrorSubcode: graphDetails.graphErrorSubcode,
-      graphResponseBody: graphDetails.graphResponseBody,
+      graphResponseBody: redactSecretsFromLogDetails(graphDetails.graphResponseBody),
       responseStatus: graphDetails.graphStatus,
       ...getMetaExchangeEnvSnapshot()
     });
@@ -579,13 +654,18 @@ async function completeEmbeddedSignupExchange(input) {
   try {
     assets = await resolveConnectionAssets({
       accessToken,
-      wabaId: input.wabaId || null,
-      phoneNumberId: input.phoneNumberId || null
+      wabaId,
+      phoneNumberId: phoneNumberId || null,
+      businessId: businessId || null
     });
   } catch (error) {
-    logCompletionStageFailure(COMPLETION_STAGES.ASSET_DISCOVERY_FAILED, {
-      message: error.message
-    });
+    logCompletionStageFailure(
+      COMPLETION_STAGES.ASSET_DISCOVERY_FAILED,
+      buildAssetDiscoveryFailureLogDetails(error, {
+        wabaId,
+        phoneNumberId: phoneNumberId || null
+      })
+    );
     throw createCompletionStageError(COMPLETION_STAGES.ASSET_DISCOVERY_FAILED, error);
   }
 
@@ -603,8 +683,8 @@ async function completeEmbeddedSignupExchange(input) {
   const now = new Date().toISOString();
 
   try {
-    saved = await repository.saveConnection(organizationId, {
-      business_id: assets.businessId,
+    saved = await connectionRepository.saveConnection(organizationId, {
+      business_id: assets.businessId || null,
       waba_id: assets.wabaId,
       phone_number_id: assets.phoneNumberId,
       connection_type: input.onboardingType || "whatsapp_business_app",
@@ -658,10 +738,13 @@ module.exports = {
   getEmbeddedSignupStatus,
   sanitizeMetaError,
   extractGraphErrorDetails,
+  redactSecretsFromLogDetails,
+  buildAssetDiscoveryFailureLogDetails,
   getMetaExchangeEnvSnapshot,
   exchangeAuthorizationCodeForToken,
   resolveEmbeddedSignupOAuthRedirectUri,
   describeOAuthRedirectUriForLogs,
+  fetchWabaPhoneNumbers,
   resolveConnectionAssets,
   subscribeWabaToApp
 };
