@@ -108,6 +108,44 @@ describe("PolicyValuesCheckpoints layout", () => {
       assert.match(html, /pi-source-line/);
       assert.match(html, /Source: Current Illustrated Annual Values — Pages 21–24/);
       assert.equal(html.includes("data-year=\"2\""), false);
+
+      assert.equal(html.includes("<caption"), false);
+      const noteIdx = html.indexOf("pi-checkpoint-table__note");
+      const tableIdx = html.indexOf("<table");
+      const theadIdx = html.indexOf("<thead");
+      const tbodyIdx = html.indexOf("<tbody");
+      assert.ok(noteIdx > 0 && tableIdx > noteIdx, "explanatory note must sit above the table");
+      assert.ok(theadIdx > tableIdx && tbodyIdx > theadIdx, "thead must precede tbody inside the table");
+      const noteChunk = html.slice(noteIdx, tableIdx);
+      assert.equal(noteChunk.includes("<th"), false);
+      assert.equal(noteChunk.includes("<td"), false);
+      assert.match(html, /<p[^>]*pi-checkpoint-table__note/);
+      assert.match(html, /Sourced checkpoint values/);
+      assert.match(html, /data-testid="pi-checkpoint-h-year"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-age"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-premium"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-coi"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-other"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-surrender"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-av"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-csv"/);
+      assert.match(html, /data-testid="pi-checkpoint-h-db"/);
+
+      const noteRules = [...css.matchAll(/\.pi-checkpoint-table__note[^{]*\{([^}]+)\}/g)];
+      assert.ok(noteRules.length > 0, "expected note CSS");
+      for (const match of noteRules) {
+        assert.equal(/display:\s*(flex|grid)/.test(match[1]), false, "note must not be a flex/grid column");
+      }
+      assert.match(css, /\.pi-checkpoint-table thead[\s\S]{0,120}page-break-after:\s*avoid/);
+      assert.match(css, /tbody tr:first-child[\s\S]{0,80}page-break-before:\s*avoid/);
+      assert.equal(
+        /\.pi-checkpoint-table thead[\s\S]{0,80}break-before:\s*page/.test(css),
+        false
+      );
+      assert.equal(
+        /\.pi-checkpoint-table\s*\{[^}]*break-inside:\s*avoid/.test(css),
+        false
+      );
     } finally {
       await server.close();
     }

@@ -343,6 +343,8 @@ describe("ClientPolicyReport", () => {
       assert.match(nationwideHtml, /pi-checkpoint-table__csv/);
       assert.match(nationwideHtml, /pi-checkpoint-table__head-line/);
       assert.match(nationwideHtml, /data-testid="pi-checkpoint-h-coi"/);
+      assert.match(nationwideHtml, /pi-checkpoint-table__note/);
+      assert.equal(nationwideHtml.includes("<caption"), false);
       assert.match(nationwideHtml, /Cash received is not the same/);
       assert.match(nationwideHtml, /Atlas informs/);
       assert.match(nationwideHtml, /Not disclosed in this illustration/);
