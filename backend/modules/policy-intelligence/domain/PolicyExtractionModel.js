@@ -239,7 +239,17 @@ function normalizeRider(entry) {
     annualLimitDollars: asNumber(entry.annualLimitDollars),
     riderCharges: entry.riderCharges && typeof entry.riderCharges === "object" ? entry.riderCharges : null,
     sourcePage: asNumber(entry.sourcePage),
-    calculated: entry.calculated === true
+    calculated: entry.calculated === true,
+    formNumber: asTrimmedString(entry.formNumber),
+    formNumbers: Array.isArray(entry.formNumbers)
+      ? entry.formNumbers.map((value) => asTrimmedString(value)).filter(Boolean)
+      : null,
+    adapterKey: asTrimmedString(entry.adapterKey),
+    payoutClassification: asTrimmedString(entry.payoutClassification),
+    discountSampleInterestRate: asNumber(entry.discountSampleInterestRate),
+    discountSampleNote: asTrimmedString(entry.discountSampleNote),
+    cashReceivedNotEqualToAmountAccelerated: entry.cashReceivedNotEqualToAmountAccelerated === true,
+    monthlyLimitPercent: asNumber(entry.monthlyLimitPercent)
   };
 }
 
