@@ -35,10 +35,44 @@ function snapshotPremium(snapshot) {
   return snapshot.premiumFrequency ? `${amount} / ${snapshot.premiumFrequency}` : amount;
 }
 
+function normalizeDisplayName(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function issuerIsDistinct(snapshot = {}) {
-  const carrier = String(snapshot.carrier || "").trim().toLowerCase();
-  const issuer = String(snapshot.issuer || "").trim().toLowerCase();
+  const carrier = normalizeDisplayName(snapshot.carrier);
+  const issuer = normalizeDisplayName(snapshot.issuer);
   return Boolean(issuer && carrier && issuer !== carrier);
+}
+
+function uniqueDisplayParts(parts = []) {
+  const unique = [];
+  for (const part of parts) {
+    const text = String(part || "").replace(/\s+/g, " ").trim();
+    if (!text) {
+      continue;
+    }
+    const key = text.toLowerCase();
+    if (unique.some((existing) => existing.toLowerCase() === key)) {
+      continue;
+    }
+    unique.push(text);
+  }
+  return unique;
+}
+
+function reportContextLine(report) {
+  const snapshot = report?.snapshot || {};
+  return uniqueDisplayParts([
+    report?.reviewTitle,
+    snapshot.carrier,
+    snapshot.product
+  ]).join(" · ") || "Client policy review";
+}
+
+function printRepeatLine(snapshot = {}) {
+  const identity = uniqueDisplayParts([snapshot.carrier, snapshot.product]).join(" · ");
+  return `Team Vision Financial · Policy Intelligence Report${identity ? ` · ${identity}` : ""}`;
 }
 
 function chargeScheduleUndisclosed(report) {
@@ -64,7 +98,7 @@ function comparisonHorizonYears(financialEvaluation) {
 
 function SectionBand({ title, testId }) {
   return (
-    <header className="pi-section-band" data-testid={testId}>
+    <header className="pi-section-band pi-print-keep-with-next" data-testid={testId}>
       <span className="pi-section-band__accent" aria-hidden="true" />
       <h3>{title}</h3>
     </header>
@@ -120,13 +154,12 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
     >
       <header className="pi-client-report__header">
         <p className="pi-print-repeat fi-print-only" data-testid="pi-print-repeat">
-          {`Team Vision Financial · Policy Intelligence Report${snapshot.carrier ? ` · ${snapshot.carrier}` : ""}${snapshot.product ? ` · ${snapshot.product}` : ""}`}
+          {printRepeatLine(snapshot)}
         </p>
         <p className="pi-client-report__eyebrow">Team Vision Financial</p>
         <h2>Policy Intelligence Report</h2>
         <p className="pi-client-report__context" data-testid="pi-report-context">
-          {[report.reviewTitle, snapshot.carrier, snapshot.product].filter(Boolean).join(" · ") ||
-            "Client policy review"}
+          {reportContextLine(report)}
         </p>
         <p className="pi-client-report__lede">
           Sourced from the uploaded illustration. Exact values stay exact. Undisclosed costs are
@@ -209,48 +242,53 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
       </section>
 
       <section className="pi-report-section pi-report-section--values" data-testid="pi-section-values">
-        <SectionBand title="3. Policy Values Over Time" testId="pi-section-band-values" />
         {annualUnavailable ? (
-          <p className="pi-report__empty" data-testid="pi-annual-values-missing">
-            {report.annualValuesUnavailableMessage ||
-              "Illustrated annual values are not available for this review."}
-          </p>
+          <>
+            <SectionBand title="3. Policy Values Over Time" testId="pi-section-band-values" />
+            <p className="pi-report__empty" data-testid="pi-annual-values-missing">
+              {report.annualValuesUnavailableMessage ||
+                "Illustrated annual values are not available for this review."}
+            </p>
+          </>
         ) : (
           <>
-            <div className="pi-illustrated-values" data-testid="pi-carrier-illustrated">
-              <h4 className="pi-illustrated-values__title" data-testid="pi-carrier-illustrated-label">
-                Carrier Illustrated Values — Non-Guaranteed
-              </h4>
-              <p className="pi-illustrated-values__copy" data-testid="pi-carrier-illustrated-copy">
-                Atlas displays the carrier’s illustrated values exactly as provided. These values are
-                not independently recalculated by Atlas.
-              </p>
-              {showCoiWarning ? (
-                <p className="pi-illustrated-values__warning" data-testid="pi-coi-charge-warning">
-                  The illustration does not disclose the complete annual Cost of Insurance and charge
-                  schedule. Atlas therefore cannot independently reproduce or verify the long-term
-                  illustrated values.
+            <div className="pi-values-lead" data-testid="pi-values-lead">
+              <SectionBand title="3. Policy Values Over Time" testId="pi-section-band-values" />
+              <div className="pi-illustrated-values" data-testid="pi-carrier-illustrated">
+                <h4 className="pi-illustrated-values__title" data-testid="pi-carrier-illustrated-label">
+                  Carrier Illustrated Values — Non-Guaranteed
+                </h4>
+                <p className="pi-illustrated-values__copy" data-testid="pi-carrier-illustrated-copy">
+                  Atlas displays the carrier’s illustrated values exactly as provided. These values are
+                  not independently recalculated by Atlas.
                 </p>
+                {showCoiWarning ? (
+                  <p className="pi-illustrated-values__warning" data-testid="pi-coi-charge-warning">
+                    The illustration does not disclose the complete annual Cost of Insurance and charge
+                    schedule. Atlas therefore cannot independently reproduce or verify the long-term
+                    illustrated values.
+                  </p>
+                ) : null}
+              </div>
+              {useDistributionValues && distributionScenario.distributionStartYear != null ? (
+                <aside className="pi-distribution-callout" data-testid="pi-distribution-callout">
+                  <p className="pi-distribution-callout__lead">
+                    {`Planned distributions begin in policy year ${distributionScenario.distributionStartYear}.`}
+                  </p>
+                  <p>
+                    Later policy values reflect the carrier’s illustrated distribution and policy-loan
+                    assumptions. Policy debt can materially affect cash surrender value and net death
+                    benefit.
+                  </p>
+                </aside>
               ) : null}
+              <PolicyValuesCheckpointChart
+                title="Policy values over time"
+                checkpoints={valuesChartCheckpoints}
+                series={valuesChartSeries}
+                sourceLine={distributionSourceLine || valuesSourceLine}
+              />
             </div>
-            {useDistributionValues && distributionScenario.distributionStartYear != null ? (
-              <aside className="pi-distribution-callout" data-testid="pi-distribution-callout">
-                <p className="pi-distribution-callout__lead">
-                  {`Planned distributions begin in policy year ${distributionScenario.distributionStartYear}.`}
-                </p>
-                <p>
-                  Later policy values reflect the carrier’s illustrated distribution and policy-loan
-                  assumptions. Policy debt can materially affect cash surrender value and net death
-                  benefit.
-                </p>
-              </aside>
-            ) : null}
-            <PolicyValuesCheckpointChart
-              title="Policy values over time"
-              checkpoints={valuesChartCheckpoints}
-              series={valuesChartSeries}
-              sourceLine={distributionSourceLine || valuesSourceLine}
-            />
             <PolicyValuesCheckpointChart
               title="Premium vs known policy costs"
               checkpoints={economics?.policyCostCheckpoints || []}

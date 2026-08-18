@@ -230,7 +230,7 @@ export default function PolicyValuesCheckpoints({
 
   return (
     <div
-      className="pi-checkpoint-wrap"
+      className="pi-checkpoint-wrap pi-print-keep"
       data-testid="pi-checkpoint-table"
       data-variant={distribution ? "distribution" : "standard"}
     >

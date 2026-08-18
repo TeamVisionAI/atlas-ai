@@ -748,23 +748,15 @@
     }
   }
 
-  .pi-print-repeat {
-    display: block !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    padding: 0 0 5px;
-    font-size: 9pt;
-    font-weight: 700;
-    color: #0b1f3a !important;
-    background: #fff !important;
-    border-bottom: 1px solid #c9a227;
+  .pi-print-repeat,
+  .pi-print-repeat.fi-print-only,
+  .pi-client-report .pi-print-repeat {
+    display: none !important;
   }
 
   .pi-client-report {
     max-width: none;
-    padding: 18px 0 0;
+    padding: 0;
     color: #0b1f3a !important;
     background: #fff !important;
   }
@@ -780,12 +772,25 @@
     margin-bottom: 12px;
   }
 
-  .pi-section-band {
+  .pi-section-band,
+  .pi-print-keep-with-next {
     background: #0b1f3a !important;
     color: #fff !important;
     break-after: avoid;
     page-break-after: avoid;
     break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .pi-section-band + .pi-values-lead,
+  .pi-section-band + .pi-snapshot,
+  .pi-section-band + .pi-report__empty,
+  .pi-section-band + .pi-safeguards,
+  .pi-section-band + .pi-cost-grid,
+  .pi-section-band + .pi-rider-groups,
+  .pi-rider-group__title + .pi-rider-grid {
+    break-before: avoid;
+    page-break-before: avoid;
   }
 
   .pi-section-band__accent {
@@ -814,10 +819,14 @@
   }
 
   .pi-cost-grid,
-  .pi-rider-grid,
   .pi-values-summary {
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 6px;
+  }
+
+  .pi-rider-grid {
+    display: block !important;
+    grid-template-columns: none;
   }
 
   .pi-snapshot--hero {
@@ -825,7 +834,7 @@
   }
 
   .pi-report-section {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
 
   .pi-cost-card,
@@ -838,9 +847,96 @@
   .pi-safeguards,
   .pi-illustrated-values,
   .pi-distribution-callout,
-  .pi-fi-horizon {
+  .pi-fi-horizon,
+  .pi-values-lead,
+  .pi-print-keep,
+  .pi-checkpoint-wrap {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .pi-rider-card {
+    display: block;
+    overflow: visible !important;
+    margin: 0 0 8px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  .pi-rider-card__header,
+  .pi-rider-card__body,
+  .pi-rider-card__carrier,
+  .pi-rider-card__warning {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .pi-cost-card {
+    padding: 7px 8px;
+  }
+
+  .pi-cost-card__label {
+    margin: 2px 0 4px;
+    font-size: 0.86rem;
+  }
+
+  .pi-cost-card__value {
+    font-size: 0.95rem;
+  }
+
+  .pi-cost-card__note,
+  .pi-cost-card__caption,
+  .pi-cost-card .pi-source-line {
+    margin-top: 3px;
+    font-size: 0.7rem;
+  }
+
+  .pi-illustrated-values,
+  .pi-distribution-callout {
+    margin: 0 0 8px;
+    padding: 6px 8px;
+  }
+
+  .pi-illustrated-values__copy,
+  .pi-illustrated-values__warning,
+  .pi-distribution-callout p,
+  .pi-fi-horizon {
+    margin: 4px 0 0;
+    font-size: 0.74rem;
+    line-height: 1.3;
+  }
+
+  .pi-values-lead {
+    margin: 0 0 8px;
+  }
+
+  .pi-values-summary {
+    display: none !important;
+  }
+
+  .pi-values-chart {
+    margin: 0 0 8px;
+    padding: 6px 6px 4px;
+  }
+
+  .pi-values-chart__title {
+    margin: 0 0 4px;
+    font-size: 0.82rem;
+  }
+
+  .pi-values-chart__svg {
+    max-height: 150pt !important;
+    height: 150pt;
+    width: 100%;
+  }
+
+  .pi-values-chart__legend {
+    margin-top: 4px;
+    padding-top: 4px;
+    font-size: 0.72rem;
+    gap: 6px 12px;
   }
 
   .pi-report-section--values,
@@ -881,15 +977,24 @@
     fill: #0b1f3a !important;
   }
 
-  .pi-checkpoint-table thead {
-    display: table-header-group;
-    break-after: avoid;
-    page-break-after: avoid;
+  .pi-checkpoint-table {
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
-  .pi-checkpoint-table tbody tr:first-child {
-    break-before: avoid;
-    page-break-before: avoid;
+  .pi-checkpoint-table thead {
+    display: table-header-group;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .pi-checkpoint-table tbody {
+    display: table-row-group;
+  }
+
+  .pi-checkpoint-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .pi-checkpoint-table__note {
