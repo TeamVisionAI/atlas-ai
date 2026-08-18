@@ -42,6 +42,10 @@ export default function PolicyValuesCheckpoints({
 
   return (
     <div className="pi-checkpoint-wrap" data-testid="pi-checkpoint-table">
+      <p className="pi-checkpoint-table__note" data-testid="pi-checkpoint-note">
+        Sourced checkpoint values. Missing costs display as “—” and are never treated as $0.
+        {footnoteId ? <sup className="pi-fn">{`[${footnoteId}]`}</sup> : null}
+      </p>
       <table className="pi-checkpoint-table">
         <colgroup>
           <col className="pi-checkpoint-table__col--year" />
@@ -54,10 +58,6 @@ export default function PolicyValuesCheckpoints({
           <col className="pi-checkpoint-table__col--csv" />
           <col className="pi-checkpoint-table__col--db" />
         </colgroup>
-        <caption className="pi-checkpoint-table__caption">
-          Sourced checkpoint values. Missing costs display as “—” and are never treated as $0.
-          {footnoteId ? <sup className="pi-fn">{`[${footnoteId}]`}</sup> : null}
-        </caption>
         <thead>
           <tr>
             <Head lines={["Policy Year"]} className="pi-checkpoint-table__col--year" testId="pi-checkpoint-h-year" />

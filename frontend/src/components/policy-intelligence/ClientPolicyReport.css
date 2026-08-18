@@ -472,12 +472,14 @@
   border-bottom: 2px dashed;
 }
 
-.pi-checkpoint-table__caption {
-  caption-side: top;
-  text-align: left;
+.pi-checkpoint-table__note {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   margin: 0 0 6px;
   font-size: 0.78rem;
   color: var(--pi-muted);
+  line-height: 1.4;
 }
 
 .pi-checkpoint-table thead {
@@ -753,7 +755,7 @@
   }
 
   .pi-source-line,
-  .pi-checkpoint-table__caption,
+  .pi-checkpoint-table__note,
   .pi-values-chart__legend {
     display: block !important;
     color: #0b1f3a !important;
@@ -771,6 +773,21 @@
 
   .pi-checkpoint-table thead {
     display: table-header-group;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .pi-checkpoint-table tbody tr:first-child {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  .pi-checkpoint-table__note {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100%;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .pi-checkpoint-wrap {
