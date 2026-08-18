@@ -118,6 +118,12 @@ function OperationalWorkspace({
             variant="inline"
             titleKey={interviewComposerSession.titleKey}
             testId="workspace-interview-whatsapp-composer"
+            requiresHumanOwnership={
+              interviewComposerSession.requiresHumanOwnership !== false
+            }
+            sendVia={interviewComposerSession.sendVia || "human_reply"}
+            appointmentId={interviewComposerSession.appointmentId || null}
+            customerCareWindow={interviewComposerSession.customerCareWindow}
             onClose={onCloseInterviewComposer}
             onSuccessToast={onInterviewComposerSuccessToast}
             onErrorToast={onInterviewComposerErrorToast}

@@ -103,6 +103,17 @@ test("empty message disables send; HUMAN ownership required", () => {
     }),
     false
   );
+  assert.equal(
+    canSubmitHumanWhatsAppSend({
+      phone: "+15555550100",
+      message: "Hola",
+      ownershipState: "ATLAS",
+      customerCareWindow: { open: true },
+      windowKnown: true,
+      requiresHumanOwnership: false
+    }),
+    true
+  );
 });
 
 test("send request reuses Conversations human-reply payload shape", () => {
@@ -131,6 +142,8 @@ test("send request reuses Conversations human-reply payload shape", () => {
     "utf8"
   );
   assert.match(composer, /sendHumanConversationReply/);
+  assert.match(composer, /sendInterviewDetails/);
+  assert.match(composer, /sendVia === "interview_details"/);
   assert.doesNotMatch(composer, /takeOverConversation/);
   assert.doesNotMatch(composer, /openWhatsAppConversation/);
   assert.doesNotMatch(composer, /copyMessageToClipboard/);

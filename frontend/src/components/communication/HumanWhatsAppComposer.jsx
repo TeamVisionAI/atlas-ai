@@ -17,6 +17,7 @@ import {
   shouldBlockFreeformWhatsAppSend
 } from "../../engines/humanWhatsAppComposer";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { sendInterviewDetails } from "../../services/appointmentService";
 import "./HumanWhatsAppComposer.css";
 
 function newClientRequestId() {
@@ -41,7 +42,8 @@ function mapSendError(err, translate) {
 /**
  * Shared Human WhatsApp composer — Conversations, Mission Control, Prospect Workspace.
  * Send path: sendHumanConversationReply → /api/conversations/human-reply (BR-075).
- * Opening never mutates ownership.
+ * Opening never mutates ownership. Interview-details may send under ATLAS
+ * via the appointment send path (no TAKE OVER).
  */
 export default function HumanWhatsAppComposer({
   phone: phoneProp = null,
@@ -57,6 +59,9 @@ export default function HumanWhatsAppComposer({
   showPhone = true,
   titleKey = "whatsappActionCustomMessage",
   testId = "human-whatsapp-composer",
+  requiresHumanOwnership = true,
+  sendVia = "human_reply",
+  appointmentId = null,
   onClose = null,
   onSent = null,
   onSuccessToast = null,
@@ -70,13 +75,18 @@ export default function HumanWhatsAppComposer({
     prospectPhone: workspace?.prospect?.phone
   });
 
+  const skipConversationLookup =
+    controlled || sendVia === "interview_details";
+
   const [ownershipState, setOwnershipState] = useState(
-    controlled ? ownershipProp ?? null : null
+    skipConversationLookup ? ownershipProp ?? null : null
   );
   const [customerCareWindow, setCustomerCareWindow] = useState(() =>
-    controlled ? normalizeCustomerCareWindow(windowProp) : null
+    skipConversationLookup ? normalizeCustomerCareWindow(windowProp) : null
   );
-  const [metaLoading, setMetaLoading] = useState(!controlled && Boolean(phone));
+  const [metaLoading, setMetaLoading] = useState(
+    !skipConversationLookup && Boolean(phone)
+  );
   const [metaError, setMetaError] = useState(null);
   const [message, setMessage] = useState(() => String(initialMessage || ""));
   const [clientRequestId, setClientRequestId] = useState(() => newClientRequestId());
@@ -103,15 +113,15 @@ export default function HumanWhatsAppComposer({
   }, [initialMessage, phone]);
 
   useEffect(() => {
-    if (!controlled) return;
+    if (!skipConversationLookup) return;
     setOwnershipState(ownershipProp ?? null);
     setCustomerCareWindow(normalizeCustomerCareWindow(windowProp));
     setMetaLoading(false);
     setMetaError(null);
-  }, [controlled, ownershipProp, windowProp]);
+  }, [skipConversationLookup, ownershipProp, windowProp]);
 
   useEffect(() => {
-    if (controlled) return undefined;
+    if (skipConversationLookup) return undefined;
 
     if (!phone) {
       setOwnershipState(null);
@@ -148,9 +158,11 @@ export default function HumanWhatsAppComposer({
     return () => {
       cancelled = true;
     };
-  }, [controlled, phone, translate]);
+  }, [skipConversationLookup, phone, translate]);
 
-  const composerEnabled = resolveHumanWhatsAppComposerEnabled(ownershipState);
+  const composerEnabled =
+    !requiresHumanOwnership ||
+    resolveHumanWhatsAppComposerEnabled(ownershipState);
   const windowClosed = shouldBlockFreeformWhatsAppSend(customerCareWindow);
   const windowOpen = isFreeformWhatsAppWindowOpen(customerCareWindow);
   const windowKnown = customerCareWindow != null;
@@ -161,7 +173,8 @@ export default function HumanWhatsAppComposer({
     ownershipState,
     sending,
     customerCareWindow,
-    windowKnown
+    windowKnown,
+    requiresHumanOwnership
   });
 
   async function onSubmit(event) {
@@ -186,10 +199,29 @@ export default function HumanWhatsAppComposer({
     setStatus(null);
 
     try {
-      const result = await sendHumanConversationReply(payload.phone, {
-        message: payload.message,
-        clientRequestId: payload.clientRequestId
-      });
+      let result;
+      if (sendVia === "interview_details") {
+        if (!appointmentId) {
+          throw new Error("Appointment is required to send interview details");
+        }
+        result = await sendInterviewDetails(appointmentId, {
+          message: payload.message,
+          clientRequestId: payload.clientRequestId
+        });
+        if (!result?.success) {
+          const sendError = new Error(
+            result?.message || "Failed to send interview details"
+          );
+          sendError.code = result?.error || null;
+          sendError.delivery = result?.delivery || null;
+          throw sendError;
+        }
+      } else {
+        result = await sendHumanConversationReply(payload.phone, {
+          message: payload.message,
+          clientRequestId: payload.clientRequestId
+        });
+      }
       setMessage("");
       setClientRequestId(newClientRequestId());
       const successMessage = result.duplicateSuppressed
@@ -202,11 +234,12 @@ export default function HumanWhatsAppComposer({
       const errorMessage = mapSendError(err, translate);
       setStatus({ type: "error", message: errorMessage });
       onErrorToast?.(errorMessage);
+      const openFlag = err?.delivery?.windowOpen;
       if (
-        err instanceof ConversationsCenterError &&
-        err.code === "WHATSAPP_TEMPLATE_REQUIRED_OUTSIDE_WINDOW"
+        (err instanceof ConversationsCenterError &&
+          err.code === "WHATSAPP_TEMPLATE_REQUIRED_OUTSIDE_WINDOW") ||
+        err?.code === "blocked_window_closed"
       ) {
-        const openFlag = err.delivery?.windowOpen;
         setCustomerCareWindow(
           normalizeCustomerCareWindow({
             open: typeof openFlag === "boolean" ? openFlag : false,
@@ -245,6 +278,7 @@ export default function HumanWhatsAppComposer({
       data-phone={phone}
       data-ownership={ownershipState || "unknown"}
       data-composer-enabled={composerEnabled ? "true" : "false"}
+      data-send-via={sendVia}
       data-window-open={windowOpen ? "true" : windowClosed ? "false" : "unknown"}
       data-variant={variant}
       aria-label={translate(titleKey)}

@@ -151,13 +151,33 @@ export function buildInterviewComposerPrefill({
   phone = null,
   appointmentId = null
 } = {}) {
+  const sendPolicy = resolveInterviewComposerSendPolicy(actionId);
   return {
     actionId,
     purpose: resolveInterviewWhatsAppPurpose(actionId),
     phone: phone || null,
     appointmentId: appointmentId || null,
     message: String(previewMessage || "").trim(),
-    deliveryMode: "freeform_composer"
+    deliveryMode: "freeform_composer",
+    requiresHumanOwnership: sendPolicy.requiresHumanOwnership,
+    sendVia: sendPolicy.sendVia
+  };
+}
+
+/**
+ * Interview-details composer may send under ATLAS ownership.
+ * Custom / Zoom / reminder composers still require HUMAN (TAKE OVER).
+ */
+export function resolveInterviewComposerSendPolicy(actionId) {
+  if (actionId === COMMUNICATION_ACTION_IDS.RESEND_INTERVIEW_DETAILS) {
+    return {
+      requiresHumanOwnership: false,
+      sendVia: "interview_details"
+    };
+  }
+  return {
+    requiresHumanOwnership: true,
+    sendVia: "human_reply"
   };
 }
 

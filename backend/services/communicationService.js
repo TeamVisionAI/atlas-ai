@@ -3,7 +3,9 @@
  * Implements BR-027: prospect-facing messages use the assigned representative identity.
  *
  * Interview WhatsApp actions (details / reminder / zoom):
- * - Inside BR-075 window → freeform composer preferred (preview still available)
+ * - Interview details inside BR-075 window → canonical outbound freeform send
+ *   (no TAKE OVER / no HUMAN ownership change; any prospect:write tenant user)
+ * - Reminder / Zoom inside window → freeform composer preferred (preview still available)
  * - Outside window → approved Meta template via canonical outbound pipeline (no wa.me)
  */
 
@@ -307,6 +309,82 @@ async function sendNativeApprovedTemplate({
   });
 }
 
+/**
+ * Inside-window interview details — send via the canonical WhatsApp pipeline.
+ * Does not TAKE OVER, set sticky HUMAN, or disable Recruit AI automation.
+ * Implements operational resend without Conversations human-composer ownership.
+ */
+async function sendNativeInterviewDetailsFreeform({
+  appointmentId,
+  context = {},
+  prepared
+}) {
+  const organizationId = requireTenantOrganizationId(context.organizationId);
+  const findProspectFn =
+    context.findProspectInOrganizationFn || findProspectInOrganization;
+  const sendFn = context.sendTextMessageFn || sendTextMessage;
+
+  const prospect = await findProspectFn(prepared.phone, organizationId);
+  if (!prospect) {
+    return buildError("PROSPECT_NOT_FOUND", "Prospect not found.");
+  }
+
+  const message = String(context.message || prepared.message || "").trim();
+  if (!message) {
+    return buildError("MESSAGE_REQUIRED", "Interview details message is required.");
+  }
+
+  const requestId = String(context.clientRequestId || "").trim();
+  const idempotencyKey = requestId
+    ? `native-interview-wa:${organizationId}:${appointmentId}:resend_interview_details:${requestId}`
+    : `native-interview-wa:${organizationId}:${appointmentId}:resend_interview_details:${Date.now()}`;
+
+  const result = await sendFn(prepared.phone, message, {
+    actor: "ATLAS",
+    intent: SOURCE_ACTION_TO_PIPELINE_INTENT.resend_interview_details,
+    organizationId,
+    idempotencyKey
+  });
+
+  if (!result?.success) {
+    const status = result?.status || null;
+    const safeMessage =
+      status === "blocked_window_closed" || status === "blocked_template_missing"
+        ? "Outside the 24-hour WhatsApp window. An approved template is required, or templates are not active yet."
+        : "Could not send interview details.";
+
+    return buildError(status || "INTERVIEW_DETAILS_SEND_FAILED", safeMessage, {
+      deliveryMode: DELIVERY_MODES.AUTOMATIC,
+      customerCareWindow: prepared.customerCareWindow || null,
+      retryable: Boolean(result?.retryable),
+      delivery: result?.delivery
+        ? {
+            status: result.delivery.status || status,
+            reason: result.delivery.reason || result.error || null,
+            windowOpen: result.delivery.window?.open ?? false
+          }
+        : null
+    });
+  }
+
+  return buildSuccess("Interview details sent.", {
+    channel: "whatsapp",
+    template: prepared.template,
+    phone: prepared.phone,
+    language: prepared.language,
+    zoomUrl: prepared.zoomUrl || null,
+    message: null,
+    deliveryMode: DELIVERY_MODES.AUTOMATIC,
+    customerCareWindow: prepared.customerCareWindow || null,
+    toastKey: "whatsappNativeTemplateSent",
+    opensWaMe: false,
+    providerMessageId: result.providerMessageId || null,
+    conversationLogId: result.conversationLogId || null,
+    deliveryStatus: result.status || null,
+    workflowState: null
+  });
+}
+
 async function sendAppointmentCommunication(appointmentId, context, { sourceAction, prepared }) {
   const organizationId = requireTenantOrganizationId(context.organizationId);
   const customerCareWindow =
@@ -323,6 +401,20 @@ async function sendAppointmentCommunication(appointmentId, context, { sourceActi
       appointmentId,
       context,
       sourceAction,
+      prepared: { ...prepared, customerCareWindow }
+    });
+  }
+
+  // Interview details inside the care window: send freeform on the canonical
+  // outbound path. Do not require TAKE OVER / HUMAN composer ownership.
+  if (
+    sourceAction === "resend_interview_details" &&
+    customerCareWindow &&
+    customerCareWindow.open === true
+  ) {
+    return sendNativeInterviewDetailsFreeform({
+      appointmentId,
+      context,
       prepared: { ...prepared, customerCareWindow }
     });
   }
@@ -504,5 +596,6 @@ module.exports = {
   sendInterviewDetails,
   sendInterviewReminder,
   sendZoomInvitation,
-  sendOfficeLocation
+  sendOfficeLocation,
+  sendNativeInterviewDetailsFreeform
 };

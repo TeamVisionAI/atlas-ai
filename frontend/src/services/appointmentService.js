@@ -216,11 +216,27 @@ async function sendAppointmentCommunication(appointmentId, purpose) {
   });
 }
 
-export async function sendInterviewDetails(appointmentId) {
-  return sendAppointmentCommunication(
-    appointmentId,
-    APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION
-  );
+export async function sendInterviewDetails(appointmentId, options = {}) {
+  const persistedId = resolvePersistedAppointmentId(appointmentId);
+  const pathSegment = APPOINTMENT_SEND_PATHS[APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION];
+
+  if (!persistedId || !pathSegment) {
+    return { success: false, message: "Appointment not found." };
+  }
+
+  const body = {};
+  if (options.message) {
+    body.message = String(options.message).trim();
+  }
+  if (options.clientRequestId) {
+    body.clientRequestId = String(options.clientRequestId).trim();
+  }
+
+  return apiFetch(`/api/appointments/${encodeURIComponent(persistedId)}/${pathSegment}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
 }
 
 export async function sendInterviewReminder(appointmentId) {

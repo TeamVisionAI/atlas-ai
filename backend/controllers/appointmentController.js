@@ -253,7 +253,9 @@ async function sendInterviewDetails(req, res) {
     const communicationService = require("../services/communicationService");
     const result = await communicationService.sendInterviewDetails(req.params.id, {
       organizationId: req.tenantContext.organizationId,
-      actorUser: req.atlasUser || null
+      actorUser: req.atlasUser || null,
+      message: req.body?.message || null,
+      clientRequestId: req.body?.clientRequestId || null
     });
 
     res.status(result.success ? 200 : 400).json(result);

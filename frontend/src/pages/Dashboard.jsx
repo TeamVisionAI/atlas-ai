@@ -1308,6 +1308,19 @@ export default function Dashboard() {
                 variant="inline"
                 titleKey={nativeInterviewWhatsApp.composerSession.titleKey}
                 testId="mc-interview-whatsapp-composer"
+                requiresHumanOwnership={
+                  nativeInterviewWhatsApp.composerSession.requiresHumanOwnership !==
+                  false
+                }
+                sendVia={
+                  nativeInterviewWhatsApp.composerSession.sendVia || "human_reply"
+                }
+                appointmentId={
+                  nativeInterviewWhatsApp.composerSession.appointmentId || null
+                }
+                customerCareWindow={
+                  nativeInterviewWhatsApp.composerSession.customerCareWindow
+                }
                 onClose={nativeInterviewWhatsApp.closeComposer}
                 onSuccessToast={showSuccess}
                 onErrorToast={showError}

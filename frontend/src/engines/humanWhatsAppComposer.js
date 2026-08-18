@@ -108,7 +108,8 @@ export function canSubmitHumanWhatsAppSend({
   ownershipState,
   sending = false,
   customerCareWindow = null,
-  windowKnown = true
+  windowKnown = true,
+  requiresHumanOwnership = true
 } = {}) {
   if (sending) {
     return false;
@@ -116,7 +117,10 @@ export function canSubmitHumanWhatsAppSend({
   if (!phone || !String(message || "").trim()) {
     return false;
   }
-  if (!resolveHumanWhatsAppComposerEnabled(ownershipState)) {
+  if (
+    requiresHumanOwnership &&
+    !resolveHumanWhatsAppComposerEnabled(ownershipState)
+  ) {
     return false;
   }
   if (!windowKnown) {

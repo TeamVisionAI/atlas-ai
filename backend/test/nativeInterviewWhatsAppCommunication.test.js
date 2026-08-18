@@ -1,7 +1,8 @@
 /**
  * Native interview WhatsApp actions — communicationService routing contract.
  * Outside BR-075 window → approved Meta template pipeline (no wa.me).
- * Inside window → FE uses HumanWhatsAppComposer; send API may still record copy_open for legacy.
+ * Inside window → interview details send freeform on the canonical outbound path
+ * (no TAKE OVER). Zoom / reminder still prefer the HUMAN composer.
  */
 
 const test = require("node:test");
@@ -123,6 +124,14 @@ test("communicationService routes outside-window native interview actions via se
   assert.match(serviceSource, /DELIVERY_MODES\.AUTOMATIC/);
   assert.match(serviceSource, /customerCareWindow\.open === false/);
   assert.match(serviceSource, /preferComposer/);
+});
+
+test("inside-window interview details send freeform without TAKE OVER", () => {
+  assert.match(serviceSource, /sendNativeInterviewDetailsFreeform/);
+  assert.match(serviceSource, /sourceAction === "resend_interview_details"/);
+  assert.match(serviceSource, /actor: "ATLAS"/);
+  assert.match(serviceSource, /INTERVIEW_DETAILS/);
+  assert.doesNotMatch(serviceSource, /takeOverConversation/);
 });
 
 test("office location is not in native interview template source actions", () => {
