@@ -166,7 +166,9 @@ async function verifySimulatorUsesHub() {
 async function verifyBusinessRulesGateHelper() {
   const prospect = {
     phone: "+10000000001",
-    current_step: "QUALIFYING"
+    current_step: "QUALIFYING",
+    entry_method: "QR",
+    source: "car_magnet"
   };
 
   assert(await shouldDeliverAutomatedReply(prospect) === true, "Default prospect allows automated reply");

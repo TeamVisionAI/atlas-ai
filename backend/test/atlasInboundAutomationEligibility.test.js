@@ -1,6 +1,6 @@
 /**
  * BR-142 — Atlas auto-reply requires positive inbound eligibility.
- * Shared 7338 must not auto-reply to unknown/personal inbound.
+ * FACEBOOK / CLICK_TO_WHATSAPP labels and existing Recruit AI sessions are not proof.
  */
 
 require("dotenv").config();
@@ -13,6 +13,7 @@ const path = require("node:path");
 const {
   evaluateAtlasInboundAutomationEligibility,
   hasPositiveCtwaReferral,
+  persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled
 } = require("../core/atlasInboundAutomationEligibility");
 const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("../core/whatsappConstants");
@@ -24,7 +25,7 @@ const {
 const { resolveCreateSourceFields } = require("../core/whatsappProspectResolver");
 
 const STATE_FILE = path.join(__dirname, "../data/workflowState.json");
-const PHONE = "+17865557338";
+const PHONE = "+17865740523";
 
 async function withTempWorkflowState(run) {
   const previous = fs.existsSync(STATE_FILE)
@@ -47,10 +48,23 @@ async function withTempWorkflowState(run) {
   }
 }
 
+function middreyProspect(overrides = {}) {
+  return {
+    id: "prospect-middrey",
+    phone: PHONE,
+    name: "Middrey",
+    organization_id: "00000000-0000-4000-8000-000000000001",
+    current_step: "NEW",
+    source: WHATSAPP_SOURCE.FACEBOOK,
+    entry_method: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
+    ...overrides
+  };
+}
+
 function unknownProspect(overrides = {}) {
   return {
     id: "prospect-unknown-7338",
-    phone: PHONE,
+    phone: "+17865557338",
     name: "Unknown",
     organization_id: "00000000-0000-4000-8000-000000000001",
     current_step: "NEW",
@@ -60,24 +74,73 @@ function unknownProspect(overrides = {}) {
   };
 }
 
-test("greeting text is not CTWA evidence", () => {
-  assert.equal(hasPositiveCtwaReferral(null), false);
-  assert.equal(hasPositiveCtwaReferral({ source_type: "post" }), false);
+test("personal inbound + no referral/ctwa/QR => no auto reply", async () => {
+  await withTempWorkflowState(async () => {
+    const { processNormalizedInboundMessage } = require("../core/communicationHub");
+    const liveAuthoringBridge = require("../core/recruitAiV2/liveAuthoringBridge");
+    const originalAttempt = liveAuthoringBridge.attemptLiveV2Authoring;
+    let authored = 0;
+    liveAuthoringBridge.attemptLiveV2Authoring = async () => {
+      authored += 1;
+      return { authored: true, replyText: "should not send" };
+    };
+
+    try {
+      const result = await processNormalizedInboundMessage(
+        {
+          phone: PHONE,
+          text: "Hola",
+          channel: "whatsapp",
+          providerMessageId: "wamid.middrey-hola"
+        },
+        { prospect: middreyProspect() }
+      );
+      assert.equal(authored, 0);
+      assert.equal(result.replied, false);
+      assert.equal(result.reason, "ATLAS_AUTOMATION_NOT_ELIGIBLE");
+    } finally {
+      liveAuthoringBridge.attemptLiveV2Authoring = originalAttempt;
+    }
+  });
+});
+
+test("existing Recruit AI session + personal inbound => no auto reply", () => {
+  const result = evaluateAtlasInboundAutomationEligibility({
+    prospect: middreyProspect({
+      current_step: "QUALIFICATION"
+    }),
+    inbound: { text: "Hola" },
+    workflowState: {
+      canonicalMilestone: MILESTONES.QUALIFICATION,
+      workflowOwnership: "ATLAS"
+    }
+  });
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "NOT_ELIGIBLE");
+});
+
+test("source label FACEBOOK alone => no auto reply", () => {
   assert.equal(
     evaluateAtlasInboundAutomationEligibility({
-      prospect: unknownProspect(),
-      inbound: { text: "Hola", body: "Hi" }
+      prospect: middreyProspect({
+        source: "FACEBOOK",
+        entry_method: "CLICK_TO_WHATSAPP"
+      })
+    }).eligible,
+    false
+  );
+  assert.equal(
+    evaluateAtlasInboundAutomationEligibility({
+      prospect: unknownProspect({
+        source: "FACEBOOK",
+        entry_method: null
+      })
     }).eligible,
     false
   );
 });
 
-test("1. CTWA ad referral → Atlas eligible", () => {
-  assert.equal(
-    hasPositiveCtwaReferral({ source_type: "ad", ctwa_clid: "clid-1" }),
-    true
-  );
-
+test("valid CTWA referral.source_type=ad => reply allowed", () => {
   const parsed = parseWhatsAppWebhookBody({
     entry: [
       {
@@ -91,15 +154,11 @@ test("1. CTWA ad referral → Atlas eligible", () => {
               messages: [
                 {
                   from: "17865550001",
-                  id: "wamid.ctwa-1",
+                  id: "wamid.ctwa-ad",
                   timestamp: "1710000000",
                   type: "text",
                   text: { body: "Hola" },
-                  referral: {
-                    source_type: "ad",
-                    source_id: "ad-1",
-                    ctwa_clid: "clid-1"
-                  }
+                  referral: { source_type: "ad", source_id: "ad-1" }
                 }
               ]
             }
@@ -108,154 +167,79 @@ test("1. CTWA ad referral → Atlas eligible", () => {
       }
     ]
   });
-  assert.equal(parsed.length, 1);
-  assert.equal(parsed[0].ctwaReferral.ctwaClid, "clid-1");
-  assert.equal(parsed[0].body, "Hola");
-
+  assert.equal(parsed[0].ctwaReferral.sourceType, "ad");
   const result = evaluateAtlasInboundAutomationEligibility({
-    prospect: unknownProspect({ current_step: "NEW" }),
+    prospect: unknownProspect(),
     inbound: { ctwaReferral: parsed[0].ctwaReferral, text: "Hola" }
   });
   assert.equal(result.eligible, true);
   assert.equal(result.reason, "CTWA_REFERRAL");
-
-  const stamped = resolveCreateSourceFields(null, {
-    ctwaReferral: parsed[0].ctwaReferral
-  });
-  assert.equal(stamped.entryMethod, WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP);
 });
 
-test("2. QR attribution → Atlas eligible", () => {
-  const qrProspect = unknownProspect({
-    source: WHATSAPP_SOURCE.CAR_MAGNET,
-    entry_method: WHATSAPP_ENTRY_METHOD.QR
-  });
-  const stored = evaluateAtlasInboundAutomationEligibility({
-    prospect: qrProspect
-  });
-  assert.equal(stored.eligible, true);
-  assert.equal(stored.reason, "QR_ATTRIBUTION");
-
-  const thisTurn = evaluateAtlasInboundAutomationEligibility({
-    prospect: unknownProspect(),
-    qrAttributed: true
-  });
-  assert.equal(thisTurn.eligible, true);
-  assert.equal(thisTurn.reason, "QR_ATTRIBUTION");
-});
-
-test("3. existing eligible Atlas prospect → Atlas eligible", () => {
-  const ctwa = evaluateAtlasInboundAutomationEligibility({
-    prospect: unknownProspect({
-      source: WHATSAPP_SOURCE.FACEBOOK,
-      entry_method: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP
-    })
-  });
-  assert.equal(ctwa.eligible, true);
-  assert.equal(ctwa.reason, "ELIGIBLE_ORIGIN");
-
-  const workflow = evaluateAtlasInboundAutomationEligibility({
-    prospect: unknownProspect({
-      current_step: "QUALIFICATION",
-      source: WHATSAPP_SOURCE.UNKNOWN,
-      entry_method: WHATSAPP_ENTRY_METHOD.UNATTRIBUTED
-    })
-  });
-  assert.equal(workflow.eligible, true);
-  assert.equal(workflow.reason, "ACTIVE_AUTOMATED_WORKFLOW");
-});
-
-test("4. unknown new number is not eligible (persist/log is allowed)", () => {
-  const created = resolveCreateSourceFields(null);
-  assert.equal(created.source, WHATSAPP_SOURCE.UNKNOWN);
-  assert.equal(created.entryMethod, WHATSAPP_ENTRY_METHOD.UNATTRIBUTED);
-
+test("valid ctwa_clid => reply allowed", () => {
+  assert.equal(hasPositiveCtwaReferral({ ctwa_clid: "clid-1" }), true);
   const result = evaluateAtlasInboundAutomationEligibility({
-    prospect: unknownProspect({ current_step: "NEW" }),
-    inbound: { text: "Hola" },
-    workflowState: { canonicalMilestone: MILESTONES.NEW_LEAD }
+    prospect: unknownProspect(),
+    inbound: { ctwaReferral: { ctwaClid: "clid-1" } }
   });
-  assert.equal(result.eligible, false);
-  assert.equal(result.reason, "NOT_ELIGIBLE");
+  assert.equal(result.eligible, true);
+  assert.equal(result.reason, "CTWA_REFERRAL");
+});
 
-  const pipeline = fs.readFileSync(
-    path.join(__dirname, "../core/whatsappInboundPipeline.js"),
-    "utf8"
+test("valid QR pending/stored attribution => reply allowed", () => {
+  assert.equal(
+    evaluateAtlasInboundAutomationEligibility({
+      prospect: unknownProspect(),
+      qrAttributed: true
+    }).reason,
+    "QR_ATTRIBUTION"
   );
-  const persistIdx = pipeline.indexOf("persistInboundLog");
-  const hubIdx = pipeline.indexOf("runHub(");
-  assert.ok(persistIdx > 0 && hubIdx > persistIdx);
-  assert.match(pipeline, /ATLAS_AUTOMATION_NOT_ELIGIBLE/);
+  assert.equal(
+    evaluateAtlasInboundAutomationEligibility({
+      prospect: unknownProspect({
+        source: WHATSAPP_SOURCE.CAR_MAGNET,
+        entry_method: WHATSAPP_ENTRY_METHOD.QR
+      })
+    }).eligible,
+    true
+  );
 });
 
-test("5. known non-automated/personal contact → no Atlas reply", async () => {
+test("verified CTWA eligibility source survives later turns without referral", async () => {
   await withTempWorkflowState(async () => {
     const { shouldDeliverAutomatedReply } = require("../core/communicationHub");
-    const { processNormalizedInboundMessage } = require("../core/communicationHub");
-
-    const prospect = unknownProspect({ current_step: "NEW" });
+    const prospect = unknownProspect();
     assert.equal(await shouldDeliverAutomatedReply(prospect), false);
 
-    let authored = 0;
-    const liveAuthoringBridge = require("../core/recruitAiV2/liveAuthoringBridge");
-    const originalAttempt = liveAuthoringBridge.attemptLiveV2Authoring;
-    liveAuthoringBridge.attemptLiveV2Authoring = async () => {
-      authored += 1;
-      return { authored: true, replyText: "should not send" };
-    };
-
-    try {
-      const result = await processNormalizedInboundMessage(
-        {
-          phone: PHONE,
-          text: "Hola",
-          channel: "whatsapp",
-          providerMessageId: "wamid.personal-1"
-        },
-        { prospect }
-      );
-      assert.equal(authored, 0);
-      assert.equal(result.replied, false);
-      assert.equal(result.reason, "ATLAS_AUTOMATION_NOT_ELIGIBLE");
-    } finally {
-      liveAuthoringBridge.attemptLiveV2Authoring = originalAttempt;
-    }
-  });
-});
-
-test("6. explicit enable Atlas → replies resume", async () => {
-  await withTempWorkflowState(async () => {
-    const { shouldDeliverAutomatedReply } = require("../core/communicationHub");
-    const prospect = unknownProspect({ current_step: "NEW" });
-
-    assert.equal(await shouldDeliverAutomatedReply(prospect), false);
-
-    await setAtlasAutomationEnabled(PHONE, true, {
+    await persistVerifiedAtlasEligibilitySource(prospect.phone, "CTWA_REFERRAL", {
       organizationId: prospect.organization_id,
       prospectId: prospect.id
     });
-
-    const after = evaluateAtlasInboundAutomationEligibility({
-      prospect,
-      workflowState: { atlasAutomationEnabled: true }
-    });
-    assert.equal(after.eligible, true);
-    assert.equal(after.reason, "EXPLICITLY_ENABLED");
     assert.equal(await shouldDeliverAutomatedReply(prospect), true);
   });
 });
 
-test("parser extracts only ad/ctwa_clid referrals", () => {
-  assert.equal(
-    extractClickToWhatsAppReferral({
-      referral: { source_type: "ad", ctwa_clid: "x" }
-    }).ctwaClid,
-    "x"
-  );
-  assert.equal(
-    extractClickToWhatsAppReferral({
-      referral: { source_type: "post", source_url: "https://fb.me/x" }
-    }),
-    null
-  );
+test("create path still stamps CTWA only from verified referral", () => {
+  const unknown = resolveCreateSourceFields(null);
+  assert.equal(unknown.entryMethod, WHATSAPP_ENTRY_METHOD.UNATTRIBUTED);
+
+  const ctwa = resolveCreateSourceFields(null, {
+    ctwaReferral: { source_type: "ad", ctwa_clid: "clid-1" }
+  });
+  assert.equal(ctwa.entryMethod, WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP);
+
+  assert.equal(extractClickToWhatsAppReferral({ referral: { source_type: "post" } }), null);
+});
+
+test("explicit enable still resumes Atlas replies", async () => {
+  await withTempWorkflowState(async () => {
+    const { shouldDeliverAutomatedReply } = require("../core/communicationHub");
+    const prospect = middreyProspect();
+    assert.equal(await shouldDeliverAutomatedReply(prospect), false);
+    await setAtlasAutomationEnabled(PHONE, true, {
+      organizationId: prospect.organization_id,
+      prospectId: prospect.id
+    });
+    assert.equal(await shouldDeliverAutomatedReply(prospect), true);
+  });
 });

@@ -40,6 +40,8 @@ function scheduleCompleteProspect(overrides = {}) {
     phone: "+17865550999",
     organization_id: TEAM_VISION_ORG,
     owner_user_id: PRIMARY_RVP,
+    entry_method: "QR",
+    source: "car_magnet",
     appointment_date: "2026-08-10T17:15:00.000Z",
     interview_type: "In Person",
     notes: JSON.stringify({

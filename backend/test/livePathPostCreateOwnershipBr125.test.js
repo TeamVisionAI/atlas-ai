@@ -341,7 +341,9 @@ describe("BR-125 live post-create ownership", () => {
               name: "Ana Perez",
               organization_id: ORG,
               owner_user_id: AGENT,
-              current_step: "DAY_PART"
+              current_step: "DAY_PART",
+              entry_method: "QR",
+              source: "car_magnet"
             },
             env: execEnv(),
             authoringDependencies: schedule.deps

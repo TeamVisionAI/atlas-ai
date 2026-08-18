@@ -51,7 +51,8 @@ const DURABLE_RUNTIME_FIELDS = Object.freeze([
   "handoffAt",
   "humanTakenOverAt",
   "returnedToAtlasAt",
-  "atlasAutomationEnabled"
+  "atlasAutomationEnabled",
+  "atlasEligibilitySource"
 ]);
 
 /** In-memory backend for tests / restart simulation. */
@@ -108,7 +109,8 @@ function defaultWorkflowRecord() {
     inboxMarkedTestAt: null,
     conversationsLastReadInboundAt: null,
     conversationsLastSeenInboundMessageId: null,
-    atlasAutomationEnabled: null
+    atlasAutomationEnabled: null,
+    atlasEligibilitySource: null
   };
 }
 
@@ -229,7 +231,10 @@ function normalizeRecord(raw = {}) {
         ? true
         : raw.atlasAutomationEnabled === false
           ? false
-          : null
+          : null,
+    atlasEligibilitySource: raw.atlasEligibilitySource
+      ? String(raw.atlasEligibilitySource).trim().toUpperCase()
+      : null
   };
 }
 
