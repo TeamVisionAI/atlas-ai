@@ -86,7 +86,10 @@ function loadConversationContext(input = {}) {
     // BR-107 — read-only scheduling agent hints (never mutate BR-080 here).
     agentId = null,
     prospectOwnerUserId = null,
-    orgDefaultRecruiterUserId = null
+    orgDefaultRecruiterUserId = null,
+    conversationGoal = null,
+    campaignKind = null,
+    ctwaReferral = null
   } = input;
 
   const lastOutbound = [...transcriptTail]
@@ -159,7 +162,16 @@ function loadConversationContext(input = {}) {
     prospectOwnerUserId:
       prospectOwnerUserId || existingContext?.prospectOwnerUserId || null,
     orgDefaultRecruiterUserId:
-      orgDefaultRecruiterUserId || existingContext?.orgDefaultRecruiterUserId || null
+      orgDefaultRecruiterUserId || existingContext?.orgDefaultRecruiterUserId || null,
+    conversationGoal:
+      conversationGoal ||
+      existingContext?.conversationGoal ||
+      base.conversationGoal ||
+      null,
+    campaignKind:
+      campaignKind || existingContext?.campaignKind || base.campaignKind || null,
+    ctwaReferral:
+      ctwaReferral || existingContext?.ctwaReferral || base.ctwaReferral || null
   });
 }
 

@@ -1748,6 +1748,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-143 — IUL Review Ad Conversation (Policy Review Goal)
+
+**Implements:** Leads from the Spanish IUL-review ad get a natural educate → clarify → review conversation that moves toward a no-obligation review appointment without attacking IUL or sounding scripted.  
+**Domain:** Recruit / Lead AI v2 / WhatsApp CTWA  
+**Depends on:** BR-049, BR-081, BR-114, BR-130, BR-131, BR-142  
+**Related:** BR-132 (policy-review **booking** remains unimplemented; this rule does not create appointments)  
+**Status:** Implemented (conversation + copy only)  
+**Engine target:** `recruitAiV2/iulAdConversation.js`; V2 `interpret` + `decide` + `responseRenderer`; referral headline/body on `extractClickToWhatsAppReferral` (eligibility unchanged)  
+**Tests:** `backend/test/recruitAiV2IulAdConversation.test.js`
+
+### Rules
+
+1. **Track** — Activate when `conversationGoal=policy_review`, campaign kind `iul_review_ad`, CTWA referral headline/body/source_id identifies an IUL review ad, or the prospect explicitly asks to review an IUL policy. Do **not** treat recruiting CTWA or FACEBOOK labels as IUL ads.
+2. **Spanish-first** — Default replies in Spanish for this campaign. Switch naturally when the prospect writes in English (existing language policy).
+3. **Opener** — First IUL-ad turn asks whether the policy is currently active. Do not open with recruiting city/state or job-opportunity copy.
+4. **If active** — Ask what they want to understand better: cash-value growth, policy costs, future projection, or whether another strategy may fit their goals.
+5. **Safety copy** — Never say or imply the IUL is bad before reviewing it. Never argue with the prospect’s current agent. Never call an IUL simply an “investment”; describe it as life insurance with cash-value features when relevant.
+6. **Branches** — Info-only: answer briefly, then offer the review. “I don’t want to change my policy”: the review is informational and does not obligate replacement. “My agent said it’s an investment”: do not confront; explain life insurance + cash-value features; offer to review their policy. “Send the info here”: basics on WhatsApp; no personalized recommendation without a review. “Is this Primerica?”: answer clearly. “How much does it cost?”: the review is free; any financial recommendation depends on their needs/situation.
+7. **Soft appointment** — After educate/clarify, invite a no-obligation review (day vs evening/night). Do **not** call `create_appointment` / recruiting interview booking (BR-132 still specified-only; BR-111/112 gates unchanged).
+8. **Boundaries** — Does not change BR-142 eligibility. Does not run recruiting qualification on an established IUL-ad / `policy_review` track. Opt-out / cancel / withdraw / TAKE OVER remain unchanged.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
