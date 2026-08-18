@@ -3,6 +3,28 @@ import {
 } from "./classifiedValueDisplay";
 import { collectPages, formatSourceLine } from "./sourceReferences";
 
+const COMPANY_DETERMINED = /named[_\s-]*company[_\s-]*determined/i;
+const DECLINING_TERM_YEARS = /declining[_\s-]*term[_\s-]*years[_\s-]*(\d+|unknown)/i;
+
+export function formatCostClientNote(notes) {
+  if (notes == null || notes === "") {
+    return null;
+  }
+  const raw = String(notes).trim();
+  if (COMPANY_DETERMINED.test(raw)) {
+    return "Carrier-determined; dollar amount not disclosed.";
+  }
+  const declining = raw.match(DECLINING_TERM_YEARS);
+  if (declining) {
+    const years = declining[1];
+    if (years && years !== "unknown" && Number.isFinite(Number(years))) {
+      return `Surrender period: ${Number(years)} years`;
+    }
+    return "Surrender period as disclosed in the illustration.";
+  }
+  return raw.replace(/_/g, " ");
+}
+
 function CostCard({ category }) {
   const formatted = formatClassifiedValue(category?.display);
   const source = formatSourceLine({
@@ -10,8 +32,10 @@ function CostCard({ category }) {
     pages: collectPages(category.sourcePages, category.provenance, category.display),
     tableLabel: "Policy Illustration"
   });
+  const clientNote = formatted.value == null ? formatCostClientNote(category.notes) : null;
+  const surrenderPeriod = clientNote && clientNote.startsWith("Surrender period:");
   const schedule =
-    category?.id === "surrender_charges" && category.scheduleLength > 0
+    category?.id === "surrender_charges" && category.scheduleLength > 0 && !surrenderPeriod
       ? `${category.scheduleLength}-year schedule sourced`
       : null;
 
@@ -32,8 +56,8 @@ function CostCard({ category }) {
       {category.existenceMentioned && formatted.value == null ? (
         <p className="pi-cost-card__note">Named in the illustration without a disclosed dollar amount.</p>
       ) : null}
-      {category.notes && formatted.value == null ? (
-        <p className="pi-cost-card__note">{String(category.notes).replace(/_/g, " ")}</p>
+      {clientNote ? (
+        <p className="pi-cost-card__note">{clientNote}</p>
       ) : null}
       {schedule ? <p className="pi-cost-card__note">{schedule}</p> : null}
       {category.separateFromCsv ? (

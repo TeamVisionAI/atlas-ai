@@ -257,7 +257,20 @@ function nationalLifeReport() {
     },
     economics: {
       policyCostCategories: [
-        { id: "cost_of_insurance", number: 2, label: "Cost of Insurance / Monthly COI", display: classified(null, "NOT_AVAILABLE") }
+        {
+          id: "cost_of_insurance",
+          number: 2,
+          label: "Cost of Insurance / Monthly COI",
+          display: classified(null, "NOT_AVAILABLE"),
+          notes: "named_company_determined"
+        },
+        {
+          id: "surrender_charges",
+          number: 7,
+          label: "Surrender Charges",
+          display: classified(null, "NOT_AVAILABLE"),
+          notes: "declining_term_years_10"
+        }
       ],
       policyCostCheckpoints: [
         {
@@ -439,6 +452,9 @@ describe("ClientPolicyReport", () => {
       assert.equal(nationwideHtml.includes('data-testid="pi-checkpoint-h-income"'), false);
       assert.equal(nationwideHtml.includes("data-series=\"accumulatedLoan\""), false);
       assert.match(nationwideHtml, /data-testid="pi-checkpoint-h-coi"/);
+      assert.match(nationwideHtml, /11-year schedule sourced/);
+      assert.equal(nationwideHtml.includes("Surrender period: 10 years"), false);
+      assert.equal(nationwideHtml.includes("named company determined"), false);
       assert.match(nationwideHtml, /pi-checkpoint-table__note/);
       assert.equal(nationwideHtml.includes("<caption"), false);
       assert.match(nationwideHtml, /Cash received is not the same/);
@@ -458,7 +474,16 @@ describe("ClientPolicyReport", () => {
       assert.match(nationwideHtml, /Source: Policy Illustration — Page 6/);
       assert.match(nationwideHtml, /Source: Form ICC13-NWLA-495 — Page 15/);
       assert.match(nationwideHtml, /Carrier calculation required — methodology described on Page 15/);
-      assert.match(nationwideHtml, /data-testid="pi-values-chart"/);
+      assert.match(nationwideHtml, /data-testid="pi-values-lead"/);
+      const leadStart = nationwideHtml.indexOf('data-testid="pi-values-lead"');
+      const tableStart = nationwideHtml.indexOf('data-testid="pi-checkpoint-table"');
+      assert.ok(leadStart >= 0 && tableStart > leadStart, "values lead must precede the checkpoint table");
+      const valuesLead = nationwideHtml.slice(leadStart, tableStart);
+      assert.match(valuesLead, /data-testid="pi-section-band-values"/);
+      assert.match(valuesLead, /data-testid="pi-carrier-illustrated"/);
+      assert.match(valuesLead, /data-testid="pi-values-chart"/);
+      assert.equal(valuesLead.includes('data-testid="pi-checkpoint-table"'), false);
+      assert.match(nationwideHtml, /pi-print-keep-with-next/);
       assert.match(nationwideHtml, /Policy values over time/);
       assert.match(nationwideHtml, /Accumulated Value/);
       assert.match(nationwideHtml, /Cash Surrender Value/);
@@ -507,6 +532,19 @@ describe("ClientPolicyReport", () => {
       assert.match(lswHtml, /national life abr mortality table/i);
       assert.equal(lswHtml.includes("ICC13-NWLA"), false);
       assert.match(lswHtml, /data-testid="pi-snapshot-issuer"/);
+      assert.match(lswHtml, /data-testid="pi-values-lead"/);
+      const lswLead = lswHtml.slice(
+        lswHtml.indexOf('data-testid="pi-values-lead"'),
+        lswHtml.indexOf('data-testid="pi-checkpoint-table"')
+      );
+      assert.match(lswLead, /data-testid="pi-section-band-values"/);
+      assert.match(lswLead, /data-testid="pi-carrier-illustrated"/);
+      assert.match(lswLead, /data-testid="pi-distribution-callout"/);
+      assert.match(lswLead, /data-testid="pi-values-chart"/);
+      assert.match(lswHtml, /Carrier-determined; dollar amount not disclosed\./);
+      assert.match(lswHtml, /Surrender period: 10 years/);
+      assert.equal(lswHtml.includes("named company determined"), false);
+      assert.equal(lswHtml.includes("declining term years 10"), false);
       const charitableHtml = lswHtml.slice(lswHtml.indexOf("pi-rider-card-20186FL"));
       const charitableCard = charitableHtml.slice(0, charitableHtml.indexOf("</article>") + 10);
       assert.match(charitableCard, /Charitable Matching Gift/);
@@ -614,6 +652,33 @@ describe("ClientPolicyReport", () => {
         reportCss,
         /@media print[\s\S]*\.pi-checkpoint-table[\s\S]*width:\s*100%\s*!important/
       );
+      assert.match(reportCss, /@media print[\s\S]*\.pi-values-lead[\s\S]{0,120}page-break-inside:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-print-keep-with-next[\s\S]{0,120}page-break-after:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-card[\s\S]{0,160}page-break-inside:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-card[\s\S]{0,160}break-inside:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-grid[\s\S]{0,80}display:\s*block\s*!important/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-values-chart__svg[\s\S]{0,80}max-height:\s*150pt/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-values-summary[\s\S]{0,80}display:\s*none\s*!important/);
+      assert.match(reportCss, /\.pi-print-repeat\.fi-print-only[\s\S]{0,80}display:\s*none\s*!important/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-checkpoint-table thead[\s\S]{0,80}display:\s*table-header-group/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-checkpoint-wrap[\s\S]{0,240}page-break-inside:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-checkpoint-table[\s\S]{0,80}page-break-inside:\s*auto/);
+      assert.equal(/tbody tr:first-child[\s\S]{0,80}page-break-before:\s*avoid/.test(reportCss), false);
+
+      const duplicateTitle = nationalLifeReport();
+      duplicateTitle.reviewTitle = "National Life Group";
+      duplicateTitle.snapshot = {
+        ...duplicateTitle.snapshot,
+        carrier: "National Life Group",
+        product: "IUL"
+      };
+      const duplicateHtml = renderToString(
+        React.createElement(ClientPolicyReport, { report: duplicateTitle })
+      );
+      assert.match(duplicateHtml, /data-testid="pi-report-context">National Life Group · IUL</);
+      assert.equal(duplicateHtml.includes("National Life Group · National Life Group"), false);
+      assert.match(nationwideHtml, /data-testid="pi-checkpoint-h-coi"/);
+      assert.match(nationwideHtml, /\$1,422/);
     } finally {
       await server.close();
     }

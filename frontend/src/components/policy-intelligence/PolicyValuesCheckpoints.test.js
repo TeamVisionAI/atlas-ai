@@ -136,8 +136,16 @@ describe("PolicyValuesCheckpoints layout", () => {
       for (const match of noteRules) {
         assert.equal(/display:\s*(flex|grid)/.test(match[1]), false, "note must not be a flex/grid column");
       }
-      assert.match(css, /\.pi-checkpoint-table thead[\s\S]{0,120}page-break-after:\s*avoid/);
-      assert.match(css, /tbody tr:first-child[\s\S]{0,80}page-break-before:\s*avoid/);
+      assert.match(css, /\.pi-checkpoint-table thead[\s\S]{0,80}display:\s*table-header-group/);
+      assert.equal(
+        /tbody tr:first-child[\s\S]{0,80}page-break-before:\s*avoid/.test(css),
+        false
+      );
+      assert.match(css, /@media print[\s\S]*\.pi-checkpoint-wrap[\s\S]{0,240}page-break-inside:\s*avoid/);
+      assert.match(css, /@media print[\s\S]*\.pi-checkpoint-table[\s\S]{0,80}page-break-inside:\s*auto/);
+      assert.match(css, /@media print[\s\S]*\.pi-checkpoint-table thead[\s\S]{0,120}display:\s*table-header-group/);
+      assert.ok(jsx.includes("pi-print-keep"));
+      assert.match(html, /pi-checkpoint-wrap pi-print-keep/);
       assert.equal(
         /\.pi-checkpoint-table thead[\s\S]{0,80}break-before:\s*page/.test(css),
         false
