@@ -1,6 +1,8 @@
 /**
  * Illustration extract facade — PDF text → annual rows + riders.
  * BR-060: structured tables only; missing cells stay null.
+ * Routes National Life FlexLife II (20417FL) to a dedicated adapter.
+ * Nationwide-shaped documents keep the existing ledger parser unchanged.
  */
 
 const { extractPdfTextPages } = require("./extractPdfText");
@@ -10,26 +12,75 @@ const {
 } = require("./parseIulIllustrationTables");
 const { parseLivingBenefitRiders } = require("./parseLivingBenefitRiders");
 const { buildReportCheckpoints } = require("./reportCheckpoints");
+const {
+  ADAPTER_KEYS,
+  detectIllustrationAdapter
+} = require("./detectIllustrationAdapter");
+const {
+  parseLswFlexLifeIi20417FL,
+  toAnnualValuesEngineRows: toLswAnnualValuesEngineRows
+} = require("./adapters/lswFlexLifeIi20417FL");
+const { parseLswFlexLifeRiders } = require("./parseLswFlexLifeRiders");
 
-async function extractIllustrationFromPdf(buffer) {
-  const textResult = await extractPdfTextPages(buffer);
-  if (!textResult.hasText) {
+function emptyExtract(reason, pages = [], pageCount = 0) {
+  return {
+    ok: false,
+    reason,
+    ocr: false,
+    interpolated: false,
+    pages,
+    pageCount,
+    rows: [],
+    engineRows: [],
+    riders: [],
+    surrenderCharges: [],
+    reportCheckpoints: [],
+    adapterKey: null,
+    comparisonScenario: null,
+    scenarios: null
+  };
+}
+
+function extractIllustrationFromPages(pages = [], { pageCount = pages.length } = {}) {
+  const adapterKey = detectIllustrationAdapter(pages);
+
+  if (adapterKey === ADAPTER_KEYS.LSW_FLEXLIFE_II_20417FL) {
+    const parsed = parseLswFlexLifeIi20417FL(pages);
+    const riders = parseLswFlexLifeRiders(pages);
+    const engineRows = toLswAnnualValuesEngineRows(parsed.rows);
+    const reportCheckpoints = buildReportCheckpoints(parsed.rows).map((point) => ({
+      requestedYear: point.requestedYear,
+      usedYear: point.usedYear,
+      fallback: point.fallback,
+      fallbackStep: point.fallbackStep
+    }));
+
     return {
-      ok: false,
-      reason: textResult.reason || "no_extractable_text",
+      ok: parsed.rows.length > 0,
+      reason: parsed.rows.length > 0 ? null : "no_annual_ledger_rows",
       ocr: false,
-      pages: textResult.pages,
-      pageCount: textResult.pageCount,
-      rows: [],
-      engineRows: [],
-      riders: [],
-      surrenderCharges: [],
-      reportCheckpoints: []
+      interpolated: false,
+      pageCount,
+      adapterKey,
+      issuer: parsed.issuer,
+      product: parsed.product,
+      baseForm: parsed.baseForm,
+      scenario: parsed.scenario,
+      comparisonScenario: parsed.comparisonScenario,
+      scenarios: parsed.scenarios,
+      rows: parsed.rows,
+      engineRows,
+      riders,
+      surrenderCharges: parsed.surrenderCharges,
+      surrenderMechanics: parsed.surrenderMechanics,
+      candidateRowCount: parsed.candidateRowCount,
+      reportCheckpoints,
+      source: "pdf_text_table"
     };
   }
 
-  const parsed = parseIulIllustrationTables(textResult.pages);
-  const riders = parseLivingBenefitRiders(textResult.pages);
+  const parsed = parseIulIllustrationTables(pages);
+  const riders = parseLivingBenefitRiders(pages);
   const engineRows = toAnnualValuesEngineRows(parsed.rows);
   const reportCheckpoints = buildReportCheckpoints(parsed.rows).map((point) => ({
     requestedYear: point.requestedYear,
@@ -43,23 +94,40 @@ async function extractIllustrationFromPdf(buffer) {
     reason: parsed.rows.length > 0 ? null : "no_annual_ledger_rows",
     ocr: false,
     interpolated: false,
-    pageCount: textResult.pageCount,
+    pageCount,
+    adapterKey,
     scenario: parsed.scenario,
+    comparisonScenario: parsed.scenario,
+    scenarios: null,
     rows: parsed.rows,
     engineRows,
     riders,
     surrenderCharges: parsed.surrenderCharges,
-    candidateRowCount: parsed.candidateRowCount,
     reportCheckpoints,
+    candidateRowCount: parsed.candidateRowCount,
     source: "pdf_text_table"
   };
 }
 
+async function extractIllustrationFromPdf(buffer) {
+  const textResult = await extractPdfTextPages(buffer);
+  if (!textResult.hasText) {
+    return emptyExtract(textResult.reason || "no_extractable_text", textResult.pages, textResult.pageCount);
+  }
+
+  return extractIllustrationFromPages(textResult.pages, { pageCount: textResult.pageCount });
+}
+
 module.exports = {
   extractIllustrationFromPdf,
+  extractIllustrationFromPages,
   extractPdfTextPages,
   parseIulIllustrationTables,
   parseLivingBenefitRiders,
+  parseLswFlexLifeIi20417FL,
+  parseLswFlexLifeRiders,
   buildReportCheckpoints,
-  toAnnualValuesEngineRows
+  toAnnualValuesEngineRows,
+  detectIllustrationAdapter,
+  ADAPTER_KEYS
 };

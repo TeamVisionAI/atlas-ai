@@ -92,6 +92,10 @@ function buildRowMetadata(sourceRow = {}, canonical = {}) {
     accumulatedValueCharge: sourceRow.accumulatedValueCharge ?? null,
     totalAnnualCharges: sourceRow.totalAnnualCharges ?? null,
     illustratedRate: sourceRow.illustratedRate ?? null,
+    income: sourceRow.income ?? null,
+    plannedLoan: sourceRow.plannedLoan ?? null,
+    accumulatedLoan: sourceRow.accumulatedLoan ?? null,
+    adapterKey: sourceRow.adapterKey || null,
     missingFields,
     invented: false,
     interpolated: false
@@ -302,8 +306,11 @@ class AnnualValuesService {
       source: "pdf_text_table",
       setMetadata: {
         illustrationScenario: extracted.scenario,
+        adapterKey: extracted.adapterKey || null,
+        comparisonScenario: extracted.comparisonScenario || extracted.scenario || null,
         riders: extracted.riders,
         surrenderChargeSchedule: extracted.surrenderCharges,
+        surrenderMechanics: extracted.surrenderMechanics || null,
         reportCheckpoints: extracted.reportCheckpoints,
         ocr: false,
         interpolated: false
