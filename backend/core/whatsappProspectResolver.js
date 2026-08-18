@@ -102,7 +102,7 @@ function shouldEmitConversationReopened(prospect) {
   return false;
 }
 
-function resolveCreateSourceFields(qrTouch) {
+function resolveCreateSourceFields(qrTouch, origin = {}) {
   if (qrTouch) {
     return {
       source: qrTouch.source || WHATSAPP_SOURCE.CAR_MAGNET,
@@ -111,11 +111,40 @@ function resolveCreateSourceFields(qrTouch) {
       assignmentSourceHint: qrTouch.source
     };
   }
+
+  const {
+    hasPositiveCtwaReferral
+  } = require("./atlasInboundAutomationEligibility");
+
+  if (hasPositiveCtwaReferral(origin.ctwaReferral)) {
+    return {
+      source: WHATSAPP_SOURCE.FACEBOOK,
+      entryMethod: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
+      campaignAgentId: null,
+      assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK
+    };
+  }
+
+  const intake = String(origin.intakeSource || "").trim().toUpperCase();
+  if (
+    intake === WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS ||
+    intake === "FACEBOOK_LEAD" ||
+    intake === "FACEBOOK_LEAD_ADS"
+  ) {
+    return {
+      source: WHATSAPP_SOURCE.FACEBOOK,
+      entryMethod: WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
+      campaignAgentId: null,
+      assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK
+    };
+  }
+
+  // Implements BR-142 — unknown inbound is not Click-to-WhatsApp.
   return {
-    source: WHATSAPP_SOURCE.FACEBOOK,
-    entryMethod: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
+    source: WHATSAPP_SOURCE.UNKNOWN,
+    entryMethod: WHATSAPP_ENTRY_METHOD.UNATTRIBUTED,
     campaignAgentId: null,
-    assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK
+    assignmentSourceHint: null
   };
 }
 
@@ -128,7 +157,8 @@ async function insertWhatsAppProspectRow({
   name,
   firstMessage,
   organizationId,
-  qrTouch = null
+  qrTouch = null,
+  origin = {}
 }) {
   if (!organizationId) {
     throw new WhatsAppInboundOrganizationError(
@@ -138,7 +168,7 @@ async function insertWhatsAppProspectRow({
 
   const prospectNumber = await prospectNumberService.generateNextProspectNumber();
   const fullName = String(name || "Unknown").trim() || "Unknown";
-  const sourceFields = resolveCreateSourceFields(qrTouch);
+  const sourceFields = resolveCreateSourceFields(qrTouch, origin);
   // Always set preferred_language — DB DEFAULT 'english' must not override Spanish WhatsApp leads.
   const languageFields = resolveWhatsAppCreateLanguageFields(firstMessage);
 
@@ -279,12 +309,12 @@ async function stampCoreLeadSourceAttribution({
 
 async function emitProspectLifecycleEvents(
   prospect,
-  { created, reopened, correlationBase, organizationId, qrTouch = null }
+  { created, reopened, correlationBase, organizationId, qrTouch = null, sourceFields = null }
 ) {
-  const source = qrTouch?.source || WHATSAPP_SOURCE.FACEBOOK;
-  const entryMethod = qrTouch
-    ? WHATSAPP_ENTRY_METHOD.QR
-    : WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP;
+  const resolved =
+    sourceFields || resolveCreateSourceFields(qrTouch, {});
+  const source = resolved.source || WHATSAPP_SOURCE.UNKNOWN;
+  const entryMethod = resolved.entryMethod || WHATSAPP_ENTRY_METHOD.UNATTRIBUTED;
 
   if (created) {
     await savePersistedWorkflowState(
@@ -337,7 +367,11 @@ async function emitProspectLifecycleEvents(
 
     // Core stamp for QR happens in stampCoreLeadSourceAttribution (rich lead_source).
     // Non-QR keeps the Facebook bridge path.
-    if (!qrTouch) {
+    if (
+      !qrTouch &&
+      (entryMethod === WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP ||
+        entryMethod === WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS)
+    ) {
       await recruitingWorkflowHooks
         .onLegacyProspectCreated({
           prospect,
@@ -380,7 +414,9 @@ async function locateOrCreateWhatsAppProspect({
   phoneNumberId = null,
   wabaId = null,
   organizationId: explicitOrganizationId = null,
-  providerMessageId = null
+  providerMessageId = null,
+  ctwaReferral = null,
+  intakeSource = null
 } = {}) {
   const normalizedPhone = normalizePhoneNumber(phone);
   const storagePhone = resolveStoragePhone(phone);
@@ -408,12 +444,18 @@ async function locateOrCreateWhatsAppProspect({
     qrTouch = attribution.buildAttributionTouch(matchedCampaign, matchedScan);
   }
 
+  const origin = {
+    ctwaReferral: ctwaReferral || null,
+    intakeSource: intakeSource || null
+  };
+
   let prospect =
     (await quickCaptureEngine.findProspectByNormalizedPhone(normalizedPhone || phone)) ||
     (await supabaseService.findProspect(storagePhone)) ||
     (await supabaseService.findProspect(phone));
 
   const created = !prospect;
+  const sourceFields = resolveCreateSourceFields(qrTouch, origin);
 
   if (created) {
     prospect = await insertWhatsAppProspectRow({
@@ -422,7 +464,8 @@ async function locateOrCreateWhatsAppProspect({
       name,
       firstMessage,
       organizationId,
-      qrTouch
+      qrTouch,
+      origin
     });
   } else if (firstMessage) {
     const updates = {
@@ -447,7 +490,8 @@ async function locateOrCreateWhatsAppProspect({
     reopened,
     correlationBase,
     organizationId,
-    qrTouch
+    qrTouch,
+    sourceFields
   });
 
   let qrAttribution = null;

@@ -91,7 +91,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
   const body = inbound.body || `[${inbound.messageType} message]`;
 
-  const { prospect, created, storagePhone, organizationId } =
+  const { prospect, created, storagePhone, organizationId, qrAttribution } =
     await locateOrCreate({
       phone: inbound.phone,
       name: inbound.contactName,
@@ -99,7 +99,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       correlationBase: correlationId,
       phoneNumberId: inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
       wabaId: inbound.wabaId || null,
-      providerMessageId: inbound.providerMessageId || null
+      providerMessageId: inbound.providerMessageId || null,
+      ctwaReferral: inbound.ctwaReferral || null
     });
 
   logWhatsAppStage("inbound_prospect_ready", {
@@ -237,7 +238,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       inbound,
       storagePhone,
       prospect,
-      contactName: prospect.name || inbound.contactName
+      contactName: prospect.name || inbound.contactName,
+      qrAttributed: Boolean(qrAttribution?.matched)
     });
   } catch (error) {
     logWhatsAppStage("conversation_engine_failed", {
@@ -288,7 +290,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   // Live CE / WhatsApp / appointments / BR-080 remain authoritative. Failures never interrupt.
   // Ordering: post-live CE + BR-080 snapshot (canonical production state).
   // BR-141 — audio inbound is not semantic text; advisory runs after STT replay instead.
-  if (!isAudioInbound) {
+  if (!isAudioInbound && conversation?.reason !== "ATLAS_AUTOMATION_NOT_ELIGIBLE") {
     try {
       const {
         scheduleRecruitAiV2PostLiveAdvisory

@@ -16,6 +16,10 @@ const { isWorkflowGateActive } = require("./agentActionEngine");
 const { OWNERSHIP } = require("./workflowConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const liveAuthoringBridge = require("./recruitAiV2/liveAuthoringBridge");
+const {
+  evaluateAtlasInboundAutomationEligibility,
+  resolveAtlasInboundAutomationEligibility
+} = require("./atlasInboundAutomationEligibility");
 
 function extractReplyText(engineResult) {
   if (!engineResult) {
@@ -96,6 +100,21 @@ async function shouldDeliverAutomatedReply(prospect, options = {}) {
     return false;
   }
 
+  // Implements BR-142 — auto-reply only for positively eligible Atlas contacts.
+  const eligibility = evaluateAtlasInboundAutomationEligibility({
+    prospect,
+    inbound: options.inbound || null,
+    qrAttributed: options.qrAttributed === true,
+    workflowState: persisted
+  });
+  if (!eligibility.eligible) {
+    logWhatsAppStage("automated_reply_suppressed_not_eligible", {
+      phone: prospect.phone || null,
+      reason: eligibility.reason
+    });
+    return false;
+  }
+
   return true;
 }
 
@@ -131,11 +150,18 @@ async function deliverWhatsAppReply({
   prospect,
   replyText,
   engineResult,
-  outboundIntent = "CONVERSATION_ENGINE_REPLY"
+  outboundIntent = "CONVERSATION_ENGINE_REPLY",
+  qrAttributed = false
 }) {
   const allowHandoffAck = computeAllowHandoffAck(engineResult);
 
-  if (!(await shouldDeliverAutomatedReply(prospect, { allowHandoffAck }))) {
+  if (
+    !(await shouldDeliverAutomatedReply(prospect, {
+      allowHandoffAck,
+      inbound: normalized,
+      qrAttributed
+    }))
+  ) {
     logWhatsAppStage("conversation_engine_reply_suppressed", {
       phone: normalized.phone,
       reason: "BUSINESS_RULES_OR_HUMAN_OWNERSHIP"
@@ -269,7 +295,13 @@ async function deliverWhatsAppReply({
 
 async function processNormalizedInboundMessage(
   normalized,
-  { prospect, contactName, env = process.env, authoringDependencies = null } = {}
+  {
+    prospect,
+    contactName,
+    env = process.env,
+    authoringDependencies = null,
+    qrAttributed = false
+  } = {}
 ) {
   if (!normalized?.phone || !normalized?.text) {
     return {
@@ -295,6 +327,26 @@ async function processNormalizedInboundMessage(
       replied: false,
       reason: "AUDIO_STT_PENDING",
       mediaType: inboundMedia.mediaType
+    };
+  }
+
+  // Implements BR-142 — skip live authoring and CE until the sender is eligible.
+  const eligibility = await resolveAtlasInboundAutomationEligibility({
+    prospect,
+    inbound: normalized,
+    qrAttributed
+  });
+  if (!eligibility.eligible) {
+    logWhatsAppStage("atlas_automation_not_eligible", {
+      phone: normalized.phone,
+      reason: eligibility.reason,
+      providerMessageId: normalized.providerMessageId || null
+    });
+    return {
+      success: true,
+      replied: false,
+      reason: "ATLAS_AUTOMATION_NOT_ELIGIBLE",
+      eligibilityReason: eligibility.reason
     };
   }
 
@@ -324,7 +376,8 @@ async function processNormalizedInboundMessage(
         prospect,
         replyText: authoringAttempt.replyText,
         engineResult,
-        outboundIntent: "CONVERSATION_ENGINE_REPLY"
+        outboundIntent: "CONVERSATION_ENGINE_REPLY",
+        qrAttributed
       });
     }
 
@@ -368,7 +421,8 @@ async function processNormalizedInboundMessage(
               nextAction: protectedReply.nextAction,
               v2Result: protectedReply.v2Result
             },
-            outboundIntent: "CONVERSATION_ENGINE_REPLY"
+            outboundIntent: "CONVERSATION_ENGINE_REPLY",
+            qrAttributed
           });
         }
       } catch {
@@ -452,7 +506,8 @@ async function processNormalizedInboundMessage(
       prospect,
       replyText,
       engineResult,
-      outboundIntent
+      outboundIntent,
+      qrAttributed
     });
   }
 
@@ -472,13 +527,15 @@ async function processConversationAfterInbound({
   inbound,
   storagePhone,
   prospect,
-  contactName
+  contactName,
+  qrAttributed = false
 }) {
   const normalized = buildNormalizedMessageFromWhatsApp(inbound, storagePhone);
 
   return processNormalizedInboundMessage(normalized, {
     prospect,
-    contactName: contactName || prospect?.name
+    contactName: contactName || prospect?.name,
+    qrAttributed
   });
 }
 

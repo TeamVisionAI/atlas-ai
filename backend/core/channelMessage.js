@@ -29,7 +29,8 @@ function buildNormalizedMessageFromWhatsApp(inbound, storagePhone) {
     text: String(inbound.body || "").trim(),
     messageType: inbound.messageType || "text",
     media: inbound.media || null,
-    timestamp: inbound.timestamp || new Date().toISOString()
+    timestamp: inbound.timestamp || new Date().toISOString(),
+    ctwaReferral: inbound.ctwaReferral || null
   };
 }
 
