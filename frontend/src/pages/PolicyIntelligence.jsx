@@ -5,10 +5,13 @@ import {
   fetchPolicyReviewBundle,
   listPolicyReviews,
   savePolicyExtraction,
-  uploadPolicyDocument
+  uploadPolicyDocument,
+  fetchClientPolicyReport
 } from "../services/policyIntelligenceService";
 import ComparisonWorkspace from "../components/policy-intelligence/ComparisonWorkspace";
+import ClientPolicyReport from "../components/policy-intelligence/ClientPolicyReport";
 import FinancialIntelligencePanel from "../components/financial-intelligence/FinancialIntelligencePanel";
+import { fetchLatestStrategyEvaluation } from "../services/financialIntelligenceService";
 import "./WorkspaceDashboard.css";
 import "./PolicyIntelligence.css";
 
@@ -62,6 +65,8 @@ export default function PolicyIntelligence() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [workspaceTab, setWorkspaceTab] = useState("extract");
+  const [clientReport, setClientReport] = useState(null);
+  const [fiEvaluation, setFiEvaluation] = useState(null);
 
   const refreshReviews = useCallback(async () => {
     const rows = await listPolicyReviews();
@@ -142,6 +147,43 @@ export default function PolicyIntelligence() {
       cancelled = true;
     };
   }, [loadBundle, refreshReviews, translate]);
+
+  useEffect(() => {
+    if (workspaceTab !== "report" || !selectedReviewId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function loadReport() {
+      setBusy(true);
+      setError("");
+      try {
+        const [report, evaluation] = await Promise.all([
+          fetchClientPolicyReport(selectedReviewId),
+          fetchLatestStrategyEvaluation(selectedReviewId).catch(() => null)
+        ]);
+        if (!cancelled) {
+          setClientReport(report);
+          setFiEvaluation(evaluation);
+        }
+      } catch (reportError) {
+        if (!cancelled) {
+          setClientReport(null);
+          setError(reportError.message || translate("policyIntelligenceErrorLoad"));
+        }
+      } finally {
+        if (!cancelled) {
+          setBusy(false);
+        }
+      }
+    }
+
+    loadReport();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceTab, selectedReviewId, translate]);
 
   async function handleCreateReview(event) {
     event.preventDefault();
@@ -285,6 +327,20 @@ export default function PolicyIntelligence() {
         <button
           type="button"
           role="tab"
+          aria-selected={workspaceTab === "report"}
+          className={
+            workspaceTab === "report"
+              ? "policy-intelligence__tab policy-intelligence__tab--active"
+              : "policy-intelligence__tab"
+          }
+          onClick={() => setWorkspaceTab("report")}
+          data-testid="pi-tab-report"
+        >
+          {translate("policyIntelligenceTabReport")}
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={workspaceTab === "discussion"}
           className={
             workspaceTab === "discussion"
@@ -342,6 +398,49 @@ export default function PolicyIntelligence() {
             </label>
           ) : null}
           <FinancialIntelligencePanel reviewId={selectedReviewId || null} />
+        </section>
+      ) : null}
+
+      {workspaceTab === "report" ? (
+        <section className="workspace-dashboard__panel" aria-labelledby="pi-client-report-title">
+          <div className="workspace-dashboard__panel-head fi-print-hide">
+            <h2 id="pi-client-report-title">Client policy report</h2>
+            <div className="pi-client-report-toolbar">
+              {reviews.length ? (
+                <label className="policy-intelligence__select-label">
+                  <span>{translate("policyIntelligenceSelectReview")}</span>
+                  <select
+                    value={selectedReviewId}
+                    onChange={handleSelectReview}
+                    disabled={busy}
+                    data-testid="pi-report-review-select"
+                  >
+                    {reviews.map((review) => (
+                      <option key={review.id} value={review.id}>
+                        {review.title} ({review.status})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <button
+                type="button"
+                className="policy-intelligence__print"
+                onClick={() => window.print()}
+                data-testid="pi-report-print"
+                disabled={!clientReport}
+              >
+                {translate("policyIntelligencePrintReport")}
+              </button>
+            </div>
+          </div>
+          {clientReport ? (
+            <ClientPolicyReport report={clientReport} financialEvaluation={fiEvaluation} />
+          ) : (
+            <p className="policy-intelligence__empty-copy">
+              Select a review to open the client-facing policy report.
+            </p>
+          )}
         </section>
       ) : null}
 

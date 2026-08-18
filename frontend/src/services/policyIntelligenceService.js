@@ -59,6 +59,12 @@ export async function savePolicyExtraction(documentId, extractedData, { merge = 
   });
 }
 
+export async function fetchClientPolicyReport(reviewId) {
+  return apiFetch(
+    `/api/policy-intelligence/reviews/${encodeURIComponent(reviewId)}/client-report`
+  );
+}
+
 export async function fetchPolicyDocumentDownloadUrl(documentId) {
   return apiFetch(
     `/api/policy-intelligence/documents/${encodeURIComponent(documentId)}/download-url`

@@ -1,0 +1,424 @@
+.pi-client-report {
+  --pi-navy: #0b1f3a;
+  --pi-gold: #c4a35a;
+  --pi-paper: #ffffff;
+  --pi-muted: #5c6b80;
+  --pi-line: #e6ddc8;
+  color: var(--pi-navy);
+  background: var(--pi-paper);
+  padding: 8px 0 32px;
+  max-width: 1080px;
+}
+
+.pi-client-report__header {
+  margin: 0 0 28px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--pi-gold);
+}
+
+.pi-client-report__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pi-gold);
+  font-weight: 700;
+}
+
+.pi-client-report__header h2 {
+  margin: 8px 0 0;
+  font-size: 1.85rem;
+  letter-spacing: -0.02em;
+}
+
+.pi-client-report__lede {
+  margin: 10px 0 0;
+  max-width: 42rem;
+  color: var(--pi-muted);
+  line-height: 1.5;
+}
+
+.pi-report-section {
+  margin: 0 0 32px;
+}
+
+.pi-report-section > h3 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pi-navy);
+}
+
+.pi-report__empty,
+.pi-report__banner,
+.pi-report__notes {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--pi-line);
+  background: #fbf8f1;
+  color: var(--pi-navy);
+  line-height: 1.5;
+}
+
+.pi-report__banner {
+  margin: 0 0 20px;
+  border-color: var(--pi-gold);
+  font-weight: 600;
+}
+
+.pi-snapshot {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.pi-snapshot__fact {
+  padding: 12px 14px;
+  border: 1px solid var(--pi-line);
+  background: #fff;
+}
+
+.pi-snapshot__fact dt {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pi-muted);
+}
+
+.pi-snapshot__fact dd {
+  margin: 6px 0 0;
+  font-weight: 650;
+}
+
+.pi-cost-grid,
+.pi-rider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.pi-cost-card,
+.pi-rider-card {
+  padding: 16px;
+  border: 1px solid var(--pi-line);
+  background: #fff;
+}
+
+.pi-cost-card__number {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--pi-gold);
+  font-weight: 700;
+}
+
+.pi-cost-card__label,
+.pi-rider-card__name {
+  margin: 6px 0 10px;
+  font-size: 1rem;
+}
+
+.pi-cost-card__value {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.pi-cost-card--not_available .pi-cost-card__value,
+.pi-cost-card--carrier_calculation_required .pi-cost-card__value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--pi-muted);
+}
+
+.pi-cost-card__caption {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--pi-gold);
+}
+
+.pi-cost-card__note,
+.pi-rider-card__form,
+.pi-rider-card__illustrative {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--pi-muted);
+  line-height: 1.4;
+}
+
+.pi-rider-card__kicker {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pi-gold);
+}
+
+.pi-rider-card__body {
+  margin: 12px 0 0;
+  line-height: 1.45;
+}
+
+.pi-rider-card__carrier,
+.pi-rider-card__warning {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--pi-gold);
+  background: #fbf8f1;
+  line-height: 1.45;
+}
+
+.pi-client-report__context {
+  margin: 6px 0 0;
+  font-weight: 650;
+  color: var(--pi-navy);
+}
+
+.pi-source-line {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--pi-muted);
+  line-height: 1.4;
+}
+
+.pi-fn {
+  font-size: 0.72em;
+  font-weight: 700;
+  color: var(--pi-navy);
+}
+
+.pi-source-catalog {
+  margin: 0;
+  padding-left: 1.4rem;
+  line-height: 1.55;
+}
+
+.pi-values-chart {
+  margin: 0 0 16px;
+  padding: 12px 12px 8px;
+  border: 1px solid var(--pi-line);
+  background: #fff;
+}
+
+.pi-values-chart__title {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+  color: var(--pi-navy);
+}
+
+.pi-values-chart__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pi-values-chart__axis-label {
+  font-size: 10px;
+  fill: #5c6b80;
+}
+
+.pi-print-repeat {
+  display: none;
+}
+
+.pi-values-chart__tick {
+  font-size: 10px;
+  fill: #5c6b80;
+}
+
+.pi-values-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.pi-values-chart__swatch {
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--pi-navy);
+}
+
+.pi-checkpoint-table__caption {
+  caption-side: top;
+  text-align: left;
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--pi-muted);
+}
+
+.pi-checkpoint-table thead {
+  display: table-header-group;
+}
+
+.pi-checkpoint-table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.pi-checkpoint-wrap {
+  overflow-x: auto;
+}
+
+.pi-checkpoint-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.pi-checkpoint-table th,
+.pi-checkpoint-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--pi-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.pi-checkpoint-table th {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pi-muted);
+}
+
+.pi-checkpoint-table__av {
+  background: #f4f7fb;
+  font-weight: 650;
+}
+
+.pi-checkpoint-table__csv {
+  background: #fbf8f1;
+  font-weight: 650;
+}
+
+.pi-checkpoint-table__fallback {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--pi-muted);
+  font-weight: 500;
+  white-space: normal;
+}
+
+.pi-checkpoint-table__legend,
+.pi-safeguards {
+  margin: 12px 0 0;
+  color: var(--pi-muted);
+  line-height: 1.5;
+}
+
+.pi-safeguards {
+  padding-left: 1.1rem;
+  color: var(--pi-navy);
+}
+
+@media print {
+  @page {
+    size: letter;
+    margin: 0.75in 0.6in 0.9in;
+    @bottom-center {
+      content: "Team Vision Financial · Policy Intelligence Report · Page " counter(page);
+      font-size: 9pt;
+      color: #0b1f3a;
+    }
+  }
+
+  .pi-print-repeat {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 0 0 6px;
+    font-size: 9pt;
+    font-weight: 700;
+    color: #0b1f3a !important;
+    background: #fff !important;
+    border-bottom: 1px solid #c4a35a;
+  }
+
+  .pi-client-report {
+    max-width: none;
+    padding: 22px 0 0;
+    color: #0b1f3a !important;
+    background: #fff !important;
+  }
+
+  .pi-client-report__eyebrow,
+  .pi-cost-card__number,
+  .pi-rider-card__kicker {
+    color: #c4a35a !important;
+  }
+
+  .pi-client-report__header {
+    border-bottom: 2px solid #c4a35a !important;
+    color: #0b1f3a !important;
+  }
+
+  .pi-client-report,
+  .pi-cost-card,
+  .pi-rider-card,
+  .pi-snapshot__fact,
+  .pi-values-chart,
+  .pi-report__banner,
+  .pi-report__empty,
+  .pi-checkpoint-table__av,
+  .pi-checkpoint-table__csv {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .pi-cost-card,
+  .pi-rider-card,
+  .pi-snapshot__fact,
+  .pi-report__banner,
+  .pi-report__empty,
+  .pi-values-chart,
+  .pi-safeguards,
+  .pi-source-catalog {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .pi-report-section--values,
+  .pi-report-section--fi,
+  .pi-report-section--sources {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .pi-report-section > h3,
+  .pi-values-chart__title,
+  .pi-client-report__header {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .pi-source-line,
+  .pi-source-catalog,
+  .pi-checkpoint-table__caption,
+  .pi-values-chart__legend {
+    display: block !important;
+    color: #0b1f3a !important;
+  }
+
+  .pi-values-chart__legend {
+    display: flex !important;
+  }
+
+  .pi-values-chart__tick,
+  .pi-values-chart__axis-label {
+    fill: #0b1f3a !important;
+  }
+
+  .pi-checkpoint-table thead {
+    display: table-header-group;
+  }
+}

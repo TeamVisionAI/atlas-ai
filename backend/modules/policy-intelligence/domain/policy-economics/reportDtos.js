@@ -3,9 +3,13 @@
  * No UI. Null costs stay null.
  */
 
-const { buildReportCheckpoints } = require("../illustration-extract/reportCheckpoints");
+const {
+  buildReportCheckpoints,
+  DEFAULT_CHECKPOINT_YEARS
+} = require("../illustration-extract/reportCheckpoints");
 const { VALUE_CLASSIFICATIONS, CARRIER_CALCULATION_REQUIRED_TEXT } = require("./classifications");
 const { overlayAnnualByYear } = require("./policyCostTerms");
+const { POLICY_COST_CATEGORY_ORDER } = require("./policyCostCategories");
 const {
   fromRawNumber,
   unavailableValue,
@@ -18,12 +22,88 @@ function classifiedFromRow(value, { nullReason, provenance, explicitZero = true 
   return fromRawNumber(value, { nullReason, provenance, explicitZero });
 }
 
+const COST_TERM_FIELDS = Object.freeze({
+  percent_of_premium_expense_charge: "percentOfPremiumExpenseCharge",
+  cost_of_insurance: "costOfInsurance",
+  monthly_expense_charge: "monthlyExpenseCharge",
+  monthly_policy_fee: "monthlyPolicyFee",
+  monthly_percent_of_accumulated_value: "monthlyPercentOfAccumulatedValue",
+  rider_charges: "riderCharges",
+  surrender_charges: "surrenderCharges"
+});
+
+function extraCheckpointYears(timeline = []) {
+  const years = (Array.isArray(timeline) ? timeline : [])
+    .map((row) => Number(row?.policyYear))
+    .filter((year) => Number.isInteger(year) && year > 0);
+  if (!years.length) {
+    return [];
+  }
+  const lastYear = Math.max(...years);
+  return DEFAULT_CHECKPOINT_YEARS.includes(lastYear) ? [] : [lastYear];
+}
+
+function preferredClassifiedFromCategory(terms) {
+  if (!terms || typeof terms !== "object") {
+    return unavailableValue("not_stated");
+  }
+  const candidates = [terms.annualDollars, terms.monthlyDollars, terms.rate];
+  for (const candidate of candidates) {
+    if (
+      candidate &&
+      candidate.classification !== VALUE_CLASSIFICATIONS.NOT_AVAILABLE &&
+      (candidate.value != null ||
+        candidate.classification === VALUE_CLASSIFICATIONS.CARRIER_CALCULATION_REQUIRED)
+    ) {
+      return candidate;
+    }
+  }
+  return terms.annualDollars || unavailableValue("not_stated");
+}
+
+function buildPolicyCostCategoryCards(costTerms = null) {
+  return POLICY_COST_CATEGORY_ORDER.map((category) => {
+    const terms = costTerms ? costTerms[COST_TERM_FIELDS[category.id]] : null;
+    const display = preferredClassifiedFromCategory(terms);
+    return Object.freeze({
+      id: category.id,
+      number: category.number,
+      label: category.label,
+      display,
+      rate: terms?.rate || unavailableValue("not_stated"),
+      monthlyDollars: terms?.monthlyDollars || unavailableValue("not_stated"),
+      annualDollars: terms?.annualDollars || unavailableValue("not_stated"),
+      existenceMentioned: terms?.existenceMentioned === true,
+      notes: terms?.notes || null,
+      scheduleLength: Array.isArray(terms?.schedule) ? terms.schedule.length : 0,
+      sourcePages: Object.freeze(
+        [...new Set(
+          [
+            display?.provenance?.sourcePage,
+            terms?.annualDollars?.provenance?.sourcePage,
+            terms?.rate?.provenance?.sourcePage,
+            ...(Array.isArray(terms?.schedule)
+              ? terms.schedule.flatMap((item) => [item?.sourcePage, item?.provenance?.sourcePage])
+              : [])
+          ].filter((page) => Number.isInteger(Number(page)) && Number(page) > 0).map(Number)
+        )].sort((a, b) => a - b)
+      ),
+      separateFromCsv: terms?.separateFromCsv === true,
+      provenance: display?.provenance || terms?.annualDollars?.provenance || null
+    });
+  });
+}
+
 function buildPolicyCostCheckpoints({
   timeline = [],
   costTerms = null,
-  adapterKey = null
+  adapterKey = null,
+  requestedYears = null
 } = {}) {
-  const points = buildReportCheckpoints(timeline);
+  const years = Array.isArray(requestedYears) && requestedYears.length
+    ? requestedYears
+    : [...DEFAULT_CHECKPOINT_YEARS, ...extraCheckpointYears(timeline)];
+  const points = buildReportCheckpoints(timeline, years);
 
   return points.map((point) => {
     const row = point.row || {};
@@ -77,6 +157,14 @@ function buildPolicyCostCheckpoints({
       }
     );
 
+    const otherKnownCharges = sumKnownDollarValues(
+      [premiumLoad, monthlyExpense, policyFee, percentAvCharge, riderCharges],
+      createProvenance({
+        adapterKey,
+        section: "other_known_charges",
+        classification: VALUE_CLASSIFICATIONS.CALCULATED_FROM_EXPLICIT_TERMS
+      })
+    );
     const totalKnownPolicyCosts = sumKnownDollarValues(
       [coi, premiumLoad, monthlyExpense, policyFee, percentAvCharge, riderCharges],
       createProvenance({
@@ -100,6 +188,7 @@ function buildPolicyCostCheckpoints({
       policyFee,
       percentOfAccumulatedValueCharge: percentAvCharge,
       riderCharges,
+      otherKnownCharges,
       surrenderCharge,
       totalKnownPolicyCosts,
       accountValue: classifiedFromRow(row.accountValue, {
@@ -177,6 +266,16 @@ function buildLivingBenefitCard(rider = {}) {
     riderCharges: rider.riderCharges || null,
     cashReceivedNotEqualToAmountAccelerated:
       rider.cashReceivedNotEqualToAmountAccelerated !== false,
+    sourcePage: rider.sourcePage ?? rider.provenance?.sourcePage ?? null,
+    sourcePages: Object.freeze(
+      [...new Set(
+        [
+          ...(Array.isArray(rider.sourcePages) ? rider.sourcePages : []),
+          rider.sourcePage,
+          rider.provenance?.sourcePage
+        ].filter((page) => Number.isInteger(Number(page)) && Number(page) > 0).map(Number)
+      )].sort((a, b) => a - b)
+    ),
     provenance: rider.provenance || createProvenance({
       sourcePage: rider.sourcePage,
       formNumber: rider.formNumber,
@@ -208,6 +307,7 @@ function buildPolicyEconomicsReportDto({
     issuer,
     product,
     policyCostCheckpoints: buildPolicyCostCheckpoints({ timeline, costTerms, adapterKey }),
+    policyCostCategories: buildPolicyCostCategoryCards(costTerms),
     livingBenefitCards: buildLivingBenefitCards(riders),
     invented: false,
     interpolated: false
@@ -216,6 +316,7 @@ function buildPolicyEconomicsReportDto({
 
 module.exports = {
   buildPolicyCostCheckpoints,
+  buildPolicyCostCategoryCards,
   buildLivingBenefitCard,
   buildLivingBenefitCards,
   buildPolicyEconomicsReportDto

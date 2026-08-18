@@ -17,6 +17,7 @@ const {
 const { createSignedDownloadUrl } = require("../infrastructure/policyDocumentStorage");
 const { mapReview, mapDocument, mapExtraction } = require("./policyMappers");
 const { buildPolicyReport } = require("./policyReportService");
+const { assembleClientPolicyReport } = require("./assembleClientPolicyReport");
 const {
   gateExtractionForAi,
   gateExtractionForBenchmark,
@@ -218,6 +219,33 @@ class PolicyExtractionService {
     ]);
 
     return buildPolicyReport({ review, documents, extractions }, { mode });
+  }
+
+  /**
+   * Client-facing report — persisted BR-144 DTOs only. No PDF re-parse.
+   */
+  async getClientReport(organizationId, reviewId) {
+    const review = await this.repository.getReview(organizationId, reviewId);
+
+    if (!review) {
+      throw httpError("Policy review not found.", 404, "POLICY_REVIEW_NOT_FOUND");
+    }
+
+    const [extractions, annual] = await Promise.all([
+      this.repository.listExtractionsForReview(organizationId, reviewId),
+      this.annualValuesService
+        ? this.annualValuesService.getForReview(organizationId, reviewId)
+        : Promise.resolve({ annualValues: null })
+    ]);
+
+    const latestExtraction = (extractions || [])[0] || null;
+    const extractedData = latestExtraction?.extracted_data || latestExtraction?.extractedData || {};
+
+    return assembleClientPolicyReport({
+      review: mapReview(review),
+      extractedData: normalizePolicyExtractionData(extractedData),
+      annualValues: annual?.annualValues || null
+    });
   }
 
   async getAiContextForDocument(organizationId, documentId) {

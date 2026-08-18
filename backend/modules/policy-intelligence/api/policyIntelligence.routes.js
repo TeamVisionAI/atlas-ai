@@ -210,6 +210,23 @@ function createPolicyIntelligenceRoutes(deps = {}) {
   );
 
   router.get(
+    "/reviews/:reviewId/client-report",
+    requirePermission(PERMISSIONS.POLICY_READ),
+    async (req, res) => {
+      try {
+        const organizationId = getTenantOrganizationId(req);
+        const report = await service.extraction.getClientReport(
+          organizationId,
+          req.params.reviewId
+        );
+        res.json(report);
+      } catch (error) {
+        sendError(res, error);
+      }
+    }
+  );
+
+  router.get(
     "/documents/:documentId/ai-context",
     requirePermission(PERMISSIONS.POLICY_READ),
     async (req, res) => {

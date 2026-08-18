@@ -38,6 +38,8 @@ describe("FI print layout contract", () => {
       ".fi-panel__button",
       ".fi-panel__history",
       ".fi-panel__meta-bar",
+      ".policy-intelligence__print",
+      ".pi-client-report-toolbar",
       ".fi-print-hide"
     ]) {
       assert.ok(printCss.includes(selector), `missing hide rule for ${selector}`);
@@ -51,6 +53,7 @@ describe("FI print layout contract", () => {
       ".fi-discussion-scenarios__missing",
       ".fi-discussion-scenarios__disclaimers",
       ".fi-projection",
+      ".pi-client-report",
       ".fi-print-root"
     ]) {
       const hideRule = new RegExp(
@@ -76,6 +79,18 @@ describe("FI print layout contract", () => {
     assert.ok(sectionJsx.includes("localizeFiStatus"));
     assert.ok(sectionJsx.includes("fiRegisteredRepHandoff"));
     assert.ok(panelJsx.includes("fiPrintReport.css"));
+  });
+
+  it("does not hide PI source lines, charts, or page numbers in print CSS", () => {
+    const piCss = readFileSync(join(__dirname, "../policy-intelligence/ClientPolicyReport.css"), "utf8");
+    assert.ok(piCss.includes("@page"));
+    assert.ok(piCss.includes("counter(page)"));
+    assert.ok(piCss.includes(".pi-source-line"));
+    assert.ok(piCss.includes("display: block !important"));
+    assert.equal(/pi-source-line[^{]*\{[^}]*display:\s*none/m.test(piCss), false);
+    assert.equal(/pi-values-chart[^{]*\{[^}]*display:\s*none/m.test(printCss), false);
+    assert.ok(printCss.includes(".pi-client-report-toolbar"));
+    assert.ok(printCss.includes(".policy-intelligence__print"));
   });
 
   it("does not add a PDF-generation dependency", () => {

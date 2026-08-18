@@ -132,6 +132,14 @@ function createRiderEconomics(input = {}) {
     minimumDollarAmount: input.minAccelerationDollars ?? input.minimumDollarAmount ?? null,
     adapterKey: input.adapterKey || null,
     sourcePage: input.sourcePage ?? null,
+    sourcePages: Object.freeze(
+      [...new Set(
+        [
+          ...(Array.isArray(input.sourcePages) ? input.sourcePages : []),
+          input.sourcePage
+        ].filter((page) => Number.isInteger(Number(page)) && Number(page) > 0).map(Number)
+      )].sort((a, b) => a - b)
+    ),
     sourceSnippet: input.sourceSnippet || null,
     calculated: input.calculated === true,
     notes: input.notes || null,

@@ -152,7 +152,13 @@ function run() {
   const year1 = dto.policyCostCheckpoints.find((row) => row.requestedYear === 1);
   assert(year1.year === 1 && year1.fallback === false, "LSW checkpoint year 1 exact");
   assert(year1.costOfInsurance.value == null, "LSW DTO COI null");
+  assert(year1.otherKnownCharges.value == null, "LSW other known charges stay unknown");
   assert(year1.totalKnownPolicyCosts.value == null, "LSW known costs stay unknown");
+  assert(dto.policyCostCategories.length === 7, "seven cost category cards");
+  assert(
+    dto.policyCostCategories.every((card) => card.display.value !== 0 || card.display.classification === "EXTRACTED_EXACT"),
+    "category cards do not coerce unknown to zero"
+  );
   const abrCard = dto.livingBenefitCards.find((card) => card.form === "8052FL");
   assert(abrCard.carrierCalculationRequired === true, "LSW ABR card fail-closed");
 
