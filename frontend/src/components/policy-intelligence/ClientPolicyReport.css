@@ -490,28 +490,95 @@
 }
 
 .pi-checkpoint-wrap {
-  overflow-x: auto;
+  overflow-x: visible;
+  max-width: 100%;
 }
 
 .pi-checkpoint-table {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--year,
+.pi-checkpoint-table__col--year {
+  width: 8%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--age,
+.pi-checkpoint-table__col--age {
+  width: 8%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--premium,
+.pi-checkpoint-table__col--premium {
+  width: 12%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--coi,
+.pi-checkpoint-table__col--coi {
+  width: 10%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--other,
+.pi-checkpoint-table__col--other {
+  width: 11%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--surrender,
+.pi-checkpoint-table__col--surrender {
+  width: 11%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--av,
+.pi-checkpoint-table__col--av {
+  width: 14%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--csv,
+.pi-checkpoint-table__col--csv {
+  width: 15%;
+}
+
+.pi-checkpoint-table col.pi-checkpoint-table__col--db,
+.pi-checkpoint-table__col--db {
+  width: 11%;
 }
 
 .pi-checkpoint-table th,
 .pi-checkpoint-table td {
-  padding: 6px 8px;
+  box-sizing: border-box;
+  padding: 5px 4px;
   border-bottom: 1px solid var(--pi-line);
   text-align: left;
-  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .pi-checkpoint-table th {
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--pi-muted);
+  white-space: normal;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+.pi-checkpoint-table td {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+.pi-checkpoint-table__head {
+  display: flex;
+  flex-direction: column;
+}
+
+.pi-checkpoint-table__head-line {
+  display: block;
 }
 
 .pi-checkpoint-table__av {
@@ -544,9 +611,24 @@
   color: var(--pi-navy);
 }
 
+@media (max-width: 900px) {
+  .pi-checkpoint-table {
+    font-size: 0.72rem;
+  }
+
+  .pi-checkpoint-table th,
+  .pi-checkpoint-table td {
+    padding: 4px 3px;
+  }
+}
+
 @media (max-width: 720px) {
   .pi-snapshot--hero {
     grid-template-columns: 1fr;
+  }
+
+  .pi-checkpoint-wrap {
+    overflow-x: auto;
   }
 }
 
@@ -689,5 +771,34 @@
 
   .pi-checkpoint-table thead {
     display: table-header-group;
+  }
+
+  .pi-checkpoint-wrap {
+    overflow: visible !important;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .pi-checkpoint-table {
+    width: 100% !important;
+    max-width: 100%;
+    table-layout: fixed;
+    font-size: 7.5pt;
+  }
+
+  .pi-checkpoint-table th,
+  .pi-checkpoint-table td {
+    padding: 3px 2px;
+  }
+
+  .pi-checkpoint-table th {
+    font-size: 6.5pt;
+    white-space: normal !important;
+    line-height: 1.12;
+  }
+
+  .pi-checkpoint-table td {
+    white-space: nowrap;
+    font-size: 7.5pt;
   }
 }
