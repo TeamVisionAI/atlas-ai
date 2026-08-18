@@ -57,6 +57,18 @@ function run() {
   assert(nearlyEqual(altY1.illustratedRate, 0.03), "alternative current 3.00%");
   assert(distY1.accountValue === 1921, "distributions year 1 AV matches current illustrated");
   assert(distY1.plannedLoan === 0 && distY1.accumulatedLoan === 0, "distributions loans present as zeros");
+  const distY32 = scenarios[SCENARIOS.CURRENT_ILLUSTRATED_DISTRIBUTIONS].find((row) => row.policyYear === 32);
+  const distY40 = scenarios[SCENARIOS.CURRENT_ILLUSTRATED_DISTRIBUTIONS].find((row) => row.policyYear === 40);
+  const distY60 = scenarios[SCENARIOS.CURRENT_ILLUSTRATED_DISTRIBUTIONS].find((row) => row.policyYear === 60);
+  const distY86 = scenarios[SCENARIOS.CURRENT_ILLUSTRATED_DISTRIBUTIONS].find((row) => row.policyYear === 86);
+  assert(distY32 && distY32.plannedLoan === 17265 && distY32.accumulatedLoan === 18280, "year 32 distribution loans");
+  assert(distY32.sourcePage === 26, "year 32 distribution page");
+  assert(distY40 && distY40.plannedLoan === 27270 && distY40.accumulatedLoan === 209023, "year 40 distribution loans");
+  assert(distY60 && distY60.plannedLoan === 85498 && distY60.accumulatedLoan === 1319188, "year 60 distribution loans");
+  assert(distY86 && distY86.plannedLoan === 377676 && distY86.accumulatedLoan === 6889734, "year 86 distribution loans");
+  assert(distY86.sourcePage === 28, "year 86 distribution page");
+  assert(year1.plannedLoan === 0 && year1.accumulatedLoan === 0, "current illustrated dual-ledger still has placeholder zeros");
+  assert(year1.sourcePage === 21, "canonical current illustrated stays on pages 21–24");
   assert(
     guaranteedY1.accountValue !== year1.accountValue && altY1.accountValue !== year1.accountValue,
     "four scenarios stay separated"
