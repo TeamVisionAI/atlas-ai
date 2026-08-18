@@ -38,6 +38,8 @@
   .workspace-dashboard__panel-head,
   .policy-intelligence__form,
   .policy-intelligence__notice,
+  .policy-intelligence__print,
+  .pi-client-report-toolbar,
   .workspace-dashboard__error,
   .fi-panel__forms,
   .fi-panel__button,
@@ -62,6 +64,8 @@
   .workspace-dashboard__panel,
   .fi-panel,
   .fi-print-root,
+  .pi-client-report,
+  .pi-values-chart,
   .fi-discussion-scenarios,
   .fi-discussion-scenarios__table-wrap,
   .fi-discussion-scenarios__projection-grid {
@@ -94,6 +98,7 @@
 
   /* Report starts on page 1 — never force a leading page break */
   .fi-print-root,
+  .pi-client-report,
   .fi-discussion-scenarios {
     break-before: auto !important;
     page-break-before: auto !important;

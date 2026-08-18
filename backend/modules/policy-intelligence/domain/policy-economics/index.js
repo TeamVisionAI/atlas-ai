@@ -14,6 +14,7 @@ const {
 } = require("./riderEconomics");
 const {
   buildPolicyCostCheckpoints,
+  buildPolicyCostCategoryCards,
   buildLivingBenefitCard,
   buildLivingBenefitCards,
   buildPolicyEconomicsReportDto
@@ -31,6 +32,7 @@ module.exports = {
   createRiderEconomics,
   resolveAcceleratedBenefitPayout,
   buildPolicyCostCheckpoints,
+  buildPolicyCostCategoryCards,
   buildLivingBenefitCard,
   buildLivingBenefitCards,
   buildPolicyEconomicsReportDto

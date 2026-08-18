@@ -827,7 +827,7 @@ PI-001 Carrier Identified · PI-002 Product Identified · PI-003 Increasing Deat
 **Module:** `backend/modules/policy-intelligence/domain/policy-economics`  
 **Depends on:** BR-052, BR-054, BR-057, BR-058, BR-060  
 **Related:** BR-061 (consumes Facts / Annual Values; does not invent costs)  
-**Status:** Implemented (data layer only; no Policy Intelligence UI)  
+**Status:** Implemented (data layer + client-facing report UI consumes DTOs; no new calculations)  
 **Persistence:** Existing JSONB (`extracted_data`, annual-value-set `metadata`, annual-value row `metadata`). **No database migration.** Do not alter migrations 024 or 029.
 
 ### Rules
@@ -840,7 +840,7 @@ PI-001 Carrier Identified · PI-002 Product Identified · PI-003 Increasing Deat
 6. **Cash ≠ accelerated DB** — Never assume cash benefit equals death benefit accelerated. If the document lacks a complete calculation chain, classification is `CARRIER_CALCULATION_REQUIRED` and report text is: “Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.”
 7. **Carrier isolation** — Nationwide IUL Protector II and National Life / LSW FlexLife II use separate adapters. Do not reuse Nationwide column maps, discount factors, or rider assumptions on National Life (or the reverse). National Life sample 6.5% ABR values remain illustrative only; exact payout stays `CARRIER_CALCULATION_REQUIRED`.
 8. **Insurance Facts pass-through** — Facts must preserve full safe rider economics (not `{type, amount, notes}` only). Facts remain immutable (BR-058).
-9. **Report DTOs, no UI** — Policy cost checkpoints use years 1, 10, 20, 30, 40… with 5-year fallback only when an exact year is absent. Living-benefit cards carry qualify / limits / methodology / exact payout or carrier-calculation-required / remaining DB / AV-CSV effect / provenance.
+9. **Report DTOs and client report** — Policy cost checkpoints use years 1, 10, 20, 30, 40… with 5-year fallback only when an exact year is absent. Living-benefit cards carry qualify / limits / methodology / exact payout or carrier-calculation-required / remaining DB / AV-CSV effect / provenance. The client-facing report UI consumes these DTOs and must not re-parse documents or invent costs, rider payouts, or investment series.
 10. **Boundaries** — Do not redesign annual ledger parsing except additive metadata/pass-through. Do not change BR-142, BR-143, Comparison stress fail-closed math, or Recruit OS / Meta / calendar / WhatsApp.
 
 ---

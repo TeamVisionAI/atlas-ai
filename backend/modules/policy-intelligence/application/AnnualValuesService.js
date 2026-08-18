@@ -117,6 +117,7 @@ function mapAnnualValueSet(setRow, valueRows = []) {
     summaryMetrics: setRow.summary_metrics || {},
     validationResults: setRow.validation_results || {},
     calculationMetadata: setRow.calculation_metadata || {},
+    metadata: setRow.metadata || {},
     createdAt: setRow.created_at,
     updatedAt: setRow.updated_at
   };

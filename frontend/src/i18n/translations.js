@@ -86,6 +86,8 @@ export const translations = {
     policyIntelligenceErrorNoDocument: "Suba un documento antes de guardar la extracción.",
     policyIntelligenceTabExtract: "Extracción",
     policyIntelligenceTabComparison: "Comparación",
+    policyIntelligenceTabReport: "Informe",
+    policyIntelligencePrintReport: "Imprimir / PDF",
     policyIntelligenceComparisonSetupTitle: "Espacio de comparación",
     policyIntelligenceComparisonHelp:
       "Compare escenarios con el mismo modelo canónico. Solo cálculos deterministas — sin IA ni OCR (BR-061).",
@@ -1790,6 +1792,8 @@ export const translations = {
     policyIntelligenceErrorNoDocument: "Upload a document before saving extraction.",
     policyIntelligenceTabExtract: "Extract",
     policyIntelligenceTabComparison: "Comparison",
+    policyIntelligenceTabReport: "Report",
+    policyIntelligencePrintReport: "Print / PDF",
     policyIntelligenceComparisonSetupTitle: "Comparison Workspace",
     policyIntelligenceComparisonHelp:
       "Compare scenarios using the same canonical model. Deterministic calculations only — no AI or OCR (BR-061).",
