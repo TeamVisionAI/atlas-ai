@@ -38,6 +38,7 @@
     "googleapis": "^173.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
+    "pdfjs-dist": "^4.10.38",
     "pg": "^8.22.0",
     "qrcode": "^1.5.4",
     "react-router-dom": "^7.18.1",

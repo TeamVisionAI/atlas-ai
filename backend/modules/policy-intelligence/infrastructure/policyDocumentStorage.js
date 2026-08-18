@@ -103,6 +103,25 @@ async function uploadPolicyDocument({
   return { storagePath, bucket: POLICY_DOCUMENT_BUCKET };
 }
 
+async function downloadPolicyDocument(storagePath) {
+  if (!storagePath) {
+    throw createHttpError("Document storage path is missing.", 404, "POLICY_DOCUMENT_NOT_FOUND");
+  }
+
+  const { data, error } = await supabase.storage.from(POLICY_DOCUMENT_BUCKET).download(storagePath);
+
+  if (error || !data) {
+    throw createHttpError(
+      error?.message || "Failed to download policy document.",
+      500,
+      "POLICY_DOCUMENT_DOWNLOAD_FAILED"
+    );
+  }
+
+  const buffer = Buffer.from(await data.arrayBuffer());
+  return { buffer, storagePath, bucket: POLICY_DOCUMENT_BUCKET };
+}
+
 async function createSignedDownloadUrl(storagePath, expiresIn = SIGNED_URL_EXPIRES_SECONDS) {
   if (!storagePath) {
     throw createHttpError("Document storage path is missing.", 404, "POLICY_DOCUMENT_NOT_FOUND");
@@ -130,6 +149,7 @@ module.exports = {
   ensurePolicyDocumentBucket,
   buildStoragePath,
   uploadPolicyDocument,
+  downloadPolicyDocument,
   createSignedDownloadUrl,
   POLICY_DOCUMENT_BUCKET,
   MAX_POLICY_DOCUMENT_BYTES,

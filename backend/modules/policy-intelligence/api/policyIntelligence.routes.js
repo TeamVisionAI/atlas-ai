@@ -353,6 +353,26 @@ function createPolicyIntelligenceRoutes(deps = {}) {
     }
   );
 
+  router.post(
+    "/reviews/:reviewId/annual-values/extract",
+    requirePermission(PERMISSIONS.POLICY_WRITE),
+    async (req, res) => {
+      try {
+        const organizationId = getTenantOrganizationId(req);
+        const userId = req.authContext?.userId || null;
+        const result = await service.annualValues.extractAndPersistFromStoredDocument({
+          organizationId,
+          userId,
+          reviewId: req.params.reviewId,
+          documentId: req.body?.documentId || null
+        });
+        res.json(result);
+      } catch (error) {
+        sendError(res, error);
+      }
+    }
+  );
+
   // -------------------------------------------------------------------------
   // Comparison Engine (Sprint 5 / BR-061)
   // -------------------------------------------------------------------------

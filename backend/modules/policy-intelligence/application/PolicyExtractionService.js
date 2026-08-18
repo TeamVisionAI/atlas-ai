@@ -36,8 +36,9 @@ function httpError(message, statusCode, publicCode) {
 }
 
 class PolicyExtractionService {
-  constructor({ repository }) {
+  constructor({ repository, annualValuesService } = {}) {
     this.repository = repository;
+    this.annualValuesService = annualValuesService || null;
   }
 
   async getReviewBundle(organizationId, reviewId) {
@@ -157,6 +158,21 @@ class PolicyExtractionService {
           ...(extraction.metadata || {}),
           insuranceLanguageLayer: true
         }
+      });
+    }
+
+    if (
+      this.annualValuesService &&
+      Array.isArray(extractedData.annualValues) &&
+      extractedData.annualValues.length > 0
+    ) {
+      await this.annualValuesService.upsertForReview({
+        organizationId,
+        userId,
+        reviewId: document.policy_review_id,
+        extractionId: extraction.id,
+        rows: extractedData.annualValues,
+        source: "structured_table"
       });
     }
 

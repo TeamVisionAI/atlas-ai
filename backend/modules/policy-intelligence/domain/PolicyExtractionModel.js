@@ -221,7 +221,25 @@ function normalizeRider(entry) {
   return {
     type,
     amount: asNumber(entry.amount),
-    notes: asTrimmedString(entry.notes)
+    notes: asTrimmedString(entry.notes),
+    name: asTrimmedString(entry.name) || type,
+    qualifyingTrigger: asTrimmedString(entry.qualifyingTrigger),
+    maximumAccelerationPercent: asNumber(entry.maximumAccelerationPercent),
+    maximumDollarAmount: asNumber(entry.maximumDollarAmount),
+    minimumDollarAmount: asNumber(entry.minimumDollarAmount),
+    discountFactor: asNumber(entry.discountFactor),
+    discountMethodology: asTrimmedString(entry.discountMethodology),
+    amountOfDeathBenefitAccelerated: asNumber(entry.amountOfDeathBenefitAccelerated),
+    estimatedActualCashBenefit: asNumber(entry.estimatedActualCashBenefit),
+    remainingDeathBenefit:
+      asTrimmedString(entry.remainingDeathBenefit) || asNumber(entry.remainingDeathBenefit),
+    effectOnCashValue: asTrimmedString(entry.effectOnCashValue),
+    monthlyLimit: asNumber(entry.monthlyLimit),
+    annualLimitPercent: asNumber(entry.annualLimitPercent),
+    annualLimitDollars: asNumber(entry.annualLimitDollars),
+    riderCharges: entry.riderCharges && typeof entry.riderCharges === "object" ? entry.riderCharges : null,
+    sourcePage: asNumber(entry.sourcePage),
+    calculated: entry.calculated === true
   };
 }
 

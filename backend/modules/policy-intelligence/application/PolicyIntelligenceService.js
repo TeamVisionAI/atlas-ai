@@ -21,9 +21,15 @@ const { ComparisonService } = require("./ComparisonService");
 class PolicyIntelligenceService {
   constructor({ repository } = {}) {
     this.repository = repository;
-    this.ingestion = new DocumentIngestionService({ repository });
-    this.extraction = new PolicyExtractionService({ repository });
     this.annualValues = new AnnualValuesService({ repository });
+    this.ingestion = new DocumentIngestionService({
+      repository,
+      annualValuesService: this.annualValues
+    });
+    this.extraction = new PolicyExtractionService({
+      repository,
+      annualValuesService: this.annualValues
+    });
     this.comparison = new ComparisonService({
       repository,
       annualValuesService: this.annualValues

@@ -8,6 +8,9 @@ const {
   analyzeAnnualValues,
   getAnnualValuesCatalog
 } = require("../domain/annual-values/annualValuesEngine");
+const { extractIllustrationFromPdf } = require("../domain/illustration-extract");
+const { buildReportCheckpoints } = require("../domain/illustration-extract/reportCheckpoints");
+const { downloadPolicyDocument } = require("../infrastructure/policyDocumentStorage");
 const { mapReview } = require("./policyMappers");
 
 function httpError(message, statusCode, publicCode) {
@@ -43,7 +46,55 @@ function mapAnnualValueRow(row) {
     deathBenefit: row.death_benefit != null ? Number(row.death_benefit) : null,
     loanBalance: row.loan_balance != null ? Number(row.loan_balance) : null,
     withdrawals: row.withdrawals != null ? Number(row.withdrawals) : null,
-    netCashValue: row.net_cash_value != null ? Number(row.net_cash_value) : null
+    netCashValue: row.net_cash_value != null ? Number(row.net_cash_value) : null,
+    metadata: row.metadata || {}
+  };
+}
+
+function extrasByPolicyYear(rows = []) {
+  const map = new Map();
+  for (const row of rows) {
+    const year = Number(row.policyYear ?? row.policy_year ?? row.Year);
+    if (!Number.isFinite(year)) {
+      continue;
+    }
+    map.set(year, row);
+  }
+  return map;
+}
+
+function buildRowMetadata(sourceRow = {}, canonical = {}) {
+  const missingFields = [
+    "annualPremium",
+    "costOfInsurance",
+    "premiumLoad",
+    "administrativeCharge",
+    "riderCharges",
+    "interestCredited",
+    "accountValue",
+    "cashValue",
+    "cashSurrenderValue",
+    "deathBenefit",
+    "loanBalance",
+    "withdrawals"
+  ].filter((field) => canonical[field] == null);
+
+  return {
+    sourcePage: sourceRow.sourcePage || null,
+    tableLabel: sourceRow.tableLabel || null,
+    scenario: sourceRow.scenario || null,
+    surrenderCharge: sourceRow.surrenderCharge ?? sourceRow["Surrender Charge"] ?? null,
+    lapse: sourceRow.lapse === true,
+    nonguaranteedCurrent: sourceRow.nonguaranteedCurrent || null,
+    premiumExpenseCharge: sourceRow.premiumExpenseCharge ?? null,
+    monthlyExpenseCharge: sourceRow.monthlyExpenseCharge ?? null,
+    monthlyPolicyFee: sourceRow.monthlyPolicyFee ?? null,
+    accumulatedValueCharge: sourceRow.accumulatedValueCharge ?? null,
+    totalAnnualCharges: sourceRow.totalAnnualCharges ?? null,
+    illustratedRate: sourceRow.illustratedRate ?? null,
+    missingFields,
+    invented: false,
+    interpolated: false
   };
 }
 
@@ -92,7 +143,8 @@ class AnnualValuesService {
     reviewId,
     rows,
     extractionId = null,
-    source = "structured_table"
+    source = "structured_table",
+    setMetadata = {}
   }) {
     if (!organizationId || !reviewId) {
       throw httpError("organizationId and reviewId are required.", 400, "ANNUAL_VALUES_CONTEXT_REQUIRED");
@@ -118,6 +170,14 @@ class AnnualValuesService {
       // in output — still allow persist so UI can show issues; mark metadata.
     }
 
+    const extras = extrasByPolicyYear(rows);
+    const reportCheckpoints = buildReportCheckpoints(analysis.timeline).map((point) => ({
+      requestedYear: point.requestedYear,
+      usedYear: point.usedYear,
+      fallback: point.fallback,
+      fallbackStep: point.fallbackStep
+    }));
+
     const setRow = await this.repository.replaceAnnualValueSet({
       organization_id: organizationId,
       policy_review_id: reviewId,
@@ -126,11 +186,16 @@ class AnnualValuesService {
       row_count: analysis.timeline.length,
       summary_metrics: analysis.summaryMetrics,
       validation_results: analysis.validationResults,
-      calculation_metadata: analysis.calculationMetadata,
+      calculation_metadata: {
+        ...analysis.calculationMetadata,
+        reportCheckpoints
+      },
       metadata: {
         engine: analysis.meta.engine,
         version: analysis.meta.version,
-        factsImmutable: true
+        factsImmutable: true,
+        reportCheckpoints,
+        ...setMetadata
       },
       created_by: userId
     });
@@ -156,7 +221,7 @@ class AnnualValuesService {
         loan_balance: row.loanBalance,
         withdrawals: row.withdrawals,
         net_cash_value: row.netCashValue,
-        metadata: {}
+        metadata: buildRowMetadata(extras.get(row.policyYear) || {}, row)
       }))
     );
 
@@ -205,6 +270,117 @@ class AnnualValuesService {
         : [];
 
     return analyzeAnnualValues(rows, options);
+  }
+
+  /**
+   * Extract illustration tables from a PDF buffer and persist via BR-060 tables.
+   */
+  async extractAndPersistFromPdf({
+    organizationId,
+    userId = null,
+    reviewId,
+    extractionId = null,
+    buffer
+  }) {
+    const extracted = await extractIllustrationFromPdf(buffer);
+    if (!extracted.ok) {
+      return {
+        persisted: false,
+        reason: extracted.reason,
+        pageCount: extracted.pageCount,
+        riders: extracted.riders,
+        annualValues: null
+      };
+    }
+
+    const persisted = await this.upsertForReview({
+      organizationId,
+      userId,
+      reviewId,
+      extractionId,
+      rows: extracted.engineRows,
+      source: "pdf_text_table",
+      setMetadata: {
+        illustrationScenario: extracted.scenario,
+        riders: extracted.riders,
+        surrenderChargeSchedule: extracted.surrenderCharges,
+        reportCheckpoints: extracted.reportCheckpoints,
+        ocr: false,
+        interpolated: false
+      }
+    });
+
+    return {
+      persisted: true,
+      reason: null,
+      pageCount: extracted.pageCount,
+      riders: extracted.riders,
+      scenario: extracted.scenario,
+      rowCount: extracted.rows.length,
+      reportCheckpoints: extracted.reportCheckpoints,
+      annualValues: persisted
+    };
+  }
+
+  async extractAndPersistFromStoredDocument({
+    organizationId,
+    userId = null,
+    reviewId,
+    documentId = null
+  }) {
+    const review = await this.repository.getReview(organizationId, reviewId);
+    if (!review) {
+      throw httpError("Policy review not found.", 404, "POLICY_REVIEW_NOT_FOUND");
+    }
+
+    const documents = documentId
+      ? [await this.repository.getDocument(organizationId, documentId)].filter(Boolean)
+      : await this.repository.listDocumentsForReview(organizationId, reviewId);
+    const pdf = documents.find(
+      (doc) =>
+        doc?.mime_type === "application/pdf" &&
+        doc.upload_status === "stored" &&
+        doc.storage_path
+    );
+
+    if (!pdf) {
+      throw httpError("No stored PDF was found for this review.", 404, "POLICY_DOCUMENT_NOT_STORED");
+    }
+
+    const extraction = await this.repository.getExtractionByDocument(organizationId, pdf.id);
+    const { buffer } = await downloadPolicyDocument(pdf.storage_path);
+    const result = await this.extractAndPersistFromPdf({
+      organizationId,
+      userId,
+      reviewId,
+      extractionId: extraction?.id || null,
+      buffer
+    });
+
+    if (result.persisted && extraction?.id) {
+      const extractedData = {
+        ...(extraction.extracted_data || {}),
+        annualValues: result.annualValues?.analysis?.timeline || [],
+        riders: [
+          ...((extraction.extracted_data && extraction.extracted_data.riders) || []),
+          ...result.riders
+        ]
+      };
+      await this.repository.updateExtraction(organizationId, extraction.id, {
+        extracted_data: extractedData,
+        metadata: {
+          ...(extraction.metadata || {}),
+          illustrationExtract: true,
+          ocr: false
+        }
+      });
+    }
+
+    return {
+      ...result,
+      documentId: pdf.id,
+      extractionId: extraction?.id || null
+    };
   }
 }
 

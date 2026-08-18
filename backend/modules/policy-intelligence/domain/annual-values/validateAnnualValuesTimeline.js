@@ -28,18 +28,28 @@ function validateAnnualValuesTimeline(timeline = []) {
     });
   }
 
+  const seenYears = new Set();
   let sequentialPolicyYears = true;
   for (let i = 0; i < rows.length; i += 1) {
     const year = rows[i].policyYear;
     if (year == null || !Number.isInteger(year)) {
       sequentialPolicyYears = false;
       errors.push({
-        code: "POLICY_YEAR_INVALID",
-        message: `Row ${i} has invalid policyYear.`,
+        code: "MISSING_POLICY_YEAR",
+        message: `Row ${i} is missing required policyYear identity.`,
         policyYear: year
       });
       continue;
     }
+
+    if (seenYears.has(year)) {
+      errors.push({
+        code: "DUPLICATE_POLICY_YEAR",
+        message: `Duplicate policyYear ${year}.`,
+        policyYear: year
+      });
+    }
+    seenYears.add(year);
 
     if (i > 0) {
       const prev = rows[i - 1].policyYear;
@@ -113,6 +123,36 @@ function validateAnnualValuesTimeline(timeline = []) {
         message: "deathBenefit must be numeric or null.",
         policyYear: row.policyYear
       });
+    }
+
+    if (row.insuredAge != null) {
+      if (!Number.isInteger(row.insuredAge) || row.insuredAge < 0 || row.insuredAge > 120) {
+        errors.push({
+          code: "IMPOSSIBLE_INSURED_AGE",
+          message: `Insured age ${row.insuredAge} is not a possible attained age.`,
+          policyYear: row.policyYear,
+          insuredAge: row.insuredAge
+        });
+      } else if (row.policyYear != null && row.insuredAge < row.policyYear) {
+        errors.push({
+          code: "IMPOSSIBLE_INSURED_AGE",
+          message: `Insured age ${row.insuredAge} is inconsistent with policy year ${row.policyYear}.`,
+          policyYear: row.policyYear,
+          insuredAge: row.insuredAge
+        });
+      }
+    }
+
+    for (const field of NUMERIC_ANNUAL_VALUE_FIELDS) {
+      const value = row[field];
+      if (typeof value === "number" && value < 0) {
+        errors.push({
+          code: "NEGATIVE_VALUE",
+          message: `${field} cannot be negative.`,
+          policyYear: row.policyYear,
+          field
+        });
+      }
     }
 
     for (const field of NUMERIC_ANNUAL_VALUE_FIELDS) {
