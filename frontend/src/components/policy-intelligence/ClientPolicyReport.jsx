@@ -2,7 +2,8 @@ import DiscussionScenariosSection from "../financial-intelligence/DiscussionScen
 import PolicyCostCategoryCards from "./PolicyCostCategoryCards";
 import PolicyValuesCheckpoints from "./PolicyValuesCheckpoints";
 import PolicyValuesCheckpointChart, {
-  PREMIUM_COST_SERIES
+  PREMIUM_COST_SERIES,
+  policyValuesSeriesFor
 } from "./PolicyValuesCheckpointChart";
 import LivingBenefitRiderCards from "./LivingBenefitRiderCards";
 import { formatUsd, TABLE_UNAVAILABLE } from "./classifiedValueDisplay";
@@ -40,6 +41,27 @@ function issuerIsDistinct(snapshot = {}) {
   return Boolean(issuer && carrier && issuer !== carrier);
 }
 
+function chargeScheduleUndisclosed(report) {
+  if (report?.chargeScheduleUndisclosed === true) {
+    return true;
+  }
+  if (report?.chargeScheduleUndisclosed === false) {
+    return false;
+  }
+  const categories = report?.economics?.policyCostCategories;
+  if (!Array.isArray(categories) || !categories.length) {
+    return false;
+  }
+  const coi = categories.find((category) => category.id === "cost_of_insurance");
+  return coi?.display?.classification === "NOT_AVAILABLE";
+}
+
+function comparisonHorizonYears(financialEvaluation) {
+  const years = financialEvaluation?.investmentHorizon?.years;
+  const number = Number(years);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
 function SectionBand({ title, testId }) {
   return (
     <header className="pi-section-band" data-testid={testId}>
@@ -58,13 +80,37 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
   const economics = report.economics;
   const adapterUnsupported = report.adapter && report.adapter.supported === false;
   const annualUnavailable = report.annualValuesAvailable === false;
+  const distributionScenario = report.distributionScenario || null;
+  const distributionCheckpoints = Array.isArray(distributionScenario?.checkpoints)
+    ? distributionScenario.checkpoints
+    : [];
+  const useDistributionValues = distributionCheckpoints.length > 0;
   const sourceCatalog = buildSourceCatalog(report);
-  const valuesFootnote = footnoteFor(sourceCatalog, (item) => item.kind === "annual_values");
+  const valuesFootnote = footnoteFor(
+    sourceCatalog,
+    (item) => item.kind === (useDistributionValues ? "distributions" : "annual_values")
+  );
+  const premiumFootnote = footnoteFor(sourceCatalog, (item) => item.kind === "annual_values");
   const valuesSourceLine = formatSourceLine({
     pages: report.illustrationSource?.pages,
     tableLabel: report.illustrationSource?.label || "Policy Illustration"
   });
+  const distributionSourceLine = useDistributionValues
+    ? formatSourceLine({
+      pages: distributionScenario.sourcePages,
+      tableLabel: distributionScenario.sourceLabel || "Distributions Ledger"
+    })
+    : null;
   const showIssuer = issuerIsDistinct(snapshot);
+  const showCoiWarning = chargeScheduleUndisclosed(report);
+  const storedComparisonHorizon = comparisonHorizonYears(financialEvaluation);
+  const valuesChartCheckpoints = useDistributionValues
+    ? distributionCheckpoints
+    : economics?.policyCostCheckpoints || [];
+  const valuesChartSeries = policyValuesSeriesFor({
+    distribution: useDistributionValues,
+    checkpoints: valuesChartCheckpoints
+  });
 
   return (
     <article
@@ -171,10 +217,39 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
           </p>
         ) : (
           <>
+            <div className="pi-illustrated-values" data-testid="pi-carrier-illustrated">
+              <h4 className="pi-illustrated-values__title" data-testid="pi-carrier-illustrated-label">
+                Carrier Illustrated Values — Non-Guaranteed
+              </h4>
+              <p className="pi-illustrated-values__copy" data-testid="pi-carrier-illustrated-copy">
+                Atlas displays the carrier’s illustrated values exactly as provided. These values are
+                not independently recalculated by Atlas.
+              </p>
+              {showCoiWarning ? (
+                <p className="pi-illustrated-values__warning" data-testid="pi-coi-charge-warning">
+                  The illustration does not disclose the complete annual Cost of Insurance and charge
+                  schedule. Atlas therefore cannot independently reproduce or verify the long-term
+                  illustrated values.
+                </p>
+              ) : null}
+            </div>
+            {useDistributionValues && distributionScenario.distributionStartYear != null ? (
+              <aside className="pi-distribution-callout" data-testid="pi-distribution-callout">
+                <p className="pi-distribution-callout__lead">
+                  {`Planned distributions begin in policy year ${distributionScenario.distributionStartYear}.`}
+                </p>
+                <p>
+                  Later policy values reflect the carrier’s illustrated distribution and policy-loan
+                  assumptions. Policy debt can materially affect cash surrender value and net death
+                  benefit.
+                </p>
+              </aside>
+            ) : null}
             <PolicyValuesCheckpointChart
               title="Policy values over time"
-              checkpoints={economics?.policyCostCheckpoints || []}
-              sourceLine={valuesSourceLine}
+              checkpoints={valuesChartCheckpoints}
+              series={valuesChartSeries}
+              sourceLine={distributionSourceLine || valuesSourceLine}
             />
             <PolicyValuesCheckpointChart
               title="Premium vs known policy costs"
@@ -184,10 +259,16 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
               testId="pi-premium-cost-chart"
               sourceLine={valuesSourceLine}
             />
+            {valuesSourceLine ? (
+              <p className="pi-source-line" data-testid="pi-canonical-illustration-source">
+                {valuesSourceLine}
+              </p>
+            ) : null}
             <PolicyValuesCheckpoints
-              checkpoints={economics?.policyCostCheckpoints || []}
-              sourceLine={valuesSourceLine}
-              footnoteId={valuesFootnote}
+              checkpoints={useDistributionValues ? distributionCheckpoints : economics?.policyCostCheckpoints || []}
+              sourceLine={distributionSourceLine || valuesSourceLine}
+              footnoteId={useDistributionValues ? valuesFootnote : premiumFootnote}
+              variant={useDistributionValues ? "distribution" : "standard"}
             />
           </>
         )}
@@ -201,7 +282,14 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
       <section className="pi-report-section pi-report-section--fi" data-testid="pi-section-term-invest">
         <SectionBand title="5. Term + Invest-the-Difference" testId="pi-section-band-term-invest" />
         {financialEvaluation ? (
-          <DiscussionScenariosSection evaluation={financialEvaluation} source="api" />
+          <>
+            {storedComparisonHorizon != null ? (
+              <p className="pi-fi-horizon" data-testid="pi-fi-comparison-horizon">
+                {`Comparison horizon: ${storedComparisonHorizon} years (stored Financial Intelligence scenario). Long-range IUL carrier values remain outside this apples-to-apples comparison.`}
+              </p>
+            ) : null}
+            <DiscussionScenariosSection evaluation={financialEvaluation} source="api" />
+          </>
         ) : (
           <p className="pi-report__empty" data-testid="pi-fi-unavailable">
             No Financial Intelligence discussion scenario is on file for this review. Create one

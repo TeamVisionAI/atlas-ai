@@ -7,6 +7,19 @@ export const POLICY_VALUE_SERIES = [
   { key: "deathBenefit", label: "Death Benefit", color: "#2f6b8f", dash: null }
 ];
 
+export const DISTRIBUTION_VALUE_SERIES = [
+  { key: "accountValue", label: "Accumulated Value", color: "#0b1f3a", dash: null },
+  { key: "cashSurrenderValue", label: "Cash Surrender Value", color: "#c9a227", dash: "7 5" },
+  { key: "deathBenefit", label: "Net Death Benefit", color: "#2f6b8f", dash: null }
+];
+
+export const DEBT_SERIES = {
+  key: "accumulatedLoan",
+  label: "Accumulated Loan / Policy Debt",
+  color: "#8b3a3a",
+  dash: "3 5"
+};
+
 export const PREMIUM_COST_SERIES = [
   { key: "premium", label: "Annual Premium", color: "#0b1f3a", dash: null },
   { key: "totalKnownPolicyCosts", label: "Known policy costs", color: "#b8860b", dash: "6 4" }
@@ -27,6 +40,20 @@ function knownValue(classified) {
   }
   const number = Number(classified.value);
   return Number.isFinite(number) ? number : null;
+}
+
+export function hasExplicitAccumulatedLoan(checkpoints = []) {
+  return (Array.isArray(checkpoints) ? checkpoints : []).some(
+    (row) => knownValue(row?.accumulatedLoan) != null
+  );
+}
+
+export function policyValuesSeriesFor({ distribution = false, checkpoints = [] } = {}) {
+  const series = distribution ? [...DISTRIBUTION_VALUE_SERIES] : [...POLICY_VALUE_SERIES];
+  if (distribution && hasExplicitAccumulatedLoan(checkpoints)) {
+    series.push(DEBT_SERIES);
+  }
+  return series;
 }
 
 function compactMoney(value) {
@@ -234,7 +261,7 @@ export default function PolicyValuesCheckpointChart({
             const isLast = index === anchors.length - 1 && anchors.length > 1;
             const x = xFor(row.year);
             const y = yFor(row[item.key]);
-            const dy = seriesIndex === 1 ? 16 : seriesIndex === 2 ? -18 : -8;
+            const dy = seriesIndex === 1 ? 16 : seriesIndex === 2 ? -18 : seriesIndex === 3 ? 20 : -8;
             return (
               <text
                 key={`callout-${item.key}-${row.year}`}

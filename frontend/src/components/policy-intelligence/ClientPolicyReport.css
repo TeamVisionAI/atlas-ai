@@ -338,6 +338,59 @@
   line-height: 1.35;
 }
 
+.pi-illustrated-values {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--pi-line);
+  background: #fff;
+}
+
+.pi-illustrated-values__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--pi-navy);
+}
+
+.pi-illustrated-values__copy,
+.pi-illustrated-values__warning,
+.pi-distribution-callout p,
+.pi-fi-horizon {
+  margin: 6px 0 0;
+  font-size: 0.84rem;
+  color: var(--pi-muted);
+  line-height: 1.45;
+}
+
+.pi-illustrated-values__warning {
+  padding: 8px 10px;
+  border-left: 3px solid var(--pi-red);
+  background: var(--pi-red-bg);
+  color: var(--pi-navy);
+}
+
+.pi-distribution-callout {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--pi-line);
+  border-left: 4px solid var(--pi-navy);
+  background: var(--pi-av);
+}
+
+.pi-distribution-callout__lead {
+  margin: 0;
+  font-weight: 700;
+  color: var(--pi-navy);
+}
+
+.pi-fi-horizon {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--pi-gold);
+  background: var(--pi-amber-bg);
+  color: var(--pi-navy);
+}
+
 .pi-fn {
   font-size: 0.72em;
   font-weight: 700;
@@ -549,6 +602,51 @@
   width: 11%;
 }
 
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--year,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--year {
+  width: 8%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--age,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--age {
+  width: 6%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--premium,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--premium {
+  width: 11%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--income,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--income {
+  width: 11%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--loan,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--loan {
+  width: 10%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--debt,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--debt {
+  width: 14%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--av,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--av {
+  width: 13%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--csv,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--csv {
+  width: 14%;
+}
+
+.pi-checkpoint-table--distribution col.pi-checkpoint-table__col--db,
+.pi-checkpoint-table--distribution .pi-checkpoint-table__col--db {
+  width: 13%;
+}
+
 .pi-checkpoint-table th,
 .pi-checkpoint-table td {
   box-sizing: border-box;
@@ -590,6 +688,11 @@
 
 .pi-checkpoint-table__csv {
   background: var(--pi-csv);
+  font-weight: 650;
+}
+
+.pi-checkpoint-table__debt {
+  background: var(--pi-red-bg);
   font-weight: 650;
 }
 
@@ -703,6 +806,7 @@
   .pi-report__empty,
   .pi-checkpoint-table__av,
   .pi-checkpoint-table__csv,
+  .pi-checkpoint-table__debt,
   .pi-section-band,
   .pi-rider-card--living .pi-rider-card__header {
     -webkit-print-color-adjust: exact;
@@ -731,7 +835,10 @@
   .pi-report__empty,
   .pi-values-chart,
   .pi-values-summary__card,
-  .pi-safeguards {
+  .pi-safeguards,
+  .pi-illustrated-values,
+  .pi-distribution-callout,
+  .pi-fi-horizon {
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -756,7 +863,10 @@
 
   .pi-source-line,
   .pi-checkpoint-table__note,
-  .pi-values-chart__legend {
+  .pi-values-chart__legend,
+  .pi-illustrated-values,
+  .pi-distribution-callout,
+  .pi-fi-horizon {
     display: block !important;
     color: #0b1f3a !important;
   }

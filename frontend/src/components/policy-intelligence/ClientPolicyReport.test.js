@@ -161,6 +161,90 @@ function nationalLifeReport() {
       label: "Current Illustrated Annual Values",
       pages: [21, 22]
     },
+    chargeScheduleUndisclosed: true,
+    distributionScenario: {
+      scenario: "current_illustrated_distributions",
+      sourceLabel: "Distributions Ledger",
+      sourcePages: [25, 26, 27, 28],
+      distributionStartYear: 32,
+      checkpoints: [
+        {
+          requestedYear: 1,
+          usedYear: 1,
+          fallback: false,
+          policyYear: 1,
+          attainedAge: 35,
+          annualPremium: classified(2991.53, "EXTRACTED_EXACT", { sourcePage: 25 }),
+          income: classified(0, "EXTRACTED_EXACT", { sourcePage: 25 }),
+          plannedLoan: classified(0, "EXTRACTED_EXACT", { sourcePage: 25 }),
+          accumulatedLoan: classified(0, "EXTRACTED_EXACT", { sourcePage: 25 }),
+          accountValue: classified(1921, "EXTRACTED_EXACT", { sourcePage: 25 }),
+          cashSurrenderValue: classified(0, "EXTRACTED_EXACT", { sourcePage: 25 }),
+          deathBenefit: classified(294921, "EXTRACTED_EXACT", { sourcePage: 25 }),
+          sourcePage: 25
+        },
+        {
+          requestedYear: 32,
+          usedYear: 32,
+          fallback: false,
+          policyYear: 32,
+          attainedAge: 66,
+          annualPremium: classified(0, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          income: classified(17265, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          plannedLoan: classified(17265, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          accumulatedLoan: classified(18280, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          accountValue: classified(213397, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          cashSurrenderValue: classified(195117, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          deathBenefit: classified(475814, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          sourcePage: 26
+        },
+        {
+          requestedYear: 40,
+          usedYear: 40,
+          fallback: false,
+          policyYear: 40,
+          attainedAge: 74,
+          annualPremium: classified(0, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          income: classified(17265, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          plannedLoan: classified(27270, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          accumulatedLoan: classified(209023, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          accountValue: classified(345025, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          cashSurrenderValue: classified(136002, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          deathBenefit: classified(285071, "EXTRACTED_EXACT", { sourcePage: 26 }),
+          sourcePage: 26
+        },
+        {
+          requestedYear: 60,
+          usedYear: 60,
+          fallback: false,
+          policyYear: 60,
+          attainedAge: 94,
+          annualPremium: classified(0, "EXTRACTED_EXACT", { sourcePage: 27 }),
+          income: classified(17265, "EXTRACTED_EXACT", { sourcePage: 27 }),
+          plannedLoan: classified(85498, "EXTRACTED_EXACT", { sourcePage: 27 }),
+          accumulatedLoan: classified(1319188, "EXTRACTED_EXACT", { sourcePage: 27 }),
+          accountValue: classified(1338219, "EXTRACTED_EXACT", { sourcePage: 27 }),
+          cashSurrenderValue: classified(19031, "EXTRACTED_EXACT", { sourcePage: 27 }),
+          deathBenefit: classified(32414, "EXTRACTED_EXACT", { sourcePage: 27 }),
+          sourcePage: 27
+        },
+        {
+          requestedYear: 86,
+          usedYear: 86,
+          fallback: false,
+          policyYear: 86,
+          attainedAge: 120,
+          annualPremium: classified(0, "EXTRACTED_EXACT", { sourcePage: 28 }),
+          income: classified(17265, "EXTRACTED_EXACT", { sourcePage: 28 }),
+          plannedLoan: classified(377676, "EXTRACTED_EXACT", { sourcePage: 28 }),
+          accumulatedLoan: classified(6889734, "EXTRACTED_EXACT", { sourcePage: 28 }),
+          accountValue: classified(8760818, "EXTRACTED_EXACT", { sourcePage: 28 }),
+          cashSurrenderValue: classified(1871085, "EXTRACTED_EXACT", { sourcePage: 28 }),
+          deathBenefit: classified(1871085, "EXTRACTED_EXACT", { sourcePage: 28 }),
+          sourcePage: 28
+        }
+      ]
+    },
     snapshot: {
       carrier: "National Life Group",
       issuer: "Life Insurance Company of the Southwest",
@@ -275,6 +359,7 @@ const fiEvaluation = {
       { id: "aggressive", label: "Aggressive Growth 10%", annualReturn: 0.1, illustrativeProjectedValue: 30000 }
     ]
   },
+  investmentHorizon: { years: 20, confirmed: true },
   replacementWarnings: ["Do not cancel existing coverage first."],
   disclaimers: ["Hypothetical."]
 };
@@ -287,6 +372,11 @@ describe("ClientPolicyReport", () => {
     const pageJsx = readFileSync(path.join(__dirname, "../../pages/PolicyIntelligence.jsx"), "utf8");
     assert.equal(reportJsx.includes("Math.pow"), false);
     assert.equal(reportJsx.includes("extractIllustrationFromPdf"), false);
+    assert.equal(reportJsx.includes("loan_balance"), false);
+    assert.equal(/accountValue\s*-/.test(reportJsx), false);
+    assert.ok(reportJsx.includes("Carrier Illustrated Values — Non-Guaranteed"));
+    assert.ok(reportJsx.includes("Comparison horizon"));
+    assert.equal(reportJsx.includes("age 120"), false);
     assert.ok(reportJsx.includes("DiscussionScenariosSection"));
     assert.ok(pageJsx.includes("FinancialIntelligencePanel"));
     assert.ok(pageJsx.includes("pi-tab-report"));
@@ -342,6 +432,12 @@ describe("ClientPolicyReport", () => {
       assert.match(nationwideHtml, /pi-checkpoint-table__av/);
       assert.match(nationwideHtml, /pi-checkpoint-table__csv/);
       assert.match(nationwideHtml, /pi-checkpoint-table__head-line/);
+      assert.match(nationwideHtml, /data-testid="pi-carrier-illustrated-label"/);
+      assert.match(nationwideHtml, /Carrier Illustrated Values — Non-Guaranteed/);
+      assert.match(nationwideHtml, /data-testid="pi-coi-charge-warning"/);
+      assert.equal(nationwideHtml.includes('data-testid="pi-distribution-callout"'), false);
+      assert.equal(nationwideHtml.includes('data-testid="pi-checkpoint-h-income"'), false);
+      assert.equal(nationwideHtml.includes("data-series=\"accumulatedLoan\""), false);
       assert.match(nationwideHtml, /data-testid="pi-checkpoint-h-coi"/);
       assert.match(nationwideHtml, /pi-checkpoint-table__note/);
       assert.equal(nationwideHtml.includes("<caption"), false);
@@ -382,7 +478,29 @@ describe("ClientPolicyReport", () => {
       assert.match(lswHtml, /National Life Group/);
       assert.match(lswHtml, /20417FL/);
       assert.match(lswHtml, /8052FL/);
+      assert.match(lswHtml, /Carrier Illustrated Values — Non-Guaranteed/);
+      assert.match(lswHtml, /Atlas displays the carrier/);
+      assert.match(lswHtml, /data-testid="pi-coi-charge-warning"/);
+      assert.match(lswHtml, /Planned distributions begin in policy year 32/);
+      assert.match(lswHtml, /Policy debt can materially affect cash surrender value/);
       assert.match(lswHtml, /Source: Current Illustrated Annual Values — Pages 21–22/);
+      assert.match(lswHtml, /data-testid="pi-canonical-illustration-source"/);
+      assert.match(lswHtml, /Source: Distributions Ledger — Pages 25–28/);
+      assert.match(lswHtml, /data-testid="pi-checkpoint-h-income"/);
+      assert.match(lswHtml, /data-testid="pi-checkpoint-h-loan"/);
+      assert.match(lswHtml, /data-testid="pi-checkpoint-h-debt"/);
+      assert.equal(lswHtml.includes('data-testid="pi-checkpoint-h-coi"'), false);
+      assert.equal(lswHtml.includes('data-testid="pi-checkpoint-h-other"'), false);
+      assert.match(lswHtml, /\$17,265/);
+      assert.match(lswHtml, /\$18,280/);
+      assert.match(lswHtml, /\$209,023/);
+      assert.match(lswHtml, /\$1,319,188/);
+      assert.match(lswHtml, /\$6,889,734/);
+      assert.match(lswHtml, /data-series="accumulatedLoan"/);
+      assert.match(lswHtml, /data-source-page="26"/);
+      assert.match(lswHtml, /data-source-page="27"/);
+      assert.match(lswHtml, /data-source-page="28"/);
+      assert.match(lswHtml, /Net Death/);
       assert.match(lswHtml, /Source: Form 8095FL — Page 9/);
       assert.equal(lswHtml.includes("Pages 9–10"), false);
       assert.match(lswHtml, /illustrative only/);
@@ -434,6 +552,37 @@ describe("ClientPolicyReport", () => {
       );
       assert.match(withFi, /fi-discussion-scenarios/);
       assert.match(withFi, /Conservative|4%/);
+      assert.match(withFi, /data-testid="pi-fi-comparison-horizon"/);
+      assert.match(withFi, /Comparison horizon: 20 years/);
+      assert.equal(withFi.includes("policy year 86"), false);
+      assert.equal(withFi.includes("age 120"), false);
+
+      const disclosedCoi = nationwideReport();
+      disclosedCoi.chargeScheduleUndisclosed = false;
+      disclosedCoi.economics.policyCostCategories = disclosedCoi.economics.policyCostCategories.map((category) =>
+        category.id === "cost_of_insurance"
+          ? { ...category, display: classified(120, "EXTRACTED_EXACT") }
+          : category
+      );
+      const disclosedHtml = renderToString(
+        React.createElement(ClientPolicyReport, { report: disclosedCoi })
+      );
+      assert.equal(disclosedHtml.includes('data-testid="pi-coi-charge-warning"'), false);
+
+      const lswWithFi = renderToString(
+        React.createElement(
+          LanguageProvider,
+          null,
+          React.createElement(ClientPolicyReport, {
+            report: nationalLifeReport(),
+            financialEvaluation: fiEvaluation
+          })
+        )
+      );
+      const fiSection = lswWithFi.slice(lswWithFi.indexOf('data-testid="pi-section-term-invest"'));
+      assert.match(fiSection, /Comparison horizon: 20 years/);
+      assert.equal(fiSection.includes("policy year 86"), false);
+      assert.equal(fiSection.includes("age 120"), false);
 
       const reportCss = readFileSync(path.join(__dirname, "ClientPolicyReport.css"), "utf8");
       assert.ok(reportCss.includes("@page"));
