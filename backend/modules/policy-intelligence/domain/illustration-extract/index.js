@@ -11,6 +11,12 @@ const {
   toAnnualValuesEngineRows
 } = require("./parseIulIllustrationTables");
 const { parseLivingBenefitRiders } = require("./parseLivingBenefitRiders");
+const { parseNationwideLivingBenefitRiders } = require("./parseNationwideLivingBenefitRiders");
+const {
+  parseNationwidePolicyCosts,
+  applyExplicitAnnualCosts
+} = require("./parseNationwidePolicyCosts");
+const { parseLswPolicyCostTerms } = require("./parseLswPolicyCostTerms");
 const { buildReportCheckpoints } = require("./reportCheckpoints");
 const {
   ADAPTER_KEYS,
@@ -33,6 +39,7 @@ function emptyExtract(reason, pages = [], pageCount = 0) {
     rows: [],
     engineRows: [],
     riders: [],
+    policyCostTerms: null,
     surrenderCharges: [],
     reportCheckpoints: [],
     adapterKey: null,
@@ -48,6 +55,7 @@ function extractIllustrationFromPages(pages = [], { pageCount = pages.length } =
     const parsed = parseLswFlexLifeIi20417FL(pages);
     const riders = parseLswFlexLifeRiders(pages);
     const engineRows = toLswAnnualValuesEngineRows(parsed.rows);
+    const policyCostTerms = parseLswPolicyCostTerms(pages, parsed);
     const reportCheckpoints = buildReportCheckpoints(parsed.rows).map((point) => ({
       requestedYear: point.requestedYear,
       usedYear: point.usedYear,
@@ -71,6 +79,7 @@ function extractIllustrationFromPages(pages = [], { pageCount = pages.length } =
       rows: parsed.rows,
       engineRows,
       riders,
+      policyCostTerms,
       surrenderCharges: parsed.surrenderCharges,
       surrenderMechanics: parsed.surrenderMechanics,
       candidateRowCount: parsed.candidateRowCount,
@@ -80,8 +89,12 @@ function extractIllustrationFromPages(pages = [], { pageCount = pages.length } =
   }
 
   const parsed = parseIulIllustrationTables(pages);
-  const riders = parseLivingBenefitRiders(pages);
-  const engineRows = toAnnualValuesEngineRows(parsed.rows);
+  const riders = parseNationwideLivingBenefitRiders(pages);
+  const policyCostTerms = parseNationwidePolicyCosts(pages);
+  const engineRows = applyExplicitAnnualCosts(
+    toAnnualValuesEngineRows(parsed.rows),
+    policyCostTerms
+  );
   const reportCheckpoints = buildReportCheckpoints(parsed.rows).map((point) => ({
     requestedYear: point.requestedYear,
     usedYear: point.usedYear,
@@ -102,6 +115,7 @@ function extractIllustrationFromPages(pages = [], { pageCount = pages.length } =
     rows: parsed.rows,
     engineRows,
     riders,
+    policyCostTerms,
     surrenderCharges: parsed.surrenderCharges,
     reportCheckpoints,
     candidateRowCount: parsed.candidateRowCount,
@@ -124,6 +138,8 @@ module.exports = {
   extractPdfTextPages,
   parseIulIllustrationTables,
   parseLivingBenefitRiders,
+  parseNationwideLivingBenefitRiders,
+  parseNationwidePolicyCosts,
   parseLswFlexLifeIi20417FL,
   parseLswFlexLifeRiders,
   buildReportCheckpoints,

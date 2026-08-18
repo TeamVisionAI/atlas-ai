@@ -12,6 +12,7 @@ const {
   FORBIDDEN_PII_KEYS
 } = require("./constants");
 const { mapToAtlasTerm } = require("./insurance-language/insuranceVocabulary");
+const { createRiderEconomics } = require("./policy-economics");
 
 const FORBIDDEN_KEY_SET = new Set(
   FORBIDDEN_PII_KEYS.map((key) => key.toLowerCase())
@@ -59,6 +60,7 @@ function createEmptyPolicyExtractionData() {
     riders: [],
     coverages: [],
     policyYears: null,
+    policyCostTerms: null,
     // Sprint 4A — raw annual illustration table (Annual Values Engine input).
     // Not Insurance Facts; normalized separately (BR-060).
     annualValues: [],
@@ -218,38 +220,17 @@ function normalizeRider(entry) {
     return null;
   }
 
+  const economics = createRiderEconomics({
+    ...entry,
+    type,
+    name: asTrimmedString(entry.name) || type
+  });
+
   return {
+    ...economics,
     type,
     amount: asNumber(entry.amount),
-    notes: asTrimmedString(entry.notes),
-    name: asTrimmedString(entry.name) || type,
-    qualifyingTrigger: asTrimmedString(entry.qualifyingTrigger),
-    maximumAccelerationPercent: asNumber(entry.maximumAccelerationPercent),
-    maximumDollarAmount: asNumber(entry.maximumDollarAmount),
-    minimumDollarAmount: asNumber(entry.minimumDollarAmount),
-    discountFactor: asNumber(entry.discountFactor),
-    discountMethodology: asTrimmedString(entry.discountMethodology),
-    amountOfDeathBenefitAccelerated: asNumber(entry.amountOfDeathBenefitAccelerated),
-    estimatedActualCashBenefit: asNumber(entry.estimatedActualCashBenefit),
-    remainingDeathBenefit:
-      asTrimmedString(entry.remainingDeathBenefit) || asNumber(entry.remainingDeathBenefit),
-    effectOnCashValue: asTrimmedString(entry.effectOnCashValue),
-    monthlyLimit: asNumber(entry.monthlyLimit),
-    annualLimitPercent: asNumber(entry.annualLimitPercent),
-    annualLimitDollars: asNumber(entry.annualLimitDollars),
-    riderCharges: entry.riderCharges && typeof entry.riderCharges === "object" ? entry.riderCharges : null,
-    sourcePage: asNumber(entry.sourcePage),
-    calculated: entry.calculated === true,
-    formNumber: asTrimmedString(entry.formNumber),
-    formNumbers: Array.isArray(entry.formNumbers)
-      ? entry.formNumbers.map((value) => asTrimmedString(value)).filter(Boolean)
-      : null,
-    adapterKey: asTrimmedString(entry.adapterKey),
-    payoutClassification: asTrimmedString(entry.payoutClassification),
-    discountSampleInterestRate: asNumber(entry.discountSampleInterestRate),
-    discountSampleNote: asTrimmedString(entry.discountSampleNote),
-    cashReceivedNotEqualToAmountAccelerated: entry.cashReceivedNotEqualToAmountAccelerated === true,
-    monthlyLimitPercent: asNumber(entry.monthlyLimitPercent)
+    notes: asTrimmedString(entry.notes)
   };
 }
 
@@ -397,6 +378,11 @@ function normalizePolicyExtractionData(input = {}) {
           .map((row) => stripForbiddenKeys(row))
       : [];
 
+  base.policyCostTerms =
+    source.policyCostTerms && typeof source.policyCostTerms === "object"
+      ? stripForbiddenKeys(source.policyCostTerms)
+      : null;
+
   // BR-057: findings/recommendations are derived — never accepted as extract facts.
   base.findings = [];
   base.recommendations = [];
@@ -426,6 +412,7 @@ function normalizePolicyExtractionData(input = {}) {
     "withdrawals",
     "riders",
     "coverages",
+    "policyCostTerms",
     "annualValues",
     "annual_values",
     "findings",

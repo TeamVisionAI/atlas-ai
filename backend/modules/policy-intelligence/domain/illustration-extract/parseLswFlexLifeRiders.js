@@ -4,7 +4,13 @@
  * Does not reuse Nationwide rider column or discount assumptions.
  */
 
-const CARRIER_CALCULATION_REQUIRED = "CARRIER_CALCULATION_REQUIRED";
+const {
+  VALUE_CLASSIFICATIONS,
+  CARRIER_CALCULATION_REQUIRED_TEXT,
+  createRiderEconomics
+} = require("../policy-economics");
+
+const CARRIER_CALCULATION_REQUIRED = VALUE_CLASSIFICATIONS.CARRIER_CALCULATION_REQUIRED;
 
 const RIDER_SPECS = Object.freeze([
   {
@@ -232,18 +238,26 @@ function parseLswFlexLifeRiders(pages = []) {
       ? extractAbrEconomics(joinedText, spec)
       : extractNonAbrFields(joinedText, spec);
 
-    riders.push({
-      type: spec.type,
-      name: spec.type,
-      formNumber: spec.formNumber,
-      formNumbers: spec.formNumbers || [spec.formNumber],
-      adapterKey: "lsw-flexlife-ii-20417FL",
-      sourcePage,
-      sourceSnippet: "explicit_form_series_narrative",
-      calculated: false,
-      qualifyingTrigger: spec.qualifyingTrigger,
-      ...economics
-    });
+    riders.push(
+      createRiderEconomics({
+        carrier: "National Life Group",
+        issuer: "Life Insurance Company of the Southwest",
+        product: "FlexLife II",
+        type: spec.type,
+        name: spec.type,
+        formNumber: spec.formNumber,
+        formNumbers: spec.formNumbers || [spec.formNumber],
+        adapterKey: "lsw-flexlife-ii-20417FL",
+        sourcePage,
+        sourceSnippet: "explicit_form_series_narrative",
+        sourceText: joinedText,
+        calculated: false,
+        qualifyingTrigger: spec.qualifyingTrigger,
+        completeCalculationChain: false,
+        payoutReportText: isAbr(spec.type) ? CARRIER_CALCULATION_REQUIRED_TEXT : null,
+        ...economics
+      })
+    );
   }
 
   return riders;

@@ -6,6 +6,7 @@
  */
 
 const { mapToAtlasTerm } = require("./insuranceVocabulary");
+const { createRiderEconomics } = require("../policy-economics");
 
 const FACT_SOURCE = Object.freeze({
   ATLAS_EXTRACT: "atlas_extract"
@@ -71,11 +72,15 @@ function buildInsuranceFactsFromExtract(extractedData = {}, { extractionId = nul
     : [];
 
   const riders = Array.isArray(source.riders)
-    ? source.riders.map((rider) => ({
-        type: mapToAtlasTerm(rider?.type, "rider") || asString(rider?.type),
-        amount: asNumber(rider?.amount),
-        notes: asString(rider?.notes)
-      }))
+    ? source.riders.map((rider) => {
+        const economics = createRiderEconomics(rider || {});
+        return {
+          ...economics,
+          type: mapToAtlasTerm(rider?.type, "rider") || economics.type,
+          amount: asNumber(rider?.amount) ?? economics.amount,
+          notes: asString(rider?.notes) || economics.notes
+        };
+      })
     : [];
 
   const facts = {
@@ -109,6 +114,10 @@ function buildInsuranceFactsFromExtract(extractedData = {}, { extractionId = nul
     ),
     charges,
     riders,
+    policyCostTerms:
+      source.policyCostTerms && typeof source.policyCostTerms === "object"
+        ? source.policyCostTerms
+        : null,
     coi:
       source.coi && typeof source.coi === "object"
         ? {

@@ -114,6 +114,13 @@ function calculateAnnualValueMetrics(timeline = []) {
       administrativeChargeRows: admin.counted,
       riderChargesRows: riders.counted,
       premiumLoadRows: premiumLoads.counted
+    }),
+    fieldClassifications: Object.freeze({
+      totalCostOfInsurance: coi.counted > 0 ? "CALCULATED_FROM_EXPLICIT_TERMS" : "NOT_AVAILABLE",
+      totalAdministrativeCharges: admin.counted > 0 ? "CALCULATED_FROM_EXPLICIT_TERMS" : "NOT_AVAILABLE",
+      totalRiderCharges: riders.counted > 0 ? "CALCULATED_FROM_EXPLICIT_TERMS" : "NOT_AVAILABLE",
+      totalPremiumLoads: premiumLoads.counted > 0 ? "CALCULATED_FROM_EXPLICIT_TERMS" : "NOT_AVAILABLE",
+      totalInternalCharges: chargeSeriesPresent ? "CALCULATED_FROM_EXPLICIT_TERMS" : "NOT_AVAILABLE"
     })
   });
 

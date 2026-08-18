@@ -70,6 +70,10 @@ function run() {
 
   const facts = buildInsuranceFactsFromExtract(extracted, { extractionId: "ex-1" });
   assertInsuranceFactsImmutable(facts);
+  assert(facts.riders[0].type === ATLAS_TERMS.ACCELERATED_DEATH_BENEFIT, "ADB type mapped");
+  assert(facts.riders[0].amount === 60, "rider amount kept");
+  assert("payoutClassification" in facts.riders[0], "Facts keep rider economics fields");
+  assert("discountMethodology" in facts.riders[0], "Facts do not collapse to type/amount/notes only");
   assert(facts.immutable === true, "facts marked immutable");
   assert(facts.source === "atlas_extract", "facts from extract only");
   assert(

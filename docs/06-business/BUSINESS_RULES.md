@@ -819,6 +819,32 @@ PI-001 Carrier Identified · PI-002 Product Identified · PI-003 Increasing Deat
 
 ---
 
+## BR-144 — Policy Cost + Living Benefit Economics
+
+**Implements:** Canonical IUL policy-cost categories, living-benefit/rider economics, provenance/classification, and report-ready DTOs (no UI).  
+**Domain:** Business / Analytics & Intelligence  
+**Capability:** Analytics & Intelligence  
+**Module:** `backend/modules/policy-intelligence/domain/policy-economics`  
+**Depends on:** BR-052, BR-054, BR-057, BR-058, BR-060  
+**Related:** BR-061 (consumes Facts / Annual Values; does not invent costs)  
+**Status:** Implemented (data layer only; no Policy Intelligence UI)  
+**Persistence:** Existing JSONB (`extracted_data`, annual-value-set `metadata`, annual-value row `metadata`). **No database migration.** Do not alter migrations 024 or 029.
+
+### Rules
+
+1. **Seven cost categories** — Percent of Premium Expense Charge; Cost of Insurance / Monthly COI; Monthly Expense Charge; Monthly Policy Fee; Monthly % of Accumulated Value Charge; Rider Charges; Surrender Charges. Contract-level rates/fees live in extraction JSON/metadata. Annual dollars persist only when explicitly sourced (existing BR-060 columns or overlay metadata). Surrender charge stays separate from CSV.
+2. **Null is never zero** — Unavailable costs classify as `NOT_AVAILABLE` with `value: null`. Only an explicit source zero may be stored as `0` (`EXTRACTED_EXACT`). Totals (including total COI, rider charges, admin/load, and “total known policy costs”) must not coerce an all-null series to `$0`.
+3. **No inferred COI** — Never derive COI from AV, CSV, premium, or AV−CSV differences. Continuation-of-COI rate endorsements are not annual COI dollars.
+4. **Classifications** — `EXTRACTED_EXACT` · `CALCULATED_FROM_EXPLICIT_TERMS` · `NOT_AVAILABLE` · `CARRIER_CALCULATION_REQUIRED`. Provenance (page, section/table, form/version, snippet or hash, adapter/extractor id, classification, null reason) rides with each field when available. `invented` and `interpolated` remain false.
+5. **Living-benefit economics** — Canonical rider model includes carrier, issuer, product, form/version, name/type, trigger, eligibility, min/max acceleration, event limits, claim frequency/max claims, admin fees, rider charges, discount methodology, discount factor only if explicitly supplied, discount variables, elected acceleration, actual cash benefit, remaining DB, AV/CSV impact, loan/debt effect, tax/Medicaid caveats, and provenance.
+6. **Cash ≠ accelerated DB** — Never assume cash benefit equals death benefit accelerated. If the document lacks a complete calculation chain, classification is `CARRIER_CALCULATION_REQUIRED` and report text is: “Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.”
+7. **Carrier isolation** — Nationwide IUL Protector II and National Life / LSW FlexLife II use separate adapters. Do not reuse Nationwide column maps, discount factors, or rider assumptions on National Life (or the reverse). National Life sample 6.5% ABR values remain illustrative only; exact payout stays `CARRIER_CALCULATION_REQUIRED`.
+8. **Insurance Facts pass-through** — Facts must preserve full safe rider economics (not `{type, amount, notes}` only). Facts remain immutable (BR-058).
+9. **Report DTOs, no UI** — Policy cost checkpoints use years 1, 10, 20, 30, 40… with 5-year fallback only when an exact year is absent. Living-benefit cards carry qualify / limits / methodology / exact payout or carrier-calculation-required / remaining DB / AV-CSV effect / provenance.
+10. **Boundaries** — Do not redesign annual ledger parsing except additive metadata/pass-through. Do not change BR-142, BR-143, Comparison stress fail-closed math, or Recruit OS / Meta / calendar / WhatsApp.
+
+---
+
 ## BR-062 — Financial Intelligence Boundary
 
 **Implements:** RC2 architecture / RC3 Phase A runtime  

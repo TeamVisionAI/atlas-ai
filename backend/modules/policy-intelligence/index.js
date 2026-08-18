@@ -54,6 +54,10 @@ const {
   getComparisonCatalog,
   createPolicyScenario
 } = require("./domain/comparison/comparisonEngine");
+const {
+  buildPolicyEconomicsReportDto,
+  VALUE_CLASSIFICATIONS
+} = require("./domain/policy-economics");
 
 function createPolicyIntelligenceModule(deps = {}) {
   const repository = deps.repository || new PolicyIntelligenceRepository();
@@ -106,5 +110,7 @@ module.exports = {
   compareScenarios,
   compareWithStress,
   getComparisonCatalog,
-  createPolicyScenario
+  createPolicyScenario,
+  buildPolicyEconomicsReportDto,
+  VALUE_CLASSIFICATIONS
 };
