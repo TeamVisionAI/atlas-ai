@@ -110,6 +110,8 @@ const COLUMN_ALIASES = Object.freeze({
     "csv",
     "CSV",
     "Cash Surrender Value",
+    "Net Surrender Value",
+    "netSurrenderValue",
     "Surrender Value",
     "surrenderValue"
   ],

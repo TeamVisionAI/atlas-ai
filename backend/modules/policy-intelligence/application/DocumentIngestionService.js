@@ -34,8 +34,9 @@ function httpError(message, statusCode, publicCode) {
 }
 
 class DocumentIngestionService {
-  constructor({ repository }) {
+  constructor({ repository, annualValuesService } = {}) {
     this.repository = repository;
+    this.annualValuesService = annualValuesService || null;
   }
 
   /**
@@ -210,6 +211,47 @@ class DocumentIngestionService {
       }
     });
 
+    if (
+      this.annualValuesService &&
+      file.mimetype === "application/pdf"
+    ) {
+      try {
+        const illustration = await this.annualValuesService.extractAndPersistFromPdf({
+          organizationId,
+          userId,
+          reviewId,
+          extractionId: extraction.id,
+          buffer: file.buffer
+        });
+        if (illustration.persisted) {
+          await this.repository.updateExtraction(organizationId, extraction.id, {
+            extracted_data: {
+              ...layeredData,
+              annualValues: illustration.annualValues?.analysis?.timeline || [],
+              riders: [
+                ...(layeredData.riders || []),
+                ...illustration.riders
+              ]
+            },
+            status: POLICY_EXTRACTION_STATUSES.EXTRACTED,
+            extracted_at: new Date().toISOString(),
+            metadata: {
+              atlasExtract: true,
+              ai: false,
+              ocr: false,
+              piiIsolation: true,
+              zeroKnowledge: true,
+              insuranceLanguageLayer: true,
+              illustrationExtract: true,
+              schemaVersion: POLICY_EXTRACTION_SCHEMA_VERSION
+            }
+          });
+        }
+      } catch {
+        // Illustration extract is additive — upload still succeeds if tables are absent.
+      }
+    }
+
     if (review.status === POLICY_REVIEW_STATUSES.DRAFT) {
       await this.repository.updateReview(organizationId, reviewId, {
         status: POLICY_REVIEW_STATUSES.UPLOADED
@@ -217,11 +259,15 @@ class DocumentIngestionService {
     }
 
     const refreshedReview = await this.repository.getReview(organizationId, reviewId);
+    const refreshedExtraction = await this.repository.getExtractionByDocument(
+      organizationId,
+      documentId
+    );
 
     return {
       review: mapReview(refreshedReview),
       document: mapDocument(document),
-      extraction: mapExtraction(extraction)
+      extraction: mapExtraction(refreshedExtraction || extraction)
     };
   }
 }
