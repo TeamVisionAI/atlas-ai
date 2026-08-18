@@ -99,6 +99,7 @@ function run() {
   assert(costs.surrenderCharges.separateFromCsv === true, "surrender stays separate from CSV");
 
   const extracted = extractIllustrationFromPages(pages);
+  assert(extracted.scenarios == null, "Nationwide extract does not emit LSW scenario maps");
   const timeline = analysis.timeline.map((row) => {
     const source = parsed.rows.find((item) => item.policyYear === row.policyYear) || {};
     return {

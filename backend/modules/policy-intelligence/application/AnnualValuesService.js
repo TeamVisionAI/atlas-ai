@@ -10,14 +10,85 @@ const {
 } = require("../domain/annual-values/annualValuesEngine");
 const { extractIllustrationFromPdf } = require("../domain/illustration-extract");
 const { buildReportCheckpoints } = require("../domain/illustration-extract/reportCheckpoints");
-const { downloadPolicyDocument } = require("../infrastructure/policyDocumentStorage");
+const { SCENARIOS } = require("../domain/illustration-extract/adapters/lswFlexLifeIi20417FL");
 const { mapReview } = require("./policyMappers");
+
+/** Dual Current/Alternative ledgers have no loan columns; adapter fills 0. Do not persist those as source-backed debt. */
+const DUAL_LEDGER_PLACEHOLDER_LOAN_SCENARIOS = new Set([
+  SCENARIOS.CURRENT_ILLUSTRATED,
+  SCENARIOS.ALTERNATIVE_CURRENT
+]);
 
 function httpError(message, statusCode, publicCode) {
   const error = new Error(message);
   error.statusCode = statusCode;
   error.publicCode = publicCode;
   return error;
+}
+
+function asStoredNumber(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+/**
+ * Persist already-parsed illustration scenarios in annual-set JSONB metadata (BR-144).
+ * Does not replace the canonical Current Illustrated timeline. Does not invent zeros.
+ */
+function serializeScenarioRow(row = {}, scenarioKey) {
+  const dualPlaceholderLoans = DUAL_LEDGER_PLACEHOLDER_LOAN_SCENARIOS.has(scenarioKey);
+  return Object.freeze({
+    policyYear: asStoredNumber(row.policyYear),
+    insuredAge: asStoredNumber(row.insuredAge),
+    annualPremium: asStoredNumber(row.annualPremium),
+    income: asStoredNumber(row.income),
+    plannedLoan: dualPlaceholderLoans ? null : asStoredNumber(row.plannedLoan),
+    accumulatedLoan: dualPlaceholderLoans ? null : asStoredNumber(row.accumulatedLoan),
+    accountValue: asStoredNumber(row.accountValue),
+    cashSurrenderValue: asStoredNumber(row.cashSurrenderValue),
+    deathBenefit: asStoredNumber(row.deathBenefit),
+    sourcePage: asStoredNumber(row.sourcePage),
+    scenario: row.scenario || scenarioKey || null
+  });
+}
+
+function serializeIllustrationScenarios(scenarios) {
+  if (!scenarios || typeof scenarios !== "object" || Array.isArray(scenarios)) {
+    return null;
+  }
+
+  const serialized = {};
+  for (const [scenarioKey, rows] of Object.entries(scenarios)) {
+    if (!Array.isArray(rows)) {
+      continue;
+    }
+    serialized[scenarioKey] = rows.map((row) => serializeScenarioRow(row, scenarioKey));
+  }
+
+  return Object.keys(serialized).length ? Object.freeze(serialized) : null;
+}
+
+function buildIllustrationSetMetadata(extracted = {}) {
+  const metadata = {
+    illustrationScenario: extracted.scenario || null,
+    adapterKey: extracted.adapterKey || null,
+    comparisonScenario: extracted.comparisonScenario || extracted.scenario || null,
+    riders: extracted.riders,
+    policyCostTerms: extracted.policyCostTerms || null,
+    surrenderChargeSchedule: extracted.surrenderCharges,
+    surrenderMechanics: extracted.surrenderMechanics || null,
+    reportCheckpoints: extracted.reportCheckpoints,
+    ocr: false,
+    interpolated: false
+  };
+  const scenarios = serializeIllustrationScenarios(extracted.scenarios);
+  if (scenarios) {
+    metadata.scenarios = scenarios;
+  }
+  return metadata;
 }
 
 function mapAnnualValueRow(row) {
@@ -305,18 +376,7 @@ class AnnualValuesService {
       extractionId,
       rows: extracted.engineRows,
       source: "pdf_text_table",
-      setMetadata: {
-        illustrationScenario: extracted.scenario,
-        adapterKey: extracted.adapterKey || null,
-        comparisonScenario: extracted.comparisonScenario || extracted.scenario || null,
-        riders: extracted.riders,
-        policyCostTerms: extracted.policyCostTerms || null,
-        surrenderChargeSchedule: extracted.surrenderCharges,
-        surrenderMechanics: extracted.surrenderMechanics || null,
-        reportCheckpoints: extracted.reportCheckpoints,
-        ocr: false,
-        interpolated: false
-      }
+      setMetadata: buildIllustrationSetMetadata(extracted)
     });
 
     return {
@@ -358,6 +418,7 @@ class AnnualValuesService {
     }
 
     const extraction = await this.repository.getExtractionByDocument(organizationId, pdf.id);
+    const { downloadPolicyDocument } = require("../infrastructure/policyDocumentStorage");
     const { buffer } = await downloadPolicyDocument(pdf.storage_path);
     const result = await this.extractAndPersistFromPdf({
       organizationId,
@@ -398,5 +459,8 @@ class AnnualValuesService {
 module.exports = {
   AnnualValuesService,
   mapAnnualValueSet,
-  mapAnnualValueRow
+  mapAnnualValueRow,
+  serializeIllustrationScenarios,
+  buildIllustrationSetMetadata,
+  DUAL_LEDGER_PLACEHOLDER_LOAN_SCENARIOS
 };
