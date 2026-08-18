@@ -5,6 +5,11 @@
 
 const { analyzeAnnualValues } = require("../annual-values/annualValuesEngine");
 const { createPolicyScenario, SCENARIO_TYPES, cloneJson } = require("./scenarioModel");
+const {
+  assertIllustratedRateStressComputable,
+  requireExplicitNumber,
+  createIllustratedRateStressNotComputableError
+} = require("./stressComputability");
 
 const STRESS_KINDS = Object.freeze({
   ILLUSTRATED_RATE: "illustrated_rate",
@@ -24,7 +29,9 @@ function roundPercent(rate) {
 }
 
 /**
- * Rebuild timeline cash path after adjusting premium and/or interest credited.
+ * Rebuild AV cash path only when every formula term is an explicit number.
+ * Does not invent CSV via CSV/AV, does not copy death benefit, does not
+ * coerce null charges/interest to 0. Implements BR-061 fail-closed stress.
  */
 function reprojectTimeline(baseTimeline, mapYear) {
   let accountValue = 0;
@@ -32,34 +39,42 @@ function reprojectTimeline(baseTimeline, mapYear) {
 
   for (const base of baseTimeline) {
     const mapped = mapYear(base, accountValue);
-    const annualPremium = mapped.annualPremium;
-    const premiumLoad = mapped.premiumLoad;
-    const administrativeCharge = mapped.administrativeCharge;
-    const costOfInsurance = mapped.costOfInsurance;
-    const riderCharges = mapped.riderCharges;
-    const interestCredited = mapped.interestCredited;
-    const withdrawals = mapped.withdrawals ?? 0;
+    const annualPremium = requireExplicitNumber(
+      mapped.annualPremium,
+      "ANNUAL_PREMIUM_UNAVAILABLE"
+    );
+    const premiumLoad = requireExplicitNumber(mapped.premiumLoad, "PREMIUM_LOAD_UNAVAILABLE");
+    const administrativeCharge = requireExplicitNumber(
+      mapped.administrativeCharge,
+      "ADMINISTRATIVE_CHARGE_UNAVAILABLE"
+    );
+    const costOfInsurance = requireExplicitNumber(
+      mapped.costOfInsurance,
+      "COST_OF_INSURANCE_UNAVAILABLE"
+    );
+    const riderCharges = requireExplicitNumber(mapped.riderCharges, "RIDER_CHARGES_UNAVAILABLE");
+    const interestCredited = requireExplicitNumber(
+      mapped.interestCredited,
+      "INTEREST_CREDITED_UNAVAILABLE"
+    );
+    const withdrawals = mapped.withdrawals == null ? 0 : mapped.withdrawals;
+    if (mapped.withdrawals != null && typeof mapped.withdrawals !== "number") {
+      throw createIllustratedRateStressNotComputableError(["WITHDRAWALS_UNAVAILABLE"]);
+    }
 
     accountValue = Math.max(
       0,
       accountValue +
-        (annualPremium ?? 0) -
-        (premiumLoad ?? 0) -
-        (administrativeCharge ?? 0) -
-        (costOfInsurance ?? 0) -
-        (riderCharges ?? 0) +
-        (interestCredited ?? 0) -
-        (withdrawals ?? 0)
+        annualPremium -
+        premiumLoad -
+        administrativeCharge -
+        costOfInsurance -
+        riderCharges +
+        interestCredited -
+        withdrawals
     );
 
-    const baseAv = typeof base.accountValue === "number" ? base.accountValue : null;
-    const baseCsv =
-      typeof base.cashSurrenderValue === "number" ? base.cashSurrenderValue : null;
-    const surrenderRatio =
-      baseAv != null && baseAv > 0 && baseCsv != null ? baseCsv / baseAv : 1;
-
     const cashValue = Math.round(accountValue);
-    const cashSurrenderValue = Math.round(accountValue * surrenderRatio);
 
     rows.push({
       policyYear: base.policyYear,
@@ -73,8 +88,10 @@ function reprojectTimeline(baseTimeline, mapYear) {
       interestCredited,
       accountValue: cashValue,
       cashValue,
-      cashSurrenderValue,
-      deathBenefit: base.deathBenefit,
+      // CSV/AV ratio scaling is not a surrender model — omit stressed CSV.
+      cashSurrenderValue: null,
+      // DB option / corridor / lapse are not modeled — omit stressed DB.
+      deathBenefit: null,
       loanBalance: base.loanBalance,
       withdrawals,
       netCashValue: cashValue - (base.loanBalance ?? 0)
@@ -100,18 +117,16 @@ function applyIllustratedRateStress(baseScenario, { fromRate, toRate }) {
 
   const factor = to / from;
   const baseTimeline = baseScenario.annualValues?.timeline || [];
+  assertIllustratedRateStressComputable(baseTimeline);
   const rows = reprojectTimeline(baseTimeline, (base) => ({
-    annualPremium: base.annualPremium ?? 0,
+    annualPremium: base.annualPremium,
     scheduledPremium: base.scheduledPremium,
-    premiumLoad: base.premiumLoad ?? 0,
-    administrativeCharge: base.administrativeCharge ?? 0,
-    costOfInsurance: base.costOfInsurance ?? 0,
-    riderCharges: base.riderCharges ?? 0,
-    interestCredited:
-      typeof base.interestCredited === "number"
-        ? Number((base.interestCredited * factor).toFixed(2))
-        : 0,
-    withdrawals: base.withdrawals ?? 0
+    premiumLoad: base.premiumLoad,
+    administrativeCharge: base.administrativeCharge,
+    costOfInsurance: base.costOfInsurance,
+    riderCharges: base.riderCharges,
+    interestCredited: Number((base.interestCredited * factor).toFixed(2)),
+    withdrawals: base.withdrawals
   }));
 
   const annualValues = buildStressedAnnualValues(rows);
@@ -146,7 +161,13 @@ function applyIllustratedRateStress(baseScenario, { fromRate, toRate }) {
     },
     metadata: {
       derivedFrom: baseScenario.id,
-      deterministic: true
+      deterministic: true,
+      failClosed: true,
+      valueComputability: {
+        cashSurrenderValue: "NOT_COMPUTABLE",
+        deathBenefit: "NOT_COMPUTABLE",
+        breakEvenYear: "NOT_COMPUTABLE"
+      }
     }
   });
 }
@@ -162,24 +183,24 @@ function applyMinimumFundingStress(baseScenario, { fundingRatio = 0.5 } = {}) {
 
   const baseTimeline = baseScenario.annualValues?.timeline || [];
   const rows = reprojectTimeline(baseTimeline, (base) => {
-    const annualPremium =
-      typeof base.annualPremium === "number"
-        ? Number((base.annualPremium * ratio).toFixed(2))
-        : 0;
-    const premiumLoad =
-      typeof base.premiumLoad === "number"
-        ? Number((base.premiumLoad * ratio).toFixed(2))
-        : 0;
+    const annualPremium = Number(
+      (
+        requireExplicitNumber(base.annualPremium, "ANNUAL_PREMIUM_UNAVAILABLE") * ratio
+      ).toFixed(2)
+    );
+    const premiumLoad = Number(
+      (requireExplicitNumber(base.premiumLoad, "PREMIUM_LOAD_UNAVAILABLE") * ratio).toFixed(2)
+    );
 
     return {
       annualPremium,
       scheduledPremium: base.scheduledPremium,
       premiumLoad,
-      administrativeCharge: base.administrativeCharge ?? 0,
-      costOfInsurance: base.costOfInsurance ?? 0,
-      riderCharges: base.riderCharges ?? 0,
-      interestCredited: base.interestCredited ?? 0,
-      withdrawals: base.withdrawals ?? 0
+      administrativeCharge: base.administrativeCharge,
+      costOfInsurance: base.costOfInsurance,
+      riderCharges: base.riderCharges,
+      interestCredited: base.interestCredited,
+      withdrawals: base.withdrawals
     };
   });
 
@@ -226,5 +247,6 @@ module.exports = {
   STRESS_KINDS,
   buildStressScenario,
   applyIllustratedRateStress,
-  applyMinimumFundingStress
+  applyMinimumFundingStress,
+  reprojectTimeline
 };

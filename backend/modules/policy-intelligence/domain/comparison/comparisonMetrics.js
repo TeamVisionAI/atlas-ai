@@ -3,6 +3,8 @@
  * Extensible — future comparison types register additional metrics here.
  */
 
+const { SCENARIO_TYPES } = require("./scenarioModel");
+
 const METRIC_DIRECTIONS = Object.freeze({
   LOWER_BETTER: "lower_better",
   HIGHER_BETTER: "higher_better",
@@ -141,7 +143,11 @@ function extractScenarioMetrics(scenario) {
     totalInternalCharges: asNumber(summary.totalInternalCharges),
     cashValue: asNumber(last?.cashValue ?? summary.cashValueAtAge65),
     cashSurrenderValue: asNumber(last?.cashSurrenderValue),
-    deathBenefit: asNumber(last?.deathBenefit ?? facts.faceAmount),
+    deathBenefit:
+      scenario?.type === SCENARIO_TYPES.STRESS_TEST ||
+      scenario?.type === SCENARIO_TYPES.ALTERNATIVE_FUNDING
+        ? asNumber(last?.deathBenefit)
+        : asNumber(last?.deathBenefit ?? facts.faceAmount),
     breakEvenYear: asNumber(summary.breakEvenYear),
     guaranteedDuration: asNumber(facts.guaranteedDuration),
     illustratedDuration: asNumber(facts.illustratedDuration),

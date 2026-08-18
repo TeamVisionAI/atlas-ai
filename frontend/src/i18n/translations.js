@@ -112,6 +112,8 @@ export const translations = {
     policyIntelligenceComparisonWinner: "Ganador",
     policyIntelligenceComparisonYear: "Año",
     policyIntelligenceComparisonAge: "Edad",
+    policyIntelligenceComparisonStressNotComputable:
+      "Esta ilustración de póliza no proporciona suficiente información para recalcular con precisión los valores de la póliza a una tasa ilustrada distinta. Se requiere una ilustración generada por la aseguradora.",
 
     workspaceLabel: "Workspace",
     workspaceLabelAdministrator: "Administrator",
@@ -712,11 +714,13 @@ export const translations = {
     configurationCalendar: "Calendario",
     configurationLastSync: "Última sincronización",
     configurationConnectGoogle: "Conectar Google Calendar",
+    configurationReconnectGoogle: "Reconectar calendario",
     configurationDisconnectGoogle: "Desconectar",
     configurationGoogleConnected: "Google Calendar conectado.",
     configurationGoogleConnectFailed: "No se pudo conectar Google Calendar.",
     configurationGoogleReconnectRequired:
       "La autorización de Google Calendar expiró. Vuelve a conectar Google Calendar para continuar.",
+    configurationGoogleReconnectBadge: "Reconexión requerida",
     configurationGoogleDisconnected: "Google Calendar desconectado.",
     configurationSelectCalendar: "Seleccionar calendario",
     configurationSelectCalendarPlaceholder: "Elegir calendario…",
@@ -1812,6 +1816,8 @@ export const translations = {
     policyIntelligenceComparisonWinner: "Winner",
     policyIntelligenceComparisonYear: "Year",
     policyIntelligenceComparisonAge: "Age",
+    policyIntelligenceComparisonStressNotComputable:
+      "This policy illustration does not provide enough information to accurately recalculate policy values at a different illustrated rate. A carrier-generated illustration is required.",
 
     workspaceLabel: "Workspace",
     workspaceLabelAdministrator: "Administrator",
@@ -2412,11 +2418,13 @@ export const translations = {
     configurationCalendar: "Calendar",
     configurationLastSync: "Last Sync",
     configurationConnectGoogle: "Connect Google Calendar",
+    configurationReconnectGoogle: "Reconnect Calendar",
     configurationDisconnectGoogle: "Disconnect",
     configurationGoogleConnected: "Google Calendar connected.",
     configurationGoogleConnectFailed: "Unable to connect Google Calendar.",
     configurationGoogleReconnectRequired:
       "Google Calendar authorization expired. Reconnect Google Calendar to continue.",
+    configurationGoogleReconnectBadge: "Reconnect required",
     configurationGoogleDisconnected: "Google Calendar disconnected.",
     configurationSelectCalendar: "Select calendar",
     configurationSelectCalendarPlaceholder: "Choose a calendar…",

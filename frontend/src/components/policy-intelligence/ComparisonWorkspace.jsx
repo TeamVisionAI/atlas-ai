@@ -97,7 +97,11 @@ export default function ComparisonWorkspace({
       setNotice(translate("policyIntelligenceComparisonReady"));
     } catch (compareError) {
       setResult(null);
-      setError(compareError.message || translate("policyIntelligenceErrorGeneric"));
+      if (compareError.code === "ILLUSTRATED_RATE_STRESS_NOT_COMPUTABLE") {
+        setError(translate("policyIntelligenceComparisonStressNotComputable"));
+      } else {
+        setError(compareError.message || translate("policyIntelligenceErrorGeneric"));
+      }
     } finally {
       setBusy(false);
     }

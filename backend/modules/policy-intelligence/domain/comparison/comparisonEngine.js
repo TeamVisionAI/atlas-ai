@@ -15,6 +15,11 @@ const { createComparisonMetricRow, createComparisonResult } = require("./Compari
 const { resolveComparisonType, listComparisonTypes } = require("./comparisonTypes");
 const { createPolicyScenario, SCENARIO_TYPES, SCENARIO_LABELS } = require("./scenarioModel");
 const { buildStressScenario, STRESS_KINDS } = require("./stressScenarios");
+const {
+  evaluateIllustratedRateStressComputability,
+  ILLUSTRATED_RATE_STRESS_NOT_COMPUTABLE,
+  STRESS_NOT_COMPUTABLE_MESSAGE
+} = require("./stressComputability");
 
 function buildTimelineComparison(scenarios) {
   const byYear = new Map();
@@ -156,6 +161,7 @@ function getComparisonCatalog() {
       ai: false,
       ocr: false,
       calculationsOnly: true,
+      illustratedRateStressFailClosed: true,
       consumes: ["insuranceFacts", "annualValues", "findings", "recommendations"]
     }
   };
@@ -168,6 +174,9 @@ module.exports = {
   createPolicyScenario,
   buildStressScenario,
   extractScenarioMetrics,
+  evaluateIllustratedRateStressComputability,
+  ILLUSTRATED_RATE_STRESS_NOT_COMPUTABLE,
+  STRESS_NOT_COMPUTABLE_MESSAGE,
   SCENARIO_TYPES,
   STRESS_KINDS
 };
