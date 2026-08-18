@@ -21,6 +21,7 @@ const {
 } = require("./shadowDivergence");
 const { resolveProspectPreferredLanguage } = require("../prospectLanguage");
 const { resolveCanonicalProspectEmail } = require("./prospectEmail");
+const { resolveIulCampaignFields } = require("./iulAdConversation");
 
 function sanitizeFailureMessage(error) {
   const message = String(error?.message || error || "shadow_evaluation_failed");
@@ -59,6 +60,14 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
     prospect.assigned_rvp_id ||
     prospect.assignedRvpId ||
     null;
+
+  const leadSource = prospect.lead_source || prospect.leadSource || extras.leadSource || null;
+  const iulCampaign = resolveIulCampaignFields({
+    conversationGoal: extras.conversationGoal || prospect.conversationGoal || null,
+    campaignKind: extras.campaignKind || prospect.campaignKind || null,
+    ctwaReferral: extras.ctwaReferral || extras.referral || null,
+    leadSource
+  });
 
   return {
     organizationId: extras.organizationId || prospect.organization_id || null,
@@ -110,7 +119,10 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
       acknowledged: Boolean(prospect.attention_acknowledged_at)
     },
     transcriptTail: extras.transcriptTail || [],
-    prospectClosed: closed
+    prospectClosed: closed,
+    conversationGoal: iulCampaign.conversationGoal,
+    campaignKind: iulCampaign.campaignKind,
+    ctwaReferral: iulCampaign.ctwaReferral
   };
 }
 

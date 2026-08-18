@@ -61,6 +61,7 @@ const {
   violatesEarliestConstraint
 } = require("./schedulingConstraints");
 const { READ_STATUS } = require("./schedulingAvailabilityReader");
+const { applyIulAdDecision } = require("./iulAdConversation");
 
 function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
   if (!Array.isArray(offeredSlots) || offeredSlots.length === 0) {
@@ -996,6 +997,11 @@ function decideConversationTurn({
       providerFailure: Boolean(availability.providerFailure),
       agentResolutionSource: availability.agentResolutionSource || null
     };
+  }
+
+  const iulDecision = applyIulAdDecision({ structured, context, interpretation });
+  if (iulDecision) {
+    return iulDecision;
   }
 
   if (intent === INTENTS.GREETING) {

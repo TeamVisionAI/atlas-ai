@@ -104,6 +104,11 @@ const {
 } = require("./shadowDivergence");
 const constants = require("./constants");
 const {
+  isIulReviewAdContext,
+  classifyIulAdInbound,
+  renderIulAdReply
+} = require("./iulAdConversation");
+const {
   readCandidateSlots,
   readCandidateSlotsSync,
   resolveAvailabilityAgent,
@@ -191,5 +196,8 @@ module.exports = {
   classifyInboundMedia,
   isPostConfirmDeferredSchedulingState,
   decideNonTextMediaTurn,
+  isIulReviewAdContext,
+  classifyIulAdInbound,
+  renderIulAdReply,
   ...constants
 };

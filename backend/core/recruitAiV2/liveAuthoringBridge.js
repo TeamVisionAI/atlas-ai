@@ -714,7 +714,11 @@ async function attemptLiveV2Authoring({
     prospectId: canonicalProspectId,
     prospectPhone,
     legacyProspectId,
-    timezone: "America/New_York"
+    timezone: "America/New_York",
+    ctwaReferral: normalized.ctwaReferral || null,
+    conversationGoal: prospect.lead_source?.conversationGoal || prospect.conversationGoal || null,
+    campaignKind: prospect.lead_source?.campaignKind || prospect.campaignKind || null,
+    leadSource: prospect.lead_source || prospect.leadSource || null
   });
 
   try {

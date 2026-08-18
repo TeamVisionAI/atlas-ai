@@ -5,6 +5,7 @@
  */
 
 const { LANGUAGES } = require("./constants");
+const { renderIulAdReply } = require("./iulAdConversation");
 const { sanitizeCustomerCopy } = require("./sanitize");
 const { collapseRedundantAcknowledgements } = require("./acknowledgementStyle");
 const { stateDisplayName } = require("./locationFacts");
@@ -665,6 +666,10 @@ function renderCustomerReply(responsePlan) {
   }
 
   if (
+    String(key).startsWith("iul_")
+  ) {
+    template = renderIulAdReply(key, language);
+  } else if (
     key === "value_prop_then_qualify" ||
     key === "job_opportunity_faq_then_resume"
   ) {

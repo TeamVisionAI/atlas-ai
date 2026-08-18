@@ -57,7 +57,11 @@ function emptyKnownFacts() {
      */
     prospectGoals: [],
     /** BR-137 — primary theme when material for later copy; never invented. */
-    prospectGoalTheme: null
+    prospectGoalTheme: null,
+    /** BR-143 — IUL review ad facts (not recruiting qualification). */
+    iulPolicyActive: null,
+    iulReviewTopic: null,
+    iulReviewDayPart: null
   };
 }
 
@@ -135,7 +139,10 @@ function createConversationContext(overrides = {}) {
     conversation: emptyConversationMeta(),
     attention: emptyAttention(),
     timezone: "America/New_York",
-    schemaVersion: 1
+    schemaVersion: 1,
+    conversationGoal: null,
+    campaignKind: null,
+    ctwaReferral: null
   };
 
   return mergeConversationContext(base, overrides);
@@ -174,7 +181,15 @@ function mergeConversationContext(base, patch = {}) {
       ...emptyLanguageMeta(),
       ...(base.languageMeta || {}),
       ...(patch.languageMeta || {})
-    }
+    },
+    conversationGoal:
+      patch.conversationGoal !== undefined
+        ? patch.conversationGoal
+        : base.conversationGoal || null,
+    campaignKind:
+      patch.campaignKind !== undefined ? patch.campaignKind : base.campaignKind || null,
+    ctwaReferral:
+      patch.ctwaReferral !== undefined ? patch.ctwaReferral : base.ctwaReferral || null
   };
 
   return next;

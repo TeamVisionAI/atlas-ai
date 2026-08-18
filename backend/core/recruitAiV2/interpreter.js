@@ -12,6 +12,11 @@ const {
   looksLikeLicensePathDetailQuestion
 } = require("../teamVisionWorkflowCopy");
 const {
+  isIulReviewAdTurn,
+  classifyIulAdInbound,
+  looksLikeEnglishIulUtterance
+} = require("./iulAdConversation");
+const {
   looksLikeJobOpportunityQuestion,
   looksLikeJobOverviewQuestion,
   looksLikeSpanishInfoRequest,
@@ -856,7 +861,13 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     now: options.now || context?._testNow || undefined
   });
 
-  const messageLanguage = detectMessageLanguageHint(originalText || text);
+  let messageLanguage = detectMessageLanguageHint(originalText || text);
+  if (
+    isIulReviewAdTurn({ context, text: originalText || text }) &&
+    looksLikeEnglishIulUtterance(originalText || text)
+  ) {
+    messageLanguage = LANGUAGES.ENGLISH;
+  }
 
   let intent = INTENTS.UNKNOWN;
   let confidence = 0.4;
@@ -909,6 +920,16 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.alsoWithdraw = Boolean(cancellation.alsoWithdraw);
     entities.alsoOptOut = Boolean(cancellation.alsoOptOut);
     entities.directLackOfInterest = Boolean(cancellation.directLackOfInterest);
+  } else if (languageSwitchTo) {
+    intent = INTENTS.REQUEST_LANGUAGE_SWITCH;
+    confidence = 0.95;
+    entities.requestedLanguage = languageSwitchTo;
+  } else if (isIulReviewAdTurn({ context, text: originalText || text })) {
+    // Implements BR-143 — IUL-ad / policy_review track outranks recruiting FAQ.
+    const iul = classifyIulAdInbound({ text: originalText || text, context });
+    intent = iul.intent;
+    confidence = iul.confidence;
+    Object.assign(entities, iul.entities || {});
   } else if (
     looksLikeCompanyIdentityQuestion(text) ||
     looksLikeCompanyIdentityQuestion(originalText)
@@ -1452,12 +1473,26 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     explicitPreference: explicitFromTurn
   });
 
+  let preferredLanguage = languageResolution.preferredLanguage;
+  if (
+    isIulReviewAdTurn({ context, text: originalText || text }) &&
+    preferredLanguage === LANGUAGES.UNKNOWN
+  ) {
+    preferredLanguage = LANGUAGES.SPANISH;
+  }
+  if (
+    isIulReviewAdTurn({ context, text: originalText || text }) &&
+    (messageLanguage === LANGUAGES.ENGLISH || messageLanguage === LANGUAGES.SPANISH)
+  ) {
+    preferredLanguage = messageLanguage;
+  }
+
   return {
     intent,
     confidence,
     entities,
     messageLanguage,
-    preferredLanguage: languageResolution.preferredLanguage,
+    preferredLanguage,
     languageMeta: languageResolution.languageMeta,
     languageAdapted: languageResolution.adapted,
     languageReason: languageResolution.reason,

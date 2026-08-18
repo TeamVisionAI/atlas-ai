@@ -49,7 +49,9 @@ function extractClickToWhatsAppReferral(message) {
     sourceType: referral.source_type ? String(referral.source_type) : null,
     sourceId: referral.source_id ? String(referral.source_id) : null,
     ctwaClid,
-    sourceUrl: referral.source_url ? String(referral.source_url) : null
+    sourceUrl: referral.source_url ? String(referral.source_url) : null,
+    headline: referral.headline ? String(referral.headline) : null,
+    body: referral.body ? String(referral.body) : null
   };
 }
 
