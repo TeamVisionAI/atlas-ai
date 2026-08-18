@@ -66,6 +66,13 @@ describe("PolicyValuesCheckpointChart", () => {
               accountValue: classified(null, "NOT_AVAILABLE"),
               cashSurrenderValue: classified(null, "NOT_AVAILABLE"),
               deathBenefit: classified(100000, "EXTRACTED_EXACT")
+            },
+            {
+              usedYear: 86,
+              attainedAge: 121,
+              accountValue: classified(2500000, "EXTRACTED_EXACT"),
+              cashSurrenderValue: classified(2480000, "EXTRACTED_EXACT"),
+              deathBenefit: classified(2500000, "EXTRACTED_EXACT")
             }
           ]
         })
@@ -78,11 +85,17 @@ describe("PolicyValuesCheckpointChart", () => {
       assert.match(html, /Death Benefit/);
       assert.match(html, /Yr 1 · 36/);
       assert.match(html, /Source: Policy Illustration — Pages 22–23/);
+      assert.match(html, /data-testid="pi-values-chart-summary"/);
+      assert.match(html, /data-testid="pi-values-chart-summary-1"/);
+      assert.match(html, /data-testid="pi-values-chart-summary-86"/);
+      assert.match(html, /data-testid="pi-values-chart-summary-1-accountValue"[^>]*>\$1,422/);
+      assert.match(html, /data-testid="pi-values-chart-summary-1-cashSurrenderValue"[^>]*>\$0/);
+      assert.match(html, /stroke-width="3.2"/);
       assert.match(html, /data-series="accountValue"[^>]*data-year="1"[^>]*data-value="1422"/);
       assert.match(html, /data-series="cashSurrenderValue"[^>]*data-year="1"[^>]*data-value="0"/);
       assert.equal(html.includes('data-series="accountValue" data-year="20"'), false);
-      assert.equal(html.includes('data-year="2"'), false);
-      assert.equal(html.includes('data-year="5"'), false);
+      assert.equal(/data-year="2(?!\d)"/.test(html), false);
+      assert.equal(/data-year="5(?!\d)"/.test(html), false);
       assert.equal(/data-series="accountValue"[^>]*data-value="0"/.test(html), false);
     } finally {
       await server.close();

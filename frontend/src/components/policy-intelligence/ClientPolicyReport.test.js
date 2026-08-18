@@ -126,6 +126,20 @@ function nationwideReport() {
           cashReceivedNotEqualToAmountAccelerated: true,
           provenance: { sourcePage: 16, formNumber: "ICC20-NWLA-606" },
           sourcePages: [16]
+        },
+        {
+          rider: "Overloan Lapse Protection",
+          type: "Overloan Lapse Protection",
+          form: "ICC20-NWLA-594",
+          riderCategory: "other",
+          whatQualifies: "may_be_invoked_after_year_15_and_age_65_as_described",
+          carrierCalculationRequired: true,
+          carrierCalculationRequiredText:
+            "Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.",
+          exactPayout: classified(null, "CARRIER_CALCULATION_REQUIRED"),
+          cashReceivedNotEqualToAmountAccelerated: true,
+          provenance: { sourcePage: 18, formNumber: "ICC20-NWLA-594" },
+          sourcePages: [18]
         }
       ]
     },
@@ -215,6 +229,19 @@ function nationalLifeReport() {
           cashReceivedNotEqualToAmountAccelerated: true,
           provenance: { sourcePage: 9, formNumber: "8095FL" },
           sourcePages: [9]
+        },
+        {
+          rider: "Charitable Matching Gift",
+          type: "Charitable Matching Gift",
+          form: "20186FL",
+          riderCategory: "other",
+          carrierCalculationRequired: true,
+          carrierCalculationRequiredText:
+            "Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.",
+          exactPayout: classified(null, "CARRIER_CALCULATION_REQUIRED"),
+          cashReceivedNotEqualToAmountAccelerated: true,
+          provenance: { sourcePage: 5, formNumber: "20186FL" },
+          sourcePages: [5]
         }
       ]
     },
@@ -264,6 +291,7 @@ describe("ClientPolicyReport", () => {
     assert.ok(pageJsx.includes("FinancialIntelligencePanel"));
     assert.ok(pageJsx.includes("pi-tab-report"));
     assert.ok(pageJsx.includes("window.print()"));
+    assert.ok(riderJsx.includes("isAcceleratedLivingBenefitRider"));
     assert.ok(riderJsx.includes("Cash received is not the same as the death benefit accelerated"));
     assert.ok(displayJs.includes("NOT_AVAILABLE"));
     assert.equal(displayJs.includes("value === 0 ? \"$0\""), false);
@@ -290,15 +318,39 @@ describe("ClientPolicyReport", () => {
       );
       assert.match(nationwideHtml, /Nationwide/);
       assert.match(nationwideHtml, /IUL Protector II/);
+      assert.match(nationwideHtml, /data-testid="pi-section-band-snapshot"/);
+      assert.match(nationwideHtml, /1\. Current Policy Snapshot/);
+      assert.match(nationwideHtml, /2\. Policy Cost Analysis — The 7 Costs/);
+      assert.match(nationwideHtml, /3\. Policy Values Over Time/);
+      assert.match(nationwideHtml, /4\. Living Benefits \/ Riders/);
+      assert.match(nationwideHtml, /5\. Term \+ Invest-the-Difference/);
+      assert.match(nationwideHtml, /6\. Representative Notes \/ Safeguards/);
+      assert.match(nationwideHtml, /pi-snapshot--hero/);
+      assert.match(nationwideHtml, /pi-snapshot__fact--hero/);
+      assert.equal(nationwideHtml.includes('data-testid="pi-snapshot-issuer"'), false);
       assert.match(nationwideHtml, /data-classification="NOT_AVAILABLE"/);
+      assert.match(nationwideHtml, /pi-cost-card--not_available/);
+      assert.match(nationwideHtml, /pi-cost-card--extracted_exact/);
       assert.match(nationwideHtml, /Not disclosed in this illustration/);
+      assert.equal(nationwideHtml.includes("$0</p>"), false);
       assert.match(nationwideHtml, /ICC13-NWLA-495/);
+      assert.match(nationwideHtml, /data-rider-kind="living-benefit"/);
+      assert.match(nationwideHtml, /data-rider-kind="policy-feature"/);
+      assert.match(nationwideHtml, /pi-rider-group-living/);
+      assert.match(nationwideHtml, /pi-rider-group-other/);
       assert.match(nationwideHtml, /Exact accelerated benefit cannot be determined/);
       assert.match(nationwideHtml, /pi-checkpoint-table__av/);
       assert.match(nationwideHtml, /pi-checkpoint-table__csv/);
       assert.match(nationwideHtml, /Cash received is not the same/);
       assert.match(nationwideHtml, /Atlas informs/);
       assert.match(nationwideHtml, /Not disclosed in this illustration/);
+      const overloanHtml = nationwideHtml.slice(
+        nationwideHtml.indexOf("pi-rider-card-ICC20-NWLA-594")
+      );
+      const overloanCard = overloanHtml.slice(0, overloanHtml.indexOf("</article>") + 10);
+      assert.match(overloanCard, /Overloan Lapse Protection/);
+      assert.equal(overloanCard.includes("Cash received is not the same"), false);
+      assert.equal(overloanCard.includes("Exact accelerated benefit cannot be determined"), false);
 
       assert.match(nationwideHtml, /pi-source-line/);
       assert.match(nationwideHtml, /Source: Policy Illustration — Pages 22–23/);
@@ -312,8 +364,12 @@ describe("ClientPolicyReport", () => {
       assert.match(nationwideHtml, /Cash Surrender Value/);
       assert.match(nationwideHtml, /Yr 1/);
       assert.match(nationwideHtml, /data-testid="pi-section-sources"/);
+      assert.match(nationwideHtml, /fi-print-hide/);
+      assert.match(nationwideHtml, /<details/);
+      assert.match(nationwideHtml, /Source references/);
+      assert.equal(nationwideHtml.includes("7. Source references"), false);
+      assert.match(nationwideHtml, /6\. Representative Notes \/ Safeguards/);
       assert.match(nationwideHtml, /\[1\]/);
-      assert.equal(nationwideHtml.includes("<details"), false);
       assert.equal(nationwideHtml.includes("Page 24"), false);
 
       const lswHtml = renderToString(
@@ -328,6 +384,12 @@ describe("ClientPolicyReport", () => {
       assert.match(lswHtml, /illustrative only/);
       assert.match(lswHtml, /national life abr mortality table/i);
       assert.equal(lswHtml.includes("ICC13-NWLA"), false);
+      assert.match(lswHtml, /data-testid="pi-snapshot-issuer"/);
+      const charitableHtml = lswHtml.slice(lswHtml.indexOf("pi-rider-card-20186FL"));
+      const charitableCard = charitableHtml.slice(0, charitableHtml.indexOf("</article>") + 10);
+      assert.match(charitableCard, /Charitable Matching Gift/);
+      assert.equal(charitableCard.includes("Cash received is not the same"), false);
+      assert.equal(charitableCard.includes("Exact accelerated benefit cannot be determined"), false);
 
       const missingHtml = renderToString(
         React.createElement(ClientPolicyReport, {
@@ -375,7 +437,24 @@ describe("ClientPolicyReport", () => {
       assert.ok(reportCss.includes("background: #fff !important"));
       assert.ok(reportCss.includes("break-inside: avoid"));
       assert.ok(reportCss.includes(".pi-source-line"));
-      assert.ok(reportCss.includes("#c4a35a"));
+      assert.ok(reportCss.includes(".pi-section-band"));
+      assert.ok(reportCss.includes(".pi-cost-card--extracted_exact"));
+      assert.ok(reportCss.includes(".pi-cost-card--not_available"));
+      assert.ok(reportCss.includes(".pi-cost-card--carrier_calculation_required"));
+      assert.ok(reportCss.includes(".pi-rider-card--living"));
+      assert.ok(reportCss.includes(".pi-report-section--sources"));
+      assert.match(
+        reportCss,
+        /\.pi-report-section--sources[\s\S]{0,80}display:\s*none\s*!important/
+      );
+      assert.equal(
+        /pi-source-line[^{]*\{[^}]*display:\s*none/m.test(reportCss),
+        false
+      );
+      assert.equal(/\.pi-report-section--sources[\s\S]{0,40}break-before:\s*page/.test(reportCss), false);
+      assert.ok(reportCss.includes("break-inside: avoid"));
+      assert.ok(reportCss.includes("page-break-inside: avoid"));
+      assert.ok(reportCss.includes("#c9a227"));
       assert.ok(reportCss.includes("#0b1f3a"));
     } finally {
       await server.close();

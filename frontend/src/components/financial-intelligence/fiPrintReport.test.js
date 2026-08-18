@@ -89,6 +89,11 @@ describe("FI print layout contract", () => {
     assert.ok(piCss.includes("display: block !important"));
     assert.equal(/pi-source-line[^{]*\{[^}]*display:\s*none/m.test(piCss), false);
     assert.equal(/pi-values-chart[^{]*\{[^}]*display:\s*none/m.test(printCss), false);
+    assert.match(
+      piCss,
+      /\.pi-report-section--sources[\s\S]{0,80}display:\s*none\s*!important/
+    );
+    assert.ok(printCss.includes(".fi-print-hide"));
     assert.ok(printCss.includes(".pi-client-report-toolbar"));
     assert.ok(printCss.includes(".policy-intelligence__print"));
   });
