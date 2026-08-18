@@ -1,6 +1,9 @@
 import { formatClassifiedValue, VALUE_CLASSIFICATIONS } from "./classifiedValueDisplay";
 import { collectPages, formatSourceLine } from "./sourceReferences";
-import { isAcceleratedLivingBenefitRider } from "./riderPresentation";
+import {
+  groupAcceleratedPrintPairs,
+  isAcceleratedLivingBenefitRider
+} from "./riderPresentation";
 
 const DEFAULT_CARRIER_TEXT =
   "Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.";
@@ -150,12 +153,6 @@ function RiderCard({ card }) {
         </p>
       ) : null}
 
-      {showCarrierCalc ? (
-        <p className="pi-rider-card__carrier" data-testid="pi-rider-carrier-calc">
-          {card.carrierCalculationRequiredText || DEFAULT_CARRIER_TEXT}
-        </p>
-      ) : null}
-
       {accelerated && !showCarrierCalc && card.exactPayoutCalculable ? (
         <p className="pi-rider-card__body">
           <span className="pi-rider-card__kicker">Actual benefit</span>
@@ -171,12 +168,6 @@ function RiderCard({ card }) {
         </p>
       ) : null}
 
-      {card.remainingDeathBenefitEffect ? (
-        <p className="pi-rider-card__body">
-          <span className="pi-rider-card__kicker">Remaining death benefit</span>
-          {String(card.remainingDeathBenefitEffect).replace(/_/g, " ")}
-        </p>
-      ) : null}
       {card.accountValueEffect ? (
         <p className="pi-rider-card__body">
           <span className="pi-rider-card__kicker">Effect on accumulated value</span>
@@ -201,30 +192,75 @@ function RiderCard({ card }) {
           {card.taxMedicaidCaveats}
         </p>
       ) : null}
-      {formSource ? (
-        <p className="pi-source-line" data-testid="pi-rider-source">
-          {formSource}
-        </p>
-      ) : null}
-      {classSource && classSource !== formSource ? (
-        <p className="pi-source-line" data-testid="pi-rider-source-method">
-          {classSource}
-        </p>
-      ) : null}
+
+      <div className="pi-rider-card__tail">
+        {showCarrierCalc ? (
+          <p className="pi-rider-card__carrier" data-testid="pi-rider-carrier-calc">
+            {card.carrierCalculationRequiredText || DEFAULT_CARRIER_TEXT}
+          </p>
+        ) : null}
+        {card.remainingDeathBenefitEffect ? (
+          <p className="pi-rider-card__body">
+            <span className="pi-rider-card__kicker">Remaining death benefit</span>
+            {String(card.remainingDeathBenefitEffect).replace(/_/g, " ")}
+          </p>
+        ) : null}
+        {formSource ? (
+          <p className="pi-source-line" data-testid="pi-rider-source">
+            {formSource}
+          </p>
+        ) : null}
+        {classSource && classSource !== formSource ? (
+          <p className="pi-source-line" data-testid="pi-rider-source-method">
+            {classSource}
+          </p>
+        ) : null}
+      </div>
     </article>
   );
 }
 
-function RiderGroup({ title, testId, cards }) {
+function riderCardKey(card) {
+  return `${card.form || card.type}-${card.rider}`;
+}
+
+function LivingRiderGroup({ cards }) {
+  if (!cards.length) {
+    return null;
+  }
+  const pairs = groupAcceleratedPrintPairs(cards);
+  return (
+    <div className="pi-rider-group" data-testid="pi-rider-group-living">
+      <h4 className="pi-rider-group__title">Accelerated living-benefit riders</h4>
+      <div className="pi-rider-grid pi-rider-grid--living">
+        {pairs.map((pair, index) => (
+          <div
+            key={`${pair.id}-${index}`}
+            className="pi-rider-print-pair"
+            data-testid={`pi-rider-print-pair-${pair.id}`}
+            data-pair={pair.id}
+            data-count={String(pair.cards.length)}
+          >
+            {pair.cards.map((card) => (
+              <RiderCard key={riderCardKey(card)} card={card} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OtherRiderGroup({ cards }) {
   if (!cards.length) {
     return null;
   }
   return (
-    <div className="pi-rider-group" data-testid={testId}>
-      <h4 className="pi-rider-group__title">{title}</h4>
-      <div className="pi-rider-grid">
+    <div className="pi-rider-group" data-testid="pi-rider-group-other">
+      <h4 className="pi-rider-group__title">Other policy riders / features</h4>
+      <div className="pi-rider-grid pi-rider-grid--other">
         {cards.map((card) => (
-          <RiderCard key={`${card.form || card.type}-${card.rider}`} card={card} />
+          <RiderCard key={riderCardKey(card)} card={card} />
         ))}
       </div>
     </div>
@@ -245,16 +281,8 @@ export default function LivingBenefitRiderCards({ cards = [] }) {
 
   return (
     <div className="pi-rider-groups" data-testid="pi-rider-grid">
-      <RiderGroup
-        title="Accelerated living-benefit riders"
-        testId="pi-rider-group-living"
-        cards={living}
-      />
-      <RiderGroup
-        title="Other policy riders / features"
-        testId="pi-rider-group-other"
-        cards={other}
-      />
+      <LivingRiderGroup cards={living} />
+      <OtherRiderGroup cards={other} />
     </div>
   );
 }

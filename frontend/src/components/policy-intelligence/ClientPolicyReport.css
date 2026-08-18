@@ -248,6 +248,10 @@
   gap: 12px;
 }
 
+.pi-rider-print-pair {
+  display: contents;
+}
+
 .pi-rider-group__title {
   margin: 0 0 8px;
   font-size: 0.78rem;
@@ -311,6 +315,10 @@
 
 .pi-rider-card .pi-source-line {
   padding-bottom: 10px;
+}
+
+.pi-rider-card__tail {
+  display: block;
 }
 
 .pi-rider-card__body {
@@ -819,14 +827,48 @@
   }
 
   .pi-cost-grid,
+  .pi-print-cost-compact,
   .pi-values-summary {
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 4px;
   }
 
-  .pi-rider-grid {
+  .pi-rider-grid,
+  .pi-rider-grid--living,
+  .pi-rider-grid--other {
     display: block !important;
     grid-template-columns: none;
+  }
+
+  .pi-rider-print-pair {
+    display: table !important;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 6px 0;
+    margin: 0 0 8px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .pi-rider-print-pair > .pi-rider-card {
+    display: table-cell;
+    width: 50%;
+    vertical-align: top;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .pi-rider-print-pair[data-count="1"] {
+    display: block !important;
+    border-spacing: 0;
+  }
+
+  .pi-rider-print-pair[data-count="1"] > .pi-rider-card {
+    display: block;
+    width: auto;
   }
 
   .pi-snapshot--hero {
@@ -858,7 +900,7 @@
   .pi-rider-card {
     display: block;
     overflow: visible !important;
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     break-inside: avoid;
     page-break-inside: avoid;
     break-before: auto;
@@ -868,29 +910,80 @@
   .pi-rider-card__header,
   .pi-rider-card__body,
   .pi-rider-card__carrier,
-  .pi-rider-card__warning {
+  .pi-rider-card__warning,
+  .pi-rider-card__tail,
+  .pi-rider-card .pi-source-line {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
+  .pi-rider-card__tail,
+  .pi-rider-card .pi-source-line,
+  .pi-rider-card__carrier {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
   .pi-cost-card {
-    padding: 7px 8px;
+    padding: 5px 6px;
+  }
+
+  .pi-print-cost-compact .pi-cost-card {
+    padding: 5px 6px;
   }
 
   .pi-cost-card__label {
-    margin: 2px 0 4px;
-    font-size: 0.86rem;
+    margin: 1px 0 2px;
+    font-size: 0.82rem;
   }
 
   .pi-cost-card__value {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
   }
 
   .pi-cost-card__note,
   .pi-cost-card__caption,
   .pi-cost-card .pi-source-line {
-    margin-top: 3px;
+    margin-top: 2px;
+    font-size: 0.68rem;
+    line-height: 1.25;
+  }
+
+  .pi-rider-card__header {
+    padding: 6px 8px 4px;
+  }
+
+  .pi-rider-card__name {
+    margin: 0;
+    font-size: 0.82rem;
+  }
+
+  .pi-rider-card__form {
+    margin-top: 2px;
+    font-size: 0.68rem;
+  }
+
+  .pi-rider-card__body,
+  .pi-rider-card__carrier,
+  .pi-rider-card__warning,
+  .pi-rider-card .pi-source-line {
+    padding: 4px 8px 0;
     font-size: 0.7rem;
+    line-height: 1.25;
+  }
+
+  .pi-rider-card .pi-source-line {
+    padding-bottom: 6px;
+  }
+
+  .pi-rider-card__carrier,
+  .pi-rider-card__warning {
+    margin: 4px 8px 0;
+    padding: 4px 6px;
+  }
+
+  .pi-rider-grid--other .pi-rider-card {
+    margin: 0 0 6px;
   }
 
   .pi-illustrated-values,

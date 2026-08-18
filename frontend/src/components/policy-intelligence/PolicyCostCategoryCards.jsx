@@ -82,7 +82,7 @@ export default function PolicyCostCategoryCards({ categories = [] }) {
   }
 
   return (
-    <div className="pi-cost-grid" data-testid="pi-cost-grid">
+    <div className="pi-cost-grid pi-print-cost-compact" data-testid="pi-cost-grid">
       {categories.map((category) => (
         <CostCard key={category.id} category={category} />
       ))}

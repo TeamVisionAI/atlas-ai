@@ -324,7 +324,30 @@ function nationalLifeReport() {
             "Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.",
           exactPayout: classified(null, "CARRIER_CALCULATION_REQUIRED"),
           cashReceivedNotEqualToAmountAccelerated: true,
+          remainingDeathBenefitEffect: "remaining_death_benefit_reduced_as_described",
           provenance: { sourcePage: 9, formNumber: "8095FL" },
+          sourcePages: [9]
+        },
+        {
+          rider: "Critical Illness ABR",
+          form: "8053FL",
+          carrierCalculationRequired: true,
+          carrierCalculationRequiredText:
+            "Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.",
+          exactPayout: classified(null, "CARRIER_CALCULATION_REQUIRED"),
+          cashReceivedNotEqualToAmountAccelerated: true,
+          provenance: { sourcePage: 9, formNumber: "8053FL" },
+          sourcePages: [9]
+        },
+        {
+          rider: "Critical Injury ABR",
+          form: "8054FL",
+          carrierCalculationRequired: true,
+          carrierCalculationRequiredText:
+            "Exact accelerated benefit cannot be determined from this policy document alone. A current carrier-specific calculation is required.",
+          exactPayout: classified(null, "CARRIER_CALCULATION_REQUIRED"),
+          cashReceivedNotEqualToAmountAccelerated: true,
+          provenance: { sourcePage: 9, formNumber: "8054FL" },
           sourcePages: [9]
         },
         {
@@ -437,7 +460,9 @@ describe("ClientPolicyReport", () => {
       assert.match(nationwideHtml, /Not disclosed in this illustration/);
       assert.equal(nationwideHtml.includes("$0</p>"), false);
       assert.match(nationwideHtml, /ICC13-NWLA-495/);
-      assert.match(nationwideHtml, /data-rider-kind="living-benefit"/);
+      assert.match(nationwideHtml, /pi-print-cost-compact/);
+      assert.match(nationwideHtml, /data-testid="pi-rider-print-pair-terminal-chronic"/);
+      assert.match(nationwideHtml, /data-testid="pi-rider-print-pair-critical-illness-injury"/);
       assert.match(nationwideHtml, /data-rider-kind="policy-feature"/);
       assert.match(nationwideHtml, /pi-rider-group-living/);
       assert.match(nationwideHtml, /pi-rider-group-other/);
@@ -532,6 +557,24 @@ describe("ClientPolicyReport", () => {
       assert.match(lswHtml, /national life abr mortality table/i);
       assert.equal(lswHtml.includes("ICC13-NWLA"), false);
       assert.match(lswHtml, /data-testid="pi-snapshot-issuer"/);
+      assert.match(lswHtml, /data-testid="pi-rider-print-pair-terminal-chronic"/);
+      assert.match(lswHtml, /data-testid="pi-rider-print-pair-critical-illness-injury"/);
+      const terminalPair = lswHtml.slice(
+        lswHtml.indexOf('data-testid="pi-rider-print-pair-terminal-chronic"'),
+        lswHtml.indexOf('data-testid="pi-rider-print-pair-critical-illness-injury"')
+      );
+      assert.match(terminalPair, /Terminal Illness ABR/);
+      assert.match(terminalPair, /Chronic Illness ABR/);
+      assert.match(terminalPair, /pi-rider-card__tail/);
+      assert.match(terminalPair, /data-testid="pi-rider-source"/);
+      assert.match(terminalPair, /Carrier calculation required — methodology described on Page 9/);
+      assert.match(terminalPair, /remaining death benefit reduced as described/i);
+      const chronicCard = lswHtml.slice(lswHtml.indexOf("pi-rider-card-8095FL"));
+      const chronicArticle = chronicCard.slice(0, chronicCard.indexOf("</article>") + 10);
+      assert.match(chronicArticle, /pi-rider-card__tail/);
+      assert.match(chronicArticle, /Carrier calculation required/);
+      assert.match(chronicArticle, /data-testid="pi-rider-source"/);
+      assert.equal(chronicArticle.includes("</article>") && chronicArticle.indexOf("pi-rider-card__tail") < chronicArticle.indexOf("</article>"), true);
       assert.match(lswHtml, /data-testid="pi-values-lead"/);
       const lswLead = lswHtml.slice(
         lswHtml.indexOf('data-testid="pi-values-lead"'),
@@ -657,6 +700,12 @@ describe("ClientPolicyReport", () => {
       assert.match(reportCss, /@media print[\s\S]*\.pi-rider-card[\s\S]{0,160}page-break-inside:\s*avoid/);
       assert.match(reportCss, /@media print[\s\S]*\.pi-rider-card[\s\S]{0,160}break-inside:\s*avoid/);
       assert.match(reportCss, /@media print[\s\S]*\.pi-rider-grid[\s\S]{0,80}display:\s*block\s*!important/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-print-pair[\s\S]{0,160}display:\s*table\s*!important/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-print-pair[\s\S]{0,240}page-break-inside:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-print-pair[\s\S]{0,240}break-inside:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-print-cost-compact[\s\S]{0,80}gap:\s*4px/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-card__tail[\s\S]{0,160}page-break-inside:\s*avoid/);
+      assert.match(reportCss, /@media print[\s\S]*\.pi-rider-card \.pi-source-line[\s\S]{0,160}page-break-before:\s*avoid/);
       assert.match(reportCss, /@media print[\s\S]*\.pi-values-chart__svg[\s\S]{0,80}max-height:\s*150pt/);
       assert.match(reportCss, /@media print[\s\S]*\.pi-values-summary[\s\S]{0,80}display:\s*none\s*!important/);
       assert.match(reportCss, /\.pi-print-repeat\.fi-print-only[\s\S]{0,80}display:\s*none\s*!important/);
