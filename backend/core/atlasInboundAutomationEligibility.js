@@ -1,64 +1,34 @@
 /**
  * BR-142 — Atlas may auto-reply only when the sender is positively eligible.
  * Shared 7338 is both Cloud API and a personal/business number; unknown inbound
- * must stay silent. Do not infer eligibility from greeting text.
+ * must stay silent. Do not infer eligibility from greeting text, FACEBOOK /
+ * CLICK_TO_WHATSAPP labels, or an existing Recruit AI session.
  */
 
-const { MILESTONES } = require("./workflowConstants");
 const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("./whatsappConstants");
 const {
   loadPersistedWorkflowState,
   savePersistedWorkflowState
 } = require("./workflowStateStore");
 
-const ELIGIBLE_ENTRY_METHODS = Object.freeze(
+/** Durable proof that Atlas eligibility was earned from a verified event. */
+const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
+  CTWA_REFERRAL: "CTWA_REFERRAL",
+  QR: "QR",
+  FACEBOOK_LEAD_ADS: "FACEBOOK_LEAD_ADS",
+  QUICK_CAPTURE: "QUICK_CAPTURE"
+});
+
+const VERIFIED_SOURCE_SET = Object.freeze(
+  new Set(Object.values(VERIFIED_ATLAS_ELIGIBILITY_SOURCES))
+);
+
+/** Stored origins that are only written by a verified intake path (not default CTWA). */
+const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
   new Set([
-    WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.QR,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     "QUICK_CAPTURE"
-  ])
-);
-
-const ELIGIBLE_SOURCES = Object.freeze(
-  new Set([
-    String(WHATSAPP_SOURCE.FACEBOOK).toUpperCase(),
-    String(WHATSAPP_SOURCE.CAR_MAGNET).toUpperCase()
-  ])
-);
-
-const ACTIVE_AUTOMATION_STEPS = Object.freeze(
-  new Set([
-    "QUALIFYING",
-    "QUALIFICATION",
-    "GREETING_SENT",
-    "SCHEDULE",
-    "SCHEDULING",
-    "INTERVIEW_READY",
-    "INTERVIEW_SCHEDULED",
-    "INTERVIEW_DUE",
-    "INTERVIEW_COMPLETED",
-    "INTERVIEW_RESULT_PENDING",
-    "FOLLOW_UP",
-    "ORIENTATION",
-    "LICENSING",
-    "FAST_START"
-  ])
-);
-
-const ACTIVE_AUTOMATION_MILESTONES = Object.freeze(
-  new Set([
-    MILESTONES.GREETING_SENT,
-    MILESTONES.QUALIFICATION,
-    MILESTONES.INTERVIEW_READY,
-    MILESTONES.INTERVIEW_SCHEDULED,
-    MILESTONES.INTERVIEW_DUE,
-    MILESTONES.INTERVIEW_COMPLETED,
-    MILESTONES.INTERVIEW_RESULT_PENDING,
-    MILESTONES.FOLLOW_UP,
-    MILESTONES.ORIENTATION,
-    MILESTONES.LICENSING,
-    MILESTONES.FAST_START
   ])
 );
 
@@ -97,24 +67,35 @@ function hasQrOrigin({ prospect, qrAttributed, qrTouch } = {}) {
   );
 }
 
-function hasEligibleStoredOrigin(prospect) {
+function hasVerifiedStoredIntakeOrigin(prospect) {
   const entry = upper(prospect?.entry_method);
-  const source = upper(prospect?.source);
-  if (ELIGIBLE_ENTRY_METHODS.has(entry) || ELIGIBLE_ENTRY_METHODS.has(prospect?.entry_method)) {
-    return true;
-  }
-  return ELIGIBLE_SOURCES.has(source);
+  return VERIFIED_STORED_ENTRY_METHODS.has(entry);
 }
 
-function isInActiveAutomatedWorkflow(prospect, workflowState) {
-  const step = upper(prospect?.current_step);
-  if (ACTIVE_AUTOMATION_STEPS.has(step)) {
-    return true;
+function resolveVerifiedAtlasEligibilitySource({
+  qrTouch = null,
+  qrAttributed = false,
+  ctwaReferral = null,
+  intakeSource = null,
+  sourceFields = null
+} = {}) {
+  if (qrTouch || qrAttributed) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
   }
-  const milestone = upper(
-    workflowState?.canonicalMilestone || prospect?.canonicalMilestone
-  );
-  return ACTIVE_AUTOMATION_MILESTONES.has(milestone);
+  if (hasPositiveCtwaReferral(ctwaReferral)) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL;
+  }
+  const entry = upper(sourceFields?.entryMethod || intakeSource);
+  if (entry === WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS || entry === "FACEBOOK_LEAD") {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.FACEBOOK_LEAD_ADS;
+  }
+  if (entry === "QUICK_CAPTURE") {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QUICK_CAPTURE;
+  }
+  if (upper(sourceFields?.source) === upper(WHATSAPP_SOURCE.CAR_MAGNET)) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
+  }
+  return null;
 }
 
 /**
@@ -148,12 +129,13 @@ function evaluateAtlasInboundAutomationEligibility({
     return { eligible: true, reason: "QR_ATTRIBUTION" };
   }
 
-  if (hasEligibleStoredOrigin(prospect)) {
-    return { eligible: true, reason: "ELIGIBLE_ORIGIN" };
+  const storedProof = upper(workflowState?.atlasEligibilitySource);
+  if (VERIFIED_SOURCE_SET.has(storedProof)) {
+    return { eligible: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
   }
 
-  if (isInActiveAutomatedWorkflow(prospect, workflowState)) {
-    return { eligible: true, reason: "ACTIVE_AUTOMATED_WORKFLOW" };
+  if (hasVerifiedStoredIntakeOrigin(prospect)) {
+    return { eligible: true, reason: "VERIFIED_STORED_ORIGIN" };
   }
 
   return { eligible: false, reason: "NOT_ELIGIBLE" };
@@ -181,6 +163,18 @@ async function resolveAtlasInboundAutomationEligibility(input = {}) {
   });
 }
 
+async function persistVerifiedAtlasEligibilitySource(phone, source, options = {}) {
+  const eligibilitySource = upper(source);
+  if (!phone || !VERIFIED_SOURCE_SET.has(eligibilitySource)) {
+    return null;
+  }
+  return savePersistedWorkflowState(
+    phone,
+    { atlasEligibilitySource: eligibilitySource },
+    options
+  );
+}
+
 async function setAtlasAutomationEnabled(phone, enabled, options = {}) {
   return savePersistedWorkflowState(
     phone,
@@ -193,7 +187,8 @@ module.exports = {
   evaluateAtlasInboundAutomationEligibility,
   resolveAtlasInboundAutomationEligibility,
   hasPositiveCtwaReferral,
+  resolveVerifiedAtlasEligibilitySource,
+  persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
-  ELIGIBLE_ENTRY_METHODS,
-  ACTIVE_AUTOMATION_STEPS
+  VERIFIED_ATLAS_ELIGIBILITY_SOURCES
 };

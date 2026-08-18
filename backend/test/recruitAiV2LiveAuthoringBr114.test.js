@@ -58,6 +58,8 @@ function canaryProspect(overrides = {}) {
     city: "Miami",
     state: "FL",
     current_step: "SCHEDULE",
+    entry_method: "QR",
+    source: "car_magnet",
     ...overrides
   };
 }
