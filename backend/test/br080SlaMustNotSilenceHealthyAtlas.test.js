@@ -75,6 +75,8 @@ function healthyWaitingProspect(overrides = {}) {
     organization_id: ORG,
     owner_user_id: OWNER,
     current_step: "QUALIFICATION",
+    entry_method: "QR",
+    source: "car_magnet",
     attention_status: "waiting_for_prospect",
     acknowledged_at: null,
     escalation_level: 1,

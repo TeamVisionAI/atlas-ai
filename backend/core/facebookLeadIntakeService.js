@@ -4,6 +4,7 @@
 
 const { processFacebookLead } = require("./recruitingWorkflowOrchestrator");
 const { locateOrCreateWhatsAppProspect } = require("./whatsappProspectResolver");
+const { WHATSAPP_ENTRY_METHOD } = require("./whatsappConstants");
 
 function parseLeadPayload(body = {}) {
   if (body.phone && (body.first_name || body.firstName || body.name)) {
@@ -49,7 +50,8 @@ async function intakeFacebookLead(body = {}) {
     phone: parsed.phone,
     name: [parsed.firstName, parsed.lastName].filter(Boolean).join(" "),
     firstMessage: "Facebook Lead Ads submission",
-    correlationBase: parsed.leadgenId ? `facebook-lead:${parsed.leadgenId}` : "facebook-lead"
+    correlationBase: parsed.leadgenId ? `facebook-lead:${parsed.leadgenId}` : "facebook-lead",
+    intakeSource: WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS
   });
 
   const result = await processFacebookLead(parsed);
