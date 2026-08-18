@@ -79,28 +79,64 @@ Policy Year Surrender Charge
 page 13 of 34
 `;
 
-  const riders = `
-Living Benefit for Terminal Illness
+  const ridersPage15 = `
+Living Benefit for Terminal Illness ICC13-NWLA-495
 The maximum amount of the accelerated death benefit cannot exceed 50% of the base policy
 death benefit. The accelerated death benefit payment must be at least $10,000 and shall not exceed $250,000.
 There is no upfront charge for this rider; however, charges and adjustments will apply at the time a claim is paid.
-The remaining death benefit, after acceleration of the death benefit, must be at the policy minimum.
+The remaining death benefit, after acceleration of the death benefit, must be at least the policy minimum of $50,000.
+Benefits may be taxable and may affect Medicaid eligibility as described in the rider.
 
-Chronic Illness Rider
-An administrative charge of up to $250 dollars is deducted from the benefit payment.
-The Specified Amount and other policy values are reduced each time an accelerated death benefit payment is made.
-The reduction in the Specified Amount will be more than one dollar for each dollar of benefit received based on
-factors that exist at the time of claim including interest rates and age of insured at the time of claim.
-
-Critical Illness Rider
-The maximum annual benefit is the lesser of 10% of the specified amount or $25,000 per event and is paid as
-described in the rider when the Insured is diagnosed with any of the following as described in the rider.
+Chronic Illness Rider ICC20-NWLA-567
 page 15 of 34
 `;
 
+  const ridersPage16 = `
+Chronic Illness Rider ICC20-NWLA-567
+The Insured qualifies when unable to perform 2 of 6 activities of daily living or has a severe cognitive impairment as described in the rider.
+An administrative charge of up to $250 dollars is deducted from the benefit payment. Any outstanding loan and unpaid charges are deducted.
+The Specified Amount and other policy values are reduced each time an accelerated death benefit payment is made.
+The reduction in the Specified Amount will be more than one dollar for each dollar of benefit received based on
+factors that exist at the time of claim including interest rates and age of insured at the time of claim.
+Benefits may be taxable and may affect Medicaid eligibility as described in the rider.
+
+Critical Illness Rider ICC20-NWLA-606
+The maximum annual benefit is the lesser of 10% of the specified amount or $25,000 per event and is paid as
+described in the rider when the Insured is diagnosed with any of the following as described in the rider.
+page 16 of 34
+`;
+
+  const ridersPage17 = `
+Critical Illness Rider ICC20-NWLA-606
+Benefits may be claimed a maximum of 5 times. An administrative charge of up to $250 dollars is deducted from the benefit payment.
+The reduction in the Specified Amount will be more than one dollar for each dollar of benefit received.
+There is no upfront charge for this rider.
+
+Overloan Lapse Protection II ICC20-NWLA-594
+May be invoked after policy year 15 when the insured is age 65 or older. There is no charge until the rider is invoked.
+page 17 of 34
+`;
+
+  const costPage6 = `
+A Percent of Premium Expense Charge may be deducted from each premium payment received.
+No percentage rate is printed in this illustration.
+page 6 of 34
+`;
+
+  const costPage12 = `
+Cost of Insurance charges are deducted monthly. An optional Cost of Insurance report was not generated with this illustration.
+Per policy charges may also apply. Continuation of COI endorsement ICC14-NWLA-517: illustrated values already reflect a 25% COI rate reduction.
+Do not treat this percentage as an annual Cost of Insurance dollar amount.
+page 12 of 34
+`;
+
   return [
+    { page: 6, text: costPage6 },
+    { page: 12, text: costPage12 },
     { page: 13, text: surrender },
-    { page: 15, text: riders },
+    { page: 15, text: ridersPage15 },
+    { page: 16, text: ridersPage16 },
+    { page: 17, text: ridersPage17 },
     { page: 18, text: summary },
     { page: 20, text: guaranteed },
     { page: 22, text: page22 },

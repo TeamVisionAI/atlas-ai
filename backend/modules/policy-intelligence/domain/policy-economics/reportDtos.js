@@ -1,0 +1,222 @@
+/**
+ * Report-ready DTOs for policy-cost checkpoints and living-benefit cards (BR-144).
+ * No UI. Null costs stay null.
+ */
+
+const { buildReportCheckpoints } = require("../illustration-extract/reportCheckpoints");
+const { VALUE_CLASSIFICATIONS, CARRIER_CALCULATION_REQUIRED_TEXT } = require("./classifications");
+const { overlayAnnualByYear } = require("./policyCostTerms");
+const {
+  fromRawNumber,
+  unavailableValue,
+  sumKnownDollarValues,
+  createClassifiedValue
+} = require("./classifiedValue");
+const { createProvenance } = require("./provenance");
+
+function classifiedFromRow(value, { nullReason, provenance, explicitZero = true } = {}) {
+  return fromRawNumber(value, { nullReason, provenance, explicitZero });
+}
+
+function buildPolicyCostCheckpoints({
+  timeline = [],
+  costTerms = null,
+  adapterKey = null
+} = {}) {
+  const points = buildReportCheckpoints(timeline);
+
+  return points.map((point) => {
+    const row = point.row || {};
+    const year = point.usedYear;
+    const provenance = createProvenance({
+      sourcePage: row.sourcePage ?? row.metadata?.sourcePage ?? null,
+      adapterKey,
+      table: "annual_values_checkpoint",
+      section: `year_${point.requestedYear}`
+    });
+
+    const premium = classifiedFromRow(row.annualPremium, {
+      nullReason: "premium_not_on_checkpoint_year",
+      provenance
+    });
+    const coiOverlay = year != null && costTerms
+      ? overlayAnnualByYear(costTerms.costOfInsurance, year)
+      : null;
+    const coi = coiOverlay && coiOverlay.classification !== VALUE_CLASSIFICATIONS.NOT_AVAILABLE
+      ? coiOverlay
+      : classifiedFromRow(row.costOfInsurance, {
+        nullReason: "annual_coi_not_in_illustration",
+        provenance
+      });
+
+    const premiumLoad = classifiedFromRow(row.premiumLoad, {
+      nullReason: "premium_load_not_in_illustration",
+      provenance
+    });
+    const monthlyExpense = year != null && costTerms
+      ? overlayAnnualByYear(costTerms.monthlyExpenseCharge, year)
+      : unavailableValue("monthly_expense_not_in_illustration", provenance);
+    const policyFee = year != null && costTerms
+      ? overlayAnnualByYear(costTerms.monthlyPolicyFee, year)
+      : unavailableValue("policy_fee_not_in_illustration", provenance);
+    const percentAvCharge = year != null && costTerms
+      ? overlayAnnualByYear(costTerms.monthlyPercentOfAccumulatedValue, year)
+      : unavailableValue("percent_av_charge_not_in_illustration", provenance);
+    const riderCharges = classifiedFromRow(row.riderCharges, {
+      nullReason: "annual_rider_charges_not_in_illustration",
+      provenance
+    });
+    const surrenderCharge = classifiedFromRow(
+      row.surrenderCharge ?? row.metadata?.surrenderCharge,
+      {
+        nullReason: "surrender_charge_not_on_this_year",
+        provenance: createProvenance({
+          ...provenance,
+          table: "surrender_charge_schedule"
+        })
+      }
+    );
+
+    const totalKnownPolicyCosts = sumKnownDollarValues(
+      [coi, premiumLoad, monthlyExpense, policyFee, percentAvCharge, riderCharges],
+      createProvenance({
+        adapterKey,
+        section: "total_known_policy_costs",
+        classification: VALUE_CLASSIFICATIONS.CALCULATED_FROM_EXPLICIT_TERMS
+      })
+    );
+
+    return Object.freeze({
+      requestedYear: point.requestedYear,
+      year: point.usedYear,
+      usedYear: point.usedYear,
+      fallback: point.fallback === true,
+      fallbackStep: point.fallbackStep,
+      attainedAge: row.insuredAge ?? null,
+      premium,
+      costOfInsurance: coi,
+      premiumLoad,
+      monthlyExpense,
+      policyFee,
+      percentOfAccumulatedValueCharge: percentAvCharge,
+      riderCharges,
+      surrenderCharge,
+      totalKnownPolicyCosts,
+      accountValue: classifiedFromRow(row.accountValue, {
+        nullReason: "account_value_not_on_checkpoint_year",
+        provenance
+      }),
+      cashSurrenderValue: classifiedFromRow(row.cashSurrenderValue, {
+        nullReason: "csv_not_on_checkpoint_year",
+        provenance
+      }),
+      deathBenefit: classifiedFromRow(row.deathBenefit, {
+        nullReason: "death_benefit_not_on_checkpoint_year",
+        provenance
+      }),
+      surrenderChargeSeparateFromCsv: true,
+      invented: false,
+      interpolated: false,
+      provenance
+    });
+  });
+}
+
+function buildLivingBenefitCard(rider = {}) {
+  const payoutClassification =
+    rider.payoutClassification || VALUE_CLASSIFICATIONS.CARRIER_CALCULATION_REQUIRED;
+  const exactPayoutCalculable =
+    payoutClassification === VALUE_CLASSIFICATIONS.EXTRACTED_EXACT ||
+    payoutClassification === VALUE_CLASSIFICATIONS.CALCULATED_FROM_EXPLICIT_TERMS;
+
+  return Object.freeze({
+    rider: rider.name || rider.type || null,
+    type: rider.type || null,
+    form: rider.formNumber || null,
+    formNumbers: rider.formNumbers || (rider.formNumber ? [rider.formNumber] : []),
+    carrier: rider.carrier || null,
+    issuer: rider.issuer || null,
+    product: rider.product || null,
+    whatQualifies: rider.eligibilityDefinition || rider.qualifyingTrigger || null,
+    limits: Object.freeze({
+      minAccelerationPercent: rider.minAccelerationPercent ?? null,
+      minAccelerationDollars: rider.minAccelerationDollars ?? rider.minimumDollarAmount ?? null,
+      maxAccelerationPercent: rider.maxAccelerationPercent ?? rider.maximumAccelerationPercent ?? null,
+      maxAccelerationDollars: rider.maxAccelerationDollars ?? rider.maximumDollarAmount ?? null,
+      monthlyLimit: rider.monthlyLimit ?? null,
+      monthlyLimitPercent: rider.monthlyLimitPercent ?? null,
+      annualLimitPercent: rider.annualLimitPercent ?? null,
+      annualLimitDollars: rider.annualLimitDollars ?? null,
+      maxClaims: rider.maxClaims ?? null,
+      eventLimits: rider.eventLimits || null
+    }),
+    discountMethodology: rider.discountMethodology || null,
+    discountFactor: rider.discountFactor ?? null,
+    discountVariables: rider.discountVariables || null,
+    exactPayout: exactPayoutCalculable
+      ? createClassifiedValue({
+        value: rider.actualCashBenefit,
+        classification: payoutClassification
+      })
+      : createClassifiedValue({
+        value: null,
+        classification: VALUE_CLASSIFICATIONS.CARRIER_CALCULATION_REQUIRED,
+        nullReason: "incomplete_acceleration_calculation_chain"
+      }),
+    exactPayoutCalculable,
+    carrierCalculationRequired: !exactPayoutCalculable,
+    carrierCalculationRequiredText: !exactPayoutCalculable
+      ? (rider.payoutReportText || CARRIER_CALCULATION_REQUIRED_TEXT)
+      : null,
+    remainingDeathBenefitEffect: rider.remainingDeathBenefit || null,
+    accountValueEffect: rider.impactOnAccountValue || rider.effectOnCashValue || null,
+    cashSurrenderValueEffect: rider.impactOnCashSurrenderValue || rider.effectOnCashValue || null,
+    loanDebtEffect: rider.loanDebtEffect || null,
+    taxMedicaidCaveats: rider.taxMedicaidCaveats || null,
+    administrativeFees: rider.administrativeFees || null,
+    riderCharges: rider.riderCharges || null,
+    cashReceivedNotEqualToAmountAccelerated:
+      rider.cashReceivedNotEqualToAmountAccelerated !== false,
+    provenance: rider.provenance || createProvenance({
+      sourcePage: rider.sourcePage,
+      formNumber: rider.formNumber,
+      adapterKey: rider.adapterKey,
+      section: rider.type
+    }),
+    invented: false,
+    interpolated: false
+  });
+}
+
+function buildLivingBenefitCards(riders = []) {
+  return (Array.isArray(riders) ? riders : []).map((rider) => buildLivingBenefitCard(rider));
+}
+
+function buildPolicyEconomicsReportDto({
+  timeline = [],
+  costTerms = null,
+  riders = [],
+  adapterKey = null,
+  carrier = null,
+  issuer = null,
+  product = null
+} = {}) {
+  return Object.freeze({
+    layer: "policy_economics_report",
+    adapterKey,
+    carrier,
+    issuer,
+    product,
+    policyCostCheckpoints: buildPolicyCostCheckpoints({ timeline, costTerms, adapterKey }),
+    livingBenefitCards: buildLivingBenefitCards(riders),
+    invented: false,
+    interpolated: false
+  });
+}
+
+module.exports = {
+  buildPolicyCostCheckpoints,
+  buildLivingBenefitCard,
+  buildLivingBenefitCards,
+  buildPolicyEconomicsReportDto
+};

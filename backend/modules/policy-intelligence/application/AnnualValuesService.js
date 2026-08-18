@@ -309,6 +309,7 @@ class AnnualValuesService {
         adapterKey: extracted.adapterKey || null,
         comparisonScenario: extracted.comparisonScenario || extracted.scenario || null,
         riders: extracted.riders,
+        policyCostTerms: extracted.policyCostTerms || null,
         surrenderChargeSchedule: extracted.surrenderCharges,
         surrenderMechanics: extracted.surrenderMechanics || null,
         reportCheckpoints: extracted.reportCheckpoints,
@@ -322,6 +323,7 @@ class AnnualValuesService {
       reason: null,
       pageCount: extracted.pageCount,
       riders: extracted.riders,
+      policyCostTerms: extracted.policyCostTerms || null,
       scenario: extracted.scenario,
       rowCount: extracted.rows.length,
       reportCheckpoints: extracted.reportCheckpoints,
@@ -371,7 +373,8 @@ class AnnualValuesService {
         riders: [
           ...((extraction.extracted_data && extraction.extracted_data.riders) || []),
           ...result.riders
-        ]
+        ],
+        policyCostTerms: result.policyCostTerms || extraction.extracted_data?.policyCostTerms || null
       };
       await this.repository.updateExtraction(organizationId, extraction.id, {
         extracted_data: extractedData,

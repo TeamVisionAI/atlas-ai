@@ -231,7 +231,8 @@ class DocumentIngestionService {
               riders: [
                 ...(layeredData.riders || []),
                 ...illustration.riders
-              ]
+              ],
+              policyCostTerms: illustration.policyCostTerms || layeredData.policyCostTerms || null
             },
             status: POLICY_EXTRACTION_STATUSES.EXTRACTED,
             extracted_at: new Date().toISOString(),

@@ -61,6 +61,22 @@ function run() {
   assert(!normalized.mechanics.prospectId, "mechanics must not keep prospectId");
   assert(hasExtractedIdentity(normalized), "anonymous attributes count as extracted");
 
+  const riderEconomics = normalizePolicyExtractionData({
+    riders: [
+      {
+        type: "Terminal Illness",
+        formNumber: "ICC13-NWLA-495",
+        maximumAccelerationPercent: 50,
+        payoutClassification: "CARRIER_CALCULATION_REQUIRED",
+        discountMethodology: "more_than_dollar_for_dollar_at_claim"
+      }
+    ],
+    policyCostTerms: { costOfInsurance: { annualDollars: null } }
+  });
+  assert(riderEconomics.riders[0].formNumber === "ICC13-NWLA-495", "normalize keeps form number");
+  assert(riderEconomics.riders[0].maxAccelerationPercent === 50, "normalize keeps acceleration cap");
+  assert(riderEconomics.policyCostTerms.costOfInsurance.annualDollars === null, "policyCostTerms passthrough");
+
   const hints = buildRulesHintsFromDocument({
     fileName: "John_Smith_term_life_AB1234567.pdf",
     mimeType: "application/pdf"
