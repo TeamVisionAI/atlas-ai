@@ -109,6 +109,21 @@ export function buildSourceCatalog(report = {}) {
     });
   }
 
+  const distribution = report.distributionScenario;
+  const distributionPages = collectPages(
+    distribution?.sourcePages,
+    (distribution?.checkpoints || []).map((row) => row.sourcePage)
+  );
+  if (distributionPages.length) {
+    items.push({
+      kind: "distributions",
+      label: distribution.sourceLabel || "Distributions Ledger",
+      form: null,
+      pages: distributionPages,
+      text: `${distribution.sourceLabel || "Distributions Ledger"} — ${formatPagePhrase(distributionPages)}`
+    });
+  }
+
   for (const category of report.economics?.policyCostCategories || []) {
     const pages = collectPages(category.sourcePages, category.provenance, category.display);
     if (!pages.length) {

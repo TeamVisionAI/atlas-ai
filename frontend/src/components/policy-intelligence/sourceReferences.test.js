@@ -26,6 +26,10 @@ describe("sourceReferences", () => {
 
   it("uses exact / calculated / carrier phrasing only when pages exist", () => {
     assert.equal(
+      formatSourceLine({ tableLabel: "Distributions Ledger", pages: [25, 26, 27, 28] }),
+      "Source: Distributions Ledger — Pages 25–28"
+    );
+    assert.equal(
       formatSourceLine({ tableLabel: "Policy Illustration", pages: [24] }),
       "Source: Policy Illustration — Page 24"
     );
@@ -60,6 +64,10 @@ describe("sourceReferences", () => {
   it("builds a source catalog from stored BR-144 provenance only", () => {
     const catalog = buildSourceCatalog({
       illustrationSource: { label: "Current Illustrated Annual Values", pages: [21, 22, 23, 24] },
+      distributionScenario: {
+        sourceLabel: "Distributions Ledger",
+        sourcePages: [25, 26, 27, 28]
+      },
       economics: {
         policyCostCategories: [
           { label: "Surrender Charges", sourcePages: [17] }
@@ -70,8 +78,9 @@ describe("sourceReferences", () => {
       }
     });
     assert.equal(catalog[0].text, "Current Illustrated Annual Values — Pages 21–24");
-    assert.equal(catalog[1].text, "Surrender Charges — Page 17");
-    assert.equal(catalog[2].text, "Chronic Illness ABR — Form 8095FL — Pages 9–10");
+    assert.equal(catalog[1].text, "Distributions Ledger — Pages 25–28");
+    assert.equal(catalog[2].text, "Surrender Charges — Page 17");
+    assert.equal(catalog[3].text, "Chronic Illness ABR — Form 8095FL — Pages 9–10");
     assert.equal(catalog.every((item) => item.id >= 1), true);
   });
 });

@@ -101,4 +101,84 @@ describe("PolicyValuesCheckpointChart", () => {
       await server.close();
     }
   });
+
+  it("adds a debt series only from explicit accumulatedLoan values", async () => {
+    const server = await createServer({
+      root: frontendRoot,
+      server: { middlewareMode: true },
+      appType: "custom",
+      logLevel: "error"
+    });
+
+    try {
+      const mod = await server.ssrLoadModule(
+        "/src/components/policy-intelligence/PolicyValuesCheckpointChart.jsx"
+      );
+      const Chart = mod.default;
+      const series = mod.policyValuesSeriesFor({
+        distribution: true,
+        checkpoints: [
+          {
+            usedYear: 32,
+            accumulatedLoan: classified(18280, "EXTRACTED_EXACT")
+          },
+          {
+            usedYear: 86,
+            accumulatedLoan: classified(6889734, "EXTRACTED_EXACT")
+          }
+        ]
+      });
+      assert.equal(series.some((item) => item.key === "accumulatedLoan"), true);
+
+      const withoutDebt = mod.policyValuesSeriesFor({
+        distribution: true,
+        checkpoints: [
+          {
+            usedYear: 32,
+            accumulatedLoan: classified(null, "NOT_AVAILABLE")
+          },
+          {
+            usedYear: 86,
+            accumulatedLoan: classified(null, "NOT_AVAILABLE")
+          }
+        ]
+      });
+      assert.equal(withoutDebt.some((item) => item.key === "accumulatedLoan"), false);
+
+      const html = renderToString(
+        React.createElement(Chart, {
+          series,
+          sourceLine: "Source: Distributions Ledger — Pages 25–28",
+          checkpoints: [
+            {
+              usedYear: 32,
+              attainedAge: 66,
+              accountValue: classified(213397, "EXTRACTED_EXACT"),
+              cashSurrenderValue: classified(195117, "EXTRACTED_EXACT"),
+              deathBenefit: classified(475814, "EXTRACTED_EXACT"),
+              accumulatedLoan: classified(18280, "EXTRACTED_EXACT")
+            },
+            {
+              usedYear: 86,
+              attainedAge: 120,
+              accountValue: classified(8760818, "EXTRACTED_EXACT"),
+              cashSurrenderValue: classified(1871085, "EXTRACTED_EXACT"),
+              deathBenefit: classified(1871085, "EXTRACTED_EXACT"),
+              accumulatedLoan: classified(6889734, "EXTRACTED_EXACT")
+            }
+          ]
+        })
+      );
+
+      assert.match(html, /Accumulated Loan \/ Policy Debt/);
+      assert.match(html, /Net Death Benefit/);
+      assert.match(html, /data-series="accumulatedLoan"[^>]*data-year="32"[^>]*data-value="18280"/);
+      assert.match(html, /data-series="accumulatedLoan"[^>]*data-year="86"[^>]*data-value="6889734"/);
+      assert.match(html, /Source: Distributions Ledger — Pages 25–28/);
+      assert.equal(html.includes("Math.pow"), false);
+      assert.equal(/data-year="33"/.test(html), false);
+    } finally {
+      await server.close();
+    }
+  });
 });

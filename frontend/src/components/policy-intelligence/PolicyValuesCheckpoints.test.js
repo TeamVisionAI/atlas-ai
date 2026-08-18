@@ -150,4 +150,79 @@ describe("PolicyValuesCheckpoints layout", () => {
       await server.close();
     }
   });
+
+  it("switches to a distribution-aware table only when that variant is requested", async () => {
+    const jsx = readFileSync(path.join(__dirname, "PolicyValuesCheckpoints.jsx"), "utf8");
+    assert.ok(jsx.includes("pi-checkpoint-table--distribution"));
+    assert.ok(jsx.includes("Accumulated Loan"));
+    assert.ok(jsx.includes("Annual"));
+    assert.ok(jsx.includes("Income"));
+    assert.equal(jsx.includes("Math.pow"), false);
+    assert.equal(/accountValue\s*-/.test(jsx), false);
+
+    const server = await createServer({
+      root: frontendRoot,
+      server: { middlewareMode: true },
+      appType: "custom",
+      logLevel: "error"
+    });
+
+    try {
+      const mod = await server.ssrLoadModule(
+        "/src/components/policy-intelligence/PolicyValuesCheckpoints.jsx"
+      );
+      const distributionHtml = renderToString(
+        React.createElement(mod.default, {
+          variant: "distribution",
+          sourceLine: "Source: Distributions Ledger — Pages 25–28",
+          checkpoints: [
+            {
+              requestedYear: 32,
+              usedYear: 32,
+              fallback: false,
+              attainedAge: 66,
+              annualPremium: classified(0, "EXTRACTED_EXACT"),
+              income: classified(17265, "EXTRACTED_EXACT"),
+              plannedLoan: classified(17265, "EXTRACTED_EXACT"),
+              accumulatedLoan: classified(18280, "EXTRACTED_EXACT"),
+              accountValue: classified(213397, "EXTRACTED_EXACT"),
+              cashSurrenderValue: classified(195117, "EXTRACTED_EXACT"),
+              deathBenefit: classified(475814, "EXTRACTED_EXACT"),
+              sourcePage: 26
+            },
+            {
+              requestedYear: 86,
+              usedYear: 86,
+              fallback: false,
+              attainedAge: 120,
+              annualPremium: classified(0, "EXTRACTED_EXACT"),
+              income: classified(17265, "EXTRACTED_EXACT"),
+              plannedLoan: classified(377676, "EXTRACTED_EXACT"),
+              accumulatedLoan: classified(6889734, "EXTRACTED_EXACT"),
+              accountValue: classified(8760818, "EXTRACTED_EXACT"),
+              cashSurrenderValue: classified(1871085, "EXTRACTED_EXACT"),
+              deathBenefit: classified(1871085, "EXTRACTED_EXACT"),
+              sourcePage: 28
+            }
+          ]
+        })
+      );
+
+      assert.match(distributionHtml, /pi-checkpoint-table--distribution/);
+      assert.match(distributionHtml, /data-testid="pi-checkpoint-h-income"/);
+      assert.match(distributionHtml, /data-testid="pi-checkpoint-h-debt"/);
+      assert.equal(distributionHtml.includes('data-testid="pi-checkpoint-h-coi"'), false);
+      assert.match(distributionHtml, /\$17,265/);
+      assert.match(distributionHtml, /\$6,889,734/);
+      assert.match(distributionHtml, /Source: Distributions Ledger — Pages 25–28/);
+      const noteIdx = distributionHtml.indexOf("pi-checkpoint-table__note");
+      const tableIdx = distributionHtml.indexOf("<table");
+      const theadIdx = distributionHtml.indexOf("<thead");
+      const tbodyIdx = distributionHtml.indexOf("<tbody");
+      assert.ok(noteIdx > 0 && tableIdx > noteIdx, "distribution note stays above the table");
+      assert.ok(theadIdx > tableIdx && tbodyIdx > theadIdx, "distribution thead precedes tbody");
+    } finally {
+      await server.close();
+    }
+  });
 });

@@ -6,8 +6,15 @@
 const { ADAPTER_KEYS } = require("../domain/illustration-extract/detectIllustrationAdapter");
 const {
   buildPolicyEconomicsReportDto,
-  createEmptyPolicyCostTerms
+  createEmptyPolicyCostTerms,
+  fromRawNumber,
+  createProvenance,
+  VALUE_CLASSIFICATIONS
 } = require("../domain/policy-economics");
+const {
+  buildReportCheckpoints,
+  DEFAULT_CHECKPOINT_YEARS
+} = require("../domain/illustration-extract/reportCheckpoints");
 
 const SUPPORTED_ADAPTERS = new Set(Object.values(ADAPTER_KEYS));
 
@@ -19,6 +26,8 @@ const CARRIER_CALC_CAVEAT =
   "Some living-benefit amounts require a current carrier-specific calculation and underwriting review.";
 const HYPOTHETICAL_CAVEAT =
   "Investment projections are hypothetical and not guaranteed.";
+const DISTRIBUTION_SCENARIO_KEY = "current_illustrated_distributions";
+const DISTRIBUTIONS_LEDGER_LABEL = "Distributions Ledger";
 
 function hydrateTimeline(rows = []) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({
@@ -49,6 +58,149 @@ function illustrationTableLabel(metadata = {}) {
 
 function year1Row(timeline = []) {
   return timeline.find((row) => Number(row.policyYear) === 1) || timeline[0] || null;
+}
+
+function extraCheckpointYears(timeline = []) {
+  const years = (Array.isArray(timeline) ? timeline : [])
+    .map((row) => Number(row?.policyYear))
+    .filter((year) => Number.isInteger(year) && year > 0);
+  if (!years.length) {
+    return [];
+  }
+  const lastYear = Math.max(...years);
+  return DEFAULT_CHECKPOINT_YEARS.includes(lastYear) ? [] : [lastYear];
+}
+
+function isExplicitNonzero(value) {
+  if (value == null || value === "") {
+    return false;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) && number !== 0;
+}
+
+function distributionStartYearFromRows(rows = []) {
+  const sorted = [...rows].sort(
+    (left, right) => Number(left.policyYear) - Number(right.policyYear)
+  );
+  for (const row of sorted) {
+    if (isExplicitNonzero(row.income) || isExplicitNonzero(row.plannedLoan)) {
+      return Number(row.policyYear);
+    }
+  }
+  return null;
+}
+
+function classifyDistributionField(value, sourcePage, nullReason) {
+  return fromRawNumber(value, {
+    explicitZero: true,
+    nullReason,
+    provenance: createProvenance({
+      sourcePage: sourcePage ?? null,
+      section: DISTRIBUTION_SCENARIO_KEY,
+      table: DISTRIBUTIONS_LEDGER_LABEL,
+      classification:
+        value == null || value === ""
+          ? VALUE_CLASSIFICATIONS.NOT_AVAILABLE
+          : VALUE_CLASSIFICATIONS.EXTRACTED_EXACT
+    })
+  });
+}
+
+function mapDistributionTimelineRow(row) {
+  if (!row || row.policyYear == null) {
+    return null;
+  }
+  return {
+    policyYear: Number(row.policyYear),
+    insuredAge: row.insuredAge ?? row.attainedAge ?? null,
+    annualPremium: row.annualPremium ?? row.premium ?? null,
+    income: row.income ?? null,
+    plannedLoan: row.plannedLoan ?? null,
+    accumulatedLoan: row.accumulatedLoan ?? null,
+    accountValue: row.accountValue ?? row.accumulatedValue ?? null,
+    cashSurrenderValue: row.cashSurrenderValue ?? null,
+    deathBenefit: row.deathBenefit ?? row.netDeathBenefit ?? null,
+    sourcePage: row.sourcePage ?? null,
+    scenario: row.scenario || DISTRIBUTION_SCENARIO_KEY
+  };
+}
+
+function buildDistributionScenario(metadata = {}) {
+  const rawRows = metadata?.scenarios?.[DISTRIBUTION_SCENARIO_KEY];
+  if (!Array.isArray(rawRows) || !rawRows.length) {
+    return null;
+  }
+
+  const timeline = rawRows.map(mapDistributionTimelineRow).filter(Boolean);
+  if (!timeline.length) {
+    return null;
+  }
+
+  const distributionStartYear = distributionStartYearFromRows(timeline);
+  const requestedYears = [...DEFAULT_CHECKPOINT_YEARS];
+  if (distributionStartYear != null && !requestedYears.includes(distributionStartYear)) {
+    requestedYears.push(distributionStartYear);
+  }
+  for (const year of extraCheckpointYears(timeline)) {
+    if (!requestedYears.includes(year)) {
+      requestedYears.push(year);
+    }
+  }
+  requestedYears.sort((left, right) => left - right);
+
+  const checkpoints = buildReportCheckpoints(timeline, requestedYears)
+    .filter((point) => point.usedYear != null && point.row)
+    .map((point) => {
+      const row = point.row;
+      const sourcePage = row.sourcePage ?? null;
+      return Object.freeze({
+        requestedYear: point.requestedYear,
+        usedYear: point.usedYear,
+        fallback: point.fallback === true,
+        fallbackStep: point.fallbackStep,
+        policyYear: point.usedYear,
+        attainedAge: row.insuredAge ?? null,
+        annualPremium: classifyDistributionField(row.annualPremium, sourcePage, "premium_not_on_distribution_year"),
+        income: classifyDistributionField(row.income, sourcePage, "income_not_on_distribution_year"),
+        plannedLoan: classifyDistributionField(row.plannedLoan, sourcePage, "planned_loan_not_on_distribution_year"),
+        accumulatedLoan: classifyDistributionField(
+          row.accumulatedLoan,
+          sourcePage,
+          "accumulated_loan_not_on_distribution_year"
+        ),
+        accountValue: classifyDistributionField(row.accountValue, sourcePage, "account_value_not_on_distribution_year"),
+        cashSurrenderValue: classifyDistributionField(
+          row.cashSurrenderValue,
+          sourcePage,
+          "csv_not_on_distribution_year"
+        ),
+        deathBenefit: classifyDistributionField(row.deathBenefit, sourcePage, "death_benefit_not_on_distribution_year"),
+        sourcePage,
+        scenario: row.scenario || DISTRIBUTION_SCENARIO_KEY
+      });
+    });
+
+  if (!checkpoints.length) {
+    return null;
+  }
+
+  return Object.freeze({
+    scenario: DISTRIBUTION_SCENARIO_KEY,
+    sourceLabel: DISTRIBUTIONS_LEDGER_LABEL,
+    sourcePages: Object.freeze(collectStoredPages(timeline.map((row) => row.sourcePage))),
+    distributionStartYear,
+    checkpoints: Object.freeze(checkpoints)
+  });
+}
+
+function annualChargeDetailUnavailable(economics) {
+  const categories = economics?.policyCostCategories;
+  if (!Array.isArray(categories) || !categories.length) {
+    return false;
+  }
+  const coi = categories.find((category) => category.id === "cost_of_insurance");
+  return coi?.display?.classification === VALUE_CLASSIFICATIONS.NOT_AVAILABLE;
 }
 
 function buildSnapshot({ extractedData = {}, metadata = {}, timeline = [] } = {}) {
@@ -145,6 +297,8 @@ function assembleClientPolicyReport({
       scenario: metadata.comparisonScenario || metadata.illustrationScenario || null,
       pages: collectStoredPages(timeline.map((row) => row.sourcePage))
     }),
+    distributionScenario: buildDistributionScenario(metadata),
+    chargeScheduleUndisclosed: annualChargeDetailUnavailable(economics),
     economics,
     fieldClassifications:
       annualValues?.calculationMetadata?.fieldClassifications || null,
@@ -163,7 +317,10 @@ function assembleClientPolicyReport({
 module.exports = {
   assembleClientPolicyReport,
   hydrateTimeline,
+  buildDistributionScenario,
   SUPPORTED_ADAPTERS,
   ATLAS_INFORMS,
-  REPLACEMENT_SAFEGUARD
+  REPLACEMENT_SAFEGUARD,
+  DISTRIBUTION_SCENARIO_KEY,
+  DISTRIBUTIONS_LEDGER_LABEL
 };
