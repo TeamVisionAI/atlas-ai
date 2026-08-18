@@ -341,6 +341,8 @@ describe("ClientPolicyReport", () => {
       assert.match(nationwideHtml, /Exact accelerated benefit cannot be determined/);
       assert.match(nationwideHtml, /pi-checkpoint-table__av/);
       assert.match(nationwideHtml, /pi-checkpoint-table__csv/);
+      assert.match(nationwideHtml, /pi-checkpoint-table__head-line/);
+      assert.match(nationwideHtml, /data-testid="pi-checkpoint-h-coi"/);
       assert.match(nationwideHtml, /Cash received is not the same/);
       assert.match(nationwideHtml, /Atlas informs/);
       assert.match(nationwideHtml, /Not disclosed in this illustration/);
@@ -454,8 +456,13 @@ describe("ClientPolicyReport", () => {
       assert.equal(/\.pi-report-section--sources[\s\S]{0,40}break-before:\s*page/.test(reportCss), false);
       assert.ok(reportCss.includes("break-inside: avoid"));
       assert.ok(reportCss.includes("page-break-inside: avoid"));
-      assert.ok(reportCss.includes("#c9a227"));
-      assert.ok(reportCss.includes("#0b1f3a"));
+      assert.ok(reportCss.includes("table-layout: fixed"));
+      assert.ok(reportCss.includes(".pi-checkpoint-table__head-line"));
+      assert.match(reportCss, /\.pi-checkpoint-wrap\s*\{[\s\S]*?overflow-x:\s*visible/);
+      assert.match(
+        reportCss,
+        /@media print[\s\S]*\.pi-checkpoint-table[\s\S]*width:\s*100%\s*!important/
+      );
     } finally {
       await server.close();
     }
