@@ -1728,6 +1728,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-142 — Atlas Auto-Reply Requires Positive Inbound Eligibility
+
+**Implements:** The production WhatsApp Cloud API number may also be a personal/business line. Atlas may auto-reply (live authoring, Conversation Engine, automated outbound) only when the sender is **positively eligible**. Unknown and personal inbound default to silence.
+**Domain:** WhatsApp inbound / Recruit AI / Conversation Engine
+**Depends on:** BR-075, BR-114, BR-129, BR-135, BR-138
+**Related:** BR-080 (unknown inbound may persist; silence is not a BR-080 AI failure), BR-049
+**Status:** Implemented
+**Engine target:** `atlasInboundAutomationEligibility.js`, `communicationHub.js` (before live authoring and `shouldDeliverAutomatedReply`), `whatsappProspectResolver.resolveCreateSourceFields`, `whatsappWebhookParser.extractClickToWhatsAppReferral`
+**Tests:** `backend/test/atlasInboundAutomationEligibility.test.js`
+
+### Rules
+
+1. **Fail closed** — Auto-reply only with a positive signal. Do not infer eligibility from message text (`Hi`, `Hola`, …), contact name, or “someone texted 7338”.
+2. **Eligible origins** — Click-to-WhatsApp Meta ad referral (`referral.source_type=ad` or `ctwa_clid`); trusted QR pending-inbound match (BR-129); stored `entry_method` QR / CLICK_TO_WHATSAPP / FACEBOOK_LEAD_ADS / QUICK_CAPTURE; existing prospect already in an active automated workflow (qualification/scheduling/interview+); or explicit `atlasAutomationEnabled=true` on durable workflow state.
+3. **Unknown inbound** — May persist the message (and create an `UNATTRIBUTED` prospect). Must not live-author, run CE for a customer reply, or send automated WhatsApp. Must not stamp FACEBOOK / CLICK_TO_WHATSAPP by default.
+4. **Explicit enable** — Operators may set `atlasAutomationEnabled` so a previously silent contact starts receiving Atlas replies. Explicit `false` keeps Atlas silent.
+5. **Boundaries** — Does not change TAKE OVER / RETURN TO ATLAS, BR-075, QR matching, or execution flags. Does not guess CTWA from greetings. Does not rewrite historical production rows.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

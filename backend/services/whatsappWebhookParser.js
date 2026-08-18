@@ -30,6 +30,30 @@ function normalizeMessageBody(message) {
 }
 
 /**
+ * Positive Click-to-WhatsApp ad referral from Meta Cloud API.
+ * Only `source_type=ad` or `ctwa_clid` — not greetings, not organic posts.
+ */
+function extractClickToWhatsAppReferral(message) {
+  const referral = message?.referral;
+  if (!referral || typeof referral !== "object") {
+    return null;
+  }
+
+  const sourceType = String(referral.source_type || "").trim().toLowerCase();
+  const ctwaClid = referral.ctwa_clid ? String(referral.ctwa_clid) : null;
+  if (sourceType !== "ad" && !ctwaClid) {
+    return null;
+  }
+
+  return {
+    sourceType: referral.source_type ? String(referral.source_type) : null,
+    sourceId: referral.source_id ? String(referral.source_id) : null,
+    ctwaClid,
+    sourceUrl: referral.source_url ? String(referral.source_url) : null
+  };
+}
+
+/**
  * Structured WhatsApp media metadata. Phase 1 extracts audio only.
  * Keep rawMessage separately; never include provider tokens.
  */
@@ -145,6 +169,7 @@ function parseWhatsAppWebhookPayload(body) {
           phoneNumberId,
           wabaId,
           media: extractWhatsAppMedia(message),
+          ctwaReferral: extractClickToWhatsAppReferral(message),
           rawMessage: message,
           rawValue: value
         });
@@ -175,5 +200,6 @@ module.exports = {
   parseWhatsAppWebhookPayload,
   normalizeMessageBody,
   extractWhatsAppMedia,
+  extractClickToWhatsAppReferral,
   normalizeStatusItem
 };

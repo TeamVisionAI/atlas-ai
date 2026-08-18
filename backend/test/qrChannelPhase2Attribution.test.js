@@ -119,7 +119,7 @@ test("A. fresh bind + inbound match → consume + first/last touch + interview g
   assert.equal(consumed.scan.core_prospect_id, "core-1");
 });
 
-test("B. no pending scan → miss (Facebook path unchanged fields)", async () => {
+test("B. no pending scan → miss (unknown inbound is not stamped CTWA)", async () => {
   const repo = createMemoryQrChannelRepository();
   const svc = attributionFor(repo);
   const match = await svc.matchEligiblePendingInboundScan({
@@ -128,9 +128,15 @@ test("B. no pending scan → miss (Facebook path unchanged fields)", async () =>
   });
   assert.equal(match.outcome, MATCH_OUTCOME.MISS);
   const fields = resolveCreateSourceFields(null);
-  assert.equal(fields.source, WHATSAPP_SOURCE.FACEBOOK);
-  assert.equal(fields.entryMethod, WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP);
+  assert.equal(fields.source, WHATSAPP_SOURCE.UNKNOWN);
+  assert.equal(fields.entryMethod, WHATSAPP_ENTRY_METHOD.UNATTRIBUTED);
   assert.equal(fields.campaignAgentId, null);
+
+  const ctwa = resolveCreateSourceFields(null, {
+    ctwaReferral: { source_type: "ad", ctwa_clid: "clid-1" }
+  });
+  assert.equal(ctwa.source, WHATSAPP_SOURCE.FACEBOOK);
+  assert.equal(ctwa.entryMethod, WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP);
 });
 
 test("C. wrong phone → no attribution", async () => {
