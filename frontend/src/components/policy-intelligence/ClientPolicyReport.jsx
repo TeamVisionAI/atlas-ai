@@ -10,11 +10,15 @@ import { buildSourceCatalog, formatSourceLine, footnoteFor } from "./sourceRefer
 import "./ClientPolicyReport.css";
 import "../financial-intelligence/fiPrintReport.css";
 
-function Fact({ label, value, testId }) {
+function Fact({ label, value, testId, variant = "meta", hideIfEmpty = false }) {
+  const display = value || TABLE_UNAVAILABLE;
+  if (hideIfEmpty && (!value || value === TABLE_UNAVAILABLE)) {
+    return null;
+  }
   return (
-    <div className="pi-snapshot__fact">
+    <div className={`pi-snapshot__fact pi-snapshot__fact--${variant}`}>
       <dt>{label}</dt>
-      <dd data-testid={testId}>{value || TABLE_UNAVAILABLE}</dd>
+      <dd data-testid={testId}>{display}</dd>
     </div>
   );
 }
@@ -28,6 +32,21 @@ function snapshotPremium(snapshot) {
     return TABLE_UNAVAILABLE;
   }
   return snapshot.premiumFrequency ? `${amount} / ${snapshot.premiumFrequency}` : amount;
+}
+
+function issuerIsDistinct(snapshot = {}) {
+  const carrier = String(snapshot.carrier || "").trim().toLowerCase();
+  const issuer = String(snapshot.issuer || "").trim().toLowerCase();
+  return Boolean(issuer && carrier && issuer !== carrier);
+}
+
+function SectionBand({ title, testId }) {
+  return (
+    <header className="pi-section-band" data-testid={testId}>
+      <span className="pi-section-band__accent" aria-hidden="true" />
+      <h3>{title}</h3>
+    </header>
+  );
 }
 
 export default function ClientPolicyReport({ report, financialEvaluation = null }) {
@@ -45,6 +64,7 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
     pages: report.illustrationSource?.pages,
     tableLabel: report.illustrationSource?.label || "Policy Illustration"
   });
+  const showIssuer = issuerIsDistinct(snapshot);
 
   return (
     <article
@@ -69,51 +89,70 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
       </header>
 
       {adapterUnsupported ? (
-        <p className="pi-report__banner" role="status" data-testid="pi-adapter-unsupported">
+        <p className="pi-report__banner pi-report__banner--alert" role="status" data-testid="pi-adapter-unsupported">
           {report.adapter.message || "Policy structure requires additional review"}
         </p>
       ) : null}
 
       <section className="pi-report-section" data-testid="pi-section-snapshot">
-        <h3>1. Current policy snapshot</h3>
-        <dl className="pi-snapshot">
-          <Fact label="Carrier" value={snapshot.carrier} testId="pi-snapshot-carrier" />
-          <Fact label="Issuer" value={snapshot.issuer} testId="pi-snapshot-issuer" />
-          <Fact label="Product" value={snapshot.product} testId="pi-snapshot-product" />
-          <Fact label="Form / version" value={snapshot.formVersion} testId="pi-snapshot-form" />
+        <SectionBand title="1. Current Policy Snapshot" testId="pi-section-band-snapshot" />
+        <dl className="pi-snapshot pi-snapshot--hero" data-testid="pi-snapshot-hero">
           <Fact
-            label="Insured age"
-            value={snapshot.issueAge != null ? String(snapshot.issueAge) : null}
-            testId="pi-snapshot-age"
+            label="Premium"
+            value={snapshotPremium(snapshot)}
+            testId="pi-snapshot-premium"
+            variant="hero"
           />
-          <Fact label="Gender" value={snapshot.gender} testId="pi-snapshot-gender" />
-          <Fact
-            label="Underwriting"
-            value={snapshot.underwritingClass}
-            testId="pi-snapshot-underwriting"
-          />
-          <Fact label="Tobacco" value={snapshot.tobaccoStatus} testId="pi-snapshot-tobacco" />
-          <Fact label="Premium" value={snapshotPremium(snapshot)} testId="pi-snapshot-premium" />
           <Fact
             label="Face amount"
             value={formatUsd(snapshot.faceAmount)}
             testId="pi-snapshot-face"
+            variant="hero"
           />
           <Fact
             label="Death benefit"
             value={formatUsd(snapshot.deathBenefit)}
             testId="pi-snapshot-db"
+            variant="hero"
           />
+        </dl>
+        <dl className="pi-snapshot pi-snapshot--meta" data-testid="pi-snapshot-meta">
+          <Fact label="Carrier" value={snapshot.carrier} testId="pi-snapshot-carrier" hideIfEmpty />
+          {showIssuer ? (
+            <Fact label="Issuer" value={snapshot.issuer} testId="pi-snapshot-issuer" hideIfEmpty />
+          ) : null}
+          <Fact label="Product" value={snapshot.product} testId="pi-snapshot-product" hideIfEmpty />
+          <Fact
+            label="Form / version"
+            value={snapshot.formVersion}
+            testId="pi-snapshot-form"
+            hideIfEmpty
+          />
+          <Fact
+            label="Insured age"
+            value={snapshot.issueAge != null ? String(snapshot.issueAge) : null}
+            testId="pi-snapshot-age"
+            hideIfEmpty
+          />
+          <Fact label="Gender" value={snapshot.gender} testId="pi-snapshot-gender" hideIfEmpty />
+          <Fact
+            label="Underwriting"
+            value={snapshot.underwritingClass}
+            testId="pi-snapshot-underwriting"
+            hideIfEmpty
+          />
+          <Fact label="Tobacco" value={snapshot.tobaccoStatus} testId="pi-snapshot-tobacco" hideIfEmpty />
           <Fact
             label="Death benefit option"
             value={snapshot.deathBenefitOption}
             testId="pi-snapshot-db-option"
+            hideIfEmpty
           />
         </dl>
       </section>
 
       <section className="pi-report-section" data-testid="pi-section-costs">
-        <h3>2. Policy cost analysis — the 7 costs</h3>
+        <SectionBand title="2. Policy Cost Analysis — The 7 Costs" testId="pi-section-band-costs" />
         {economics?.policyCostCategories ? (
           <PolicyCostCategoryCards categories={economics.policyCostCategories} />
         ) : (
@@ -124,7 +163,7 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
       </section>
 
       <section className="pi-report-section pi-report-section--values" data-testid="pi-section-values">
-        <h3>3. Policy values over time</h3>
+        <SectionBand title="3. Policy Values Over Time" testId="pi-section-band-values" />
         {annualUnavailable ? (
           <p className="pi-report__empty" data-testid="pi-annual-values-missing">
             {report.annualValuesUnavailableMessage ||
@@ -155,12 +194,12 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
       </section>
 
       <section className="pi-report-section" data-testid="pi-section-riders">
-        <h3>4. Living benefits / riders</h3>
+        <SectionBand title="4. Living Benefits / Riders" testId="pi-section-band-riders" />
         <LivingBenefitRiderCards cards={economics?.livingBenefitCards || []} />
       </section>
 
       <section className="pi-report-section pi-report-section--fi" data-testid="pi-section-term-invest">
-        <h3>5. Term + invest-the-difference</h3>
+        <SectionBand title="5. Term + Invest-the-Difference" testId="pi-section-band-term-invest" />
         {financialEvaluation ? (
           <DiscussionScenariosSection evaluation={financialEvaluation} source="api" />
         ) : (
@@ -173,7 +212,7 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
       </section>
 
       <section className="pi-report-section" data-testid="pi-section-safeguards">
-        <h3>6. Representative notes / safeguards</h3>
+        <SectionBand title="6. Representative Notes / Safeguards" testId="pi-section-band-safeguards" />
         {report.representativeNotes ? (
           <p className="pi-report__notes" data-testid="pi-representative-notes">
             {report.representativeNotes}
@@ -189,17 +228,19 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
 
       {sourceCatalog.length ? (
         <section
-          className="pi-report-section pi-report-section--sources"
+          className="pi-report-section pi-report-section--sources fi-print-hide"
           data-testid="pi-section-sources"
         >
-          <h3>7. Source references</h3>
-          <ol className="pi-source-catalog">
-            {sourceCatalog.map((item) => (
-              <li key={item.id} data-testid={`pi-source-ref-${item.id}`}>
-                <span className="pi-fn">{`[${item.id}]`}</span> {item.text}
-              </li>
-            ))}
-          </ol>
+          <details className="pi-source-catalog-details">
+            <summary>Source references</summary>
+            <ol className="pi-source-catalog">
+              {sourceCatalog.map((item) => (
+                <li key={item.id} data-testid={`pi-source-ref-${item.id}`}>
+                  <span className="pi-fn">{`[${item.id}]`}</span> {item.text}
+                </li>
+              ))}
+            </ol>
+          </details>
         </section>
       ) : null}
     </article>

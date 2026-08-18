@@ -2,14 +2,14 @@ import { formatUsd } from "./classifiedValueDisplay";
 import { VALUE_CLASSIFICATIONS } from "./classifiedValueDisplay";
 
 export const POLICY_VALUE_SERIES = [
-  { key: "accountValue", label: "Accumulated Value", color: "#0b1f3a" },
-  { key: "cashSurrenderValue", label: "Cash Surrender Value", color: "#c4a35a" },
-  { key: "deathBenefit", label: "Death Benefit", color: "#5c6b80" }
+  { key: "accountValue", label: "Accumulated Value", color: "#0b1f3a", dash: null },
+  { key: "cashSurrenderValue", label: "Cash Surrender Value", color: "#c9a227", dash: "7 5" },
+  { key: "deathBenefit", label: "Death Benefit", color: "#2f6b8f", dash: null }
 ];
 
 export const PREMIUM_COST_SERIES = [
-  { key: "premium", label: "Annual Premium", color: "#0b1f3a" },
-  { key: "totalKnownPolicyCosts", label: "Known policy costs", color: "#8a6a2a" }
+  { key: "premium", label: "Annual Premium", color: "#0b1f3a", dash: null },
+  { key: "totalKnownPolicyCosts", label: "Known policy costs", color: "#b8860b", dash: "6 4" }
 ];
 
 function knownValue(classified) {
@@ -41,6 +41,16 @@ function compactMoney(value) {
     return "$0";
   }
   return formatUsd(value);
+}
+
+function endpointRows(plotted) {
+  if (!plotted.length) {
+    return [];
+  }
+  if (plotted.length === 1) {
+    return [plotted[0]];
+  }
+  return [plotted[0], plotted[plotted.length - 1]];
 }
 
 export default function PolicyValuesCheckpointChart({
@@ -75,9 +85,9 @@ export default function PolicyValuesCheckpointChart({
     return null;
   }
 
-  const width = 720;
-  const height = 280;
-  const padding = { top: 16, right: 18, bottom: 42, left: 64 };
+  const width = 760;
+  const height = 318;
+  const padding = { top: 28, right: 28, bottom: 44, left: 68 };
   const innerW = width - padding.left - padding.right;
   const innerH = height - padding.top - padding.bottom;
   const minYear = Math.min(...years);
@@ -103,11 +113,36 @@ export default function PolicyValuesCheckpointChart({
     return `M${points.join(" L")}`;
   }
 
-  const yTicks = [minVal, minVal + range / 2, maxVal];
+  const yTicks = [minVal, minVal + range / 3, minVal + (2 * range) / 3, maxVal];
+  const summaries = endpointRows(plotted);
 
   return (
     <figure className="pi-values-chart" data-testid={testId}>
       {title ? <h4 className="pi-values-chart__title">{title}</h4> : null}
+      <div className="pi-values-summary" data-testid={`${testId}-summary`}>
+        {summaries.map((row) => (
+          <div
+            key={`summary-${row.year}`}
+            className="pi-values-summary__card"
+            data-testid={`${testId}-summary-${row.year}`}
+          >
+            <p className="pi-values-summary__year">
+              {`Year ${row.year}${row.age != null ? ` · Age ${row.age}` : ""}`}
+            </p>
+            {series.map((item) =>
+              row[item.key] != null ? (
+                <p key={item.key} className="pi-values-summary__metric">
+                  <span className="pi-values-summary__swatch" style={{ background: item.color }} />
+                  <span>{item.label}</span>
+                  <strong data-testid={`${testId}-summary-${row.year}-${item.key}`}>
+                    {formatUsd(row[item.key])}
+                  </strong>
+                </p>
+              ) : null
+            )}
+          </div>
+        ))}
+      </div>
       <svg
         className="pi-values-chart__svg"
         viewBox={`0 0 ${width} ${height}`}
@@ -121,7 +156,8 @@ export default function PolicyValuesCheckpointChart({
               x2={width - padding.right}
               y1={yFor(tick)}
               y2={yFor(tick)}
-              stroke="#e6ddc8"
+              stroke="#d7dee8"
+              strokeWidth="1"
             />
             <text
               x={padding.left - 8}
@@ -137,11 +173,13 @@ export default function PolicyValuesCheckpointChart({
           <text
             key={`x-${row.year}`}
             x={xFor(row.year)}
-            y={height - 14}
+            y={height - 16}
             textAnchor="middle"
             className="pi-values-chart__tick"
           >
-            {`Yr ${row.year}${row.age != null ? ` · ${row.age}` : ""}`}
+            {row.year === minYear || row.year === maxYear
+              ? `Yr ${row.year}${row.age != null ? ` · ${row.age}` : ""}`
+              : `${row.year}`}
           </text>
         ))}
         <text
@@ -160,7 +198,8 @@ export default function PolicyValuesCheckpointChart({
               d={d}
               fill="none"
               stroke={item.color}
-              strokeWidth="2.4"
+              strokeWidth="3.2"
+              strokeDasharray={item.dash || undefined}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -174,8 +213,10 @@ export default function PolicyValuesCheckpointChart({
                 key={`${item.key}-${row.year}`}
                 cx={xFor(row.year)}
                 cy={yFor(row[item.key])}
-                r="3.2"
-                fill={item.color}
+                r="4.4"
+                fill="#ffffff"
+                stroke={item.color}
+                strokeWidth="2.4"
                 data-series={item.key}
                 data-year={row.year}
                 data-value={row[item.key]}
@@ -186,11 +227,36 @@ export default function PolicyValuesCheckpointChart({
               </circle>
             ))
         )}
+        {series.flatMap((item, seriesIndex) => {
+          const points = plotted.filter((row) => row[item.key] != null);
+          const anchors = endpointRows(points);
+          return anchors.map((row, index) => {
+            const isLast = index === anchors.length - 1 && anchors.length > 1;
+            const x = xFor(row.year);
+            const y = yFor(row[item.key]);
+            const dy = seriesIndex === 1 ? 16 : seriesIndex === 2 ? -18 : -8;
+            return (
+              <text
+                key={`callout-${item.key}-${row.year}`}
+                x={x + (isLast ? -8 : 8)}
+                y={y + dy}
+                textAnchor={isLast ? "end" : "start"}
+                className="pi-values-chart__callout"
+                fill={item.color}
+              >
+                {compactMoney(row[item.key])}
+              </text>
+            );
+          });
+        })}
       </svg>
       <ul className="pi-values-chart__legend" data-testid={`${testId}-legend`}>
         {series.map((item) => (
           <li key={item.key}>
-            <span className="pi-values-chart__swatch" style={{ background: item.color }} />
+            <span
+              className={`pi-values-chart__swatch${item.dash ? " pi-values-chart__swatch--dashed" : ""}`}
+              style={{ background: item.dash ? "transparent" : item.color, borderColor: item.color }}
+            />
             {item.label}
           </li>
         ))}
