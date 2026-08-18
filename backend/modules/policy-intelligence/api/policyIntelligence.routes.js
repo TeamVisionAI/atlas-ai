@@ -16,7 +16,8 @@ function sendError(res, error) {
   const status = error.statusCode || 500;
   return res.status(status).json({
     error: error.publicCode || "POLICY_INTELLIGENCE_ERROR",
-    message: error.message || "Policy Intelligence request failed."
+    message: error.message || "Policy Intelligence request failed.",
+    ...(error.details ? { details: error.details } : {})
   });
 }
 

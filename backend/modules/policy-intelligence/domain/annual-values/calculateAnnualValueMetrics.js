@@ -36,11 +36,7 @@ function findBreakEvenYear(timeline) {
     }
 
     const surrender =
-      typeof row.cashSurrenderValue === "number"
-        ? row.cashSurrenderValue
-        : typeof row.cashValue === "number"
-          ? row.cashValue
-          : null;
+      typeof row.cashSurrenderValue === "number" ? row.cashSurrenderValue : null;
 
     if (surrender != null && cumulativePremiums > 0 && surrender >= cumulativePremiums) {
       return row.policyYear;
@@ -64,8 +60,11 @@ function calculateAnnualValueMetrics(timeline = []) {
   const riders = sumField(rows, "riderCharges");
   const premiumLoads = sumField(rows, "premiumLoad");
 
-  const totalInternalCharges =
-    coi.total + admin.total + riders.total + premiumLoads.total;
+  const chargeSeriesPresent =
+    coi.counted > 0 && admin.counted > 0 && riders.counted > 0 && premiumLoads.counted > 0;
+  const totalInternalCharges = chargeSeriesPresent
+    ? coi.total + admin.total + riders.total + premiumLoads.total
+    : null;
 
   const policyYears = rows.map((row) => row.policyYear).filter((year) => year != null);
   const policyDuration = policyYears.length
@@ -73,11 +72,11 @@ function calculateAnnualValueMetrics(timeline = []) {
     : 0;
 
   const summaryMetrics = Object.freeze({
-    totalPremiumsPaid: premiums.total,
-    totalCostOfInsurance: coi.total,
-    totalAdministrativeCharges: admin.total,
-    totalRiderCharges: riders.total,
-    totalPremiumLoads: premiumLoads.total,
+    totalPremiumsPaid: premiums.counted > 0 ? premiums.total : null,
+    totalCostOfInsurance: coi.counted > 0 ? coi.total : null,
+    totalAdministrativeCharges: admin.counted > 0 ? admin.total : null,
+    totalRiderCharges: riders.counted > 0 ? riders.total : null,
+    totalPremiumLoads: premiumLoads.counted > 0 ? premiumLoads.total : null,
     totalInternalCharges,
     cashValueAtAge65: cashValueAtAge(rows, 65),
     cashValueAtAge70: cashValueAtAge(rows, 70),
@@ -106,7 +105,7 @@ function calculateAnnualValueMetrics(timeline = []) {
         "totalCostOfInsurance + totalAdministrativeCharges + totalRiderCharges + totalPremiumLoads",
       cashValueAtAge: "cashValue where insuredAge = target",
       breakEvenYear:
-        "first policyYear where (cashSurrenderValue || cashValue) >= cumulative annualPremium",
+        "first policyYear where cashSurrenderValue >= cumulative annualPremium",
       policyDuration: "max(policyYear) - min(policyYear) + 1"
     }),
     fieldPresence: Object.freeze({

@@ -119,6 +119,11 @@ function run() {
   assert(sparse.timeline[0].cashValue === null, "missing cashValue is null");
   assert(sparse.timeline[0].costOfInsurance === null, "missing COI is null");
   assert(sparse.summaryMetrics.cashValueAtAge65 === null, "missing age milestone is null");
+  assert(sparse.summaryMetrics.totalCostOfInsurance === null, "all-null COI series is not summarized as 0");
+  assert(sparse.summaryMetrics.totalPremiumLoads === null, "all-null premium loads are not 0");
+  assert(sparse.summaryMetrics.totalAdministrativeCharges === null, "all-null admin is not 0");
+  assert(sparse.summaryMetrics.totalRiderCharges === null, "all-null rider charges are not 0");
+  assert(sparse.summaryMetrics.totalInternalCharges === null, "all-null internal charges are not 0");
 
   // Insurance Facts remain independent / immutable; Rule Engine untouched by this module
   const facts = buildInsuranceFactsFromExtract({
