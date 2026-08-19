@@ -61,15 +61,16 @@ test("recordInterviewOutcome delegates Reschedule Interview to appointmentApplic
   const resolverPath = require.resolve("../core/activeAppointmentResolver");
   const resolverModule = require(resolverPath);
 
-  const originalFindProspect = supabaseService.findProspect;
+  const originalFindProspectInOrg = supabaseService.findProspectInOrganization;
   const originalAdvance = humanAdvancementEngine.advanceProspectWorkflow;
   const originalLog = logService.logConversation;
   const originalIsProductionProspect = productionProspectFilter.isProductionProspect;
   const originalFindActive = resolverModule.findActiveAppointmentForProspect;
 
-  supabaseService.findProspect = async () => ({
+  supabaseService.findProspectInOrganization = async () => ({
     phone: "+15551234567",
     name: "Test Prospect",
+    organization_id: "00000000-0000-4000-8000-000000000001",
     current_step: "CONFIRMED",
     language: "en"
   });
@@ -116,7 +117,7 @@ test("recordInterviewOutcome delegates Reschedule Interview to appointmentApplic
   assert.equal(lookupAgentId, undefined);
 
   appointmentService.rescheduleAppointment = originalReschedule;
-  supabaseService.findProspect = originalFindProspect;
+  supabaseService.findProspectInOrganization = originalFindProspectInOrg;
   humanAdvancementEngine.advanceProspectWorkflow = originalAdvance;
   logService.logConversation = originalLog;
   productionProspectFilter.isProductionProspect = originalIsProductionProspect;

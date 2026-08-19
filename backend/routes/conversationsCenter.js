@@ -30,7 +30,7 @@ const { loadPersistedWorkflowState } = require("../core/workflowStateStore");
 const {
   markConversationRead
 } = require("../core/conversationsCenter/conversationsReadCursorService");
-const { findProspect } = require("../services/supabaseService");
+const { findProspectInOrganization } = require("../services/supabaseService");
 const {
   INBOX_CLOSE_REASONS
 } = require("../core/conversationsCenter/conversationsCenterLifecycle");
@@ -97,13 +97,16 @@ router.get("/", async (req, res) => {
 });
 
 async function loadScopedProspect(phone, organizationId) {
-  const prospect = await findProspect(phone);
-  if (!prospect || String(prospect.organization_id || "") !== String(organizationId)) {
+  if (!phone || !organizationId) {
     return null;
   }
-  if (!isProspectInNiovelPilotScope(prospect)) {
+
+  const prospect = await findProspectInOrganization(phone, organizationId);
+
+  if (!prospect || !isProspectInNiovelPilotScope(prospect)) {
     return null;
   }
+
   return prospect;
 }
 
