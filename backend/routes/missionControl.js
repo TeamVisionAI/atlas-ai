@@ -274,8 +274,11 @@ router.post(
       return;
     }
 
-    const result = await postWorkflowAdvance(req.params.phone, req.body || {});
-
+    const result = await postWorkflowAdvance(
+      req.params.phone,
+      req.body || {},
+      tenantMissionControlOptions(req)
+    );
     res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     res.status(500).json({

@@ -4,7 +4,11 @@
  * Does not redesign Mission Control or alter automated conversation pipeline messages.
  */
 
-const { findProspect, updateProspect } = require("../services/supabaseService");
+const {
+  findProspectInOrganization,
+  updateProspectInOrganization
+} = require("../services/supabaseService");
+const { requireTenantOrganizationId } = require("./tenantProspectLookup");
 const { logConversation } = require("../services/logService");
 const { parseSchedulingState, mergeNotesWithSchedulingState } = require("../core/schedulingState");
 const {
@@ -124,7 +128,13 @@ function qualificationFieldsChanged(beforeProfile, afterProfile, capturedFields)
   });
 }
 
-async function persistProspectAdvancement(prospect, mergedProfile, capturedFields, targetMilestone) {
+async function persistProspectAdvancement(
+  prospect,
+  mergedProfile,
+  capturedFields,
+  targetMilestone,
+  organizationId
+) {
   const schedulingState = parseSchedulingState(prospect.notes);
   const profileForPersist = { ...mergedProfile };
 
@@ -165,13 +175,26 @@ async function persistProspectAdvancement(prospect, mergedProfile, capturedField
     }
   }
 
-  return updateProspect(prospect.phone, updates);
+  return updateProspectInOrganization(prospect.phone, organizationId, updates);
 }
 
 /**
  * Executes BR-035 human advancement after BR-037 validation.
  */
 async function advanceProspectWorkflow(phone, payload = {}) {
+  let organizationId = null;
+
+  try {
+    organizationId = requireTenantOrganizationId(payload.organizationId);
+  } catch {
+    return {
+      success: false,
+      action: "workflow_advance",
+      error: "TENANT_ORGANIZATION_REQUIRED",
+      message: "Organization context is required for workflow advancement."
+    };
+  }
+
   const targetMilestone = payload.targetMilestone;
   const capturedFields = {
     ...(payload.capturedFields || {}),
@@ -186,7 +209,7 @@ async function advanceProspectWorkflow(phone, payload = {}) {
     capturedFields.outcome = "Needs More Time";
   }
 
-  const prospect = await findProspect(phone);
+  const prospect = await findProspectInOrganization(phone, organizationId);
 
   if (!prospect) {
     return {
@@ -199,7 +222,7 @@ async function advanceProspectWorkflow(phone, payload = {}) {
 
   const agentState = loadAgentState(phone);
   const persisted = await loadPersistedWorkflowState(phone, {
-    organizationId: prospect.organization_id || null,
+    organizationId,
     prospectId: prospect.id || null
   });
   const messageHints = await fetchMessageHints(phone);
@@ -237,9 +260,7 @@ async function advanceProspectWorkflow(phone, payload = {}) {
 
   // Implements BR-039 — INTERVIEW_SCHEDULED requires a persisted appointment row.
   if (targetMilestone === MILESTONES.INTERVIEW_SCHEDULED) {
-    const organizationId = payload.organizationId || prospect.organization_id || null;
-
-    if (organizationId && !capturedFields.appointmentId) {
+    if (!capturedFields.appointmentId) {
       const { findActiveAppointmentForProspect } = require("./activeAppointmentResolver");
       const activeAppointment = await findActiveAppointmentForProspect(phone, organizationId);
 
@@ -263,7 +284,13 @@ async function advanceProspectWorkflow(phone, payload = {}) {
     persisted.workflowOwnership ||
     deriveDefaultOwnership(currentMilestone, mergedAgentState);
 
-  await persistProspectAdvancement(prospect, mergedProfile, capturedFields, targetMilestone);
+  await persistProspectAdvancement(
+    prospect,
+    mergedProfile,
+    capturedFields,
+    targetMilestone,
+    organizationId
+  );
 
   const agentPatch = buildAgentStatePatch(targetMilestone, capturedFields);
   applyInterviewRescheduleAgentReset(targetMilestone, capturedFields, agentPatch);
@@ -289,7 +316,7 @@ async function advanceProspectWorkflow(phone, payload = {}) {
   }
 
   const updatedAgentState = loadAgentState(phone);
-  const updatedProspect = await findProspect(phone);
+  const updatedProspect = await findProspectInOrganization(phone, organizationId);
 
   // BR-135 — Manual TAKE OVER is sticky through BR-035 advancement.
   // Only explicit RETURN TO ATLAS (or equivalent release) may clear HUMAN ownership.
@@ -325,7 +352,7 @@ async function advanceProspectWorkflow(phone, payload = {}) {
       doNotContact: targetMilestone === MILESTONES.DO_NOT_CONTACT
     },
     {
-      organizationId: prospect.organization_id || null,
+      organizationId,
       prospectId: prospect.id || null
     }
   );

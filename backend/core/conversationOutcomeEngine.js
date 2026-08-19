@@ -3,7 +3,11 @@
  * Reuses human advancement, information model, and workflow event patterns.
  */
 
-const { findProspect, updateProspect } = require("../services/supabaseService");
+const {
+  findProspectInOrganization,
+  updateProspectInOrganization
+} = require("../services/supabaseService");
+const { requireTenantOrganizationId } = require("./tenantProspectLookup");
 const { logConversation } = require("../services/logService");
 const {
   buildProfileFromProspect,
@@ -839,7 +843,45 @@ function fieldKeysToLabels(keys = []) {
   return keys.map((key) => FIELD_LABELS[key] || key);
 }
 
-async function saveRequiredInformation(phone, body = {}) {
+function tenantOrganizationRequiredResponse() {
+  return {
+    success: false,
+    status: 400,
+    error: "TENANT_ORGANIZATION_REQUIRED",
+    message: "Organization context is required for this operation."
+  };
+}
+
+function resolveScopedOrganizationId(organizationId) {
+  try {
+    return requireTenantOrganizationId(organizationId);
+  } catch {
+    return null;
+  }
+}
+
+async function loadScopedProspect(phone, organizationId) {
+  const scopedOrganizationId = resolveScopedOrganizationId(organizationId);
+
+  if (!scopedOrganizationId) {
+    return null;
+  }
+
+  return findProspectInOrganization(phone, scopedOrganizationId);
+}
+
+async function scopedUpdateProspect(phone, organizationId, patch) {
+  const scopedOrganizationId = requireTenantOrganizationId(organizationId);
+  return updateProspectInOrganization(phone, scopedOrganizationId, patch);
+}
+
+async function saveRequiredInformation(phone, body = {}, options = {}) {
+  const organizationId = options.organizationId || null;
+
+  if (!resolveScopedOrganizationId(organizationId)) {
+    return tenantOrganizationRequiredResponse();
+  }
+
   if (!isProductionProspect(phone)) {
     return {
       success: false,
@@ -849,7 +891,7 @@ async function saveRequiredInformation(phone, body = {}) {
     };
   }
 
-  const prospect = await findProspect(phone);
+  const prospect = await loadScopedProspect(phone, organizationId);
 
   if (!prospect) {
     return {
@@ -939,7 +981,7 @@ async function saveRequiredInformation(phone, body = {}) {
   }
 
   const { fields } = normalized;
-  const identityChanges = await persistIdentityAndLanguageFields(prospect, fields);
+  const identityChanges = await persistIdentityAndLanguageFields(prospect, fields, organizationId);
   const capturedFields = {
     city: fields.city,
     state: fields.state,
@@ -976,7 +1018,7 @@ async function saveRequiredInformation(phone, body = {}) {
   }
 
   const notesWithCapture = mergeNotesWithQualificationCapture(prospect.notes, captureState);
-  await updateProspect(prospect.phone, { notes: notesWithCapture });
+  await scopedUpdateProspect(prospect.phone, organizationId, { notes: notesWithCapture });
 
   const prospectForAdvance = {
     ...prospect,
@@ -1004,14 +1046,15 @@ async function saveRequiredInformation(phone, body = {}) {
     capturedFields,
     explicitProfileFields,
     interactionNotes,
-    interactionType: "phone"
+    interactionType: "phone",
+    organizationId
   });
 
   if (!advanceResult.success) {
     return advanceResult;
   }
 
-  const updatedProspect = await findProspect(phone);
+  const updatedProspect = await loadScopedProspect(phone, organizationId);
 
   await logConversation({
     phone,
@@ -1040,7 +1083,11 @@ async function saveRequiredInformation(phone, body = {}) {
   };
 }
 
-async function persistIdentityAndLanguageFields(prospect, fields) {
+async function persistIdentityAndLanguageFields(prospect, fields, organizationId) {
+  if (!resolveScopedOrganizationId(organizationId)) {
+    return { changed: [] };
+  }
+
   const updates = {};
   const changed = [];
 
@@ -1087,11 +1134,17 @@ async function persistIdentityAndLanguageFields(prospect, fields) {
     return { changed };
   }
 
-  await updateProspect(prospect.phone, updates);
+  await scopedUpdateProspect(prospect.phone, organizationId, updates);
   return { changed };
 }
 
-async function saveConversationOutcome(phone, body = {}) {
+async function saveConversationOutcome(phone, body = {}, options = {}) {
+  const organizationId = options.organizationId || null;
+
+  if (!resolveScopedOrganizationId(organizationId)) {
+    return tenantOrganizationRequiredResponse();
+  }
+
   if (!isProductionProspect(phone)) {
     return {
       success: false,
@@ -1112,7 +1165,7 @@ async function saveConversationOutcome(phone, body = {}) {
     };
   }
 
-  const prospect = await findProspect(phone);
+  const prospect = await loadScopedProspect(phone, organizationId);
 
   if (!prospect) {
     return {
@@ -1146,7 +1199,7 @@ async function saveConversationOutcome(phone, body = {}) {
   let identityChanges = { changed: [] };
 
   if (hasQualificationFields) {
-    identityChanges = await persistIdentityAndLanguageFields(prospect, fields);
+    identityChanges = await persistIdentityAndLanguageFields(prospect, fields, organizationId);
   }
 
   const capturedFields = {
@@ -1204,14 +1257,15 @@ async function saveConversationOutcome(phone, body = {}) {
     capturedFields,
     explicitProfileFields,
     interactionNotes,
-    interactionType: "phone"
+    interactionType: "phone",
+    organizationId
   });
 
   if (!advanceResult.success) {
     return advanceResult;
   }
 
-  const updatedProspect = await findProspect(phone);
+  const updatedProspect = await loadScopedProspect(phone, organizationId);
 
   await logConversation({
     phone,

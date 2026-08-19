@@ -204,7 +204,10 @@ test("H. RETURN TO ATLAS releases sticky HUMAN", async () => {
     assert.equal(
       await shouldDeliverAutomatedReply({
         phone: NANCY_PHONE,
-        current_step: "QUALIFICATION"
+        current_step: "QUALIFICATION",
+        organization_id: "00000000-0000-4000-8000-000000000001",
+        entry_method: "QR",
+        source: "car_magnet"
       }),
       true
     );
@@ -290,15 +293,23 @@ async function withAdvancementStubs(phone, prospectOverrides, run) {
     ...prospectOverrides
   };
 
-  const originalFind = supabaseService.findProspect;
-  const originalUpdate = supabaseService.updateProspect;
+  const originalFind = supabaseService.findProspectInOrganization;
+  const originalUpdate = supabaseService.updateProspectInOrganization;
   const originalValidate = milestoneValidation.validateMilestoneAdvancement;
   const originalEmit = humanAdvancementEvents.emitHumanAdvancementEvents;
   const originalMc = missionControlReadModel.getMissionControlState;
   const originalHints = workflowReadModel.fetchMessageHints;
 
-  supabaseService.findProspect = async () => ({ ...prospect });
-  supabaseService.updateProspect = async (_phone, updates) => {
+  supabaseService.findProspectInOrganization = async (_phone, organizationId) => {
+    if (String(organizationId) !== String(prospect.organization_id)) {
+      return null;
+    }
+    return { ...prospect };
+  };
+  supabaseService.updateProspectInOrganization = async (_phone, organizationId, updates) => {
+    if (String(organizationId) !== String(prospect.organization_id)) {
+      return null;
+    }
     Object.assign(prospect, updates);
     return { ...prospect };
   };
@@ -333,8 +344,8 @@ async function withAdvancementStubs(phone, prospectOverrides, run) {
   try {
     return await run({ prospect });
   } finally {
-    supabaseService.findProspect = originalFind;
-    supabaseService.updateProspect = originalUpdate;
+    supabaseService.findProspectInOrganization = originalFind;
+    supabaseService.updateProspectInOrganization = originalUpdate;
     milestoneValidation.validateMilestoneAdvancement = originalValidate;
     humanAdvancementEvents.emitHumanAdvancementEvents = originalEmit;
     missionControlReadModel.getMissionControlState = originalMc;
@@ -360,6 +371,7 @@ test("Ruth-1. TAKE OVER → Complete Qualification auth+interview → BR-035 sta
       const seal = (await loadPersistedWorkflowState(RUTH_PHONE)).humanTakenOverAt;
 
       const result = await advanceProspectWorkflow(RUTH_PHONE, {
+        organizationId: "00000000-0000-4000-8000-000000000001",
         targetMilestone: MILESTONES.QUALIFICATION,
         capturedFields: {
           authorization: true,
@@ -411,6 +423,7 @@ test("Ruth-2. HUMAN + City/State qualification submit → remains HUMAN", async 
 
       await takeOverConversation(RUTH_PHONE, { reason: "take_over" });
       const result = await advanceProspectWorkflow(RUTH_PHONE, {
+        organizationId: "00000000-0000-4000-8000-000000000001",
         targetMilestone: MILESTONES.QUALIFICATION,
         capturedFields: { city: "Tampa", state: "FL" },
         interactionNotes: "Required information updated: City, State.",
@@ -442,6 +455,7 @@ test("11. Non-HUMAN qualification advancement → BR-035 still resumes ATLAS", a
       });
 
       const result = await advanceProspectWorkflow("+17865550911", {
+        organizationId: "00000000-0000-4000-8000-000000000001",
         targetMilestone: MILESTONES.QUALIFICATION,
         capturedFields: { authorization: true, interviewType: "Zoom" },
         interactionType: "phone"
