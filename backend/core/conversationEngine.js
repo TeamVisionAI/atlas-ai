@@ -1,5 +1,5 @@
 const {
-  findProspect
+  findProspectInOrganization
 } = require("../services/supabaseService");
 
 const { handleSemanticMessage } = require("./semanticConversationEngine");
@@ -42,8 +42,13 @@ function buildReplyResult(reply, handoff = null) {
   };
 }
 
-async function finalizeReply(phone, reply) {
-  const prospect = await findProspect(phone);
+async function finalizeReply(phone, reply, options = {}) {
+  const organizationId = options.organizationId || null;
+  if (!organizationId) {
+    return buildReplyResult(reply, null);
+  }
+
+  const prospect = await findProspectInOrganization(phone, organizationId);
   if (!prospect) {
     return buildReplyResult(reply, null);
   }
@@ -58,16 +63,18 @@ async function finalizeReply(phone, reply) {
  * Semantic engine: collects missing information instead of fixed step order.
  */
 async function handleIncomingMessage(phone, name, message, options = {}) {
+  const organizationId = options.organizationId || null;
   const reply = await handleSemanticMessage({
     phone,
     name,
     message,
     channel: options.channel || "whatsapp",
     skipConversationLogging: Boolean(options.skipConversationLogging),
-    messageType: options.messageType || null
+    messageType: options.messageType || null,
+    organizationId
   });
 
-  return finalizeReply(phone, reply);
+  return finalizeReply(phone, reply, { organizationId });
 }
 
 module.exports = {

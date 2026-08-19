@@ -278,15 +278,15 @@ test("9. failed persistence path does not claim success or expose diagnostics", 
 });
 
 test("10. successful persistence returns appointment id and stamps owner", async () => {
-  const semantic = require("../core/semanticConversationEngine");
+  const servicePath = require.resolve("../services/supabaseService");
+  const semanticPath = require.resolve("../core/semanticConversationEngine");
+  const originalService = require(servicePath);
   const orgResolver = require("../core/autonomousScheduleAgentResolver");
   const mission = require("../application/missionExecutionApplicationService");
-  const supabaseService = require("../services/supabaseService");
   const capacityEngine = require("../core/capacityEngine");
 
   const originalResolve = orgResolver.resolveAutonomousScheduleAgentId;
   const originalExecute = mission.executeScheduleInterview;
-  const originalUpdate = supabaseService.updateProspect;
   const originalRelease = capacityEngine.releaseSlotByIso;
   let stampedOwner = null;
 
@@ -304,11 +304,17 @@ test("10. successful persistence returns appointment id and stamps owner", async
       booking: { startTimeISO: "2026-08-10T17:15:00.000Z", googleCalendarEventId: "gcal-1" }
     };
   };
-  supabaseService.updateProspect = async (_phone, updates) => {
-    stampedOwner = updates.owner_user_id || null;
-    return updates;
-  };
   capacityEngine.releaseSlotByIso = () => {};
+
+  require.cache[servicePath].exports = {
+    ...originalService,
+    updateProspectInOrganization: async (_phone, _organizationId, updates) => {
+      stampedOwner = updates.owner_user_id || null;
+      return updates;
+    }
+  };
+  delete require.cache[semanticPath];
+  const semantic = require("../core/semanticConversationEngine");
 
   try {
     const result = await semantic.completeInterview(
@@ -334,8 +340,9 @@ test("10. successful persistence returns appointment id and stamps owner", async
   } finally {
     orgResolver.resolveAutonomousScheduleAgentId = originalResolve;
     mission.executeScheduleInterview = originalExecute;
-    supabaseService.updateProspect = originalUpdate;
     capacityEngine.releaseSlotByIso = originalRelease;
+    require.cache[servicePath].exports = originalService;
+    delete require.cache[semanticPath];
   }
 });
 

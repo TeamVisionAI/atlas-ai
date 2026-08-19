@@ -1,5 +1,9 @@
 const supabaseService = require("../services/supabaseService");
-const { findProspect, createProspect, updateProspect } = supabaseService;
+const {
+  findProspectInOrganization,
+  updateProspectInOrganization
+} = supabaseService;
+const { requireTenantOrganizationId } = require("./tenantProspectLookup");
 const { onConversationProgress } = require("./recruitingWorkflowHooks");
 const { logConversation } = require("../services/logService");
 const { detectIntent } = require("./intentEngine");
@@ -87,7 +91,6 @@ const {
 } = require("./conversationLanguage");
 const { resolveConversationSchedulePayload } = require("./conversationScheduleDelegation");
 const missionExecutionApplicationService = require("../application/missionExecutionApplicationService");
-const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const capacityEngine = require("./capacityEngine");
 const autonomousScheduleAgentResolver = require("./autonomousScheduleAgentResolver");
 const workflowStateStore = require("./workflowStateStore");
@@ -98,6 +101,28 @@ const {
 } = require("./appointmentConfirmationCopy");
 
 const CONVERSATION_GOAL = "Schedule Interview";
+
+async function loadProspectInOrganization(phone, organizationId) {
+  if (!phone || !organizationId) {
+    return null;
+  }
+
+  return findProspectInOrganization(phone, organizationId);
+}
+
+async function reloadProspectInOrganization(phone, organizationId, fallback = null) {
+  const reloaded = await loadProspectInOrganization(phone, organizationId);
+  return reloaded || fallback;
+}
+
+async function scopedUpdateProspect(phone, organizationId, patch) {
+  const scopedOrganizationId = requireTenantOrganizationId(organizationId);
+  return updateProspectInOrganization(phone, scopedOrganizationId, patch);
+}
+
+function resolveOperationalOrganizationId(prospect, organizationId) {
+  return prospect?.organization_id || organizationId || null;
+}
 
 function isLikelyQuestion(message) {
   const text = String(message || "").trim();
@@ -332,7 +357,7 @@ function hasWorkflowAdvancement(extracted) {
   });
 }
 
-async function initializeScheduleIfNeeded(prospect, profile) {
+async function initializeScheduleIfNeeded(prospect, profile, organizationId) {
   const captureState = parseQualificationCapture(prospect.notes);
   const brainOptions = { notes: prospect.notes, captureState };
 
@@ -368,13 +393,13 @@ async function initializeScheduleIfNeeded(prospect, profile) {
         profile.dayPart
       );
 
-  await updateProspect(prospect.phone, {
+  await scopedUpdateProspect(prospect.phone, organizationId, {
     current_step: "SCHEDULE",
     appointment_type: PHASES.DAY,
     notes: mergeNotesWithSchedulingState(prospect.notes, nextState)
   });
 
-  return findProspect(prospect.phone);
+  return reloadProspectInOrganization(prospect.phone, organizationId, prospect);
 }
 
 function isActiveScheduleStep(prospect) {
@@ -383,7 +408,7 @@ function isActiveScheduleStep(prospect) {
   return Boolean(prospect?.appointment_type && schedulingState?.phase);
 }
 
-async function handleScheduleMessage(prospect, message, language, personality) {
+async function handleScheduleMessage(prospect, message, language, personality, organizationId) {
   const result = handleScheduleTurn({
     prospect,
     message,
@@ -391,7 +416,7 @@ async function handleScheduleMessage(prospect, message, language, personality) {
     personality
   });
 
-  await updateProspect(prospect.phone, result.prospectUpdates);
+  await scopedUpdateProspect(prospect.phone, organizationId, result.prospectUpdates);
 
   return result;
 }
@@ -441,7 +466,23 @@ async function completeInterview(prospect, profile, language, options = {}) {
     };
   }
 
-  const organizationId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
+  const organizationId = resolveOperationalOrganizationId(
+    prospect,
+    options.organizationId || null
+  );
+
+  if (!organizationId) {
+    return {
+      success: false,
+      reply:
+        language === "es"
+          ? "No pudimos confirmar tu entrevista en este momento. Un agente de Team Vision te ayudará pronto."
+          : "We couldn't confirm your interview right now. A Team Vision agent will help you shortly.",
+      humanAssist: true,
+      reason: "TENANT_ORGANIZATION_REQUIRED"
+    };
+  }
+
   const resolvedAgent = await autonomousScheduleAgentResolver.resolveAutonomousScheduleAgentId({
     prospect,
     organizationId
@@ -497,7 +538,9 @@ async function completeInterview(prospect, profile, language, options = {}) {
 
   // Stamp ownership for autonomous WhatsApp leads so appointments and UI stay tenant-scoped.
   if (!prospect.owner_user_id) {
-    await supabaseService.updateProspect(prospect.phone, { owner_user_id: agentId }).catch((error) => {
+    await updateProspectInOrganization(prospect.phone, organizationId, {
+      owner_user_id: agentId
+    }).catch((error) => {
       logWhatsAppStage("autonomous_schedule_owner_stamp_failed", {
         level: "warn",
         error: error.message,
@@ -780,7 +823,8 @@ async function buildSemanticReply({
   isNew,
   informationalReply,
   localZoomSwitch = false,
-  dayPartMiss = false
+  dayPartMiss = false,
+  organizationId = null
 }) {
   const captureState = parseQualificationCapture(prospect?.notes);
   const brainOptions = { notes: prospect?.notes, captureState };
@@ -788,12 +832,14 @@ async function buildSemanticReply({
   const nextField = getNextMissingField(profile, brainOptions);
 
   if (!missing.length) {
-    const completion = await completeInterview(prospect, profile, language);
+    const completion = await completeInterview(prospect, profile, language, {
+      organizationId
+    });
     return completion.reply;
   }
 
   if (nextField === "schedule" && canBeginScheduling(profile, brainOptions)) {
-    prospect = await initializeScheduleIfNeeded(prospect, profile);
+    prospect = await initializeScheduleIfNeeded(prospect, profile, organizationId);
   }
 
   let question = buildQuestionForMissingField(nextField, profile, language, prospect);
@@ -952,7 +998,11 @@ async function syncProfileToProspect(prospect, profile, options = {}) {
     updates.notes = notes;
   }
 
-  await updateProspect(prospect.phone, updates);
+  if (!options.organizationId) {
+    return;
+  }
+
+  await scopedUpdateProspect(prospect.phone, options.organizationId, updates);
 
   try {
     const {
@@ -973,13 +1023,21 @@ async function handleSemanticMessage({
   message,
   channel = "whatsapp",
   skipConversationLogging = false,
-  messageType = null
+  messageType = null,
+  organizationId = null
 }) {
   const recordLog = skipConversationLogging
     ? async () => ({ success: true, skipped: true })
     : logConversation;
 
   const cleanMessage = String(message || "").trim();
+
+  let scopedOrganizationId = null;
+  try {
+    scopedOrganizationId = requireTenantOrganizationId(organizationId);
+  } catch {
+    return "";
+  }
 
   // BR-140 / BR-118 — never interpret non-text media placeholders as qualification text.
   try {
@@ -996,26 +1054,24 @@ async function handleSemanticMessage({
   }
 
   const intent = detectIntent(cleanMessage);
-  let prospect = await findProspect(phone);
-  const wasNewProspect = !prospect;
+  let prospect = await loadProspectInOrganization(phone, scopedOrganizationId);
 
-  if (wasNewProspect) {
-    await createProspect(phone, name, cleanMessage);
-    await updateProspect(phone, {
-      notes: encodeQualificationCapture(defaultCaptureState())
-    });
-    prospect = await findProspect(phone);
-  } else if (!hasQualificationCaptureMarker(prospect.notes)) {
-    await updateProspect(phone, {
+  if (!prospect) {
+    return "";
+  }
+
+  if (!hasQualificationCaptureMarker(prospect.notes)) {
+    await scopedUpdateProspect(phone, scopedOrganizationId, {
       notes: mergeNotesWithQualificationCapture(prospect.notes, defaultCaptureState())
     });
-    prospect = await findProspect(phone);
+    prospect =
+      (await reloadProspectInOrganization(phone, scopedOrganizationId, prospect)) || prospect;
   }
 
   const activeLanguage = resolveConversationLanguage(prospect, cleanMessage);
 
   if (detectMessageLanguage(cleanMessage)) {
-    await updateProspect(prospect.phone, {
+    await scopedUpdateProspect(prospect.phone, scopedOrganizationId, {
       language: activeLanguage,
       communication_language: activeLanguage
     });
@@ -1119,7 +1175,7 @@ async function handleSemanticMessage({
   }
 
   if (extracted.authorizationAmbiguous) {
-    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
     const handoffReply = getHandoffMessage(language);
 
     await recordLog({
@@ -1161,7 +1217,7 @@ async function handleSemanticMessage({
 
   if (extracted.authorization === false) {
     captureState.authorization = true;
-    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
     const deniedReply = getAuthorizationDeniedMessage(language);
 
     await recordLog({
@@ -1261,7 +1317,7 @@ async function handleSemanticMessage({
 
   if (rulesResult.escalation?.needsHumanCoordinator) {
     prospect.last_message = cleanMessage;
-    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
@@ -1327,7 +1383,7 @@ async function handleSemanticMessage({
         persistOwnedConfirmedContext,
         appointmentLocalSlot
       } = require("./recruitAiV2/postCreateOwnership");
-      const orgId = prospect.organization_id || DEFAULT_ORGANIZATION_ID;
+      const orgId = scopedOrganizationId;
       const active = await findActiveAppointmentForProspect(phone, orgId);
       const slot = appointmentLocalSlot(
         active || {},
@@ -1390,8 +1446,8 @@ async function handleSemanticMessage({
   const informationalReply = interruptionReply;
 
   prospect.last_message = cleanMessage;
-  await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
-  prospect = await findProspect(phone);
+  await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
+  prospect = await reloadProspectInOrganization(phone, scopedOrganizationId, prospect);
   profile = buildProfileFromProspect(prospect, channel);
   captureState = parseQualificationCapture(prospect.notes);
 
@@ -1408,7 +1464,7 @@ async function handleSemanticMessage({
   }
 
   if (postSyncRules.escalation?.needsHumanCoordinator) {
-    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
     const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
 
     await recordLog({
@@ -1428,8 +1484,8 @@ async function handleSemanticMessage({
   }
 
   if (postSyncRules.profile.interviewType !== prospect.interview_type) {
-    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
-    prospect = await findProspect(phone);
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
+    prospect = await reloadProspectInOrganization(phone, scopedOrganizationId, prospect);
     profile = buildProfileFromProspect(prospect, channel);
     captureState = parseQualificationCapture(prospect.notes);
   }
@@ -1456,7 +1512,8 @@ async function handleSemanticMessage({
       prospect,
       cleanMessage,
       language,
-      personality
+      personality,
+      scopedOrganizationId
     );
     const scheduleReply = scheduleResult.replyText;
 
@@ -1490,7 +1547,7 @@ async function handleSemanticMessage({
       return coordinatorReply;
     }
 
-    prospect = await findProspect(phone);
+    prospect = await reloadProspectInOrganization(phone, scopedOrganizationId, prospect);
     profile = buildProfileFromProspect(prospect, channel);
     captureState = parseQualificationCapture(prospect.notes);
 
@@ -1505,10 +1562,11 @@ async function handleSemanticMessage({
         language,
         isNew: false,
         informationalReply,
-        localZoomSwitch: false
+        localZoomSwitch: false,
+        organizationId: scopedOrganizationId
       });
 
-      await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
+      await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
 
       await recordLog({
         phone,
@@ -1528,7 +1586,8 @@ async function handleSemanticMessage({
 
     if (isScheduleComplete(profile) && !postScheduleMissing.length) {
       const completion = await completeInterview(prospect, profile, language, {
-        messageText: cleanMessage
+        messageText: cleanMessage,
+        organizationId: scopedOrganizationId
       });
 
       await recordLog({
@@ -1599,14 +1658,15 @@ async function handleSemanticMessage({
     if (extracted.email) {
       profile.email = extracted.email;
       captureState = markCapturedFields(captureState, extracted);
-      await updateProspect(prospect.phone, {
+      await scopedUpdateProspect(prospect.phone, scopedOrganizationId, {
         notes: mergeNotesWithQualificationCapture(prospect.notes, captureState)
       });
-      prospect = await findProspect(phone);
+      prospect = await reloadProspectInOrganization(phone, scopedOrganizationId, prospect);
       profile = buildProfileFromProspect(prospect, channel);
 
       const completion = await completeInterview(prospect, profile, language, {
-        messageText: cleanMessage
+        messageText: cleanMessage,
+        organizationId: scopedOrganizationId
       });
 
       await recordLog({
@@ -1627,14 +1687,15 @@ async function handleSemanticMessage({
 
     if (extracted.emailSkipped || isEmailDeclined(cleanMessage)) {
       captureState.email = true;
-      await updateProspect(prospect.phone, {
+      await scopedUpdateProspect(prospect.phone, scopedOrganizationId, {
         notes: mergeNotesWithQualificationCapture(prospect.notes, captureState)
       });
-      prospect = await findProspect(phone);
+      prospect = await reloadProspectInOrganization(phone, scopedOrganizationId, prospect);
       profile = buildProfileFromProspect(prospect, channel);
 
       const completion = await completeInterview(prospect, profile, language, {
-        messageText: cleanMessage
+        messageText: cleanMessage,
+        organizationId: scopedOrganizationId
       });
 
       await recordLog({
@@ -1662,10 +1723,11 @@ async function handleSemanticMessage({
       language,
       isNew: false,
       informationalReply,
-      localZoomSwitch
+      localZoomSwitch,
+      organizationId: scopedOrganizationId
     });
 
-    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
+    await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
 
     await recordLog({
       phone,
@@ -1691,14 +1753,15 @@ async function handleSemanticMessage({
     profile,
     extracted,
     language,
-    isNew: wasNewProspect,
+    isNew: false,
     informationalReply,
     localZoomSwitch,
-    dayPartMiss
+    dayPartMiss,
+    organizationId: scopedOrganizationId
   });
 
-  await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage });
-  prospect = await findProspect(phone);
+  await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
+  prospect = await reloadProspectInOrganization(phone, scopedOrganizationId, prospect);
 
   await recordLog({
     phone,
@@ -1713,7 +1776,10 @@ async function handleSemanticMessage({
     state: profile.state
   });
 
-  await onConversationProgress({ phone }).catch((error) => {
+  await onConversationProgress({
+    phone,
+    organizationId: scopedOrganizationId
+  }).catch((error) => {
     console.warn("[semanticConversationEngine] recruiting progress hook failed:", error.message);
   });
 
