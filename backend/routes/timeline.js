@@ -1,30 +1,46 @@
 const express = require("express");
-const { getConversationTimeline } = require("../services/timelineService");
-const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const timelineService = require("../services/timelineService");
+const { TimelineOrganizationRequiredError } = timelineService;
 
 const router = express.Router();
 
-router.use(requireAtlasUser);
+function resolveAuthenticatedOrganizationId(req) {
+  // Authenticated tenant context only — never query/body org overrides.
+  return req.authContext?.organizationId || null;
+}
 
 router.get("/:phone", async (req, res) => {
-
   try {
+    const organizationId = resolveAuthenticatedOrganizationId(req);
 
-    const timeline = await getConversationTimeline(
-      req.params.phone
+    if (!organizationId) {
+      return res.status(403).json({
+        error: "FORBIDDEN",
+        message: "Organization context required."
+      });
+    }
+
+    const timeline = await timelineService.getConversationTimeline(
+      req.params.phone,
+      organizationId
     );
 
-    res.json(timeline);
-
+    return res.json(timeline);
   } catch (err) {
-
     console.error(err);
-    res.status(500).json({
-      error: err.message
+
+    if (err instanceof TimelineOrganizationRequiredError) {
+      return res.status(err.statusCode).json({
+        error: err.publicCode,
+        message: err.message
+      });
+    }
+
+    return res.status(err.statusCode || 500).json({
+      error: err.publicCode || "TIMELINE_ERROR",
+      message: err.message || "Unexpected timeline error."
     });
-
   }
-
 });
 
 module.exports = router;

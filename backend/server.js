@@ -78,6 +78,7 @@ const { createPolicyIntelligenceModule } = require("./modules/policy-intelligenc
 const { createFinancialIntelligenceModule } = require("./modules/financial-intelligence");
 const { createWorkflowModule } = require("./modules/workflows");
 const { requireAtlasUser } = require("./middleware/requireAtlasUser");
+const { organizationGuard } = require("./middleware/organizationGuard");
 const { verifyMetaWebhookSignature } = require("./middleware/metaWebhookSignature");
 const { safeRequestLogger } = require("./middleware/safeRequestLogger");
 const contactRoutes = require("./routes/contact");
@@ -238,7 +239,12 @@ app.use("/api/interview-assignment", interviewAssignmentRoutes);
 app.use("/api/qr-campaigns", require("./routes/qrCampaigns"));
 app.use("/api/missions", missionRoutes);
 app.use("/api", quickCaptureRoutes);
-app.use("/timeline", timelineRoutes);
+app.use(
+  "/timeline",
+  requireAtlasUser,
+  organizationGuard({ allowSuperAdminCrossOrg: false }),
+  timelineRoutes
+);
 
 // Development-only routes
 if (process.env.NODE_ENV !== "production") {
