@@ -145,13 +145,13 @@ test("recordInterviewOutcome passes organizationId to advanceProspectWorkflow", 
   const resolverModule = require("../core/activeAppointmentResolver");
 
   const advances = [];
-  const originalFindProspect = supabaseService.findProspect;
+  const originalFindProspectInOrg = supabaseService.findProspectInOrganization;
   const originalAdvance = humanAdvancementEngine.advanceProspectWorkflow;
   const originalLog = logService.logConversation;
   const originalIsProductionProspect = productionProspectFilter.isProductionProspect;
   const originalFindActive = resolverModule.findActiveAppointmentForProspect;
 
-  supabaseService.findProspect = async () => ({
+  supabaseService.findProspectInOrganization = async () => ({
     phone: PHONE,
     name: "Interview Outcome Test",
     organization_id: ORG,
@@ -188,7 +188,7 @@ test("recordInterviewOutcome passes organizationId to advanceProspectWorkflow", 
     assert.equal(advances[0].targetMilestone, "FOLLOW_UP");
     assert.equal(advances[0].capturedFields.followUpDate, "2026-08-20");
   } finally {
-    supabaseService.findProspect = originalFindProspect;
+    supabaseService.findProspectInOrganization = originalFindProspectInOrg;
     humanAdvancementEngine.advanceProspectWorkflow = originalAdvance;
     logService.logConversation = originalLog;
     productionProspectFilter.isProductionProspect = originalIsProductionProspect;
@@ -203,21 +203,21 @@ test("recordInterviewOutcome fails closed without organizationId before workflow
   const humanAdvancementEngine = require("../core/humanAdvancementEngine");
   const productionProspectFilter = require("../core/productionProspectFilter");
 
-  let advanceCalls = 0;
-  const originalFindProspect = supabaseService.findProspect;
+  let lookupCalls = 0;
+  const originalFindProspectInOrg = supabaseService.findProspectInOrganization;
   const originalAdvance = humanAdvancementEngine.advanceProspectWorkflow;
   const originalIsProductionProspect = productionProspectFilter.isProductionProspect;
 
-  supabaseService.findProspect = async () => ({
-    phone: PHONE,
-    name: "Missing Org",
-    current_step: "CONFIRMED"
-  });
-  productionProspectFilter.isProductionProspect = () => true;
-  humanAdvancementEngine.advanceProspectWorkflow = async () => {
-    advanceCalls += 1;
-    return { success: true, workflow: {} };
+  supabaseService.findProspectInOrganization = async () => {
+    lookupCalls += 1;
+    return {
+      phone: PHONE,
+      name: "Missing Org",
+      current_step: "CONFIRMED"
+    };
   };
+
+  productionProspectFilter.isProductionProspect = () => true;
 
   delete require.cache[outcomeServicePath];
   const { recordInterviewOutcome } = require(outcomeServicePath);
@@ -232,9 +232,9 @@ test("recordInterviewOutcome fails closed without organizationId before workflow
 
     assert.equal(result.success, false);
     assert.equal(result.error, "TENANT_ORGANIZATION_REQUIRED");
-    assert.equal(advanceCalls, 0);
+    assert.equal(lookupCalls, 0);
   } finally {
-    supabaseService.findProspect = originalFindProspect;
+    supabaseService.findProspectInOrganization = originalFindProspectInOrg;
     humanAdvancementEngine.advanceProspectWorkflow = originalAdvance;
     productionProspectFilter.isProductionProspect = originalIsProductionProspect;
     delete require.cache[outcomeServicePath];

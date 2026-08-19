@@ -3,7 +3,7 @@
  * Unifies Mission Control, Workflow Gate, and appointment completion paths.
  */
 
-const { findProspect } = require("../services/supabaseService");
+const { findProspectInOrganization } = require("../services/supabaseService");
 const { logConversation } = require("../services/logService");
 const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
 const { isProductionProspect } = require("../core/productionProspectFilter");
@@ -57,7 +57,16 @@ async function recordInterviewOutcome({
 
   const outcomeId = resolveOutcomeId(rawOutcome);
 
-  const prospect = await findProspect(phone);
+  if (!organizationId) {
+    return {
+      success: false,
+      status: 400,
+      error: "TENANT_ORGANIZATION_REQUIRED",
+      message: "Organization context is required for interview outcome recording."
+    };
+  }
+
+  const prospect = await findProspectInOrganization(phone, organizationId);
 
   if (!prospect) {
     return {
@@ -226,15 +235,6 @@ async function recordInterviewOutcome({
     });
   }
 
-  if (!organizationId) {
-    return {
-      success: false,
-      status: 400,
-      error: "TENANT_ORGANIZATION_REQUIRED",
-      message: "Organization context is required for interview outcome workflow advancement."
-    };
-  }
-
   const workflowResult = await advanceProspectWorkflow(phone, {
     targetMilestone: advancePayload.targetMilestone,
     capturedFields: advancePayload.capturedFields,
@@ -247,7 +247,7 @@ async function recordInterviewOutcome({
     return workflowResult;
   }
 
-  const updatedProspect = await findProspect(phone);
+  const updatedProspect = await findProspectInOrganization(phone, organizationId);
   const config = getInterviewOutcomeConfig(outcomeId);
   const outcomeLabel = resolveSelectorOutcomeLabel(rawOutcome, config).replace(
     /^[^\p{L}\p{N}]+/u,

@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const axios = require("axios");
 const { shouldMockExternalComms } = require("../dev/simulatorGuard");
 const { logConversation } = require("../services/logService");
-const { findProspect, findProspectInOrganization } = require("../services/supabaseService");
+const { findProspectInOrganization } = require("../services/supabaseService");
 const { normalizePhoneNumber } = require("./phoneNormalizer");
 const { resolveStoragePhone } = require("./whatsappProspectResolver");
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
@@ -85,19 +85,14 @@ async function resolveProspectForOutbound(to, organizationId = null) {
   const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
   const storagePhone = resolveStoragePhone(metaTo);
 
-  if (organizationId) {
-    return (
-      (await findProspectInOrganization(storagePhone, organizationId)) ||
-      (await findProspectInOrganization(to, organizationId)) ||
-      (await findProspectInOrganization(`+${metaTo}`, organizationId)) ||
-      null
-    );
+  if (!organizationId) {
+    return null;
   }
 
   return (
-    (await findProspect(storagePhone)) ||
-    (await findProspect(to)) ||
-    (await findProspect(`+${metaTo}`)) ||
+    (await findProspectInOrganization(storagePhone, organizationId)) ||
+    (await findProspectInOrganization(to, organizationId)) ||
+    (await findProspectInOrganization(`+${metaTo}`, organizationId)) ||
     null
   );
 }
@@ -626,5 +621,6 @@ async function sendAndPersistWhatsAppMessage({
 module.exports = {
   sendAndPersistWhatsAppMessage,
   buildOutboundCorrelationId,
-  buildTemplateComponents
+  buildTemplateComponents,
+  resolveProspectForOutbound
 };
