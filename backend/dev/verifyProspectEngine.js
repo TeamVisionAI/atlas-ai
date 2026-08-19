@@ -12,6 +12,7 @@ const { ProspectApplicationService } = require("../modules/prospects/application
 const { validateCreateProspectInput } = require("../modules/prospects/application/validators/createProspect");
 const { ProspectStatus } = require("../modules/prospects/domain/value-objects/ProspectStatus");
 const { LIFECYCLE_STATES } = require("../modules/prospects/domain/constants");
+const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const createProspectRoutes = require("../modules/prospects/api/prospect.routes");
 const { InMemoryBusinessEventStore } = require("../modules/business-events/infrastructure/persistence/SupabaseBusinessEventRepository");
 const { SupabaseBusinessEventRepository } = require("../modules/business-events/infrastructure/persistence/SupabaseBusinessEventRepository");
@@ -70,6 +71,7 @@ async function run() {
   );
 
   const created = await service.createProspect(
+    DEFAULT_ORGANIZATION_ID,
     {
       displayName: "Maria Lopez",
       email: "maria@example.com",
@@ -91,11 +93,12 @@ async function run() {
     "prospect_created event type"
   );
 
-  const listed = await service.listProspects({ q: "Maria" });
+  const listed = await service.listProspects({ q: "Maria", organizationId: DEFAULT_ORGANIZATION_ID });
   assert(listed.total === 1, "search must find created prospect");
 
   const updated = await service.updateProspect(
     created.prospectId,
+    DEFAULT_ORGANIZATION_ID,
     { lifecycleState: LIFECYCLE_STATES.CONTACT_ATTEMPTED },
     "AGENT:test"
   );
@@ -107,6 +110,7 @@ async function run() {
 
   const assigned = await service.assignProspect(
     created.prospectId,
+    DEFAULT_ORGANIZATION_ID,
     {
       assignedAgentId: "00000000-0000-4000-8000-000000000001",
       assignmentReason: "Territory match"
@@ -116,13 +120,22 @@ async function run() {
 
   assert(assigned.assignedAgent.assignedAgentId, "assignment persisted");
 
-  const archived = await service.archiveProspect(created.prospectId, "AGENT:test");
+  const archived = await service.archiveProspect(
+    created.prospectId,
+    DEFAULT_ORGANIZATION_ID,
+    "AGENT:test"
+  );
   assert(archived.archivedAt, "archive sets archivedAt");
 
-  const restored = await service.restoreProspect(created.prospectId, "AGENT:test");
+  const restored = await service.restoreProspect(
+    created.prospectId,
+    DEFAULT_ORGANIZATION_ID,
+    "AGENT:test"
+  );
   assert(!restored.archivedAt, "restore clears archivedAt");
 
   const duplicate = await service.createProspect(
+    DEFAULT_ORGANIZATION_ID,
     {
       displayName: "Carlos Ruiz",
       email: "carlos@example.com"
@@ -131,6 +144,7 @@ async function run() {
   );
 
   await service.mergeProspects(
+    DEFAULT_ORGANIZATION_ID,
     {
       survivorId: created.prospectId,
       mergedId: duplicate.prospectId

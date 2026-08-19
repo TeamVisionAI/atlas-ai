@@ -4,18 +4,27 @@
 
 const { fromRow, toInsertRow, toUpdateRow } = require("./ProspectMapper");
 
+function sameOrganization(storedOrgId, organizationId) {
+  return String(storedOrgId) === String(organizationId);
+}
+
 class InMemoryProspectStore {
   constructor() {
     this.rows = new Map();
   }
 
-  insert(prospect) {
+  insert(prospect, organizationId) {
     const row = toInsertRow(prospect);
+
+    if (!sameOrganization(row.organization_id, organizationId)) {
+      throw new Error("Prospect organizationId must match create organizationId.");
+    }
+
     this.rows.set(row.id, { ...row });
     return fromRow(this.rows.get(row.id));
   }
 
-  save(prospect) {
+  save(prospect, organizationId) {
     const row = toUpdateRow(prospect);
     const existing = this.rows.get(prospect.prospectId);
 
@@ -23,7 +32,11 @@ class InMemoryProspectStore {
       return null;
     }
 
-    const next = { ...existing, ...row, id: prospect.prospectId };
+    if (!sameOrganization(existing.organization_id, organizationId)) {
+      return null;
+    }
+
+    const next = { ...existing, ...row, id: prospect.prospectId, organization_id: existing.organization_id };
     this.rows.set(prospect.prospectId, next);
     return fromRow(next);
   }
@@ -32,10 +45,14 @@ class InMemoryProspectStore {
     return this.rows.get(id) || null;
   }
 
-  findActiveById(id) {
+  findActiveById(id, organizationId) {
     const row = this.getById(id);
 
     if (!row || row.deleted_at) {
+      return null;
+    }
+
+    if (!organizationId || !sameOrganization(row.organization_id, organizationId)) {
       return null;
     }
 
@@ -108,11 +125,13 @@ class InMemoryProspectStore {
   }
 
   search({ q, lifecycleState, limit = 50, offset = 0, organizationId }) {
-    let results = [...this.rows.values()].filter((row) => !row.deleted_at);
-
-    if (organizationId) {
-      results = results.filter((row) => row.organization_id === organizationId);
+    if (!organizationId) {
+      throw new Error("organizationId is required for prospect search.");
     }
+
+    let results = [...this.rows.values()].filter(
+      (row) => !row.deleted_at && sameOrganization(row.organization_id, organizationId)
+    );
 
     if (lifecycleState) {
       results = results.filter((row) => row.lifecycle_state === lifecycleState);

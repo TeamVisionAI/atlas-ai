@@ -247,11 +247,11 @@ async function ensureCoreProspectForLegacyLead({
   try {
     const { prospectService } = getRecruitingWorkflowDeps();
     const created = await prospectService.createProspect(
+      resolvedOrganizationId,
       {
         displayName: displayName || storagePhone,
         primaryPhone: storagePhone,
         email: email || undefined,
-        organizationId: resolvedOrganizationId,
         leadSource,
         tags: ["autonomous-recruiting"],
         customFields: {

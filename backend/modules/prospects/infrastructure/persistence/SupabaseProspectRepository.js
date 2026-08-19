@@ -9,6 +9,27 @@ const { PhoneNumber } = require("../../domain/value-objects/PhoneNumber");
 const { fromRow, toInsertRow, toUpdateRow } = require("./ProspectMapper");
 const { InMemoryProspectStore } = require("./InMemoryProspectStore");
 const { forbidProductionInMemoryFallback } = require("../../../../core/productionReadinessValidator");
+const { ProspectDomainError } = require("../../domain/errors/ProspectDomainError");
+
+function assertOrganizationId(organizationId) {
+  if (!organizationId) {
+    throw new ProspectDomainError("Organization context is required.", {
+      statusCode: 400,
+      publicCode: "ORGANIZATION_REQUIRED"
+    });
+  }
+}
+
+function assertProspectOrganization(prospect, organizationId) {
+  const prospectOrg = prospect.toJSON?.().organizationId ?? prospect.organizationId;
+
+  if (!prospectOrg || String(prospectOrg) !== String(organizationId)) {
+    throw new ProspectDomainError("Prospect organizationId must match tenant organizationId.", {
+      statusCode: 400,
+      publicCode: "ORGANIZATION_MISMATCH"
+    });
+  }
+}
 
 function activateMemoryFallback(repository) {
   forbidProductionInMemoryFallback("ProspectRepository");
@@ -33,11 +54,14 @@ class ProspectRepository {
     this.useMemory = false;
   }
 
-  async create(prospect) {
+  async create(prospect, organizationId) {
+    assertOrganizationId(organizationId);
+    assertProspectOrganization(prospect, organizationId);
+
     const row = toInsertRow(prospect);
 
     if (this.useMemory) {
-      return this.memory.insert(prospect);
+      return this.memory.insert(prospect, organizationId);
     }
 
     const { data, error } = await supabase
@@ -50,7 +74,7 @@ class ProspectRepository {
       if (isMissingProspectTable(error)) {
         forbidProductionInMemoryFallback("ProspectRepository");
         activateMemoryFallback(this);
-        return this.memory.insert(prospect);
+        return this.memory.insert(prospect, organizationId);
       }
 
       throw error;
@@ -59,7 +83,15 @@ class ProspectRepository {
     return fromRow(data);
   }
 
-  async save(prospect) {
+  async save(prospect, organizationId) {
+    assertOrganizationId(organizationId);
+
+    const prospectOrg = prospect.toJSON?.().organizationId ?? prospect.organizationId;
+
+    if (!prospectOrg || String(prospectOrg) !== String(organizationId)) {
+      return null;
+    }
+
     const row = toUpdateRow(prospect);
     const prospectId = prospect.prospectId;
 
@@ -68,13 +100,14 @@ class ProspectRepository {
     console.log("[ProspectRepository.save] update payload:", JSON.stringify(row, null, 2));
 
     if (this.useMemory) {
-      return this.memory.save(prospect);
+      return this.memory.save(prospect, organizationId);
     }
 
     const response = await supabase
       .from(TABLE_NAME)
       .update(row)
       .eq("id", prospectId)
+      .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .select("*")
       .maybeSingle();
@@ -97,7 +130,7 @@ class ProspectRepository {
     if (response.error) {
       if (isMissingProspectTable(response.error)) {
         activateMemoryFallback(this);
-        return this.memory.save(prospect);
+        return this.memory.save(prospect, organizationId);
       }
 
       console.error(
@@ -127,13 +160,28 @@ class ProspectRepository {
     return fromRow(response.data);
   }
 
-  async findById(id, { includeDeleted = false } = {}) {
-    if (this.useMemory) {
-      const row = includeDeleted ? this.memory.getById(id) : this.memory.findActiveById(id);
-      return row ? fromRow(row) : null;
+  async findById(id, organizationId, { includeDeleted = false } = {}) {
+    if (!id || !organizationId) {
+      return null;
     }
 
-    let query = supabase.from(TABLE_NAME).select("*").eq("id", id);
+    if (this.useMemory) {
+      const row = includeDeleted
+        ? this.memory.getById(id)
+        : this.memory.findActiveById(id, organizationId);
+
+      if (!row || String(row.organization_id) !== String(organizationId)) {
+        return null;
+      }
+
+      return fromRow(row);
+    }
+
+    let query = supabase
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("id", id)
+      .eq("organization_id", organizationId);
 
     if (!includeDeleted) {
       query = query.is("deleted_at", null);
@@ -144,7 +192,7 @@ class ProspectRepository {
     if (error) {
       if (isMissingProspectTable(error)) {
         activateMemoryFallback(this);
-        return this.findById(id, { includeDeleted });
+        return this.findById(id, organizationId, { includeDeleted });
       }
 
       throw error;
@@ -283,6 +331,13 @@ class ProspectRepository {
   }
 
   async search(filters = {}) {
+    if (!filters.organizationId) {
+      throw new ProspectDomainError("organizationId is required for prospect search.", {
+        statusCode: 400,
+        publicCode: "ORGANIZATION_REQUIRED"
+      });
+    }
+
     const limit = Math.min(Number(filters.limit) || 50, 100);
     const offset = Math.max(Number(filters.offset) || 0, 0);
 
@@ -294,12 +349,9 @@ class ProspectRepository {
       .from(TABLE_NAME)
       .select("*", { count: "exact" })
       .is("deleted_at", null)
+      .eq("organization_id", filters.organizationId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
-
-    if (filters.organizationId) {
-      query = query.eq("organization_id", filters.organizationId);
-    }
 
     if (filters.divisionId) {
       query = query.eq("assigned_division_id", filters.divisionId);
@@ -340,56 +392,56 @@ class ProspectRepository {
   }
 
   /** @deprecated Use application service + aggregate.save — kept for compatibility. */
-  async update(_id, _patch) {
+  async update(_id, _patch, _organizationId) {
     throw new Error("Use ProspectApplicationService.updateProspect — repository.update is deprecated.");
   }
 
   /** @deprecated */
-  async archive(id) {
-    const prospect = await this.findById(id);
+  async archive(id, organizationId) {
+    const prospect = await this.findById(id, organizationId);
 
     if (!prospect) {
       return null;
     }
 
     prospect.archive();
-    return this.save(prospect);
+    return this.save(prospect, organizationId);
   }
 
   /** @deprecated */
-  async restore(id) {
-    const prospect = await this.findById(id);
+  async restore(id, organizationId) {
+    const prospect = await this.findById(id, organizationId);
 
     if (!prospect) {
       return null;
     }
 
     prospect.restore();
-    return this.save(prospect);
+    return this.save(prospect, organizationId);
   }
 
   /** @deprecated */
-  async assign(id, assignment) {
-    const prospect = await this.findById(id);
+  async assign(id, organizationId, assignment) {
+    const prospect = await this.findById(id, organizationId);
 
     if (!prospect) {
       return null;
     }
 
     prospect.assign(assignment, assignment.assignedBy);
-    return this.save(prospect);
+    return this.save(prospect, organizationId);
   }
 
   /** @deprecated */
-  async merge(survivorId, mergedId) {
-    const merged = await this.findById(mergedId);
+  async merge(survivorId, mergedId, organizationId) {
+    const merged = await this.findById(mergedId, organizationId);
 
     if (!merged) {
       return null;
     }
 
     merged.markMergedInto(survivorId);
-    return this.save(merged);
+    return this.save(merged, organizationId);
   }
 }
 

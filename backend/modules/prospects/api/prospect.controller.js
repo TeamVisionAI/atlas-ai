@@ -18,7 +18,7 @@ const {
   sanitizeProspectList
 } = require("../../../security/piiFilter");
 const { PERMISSIONS } = require("../../../security/permissions");
-const { loadCoreProspectById } = require("../../../security/prospectAccessService");
+const prospectAccessService = require("../../../security/prospectAccessService");
 
 function createProspectController(service = new ProspectApplicationService()) {
   function handleError(res, error, context) {
@@ -30,10 +30,28 @@ function createProspectController(service = new ProspectApplicationService()) {
     });
   }
 
-  function deny(res) {
+  function deny(res, message = "You do not have permission to perform this action.") {
     return res.status(403).json({
       error: "FORBIDDEN",
-      message: "You do not have permission to perform this action."
+      message
+    });
+  }
+
+  function resolveOrganizationId(req) {
+    return resolveTenantOrganizationId(req, req.query.organizationId);
+  }
+
+  function stripBodyOrganization(input = {}) {
+    const body = { ...input };
+    delete body.organizationId;
+    delete body.organization_id;
+    return body;
+  }
+
+  function notFound(res) {
+    return res.status(404).json({
+      error: "PROSPECT_NOT_FOUND",
+      message: "Prospect not found."
     });
   }
 
@@ -45,22 +63,25 @@ function createProspectController(service = new ProspectApplicationService()) {
       return null;
     }
 
-    const prospect = await loadCoreProspectById(prospectId);
+    const organizationId = resolveOrganizationId(req);
+    const prospect = await prospectAccessService.loadCoreProspectById(prospectId, organizationId);
 
     if (!prospect) {
-      res.status(404).json({
-        error: "PROSPECT_NOT_FOUND",
-        message: "Prospect not found."
-      });
+      notFound(res);
       return null;
     }
 
-    if (!canAccessProspect(req.authContext, prospect)) {
-      deny(res);
+    const effectiveContext = {
+      ...req.authContext,
+      organizationId
+    };
+
+    if (!canAccessProspect(effectiveContext, prospect)) {
+      deny(res, "You do not have access to this prospect.");
       return null;
     }
 
-    return prospect;
+    return { prospect, organizationId };
   }
 
   return {
@@ -70,8 +91,13 @@ function createProspectController(service = new ProspectApplicationService()) {
           return deny(res);
         }
 
+        const organizationId = resolveOrganizationId(req);
         const actor = actorFromRequest(req.atlasUser);
-        const prospect = await service.createProspect(req.body, actor);
+        const prospect = await service.createProspect(
+          organizationId,
+          stripBodyOrganization(req.body),
+          actor
+        );
 
         auditFromRequest(req, {
           action: "prospect.updated",
@@ -105,7 +131,7 @@ function createProspectController(service = new ProspectApplicationService()) {
           lifecycleState: req.query.lifecycleState,
           limit: req.query.limit,
           offset: req.query.offset,
-          organizationId: resolveTenantOrganizationId(req, req.query.organizationId),
+          organizationId: resolveOrganizationId(req),
           ownerUserId: scope.ownerUserId,
           divisionId: scope.divisionId
         });
@@ -121,13 +147,13 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async getById(req, res) {
       try {
-        const prospectRow = await authorizeProspectAccess(req, res, req.params.id);
+        const authorized = await authorizeProspectAccess(req, res, req.params.id);
 
-        if (!prospectRow) {
+        if (!authorized) {
           return;
         }
 
-        const prospect = await service.getProspect(req.params.id);
+        const prospect = await service.getProspect(req.params.id, authorized.organizationId);
 
         auditFromRequest(req, {
           action: "prospect.viewed",
@@ -145,16 +171,21 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async update(req, res) {
       try {
-        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+        const authorized = await authorizeProspectAccess(req, res, req.params.id, {
           write: true
         });
 
-        if (!prospectRow) {
+        if (!authorized) {
           return;
         }
 
         const actor = actorFromRequest(req.atlasUser);
-        const prospect = await service.updateProspect(req.params.id, req.body, actor);
+        const prospect = await service.updateProspect(
+          req.params.id,
+          authorized.organizationId,
+          req.body,
+          actor
+        );
 
         auditFromRequest(req, {
           action: "prospect.updated",
@@ -172,16 +203,20 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async archive(req, res) {
       try {
-        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+        const authorized = await authorizeProspectAccess(req, res, req.params.id, {
           write: true
         });
 
-        if (!prospectRow) {
+        if (!authorized) {
           return;
         }
 
         const actor = actorFromRequest(req.atlasUser);
-        const prospect = await service.archiveProspect(req.params.id, actor);
+        const prospect = await service.archiveProspect(
+          req.params.id,
+          authorized.organizationId,
+          actor
+        );
 
         auditFromRequest(req, {
           action: "prospect.updated",
@@ -200,16 +235,20 @@ function createProspectController(service = new ProspectApplicationService()) {
 
     async restore(req, res) {
       try {
-        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+        const authorized = await authorizeProspectAccess(req, res, req.params.id, {
           write: true
         });
 
-        if (!prospectRow) {
+        if (!authorized) {
           return;
         }
 
         const actor = actorFromRequest(req.atlasUser);
-        const prospect = await service.restoreProspect(req.params.id, actor);
+        const prospect = await service.restoreProspect(
+          req.params.id,
+          authorized.organizationId,
+          actor
+        );
 
         return res.json({
           prospect: sanitizeProspectResponse(prospect, req.authContext.role)
@@ -225,16 +264,21 @@ function createProspectController(service = new ProspectApplicationService()) {
           return deny(res);
         }
 
-        const prospectRow = await authorizeProspectAccess(req, res, req.params.id, {
+        const authorized = await authorizeProspectAccess(req, res, req.params.id, {
           write: true
         });
 
-        if (!prospectRow) {
+        if (!authorized) {
           return;
         }
 
         const actor = actorFromRequest(req.atlasUser);
-        const prospect = await service.assignProspect(req.params.id, req.body, actor);
+        const prospect = await service.assignProspect(
+          req.params.id,
+          authorized.organizationId,
+          req.body,
+          actor
+        );
 
         auditFromRequest(req, {
           action: "lead.assigned",
@@ -259,8 +303,44 @@ function createProspectController(service = new ProspectApplicationService()) {
           return deny(res);
         }
 
+        const organizationId = resolveOrganizationId(req);
+        const { survivorId, mergedId } = req.body || {};
+
+        if (!survivorId || !mergedId) {
+          return res.status(400).json({
+            error: "VALIDATION_ERROR",
+            message: "survivorId and mergedId are required."
+          });
+        }
+
+        const survivor = await prospectAccessService.loadCoreProspectById(
+          survivorId,
+          organizationId
+        );
+        const merged = await prospectAccessService.loadCoreProspectById(mergedId, organizationId);
+
+        if (!survivor || !merged) {
+          return notFound(res);
+        }
+
+        const effectiveContext = {
+          ...req.authContext,
+          organizationId
+        };
+
+        if (
+          !canAccessProspect(effectiveContext, survivor) ||
+          !canAccessProspect(effectiveContext, merged)
+        ) {
+          return deny(res, "You do not have access to this prospect.");
+        }
+
         const actor = actorFromRequest(req.atlasUser);
-        const result = await service.mergeProspects(req.body, actor);
+        const result = await service.mergeProspects(
+          organizationId,
+          { survivorId, mergedId },
+          actor
+        );
 
         return res.json({
           survivor: sanitizeProspectResponse(result.survivor, req.authContext.role),
