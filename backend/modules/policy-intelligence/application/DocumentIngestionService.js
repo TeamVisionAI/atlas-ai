@@ -21,10 +21,10 @@ const {
   buildRulesHintsFromDocument,
   applyRulesHints
 } = require("../domain/PolicyExtractionModel");
-const { uploadPolicyDocument } = require("../infrastructure/policyDocumentStorage");
 const { mapReview, mapDocument, mapExtraction } = require("./policyMappers");
 const { hashCrmPolicyNumber } = require("../domain/crmBoundary");
 const { enrichExtractionWithLanguageLayer } = require("./enrichExtractionWithLanguageLayer");
+const { authoritativeParsedRiders } = require("./AnnualValuesService");
 
 function httpError(message, statusCode, publicCode) {
   const error = new Error(message);
@@ -34,9 +34,10 @@ function httpError(message, statusCode, publicCode) {
 }
 
 class DocumentIngestionService {
-  constructor({ repository, annualValuesService } = {}) {
+  constructor({ repository, annualValuesService, uploadPolicyDocument: uploadFn } = {}) {
     this.repository = repository;
     this.annualValuesService = annualValuesService || null;
+    this.uploadPolicyDocument = uploadFn || null;
   }
 
   /**
@@ -117,7 +118,10 @@ class DocumentIngestionService {
     let storagePath = null;
 
     try {
-      const uploaded = await uploadPolicyDocument({
+      const upload =
+        this.uploadPolicyDocument ||
+        require("../infrastructure/policyDocumentStorage").uploadPolicyDocument;
+      const uploaded = await upload({
         organizationId,
         reviewId,
         documentId,
@@ -228,10 +232,9 @@ class DocumentIngestionService {
             extracted_data: {
               ...layeredData,
               annualValues: illustration.annualValues?.analysis?.timeline || [],
-              riders: [
-                ...(layeredData.riders || []),
-                ...illustration.riders
-              ],
+              // Successful illustration persist: adapter riders are authoritative (BR-144).
+              // Do not concatenate Atlas/generic structured riders. Failed persist keeps layeredData.
+              riders: authoritativeParsedRiders(illustration.riders),
               policyCostTerms: illustration.policyCostTerms || layeredData.policyCostTerms || null
             },
             status: POLICY_EXTRACTION_STATUSES.EXTRACTED,
