@@ -112,6 +112,28 @@
     margin: 0 !important;
   }
 
+  /* ——— Print compaction ——— */
+  /* Keep the top-of-section header tight so cards/panels reclaim vertical space. */
+  .fi-discussion-scenarios__header {
+    margin-bottom: 12px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .fi-discussion-scenarios__print-meta {
+    margin: 0 0 12px !important;
+    padding: 10px 12px !important;
+  }
+
+  .fi-report-section {
+    margin: 0 0 14px !important;
+  }
+
+  .fi-discussion-scenarios__block > h3,
+  .fi-report-section > h3 {
+    margin: 0 0 8px !important;
+    font-size: 0.78rem !important;
+  }
+
   .fi-print-root {
     display: block !important;
   }
@@ -163,17 +185,44 @@
     page-break-inside: avoid;
   }
 
+  /* Projection cards: pair them in print to reduce page count.
+     Using flex-wrap is Safari/WebKit-friendly for pagination compared to multi-row grids. */
   .fi-discussion-scenarios__projection-grid {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 10px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px 10px !important;
   }
 
-  .fi-projection,
+  .fi-projection {
+    /* Two per row. */
+    flex: 0 0 calc(50% - 5px) !important;
+    margin-bottom: 0 !important;
+    padding: 10px 12px !important;
+    border-color: #666 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .fi-projection h4 {
+    margin: 0 0 3px !important;
+    font-size: 0.95rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .fi-projection dl {
+    margin: 6px 0 0 !important;
+    gap: 8px !important;
+  }
+
+  .fi-projection dt {
+    font-size: 0.66rem !important;
+  }
+
   .fi-hero-difference__card,
   .fi-projection-compare,
   .fi-report-fact {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     border-color: #666 !important;
     box-shadow: none !important;
     background: #fff !important;
@@ -183,6 +232,33 @@
   .fi-hero-difference__card {
     background: #fff !important;
     border: 2px solid #000 !important;
+    padding: 14px 14px !important;
+  }
+
+  .fi-hero-difference__value {
+    margin: 6px 0 4px !important;
+    font-size: 2.05rem !important;
+    line-height: 1.05 !important;
+  }
+
+  .fi-hero-difference__hint {
+    margin: 0 0 12px !important;
+  }
+
+  .fi-discussion-scenarios__assumptions {
+    margin-top: 10px !important;
+    padding: 10px 12px !important;
+  }
+
+  .fi-discussion-scenarios__warning,
+  .fi-discussion-scenarios__missing,
+  .fi-discussion-scenarios__safeguards {
+    padding: 10px 12px !important;
+  }
+
+  .fi-discussion-scenarios__disclaimers {
+    margin-top: 6px !important;
+    padding-top: 12px !important;
   }
 
   .fi-hero-difference__eyebrow,

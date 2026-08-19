@@ -81,6 +81,15 @@ describe("FI print layout contract", () => {
     assert.ok(panelJsx.includes("fiPrintReport.css"));
   });
 
+  it("compacts projection cards for print (Safari/WebKit-friendly)", () => {
+    assert.match(
+      printCss,
+      /\.fi-discussion-scenarios__projection-grid[\s\S]{0,140}display:\s*flex\s*!important/
+    );
+    assert.match(printCss, /\.fi-projection[\s\S]{0,120}flex:\s*0 0 calc\(50%\s*-\s*5px\)\s*!important/);
+    assert.equal(printCss.includes("grid-template-columns: 1fr !important"), false);
+  });
+
   it("does not hide PI source lines, charts, or page numbers in print CSS", () => {
     const piCss = readFileSync(join(__dirname, "../policy-intelligence/ClientPolicyReport.css"), "utf8");
     assert.ok(piCss.includes("@page"));

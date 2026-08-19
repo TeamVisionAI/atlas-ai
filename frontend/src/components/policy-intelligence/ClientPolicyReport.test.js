@@ -381,21 +381,51 @@ const fiEvaluation = {
   currentIulMonthlyPremium: 173,
   currentIulDeathBenefit: 100000,
   proposedTermMonthlyPremium: 48,
-  monthlyInvestmentDifference: 125,
+  monthlyInvestmentDifference: 56.08,
   comparisonTable: {
     deathBenefit: { existingIul: 100000, discussionScenario: 100000 },
     monthlyInsurancePremium: { existingIul: 173, discussionScenario: 48 },
-    monthlyInvestmentAmount: { existingIul: 0, discussionScenario: 125 },
+    monthlyInvestmentAmount: { existingIul: 0, discussionScenario: 56.08 },
     totalMonthlyOutlay: { existingIul: 173, discussionScenario: 173 }
+  },
+  termQuote: {
+    notes: "Representative note to be shown in the print narrative."
   },
   projectionOutputs: {
     scenarios: [
-      { id: "conservative", label: "Conservative 4%", annualReturn: 0.04, illustrativeProjectedValue: 10000 },
-      { id: "moderate", label: "Moderate Growth 7%", annualReturn: 0.07, illustrativeProjectedValue: 20000 },
-      { id: "aggressive", label: "Aggressive Growth 10%", annualReturn: 0.1, illustrativeProjectedValue: 30000 }
+      {
+        id: "conservative",
+        label: "Conservative 4%",
+        annualReturn: 0.04,
+        monthlyContribution: 56.08,
+        timeHorizonYears: 25,
+        totalContributions: 16824,
+        illustrativeGrowth: 12008.39,
+        illustrativeProjectedValue: 28832.39
+      },
+      {
+        id: "moderate",
+        label: "Moderate Growth 7%",
+        annualReturn: 0.07,
+        monthlyContribution: 56.08,
+        timeHorizonYears: 25,
+        totalContributions: 16824,
+        illustrativeGrowth: 28604.82,
+        illustrativeProjectedValue: 45428.82
+      },
+      {
+        id: "aggressive",
+        label: "Aggressive Growth 10%",
+        annualReturn: 0.1,
+        monthlyContribution: 56.08,
+        timeHorizonYears: 25,
+        totalContributions: 16824,
+        illustrativeGrowth: 57584.82,
+        illustrativeProjectedValue: 74408.82
+      }
     ]
   },
-  investmentHorizon: { years: 20, confirmed: true },
+  investmentHorizon: { years: 25, confirmed: true },
   replacementWarnings: ["Do not cancel existing coverage first."],
   disclaimers: ["Hypothetical."]
 };
@@ -495,6 +525,9 @@ describe("ClientPolicyReport", () => {
 
       assert.match(nationwideHtml, /pi-source-line/);
       assert.match(nationwideHtml, /Source: Policy Illustration — Pages 22–23/);
+      const nationwideSourceLineCount =
+        (nationwideHtml.match(/Source: Policy Illustration — Pages 22–23/g) || []).length;
+      assert.equal(nationwideSourceLineCount, 1);
       assert.match(nationwideHtml, /Source: Policy Illustration — Page 13/);
       assert.match(nationwideHtml, /Source: Policy Illustration — Page 6/);
       assert.match(nationwideHtml, /Source: Form ICC13-NWLA-495 — Page 15/);
@@ -634,9 +667,25 @@ describe("ClientPolicyReport", () => {
       assert.match(withFi, /fi-discussion-scenarios/);
       assert.match(withFi, /Conservative|4%/);
       assert.match(withFi, /data-testid="pi-fi-comparison-horizon"/);
-      assert.match(withFi, /Comparison horizon: 20 years/);
+      assert.match(withFi, /Comparison horizon: 25 years/);
       assert.equal(withFi.includes("policy year 86"), false);
       assert.equal(withFi.includes("age 120"), false);
+
+      // FI print contract: these amounts/horizon are presentation-only and must remain exact.
+      assert.match(withFi, /data-testid="fi-monthly-investment-difference"[\s\S]{0,60}>\$56\.08</);
+      assert.match(withFi, /\$28,832\.39/);
+      assert.match(withFi, /\$45,428\.82/);
+      assert.match(withFi, /\$74,408\.82/);
+      assert.match(withFi, /\$16,824\.00/);
+
+      assert.match(withFi, /data-testid="fi-existing-premium"/);
+      assert.match(withFi, /data-testid="fi-proposed-term-premium"/);
+      assert.match(withFi, /data-testid="fi-projection-assumptions"/);
+      assert.match(withFi, /data-testid="fi-section-safeguards"/);
+      assert.match(withFi, /data-testid="fi-not-a-recommendation"/);
+      assert.match(withFi, /data-testid="fi-registered-rep-handoff"/);
+      assert.match(withFi, /data-testid="fi-disclaimers"/);
+      assert.match(withFi, /data-testid="fi-quote-notes"/);
 
       const disclosedCoi = nationwideReport();
       disclosedCoi.chargeScheduleUndisclosed = false;
@@ -661,7 +710,7 @@ describe("ClientPolicyReport", () => {
         )
       );
       const fiSection = lswWithFi.slice(lswWithFi.indexOf('data-testid="pi-section-term-invest"'));
-      assert.match(fiSection, /Comparison horizon: 20 years/);
+      assert.match(fiSection, /Comparison horizon: 25 years/);
       assert.equal(fiSection.includes("policy year 86"), false);
       assert.equal(fiSection.includes("age 120"), false);
 

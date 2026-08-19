@@ -286,7 +286,10 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
                 title="Policy values over time"
                 checkpoints={valuesChartCheckpoints}
                 series={valuesChartSeries}
-                sourceLine={distributionSourceLine || valuesSourceLine}
+                // Print-visible sources are deduped:
+                // - Nationwide: show illustration source once via canonical source line block below.
+                // - Distribution cases (e.g. National Life): keep the distributions ledger source here.
+                sourceLine={useDistributionValues ? distributionSourceLine : null}
               />
             </div>
             <PolicyValuesCheckpointChart
@@ -295,7 +298,7 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
               series={PREMIUM_COST_SERIES}
               requireAllSeries
               testId="pi-premium-cost-chart"
-              sourceLine={valuesSourceLine}
+              sourceLine={null}
             />
             {valuesSourceLine ? (
               <p className="pi-source-line" data-testid="pi-canonical-illustration-source">
@@ -304,7 +307,9 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
             ) : null}
             <PolicyValuesCheckpoints
               checkpoints={useDistributionValues ? distributionCheckpoints : economics?.policyCostCheckpoints || []}
-              sourceLine={distributionSourceLine || valuesSourceLine}
+              // For non-distribution (e.g. Nationwide), the illustration source is rendered once below.
+              // For distribution cases, keep the distributions ledger provenance on the checkpoint table.
+              sourceLine={useDistributionValues ? distributionSourceLine : null}
               footnoteId={useDistributionValues ? valuesFootnote : premiumFootnote}
               variant={useDistributionValues ? "distribution" : "standard"}
             />
