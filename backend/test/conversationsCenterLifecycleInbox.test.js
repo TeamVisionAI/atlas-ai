@@ -13,6 +13,10 @@ const path = require("node:path");
 
 const TEAM_VISION = "00000000-0000-4000-8000-000000000001";
 const NIOVEL = "33ad243a-9d00-4a4d-810b-df2762c0f076";
+const {
+  recruitingProspectFixture,
+  seedRecruitingWorkflowState
+} = require("./helpers/conversationsCenterRecruitingFixture");
 
 const AGENT_FILE = path.join(__dirname, "../data/agentActionState.json");
 
@@ -63,19 +67,7 @@ async function withTempStores(run) {
 }
 
 function prospect(overrides = {}) {
-  return {
-    id: overrides.id || "p1",
-    organization_id: TEAM_VISION,
-    owner_user_id: NIOVEL,
-    phone: overrides.phone || "+17865551001",
-    name: overrides.name || "Prospect",
-    source: overrides.source || "whatsapp",
-    current_step: overrides.current_step || "QUALIFICATION",
-    appointment_status: overrides.appointment_status || null,
-    entry_method: overrides.entry_method || null,
-    updated_at: "2026-08-10T12:00:00.000Z",
-    ...overrides
-  };
+  return recruitingProspectFixture(overrides);
 }
 
 test("A–C Active: ATLAS / NEEDS_ATTENTION / HUMAN stay Active", async () => {
@@ -88,16 +80,16 @@ test("A–C Active: ATLAS / NEEDS_ATTENTION / HUMAN stay Active", async () => {
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
     const { OWNERSHIP } = require("../core/workflowConstants");
 
-    await savePersistedWorkflowState("+17865551001", {
+    await seedRecruitingWorkflowState("+17865551001", {
       workflowOwnership: OWNERSHIP.ATLAS,
       needsHumanAttention: false
     });
-    await savePersistedWorkflowState("+17865551002", {
+    await seedRecruitingWorkflowState("+17865551002", {
       workflowOwnership: OWNERSHIP.AGENT,
       needsHumanAttention: true,
       manualAgentOwnership: true
     });
-    await savePersistedWorkflowState("+17865551003", {
+    await seedRecruitingWorkflowState("+17865551003", {
       workflowOwnership: OWNERSHIP.AGENT,
       needsHumanAttention: false,
       manualAgentOwnership: true,
@@ -132,7 +124,7 @@ test("D–E Scheduled interview leaves Active; remains in Archived", async () =>
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
-    await savePersistedWorkflowState("+17865551010", {
+    await seedRecruitingWorkflowState("+17865551010", {
       workflowOwnership: OWNERSHIP.ATLAS,
       canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED
     });
@@ -165,7 +157,7 @@ test("F Interview completed + Not Interested leaves Active", async () => {
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
-    await savePersistedWorkflowState("+17865551020", {
+    await seedRecruitingWorkflowState("+17865551020", {
       workflowOwnership: OWNERSHIP.CLOSED,
       canonicalMilestone: MILESTONES.CLOSED
     });
@@ -269,15 +261,28 @@ test("H TEST/CANARY excluded from Active and attention badge", async () => {
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
     const phone = "+17865551040";
-    await markConversationNeedsAttention(phone, "stall");
-    await markConversationAsTest(phone);
+    await seedRecruitingWorkflowState(phone, {}, {
+      organizationId: TEAM_VISION,
+      prospectId: "canary-test"
+    });
+    await markConversationNeedsAttention(phone, "stall", {}, {
+      organizationId: TEAM_VISION,
+      prospectId: "canary-test"
+    });
+    await markConversationAsTest(phone, {
+      organizationId: TEAM_VISION,
+      prospectId: "canary-test"
+    });
 
     const prospects = [
-      prospect({ phone, name: "Canary", source: "whatsapp" }),
+      prospect({ id: "canary-test", phone, name: "Canary" }),
       prospect({
+        id: "meta-demo-test",
         phone: "+17865551041",
         name: "MetaDemo",
-        entry_method: "META_REVIEW_DEMO"
+        entry_method: "META_REVIEW_DEMO",
+        source: "META_REVIEW_DEMO",
+        workflow_state: { atlasEligibilitySource: "QR" }
       })
     ];
 
@@ -397,7 +402,7 @@ test("invariant: CONFIRMED + INTERVIEW_SCHEDULED → SCHEDULED / excluded from A
     const { MILESTONES, OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865551050";
-    await savePersistedWorkflowState(phone, {
+    await seedRecruitingWorkflowState(phone, {
       workflowOwnership: OWNERSHIP.WAITING_EVENT,
       canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED
     });

@@ -88,15 +88,15 @@ function healthyWaitingProspect(overrides = {}) {
 function stubCrmWrites() {
   const supabaseService = require("../services/supabaseService");
   const captured = [];
-  const originalUpdate = supabaseService.updateProspect;
-  supabaseService.updateProspect = async (phone, updates) => {
-    captured.push({ phone, updates });
-    return { phone, ...updates };
+  const originalUpdate = supabaseService.updateProspectInOrganization;
+  supabaseService.updateProspectInOrganization = async (phone, organizationId, updates) => {
+    captured.push({ phone, organizationId, updates });
+    return { phone, organization_id: organizationId, ...updates };
   };
   return {
     captured,
     restore() {
-      supabaseService.updateProspect = originalUpdate;
+      supabaseService.updateProspectInOrganization = originalUpdate;
     }
   };
 }

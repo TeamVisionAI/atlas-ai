@@ -12,6 +12,7 @@ const path = require("node:path");
 const TEAM_VISION = "00000000-0000-4000-8000-000000000001";
 const NIOVEL = "33ad243a-9d00-4a4d-810b-df2762c0f076";
 const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
+const { recruitingProspectFixture } = require("./helpers/conversationsCenterRecruitingFixture");
 const MEMORY = { backend: "memory" };
 
 const {
@@ -296,24 +297,20 @@ test("read model: inbound unread + sort + system event does not reorder", async 
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
     const prospects = [
-      {
+      recruitingProspectFixture({
         id: "p-old",
         phone: "+17865558110",
         name: "Older Comm",
-        organization_id: TEAM_VISION,
-        owner_user_id: NIOVEL,
         last_message: "stale preview",
         updated_at: "2026-08-13T18:00:00.000Z"
-      },
-      {
+      }),
+      recruitingProspectFixture({
         id: "p-new",
         phone: "+17865558111",
         name: "Nancy Ortiz",
-        organization_id: TEAM_VISION,
-        owner_user_id: NIOVEL,
         last_message: "[Required Information Updated]",
         updated_at: "2026-08-13T08:00:00.000Z"
-      }
+      })
     ];
 
     const logsByPhone = {
@@ -357,26 +354,22 @@ test("read model: blocked_template_missing does not become preview or sort key",
     const model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
       prospects: [
-        {
+        recruitingProspectFixture({
           id: "p-block",
           phone: "+17865558130",
           name: "Santander Sweets",
-          organization_id: TEAM_VISION,
-          owner_user_id: NIOVEL,
           last_message:
             "[whatsapp_outbound:blocked_template_missing] intent=HUMAN_COMPOSER_REPLY; reason=NO_TEMPLATE_FOR_INTENT",
           last_message_at: "2026-08-13T21:00:00.000Z",
           updated_at: "2026-08-13T21:00:00.000Z"
-        },
-        {
+        }),
+        recruitingProspectFixture({
           id: "p-real-later",
           phone: "+17865558131",
           name: "Later Real",
-          organization_id: TEAM_VISION,
-          owner_user_id: NIOVEL,
           last_message: "ok gracias",
           updated_at: "2026-08-13T08:00:00.000Z"
-        }
+        })
       ],
       conversationLogsByPhone: {
         "+17865558130": [
@@ -414,22 +407,19 @@ test("20. tenant/org isolation: other-org prospects stay out of the list", async
     const model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
       prospects: [
-        {
+        recruitingProspectFixture({
           id: "tv",
           phone: "+17865558120",
           name: "TV lead",
-          organization_id: TEAM_VISION,
-          owner_user_id: NIOVEL,
           updated_at: "2026-08-13T10:00:00.000Z"
-        },
-        {
+        }),
+        recruitingProspectFixture({
           id: "other",
           phone: "+17865558121",
           name: "Other org",
           organization_id: OTHER_ORG,
-          owner_user_id: NIOVEL,
           updated_at: "2026-08-13T12:00:00.000Z"
-        }
+        })
       ],
       conversationLogsByPhone: {
         "+17865558121": [inbound("2026-08-13T12:00:00.000Z", "secret inbound")]

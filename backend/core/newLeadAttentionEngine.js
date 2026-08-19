@@ -15,6 +15,10 @@ const {
   isEligibleNewLeadOwner
 } = require("./newLeadAssignmentEngine");
 const atlasUserService = require("../services/atlasUserService");
+const {
+  evaluateRecruitingInboxEligibility,
+  resolveRecruitingInboxEligibility
+} = require("./conversationsCenter/conversationsCenterInboxEligibility");
 
 const ATTENTION_STATUS = Object.freeze({
   NEW: "new",
@@ -196,11 +200,19 @@ async function writeSafeAudit({
   }
 }
 
+function isRecruitingProspectForBr080(prospect = {}, workflowState = null) {
+  return evaluateRecruitingInboxEligibility(prospect, workflowState).eligible;
+}
+
 /**
  * Mark AI actively handling without clearing New / acknowledgement.
  */
 async function markAiResponding(prospect, options = {}) {
   if (!prospect?.phone || isAcknowledged(prospect)) {
+    return prospect;
+  }
+
+  if (!isRecruitingProspectForBr080(prospect, options.workflowState || null)) {
     return prospect;
   }
 
@@ -233,6 +245,11 @@ async function markAiResponding(prospect, options = {}) {
  */
 async function markHumanAttentionRequired(prospect, reason, actor = {}) {
   if (!prospect?.phone) {
+    return null;
+  }
+
+  const recruiting = await resolveRecruitingInboxEligibility(prospect);
+  if (!recruiting.eligible) {
     return null;
   }
 
@@ -482,6 +499,10 @@ async function claimLead(prospect, actor = {}) {
 }
 
 function evaluateEscalation(prospect, nowMs = Date.now()) {
+  if (!isRecruitingProspectForBr080(prospect)) {
+    return { shouldEscalate: false, level: prospect.escalation_level || 0 };
+  }
+
   if (!isNewLeadAttentionOpen(prospect)) {
     return { shouldEscalate: false, level: prospect.escalation_level || 0 };
   }
@@ -517,6 +538,10 @@ function evaluateEscalation(prospect, nowMs = Date.now()) {
 
 async function applyEscalation(prospect, decision) {
   if (!decision?.shouldEscalate || !prospect?.phone) {
+    return { escalated: false, prospect };
+  }
+
+  if (!isRecruitingProspectForBr080(prospect)) {
     return { escalated: false, prospect };
   }
 
