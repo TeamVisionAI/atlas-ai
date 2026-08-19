@@ -173,6 +173,10 @@ function buildRowMetadata(sourceRow = {}, canonical = {}) {
   };
 }
 
+function authoritativeParsedRiders(parsedRiders) {
+  return Array.isArray(parsedRiders) ? parsedRiders : [];
+}
+
 function mapAnnualValueSet(setRow, valueRows = []) {
   if (!setRow) {
     return null;
@@ -195,8 +199,9 @@ function mapAnnualValueSet(setRow, valueRows = []) {
 }
 
 class AnnualValuesService {
-  constructor({ repository }) {
+  constructor({ repository, downloadPolicyDocument } = {}) {
     this.repository = repository;
+    this.downloadPolicyDocument = downloadPolicyDocument || null;
   }
 
   getCatalog() {
@@ -418,8 +423,10 @@ class AnnualValuesService {
     }
 
     const extraction = await this.repository.getExtractionByDocument(organizationId, pdf.id);
-    const { downloadPolicyDocument } = require("../infrastructure/policyDocumentStorage");
-    const { buffer } = await downloadPolicyDocument(pdf.storage_path);
+    const download =
+      this.downloadPolicyDocument ||
+      require("../infrastructure/policyDocumentStorage").downloadPolicyDocument;
+    const { buffer } = await download(pdf.storage_path);
     const result = await this.extractAndPersistFromPdf({
       organizationId,
       userId,
@@ -432,10 +439,8 @@ class AnnualValuesService {
       const extractedData = {
         ...(extraction.extracted_data || {}),
         annualValues: result.annualValues?.analysis?.timeline || [],
-        riders: [
-          ...((extraction.extracted_data && extraction.extracted_data.riders) || []),
-          ...result.riders
-        ],
+        // Current parser output is authoritative. Do not append stale extracted_data.riders (BR-144).
+        riders: authoritativeParsedRiders(result.riders),
         policyCostTerms: result.policyCostTerms || extraction.extracted_data?.policyCostTerms || null
       };
       await this.repository.updateExtraction(organizationId, extraction.id, {
@@ -462,5 +467,6 @@ module.exports = {
   mapAnnualValueRow,
   serializeIllustrationScenarios,
   buildIllustrationSetMetadata,
+  authoritativeParsedRiders,
   DUAL_LEDGER_PLACEHOLDER_LOAN_SCENARIOS
 };
