@@ -195,8 +195,10 @@ test("whatsapp resolver existing-prospect update uses tenant-scoped mutation", a
     calls.push({ phone, organizationId, updates });
     return { ...existing, ...updates };
   };
-  quickCapture.findProspectByNormalizedPhone = async () => existing;
-  supabaseService.findProspect = async () => existing;
+  quickCapture.findProspectByNormalizedPhone = async (_phone, organizationId) =>
+    organizationId === ORG_A ? existing : null;
+  supabaseService.findProspectInOrganization = async (_phone, organizationId) =>
+    organizationId === ORG_A ? existing : null;
   orgResolver.resolveWhatsAppInboundOrganizationId = async () => ({
     organizationId: ORG_A,
     source: "explicit"

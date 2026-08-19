@@ -12,12 +12,16 @@ const { LIFECYCLE_STATES } = require("../modules/prospects/domain/constants");
 const { getRecruitingWorkflowDeps, isRecruitingWorkflowReady } = require("./recruitingWorkflowRegistry");
 const { findCoreProspectIdByPhone } = require("./recruitingProspectBridge");
 
-async function resolveProspectId(phone, prospectId) {
+async function resolveProspectId(phone, prospectId, organizationId) {
   if (prospectId) {
     return prospectId;
   }
 
-  return findCoreProspectIdByPhone(phone);
+  if (!organizationId) {
+    return null;
+  }
+
+  return findCoreProspectIdByPhone(phone, organizationId);
 }
 
 async function recordBusinessEvent(input) {
@@ -25,7 +29,11 @@ async function recordBusinessEvent(input) {
     return null;
   }
 
-  const prospectId = await resolveProspectId(input.phone, input.prospectId);
+  const prospectId = await resolveProspectId(
+    input.phone,
+    input.prospectId,
+    input.organizationId
+  );
 
   if (!prospectId) {
     return null;

@@ -5,7 +5,7 @@
  * Interview Scheduling → Google Calendar → Business Events → Executive Dashboard
  */
 
-const { findProspect } = require("../services/supabaseService");
+const { findProspectInOrganization } = require("../services/supabaseService");
 const { sendAndPersistWhatsAppMessage } = require("./whatsappOutboundPipeline");
 const { LIFECYCLE_STATES } = require("../modules/prospects/domain/constants");
 const {
@@ -26,6 +26,19 @@ const { MILESTONES } = require("./workflowConstants");
 const { savePersistedWorkflowState } = require("./workflowStateStore");
 
 const qualificationStateByPhone = new Map();
+
+async function resolveLegacyProspectInOrganization(phone, organizationId) {
+  if (!phone || !organizationId) {
+    return null;
+  }
+
+  const storagePhone = normalizeStoragePhone(phone);
+
+  return (
+    (await findProspectInOrganization(storagePhone, organizationId)) ||
+    (await findProspectInOrganization(phone, organizationId))
+  );
+}
 
 function buildWelcomeMessage({ displayName, language = "es" }) {
   const name = displayName?.split(" ")[0] || displayName || "";
@@ -154,6 +167,7 @@ async function processFacebookLead(input = {}) {
     await recordBusinessEvent({
       phone,
       prospectId: bridge.prospectId,
+      organizationId: bridge.organizationId,
       eventType: COMMUNICATION_EVENTS.MESSAGE_SENT,
       actor: "ATLAS",
       channel: "whatsapp",
@@ -206,15 +220,24 @@ async function onLegacyProspectCreated({
   });
 }
 
-async function onMessageReceived({ phone, message, prospectId = null }) {
-  const legacyProspect = await findProspect(phone);
-  const organizationId = legacyProspect?.organization_id || legacyProspect?.organizationId || null;
+async function onMessageReceived({ phone, message, prospectId = null, organizationId = null }) {
+  const legacyProspect = await resolveLegacyProspectInOrganization(phone, organizationId);
+  const resolvedOrganizationId =
+    organizationId ||
+    legacyProspect?.organization_id ||
+    legacyProspect?.organizationId ||
+    null;
   const assessment = assessQualificationFromProspect(legacyProspect);
-  const resolvedProspectId = prospectId || (await findCoreProspectIdByPhone(phone));
+  const resolvedProspectId =
+    prospectId ||
+    (resolvedOrganizationId
+      ? await findCoreProspectIdByPhone(phone, resolvedOrganizationId)
+      : null);
 
   await recordBusinessEvent({
     phone,
     prospectId: resolvedProspectId,
+    organizationId: resolvedOrganizationId,
     eventType: COMMUNICATION_EVENTS.MESSAGE_RECEIVED,
     actor: "PROSPECT",
     channel: "whatsapp",
@@ -228,26 +251,48 @@ async function onMessageReceived({ phone, message, prospectId = null }) {
     }
   });
 
-  if (resolvedProspectId && organizationId) {
+  if (resolvedProspectId && resolvedOrganizationId) {
     await updateCoreLifecycle(
       resolvedProspectId,
       LIFECYCLE_STATES.CONVERSATION_STARTED,
       "ATLAS",
-      organizationId
+      resolvedOrganizationId
     );
   }
 
-  return handleQualificationProgress({ phone, legacyProspect, assessment, resolvedProspectId });
+  return handleQualificationProgress({
+    phone,
+    legacyProspect,
+    assessment,
+    resolvedProspectId,
+    organizationId: resolvedOrganizationId
+  });
 }
 
-async function onMessageSent({ phone, message, prospectId = null, summary = "Message sent" }) {
-  const legacyProspect = await findProspect(phone);
+async function onMessageSent({
+  phone,
+  message,
+  prospectId = null,
+  organizationId = null,
+  summary = "Message sent"
+}) {
+  const legacyProspect = await resolveLegacyProspectInOrganization(phone, organizationId);
+  const resolvedOrganizationId =
+    organizationId ||
+    legacyProspect?.organization_id ||
+    legacyProspect?.organizationId ||
+    null;
   const assessment = assessQualificationFromProspect(legacyProspect);
-  const resolvedProspectId = prospectId || (await findCoreProspectIdByPhone(phone));
+  const resolvedProspectId =
+    prospectId ||
+    (resolvedOrganizationId
+      ? await findCoreProspectIdByPhone(phone, resolvedOrganizationId)
+      : null);
 
   await recordBusinessEvent({
     phone,
     prospectId: resolvedProspectId,
+    organizationId: resolvedOrganizationId,
     eventType: COMMUNICATION_EVENTS.MESSAGE_SENT,
     actor: "ATLAS",
     channel: "whatsapp",
@@ -261,26 +306,38 @@ async function onMessageSent({ phone, message, prospectId = null, summary = "Mes
     }
   });
 
-  return handleQualificationProgress({ phone, legacyProspect, assessment, resolvedProspectId });
+  return handleQualificationProgress({
+    phone,
+    legacyProspect,
+    assessment,
+    resolvedProspectId,
+    organizationId: resolvedOrganizationId
+  });
 }
 
 async function handleQualificationProgress({
   phone,
   legacyProspect,
   assessment,
-  resolvedProspectId
+  resolvedProspectId,
+  organizationId = null
 }) {
   const storagePhone = normalizeStoragePhone(phone);
-  const organizationId = legacyProspect?.organization_id || legacyProspect?.organizationId || null;
+  const resolvedOrganizationId =
+    organizationId ||
+    legacyProspect?.organization_id ||
+    legacyProspect?.organizationId ||
+    null;
   const previous = qualificationStateByPhone.get(storagePhone) || {
     isQualified: false,
     isInterviewScheduled: false
   };
 
-  if (resolvedProspectId && organizationId && assessment.isQualified && !previous.isQualified) {
+  if (resolvedProspectId && resolvedOrganizationId && assessment.isQualified && !previous.isQualified) {
     await recordBusinessEvent({
       phone,
       prospectId: resolvedProspectId,
+      organizationId: resolvedOrganizationId,
       eventType: LEAD_EVENTS.PROSPECT_UPDATED,
       actor: "ATLAS",
       channel: "whatsapp",
@@ -297,7 +354,7 @@ async function handleQualificationProgress({
       resolvedProspectId,
       LIFECYCLE_STATES.QUALIFIED,
       "ATLAS",
-      organizationId
+      resolvedOrganizationId
     );
   }
 
@@ -365,7 +422,9 @@ async function onInterviewScheduled({
   calendarEvent
 }) {
   const organizationId = prospect?.organization_id || prospect?.organizationId || null;
-  const resolvedProspectId = await findCoreProspectIdByPhone(phone);
+  const resolvedProspectId = organizationId
+    ? await findCoreProspectIdByPhone(phone, organizationId)
+    : null;
 
   if (!resolvedProspectId || !organizationId) {
     return null;
@@ -374,6 +433,7 @@ async function onInterviewScheduled({
   await recordBusinessEvent({
     phone,
     prospectId: resolvedProspectId,
+    organizationId,
     eventType: APPOINTMENT_EVENTS.APPOINTMENT_CREATED,
     actor: "ATLAS",
     channel: "whatsapp",
@@ -407,21 +467,26 @@ async function onInterviewScheduled({
   };
 }
 
-async function onConversationProgress({ phone }) {
-  const legacyProspect = await findProspect(phone);
+async function onConversationProgress({ phone, organizationId = null }) {
+  if (!organizationId) {
+    return null;
+  }
+
+  const legacyProspect = await resolveLegacyProspectInOrganization(phone, organizationId);
 
   if (!legacyProspect) {
     return null;
   }
 
   const assessment = assessQualificationFromProspect(legacyProspect);
-  const resolvedProspectId = await findCoreProspectIdByPhone(phone);
+  const resolvedProspectId = await findCoreProspectIdByPhone(phone, organizationId);
 
   return handleQualificationProgress({
     phone,
     legacyProspect,
     assessment,
-    resolvedProspectId
+    resolvedProspectId,
+    organizationId
   });
 }
 

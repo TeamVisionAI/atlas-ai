@@ -467,9 +467,16 @@ async function locateOrCreateWhatsAppProspect({
   };
 
   let prospect =
-    (await quickCaptureEngine.findProspectByNormalizedPhone(normalizedPhone || phone)) ||
-    (await supabaseService.findProspect(storagePhone)) ||
-    (await supabaseService.findProspect(phone));
+    (await quickCaptureEngine.findProspectByNormalizedPhone(
+      normalizedPhone || phone,
+      organizationId
+    )) ||
+    (await supabaseService.findProspectByNormalizedPhoneInOrganization(
+      normalizedPhone || phone,
+      organizationId
+    )) ||
+    (await supabaseService.findProspectInOrganization(storagePhone, organizationId)) ||
+    (await supabaseService.findProspectInOrganization(phone, organizationId));
 
   const created = !prospect;
   const sourceFields = resolveCreateSourceFields(qrTouch, origin);
@@ -501,7 +508,9 @@ async function locateOrCreateWhatsAppProspect({
       organizationId,
       updates
     );
-    prospect = (await supabaseService.findProspect(prospect.phone)) || prospect;
+    prospect =
+      (await supabaseService.findProspectInOrganization(prospect.phone, organizationId)) ||
+      prospect;
   }
 
   const reopened = !created && shouldEmitConversationReopened(prospect);

@@ -36,6 +36,12 @@ const bridgeSource = fs.readFileSync(
   "utf8"
 );
 
+test("audit: orchestrator scopes legacy reads and core lookup by organizationId", () => {
+  assert.match(orchestratorSource, /findProspectInOrganization/);
+  assert.match(orchestratorSource, /findCoreProspectIdByPhone\(phone,\s*resolvedOrganizationId\)/);
+  assert.doesNotMatch(orchestratorSource, /\bfindProspect\(/);
+});
+
 test("audit: orchestrator scopes findById and updateProspect by organizationId", () => {
   assert.match(orchestratorSource, /findById\(prospectId,\s*organizationId\)/);
   assert.match(
@@ -48,7 +54,8 @@ test("audit: orchestrator scopes findById and updateProspect by organizationId",
 
 test("audit: orchestrator lifecycle org sources are workflow context fields", () => {
   assert.match(orchestratorSource, /bridge\.organizationId/);
-  assert.match(orchestratorSource, /legacyProspect\?\.organization_id \|\| legacyProspect\?\.organizationId/);
+  assert.match(orchestratorSource, /legacyProspect\?\.organization_id/);
+  assert.match(orchestratorSource, /legacyProspect\?\.organizationId/);
   assert.match(orchestratorSource, /prospect\?\.organization_id \|\| prospect\?\.organizationId/);
 });
 
@@ -126,14 +133,12 @@ function loadOrchestrator() {
   return require("../core/recruitingWorkflowOrchestrator");
 }
 
-test("orchestrator: onMessageReceived skips lifecycle update without legacy org", async () => {
+test("orchestrator: onMessageReceived skips lifecycle update without organizationId", async () => {
   const bridge = require("../core/recruitingProspectBridge");
   const originalFindCore = bridge.findCoreProspectIdByPhone;
-  bridge.findCoreProspectIdByPhone = async () => CORE_ID;
-
-  const supabaseService = require("../services/supabaseService");
-  const originalFindProspect = supabaseService.findProspect;
-  supabaseService.findProspect = async () => ({ phone: PHONE });
+  bridge.findCoreProspectIdByPhone = async () => {
+    throw new Error("findCoreProspectIdByPhone must not run without organizationId");
+  };
 
   const eventBridge = require("../core/recruitingBusinessEventBridge");
   const originalRecord = eventBridge.recordBusinessEvent;
@@ -159,24 +164,29 @@ test("orchestrator: onMessageReceived skips lifecycle update without legacy org"
     await onMessageReceived({ phone: PHONE, message: "hola" });
     assert.equal(updateCalls.length, 0);
   } finally {
-    supabaseService.findProspect = originalFindProspect;
     bridge.findCoreProspectIdByPhone = originalFindCore;
     eventBridge.recordBusinessEvent = originalRecord;
     clearAutonomousWorkflowStateForTests();
   }
 });
 
-test("orchestrator: onMessageReceived passes legacy org into scoped updateProspect", async () => {
+test("orchestrator: onMessageReceived passes organizationId into scoped legacy lookup", async () => {
   const bridge = require("../core/recruitingProspectBridge");
   const originalFindCore = bridge.findCoreProspectIdByPhone;
-  bridge.findCoreProspectIdByPhone = async () => CORE_ID;
+  bridge.findCoreProspectIdByPhone = async (_phone, organizationId) => {
+    assert.equal(organizationId, ORG_A);
+    return CORE_ID;
+  };
 
   const supabaseService = require("../services/supabaseService");
-  const originalFindProspect = supabaseService.findProspect;
-  supabaseService.findProspect = async () => ({
-    phone: PHONE,
-    organization_id: ORG_A
-  });
+  const originalFindInOrg = supabaseService.findProspectInOrganization;
+  supabaseService.findProspectInOrganization = async (phone, organizationId) => {
+    assert.equal(organizationId, ORG_A);
+    return {
+      phone,
+      organization_id: ORG_A
+    };
+  };
 
   const eventBridge = require("../core/recruitingBusinessEventBridge");
   const originalRecord = eventBridge.recordBusinessEvent;
@@ -199,12 +209,12 @@ test("orchestrator: onMessageReceived passes legacy org into scoped updateProspe
   const { onMessageReceived, clearAutonomousWorkflowStateForTests } = loadOrchestrator();
 
   try {
-    await onMessageReceived({ phone: PHONE, message: "hola" });
+    await onMessageReceived({ phone: PHONE, message: "hola", organizationId: ORG_A });
     assert.equal(updateCalls.length, 1);
     assert.equal(updateCalls[0].prospectId, CORE_ID);
     assert.equal(updateCalls[0].organizationId, ORG_A);
   } finally {
-    supabaseService.findProspect = originalFindProspect;
+    supabaseService.findProspectInOrganization = originalFindInOrg;
     bridge.findCoreProspectIdByPhone = originalFindCore;
     eventBridge.recordBusinessEvent = originalRecord;
     clearAutonomousWorkflowStateForTests();

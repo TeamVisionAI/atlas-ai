@@ -214,7 +214,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   await recruitingWorkflowHooks
     .onMessageReceived({
       phone: storagePhone,
-      message: body
+      message: body,
+      organizationId: organizationId || prospect?.organization_id || null
     })
     .catch((error) => {
       console.warn("[whatsappInboundPipeline] recruiting workflow hook failed:", error.message);

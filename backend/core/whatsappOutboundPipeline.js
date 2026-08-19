@@ -587,6 +587,7 @@ async function sendAndPersistWhatsAppMessage({
     await onMessageSent({
       phone: prospect?.phone || storagePhone,
       message: persistBody,
+      organizationId: resolvedOrgId,
       summary: intent === "FACEBOOK_LEAD_WELCOME" ? "Initial outreach" : "Message sent"
     }).catch((error) => {
       console.warn("[whatsappOutboundPipeline] recruiting workflow hook failed:", error.message);
