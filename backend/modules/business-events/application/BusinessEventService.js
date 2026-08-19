@@ -9,6 +9,17 @@ const { SupabaseBusinessEventRepository } = require("../infrastructure/persisten
 const { InProcessEventPublisher } = require("./InProcessEventPublisher");
 const { EventFactory } = require("./EventFactory");
 
+function assertTenantOrganizationId(organizationId) {
+  if (!organizationId) {
+    throw new BusinessEventDomainError(
+      "organizationId is required for tenant-scoped business event access.",
+      { statusCode: 400, publicCode: "TENANT_ORGANIZATION_REQUIRED" }
+    );
+  }
+
+  return organizationId;
+}
+
 function toApplicationError(error) {
   if (error instanceof BusinessEventDomainError || error.statusCode) {
     return error;
@@ -55,8 +66,9 @@ class BusinessEventService {
     }
   }
 
-  async getById(eventId) {
-    const event = await this.repository.findById(eventId);
+  async getById(eventId, organizationId) {
+    assertTenantOrganizationId(organizationId);
+    const event = await this.repository.findById(eventId, organizationId);
 
     if (!event) {
       throw new BusinessEventDomainError("Business event not found.", {
@@ -77,8 +89,9 @@ class BusinessEventService {
     };
   }
 
-  async listByProspect(prospectId, filters = {}) {
-    const result = await this.repository.findByProspect(prospectId, filters);
+  async listByProspect(prospectId, organizationId, filters = {}) {
+    assertTenantOrganizationId(organizationId);
+    const result = await this.repository.findByProspect(prospectId, organizationId, filters);
 
     return {
       items: result.items.map((event) => event.toJSON()),

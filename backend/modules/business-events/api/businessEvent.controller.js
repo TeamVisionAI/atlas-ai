@@ -37,7 +37,8 @@ function createBusinessEventController(service = new BusinessEventService()) {
 
     async getById(req, res) {
       try {
-        const event = await service.getById(req.params.id);
+        const organizationId = resolveTenantOrganizationId(req, req.query.organizationId);
+        const event = await service.getById(req.params.id, organizationId);
         return res.json({ event });
       } catch (error) {
         return handleError(res, error, "getById");
@@ -46,7 +47,8 @@ function createBusinessEventController(service = new BusinessEventService()) {
 
     async listByProspect(req, res) {
       try {
-        const result = await service.listByProspect(req.params.id, {
+        const organizationId = resolveTenantOrganizationId(req, req.query.organizationId);
+        const result = await service.listByProspect(req.params.id, organizationId, {
           eventType: req.query.eventType,
           from: req.query.from,
           to: req.query.to,
