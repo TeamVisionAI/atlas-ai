@@ -36,11 +36,13 @@ function createTimelineController(service = new TimelineService()) {
 
     async getProspectTimeline(req, res) {
       try {
+        const organizationId = resolveTenantOrganizationId(req, req.query.organizationId);
         const result = await service.getByProspect(req.params.id, {
           entryType: req.query.entryType,
           eventType: req.query.eventType,
           limit: req.query.limit,
-          offset: req.query.offset
+          offset: req.query.offset,
+          organizationId
         });
 
         return res.json(result);

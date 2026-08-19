@@ -4,6 +4,8 @@
 
 const express = require("express");
 const { requireAtlasUser } = require("../../../middleware/requireAtlasUser");
+const { organizationGuard } = require("../../../middleware/organizationGuard");
+const { requireProspectAccessById } = require("../../../middleware/requireProspectAccess");
 const { createTimelineController } = require("./timeline.controller");
 const { TimelineService } = require("../application/TimelineService");
 
@@ -25,5 +27,15 @@ function createProspectTimelineHandler(deps = {}) {
   return controller.getProspectTimeline.bind(controller);
 }
 
+function createProspectTimelineStack(deps = {}) {
+  return [
+    requireAtlasUser,
+    organizationGuard({ allowSuperAdminCrossOrg: true }),
+    requireProspectAccessById(),
+    createProspectTimelineHandler(deps)
+  ];
+}
+
 module.exports = createTimelineRoutes;
 module.exports.createProspectTimelineHandler = createProspectTimelineHandler;
+module.exports.createProspectTimelineStack = createProspectTimelineStack;

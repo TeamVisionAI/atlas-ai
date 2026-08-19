@@ -7,12 +7,11 @@ const {
   hasPermission
 } = require("../security/authorizationService");
 const { auditFromRequest } = require("../security/auditLogService");
+const prospectAccessService = require("../security/prospectAccessService");
 const {
-  loadLegacyProspectByPhone,
-  loadLegacyProspectById,
-  loadCoreProspectById
-} = require("../security/prospectAccessService");
-const { getTenantOrganizationId } = require("../services/tenantContextService");
+  getTenantOrganizationId,
+  resolveTenantOrganizationId
+} = require("../services/tenantContextService");
 const { PERMISSIONS } = require("../security/permissions");
 
 function requireLegacyProspectAccess(options = {}) {
@@ -30,7 +29,7 @@ function requireLegacyProspectAccess(options = {}) {
       }
 
       const organizationId = getTenantOrganizationId(req);
-      const prospect = await loadLegacyProspectByPhone(phone, organizationId);
+      const prospect = await prospectAccessService.loadLegacyProspectByPhone(phone, organizationId);
 
       if (!prospect) {
         return res.status(404).json({
@@ -91,7 +90,7 @@ function requireCoreProspectAccess(options = {}) {
       }
 
       const organizationId = getTenantOrganizationId(req);
-      const prospect = await loadCoreProspectById(prospectId, organizationId);
+      const prospect = await prospectAccessService.loadCoreProspectById(prospectId, organizationId);
 
       if (!prospect) {
         return res.status(404).json({
@@ -155,12 +154,12 @@ function requireProspectAccessById(options = {}) {
         });
       }
 
-      const organizationId = getTenantOrganizationId(req);
-      let prospect = await loadLegacyProspectById(prospectId, organizationId);
+      const organizationId = resolveTenantOrganizationId(req, req.query.organizationId);
+      let prospect = await prospectAccessService.loadLegacyProspectById(prospectId, organizationId);
       let source = "legacy";
 
       if (!prospect) {
-        prospect = await loadCoreProspectById(prospectId, organizationId);
+        prospect = await prospectAccessService.loadCoreProspectById(prospectId, organizationId);
         source = "core";
       }
 
@@ -180,7 +179,12 @@ function requireProspectAccessById(options = {}) {
         });
       }
 
-      if (!canAccessProspect(req.authContext, prospect)) {
+      const effectiveContext = {
+        ...req.authContext,
+        organizationId
+      };
+
+      if (!canAccessProspect(effectiveContext, prospect)) {
         return res.status(403).json({
           error: "FORBIDDEN",
           message: "You do not have access to this prospect."
