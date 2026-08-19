@@ -138,13 +138,13 @@ async function defaultListCoreByPhoneAnyOrganization(phone) {
  * @param {string} [organizationId]
  * @param {{ listInOrg?: Function, listAnyOrg?: Function }} [deps]
  */
-async function findCoreProspectIdByPhone(
-  phone,
-  organizationId = DEFAULT_ORGANIZATION_ID,
-  deps = {}
-) {
+async function findCoreProspectIdByPhone(phone, organizationId = null, deps = {}) {
+  if (!phone || !organizationId) {
+    return null;
+  }
+
   const storagePhone = normalizeStoragePhone(phone);
-  const resolvedOrganizationId = organizationId || DEFAULT_ORGANIZATION_ID;
+  const resolvedOrganizationId = organizationId;
 
   const cached = readCachedCoreProspectId(storagePhone, resolvedOrganizationId);
   if (cached) {

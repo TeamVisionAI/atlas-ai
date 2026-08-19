@@ -417,13 +417,18 @@ test("13. locateOrCreate is idempotent for existing phone (no second insert)", a
       };
 
       const originalFindNorm = quickCapture.findProspectByNormalizedPhone;
-      const originalFind = supabaseService.findProspect;
+      const originalFindNormalizedInOrg = supabaseService.findProspectByNormalizedPhoneInOrganization;
+      const originalFindInOrg = supabaseService.findProspectInOrganization;
       const originalUpdate = supabaseService.updateProspectInOrganization;
       const originalHook = hooks.onLegacyProspectCreated;
       const originalResolve = orgResolver.resolveWhatsAppInboundOrganizationId;
 
-      quickCapture.findProspectByNormalizedPhone = async () => existing;
-      supabaseService.findProspect = async () => existing;
+      quickCapture.findProspectByNormalizedPhone = async (_phone, organizationId) =>
+        organizationId === ORG_A ? existing : null;
+      supabaseService.findProspectByNormalizedPhoneInOrganization = async (_phone, organizationId) =>
+        organizationId === ORG_A ? existing : null;
+      supabaseService.findProspectInOrganization = async (_phone, organizationId) =>
+        organizationId === ORG_A ? existing : null;
       supabaseService.updateProspectInOrganization = async (_phone, organizationId, updates) => ({
         ...existing,
         organization_id: organizationId,
@@ -460,7 +465,8 @@ test("13. locateOrCreate is idempotent for existing phone (no second insert)", a
         assert.equal(result.prospect.prospect_number, "TV-EXIST");
       } finally {
         quickCapture.findProspectByNormalizedPhone = originalFindNorm;
-        supabaseService.findProspect = originalFind;
+        supabaseService.findProspectByNormalizedPhoneInOrganization = originalFindNormalizedInOrg;
+        supabaseService.findProspectInOrganization = originalFindInOrg;
         supabaseService.updateProspectInOrganization = originalUpdate;
         hooks.onLegacyProspectCreated = originalHook;
         orgResolver.resolveWhatsAppInboundOrganizationId = originalResolve;
