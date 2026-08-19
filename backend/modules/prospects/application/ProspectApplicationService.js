@@ -5,7 +5,6 @@
 
 const { Prospect } = require("../domain/Prospect");
 const { ProspectDomainError } = require("../domain/errors/ProspectDomainError");
-const { DEFAULT_ORGANIZATION_ID } = require("../domain/constants");
 const { ProspectRepository } = require("../infrastructure/persistence/SupabaseProspectRepository");
 const { validateCreateProspectInput } = require("./validators/createProspect");
 const { validateUpdateProspectInput } = require("./validators/updateProspect");
@@ -21,6 +20,22 @@ function actorFromRequest(user) {
   }
 
   return "SYSTEM";
+}
+
+function assertOrganizationId(organizationId) {
+  if (!organizationId) {
+    throw new ProspectDomainError("Organization context is required.", {
+      statusCode: 400,
+      publicCode: "ORGANIZATION_REQUIRED"
+    });
+  }
+}
+
+function prospectNotFoundError() {
+  return new ProspectDomainError("Prospect not found.", {
+    statusCode: 404,
+    publicCode: "PROSPECT_NOT_FOUND"
+  });
 }
 
 function toApplicationError(error) {
@@ -82,14 +97,16 @@ class ProspectApplicationService {
       channel: "api",
       payload,
       version: "1.0",
-      organizationId: json.organizationId || DEFAULT_ORGANIZATION_ID,
+      organizationId: json.organizationId,
       lifecycleStateAtEvent: json.status?.lifecycleState,
       summary: payload.summary || eventType
     });
   }
 
-  async createProspect(input, actor = "SYSTEM") {
+  async createProspect(organizationId, input, actor = "SYSTEM") {
     try {
+      assertOrganizationId(organizationId);
+
       const validated = validateCreateProspectInput(input);
 
       if (validated.email) {
@@ -114,8 +131,8 @@ class ProspectApplicationService {
         }
       }
 
-      const aggregate = Prospect.create(validated);
-      const saved = await this.repository.create(aggregate);
+      const aggregate = Prospect.create({ ...validated, organizationId });
+      const saved = await this.repository.create(aggregate, organizationId);
 
       await this.emitBusinessEvent(LEAD_EVENTS.PROSPECT_CREATED, saved, actor, {
         leadSource: saved.toJSON().leadSource,
@@ -128,26 +145,34 @@ class ProspectApplicationService {
     }
   }
 
-  async getProspect(prospectId) {
-    const prospect = await this.repository.findById(prospectId);
+  async getProspect(prospectId, organizationId) {
+    assertOrganizationId(organizationId);
+
+    const prospect = await this.repository.findById(prospectId, organizationId);
 
     if (!prospect) {
-      throw new ProspectDomainError("Prospect not found.", {
-        statusCode: 404,
-        publicCode: "PROSPECT_NOT_FOUND"
-      });
+      throw prospectNotFoundError();
     }
 
     return this._present(prospect);
   }
 
   async listProspects(query = {}) {
+    if (!query.organizationId) {
+      throw new ProspectDomainError("organizationId is required for prospect search.", {
+        statusCode: 400,
+        publicCode: "ORGANIZATION_REQUIRED"
+      });
+    }
+
     const result = await this.repository.search({
       q: query.q,
       lifecycleState: query.lifecycleState,
       limit: query.limit,
       offset: query.offset,
-      organizationId: query.organizationId
+      organizationId: query.organizationId,
+      ownerUserId: query.ownerUserId,
+      divisionId: query.divisionId
     });
 
     return {
@@ -156,15 +181,14 @@ class ProspectApplicationService {
     };
   }
 
-  async updateProspect(prospectId, input, actor = "SYSTEM") {
+  async updateProspect(prospectId, organizationId, input, actor = "SYSTEM") {
     try {
-      const existing = await this.repository.findById(prospectId);
+      assertOrganizationId(organizationId);
+
+      const existing = await this.repository.findById(prospectId, organizationId);
 
       if (!existing) {
-        throw new ProspectDomainError("Prospect not found.", {
-          statusCode: 404,
-          publicCode: "PROSPECT_NOT_FOUND"
-        });
+        throw prospectNotFoundError();
       }
 
       const patch = validateUpdateProspectInput(input);
@@ -193,13 +217,10 @@ class ProspectApplicationService {
       }
 
       const changedFields = existing.applyUpdate(patch);
-      const saved = await this.repository.save(existing);
+      const saved = await this.repository.save(existing, organizationId);
 
       if (!saved) {
-        throw new ProspectDomainError("Prospect not found.", {
-          statusCode: 404,
-          publicCode: "PROSPECT_NOT_FOUND"
-        });
+        throw prospectNotFoundError();
       }
 
       await this.emitBusinessEvent(LEAD_EVENTS.PROSPECT_UPDATED, saved, actor, { changedFields });
@@ -210,22 +231,21 @@ class ProspectApplicationService {
     }
   }
 
-  async archiveProspect(prospectId, actor = "SYSTEM") {
+  async archiveProspect(prospectId, organizationId, actor = "SYSTEM") {
     try {
-      const existing = await this.repository.findById(prospectId);
+      assertOrganizationId(organizationId);
+
+      const existing = await this.repository.findById(prospectId, organizationId);
 
       if (!existing) {
-        throw new ProspectDomainError("Prospect not found.", {
-          statusCode: 404,
-          publicCode: "PROSPECT_NOT_FOUND"
-        });
+        throw prospectNotFoundError();
       }
 
       if (!existing.archive()) {
         return this._present(existing);
       }
 
-      const saved = await this.repository.save(existing);
+      const saved = await this.repository.save(existing, organizationId);
       await this.emitBusinessEvent(LEAD_EVENTS.PROSPECT_ARCHIVED, saved, actor, {
         archivedBy: actor
       });
@@ -236,19 +256,18 @@ class ProspectApplicationService {
     }
   }
 
-  async restoreProspect(prospectId, actor = "SYSTEM") {
+  async restoreProspect(prospectId, organizationId, actor = "SYSTEM") {
     try {
-      const existing = await this.repository.findById(prospectId);
+      assertOrganizationId(organizationId);
+
+      const existing = await this.repository.findById(prospectId, organizationId);
 
       if (!existing) {
-        throw new ProspectDomainError("Prospect not found.", {
-          statusCode: 404,
-          publicCode: "PROSPECT_NOT_FOUND"
-        });
+        throw prospectNotFoundError();
       }
 
       existing.restore();
-      const saved = await this.repository.save(existing);
+      const saved = await this.repository.save(existing, organizationId);
 
       await this.emitBusinessEvent(LEAD_EVENTS.PROSPECT_RESTORED, saved, actor, {
         restoredBy: actor
@@ -260,15 +279,14 @@ class ProspectApplicationService {
     }
   }
 
-  async assignProspect(prospectId, assignment, actor = "SYSTEM") {
+  async assignProspect(prospectId, organizationId, assignment, actor = "SYSTEM") {
     try {
-      const existing = await this.repository.findById(prospectId);
+      assertOrganizationId(organizationId);
+
+      const existing = await this.repository.findById(prospectId, organizationId);
 
       if (!existing) {
-        throw new ProspectDomainError("Prospect not found.", {
-          statusCode: 404,
-          publicCode: "PROSPECT_NOT_FOUND"
-        });
+        throw prospectNotFoundError();
       }
 
       existing.assign(assignment, actor);
@@ -283,7 +301,7 @@ class ProspectApplicationService {
         JSON.stringify(assignment, null, 2)
       );
 
-      const saved = await this.repository.save(existing);
+      const saved = await this.repository.save(existing, organizationId);
 
       if (!saved) {
         throw new ProspectDomainError("Prospect could not be saved after assignment.", {
@@ -303,8 +321,10 @@ class ProspectApplicationService {
     }
   }
 
-  async mergeProspects({ survivorId, mergedId }, actor = "SYSTEM") {
+  async mergeProspects(organizationId, { survivorId, mergedId }, actor = "SYSTEM") {
     try {
+      assertOrganizationId(organizationId);
+
       if (!survivorId || !mergedId) {
         throw new ProspectDomainError("survivorId and mergedId are required.", {
           publicCode: "VALIDATION_ERROR"
@@ -317,18 +337,15 @@ class ProspectApplicationService {
         });
       }
 
-      const survivor = await this.repository.findById(survivorId);
-      const merged = await this.repository.findById(mergedId);
+      const survivor = await this.repository.findById(survivorId, organizationId);
+      const merged = await this.repository.findById(mergedId, organizationId);
 
       if (!survivor || !merged) {
-        throw new ProspectDomainError("Prospect not found.", {
-          statusCode: 404,
-          publicCode: "PROSPECT_NOT_FOUND"
-        });
+        throw prospectNotFoundError();
       }
 
       merged.markMergedInto(survivorId);
-      const mergedRecord = await this.repository.save(merged);
+      const mergedRecord = await this.repository.save(merged, organizationId);
 
       await this.emitBusinessEvent(LEAD_EVENTS.PROSPECT_MERGED, survivor, actor, {
         survivorId,

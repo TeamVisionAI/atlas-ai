@@ -101,16 +101,17 @@ async function countLegacyProspectsSharingPhone({
   return matched;
 }
 
-async function loadCoreProspectById(prospectId, organizationId = null) {
+async function loadCoreProspectById(prospectId, organizationId) {
+  if (!prospectId || !organizationId) {
+    return null;
+  }
+
   let query = supabase
     .from(TABLE_NAME)
     .select("*")
     .eq("id", prospectId)
+    .eq("organization_id", organizationId)
     .is("deleted_at", null);
-
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
-  }
 
   const { data, error } = await query.maybeSingle();
 

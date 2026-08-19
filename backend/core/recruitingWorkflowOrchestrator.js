@@ -37,13 +37,13 @@ function buildWelcomeMessage({ displayName, language = "es" }) {
   return `Hola${name ? ` ${name}` : ""}! Soy Atlas de Team Vision. Recibí tu interés y puedo ayudarte a agendar tu entrevista en pocos mensajes. ¿En qué ciudad te encuentras?`;
 }
 
-async function advanceLifecycleTo(prospectId, targetState, actor = "ATLAS") {
-  if (!prospectId || !isRecruitingWorkflowReady()) {
+async function advanceLifecycleTo(prospectId, targetState, actor = "ATLAS", organizationId = null) {
+  if (!prospectId || !organizationId || !isRecruitingWorkflowReady()) {
     return null;
   }
 
   const { prospectService, prospectRepository } = getRecruitingWorkflowDeps();
-  const aggregate = await prospectRepository.findById(prospectId);
+  const aggregate = await prospectRepository.findById(prospectId, organizationId);
 
   if (!aggregate) {
     return null;
@@ -70,7 +70,7 @@ async function advanceLifecycleTo(prospectId, targetState, actor = "ATLAS") {
       return aggregate;
     }
 
-    return updateCoreLifecycle(prospectId, targetState, actor);
+    return updateCoreLifecycle(prospectId, targetState, actor, organizationId);
   }
 
   let latest = aggregate;
@@ -78,6 +78,7 @@ async function advanceLifecycleTo(prospectId, targetState, actor = "ATLAS") {
   for (let index = startIndex + 1; index <= targetIndex; index += 1) {
     latest = await prospectService.updateProspect(
       prospectId,
+      organizationId,
       { lifecycleState: sequence[index] },
       actor
     );
@@ -86,8 +87,8 @@ async function advanceLifecycleTo(prospectId, targetState, actor = "ATLAS") {
   return latest;
 }
 
-async function updateCoreLifecycle(prospectId, lifecycleState, actor = "ATLAS") {
-  if (!prospectId || !isRecruitingWorkflowReady()) {
+async function updateCoreLifecycle(prospectId, lifecycleState, actor = "ATLAS", organizationId = null) {
+  if (!prospectId || !organizationId || !isRecruitingWorkflowReady()) {
     return null;
   }
 
@@ -96,6 +97,7 @@ async function updateCoreLifecycle(prospectId, lifecycleState, actor = "ATLAS") 
   try {
     return await prospectService.updateProspect(
       prospectId,
+      organizationId,
       { lifecycleState },
       actor
     );
@@ -148,7 +150,7 @@ async function processFacebookLead(input = {}) {
   });
 
   // Do not claim MESSAGE_SENT when the outbound gate blocked or provider failed.
-  if (bridge.prospectId && outbound?.success) {
+  if (bridge.prospectId && bridge.organizationId && outbound?.success) {
     await recordBusinessEvent({
       phone,
       prospectId: bridge.prospectId,
@@ -166,7 +168,12 @@ async function processFacebookLead(input = {}) {
       correlationId: input.leadgenId ? `facebook-lead:${input.leadgenId}` : null
     });
 
-    await updateCoreLifecycle(bridge.prospectId, LIFECYCLE_STATES.CONTACT_ATTEMPTED);
+    await updateCoreLifecycle(
+      bridge.prospectId,
+      LIFECYCLE_STATES.CONTACT_ATTEMPTED,
+      "ATLAS",
+      bridge.organizationId
+    );
   }
 
   return {
@@ -201,6 +208,7 @@ async function onLegacyProspectCreated({
 
 async function onMessageReceived({ phone, message, prospectId = null }) {
   const legacyProspect = await findProspect(phone);
+  const organizationId = legacyProspect?.organization_id || legacyProspect?.organizationId || null;
   const assessment = assessQualificationFromProspect(legacyProspect);
   const resolvedProspectId = prospectId || (await findCoreProspectIdByPhone(phone));
 
@@ -220,8 +228,13 @@ async function onMessageReceived({ phone, message, prospectId = null }) {
     }
   });
 
-  if (resolvedProspectId) {
-    await updateCoreLifecycle(resolvedProspectId, LIFECYCLE_STATES.CONVERSATION_STARTED);
+  if (resolvedProspectId && organizationId) {
+    await updateCoreLifecycle(
+      resolvedProspectId,
+      LIFECYCLE_STATES.CONVERSATION_STARTED,
+      "ATLAS",
+      organizationId
+    );
   }
 
   return handleQualificationProgress({ phone, legacyProspect, assessment, resolvedProspectId });
@@ -258,12 +271,13 @@ async function handleQualificationProgress({
   resolvedProspectId
 }) {
   const storagePhone = normalizeStoragePhone(phone);
+  const organizationId = legacyProspect?.organization_id || legacyProspect?.organizationId || null;
   const previous = qualificationStateByPhone.get(storagePhone) || {
     isQualified: false,
     isInterviewScheduled: false
   };
 
-  if (resolvedProspectId && assessment.isQualified && !previous.isQualified) {
+  if (resolvedProspectId && organizationId && assessment.isQualified && !previous.isQualified) {
     await recordBusinessEvent({
       phone,
       prospectId: resolvedProspectId,
@@ -279,7 +293,12 @@ async function handleQualificationProgress({
       }
     });
 
-    await updateCoreLifecycle(resolvedProspectId, LIFECYCLE_STATES.QUALIFIED);
+    await updateCoreLifecycle(
+      resolvedProspectId,
+      LIFECYCLE_STATES.QUALIFIED,
+      "ATLAS",
+      organizationId
+    );
   }
 
   qualificationStateByPhone.set(storagePhone, {
@@ -345,9 +364,10 @@ async function onInterviewScheduled({
   profile,
   calendarEvent
 }) {
+  const organizationId = prospect?.organization_id || prospect?.organizationId || null;
   const resolvedProspectId = await findCoreProspectIdByPhone(phone);
 
-  if (!resolvedProspectId) {
+  if (!resolvedProspectId || !organizationId) {
     return null;
   }
 
@@ -367,7 +387,12 @@ async function onInterviewScheduled({
     }
   });
 
-  await advanceLifecycleTo(resolvedProspectId, LIFECYCLE_STATES.INTERVIEW_SCHEDULED);
+  await advanceLifecycleTo(
+    resolvedProspectId,
+    LIFECYCLE_STATES.INTERVIEW_SCHEDULED,
+    "ATLAS",
+    organizationId
+  );
 
   const assessment = assessQualificationFromProspect(prospect);
   qualificationStateByPhone.set(normalizeStoragePhone(phone), {

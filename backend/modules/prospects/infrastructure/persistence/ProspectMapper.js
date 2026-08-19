@@ -107,6 +107,7 @@ function toUpdateRow(prospect) {
   const row = toInsertRow(prospect);
   delete row.id;
   delete row.created_at;
+  delete row.organization_id;
   return row;
 }
 

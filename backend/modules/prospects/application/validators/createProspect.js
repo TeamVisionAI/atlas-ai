@@ -36,7 +36,6 @@ function validateCreateProspectInput(input = {}) {
 
   return {
     prospectId: input.prospectId || crypto.randomUUID(),
-    organizationId: input.organizationId,
     displayName: displayName ? String(displayName).trim() : null,
     legalName: input.legalName ?? input.identity?.legalName ?? null,
     primaryPhone: primaryPhone ? String(primaryPhone).trim() : null,
