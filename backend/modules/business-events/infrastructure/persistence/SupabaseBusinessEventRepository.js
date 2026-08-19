@@ -6,6 +6,27 @@ const { supabase } = require("../../../../services/supabaseService");
 const { TABLE_NAME, fromRow, toInsertRow } = require("./BusinessEventMapper");
 const { InMemoryBusinessEventStore } = require("./InMemoryBusinessEventRepository");
 const { forbidProductionInMemoryFallback } = require("../../../../core/productionReadinessValidator");
+const { BusinessEventDomainError } = require("../../domain/errors/BusinessEventDomainError");
+
+function assertTenantOrganizationId(organizationId) {
+  if (!organizationId) {
+    throw new BusinessEventDomainError(
+      "organizationId is required for tenant-scoped business event access.",
+      { statusCode: 400, publicCode: "TENANT_ORGANIZATION_REQUIRED" }
+    );
+  }
+
+  return organizationId;
+}
+
+function assertProspectScopedFilters(filters = {}) {
+  if (filters.prospectId && !filters.organizationId) {
+    throw new BusinessEventDomainError(
+      "organizationId is required when querying business events by prospectId.",
+      { statusCode: 400, publicCode: "TENANT_ORGANIZATION_REQUIRED" }
+    );
+  }
+}
 
 function activateMemoryFallback(repository) {
   forbidProductionInMemoryFallback("SupabaseBusinessEventRepository");
@@ -55,21 +76,29 @@ class SupabaseBusinessEventRepository {
     return fromRow(data);
   }
 
-  async findById(id) {
+  async findById(id, organizationId) {
+    assertTenantOrganizationId(organizationId);
+
     if (this.useMemory) {
-      return this.memory.findById(id);
+      const row = this.memory.rows.find(
+        (entry) =>
+          entry.id === id &&
+          String(entry.organization_id) === String(organizationId)
+      );
+      return row ? fromRow(row) : null;
     }
 
     const { data, error } = await supabase
       .from(TABLE_NAME)
       .select("*")
       .eq("id", id)
+      .eq("organization_id", organizationId)
       .maybeSingle();
 
     if (error) {
       if (isMissingEventTable(error)) {
         activateMemoryFallback(this);
-        return this.findById(id);
+        return this.findById(id, organizationId);
       }
 
       throw error;
@@ -78,8 +107,9 @@ class SupabaseBusinessEventRepository {
     return fromRow(data);
   }
 
-  async findByProspect(prospectId, filters = {}) {
-    return this.search({ ...filters, prospectId });
+  async findByProspect(prospectId, organizationId, filters = {}) {
+    assertTenantOrganizationId(organizationId);
+    return this.search({ ...filters, prospectId, organizationId });
   }
 
   async findByType(eventType, filters = {}) {
@@ -95,6 +125,7 @@ class SupabaseBusinessEventRepository {
   }
 
   async search(filters = {}) {
+    assertProspectScopedFilters(filters);
     const limit = Math.min(Number(filters.limit) || 50, 100);
     const offset = Math.max(Number(filters.offset) || 0, 0);
 

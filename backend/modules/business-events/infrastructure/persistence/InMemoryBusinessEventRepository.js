@@ -3,6 +3,16 @@
  */
 
 const { fromRow, toInsertRow } = require("./BusinessEventMapper");
+const { BusinessEventDomainError } = require("../../domain/errors/BusinessEventDomainError");
+
+function assertProspectScopedFilters(filters = {}) {
+  if (filters.prospectId && !filters.organizationId) {
+    throw new BusinessEventDomainError(
+      "organizationId is required when querying business events by prospectId.",
+      { statusCode: 400, publicCode: "TENANT_ORGANIZATION_REQUIRED" }
+    );
+  }
+}
 
 class InMemoryBusinessEventStore {
   constructor() {
@@ -25,6 +35,7 @@ class InMemoryBusinessEventStore {
   }
 
   search(filters = {}) {
+    assertProspectScopedFilters(filters);
     let results = [...this.rows];
 
     if (filters.prospectId) {
