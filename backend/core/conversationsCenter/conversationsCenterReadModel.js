@@ -14,6 +14,10 @@ const {
 const { resolveConversationOwnershipState } = require("./conversationsCenterOwnershipService");
 const { isProspectInNiovelPilotScope } = require("./conversationsCenterAccess");
 const {
+  isRecruitingConversationEligibleForInbox,
+  resolveRecruitingInboxEligibility
+} = require("./conversationsCenterInboxEligibility");
+const {
   INBOX_LIFECYCLE,
   resolveInboxLifecycle,
   isActiveInboxLifecycle,
@@ -342,7 +346,15 @@ async function buildConversationsCenterReadModel(options = {}) {
   const prospects =
     options.prospects ?? (await loadProductionProspectsSafe(options.organizationId));
 
-  const scoped = prospects.filter(isProspectInNiovelPilotScope);
+  const pilotScoped = prospects.filter(isProspectInNiovelPilotScope);
+  const scoped = (
+    await Promise.all(
+      pilotScoped.map(async (prospect) => {
+        const eligibility = await resolveRecruitingInboxEligibility(prospect);
+        return eligibility.eligible ? prospect : null;
+      })
+    )
+  ).filter(Boolean);
   const logsByPhone = await resolveConversationLogsByPhone(
     scoped.map((row) => row.phone).filter(Boolean),
     options.organizationId,
@@ -403,5 +415,7 @@ module.exports = {
   extractConversationGoal,
   extractSource,
   fetchConversationLogsByPhones,
-  logsForPhone
+  logsForPhone,
+  isRecruitingConversationEligibleForInbox,
+  resolveRecruitingInboxEligibility
 };

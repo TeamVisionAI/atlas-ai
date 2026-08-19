@@ -13,29 +13,52 @@ const TEAM_VISION = "00000000-0000-4000-8000-000000000001";
 const NIOVEL = "33ad243a-9d00-4a4d-810b-df2762c0f076";
 const OTHER_USER = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
+const { recruitingProspectFixture, seedRecruitingWorkflowState } = require("./helpers/conversationsCenterRecruitingFixture");
 
-const STATE_FILE = path.join(__dirname, "../data/workflowState.json");
+const os = require("node:os");
+
+function clearWorkflowModules() {
+  for (const key of Object.keys(require.cache)) {
+    if (
+      key.includes(`${path.sep}workflowStateStore.js`) ||
+      key.includes(`${path.sep}conversationsCenterReadModel.js`) ||
+      key.includes(`${path.sep}conversationsCenterOwnershipService.js`)
+    ) {
+      delete require.cache[key];
+    }
+  }
+}
 
 async function withTempWorkflowState(run) {
-  const previous = fs.existsSync(STATE_FILE)
-    ? fs.readFileSync(STATE_FILE, "utf8")
-    : null;
-
-  const dir = path.dirname(STATE_FILE);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(STATE_FILE, "{}");
+  const previousFile = process.env.ATLAS_WORKFLOW_STATE_FILE;
+  const previousBackend = process.env.ATLAS_WORKFLOW_STATE_BACKEND;
+  const tempFile = path.join(
+    os.tmpdir(),
+    `atlas-cc-handoff-${process.pid}-${Date.now()}.json`
+  );
+  fs.writeFileSync(tempFile, "{}");
+  process.env.ATLAS_WORKFLOW_STATE_FILE = tempFile;
+  process.env.ATLAS_WORKFLOW_STATE_BACKEND = "file";
+  clearWorkflowModules();
 
   try {
     return await run();
   } finally {
-    if (previous == null) {
-      try {
-        fs.unlinkSync(STATE_FILE);
-      } catch {
-        /* ignore */
-      }
+    if (previousFile === undefined) {
+      delete process.env.ATLAS_WORKFLOW_STATE_FILE;
     } else {
-      fs.writeFileSync(STATE_FILE, previous);
+      process.env.ATLAS_WORKFLOW_STATE_FILE = previousFile;
+    }
+    if (previousBackend === undefined) {
+      delete process.env.ATLAS_WORKFLOW_STATE_BACKEND;
+    } else {
+      process.env.ATLAS_WORKFLOW_STATE_BACKEND = previousBackend;
+    }
+    clearWorkflowModules();
+    try {
+      fs.unlinkSync(tempFile);
+    } catch {
+      /* ignore */
     }
   }
 }
@@ -91,32 +114,39 @@ test("list shows newest activity first; NEEDS_ATTENTION is not messaging unread"
     const {
       buildConversationsCenterReadModel
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
+    const { savePersistedWorkflowState } = require("../core/workflowStateStore");
 
-    await markConversationNeedsAttention("+17865550111", "ambiguity");
+    await savePersistedWorkflowState(
+      "+17865550111",
+      {
+        atlasEligibilitySource: "QR",
+        needsHumanAttention: true,
+        workflowOwnership: "AGENT",
+        manualAgentOwnership: true,
+        handoffReason: "ambiguity",
+        handoffAt: new Date().toISOString()
+      },
+      { organizationId: TEAM_VISION, prospectId: "p-new" }
+    );
 
     const model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
       prospects: [
-        {
+        recruitingProspectFixture({
           id: "p-old",
           phone: "+17865550110",
           name: "Old",
-          organization_id: TEAM_VISION,
-          owner_user_id: NIOVEL,
           last_message: "hola ayer",
-          updated_at: "2026-08-01T10:00:00.000Z",
-          source: "facebook_ad"
-        },
-        {
+          updated_at: "2026-08-01T10:00:00.000Z"
+        }),
+        recruitingProspectFixture({
           id: "p-new",
           phone: "+17865550111",
           name: "New",
-          organization_id: TEAM_VISION,
-          owner_user_id: NIOVEL,
           last_message: "necesito hablar con alguien",
           updated_at: "2026-08-03T15:00:00.000Z",
           lead_source: { conversationGoal: "interview", source: "facebook_ad" }
-        }
+        })
       ]
     });
 
@@ -138,15 +168,13 @@ test("subsequent message updates visibility on existing conversation", async () 
       buildConversationsCenterReadModel
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
-    const base = {
+    const base = recruitingProspectFixture({
       id: "p1",
       phone: "+17865550120",
       name: "Ana",
-      organization_id: TEAM_VISION,
-      owner_user_id: NIOVEL,
       last_message: "first",
       updated_at: "2026-08-03T10:00:00.000Z"
-    };
+    });
 
     let model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
@@ -181,9 +209,20 @@ test("take over stops Atlas ownership; inbound does not allow automated reply", 
     const { OWNERSHIP } = require("../core/workflowConstants");
 
     const phone = "+17865550130";
-    const prospect = { phone, current_step: "QUALIFICATION" };
-
-    await markConversationNeedsAttention(phone, "explicit_human_request");
+    const prospect = recruitingProspectFixture({
+      phone,
+      current_step: "QUALIFICATION"
+    });
+    const { savePersistedWorkflowState } = require("../core/workflowStateStore");
+    await savePersistedWorkflowState(
+      phone,
+      { atlasEligibilitySource: "QR" },
+      { organizationId: TEAM_VISION, prospectId: prospect.id }
+    );
+    await markConversationNeedsAttention(phone, "explicit_human_request", {}, {
+      organizationId: TEAM_VISION,
+      prospectId: prospect.id
+    });
     assert.equal(
       resolveConversationOwnershipState(await loadPersistedWorkflowState(phone)),
       "NEEDS_ATTENTION"
@@ -244,37 +283,47 @@ test("filters isolate NEEDS_ATTENTION / ATLAS / HUMAN", async () => {
       buildConversationsCenterReadModel
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
 
-    await markConversationNeedsAttention("+17865550151", "escalation");
-    await takeOverConversation("+17865550152");
+    await seedRecruitingWorkflowState("+17865550151", {}, {
+      organizationId: TEAM_VISION,
+      prospectId: "b"
+    });
+    await seedRecruitingWorkflowState("+17865550152", {}, {
+      organizationId: TEAM_VISION,
+      prospectId: "c"
+    });
+    await markConversationNeedsAttention("+17865550151", "escalation", {}, {
+      organizationId: TEAM_VISION,
+      prospectId: "b"
+    });
+    await takeOverConversation("+17865550152", {
+      organizationId: TEAM_VISION,
+      prospectId: "c"
+    });
 
     const prospects = [
-      {
+      recruitingProspectFixture({
         id: "a",
         phone: "+17865550150",
-        organization_id: TEAM_VISION,
-        owner_user_id: NIOVEL,
         updated_at: "2026-08-03T09:00:00.000Z"
-      },
-      {
+      }),
+      recruitingProspectFixture({
         id: "b",
         phone: "+17865550151",
-        organization_id: TEAM_VISION,
-        owner_user_id: NIOVEL,
         updated_at: "2026-08-03T10:00:00.000Z"
-      },
-      {
+      }),
+      recruitingProspectFixture({
         id: "c",
         phone: "+17865550152",
-        organization_id: TEAM_VISION,
-        owner_user_id: NIOVEL,
         updated_at: "2026-08-03T11:00:00.000Z"
-      },
+      }),
       {
         id: "out",
         phone: "+17865550999",
         organization_id: TEAM_VISION,
         owner_user_id: OTHER_USER,
-        updated_at: "2026-08-03T12:00:00.000Z"
+        updated_at: "2026-08-03T12:00:00.000Z",
+        source: "UNKNOWN",
+        entry_method: "UNATTRIBUTED"
       }
     ];
 

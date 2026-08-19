@@ -299,7 +299,10 @@ test("24-27. escalation 5m/15m idempotent levels; acknowledged/closed stop", () 
     attention_status: "new",
     new_lead_received_at: new Date(now - ESCALATION_UNASSIGNED_MS - 1000).toISOString(),
     escalation_level: 0,
-    current_step: "GREETING"
+    current_step: "GREETING",
+    entry_method: "QR",
+    source: "car_magnet",
+    workflow_state: { atlasEligibilitySource: "QR" }
   };
 
   const level1 = evaluateEscalation(unassigned, now);
