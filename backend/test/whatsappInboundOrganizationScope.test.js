@@ -418,13 +418,17 @@ test("13. locateOrCreate is idempotent for existing phone (no second insert)", a
 
       const originalFindNorm = quickCapture.findProspectByNormalizedPhone;
       const originalFind = supabaseService.findProspect;
-      const originalUpdate = supabaseService.updateProspect;
+      const originalUpdate = supabaseService.updateProspectInOrganization;
       const originalHook = hooks.onLegacyProspectCreated;
       const originalResolve = orgResolver.resolveWhatsAppInboundOrganizationId;
 
       quickCapture.findProspectByNormalizedPhone = async () => existing;
       supabaseService.findProspect = async () => existing;
-      supabaseService.updateProspect = async (_phone, updates) => ({ ...existing, ...updates });
+      supabaseService.updateProspectInOrganization = async (_phone, organizationId, updates) => ({
+        ...existing,
+        organization_id: organizationId,
+        ...updates
+      });
       hooks.onLegacyProspectCreated = async () => null;
       orgResolver.resolveWhatsAppInboundOrganizationId = async () => ({
         organizationId: ORG_A,
@@ -457,7 +461,7 @@ test("13. locateOrCreate is idempotent for existing phone (no second insert)", a
       } finally {
         quickCapture.findProspectByNormalizedPhone = originalFindNorm;
         supabaseService.findProspect = originalFind;
-        supabaseService.updateProspect = originalUpdate;
+        supabaseService.updateProspectInOrganization = originalUpdate;
         hooks.onLegacyProspectCreated = originalHook;
         orgResolver.resolveWhatsAppInboundOrganizationId = originalResolve;
         resolver.setQrAttributionServiceForTests(null);

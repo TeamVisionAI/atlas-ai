@@ -2,6 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { assertProductionPlatformConfig } = require("../core/platformProductionGuard");
 const { formatPhoneForStorage } = require("../core/phoneNormalizer");
+const { requireTenantOrganizationId } = require("../core/tenantProspectLookup");
 
 assertProductionPlatformConfig();
 
@@ -117,17 +118,43 @@ async function createProspect(phone, name, lastMessage) {
 }
 
 async function updateProspect(phone, updates) {
-    const { data, error } = await supabase
-      .from("prospects")
-      .update(updates)
-      .eq("phone", phone)
-      .select()
-      .single();
-  
-    if (error) throw error;
-  
-    return data;
+  const { data, error } = await supabase
+    .from("prospects")
+    .update(updates)
+    .eq("phone", phone)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
+
+/**
+ * Tenant-scoped legacy prospect update. Requires organizationId — no global fallback.
+ * @returns {Promise<object|null>} Updated row, or null when no row matches phone+org.
+ */
+async function updateProspectInOrganization(phone, organizationId, updates) {
+  const scopedOrganizationId = requireTenantOrganizationId(organizationId);
+
+  if (!phone) {
+    return null;
   }
+
+  const { data, error } = await supabase
+    .from("prospects")
+    .update(updates)
+    .eq("phone", phone)
+    .eq("organization_id", scopedOrganizationId)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data || null;
+}
 
 async function findLatestActiveProspectInOrganization(organizationId) {
   let query = supabase.from("prospects").select("*").neq("current_step", "CONFIRMED");
@@ -222,5 +249,6 @@ module.exports = {
   findLatestActiveProspectInOrganization,
   createProspect,
   updateProspect,
+  updateProspectInOrganization,
   deleteProspect
 };

@@ -18,7 +18,10 @@ const {
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
 const appointmentReminderEngine = require("../services/appointmentReminderEngine");
 const meetingManagementService = require("../services/meetingManagementService");
-const { updateProspect, findProspectInOrganization } = require("../services/supabaseService");
+const {
+  updateProspectInOrganization,
+  findProspectInOrganization
+} = require("../services/supabaseService");
 const { logConversation } = require("../services/logService");
 const { recordBusinessEvent } = require("../core/recruitingBusinessEventBridge");
 const {
@@ -223,7 +226,7 @@ async function emitAppointmentEvent(phone, eventType, payload = {}, summary) {
   }).catch(() => {});
 }
 
-async function syncProspectContact(phone, contact = {}) {
+async function syncProspectContact(phone, contact = {}, organizationId) {
   const patch = {};
 
   if (contact.firstName) {
@@ -250,8 +253,8 @@ async function syncProspectContact(phone, contact = {}) {
     }
   }
 
-  if (Object.keys(patch).length) {
-    await updateProspect(phone, patch).catch(() => {});
+  if (Object.keys(patch).length && organizationId) {
+    await updateProspectInOrganization(phone, organizationId, patch).catch(() => {});
   }
 
   return patch;
@@ -389,7 +392,7 @@ async function createAppointment(input, context = {}) {
 
   const prospectId = identity.coreProspectId;
 
-  await syncProspectContact(prospectPhone, contact);
+  await syncProspectContact(prospectPhone, contact, organizationId);
 
   const isVirtual = meeting.meetingType === MEETING_TYPES.VIRTUAL;
   const email = normalizeEmail(contact.email) || extractEmailFromProspectNotes(prospect.notes);
@@ -593,7 +596,7 @@ async function createAppointment(input, context = {}) {
   }
 
   if (!skipProspectUpdate) {
-    await updateProspect(prospectPhone, {
+    await updateProspectInOrganization(prospectPhone, organizationId, {
       calendar_event_id: bookingResult.googleCalendarEventId,
       appointment_date: bookingResult.startTimeISO,
       interview_time: bookingResult.startTimeISO,
@@ -788,11 +791,15 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
     reminderStatus: reminderResult.status
   });
 
-  await updateProspect(appointment.prospectPhone, {
-    appointment_date: matchedSlot.startTimeISO,
-    interview_time: matchedSlot.startTimeISO,
-    calendar_event_id: calendarSync.calendarEventId || null
-  }).catch(() => {});
+  await updateProspectInOrganization(
+    appointment.prospectPhone,
+    appointment.organizationId || organizationId,
+    {
+      appointment_date: matchedSlot.startTimeISO,
+      interview_time: matchedSlot.startTimeISO,
+      calendar_event_id: calendarSync.calendarEventId || null
+    }
+  ).catch(() => {});
 
   if (!input.skipWorkflowAdvance) {
     await advanceProspectWorkflow(appointment.prospectPhone, {
@@ -877,12 +884,16 @@ async function cancelAppointment(id, input, context = {}) {
     reminderStatus: REMINDER_STATUSES.CANCELLED
   });
 
-  await updateProspect(appointment.prospectPhone, {
-    interview_time: null,
-    appointment_date: null,
-    calendar_event_id: null,
-    current_step: "SCHEDULE"
-  }).catch((error) => {
+  await updateProspectInOrganization(
+    appointment.prospectPhone,
+    appointment.organizationId || organizationId,
+    {
+      interview_time: null,
+      appointment_date: null,
+      calendar_event_id: null,
+      current_step: "SCHEDULE"
+    }
+  ).catch((error) => {
     console.error("[appointments] cancel prospect sync failed:", error.message);
   });
 
@@ -1105,7 +1116,7 @@ async function collectProspectEmail(phone, email, organizationId) {
 
   const typoSuggestion = detectDomainTypo(normalized);
 
-  await syncProspectContact(phone, { email: normalized });
+  await syncProspectContact(phone, { email: normalized }, organizationId);
 
   return {
     email: normalized,
@@ -1144,11 +1155,15 @@ async function reconcileAppointmentGoogleCalendar(id, context = {}) {
     updatedAt: nowIso()
   });
 
-  await updateProspect(appointment.prospectPhone, {
-    calendar_event_id: calendarSync.calendarEventId || null,
-    appointment_date: appointment.startDateTime,
-    interview_time: appointment.startDateTime
-  }).catch(() => {});
+  await updateProspectInOrganization(
+    appointment.prospectPhone,
+    appointment.organizationId || organizationId,
+    {
+      calendar_event_id: calendarSync.calendarEventId || null,
+      appointment_date: appointment.startDateTime,
+      interview_time: appointment.startDateTime
+    }
+  ).catch(() => {});
 
   return enrichWithProspect(saved);
 }

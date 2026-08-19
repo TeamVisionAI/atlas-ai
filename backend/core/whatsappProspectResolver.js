@@ -496,7 +496,11 @@ async function locateOrCreateWhatsAppProspect({
 
     // BR-080 — never reassign a valid owner on duplicate/repeated inbound.
     // Sticky HUMAN / workflow ownership are intentionally untouched here.
-    await supabaseService.updateProspect(prospect.phone, updates);
+    await supabaseService.updateProspectInOrganization(
+      prospect.phone,
+      organizationId,
+      updates
+    );
     prospect = (await supabaseService.findProspect(prospect.phone)) || prospect;
   }
 

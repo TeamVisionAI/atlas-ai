@@ -132,9 +132,16 @@ function receivedAtMs(prospect = {}) {
   return Number.isNaN(ms) ? null : ms;
 }
 
-async function updateProspectAttention(phone, updates) {
+async function updateProspectAttention(phone, organizationId, updates) {
+  if (!organizationId) {
+    const error = new Error("organizationId is required for tenant-scoped lead attention updates.");
+    error.statusCode = 400;
+    error.publicCode = "TENANT_ORGANIZATION_REQUIRED";
+    throw error;
+  }
+
   try {
-    return await supabaseService.updateProspect(phone, updates);
+    return await supabaseService.updateProspectInOrganization(phone, organizationId, updates);
   } catch (error) {
     if (!isMissingBr080Column(error)) {
       throw error;
@@ -154,7 +161,7 @@ async function updateProspectAttention(phone, updates) {
       return null;
     }
 
-    return supabaseService.updateProspect(phone, fallback);
+    return supabaseService.updateProspectInOrganization(phone, organizationId, fallback);
   }
 }
 
@@ -202,12 +209,12 @@ async function markAiResponding(prospect, options = {}) {
       ? ATTENTION_STATUS.HUMAN_REQUIRED
       : ATTENTION_STATUS.AI_RESPONDING;
 
-  await updateProspectAttention(prospect.phone, {
+  await updateProspectAttention(prospect.phone, prospect.organization_id, {
     attention_status: attention
   });
 
   if (options.waitingForProspect) {
-    await updateProspectAttention(prospect.phone, {
+    await updateProspectAttention(prospect.phone, prospect.organization_id, {
       attention_status: ATTENTION_STATUS.WAITING_FOR_PROSPECT
     });
   }
@@ -235,7 +242,7 @@ async function markHumanAttentionRequired(prospect, reason, actor = {}) {
     human_attention_reason: sanitized
   };
 
-  await updateProspectAttention(prospect.phone, updates);
+  await updateProspectAttention(prospect.phone, prospect.organization_id, updates);
 
   await savePersistedWorkflowState(
     prospect.phone,
@@ -331,7 +338,7 @@ async function acknowledgeLead(prospect, actor = {}) {
     human_attention_reason: prospect.human_attention_reason || null
   };
 
-  await updateProspectAttention(prospect.phone, updates);
+  await updateProspectAttention(prospect.phone, prospect.organization_id, updates);
 
   await writeSafeAudit({
     organizationId: prospect.organization_id,
@@ -382,6 +389,13 @@ async function claimLead(prospect, actor = {}) {
     throw error;
   }
 
+  if (!prospect.organization_id) {
+    const error = new Error("Prospect organization is required to claim a lead.");
+    error.statusCode = 400;
+    error.publicCode = "TENANT_ORGANIZATION_REQUIRED";
+    throw error;
+  }
+
   const now = new Date().toISOString();
 
   // Compare-and-set: only claim when still unassigned.
@@ -397,6 +411,7 @@ async function claimLead(prospect, actor = {}) {
       escalation_level: prospect.escalation_level || 0
     })
     .eq("phone", prospect.phone)
+    .eq("organization_id", prospect.organization_id)
     .is("owner_user_id", null)
     .select("*")
     .maybeSingle();
@@ -406,6 +421,7 @@ async function claimLead(prospect, actor = {}) {
       .from("prospects")
       .update({ owner_user_id: actor.userId })
       .eq("phone", prospect.phone)
+      .eq("organization_id", prospect.organization_id)
       .is("owner_user_id", null)
       .select("*")
       .maybeSingle();
@@ -531,7 +547,7 @@ async function applyEscalation(prospect, decision) {
     }
   }
 
-  await updateProspectAttention(prospect.phone, updates);
+  await updateProspectAttention(prospect.phone, prospect.organization_id, updates);
 
   await writeSafeAudit({
     organizationId: prospect.organization_id,

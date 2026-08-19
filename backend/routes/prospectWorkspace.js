@@ -18,6 +18,11 @@ const { isProductionProspect } = require("../core/productionProspectFilter");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireLegacyProspectAccess } = require("../middleware/requireProspectAccess");
+const { getTenantOrganizationId } = require("../services/tenantContextService");
+
+function resolveWorkspaceOrganizationId(req) {
+  return req.legacyProspect?.organization_id || getTenantOrganizationId(req);
+}
 
 const router = express.Router();
 
@@ -87,7 +92,9 @@ router.patch(
         return;
       }
 
-      const result = await updateProspectWorkspaceProfile(req.params.phone, req.body);
+      const result = await updateProspectWorkspaceProfile(req.params.phone, req.body, {
+        organizationId: resolveWorkspaceOrganizationId(req)
+      });
 
       if (!result.ok) {
         return res.status(result.status).json(result.body);
@@ -112,7 +119,8 @@ router.patch(
 
     const result = await updateProspectCommunicationLanguage(
       req.params.phone,
-      req.body?.communication_language
+      req.body?.communication_language,
+      { organizationId: resolveWorkspaceOrganizationId(req) }
     );
 
     if (!result.ok) {
