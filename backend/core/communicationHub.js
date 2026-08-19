@@ -461,7 +461,8 @@ async function processNormalizedInboundMessage(
     {
       channel: normalized.channel,
       skipConversationLogging: normalized.channel === "whatsapp",
-      messageType: normalized.messageType || null
+      messageType: normalized.messageType || null,
+      organizationId: prospect?.organization_id || prospect?.organizationId || null
     }
   );
 
