@@ -226,11 +226,21 @@ async function recordInterviewOutcome({
     });
   }
 
+  if (!organizationId) {
+    return {
+      success: false,
+      status: 400,
+      error: "TENANT_ORGANIZATION_REQUIRED",
+      message: "Organization context is required for interview outcome workflow advancement."
+    };
+  }
+
   const workflowResult = await advanceProspectWorkflow(phone, {
     targetMilestone: advancePayload.targetMilestone,
     capturedFields: advancePayload.capturedFields,
     interactionNotes: interactionNotes || advancePayload.interactionNotes,
-    interactionType
+    interactionType,
+    organizationId
   });
 
   if (!workflowResult.success) {

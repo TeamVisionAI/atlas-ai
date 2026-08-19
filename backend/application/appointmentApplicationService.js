@@ -607,6 +607,7 @@ async function createAppointment(input, context = {}) {
 
   if (purpose === APPOINTMENT_PURPOSES.RECRUITING_INTERVIEW && !skipWorkflowSideEffects) {
     await advanceProspectWorkflow(prospectPhone, {
+      organizationId,
       targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
       capturedFields: {
         interviewDateTime: bookingResult.startTimeISO,
@@ -803,6 +804,7 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
 
   if (!input.skipWorkflowAdvance) {
     await advanceProspectWorkflow(appointment.prospectPhone, {
+      organizationId: appointment.organizationId || organizationId,
       targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
       capturedFields: {
         interviewDateTime: matchedSlot.startTimeISO,

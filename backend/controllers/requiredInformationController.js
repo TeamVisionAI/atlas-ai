@@ -6,7 +6,8 @@ const { getMissionControlWithActions } = require("./agentActionController");
 const { saveRequiredInformation } = require("../core/conversationOutcomeEngine");
 
 async function postRequiredInformation(phone, body = {}, options = {}) {
-  const result = await saveRequiredInformation(phone, body);
+  const organizationId = options.organizationId || null;
+  const result = await saveRequiredInformation(phone, body, { organizationId });
 
   if (!result.success) {
     return result;
