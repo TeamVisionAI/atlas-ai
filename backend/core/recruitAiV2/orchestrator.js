@@ -658,19 +658,26 @@ async function processRecruitAiV2Turn({
         } = require("./qualificationFactSync");
 
         const deps = options.dependencies || {};
+        const scopedOrganizationId = organizationId;
         const updateProspectFn =
           deps.updateProspect ||
           options.updateProspectFn ||
           (async (phone, patch) => {
-            const { updateProspect } = require("../../services/supabaseService");
-            return updateProspect(phone, patch);
+            if (!scopedOrganizationId) {
+              return null;
+            }
+            const { updateProspectInOrganization } = require("../../services/supabaseService");
+            return updateProspectInOrganization(phone, scopedOrganizationId, patch);
           });
         const loadProspectFn =
           deps.findProspect ||
           options.loadProspectFn ||
           (async (phone) => {
-            const { findProspect } = require("../../services/supabaseService");
-            return findProspect(phone);
+            if (!scopedOrganizationId) {
+              return null;
+            }
+            const { findProspectInOrganization } = require("../../services/supabaseService");
+            return findProspectInOrganization(phone, scopedOrganizationId);
           });
 
         await synchronizeQualificationFactsForMissionControl({

@@ -6,7 +6,7 @@
 const {
   findProspectInOrganization,
   findProspectForSystemIngress,
-  updateProspect
+  updateProspectInOrganization
 } = require("../services/supabaseService");
 const { sendTextMessage } = require("../services/whatsappService");
 const { logConversation } = require("../services/logService");
@@ -145,6 +145,18 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
     return buildActionError(action, "PROSPECT_NOT_FOUND", "Prospect not found.");
   }
 
+  let organizationId = null;
+
+  try {
+    organizationId = requireTenantOrganizationId(options.organizationId);
+  } catch {
+    return buildActionError(
+      action,
+      "TENANT_ORGANIZATION_REQUIRED",
+      "Organization context is required for agent actions."
+    );
+  }
+
   const prospect = await resolveTenantProspect(phone, options);
 
   if (!prospect) {
@@ -153,7 +165,6 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
 
   const agentState = loadAgentState(phone);
   const language = resolveProspectCommunicationCode(prospect);
-  const organizationId = requireTenantOrganizationId(options.organizationId);
 
   switch (action) {
     case ACTION_IDS.SEND_ZOOM_LINK: {
@@ -368,7 +379,7 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
       const email = extractEmailFromNotes(prospect.notes);
       const schedulingState = parseSchedulingState(prospect.notes);
 
-      await updateProspect(prospect.phone, {
+      await updateProspectInOrganization(prospect.phone, organizationId, {
         current_step: "SCHEDULE",
         interview_time: null,
         appointment_date: null,
@@ -401,7 +412,7 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
       );
 
       if (prospect.current_step !== "SCHEDULE") {
-        await updateProspect(prospect.phone, {
+        await updateProspectInOrganization(prospect.phone, organizationId, {
           current_step: "SCHEDULE"
         });
       }
@@ -603,8 +614,12 @@ async function getMissionControlWithActions(phone, options = {}) {
     conversationMessages
   });
 
+  const progressOrganizationId =
+    organizationId || prospect?.organization_id || initialState.prospect?.organization_id || null;
+
   const autonomousProgress = await onConversationProgress({
-    phone: resolvedPhone
+    phone: resolvedPhone,
+    organizationId: progressOrganizationId
   }).catch(() => null);
 
   const mergedActionCenter = mergeMissionControlActionCenters(
