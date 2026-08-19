@@ -3,7 +3,11 @@
  * Implements BR-038 — Prospect Workspace is the canonical profile maintenance surface.
  */
 
-const { findProspect, updateProspect } = require("../services/supabaseService");
+const {
+  findProspectInOrganization,
+  updateProspectInOrganization
+} = require("../services/supabaseService");
+const { requireTenantOrganizationId } = require("../core/tenantProspectLookup");
 const { COMMUNICATION_LANGUAGES } = require("./quickCaptureConstants");
 const { isProductionProspect } = require("./productionProspectFilter");
 const { extractEmailFromNotes } = require("./informationModel");
@@ -271,12 +275,26 @@ function isMissingCommunicationLanguageColumn(error) {
   );
 }
 
-async function updateProspectCommunicationLanguage(phone, communicationLanguage) {
+async function updateProspectCommunicationLanguage(phone, communicationLanguage, options = {}) {
   if (!isProductionProspect(phone)) {
     return {
       ok: false,
       status: 404,
       body: { error: "NOT_FOUND", message: "Prospect not found." }
+    };
+  }
+
+  let organizationId;
+  try {
+    organizationId = requireTenantOrganizationId(options.organizationId);
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: "TENANT_ORGANIZATION_REQUIRED",
+        message: "organizationId is required for tenant-scoped profile updates."
+      }
     };
   }
 
@@ -294,7 +312,7 @@ async function updateProspectCommunicationLanguage(phone, communicationLanguage)
     };
   }
 
-  const prospect = await findProspect(phone);
+  const prospect = await findProspectInOrganization(phone, organizationId);
 
   if (!prospect) {
     return {
@@ -315,16 +333,26 @@ async function updateProspectCommunicationLanguage(phone, communicationLanguage)
     languageFields.preferred_language
   );
 
-  const updated = await updateProspect(phone, languageFields).catch(async (error) => {
-    if (!isMissingCommunicationLanguageColumn(error)) {
-      throw error;
-    }
+  const updated = await updateProspectInOrganization(phone, organizationId, languageFields).catch(
+    async (error) => {
+      if (!isMissingCommunicationLanguageColumn(error)) {
+        throw error;
+      }
 
-    return updateProspect(phone, {
-      preferred_language: languageFields.preferred_language,
-      language: languageFields.language
-    });
-  });
+      return updateProspectInOrganization(phone, organizationId, {
+        preferred_language: languageFields.preferred_language,
+        language: languageFields.language
+      });
+    }
+  );
+
+  if (!updated) {
+    return {
+      ok: false,
+      status: 404,
+      body: { error: "NOT_FOUND", message: "Prospect not found." }
+    };
+  }
 
   return {
     ok: true,
@@ -337,7 +365,7 @@ async function updateProspectCommunicationLanguage(phone, communicationLanguage)
   };
 }
 
-async function updateProspectWorkspaceProfile(phone, input = {}) {
+async function updateProspectWorkspaceProfile(phone, input = {}, options = {}) {
   if (!isProductionProspect(phone)) {
     return {
       ok: false,
@@ -346,7 +374,21 @@ async function updateProspectWorkspaceProfile(phone, input = {}) {
     };
   }
 
-  const prospect = await findProspect(phone);
+  let organizationId;
+  try {
+    organizationId = requireTenantOrganizationId(options.organizationId);
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: "TENANT_ORGANIZATION_REQUIRED",
+        message: "organizationId is required for tenant-scoped profile updates."
+      }
+    };
+  }
+
+  const prospect = await findProspectInOrganization(phone, organizationId);
 
   if (!prospect) {
     return {
@@ -439,7 +481,15 @@ async function updateProspectWorkspaceProfile(phone, input = {}) {
     };
   }
 
-  const updated = await updateProspect(phone, updates);
+  const updated = await updateProspectInOrganization(phone, organizationId, updates);
+
+  if (!updated) {
+    return {
+      ok: false,
+      status: 404,
+      body: { error: "NOT_FOUND", message: "Prospect not found." }
+    };
+  }
 
   return {
     ok: true,
