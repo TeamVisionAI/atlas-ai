@@ -4,7 +4,10 @@
  */
 
 const createTimelineRoutes = require("./api/timeline.routes");
-const { createProspectTimelineHandler } = require("./api/timeline.routes");
+const {
+  createProspectTimelineHandler,
+  createProspectTimelineStack
+} = require("./api/timeline.routes");
 const { TimelineService } = require("./application/TimelineService");
 const {
   TimelineProjection,
@@ -35,7 +38,8 @@ function createTimelineModule(deps = {}) {
     timelineProjection,
     replayService,
     routes: createTimelineRoutes({ service }),
-    prospectTimelineHandler: createProspectTimelineHandler({ service })
+    prospectTimelineHandler: createProspectTimelineHandler({ service }),
+    prospectTimelineStack: createProspectTimelineStack({ service })
   };
 }
 
@@ -43,6 +47,7 @@ module.exports = {
   createTimelineModule,
   createTimelineRoutes,
   createProspectTimelineHandler,
+  createProspectTimelineStack,
   TimelineService,
   TimelineProjection,
   TimelineProjector,

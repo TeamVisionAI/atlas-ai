@@ -215,11 +215,7 @@ app.use(
   createOperationsRoutes({ businessEventService: businessEventModule.service })
 );
 app.use("/api/timeline", timelineModule.routes);
-app.get(
-  "/api/prospects/:id/timeline",
-  requireAtlasUser,
-  timelineModule.prospectTimelineHandler
-);
+app.get("/api/prospects/:id/timeline", ...timelineModule.prospectTimelineStack);
 app.get("/api/prospects/:id/communications", ...prospectCommunicationsStack);
 app.get(
   "/api/prospects/:id/communications/media/:mediaId/playback",
