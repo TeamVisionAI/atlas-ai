@@ -5,6 +5,7 @@
 
 const { isSuperAdmin } = require("../security/saasRoles");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
 
 function resolveRequestedOrganizationId(req) {
   return (
@@ -18,7 +19,7 @@ function resolveRequestedOrganizationId(req) {
 }
 
 function organizationGuard(options = {}) {
-  const { allowSuperAdminCrossOrg = true } = options;
+  void options;
 
   return function organizationGuardMiddleware(req, res, next) {
     const context = req.authContext;
@@ -30,27 +31,32 @@ function organizationGuard(options = {}) {
       });
     }
 
-    const tenantOrganizationId = context.organizationId || DEFAULT_ORGANIZATION_ID;
+    const effectiveOrganizationId =
+      getEffectiveOrganizationId(req) || context.organizationId || DEFAULT_ORGANIZATION_ID;
     const requestedOrgId = resolveRequestedOrganizationId(req);
 
-    if (
-      requestedOrgId &&
-      String(requestedOrgId) !== String(tenantOrganizationId) &&
-      !(allowSuperAdminCrossOrg && isSuperAdmin(context.saasRole))
-    ) {
+    if (requestedOrgId && String(requestedOrgId) !== String(effectiveOrganizationId)) {
       return res.status(403).json({
         error: "FORBIDDEN",
         message: "Cross-organization access is not permitted."
       });
     }
 
+    req.effectiveOrganizationId = effectiveOrganizationId;
     req.tenantContext = {
-      organizationId: tenantOrganizationId,
+      organizationId: effectiveOrganizationId,
+      homeOrganizationId: context.organizationId || DEFAULT_ORGANIZATION_ID,
       userId: context.userId,
       role: context.role,
       saasRole: context.saasRole,
       permissions: context.permissions || [],
-      isSuperAdmin: isSuperAdmin(context.saasRole)
+      isSuperAdmin: isSuperAdmin(context.saasRole),
+      supportMode: req.supportContext
+        ? {
+            organizationId: req.supportContext.organizationId,
+            enteredAt: req.supportContext.enteredAt
+          }
+        : null
     };
 
     return next();

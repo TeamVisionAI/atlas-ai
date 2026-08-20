@@ -171,6 +171,10 @@ app.use(
 // JSON parsing for all non-webhook routes.
 app.use(express.json());
 
+const { tenantOperationalGuard } = require("./middleware/tenantOperationalGuard");
+const platformRoutes = require("./routes/platform");
+app.use(tenantOperationalGuard);
+
 // Basic routes
 app.get("/", (req, res) => {
   res.json({
@@ -208,6 +212,7 @@ app.use("/api/conversations", conversationsCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/platform-status", platformStatusRoutes);
+app.use("/api/platform", platformRoutes);
 app.use("/api/organization", organizationRoutes);
 app.use("/api/business-events", businessEventModule.routes);
 app.use(

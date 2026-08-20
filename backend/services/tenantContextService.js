@@ -2,29 +2,36 @@
  * Sprint 16.9 — Tenant context helpers for organization-scoped queries.
  */
 
-const { resolveOrganizationId } = require("../security/authorizationService");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
+const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
 
 function getTenantOrganizationId(req) {
-  return (
-    req.tenantContext?.organizationId ||
-    req.authContext?.organizationId ||
-    DEFAULT_ORGANIZATION_ID
-  );
+  return getEffectiveOrganizationId(req) || DEFAULT_ORGANIZATION_ID;
 }
 
 function resolveTenantOrganizationId(req, requestedOrganizationId) {
-  if (!req.authContext) {
+  if (!req?.authContext) {
     return DEFAULT_ORGANIZATION_ID;
   }
 
-  return resolveOrganizationId(
-    req.authContext,
+  const effectiveOrganizationId = getEffectiveOrganizationId(req);
+  const requested =
     requestedOrganizationId ||
-      req.query?.organizationId ||
-      req.query?.organization_id ||
-      req.params?.organizationId
-  );
+    req.query?.organizationId ||
+    req.query?.organization_id ||
+    req.params?.organizationId ||
+    req.body?.organizationId ||
+    req.body?.organization_id ||
+    null;
+
+  if (requested && String(requested) !== String(effectiveOrganizationId)) {
+    const error = new Error("Cross-organization access is not permitted.");
+    error.statusCode = 403;
+    error.publicCode = "FORBIDDEN";
+    throw error;
+  }
+
+  return effectiveOrganizationId;
 }
 
 function withOrganizationFilter(query, organizationId) {
