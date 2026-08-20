@@ -15,6 +15,7 @@ function auditMeta(req) {
   return {
     userId: req.tenantContext?.userId || req.authContext?.userId,
     userEmail: req.authContext?.email,
+    organizationId: req.authContext?.organizationId,
     ipAddress: req.ip,
     userAgent: req.get("user-agent")
   };

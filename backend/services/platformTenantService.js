@@ -16,6 +16,10 @@ const {
   deriveLifecycleStatusFromOrg,
   isTenantOperational
 } = require("../core/tenantLifecycle");
+const {
+  isTeamVisionSeedTenant,
+  assertTeamVisionNotDestructible
+} = require("../core/teamVisionSeedTenant");
 
 function slugifyOrganizationName(name) {
   return String(name || "organization")
@@ -73,6 +77,13 @@ async function createTenant(input = {}, auditMeta = {}) {
 
   const lifecycleStatus = normalizeTenantStatus(input.status || input.lifecycleStatus);
   const slug = String(input.slug || slugifyOrganizationName(name)).trim().toLowerCase();
+
+  if (isTeamVisionSeedTenant(input.id) || slug === "team-vision") {
+    const error = new Error("Team Vision seed tenant already exists and cannot be recreated.");
+    error.statusCode = 409;
+    error.publicCode = "SEED_TENANT_PROTECTED";
+    throw error;
+  }
   const mapped = mapTenantStatusToOrganizationFields(lifecycleStatus);
   const now = new Date().toISOString();
 
@@ -201,7 +212,10 @@ async function assertTenantOperational(organizationId) {
     throw error;
   }
 
-  if (!isTenantOperational(tenant.lifecycleStatus, { trialEndsAt: tenant.trialEndsAt })) {
+  if (!isTenantOperational(tenant.lifecycleStatus, {
+    trialEndsAt: tenant.trialEndsAt,
+    organizationId
+  })) {
     const error = new Error("Tenant is suspended.");
     error.statusCode = 403;
     error.publicCode = "TENANT_SUSPENDED";
@@ -260,6 +274,30 @@ async function provisionTenantAdmin(organizationId, input = {}, authContext = {}
   return result;
 }
 
+function deleteTenant(organizationId) {
+  assertTeamVisionNotDestructible(organizationId, "delete");
+  const error = new Error("Tenant deletion is not implemented.");
+  error.statusCode = 501;
+  error.publicCode = "TENANT_DELETE_NOT_IMPLEMENTED";
+  throw error;
+}
+
+function archiveTenant(organizationId) {
+  assertTeamVisionNotDestructible(organizationId, "archive");
+  const error = new Error("Tenant archive is not implemented.");
+  error.statusCode = 501;
+  error.publicCode = "TENANT_ARCHIVE_NOT_IMPLEMENTED";
+  throw error;
+}
+
+function resetTenant(organizationId) {
+  assertTeamVisionNotDestructible(organizationId, "reset");
+  const error = new Error("Tenant reset is not implemented.");
+  error.statusCode = 501;
+  error.publicCode = "TENANT_RESET_NOT_IMPLEMENTED";
+  throw error;
+}
+
 module.exports = {
   TENANT_STATUS,
   ALL_TENANT_STATUSES,
@@ -274,5 +312,8 @@ module.exports = {
   getTenant,
   setTenantStatus,
   assertTenantOperational,
-  provisionTenantAdmin
+  provisionTenantAdmin,
+  deleteTenant,
+  archiveTenant,
+  resetTenant
 };

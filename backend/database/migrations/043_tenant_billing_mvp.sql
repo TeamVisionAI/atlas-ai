@@ -1,4 +1,6 @@
 -- BR-145 — SaaS tenant billing MVP (trial dates, manual payment fields)
+-- BR-146 — Preserve Team Vision seed tenant (00000000-0000-4000-8000-000000000001):
+--   ACTIVE, professional plan, NULL trial dates. Future migrations must repeat this preserve.
 -- Migration 043
 
 ALTER TABLE organization_subscriptions

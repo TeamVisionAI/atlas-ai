@@ -1822,6 +1822,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-146 — Team Vision Seed Tenant Invariant
+
+**Implements:** Team Vision (`00000000-0000-4000-8000-000000000001`) is the permanent Atlas seed tenant. Automatic billing/lifecycle and destructive tenant operations must fail closed for this organization.  
+**Domain:** Platform / tenancy / billing  
+**Depends on:** BR-145, Sprint 16.9 SaaS foundation  
+**Related:** Recruiting config defaults (C1 clone of Team Vision snapshot), platform provisioning  
+**Status:** Implemented  
+**Engine target:** `teamVisionSeedTenant.js`, `tenantBillingService.js`, `tenantOperationalGuard.js`, `platformTenantService.js`  
+**Tests:** `backend/test/tenantBillingMvp.test.js`, `backend/test/teamVisionSeedTenant.test.js`
+
+### Rules
+
+1. **Must always exist** — Seed org id `00000000-0000-4000-8000-000000000001` is permanent. Recreate/replace via `createTenant` with slug `team-vision` is rejected.
+2. **No automatic trial expiry** — Guards and billing jobs must skip Team Vision. Never auto-transition to `PAST_DUE` from trial dates.
+3. **No automatic suspend** — Automatic lifecycle must never set Team Vision `SUSPENDED`. Super Admin may still change status explicitly via platform status PATCH.
+4. **Trial dates** — Remain `NULL` unless Super Admin uses an explicit seed override. Billing PATCH cannot rewrite `trial_starts_at` / `trial_ends_at`.
+5. **Billing migrations** — Must preserve Team Vision `ACTIVE`, `professional` plan, and NULL trial dates (see migration 043).
+6. **Delete / archive / reset** — Fail closed (`SEED_TENANT_PROTECTED`) for Team Vision.
+7. **Templates** — Child tenants may **read/clone** Team Vision recruiting defaults. They must never write Team Vision rows (`assertCannotMutateSeedFromOtherTenant`).
+8. **Boundaries** — Does not change BR-142/143, WhatsApp, Meta, or recruiting engines.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

@@ -11,6 +11,8 @@ const {
   MAX_TRIAL_DAYS,
   PAYMENT_METHODS,
   TEAM_VISION_ORGANIZATION_ID,
+  isTeamVisionSeedTenant,
+  shouldSkipAutomaticTrialExpiry,
   normalizeTenantStatus,
   mapTenantStatusToOrganizationFields,
   deriveLifecycleStatusFromOrg,
@@ -169,6 +171,10 @@ function setBillingPersistenceForTests(override) {
 function deriveBillingLifecycle(orgRow, subscriptionRow, now = new Date()) {
   const lifecycleStatus = deriveLifecycleStatusFromOrg(orgRow);
 
+  if (shouldSkipAutomaticTrialExpiry(orgRow?.id)) {
+    return lifecycleStatus;
+  }
+
   if (
     lifecycleStatus === TENANT_STATUS.TRIAL &&
     isTrialExpired(subscriptionRow?.trial_ends_at, now)
@@ -204,7 +210,8 @@ function presentPlatformBilling(orgRow, subscriptionRow, now = new Date()) {
     trialExtensions: metadata.trialExtensions,
     isOperational: isTenantOperational(lifecycleStatus, {
       trialEndsAt: subscriptionRow?.trial_ends_at,
-      now
+      now,
+      organizationId: orgRow.id
     })
   };
 }
@@ -299,6 +306,16 @@ async function auditBilling(action, organizationId, actor, metadata = {}) {
 
 async function initializeBillingForNewTenant(organizationId, lifecycleStatusInput, createdAt) {
   const organizationIdNorm = requireOrganizationId(organizationId);
+
+  if (isTeamVisionSeedTenant(organizationIdNorm)) {
+    return syncLifecycleMirror(organizationIdNorm, TENANT_STATUS.ACTIVE, {
+      plan: "professional",
+      trial_starts_at: null,
+      trial_ends_at: null,
+      metadata: defaultMetadata()
+    });
+  }
+
   const lifecycleStatus = normalizeTenantStatus(lifecycleStatusInput);
   const createdIso = createdAt || new Date().toISOString();
   const subscriptionPatch = {
@@ -353,6 +370,40 @@ async function getTenantSafeBilling(organizationId) {
 
 async function updateBilling(organizationId, patch = {}, auditMeta = {}) {
   const organizationIdNorm = requireOrganizationId(organizationId);
+
+  if (patch && typeof patch === "object") {
+    if (patch.organizationId != null || patch.organization_id != null) {
+      const error = new Error("organizationId cannot be supplied in a billing patch.");
+      error.statusCode = 400;
+      error.publicCode = "ORGANIZATION_ID_NOT_ALLOWED";
+      throw error;
+    }
+
+    if (
+      patch.trialStartsAt != null ||
+      patch.trial_starts_at != null ||
+      patch.trialEndsAt != null ||
+      patch.trial_ends_at != null
+    ) {
+      const error = new Error(
+        isTeamVisionSeedTenant(organizationIdNorm)
+          ? "Team Vision trial dates remain NULL unless changed by an explicit Super Admin seed override."
+          : "Trial dates cannot be rewritten via billing PATCH."
+      );
+      error.statusCode = isTeamVisionSeedTenant(organizationIdNorm) ? 403 : 400;
+      error.publicCode = isTeamVisionSeedTenant(organizationIdNorm)
+        ? "SEED_TENANT_PROTECTED"
+        : "TRIAL_DATES_NOT_PATCHABLE";
+      throw error;
+    }
+
+    if (patch.metadata != null || patch.payments != null) {
+      const error = new Error("metadata and payments cannot be replaced via billing PATCH.");
+      error.statusCode = 400;
+      error.publicCode = "BILLING_PATCH_FORBIDDEN_FIELD";
+      throw error;
+    }
+  }
   const { orgRow, subscriptionRow } = await loadBillingContext(organizationIdNorm);
   const before = presentPlatformBilling(orgRow, subscriptionRow);
   const metadata = normalizeMetadata(subscriptionRow.metadata);
@@ -592,6 +643,11 @@ async function markPaid(organizationId, payment = {}, auditMeta = {}) {
 
 async function expireTrialIfNeeded(organizationId, auditMeta = {}) {
   const organizationIdNorm = requireOrganizationId(organizationId);
+
+  if (shouldSkipAutomaticTrialExpiry(organizationIdNorm)) {
+    const { orgRow, subscriptionRow } = await loadBillingContext(organizationIdNorm);
+    return { expired: false, billing: presentPlatformBilling(orgRow, subscriptionRow) };
+  }
   const { orgRow, subscriptionRow } = await loadBillingContext(organizationIdNorm);
   const lifecycleStatus = deriveLifecycleStatusFromOrg(orgRow);
   const metadata = normalizeMetadata(subscriptionRow.metadata);
@@ -638,7 +694,8 @@ function evaluateOperationalAccess(orgRow, subscriptionRow, now = new Date()) {
   const lifecycleStatus = deriveBillingLifecycle(orgRow, subscriptionRow, now);
   return isTenantOperational(lifecycleStatus, {
     trialEndsAt: subscriptionRow?.trial_ends_at,
-    now
+    now,
+    organizationId: orgRow?.id
   });
 }
 
