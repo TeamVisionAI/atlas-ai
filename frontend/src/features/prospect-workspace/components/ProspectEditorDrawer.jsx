@@ -1,22 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import AtlasButton from "../../../components/ui/AtlasButton";
 import { FIELD_INPUT_CONFIG } from "../../../components/mission-control/fieldInputConfig";
+import { resolveQuickCaptureSourceOptions } from "../../../config/quickCaptureCopy";
 import { updateProspectWorkspaceProfile } from "../services/prospectWorkspaceApi";
 import {
   buildProspectEditorInitialValues,
   validateProspectEditorValues
 } from "../utils/prospectEditorModel";
 import "./ProspectEditorDrawer.css";
-
-const LEAD_SOURCE_OPTIONS = [
-  { value: "IN_PERSON", labelKey: "quickCaptureSourceInPerson" },
-  { value: "REFERRAL", labelKey: "quickCaptureSourceReferral" },
-  { value: "CHURCH", labelKey: "quickCaptureSourceChurch" },
-  { value: "NETWORKING", labelKey: "quickCaptureSourceNetworking" },
-  { value: "COMMUNITY_EVENT", labelKey: "quickCaptureSourceCommunityEvent" },
-  { value: "WARM_MARKET", labelKey: "quickCaptureSourceWarmMarket" },
-  { value: "OTHER", labelKey: "quickCaptureSourceOther" }
-];
 
 function FormSection({ title, children }) {
   return (
@@ -196,10 +187,7 @@ export default function ProspectEditorDrawer({
     icon: option.icon
   }));
 
-  const leadSourceOptions = LEAD_SOURCE_OPTIONS.map((option) => ({
-    value: option.value,
-    label: translate(option.labelKey)
-  }));
+  const leadSourceOptions = resolveQuickCaptureSourceOptions(translate);
 
   return (
     <>

@@ -2,27 +2,17 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import {
+  resolveQuickCaptureCopy,
+  resolveQuickCaptureLanguageOptions,
+  resolveQuickCaptureSourceOptions
+} from "../config/quickCaptureCopy";
+import {
   QuickCaptureError,
   saveQuickCaptureProspect
 } from "../services/quickCaptureService";
 import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import QuickCaptureSuccess from "../components/quick-capture/QuickCaptureSuccess";
 import "./QuickCapture.css";
-
-const LANGUAGE_OPTIONS = [
-  { value: "english", labelKey: "quickCaptureLanguageEn" },
-  { value: "spanish", labelKey: "quickCaptureLanguageEs" }
-];
-
-const MANUAL_SOURCES = [
-  { value: "IN_PERSON", labelKey: "quickCaptureSourceInPerson" },
-  { value: "REFERRAL", labelKey: "quickCaptureSourceReferral" },
-  { value: "CHURCH", labelKey: "quickCaptureSourceChurch" },
-  { value: "NETWORKING", labelKey: "quickCaptureSourceNetworking" },
-  { value: "COMMUNITY_EVENT", labelKey: "quickCaptureSourceCommunityEvent" },
-  { value: "WARM_MARKET", labelKey: "quickCaptureSourceWarmMarket" },
-  { value: "OTHER", labelKey: "quickCaptureSourceOther" }
-];
 
 const EMPTY_FORM = {
   first_name: "",
@@ -32,7 +22,7 @@ const EMPTY_FORM = {
   source: "IN_PERSON"
 };
 
-function DuplicateDialog({ duplicate, t, onOpen, onCancel }) {
+function DuplicateDialog({ duplicate, qc, onOpen, onCancel }) {
   if (!duplicate) {
     return null;
   }
@@ -40,14 +30,14 @@ function DuplicateDialog({ duplicate, t, onOpen, onCancel }) {
   return (
     <div className="quick-capture-overlay" role="dialog" aria-modal="true">
       <div className="quick-capture-dialog">
-        <h3>{t.quickCaptureDuplicateTitle}</h3>
-        <p>{t.quickCaptureDuplicateMessage}</p>
+        <h3>{qc("quickCaptureDuplicateTitle")}</h3>
+        <p>{qc("quickCaptureDuplicateMessage")}</p>
         <div className="quick-capture-dialog-actions">
           <button type="button" className="quick-capture-dialog-primary" onClick={onOpen}>
-            {t.quickCaptureOpenExisting}
+            {qc("quickCaptureOpenExisting")}
           </button>
           <button type="button" className="quick-capture-dialog-secondary" onClick={onCancel}>
-            {t.quickCaptureCancel}
+            {qc("quickCaptureCancel")}
           </button>
         </div>
       </div>
@@ -56,7 +46,7 @@ function DuplicateDialog({ duplicate, t, onOpen, onCancel }) {
 }
 
 export default function QuickCapture() {
-  const { t } = useLanguage();
+  const { translate } = useLanguage();
   const navigate = useNavigate();
   const [form, setForm] = useState(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -65,13 +55,19 @@ export default function QuickCapture() {
   const [duplicate, setDuplicate] = useState(null);
   const [completion, setCompletion] = useState(null);
 
+  const qc = useMemo(
+    () => (key) => resolveQuickCaptureCopy(translate, key),
+    [translate]
+  );
+
   const sourceOptions = useMemo(
-    () =>
-      MANUAL_SOURCES.map((option) => ({
-        value: option.value,
-        label: t[option.labelKey]
-      })),
-    [t]
+    () => resolveQuickCaptureSourceOptions(translate),
+    [translate]
+  );
+
+  const languageOptions = useMemo(
+    () => resolveQuickCaptureLanguageOptions(translate),
+    [translate]
   );
 
   function updateField(name, value) {
@@ -84,19 +80,19 @@ export default function QuickCapture() {
     const errors = {};
 
     if (!form.first_name.trim()) {
-      errors.first_name = t.quickCaptureRequired;
+      errors.first_name = qc("quickCaptureRequired");
     }
 
     if (!form.last_name.trim()) {
-      errors.last_name = t.quickCaptureRequired;
+      errors.last_name = qc("quickCaptureRequired");
     }
 
     if (!form.phone.trim()) {
-      errors.phone = t.quickCaptureRequired;
+      errors.phone = qc("quickCaptureRequired");
     }
 
     if (!form.preferred_language) {
-      errors.preferred_language = t.quickCaptureRequired;
+      errors.preferred_language = qc("quickCaptureRequired");
     }
 
     setFieldErrors(errors);
@@ -126,7 +122,7 @@ export default function QuickCapture() {
         return;
       }
 
-      setSubmitError(t.quickCaptureError);
+      setSubmitError(qc("quickCaptureError"));
     } catch (error) {
       if (error instanceof QuickCaptureError && error.status === 409) {
         setDuplicate(error.payload?.prospect || null);
@@ -134,7 +130,7 @@ export default function QuickCapture() {
       }
 
       if (error instanceof QuickCaptureError && error.status === 401) {
-        setSubmitError(t.quickCaptureError);
+        setSubmitError(qc("quickCaptureError"));
         return;
       }
 
@@ -143,7 +139,7 @@ export default function QuickCapture() {
         return;
       }
 
-      setSubmitError(error.message || t.quickCaptureError);
+      setSubmitError(error.message || qc("quickCaptureError"));
     } finally {
       setLoading(false);
     }
@@ -187,14 +183,14 @@ export default function QuickCapture() {
     <div className="quick-capture-page">
       <div className="quick-capture-shell">
         <form className="quick-capture-card" onSubmit={handleSubmit}>
-          <h1 className="quick-capture-title">{t.quickCaptureTitle}</h1>
+          <h1 className="quick-capture-title">{qc("quickCaptureTitle")}</h1>
 
           {submitError ? (
             <div className="quick-capture-banner quick-capture-banner--error">{submitError}</div>
           ) : null}
 
           <label className="quick-capture-field">
-            <span className="quick-capture-label">{t.quickCaptureFirstName}</span>
+            <span className="quick-capture-label">{qc("quickCaptureFirstName")}</span>
             <input
               className={`quick-capture-input${fieldErrors.first_name ? " quick-capture-input--error" : ""}`}
               value={form.first_name}
@@ -207,7 +203,7 @@ export default function QuickCapture() {
           </label>
 
           <label className="quick-capture-field">
-            <span className="quick-capture-label">{t.quickCaptureLastName}</span>
+            <span className="quick-capture-label">{qc("quickCaptureLastName")}</span>
             <input
               className={`quick-capture-input${fieldErrors.last_name ? " quick-capture-input--error" : ""}`}
               value={form.last_name}
@@ -220,7 +216,7 @@ export default function QuickCapture() {
           </label>
 
           <label className="quick-capture-field">
-            <span className="quick-capture-label">{t.quickCapturePhone}</span>
+            <span className="quick-capture-label">{qc("quickCapturePhone")}</span>
             <input
               className={`quick-capture-input${fieldErrors.phone ? " quick-capture-input--error" : ""}`}
               value={form.phone}
@@ -235,15 +231,15 @@ export default function QuickCapture() {
           </label>
 
           <label className="quick-capture-field">
-            <span className="quick-capture-label">{t.quickCapturePreferredLanguage}</span>
+            <span className="quick-capture-label">{qc("quickCapturePreferredLanguage")}</span>
             <select
               className={`quick-capture-select${fieldErrors.preferred_language ? " quick-capture-input--error" : ""}`}
               value={form.preferred_language}
               onChange={(event) => updateField("preferred_language", event.target.value)}
             >
-              {LANGUAGE_OPTIONS.map((option) => (
+              {languageOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {t[option.labelKey]}
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -253,7 +249,7 @@ export default function QuickCapture() {
           </label>
 
           <label className="quick-capture-field">
-            <span className="quick-capture-label">{t.quickCaptureHowDidYouMeet}</span>
+            <span className="quick-capture-label">{qc("quickCaptureHowDidYouMeet")}</span>
             <select
               className="quick-capture-select"
               value={form.source}
@@ -268,14 +264,14 @@ export default function QuickCapture() {
           </label>
 
           <button type="submit" className="quick-capture-submit" disabled={loading}>
-            {loading ? t.quickCaptureSaving : t.quickCaptureSave}
+            {loading ? qc("quickCaptureSaving") : qc("quickCaptureSave")}
           </button>
         </form>
       </div>
 
       <DuplicateDialog
         duplicate={duplicate}
-        t={t}
+        qc={qc}
         onOpen={openExistingProspect}
         onCancel={() => setDuplicate(null)}
       />
