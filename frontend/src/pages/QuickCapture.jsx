@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import {
   resolveQuickCaptureCopy,
   resolveQuickCaptureLanguageOptions,
@@ -47,6 +48,7 @@ function DuplicateDialog({ duplicate, qc, onOpen, onCancel }) {
 
 export default function QuickCapture() {
   const { translate } = useLanguage();
+  const { user, supportMode } = useWorkspace();
   const navigate = useNavigate();
   const [form, setForm] = useState(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -54,6 +56,11 @@ export default function QuickCapture() {
   const [loading, setLoading] = useState(false);
   const [duplicate, setDuplicate] = useState(null);
   const [completion, setCompletion] = useState(null);
+
+  const effectiveOrganizationId =
+    supportMode?.active && supportMode?.organizationId
+      ? supportMode.organizationId
+      : user?.organization_id || user?.organizationId || null;
 
   const qc = useMemo(
     () => (key) => resolveQuickCaptureCopy(translate, key),
@@ -156,6 +163,17 @@ export default function QuickCapture() {
   function openExistingProspect() {
     if (!duplicate?.phone) {
       setDuplicate(null);
+      return;
+    }
+
+    // Defense in depth: never open a foreign-org row returned by a stale/global collision.
+    if (
+      effectiveOrganizationId &&
+      duplicate.organization_id &&
+      String(duplicate.organization_id) !== String(effectiveOrganizationId)
+    ) {
+      setDuplicate(null);
+      setSubmitError(qc("quickCaptureError"));
       return;
     }
 

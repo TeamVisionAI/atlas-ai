@@ -70,7 +70,7 @@ async function withServer(app, run) {
   }
 }
 
-function installQcMocks({ existingByOrg = {}, sendCalls }) {
+function installQcMocks({ existingByOrg = {}, sendCalls, forceUniqueViolation = false }) {
   const supabasePath = require.resolve("../services/supabaseService");
   const originalSupabase = require(supabasePath);
   const inserted = [];
@@ -82,6 +82,21 @@ function installQcMocks({ existingByOrg = {}, sendCalls }) {
       assert.equal(table, "prospects");
       return {
         insert(row) {
+          if (forceUniqueViolation) {
+            return {
+              select() {
+                return {
+                  async single() {
+                    return {
+                      data: null,
+                      error: { code: "23505", message: "duplicate key value violates unique constraint" }
+                    };
+                  }
+                };
+              }
+            };
+          }
+
           inserted.push(row);
           const created = {
             id: `qc-${inserted.length}`,
@@ -449,5 +464,171 @@ test("route uses canonical tenant helpers (no second Support Mode system)", () =
   assert.match(route, /organizationGuard/);
   assert.match(engine, /tenantContext\?\.organizationId/);
   assert.match(engine, /effectiveOrganizationId/);
+  assert.match(engine, /buildDuplicateProspectConflict/);
   assert.doesNotMatch(engine, /loadSupportContextForRequest/);
+});
+
+test("9. TV phone only + TL Support Mode → not existing; create allowed", async () => {
+  const mocks = installQcMocks({
+    sendCalls: [],
+    existingByOrg: {
+      [ORG_A]: [
+        {
+          id: "tv-only",
+          phone: "+17865553001",
+          normalized_phone: "17865553001",
+          organization_id: ORG_A,
+          name: "TV Only"
+        }
+      ]
+    }
+  });
+  try {
+    const { createQuickCaptureProspect, findProspectByNormalizedPhone } = require(
+      "../core/quickCaptureEngine"
+    );
+    assert.equal(await findProspectByNormalizedPhone("17865553001", ORG_B), null);
+
+    const result = await createQuickCaptureProspect(
+      {
+        ...QC_BODY,
+        phone: "+17865553001"
+      },
+      atlasUserFromContext(
+        authContext({
+          userId: SUPER_ID,
+          saasRole: SAAS_ROLES.SUPER_ADMIN,
+          organizationId: ORG_A
+        })
+      ),
+      {
+        organizationId: ORG_B,
+        tenantContext: { organizationId: ORG_B },
+        effectiveOrganizationId: ORG_B
+      }
+    );
+    assert.equal(result.status, 201);
+    assert.equal(result.body.prospect.organization_id, ORG_B);
+    assert.notEqual(result.body.prospect.id, "tv-only");
+  } finally {
+    mocks.restore();
+  }
+});
+
+test("10. after TL copy exists → TL QC detects TL record only", async () => {
+  const mocks = installQcMocks({
+    sendCalls: [],
+    existingByOrg: {
+      [ORG_A]: [
+        {
+          id: "tv-twin",
+          phone: SHARED_PHONE,
+          normalized_phone: "15555550188",
+          organization_id: ORG_A
+        }
+      ],
+      [ORG_B]: [
+        {
+          id: "tl-twin",
+          phone: SHARED_PHONE,
+          normalized_phone: "15555550188",
+          organization_id: ORG_B
+        }
+      ]
+    }
+  });
+  try {
+    const { createQuickCaptureProspect } = require("../core/quickCaptureEngine");
+    const tlConflict = await createQuickCaptureProspect(
+      QC_BODY,
+      atlasUserFromContext(
+        authContext({
+          userId: SUPER_ID,
+          saasRole: SAAS_ROLES.SUPER_ADMIN,
+          organizationId: ORG_A
+        })
+      ),
+      {
+        organizationId: ORG_B,
+        tenantContext: { organizationId: ORG_B },
+        effectiveOrganizationId: ORG_B
+      }
+    );
+    assert.equal(tlConflict.status, 409);
+    assert.equal(tlConflict.body.prospect.id, "tl-twin");
+    assert.equal(tlConflict.body.prospect.organization_id, ORG_B);
+
+    const tvConflict = await createQuickCaptureProspect(
+      QC_BODY,
+      atlasUserFromContext(
+        authContext({
+          userId: SUPER_ID,
+          saasRole: SAAS_ROLES.SUPER_ADMIN,
+          organizationId: ORG_A
+        })
+      ),
+      {
+        organizationId: ORG_A,
+        tenantContext: { organizationId: ORG_A },
+        effectiveOrganizationId: ORG_A
+      }
+    );
+    assert.equal(tvConflict.status, 409);
+    assert.equal(tvConflict.body.prospect.id, "tv-twin");
+    assert.equal(tvConflict.body.prospect.organization_id, ORG_A);
+  } finally {
+    mocks.restore();
+  }
+});
+
+test("11. legacy global 23505 without same-org hit → no Open Existing foreign prospect", async () => {
+  const mocks = installQcMocks({
+    sendCalls: [],
+    forceUniqueViolation: true,
+    existingByOrg: {
+      [ORG_A]: [
+        {
+          id: "tv-foreign",
+          phone: SHARED_PHONE,
+          normalized_phone: "15555550188",
+          organization_id: ORG_A
+        }
+      ]
+    }
+  });
+  try {
+    const { createQuickCaptureProspect } = require("../core/quickCaptureEngine");
+    const result = await createQuickCaptureProspect(
+      QC_BODY,
+      atlasUserFromContext(
+        authContext({
+          userId: SUPER_ID,
+          saasRole: SAAS_ROLES.SUPER_ADMIN,
+          organizationId: ORG_A
+        })
+      ),
+      {
+        organizationId: ORG_B,
+        tenantContext: { organizationId: ORG_B },
+        effectiveOrganizationId: ORG_B
+      }
+    );
+    assert.equal(result.status, 500);
+    assert.equal(result.body.error, "QUICK_CAPTURE_FAILED");
+    assert.equal(result.body.prospect, undefined);
+  } finally {
+    mocks.restore();
+  }
+});
+
+test("12. migration 045 scopes phone uniqueness per organization", () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, "../database/migrations/045_prospects_phone_unique_per_organization.sql"),
+    "utf8"
+  );
+  assert.match(migration, /DROP INDEX IF EXISTS idx_prospects_normalized_phone/);
+  assert.match(migration, /DROP CONSTRAINT IF EXISTS prospects_phone_key/);
+  assert.match(migration, /idx_prospects_org_normalized_phone/);
+  assert.match(migration, /organization_id, normalized_phone/);
+  assert.match(migration, /idx_prospects_org_phone/);
 });

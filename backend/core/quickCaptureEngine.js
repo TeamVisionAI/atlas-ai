@@ -125,7 +125,49 @@ async function findProspectByNormalizedPhone(normalizedPhone, organizationId) {
     return null;
   }
 
-  return findProspectByNormalizedPhoneInOrganization(normalizedPhone, organizationId);
+  const prospect = await findProspectByNormalizedPhoneInOrganization(
+    normalizedPhone,
+    organizationId
+  );
+
+  // Fail closed: never treat a foreign-org row as an in-tenant existing prospect.
+  if (
+    prospect &&
+    prospect.organization_id &&
+    String(prospect.organization_id) !== String(organizationId)
+  ) {
+    return null;
+  }
+
+  return prospect;
+}
+
+/**
+ * 409 Existing Prospect only when the conflict is in the effective organization.
+ * Never return a Team Vision (or other tenant) row to a Team Legacy Support Mode session.
+ */
+function buildDuplicateProspectConflict(duplicate, atlasUser, organizationId) {
+  if (
+    !duplicate ||
+    !duplicate.organization_id ||
+    String(duplicate.organization_id) !== String(organizationId)
+  ) {
+    return null;
+  }
+
+  return {
+    ok: false,
+    status: 409,
+    body: {
+      error: "DUPLICATE_PROSPECT",
+      message: "A prospect with this phone number already exists.",
+      prospect: buildProspectSummary(duplicate, {
+        organization_id: organizationId,
+        owner_user_id: atlasUser.id,
+        created_by_user_id: atlasUser.id
+      })
+    }
+  };
 }
 
 function buildPersistedLanguageFields(languageFields, { includePreferredColumn = true } = {}) {
@@ -270,17 +312,14 @@ async function createQuickCaptureProspect(payload, atlasUser, options = {}) {
   const { organizationId } = organizationResolution;
   const { data } = validation;
   const existing = await findProspectByNormalizedPhone(data.normalizedPhone, organizationId);
+  const existingConflict = buildDuplicateProspectConflict(
+    existing,
+    atlasUser,
+    organizationId
+  );
 
-  if (existing) {
-    return {
-      ok: false,
-      status: 409,
-      body: {
-        error: "DUPLICATE_PROSPECT",
-        message: "A prospect with this phone number already exists.",
-        prospect: buildProspectSummary(existing)
-      }
-    };
+  if (existingConflict) {
+    return existingConflict;
   }
 
   const prospectNumber = await generateNextProspectNumber();
@@ -333,16 +372,29 @@ async function createQuickCaptureProspect(payload, atlasUser, options = {}) {
   if (error) {
     if (error.code === "23505") {
       const duplicate = await findProspectByNormalizedPhone(data.normalizedPhone, organizationId);
+      const conflict = buildDuplicateProspectConflict(
+        duplicate,
+        atlasUser,
+        organizationId
+      );
+
+      if (conflict) {
+        return conflict;
+      }
+
+      // Legacy global unique indexes (pre-045) can collide across tenants.
+      // Do not expose a foreign-org prospect or invent an "Open Existing" payload.
+      console.error(
+        "[quick-capture] unique constraint without same-org duplicate",
+        error.message,
+        { organizationId, phone: data.phone }
+      );
       return {
         ok: false,
-        status: 409,
+        status: 500,
         body: {
-          error: "DUPLICATE_PROSPECT",
-          message: "A prospect with this phone number already exists.",
-          prospect: buildProspectSummary(duplicate || { phone: data.phone }, {
-            owner_user_id: atlasUser.id,
-            created_by_user_id: atlasUser.id
-          })
+          error: "QUICK_CAPTURE_FAILED",
+          message: "Unable to save prospect."
         }
       };
     }
