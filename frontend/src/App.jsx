@@ -54,6 +54,7 @@ const AppointmentSettings = lazy(() => import("./pages/configuration/Appointment
 const QrCampaignsConfiguration = lazy(() =>
   import("./pages/configuration/QrCampaignsConfiguration")
 );
+const RecruitingConfiguration = lazy(() => import("./pages/configuration/RecruitingConfiguration"));
 
 function LegacyRedirect({ suffix = "" }) {
   const location = useLocation();
@@ -163,6 +164,7 @@ export default function App() {
           <Route path="whatsapp/success" element={<WhatsAppConnectSuccess />} />
           <Route path="whatsapp/error" element={<WhatsAppConnectError />} />
           <Route path="scheduling" element={<SchedulingConfiguration />} />
+          <Route path="recruiting" element={<RecruitingConfiguration />} />
           <Route path="appointments" element={<AppointmentSettings />} />
           <Route path="qr-campaigns" element={<QrCampaignsConfiguration />} />
         </Route>

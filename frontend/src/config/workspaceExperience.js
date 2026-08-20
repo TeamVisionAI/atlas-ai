@@ -343,6 +343,10 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ORG_READ
   },
+  "settings/recruiting": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ORG_READ
+  },
   // BR-110 — MANAGEMENT (RVP / DL / RL) may open self Appointments settings.
   // API remains self-scoped; Review Users / org Scheduling stay admin-gated.
   "settings/appointments": {
@@ -528,6 +532,16 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "scheduling",
     descriptionKey: "configurationHubSchedulingDescription",
     icon: "scheduling",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    permission: PERMISSIONS.ORG_READ
+  },
+  {
+    id: "recruiting",
+    routeKey: "settings/recruiting",
+    path: appPath("settings/recruiting"),
+    titleKey: "recruiting",
+    descriptionKey: "configurationHubRecruitingDescription",
+    icon: "recruiting",
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.ORG_READ
   },
