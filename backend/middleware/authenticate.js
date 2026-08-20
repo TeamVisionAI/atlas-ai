@@ -9,6 +9,7 @@ const { verifyAccessToken, isJwtFormat } = require("../security/jwtService");
 const { buildAuthContextAsync, isActiveContext } = require("../security/authorizationService");
 const { normalizeUserRecord } = require("../security/normalizeUserRecord");
 const { isSuperAdmin } = require("../security/saasRoles");
+const { resolveAuthSessionId } = require("../security/authSessionIdentity");
 const { supabase } = require("../services/supabaseService");
 const { extractBearerToken } = require("./extractBearerToken");
 
@@ -129,18 +130,40 @@ async function authenticate(req, res, next) {
       });
     }
 
+    const supportModeService = require("../services/supportModeService");
+    const { resolveEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
+    const authSessionId = resolveAuthSessionId({
+      jwtPayload,
+      sessionToken: token
+    });
+
+    const supportContext = isSuperAdmin(authContext.saasRole)
+      ? await supportModeService.loadSupportContextForRequest(user.id, authSessionId)
+      : null;
+    const effectiveOrganizationId = resolveEffectiveOrganizationId(authContext, supportContext);
+
     req.atlasUser = user;
     req.atlasSessionToken = token;
+    req.authSessionId = authSessionId;
     req.authContext = authContext;
     req.sanitizedUser = sanitizeUser(user);
     req.jwtPayload = jwtPayload;
+    req.supportContext = supportContext;
+    req.effectiveOrganizationId = effectiveOrganizationId;
     req.tenantContext = {
-      organizationId: authContext.organizationId,
+      organizationId: effectiveOrganizationId,
+      homeOrganizationId: authContext.organizationId,
       userId: authContext.userId,
       role: authContext.role,
       saasRole: authContext.saasRole,
       permissions: authContext.permissions || [],
-      isSuperAdmin: isSuperAdmin(authContext.saasRole)
+      isSuperAdmin: isSuperAdmin(authContext.saasRole),
+      supportMode: supportContext
+        ? {
+            organizationId: supportContext.organizationId,
+            enteredAt: supportContext.enteredAt
+          }
+        : null
     };
     return next();
   } catch (error) {

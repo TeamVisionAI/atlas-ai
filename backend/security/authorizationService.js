@@ -190,13 +190,13 @@ function canAccessOperationsCenter(context) {
   );
 }
 
-function resolveOrganizationId(context, requestedOrganizationId) {
+function resolveOrganizationId(context, requestedOrganizationId, options = {}) {
   if (!context) {
     return DEFAULT_ORGANIZATION_ID;
   }
 
-  if (isSuperAdmin(context.saasRole) && requestedOrganizationId) {
-    return requestedOrganizationId;
+  if (options.effectiveOrganizationId) {
+    return options.effectiveOrganizationId;
   }
 
   return context.organizationId || DEFAULT_ORGANIZATION_ID;

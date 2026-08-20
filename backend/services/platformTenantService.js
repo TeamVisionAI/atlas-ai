@@ -1,0 +1,369 @@
+/**
+ * Platform tenant provisioning — super-admin only (no billing).
+ */
+
+const { supabase } = require("./supabaseService");
+const { writeAuditLog } = require("../security/auditLogService");
+const identityAdminService = require("./identityAdminService");
+const { ROLES, USER_STATUSES } = require("../security/roles");
+
+const TENANT_STATUS = Object.freeze({
+  ACTIVE: "ACTIVE",
+  TRIAL: "TRIAL",
+  SUSPENDED: "SUSPENDED"
+});
+
+const ALL_TENANT_STATUSES = Object.freeze(Object.values(TENANT_STATUS));
+
+function slugifyOrganizationName(name) {
+  return String(name || "organization")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || "organization";
+}
+
+function normalizeTenantStatus(value) {
+  const status = String(value || TENANT_STATUS.ACTIVE)
+    .trim()
+    .toUpperCase();
+
+  if (!ALL_TENANT_STATUSES.includes(status)) {
+    const error = new Error("Invalid tenant status.");
+    error.statusCode = 400;
+    error.publicCode = "INVALID_TENANT_STATUS";
+    throw error;
+  }
+
+  return status;
+}
+
+function mapTenantStatusToOrganizationFields(lifecycleStatus) {
+  switch (lifecycleStatus) {
+    case TENANT_STATUS.TRIAL:
+      return {
+        status: "trial",
+        is_active: true,
+        subscription_status: "trial"
+      };
+    case TENANT_STATUS.SUSPENDED:
+      return {
+        status: "suspended",
+        is_active: false,
+        subscription_status: "suspended"
+      };
+    case TENANT_STATUS.ACTIVE:
+    default:
+      return {
+        status: "active",
+        is_active: true,
+        subscription_status: "active"
+      };
+  }
+}
+
+function deriveLifecycleStatus(row = {}) {
+  const subscription = String(row.subscription_status || "").toLowerCase();
+  const status = String(row.status || "").toLowerCase();
+
+  if (row.is_active === false || status === "suspended" || subscription === "suspended") {
+    return TENANT_STATUS.SUSPENDED;
+  }
+
+  if (status === "trial" || subscription === "trial") {
+    return TENANT_STATUS.TRIAL;
+  }
+
+  return TENANT_STATUS.ACTIVE;
+}
+
+function presentTenant(row) {
+  if (!row) {
+    return null;
+  }
+
+  const lifecycleStatus = deriveLifecycleStatus(row);
+
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    lifecycleStatus,
+    status: row.status,
+    isActive: row.is_active !== false,
+    subscriptionPlan: row.subscription_plan || null,
+    subscriptionStatus: row.subscription_status || null,
+    ownerUserId: row.owner_user_id || null,
+    timezone: row.timezone || null,
+    logoUrl: row.logo_url || null,
+    primaryColor: row.primary_color || null,
+    secondaryColor: row.secondary_color || null,
+    website: row.website || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function isTenantOperational(lifecycleStatus) {
+  return (
+    lifecycleStatus === TENANT_STATUS.ACTIVE || lifecycleStatus === TENANT_STATUS.TRIAL
+  );
+}
+
+async function createTenant(input = {}, auditMeta = {}) {
+  const name = String(input.name || "").trim();
+
+  if (!name) {
+    const error = new Error("Organization name is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const lifecycleStatus = normalizeTenantStatus(input.status || input.lifecycleStatus);
+  const slug = String(input.slug || slugifyOrganizationName(name)).trim().toLowerCase();
+  const mapped = mapTenantStatusToOrganizationFields(lifecycleStatus);
+  const now = new Date().toISOString();
+
+  const insertRow = {
+    name,
+    slug,
+    status: mapped.status,
+    is_active: mapped.is_active,
+    subscription_plan: input.subscriptionPlan || input.subscription_plan || "professional",
+    subscription_status: mapped.subscription_status,
+    timezone: input.timezone || "America/New_York",
+    logo_url: input.logoUrl || input.logo_url || null,
+    primary_color: input.primaryColor || input.primary_color || null,
+    secondary_color: input.secondaryColor || input.secondary_color || null,
+    website: input.website || null,
+    updated_at: now
+  };
+
+  const { data, error } = await supabase.from("organizations").insert(insertRow).select("*").single();
+
+  if (error) {
+    if (error.code === "23505") {
+      const conflict = new Error("Organization slug already exists.");
+      conflict.statusCode = 409;
+      conflict.publicCode = "ORGANIZATION_SLUG_CONFLICT";
+      throw conflict;
+    }
+
+    throw error;
+  }
+
+  await supabase.from("organization_subscriptions").upsert(
+    {
+      organization_id: data.id,
+      plan: insertRow.subscription_plan,
+      status: mapped.subscription_status,
+      renewal_date: null,
+      updated_at: now
+    },
+    { onConflict: "organization_id" }
+  );
+
+  await writeAuditLog({
+    organizationId: data.id,
+    userId: auditMeta.userId || null,
+    userEmail: auditMeta.userEmail || null,
+    action: "platform.tenant_created",
+    targetType: "organization",
+    targetId: data.id,
+    metadata: {
+      name,
+      slug,
+      lifecycleStatus
+    },
+    ipAddress: auditMeta.ipAddress,
+    userAgent: auditMeta.userAgent
+  });
+
+  return presentTenant(data);
+}
+
+async function listTenants(query = {}) {
+  const limit = Math.min(Math.max(Number(query.limit) || 50, 1), 200);
+  const offset = Math.max(Number(query.offset) || 0, 0);
+
+  let dbQuery = supabase
+    .from("organizations")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (query.q) {
+    const needle = `%${String(query.q).trim()}%`;
+    dbQuery = dbQuery.or(`name.ilike.${needle},slug.ilike.${needle}`);
+  }
+
+  const { data, error, count } = await dbQuery;
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    items: (data || []).map(presentTenant),
+    total: count ?? (data || []).length,
+    limit,
+    offset
+  };
+}
+
+async function getTenant(organizationId) {
+  if (!organizationId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return presentTenant(data);
+}
+
+async function setTenantStatus(organizationId, lifecycleStatusInput, auditMeta = {}) {
+  const lifecycleStatus = normalizeTenantStatus(lifecycleStatusInput);
+  const mapped = mapTenantStatusToOrganizationFields(lifecycleStatus);
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .update({
+      status: mapped.status,
+      is_active: mapped.is_active,
+      subscription_status: mapped.subscription_status,
+      updated_at: now
+    })
+    .eq("id", organizationId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    const notFound = new Error("Organization not found.");
+    notFound.statusCode = 404;
+    notFound.publicCode = "ORGANIZATION_NOT_FOUND";
+    throw notFound;
+  }
+
+  await supabase.from("organization_subscriptions").upsert(
+    {
+      organization_id: organizationId,
+      status: mapped.subscription_status,
+      updated_at: now
+    },
+    { onConflict: "organization_id" }
+  );
+
+  await writeAuditLog({
+    organizationId,
+    userId: auditMeta.userId || null,
+    userEmail: auditMeta.userEmail || null,
+    action: "platform.tenant_status_updated",
+    targetType: "organization",
+    targetId: organizationId,
+    metadata: { lifecycleStatus },
+    ipAddress: auditMeta.ipAddress,
+    userAgent: auditMeta.userAgent
+  });
+
+  return presentTenant(data);
+}
+
+async function assertTenantOperational(organizationId) {
+  const tenant = await getTenant(organizationId);
+
+  if (!tenant) {
+    const error = new Error("Organization not found.");
+    error.statusCode = 404;
+    error.publicCode = "ORGANIZATION_NOT_FOUND";
+    throw error;
+  }
+
+  if (!isTenantOperational(tenant.lifecycleStatus)) {
+    const error = new Error("Tenant is suspended.");
+    error.statusCode = 403;
+    error.publicCode = "TENANT_SUSPENDED";
+    throw error;
+  }
+
+  return tenant;
+}
+
+async function provisionTenantAdmin(organizationId, input = {}, authContext = {}, auditMeta = {}) {
+  const tenant = await getTenant(organizationId);
+
+  if (!tenant) {
+    const error = new Error("Organization not found.");
+    error.statusCode = 404;
+    error.publicCode = "ORGANIZATION_NOT_FOUND";
+    throw error;
+  }
+
+  const result = await identityAdminService.createUser(
+    {
+      ...input,
+      role: input.role || ROLES.ADMINISTRATOR,
+      organizationId
+    },
+    authContext,
+    auditMeta,
+    { allowTargetOrganizationId: true }
+  );
+
+  if (result.user?.id) {
+    await supabase
+      .from("organizations")
+      .update({
+        owner_user_id: result.user.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", organizationId);
+  }
+
+  await writeAuditLog({
+    organizationId,
+    userId: authContext.userId,
+    userEmail: authContext.email,
+    action: "platform.tenant_admin_provisioned",
+    targetType: "atlas_user",
+    targetId: result.user?.id || null,
+    metadata: {
+      email: result.user?.email || input.email,
+      role: ROLES.ADMINISTRATOR
+    },
+    ipAddress: auditMeta.ipAddress,
+    userAgent: auditMeta.userAgent
+  });
+
+  return result;
+}
+
+module.exports = {
+  TENANT_STATUS,
+  ALL_TENANT_STATUSES,
+  slugifyOrganizationName,
+  normalizeTenantStatus,
+  deriveLifecycleStatus,
+  mapTenantStatusToOrganizationFields,
+  presentTenant,
+  isTenantOperational,
+  createTenant,
+  listTenants,
+  getTenant,
+  setTenantStatus,
+  assertTenantOperational,
+  provisionTenantAdmin
+};

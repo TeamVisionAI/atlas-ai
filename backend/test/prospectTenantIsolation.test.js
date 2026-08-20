@@ -588,7 +588,7 @@ test("HTTP: non-super-admin org override via body is blocked by organizationGuar
   });
 });
 
-test("HTTP: super-admin remains scoped to selected org only", async () => {
+test("HTTP: super-admin remains scoped to selected org only via Support Mode", async () => {
   const store = new InMemoryProspectStore();
   const service = new ProspectApplicationService({
     repository: new MemoryOnlyRepository(store)
@@ -611,26 +611,28 @@ test("HTTP: super-admin remains scoped to selected org only", async () => {
       saasRole: SAAS_ROLES.SUPER_ADMIN
     };
     req.atlasUser = { id: "super-admin" };
+    req.supportContext = { organizationId: ORG_B, enteredAt: new Date().toISOString() };
+    req.effectiveOrganizationId = ORG_B;
     next();
   });
 
   const router = express.Router();
-  router.use(organizationGuard({ allowSuperAdminCrossOrg: true }));
+  router.use(organizationGuard());
   router.get("/:id", controller.getById.bind(controller));
   superApp.use("/api/prospects", router);
 
   await withServer(superApp, async (port) => {
     const scopedToB = await jsonRequest(port, {
       method: "GET",
-      path: `/api/prospects/${tenantB.prospectId}?organizationId=${ORG_B}`
-    });
-    const scopedToA = await jsonRequest(port, {
-      method: "GET",
       path: `/api/prospects/${tenantB.prospectId}`
+    });
+    const foreignOverride = await jsonRequest(port, {
+      method: "GET",
+      path: `/api/prospects/${tenantB.prospectId}?organizationId=${ORG_A}`
     });
 
     assert.equal(scopedToB.status, 200);
-    assert.equal(scopedToA.status, 404);
+    assert.equal(foreignOverride.status, 403);
   });
 });
 

@@ -20,6 +20,7 @@ const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constan
 const { resolveWorkspaceOrganizationId } = require("../core/tenantOrganization");
 const { sanitizeListQuery } = require("../core/listQuerySanitizer");
 const identityWriteService = require("./identityWriteService");
+const { isSuperAdmin } = require("../security/saasRoles");
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -175,7 +176,7 @@ async function getUserById(userId, authContext) {
   }
 }
 
-async function createUser(input, authContext, auditMeta = {}) {
+async function createUser(input, authContext, auditMeta = {}, options = {}) {
   const email = String(input.email || "").trim().toLowerCase();
   const role = normalizeRole(input.role);
 
@@ -197,7 +198,26 @@ async function createUser(input, authContext, auditMeta = {}) {
   const lastName = String(input.lastName || input.last_name || "").trim();
   const status = normalizeStatus(input.status) || USER_STATUSES.PENDING_INVITATION;
 
-  const organizationId = await resolveWorkspaceOrganizationId(authContext);
+  let organizationId = await resolveWorkspaceOrganizationId(authContext);
+  const requestedOrganizationId = input.organizationId || input.organization_id || null;
+
+  if (requestedOrganizationId) {
+    if (options.allowTargetOrganizationId) {
+      if (!isSuperAdmin(authContext.saasRole || authContext.role)) {
+        const error = new Error("Cross-organization user creation is not permitted.");
+        error.statusCode = 403;
+        error.publicCode = "FORBIDDEN";
+        throw error;
+      }
+
+      organizationId = requestedOrganizationId;
+    } else if (String(requestedOrganizationId) !== String(organizationId)) {
+      const error = new Error("Cross-organization user creation is not permitted.");
+      error.statusCode = 403;
+      error.publicCode = "FORBIDDEN";
+      throw error;
+    }
+  }
 
   const user = await identityWriteService.createUser({
     email,
@@ -205,7 +225,7 @@ async function createUser(input, authContext, auditMeta = {}) {
     last_name: lastName,
     rep_id: input.repId ?? input.rep_id ?? null,
     phone: input.phone || null,
-    organization_id: input.organizationId || organizationId || DEFAULT_ORGANIZATION_ID,
+    organization_id: organizationId || DEFAULT_ORGANIZATION_ID,
     division_id: input.divisionId || input.division_id || null,
     reports_to_user_id: input.reportsToUserId || input.reports_to_user_id || null,
     role,

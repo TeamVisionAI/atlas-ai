@@ -1,0 +1,60 @@
+/**
+ * Block operational access for suspended home/effective tenants (normal users).
+ * Platform routes and super-admin home-org inspection are handled separately.
+ */
+
+const { isSuperAdmin } = require("../security/saasRoles");
+const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
+const platformTenantService = require("../services/platformTenantService");
+
+function isExemptOperationalTenantCheck(req) {
+  const path = String(req.originalUrl || req.url || req.path || "");
+
+  if (
+    path.startsWith("/api/platform") ||
+    path.startsWith("/api/auth") ||
+    path.startsWith("/api/setup") ||
+    path.startsWith("/health") ||
+    path.startsWith("/webhook") ||
+    path.startsWith("/api/platform-status")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+async function tenantOperationalGuard(req, res, next) {
+  try {
+    if (!req.authContext || isExemptOperationalTenantCheck(req)) {
+      return next();
+    }
+
+    if (isSuperAdmin(req.authContext.saasRole || req.authContext.role)) {
+      return next();
+    }
+
+    const organizationId = getEffectiveOrganizationId(req);
+    const tenant = await platformTenantService.getTenant(organizationId);
+
+    if (tenant && !platformTenantService.isTenantOperational(tenant.lifecycleStatus)) {
+      return res.status(403).json({
+        error: "TENANT_SUSPENDED",
+        message: "This organization is suspended."
+      });
+    }
+
+    return next();
+  } catch (error) {
+    console.error("[tenantOperationalGuard]", error.message);
+    return res.status(500).json({
+      error: "TENANT_GUARD_FAILED",
+      message: "Unable to validate tenant status."
+    });
+  }
+}
+
+module.exports = {
+  tenantOperationalGuard,
+  isExemptOperationalTenantCheck
+};
