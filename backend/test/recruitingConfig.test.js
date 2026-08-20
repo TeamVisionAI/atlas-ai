@@ -198,6 +198,24 @@ test("org A config never loads for org B", async () => {
   assert.notEqual(b.config.profile.businessName, "Org A Custom");
 });
 
+test("child tenant cannot mutate Team Vision recruiting config", async () => {
+  const store = createMemoryPersistence({
+    [ORG_A]: { recruiting: cloneTeamVisionRecruitingDefault() }
+  });
+  recruitingConfigService.setRecruitingConfigPersistenceForTests(store);
+
+  await assert.rejects(
+    () =>
+      recruitingConfigService.updateRecruitingConfig(
+        ORG_A,
+        { profile: { businessName: "Hijacked" } },
+        { organizationId: ORG_B }
+      ),
+    (error) => error.publicCode === "SEED_TENANT_PROTECTED"
+  );
+  assert.equal(store.rows.get(ORG_A).recruiting.profile.businessName, "Team Vision");
+});
+
 test("Team Vision seed persistence does not alter other settings", async () => {
   const recruiting = cloneTeamVisionRecruitingDefault();
   const existing = {

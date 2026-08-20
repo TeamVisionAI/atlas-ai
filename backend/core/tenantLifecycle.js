@@ -1,6 +1,13 @@
 /**
  * BR-145 — Canonical SaaS tenant lifecycle (platform billing).
+ * BR-146 — Team Vision seed tenant is excluded from automatic trial expiry.
  */
+
+const {
+  TEAM_VISION_ORGANIZATION_ID,
+  isTeamVisionSeedTenant,
+  shouldSkipAutomaticTrialExpiry
+} = require("./teamVisionSeedTenant");
 
 const TENANT_STATUS = Object.freeze({
   TRIAL: "TRIAL",
@@ -21,8 +28,6 @@ const PAYMENT_METHODS = Object.freeze({
 });
 
 const ALL_PAYMENT_METHODS = Object.freeze(Object.values(PAYMENT_METHODS));
-
-const TEAM_VISION_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
 
 function normalizeTenantStatus(value) {
   const status = String(value || TENANT_STATUS.ACTIVE)
@@ -97,7 +102,11 @@ function isTrialExpired(trialEndsAt, now = new Date()) {
   return new Date(trialEndsAt).getTime() <= now.getTime();
 }
 
-function isTenantOperational(lifecycleStatus, { trialEndsAt, now } = {}) {
+function isTenantOperational(lifecycleStatus, { trialEndsAt, now, organizationId } = {}) {
+  if (shouldSkipAutomaticTrialExpiry(organizationId) || isTeamVisionSeedTenant(organizationId)) {
+    return lifecycleStatus !== TENANT_STATUS.SUSPENDED;
+  }
+
   if (lifecycleStatus === TENANT_STATUS.SUSPENDED) {
     return false;
   }
@@ -153,6 +162,8 @@ module.exports = {
   PAYMENT_METHODS,
   ALL_PAYMENT_METHODS,
   TEAM_VISION_ORGANIZATION_ID,
+  isTeamVisionSeedTenant,
+  shouldSkipAutomaticTrialExpiry,
   normalizeTenantStatus,
   mapTenantStatusToOrganizationFields,
   deriveLifecycleStatusFromOrg,

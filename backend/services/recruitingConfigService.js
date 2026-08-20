@@ -12,6 +12,7 @@ const {
   mergeRecruitingConfig,
   validateRecruitingConfig
 } = require("../core/recruitingConfig");
+const { assertCannotMutateSeedFromOtherTenant } = require("../core/teamVisionSeedTenant");
 
 let persistence = null;
 
@@ -87,6 +88,7 @@ async function getRecruitingConfig(organizationId) {
       organizationId: orgId,
       source: CONFIG_SOURCES.DEFAULT_TEMPLATE,
       persisted: false,
+      // BR-146 — clone defaults only; never write back to the Team Vision seed tenant.
       config: cloneTeamVisionRecruitingDefault()
     };
   }
@@ -101,6 +103,7 @@ async function getRecruitingConfig(organizationId) {
 
 async function updateRecruitingConfig(organizationId, patch, actor = {}) {
   const orgId = requireOrganizationId(organizationId);
+  assertCannotMutateSeedFromOtherTenant(orgId, actor.organizationId);
   if (patch && typeof patch === "object") {
     if (patch.organizationId != null || patch.organization_id != null) {
       const error = new Error("organizationId cannot be supplied in the recruiting config body.");

@@ -5,6 +5,7 @@
 
 const { isSuperAdmin } = require("../security/saasRoles");
 const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
+const { shouldSkipAutomaticTrialExpiry } = require("../core/teamVisionSeedTenant");
 const platformTenantService = require("../services/platformTenantService");
 const tenantBillingService = require("../services/tenantBillingService");
 
@@ -46,7 +47,9 @@ async function tenantOperationalGuard(req, res, next) {
 
     const organizationId = getEffectiveOrganizationId(req);
 
-    await tenantBillingService.expireTrialIfNeeded(organizationId, auditMetaFromRequest(req));
+    if (!shouldSkipAutomaticTrialExpiry(organizationId)) {
+      await tenantBillingService.expireTrialIfNeeded(organizationId, auditMetaFromRequest(req));
+    }
 
     const tenant = await platformTenantService.getTenant(organizationId);
 

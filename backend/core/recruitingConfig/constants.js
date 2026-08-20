@@ -71,7 +71,7 @@ const LIMITS = Object.freeze({
   maxSupportedLanguages: 2
 });
 
-const TEAM_VISION_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
+const { TEAM_VISION_ORGANIZATION_ID } = require("../teamVisionSeedTenant");
 
 module.exports = {
   SCHEMA_VERSION,
