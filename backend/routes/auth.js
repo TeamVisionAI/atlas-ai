@@ -19,7 +19,7 @@ function withPlatformIdentity(payload, req) {
   return {
     ...payload,
     saasRole: req.authContext?.saasRole || null,
-    isSuperAdmin: isSuperAdmin(req.authContext?.saasRole || req.authContext?.role)
+    isSuperAdmin: isSuperAdmin(req.authContext?.saasRole)
   };
 }
 

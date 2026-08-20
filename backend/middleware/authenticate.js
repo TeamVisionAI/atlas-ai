@@ -8,7 +8,7 @@ const { findUserById } = require("../services/userService");
 const { verifyAccessToken, isJwtFormat } = require("../security/jwtService");
 const { buildAuthContextAsync, isActiveContext } = require("../security/authorizationService");
 const { normalizeUserRecord } = require("../security/normalizeUserRecord");
-const { isSuperAdmin } = require("../security/saasRoles");
+const { isSuperAdmin, resolveCanonicalIdentity } = require("../security/saasRoles");
 const { resolveAuthSessionId } = require("../security/authSessionIdentity");
 const { supabase } = require("../services/supabaseService");
 const { extractBearerToken } = require("./extractBearerToken");
@@ -19,22 +19,31 @@ async function mergeAtlasUserProfile(user) {
   }
 
   const atlasUser = normalizeUserRecord(await findAtlasUserById(user.id));
+  const canonicalUser = normalizeUserRecord(await findUserById(user.id));
+  const identity = resolveCanonicalIdentity({
+    usersRole: canonicalUser?.role,
+    atlasRole: atlasUser?.role || (canonicalUser ? null : user.role)
+  });
 
-  if (!atlasUser) {
+  if (!atlasUser && !canonicalUser) {
     return user;
   }
 
   return normalizeUserRecord({
-    ...atlasUser,
+    ...(atlasUser || {}),
     ...user,
-    organization_id: atlasUser.organization_id || user.organization_id,
-    role: atlasUser.role || user.role,
-    status: atlasUser.status || user.status,
-    email: atlasUser.email || user.email,
-    display_name: atlasUser.display_name || user.display_name || user.name,
-    first_name: atlasUser.first_name || user.first_name,
-    last_name: atlasUser.last_name || user.last_name,
-    password_hash: atlasUser.password_hash || user.password_hash
+    organization_id:
+      atlasUser?.organization_id || canonicalUser?.organization_id || user.organization_id,
+    email: atlasUser?.email || canonicalUser?.email || user.email,
+    display_name:
+      atlasUser?.display_name || user.display_name || canonicalUser?.name || user.name,
+    first_name: atlasUser?.first_name || user.first_name,
+    last_name: atlasUser?.last_name || user.last_name,
+    status: atlasUser?.status || user.status,
+    password_hash: atlasUser?.password_hash || user.password_hash || canonicalUser?.password_hash,
+    role: identity.legacyRole || user.role,
+    saas_role: identity.saasRole || null,
+    users_role: canonicalUser?.role || null
   });
 }
 
@@ -76,7 +85,7 @@ async function resolveUserFromJwt(token) {
     tokenOrgId &&
     userOrgId &&
     String(tokenOrgId) !== String(userOrgId) &&
-    !isSuperAdmin(payload.role)
+    !isSuperAdmin(user.saas_role || payload.role)
   ) {
     return { user: null, reason: "organization_mismatch" };
   }
@@ -177,5 +186,6 @@ async function authenticate(req, res, next) {
 
 module.exports = {
   authenticate,
-  resolveUserFromJwt
+  resolveUserFromJwt,
+  mergeAtlasUserProfile
 };
