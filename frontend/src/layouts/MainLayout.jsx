@@ -1,5 +1,5 @@
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appPath } from "../config/appRoutes";
 import {
   buildNavItemsForUser,
@@ -16,6 +16,9 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
 import { getConversationsAttentionCount } from "../services/conversationsCenterService";
+import { exitSupportMode, getSupportMode } from "../services/platformService";
+import { isSuperAdminUser } from "../security/isSuperAdminUser";
+import SupportModeBanner from "../components/layout/SupportModeBanner";
 import "./MainLayout.css";
 
 const NIOVEL_USER_ID = "33ad243a-9d00-4a4d-810b-df2762c0f076";
@@ -152,13 +155,18 @@ function SidebarNav({
 export default function MainLayout() {
   const { language, toggleLanguage, translate, syncFromUser } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const layoutMode = useLayoutMode();
   const [phoneNavOpen, setPhoneNavOpen] = useState(false);
   const [tabletNavCollapsed, setTabletNavCollapsed] = useState(false);
   const [operationsAllowed, setOperationsAllowed] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [conversationsAttentionCount, setConversationsAttentionCount] = useState(0);
+  const [supportMode, setSupportMode] = useState(null);
+  const [exitingSupportMode, setExitingSupportMode] = useState(false);
+  const currentUserRef = useRef(null);
   const metaReviewMode = isMetaReviewWorkspaceActive(currentUser);
+  currentUserRef.current = currentUser;
 
   const navItems = useMemo(
     () => buildNavItemsForUser(currentUser, { operationsAllowed }),
@@ -176,6 +184,39 @@ export default function MainLayout() {
     }
   }, []);
 
+  const refreshSupportMode = useCallback(async (userOverride) => {
+    const user = userOverride !== undefined ? userOverride : currentUserRef.current;
+
+    if (!isSuperAdminUser(user)) {
+      setSupportMode(null);
+      return null;
+    }
+
+    try {
+      const status = await getSupportMode();
+      setSupportMode(status);
+      return status;
+    } catch {
+      setSupportMode(null);
+      return null;
+    }
+  }, []);
+
+  const handleExitSupportMode = useCallback(async () => {
+    setExitingSupportMode(true);
+
+    try {
+      await exitSupportMode();
+      await refreshSupportMode();
+      await refreshUser();
+      navigate(appPath("platform/tenants"));
+    } catch {
+      await refreshSupportMode();
+    } finally {
+      setExitingSupportMode(false);
+    }
+  }, [navigate, refreshSupportMode, refreshUser]);
+
   const workspaceValue = useMemo(
     () => ({
       user: currentUser,
@@ -183,15 +224,19 @@ export default function MainLayout() {
       workspaceType: resolveWorkspaceType(currentUser?.role),
       navItems,
       landingPath: currentUser ? getDefaultLandingPath(currentUser.role) : appPath("login"),
-      refreshUser
+      refreshUser,
+      supportMode,
+      refreshSupportMode
     }),
-    [currentUser, operationsAllowed, navItems, refreshUser]
+    [currentUser, operationsAllowed, navItems, refreshUser, supportMode, refreshSupportMode]
   );
 
   useEffect(() => {
     ensureAtlasSession().catch(() => {});
-    refreshUser();
-  }, [location.pathname, refreshUser]);
+    refreshUser().then((user) => {
+      refreshSupportMode(user);
+    });
+  }, [location.pathname, refreshUser, refreshSupportMode]);
 
   useEffect(() => {
     if (currentUser) {
@@ -342,6 +387,12 @@ export default function MainLayout() {
         </aside>
 
         <div className="atlas-layout__frame">
+          <SupportModeBanner
+            supportMode={supportMode}
+            onExit={handleExitSupportMode}
+            exiting={exitingSupportMode}
+            translate={translate}
+          />
           {isStagingUi() ? (
             <div className="atlas-layout__staging-banner" role="status" data-atlas-env="staging">
               STAGING
