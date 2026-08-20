@@ -2,7 +2,12 @@ import { isSuperAdminUser } from "./isSuperAdminUser.js";
 
 export { isSuperAdminUser };
 
-export const TENANT_LIFECYCLE_STATUSES = Object.freeze(["TRIAL", "ACTIVE", "SUSPENDED"]);
+export const TENANT_LIFECYCLE_STATUSES = Object.freeze([
+  "TRIAL",
+  "ACTIVE",
+  "PAST_DUE",
+  "SUSPENDED"
+]);
 export const DEFAULT_CREATE_TENANT_STATUS = "TRIAL";
 
 export function shouldShowPlatformNav(user) {
@@ -25,6 +30,13 @@ export function canEnterSupportMode(tenant) {
 
 export function requiresSuspendConfirmation(status) {
   return String(status || "").trim().toUpperCase() === "SUSPENDED";
+}
+
+export function requiresReactivateConfirmation(currentStatus, nextStatus) {
+  const current = String(currentStatus || "").trim().toUpperCase();
+  const next = String(nextStatus || "").trim().toUpperCase();
+
+  return current === "SUSPENDED" && next && next !== "SUSPENDED";
 }
 
 export function shouldConfirmSupportModeSwitch(supportMode, targetOrganizationId) {

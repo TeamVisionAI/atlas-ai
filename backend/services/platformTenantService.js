@@ -52,8 +52,17 @@ function presentTenant(row, subscriptionRow = null) {
     lifecycleStatus,
     status: row.status,
     isActive: row.is_active !== false,
+    isSeedTenant: isTeamVisionSeedTenant(row.id),
     subscriptionPlan: row.subscription_plan || subscriptionRow?.plan || null,
+    plan: subscriptionRow?.plan || row.subscription_plan || null,
     subscriptionStatus: row.subscription_status || subscriptionRow?.status || null,
+    monthlyPriceCents: subscriptionRow?.monthly_price_cents ?? null,
+    currency: subscriptionRow?.currency || null,
+    paymentMethod: subscriptionRow?.payment_method || null,
+    trialStartsAt: subscriptionRow?.trial_starts_at || null,
+    trialEndsAt: subscriptionRow?.trial_ends_at || null,
+    lastPaidAt: subscriptionRow?.last_paid_at || null,
+    nextDueAt: subscriptionRow?.next_due_at || null,
     ownerUserId: row.owner_user_id || null,
     timezone: row.timezone || null,
     logoUrl: row.logo_url || null,
@@ -61,8 +70,7 @@ function presentTenant(row, subscriptionRow = null) {
     secondaryColor: row.secondary_color || null,
     website: row.website || null,
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    trialEndsAt: subscriptionRow?.trial_ends_at || null
+    updatedAt: row.updated_at
   };
 }
 
@@ -161,12 +169,36 @@ async function listTenants(query = {}) {
     throw error;
   }
 
+  const rows = data || [];
+  const subscriptionsByOrgId = await loadSubscriptionSummaries(rows.map((row) => row.id));
+
   return {
-    items: (data || []).map((row) => presentTenant(row)),
-    total: count ?? (data || []).length,
+    items: rows.map((row) => presentTenant(row, subscriptionsByOrgId.get(row.id) || null)),
+    total: count ?? rows.length,
     limit,
     offset
   };
+}
+
+async function loadSubscriptionSummaries(organizationIds = []) {
+  const ids = organizationIds.filter(Boolean);
+
+  if (!ids.length) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("organization_subscriptions")
+    .select(
+      "organization_id, plan, status, trial_starts_at, trial_ends_at, monthly_price_cents, currency, payment_method, last_paid_at, next_due_at"
+    )
+    .in("organization_id", ids);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Map((data || []).map((row) => [row.organization_id, row]));
 }
 
 async function getTenant(organizationId) {

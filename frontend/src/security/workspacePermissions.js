@@ -25,7 +25,8 @@ export const PERMISSIONS = Object.freeze({
   OPERATIONS_ACCESS: "operations:access",
   ADMIN_USERS: "admin:users",
   ADMIN_ROLES: "admin:roles",
-  AUDIT_READ: "audit:read"
+  AUDIT_READ: "audit:read",
+  BILLING_ACCESS: "billing:access"
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
