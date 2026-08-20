@@ -6,7 +6,7 @@
 const { supabase } = require("./supabaseService");
 const { withPostgresTransaction } = require("./pgFallback");
 const { buildCandidateUrls } = require("../dev/environment/databaseConnection");
-const { mapLegacyRoleToSaas, buildUsersRowFromAtlasUser } = require("./userIdentitySyncService");
+const { buildUsersRowFromAtlasUser, resolveUsersRoleFromAtlasSync } = require("./userIdentitySyncService");
 const { USER_STATUSES } = require("../security/roles");
 const { normalizeRepId } = require("../core/repIdEngine");
 
@@ -103,7 +103,9 @@ function mapIsActiveToAtlasStatus(isActive) {
 
 function compareIdentityRows(atlasRow, usersRow) {
   const issues = [];
-  const usersRowFromAtlas = buildUsersRowFromAtlasUser(atlasRow);
+  const usersRowFromAtlas = buildUsersRowFromAtlasUser(atlasRow, {
+    existingUsersRole: usersRow?.role
+  });
 
   if (!usersRow) {
     issues.push({ field: "users_row", atlas: atlasRow.id, users: null });
@@ -115,7 +117,10 @@ function compareIdentityRows(atlasRow, usersRow) {
     ["organization_id", atlasRow.organization_id, usersRow.organization_id],
     [
       "role",
-      mapLegacyRoleToSaas(atlasRow.role),
+      resolveUsersRoleFromAtlasSync({
+        atlasRole: atlasRow.role,
+        existingUsersRole: usersRow.role
+      }),
       usersRow.role
     ],
     [
@@ -153,6 +158,32 @@ function splitName(name) {
   };
 }
 
+async function fetchExistingUsersRole(userId, client = null) {
+  if (!userId) {
+    return null;
+  }
+
+  if (client) {
+    const { rows } = await client.query("SELECT role FROM users WHERE id = $1 LIMIT 1", [userId]);
+    return rows[0]?.role || null;
+  }
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "42P01") {
+      return null;
+    }
+    throw error;
+  }
+
+  return data?.role || null;
+}
+
 async function fetchAtlasUser(userId, client = null) {
   if (client) {
     const { rows } = await client.query("SELECT * FROM atlas_users WHERE id = $1 LIMIT 1", [userId]);
@@ -169,7 +200,8 @@ async function fetchAtlasUser(userId, client = null) {
 }
 
 async function upsertUsersRowFromAtlas(atlasRow, client = null) {
-  const usersRow = buildUsersRowFromAtlasUser(atlasRow);
+  const existingUsersRole = await fetchExistingUsersRole(atlasRow?.id, client);
+  const usersRow = buildUsersRowFromAtlasUser(atlasRow, { existingUsersRole });
   const originalStatus = atlasRow.status;
 
   if (!usersRow?.id) {
@@ -187,7 +219,10 @@ async function upsertUsersRowFromAtlas(atlasRow, client = null) {
         email = EXCLUDED.email,
         rep_id = EXCLUDED.rep_id,
         password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash),
-        role = EXCLUDED.role,
+        role = CASE
+          WHEN users.role = 'SUPER_ADMIN' THEN users.role
+          ELSE EXCLUDED.role
+        END,
         is_active = EXCLUDED.is_active,
         last_login = COALESCE(EXCLUDED.last_login, users.last_login),
         updated_at = EXCLUDED.updated_at`,
@@ -424,22 +459,29 @@ async function recordLastLogin(userId) {
     );
 
     if (client) {
-      await client.query("UPDATE users SET last_login = $2, updated_at = $2 WHERE id = $1", [
-        userId,
-        timestamp
-      ]);
+      const updated = await client.query(
+        "UPDATE users SET last_login = $2, updated_at = $2 WHERE id = $1 RETURNING id",
+        [userId, timestamp]
+      );
+
+      if (!updated.rowCount) {
+        await upsertUsersRowFromAtlas(atlasRow, client);
+      }
     } else {
-      const usersRow = buildUsersRowFromAtlasUser(atlasRow);
-      await supabase
+      const { data, error } = await supabase
         .from("users")
-        .upsert(
-          {
-            ...usersRow,
-            last_login: timestamp,
-            updated_at: timestamp
-          },
-          { onConflict: "id" }
-        );
+        .update({ last_login: timestamp, updated_at: timestamp })
+        .eq("id", userId)
+        .select("id")
+        .maybeSingle();
+
+      if (error && error.code !== "42P01") {
+        throw error;
+      }
+
+      if (!data) {
+        await upsertUsersRowFromAtlas(atlasRow);
+      }
     }
 
     return atlasRow;
@@ -542,6 +584,7 @@ module.exports = {
   updateProfile,
   updatePhotoUrl,
   recordLastLogin,
+  upsertUsersRowFromAtlas,
   repairIdentityFromAtlas,
   verifyIdentityConsistency,
   compareIdentityRows,
