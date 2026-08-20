@@ -64,6 +64,21 @@ const ICONS = {
       <rect x="7" y="13" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
       <rect x="13" y="13" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
     </svg>
+  ),
+  recruiting: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M6 20v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1M16 3.5h4M18 1.5v4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 };
 
