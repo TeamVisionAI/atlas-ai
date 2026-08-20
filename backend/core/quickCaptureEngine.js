@@ -193,6 +193,8 @@ function buildProspectSummary(prospect, overrides = {}) {
     first_name: prospect.first_name || overrides.first_name || null,
     last_name: prospect.last_name || overrides.last_name || null,
     name: prospect.name || null,
+    organization_id:
+      prospect.organization_id || overrides.organization_id || overrides.organizationId || null,
     status: prospect.status || prospect.current_step || overrides.status || null,
     preferred_language: preferredLanguage,
     preferred_language_label: formatPreferredLanguageLabel(preferredLanguage),
@@ -211,8 +213,24 @@ function buildProspectSummary(prospect, overrides = {}) {
   };
 }
 
-function resolveQuickCaptureOrganizationId(atlasUser) {
-  const organizationId = atlasUser?.organization_id || atlasUser?.organizationId || null;
+/**
+ * Resolve Quick Capture write organization.
+ * Precedence (matches Atlas effective-tenant model):
+ * 1. explicit organizationId from route/getTenantOrganizationId
+ * 2. tenantContext.organizationId
+ * 3. effectiveOrganizationId
+ * 4. authenticated home organization_id (no Support Mode / no effective context)
+ *
+ * Implements Support Mode tenant scoping for Super Admin Quick Capture.
+ */
+function resolveQuickCaptureOrganizationId(atlasUser, options = {}) {
+  const organizationId =
+    options.organizationId ||
+    options.tenantContext?.organizationId ||
+    options.effectiveOrganizationId ||
+    atlasUser?.organization_id ||
+    atlasUser?.organizationId ||
+    null;
 
   if (!organizationId) {
     return {
@@ -232,7 +250,7 @@ function resolveQuickCaptureOrganizationId(atlasUser) {
   };
 }
 
-async function createQuickCaptureProspect(payload, atlasUser) {
+async function createQuickCaptureProspect(payload, atlasUser, options = {}) {
   const validation = validateQuickCapturePayload(payload);
 
   if (!validation.valid) {
@@ -243,7 +261,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
     };
   }
 
-  const organizationResolution = resolveQuickCaptureOrganizationId(atlasUser);
+  const organizationResolution = resolveQuickCaptureOrganizationId(atlasUser, options);
 
   if (!organizationResolution.ok) {
     return organizationResolution;
@@ -362,6 +380,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
         data,
         atlasUser,
         prospectNumber: null,
+        organizationId,
         summaryOverrides: {
           first_name: data.firstName,
           last_name: data.lastName,
@@ -372,6 +391,7 @@ async function createQuickCaptureProspect(payload, atlasUser) {
           preferred_communication_channel: data.preferredCommunicationChannel,
           owner_user_id: atlasUser.id,
           created_by_user_id: atlasUser.id,
+          organization_id: organizationId,
           status: data.status
         }
       });
@@ -383,14 +403,22 @@ async function createQuickCaptureProspect(payload, atlasUser) {
   return finalizeQuickCaptureProspect(created, {
     data,
     atlasUser,
-    prospectNumber
+    prospectNumber,
+    organizationId
   });
 }
 
 async function finalizeQuickCaptureProspect(prospect, context) {
   const { data, atlasUser, prospectNumber, summaryOverrides = {} } = context;
 
-  const organizationId = prospect.organization_id || atlasUser.organization_id || atlasUser.organizationId;
+  // Prefer write-time resolved org, then persisted prospect org — never silently fall back
+  // to a different home org when Support Mode scoped the insert.
+  const organizationId =
+    context.organizationId ||
+    prospect.organization_id ||
+    atlasUser.organization_id ||
+    atlasUser.organizationId ||
+    null;
   const persisted = organizationId
     ? await findProspectInOrganization(prospect.phone, organizationId)
     : prospect;
@@ -405,7 +433,7 @@ async function finalizeQuickCaptureProspect(prospect, context) {
       doNotContact: false
     },
     {
-      organizationId: prospect.organization_id || organizationId || null,
+      organizationId: organizationId || null,
       prospectId: prospect.id || null
     }
   );
@@ -419,6 +447,7 @@ async function finalizeQuickCaptureProspect(prospect, context) {
       source: data.source,
       entry_method: data.entryMethod,
       prospect_number: prospectNumber,
+      organization_id: organizationId,
       communication_language: data.languageFields.communication_language,
       created_by_user_id: atlasUser.id,
       owner_user_id: atlasUser.id,
@@ -428,7 +457,10 @@ async function finalizeQuickCaptureProspect(prospect, context) {
     correlationId: `quick-capture:${prospect.phone}`
   });
 
-  const summary = buildProspectSummary(prospect, summaryOverrides);
+  const summary = buildProspectSummary(prospect, {
+    ...summaryOverrides,
+    organization_id: organizationId
+  });
   const guidance = await buildQuickCaptureGuidance(prospect);
 
   return {
