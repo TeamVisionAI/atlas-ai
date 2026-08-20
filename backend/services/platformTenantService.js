@@ -1,19 +1,21 @@
 /**
- * Platform tenant provisioning — super-admin only (no billing).
+ * Platform tenant provisioning — super-admin only.
+ * Lifecycle/billing writes delegate to tenantBillingService (BR-145).
  */
 
 const { supabase } = require("./supabaseService");
 const { writeAuditLog } = require("../security/auditLogService");
 const identityAdminService = require("./identityAdminService");
 const { ROLES, USER_STATUSES } = require("../security/roles");
-
-const TENANT_STATUS = Object.freeze({
-  ACTIVE: "ACTIVE",
-  TRIAL: "TRIAL",
-  SUSPENDED: "SUSPENDED"
-});
-
-const ALL_TENANT_STATUSES = Object.freeze(Object.values(TENANT_STATUS));
+const tenantBillingService = require("./tenantBillingService");
+const {
+  TENANT_STATUS,
+  ALL_TENANT_STATUSES,
+  normalizeTenantStatus,
+  mapTenantStatusToOrganizationFields,
+  deriveLifecycleStatusFromOrg,
+  isTenantOperational
+} = require("../core/tenantLifecycle");
 
 function slugifyOrganizationName(name) {
   return String(name || "organization")
@@ -24,66 +26,20 @@ function slugifyOrganizationName(name) {
     .slice(0, 64) || "organization";
 }
 
-function normalizeTenantStatus(value) {
-  const status = String(value || TENANT_STATUS.ACTIVE)
-    .trim()
-    .toUpperCase();
-
-  if (!ALL_TENANT_STATUSES.includes(status)) {
-    const error = new Error("Invalid tenant status.");
-    error.statusCode = 400;
-    error.publicCode = "INVALID_TENANT_STATUS";
-    throw error;
+function deriveLifecycleStatus(row = {}, subscriptionRow = null) {
+  if (subscriptionRow) {
+    return tenantBillingService.deriveBillingLifecycle(row, subscriptionRow);
   }
 
-  return status;
+  return deriveLifecycleStatusFromOrg(row);
 }
 
-function mapTenantStatusToOrganizationFields(lifecycleStatus) {
-  switch (lifecycleStatus) {
-    case TENANT_STATUS.TRIAL:
-      return {
-        status: "trial",
-        is_active: true,
-        subscription_status: "trial"
-      };
-    case TENANT_STATUS.SUSPENDED:
-      return {
-        status: "suspended",
-        is_active: false,
-        subscription_status: "suspended"
-      };
-    case TENANT_STATUS.ACTIVE:
-    default:
-      return {
-        status: "active",
-        is_active: true,
-        subscription_status: "active"
-      };
-  }
-}
-
-function deriveLifecycleStatus(row = {}) {
-  const subscription = String(row.subscription_status || "").toLowerCase();
-  const status = String(row.status || "").toLowerCase();
-
-  if (row.is_active === false || status === "suspended" || subscription === "suspended") {
-    return TENANT_STATUS.SUSPENDED;
-  }
-
-  if (status === "trial" || subscription === "trial") {
-    return TENANT_STATUS.TRIAL;
-  }
-
-  return TENANT_STATUS.ACTIVE;
-}
-
-function presentTenant(row) {
+function presentTenant(row, subscriptionRow = null) {
   if (!row) {
     return null;
   }
 
-  const lifecycleStatus = deriveLifecycleStatus(row);
+  const lifecycleStatus = deriveLifecycleStatus(row, subscriptionRow);
 
   return {
     id: row.id,
@@ -92,8 +48,8 @@ function presentTenant(row) {
     lifecycleStatus,
     status: row.status,
     isActive: row.is_active !== false,
-    subscriptionPlan: row.subscription_plan || null,
-    subscriptionStatus: row.subscription_status || null,
+    subscriptionPlan: row.subscription_plan || subscriptionRow?.plan || null,
+    subscriptionStatus: row.subscription_status || subscriptionRow?.status || null,
     ownerUserId: row.owner_user_id || null,
     timezone: row.timezone || null,
     logoUrl: row.logo_url || null,
@@ -101,14 +57,9 @@ function presentTenant(row) {
     secondaryColor: row.secondary_color || null,
     website: row.website || null,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    trialEndsAt: subscriptionRow?.trial_ends_at || null
   };
-}
-
-function isTenantOperational(lifecycleStatus) {
-  return (
-    lifecycleStatus === TENANT_STATUS.ACTIVE || lifecycleStatus === TENANT_STATUS.TRIAL
-  );
 }
 
 async function createTenant(input = {}, auditMeta = {}) {
@@ -153,15 +104,10 @@ async function createTenant(input = {}, auditMeta = {}) {
     throw error;
   }
 
-  await supabase.from("organization_subscriptions").upsert(
-    {
-      organization_id: data.id,
-      plan: insertRow.subscription_plan,
-      status: mapped.subscription_status,
-      renewal_date: null,
-      updated_at: now
-    },
-    { onConflict: "organization_id" }
+  const { orgRow, subscriptionRow } = await tenantBillingService.initializeBillingForNewTenant(
+    data.id,
+    lifecycleStatus,
+    data.created_at || now
   );
 
   await writeAuditLog({
@@ -180,7 +126,7 @@ async function createTenant(input = {}, auditMeta = {}) {
     userAgent: auditMeta.userAgent
   });
 
-  return presentTenant(data);
+  return presentTenant(orgRow || data, subscriptionRow);
 }
 
 async function listTenants(query = {}) {
@@ -205,7 +151,7 @@ async function listTenants(query = {}) {
   }
 
   return {
-    items: (data || []).map(presentTenant),
+    items: (data || []).map((row) => presentTenant(row)),
     total: count ?? (data || []).length,
     limit,
     offset
@@ -227,59 +173,22 @@ async function getTenant(organizationId) {
     throw error;
   }
 
-  return presentTenant(data);
+  if (!data) {
+    return null;
+  }
+
+  const { data: subscriptionRow } = await supabase
+    .from("organization_subscriptions")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  return presentTenant(data, subscriptionRow);
 }
 
 async function setTenantStatus(organizationId, lifecycleStatusInput, auditMeta = {}) {
-  const lifecycleStatus = normalizeTenantStatus(lifecycleStatusInput);
-  const mapped = mapTenantStatusToOrganizationFields(lifecycleStatus);
-  const now = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from("organizations")
-    .update({
-      status: mapped.status,
-      is_active: mapped.is_active,
-      subscription_status: mapped.subscription_status,
-      updated_at: now
-    })
-    .eq("id", organizationId)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    const notFound = new Error("Organization not found.");
-    notFound.statusCode = 404;
-    notFound.publicCode = "ORGANIZATION_NOT_FOUND";
-    throw notFound;
-  }
-
-  await supabase.from("organization_subscriptions").upsert(
-    {
-      organization_id: organizationId,
-      status: mapped.subscription_status,
-      updated_at: now
-    },
-    { onConflict: "organization_id" }
-  );
-
-  await writeAuditLog({
-    organizationId,
-    userId: auditMeta.userId || null,
-    userEmail: auditMeta.userEmail || null,
-    action: "platform.tenant_status_updated",
-    targetType: "organization",
-    targetId: organizationId,
-    metadata: { lifecycleStatus },
-    ipAddress: auditMeta.ipAddress,
-    userAgent: auditMeta.userAgent
-  });
-
-  return presentTenant(data);
+  await tenantBillingService.setLifecycleStatus(organizationId, lifecycleStatusInput, auditMeta);
+  return getTenant(organizationId);
 }
 
 async function assertTenantOperational(organizationId) {
@@ -292,7 +201,7 @@ async function assertTenantOperational(organizationId) {
     throw error;
   }
 
-  if (!isTenantOperational(tenant.lifecycleStatus)) {
+  if (!isTenantOperational(tenant.lifecycleStatus, { trialEndsAt: tenant.trialEndsAt })) {
     const error = new Error("Tenant is suspended.");
     error.statusCode = 403;
     error.publicCode = "TENANT_SUSPENDED";

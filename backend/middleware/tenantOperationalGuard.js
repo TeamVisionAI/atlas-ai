@@ -1,11 +1,12 @@
 /**
  * Block operational access for suspended home/effective tenants (normal users).
- * Platform routes and super-admin home-org inspection are handled separately.
+ * Lazy TRIAL expiry → PAST_DUE before operational check (BR-145).
  */
 
 const { isSuperAdmin } = require("../security/saasRoles");
 const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
 const platformTenantService = require("../services/platformTenantService");
+const tenantBillingService = require("../services/tenantBillingService");
 
 function isExemptOperationalTenantCheck(req) {
   const path = String(req.originalUrl || req.url || req.path || "");
@@ -24,6 +25,15 @@ function isExemptOperationalTenantCheck(req) {
   return false;
 }
 
+function auditMetaFromRequest(req) {
+  return {
+    userId: req.authContext?.userId || null,
+    userEmail: req.authContext?.email || null,
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent")
+  };
+}
+
 async function tenantOperationalGuard(req, res, next) {
   try {
     if (!req.authContext || isExemptOperationalTenantCheck(req)) {
@@ -35,9 +45,14 @@ async function tenantOperationalGuard(req, res, next) {
     }
 
     const organizationId = getEffectiveOrganizationId(req);
+
+    await tenantBillingService.expireTrialIfNeeded(organizationId, auditMetaFromRequest(req));
+
     const tenant = await platformTenantService.getTenant(organizationId);
 
-    if (tenant && !platformTenantService.isTenantOperational(tenant.lifecycleStatus)) {
+    if (tenant && !platformTenantService.isTenantOperational(tenant.lifecycleStatus, {
+      trialEndsAt: tenant.trialEndsAt
+    })) {
       return res.status(403).json({
         error: "TENANT_SUSPENDED",
         message: "This organization is suspended."

@@ -1797,6 +1797,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-145 — SaaS Tenant Billing Lifecycle
+
+**Implements:** Smallest production-safe tenant billing/trial lifecycle for manual onboarding (Stripe link, Zelle, manual payment recording).  
+**Domain:** Platform / tenant access / subscription  
+**Depends on:** Sprint 16.9 SaaS foundation (`organizations`, `organization_subscriptions`, `atlas_audit_log`)  
+**Related:** Platform tenant provisioning, Support Mode, `tenantOperationalGuard`  
+**Status:** Implemented (Phase 1 backend)  
+**Engine target:** `tenantBillingService.js`, `tenantLifecycle.js`, `platformTenantService.js`, `tenantOperationalGuard.js`  
+**Tests:** `backend/test/tenantBillingMvp.test.js`
+
+### Rules
+
+1. **Lifecycle states** — Canonical platform lifecycle: `TRIAL` → `ACTIVE` → `PAST_DUE` → `SUSPENDED`. Source of truth for billing fields: `organization_subscriptions`. Mirror enforcement fields on `organizations` (`status`, `subscription_status`, `is_active`).
+2. **Default trial** — New tenants created as `TRIAL` receive `trial_starts_at = now` and `trial_ends_at = now + 7 calendar days`.
+3. **Max trial** — Super Admin may extend trial so `trial_ends_at` never exceeds `trial_starts_at + 10 calendar days` (max 3-day extension on default 7-day trial).
+4. **Trial expiry** — When `now > trial_ends_at` and lifecycle is still `TRIAL`, lazy transition to `PAST_DUE` (no cron). Audit once: `platform.billing_trial_expired`. Do **not** auto-suspend on expiry.
+5. **PAST_DUE (MVP)** — Remains operational (`is_active = true`). Support Mode allowed. Frontend banner deferred to Phase 2.
+6. **SUSPENDED** — Super Admin manual only. `is_active = false`. Normal tenant access blocked. Support Mode blocked (existing contract).
+7. **Mark paid** — Super Admin records payment. `TRIAL` or `PAST_DUE` → `ACTIVE`. Sets `last_paid_at`, `next_due_at` (+1 calendar month), appends `metadata.payments[]`. **SUSPENDED:** records payment but does **not** silently reactivate.
+8. **Payment methods** — `STRIPE` (stored payment link only), `ZELLE`, `MANUAL`. No Stripe Customer/Subscription API or webhooks in Phase 1.
+9. **Tenant admin** — `GET /api/organization/billing` read-only safe DTO (`billing:access`). No tenant write path.
+10. **Boundaries** — No recruiting engine changes, no BR-142/143 changes, no Stripe webhooks, no invoice/accounting system.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
