@@ -9,7 +9,8 @@ const PERMISSION_ALIASES = Object.freeze({
   "admin:users": ["admin:users", "users:manage"],
   "admin:roles": ["admin:roles", "settings:manage"],
   "operations:access": ["operations:access"],
-  "audit:read": ["audit:read"]
+  "audit:read": ["audit:read"],
+  "billing:access": ["billing:access"]
 });
 
 function permissionMatches(context, permission) {

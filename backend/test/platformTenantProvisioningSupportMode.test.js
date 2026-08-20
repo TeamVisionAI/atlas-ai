@@ -4,6 +4,11 @@
 
 require("dotenv").config();
 
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
+process.env.SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "test-service-role-key";
+process.env.NODE_ENV = "test";
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
@@ -27,6 +32,7 @@ const { resolveAuthSessionId } = require("../security/authSessionIdentity");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireSuperAdmin } = require("../middleware/requireSuperAdmin");
 const { tenantOperationalGuard } = require("../middleware/tenantOperationalGuard");
+const tenantBillingService = require("../services/tenantBillingService");
 const { resolveTenantOrganizationId } = require("../services/tenantContextService");
 
 process.env.NODE_ENV = "test";
@@ -58,12 +64,15 @@ async function withServer(app, run) {
   }
 }
 
-test("tenant status mapping persists ACTIVE / TRIAL / SUSPENDED semantics", () => {
+test("tenant status mapping persists ACTIVE / TRIAL / PAST_DUE / SUSPENDED semantics", () => {
   const active = platformTenantService.mapTenantStatusToOrganizationFields(
     platformTenantService.TENANT_STATUS.ACTIVE
   );
   const trial = platformTenantService.mapTenantStatusToOrganizationFields(
     platformTenantService.TENANT_STATUS.TRIAL
+  );
+  const pastDue = platformTenantService.mapTenantStatusToOrganizationFields(
+    platformTenantService.TENANT_STATUS.PAST_DUE
   );
   const suspended = platformTenantService.mapTenantStatusToOrganizationFields(
     platformTenantService.TENANT_STATUS.SUSPENDED
@@ -73,6 +82,8 @@ test("tenant status mapping persists ACTIVE / TRIAL / SUSPENDED semantics", () =
   assert.equal(active.status, "active");
   assert.equal(trial.is_active, true);
   assert.equal(trial.status, "trial");
+  assert.equal(pastDue.is_active, true);
+  assert.equal(pastDue.status, "past_due");
   assert.equal(suspended.is_active, false);
   assert.equal(suspended.status, "suspended");
   assert.equal(
@@ -283,9 +294,11 @@ test("requireSuperAdmin blocks tenant admin", async () => {
 
 test("tenantOperationalGuard blocks suspended tenant for normal users", async () => {
   const originalGetTenant = platformTenantService.getTenant;
+  const originalExpire = tenantBillingService.expireTrialIfNeeded;
   platformTenantService.getTenant = async () => ({
     lifecycleStatus: platformTenantService.TENANT_STATUS.SUSPENDED
   });
+  tenantBillingService.expireTrialIfNeeded = async () => ({ expired: false });
 
   const app = express();
   app.use((req, res, next) => {
@@ -305,6 +318,7 @@ test("tenantOperationalGuard blocks suspended tenant for normal users", async ()
   });
 
   platformTenantService.getTenant = originalGetTenant;
+  tenantBillingService.expireTrialIfNeeded = originalExpire;
 });
 
 test("getEffectiveOrganizationId returns home org after support exit", () => {

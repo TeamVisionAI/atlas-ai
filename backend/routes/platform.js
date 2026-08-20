@@ -11,6 +11,8 @@ const {
   resolveEffectiveOrganizationId
 } = require("../core/effectiveOrganizationContext");
 
+const platformBillingRoutes = require("./platformBilling");
+
 const router = express.Router();
 
 router.use(requireAtlasUser);
@@ -85,6 +87,8 @@ router.patch("/tenants/:id/status", async (req, res) => {
     });
   }
 });
+
+router.use("/tenants/:id", platformBillingRoutes);
 
 router.post("/tenants/:id/admin", async (req, res) => {
   try {
