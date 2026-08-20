@@ -1,6 +1,8 @@
 /**
  * Sprint 16.9 — Organization tenant guard.
  * Ensures requests operate within the authenticated user's organization boundary.
+ * Support Mode: rebinds authContext.organizationId to the effective tenant so
+ * filterProspectsForAuthContext / canAccessProspect see Support Mode org, not home org.
  */
 
 const { isSuperAdmin } = require("../security/saasRoles");
@@ -31,8 +33,9 @@ function organizationGuard(options = {}) {
       });
     }
 
+    const homeOrganizationId = context.organizationId || DEFAULT_ORGANIZATION_ID;
     const effectiveOrganizationId =
-      getEffectiveOrganizationId(req) || context.organizationId || DEFAULT_ORGANIZATION_ID;
+      getEffectiveOrganizationId(req) || homeOrganizationId;
     const requestedOrgId = resolveRequestedOrganizationId(req);
 
     if (requestedOrgId && String(requestedOrgId) !== String(effectiveOrganizationId)) {
@@ -43,9 +46,16 @@ function organizationGuard(options = {}) {
     }
 
     req.effectiveOrganizationId = effectiveOrganizationId;
+    // Prospect visibility (MC / Prospect Center) keys off authContext.organizationId.
+    // Keep homeOrganizationId for audit / Support Mode exit; bind org to effective tenant.
+    req.authContext = {
+      ...context,
+      organizationId: effectiveOrganizationId,
+      homeOrganizationId
+    };
     req.tenantContext = {
       organizationId: effectiveOrganizationId,
-      homeOrganizationId: context.organizationId || DEFAULT_ORGANIZATION_ID,
+      homeOrganizationId,
       userId: context.userId,
       role: context.role,
       saasRole: context.saasRole,
