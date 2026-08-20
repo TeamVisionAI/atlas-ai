@@ -228,13 +228,6 @@ test("13. createAppointment hydrates incomplete existingBooking (source contract
   );
 });
 
-test("14. Meta Review allowlist unchanged by this fix", () => {
-  const allowlist = path.join(__dirname, "../../frontend/src/config/metaReviewMode.js");
-  assert.equal(fs.existsSync(allowlist), true);
-  const source = fs.readFileSync(allowlist, "utf8");
-  assert.doesNotMatch(source, /virtualMeetingUrlResolver|virtual_meeting_url/);
-});
-
 test("15. BR-075 outbound gate remains present", () => {
   const gate = path.join(__dirname, "../core/whatsappOutboundAuthorizationGate.js");
   assert.equal(fs.existsSync(gate), true);

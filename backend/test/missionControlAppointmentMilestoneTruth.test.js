@@ -132,13 +132,8 @@ describe("Mission Control appointment milestone truth (BR-039)", () => {
     assert.equal(typeof applyAppointmentMilestoneTruth, "function");
   });
 
-  it("7. Meta Review and BR-075 surfaces remain unchanged by this hotfix", () => {
-    const metaReview = path.join(
-      __dirname,
-      "../../frontend/src/config/metaReviewMode.js"
-    );
+  it("7. BR-075 surfaces remain unchanged by this hotfix", () => {
     const br075 = path.join(__dirname, "../core/whatsappOutboundAuthorizationGate.js");
-    assert.equal(fs.existsSync(metaReview), true);
     assert.equal(fs.existsSync(br075), true);
 
     const gateSource = fs.readFileSync(br075, "utf8");

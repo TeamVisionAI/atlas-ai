@@ -11,8 +11,7 @@ const {
   processRecruitAiV2Turn,
   processRecruitAiV2TurnSync,
   createConversationContext,
-  authorizeSideEffects,
-  isMetaReviewScope
+  authorizeSideEffects
 } = require("../core/recruitAiV2");
 
 const SIM_PROSPECT_PREFIX = "sim-v2-";
@@ -29,15 +28,6 @@ function assertSafeSimulatorIdentity({ prospectId, organizationId } = {}) {
       "Recruit AI v2 simulator rejects non-simulator prospect IDs"
     );
     error.code = "SIMULATOR_IDENTITY_REJECTED";
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (isMetaReviewScope({ organizationId, prospectId: pid })) {
-    const error = new Error(
-      "Recruit AI v2 simulator rejects Meta Review production fixtures"
-    );
-    error.code = "SIMULATOR_META_REVIEW_REJECTED";
     error.statusCode = 400;
     throw error;
   }

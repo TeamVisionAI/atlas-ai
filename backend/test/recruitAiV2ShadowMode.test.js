@@ -592,22 +592,6 @@ test("18. JSON shadow config and legacy alias are accepted when well-formed", ()
   assert.equal(fromLegacy.sampleRate, 1);
 });
 
-test("19. Meta Review scope is isolated from shadow persistence", async () => {
-  const { service } = makeShadowService();
-  const result = await service.evaluateShadowTurn({
-    prospect: makeProspect({
-      id: "metareview-prospect",
-      organization_id: "metareview-org"
-    }),
-    organizationId: "metareview-org",
-    inboundMessageId: "wamid.meta",
-    messageText: "hello",
-    conversation: { success: true, replied: true }
-  });
-  assert.equal(result.skipped, true);
-  assert.equal(result.reason, "META_REVIEW_ISOLATED");
-});
-
 test("20. shadow package does not send WhatsApp or book appointments", () => {
   const dir = path.join(__dirname, "../core/recruitAiV2");
   for (const name of fs.readdirSync(dir)) {

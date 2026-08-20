@@ -29,8 +29,7 @@ const {
 const { renderQrPngBuffer, renderQrSvgString } = require("./qrImageService");
 const { emitQrEvent, EVENTS } = require("./qrChannelTelemetry");
 const {
-  isEligibleNewLeadOwner,
-  isMetaReviewFixtureUser
+  isEligibleNewLeadOwner
 } = require("../newLeadAssignmentEngine");
 const { listAssignableRepresentatives } = require("../personnelDirectoryEngine");
 const { hasPermission } = require("../../security/authorizationService");
@@ -43,7 +42,6 @@ const REASON = Object.freeze({
   FEATURE_DISABLED: "QR_CAMPAIGN_MANAGER_DISABLED",
   ENCRYPTION_KEY_UNAVAILABLE: "ENCRYPTION_KEY_UNAVAILABLE",
   FORBIDDEN: "FORBIDDEN",
-  META_REVIEW_EXCLUDED: "META_REVIEW_EXCLUDED",
   NOT_FOUND: "NOT_FOUND",
   VALIDATION: "VALIDATION",
   OWNER_INELIGIBLE: "OWNER_INELIGIBLE",
@@ -101,13 +99,6 @@ function canManageOrgCampaigns(authContext) {
     authContext?.role === "administrator" ||
     isAdministrator(authContext?.user)
   );
-}
-
-function assertNotMetaReview(user) {
-  if (isMetaReviewFixtureUser(user) || user?.meta_review_user === true) {
-    return { ok: false, reason: REASON.META_REVIEW_EXCLUDED };
-  }
-  return { ok: true };
 }
 
 function sanitizeCampaign(row) {
@@ -206,9 +197,6 @@ function createQrCampaignManagerService({
   }
 
   async function listCampaigns(authContext) {
-    const meta = assertNotMetaReview(authContext.user);
-    if (!meta.ok) return { ok: false, reason: meta.reason, status: 403 };
-
     const organizationId = authContext.organizationId;
     const gate = featureGate(organizationId);
     if (!gate.allowed) {
@@ -232,9 +220,6 @@ function createQrCampaignManagerService({
   }
 
   async function getCampaign(authContext, campaignId) {
-    const meta = assertNotMetaReview(authContext.user);
-    if (!meta.ok) return { ok: false, reason: meta.reason, status: 403 };
-
     const gate = featureGate(authContext.organizationId);
     if (!gate.allowed) {
       return { ok: false, reason: gate.reason || REASON.FEATURE_DISABLED, status: 403 };
@@ -248,9 +233,6 @@ function createQrCampaignManagerService({
   }
 
   async function createCampaign(authContext, input = {}) {
-    const meta = assertNotMetaReview(authContext.user);
-    if (!meta.ok) return { ok: false, reason: meta.reason, status: 403 };
-
     const organizationId = authContext.organizationId;
     const gate = featureGate(organizationId);
     if (!gate.allowed) {
@@ -359,9 +341,6 @@ function createQrCampaignManagerService({
   }
 
   async function patchCampaign(authContext, campaignId, patch = {}) {
-    const meta = assertNotMetaReview(authContext.user);
-    if (!meta.ok) return { ok: false, reason: meta.reason, status: 403 };
-
     const gate = featureGate(authContext.organizationId);
     if (!gate.allowed) {
       return { ok: false, reason: gate.reason || REASON.FEATURE_DISABLED, status: 403 };
@@ -395,9 +374,6 @@ function createQrCampaignManagerService({
   }
 
   async function setCampaignStatus(authContext, campaignId, status) {
-    const meta = assertNotMetaReview(authContext.user);
-    if (!meta.ok) return { ok: false, reason: meta.reason, status: 403 };
-
     const gate = featureGate(authContext.organizationId);
     if (!gate.allowed) {
       return { ok: false, reason: gate.reason || REASON.FEATURE_DISABLED, status: 403 };
@@ -429,9 +405,6 @@ function createQrCampaignManagerService({
   }
 
   async function unlockPublicToken(authContext, campaignId) {
-    const meta = assertNotMetaReview(authContext.user);
-    if (!meta.ok) return { ok: false, reason: meta.reason, status: 403 };
-
     const gate = featureGate(authContext.organizationId);
     if (!gate.allowed) {
       return { ok: false, reason: gate.reason || REASON.FEATURE_DISABLED, status: 403 };
@@ -552,9 +525,6 @@ function createQrCampaignManagerService({
   }
 
   async function listOwnerCandidates(authContext) {
-    const meta = assertNotMetaReview(authContext.user);
-    if (!meta.ok) return { ok: false, reason: meta.reason, status: 403 };
-
     const gate = featureGate(authContext.organizationId);
     if (!gate.allowed) {
       return { ok: false, reason: gate.reason || REASON.FEATURE_DISABLED, status: 403 };

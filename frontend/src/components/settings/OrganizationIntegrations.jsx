@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { useWorkspace } from "../../contexts/WorkspaceContext";
-import { isMetaReviewWorkspaceActive } from "../../config/metaReviewMode";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
 import IntegrationCard from "../../components/settings/IntegrationCard";
@@ -20,11 +18,9 @@ import {
   shouldFetchGoogleCalendarList
 } from "../../services/googleCalendarListUi";
 import { disconnectWhatsAppIntegration } from "../../services/metaEmbeddedSignupService";
-import { META_REVIEW_COPY } from "../meta-review/metaReviewCopy";
 
 export default function OrganizationIntegrations() {
   const { translate } = useLanguage();
-  const { user } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const [integrations, setIntegrations] = useState(null);
   const [calendars, setCalendars] = useState([]);
@@ -37,13 +33,6 @@ export default function OrganizationIntegrations() {
     setIntegrations(result.integrations);
 
     const googleCalendar = result.integrations?.googleCalendar || {};
-    const metaReviewWorkspaceActive = isMetaReviewWorkspaceActive(user);
-
-    // Meta Review Integrations is WhatsApp-only — never fetch or surface Google Calendar.
-    if (metaReviewWorkspaceActive) {
-      setCalendars([]);
-      return;
-    }
 
     if (googleCalendar.reconnectRequired) {
       setCalendars([]);
@@ -51,15 +40,13 @@ export default function OrganizationIntegrations() {
       return;
     }
 
-    if (shouldFetchGoogleCalendarList(googleCalendar, { metaReviewWorkspaceActive })) {
+    if (shouldFetchGoogleCalendarList(googleCalendar)) {
       try {
         const calendarResult = await fetchGoogleCalendars();
         setCalendars(calendarResult.calendars || []);
         setError("");
       } catch (calendarError) {
-        const uiFailure = resolveGoogleCalendarListUiFailure(calendarError, googleCalendar, {
-          metaReviewWorkspaceActive
-        });
+        const uiFailure = resolveGoogleCalendarListUiFailure(calendarError, googleCalendar);
         setCalendars(uiFailure.calendars);
         if (uiFailure.reconnectRequired && !uiFailure.suppressGoogleError) {
           setError(translate("configurationGoogleReconnectRequired"));
@@ -68,7 +55,7 @@ export default function OrganizationIntegrations() {
     } else {
       setCalendars([]);
     }
-  }, [translate, user]);
+  }, [translate]);
 
   useEffect(() => {
     load().catch(() => setError(translate("configurationIntegrationsLoadFailed")));
@@ -210,12 +197,11 @@ export default function OrganizationIntegrations() {
 
   const googleCalendar = integrations.googleCalendar || {};
   const whatsapp = integrations.whatsapp || {};
-  const metaReviewMode = isMetaReviewWorkspaceActive(user);
 
   return (
     <ConfigurationSection title={translate("configurationIntegrations")}>
       <p className="configuration-integrations-intro">
-        {metaReviewMode ? META_REVIEW_COPY.integrationsPageIntro : translate("configurationIntegrationsIntro")}
+        {translate("configurationIntegrationsIntro")}
       </p>
 
       <div className="configuration-content configuration-content--integrations">
@@ -227,9 +213,7 @@ export default function OrganizationIntegrations() {
           onDisconnect={handleDisconnectWhatsApp}
         />
 
-        {!metaReviewMode ? (
-          <>
-            <IntegrationCard
+        <IntegrationCard
               icon="calendar"
               title={translate("configurationGoogleCalendar")}
               subtitle={translate("configurationGoogleCalendarIntro")}
@@ -288,8 +272,6 @@ export default function OrganizationIntegrations() {
                 </div>
               </header>
             </article>
-          </>
-        ) : null}
       </div>
 
       {message ? (

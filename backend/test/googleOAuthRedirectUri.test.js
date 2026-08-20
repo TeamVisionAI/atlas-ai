@@ -98,33 +98,3 @@ test("production fails closed when only localhost fallback remains", () => {
     }
   );
 });
-
-test("Meta Review allowlist and Google hide gate remain untouched by this hotfix", () => {
-  const changed = require("node:child_process")
-    .execSync("git diff --name-only", { encoding: "utf8" })
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const protectedPaths = [
-    "frontend/src/config/workspaceExperience.js",
-    "frontend/src/config/metaReviewMode.js",
-    "frontend/src/i18n/LanguageContext.jsx",
-    "backend/middleware/requireMetaReviewMode.js",
-    "backend/services/metaReviewUserService.js"
-  ];
-
-  for (const relativePath of protectedPaths) {
-    assert.equal(changed.includes(relativePath), false, relativePath);
-  }
-
-  const integrations = fs.readFileSync(
-    path.join(
-      __dirname,
-      "../../frontend/src/components/settings/OrganizationIntegrations.jsx"
-    ),
-    "utf8"
-  );
-  assert.match(integrations, /Meta Review Integrations is WhatsApp-only/);
-  assert.match(integrations, /\{!metaReviewMode \? \(/);
-});

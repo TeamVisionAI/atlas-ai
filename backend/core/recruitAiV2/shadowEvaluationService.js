@@ -7,7 +7,6 @@
 
 const { processRecruitAiV2Turn } = require("./orchestrator");
 const { containsInternalDiagnostics } = require("./sanitize");
-const { isMetaReviewScope } = require("./contextPersistenceService");
 const {
   extractLiveCeResponseIntent,
   extractLiveLanguage,
@@ -206,14 +205,6 @@ function createShadowEvaluationService({
       const error = new Error("organizationId and prospectId are required for shadow evaluation");
       error.code = "SHADOW_SCOPE_REQUIRED";
       throw error;
-    }
-
-    if (isMetaReviewScope({ organizationId: orgId, prospectId, channel })) {
-      return {
-        skipped: true,
-        reason: "META_REVIEW_ISOLATED",
-        row: null
-      };
     }
 
     const liveCeResponseIntent = extractLiveCeResponseIntent(conversation);

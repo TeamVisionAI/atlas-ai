@@ -6,9 +6,7 @@ import {
   getDefaultLandingPath,
   resolveWorkspaceType
 } from "../config/workspaceExperience";
-import { isMetaReviewWorkspaceActive, META_REVIEW_BANNER_TEXT } from "../config/metaReviewMode";
 import { isStagingUi } from "../config/atlasUiEnv";
-import "../components/meta-review/metaReviewDesign.css";
 import { WorkspaceContext } from "../contexts/WorkspaceContext";
 import RequireWorkspaceAccess from "../components/RequireWorkspaceAccess";
 import SidebarUserFooter from "../components/layout/SidebarUserFooter";
@@ -74,7 +72,6 @@ function SidebarNav({
   onCollapse,
   navItems,
   currentUser,
-  metaReviewMode = false,
   conversationsAttentionCount = 0
 }) {
   return (
@@ -142,7 +139,6 @@ function SidebarNav({
             language={language}
             onToggleLanguage={toggleLanguage}
             onNavigate={onNavigate}
-            metaReviewMode={metaReviewMode}
           />
         ) : (
           <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
@@ -165,7 +161,6 @@ export default function MainLayout() {
   const [supportMode, setSupportMode] = useState(null);
   const [exitingSupportMode, setExitingSupportMode] = useState(false);
   const currentUserRef = useRef(null);
-  const metaReviewMode = isMetaReviewWorkspaceActive(currentUser);
   currentUserRef.current = currentUser;
 
   const navItems = useMemo(
@@ -381,7 +376,6 @@ export default function MainLayout() {
             onCollapse={collapseTabletNav}
             navItems={navItems}
             currentUser={currentUser}
-            metaReviewMode={metaReviewMode}
             conversationsAttentionCount={conversationsAttentionCount}
           />
         </aside>
@@ -396,11 +390,6 @@ export default function MainLayout() {
           {isStagingUi() ? (
             <div className="atlas-layout__staging-banner" role="status" data-atlas-env="staging">
               STAGING
-            </div>
-          ) : null}
-          {metaReviewMode ? (
-            <div className="atlas-layout__meta-review-banner" role="status">
-              {META_REVIEW_BANNER_TEXT}
             </div>
           ) : null}
           <header className={`atlas-layout__header${showMobileHeader ? " is-visible" : ""}`}>

@@ -447,23 +447,3 @@ test("33. immediate Recruit AI reply after valid inbound still authorizes freefo
   });
   assert.equal(auth.status, "authorized_freeform");
 });
-
-test("Meta Review allowlist and securities surfaces remain untouched by this hotfix", () => {
-  const metaReviewTest = fs.readFileSync(
-    path.join(__dirname, "../../frontend/src/config/metaReviewWorkspace.test.js"),
-    "utf8"
-  );
-  assert.match(metaReviewTest, /meta_review_user|language lock|WhatsApp/i);
-
-  const metaReviewMode = fs.readFileSync(
-    path.join(__dirname, "../../frontend/src/config/metaReviewMode.js"),
-    "utf8"
-  );
-  assert.match(metaReviewMode, /META_REVIEW|meta_review/i);
-
-  const securities = fs.readFileSync(
-    path.join(__dirname, "../database/migrations/026_securities_access_authorization.sql"),
-    "utf8"
-  );
-  assert.match(securities, /securities/i);
-});

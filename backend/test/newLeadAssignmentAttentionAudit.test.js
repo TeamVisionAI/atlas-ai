@@ -265,12 +265,6 @@ test("26. BR-079 organization date window remains present", () => {
   assert.match(read("../core/organizationDateWindow.js"), /BR-079|getOrganizationDateWindow/);
 });
 
-test("27. Meta Review allowlist / bridge unchanged by audit (source presence)", () => {
-  assert.match(read("../services/metaReviewLegacyProspectBridge.js"), /owner_user_id:\s*reviewUser\.id/);
-  const boundary = read("./scheduleConversationalFlexibilityMetaReviewBoundary.test.js");
-  assert.match(boundary, /Meta Review/);
-});
-
 test("28. RLS 029/030 audit tests remain present", () => {
   assert.ok(fs.existsSync(path.join(__dirname, "rls029BackendOnlyPublicTables.test.js")));
   assert.ok(fs.existsSync(path.join(__dirname, "syncAtlasUsersSearchPath030.test.js")));

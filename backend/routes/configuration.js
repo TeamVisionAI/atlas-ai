@@ -16,18 +16,8 @@ const { PERMISSIONS } = require("../security/permissions");
 const { ORGANIZATION_LEVEL_VALUES } = require("../core/configuration/organizationLevels");
 const { appPath } = require("../utils/appPathHelper");
 const { resolveFrontendBaseUrl } = require("../config/frontendBaseUrl");
-const { isMetaReviewModeEnabled } = require("../config/metaReviewMode");
 
 const router = express.Router();
-
-/** Meta Review reviewers need integration status without org:read (LC2 consolidation). */
-function requireOrganizationIntegrationsRead(req, res, next) {
-  if (isMetaReviewModeEnabled()) {
-    return next();
-  }
-
-  return requirePermission(PERMISSIONS.ORG_READ)(req, res, next);
-}
 
 function auditMeta(req) {
   return {
@@ -181,7 +171,7 @@ router.patch(
   }
 );
 
-router.get("/organization/integrations", requireOrganizationIntegrationsRead, async (req, res) => {
+router.get("/organization/integrations", requirePermission(PERMISSIONS.ORG_READ), async (req, res) => {
   try {
     const integrations = await organizationIntegrationService.getIntegrationsStatus(
       req.tenantContext.organizationId

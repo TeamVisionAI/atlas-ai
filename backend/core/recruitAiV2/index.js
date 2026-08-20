@@ -58,8 +58,7 @@ const {
   createSupabaseContextRepository
 } = require("./contextRepository");
 const {
-  createContextPersistenceService,
-  isMetaReviewScope
+  createContextPersistenceService
 } = require("./contextPersistenceService");
 const {
   resolveShadowConfig,
@@ -162,7 +161,6 @@ module.exports = {
   createMemoryContextRepository,
   createSupabaseContextRepository,
   createContextPersistenceService,
-  isMetaReviewScope,
   resolveShadowConfig,
   isShadowModeEnabled,
   isEligibleForShadowEvaluation,

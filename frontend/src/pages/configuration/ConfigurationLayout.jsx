@@ -7,8 +7,6 @@ import { buildSettingsNavItems } from "../../config/workspaceExperience";
 import { SETTINGS_SECTIONS, SETTINGS_TITLE } from "../../config/settingsProductNames";
 import SettingsIcon from "../../components/icons/SettingsIcons";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
-import { isMetaReviewWorkspaceActive } from "../../config/metaReviewMode";
-import MetaReviewSettingsFooter from "../../components/meta-review/MetaReviewSettingsFooter";
 import "./Configuration.css";
 
 export default function ConfigurationLayout() {
@@ -16,7 +14,6 @@ export default function ConfigurationLayout() {
   const { user } = useWorkspace();
   const isHubIndex = Boolean(useMatch({ path: appPath("settings"), end: true }));
   const navItems = buildSettingsNavItems(user, SETTINGS_SECTIONS);
-  const metaReviewWorkspace = isMetaReviewWorkspaceActive(user);
 
   return (
     <div className="configuration-page">
@@ -48,8 +45,6 @@ export default function ConfigurationLayout() {
       <Suspense fallback={<ConfigurationLoading />}>
         <Outlet />
       </Suspense>
-
-      {metaReviewWorkspace ? <MetaReviewSettingsFooter /> : null}
     </div>
   );
 }

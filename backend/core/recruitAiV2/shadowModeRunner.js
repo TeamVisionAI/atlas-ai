@@ -19,7 +19,7 @@ const {
   resolveShadowConfig,
   DEFAULT_TIMEOUT_MS
 } = require("./shadowConfig");
-const { isMetaReviewScope, createContextPersistenceService } = require("./contextPersistenceService");
+const { createContextPersistenceService } = require("./contextPersistenceService");
 const {
   createSupabaseContextRepository,
   createMemoryContextRepository
@@ -154,21 +154,6 @@ async function runRecruitAiV2ShadowEvaluation(input = {}, deps = {}) {
       scheduled: false,
       skipped: true,
       reason: eligibility.reason,
-      config: eligibility.config
-    };
-  }
-
-  if (
-    isMetaReviewScope({
-      organizationId: orgId,
-      prospectId,
-      channel
-    })
-  ) {
-    return {
-      scheduled: false,
-      skipped: true,
-      reason: "META_REVIEW_ISOLATED",
       config: eligibility.config
     };
   }

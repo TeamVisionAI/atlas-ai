@@ -1,17 +1,11 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useWorkspace } from "../contexts/WorkspaceContext";
-import { appPath } from "../config/appRoutes";
-import {
-  canAccessRoute,
-  canManageUsers,
-  getDefaultLandingPath,
-  resolveRouteKey
-} from "../config/workspaceExperience";
-import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
+import { getDefaultLandingPath, resolveRouteKey } from "../config/workspaceExperience";
+import { canAccessRoute } from "../config/workspaceExperience";
 import ForbiddenPage from "../pages/ForbiddenPage";
 
 export default function RequireWorkspaceAccess({ children, routeKey = null }) {
-  const { user, operationsAllowed, landingPath } = useWorkspace();
+  const { user, operationsAllowed } = useWorkspace();
   const location = useLocation();
   const key = routeKey || resolveRouteKey(location.pathname);
 
@@ -20,14 +14,6 @@ export default function RequireWorkspaceAccess({ children, routeKey = null }) {
   }
 
   if (!canAccessRoute(key, user, { operationsAllowed })) {
-    if (isMetaReviewWorkspaceActive(user)) {
-      if (key === "admin/users" && canManageUsers(user, { operationsAllowed })) {
-        return <Navigate to={appPath("settings/review-users")} replace />;
-      }
-
-      return <Navigate to={landingPath || getDefaultLandingPath(user.role)} replace />;
-    }
-
     return <ForbiddenPage routeKey={key} />;
   }
 

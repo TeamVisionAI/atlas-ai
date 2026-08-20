@@ -6,7 +6,7 @@
  * Ordering: runs after live CE + BR-080 (post-live authoritative snapshot).
  */
 
-const { isMetaReviewScope } = require("./contextPersistenceService");
+const { createContextPersistenceService } = require("./contextPersistenceService");
 const {
   computeContextOnlyTurn,
   buildCaptureDiagnostic
@@ -41,10 +41,6 @@ function createContextCaptureService({ persistenceService } = {}) {
       const error = new Error("organizationId and prospectId are required");
       error.code = "CONTEXT_CAPTURE_SCOPE_REQUIRED";
       throw error;
-    }
-
-    if (isMetaReviewScope({ organizationId: orgId, prospectId, channel })) {
-      return { skipped: true, reason: "META_REVIEW_ISOLATED", persistence: null };
     }
 
     const text = String(messageText || "").trim();
