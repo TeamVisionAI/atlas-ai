@@ -1,0 +1,42 @@
+.support-mode-banner {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+  padding: 10px 16px;
+  text-align: center;
+  color: #111827;
+  background: #fbbf24;
+  border-bottom: 2px solid #b45309;
+  z-index: 40;
+}
+
+.support-mode-banner__label {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.support-mode-banner__hint {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.support-mode-banner__exit {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  background: #111827;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.support-mode-banner__exit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}

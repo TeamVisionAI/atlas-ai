@@ -31,6 +31,7 @@ export const translations = {
     navSettings: "Settings",
     navMyAccount: "My Account",
     navAdminUsers: "Administración — Usuarios",
+    navPlatformTenants: "Plataforma",
     navOperationsCenter: "Operations Center",
     navMyDashboard: "My Dashboard",
     navTeamDashboard: "Team Dashboard",
@@ -122,6 +123,7 @@ export const translations = {
     workspaceLabelManagement: "Management",
     workspaceLabelRepresentative: "Representative",
     workspaceRoleAdministrator: "Administrator",
+    workspaceRoleSuperAdmin: "Super Admin",
     workspaceRoleOwnerRvp: "Owner / RVP",
     workspaceRoleDivisionLeader: "Division Leader",
     workspaceRoleFieldTrainer: "Field Trainer",
@@ -136,6 +138,9 @@ export const translations = {
     forbiddenDescription: "You do not have permission to view this page in your current workspace.",
     forbiddenRouteLabel: "Route",
     forbiddenBackToWorkspace: "Back to my workspace",
+
+    supportModeBannerHint: "Estás operando en este tenant. Tu identidad Super Admin no cambia.",
+    supportModeExit: "Salir de Support Mode",
 
     myDashboardTitle: "My Dashboard",
     myDashboardIntro: "Your personal recruiting workspace — active prospects, follow-ups, and quick actions.",
@@ -1737,6 +1742,7 @@ export const translations = {
     navSettings: "Settings",
     navMyAccount: "My Account",
     navAdminUsers: "Administration — Users",
+    navPlatformTenants: "Platform",
     navOperationsCenter: "Operations Center",
     navMyDashboard: "My Dashboard",
     navTeamDashboard: "Team Dashboard",
@@ -1828,6 +1834,7 @@ export const translations = {
     workspaceLabelManagement: "Management",
     workspaceLabelRepresentative: "Representative",
     workspaceRoleAdministrator: "Administrator",
+    workspaceRoleSuperAdmin: "Super Admin",
     workspaceRoleOwnerRvp: "Owner / RVP",
     workspaceRoleDivisionLeader: "Division Leader",
     workspaceRoleFieldTrainer: "Field Trainer",
@@ -1842,6 +1849,9 @@ export const translations = {
     forbiddenDescription: "You do not have permission to view this page in your current workspace.",
     forbiddenRouteLabel: "Route",
     forbiddenBackToWorkspace: "Back to my workspace",
+
+    supportModeBannerHint: "You are operating in this tenant. Your Super Admin identity is unchanged.",
+    supportModeExit: "Exit Support Mode",
 
     myDashboardTitle: "My Dashboard",
     myDashboardIntro: "Your personal recruiting workspace — active prospects, follow-ups, and quick actions.",

@@ -9,6 +9,7 @@ import {
   getWorkspaceLabelKey,
   resolveWorkspaceType
 } from "../../config/workspaceExperience";
+import { isSuperAdminUser } from "../../security/isSuperAdminUser";
 import "./SidebarUserFooter.css";
 
 export default function SidebarUserFooter({
@@ -29,6 +30,9 @@ export default function SidebarUserFooter({
     user.email;
 
   const workspaceType = resolveWorkspaceType(user.role);
+  const roleLabelKey = isSuperAdminUser(user)
+    ? "workspaceRoleSuperAdmin"
+    : getRoleLabelKey(user.role);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -95,7 +99,7 @@ export default function SidebarUserFooter({
               {translate("sidebarRepId")}: {user.rep_id}
             </span>
           ) : null}
-          <span className="sidebar-user-footer__role">{translate(getRoleLabelKey(user.role))}</span>
+          <span className="sidebar-user-footer__role">{translate(roleLabelKey)}</span>
         </span>
         <span className="sidebar-user-footer__chevron" aria-hidden="true">
           ▾

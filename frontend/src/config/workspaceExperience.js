@@ -9,6 +9,7 @@
 import { appPath } from "./appRoutes";
 import { isMetaReviewModeEnabled, isMetaReviewWorkspaceActive } from "./metaReviewMode";
 import { normalizeRole, roleHasPermission, ROLES, PERMISSIONS } from "../security/workspacePermissions";
+import { isSuperAdminUser } from "../security/isSuperAdminUser";
 
 export const WORKSPACE_TYPES = Object.freeze({
   ADMINISTRATOR: "administrator",
@@ -203,6 +204,14 @@ const NAV_ITEM_DEFS = Object.freeze({
     permission: PERMISSIONS.OPERATIONS_ACCESS,
     requiresOperationsAccess: true
   },
+  platformTenants: {
+    id: "platform-tenants",
+    path: appPath("platform/tenants"),
+    labelKey: "navPlatformTenants",
+    end: true,
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    requiresSuperAdmin: true
+  },
   whatsapp: {
     id: "whatsapp",
     path: appPath("settings/whatsapp"),
@@ -314,7 +323,7 @@ const LEADERSHIP_EXTENSION_NAV = Object.freeze({
 
 /** Administration surfaces — configuration and platform operations. */
 const ADMINISTRATION_NAV = Object.freeze({
-  [WORKSPACE_TYPES.ADMINISTRATOR]: ["settings", "adminUsers", "operationsCenter"],
+  [WORKSPACE_TYPES.ADMINISTRATOR]: ["settings", "adminUsers", "operationsCenter", "platformTenants"],
   [WORKSPACE_TYPES.MANAGEMENT]: ["settings"],
   [WORKSPACE_TYPES.REPRESENTATIVE]: ["settings"]
 });
@@ -349,6 +358,10 @@ function matchesRouteAccessRule(rule, user, { operationsAllowed = false } = {}) 
   }
 
   if (rule.requiresOperationsAccess && !operationsAllowed) {
+    return false;
+  }
+
+  if (rule.requiresSuperAdmin && !isSuperAdminUser(user)) {
     return false;
   }
 
@@ -448,6 +461,9 @@ export const ROUTE_ACCESS = Object.freeze({
     permission: PERMISSIONS.OPERATIONS_ACCESS,
     requiresOperationsAccess: true
   },
+  "platform/tenants": {
+    requiresSuperAdmin: true
+  },
   "my-account": {}
 });
 
@@ -461,6 +477,10 @@ function canSeeNavItem(def, user, workspaceType, operationsAllowed) {
   }
 
   if (def.requiresOperationsAccess && !operationsAllowed) {
+    return false;
+  }
+
+  if (def.requiresSuperAdmin && !isSuperAdminUser(user)) {
     return false;
   }
 
@@ -564,6 +584,10 @@ export function resolveRouteKey(pathname) {
 
   if (normalized[0] === "admin" && normalized[1] === "users") {
     return "admin/users";
+  }
+
+  if (normalized[0] === "platform" && normalized[1] === "tenants") {
+    return "platform/tenants";
   }
 
   if (normalized[0] === "prospect-workspace") {

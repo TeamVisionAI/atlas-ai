@@ -19,6 +19,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import AcceptInvitation from "./pages/auth/AcceptInvitation";
 import MetaReviewUsersConfiguration from "./pages/configuration/MetaReviewUsersConfiguration";
 import AdminUsers from "./pages/identity/AdminUsers";
+import PlatformTenantsPage from "./pages/platform/PlatformTenantsPage";
 import MyAccount from "./pages/identity/MyAccount";
 import SetupWizard from "./pages/identity/SetupWizard";
 import RequireSetupComplete from "./components/RequireSetupComplete";
@@ -171,6 +172,7 @@ export default function App() {
         <Route path="policy-intelligence" element={<PolicyIntelligence />} />
         <Route path="my-account" element={<MyAccount />} />
         <Route path="admin/users" element={<AdminUsers />} />
+        <Route path="platform/tenants" element={<PlatformTenantsPage />} />
         <Route path="operations-center/*" element={<OperationsCenter />} />
       </Route>
 

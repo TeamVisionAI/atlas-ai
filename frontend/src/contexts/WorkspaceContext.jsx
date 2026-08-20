@@ -6,7 +6,9 @@ export const WorkspaceContext = createContext({
   workspaceType: "representative",
   navItems: [],
   landingPath: "/app/my-dashboard",
-  refreshUser: async () => null
+  refreshUser: async () => null,
+  supportMode: null,
+  refreshSupportMode: async () => null
 });
 
 export function useWorkspace() {
