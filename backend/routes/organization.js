@@ -2,10 +2,12 @@ const express = require("express");
 const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { protectedRoute } = require("../middleware/protectedRoute");
 const { getOrganizationBranding } = require("../services/organizationBrandingService");
+const recruitingConfigRoutes = require("./recruitingConfig");
 
 const router = express.Router();
 
 router.use(...protectedRoute());
+router.use(recruitingConfigRoutes);
 
 router.get("/settings", (req, res) => {
   res.json(getOrganizationSettings());
