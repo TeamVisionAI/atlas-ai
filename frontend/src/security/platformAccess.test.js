@@ -19,6 +19,7 @@ import {
   DEFAULT_CREATE_TENANT_STATUS,
   isSupportModeBannerVisible,
   isTenantSuspended,
+  requiresReactivateConfirmation,
   requiresSuspendConfirmation,
   shouldConfirmSupportModeSwitch,
   shouldShowPlatformNav,
@@ -85,6 +86,13 @@ describe("tenant lifecycle UI rules", () => {
     assert.equal(requiresSuspendConfirmation("SUSPENDED"), true);
     assert.equal(requiresSuspendConfirmation("ACTIVE"), false);
     assert.equal(requiresSuspendConfirmation("TRIAL"), false);
+    assert.equal(requiresSuspendConfirmation("PAST_DUE"), false);
+  });
+
+  it("requires confirmation to reactivate from SUSPENDED", () => {
+    assert.equal(requiresReactivateConfirmation("SUSPENDED", "ACTIVE"), true);
+    assert.equal(requiresReactivateConfirmation("SUSPENDED", "TRIAL"), true);
+    assert.equal(requiresReactivateConfirmation("ACTIVE", "TRIAL"), false);
   });
 
   it("blocks Support Mode enter for suspended tenants", () => {

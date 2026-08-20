@@ -8,6 +8,7 @@ import {
   TENANT_LIFECYCLE_STATUSES,
   canEnterSupportMode,
   isTenantSuspended,
+  requiresReactivateConfirmation,
   requiresSuspendConfirmation,
   shouldConfirmSupportModeSwitch
 } from "../../security/platformAccess";
@@ -19,6 +20,18 @@ import {
   listTenants,
   updateTenantStatus
 } from "../../services/platformService";
+import {
+  LIFECYCLE_FILTERS,
+  countLifecycleStatuses,
+  filterTenantsByLifecycle,
+  formatLifecycleBadge,
+  formatPaymentMethod,
+  formatPrice,
+  isSeedTenant,
+  nextDueLabel,
+  trialDueLabel
+} from "./platformBillingHelpers";
+import TenantBillingPanel from "./TenantBillingPanel";
 import "../identity/identity.css";
 import "./PlatformTenantsPage.css";
 
@@ -47,22 +60,36 @@ function ownerLabel(tenant) {
   return tenant?.ownerUserId || "—";
 }
 
+function LifecycleBadge({ status }) {
+  const normalized = String(status || "").trim().toUpperCase();
+  const className = `platform-status-badge platform-status-badge--${normalized.toLowerCase() || "unknown"}`;
+
+  return <span className={className}>{formatLifecycleBadge(normalized)}</span>;
+}
+
 export default function PlatformTenantsPage() {
   const navigate = useNavigate();
   const { user, landingPath, supportMode, refreshSupportMode } = useWorkspace();
   const [tenants, setTenants] = useState([]);
+  const [lifecycleFilter, setLifecycleFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [createForm, setCreateForm] = useState(EMPTY_CREATE);
   const [creating, setCreating] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
+  const [billingTenant, setBillingTenant] = useState(null);
   const [detail, setDetail] = useState(null);
   const [adminForm, setAdminForm] = useState(EMPTY_ADMIN);
   const [assigning, setAssigning] = useState(false);
   const [busyTenantId, setBusyTenantId] = useState("");
 
   const allowed = isSuperAdminUser(user);
+  const counts = useMemo(() => countLifecycleStatuses(tenants), [tenants]);
+  const rows = useMemo(
+    () => filterTenantsByLifecycle(tenants, lifecycleFilter),
+    [tenants, lifecycleFilter]
+  );
 
   async function refreshList() {
     const result = await listTenants();
@@ -100,10 +127,26 @@ export default function PlatformTenantsPage() {
     };
   }, [allowed]);
 
-  const rows = useMemo(() => tenants, [tenants]);
-
   if (!allowed) {
     return null;
+  }
+
+  function applyTenantUpdate(updated) {
+    if (!updated?.id) {
+      return;
+    }
+
+    setTenants((current) =>
+      current.map((tenant) => (tenant.id === updated.id ? { ...tenant, ...updated } : tenant))
+    );
+
+    if (detail?.id === updated.id) {
+      setDetail((current) => ({ ...current, ...updated }));
+    }
+
+    if (billingTenant?.id === updated.id) {
+      setBillingTenant((current) => ({ ...current, ...updated }));
+    }
   }
 
   async function handleCreate(event) {
@@ -155,6 +198,16 @@ export default function PlatformTenantsPage() {
       }
     }
 
+    if (requiresReactivateConfirmation(tenant.lifecycleStatus, status)) {
+      const confirmed = window.confirm(
+        `Reactivate ${tenant.name} from Suspended? This is a Super Admin lifecycle change.`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
     setBusyTenantId(tenant.id);
     setError("");
     setNotice("");
@@ -164,9 +217,7 @@ export default function PlatformTenantsPage() {
       const updated = result.tenant || result;
       setNotice(`${updated.name} is now ${updated.lifecycleStatus}.`);
       await refreshList();
-      if (detail?.id === tenant.id) {
-        setDetail(updated);
-      }
+      applyTenantUpdate(updated);
     } catch (err) {
       setError(err.message || "Unable to update tenant status.");
     } finally {
@@ -237,7 +288,7 @@ export default function PlatformTenantsPage() {
         <div>
           <h1>Platform tenants</h1>
           <p className="platform-tenants-page__lede">
-            Super Admin console. Tenant Administrators do not see this page.
+            Super Admin billing and lifecycle console. Tenant Administrators do not see this page.
           </p>
         </div>
       </div>
@@ -287,35 +338,67 @@ export default function PlatformTenantsPage() {
 
       <section className="identity-card">
         <h2>Tenants</h2>
+        <div className="platform-lifecycle-filters" data-testid="platform-lifecycle-filters">
+          {LIFECYCLE_FILTERS.map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              className={`platform-lifecycle-filters__button${
+                lifecycleFilter === filter ? " platform-lifecycle-filters__button--active" : ""
+              }`}
+              data-testid={`lifecycle-filter-${filter}`}
+              onClick={() => setLifecycleFilter(filter)}
+            >
+              {formatLifecycleBadge(filter === "ALL" ? "ALL" : filter)} ({counts[filter] ?? 0})
+            </button>
+          ))}
+        </div>
         {loading ? <p>Loading tenants…</p> : null}
         <div className="identity-table-wrap">
           <table className="identity-table">
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Slug</th>
                 <th>Status</th>
-                <th>Active</th>
-                <th>Subscription</th>
+                <th>Plan</th>
+                <th>Price</th>
+                <th>Payment Method</th>
+                <th>Trial / Due</th>
+                <th>Next Due</th>
                 <th>Owner / admin</th>
-                <th>Created</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((tenant) => {
                 const suspended = isTenantSuspended(tenant);
+                const seed = isSeedTenant(tenant);
+
                 return (
-                  <tr key={tenant.id} className={suspended ? "platform-tenants-page__row--suspended" : ""}>
-                    <td>{tenant.name}</td>
-                    <td>{tenant.slug || "—"}</td>
+                  <tr
+                    key={tenant.id}
+                    className={suspended ? "platform-tenants-page__row--suspended" : ""}
+                  >
                     <td>
-                      <strong>{tenant.lifecycleStatus || tenant.status || "—"}</strong>
+                      <div className="platform-tenants-page__name">
+                        <strong>{tenant.name}</strong>
+                        {seed ? (
+                          <span className="platform-seed-badge" data-testid="seed-tenant-badge">
+                            Seed Tenant
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="platform-tenants-page__slug">{tenant.slug || "—"}</div>
                     </td>
-                    <td>{tenant.isActive === false ? "Inactive" : "Active"}</td>
-                    <td>{tenant.subscriptionStatus || "—"}</td>
+                    <td>
+                      <LifecycleBadge status={tenant.lifecycleStatus || tenant.status} />
+                    </td>
+                    <td>{tenant.plan || tenant.subscriptionPlan || "—"}</td>
+                    <td>{formatPrice(tenant.monthlyPriceCents, tenant.currency)}</td>
+                    <td>{formatPaymentMethod(tenant.paymentMethod)}</td>
+                    <td>{trialDueLabel(tenant)}</td>
+                    <td>{nextDueLabel(tenant)}</td>
                     <td className="platform-tenants-page__owner">{ownerLabel(tenant)}</td>
-                    <td>{formatDate(tenant.createdAt)}</td>
                     <td>
                       <div className="identity-actions">
                         <button
@@ -329,6 +412,14 @@ export default function PlatformTenantsPage() {
                         <button
                           type="button"
                           className="identity-button-secondary"
+                          data-testid="view-billing"
+                          onClick={() => setBillingTenant(tenant)}
+                        >
+                          View Billing
+                        </button>
+                        <button
+                          type="button"
+                          className="identity-button-secondary"
                           onClick={() => {
                             setSelectedTenant(tenant);
                             setAdminForm(EMPTY_ADMIN);
@@ -337,6 +428,7 @@ export default function PlatformTenantsPage() {
                         >
                           Assign first admin
                         </button>
+                        {/* BR-146: Super Admin may still manually PATCH Team Vision lifecycle. */}
                         <select
                           aria-label={`Change status for ${tenant.name}`}
                           value={tenant.lifecycleStatus || ""}
@@ -430,6 +522,17 @@ export default function PlatformTenantsPage() {
             </div>
           </form>
         </section>
+      ) : null}
+
+      {billingTenant ? (
+        <TenantBillingPanel
+          tenant={billingTenant}
+          onClose={() => setBillingTenant(null)}
+          onTenantUpdated={async (updated) => {
+            applyTenantUpdate(updated);
+            await refreshList();
+          }}
+        />
       ) : null}
 
       {detail ? (

@@ -54,3 +54,98 @@
 .identity-table-wrap {
   overflow-x: auto;
 }
+
+.platform-lifecycle-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.platform-lifecycle-filters__button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.platform-lifecycle-filters__button--active {
+  background: #1e3a8a;
+  border-color: #1e3a8a;
+  color: #fff;
+}
+
+.platform-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.platform-status-badge--trial {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.platform-status-badge--active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.platform-status-badge--past_due {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.platform-status-badge--suspended {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.platform-seed-badge {
+  display: inline-flex;
+  margin-left: 0.4rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  vertical-align: middle;
+}
+
+.platform-tenants-page__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.platform-tenants-page__slug {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.platform-billing-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.platform-billing-panel__history {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.configuration-billing__detail {
+  margin-top: 0.5rem;
+}
