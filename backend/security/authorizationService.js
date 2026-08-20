@@ -22,7 +22,7 @@ function permissionMatches(context, permission) {
   return aliases.some((code) => context.permissions.includes(code));
 }
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
-const { normalizeSaasRole, toLegacyRole, isSuperAdmin } = require("./saasRoles");
+const { normalizeSaasRole, toLegacyRole, resolveCanonicalIdentity } = require("./saasRoles");
 const { resolvePermissionsForUser } = require("./permissionService");
 
 function resolveUserStatus(user) {
@@ -38,8 +38,15 @@ function buildAuthContext(user, { jwtPayload = null, permissions = null } = {}) 
     return null;
   }
 
-  const saasRole = normalizeSaasRole(user.role) || String(user.role || ROLES.RECRUITER).toUpperCase();
-  const legacyRole = normalizeRole(user.role) || toLegacyRole(saasRole);
+  const identity = resolveCanonicalIdentity({
+    usersRole: user.users_role || user.saas_role || user.saasRole,
+    atlasRole: user.role
+  });
+  const saasRole =
+    identity.saasRole ||
+    normalizeSaasRole(jwtPayload?.role) ||
+    String(user.role || ROLES.RECRUITER).toUpperCase();
+  const legacyRole = identity.legacyRole || normalizeRole(user.role) || toLegacyRole(saasRole);
 
   return {
     userId: user.id,

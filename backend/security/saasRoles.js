@@ -78,6 +78,41 @@ function isOrgAdmin(role) {
   return normalized === SAAS_ROLES.SUPER_ADMIN || normalized === SAAS_ROLES.ADMIN;
 }
 
+function isLegacyWorkspaceRole(value) {
+  const legacy = String(value || "").trim().toLowerCase();
+  return Boolean(LEGACY_TO_SAAS[legacy]);
+}
+
+/**
+ * Canonical SaaS role is users.role.
+ * atlas_users.role is the LC1 workspace mirror and must not downgrade SUPER_ADMIN.
+ */
+function resolveCanonicalSaasRole({ usersRole, atlasRole } = {}) {
+  return normalizeSaasRole(usersRole) || normalizeSaasRole(atlasRole) || null;
+}
+
+function resolveLegacyWorkspaceRole({ atlasRole, saasRole } = {}) {
+  if (isLegacyWorkspaceRole(atlasRole)) {
+    return String(atlasRole).trim().toLowerCase();
+  }
+
+  return toLegacyRole(saasRole || atlasRole);
+}
+
+function resolveCanonicalIdentity({ usersRole, atlasRole } = {}) {
+  const saasRole = resolveCanonicalSaasRole({ usersRole, atlasRole });
+  const legacyRole = resolveLegacyWorkspaceRole({
+    atlasRole,
+    saasRole
+  });
+
+  return {
+    saasRole,
+    legacyRole,
+    isSuperAdmin: isSuperAdmin(saasRole)
+  };
+}
+
 module.exports = {
   SAAS_ROLES,
   ALL_SAAS_ROLES,
@@ -87,5 +122,9 @@ module.exports = {
   normalizeSaasRole,
   toLegacyRole,
   isSuperAdmin,
-  isOrgAdmin
+  isOrgAdmin,
+  isLegacyWorkspaceRole,
+  resolveCanonicalSaasRole,
+  resolveLegacyWorkspaceRole,
+  resolveCanonicalIdentity
 };

@@ -12,6 +12,7 @@ const {
   sanitizeUser,
   updateLastLogin
 } = require("../services/atlasUserService");
+const { findUserById: findCanonicalUserById } = require("./userService");
 const { signAccessToken } = require("../security/jwtService");
 const { hashPassword, verifyPassword } = require("../security/passwordService");
 const { hashToken } = require("../security/tokenService");
@@ -134,6 +135,13 @@ async function loginWithPassword({
   let session;
 
   try {
+    const canonicalUser = await findCanonicalUserById(user.id).catch(() => null);
+
+    if (canonicalUser?.role) {
+      user.users_role = canonicalUser.role;
+      user.saas_role = canonicalUser.role;
+    }
+
     const jwtResult = await signAccessToken(user, { rememberMe });
     accessToken = jwtResult.token;
 

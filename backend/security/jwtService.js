@@ -28,7 +28,7 @@ function createJti() {
 
 async function buildTokenPayload(user, { rememberMe = false } = {}) {
   const permissions = await resolvePermissionsForUser(user);
-  const role = normalizeSaasRole(user.role) || user.role;
+  const role = normalizeSaasRole(user.saas_role || user.users_role || user.role) || user.role;
 
   return {
     sub: user.id,
