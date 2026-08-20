@@ -293,24 +293,6 @@ test("6–7. cross-org campaign GET / QR inaccessible", async () => {
   assert.equal(png.ok, false);
 });
 
-test("8. Meta Review user → denied", async () => {
-  const manager = createManager(createMemoryQrChannelRepository());
-  const result = await manager.createCampaign(
-    auth({
-      userId: USER_META,
-      role: "administrator",
-      userExtra: {
-        meta_review_user: true,
-        profile_settings: { meta_review_user: true },
-        email: "meta.reviewer@example.test"
-      }
-    }),
-    { name: "Meta", campaignType: "custom" }
-  );
-  assert.equal(result.ok, false);
-  assert.equal(result.reason, REASON.META_REVIEW_EXCLUDED);
-});
-
 test("9. ineligible owner → denied", async () => {
   const manager = createManager(createMemoryQrChannelRepository());
   // Force findUserById to return operations role

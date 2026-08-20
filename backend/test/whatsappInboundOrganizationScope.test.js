@@ -376,14 +376,6 @@ test("10. BR-075 outbound gate remains active (unchanged)", async () => {
   );
 });
 
-test("11. Meta Review workspace contract file remains present (unchanged surface)", () => {
-  const metaReviewTest = path.join(
-    __dirname,
-    "../../frontend/src/config/metaReviewWorkspace.test.js"
-  );
-  assert.equal(fs.existsSync(metaReviewTest), true);
-});
-
 test("12. mission projection catch-up contract: org-scoped business events are sufficient", () => {
   // atlas_mission_control_prospects is not written by MissionControlRepository;
   // state blob projection keys by prospectId + organizationId from business events.

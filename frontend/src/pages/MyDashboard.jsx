@@ -4,16 +4,11 @@ import { getDashboard } from "../services/api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { appPath } from "../config/appRoutes";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
-import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
-import { useWorkspace } from "../contexts/WorkspaceContext";
-import MetaReviewDashboardCard from "../components/meta-review/MetaReviewDashboardCard";
 import { buildProspectMilestoneLabel } from "../engines/prospectCenterViewModel";
 import "./WorkspaceDashboard.css";
 
 export default function MyDashboard() {
   const { translate } = useLanguage();
-  const { user } = useWorkspace();
-  const metaReviewMode = isMetaReviewWorkspaceActive(user);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -67,19 +62,15 @@ export default function MyDashboard() {
           <h1>{translate("myDashboardTitle")}</h1>
           <p className="workspace-dashboard__intro">{translate("myDashboardIntro")}</p>
         </div>
-        {!metaReviewMode ? (
-          <div className="workspace-dashboard__actions">
-            <Link className="workspace-dashboard__button" to={appPath("quick-capture")}>
-              {translate("navQuickCapture")}
-            </Link>
-            <Link className="workspace-dashboard__button workspace-dashboard__button--secondary" to={appPath("prospect-center")}>
-              {translate("navMyProspects")}
-            </Link>
-          </div>
-        ) : null}
+        <div className="workspace-dashboard__actions">
+          <Link className="workspace-dashboard__button" to={appPath("quick-capture")}>
+            {translate("navQuickCapture")}
+          </Link>
+          <Link className="workspace-dashboard__button workspace-dashboard__button--secondary" to={appPath("prospect-center")}>
+            {translate("navMyProspects")}
+          </Link>
+        </div>
       </header>
-
-      {metaReviewMode ? <MetaReviewDashboardCard /> : null}
 
       {loading ? <p>{translate("myDashboardLoading")}</p> : null}
       {error ? <p className="workspace-dashboard__error">{error}</p> : null}

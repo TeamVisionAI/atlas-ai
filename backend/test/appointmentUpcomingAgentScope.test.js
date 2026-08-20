@@ -91,18 +91,3 @@ test("legacy repair prefers preferredAgentId over prospect owner_user_id", () =>
   );
   assert.equal(agentId, RVP_ID);
 });
-
-test("Meta Review surfaces are untouched by this ownership-scope hotfix", () => {
-  const changed = require("node:child_process")
-    .execSync("git diff --name-only", { encoding: "utf8" })
-    .split("\n")
-    .filter(Boolean);
-
-  for (const file of [
-    "frontend/src/config/workspaceExperience.js",
-    "frontend/src/config/metaReviewMode.js",
-    "frontend/src/i18n/LanguageContext.jsx"
-  ]) {
-    assert.equal(changed.includes(file), false, file);
-  }
-});

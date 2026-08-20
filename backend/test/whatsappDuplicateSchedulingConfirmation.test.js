@@ -170,11 +170,6 @@ describe("WhatsApp duplicate scheduling confirmation", () => {
     assert.match(source, /BR-075|24|session/i);
   });
 
-  it("14. Meta Review remains unchanged", () => {
-    const meta = path.join(__dirname, "../../frontend/src/config/metaReviewMode.js");
-    assert.equal(fs.existsSync(meta), true);
-  });
-
   it("15. Tenant and ownership isolation remain intact", () => {
     const confirmation = buildPersistedAppointmentConfirmation(officeAppointment(), {
       preferred_language: "english",

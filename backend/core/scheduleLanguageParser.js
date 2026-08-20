@@ -2,12 +2,8 @@
  * Schedule natural-language parsing for Recruit AI.
  *
  * Conversational flexibility (soft punctuation / bare hour questions like "6?")
- * runs only in the normal production workspace.
- * Implements Meta Review boundary: when META_REVIEW_MODE is enabled, keep the
- * historical strict parser so reviewer demo conversations stay unchanged.
+ * is enabled in production.
  */
-
-const { isMetaReviewModeEnabled } = require("../config/metaReviewMode");
 
 const EN_DAYS = [
   "sunday",
@@ -48,8 +44,7 @@ const SPANISH_HOUR_WORDS = {
 };
 
 function isConversationalScheduleFlexibilityEnabled() {
-  // Meta Review mode must keep the prior strict schedule parser behavior.
-  return !isMetaReviewModeEnabled();
+  return true;
 }
 
 function normalize(text) {

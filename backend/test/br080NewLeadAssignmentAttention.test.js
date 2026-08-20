@@ -15,8 +15,7 @@ const {
   ASSIGNMENT_SOURCES,
   resolveNewLeadAssignment,
   buildNewLeadAttentionFields,
-  isEligibleNewLeadOwner,
-  isMetaReviewFixtureUser
+  isEligibleNewLeadOwner
 } = require("../core/newLeadAssignmentEngine");
 const {
   ATTENTION_STATUS,
@@ -143,13 +142,6 @@ test("1-5. create-time assignment precedence: explicit, default recruiter, RVP, 
 test("6-9. invalid/disabled/cross-org rejected; no eligible → unassigned", async () => {
   assert.equal(isEligibleNewLeadOwner(USERS[DISABLED], ORG_A), false);
   assert.equal(isEligibleNewLeadOwner(USERS[OTHER_ORG], ORG_A), false);
-  assert.equal(
-    isMetaReviewFixtureUser({
-      email: "reviewer@meta.example",
-      profile_settings: { meta_review_user: true }
-    }),
-    true
-  );
 
   const unassigned = await resolveNewLeadAssignment({
     organizationId: ORG_A,
@@ -428,7 +420,7 @@ test("37. schedule booking preserves valid owner (stamp only when null)", () => 
   assert.match(semantic, /owner_user_id: agentId/);
 });
 
-test("38-40. claim/acknowledge audited; Meta Review fixture rejected; migration additive", () => {
+test("38-40. claim/acknowledge audited; migration additive", () => {
   const attention = read("../core/newLeadAttentionEngine.js");
   assert.match(attention, /lead\.acknowledged/);
   assert.match(attention, /lead\.claimed/);
@@ -437,11 +429,6 @@ test("38-40. claim/acknowledge audited; Meta Review fixture rejected; migration 
   const migration = read("../database/migrations/031_br080_new_lead_attention.sql");
   assert.match(migration, /ADD COLUMN IF NOT EXISTS/);
   assert.match(migration, /No ownership backfill/i);
-
-  assert.equal(
-    isMetaReviewFixtureUser({ profile_settings: { meta_review_user: true } }),
-    true
-  );
 });
 
 test("41-45. BR-075/076/077/078/079 unchanged contracts present", () => {

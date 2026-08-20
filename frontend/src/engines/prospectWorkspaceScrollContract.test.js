@@ -69,5 +69,4 @@ test("Interview, Communications Center, and Meta Review boundaries remain intact
 
   assert.match(page, /CommunicationHistorySection/);
   assert.match(interviewPanel, /buildInterviewModuleCommunicationCards/);
-  assert.equal(fs.existsSync(path.join(__dirname, "../config/metaReviewMode.js")), true);
 });

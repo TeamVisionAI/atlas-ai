@@ -20,7 +20,7 @@ const {
   isEligibleForContextCapture,
   DEFAULT_CAPTURE_TIMEOUT_MS
 } = require("./contextCaptureConfig");
-const { isMetaReviewScope, createContextPersistenceService } = require("./contextPersistenceService");
+const { createContextPersistenceService } = require("./contextPersistenceService");
 const {
   createSupabaseContextRepository,
   createMemoryContextRepository
@@ -162,21 +162,6 @@ async function runRecruitAiV2PostLiveAdvisory(input = {}, deps = {}) {
   const text =
     messageText != null ? messageText : inbound?.body || inbound?.text || "";
   const closed = isProspectClosed(prospect);
-
-  if (
-    isMetaReviewScope({
-      organizationId: orgId,
-      prospectId,
-      channel
-    })
-  ) {
-    return {
-      skipped: true,
-      reason: "META_REVIEW_ISOLATED",
-      contextCapture: null,
-      shadow: null
-    };
-  }
 
   const captureEligibility = isEligibleForContextCapture({
     organizationId: orgId,

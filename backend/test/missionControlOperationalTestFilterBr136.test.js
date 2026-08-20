@@ -174,24 +174,6 @@ test("implementation does not import Conversations lifecycle TEST helper", () =>
   assert.doesNotMatch(engineSrc, /conversationsCenterLifecycle/);
 });
 
-test("Meta Review allowlist / mode files unchanged by this change", () => {
-  const root = path.join(__dirname, "../..");
-  for (const rel of [
-    "frontend/src/config/metaReviewMode.js",
-    "frontend/src/config/workspaceExperience.js",
-    "backend/config/metaReviewMode.js",
-    "backend/middleware/requireMetaReviewMode.js"
-  ]) {
-    assert.ok(fs.existsSync(path.join(root, rel)), rel);
-  }
-  const workspace = fs.readFileSync(
-    path.join(root, "frontend/src/config/workspaceExperience.js"),
-    "utf8"
-  );
-  assert.match(workspace, /META_REVIEW_ALLOWED_ROUTE_KEYS/);
-  assert.match(workspace, /"conversations"/);
-});
-
 test("execution remains OFF", () => {
   const {
     isExecutionEnabled

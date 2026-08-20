@@ -334,12 +334,6 @@ test("15. Meta / execution config modules still present (sprint must not remove 
   for (const full of required) {
     assert.ok(fs.existsSync(full), full);
   }
-  // Meta Review boundary suite remains the regression authority for fixtures/protections.
-  const metaBoundary = path.join(
-    __dirname,
-    "scheduleConversationalFlexibilityMetaReviewBoundary.test.js"
-  );
-  assert.ok(fs.existsSync(metaBoundary));
 });
 
 test("16. Soft compose helper keeps one question", () => {

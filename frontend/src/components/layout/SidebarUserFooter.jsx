@@ -17,8 +17,7 @@ export default function SidebarUserFooter({
   translate,
   language,
   onToggleLanguage,
-  onNavigate,
-  metaReviewMode = false
+  onNavigate
 }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -115,16 +114,14 @@ export default function SidebarUserFooter({
             </span>
           </div>
 
-          {!metaReviewMode ? (
-            <Link
-              to={appPath("my-account")}
-              className="sidebar-user-footer__menu-item"
-              role="menuitem"
-              onClick={closeMenu}
-            >
-              {translate("navMyAccount")}
-            </Link>
-          ) : null}
+          <Link
+            to={appPath("my-account")}
+            className="sidebar-user-footer__menu-item"
+            role="menuitem"
+            onClick={closeMenu}
+          >
+            {translate("navMyAccount")}
+          </Link>
           <Link
             to={getSettingsPathForUser(user)}
             className="sidebar-user-footer__menu-item"
@@ -133,17 +130,15 @@ export default function SidebarUserFooter({
           >
             {translate("navSettings")}
           </Link>
-          {!metaReviewMode ? (
-            <button
-              type="button"
-              className="sidebar-user-footer__menu-item"
-              role="menuitem"
-              onClick={handleToggleLanguage}
-            >
-              {translate("sidebarLanguage")}:{" "}
-              {language === "es" ? translate("switchToEnglish") : translate("switchToSpanish")}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="sidebar-user-footer__menu-item"
+            role="menuitem"
+            onClick={handleToggleLanguage}
+          >
+            {translate("sidebarLanguage")}:{" "}
+            {language === "es" ? translate("switchToEnglish") : translate("switchToSpanish")}
+          </button>
           <button
             type="button"
             className="sidebar-user-footer__menu-item sidebar-user-footer__menu-item--danger"

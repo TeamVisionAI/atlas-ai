@@ -304,7 +304,7 @@ test("17-18. archive behavior and closed prospect blocks writes", async () => {
   assert.equal(active, null);
 });
 
-test("19-20. cross-org denied and Meta Review fixture isolation", async () => {
+test("19-20. cross-org denied", async () => {
   const service = makeService();
   await service.createContext({
     organizationId: ORG,
@@ -317,17 +317,6 @@ test("19-20. cross-org denied and Meta Review fixture isolation", async () => {
     prospectId: PROSPECT
   });
   assert.equal(otherOrg, null);
-
-  await assert.rejects(
-    () =>
-      service.createContext({
-        organizationId: ORG,
-        prospectId: PROSPECT,
-        channel: "meta_review",
-        context: { preferredLanguage: "english" }
-      }),
-    (error) => error.code === "CONTEXT_META_REVIEW_ISOLATED"
-  );
 });
 
 test("21-22. no raw PII / hidden reasoning persisted", () => {

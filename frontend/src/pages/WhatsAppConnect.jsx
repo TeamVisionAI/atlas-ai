@@ -15,11 +15,6 @@ import {
 } from "../utils/metaEmbeddedSignupEvents";
 import { buildWhatsAppErrorNavigationState } from "../utils/mapWhatsAppUserError";
 import { whatsAppConnectDebug } from "../utils/whatsappConnectDebug";
-import { isMetaReviewWorkspaceActive } from "../config/metaReviewMode";
-import { useWorkspace } from "../contexts/WorkspaceContext";
-import { fetchWhatsAppConfiguration } from "../services/configurationService";
-import { getEmbeddedSignupHealth } from "../services/metaEmbeddedSignupService";
-import MetaReviewWhatsAppPage from "../components/meta-review/MetaReviewWhatsAppPage";
 import "./WhatsAppConnect.css";
 
 const FINISH_EVENTS = new Set([
@@ -40,17 +35,11 @@ function navigateToError(navigate, details) {
 export default function WhatsAppConnect() {
   const { translate } = useLanguage();
   const navigate = useNavigate();
-  const { user } = useWorkspace();
-  const metaReviewWorkspace = isMetaReviewWorkspaceActive(user);
   const { ready, error: sdkError, appId, configId } = useFacebookSdk();
 
   const [status, setStatus] = useState("disconnected");
   const [alreadyConnected, setAlreadyConnected] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [reviewConnection, setReviewConnection] = useState(null);
-  const [reviewHealth, setReviewHealth] = useState(null);
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewError, setReviewError] = useState(false);
 
   const authorizationCodeRef = useRef(null);
   const onboardingAssetsRef = useRef({ wabaId: null, phoneNumberId: null, businessId: null });
@@ -186,64 +175,18 @@ export default function WhatsAppConnect() {
         if (!cancelled && payload.connected && payload.connection) {
           setAlreadyConnected(true);
           setStatus("connected");
-          setReviewConnection(payload.connection);
         }
       } catch (error) {
         whatsAppConnectDebug("status load failed", error);
       }
     }
 
-    async function loadReviewPresentation() {
-      if (!metaReviewWorkspace) {
-        return;
-      }
-
-      setReviewLoading(true);
-      setReviewError(false);
-
-      try {
-        const [configuration, health] = await Promise.all([
-          fetchWhatsAppConfiguration(),
-          getEmbeddedSignupHealth().catch(() => null)
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        const connected = Boolean(configuration?.connected);
-        setAlreadyConnected(connected);
-        setStatus(connected ? "connected" : "disconnected");
-        setReviewConnection({
-          businessName: configuration?.businessName,
-          verifiedName: configuration?.businessName,
-          wabaId: configuration?.wabaId,
-          phoneNumberId: configuration?.phoneNumberId,
-          displayPhoneNumber: configuration?.businessPhone,
-          connectedAt: configuration?.connectedAt,
-          lastSyncAt: configuration?.lastSync,
-          healthStatus: configuration?.connectionStatus
-        });
-        setReviewHealth(health);
-      } catch (error) {
-        whatsAppConnectDebug("review whatsapp load failed", error);
-        if (!cancelled) {
-          setReviewError(true);
-        }
-      } finally {
-        if (!cancelled) {
-          setReviewLoading(false);
-        }
-      }
-    }
-
     loadStatus();
-    loadReviewPresentation();
 
     return () => {
       cancelled = true;
     };
-  }, [metaReviewWorkspace]);
+  }, []);
 
   useEffect(() => {
     function handler(event) {
@@ -303,23 +246,6 @@ export default function WhatsAppConnect() {
   const isConnectDisabled =
     launching || !ready || !appId || !configId || status === "connecting" || status === "finalizing";
   const configurationMissing = !appId || !configId;
-
-  if (metaReviewWorkspace) {
-    return (
-      <MetaReviewWhatsAppPage
-        connected={alreadyConnected}
-        connection={reviewConnection || {}}
-        health={reviewHealth}
-        loading={reviewLoading}
-        error={reviewError}
-        launching={launching}
-        configurationMissing={configurationMissing}
-        sdkError={sdkError}
-        onConnect={launchWhatsAppSignup}
-        connectDisabled={isConnectDisabled}
-      />
-    );
-  }
 
   return (
     <div className="whatsapp-connect">

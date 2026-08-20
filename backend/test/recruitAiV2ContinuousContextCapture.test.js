@@ -470,32 +470,6 @@ test("22-27. no side effects; live CE remains authoritative in pipeline", () => 
   assert.doesNotMatch(pipeline, /sendAndPersistWhatsAppMessage/);
 });
 
-test("28. Meta Review excluded from capture and shadow advisory", async () => {
-  const { services } = makeServices();
-  const result = await runRecruitAiV2PostLiveAdvisory(
-    {
-      prospect: makeProspect({
-        id: "metareview-prospect",
-        organization_id: "metareview-org"
-      }),
-      organizationId: "metareview-org",
-      inboundMessageId: "wamid.meta",
-      messageText: "hello",
-      conversation: { success: true, replied: true },
-      env: {
-        RECRUIT_AI_V2_CONTEXT_CAPTURE_ENABLED: "true",
-        RECRUIT_AI_V2_CONTEXT_CAPTURE_ORGANIZATION_IDS: "metareview-org",
-        RECRUIT_AI_V2_CONTEXT_CAPTURE_SAMPLE_RATE: "1",
-        RECRUIT_AI_V2_SHADOW_ENABLED: "true",
-        RECRUIT_AI_V2_SHADOW_ORGANIZATION_IDS: "metareview-org",
-        RECRUIT_AI_V2_SHADOW_SAMPLE_RATE: "1"
-      }
-    },
-    { services }
-  );
-  assert.equal(result.reason, "META_REVIEW_ISOLATED");
-});
-
 test("29. TV-000028 sparse-shadow/full-capture: unsampled 6? then 6:30? visible later", async () => {
   const { services, shadowRepo } = makeServices();
   await services.captureService.captureContextTurn({

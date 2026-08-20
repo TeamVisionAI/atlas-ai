@@ -213,18 +213,3 @@ test("9. persistRescheduledAppointment wires Google sync engine (source contract
     /updateCalendarEvent\([\s\S]*?\.catch\(\(\) => \{\}\)/
   );
 });
-
-test("10. Meta Review allowlist unchanged by this hotfix", () => {
-  const changed = require("node:child_process")
-    .execSync("git diff --name-only", { encoding: "utf8" })
-    .split("\n")
-    .filter(Boolean);
-
-  for (const file of [
-    "frontend/src/config/workspaceExperience.js",
-    "frontend/src/config/metaReviewMode.js",
-    "frontend/src/i18n/LanguageContext.jsx"
-  ]) {
-    assert.equal(changed.includes(file), false, file);
-  }
-});

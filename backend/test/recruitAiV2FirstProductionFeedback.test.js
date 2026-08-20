@@ -21,7 +21,6 @@ const {
   isEligibleForShadowEvaluation,
   resolveContextCaptureConfig,
   resolveShadowConfig,
-  isMetaReviewScope,
   containsInternalDiagnostics,
   INTENTS,
   NEXT_ACTIONS,
@@ -411,8 +410,6 @@ test("25. live CE remains authoritative / v2 execution off", () => {
 });
 
 test("26-29. BR-075/078/080/081 regression smoke", () => {
-  // Side effects denied; meta review isolated; no diagnostic leak on greeting path.
-  assert.equal(isMetaReviewScope({ organizationId: "metareview-org", prospectId: "p" }), true);
   const result = processRecruitAiV2TurnSync({
     message: { text: "Hola" },
     context: createConversationContext({
@@ -424,20 +421,6 @@ test("26-29. BR-075/078/080/081 regression smoke", () => {
   assert.equal(result.execution.attempted, false);
   assert.equal(containsInternalDiagnostics(result.rendered.text), false);
   assert.ok(result.structuredDecision.reasonCodes.includes("SIDE_EFFECTS_DISABLED"));
-});
-
-test("30. Meta Review isolation", () => {
-  assert.equal(
-    isMetaReviewScope({
-      organizationId: "00000000-0000-4000-8000-000000000001",
-      prospectId: "normal"
-    }),
-    false
-  );
-  assert.equal(
-    isMetaReviewScope({ organizationId: "metareview-org", prospectId: "x" }),
-    true
-  );
 });
 
 test("31. first production fixture sequential turns", () => {

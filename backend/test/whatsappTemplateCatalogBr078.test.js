@@ -431,13 +431,7 @@ test("35-36. blocked send does not look successful; mocked template auth updates
   assert.notEqual(blocked.status, DELIVERY_STATUSES.SENT_TEMPLATE);
 });
 
-test("37-38. Meta Review untouched; audit components sanitized", () => {
-  const metaReview = fs.readFileSync(
-    path.join(__dirname, "../test/scheduleConversationalFlexibilityMetaReviewBoundary.test.js"),
-    "utf8"
-  );
-  assert.match(metaReview, /Meta Review/);
-
+test("37-38. audit components sanitized", () => {
   const components = buildTemplateComponents(
     ["prospect_first_name"],
     { prospect_first_name: "Ana" },

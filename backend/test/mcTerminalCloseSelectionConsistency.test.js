@@ -32,11 +32,9 @@ test("I. Not Interested / CLOSED remain excluded from default MC queue (BR-044)"
   );
 });
 
-test("G/H posture: BR-136 + Meta filter modules unchanged by this MC selection fix", () => {
+test("G/H posture: BR-136 filter module unchanged by this MC selection fix", () => {
   const br136 = path.join(__dirname, "../core/missionControlOperationalTestFilter.js");
-  const metaMode = path.join(__dirname, "../../frontend/src/config/metaReviewMode.js");
   assert.equal(fs.existsSync(br136), true);
-  assert.equal(fs.existsSync(metaMode), true);
 });
 
 test("L. execution remains OFF", () => {

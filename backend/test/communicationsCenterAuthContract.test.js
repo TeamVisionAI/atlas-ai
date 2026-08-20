@@ -72,20 +72,6 @@ test("hierarchy: RVP/admin same org allowed; agent ownership enforced; cross-org
   );
 });
 
-test("Meta Review dedicated user remains gated by meta_review_user session contract files", () => {
-  const metaFrontend = fs.readFileSync(
-    path.join(__dirname, "../../frontend/src/config/metaReviewMode.js"),
-    "utf8"
-  );
-  assert.match(metaFrontend, /meta_review_user/);
-  // Communications Center does not add Meta Review allowlist entries.
-  const workspace = fs.readFileSync(
-    path.join(__dirname, "../../frontend/src/config/metaReviewWorkspace.test.js"),
-    "utf8"
-  );
-  assert.doesNotMatch(workspace, /communications-center|CommunicationsCenterTimeline/);
-});
-
 test("error and success envelopes are PII-safe after sanitizer", () => {
   const errorBody = sanitizeCommunicationsCenterResponse({
     error: "COMMUNICATIONS_CENTER_FAILED",

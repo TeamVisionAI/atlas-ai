@@ -20,16 +20,6 @@ const {
   resolveCanonicalProspectIdentity
 } = require("../recruitingProspectBridge");
 
-const META_REVIEW_HINTS = ["meta review", "meta_review", "metareview", "reviewer@meta"];
-
-function isMetaReviewScope({ organizationId, prospectId, channel } = {}) {
-  const haystack = [organizationId, prospectId, channel]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return META_REVIEW_HINTS.some((hint) => haystack.includes(hint));
-}
-
 function assertTenantScope({ organizationId, prospectId }) {
   if (!organizationId || !prospectId) {
     const error = new Error("organizationId and prospectId are required");
@@ -251,13 +241,6 @@ function createContextPersistenceService({
     const canonicalProspectId = identity.coreProspectId || prospectId;
     assertTenantScope({ organizationId, prospectId: canonicalProspectId });
 
-    if (isMetaReviewScope({ organizationId, prospectId: canonicalProspectId, channel })) {
-      const error = new Error("Meta Review fixtures cannot persist Recruit AI v2 context");
-      error.code = "CONTEXT_META_REVIEW_ISOLATED";
-      error.statusCode = 403;
-      throw error;
-    }
-
     // Prefer an existing active under an alternate identity (legacy↔core) rather than
     // creating a second active for the same person (BR-120). Same-key duplicates still
     // raise CONTEXT_UNIQUE_VIOLATION via repo.insert.
@@ -426,13 +409,6 @@ function createContextPersistenceService({
       const error = new Error("Closed prospect cannot accept active context writes");
       error.code = "CONTEXT_PROSPECT_CLOSED";
       error.statusCode = 409;
-      throw error;
-    }
-
-    if (isMetaReviewScope({ organizationId, prospectId: canonicalProspectId, channel })) {
-      const error = new Error("Meta Review fixtures cannot persist Recruit AI v2 context");
-      error.code = "CONTEXT_META_REVIEW_ISOLATED";
-      error.statusCode = 403;
       throw error;
     }
 
@@ -654,7 +630,6 @@ module.exports = {
   createContextPersistenceService,
   rowToContext,
   protectConfirmedAppointmentFromDowngrade,
-  isMetaReviewScope,
   resolvePersistenceIdentityScope,
   findActiveRowByIdentity
 };

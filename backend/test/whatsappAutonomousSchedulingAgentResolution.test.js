@@ -368,14 +368,6 @@ test("11. BR-075 outbound gate remains active", async () => {
   );
 });
 
-test("12. Meta Review surface remains present and unchanged by this hotfix", () => {
-  const metaReviewTest = path.join(
-    __dirname,
-    "../../frontend/src/config/metaReviewWorkspace.test.js"
-  );
-  assert.equal(fs.existsSync(metaReviewTest), true);
-});
-
 test("13. tenant isolation: resolver stays within provided organization settings/users", async () => {
   const atlasUserService = require("../services/atlasUserService");
   const originalFind = atlasUserService.findUserById;

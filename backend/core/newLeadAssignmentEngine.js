@@ -26,42 +26,8 @@ const ASSIGNMENT_SOURCES = Object.freeze({
   UNASSIGNED: "unassigned"
 });
 
-const META_REVIEW_FIXTURE_HINTS = [
-  "meta review",
-  "meta_review",
-  "metareview",
-  "reviewer@meta"
-];
-
-function isMetaReviewFixtureUser(user) {
-  if (!user) {
-    return false;
-  }
-
-  const haystack = [
-    user.email,
-    user.display_name,
-    user.first_name,
-    user.last_name,
-    user.role
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (user.profile_settings?.meta_review_user === true) {
-    return true;
-  }
-
-  return META_REVIEW_FIXTURE_HINTS.some((hint) => haystack.includes(hint));
-}
-
 function isEligibleNewLeadOwner(user, organizationId) {
   if (!isEligibleScheduleAgent(user)) {
-    return false;
-  }
-
-  if (isMetaReviewFixtureUser(user)) {
     return false;
   }
 
@@ -271,6 +237,5 @@ module.exports = {
   ASSIGNMENT_SOURCES,
   resolveNewLeadAssignment,
   buildNewLeadAttentionFields,
-  isEligibleNewLeadOwner,
-  isMetaReviewFixtureUser
+  isEligibleNewLeadOwner
 };

@@ -17,7 +17,6 @@ import Login from "./pages/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import AcceptInvitation from "./pages/auth/AcceptInvitation";
-import MetaReviewUsersConfiguration from "./pages/configuration/MetaReviewUsersConfiguration";
 import AdminUsers from "./pages/identity/AdminUsers";
 import PlatformTenantsPage from "./pages/platform/PlatformTenantsPage";
 import MyAccount from "./pages/identity/MyAccount";
@@ -160,7 +159,6 @@ export default function App() {
           <Route path="profile" element={<ProfileConfiguration />} />
           <Route path="organization" element={<OrganizationConfiguration />} />
           <Route path="integrations" element={<IntegrationsConfiguration />} />
-          <Route path="review-users" element={<MetaReviewUsersConfiguration />} />
           <Route path="whatsapp" element={<WhatsAppConnect />} />
           <Route path="whatsapp/success" element={<WhatsAppConnectSuccess />} />
           <Route path="whatsapp/error" element={<WhatsAppConnectError />} />
