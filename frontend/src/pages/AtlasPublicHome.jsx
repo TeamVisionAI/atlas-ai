@@ -1,6 +1,7 @@
 import Navbar from "../components/public/Navbar";
 import Footer from "../components/public/Footer";
 import { getAtlasAppLoginUrl } from "../config/publicSiteHost";
+import { ATLAS_BRAND_ASSETS } from "../config/publicBrandAssets";
 import { usePageMeta } from "../hooks/usePageMeta";
 import "./PublicSite.css";
 import "./AtlasLanding.css";
@@ -57,7 +58,9 @@ export default function AtlasPublicHome() {
   usePageMeta({
     title: "Atlas AI | Connect • Automate • Grow",
     description:
-      "Atlas AI helps insurance and recruiting organizations connect with prospects, automate follow-up, schedule meetings, and execute as a team."
+      "Atlas AI helps insurance and recruiting organizations connect with prospects, automate follow-up, schedule meetings, and execute as a team.",
+    ogTitle: "Atlas AI",
+    ogImage: `${typeof window !== "undefined" ? window.location.origin : "https://useatlas-ai.com"}${ATLAS_BRAND_ASSETS.ogImage}`
   });
 
   return (
@@ -106,7 +109,14 @@ export default function AtlasPublicHome() {
             <div className="atlas-hero__visual" aria-hidden="true">
               <div className="atlas-hero__panel">
                 <div className="atlas-hero__panel-head">
-                  <span className="atlas-hero__panel-mark">A</span>
+                  <img
+                    className="atlas-hero__panel-logo"
+                    src={ATLAS_BRAND_ASSETS.logoMark96}
+                    alt=""
+                    width={48}
+                    height={48}
+                    decoding="async"
+                  />
                   <div>
                     <p className="atlas-hero__panel-title">Atlas AI</p>
                     <p className="atlas-hero__panel-sub">Connect • Automate • Grow</p>
