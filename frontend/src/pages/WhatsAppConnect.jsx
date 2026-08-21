@@ -23,7 +23,9 @@ const FINISH_EVENTS = new Set([
   "FINISH_ONLY_WABA",
   "FINISH_GRANT_ONLY_API_ACCESS"
 ]);
-const COMPLETION_TIMEOUT_MS = 60_000;
+/** Base wait for Meta FINISH + OAuth code; extended once on partial progress. */
+const COMPLETION_TIMEOUT_MS = 120_000;
+const COMPLETION_EXTENSION_MS = 90_000;
 
 function navigateToError(navigate, details) {
   navigate(appPath("settings/whatsapp/error"), {
@@ -46,6 +48,7 @@ export default function WhatsAppConnect() {
   const exchangeSubmittedRef = useRef(false);
   const exchangeInFlightRef = useRef(false);
   const completionTimeoutRef = useRef(null);
+  const timeoutExtendedRef = useRef(false);
 
   const clearCompletionTimeout = useCallback(() => {
     if (completionTimeoutRef.current != null) {
@@ -60,21 +63,61 @@ export default function WhatsAppConnect() {
     onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null, businessId: null };
     exchangeSubmittedRef.current = false;
     exchangeInFlightRef.current = false;
+    timeoutExtendedRef.current = false;
     setLaunching(false);
     setStatus("disconnected");
   }, [clearCompletionTimeout]);
 
-  const armCompletionTimeout = useCallback(() => {
-    clearCompletionTimeout();
-    completionTimeoutRef.current = setTimeout(() => {
-      if (exchangeSubmittedRef.current || exchangeInFlightRef.current) {
-        return;
-      }
+  const attemptCompletionRef = useRef(null);
 
-      whatsAppConnectDebug("completion timeout");
-      navigateToError(navigate, { errorKey: "TIMEOUT" });
-    }, COMPLETION_TIMEOUT_MS);
-  }, [clearCompletionTimeout, navigate]);
+  const armCompletionTimeout = useCallback(
+    (durationMs = COMPLETION_TIMEOUT_MS) => {
+      clearCompletionTimeout();
+      completionTimeoutRef.current = setTimeout(() => {
+        void (async () => {
+          if (exchangeSubmittedRef.current || exchangeInFlightRef.current) {
+            return;
+          }
+
+          // Late race: both halves arrived just as timer fired — finalize instead of TIMEOUT.
+          if (authorizationCodeRef.current && onboardingAssetsRef.current.wabaId) {
+            whatsAppConnectDebug("timeout race — attempting completion");
+            await attemptCompletionRef.current?.();
+            return;
+          }
+
+          // Partial Meta progress (QR / FINISH without code, or code without FINISH): extend once.
+          const partial =
+            Boolean(authorizationCodeRef.current) || Boolean(onboardingAssetsRef.current.wabaId);
+          if (partial && !timeoutExtendedRef.current) {
+            timeoutExtendedRef.current = true;
+            whatsAppConnectDebug("timeout extended for partial Embedded Signup progress");
+            armCompletionTimeout(COMPLETION_EXTENSION_MS);
+            return;
+          }
+
+          // Backend may have finalized after a prior attempt — do not overwrite success with TIMEOUT.
+          try {
+            const payload = await getEmbeddedSignupStatus();
+            if (payload?.connected && payload.connection) {
+              whatsAppConnectDebug("timeout reconcile — already connected");
+              navigate(appPath("settings/whatsapp/success"), {
+                replace: true,
+                state: { connection: payload.connection }
+              });
+              return;
+            }
+          } catch (error) {
+            whatsAppConnectDebug("timeout status reconcile failed", error);
+          }
+
+          whatsAppConnectDebug("completion timeout");
+          navigateToError(navigate, { errorKey: "TIMEOUT" });
+        })();
+      }, durationMs);
+    },
+    [clearCompletionTimeout, navigate]
+  );
 
   const attemptCompletion = useCallback(async () => {
     const code = authorizationCodeRef.current;
@@ -125,6 +168,8 @@ export default function WhatsAppConnect() {
       });
     }
   }, [clearCompletionTimeout, navigate]);
+
+  attemptCompletionRef.current = attemptCompletion;
 
   const handleEmbeddedSignupEvent = useCallback(
     (parsed) => {
