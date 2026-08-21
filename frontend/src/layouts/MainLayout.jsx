@@ -13,14 +13,15 @@ import SidebarUserFooter from "../components/layout/SidebarUserFooter";
 import { useLanguage } from "../i18n/LanguageContext";
 import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
-import { getConversationsAttentionCount } from "../services/conversationsCenterService";
+import { getConversationsAttentionCount, getConversationsCenterAccess } from "../services/conversationsCenterService";
 import { exitSupportMode, getSupportMode } from "../services/platformService";
 import { isSuperAdminUser } from "../security/isSuperAdminUser";
+import {
+  conversationsAccessAllowsNav,
+  resolveConversationsAccessStateFromPayload
+} from "../engines/conversationsCenterAccess";
 import SupportModeBanner from "../components/layout/SupportModeBanner";
 import "./MainLayout.css";
-
-const NIOVEL_USER_ID = "33ad243a-9d00-4a4d-810b-df2762c0f076";
-const TEAM_VISION_ORG_ID = "00000000-0000-4000-8000-000000000001";
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => getLayoutMode());
@@ -158,14 +159,19 @@ export default function MainLayout() {
   const [operationsAllowed, setOperationsAllowed] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [conversationsAttentionCount, setConversationsAttentionCount] = useState(0);
+  const [conversationsCenterAllowed, setConversationsCenterAllowed] = useState(null);
   const [supportMode, setSupportMode] = useState(null);
   const [exitingSupportMode, setExitingSupportMode] = useState(false);
   const currentUserRef = useRef(null);
   currentUserRef.current = currentUser;
 
   const navItems = useMemo(
-    () => buildNavItemsForUser(currentUser, { operationsAllowed }),
-    [currentUser, operationsAllowed]
+    () =>
+      buildNavItemsForUser(currentUser, {
+        operationsAllowed,
+        conversationsCenterAllowed
+      }),
+    [currentUser, operationsAllowed, conversationsCenterAllowed]
   );
 
   const refreshUser = useCallback(async () => {
@@ -260,11 +266,40 @@ export default function MainLayout() {
   }, []);
 
   useEffect(() => {
-    const isPilotUser =
-      currentUser?.id === NIOVEL_USER_ID &&
-      String(currentUser?.organization_id || "") === TEAM_VISION_ORG_ID;
+    if (!currentUser) {
+      setConversationsCenterAllowed(null);
+      setConversationsAttentionCount(0);
+      return undefined;
+    }
 
-    if (!isPilotUser) {
+    let cancelled = false;
+
+    getConversationsCenterAccess()
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        const state = resolveConversationsAccessStateFromPayload(payload);
+        setConversationsCenterAllowed(conversationsAccessAllowsNav(state));
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        if (error?.status === 403) {
+          setConversationsCenterAllowed(false);
+          return;
+        }
+        setConversationsCenterAllowed(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, supportMode?.active, supportMode?.organizationId, location.pathname]);
+
+  useEffect(() => {
+    if (conversationsCenterAllowed !== true) {
       setConversationsAttentionCount(0);
       return undefined;
     }
@@ -292,7 +327,7 @@ export default function MainLayout() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [currentUser, location.pathname]);
+  }, [conversationsCenterAllowed, currentUser, location.pathname]);
 
   useEffect(() => {
     setPhoneNavOpen(false);

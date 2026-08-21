@@ -54,19 +54,34 @@ function buildTestApp(overrides = {}) {
   });
 
   const {
-    assertConversationsCenterPilotAccess
+    assertConversationsCenterAccess
   } = require("../core/conversationsCenter/conversationsCenterAccess");
   const {
     sendHumanComposerReply
   } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
+  const { ROLES } = require("../security/roles");
+  const { permissionsForRole } = require("../security/permissions");
 
   const cc = express.Router();
 
   cc.post("/human-reply", async (req, res) => {
     try {
-      assertConversationsCenterPilotAccess({
+      const isPrivileged = req.atlasUser.id === NIOVEL;
+      const authContext = {
         userId: req.atlasUser.id,
+        role: isPrivileged ? ROLES.ADMINISTRATOR : ROLES.SUPPORT,
+        permissions: permissionsForRole(
+          isPrivileged ? ROLES.ADMINISTRATOR : ROLES.SUPPORT
+        ),
+        status: "active",
         organizationId: req.headers["x-test-org-id"]
+      };
+      assertConversationsCenterAccess({
+        userId: req.atlasUser.id,
+        organizationId: req.headers["x-test-org-id"],
+        authContext,
+        tenantFeatures: { conversationsCenterEnabled: true },
+        env: { CONVERSATIONS_CENTER_ENABLED: "true" }
       });
       const result = await sendHumanComposerReply({
         phone: req.body?.phone,
@@ -74,6 +89,8 @@ function buildTestApp(overrides = {}) {
         clientRequestId: req.body?.clientRequestId,
         userId: req.atlasUser.id,
         organizationId: req.headers["x-test-org-id"],
+        authContext,
+        accessAlreadyAsserted: true,
         findProspectFn:
           overrides.findProspectFn ||
           (async () => ({
@@ -186,7 +203,7 @@ test("POST succeeds for Niovel HUMAN-owned conversation", async () => {
   });
 });
 
-test("non-Niovel forbidden with structured error (not Route not found)", async () => {
+test("insufficient RBAC forbidden with structured error (not Route not found)", async () => {
   const app = buildTestApp();
   const { server, base } = await listen(app);
   try {
@@ -205,7 +222,7 @@ test("non-Niovel forbidden with structured error (not Route not found)", async (
     });
     const body = await res.json();
     assert.equal(res.status, 403);
-    assert.equal(body.error, "CONVERSATIONS_CENTER_USER_FORBIDDEN");
+    assert.equal(body.error, "CONVERSATIONS_CENTER_FORBIDDEN");
     assert.notEqual(body.error, "Route not found");
   } finally {
     server.close();

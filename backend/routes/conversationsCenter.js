@@ -1,5 +1,6 @@
 /**
- * Conversations Center — Niovel-only production pilot routes.
+ * Conversations Center — tenant-scoped routes.
+ * Access: GLOBAL_MASTER && TENANT_FEATURE(conversationsCenterEnabled) && RBAC.
  */
 
 const express = require("express");
@@ -11,8 +12,10 @@ const {
   getConversationsAttentionCount
 } = require("../core/conversationsCenter/conversationsCenterReadModel");
 const {
-  assertConversationsCenterPilotAccess,
-  isProspectInNiovelPilotScope
+  assertConversationsCenterAccessAsync,
+  resolveConversationsCenterAccessAsync,
+  isProspectInConversationsTenantScope,
+  ACCESS_CODES
 } = require("../core/conversationsCenter/conversationsCenterAccess");
 const {
   takeOverConversation,
@@ -40,24 +43,50 @@ const router = express.Router();
 router.use(requireAtlasUser);
 router.use(organizationGuard());
 
-function requirePilot(req, res) {
+async function requireConversationsAccess(req, res) {
   try {
-    assertConversationsCenterPilotAccess({
+    await assertConversationsCenterAccessAsync({
       userId: req.atlasUser?.id,
-      organizationId: getTenantOrganizationId(req)
+      organizationId: getTenantOrganizationId(req),
+      authContext: req.authContext
     });
     return true;
   } catch (error) {
     res.status(error.statusCode || 403).json({
-      error: error.code || "CONVERSATIONS_CENTER_FORBIDDEN",
-      message: error.message
+      error: error.code || ACCESS_CODES.FORBIDDEN,
+      message: error.message,
+      reason: error.reason || null
     });
     return false;
   }
 }
 
+router.get("/access", async (req, res) => {
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const result = await resolveConversationsCenterAccessAsync({
+      userId: req.atlasUser?.id,
+      organizationId,
+      authContext: req.authContext
+    });
+    res.json({
+      allowed: result.allowed === true,
+      organizationId,
+      reason: result.reason || null,
+      code: result.code || null,
+      featureEnabled: result.feature?.enabled === true,
+      globalEnabled: result.feature?.global?.enabled !== false
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.code || "CONVERSATIONS_CENTER_ACCESS_FAILED",
+      message: "Failed to resolve Conversations Center access"
+    });
+  }
+});
+
 router.get("/attention-count", async (req, res) => {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 
@@ -75,7 +104,7 @@ router.get("/attention-count", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 
@@ -103,7 +132,7 @@ async function loadScopedProspect(phone, organizationId) {
 
   const prospect = await findProspectInOrganization(phone, organizationId);
 
-  if (!prospect || !isProspectInNiovelPilotScope(prospect)) {
+  if (!prospect || !isProspectInConversationsTenantScope(prospect, organizationId)) {
     return null;
   }
 
@@ -111,7 +140,7 @@ async function loadScopedProspect(phone, organizationId) {
 }
 
 async function humanReplyHandler(req, res) {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 
@@ -123,7 +152,9 @@ async function humanReplyHandler(req, res) {
       message: req.body?.message,
       clientRequestId: req.body?.clientRequestId,
       userId: req.atlasUser?.id,
-      organizationId
+      organizationId,
+      authContext: req.authContext,
+      accessAlreadyAsserted: true
     });
 
     res.json(result);
@@ -152,7 +183,7 @@ async function humanReplyHandler(req, res) {
 }
 
 async function takeOverHandler(req, res) {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 
@@ -217,7 +248,7 @@ async function takeOverHandler(req, res) {
 }
 
 async function returnToAtlasHandler(req, res) {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 
@@ -265,7 +296,7 @@ router.post("/take-over", takeOverHandler);
 router.post("/return-to-atlas", returnToAtlasHandler);
 
 async function scopedLifecycleAction(req, res, actionName, run) {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 
@@ -342,7 +373,7 @@ router.post("/mark-test", (req, res) =>
  * or change inbox lifecycle.
  */
 router.post("/mark-read", async (req, res) => {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 
@@ -397,7 +428,7 @@ router.post("/mark-read", async (req, res) => {
 });
 
 router.get("/:phone", async (req, res) => {
-  if (!requirePilot(req, res)) {
+  if (!(await requireConversationsAccess(req, res))) {
     return;
   }
 

@@ -408,7 +408,10 @@ function canSeeNavItem(def, user, workspaceType, operationsAllowed) {
   return true;
 }
 
-export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
+export function buildNavItemsForUser(
+  user,
+  { operationsAllowed = false, conversationsCenterAllowed = null } = {}
+) {
   if (!user) {
     return [];
   }
@@ -419,6 +422,12 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
   return order
     .map((key) => NAV_ITEM_DEFS[key])
     .filter((def) => canSeeNavItem(def, user, workspaceType, operationsAllowed))
+    .filter((def) => {
+      if (def.id === "conversations" && conversationsCenterAllowed === false) {
+        return false;
+      }
+      return true;
+    })
     .map((def) => ({
       path: def.path,
       end: def.end,

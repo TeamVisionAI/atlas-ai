@@ -1,14 +1,15 @@
 /**
  * Conversations Center — HUMAN free-form reply via canonical WhatsApp outbound.
- * Niovel pilot only. Does not invent templates outside the customer-care window.
+ * Tenant-scoped. Does not invent templates outside the customer-care window.
  */
 
 const {
   CONVERSATION_OWNERSHIP_STATE
 } = require("./constants");
 const {
-  assertConversationsCenterPilotAccess,
-  isProspectInNiovelPilotScope
+  assertConversationsCenterAccess,
+  assertConversationsCenterAccessAsync,
+  isProspectInConversationsTenantScope
 } = require("./conversationsCenterAccess");
 const {
   resolveConversationOwnershipState
@@ -39,6 +40,9 @@ function buildWindowClosedError(delivery) {
  *   userId: string,
  *   organizationId: string,
  *   clientRequestId: string,
+ *   authContext?: object,
+ *   tenantFeatures?: object,
+ *   accessAlreadyAsserted?: boolean,
  *   sendFn?: Function,
  *   findProspectFn?: Function
  * }} input
@@ -50,11 +54,29 @@ async function sendHumanComposerReply(input = {}) {
     userId,
     organizationId,
     clientRequestId,
+    authContext = null,
+    tenantFeatures = null,
+    accessAlreadyAsserted = false,
     sendFn = sendAndPersistWhatsAppMessage,
     findProspectFn = findProspect
   } = input;
 
-  assertConversationsCenterPilotAccess({ userId, organizationId });
+  if (accessAlreadyAsserted !== true) {
+    if (tenantFeatures != null) {
+      assertConversationsCenterAccess({
+        userId,
+        organizationId,
+        authContext,
+        tenantFeatures
+      });
+    } else {
+      await assertConversationsCenterAccessAsync({
+        userId,
+        organizationId,
+        authContext
+      });
+    }
+  }
 
   const text = String(message || "").trim();
   if (!text) {
@@ -75,8 +97,7 @@ async function sendHumanComposerReply(input = {}) {
   const prospect = await findProspectFn(phone);
   if (
     !prospect ||
-    String(prospect.organization_id || "") !== String(organizationId) ||
-    !isProspectInNiovelPilotScope(prospect)
+    !isProspectInConversationsTenantScope(prospect, organizationId)
   ) {
     const error = new Error("Conversation not found in Conversations Center scope");
     error.statusCode = 404;

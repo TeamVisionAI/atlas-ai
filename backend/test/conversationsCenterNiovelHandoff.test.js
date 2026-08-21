@@ -63,45 +63,89 @@ async function withTempWorkflowState(run) {
   }
 }
 
-test("pilot access allows only Niovel in Team Vision", () => {
+test("Conversations Center access requires feature + RBAC (not Niovel user gate)", () => {
   const {
-    assertConversationsCenterPilotAccess,
-    isConversationsCenterPilotUser,
-    isProspectInNiovelPilotScope
+    assertConversationsCenterAccess,
+    evaluateConversationsCenterAccess,
+    isProspectInConversationsTenantScope
   } = require("../core/conversationsCenter/conversationsCenterAccess");
+  const { ROLES } = require("../security/roles");
+  const { permissionsForRole } = require("../security/permissions");
+
+  const env = { CONVERSATIONS_CENTER_ENABLED: "true" };
+  const featuresOn = { conversationsCenterEnabled: true };
+  const adminCtx = {
+    role: ROLES.ADMINISTRATOR,
+    permissions: permissionsForRole(ROLES.ADMINISTRATOR),
+    status: "active"
+  };
+  const supportCtx = {
+    role: ROLES.SUPPORT,
+    permissions: permissionsForRole(ROLES.SUPPORT),
+    status: "active"
+  };
 
   assert.equal(
-    isConversationsCenterPilotUser({ userId: NIOVEL, organizationId: TEAM_VISION }),
+    evaluateConversationsCenterAccess({
+      organizationId: TEAM_VISION,
+      authContext: adminCtx,
+      tenantFeatures: featuresOn,
+      env
+    }).allowed,
     true
   );
+
   assert.equal(
-    isConversationsCenterPilotUser({ userId: OTHER_USER, organizationId: TEAM_VISION }),
+    evaluateConversationsCenterAccess({
+      organizationId: TEAM_VISION,
+      authContext: supportCtx,
+      tenantFeatures: featuresOn,
+      env
+    }).allowed,
     false
   );
+
   assert.equal(
-    isConversationsCenterPilotUser({ userId: NIOVEL, organizationId: OTHER_ORG }),
+    evaluateConversationsCenterAccess({
+      organizationId: OTHER_ORG,
+      authContext: adminCtx,
+      tenantFeatures: { conversationsCenterEnabled: false },
+      env
+    }).allowed,
     false
   );
 
   assert.throws(
-    () => assertConversationsCenterPilotAccess({ userId: OTHER_USER, organizationId: TEAM_VISION }),
-    (error) => error.code === "CONVERSATIONS_CENTER_USER_FORBIDDEN"
+    () =>
+      assertConversationsCenterAccess({
+        organizationId: TEAM_VISION,
+        authContext: supportCtx,
+        tenantFeatures: featuresOn,
+        env
+      }),
+    (error) => error.code === "CONVERSATIONS_CENTER_FORBIDDEN"
   );
 
   assert.equal(
-    isProspectInNiovelPilotScope({
-      organization_id: TEAM_VISION,
-      owner_user_id: NIOVEL,
-      phone: "+17865550101"
-    }),
+    isProspectInConversationsTenantScope(
+      {
+        organization_id: TEAM_VISION,
+        owner_user_id: OTHER_USER,
+        phone: "+17865550101"
+      },
+      TEAM_VISION
+    ),
     true
   );
   assert.equal(
-    isProspectInNiovelPilotScope({
-      organization_id: TEAM_VISION,
-      owner_user_id: OTHER_USER,
-      phone: "+17865550102"
-    }),
+    isProspectInConversationsTenantScope(
+      {
+        organization_id: OTHER_ORG,
+        owner_user_id: NIOVEL,
+        phone: "+17865550102"
+      },
+      TEAM_VISION
+    ),
     false
   );
 });
@@ -366,8 +410,10 @@ test("detail list item includes full phone; unauthorized user remains forbidden"
       buildConversationListItem
     } = require("../core/conversationsCenter/conversationsCenterReadModel");
     const {
-      assertConversationsCenterPilotAccess
+      assertConversationsCenterAccess
     } = require("../core/conversationsCenter/conversationsCenterAccess");
+    const { ROLES } = require("../security/roles");
+    const { permissionsForRole } = require("../security/permissions");
 
     const item = await buildConversationListItem({
       id: "p1",
@@ -388,12 +434,19 @@ test("detail list item includes full phone; unauthorized user remains forbidden"
 
     assert.throws(
       () =>
-        assertConversationsCenterPilotAccess({
+        assertConversationsCenterAccess({
           userId: OTHER_USER,
-          organizationId: TEAM_VISION
+          organizationId: TEAM_VISION,
+          authContext: {
+            role: ROLES.SUPPORT,
+            permissions: permissionsForRole(ROLES.SUPPORT),
+            status: "active"
+          },
+          tenantFeatures: { conversationsCenterEnabled: true },
+          env: { CONVERSATIONS_CENTER_ENABLED: "true" }
         }),
       (error) =>
-        error.code === "CONVERSATIONS_CENTER_USER_FORBIDDEN" &&
+        error.code === "CONVERSATIONS_CENTER_FORBIDDEN" &&
         error.statusCode === 403
     );
   });
