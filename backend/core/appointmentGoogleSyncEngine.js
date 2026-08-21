@@ -18,15 +18,48 @@ const SYNC_STATUSES = Object.freeze({
 });
 
 function buildCalendarEventPayload(appointment, overrides = {}) {
+  const {
+    composePublicLocationCalendarLocation,
+    composePublicLocationCalendarDescription,
+    resolveMeetingLocationUrl
+  } = require("./publicLocationDetails");
+  const { MEETING_LOCATION_TYPES } = require("./configuration/appointmentDomain");
+
+  const isPublicLocation =
+    String(appointment.meetingLocationType || "").trim().toLowerCase() ===
+    MEETING_LOCATION_TYPES.PUBLIC_LOCATION;
+
+  const publicLocation = isPublicLocation
+    ? composePublicLocationCalendarLocation({
+        meetingLocationName: appointment.meetingLocationName,
+        meetingLocationAddress: appointment.meetingAddress
+      })
+    : null;
+
+  const publicDescription = isPublicLocation
+    ? composePublicLocationCalendarDescription({
+        meetingLocationUrl: resolveMeetingLocationUrl(appointment),
+        meetingNotes: appointment.meetingNotes
+      })
+    : null;
+
   return {
     summary:
       overrides.summary ||
       `interview — ${appointment.metadata?.prospectName || appointment.prospectPhone || "Prospect"}`,
-    description: overrides.description || appointment.meetingNotes || "",
+    description:
+      overrides.description !== undefined
+        ? overrides.description
+        : publicDescription || appointment.meetingNotes || "",
     startTimeISO: overrides.startTimeISO || appointment.startDateTime,
     endTimeISO: overrides.endTimeISO || appointment.endDateTime,
     timezone: overrides.timezone || appointment.timezone || "America/New_York",
-    location: overrides.location || appointment.meetingAddress || appointment.virtualMeetingUrl || null,
+    location:
+      overrides.location ||
+      publicLocation ||
+      appointment.meetingAddress ||
+      appointment.virtualMeetingUrl ||
+      null,
     attendeeEmail: overrides.attendeeEmail || appointment.metadata?.prospectEmail || null,
     zoomUrl: overrides.zoomUrl || appointment.virtualMeetingUrl || null
   };

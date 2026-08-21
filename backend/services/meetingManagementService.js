@@ -78,7 +78,12 @@ async function fetchSettingsRow(organizationId) {
   return data?.settings || {};
 }
 
-function defaultOfficeAddress() {
+function defaultOfficeAddress(organizationId = null) {
+  // RT1 — seed Team Vision BR-018 only; never borrow TV office for other tenants.
+  const { isTeamVisionSeedTenant } = require("../core/teamVisionSeedTenant");
+  if (organizationId && !isTeamVisionSeedTenant(organizationId)) {
+    return null;
+  }
   const office = getOfficeLocation();
   return office.fullAddress || null;
 }
@@ -90,7 +95,8 @@ async function getMeetingManagement(organizationId) {
   return {
     ...meetingManagement,
     configured: Boolean(meetingManagement.personalMeetingUrl || meetingManagement.officeAddress),
-    effectiveOfficeAddress: meetingManagement.officeAddress || defaultOfficeAddress()
+    effectiveOfficeAddress:
+      meetingManagement.officeAddress || defaultOfficeAddress(organizationId)
   };
 }
 
@@ -205,10 +211,21 @@ async function resolveInterviewLocation(organizationId, interviewType, options =
   }
 
   if (normalized.includes("public")) {
+    // BR-078 — never fall back to office address for public-location interviews.
     const publicLocation =
       options.publicLocation ||
-      options.officeLocation ||
-      "Public Location (details to follow)";
+      options.meetingLocationAddress ||
+      options.meetingLocationName ||
+      null;
+
+    if (!publicLocation) {
+      return {
+        location: null,
+        meetingUrl: null,
+        configured: false,
+        errorCode: "PUBLIC_LOCATION_REQUIRED"
+      };
+    }
 
     return {
       location: publicLocation,
