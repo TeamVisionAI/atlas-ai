@@ -369,11 +369,21 @@ async function createAppointment(input, context = {}) {
 
   const prospect = await findProspectInOrganization(prospectPhone, organizationId);
 
-  if (!prospect) {
+  if (!prospect?.id) {
     throw buildError("PROSPECT_NOT_FOUND", "Prospect not found.", 404);
   }
 
-  // Implements BR-120 — resolve/ensure canonical core BEFORE Calendar or appointment writes.
+  // APR1 / BR-120 — appointment.prospect_id must be public.prospects.id (MC canonical).
+  // Reject foreign/injected prospect IDs that do not match the org-scoped phone profile.
+  if (input.prospectId && String(input.prospectId) !== String(prospect.id)) {
+    throw buildError(
+      PROSPECT_IDENTITY_REASON_CODES.ORG_MISMATCH,
+      "Foreign prospect identity cannot be attached to this appointment.",
+      403
+    );
+  }
+
+  // Implements BR-120 — resolve/ensure recruiting-core identity BEFORE Calendar or appointment writes.
   // Never persist atlas_appointments.prospect_id = null on the booking path.
   const identity = await resolveCanonicalProspectIdentity({
     phone: prospectPhone,
@@ -394,7 +404,20 @@ async function createAppointment(input, context = {}) {
     );
   }
 
-  const prospectId = identity.coreProspectId;
+  if (
+    identity.legacyProspectId &&
+    String(identity.legacyProspectId) !== String(prospect.id)
+  ) {
+    throw buildError(
+      PROSPECT_IDENTITY_REASON_CODES.CONFLICT,
+      "Prospect identity conflict for this organization.",
+      409
+    );
+  }
+
+  // Canonical appointment FK = public.prospects.id; core kept explicit in metadata.
+  const prospectId = prospect.id;
+  const coreProspectId = identity.coreProspectId;
 
   await syncProspectContact(prospectPhone, contact, organizationId);
 
@@ -608,6 +631,8 @@ async function createAppointment(input, context = {}) {
         prospectName: prospect.name,
         prospectEmail: email,
         emailStatus,
+        // APR1 — recruiting-core identity kept separate from appointment.prospect_id
+        coreProspectId,
         virtualUrlStatus: virtualUrlResult.status,
         virtualUrlSource: virtualUrlResult.source,
         officeAddressStatus: officeAddressResult.status,

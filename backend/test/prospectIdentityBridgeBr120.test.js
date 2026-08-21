@@ -189,9 +189,10 @@ test("G7b: ensureCore when existing unique in-org core reuses it", async () => {
   assert.equal(identity.organizationId, ORG_A);
 });
 
-test("G8/G9: appointment create requires core — unresolved identity fails before write", async () => {
+test("G8/G9: appointment create requires identity — stores public.prospects.id not core", async () => {
   clearProspectBridgeCacheForTests();
   // Source contract: createAppointment resolves identity before scheduleAppointment.
+  // APR1 — persist prospect_id = public.prospects.id; core only in metadata.coreProspectId.
   const source = require("node:fs").readFileSync(
     require("node:path").join(__dirname, "../application/appointmentApplicationService.js"),
     "utf8"
@@ -207,6 +208,13 @@ test("G8/G9: appointment create requires core — unresolved identity fails befo
     /identity\.ok \|\| !identity\.coreProspectId[\s\S]*buildError\([\s\S]*PROSPECT_IDENTITY/
   );
   assert.match(source, /Never persist atlas_appointments\.prospect_id = null/);
+  assert.match(source, /const prospectId = prospect\.id/);
+  assert.match(source, /coreProspectId/);
+  assert.match(source, /Foreign prospect identity cannot be attached/);
+  assert.doesNotMatch(
+    source,
+    /const prospectId = identity\.coreProspectId/
+  );
 });
 
 test("G10: legacy durable row dual-load still works", async () => {

@@ -1502,27 +1502,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ## BR-120 — Canonical Prospect Identity Bridge (Legacy ↔ Core)
 
-**Implements:** One phone maps to one canonical core prospect UUID for cross-system FK/keys while legacy `prospects` remains the WhatsApp phone profile/cache  
+**Implements:** Org-scoped bridge between Mission Control `public.prospects` and recruiting-core `atlas_core_prospects` without overloading appointment FKs  
 **Domain:** Prospects / Recruit AI v2 durable context / Appointments  
 **Depends on:** BR-039, BR-049, BR-081  
-**Related:** BR-121 / BR-122 / BR-123 (incident exposed dual UUID; those rules defer identity bridging to BR-120)  
-**Status:** Implemented (map-only + dual-load; no mass DB rewrite)  
+**Related:** BR-121 / BR-122 / BR-123 (incident exposed dual UUID; those rules defer identity bridging to BR-120); **APR1** appointment prospect reference integrity  
+**Status:** Implemented (map-only + dual-load; APR1 redefines appointment FK target)  
 **Engine target:** `recruitingProspectBridge.js` (`resolveCanonicalProspectIdentity`); `recruitAiV2/contextPersistenceService.js`; `appointmentApplicationService.createAppointment`  
-**Tests:** `backend/test/prospectIdentityBridgeBr120.test.js`
+**Tests:** `backend/test/prospectIdentityBridgeBr120.test.js`; `backend/test/appointmentProspectReferenceApr1.test.js`
 
 ### Rules
 
-1. **Core is system of record** — `atlas_core_prospects.id` is the canonical prospect identity for appointment `prospect_id` and **new** durable context rows.
-2. **Legacy remains phone profile/cache** — WhatsApp resolution and phone-keyed workflow may continue using legacy `prospects.id` / phone until LC2 consolidation.
-3. **Shared resolver (org-scoped)** — `resolveCanonicalProspectIdentity({ phone, organizationId, … })` is authoritative only for **`organizationId + normalized phone`**. Never treat a phone-global core lookup as authoritative. Cache keys are `organizationId::phone`.
-4. **Fail closed** — Exactly one in-org core → use it. Zero + `ensureCore=false` → unresolved. Zero + `ensureCore=true` → ensure in requested org then verify. Foreign-org core → `PROSPECT_IDENTITY_ORG_MISMATCH`. Multiple in-org cores → `PROSPECT_IDENTITY_AMBIGUOUS`. Conflicting legacy↔lookup → `PROSPECT_IDENTITY_CONFLICT`. Do not guess.
-5. **Appointment create** — If canonical core cannot be resolved/ensured, fail **before** Calendar, capacity, appointment persist, or workflow advance. This applies to both `appointmentApplicationService.createAppointment` and the mission `executeScheduleInterview` path (identity before Calendar). Never write `atlas_appointments.prospect_id = null` on the Recruit AI booking path.
-6. **Durable context dual-load** — Load active context by **core first, then legacy** for the same phone/org/channel. Prefer an existing active row over creating a second active for the same person.
-7. **New context creates use core** — First persist for a phone/org/channel writes `prospect_id = coreProspectId` when core can be resolved/ensured.
-8. **No mass rewrite in this rule** — Do not bulk-update existing `recruit_ai_conversation_contexts.prospect_id` from legacy→core. Compare-and-save continues updating the **loaded row id** (may remain legacy-keyed) while JSON `prospectId` may reflect core.
-9. **Appointment FK stays core** — Never rewrite `atlas_appointments.prospect_id` to legacy to “match” WhatsApp.
-10. **Workflow remains phone-keyed** — `advanceProspectWorkflow` / schedule side effects continue on phone + legacy profile fields (occupation, city, etc.).
-11. **Boundaries** — Does not enable BR-111 execution, change live authoring allowlists, Calendar cancel semantics (BR-121), schedule reconcile (BR-122), or occupation optional rules (BR-123).
+1. **Appointment FK is Mission Control canonical** — `atlas_appointments.prospect_id` MUST reference the tenant’s `public.prospects.id` (Mission Control / Prospect Center / Quick Capture row). Do **not** store `atlas_core_prospects.id` in `atlas_appointments.prospect_id`.
+2. **Core remains recruiting-core identity** — `atlas_core_prospects.id` is the canonical identity for **new** Recruit AI durable context rows and bridge resolution. Persist core on appointments only as explicit metadata (`metadata.coreProspectId`), never by overloading `prospect_id`.
+3. **Legacy remains phone profile/cache** — WhatsApp resolution and phone-keyed workflow continue using `public.prospects` / phone until LC2 consolidation.
+4. **Shared resolver (org-scoped)** — `resolveCanonicalProspectIdentity({ phone, organizationId, … })` is authoritative only for **`organizationId + normalized phone`**. Never treat a phone-global core lookup as authoritative. Cache keys are `organizationId::phone`. Returns both `legacyProspectId` (`public.prospects.id`) and `coreProspectId`.
+5. **Fail closed** — Exactly one in-org core → use it. Zero + `ensureCore=false` → unresolved. Zero + `ensureCore=true` → ensure in requested org then verify. Foreign-org core → `PROSPECT_IDENTITY_ORG_MISMATCH`. Multiple in-org cores → `PROSPECT_IDENTITY_AMBIGUOUS`. Conflicting legacy↔lookup → `PROSPECT_IDENTITY_CONFLICT`. Do not guess. Foreign `prospect_id` injection on create/update → fail closed.
+6. **Appointment create** — Require a resolved in-org `public.prospects` row **and** a resolved/ensured core identity before Calendar, capacity, appointment persist, or workflow advance (MC + `executeScheduleInterview`). Persist `prospect_id = public.prospects.id` and `metadata.coreProspectId = coreProspectId`. Never write `atlas_appointments.prospect_id = null` on the Recruit AI booking path.
+7. **Durable context dual-load** — Load active context by **core first, then legacy** for the same phone/org/channel. Prefer an existing active row over creating a second active for the same person.
+8. **New context creates use core** — First persist for a phone/org/channel writes context `prospect_id = coreProspectId` when core can be resolved/ensured.
+9. **No mass rewrite of Recruit AI contexts in this rule** — Do not bulk-update existing `recruit_ai_conversation_contexts.prospect_id` from legacy→core. Compare-and-save continues updating the **loaded row id** (may remain legacy-keyed) while JSON `prospectId` may reflect core.
+10. **Do not store core as appointment FK** — Never rewrite `atlas_appointments.prospect_id` to a core UUID to “match” Recruit AI durable context.
+11. **Workflow remains phone-keyed** — `advanceProspectWorkflow` / schedule side effects continue on phone + legacy profile fields (occupation, city, etc.).
+12. **Boundaries** — Does not enable BR-111 execution, change live authoring allowlists, Calendar cancel semantics (BR-121), schedule reconcile (BR-122), or occupation optional rules (BR-123). Does not redesign the recruiting-core bridge.
 
 ---
 
