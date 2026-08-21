@@ -1,10 +1,15 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
+import {
+  PUBLIC_SITE_BRAND,
+  getAtlasAppLoginUrl
+} from "../../config/publicSiteHost";
+import { usePublicSiteBrand } from "../../hooks/usePublicSiteBrand";
 import { useContactNavigation } from "../../hooks/useContactNavigation";
 import "./PublicNavbar.css";
 
-const sectionLinks = [
+const teamVisionSectionLinks = [
   { href: "/#about", label: "About" },
   { href: "/#services", label: "Services" },
   { href: "/#careers", label: "Careers" },
@@ -12,18 +17,38 @@ const sectionLinks = [
   { to: "/atlas", label: "Atlas", isRoute: true }
 ];
 
-const legalLinks = [
+const atlasSectionLinks = [
+  { to: "/", label: "Home", isRoute: true },
+  { to: "/privacy", label: "Privacy", isRoute: true },
+  { to: "/terms", label: "Terms", isRoute: true },
+  { href: "mailto:support@teamvisionfinancial.com", label: "Contact / Support", isMailto: true }
+];
+
+const teamVisionLegalLinks = [
   { to: "/privacy", label: "Privacy Policy" },
   { to: "/legal", label: "Legal" },
+  { to: "/terms", label: "Terms of Service" }
+];
+
+const atlasLegalLinks = [
+  { to: "/privacy", label: "Privacy Policy" },
   { to: "/terms", label: "Terms of Service" },
+  { to: "/data-deletion", label: "Data Deletion" }
 ];
 
 export default function Navbar() {
   const location = useLocation();
+  const brand = usePublicSiteBrand();
+  const isAtlas = brand === PUBLIC_SITE_BRAND.ATLAS;
   const goToContact = useContactNavigation();
   const menuId = useId();
   const menuToggleRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const sectionLinks = isAtlas ? atlasSectionLinks : teamVisionSectionLinks;
+  const legalLinks = isAtlas ? atlasLegalLinks : teamVisionLegalLinks;
+  const signInHref = isAtlas ? getAtlasAppLoginUrl() : appPath();
+  const signInIsExternal = isAtlas;
 
   function closeMenu() {
     setMenuOpen(false);
@@ -67,57 +92,83 @@ export default function Navbar() {
     };
   }, [menuOpen]);
 
+  function renderNavLink(link, className, extraProps = {}) {
+    if (link.isMailto) {
+      return (
+        <a key={link.href} href={link.href} className={className} {...extraProps}>
+          {link.label}
+        </a>
+      );
+    }
+    if (link.isRoute) {
+      return (
+        <Link
+          key={link.to}
+          to={link.to}
+          className={`${className}${location.pathname === link.to ? " is-active" : ""}`}
+          {...extraProps}
+        >
+          {link.label}
+        </Link>
+      );
+    }
+    if (link.isContact) {
+      return (
+        <a
+          key={link.href}
+          href={link.href}
+          className={className}
+          onClick={goToContact}
+          {...extraProps}
+        >
+          {link.label}
+        </a>
+      );
+    }
+    return (
+      <a key={link.href} href={link.href} className={className} {...extraProps}>
+        {link.label}
+      </a>
+    );
+  }
+
   return (
     <header className="public-navbar">
       <div className="public-navbar__inner public-site__container">
         <Link
           to="/"
           className="public-navbar__brand"
-          aria-label="Team Vision Financial home"
+          aria-label={isAtlas ? "Atlas AI home" : "Team Vision Financial home"}
           onClick={handleBrandClick}
         >
           <span className="public-navbar__brand-mark" aria-hidden="true">
-            TV
+            {isAtlas ? "A" : "TV"}
           </span>
           <span className="public-navbar__brand-text">
-            Team Vision Financial
+            {isAtlas ? "Atlas AI" : "Team Vision Financial"}
           </span>
         </Link>
 
         <nav className="public-navbar__nav" aria-label="Primary">
-          {sectionLinks.map((link) =>
-            link.isRoute ? (
-              <Link
-                key={link.to}
-                to={link.to}
-                className={`public-navbar__link${location.pathname === link.to ? " is-active" : ""}`}
-              >
-                {link.label}
-              </Link>
-            ) : link.isContact ? (
-              <a
-                key={link.href}
-                href={link.href}
-                className="public-navbar__link"
-                onClick={goToContact}
-              >
-                {link.label}
-              </a>
-            ) : (
-              <a key={link.href} href={link.href} className="public-navbar__link">
-                {link.label}
-              </a>
-            )
-          )}
+          {sectionLinks.map((link) => renderNavLink(link, "public-navbar__link"))}
         </nav>
 
         <div className="public-navbar__actions">
-          <Link
-            to={appPath()}
-            className="public-site__button public-site__button--secondary public-navbar__sign-in"
-          >
-            Atlas Sign In
-          </Link>
+          {signInIsExternal ? (
+            <a
+              href={signInHref}
+              className="public-site__button public-site__button--secondary public-navbar__sign-in"
+            >
+              Sign in
+            </a>
+          ) : (
+            <Link
+              to={signInHref}
+              className="public-site__button public-site__button--secondary public-navbar__sign-in"
+            >
+              Atlas Sign In
+            </Link>
+          )}
         </div>
 
         <button
@@ -154,7 +205,16 @@ export default function Navbar() {
           <ul className="public-navbar__mobile-list">
             {sectionLinks.map((link) => (
               <li key={link.href || link.to}>
-                {link.isRoute ? (
+                {link.isMailto ? (
+                  <a
+                    href={link.href}
+                    className="public-navbar__mobile-link"
+                    tabIndex={menuOpen ? 0 : -1}
+                    onClick={closeMenu}
+                  >
+                    {link.label}
+                  </a>
+                ) : link.isRoute ? (
                   <Link
                     to={link.to}
                     className={`public-navbar__mobile-link${location.pathname === link.to ? " is-active" : ""}`}
@@ -204,14 +264,25 @@ export default function Navbar() {
             ))}
           </ul>
 
-          <Link
-            to={appPath()}
-            className="public-site__button public-site__button--secondary public-navbar__mobile-sign-in"
-            tabIndex={menuOpen ? 0 : -1}
-            onClick={closeMenu}
-          >
-            Atlas Sign In
-          </Link>
+          {signInIsExternal ? (
+            <a
+              href={signInHref}
+              className="public-site__button public-site__button--secondary public-navbar__mobile-sign-in"
+              tabIndex={menuOpen ? 0 : -1}
+              onClick={closeMenu}
+            >
+              Sign in
+            </a>
+          ) : (
+            <Link
+              to={signInHref}
+              className="public-site__button public-site__button--secondary public-navbar__mobile-sign-in"
+              tabIndex={menuOpen ? 0 : -1}
+              onClick={closeMenu}
+            >
+              Atlas Sign In
+            </Link>
+          )}
         </div>
       </nav>
     </header>
