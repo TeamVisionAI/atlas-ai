@@ -155,7 +155,9 @@ export default function SchedulingForm({
     [slots, form.dateKey, form.timeKey]
   );
 
-  const isLoading = loadingSlots || loadingExpansion;
+  // Keep previously loaded slots visible during availability reload to avoid flicker.
+  // Only blank the grid when we have nothing to show yet, or during day/week expansion.
+  const hideSlotGrid = loadingExpansion || (loadingSlots && slots.length === 0);
   const isCompactAssignment = presentation === "scheduleDialog" || inline;
   const showConductedBySummary = !isCompactAssignment;
   const selectedInterviewTypeLabel = resolveInterviewTypeLabel(form.interviewType, translate);
@@ -349,7 +351,7 @@ export default function SchedulingForm({
               {!loadingSlots && loadingExpansion ? (
                 <p className="scheduling-form__hint">{translate("missionExecutionLoadingDay")}</p>
               ) : null}
-              {!isLoading && viewMode === "next_available" && displayMode === "recommended" ? (
+              {!hideSlotGrid && viewMode === "next_available" && displayMode === "recommended" ? (
                 <p className="scheduling-form__hint">{translate("missionExecutionNextAvailableHint")}</p>
               ) : null}
             </div>
@@ -360,7 +362,7 @@ export default function SchedulingForm({
               </p>
             ) : null}
 
-            {!isLoading && !slotsError && groupedDays.length ? (
+            {!hideSlotGrid && !slotsError && groupedDays.length ? (
               <div className="scheduling-form__day-groups">
                 {groupedDays.map((day) => (
                   <div key={day.dateKey} className="scheduling-form__day-group">
@@ -393,11 +395,11 @@ export default function SchedulingForm({
               </div>
             ) : null}
 
-            {!isLoading && !slotsError && !groupedDays.length ? (
+            {!hideSlotGrid && !slotsError && !groupedDays.length ? (
               <p className="scheduling-form__hint">{translate("missionExecutionNoSlots")}</p>
             ) : null}
 
-            {!isLoading && groupedDays.length ? (
+            {!hideSlotGrid && groupedDays.length ? (
               <div className="scheduling-form__expansion">
                 {displayMode === "recommended" && hasMoreInWindow ? (
                   <AtlasButton
