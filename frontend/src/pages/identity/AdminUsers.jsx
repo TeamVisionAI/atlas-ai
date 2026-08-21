@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
+import {
+  BUSINESS_RANK_DEFAULT_PERMISSION_ROLE,
+  listBusinessRanks
+} from "../../config/teamVisionBusinessRanks";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import {
   archiveAdminUser,
@@ -10,6 +14,7 @@ import {
   listAdminUsers,
   reactivateAdminUser,
   resendInvitation,
+  revokeInvitation,
   suspendAdminUser,
   transferOwnership,
   updateAdminUser,
@@ -20,14 +25,15 @@ import UserAvatar from "../../components/ui/UserAvatar";
 import "../../components/ui/ProfilePhotoEditor.css";
 import "./identity.css";
 
-const ROLES = [
-  "administrator",
-  "operations",
+/** LC1 permission roles (platform access) — separate from Team Vision business ranks. */
+const PERMISSION_ROLES = [
   "rvp",
   "division_leader",
   "agent",
   "recruiter",
-  "support"
+  "operations",
+  "support",
+  "administrator"
 ];
 
 const SECURITIES_STATUSES = [
@@ -41,13 +47,17 @@ const SECURITIES_STATUSES = [
   "TERMINATED"
 ];
 
+const BUSINESS_RANK_OPTIONS = listBusinessRanks();
+
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
   repId: "",
   email: "",
   phone: "",
-  role: "recruiter"
+  businessRank: "REP",
+  role: BUSINESS_RANK_DEFAULT_PERMISSION_ROLE.REP,
+  reportsToUserId: ""
 };
 
 const EMPTY_SECURITIES_FORM = {
@@ -79,6 +89,13 @@ function parseScopeInput(value) {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function invitationStatusLabel(user) {
+  if (user.status === "pending_invitation") {
+    return user.invitation?.status || "pending";
+  }
+  return user.status;
 }
 
 function SecuritiesAccessBadge({ access }) {
@@ -118,6 +135,7 @@ export default function AdminUsers() {
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -156,17 +174,45 @@ export default function AdminUsers() {
     loadUsers();
   }, [query, statusFilter]);
 
+  useEffect(() => {
+    if (activeTab === "invitations") {
+      setStatusFilter("pending_invitation");
+    } else if (statusFilter === "pending_invitation") {
+      setStatusFilter("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tab switch drives status filter only
+  }, [activeTab]);
+
   async function handleCreate(event) {
     event.preventDefault();
 
     try {
-      await createAdminUser(form);
+      await createAdminUser({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone || undefined,
+        repId: form.repId || undefined,
+        businessRank: form.businessRank,
+        role: form.role,
+        reportsToUserId: form.reportsToUserId || undefined
+      });
       setForm(EMPTY_FORM);
       setShowCreate(false);
+      setActiveTab("invitations");
+      setStatusFilter("pending_invitation");
       await loadUsers();
     } catch (createError) {
       setError(createError.message);
     }
+  }
+
+  function updateBusinessRank(nextRank) {
+    setForm((current) => ({
+      ...current,
+      businessRank: nextRank,
+      role: BUSINESS_RANK_DEFAULT_PERMISSION_ROLE[nextRank] || current.role
+    }));
   }
 
   async function saveRepId(userId) {
@@ -276,6 +322,7 @@ export default function AdminUsers() {
       if (action === "reset") await forcePasswordReset(userId);
       if (action === "logout") await forceLogoutUser(userId);
       if (action === "invite") await resendInvitation(userId);
+      if (action === "revoke-invite") await revokeInvitation(userId);
       if (action === "transfer" && transferTarget) {
         await transferOwnership(userId, transferTarget);
         setTransferTarget("");
@@ -292,21 +339,60 @@ export default function AdminUsers() {
     [users]
   );
 
+  const pendingInvitations = useMemo(
+    () => users.filter((user) => user.status === "pending_invitation"),
+    [users]
+  );
+
+  const tableUsers = activeTab === "invitations" ? pendingInvitations : users;
+
   return (
     <div className="identity-page">
       <div className="identity-header">
         <div>
           <h1>Administration — Users</h1>
-          <p>{total} users</p>
+          <p>
+            {activeTab === "invitations"
+              ? `${pendingInvitations.length} pending invitations`
+              : `${total} users`}
+          </p>
         </div>
         <div className="identity-actions">
           <Link className="identity-button-secondary" to={appPath("my-account")}>
             My Account
           </Link>
-          <button type="button" className="identity-button" onClick={() => setShowCreate(true)}>
-            Create User
+          <button
+            type="button"
+            className="identity-button"
+            onClick={() => {
+              setShowCreate(true);
+              setActiveTab("invitations");
+            }}
+          >
+            Invite User
           </button>
         </div>
+      </div>
+
+      <div className="identity-tabs" role="tablist" aria-label="Users and invitations">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "users"}
+          className={`identity-tab ${activeTab === "users" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("users")}
+        >
+          Users
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "invitations"}
+          className={`identity-tab ${activeTab === "invitations" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("invitations")}
+        >
+          Invitations
+        </button>
       </div>
 
       <div className="identity-card identity-actions">
@@ -315,13 +401,15 @@ export default function AdminUsers() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="pending_invitation">Pending Invitation</option>
-          <option value="suspended">Suspended</option>
-          <option value="archived">Archived</option>
-        </select>
+        {activeTab === "users" ? (
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="pending_invitation">Pending Invitation</option>
+            <option value="suspended">Suspended</option>
+            <option value="archived">Archived</option>
+          </select>
+        ) : null}
         <input
           placeholder="Transfer ownership to user ID"
           value={transferTarget}
@@ -333,7 +421,11 @@ export default function AdminUsers() {
 
       {showCreate ? (
         <div className="identity-card">
-          <h2>Create User</h2>
+          <h2>Invite User</h2>
+          <p className="identity-muted">
+            Business rank is the Team Vision hierarchy. Permission role controls platform access and
+            defaults to a non-admin field role.
+          </p>
           <form className="identity-form" onSubmit={handleCreate}>
             <label>
               First Name
@@ -352,15 +444,6 @@ export default function AdminUsers() {
               />
             </label>
             <label>
-              Rep ID
-              <input
-                value={form.repId}
-                onChange={(event) => setForm({ ...form, repId: event.target.value.toUpperCase() })}
-                placeholder="4TJLK"
-                maxLength={5}
-              />
-            </label>
-            <label>
               Email
               <input
                 type="email"
@@ -370,28 +453,66 @@ export default function AdminUsers() {
               />
             </label>
             <label>
-              Phone
-              <input
-                value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value })}
-              />
+              Business Rank
+              <select
+                value={form.businessRank}
+                onChange={(event) => updateBusinessRank(event.target.value)}
+                required
+              >
+                {BUSINESS_RANK_OPTIONS.map((rank) => (
+                  <option key={rank.code} value={rank.code}>
+                    {rank.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
-              Role
+              Reporting Leader
+              <select
+                value={form.reportsToUserId}
+                onChange={(event) => setForm({ ...form, reportsToUserId: event.target.value })}
+              >
+                <option value="">None</option>
+                {activeUsers.map((leader) => (
+                  <option key={leader.id} value={leader.id}>
+                    {leader.display_name || `${leader.first_name} ${leader.last_name}`} (
+                    {leader.business_rank || leader.role})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Permission Role
               <select
                 value={form.role}
                 onChange={(event) => setForm({ ...form, role: event.target.value })}
               >
-                {ROLES.map((role) => (
+                {PERMISSION_ROLES.map((role) => (
                   <option key={role} value={role}>
                     {role}
                   </option>
                 ))}
               </select>
             </label>
+            <label>
+              Rep ID
+              <input
+                value={form.repId}
+                onChange={(event) => setForm({ ...form, repId: event.target.value.toUpperCase() })}
+                placeholder="4TJLK"
+                maxLength={5}
+              />
+            </label>
+            <label>
+              Phone
+              <input
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
+              />
+            </label>
             <div className="identity-actions">
               <button type="submit" className="identity-button">
-                Create User & Send Invitation
+                Send Invitation
               </button>
               <button
                 type="button"
@@ -551,16 +672,17 @@ export default function AdminUsers() {
                 <th>Name</th>
                 <th>Rep ID</th>
                 <th>Email</th>
-                <th>Role</th>
+                <th>Business Rank</th>
+                <th>Permission Role</th>
                 <th>Status</th>
-                <th>Securities Access</th>
+                {activeTab === "users" ? <th>Securities Access</th> : null}
                 <th>Last Login</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {tableUsers.map((user) => (
                 <tr key={user.id}>
                   <td>
                     <div className="profile-photo-editor__table-cell">
@@ -599,23 +721,33 @@ export default function AdminUsers() {
                     </div>
                   </td>
                   <td>{user.email}</td>
+                  <td>{user.business_rank || "—"}</td>
                   <td>{user.role}</td>
                   <td>
-                    <span className={`identity-status ${user.status}`}>{user.status}</span>
-                  </td>
-                  <td>
-                    <SecuritiesAccessBadge access={user.securities_access} />
-                    {canVerifySecurities && String(sessionUser?.id) !== String(user.id) ? (
-                      <button
-                        type="button"
-                        className="identity-button-secondary"
-                        style={{ marginTop: "0.35rem" }}
-                        onClick={() => openSecuritiesEditor(user)}
-                      >
-                        Edit Securities Access
-                      </button>
+                    <span className={`identity-status ${user.status}`}>
+                      {invitationStatusLabel(user)}
+                    </span>
+                    {user.invitation?.expires_at ? (
+                      <div className="identity-muted">
+                        Expires {new Date(user.invitation.expires_at).toLocaleString()}
+                      </div>
                     ) : null}
                   </td>
+                  {activeTab === "users" ? (
+                    <td>
+                      <SecuritiesAccessBadge access={user.securities_access} />
+                      {canVerifySecurities && String(sessionUser?.id) !== String(user.id) ? (
+                        <button
+                          type="button"
+                          className="identity-button-secondary"
+                          style={{ marginTop: "0.35rem" }}
+                          onClick={() => openSecuritiesEditor(user)}
+                        >
+                          Edit Securities Access
+                        </button>
+                      ) : null}
+                    </td>
+                  ) : null}
                   <td>{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : "—"}</td>
                   <td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}</td>
                   <td>
@@ -639,13 +771,22 @@ export default function AdminUsers() {
                         </button>
                       ) : null}
                       {user.status === "pending_invitation" ? (
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => runAction("invite", user.id)}
-                        >
-                          Resend Invite
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className="identity-button-secondary"
+                            onClick={() => runAction("invite", user.id)}
+                          >
+                            Resend Invite
+                          </button>
+                          <button
+                            type="button"
+                            className="identity-button-secondary"
+                            onClick={() => runAction("revoke-invite", user.id)}
+                          >
+                            Revoke Invite
+                          </button>
+                        </>
                       ) : null}
                       <button
                         type="button"

@@ -18,15 +18,45 @@ const {
 const { requestPasswordReset } = require("../services/authService");
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { resolveWorkspaceOrganizationId } = require("../core/tenantOrganization");
+const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
 const { sanitizeListQuery } = require("../core/listQuerySanitizer");
 const identityWriteService = require("./identityWriteService");
-const { isSuperAdmin } = require("../security/saasRoles");
+const { isSuperAdmin, isOrgAdmin } = require("../security/saasRoles");
+const {
+  normalizeBusinessRank,
+  defaultPermissionRoleForBusinessRank
+} = require("../core/teamVisionBusinessRanks");
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function buildDisplayName(firstName, lastName, fallback = "") {
   const name = [firstName, lastName].filter(Boolean).join(" ").trim();
   return name || fallback;
+}
+
+/**
+ * Prefer Support Mode / organizationGuard effective org over home-tenant workspace resolution.
+ */
+async function resolveAdminOrganizationId(authContext, req = null) {
+  if (req) {
+    const effective = getEffectiveOrganizationId(req);
+    if (effective) {
+      return effective;
+    }
+  }
+
+  if (authContext?.organizationId) {
+    return authContext.organizationId;
+  }
+
+  return resolveWorkspaceOrganizationId(authContext);
+}
+
+function actorMayGrantAdministrator(authContext) {
+  if (isOrgAdmin(authContext?.saasRole) || isSuperAdmin(authContext?.saasRole)) {
+    return true;
+  }
+  return normalizeRole(authContext?.role) === ROLES.ADMINISTRATOR;
 }
 
 function presentAdminUser(row, extras = {}) {
@@ -39,6 +69,7 @@ function presentAdminUser(row, extras = {}) {
     phone: row.phone || null,
     photo_url: row.photo_url || null,
     reports_to_user_id: row.reports_to_user_id || null,
+    business_rank: row.business_rank || null,
     notification_preferences: row.notification_preferences || {},
     timezone: row.timezone || "America/New_York",
     preferred_language: row.preferred_language || "en",
@@ -46,15 +77,62 @@ function presentAdminUser(row, extras = {}) {
     archived_at: row.archived_at || null,
     organization_name: extras.organizationName || null,
     division_name: extras.divisionName || null,
-    reports_to_name: extras.reportsToName || null
+    reports_to_name: extras.reportsToName || null,
+    invitation: extras.invitation || null
   };
 }
 
-async function listUsers(query = {}, authContext) {
+async function loadInvitationSummariesByUserId(userIds = []) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (!ids.length) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("atlas_invitation_tokens")
+    .select("user_id, expires_at, used_at, created_at")
+    .in("user_id", ids)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[admin/users] invitation summary load failed", error.message);
+    return new Map();
+  }
+
+  const map = new Map();
+  const now = Date.now();
+
+  for (const row of data || []) {
+    if (map.has(row.user_id)) {
+      continue;
+    }
+
+    const expiresAt = row.expires_at || null;
+    const usedAt = row.used_at || null;
+    let invitationStatus = "pending";
+
+    if (usedAt) {
+      invitationStatus = "accepted";
+    } else if (expiresAt && new Date(expiresAt).getTime() < now) {
+      invitationStatus = "expired";
+    }
+
+    map.set(row.user_id, {
+      status: invitationStatus,
+      expires_at: expiresAt,
+      used_at: usedAt,
+      created_at: row.created_at || null
+    });
+  }
+
+  return map;
+}
+
+async function listUsers(query = {}, authContext, req = null) {
   const filters = sanitizeListQuery(query);
   const limit = Math.min(Number(filters.limit) || 25, 100);
   const offset = Math.max(Number(filters.offset) || 0, 0);
-  const organizationId = await resolveWorkspaceOrganizationId(authContext);
+  const organizationId = await resolveAdminOrganizationId(authContext, req);
 
   let dbQuery = supabase
     .from("atlas_users")
@@ -106,7 +184,10 @@ async function listUsers(query = {}, authContext) {
     returned: (data || []).length
   });
 
-  const presented = (data || []).map((row) => presentAdminUser(row));
+  const invitationMap = await loadInvitationSummariesByUserId((data || []).map((row) => row.id));
+  const presented = (data || []).map((row) =>
+    presentAdminUser(row, { invitation: invitationMap.get(row.id) || null })
+  );
 
   try {
     const {
@@ -117,7 +198,8 @@ async function listUsers(query = {}, authContext) {
       items: withSecurities,
       total: count ?? withSecurities.length,
       limit,
-      offset
+      offset,
+      organizationId
     };
   } catch (securitiesError) {
     console.error("[admin/users/list] securities summary attach failed", securitiesError.message);
@@ -137,14 +219,15 @@ async function listUsers(query = {}, authContext) {
       })),
       total: count ?? presented.length,
       limit,
-      offset
+      offset,
+      organizationId
     };
   }
 }
 
-async function getUserById(userId, authContext) {
+async function getUserById(userId, authContext, req = null) {
   const user = await findUserById(userId);
-  const organizationId = await resolveWorkspaceOrganizationId(authContext);
+  const organizationId = await resolveAdminOrganizationId(authContext, req);
 
   if (!user || String(user.organization_id) !== String(organizationId)) {
     const error = new Error("User not found.");
@@ -176,13 +259,57 @@ async function getUserById(userId, authContext) {
   }
 }
 
-async function createUser(input, authContext, auditMeta = {}, options = {}) {
+async function createUser(input, authContext, auditMeta = {}, options = {}, req = null) {
   const email = String(input.email || "").trim().toLowerCase();
-  const role = normalizeRole(input.role);
+  const firstName = String(input.firstName || input.first_name || "").trim();
+  const lastName = String(input.lastName || input.last_name || "").trim();
+  let businessRank = normalizeBusinessRank(input.businessRank || input.business_rank);
 
-  if (!email || !role) {
-    const error = new Error("Email and role are required.");
+  if (!email || !firstName || !lastName) {
+    const error = new Error("First name, last name, and email are required.");
     error.statusCode = 400;
+    throw error;
+  }
+
+  let role = normalizeRole(input.role || input.permissionRole || input.permission_role);
+
+  if (!businessRank) {
+    // Backward-compatible defaults for platform provisioning / legacy callers.
+    if (role === ROLES.ADMINISTRATOR || role === ROLES.RVP) {
+      businessRank = "RVP";
+    } else if (role === ROLES.DIVISION_LEADER) {
+      businessRank = "DIV";
+    } else if (role === ROLES.AGENT) {
+      businessRank = "DIS";
+    } else if (role === ROLES.RECRUITER) {
+      businessRank = "REP";
+    }
+  }
+
+  if (!businessRank) {
+    const error = new Error(
+      "Business rank is required (RVP, SRL, RL, DIV, DIS, or REP)."
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!role) {
+    role = normalizeRole(defaultPermissionRoleForBusinessRank(businessRank));
+  }
+
+  if (!role) {
+    const error = new Error("Permission role could not be resolved.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (role === ROLES.ADMINISTRATOR && !actorMayGrantAdministrator(authContext)) {
+    const error = new Error(
+      "Only Owner/Admin/Super Admin may grant administrator permission role."
+    );
+    error.statusCode = 403;
+    error.publicCode = "FORBIDDEN";
     throw error;
   }
 
@@ -194,11 +321,9 @@ async function createUser(input, authContext, auditMeta = {}, options = {}) {
     throw error;
   }
 
-  const firstName = String(input.firstName || input.first_name || "").trim();
-  const lastName = String(input.lastName || input.last_name || "").trim();
   const status = normalizeStatus(input.status) || USER_STATUSES.PENDING_INVITATION;
 
-  let organizationId = await resolveWorkspaceOrganizationId(authContext);
+  let organizationId = await resolveAdminOrganizationId(authContext, req);
   const requestedOrganizationId = input.organizationId || input.organization_id || null;
 
   if (requestedOrganizationId) {
@@ -229,6 +354,7 @@ async function createUser(input, authContext, auditMeta = {}, options = {}) {
     division_id: input.divisionId || input.division_id || null,
     reports_to_user_id: input.reportsToUserId || input.reports_to_user_id || null,
     role,
+    business_rank: businessRank,
     status,
     timezone: input.timezone || "America/New_York",
     preferred_language: input.preferredLanguage || input.preferred_language || "en",
@@ -248,7 +374,7 @@ async function createUser(input, authContext, auditMeta = {}, options = {}) {
     action: "user.created",
     targetType: "atlas_user",
     targetId: user.id,
-    metadata: { role, status, email },
+    metadata: { role, businessRank, status, email },
     ipAddress: auditMeta.ipAddress,
     userAgent: auditMeta.userAgent
   });
@@ -302,8 +428,8 @@ async function createInvitationForUser(userId, invitedBy, auditMeta = {}) {
   return { expiresAt, delivered: true };
 }
 
-async function updateUser(userId, input, authContext, auditMeta = {}) {
-  const existing = await getUserById(userId, authContext);
+async function updateUser(userId, input, authContext, auditMeta = {}, req = null) {
+  const existing = await getUserById(userId, authContext, req);
   const patch = {
     updated_at: new Date().toISOString()
   };
@@ -334,6 +460,20 @@ async function updateUser(userId, input, authContext, auditMeta = {}) {
 
   if (input.reportsToUserId !== undefined || input.reports_to_user_id !== undefined) {
     patch.reports_to_user_id = input.reportsToUserId || input.reports_to_user_id || null;
+  }
+
+  if (input.businessRank !== undefined || input.business_rank !== undefined) {
+    const rank = normalizeBusinessRank(input.businessRank || input.business_rank);
+    if (input.businessRank || input.business_rank) {
+      if (!rank) {
+        const error = new Error("Invalid business rank.");
+        error.statusCode = 400;
+        throw error;
+      }
+      patch.business_rank = rank;
+    } else {
+      patch.business_rank = null;
+    }
   }
 
   if (input.timezone !== undefined) {
@@ -398,8 +538,8 @@ async function updateUser(userId, input, authContext, auditMeta = {}) {
   return presentAdminUser(data);
 }
 
-async function setUserStatus(userId, status, authContext, auditMeta = {}) {
-  const user = await getUserById(userId, authContext);
+async function setUserStatus(userId, status, authContext, auditMeta = {}, req = null) {
+  const user = await getUserById(userId, authContext, req);
   const normalizedStatus = normalizeStatus(status);
 
   if (!normalizedStatus) {
@@ -445,9 +585,9 @@ async function setUserStatus(userId, status, authContext, auditMeta = {}) {
   return presentAdminUser(data);
 }
 
-async function forcePasswordReset(userId, authContext, auditMeta = {}) {
+async function forcePasswordReset(userId, authContext, auditMeta = {}, req = null) {
   const user = await findUserById(userId);
-  const organizationId = await resolveWorkspaceOrganizationId(authContext);
+  const organizationId = await resolveAdminOrganizationId(authContext, req);
 
   if (!user || String(user.organization_id) !== String(organizationId)) {
     const error = new Error("User not found.");
@@ -471,8 +611,8 @@ async function forcePasswordReset(userId, authContext, auditMeta = {}) {
   return { success: true };
 }
 
-async function forceLogout(userId, authContext, auditMeta = {}) {
-  const user = await getUserById(userId, authContext);
+async function forceLogout(userId, authContext, auditMeta = {}, req = null) {
+  const user = await getUserById(userId, authContext, req);
   await revokeAllSessionsForUser(userId);
 
   await writeAuditLog({
@@ -490,17 +630,17 @@ async function forceLogout(userId, authContext, auditMeta = {}) {
   return { success: true };
 }
 
-async function transferOwnership({ fromUserId, toUserId }, authContext, auditMeta = {}) {
+async function transferOwnership({ fromUserId, toUserId }, authContext, auditMeta = {}, req = null) {
   if (!fromUserId || !toUserId || fromUserId === toUserId) {
     const error = new Error("Valid fromUserId and toUserId are required.");
     error.statusCode = 400;
     throw error;
   }
 
-  await getUserById(fromUserId, authContext);
-  await getUserById(toUserId, authContext);
+  await getUserById(fromUserId, authContext, req);
+  await getUserById(toUserId, authContext, req);
 
-  const orgId = await resolveWorkspaceOrganizationId(authContext);
+  const orgId = await resolveAdminOrganizationId(authContext, req);
 
   const { data: legacyProspects, error: legacyError } = await supabase
     .from("prospects")
@@ -553,8 +693,8 @@ async function transferOwnership({ fromUserId, toUserId }, authContext, auditMet
   };
 }
 
-async function getUserLoginHistory(userId, authContext, query = {}) {
-  await getUserById(userId, authContext);
+async function getUserLoginHistory(userId, authContext, query = {}, req = null) {
+  await getUserById(userId, authContext, req);
 
   const limit = Math.min(Number(query.limit) || 50, 200);
   const offset = Math.max(Number(query.offset) || 0, 0);
@@ -590,8 +730,8 @@ async function getUserLoginHistory(userId, authContext, query = {}) {
   };
 }
 
-async function resendInvitation(userId, authContext, auditMeta = {}) {
-  const user = await getUserById(userId, authContext);
+async function resendInvitation(userId, authContext, auditMeta = {}, req = null) {
+  const user = await getUserById(userId, authContext, req);
 
   if (user.status !== USER_STATUSES.PENDING_INVITATION) {
     const error = new Error("User is not pending invitation.");
@@ -599,8 +739,55 @@ async function resendInvitation(userId, authContext, auditMeta = {}) {
     throw error;
   }
 
+  // Invalidate prior unused tokens so only the resent link remains valid.
+  const nowIso = new Date().toISOString();
+  await supabase
+    .from("atlas_invitation_tokens")
+    .update({ used_at: nowIso })
+    .eq("user_id", userId)
+    .is("used_at", null);
+
   const invitation = await createInvitationForUser(userId, authContext.userId, auditMeta);
   return { success: true, invitation };
+}
+
+async function revokeInvitation(userId, authContext, auditMeta = {}, req = null) {
+  const user = await getUserById(userId, authContext, req);
+
+  if (user.status !== USER_STATUSES.PENDING_INVITATION) {
+    const error = new Error("User is not pending invitation.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const nowIso = new Date().toISOString();
+  await supabase
+    .from("atlas_invitation_tokens")
+    .update({ used_at: nowIso })
+    .eq("user_id", userId)
+    .is("used_at", null);
+
+  const archived = await setUserStatus(
+    userId,
+    USER_STATUSES.ARCHIVED,
+    authContext,
+    auditMeta,
+    req
+  );
+
+  await writeAuditLog({
+    organizationId: archived.organization_id || user.organization_id,
+    userId: authContext.userId,
+    userEmail: authContext.email,
+    action: "user.invitation_revoked",
+    targetType: "atlas_user",
+    targetId: userId,
+    metadata: { email: user.email },
+    ipAddress: auditMeta.ipAddress,
+    userAgent: auditMeta.userAgent
+  });
+
+  return { success: true, user: archived };
 }
 
 module.exports = {
@@ -614,5 +801,7 @@ module.exports = {
   transferOwnership,
   getUserLoginHistory,
   resendInvitation,
-  presentAdminUser
+  revokeInvitation,
+  presentAdminUser,
+  resolveAdminOrganizationId
 };
