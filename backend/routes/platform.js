@@ -90,6 +90,45 @@ router.patch("/tenants/:id/status", async (req, res) => {
 
 router.use("/tenants/:id", platformBillingRoutes);
 
+router.get("/tenants/:id/features", async (req, res) => {
+  try {
+    const tenantFeatureService = require("../services/tenantFeatureService");
+    const presentation =
+      await tenantFeatureService.getTenantFeatureControlsPresentation(req.params.id);
+    return res.json(presentation);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to load tenant features."
+    });
+  }
+});
+
+router.patch("/tenants/:id/features", async (req, res) => {
+  try {
+    const tenantFeatureService = require("../services/tenantFeatureService");
+    const updated = await tenantFeatureService.updateTenantFeatures(
+      req.params.id,
+      req.body || {},
+      auditMeta(req)
+    );
+    const presentation =
+      await tenantFeatureService.getTenantFeatureControlsPresentation(req.params.id, {
+        backfillSeedFromEnv: false
+      });
+    return res.json({
+      ...presentation,
+      features: updated.material,
+      featuresRaw: updated.features
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to update tenant features."
+    });
+  }
+});
+
 router.post("/tenants/:id/admin", async (req, res) => {
   try {
     const result = await platformTenantService.provisionTenantAdmin(

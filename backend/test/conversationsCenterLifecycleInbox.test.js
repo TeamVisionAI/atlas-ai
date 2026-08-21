@@ -337,17 +337,26 @@ test("M–N no Calendar/execution enablement in lifecycle module", () => {
   assert.doesNotMatch(ownership, /calendar/i);
 });
 
-test("O pilot authorization gate intact", () => {
+test("O Conversations Center access requires RBAC when feature is ON", () => {
   const {
-    assertConversationsCenterPilotAccess
+    assertConversationsCenterAccess
   } = require("../core/conversationsCenter/conversationsCenterAccess");
+  const { ROLES } = require("../security/roles");
+  const { permissionsForRole } = require("../security/permissions");
   assert.throws(
     () =>
-      assertConversationsCenterPilotAccess({
+      assertConversationsCenterAccess({
         userId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        organizationId: TEAM_VISION
+        organizationId: TEAM_VISION,
+        authContext: {
+          role: ROLES.SUPPORT,
+          permissions: permissionsForRole(ROLES.SUPPORT),
+          status: "active"
+        },
+        tenantFeatures: { conversationsCenterEnabled: true },
+        env: { CONVERSATIONS_CENTER_ENABLED: "true" }
       }),
-    (error) => error.code === "CONVERSATIONS_CENTER_USER_FORBIDDEN"
+    (error) => error.code === "CONVERSATIONS_CENTER_FORBIDDEN"
   );
 });
 

@@ -47,6 +47,10 @@ import {
   markConversationRead,
   ConversationsCenterError
 } from "../services/conversationsCenterService";
+import {
+  CONVERSATIONS_ACCESS_STATE,
+  resolveConversationsAccessStateFromError
+} from "../engines/conversationsCenterAccess";
 import "./ConversationsPage.css";
 
 const FILTERS = [
@@ -190,6 +194,7 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [forbidden, setForbidden] = useState(false);
+  const [accessState, setAccessState] = useState(CONVERSATIONS_ACCESS_STATE.UNKNOWN);
   const [selectedPhone, setSelectedPhone] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -211,6 +216,7 @@ export default function ConversationsPage() {
       setLoading(true);
       setError(null);
       setForbidden(false);
+      setAccessState(CONVERSATIONS_ACCESS_STATE.UNKNOWN);
     }
     try {
       const data = await getConversations({ filter: activeFilter });
@@ -233,6 +239,7 @@ export default function ConversationsPage() {
     } catch (err) {
       if (err instanceof ConversationsCenterError && err.status === 403) {
         setForbidden(true);
+        setAccessState(resolveConversationsAccessStateFromError(err));
         setPayload(null);
       } else if (!quiet) {
         setError(
@@ -563,10 +570,14 @@ export default function ConversationsPage() {
   }
 
   if (forbidden) {
+    const subtitleKey =
+      accessState === CONVERSATIONS_ACCESS_STATE.FORBIDDEN
+        ? "conversationsForbidden"
+        : "conversationsNotEnabled";
     return (
       <div className="conversations-page">
         <h1 className="conversations-page__title">{translate("conversationsTitle")}</h1>
-        <p className="conversations-page__subtitle">{translate("conversationsPilotOnly")}</p>
+        <p className="conversations-page__subtitle">{translate(subtitleKey)}</p>
       </div>
     );
   }
