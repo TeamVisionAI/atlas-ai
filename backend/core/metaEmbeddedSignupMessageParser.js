@@ -4,11 +4,27 @@
 
 const ALLOWED_FACEBOOK_ORIGINS = Object.freeze([
   "https://www.facebook.com",
-  "https://web.facebook.com"
+  "https://web.facebook.com",
+  "https://business.facebook.com",
+  "https://facebook.com",
+  "https://m.facebook.com"
 ]);
 
 function isAllowedFacebookOrigin(origin) {
-  return ALLOWED_FACEBOOK_ORIGINS.includes(origin);
+  if (!origin || typeof origin !== "string") {
+    return false;
+  }
+
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:") {
+      return false;
+    }
+    const host = url.hostname.toLowerCase();
+    return host === "facebook.com" || host.endsWith(".facebook.com");
+  } catch {
+    return false;
+  }
 }
 
 function parseEmbeddedSignupPostMessage(rawData) {
