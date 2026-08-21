@@ -22,7 +22,7 @@ const atlasSectionLinks = [
   { to: "/", label: "Home", isRoute: true },
   { to: "/privacy", label: "Privacy", isRoute: true },
   { to: "/terms", label: "Terms", isRoute: true },
-  { href: "mailto:support@teamvisionfinancial.com", label: "Contact / Support", isMailto: true }
+  { to: "/contact", label: "Contact / Support", isRoute: true }
 ];
 
 const teamVisionLegalLinks = [

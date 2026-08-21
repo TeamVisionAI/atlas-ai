@@ -23,7 +23,7 @@ export default function Footer() {
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
             <Link to="/data-deletion">Data Deletion</Link>
-            <a href="mailto:support@teamvisionfinancial.com">Contact / Support</a>
+            <Link to="/contact">Contact / Support</Link>
           </nav>
         </div>
 

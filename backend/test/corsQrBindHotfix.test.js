@@ -62,6 +62,13 @@ test("2–3. teamvisionfinancial.com and localhost remain allowed", () => {
   assert.ok(origins.includes("http://localhost:5173"));
 });
 
+test("Atlas public and app hosts are allowlisted by default", () => {
+  const origins = buildAllowedOrigins({ ATLAS_PUBLIC_URL: "" });
+  assert.ok(origins.includes("https://useatlas-ai.com"));
+  assert.ok(origins.includes("https://www.useatlas-ai.com"));
+  assert.ok(origins.includes("https://app.useatlas-ai.com"));
+});
+
 test("ATLAS_CORS_ORIGINS still merges", () => {
   const origins = buildAllowedOrigins({
     ATLAS_PUBLIC_URL: "https://atlas.example",

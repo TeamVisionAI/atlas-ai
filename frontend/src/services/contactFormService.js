@@ -1,37 +1,25 @@
 import { apiRequest } from "./apiClient";
+import {
+  ATLAS_CONTACT_TOPICS,
+  SUPPORT_FALLBACK_EMAIL,
+  validateAtlasContactFormFields,
+  validateContactFormFields
+} from "./contactFormValidation";
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function validateContactFormFields({ name, email, message }) {
-  const errors = {};
-  const trimmedName = String(name ?? "").trim();
-  const trimmedEmail = String(email ?? "").trim();
-  const trimmedMessage = String(message ?? "").trim();
-
-  if (!trimmedName) {
-    errors.name = "Full name is required.";
-  }
-
-  if (!trimmedEmail) {
-    errors.email = "Email is required.";
-  } else if (!EMAIL_PATTERN.test(trimmedEmail)) {
-    errors.email = "Enter a valid email address.";
-  }
-
-  if (!trimmedMessage) {
-    errors.message = "Message is required.";
-  }
-
-  return errors;
-}
+export {
+  ATLAS_CONTACT_TOPICS,
+  SUPPORT_FALLBACK_EMAIL,
+  validateAtlasContactFormFields,
+  validateContactFormFields
+};
 
 export async function submitContactForm(payload) {
   const response = await apiRequest("/api/contact", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(payload)
   });
 
   const data = await response.json().catch(() => ({}));
@@ -49,7 +37,7 @@ export async function submitContactForm(payload) {
   if (!response.ok) {
     throw new Error(
       data.error ||
-        "We couldn't send your message. Please try again or call (786) 752-8080."
+        "We couldn't send your message. Please try again or email support@teamvisionfinancial.com."
     );
   }
 

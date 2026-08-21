@@ -1,0 +1,76 @@
+.atlas-contact {
+  max-width: 40rem;
+}
+
+.atlas-contact__header {
+  margin-bottom: 2rem;
+}
+
+.atlas-contact__header h1 {
+  margin: 0.35rem 0 0.75rem;
+}
+
+.atlas-contact__fallback {
+  margin: 1rem 0 0;
+  color: var(--public-muted);
+  font-size: 0.9375rem;
+}
+
+.atlas-contact__fallback a {
+  color: var(--public-heading);
+}
+
+.atlas-contact__form {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+}
+
+.atlas-contact__optional {
+  font-weight: 400;
+  color: var(--public-muted);
+}
+
+.atlas-contact__form select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--public-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--public-heading);
+  font: inherit;
+}
+
+.atlas-contact__honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.atlas-contact__privacy {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--public-muted);
+  line-height: 1.45;
+}
+
+.atlas-contact__privacy a {
+  color: var(--public-heading);
+}
+
+.atlas-contact__status--success {
+  color: #0f6b3c;
+}
+
+.atlas-contact__status--error {
+  color: #9b1c1c;
+}
+
+@media (max-width: 640px) {
+  .atlas-contact__form {
+    gap: 0.875rem;
+  }
+}

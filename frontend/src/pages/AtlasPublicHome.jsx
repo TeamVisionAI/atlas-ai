@@ -1,5 +1,6 @@
 import Navbar from "../components/public/Navbar";
 import Footer from "../components/public/Footer";
+import { Link } from "react-router-dom";
 import { getAtlasAppLoginUrl } from "../config/publicSiteHost";
 import { ATLAS_BRAND_ASSETS } from "../config/publicBrandAssets";
 import { usePageMeta } from "../hooks/usePageMeta";
@@ -97,12 +98,12 @@ export default function AtlasPublicHome() {
                 >
                   Sign in to Atlas
                 </a>
-                <a
-                  href="mailto:support@teamvisionfinancial.com"
+                <Link
+                  to="/contact"
                   className="public-site__button public-site__button--secondary"
                 >
                   Contact / Support
-                </a>
+                </Link>
               </div>
             </div>
 
