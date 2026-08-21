@@ -142,6 +142,7 @@ const BASE_REGISTRY = Object.freeze({
       "send_interview_reminder",
       "REMINDER_24H",
       "REMINDER_1H",
+      "REMINDER_30M",
       "REMINDER_15M"
     ]),
     expectedVariableKeys: Object.freeze([

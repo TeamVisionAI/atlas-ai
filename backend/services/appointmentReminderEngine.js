@@ -28,13 +28,15 @@ const REMINDER_TYPES = Object.freeze({
   CONFIRMATION: "confirmation",
   REMINDER_24H: "reminder_24h",
   REMINDER_1H: "reminder_1h",
+  REMINDER_30M: "reminder_30m",
+  // Legacy — no longer scheduled. Kept so pending store rows can migrate/suppress safely.
   REMINDER_15M: "reminder_15m"
 });
 
 const REMINDER_SCHEDULE = Object.freeze([
   { type: REMINDER_TYPES.REMINDER_24H, offsetMinutes: 24 * 60 },
   { type: REMINDER_TYPES.REMINDER_1H, offsetMinutes: 60 },
-  { type: REMINDER_TYPES.REMINDER_15M, offsetMinutes: 15 }
+  { type: REMINDER_TYPES.REMINDER_30M, offsetMinutes: 30 }
 ]);
 
 function readStore() {
@@ -66,7 +68,7 @@ function formatWhen(iso, timezone = "America/New_York", languageCode = "en") {
   );
 }
 
-function buildReminderMessage(appointment, reminderType, prospect) {
+function buildReminderMessage(appointment, reminderType, prospect, identity = {}) {
   const preferred = resolveProspectPreferredLanguage(prospect);
   const language = preferredLanguageToCommunicationCode(preferred);
   const name = prospect?.name || appointment.metadata?.prospectName || "";
@@ -86,36 +88,49 @@ function buildReminderMessage(appointment, reminderType, prospect) {
       : virtual
         ? "via Zoom"
         : "at our office";
+  const signature =
+    String(
+      identity.handoffDisplayName ||
+        identity.displayName ||
+        appointment.metadata?.organizationDisplayName ||
+        "Team Vision"
+    ).trim() || "Team Vision";
 
   if (language === "es") {
     const greeting = first ? `Hola ${first},` : "Hola,";
     switch (reminderType) {
       case REMINDER_TYPES.CONFIRMATION:
         // Kept for backwards-compatible delivery of legacy queued confirmation rows only.
-        return `${greeting} tu entrevista ${channelLabel} quedó confirmada para ${when}.${meetLink}\n\nTeam Vision`;
+        return `${greeting} tu entrevista ${channelLabel} quedó confirmada para ${when}.${meetLink}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_24H:
-        return `${greeting} te recordamos que mañana tienes tu entrevista ${channelLabel} (${when}).${meetLink}\n\nTeam Vision`;
+        return `${greeting} te recordamos que mañana tienes tu entrevista ${channelLabel} (${when}).${meetLink}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_1H:
-        return `${greeting} tu entrevista ${channelLabel} es en 1 hora (${when}).${meetLink}\n\nTeam Vision`;
+        return `${greeting} tu entrevista ${channelLabel} es en 1 hora (${when}).${meetLink}\n\n${signature}`;
+      case REMINDER_TYPES.REMINDER_30M:
+        return `${greeting} tu entrevista ${channelLabel} comienza en 30 minutos.${meetLink}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_15M:
-        return `${greeting} tu entrevista ${channelLabel} comienza en 15 minutos.${meetLink}\n\nTeam Vision`;
+        // Legacy queued rows only — no longer scheduled.
+        return `${greeting} tu entrevista ${channelLabel} comienza en 15 minutos.${meetLink}\n\n${signature}`;
       default:
-        return `${greeting} recordatorio de entrevista: ${when}.${meetLink}\n\nTeam Vision`;
+        return `${greeting} recordatorio de entrevista: ${when}.${meetLink}\n\n${signature}`;
     }
   }
 
   const greeting = first ? `Hi ${first},` : "Hi,";
   switch (reminderType) {
     case REMINDER_TYPES.CONFIRMATION:
-      return `${greeting} your interview ${channelLabel} is confirmed for ${when}.${meetLink}\n\nTeam Vision`;
+      return `${greeting} your interview ${channelLabel} is confirmed for ${when}.${meetLink}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_24H:
-      return `${greeting} reminder: your interview ${channelLabel} is tomorrow (${when}).${meetLink}\n\nTeam Vision`;
+      return `${greeting} reminder: your interview ${channelLabel} is tomorrow (${when}).${meetLink}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_1H:
-      return `${greeting} your interview ${channelLabel} is in 1 hour (${when}).${meetLink}\n\nTeam Vision`;
+      return `${greeting} your interview ${channelLabel} is in 1 hour (${when}).${meetLink}\n\n${signature}`;
+    case REMINDER_TYPES.REMINDER_30M:
+      return `${greeting} your interview ${channelLabel} starts in 30 minutes.${meetLink}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_15M:
-      return `${greeting} your interview ${channelLabel} starts in 15 minutes.${meetLink}\n\nTeam Vision`;
+      // Legacy queued rows only — no longer scheduled.
+      return `${greeting} your interview ${channelLabel} starts in 15 minutes.${meetLink}\n\n${signature}`;
     default:
-      return `${greeting} interview reminder: ${when}.${meetLink}\n\nTeam Vision`;
+      return `${greeting} interview reminder: ${when}.${meetLink}\n\n${signature}`;
   }
 }
 
@@ -189,6 +204,100 @@ function buildReminderTemplateVariables(appointment, prospect) {
   return buildInterviewReminderVariables(appointment, prospect);
 }
 
+/**
+ * Cancel pending reminder_15m jobs and insert reminder_30m when still in the future.
+ * Prevents dual 15m+30m delivery after the global cadence change.
+ */
+function migratePendingFifteenMinuteReminders(storeInput = null) {
+  const store = storeInput || readStore();
+  let changed = false;
+  let cancelled15m = 0;
+  let added30m = 0;
+
+  for (const appointmentId of Object.keys(store)) {
+    const entries = Array.isArray(store[appointmentId]) ? store[appointmentId] : [];
+    const scheduled15 = entries.filter(
+      (entry) =>
+        entry.reminderType === REMINDER_TYPES.REMINDER_15M &&
+        entry.status === REMINDER_STATUSES.SCHEDULED
+    );
+
+    if (scheduled15.length === 0) {
+      continue;
+    }
+
+    const next = entries.map((entry) => {
+      if (
+        entry.reminderType === REMINDER_TYPES.REMINDER_15M &&
+        entry.status === REMINDER_STATUSES.SCHEDULED
+      ) {
+        cancelled15m += 1;
+        changed = true;
+        return {
+          ...entry,
+          status: REMINDER_STATUSES.CANCELLED,
+          cancelledAt: new Date().toISOString(),
+          cancelReason: "migrated_to_reminder_30m"
+        };
+      }
+
+      return entry;
+    });
+
+    const hasScheduled30 = next.some(
+      (entry) =>
+        entry.reminderType === REMINDER_TYPES.REMINDER_30M &&
+        entry.status === REMINDER_STATUSES.SCHEDULED
+    );
+
+    if (!hasScheduled30) {
+      const template = scheduled15[0];
+      const appointmentStartMs = template.appointmentStart
+        ? Date.parse(template.appointmentStart)
+        : Date.parse(template.scheduledFor) + 15 * 60 * 1000;
+      const scheduledFor30 = new Date(appointmentStartMs - 30 * 60 * 1000).toISOString();
+
+      if (
+        Number.isFinite(appointmentStartMs) &&
+        Date.parse(scheduledFor30) > Date.now() - 60_000
+      ) {
+        next.push({
+          id: crypto.randomUUID(),
+          appointmentId,
+          organizationId: template.organizationId || null,
+          prospectPhone: template.prospectPhone,
+          reminderType: REMINDER_TYPES.REMINDER_30M,
+          scheduledFor: scheduledFor30,
+          offsetMinutes: 30,
+          status: REMINDER_STATUSES.SCHEDULED,
+          channel: template.channel || "whatsapp",
+          createdAt: new Date().toISOString(),
+          appointmentStart:
+            template.appointmentStart || new Date(appointmentStartMs).toISOString(),
+          timezone: template.timezone || "America/New_York",
+          virtualMeetingUrl: template.virtualMeetingUrl || null,
+          meetingType: template.meetingType || null,
+          meetingLocationType: template.meetingLocationType || null,
+          meetingProvider: template.meetingProvider || null,
+          meetingAddress: template.meetingAddress || null,
+          metadata: template.metadata || {},
+          migratedFrom: REMINDER_TYPES.REMINDER_15M
+        });
+        added30m += 1;
+        changed = true;
+      }
+    }
+
+    store[appointmentId] = next;
+  }
+
+  if (changed && !storeInput) {
+    writeStore(store);
+  }
+
+  return { changed, cancelled15m, added30m, store };
+}
+
 async function deliverReminder(entry, appointment) {
   // Immediate confirmations are owned by the scheduling reply path.
   if (entry.reminderType === REMINDER_TYPES.CONFIRMATION) {
@@ -202,12 +311,45 @@ async function deliverReminder(entry, appointment) {
     };
   }
 
+  // Fail closed: never send legacy 15m after cadence cutover (migration may lag).
+  if (entry.reminderType === REMINDER_TYPES.REMINDER_15M) {
+    return {
+      delivered: false,
+      reason: "LEGACY_REMINDER_15M_SUPPRESSED",
+      status: REMINDER_STATUSES.CANCELLED,
+      retryable: false,
+      delivery: null,
+      suppressed: true
+    };
+  }
+
   const prospect = await findProspectInOrganization(
     entry.prospectPhone,
     entry.organizationId
   );
 
-  const message = buildReminderMessage(appointment, entry.reminderType, prospect);
+  let identity = {};
+  if (entry.organizationId) {
+    try {
+      const { loadTenantRuntimeContext } = require("../core/tenantRuntimeContext");
+      const tenantRuntime = await loadTenantRuntimeContext(entry.organizationId, {
+        requireOrganizationId: true
+      });
+      identity = {
+        handoffDisplayName: tenantRuntime.handoffDisplayName,
+        displayName: tenantRuntime.displayName
+      };
+    } catch {
+      identity = {};
+    }
+  }
+
+  const message = buildReminderMessage(
+    appointment,
+    entry.reminderType,
+    prospect,
+    identity
+  );
   const idempotencyKey = `reminder:${entry.appointmentId || appointment.id}:${entry.reminderType}`;
 
   // Always authorize through the canonical WhatsApp gate (including mocked provider sends).
@@ -255,7 +397,8 @@ async function deliverReminder(entry, appointment) {
 }
 
 async function processDueReminders() {
-  const store = readStore();
+  const migration = migratePendingFifteenMinuteReminders();
+  const store = migration.store || readStore();
   const now = Date.now();
   let processed = 0;
 
@@ -360,6 +503,16 @@ function startReminderPoller(intervalMs = 60_000) {
     return;
   }
 
+  // One-shot cutover for any durable reminder_15m rows still scheduled.
+  try {
+    migratePendingFifteenMinuteReminders();
+  } catch (error) {
+    console.warn(
+      "[appointmentReminderEngine] reminder_15m→30m migration failed:",
+      error.message
+    );
+  }
+
   pollTimer = setInterval(() => {
     processDueReminders().catch((error) => {
       console.warn("[appointmentReminderEngine] poll failed:", error.message);
@@ -387,7 +540,7 @@ module.exports = {
   processDueReminders,
   buildReminderMessage,
   deliverReminder,
+  migratePendingFifteenMinuteReminders,
   startReminderPoller,
-  stopReminderPoller,
-  buildReminderMessage
+  stopReminderPoller
 };
