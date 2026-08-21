@@ -655,12 +655,26 @@ export default function Dashboard() {
       return undefined;
     }
 
+    // Pause live workspace refresh while a Mission Action panel is open.
+    // Poll updates can rebuild the action list / workflow gate and remount the
+    // scheduling form, which reloads availability and flickers recommended times.
+    if (expandedMissionActionId) {
+      return undefined;
+    }
+
     const timer = window.setInterval(() => {
       refreshCurrentWorkspace();
     }, MISSION_CONTROL_LIVE_POLL_MS);
 
     return () => window.clearInterval(timer);
-  }, [phone, workspace?.isLive, prospectLoading, qualificationDraftActive, refreshCurrentWorkspace]);
+  }, [
+    phone,
+    workspace?.isLive,
+    prospectLoading,
+    qualificationDraftActive,
+    expandedMissionActionId,
+    refreshCurrentWorkspace
+  ]);
 
   useEffect(() => {
     return subscribeProspectProfileUpdated((updatedPhone) => {
