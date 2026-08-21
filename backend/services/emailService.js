@@ -3,7 +3,7 @@
  */
 
 const RESEND_API_URL = "https://api.resend.com/emails";
-const { resolveFrontendBaseUrl } = require("../config/frontendBaseUrl");
+const { resolveFrontendBaseUrl, buildAcceptInvitationUrl } = require("../config/frontendBaseUrl");
 const { isStagingOutboundBlocked } = require("../config/stagingOutboundGuard");
 
 function getEmailConfig() {
@@ -66,12 +66,12 @@ async function sendEmail({ to, subject, text, html }) {
 }
 
 async function sendInvitationEmail({ email, firstName, token, expiresAt }) {
-  const link = `${getFrontendBaseUrl()}/app/accept-invitation?token=${encodeURIComponent(token)}`;
+  const link = buildAcceptInvitationUrl(token);
   const subject = "Welcome to Atlas — Create Your Password";
   const text = [
     `Hello ${firstName || "there"},`,
     "",
-    "You have been invited to Atlas by Team Vision.",
+    "You have been invited to Atlas.",
     "",
     "Create your password using the secure link below:",
     link,

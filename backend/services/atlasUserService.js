@@ -40,6 +40,7 @@ function sanitizeUser(user) {
     last_name: normalized.last_name,
     display_name: normalized.display_name,
     role: normalized.role,
+    business_rank: user.business_rank || normalized.business_rank || null,
     status: normalized.status,
     organization_id: normalized.organization_id,
     division_id: normalized.division_id,

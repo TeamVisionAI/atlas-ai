@@ -22,6 +22,7 @@ const ATLAS_WRITABLE_COLUMNS = new Set([
   "reports_to_user_id",
   "rep_id",
   "role",
+  "business_rank",
   "status",
   "password_hash",
   "timezone",

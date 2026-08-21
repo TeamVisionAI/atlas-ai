@@ -192,7 +192,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "admin-users",
     path: appPath("admin/users"),
     labelKey: "navAdminUsers",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ADMIN_USERS
   },
   operationsCenter: {
@@ -246,7 +246,7 @@ const LEADERSHIP_EXTENSION_NAV = Object.freeze({
 /** Administration surfaces — configuration and platform operations. */
 const ADMINISTRATION_NAV = Object.freeze({
   [WORKSPACE_TYPES.ADMINISTRATOR]: ["settings", "adminUsers", "operationsCenter", "platformTenants"],
-  [WORKSPACE_TYPES.MANAGEMENT]: ["settings"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["settings", "adminUsers"],
   [WORKSPACE_TYPES.REPRESENTATIVE]: ["settings"]
 });
 
@@ -260,7 +260,7 @@ function buildNavOrderForWorkspace(workspaceType) {
 }
 
 const USER_MANAGEMENT_ROUTE_RULE = Object.freeze({
-  workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+  workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
   permission: PERMISSIONS.ADMIN_USERS
 });
 

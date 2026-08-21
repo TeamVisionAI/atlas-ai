@@ -80,6 +80,34 @@
 
 .identity-tabs {
   display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.identity-tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.identity-tab.is-active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.identity-muted {
+  color: #64748b;
+  font-size: 0.8rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.identity-tabs {
+  display: flex;
   gap: 0.5rem;
   margin-bottom: 1rem;
 }

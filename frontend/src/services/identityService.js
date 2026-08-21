@@ -45,6 +45,10 @@ export async function resendInvitation(userId) {
   return apiFetch(`/api/admin/users/${userId}/resend-invitation`, { method: "POST" });
 }
 
+export async function revokeInvitation(userId) {
+  return apiFetch(`/api/admin/users/${userId}/revoke-invitation`, { method: "POST" });
+}
+
 export async function transferOwnership(fromUserId, toUserId) {
   return apiFetch(`/api/admin/users/${fromUserId}/transfer-ownership`, {
     method: "POST",

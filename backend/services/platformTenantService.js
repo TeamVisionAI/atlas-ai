@@ -145,7 +145,6 @@ async function createTenant(input = {}, auditMeta = {}) {
     userAgent: auditMeta.userAgent
   });
 
-
   // RT2 — new non-seed tenants start with operational features explicitly OFF.
   try {
     const {
@@ -256,8 +255,7 @@ async function getTenant(organizationId) {
     tenant.features = {
       recruitAiAuthoringEnabled: false,
       recruitAiExecutionEnabled: false,
-      qrCampaignManagerEnabled: false,
-      conversationsCenterEnabled: false
+      qrCampaignManagerEnabled: false
     };
     tenant.featureControls = [];
   }
@@ -307,6 +305,7 @@ async function provisionTenantAdmin(organizationId, input = {}, authContext = {}
     {
       ...input,
       role: input.role || ROLES.ADMINISTRATOR,
+      businessRank: input.businessRank || input.business_rank || "RVP",
       organizationId
     },
     authContext,
