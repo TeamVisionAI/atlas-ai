@@ -1,13 +1,31 @@
 /**
  * Sprint 20.1 — Organization-scoped WhatsApp integration operations.
+ * Persist/status/disconnect MUST use effective tenant (Support Mode), not home org.
  */
 
 const { repository, toSafeConnection } = require("../repositories/metaWhatsAppConnectionRepository");
 const { resolveWorkspaceOrganizationId } = require("../core/tenantOrganization");
+const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
 const { writeAuditLog } = require("../security/auditLogService");
 const { metaLogger } = require("../core/meta/metaLogger");
 
-async function resolveOrganizationId(authContext) {
+/**
+ * Resolve org for WhatsApp integration mutations/reads.
+ * Prefers request effective tenant (Support Mode) over atlas_users home org.
+ */
+async function resolveOrganizationId(authContext, req = null) {
+  if (req) {
+    const effective = getEffectiveOrganizationId(req);
+    if (effective) {
+      return effective;
+    }
+  }
+
+  // organizationGuard rebinds authContext.organizationId and stamps homeOrganizationId
+  if (authContext?.homeOrganizationId && authContext?.organizationId) {
+    return authContext.organizationId;
+  }
+
   return resolveWorkspaceOrganizationId(authContext);
 }
 
@@ -22,8 +40,8 @@ function presentIntegrationStatus(connection) {
   };
 }
 
-async function getIntegrationStatus(authContext) {
-  const organizationId = await resolveOrganizationId(authContext);
+async function getIntegrationStatus(authContext, req = null) {
+  const organizationId = await resolveOrganizationId(authContext, req);
   return getIntegrationStatusForOrganization(organizationId);
 }
 
@@ -32,8 +50,8 @@ async function getIntegrationStatusForOrganization(organizationId) {
   return presentIntegrationStatus(connection);
 }
 
-async function disconnectIntegration(authContext, auditMeta = {}) {
-  const organizationId = await resolveOrganizationId(authContext);
+async function disconnectIntegration(authContext, auditMeta = {}, req = null) {
+  const organizationId = await resolveOrganizationId(authContext, req);
   const existing = await repository.getConnection(organizationId);
 
   if (!existing) {

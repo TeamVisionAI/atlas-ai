@@ -17,17 +17,19 @@ const {
   traceAuthorizationCode
 } = require("../core/meta/authorizationCodeTrace");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { organizationGuard } = require("../middleware/organizationGuard");
 const whatsappIntegrationService = require("../services/whatsappIntegrationService");
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
+router.use(organizationGuard());
 
 function auditMeta(req) {
   return {
     userId: req.authContext?.userId,
     userEmail: req.authContext?.email,
-    organizationId: req.authContext?.organizationId,
+    organizationId: req.tenantContext?.organizationId || req.authContext?.organizationId,
     ipAddress: req.ip,
     userAgent: req.get("user-agent")
   };
@@ -35,7 +37,10 @@ function auditMeta(req) {
 
 router.get("/embedded-signup/status", async (req, res) => {
   try {
-    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(
+      req.authContext,
+      req
+    );
     const payload = await getEmbeddedSignupStatus(organizationId);
     res.json(payload);
   } catch (error) {
@@ -46,7 +51,10 @@ router.get("/embedded-signup/status", async (req, res) => {
 
 router.get("/embedded-signup/health", async (req, res) => {
   try {
-    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(
+      req.authContext,
+      req
+    );
     const payload = await checkMetaConnectionHealth(organizationId);
     res.json(payload);
   } catch (error) {
@@ -59,7 +67,8 @@ router.post("/embedded-signup/disconnect", async (req, res) => {
   try {
     const result = await whatsappIntegrationService.disconnectIntegration(
       req.authContext,
-      auditMeta(req)
+      auditMeta(req),
+      req
     );
     res.json(result);
   } catch (error) {
@@ -117,7 +126,16 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       });
     }
 
-    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(
+      req.authContext,
+      req
+    );
+
+    metaLogger.info("embedded_signup_exchange_org_resolved", {
+      organizationId,
+      homeOrganizationId: req.tenantContext?.homeOrganizationId || null,
+      supportMode: Boolean(req.supportContext?.organizationId)
+    });
 
     const result = await completeEmbeddedSignupExchange({
       organizationId,

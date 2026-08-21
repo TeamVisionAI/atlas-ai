@@ -26,7 +26,10 @@ function collectAllowedFrontendOrigins(env = process.env) {
     "http://localhost:5173",
     "https://localhost:5173",
     "https://teamvisionfinancial.com",
-    "https://www.teamvisionfinancial.com"
+    "https://www.teamvisionfinancial.com",
+    "https://useatlas-ai.com",
+    "https://www.useatlas-ai.com",
+    "https://app.useatlas-ai.com"
   ]);
   const configured = readConfiguredFrontendUrl(env);
 

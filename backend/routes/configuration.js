@@ -111,7 +111,10 @@ router.get("/organization/levels", (_req, res) => {
 
 router.get("/whatsapp", protectedRoute, async (req, res) => {
   try {
-    const organizationId = await whatsappIntegrationService.resolveOrganizationId(req.authContext);
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(
+      req.authContext,
+      req
+    );
     const [status, health] = await Promise.all([
       whatsappIntegrationService.getIntegrationStatusForOrganization(organizationId),
       checkMetaConnectionHealth(organizationId, { persist: false })
