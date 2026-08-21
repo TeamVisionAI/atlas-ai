@@ -5,6 +5,7 @@ import {
   PUBLIC_SITE_BRAND,
   getAtlasAppLoginUrl
 } from "../../config/publicSiteHost";
+import { ATLAS_BRAND_ASSETS } from "../../config/publicBrandAssets";
 import { usePublicSiteBrand } from "../../hooks/usePublicSiteBrand";
 import { useContactNavigation } from "../../hooks/useContactNavigation";
 import "./PublicNavbar.css";
@@ -141,9 +142,20 @@ export default function Navbar() {
           aria-label={isAtlas ? "Atlas AI home" : "Team Vision Financial home"}
           onClick={handleBrandClick}
         >
-          <span className="public-navbar__brand-mark" aria-hidden="true">
-            {isAtlas ? "A" : "TV"}
-          </span>
+          {isAtlas ? (
+            <img
+              className="public-navbar__brand-logo"
+              src={ATLAS_BRAND_ASSETS.logoMark64}
+              alt=""
+              width={32}
+              height={32}
+              decoding="async"
+            />
+          ) : (
+            <span className="public-navbar__brand-mark" aria-hidden="true">
+              TV
+            </span>
+          )}
           <span className="public-navbar__brand-text">
             {isAtlas ? "Atlas AI" : "Team Vision Financial"}
           </span>

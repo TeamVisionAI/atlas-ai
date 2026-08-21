@@ -39,6 +39,15 @@
   flex-shrink: 0;
 }
 
+.public-navbar__brand-logo {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+
 .public-navbar__brand-text {
   font-size: 0.9375rem;
   font-weight: 600;
