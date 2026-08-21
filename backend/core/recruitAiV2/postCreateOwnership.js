@@ -13,6 +13,9 @@ const { APPOINTMENT_STATUS, STAGES } = require("./conversationContext");
 const {
   isActiveAppointment
 } = require("../activeAppointmentResolver");
+const {
+  appointmentMatchesProspectIdentity
+} = require("../appointmentProspectIdentity");
 
 function appointmentLocalSlot(appointment = {}, timezone = "America/New_York") {
   const start = appointment.start_date_time || appointment.startDateTime || null;
@@ -61,10 +64,6 @@ function appointmentOrgId(appointment = {}) {
   return appointment.organizationId || appointment.organization_id || null;
 }
 
-function appointmentProspectId(appointment = {}) {
-  return appointment.prospectId || appointment.prospect_id || null;
-}
-
 function appointmentAgentIds(appointment = {}) {
   return [
     appointment.agentId,
@@ -105,7 +104,7 @@ function appointmentEligibleForReclaim(
   if (appointmentOrgId(appointment) !== organizationId) {
     return { ok: false, reason: "ORG_MISMATCH" };
   }
-  if (appointmentProspectId(appointment) !== prospectId) {
+  if (!appointmentMatchesProspectIdentity(appointment, prospectId)) {
     return { ok: false, reason: "PROSPECT_MISMATCH" };
   }
   if (agentId) {
