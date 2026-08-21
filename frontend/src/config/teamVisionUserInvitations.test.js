@@ -48,10 +48,16 @@ test("workspaceExperience opens Administration — Users for MANAGEMENT with adm
 });
 
 test("AdminUsers invite UI has Users/Invitations tabs and Invite User", () => {
+  const helpersSource = fs.readFileSync(
+    path.join(__dirname, "../pages/identity/adminUsersGridHelpers.js"),
+    "utf8"
+  );
   assert.match(adminUsersSource, /Invite User/);
   assert.match(adminUsersSource, /Invitations/);
   assert.match(adminUsersSource, /Business Rank/);
   assert.match(adminUsersSource, /Permission Role/);
-  assert.match(adminUsersSource, /revoke-invite|Revoke Invite/);
-  assert.match(adminUsersSource, /Resend Invite/);
+  assert.match(adminUsersSource, /admin-users-toolbar/);
+  assert.match(adminUsersSource, /•••|RowActionsMenu/);
+  assert.match(helpersSource, /Resend Invite/);
+  assert.match(helpersSource, /Revoke Invite/);
 });
