@@ -644,7 +644,7 @@ async function createAppointment(input, context = {}) {
   });
 
   if (!skipReminders) {
-    const reminderResult = appointmentReminderEngine.scheduleReminders(saved);
+    const reminderResult = await appointmentReminderEngine.scheduleReminders(saved);
 
     await appointmentRepository.save({
       ...saved,
@@ -806,7 +806,7 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
     }
   });
 
-  appointmentReminderEngine.cancelReminders(appointment.id);
+  await appointmentReminderEngine.cancelReminders(appointment.id);
 
   const domainUpdated = await appointmentDomainService.rescheduleAppointment(appointment, {
     actor: agentId,
@@ -846,7 +846,7 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   };
 
   const saved = await appointmentRepository.save(updated);
-  const reminderResult = appointmentReminderEngine.replaceReminders(saved);
+  const reminderResult = await appointmentReminderEngine.replaceReminders(saved);
 
   await appointmentRepository.save({
     ...saved,
@@ -932,7 +932,7 @@ async function cancelAppointment(id, input, context = {}) {
     );
   }
 
-  appointmentReminderEngine.cancelReminders(appointment.id);
+  await appointmentReminderEngine.cancelReminders(appointment.id);
 
   const domainUpdated = await appointmentDomainService.cancelAppointment(appointment, {
     actor: agentId || "agent",

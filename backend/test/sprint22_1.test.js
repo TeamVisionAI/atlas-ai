@@ -18,11 +18,17 @@ const {
   REMINDER_TYPES,
   scheduleReminders,
   cancelReminders,
-  replaceReminders
+  replaceReminders,
+  stopReminderPoller
 } = require("../services/appointmentReminderEngine");
 const { recordHistoryEvent } = require("../core/appointmentHistory");
 const { detectRequestedInterviewType } = require("../core/businessRulesEngine");
 const { parseInterviewType } = require("../core/interviewScheduling");
+const {
+  createMemoryAppointmentReminderRepository,
+  setAppointmentReminderRepositoryForTests,
+  resetAppointmentReminderRepositoryCache
+} = require("../repositories/appointmentReminderRepository");
 
 describe("Sprint 22.1 — Team Vision rules", () => {
   it("detects zoom failure messages", () => {
@@ -66,14 +72,17 @@ describe("Sprint 22.1 — reminder engine", () => {
         timezone: "America/New_York",
         virtualMeetingUrl: "https://zoom.us/j/123"
       },
-      REMINDER_TYPES.REMINDER_15M,
+      REMINDER_TYPES.REMINDER_30M,
       { name: "Ana" }
     );
 
-    assert.match(message, /15 minutos|15 minutes/i);
+    assert.match(message, /30 minutos|30 minutes/i);
   });
 
-  it("schedules, replaces, and cancels reminders", () => {
+  it("schedules, replaces, and cancels reminders", async () => {
+    stopReminderPoller();
+    setAppointmentReminderRepositoryForTests(createMemoryAppointmentReminderRepository());
+
     const appointment = {
       id: "test-appt-1",
       organizationId: "org-1",
@@ -84,14 +93,19 @@ describe("Sprint 22.1 — reminder engine", () => {
       metadata: { prospectName: "Test" }
     };
 
-    const scheduled = scheduleReminders(appointment);
-    assert.ok(scheduled.count >= 3);
+    try {
+      const scheduled = await scheduleReminders(appointment);
+      assert.ok(scheduled.count >= 3);
 
-    const replaced = replaceReminders(appointment);
-    assert.equal(replaced.status, "scheduled");
+      const replaced = await replaceReminders(appointment);
+      assert.equal(replaced.status, "scheduled");
 
-    const cancelled = cancelReminders(appointment.id);
-    assert.equal(cancelled.status, "cancelled");
+      const cancelled = await cancelReminders(appointment.id);
+      assert.equal(cancelled.status, "cancelled");
+    } finally {
+      resetAppointmentReminderRepositoryCache();
+      stopReminderPoller();
+    }
   });
 });
 

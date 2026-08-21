@@ -1,6 +1,7 @@
 /**
  * Global appointment reminder cadence: 24h + 1h + 30m (replaces 15m).
  * Shared engine for Team Vision and Team Legacy — not tenant-configurable.
+ * DR1 — uses durable in-memory repository in tests (no JSON file).
  */
 
 require("dotenv").config();
@@ -9,8 +10,7 @@ process.env.NODE_ENV = "test";
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
+const crypto = require("node:crypto");
 
 const { TEAM_VISION_ORGANIZATION_ID } = require("../core/teamVisionSeedTenant");
 const {
@@ -21,33 +21,51 @@ const {
   cancelReminders,
   buildReminderMessage,
   migratePendingFifteenMinuteReminders,
-  deliverReminder
+  deliverReminder,
+  stopReminderPoller
 } = require("../services/appointmentReminderEngine");
 const { REMINDER_STATUSES } = require("../core/configuration/appointmentDomain");
+const {
+  createMemoryAppointmentReminderRepository,
+  setAppointmentReminderRepositoryForTests,
+  resetAppointmentReminderRepositoryCache
+} = require("../repositories/appointmentReminderRepository");
 
 const ORG_TV = TEAM_VISION_ORGANIZATION_ID;
 const ORG_TL = "af8fb707-f26c-4152-ad77-2d079d30bc8a";
-const REMINDER_FILE = path.join(__dirname, "../data/appointmentReminders.json");
 
-function activeTypes(appointmentId) {
-  const store = JSON.parse(fs.readFileSync(REMINDER_FILE, "utf8"));
-  return (store[appointmentId] || [])
+let memoryRepo;
+
+async function activeTypes(appointmentId) {
+  const rows = await memoryRepo.listByAppointmentId(appointmentId);
+  return rows
     .filter((row) => row.status === REMINDER_STATUSES.SCHEDULED)
     .map((row) => row.reminderType)
     .sort();
 }
 
-function allStatuses(appointmentId) {
-  const store = JSON.parse(fs.readFileSync(REMINDER_FILE, "utf8"));
-  return (store[appointmentId] || []).map((row) => ({
+async function allStatuses(appointmentId) {
+  const rows = await memoryRepo.listByAppointmentId(appointmentId);
+  return rows.map((row) => ({
     type: row.reminderType,
     status: row.status
   }));
 }
 
-test("1. new appointment schedules 24h + 1h + 30m only", () => {
+test.beforeEach(() => {
+  stopReminderPoller();
+  memoryRepo = createMemoryAppointmentReminderRepository();
+  setAppointmentReminderRepositoryForTests(memoryRepo);
+});
+
+test.afterEach(() => {
+  stopReminderPoller();
+  resetAppointmentReminderRepositoryCache();
+});
+
+test("1. new appointment schedules 24h + 1h + 30m only", async () => {
   const appointment = {
-    id: `cadence-new-${Date.now()}`,
+    id: crypto.randomUUID(),
     organizationId: ORG_TV,
     prospectPhone: "+15555550301",
     startDateTime: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
@@ -56,16 +74,16 @@ test("1. new appointment schedules 24h + 1h + 30m only", () => {
     meetingAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
   };
 
-  const scheduled = scheduleReminders(appointment);
+  const scheduled = await scheduleReminders(appointment);
   assert.equal(scheduled.count, 3);
-  assert.deepEqual(activeTypes(appointment.id), [
+  assert.deepEqual(await activeTypes(appointment.id), [
     "reminder_1h",
     "reminder_24h",
     "reminder_30m"
   ]);
-  assert.equal(activeTypes(appointment.id).includes("reminder_15m"), false);
+  assert.equal((await activeTypes(appointment.id)).includes("reminder_15m"), false);
 
-  cancelReminders(appointment.id);
+  await cancelReminders(appointment.id);
 });
 
 test("2. schedule never includes reminder_15m", () => {
@@ -91,9 +109,9 @@ test("2. schedule never includes reminder_15m", () => {
   );
 });
 
-test("3-4. reschedule recalculates exactly three active reminders with no duplicates", () => {
+test("3-4. reschedule recalculates exactly three active reminders with no duplicates", async () => {
   const appointment = {
-    id: `cadence-reschedule-${Date.now()}`,
+    id: crypto.randomUUID(),
     organizationId: ORG_TL,
     prospectPhone: "+15555550302",
     startDateTime: new Date(Date.now() + 96 * 60 * 60 * 1000).toISOString(),
@@ -103,39 +121,39 @@ test("3-4. reschedule recalculates exactly three active reminders with no duplic
     meetingProvider: "zoom"
   };
 
-  scheduleReminders(appointment);
+  await scheduleReminders(appointment);
   const moved = {
     ...appointment,
     startDateTime: new Date(Date.now() + 120 * 60 * 60 * 1000).toISOString()
   };
-  replaceReminders(moved);
+  await replaceReminders(moved);
 
-  const active = activeTypes(appointment.id);
+  const active = await activeTypes(appointment.id);
   assert.deepEqual(active, ["reminder_1h", "reminder_24h", "reminder_30m"]);
   assert.equal(active.filter((t) => t === "reminder_30m").length, 1);
   assert.equal(active.filter((t) => t === "reminder_15m").length, 0);
 
-  cancelReminders(appointment.id);
+  await cancelReminders(appointment.id);
 });
 
-test("5. cancel suppresses all three", () => {
+test("5. cancel suppresses all three", async () => {
   const appointment = {
-    id: `cadence-cancel-${Date.now()}`,
+    id: crypto.randomUUID(),
     organizationId: ORG_TV,
     prospectPhone: "+15555550303",
     startDateTime: new Date(Date.now() + 80 * 60 * 60 * 1000).toISOString(),
     timezone: "America/New_York"
   };
 
-  scheduleReminders(appointment);
-  cancelReminders(appointment.id);
-  const statuses = allStatuses(appointment.id);
+  await scheduleReminders(appointment);
+  await cancelReminders(appointment.id);
+  const statuses = await allStatuses(appointment.id);
   assert.ok(statuses.length >= 3);
   assert.equal(
     statuses.every((row) => row.status === REMINDER_STATUSES.CANCELLED),
     true
   );
-  assert.equal(activeTypes(appointment.id).length, 0);
+  assert.equal((await activeTypes(appointment.id)).length, 0);
 });
 
 test("6-8. TV/TL identity and location copy unchanged for 30m", () => {
@@ -175,7 +193,7 @@ test("6-8. TV/TL identity and location copy unchanged for 30m", () => {
 });
 
 test("pending reminder_15m migrates to 30m without dual delivery", async () => {
-  const appointmentId = `cadence-migrate-${Date.now()}`;
+  const appointmentId = crypto.randomUUID();
   const start = new Date(Date.now() + 48 * 60 * 60 * 1000);
   const memStore = {
     [appointmentId]: [
@@ -208,7 +226,7 @@ test("pending reminder_15m migrates to 30m without dual delivery", async () => {
     ]
   };
 
-  const result = migratePendingFifteenMinuteReminders(memStore);
+  const result = await migratePendingFifteenMinuteReminders(memStore);
   assert.equal(result.cancelled15m, 1);
   assert.equal(result.added30m, 1);
 
