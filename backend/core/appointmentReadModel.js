@@ -112,6 +112,10 @@ function rowToAppointment(row) {
     meetingLocationName: row.meeting_location_name || row.meetingLocationName || null,
     meetingAddress: row.meeting_address || row.meetingAddress || null,
     meetingNotes: row.meeting_notes || row.meetingNotes || null,
+    meetingLocationUrl:
+      row.metadata?.meetingLocationUrl ||
+      row.meetingLocationUrl ||
+      null,
     virtualMeetingUrl: row.virtual_meeting_url || row.virtualMeetingUrl || null,
     calendarEventId: row.calendar_event_id || row.calendarEventId || null,
     calendarProvider: row.calendar_provider || row.calendarProvider || null,
@@ -177,6 +181,9 @@ function appointmentToRow(appointment) {
     history: appointment.history || [],
     metadata: {
       ...(appointment.metadata || {}),
+      ...(appointment.meetingLocationUrl
+        ? { meetingLocationUrl: appointment.meetingLocationUrl }
+        : {}),
       ownerRepId,
       interviewerUserId,
       interviewerName,

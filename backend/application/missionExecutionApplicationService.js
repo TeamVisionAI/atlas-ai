@@ -117,13 +117,32 @@ async function createPersistedScheduleAppointment({
       source: APPOINTMENT_SOURCES.MISSION_CONTROL,
       meetingType: isZoom ? "virtual" : "in_person",
       meetingProvider: isZoom ? "zoom" : undefined,
-      meetingLocationType: isPublicLocation ? "public_location" : "office",
-      meetingAddress: isZoom ? null : location,
+      meetingLocationType: isZoom
+        ? undefined
+        : isPublicLocation
+          ? "public_location"
+          : "office",
+      meetingLocationName: isPublicLocation
+        ? payload.meetingLocationName || null
+        : undefined,
+      meetingAddress: isZoom
+        ? null
+        : isPublicLocation
+          ? payload.meetingLocationAddress || null
+          : location,
+      meetingLocationUrl: isPublicLocation
+        ? payload.meetingLocationUrl || null
+        : undefined,
       notes: payload.notes,
       contact: attendeeEmail ? { email: attendeeEmail } : {},
       interviewerUserId: payload.interviewerUserId || agentId,
       existingBooking: bookingResult,
-      skipWorkflowSideEffects: true
+      skipWorkflowSideEffects: true,
+      metadata: isPublicLocation
+        ? {
+            meetingLocationUrl: payload.meetingLocationUrl || null
+          }
+        : undefined
     },
     { organizationId }
   );
@@ -190,6 +209,16 @@ function validateSchedulePayload(payload = {}) {
 
   if (!payload.interviewType) {
     missing.push("interviewType");
+  }
+
+  const interviewType = normalizeInterviewType(payload.interviewType);
+  if (interviewType === "Public Location") {
+    const {
+      hasPublicLocationDetails
+    } = require("../core/publicLocationDetails");
+    if (!hasPublicLocationDetails(payload)) {
+      missing.push("meetingLocationName|meetingLocationAddress");
+    }
   }
 
   return missing;
@@ -384,7 +413,19 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
       meetingManagementService.resolveInterviewLocation(orgId, type, locs));
 
   const locationResult = await resolveLocation(organizationId, interviewType, {
-    publicLocation: payload.publicLocation,
+    publicLocation:
+      payload.publicLocation ||
+      (() => {
+        const {
+          composePublicLocationDisplay
+        } = require("../core/publicLocationDetails");
+        return composePublicLocationDisplay({
+          meetingLocationName: payload.meetingLocationName,
+          meetingLocationAddress: payload.meetingLocationAddress
+        });
+      })(),
+    meetingLocationName: payload.meetingLocationName,
+    meetingLocationAddress: payload.meetingLocationAddress,
     officeLocation: payload.officeLocation
   });
 
@@ -392,11 +433,15 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     const errorCode =
       locationResult.errorCode === "MEETING_URL_NOT_CONFIGURED"
         ? "MEETING_URL_NOT_CONFIGURED"
-        : "OFFICE_LOCATION_REQUIRED";
+        : locationResult.errorCode === "PUBLIC_LOCATION_REQUIRED"
+          ? "PUBLIC_LOCATION_REQUIRED"
+          : "OFFICE_LOCATION_REQUIRED";
     const message =
       locationResult.errorCode === "MEETING_URL_NOT_CONFIGURED"
         ? "Personal meeting URL is not configured. Add it under Organization → Meeting Management."
-        : "Office address is not configured. Add it under Organization → Meeting Management.";
+        : locationResult.errorCode === "PUBLIC_LOCATION_REQUIRED"
+          ? "Public location requires a place name or address."
+          : "Office address is not configured. Add it under Organization → Meeting Management.";
 
     return buildActionError(ACTION_IDS.SCHEDULE, errorCode, message);
   }
