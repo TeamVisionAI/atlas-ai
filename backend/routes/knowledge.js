@@ -4,6 +4,8 @@
 
 const express = require("express");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { requirePermission } = require("../middleware/requirePermission");
+const { PERMISSIONS } = require("../security/permissions");
 const {
   getKnowledgeTree,
   getKnowledgeDocument
@@ -12,6 +14,7 @@ const {
 const router = express.Router();
 
 router.use(requireAtlasUser);
+router.use(requirePermission(PERMISSIONS.KNOWLEDGE_READ));
 
 router.get("/tree", async (req, res) => {
   try {

@@ -138,6 +138,7 @@ export default function KnowledgeHub() {
   const { t, language } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [authError, setAuthError] = useState(null);
+  const [forbiddenError, setForbiddenError] = useState(null);
   const [tree, setTree] = useState(null);
   const [files, setFiles] = useState([]);
   const [defaultPath, setDefaultPath] = useState("CURRENT_STATE.md");
@@ -284,6 +285,11 @@ export default function KnowledgeHub() {
           return;
         }
 
+        if (error instanceof KnowledgeHubError && error.payload?.status === 403) {
+          setForbiddenError(t.knowledgeHubForbidden);
+          return;
+        }
+
         setPageError(
           error instanceof KnowledgeHubError ? error.message : t.knowledgeHubLoadError
         );
@@ -299,7 +305,7 @@ export default function KnowledgeHub() {
     return () => {
       cancelled = true;
     };
-  }, [t.knowledgeHubAuthRequired, t.knowledgeHubDocumentError, t.knowledgeHubLoadError]);
+  }, [t.knowledgeHubAuthRequired, t.knowledgeHubDocumentError, t.knowledgeHubForbidden, t.knowledgeHubLoadError]);
 
   const searchResults = useMemo(() => {
     return searchKnowledgeFiles(files, searchQuery);
@@ -343,9 +349,31 @@ export default function KnowledgeHub() {
   if (authError) {
     return (
       <div className="knowledge-hub">
-        <div className="knowledge-hub__status-card">
+        <div className="knowledge-hub__status-card" role="alert">
           <h1>{t.navKnowledge}</h1>
           <p>{authError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (forbiddenError) {
+    return (
+      <div className="knowledge-hub">
+        <div className="knowledge-hub__status-card knowledge-hub__status-card--forbidden" role="alert">
+          <h1>{t.knowledgeHubTitle}</h1>
+          <p>{forbiddenError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!loadingTree && pageError && !tree && !homeDocument && !document) {
+    return (
+      <div className="knowledge-hub">
+        <div className="knowledge-hub__status-card knowledge-hub__status-card--error" role="alert">
+          <h1>{t.knowledgeHubTitle}</h1>
+          <p>{pageError}</p>
         </div>
       </div>
     );
@@ -452,7 +480,9 @@ export default function KnowledgeHub() {
                     activity={activity}
                     onToggleFavorite={handleToggleFavorite}
                   />
-                ) : null}
+                ) : (
+                  <p className="knowledge-hub__empty">{t.knowledgeHubTreeEmpty}</p>
+                )}
               </section>
             </>
           )}
@@ -465,8 +495,13 @@ export default function KnowledgeHub() {
           ) : null}
 
           {viewMode === "home" ? (
-            loadingDocument && !homeDocument ? (
+            loadingDocument && !homeDocument && !pageError ? (
               <p className="knowledge-hub__empty">{t.loading}</p>
+            ) : !homeDocument && !pageError && !loadingDocument ? (
+              <div className="knowledge-hub__status-card">
+                <h2>{t.knowledgeHubHomeTitle}</h2>
+                <p className="knowledge-hub__empty">{t.knowledgeHubEmptyState}</p>
+              </div>
             ) : (
               <KnowledgeHubHome
                 t={t}
