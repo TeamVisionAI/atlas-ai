@@ -369,3 +369,34 @@ test("prefilled message format includes generated code", () => {
   assert.match(msg, /TVR-0822-A7K4/);
   assert.match(msg, /Quiero más información/i);
 });
+
+const CANARY_MULTILINE_BODY =
+  "¡Hola! Quiero más información.\nTVR-0826-A7K4";
+
+test("live canary multiline body extracts token on second line", () => {
+  assert.equal(extractCampaignIntakeToken(CANARY_MULTILINE_BODY), "TVR-0826-A7K4");
+  assert.equal(
+    stripCampaignIntakeToken(CANARY_MULTILINE_BODY),
+    "¡Hola! Quiero más información."
+  );
+});
+
+test("token on same line still matches", () => {
+  const body = "¡Hola! Quiero más información. TVR-0826-A7K4";
+  assert.equal(extractCampaignIntakeToken(body), "TVR-0826-A7K4");
+});
+
+test("token with trailing punctuation is still extracted", () => {
+  const body = "¡Hola! Quiero más información.\nTVR-0826-A7K4.";
+  assert.equal(extractCampaignIntakeToken(body), "TVR-0826-A7K4");
+});
+
+test("wrong token is rejected at lookup", async () => {
+  const service = buildService([seedCode({ code: "TVR-0826-A7K4" })]);
+  const match = await service.lookupInboundMatch({
+    organizationId: TEAM_VISION_ORG,
+    whatsappPhoneNumberId: TV_PHONE_ID,
+    messageBody: CANARY_MULTILINE_BODY.replace("TVR-0826-A7K4", "TVR-0826-WRNG")
+  });
+  assert.equal(match.matched, false);
+});
