@@ -9,6 +9,7 @@
 
 const workflowEventService = require("../services/workflowEventService");
 const { logConversation } = require("../services/logService");
+const { processConversationAfterInbound } = require("./communicationHub");
 const whatsappProspectResolver = require("./whatsappProspectResolver");
 const {
   resolveWhatsAppInboundOrganizationId

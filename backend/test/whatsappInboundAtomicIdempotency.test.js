@@ -422,3 +422,12 @@ test("19. QR attribution modules are not modified by this hotfix (source contrac
   assert.doesNotMatch(pipeline, /consumeMatchedScan/);
   assert.doesNotMatch(pipeline, /conversationGoal/);
 });
+
+test("20. default hub binding imports communicationHub (no ReferenceError)", () => {
+  const pipelinePath = path.join(__dirname, "../core/whatsappInboundPipeline.js");
+  const src = fs.readFileSync(pipelinePath, "utf8");
+  assert.match(
+    src,
+    /const \{ processConversationAfterInbound \} = require\("\.\/communicationHub"\)/
+  );
+});
