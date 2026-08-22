@@ -48,7 +48,7 @@ test("BR-151 KnowledgeHub exposes forbidden and error status cards", () => {
   assert.match(knowledgeHubSource, /knowledgeHubForbidden/);
   assert.match(knowledgeHubSource, /knowledge-hub__status-card--error/);
   assert.match(knowledgeHubSource, /knowledgeHubTreeEmpty/);
-  assert.match(knowledgeHubSource, /knowledgeHubEmptyState/);
+  assert.match(knowledgeHubSource, /knowledgeHubNotEnabled/);
 });
 
 test("BR-151 LanguageContext exposes translation catalog as t", () => {

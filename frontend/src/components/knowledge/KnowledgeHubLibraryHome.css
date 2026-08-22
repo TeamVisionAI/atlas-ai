@@ -1,0 +1,135 @@
+.knowledge-library {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.knowledge-library__intro h2 {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.knowledge-library__eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.knowledge-library__subtitle {
+  margin: 0;
+  opacity: 0.85;
+  max-width: 52rem;
+}
+
+.knowledge-library__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.knowledge-library__card {
+  text-align: left;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.04));
+  cursor: pointer;
+}
+
+.knowledge-library__card:hover {
+  border-color: var(--accent, #5b8def);
+}
+
+.knowledge-library__card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.knowledge-library__card p {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+.knowledge-library__card-count {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.knowledge-library__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.knowledge-library__panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.knowledge-library__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.knowledge-library__list-button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.knowledge-library__list-button.is-active,
+.knowledge-library__list-button:hover {
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.06));
+  border-color: var(--border-subtle, rgba(255, 255, 255, 0.1));
+}
+
+.knowledge-library__list-title {
+  display: block;
+  font-weight: 600;
+}
+
+.knowledge-library__list-meta {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 0.15rem;
+}
+
+.knowledge-library__empty {
+  opacity: 0.75;
+  margin: 0;
+}
+
+.knowledge-library__back {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 600;
+}
+
+.knowledge-library__category-header h2 {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.knowledge-library__category-header p {
+  margin: 0 0 1rem;
+  opacity: 0.85;
+}
+
+@media (max-width: 768px) {
+  .knowledge-library__grid {
+    grid-template-columns: 1fr;
+  }
+}

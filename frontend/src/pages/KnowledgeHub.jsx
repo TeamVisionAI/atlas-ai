@@ -8,8 +8,9 @@ import {
   KnowledgeHubError
 } from "../services/knowledgeService";
 import MarkdownViewer from "../components/knowledge/MarkdownViewer";
-import KnowledgeHubHome from "../components/knowledge/KnowledgeHubHome";
-import { usePlatformStatus } from "../hooks/usePlatformStatus";
+import KnowledgeHubLibraryHome, {
+  KnowledgeHubCategoryView
+} from "../components/knowledge/KnowledgeHubLibraryHome";
 import {
   readKnowledgeActivity,
   recordRecentlyOpened,
@@ -17,7 +18,8 @@ import {
   toggleFavorite,
   togglePinned,
   isFavorite,
-  isPinned
+  isPinned,
+  getPopularArticles
 } from "../utils/knowledgeStorage";
 import { searchKnowledgeFiles } from "../utils/knowledgeSearch";
 import "./KnowledgeHub.css";
@@ -139,44 +141,23 @@ export default function KnowledgeHub() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [authError, setAuthError] = useState(null);
   const [forbiddenError, setForbiddenError] = useState(null);
+  const [notEnabledError, setNotEnabledError] = useState(null);
   const [tree, setTree] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [files, setFiles] = useState([]);
-  const [defaultPath, setDefaultPath] = useState("CURRENT_STATE.md");
+  const [defaultPath, setDefaultPath] = useState("");
   const [viewMode, setViewMode] = useState("home");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedPath, setSelectedPath] = useState("");
   const [document, setDocument] = useState(null);
-  const [homeDocument, setHomeDocument] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activity, setActivity] = useState(() => readKnowledgeActivity());
   const [loadingTree, setLoadingTree] = useState(true);
   const [loadingDocument, setLoadingDocument] = useState(false);
   const [pageError, setPageError] = useState(null);
-  const [sessionReady, setSessionReady] = useState(false);
   const initialPathRef = useRef(searchParams.get("path"));
-  const platformStatusState = usePlatformStatus({ enabled: sessionReady });
-
-  const loadHomeDocument = useCallback(async () => {
-    setLoadingDocument(true);
-    setPageError(null);
-
-    try {
-      const payload = await fetchKnowledgeDocument(defaultPath);
-      setHomeDocument(payload);
-      setDocument(null);
-      setSelectedPath("");
-      setViewMode("home");
-      setSearchParams({}, { replace: true });
-    } catch (error) {
-      console.error("[KnowledgeHub] home document load failed", error);
-      setPageError(
-        error instanceof KnowledgeHubError
-          ? error.message
-          : t.knowledgeHubDocumentError
-      );
-    } finally {
-      setLoadingDocument(false);
-    }
-  }, [defaultPath, setSearchParams, t.knowledgeHubDocumentError]);
+  const initialCategoryRef = useRef(searchParams.get("category"));
+  const locale = language === "es" ? "es-ES" : "en-US";
 
   const loadDocument = useCallback(async (documentPath, { openedFrom = "tree" } = {}) => {
     if (!documentPath) {
@@ -231,47 +212,28 @@ export default function KnowledgeHub() {
 
       try {
         await bootstrapAtlasSession();
-        if (!cancelled) {
-          setSessionReady(true);
-        }
         const payload = await fetchKnowledgeTree();
 
         if (cancelled) {
           return;
         }
 
-        const resolvedDefault = payload.defaultPath || "CURRENT_STATE.md";
+        const resolvedDefault = payload.defaultPath || "";
         setTree(payload.root);
+        setCategories(payload.categories || []);
         setFiles(payload.files || flattenTree(payload.root));
         setDefaultPath(resolvedDefault);
 
         const requestedPath = initialPathRef.current;
+        const requestedCategory = initialCategoryRef.current;
 
         if (requestedPath) {
           await loadDocumentRef.current(requestedPath, { openedFrom: "url" });
+        } else if (requestedCategory) {
+          setSelectedCategoryId(requestedCategory);
+          setViewMode("category");
         } else {
           setViewMode("home");
-          setLoadingDocument(true);
-
-          try {
-            const homePayload = await fetchKnowledgeDocument(resolvedDefault);
-            if (!cancelled) {
-              setHomeDocument(homePayload);
-            }
-          } catch (error) {
-            if (!cancelled) {
-              console.error("[KnowledgeHub] home initialization failed", error);
-              setPageError(
-                error instanceof KnowledgeHubError
-                  ? error.message
-                  : t.knowledgeHubDocumentError
-              );
-            }
-          } finally {
-            if (!cancelled) {
-              setLoadingDocument(false);
-            }
-          }
         }
       } catch (error) {
         if (cancelled) {
@@ -286,6 +248,10 @@ export default function KnowledgeHub() {
         }
 
         if (error instanceof KnowledgeHubError && error.payload?.status === 403) {
+          if (error.payload?.error === "KNOWLEDGE_HUB_NOT_ENABLED") {
+            setNotEnabledError(t.knowledgeHubNotEnabled);
+            return;
+          }
           setForbiddenError(t.knowledgeHubForbidden);
           return;
         }
@@ -305,7 +271,28 @@ export default function KnowledgeHub() {
     return () => {
       cancelled = true;
     };
-  }, [t.knowledgeHubAuthRequired, t.knowledgeHubDocumentError, t.knowledgeHubForbidden, t.knowledgeHubLoadError]);
+  }, [t.knowledgeHubAuthRequired, t.knowledgeHubDocumentError, t.knowledgeHubForbidden, t.knowledgeHubLoadError, t.knowledgeHubNotEnabled]);
+
+  const recentlyUpdated = useMemo(() => {
+    return [...files]
+      .filter((file) => file.updatedAt)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+      .slice(0, 8);
+  }, [files]);
+
+  const popularArticles = useMemo(() => getPopularArticles(files, { limit: 8 }), [files, activity]);
+
+  const categoryArticles = useMemo(() => {
+    if (!selectedCategoryId) {
+      return [];
+    }
+    return files.filter((file) => file.categoryId === selectedCategoryId);
+  }, [files, selectedCategoryId]);
+
+  const selectedCategoryMeta = useMemo(
+    () => categories.find((category) => category.id === selectedCategoryId) || null,
+    [categories, selectedCategoryId]
+  );
 
   const searchResults = useMemo(() => {
     return searchKnowledgeFiles(files, searchQuery);
@@ -316,16 +303,31 @@ export default function KnowledgeHub() {
       return;
     }
 
-    if (file.path === defaultPath && !searchParams.get("path")) {
-      loadHomeDocument();
-      return;
-    }
-
     if (file.path === selectedPath && viewMode === "document") {
       return;
     }
 
     loadDocument(file.path);
+  }
+
+  function handleSelectCategory(category) {
+    if (!category?.id) {
+      return;
+    }
+    setSelectedCategoryId(category.id);
+    setViewMode("category");
+    setDocument(null);
+    setSelectedPath("");
+    setSearchParams({ category: category.id }, { replace: true });
+  }
+
+  function handleGoHome() {
+    setViewMode("home");
+    setSelectedCategoryId("");
+    setDocument(null);
+    setSelectedPath("");
+    setPageError(null);
+    setSearchParams({}, { replace: true });
   }
 
   function handleToggleFavorite(entry) {
@@ -334,13 +336,6 @@ export default function KnowledgeHub() {
 
   function handleTogglePinned(entry) {
     setActivity(togglePinned(entry));
-  }
-
-  async function handleGoHome() {
-    await Promise.all([
-      loadHomeDocument(),
-      platformStatusState.refresh({ force: true })
-    ]);
   }
 
   const documentIsFavorite = document ? isFavorite(document.path, activity) : false;
@@ -368,7 +363,18 @@ export default function KnowledgeHub() {
     );
   }
 
-  if (!loadingTree && pageError && !tree && !homeDocument && !document) {
+  if (notEnabledError) {
+    return (
+      <div className="knowledge-hub">
+        <div className="knowledge-hub__status-card knowledge-hub__status-card--forbidden" role="alert">
+          <h1>{t.knowledgeHubTitle}</h1>
+          <p>{notEnabledError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!loadingTree && pageError && !tree && !document) {
     return (
       <div className="knowledge-hub">
         <div className="knowledge-hub__status-card knowledge-hub__status-card--error" role="alert">
@@ -384,7 +390,7 @@ export default function KnowledgeHub() {
       <header className="knowledge-hub__header">
         <div>
           <h1 className="knowledge-hub__title">{t.knowledgeHubTitle}</h1>
-          <p className="knowledge-hub__subtitle">{t.knowledgeHubSubtitle}</p>
+          <p className="knowledge-hub__subtitle">{t.knowledgeHubLibrarySubtitle}</p>
         </div>
         <div className="knowledge-hub__header-actions">
           <button type="button" className="knowledge-hub__home-button" onClick={handleGoHome}>
@@ -495,33 +501,40 @@ export default function KnowledgeHub() {
           ) : null}
 
           {viewMode === "home" ? (
-            loadingDocument && !homeDocument && !pageError ? (
+            loadingTree ? (
               <p className="knowledge-hub__empty">{t.loading}</p>
-            ) : !homeDocument && !pageError && !loadingDocument ? (
-              <div className="knowledge-hub__status-card">
-                <h2>{t.knowledgeHubHomeTitle}</h2>
-                <p className="knowledge-hub__empty">{t.knowledgeHubEmptyState}</p>
-              </div>
             ) : (
-              <KnowledgeHubHome
+              <KnowledgeHubLibraryHome
                 t={t}
-                locale={language === "es" ? "es-ES" : "en-US"}
-                homeDocument={homeDocument}
-                recentlyOpened={activity.recentlyOpened}
-                recentlyViewed={activity.recentlyViewed}
+                locale={locale}
+                categories={categories}
+                files={files}
+                recentlyUpdated={recentlyUpdated}
+                popularArticles={popularArticles}
                 selectedPath={selectedPath}
-                onSelectDocument={handleSelectFile}
-                onRefreshHome={handleGoHome}
-                platformStatus={platformStatusState.data}
-                platformStatusLoading={loadingDocument || platformStatusState.loading}
-                platformStatusRefreshError={platformStatusState.refreshError}
-                platformStatusFreshness={platformStatusState.freshness}
+                onSelectCategory={handleSelectCategory}
+                onSelectArticle={handleSelectFile}
               />
             )
           ) : null}
 
+          {viewMode === "category" ? (
+            <KnowledgeHubCategoryView
+              t={t}
+              locale={locale}
+              category={selectedCategoryMeta}
+              articles={categoryArticles}
+              selectedPath={selectedPath}
+              onSelectArticle={handleSelectFile}
+              onBackHome={handleGoHome}
+            />
+          ) : null}
+
           {viewMode === "document" && document ? (
             <>
+              <button type="button" className="knowledge-library__back" onClick={handleGoHome}>
+                ← {t.knowledgeHubBackToHub}
+              </button>
               <div className="knowledge-hub__doc-meta">
                 <div className="knowledge-hub__doc-meta-row">
                   <h2>{document.title}</h2>

@@ -1954,6 +1954,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-152 — Knowledge Hub Practical Agent Reference Library
+
+**Implements:** Repurpose Knowledge Hub as a field-agent reference library with six categories, tenant feature gate `knowledgeHubEnabled`, and read-only field UX. Hide hub from sidebar when tenant disables for field users; RVP/Admin bypass tenant gate via `knowledge:write`.  
+**Domain:** Knowledge Hub content model / tenant features / workspace navigation  
+**Depends on:** BR-151 (`knowledge:read`, `knowledge:write`)  
+**Status:** Implemented  
+**Engine target:** `knowledgeHubService.js`, `knowledgeHubCategories.js`, `knowledgeHubAccess.js`, `tenantFeatureControls.js`, `KnowledgeHubLibraryHome.jsx`  
+**Tests:** `backend/test/knowledgeHubPracticalLibraryBr152.test.js`, `frontend/src/config/knowledgeHubPracticalLibraryBr152.test.js`
+
+### Rules
+
+1. **Content root** — Agent library lives under `docs/agent-library/` with six category folders (scripts, recruiting, licensing, product, procedures, quick reference). Technical `/docs` engineering content is not exposed in the field hub API.
+2. **Tenant gate** — `knowledgeHubEnabled` controls field-user access. OFF → hide sidebar + deny API with `KNOWLEDGE_HUB_NOT_ENABLED`. RVP/Admin (`knowledge:write`) bypass tenant gate.
+3. **Read-only field UX** — Field roles browse/search only; no edit/delete/publish in v1.
+4. **Home UX** — Category cards, search, recently updated, most-used (client view counts), empty states, back navigation inside articles.
+5. **Starter content** — One generic editable article per category; no invented legal/compliance claims.
+6. **Search** — Title, category, folder, path, and frontmatter keywords.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
