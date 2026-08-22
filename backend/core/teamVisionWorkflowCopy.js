@@ -32,6 +32,18 @@ function getNaturalGreetingAck(language) {
     : "Hi! Thanks for reaching out.";
 }
 
+/**
+ * BR-155 — Spanish ad-lead first touch (info-request opener, no financial-services lead-in).
+ */
+const SPANISH_AD_LEAD_FIRST_TOUCH =
+  "¡Hola! Claro 😊 Vi que pediste más información sobre la oportunidad. Con mucho gusto te cuento de qué se trata. ¿En qué ciudad y estado te encuentras?";
+
+function getAmbiguousCityStateQuestion(language) {
+  return language === "es"
+    ? "Perfecto 😊 ¿En qué estado queda esa ciudad?"
+    : "Perfect. Which state is that city in?";
+}
+
 function getStateQuestion(city, language, options = {}) {
   const proposedState = options.proposedState || null;
   if (city && proposedState === "FL") {
@@ -45,7 +57,7 @@ function getStateQuestion(city, language, options = {}) {
       : `Perfect. ${city}, ${proposedState}?`;
   }
   return language === "es"
-    ? `¿En qué estado está ${city}?`
+    ? getAmbiguousCityStateQuestion(language)
     : `Which state is ${city} in?`;
 }
 
@@ -148,7 +160,7 @@ function getAdLeadFirstTouchMessage(language, facts = {}) {
   if (facts.jobFaqDetailLevel === "company_identity") {
     return null;
   }
-  return "¡Hola! Claro 😊 Es una oportunidad en servicios financieros y con gusto te explicamos cómo funciona. ¿En qué ciudad estás?";
+  return SPANISH_AD_LEAD_FIRST_TOUCH;
 }
 
 /** BR-088 — explicit employment-framing ask (job/salaried/hourly). */
@@ -473,6 +485,7 @@ module.exports = {
   getFirstMessage,
   getNaturalGreetingAck,
   getStateQuestion,
+  getAmbiguousCityStateQuestion,
   getAuthorizationQuestion,
   getAuthorizationDeniedMessage,
   getLocalOfficeDayPartMessage,

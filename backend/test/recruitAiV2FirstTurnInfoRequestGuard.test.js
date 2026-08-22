@@ -82,7 +82,7 @@ test("2. Brand-new Spanish lead: ¡Hola! Quiero más información → overview +
   assert.equal(plan.templateKey, "job_overview_faq_then_resume");
   assert.equal(
     rendered.text,
-    "¡Hola! Claro 😊 Es una oportunidad en servicios financieros y con gusto te explicamos cómo funciona. ¿En qué ciudad estás?"
+    "¡Hola! Claro 😊 Vi que pediste más información sobre la oportunidad. Con mucho gusto te cuento de qué se trata. ¿En qué ciudad y estado te encuentras?"
   );
   assert.doesNotMatch(rendered.text, /dato que te acabo de pedir/i);
 
@@ -92,9 +92,9 @@ test("2. Brand-new Spanish lead: ¡Hola! Quiero más información → overview +
   );
   assert.equal(puedo.interpretation.intent, INTENTS.JOB_OPPORTUNITY_QUESTION);
   assert.equal(puedo.plan.templateKey, "job_overview_faq_then_resume");
-  assert.match(puedo.rendered.text, /servicios financieros/i);
-  assert.match(puedo.rendered.text, /ciudad estás/i);
-  assert.doesNotMatch(puedo.rendered.text, /ciudad y estado/i);
+  assert.match(puedo.rendered.text, /pediste más información/i);
+  assert.match(puedo.rendered.text, /ciudad y estado/i);
+  assert.doesNotMatch(puedo.rendered.text, /servicios financieros/i);
   assert.doesNotMatch(puedo.rendered.text, /dato que te acabo de pedir/i);
 });
 
@@ -293,8 +293,8 @@ test("8. English / Spanish first-turn parity (info request)", () => {
   assert.equal(en.plan.templateKey, es.plan.templateKey);
   assert.equal(en.plan.templateKey, "job_overview_faq_then_resume");
   assert.match(en.rendered.text, /city and state/i);
-  assert.match(es.rendered.text, /ciudad estás/i);
-  assert.doesNotMatch(es.rendered.text, /ciudad y estado/i);
+  assert.match(es.rendered.text, /ciudad y estado/i);
+  assert.doesNotMatch(es.rendered.text, /servicios financieros/i);
   assert.doesNotMatch(en.rendered.text, /detail I just asked/i);
   assert.doesNotMatch(es.rendered.text, /dato que te acabo de pedir/i);
 });

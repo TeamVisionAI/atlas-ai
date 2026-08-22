@@ -2007,6 +2007,23 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-155 — Recruiting Welcome Opener + City/State Clarification
+
+**Implements:** Spanish CTWA/QR first-touch opener without leading “servicios financieros”; city+state collection; ambiguous city-only asks state without guessing.
+**Depends on:** BR-131, BR-094
+**Status:** Implemented
+**Tests:** `backend/test/recruitAiV2WelcomeLocationHotfixBr155.test.js`
+
+### Rules
+
+1. **Spanish ad-lead first touch** — Info-request openers use acknowledgment + location ask (`ciudad y estado`); no financial-services lead-in on turn one.
+2. **Direct opportunity questions** — When prospect asks what the opportunity is (post-first-touch or explicit FAQ), use existing recruiting FAQ/overview copy honestly.
+3. **Confident city resolver** — Known cities (e.g. Miami → FL) may propose/confirm state; complete `City, ST` continues without redundant state ask.
+4. **Ambiguous city-only** — Ask only: `Perfecto 😊 ¿En qué estado queda esa ciudad?` — never invent state.
+5. **Scope** — Copy/renderer only; no change to attribution, routing, ownership, execution gates, or scheduling.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
