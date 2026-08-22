@@ -1,5 +1,5 @@
 /**
- * Conversations Center API — Niovel-only production pilot.
+ * Conversations Center API — tenant-scoped (feature + RBAC).
  */
 
 import { apiFetch } from "./apiClient";
@@ -28,6 +28,10 @@ async function wrap(path, options) {
     }
     throw wrapped;
   }
+}
+
+export async function getConversationsCenterAccess() {
+  return wrap("/api/conversations/access");
 }
 
 export async function getConversations({ filter = "active", search = "" } = {}) {

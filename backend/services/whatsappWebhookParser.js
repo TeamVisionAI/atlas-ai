@@ -139,6 +139,7 @@ function normalizeStatusItem(statusItem, value, wabaId) {
 function parseWhatsAppWebhookPayload(body) {
   const messages = [];
   const statuses = [];
+  const humanEchoes = [];
 
   for (const entry of body?.entry || []) {
     const wabaId = entry?.id ? String(entry.id) : null;
@@ -183,10 +184,34 @@ function parseWhatsAppWebhookPayload(body) {
           statuses.push(normalized);
         }
       }
+
+      // Native WhatsApp Business app / linked-device outbound (smb_message_echoes).
+      for (const echo of value.message_echoes || []) {
+        if (!echo?.id || !echo?.to) {
+          continue;
+        }
+
+        humanEchoes.push({
+          providerMessageId: String(echo.id),
+          phone: String(echo.to),
+          businessPhone: echo.from ? String(echo.from) : null,
+          messageType: echo.type || "unknown",
+          body: normalizeMessageBody(echo),
+          timestamp: echo.timestamp
+            ? new Date(Number(echo.timestamp) * 1000).toISOString()
+            : new Date().toISOString(),
+          phoneNumberId,
+          wabaId,
+          media: extractWhatsAppMedia(echo),
+          rawMessage: echo,
+          rawValue: value,
+          changeField: change?.field ? String(change.field) : "smb_message_echoes"
+        });
+      }
     }
   }
 
-  return { messages, statuses };
+  return { messages, statuses, humanEchoes };
 }
 
 /**

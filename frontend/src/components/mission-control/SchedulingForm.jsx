@@ -16,7 +16,16 @@ import SchedulingEmailWarning from "./SchedulingEmailWarning";
 import InterviewAssignmentSection, {
   resolveInterviewerLabel
 } from "./InterviewAssignmentSection";
+import {
+  clearPublicLocationFields,
+  isSchedulingFormValidWithPublicLocation
+} from "./schedulingPublicLocationForm";
 import "./SchedulingForm.css";
+
+export {
+  clearPublicLocationFields,
+  hasPublicLocationDetails
+} from "./schedulingPublicLocationForm";
 
 export const INTERVIEW_TYPE_OPTIONS = Object.freeze([
   { id: "office", icon: "🏢", labelKey: "missionExecutionInterviewTypeOffice" },
@@ -53,6 +62,9 @@ export function createInitialSchedulingForm({
     interviewerSelection: "self",
     interviewerUserId: defaultInterviewerUserId,
     officeLocation: "",
+    meetingLocationName: "",
+    meetingLocationAddress: "",
+    meetingLocationUrl: "",
     notes: "",
     email: "",
     showEmailInput: false,
@@ -61,7 +73,7 @@ export function createInitialSchedulingForm({
 }
 
 export function isSchedulingFormValid(form) {
-  return Boolean(form?.interviewType && form?.dateKey && form?.timeKey);
+  return isSchedulingFormValidWithPublicLocation(form);
 }
 
 export function resolveInterviewTypeLabel(interviewType, translate) {
@@ -143,7 +155,9 @@ export default function SchedulingForm({
     [slots, form.dateKey, form.timeKey]
   );
 
-  const isLoading = loadingSlots || loadingExpansion;
+  // Keep previously loaded slots visible during availability reload to avoid flicker.
+  // Only blank the grid when we have nothing to show yet, or during day/week expansion.
+  const hideSlotGrid = loadingExpansion || (loadingSlots && slots.length === 0);
   const isCompactAssignment = presentation === "scheduleDialog" || inline;
   const showConductedBySummary = !isCompactAssignment;
   const selectedInterviewTypeLabel = resolveInterviewTypeLabel(form.interviewType, translate);
@@ -166,7 +180,7 @@ export default function SchedulingForm({
 
   function selectInterviewType(nextType) {
     onInterviewTypeChange?.(nextType);
-    onChange({
+    const nextForm = {
       ...form,
       interviewType: nextType,
       dateKey: "",
@@ -174,7 +188,14 @@ export default function SchedulingForm({
       email: "",
       showEmailInput: false,
       whatsappDeliveryAcknowledged: false
-    });
+    };
+
+    // Do not retain stale public-location details when switching Office/Zoom.
+    if (nextType !== "public_location") {
+      Object.assign(nextForm, clearPublicLocationFields(nextForm));
+    }
+
+    onChange(nextForm);
   }
 
   function selectSlot(slot) {
@@ -222,6 +243,55 @@ export default function SchedulingForm({
           })}
         </div>
       </section>
+
+      {form.interviewType === "public_location" ? (
+        <section
+          className="scheduling-form__public-location"
+          aria-labelledby="scheduling-public-location-heading"
+        >
+          <h3 id="scheduling-public-location-heading" className="scheduling-form__slots-title">
+            {translate("missionExecutionPublicLocationDetails")}
+          </h3>
+          <p className="scheduling-form__hint">
+            {translate("missionExecutionPublicLocationDetailsHint")}
+          </p>
+          <div className="scheduling-form__public-location-fields">
+            <label className="scheduling-form__field">
+              <span>{translate("missionExecutionPublicLocationName")}</span>
+              <input
+                type="text"
+                value={form.meetingLocationName || ""}
+                onChange={(event) => updateField("meetingLocationName", event.target.value)}
+                placeholder={translate("missionExecutionPublicLocationNamePlaceholder")}
+                disabled={disabled}
+                data-testid="scheduling-public-location-name"
+              />
+            </label>
+            <label className="scheduling-form__field scheduling-form__field--full">
+              <span>{translate("missionExecutionPublicLocationAddress")}</span>
+              <input
+                type="text"
+                value={form.meetingLocationAddress || ""}
+                onChange={(event) => updateField("meetingLocationAddress", event.target.value)}
+                placeholder={translate("missionExecutionPublicLocationAddressPlaceholder")}
+                disabled={disabled}
+                data-testid="scheduling-public-location-address"
+              />
+            </label>
+            <label className="scheduling-form__field scheduling-form__field--full">
+              <span>{translate("missionExecutionPublicLocationUrl")}</span>
+              <input
+                type="url"
+                value={form.meetingLocationUrl || ""}
+                onChange={(event) => updateField("meetingLocationUrl", event.target.value)}
+                placeholder={translate("missionExecutionPublicLocationUrlPlaceholder")}
+                disabled={disabled}
+                data-testid="scheduling-public-location-url"
+              />
+            </label>
+          </div>
+        </section>
+      ) : null}
 
       {needsZoomSchedulingEmailWarning(form, prospect) ? (
         <SchedulingEmailWarning form={form} onChange={onChange} disabled={disabled} />
@@ -281,7 +351,7 @@ export default function SchedulingForm({
               {!loadingSlots && loadingExpansion ? (
                 <p className="scheduling-form__hint">{translate("missionExecutionLoadingDay")}</p>
               ) : null}
-              {!isLoading && viewMode === "next_available" && displayMode === "recommended" ? (
+              {!hideSlotGrid && viewMode === "next_available" && displayMode === "recommended" ? (
                 <p className="scheduling-form__hint">{translate("missionExecutionNextAvailableHint")}</p>
               ) : null}
             </div>
@@ -292,7 +362,7 @@ export default function SchedulingForm({
               </p>
             ) : null}
 
-            {!isLoading && !slotsError && groupedDays.length ? (
+            {!hideSlotGrid && !slotsError && groupedDays.length ? (
               <div className="scheduling-form__day-groups">
                 {groupedDays.map((day) => (
                   <div key={day.dateKey} className="scheduling-form__day-group">
@@ -325,11 +395,11 @@ export default function SchedulingForm({
               </div>
             ) : null}
 
-            {!isLoading && !slotsError && !groupedDays.length ? (
+            {!hideSlotGrid && !slotsError && !groupedDays.length ? (
               <p className="scheduling-form__hint">{translate("missionExecutionNoSlots")}</p>
             ) : null}
 
-            {!isLoading && groupedDays.length ? (
+            {!hideSlotGrid && groupedDays.length ? (
               <div className="scheduling-form__expansion">
                 {displayMode === "recommended" && hasMoreInWindow ? (
                   <AtlasButton

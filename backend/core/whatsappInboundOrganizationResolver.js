@@ -1,12 +1,14 @@
 /**
- * Canonical organization resolution for WhatsApp Cloud API inbound leads.
- * Prefer WABA/phone configuration; fall back to the single-tenant default only
- * through this resolver (no scattered hardcoding at insert sites).
+ * Canonical organization (+ optional owning user) resolution for WhatsApp inbound.
+ * Preferred: connected phone_number_id → organization_id + user_id (BR-147).
  */
 
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
-const { repository } = require("../repositories/metaWhatsAppConnectionRepository");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
+
+function defaultConnectionRepository() {
+  return require("../repositories/metaWhatsAppConnectionRepository").repository;
+}
 
 class WhatsAppInboundOrganizationError extends Error {
   constructor(message, { code = "WHATSAPP_ORGANIZATION_UNRESOLVED" } = {}) {
@@ -42,24 +44,20 @@ function sameId(a, b) {
 }
 
 /**
- * @param {object} [input]
- * @param {string|null} [input.phoneNumberId] — Meta value.metadata.phone_number_id
- * @param {string|null} [input.wabaId] — Meta entry.id (WABA)
- * @param {string|null} [input.explicitOrganizationId]
- * @param {{ getConnection?: Function }} [input.connectionRepository]
- * @returns {Promise<{ organizationId: string, source: string }>}
+ * @returns {Promise<{ organizationId: string, source: string, ownerUserId: string|null }>}
  */
 async function resolveWhatsAppInboundOrganizationId(input = {}) {
   const {
     phoneNumberId = null,
     wabaId = null,
     explicitOrganizationId = null,
-    connectionRepository = repository
+    connectionRepository = defaultConnectionRepository()
   } = input;
 
   if (explicitOrganizationId && String(explicitOrganizationId).trim()) {
     return {
       organizationId: String(explicitOrganizationId).trim(),
+      ownerUserId: null,
       source: "explicit"
     };
   }
@@ -67,6 +65,40 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
   const defaultOrganizationId = canonicalDefaultOrganizationId();
   const envPhoneNumberId = configuredEnvPhoneNumberId();
   const envWabaId = configuredEnvWabaId();
+
+  // 1) Preferred: Phone Number ID → connected whatsapp_integrations row (org + owner)
+  if (phoneNumberId && typeof connectionRepository.findConnectionByPhoneNumberId === "function") {
+    try {
+      const byPhone = await connectionRepository.findConnectionByPhoneNumberId(phoneNumberId);
+      if (byPhone?.organization_id && byPhone.status === "connected") {
+        if (wabaId && byPhone.waba_id && !sameId(wabaId, byPhone.waba_id)) {
+          throw new WhatsAppInboundOrganizationError(
+            "Inbound WhatsApp WABA id does not match connected phone asset.",
+            { code: "WHATSAPP_WABA_ASSET_MISMATCH" }
+          );
+        }
+
+        return {
+          organizationId: String(byPhone.organization_id),
+          ownerUserId: byPhone.user_id ? String(byPhone.user_id) : null,
+          source: byPhone.user_id
+            ? "whatsapp_personal_connection"
+            : "whatsapp_organization_connection"
+        };
+      }
+    } catch (error) {
+      if (error instanceof WhatsAppInboundOrganizationError) {
+        throw error;
+      }
+      if (error?.publicCode === "WHATSAPP_PHONE_ID_AMBIGUOUS") {
+        throw error;
+      }
+      logWhatsAppStage("inbound_organization_phone_lookup_failed", {
+        level: "warn",
+        error: error.message
+      });
+    }
+  }
 
   if (phoneNumberId && envPhoneNumberId && !sameId(phoneNumberId, envPhoneNumberId)) {
     throw new WhatsAppInboundOrganizationError(
@@ -82,6 +114,7 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
     );
   }
 
+  // 2) Legacy: default-org organization-owned connection
   if (defaultOrganizationId && connectionRepository?.getConnection) {
     try {
       const connection = await connectionRepository.getConnection(defaultOrganizationId);
@@ -93,6 +126,7 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
       ) {
         return {
           organizationId: defaultOrganizationId,
+          ownerUserId: connection.user_id ? String(connection.user_id) : null,
           source: "whatsapp_connection"
         };
       }
@@ -104,12 +138,12 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
     }
   }
 
-  // Single-tenant env credentials: configured phone (and optional WABA) map to canonical default org.
   if (defaultOrganizationId && envPhoneNumberId) {
     if (!phoneNumberId || sameId(phoneNumberId, envPhoneNumberId)) {
       if (!wabaId || !envWabaId || sameId(wabaId, envWabaId)) {
         return {
           organizationId: defaultOrganizationId,
+          ownerUserId: null,
           source: "environment_credentials"
         };
       }
@@ -117,9 +151,9 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
   }
 
   if (defaultOrganizationId && !phoneNumberId && !wabaId && !envPhoneNumberId) {
-    // Dev/test ingress without Cloud API asset ids still needs a tenant.
     return {
       organizationId: defaultOrganizationId,
+      ownerUserId: null,
       source: "canonical_default"
     };
   }

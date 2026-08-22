@@ -136,6 +136,23 @@ test("evaluateRecruitingInboxEligibility: stored entry_method QR => eligible", (
   assert.equal(result.reason, "QR_ATTRIBUTION");
 });
 
+test("evaluateRecruitingInboxEligibility: stored entry_method CLICK_TO_WHATSAPP => eligible", () => {
+  const {
+    evaluateRecruitingInboxEligibility
+  } = require("../core/conversationsCenter/conversationsCenterInboxEligibility");
+  const result = evaluateRecruitingInboxEligibility(
+    prospect({
+      phone: "+13053479639",
+      name: "Rosi",
+      source: "FACEBOOK",
+      entry_method: "CLICK_TO_WHATSAPP"
+    }),
+    {}
+  );
+  assert.equal(result.eligible, true);
+  assert.equal(result.reason, "VERIFIED_STORED_ORIGIN");
+});
+
 test("evaluateRecruitingInboxEligibility: CTWA durable source => eligible", () => {
   const {
     evaluateRecruitingInboxEligibility

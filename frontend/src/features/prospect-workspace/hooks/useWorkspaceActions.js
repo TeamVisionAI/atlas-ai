@@ -493,6 +493,9 @@ export function useWorkspaceActions({
           interviewType,
           interviewerUserId: form.interviewerUserId || undefined,
           officeLocation: form.officeLocation?.trim() || undefined,
+          meetingLocationName: form.meetingLocationName?.trim() || undefined,
+          meetingLocationAddress: form.meetingLocationAddress?.trim() || undefined,
+          meetingLocationUrl: form.meetingLocationUrl?.trim() || undefined,
           notes: form.notes?.trim() || undefined,
           email: form.email || undefined
         });

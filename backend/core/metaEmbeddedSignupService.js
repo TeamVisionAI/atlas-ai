@@ -26,7 +26,10 @@ function collectAllowedFrontendOrigins(env = process.env) {
     "http://localhost:5173",
     "https://localhost:5173",
     "https://teamvisionfinancial.com",
-    "https://www.teamvisionfinancial.com"
+    "https://www.teamvisionfinancial.com",
+    "https://useatlas-ai.com",
+    "https://www.useatlas-ai.com",
+    "https://app.useatlas-ai.com"
   ]);
   const configured = readConfiguredFrontendUrl(env);
 
@@ -684,6 +687,10 @@ async function completeEmbeddedSignupExchange(input) {
 
   try {
     saved = await connectionRepository.saveConnection(organizationId, {
+      user_id:
+        input.ownershipMode === "organization"
+          ? null
+          : input.userId || input.user_id || null,
       business_id: assets.businessId || null,
       waba_id: assets.wabaId,
       phone_number_id: assets.phoneNumberId,

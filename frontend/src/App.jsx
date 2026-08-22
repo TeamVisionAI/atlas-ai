@@ -33,12 +33,13 @@ import AppointmentsPage from "./pages/AppointmentsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import Prospect from "./pages/Prospect";
-import Home from "./pages/Home";
+import PublicRoot from "./components/PublicRoot";
 import AtlasLanding from "./pages/AtlasLanding";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import Terms from "./pages/Terms";
 import DataDeletion from "./pages/DataDeletion";
+import ContactRoute from "./components/ContactRoute";
 import { appPath } from "./config/appRoutes";
 import { buildProspectWorkspacePath } from "./utils/prospectRoutes";
 import {
@@ -90,12 +91,13 @@ function LegacyProspectRedirect() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<PublicRoot />} />
       <Route path="/atlas" element={<AtlasLanding />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/legal" element={<Legal />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/data-deletion" element={<DataDeletion />} />
+      <Route path="/contact" element={<ContactRoute />} />
       <Route path="/app/login" element={<Login />} />
       <Route path="/app/setup" element={<SetupWizard />} />
       <Route path="/app/forgot-password" element={<ForgotPassword />} />

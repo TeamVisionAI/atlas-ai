@@ -11,6 +11,9 @@
 const { REASON_CODES, V2_EXECUTABLE_ACTIONS } = require("./constants");
 const { isActiveAppointment } = require("../activeAppointmentResolver");
 const { buildIsoTimestamp } = require("../../services/availabilityService");
+const {
+  appointmentMatchesProspectIdentity
+} = require("../appointmentProspectIdentity");
 
 function resolveProspectPhone({ context, options } = {}) {
   return (
@@ -133,8 +136,7 @@ function appointmentMatchesRequestedSlot(
   }
 
   if (prospectId) {
-    const apptProspect = appointment.prospectId || appointment.prospect_id || null;
-    if (!apptProspect || apptProspect !== prospectId) {
+    if (!appointmentMatchesProspectIdentity(appointment, prospectId)) {
       return false;
     }
   }

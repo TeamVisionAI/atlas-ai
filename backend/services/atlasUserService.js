@@ -31,6 +31,9 @@ function sanitizeUser(user) {
   }
 
   const { normalizeUserRecord } = require("../security/normalizeUserRecord");
+  const {
+    resolveAgentCapabilitiesFromUser
+  } = require("../core/agentCapabilitiesEngine");
   const normalized = normalizeUserRecord(user);
 
   return {
@@ -40,6 +43,7 @@ function sanitizeUser(user) {
     last_name: normalized.last_name,
     display_name: normalized.display_name,
     role: normalized.role,
+    business_rank: user.business_rank || normalized.business_rank || null,
     status: normalized.status,
     organization_id: normalized.organization_id,
     division_id: normalized.division_id,
@@ -53,6 +57,7 @@ function sanitizeUser(user) {
     // Canonical Meta Review demo identity (profile_settings.meta_review_user).
     // Drives the session-scoped UI locker; does not elevate permissions.
     meta_review_user: normalized.profile_settings?.meta_review_user === true,
+    agent_capabilities: resolveAgentCapabilitiesFromUser(user),
     last_login_at: normalized.last_login_at || null,
     created_at: normalized.created_at,
     updated_at: normalized.updated_at

@@ -10,8 +10,10 @@ import ScrollToTop from "./components/ScrollToTop";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import { ToastProvider } from "./components/ui/ToastProvider";
 import { validateProductionEnvironment } from "./config/validateEnvironment";
+import { applyPublicBrandHead } from "./config/applyPublicBrandHead";
 
 validateProductionEnvironment();
+applyPublicBrandHead();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>

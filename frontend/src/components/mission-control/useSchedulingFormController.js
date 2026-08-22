@@ -16,6 +16,12 @@ import {
   normalizeInterviewType
 } from "./SchedulingForm";
 import { useInterviewAssignmentCandidates } from "./InterviewAssignmentSection";
+import {
+  buildSchedulingAvailabilityFetchKey,
+  recordSchedulingAvailabilityFetch,
+  resolveAvailabilityFetchReason,
+  shouldFetchSchedulingAvailability
+} from "./schedulingAvailabilityFetchGate";
 
 function resolveInterviewDuration(profile) {
   return (
@@ -23,6 +29,14 @@ function resolveInterviewDuration(profile) {
     profile?.appointmentProfile?.defaults?.defaultDurationMinutes ||
     30
   );
+}
+
+function isDevInstrumentationEnabled() {
+  try {
+    return Boolean(import.meta?.env?.DEV) || process.env.NODE_ENV === "test";
+  } catch {
+    return process.env.NODE_ENV === "test";
+  }
 }
 
 export function useSchedulingFormController({
@@ -48,35 +62,61 @@ export function useSchedulingFormController({
   const slotCacheRef = useRef(new Map());
   const durationRef = useRef(30);
   const sessionRef = useRef(false);
-  const slotsLoadedForRef = useRef("");
+  const slotsLoadedForKeyRef = useRef("");
+  const loadGenerationRef = useRef(0);
+  const recruiterNameRef = useRef(recruiterName);
+  const translateRef = useRef(translate);
+
+  recruiterNameRef.current = recruiterName;
+  translateRef.current = translate;
 
   const selectableDays = useMemo(() => buildSelectableDayOptions(new Date(), 8), [active]);
   const nextWeekStartDateKey = useMemo(() => resolveNextWeekStart(new Date()), [active]);
 
-  const fetchAvailability = useCallback(
-    (params) => fetchAppointmentAvailability(params),
-    []
-  );
+  const fetchAvailability = useCallback((params) => {
+    if (isDevInstrumentationEnabled()) {
+      // Per-day HTTP calls inside a logical load (48h scan may issue 1–N).
+      recordSchedulingAvailabilityFetch(
+        "http",
+        `${params?.date || ""}|${params?.agentId || ""}|${params?.duration || ""}`
+      );
+    }
+
+    return fetchAppointmentAvailability(params);
+  }, []);
 
   useEffect(() => {
     if (!active) {
       sessionRef.current = false;
-      slotsLoadedForRef.current = "";
+      slotsLoadedForKeyRef.current = "";
+      loadGenerationRef.current += 1;
       return;
     }
 
     if (sessionRef.current) {
-      setForm((current) => ({
-        ...current,
-        interviewType:
-          current.interviewType ||
-          (defaultInterviewType ? normalizeInterviewType(defaultInterviewType) : ""),
-        recruiter: current.recruiter || recruiterName || ""
-      }));
+      const nextInterviewType =
+        defaultInterviewType ? normalizeInterviewType(defaultInterviewType) : "";
+      const nextRecruiter = recruiterName || "";
+
+      setForm((current) => {
+        const interviewType = current.interviewType || nextInterviewType;
+        const recruiter = current.recruiter || nextRecruiter;
+
+        if (interviewType === current.interviewType && recruiter === current.recruiter) {
+          return current;
+        }
+
+        return {
+          ...current,
+          interviewType,
+          recruiter
+        };
+      });
       return;
     }
 
     sessionRef.current = true;
+    slotsLoadedForKeyRef.current = "";
     setForm(
       createInitialSchedulingForm({
         defaultInterviewType,
@@ -95,71 +135,130 @@ export function useSchedulingFormController({
     slotCacheRef.current = new Map();
   }, [active, defaultInterviewType, recruiterName, currentUser?.id]);
 
-  const loadSlotsForInterviewType = useCallback(
-    async (interviewType) => {
-      if (!interviewType) {
-        setDisplaySlots([]);
-        setWindowSlots([]);
-        setSlotsError(null);
+  const loadSlotsForKey = useCallback(async (fetchKey, interviewType, interviewerUserId) => {
+    if (!interviewType) {
+      setDisplaySlots([]);
+      setWindowSlots([]);
+      setSlotsError(null);
+      return;
+    }
+
+    const generation = ++loadGenerationRef.current;
+    const translateFn = translateRef.current;
+    const recruiter = recruiterNameRef.current;
+
+    setLoadingSlots(true);
+    setSlotsError(null);
+
+    try {
+      const profileResult = await fetchAppointmentProfile().catch(() => null);
+      if (generation !== loadGenerationRef.current) {
         return;
       }
 
-      setLoadingSlots(true);
-      setSlotsError(null);
+      const duration = resolveInterviewDuration(profileResult);
+      durationRef.current = duration;
+      setDurationMinutes(duration);
+      setForm((current) => {
+        if (
+          current.duration === duration &&
+          current.interviewType === interviewType &&
+          (recruiter ? current.recruiter === recruiter : true)
+        ) {
+          return current;
+        }
 
-      try {
-        const profileResult = await fetchAppointmentProfile().catch(() => null);
-        const duration = resolveInterviewDuration(profileResult);
-        durationRef.current = duration;
-        setDurationMinutes(duration);
-        setForm((current) => ({
+        return {
           ...current,
           duration,
-          recruiter: recruiterName || current.recruiter,
-          interviewType,
-          dateKey: current.dateKey,
-          timeKey: current.timeKey
-        }));
+          recruiter: recruiter || current.recruiter,
+          interviewType
+        };
+      });
 
-        const result = await loadInitialSchedulingSlots(fetchAvailability, duration);
+      const availabilityFetcher = (params) =>
+        fetchAvailability({
+          ...params,
+          ...(interviewerUserId ? { agentId: interviewerUserId } : {})
+        });
 
-        slotCacheRef.current = result.cacheByDay;
-        setWindowSlots(result.windowSlots);
-        setViewMode(result.viewMode);
-        setHasMoreInWindow(result.hasMoreInWindow);
-        setDisplayMode("recommended");
-        setActiveDayKey(null);
-        setDisplaySlots(result.recommendedSlots);
+      const result = await loadInitialSchedulingSlots(availabilityFetcher, duration);
 
-        if (!result.recommendedSlots.length) {
-          setSlotsError(translate("missionExecutionNoSlots"));
-        }
-      } catch (requestError) {
-        setDisplaySlots([]);
-        setWindowSlots([]);
-        setSlotsError(requestError?.message || translate("missionExecutionSlotsFailed"));
-      } finally {
+      if (generation !== loadGenerationRef.current) {
+        return;
+      }
+
+      slotCacheRef.current = result.cacheByDay;
+      setWindowSlots(result.windowSlots);
+      setViewMode(result.viewMode);
+      setHasMoreInWindow(result.hasMoreInWindow);
+      setDisplayMode("recommended");
+      setActiveDayKey(null);
+      setDisplaySlots(result.recommendedSlots);
+      slotsLoadedForKeyRef.current = fetchKey;
+
+      if (!result.recommendedSlots.length) {
+        setSlotsError(translateFn("missionExecutionNoSlots"));
+      }
+    } catch (requestError) {
+      if (generation !== loadGenerationRef.current) {
+        return;
+      }
+
+      slotsLoadedForKeyRef.current = "";
+      setDisplaySlots([]);
+      setWindowSlots([]);
+      setSlotsError(requestError?.message || translateFn("missionExecutionSlotsFailed"));
+    } finally {
+      if (generation === loadGenerationRef.current) {
         setLoadingSlots(false);
       }
-    },
-    [fetchAvailability, recruiterName, translate]
+    }
+  }, [fetchAvailability]);
+
+  const availabilityFetchKey = useMemo(
+    () =>
+      buildSchedulingAvailabilityFetchKey({
+        interviewType: form.interviewType,
+        interviewerUserId: form.interviewerUserId
+      }),
+    [form.interviewType, form.interviewerUserId]
   );
 
   useEffect(() => {
-    if (!active || !form.interviewType) {
+    if (!active || !availabilityFetchKey) {
       return;
     }
 
-    if (slotsLoadedForRef.current === form.interviewType) {
+    if (!shouldFetchSchedulingAvailability(slotsLoadedForKeyRef.current, availabilityFetchKey)) {
       return;
     }
 
-    slotsLoadedForRef.current = form.interviewType;
-    loadSlotsForInterviewType(form.interviewType);
-  }, [active, form.interviewType, loadSlotsForInterviewType]);
+    const reason = resolveAvailabilityFetchReason(
+      slotsLoadedForKeyRef.current,
+      availabilityFetchKey
+    );
+
+    if (isDevInstrumentationEnabled()) {
+      recordSchedulingAvailabilityFetch(reason, availabilityFetchKey);
+      // eslint-disable-next-line no-console
+      console.info("[scheduling-availability]", {
+        reason,
+        key: availabilityFetchKey,
+        previousKey: slotsLoadedForKeyRef.current
+      });
+    }
+
+    // Reserve the key immediately so overlapping effect runs (e.g. dep churn) cannot
+    // start a second identical initial load before the async work finishes.
+    slotsLoadedForKeyRef.current = availabilityFetchKey;
+    slotCacheRef.current = new Map();
+    loadSlotsForKey(availabilityFetchKey, form.interviewType, form.interviewerUserId || "");
+  }, [active, availabilityFetchKey, form.interviewType, form.interviewerUserId, loadSlotsForKey]);
 
   const handleInterviewTypeChange = useCallback(() => {
-    slotsLoadedForRef.current = "";
+    slotsLoadedForKeyRef.current = "";
+    loadGenerationRef.current += 1;
     setDisplaySlots([]);
     setWindowSlots([]);
     setDisplayMode("recommended");
@@ -191,8 +290,15 @@ export function useSchedulingFormController({
       setSlotsError(null);
 
       try {
+        const interviewerUserId = form.interviewerUserId || "";
+        const availabilityFetcher = (params) =>
+          fetchAvailability({
+            ...params,
+            ...(interviewerUserId ? { agentId: interviewerUserId } : {})
+          });
+
         const daySlots = await loadDaySchedulingSlots(
-          fetchAvailability,
+          availabilityFetcher,
           dateKey,
           durationRef.current,
           slotCacheRef.current
@@ -203,15 +309,17 @@ export function useSchedulingFormController({
         setDisplaySlots(daySlots);
 
         if (!daySlots.length) {
-          setSlotsError(translate("missionExecutionNoSlotsDay"));
+          setSlotsError(translateRef.current("missionExecutionNoSlotsDay"));
         }
       } catch (requestError) {
-        setSlotsError(requestError?.message || translate("missionExecutionSlotsFailed"));
+        setSlotsError(
+          requestError?.message || translateRef.current("missionExecutionSlotsFailed")
+        );
       } finally {
         setLoadingExpansion(false);
       }
     },
-    [fetchAvailability, translate]
+    [fetchAvailability, form.interviewerUserId]
   );
 
   const handleNextWeek = useCallback(async () => {
@@ -220,8 +328,15 @@ export function useSchedulingFormController({
 
     try {
       const weekStart = resolveNextWeekStart(new Date());
+      const interviewerUserId = form.interviewerUserId || "";
+      const availabilityFetcher = (params) =>
+        fetchAvailability({
+          ...params,
+          ...(interviewerUserId ? { agentId: interviewerUserId } : {})
+        });
+
       const weekSlots = await loadWeekSchedulingSlots(
-        fetchAvailability,
+        availabilityFetcher,
         weekStart,
         durationRef.current,
         slotCacheRef.current
@@ -232,14 +347,16 @@ export function useSchedulingFormController({
       setDisplaySlots(weekSlots);
 
       if (!weekSlots.length) {
-        setSlotsError(translate("missionExecutionNoSlotsWeek"));
+        setSlotsError(translateRef.current("missionExecutionNoSlotsWeek"));
       }
     } catch (requestError) {
-      setSlotsError(requestError?.message || translate("missionExecutionSlotsFailed"));
+      setSlotsError(
+        requestError?.message || translateRef.current("missionExecutionSlotsFailed")
+      );
     } finally {
       setLoadingExpansion(false);
     }
-  }, [fetchAvailability, translate]);
+  }, [fetchAvailability, form.interviewerUserId]);
 
   return {
     form,

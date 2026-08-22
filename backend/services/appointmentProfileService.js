@@ -43,7 +43,8 @@ const DEFAULT_APPOINTMENT_PROFILE = Object.freeze({
   },
   virtualMeeting: {
     preferredProvider: VIRTUAL_PROVIDERS.ZOOM,
-    allowedAlternatives: [VIRTUAL_PROVIDERS.WHATSAPP_VIDEO]
+    allowedAlternatives: [VIRTUAL_PROVIDERS.WHATSAPP_VIDEO],
+    personalMeetingUrl: ""
   },
   inPersonMeeting: {
     allowedLocationTypes: [

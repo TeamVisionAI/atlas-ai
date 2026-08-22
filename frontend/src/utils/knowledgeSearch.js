@@ -5,10 +5,13 @@
 export const SEARCH_STRATEGY = "keyword";
 
 const FIELD_WEIGHTS = {
+  displayTitle: 6,
   title: 5,
-  name: 4,
-  folder: 3,
-  path: 2
+  shortSummary: 4,
+  name: 3,
+  categoryId: 4,
+  keywords: 3,
+  path: 1
 };
 
 function tokenize(query) {
@@ -44,6 +47,10 @@ function scoreFile(file, terms) {
   let total = 0;
 
   for (const [field, weight] of Object.entries(FIELD_WEIGHTS)) {
+    if (field === "keywords" && Array.isArray(file.keywords)) {
+      total += scoreField(file.keywords.join(" "), terms) * weight;
+      continue;
+    }
     total += scoreField(file[field], terms) * weight;
   }
 

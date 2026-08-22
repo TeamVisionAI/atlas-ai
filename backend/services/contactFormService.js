@@ -1,4 +1,4 @@
-const { validateContactSubmission } = require("../core/contactFormValidation");
+const { validateContactSubmission, CONTACT_SOURCES } = require("../core/contactFormValidation");
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -8,20 +8,37 @@ function getDeliveryConfig() {
     fromEmail:
       process.env.CONTACT_FORM_FROM_EMAIL ||
       "Team Vision Financial <notifications@teamvisionfinancial.com>",
-    toEmail: process.env.CONTACT_FORM_TO_EMAIL || "contact@teamvisionfinancial.com",
+    toEmail: process.env.CONTACT_FORM_TO_EMAIL || "contact@teamvisionfinancial.com"
   };
 }
 
-function buildEmailText({ name, email, message }) {
-  return [
-    "New contact form submission — teamvisionfinancial.com",
+function buildEmailText(submission) {
+  const isAtlas = submission.source === CONTACT_SOURCES.ATLAS;
+  const lines = [
+    isAtlas
+      ? "New Atlas AI contact / support submission — useatlas-ai.com"
+      : "New contact form submission — teamvisionfinancial.com",
     "",
-    `Name: ${name}`,
-    `Email: ${email}`,
-    "",
-    "Message:",
-    message,
-  ].join("\n");
+    `Name: ${submission.name}`,
+    `Email: ${submission.email}`
+  ];
+
+  if (isAtlas) {
+    lines.push(`Topic: ${submission.topic}`);
+    if (submission.organization) {
+      lines.push(`Organization: ${submission.organization}`);
+    }
+  }
+
+  lines.push("", "Message:", submission.message);
+  return lines.join("\n");
+}
+
+function buildEmailSubject(submission) {
+  if (submission.source === CONTACT_SOURCES.ATLAS) {
+    return `Atlas support (${submission.topic}): ${submission.name}`;
+  }
+  return `Website contact: ${submission.name}`;
 }
 
 async function sendContactEmail(submission, { traceId } = {}) {
@@ -33,7 +50,8 @@ async function sendContactEmail(submission, { traceId } = {}) {
     apiKeyLength: apiKey ? apiKey.length : 0,
     fromEmail,
     toEmail,
-    nodeEnv: process.env.NODE_ENV || "(unset)",
+    source: submission.source || CONTACT_SOURCES.TEAM_VISION,
+    nodeEnv: process.env.NODE_ENV || "(unset)"
   });
 
   if (!apiKey) {
@@ -52,8 +70,8 @@ async function sendContactEmail(submission, { traceId } = {}) {
     from: fromEmail,
     to: [toEmail],
     reply_to: submission.email,
-    subject: `Website contact: ${submission.name}`,
-    text: buildEmailText(submission),
+    subject: buildEmailSubject(submission),
+    text: buildEmailText(submission)
   };
 
   console.log(`${logPrefix} 6. sending HTTP POST to Resend`, {
@@ -61,7 +79,7 @@ async function sendContactEmail(submission, { traceId } = {}) {
     from: payload.from,
     to: payload.to,
     reply_to: payload.reply_to,
-    subject: payload.subject,
+    subject: payload.subject
   });
 
   let response;
@@ -71,15 +89,15 @@ async function sendContactEmail(submission, { traceId } = {}) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     });
   } catch (error) {
     console.error(`${logPrefix} 7. Resend fetch threw`, {
       message: error.message,
       stack: error.stack,
-      cause: error.cause,
+      cause: error.cause
     });
     throw error;
   }
@@ -89,7 +107,7 @@ async function sendContactEmail(submission, { traceId } = {}) {
   console.log(`${logPrefix} 7. Resend response`, {
     status: response.status,
     statusText: response.statusText,
-    body: responseBody,
+    body: responseBody
   });
 
   if (!response.ok) {
@@ -106,7 +124,7 @@ async function sendContactEmail(submission, { traceId } = {}) {
     parsedBody = responseBody ? JSON.parse(responseBody) : responseBody;
   } catch (parseError) {
     console.warn(`${logPrefix} Resend response body is not JSON`, {
-      message: parseError.message,
+      message: parseError.message
     });
   }
 
@@ -114,7 +132,7 @@ async function sendContactEmail(submission, { traceId } = {}) {
     delivered: true,
     mode: "email",
     to: toEmail,
-    resend: parsedBody,
+    resend: parsedBody
   };
 }
 
@@ -127,7 +145,7 @@ async function submitContactForm(body, { traceId } = {}) {
   if (!validation.ok) {
     if (validation.spam) {
       console.warn(`${logPrefix} honeypot triggered — treating as spam`, {
-        website: body?.website,
+        website: body?.website
       });
       return { ok: true, spam: true };
     }
@@ -139,18 +157,22 @@ async function submitContactForm(body, { traceId } = {}) {
   console.log(`${logPrefix} validation passed`, {
     name: validation.data.name,
     email: validation.data.email,
-    messageLength: validation.data.message.length,
+    source: validation.data.source,
+    topic: validation.data.topic || null,
+    messageLength: validation.data.message.length
   });
 
   const delivery = await sendContactEmail(validation.data, { traceId });
 
   return {
     ok: true,
-    delivery,
+    delivery
   };
 }
 
 module.exports = {
   getDeliveryConfig,
-  submitContactForm,
+  buildEmailText,
+  buildEmailSubject,
+  submitContactForm
 };

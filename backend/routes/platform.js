@@ -90,6 +90,45 @@ router.patch("/tenants/:id/status", async (req, res) => {
 
 router.use("/tenants/:id", platformBillingRoutes);
 
+router.get("/tenants/:id/features", async (req, res) => {
+  try {
+    const tenantFeatureService = require("../services/tenantFeatureService");
+    const presentation =
+      await tenantFeatureService.getTenantFeatureControlsPresentation(req.params.id);
+    return res.json(presentation);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to load tenant features."
+    });
+  }
+});
+
+router.patch("/tenants/:id/features", async (req, res) => {
+  try {
+    const tenantFeatureService = require("../services/tenantFeatureService");
+    const updated = await tenantFeatureService.updateTenantFeatures(
+      req.params.id,
+      req.body || {},
+      auditMeta(req)
+    );
+    const presentation =
+      await tenantFeatureService.getTenantFeatureControlsPresentation(req.params.id, {
+        backfillSeedFromEnv: false
+      });
+    return res.json({
+      ...presentation,
+      features: updated.material,
+      featuresRaw: updated.features
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to update tenant features."
+    });
+  }
+});
+
 router.post("/tenants/:id/admin", async (req, res) => {
   try {
     const result = await platformTenantService.provisionTenantAdmin(
@@ -184,6 +223,46 @@ router.get("/support-mode", async (req, res) => {
     res.status(error.statusCode || 500).json({
       error: error.publicCode || error.message,
       message: error.message || "Unable to load Support Mode status."
+    });
+  }
+});
+
+router.get("/whatsapp-inbound-webhooks", async (req, res) => {
+  try {
+    const {
+      findInboundWebhookObservability
+    } = require("../services/whatsappInboundWebhookObservabilityService");
+
+    const phone = req.query.phone ? String(req.query.phone).trim() : null;
+    const providerMessageId = req.query.providerMessageId
+      ? String(req.query.providerMessageId).trim()
+      : null;
+    const prospectId = req.query.prospectId ? String(req.query.prospectId).trim() : null;
+    const organizationId = req.query.organizationId
+      ? String(req.query.organizationId).trim()
+      : null;
+    const since = req.query.since ? String(req.query.since).trim() : null;
+    const until = req.query.until ? String(req.query.until).trim() : null;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+
+    const rows = await findInboundWebhookObservability({
+      phone,
+      providerMessageId,
+      prospectId,
+      organizationId,
+      since,
+      until,
+      limit
+    });
+
+    res.json({
+      count: rows.length,
+      rows
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to query inbound webhook observability."
     });
   }
 });

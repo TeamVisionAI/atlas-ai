@@ -78,7 +78,8 @@ const {
   demotePersistedScheduleClaimAfterCancel
 } = require("../core/appointmentMilestoneTruth");
 const {
-  syncAppointmentGoogleCalendar
+  syncAppointmentGoogleCalendar,
+  buildCalendarEventPayload
 } = require("../core/appointmentGoogleSyncEngine");
 const {
   VIRTUAL_MEETING_URL_SOURCES,
@@ -170,12 +171,14 @@ function resolveLocationDetails(profile, payload = {}) {
     }
   }
 
-  if (payload.meetingLocationName || payload.meetingAddress) {
+  if (payload.meetingLocationName || payload.meetingAddress || payload.meetingLocationAddress) {
     return {
       meetingLocationType: locationType,
       meetingLocationName: payload.meetingLocationName || null,
-      meetingAddress: payload.meetingAddress || null,
-      meetingNotes: payload.meetingNotes || null
+      meetingAddress:
+        payload.meetingAddress || payload.meetingLocationAddress || null,
+      meetingNotes: payload.meetingNotes || null,
+      meetingLocationUrl: payload.meetingLocationUrl || null
     };
   }
 
@@ -183,7 +186,8 @@ function resolveLocationDetails(profile, payload = {}) {
     meetingLocationType: locationType,
     meetingLocationName: null,
     meetingAddress: null,
-    meetingNotes: null
+    meetingNotes: null,
+    meetingLocationUrl: null
   };
 }
 
@@ -365,11 +369,21 @@ async function createAppointment(input, context = {}) {
 
   const prospect = await findProspectInOrganization(prospectPhone, organizationId);
 
-  if (!prospect) {
+  if (!prospect?.id) {
     throw buildError("PROSPECT_NOT_FOUND", "Prospect not found.", 404);
   }
 
-  // Implements BR-120 — resolve/ensure canonical core BEFORE Calendar or appointment writes.
+  // APR1 / BR-120 — appointment.prospect_id must be public.prospects.id (MC canonical).
+  // Reject foreign/injected prospect IDs that do not match the org-scoped phone profile.
+  if (input.prospectId && String(input.prospectId) !== String(prospect.id)) {
+    throw buildError(
+      PROSPECT_IDENTITY_REASON_CODES.ORG_MISMATCH,
+      "Foreign prospect identity cannot be attached to this appointment.",
+      403
+    );
+  }
+
+  // Implements BR-120 — resolve/ensure recruiting-core identity BEFORE Calendar or appointment writes.
   // Never persist atlas_appointments.prospect_id = null on the booking path.
   const identity = await resolveCanonicalProspectIdentity({
     phone: prospectPhone,
@@ -390,7 +404,20 @@ async function createAppointment(input, context = {}) {
     );
   }
 
-  const prospectId = identity.coreProspectId;
+  if (
+    identity.legacyProspectId &&
+    String(identity.legacyProspectId) !== String(prospect.id)
+  ) {
+    throw buildError(
+      PROSPECT_IDENTITY_REASON_CODES.CONFLICT,
+      "Prospect identity conflict for this organization.",
+      409
+    );
+  }
+
+  // Canonical appointment FK = public.prospects.id; core kept explicit in metadata.
+  const prospectId = prospect.id;
+  const coreProspectId = identity.coreProspectId;
 
   await syncProspectContact(prospectPhone, contact, organizationId);
 
@@ -435,6 +462,43 @@ async function createAppointment(input, context = {}) {
         400
       );
     }
+  } else if (location.meetingLocationType === MEETING_LOCATION_TYPES.PUBLIC_LOCATION) {
+    // Implements BR-078 — never substitute office address for public-location appointments.
+    const {
+      hasPublicLocationDetails,
+      composePublicLocationDisplay
+    } = require("../core/publicLocationDetails");
+
+    if (
+      !hasPublicLocationDetails({
+        meetingLocationName: input.meetingLocationName || location.meetingLocationName,
+        meetingLocationAddress: input.meetingAddress || location.meetingAddress
+      })
+    ) {
+      throw buildError(
+        "PUBLIC_LOCATION_REQUIRED",
+        "Public location requires a place name or address.",
+        400
+      );
+    }
+
+    location.meetingLocationName =
+      input.meetingLocationName || location.meetingLocationName || null;
+    location.meetingAddress = input.meetingAddress || location.meetingAddress || null;
+    location.meetingLocationUrl =
+      input.meetingLocationUrl || location.meetingLocationUrl || null;
+    officeLocation =
+      composePublicLocationDisplay({
+        meetingLocationName: location.meetingLocationName,
+        meetingLocationAddress: location.meetingAddress
+      }) || location.meetingAddress;
+    officeAddressResult = {
+      address: location.meetingAddress || null,
+      status: location.meetingAddress
+        ? OFFICE_ADDRESS_STATUSES.CONFIGURED
+        : OFFICE_ADDRESS_STATUSES.UNAVAILABLE,
+      source: OFFICE_ADDRESS_SOURCES.REQUEST
+    };
   } else {
     officeAddressResult = await resolveCanonicalOfficeAddress({
       organizationId,
@@ -461,7 +525,11 @@ async function createAppointment(input, context = {}) {
         prospectName: prospect.name,
         phone: prospectPhone,
         notes,
-        interviewType: isVirtual ? "Zoom" : "In Person",
+        interviewType: isVirtual
+          ? "Zoom"
+          : location.meetingLocationType === MEETING_LOCATION_TYPES.PUBLIC_LOCATION
+            ? "Public Location"
+            : "In Person",
         location: isVirtual ? meetingUrl : officeLocation,
         meetingUrl,
         zoomUrl: meetingUrl,
@@ -516,6 +584,11 @@ async function createAppointment(input, context = {}) {
     source: "appointmentApplicationService.createAppointment.beforeSave"
   });
 
+  const {
+    meetingLocationUrl: resolvedMeetingLocationUrl = null,
+    ...persistedLocation
+  } = location;
+
   const scheduledResult = appointmentDomainService.scheduleAppointment(
     {
       id: appointmentRepository.generateId(),
@@ -531,9 +604,13 @@ async function createAppointment(input, context = {}) {
       timezone,
       meetingType: meeting.meetingType,
       meetingProvider: meeting.meetingProvider,
-      ...location,
-      meetingAddress: isVirtual ? null : officeLocation,
-      meetingNotes: notes || location.meetingNotes,
+      ...persistedLocation,
+      meetingAddress: isVirtual
+        ? null
+        : persistedLocation.meetingLocationType === MEETING_LOCATION_TYPES.PUBLIC_LOCATION
+          ? persistedLocation.meetingAddress
+          : officeLocation,
+      meetingNotes: notes || null,
       virtualMeetingUrl: isVirtual ? virtualUrlResult.url : null,
       calendarEventId: bookingResult.googleCalendarEventId,
       calendarProvider: bookingResult.googleCalendarSynced ? "google_calendar" : null,
@@ -554,10 +631,16 @@ async function createAppointment(input, context = {}) {
         prospectName: prospect.name,
         prospectEmail: email,
         emailStatus,
+        // APR1 — recruiting-core identity kept separate from appointment.prospect_id
+        coreProspectId,
         virtualUrlStatus: virtualUrlResult.status,
         virtualUrlSource: virtualUrlResult.source,
         officeAddressStatus: officeAddressResult.status,
         officeAddressSource: officeAddressResult.source,
+        meetingLocationUrl:
+          persistedLocation.meetingLocationType === MEETING_LOCATION_TYPES.PUBLIC_LOCATION
+            ? resolvedMeetingLocationUrl || input.meetingLocationUrl || null
+            : null,
         ownerRepId,
         interviewerUserId: interviewAssignment.interviewerUserId,
         interviewerName: interviewAssignment.interviewerName
@@ -586,7 +669,7 @@ async function createAppointment(input, context = {}) {
   });
 
   if (!skipReminders) {
-    const reminderResult = appointmentReminderEngine.scheduleReminders(saved);
+    const reminderResult = await appointmentReminderEngine.scheduleReminders(saved);
 
     await appointmentRepository.save({
       ...saved,
@@ -729,23 +812,26 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   };
 
   // Implements BR-039/BR-050 — never silently skip Google sync when event id is missing/stale.
+  const calendarPayload = buildCalendarEventPayload(appointmentForSync, {
+    summary: formatAppointmentTitle(appointment.purpose, appointment.metadata),
+    startTimeISO: matchedSlot.startTimeISO,
+    endTimeISO: matchedSlot.endTimeISO,
+    timezone: appointment.timezone
+  });
   const calendarSync = await syncAppointmentGoogleCalendar(appointmentForSync, {
     organizationId: appointment.organizationId,
     eventOverrides: {
-      summary: formatAppointmentTitle(appointment.purpose, appointment.metadata),
-      description: appointment.meetingNotes || "",
-      startTimeISO: matchedSlot.startTimeISO,
-      endTimeISO: matchedSlot.endTimeISO,
-      timezone: appointment.timezone,
-      location:
-        appointment.meetingAddress ||
-        appointmentForSync.virtualMeetingUrl ||
-        null,
-      zoomUrl: appointmentForSync.virtualMeetingUrl || null
+      summary: calendarPayload.summary,
+      description: calendarPayload.description,
+      startTimeISO: calendarPayload.startTimeISO,
+      endTimeISO: calendarPayload.endTimeISO,
+      timezone: calendarPayload.timezone,
+      location: calendarPayload.location,
+      zoomUrl: calendarPayload.zoomUrl
     }
   });
 
-  appointmentReminderEngine.cancelReminders(appointment.id);
+  await appointmentReminderEngine.cancelReminders(appointment.id);
 
   const domainUpdated = await appointmentDomainService.rescheduleAppointment(appointment, {
     actor: agentId,
@@ -785,7 +871,7 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   };
 
   const saved = await appointmentRepository.save(updated);
-  const reminderResult = appointmentReminderEngine.replaceReminders(saved);
+  const reminderResult = await appointmentReminderEngine.replaceReminders(saved);
 
   await appointmentRepository.save({
     ...saved,
@@ -871,7 +957,7 @@ async function cancelAppointment(id, input, context = {}) {
     );
   }
 
-  appointmentReminderEngine.cancelReminders(appointment.id);
+  await appointmentReminderEngine.cancelReminders(appointment.id);
 
   const domainUpdated = await appointmentDomainService.cancelAppointment(appointment, {
     actor: agentId || "agent",

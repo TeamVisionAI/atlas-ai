@@ -201,12 +201,13 @@ function verifyOAuthState(state) {
   }
 }
 
-async function fetchIntegration(organizationId) {
+async function fetchOrganizationLegacyIntegration(organizationId) {
   const { data, error } = await supabase
     .from("organization_integrations")
     .select("*")
     .eq("organization_id", organizationId)
     .eq("provider", PROVIDER)
+    .is("user_id", null)
     .maybeSingle();
 
   if (error) {
@@ -214,6 +215,59 @@ async function fetchIntegration(organizationId) {
   }
 
   return data;
+}
+
+/** @deprecated Prefer fetchOrganizationLegacyIntegration or fetchPersonalIntegration. */
+async function fetchIntegration(organizationId) {
+  return fetchOrganizationLegacyIntegration(organizationId);
+}
+
+async function fetchPersonalIntegration(organizationId, userId) {
+  if (!organizationId || !userId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("organization_integrations")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("provider", PROVIDER)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * BR-147 — Resolve Google credentials for an actor/interviewer.
+ * Personal preferred. Org legacy only when allowOrgLegacyFallback=true.
+ */
+async function resolveIntegrationForUser(
+  organizationId,
+  userId,
+  { allowOrgLegacyFallback = false } = {}
+) {
+  const { selectGoogleIntegrationRow, OWNERSHIP } = require("../core/personalIntegrationOwnership");
+  const personalRow = userId
+    ? await fetchPersonalIntegration(organizationId, userId)
+    : null;
+  const organizationLegacyRow = allowOrgLegacyFallback
+    ? await fetchOrganizationLegacyIntegration(organizationId)
+    : null;
+  const selected = selectGoogleIntegrationRow({
+    personalRow,
+    organizationLegacyRow,
+    allowOrgLegacyFallback
+  });
+  return {
+    integration: selected.row,
+    ownership: selected.ownership,
+    OWNERSHIP
+  };
 }
 
 function decryptRefreshToken(integration) {
@@ -224,8 +278,22 @@ function decryptRefreshToken(integration) {
   return tokenEncryption.decrypt(integration.credentials_encrypted);
 }
 
-async function getAuthorizedClient(organizationId) {
-  const integration = await fetchIntegration(organizationId);
+async function getAuthorizedClient(organizationId, options = {}) {
+  const userId = options.userId || null;
+  const allowOrgLegacyFallback = options.allowOrgLegacyFallback !== false && !options.personalOnly;
+  let integration;
+
+  if (options.personalOnly && userId) {
+    integration = await fetchPersonalIntegration(organizationId, userId);
+  } else if (userId) {
+    const resolved = await resolveIntegrationForUser(organizationId, userId, {
+      allowOrgLegacyFallback
+    });
+    integration = resolved.integration;
+  } else {
+    integration = await fetchOrganizationLegacyIntegration(organizationId);
+  }
+
   const refreshToken = decryptRefreshToken(integration);
   const oauth2Client = createOAuthClient();
 
@@ -237,9 +305,11 @@ async function getAuthorizedClient(organizationId) {
   return { oauth2Client, integration };
 }
 
-function presentIntegrationStatus(integration) {
+function presentIntegrationStatus(integration, { ownership = null } = {}) {
   const config = integration?.config || {};
   const reconnectRequired = config.syncStatus === "reconnect_required";
+  const { classifyIntegrationOwnership } = require("../core/personalIntegrationOwnership");
+  const classified = ownership || classifyIntegrationOwnership(integration);
 
   return {
     connected: integration?.status === "connected",
@@ -249,7 +319,9 @@ function presentIntegrationStatus(integration) {
     syncStatus: config.syncStatus || "idle",
     reconnectRequired,
     lastSync: config.lastSync || null,
-    connectedAt: integration?.connected_at || null
+    connectedAt: integration?.connected_at || null,
+    ownership: classified?.kind || null,
+    userId: classified?.userId || null
   };
 }
 
@@ -386,7 +458,7 @@ async function markReconnectRequired(organizationId, integration) {
     lastErrorAt: new Date().toISOString()
   };
 
-  const { error } = await supabase
+  let query = supabase
     .from("organization_integrations")
     .update({
       config,
@@ -394,6 +466,16 @@ async function markReconnectRequired(organizationId, integration) {
     })
     .eq("organization_id", organizationId)
     .eq("provider", PROVIDER);
+
+  if (integration.id) {
+    query = query.eq("id", integration.id);
+  } else if (integration.user_id) {
+    query = query.eq("user_id", integration.user_id);
+  } else {
+    query = query.is("user_id", null);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.warn(
@@ -409,9 +491,19 @@ async function markReconnectRequired(organizationId, integration) {
   }
 }
 
-async function getIntegrationStatus(organizationId) {
-  const integration = await fetchIntegration(organizationId);
+async function getIntegrationStatus(organizationId, userId = null, options = {}) {
+  const personalOnly = options.personalOnly !== false && Boolean(userId);
+  if (personalOnly && userId) {
+    const integration = await fetchPersonalIntegration(organizationId, userId);
+    return presentIntegrationStatus(integration, { ownership: integration ? undefined : null });
+  }
+
+  const integration = await fetchOrganizationLegacyIntegration(organizationId);
   return presentIntegrationStatus(integration);
+}
+
+async function getPersonalIntegrationStatus(organizationId, userId) {
+  return getIntegrationStatus(organizationId, userId, { personalOnly: true });
 }
 
 function getAuthUrl(organizationId, userId, options = {}) {
@@ -425,10 +517,14 @@ function getAuthUrl(organizationId, userId, options = {}) {
 
   const redirectUri = resolveGoogleOAuthRedirectUri();
 
+  const ownershipMode =
+    options.ownershipMode === "organization" ? "organization" : "personal";
+
   const state = signOAuthState({
     organizationId,
     userId,
-    returnPath: options.returnPath || "settings/scheduling",
+    ownershipMode,
+    returnPath: options.returnPath || "settings/integrations",
     exp: Date.now() + 15 * 60 * 1000
   });
 
@@ -477,19 +573,46 @@ async function handleOAuthCallback(code, state) {
     lastSync: new Date().toISOString()
   };
 
-  const { error } = await supabase.from("organization_integrations").upsert(
-    {
-      organization_id: payload.organizationId,
-      provider: PROVIDER,
-      status: "connected",
-      config,
-      credentials_encrypted: encryptedRefreshToken,
-      connected_at: new Date().toISOString(),
-      connected_by: payload.userId || null,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: "organization_id,provider" }
-  );
+  const ownershipMode =
+    payload.ownershipMode === "organization" ? "organization" : "personal";
+  const ownerUserId =
+    ownershipMode === "personal" ? payload.userId || null : null;
+
+  if (ownershipMode === "personal" && !ownerUserId) {
+    const error = new Error("Personal Google Calendar connect requires an authenticated user.");
+    error.statusCode = 400;
+    error.publicCode = "GOOGLE_PERSONAL_OWNER_REQUIRED";
+    throw error;
+  }
+
+  const rowPayload = {
+    organization_id: payload.organizationId,
+    provider: PROVIDER,
+    status: "connected",
+    config,
+    credentials_encrypted: encryptedRefreshToken,
+    connected_at: new Date().toISOString(),
+    connected_by: payload.userId || null,
+    user_id: ownerUserId,
+    updated_at: new Date().toISOString()
+  };
+
+  let existing;
+  if (ownerUserId) {
+    existing = await fetchPersonalIntegration(payload.organizationId, ownerUserId);
+  } else {
+    existing = await fetchOrganizationLegacyIntegration(payload.organizationId);
+  }
+
+  let error;
+  if (existing?.id) {
+    ({ error } = await supabase
+      .from("organization_integrations")
+      .update(rowPayload)
+      .eq("id", existing.id));
+  } else {
+    ({ error } = await supabase.from("organization_integrations").insert(rowPayload));
+  }
 
   if (error) {
     throw error;
@@ -497,6 +620,8 @@ async function handleOAuthCallback(code, state) {
 
   return {
     organizationId: payload.organizationId,
+    userId: ownerUserId,
+    ownership: ownershipMode,
     googleAccountEmail,
     calendarId: config.calendarId
   };
@@ -507,8 +632,13 @@ async function listCalendars(organizationId, deps = {}) {
   const createCalendarClient =
     deps.createCalendarClient || ((auth) => google.calendar({ version: "v3", auth }));
   const persistReconnectRequired = deps.markReconnectRequired || markReconnectRequired;
+  const clientOptions = deps.clientOptions || {
+    userId: deps.userId || null,
+    personalOnly: deps.personalOnly !== false && Boolean(deps.userId),
+    allowOrgLegacyFallback: deps.allowOrgLegacyFallback === true
+  };
 
-  const { oauth2Client, integration } = await getClient(organizationId);
+  const { oauth2Client, integration } = await getClient(organizationId, clientOptions);
 
   if (!oauth2Client) {
     if (integration?.status === "connected") {
@@ -552,8 +682,12 @@ async function listCalendars(organizationId, deps = {}) {
   }
 }
 
-async function setCalendar(organizationId, calendarId) {
-  const integration = await fetchIntegration(organizationId);
+async function setCalendar(organizationId, calendarId, options = {}) {
+  const userId = options.userId || null;
+  const personalOnly = options.personalOnly !== false && Boolean(userId);
+  const integration = personalOnly
+    ? await fetchPersonalIntegration(organizationId, userId)
+    : await fetchOrganizationLegacyIntegration(organizationId);
 
   if (!integration || integration.status !== "connected") {
     const error = new Error("Google Calendar is not connected.");
@@ -574,8 +708,7 @@ async function setCalendar(organizationId, calendarId) {
       config,
       updated_at: new Date().toISOString()
     })
-    .eq("organization_id", organizationId)
-    .eq("provider", PROVIDER);
+    .eq("id", integration.id);
 
   if (error) {
     throw error;
@@ -584,8 +717,14 @@ async function setCalendar(organizationId, calendarId) {
   return config;
 }
 
-async function disconnect(organizationId) {
-  const { error } = await supabase
+async function disconnect(organizationId, options = {}) {
+  const userId = options.userId || null;
+  const ownershipMode =
+    options.ownershipMode === "organization" || (!userId && options.personalOnly !== true)
+      ? "organization"
+      : "personal";
+
+  let query = supabase
     .from("organization_integrations")
     .update({
       status: "disconnected",
@@ -599,11 +738,24 @@ async function disconnect(organizationId) {
     .eq("organization_id", organizationId)
     .eq("provider", PROVIDER);
 
+  if (ownershipMode === "personal") {
+    if (!userId) {
+      const error = new Error("Personal Google disconnect requires userId.");
+      error.statusCode = 400;
+      throw error;
+    }
+    query = query.eq("user_id", userId);
+  } else {
+    query = query.is("user_id", null);
+  }
+
+  const { error } = await query;
+
   if (error) {
     throw error;
   }
 
-  return { disconnected: true };
+  return { disconnected: true, ownership: ownershipMode, userId: userId || null };
 }
 
 async function createCalendarEvent(organizationId, event) {
@@ -615,7 +767,13 @@ async function createCalendarEvent(organizationId, event) {
     };
   }
 
-  const { oauth2Client, integration } = await getAuthorizedClient(organizationId);
+  // BR-147 — prefer interviewer personal calendar; fall back to org legacy for sync compat.
+  const interviewerUserId = event?.interviewerUserId || event?.userId || null;
+  const { oauth2Client, integration } = await getAuthorizedClient(organizationId, {
+    userId: interviewerUserId,
+    allowOrgLegacyFallback: true,
+    personalOnly: false
+  });
 
   if (!oauth2Client) {
     return null;
@@ -819,12 +977,24 @@ async function resendCalendarInvitation(organizationId, eventId, attendeeEmail, 
  * Query Google Calendar FreeBusy for connected org calendar.
  * Returns [] when not connected — graceful fallback for scheduling engine.
  */
-async function queryFreeBusy(organizationId, timeMin, timeMax, timezone = "America/New_York") {
+async function queryFreeBusy(
+  organizationId,
+  timeMin,
+  timeMax,
+  timezone = "America/New_York",
+  options = {}
+) {
   if (shouldMockExternalComms()) {
     return [];
   }
 
-  const { oauth2Client, integration } = await getAuthorizedClient(organizationId);
+  const userId = options.userId || null;
+  // BR-147 — agent free/busy uses personal calendar only (never inherit org/RVP).
+  const { oauth2Client, integration } = await getAuthorizedClient(organizationId, {
+    userId,
+    personalOnly: Boolean(userId),
+    allowOrgLegacyFallback: !userId
+  });
 
   if (!oauth2Client) {
     return [];
@@ -854,6 +1024,11 @@ module.exports = {
   getAuthUrl,
   handleOAuthCallback,
   getIntegrationStatus,
+  getPersonalIntegrationStatus,
+  fetchPersonalIntegration,
+  fetchOrganizationLegacyIntegration,
+  resolveIntegrationForUser,
+  getAuthorizedClient,
   listCalendars,
   setCalendar,
   disconnect,

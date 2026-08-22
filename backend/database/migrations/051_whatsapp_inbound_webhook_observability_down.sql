@@ -1,0 +1,12 @@
+DROP POLICY IF EXISTS whatsapp_inbound_webhook_obs_deny_authenticated
+  ON public.whatsapp_inbound_webhook_observability;
+DROP POLICY IF EXISTS whatsapp_inbound_webhook_obs_deny_anon
+  ON public.whatsapp_inbound_webhook_observability;
+
+DROP INDEX IF EXISTS idx_whatsapp_inbound_webhook_obs_received_at;
+DROP INDEX IF EXISTS idx_whatsapp_inbound_webhook_obs_prospect_id;
+DROP INDEX IF EXISTS idx_whatsapp_inbound_webhook_obs_phone_received;
+DROP INDEX IF EXISTS idx_whatsapp_inbound_webhook_obs_org_received;
+DROP INDEX IF EXISTS idx_whatsapp_inbound_webhook_obs_provider_message_id;
+
+DROP TABLE IF EXISTS whatsapp_inbound_webhook_observability;

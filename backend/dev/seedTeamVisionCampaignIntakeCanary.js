@@ -32,7 +32,7 @@ async function main() {
   const migration = require("node:fs").readFileSync(
     require("node:path").join(
       __dirname,
-      "../database/migrations/049_campaign_intake_codes.sql"
+      "../database/migrations/052_campaign_intake_codes.sql"
     ),
     "utf8"
   );

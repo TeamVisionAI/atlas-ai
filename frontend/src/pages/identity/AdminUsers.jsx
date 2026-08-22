@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
+import {
+  BUSINESS_RANK_DEFAULT_PERMISSION_ROLE,
+  BUSINESS_RANK_ORDER,
+  listBusinessRanks
+} from "../../config/teamVisionBusinessRanks";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import {
   archiveAdminUser,
@@ -10,24 +15,35 @@ import {
   listAdminUsers,
   reactivateAdminUser,
   resendInvitation,
+  revokeInvitation,
   suspendAdminUser,
-  transferOwnership,
   updateAdminUser,
+  updateUserAgentCapabilities,
   updateUserSecuritiesAuthorization,
   revokeUserSecuritiesAuthorization
 } from "../../services/identityService";
 import UserAvatar from "../../components/ui/UserAvatar";
 import "../../components/ui/ProfilePhotoEditor.css";
+import {
+  USERS_DEFAULT_STATUS_FILTER,
+  buildUserRowActions,
+  displayUserName,
+  filterAdminUsers,
+  formatStatusLabel,
+  invitationDisplayStatus,
+  statusBadgeClass
+} from "./adminUsersGridHelpers";
 import "./identity.css";
 
-const ROLES = [
-  "administrator",
-  "operations",
+/** LC1 permission roles (platform access) — separate from business ranks. */
+const PERMISSION_ROLES = [
   "rvp",
   "division_leader",
   "agent",
   "recruiter",
-  "support"
+  "operations",
+  "support",
+  "administrator"
 ];
 
 const SECURITIES_STATUSES = [
@@ -41,13 +57,17 @@ const SECURITIES_STATUSES = [
   "TERMINATED"
 ];
 
+const BUSINESS_RANK_OPTIONS = listBusinessRanks();
+
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
   repId: "",
   email: "",
   phone: "",
-  role: "recruiter"
+  businessRank: "REP",
+  role: BUSINESS_RANK_DEFAULT_PERMISSION_ROLE.REP,
+  reportsToUserId: ""
 };
 
 const EMPTY_SECURITIES_FORM = {
@@ -59,6 +79,14 @@ const EMPTY_SECURITIES_FORM = {
   jurisdiction_scope: "",
   principal_scope: "",
   status_reason: ""
+};
+
+const EMPTY_CAPABILITIES_FORM = {
+  canReceiveOrganizationLeads: true,
+  roundRobinEligible: false,
+  personalWhatsAppEnabled: false,
+  personalLeadSourcesEnabled: false,
+  personalMetaAdsEnabled: false
 };
 
 function formatScope(scope) {
@@ -81,30 +109,93 @@ function parseScopeInput(value) {
     .filter(Boolean);
 }
 
-function SecuritiesAccessBadge({ access }) {
-  const verified = access?.securities_access_verified === true;
-  const status = access?.securities_access_status || "UNKNOWN";
+function formatShortDateTime(value) {
+  if (!value) {
+    return "—";
+  }
+  try {
+    return new Date(value).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function Badge({ className, children, title }) {
+  return (
+    <span className={className} title={title || (typeof children === "string" ? children : undefined)}>
+      {children}
+    </span>
+  );
+}
+
+function RowActionsMenu({ actions, onAction }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    function onPointerDown(event) {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function onKeyDown(event) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  if (!actions.length) {
+    return null;
+  }
 
   return (
-    <div className="securities-access-cell">
-      <span className={`securities-access-badge ${verified ? "is-verified" : ""}`}>
-        <span className="securities-access-badge__mark" aria-hidden="true">
-          {verified ? "✓" : ""}
-        </span>
-        Securities Access Verified
-      </span>
-      <span className="securities-access-meta">{status}</span>
-      <span className="securities-access-meta">Scope: {formatScope(access?.permitted_product_scope)}</span>
-      <span className="securities-access-meta">
-        Effective:{" "}
-        {access?.effective_from ? new Date(access.effective_from).toLocaleDateString() : "—"}
-        {" → "}
-        {access?.effective_to ? new Date(access.effective_to).toLocaleDateString() : "open"}
-      </span>
-      {access?.jurisdiction_scope ? (
-        <span className="securities-access-meta">
-          Jurisdiction: {formatScope(access.jurisdiction_scope)}
-        </span>
+    <div className="admin-users-menu" ref={rootRef}>
+      <button
+        type="button"
+        className="admin-users-menu__trigger"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Row actions"
+        onClick={() => setOpen((current) => !current)}
+      >
+        •••
+      </button>
+      {open ? (
+        <div className="admin-users-menu__panel" role="menu">
+          {actions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              role="menuitem"
+              className="admin-users-menu__item"
+              onClick={() => {
+                setOpen(false);
+                onAction(action.id);
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
       ) : null}
     </div>
   );
@@ -117,34 +208,35 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(USERS_DEFAULT_STATUS_FILTER);
+  const [rankFilter, setRankFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [transferTarget, setTransferTarget] = useState("");
-  const [repIdDrafts, setRepIdDrafts] = useState({});
+  const [editingRepId, setEditingRepId] = useState(null);
+  const [repIdDraft, setRepIdDraft] = useState("");
   const [securitiesTarget, setSecuritiesTarget] = useState(null);
   const [securitiesForm, setSecuritiesForm] = useState(EMPTY_SECURITIES_FORM);
   const [securitiesSaving, setSecuritiesSaving] = useState(false);
+  const [capabilitiesTarget, setCapabilitiesTarget] = useState(null);
+  const [capabilitiesForm, setCapabilitiesForm] = useState(EMPTY_CAPABILITIES_FORM);
+  const [capabilitiesSaving, setCapabilitiesSaving] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
     setError("");
 
     try {
+      // Load tenant-scoped list once; filters applied client-side for multi-criteria UX.
+      // Flag for later: server pagination when tenants exceed ~500 users.
       const result = await listAdminUsers({
-        q: query || undefined,
-        status: statusFilter || undefined,
-        limit: 50
+        limit: 200
       });
       setUsers(result.items || []);
       setTotal(result.total || 0);
-      setRepIdDrafts(
-        Object.fromEntries(
-          (result.items || []).map((user) => [user.id, user.rep_id || ""])
-        )
-      );
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -154,29 +246,119 @@ export default function AdminUsers() {
 
   useEffect(() => {
     loadUsers();
-  }, [query, statusFilter]);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "invitations") {
+      setStatusFilter("pending_invitation");
+    } else if (statusFilter === "pending_invitation") {
+      setStatusFilter(USERS_DEFAULT_STATUS_FILTER);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tab switch drives status filter only
+  }, [activeTab]);
+
+  const filteredUsers = useMemo(
+    () =>
+      filterAdminUsers(users, {
+        query,
+        statusFilter: activeTab === "invitations" ? "pending_invitation" : statusFilter,
+        rankFilter,
+        roleFilter
+      }),
+    [users, query, statusFilter, rankFilter, roleFilter, activeTab]
+  );
+
+  const activeLeaders = useMemo(
+    () => users.filter((user) => user.status === "active"),
+    [users]
+  );
 
   async function handleCreate(event) {
     event.preventDefault();
 
     try {
-      await createAdminUser(form);
+      await createAdminUser({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone || undefined,
+        repId: form.repId || undefined,
+        businessRank: form.businessRank,
+        role: form.role,
+        reportsToUserId: form.reportsToUserId || undefined
+      });
       setForm(EMPTY_FORM);
       setShowCreate(false);
+      setActiveTab("invitations");
+      setStatusFilter("pending_invitation");
       await loadUsers();
     } catch (createError) {
       setError(createError.message);
     }
   }
 
+  function updateBusinessRank(nextRank) {
+    setForm((current) => ({
+      ...current,
+      businessRank: nextRank,
+      role: BUSINESS_RANK_DEFAULT_PERMISSION_ROLE[nextRank] || current.role
+    }));
+  }
+
+  function startRepIdEdit(user) {
+    setEditingRepId(user.id);
+    setRepIdDraft(user.rep_id || "");
+  }
+
+  function cancelRepIdEdit() {
+    setEditingRepId(null);
+    setRepIdDraft("");
+  }
+
   async function saveRepId(userId) {
     setError("");
 
     try {
-      await updateAdminUser(userId, { repId: repIdDrafts[userId] || null });
+      await updateAdminUser(userId, { repId: repIdDraft || null });
+      cancelRepIdEdit();
       await loadUsers();
     } catch (saveError) {
       setError(saveError.message);
+    }
+  }
+
+  function openCapabilitiesEditor(user) {
+    const caps = user.agent_capabilities || {};
+    setCapabilitiesTarget(user);
+    setCapabilitiesForm({
+      canReceiveOrganizationLeads: caps.canReceiveOrganizationLeads !== false,
+      roundRobinEligible: caps.roundRobinEligible === true,
+      personalWhatsAppEnabled: caps.personalWhatsAppEnabled === true,
+      personalLeadSourcesEnabled: caps.personalLeadSourcesEnabled === true,
+      personalMetaAdsEnabled: false
+    });
+  }
+
+  async function saveCapabilities(event) {
+    event.preventDefault();
+    if (!capabilitiesTarget) {
+      return;
+    }
+
+    setCapabilitiesSaving(true);
+    setError("");
+
+    try {
+      await updateUserAgentCapabilities(capabilitiesTarget.id, {
+        ...capabilitiesForm,
+        personalMetaAdsEnabled: false
+      });
+      setCapabilitiesTarget(null);
+      await loadUsers();
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setCapabilitiesSaving(false);
     }
   }
 
@@ -266,20 +448,29 @@ export default function AdminUsers() {
     }
   }
 
-  async function runAction(action, userId) {
+  async function runAction(action, user) {
     setError("");
 
     try {
-      if (action === "suspend") await suspendAdminUser(userId);
-      if (action === "reactivate") await reactivateAdminUser(userId);
-      if (action === "archive") await archiveAdminUser(userId);
-      if (action === "reset") await forcePasswordReset(userId);
-      if (action === "logout") await forceLogoutUser(userId);
-      if (action === "invite") await resendInvitation(userId);
-      if (action === "transfer" && transferTarget) {
-        await transferOwnership(userId, transferTarget);
-        setTransferTarget("");
+      if (action === "edit-rep") {
+        startRepIdEdit(user);
+        return;
       }
+      if (action === "edit-capabilities") {
+        openCapabilitiesEditor(user);
+        return;
+      }
+      if (action === "edit-securities") {
+        openSecuritiesEditor(user);
+        return;
+      }
+      if (action === "suspend") await suspendAdminUser(user.id);
+      if (action === "reactivate") await reactivateAdminUser(user.id);
+      if (action === "archive") await archiveAdminUser(user.id);
+      if (action === "reset") await forcePasswordReset(user.id);
+      if (action === "logout") await forceLogoutUser(user.id);
+      if (action === "invite") await resendInvitation(user.id);
+      if (action === "revoke-invite") await revokeInvitation(user.id);
 
       await loadUsers();
     } catch (actionError) {
@@ -287,53 +478,279 @@ export default function AdminUsers() {
     }
   }
 
-  const activeUsers = useMemo(
-    () => users.filter((user) => user.status === "active"),
-    [users]
-  );
-
-  return (
-    <div className="identity-page">
-      <div className="identity-header">
-        <div>
-          <h1>Administration — Users</h1>
-          <p>{total} users</p>
-        </div>
-        <div className="identity-actions">
-          <Link className="identity-button-secondary" to={appPath("my-account")}>
-            My Account
-          </Link>
-          <button type="button" className="identity-button" onClick={() => setShowCreate(true)}>
-            Create User
+  function renderRepIdCell(user) {
+    if (editingRepId === user.id) {
+      return (
+        <div className="admin-users-rep-edit">
+          <input
+            className="admin-users-rep-edit__input"
+            value={repIdDraft}
+            onChange={(event) => setRepIdDraft(event.target.value.toUpperCase())}
+            placeholder="Rep ID"
+            maxLength={5}
+            aria-label={`Edit Rep ID for ${user.email}`}
+            autoFocus
+          />
+          <button type="button" className="identity-button" onClick={() => saveRepId(user.id)}>
+            Save
+          </button>
+          <button type="button" className="identity-button-secondary" onClick={cancelRepIdEdit}>
+            Cancel
           </button>
         </div>
+      );
+    }
+
+    return (
+      <div className="admin-users-rep-display">
+        <span className="admin-users-rep-display__value">{user.rep_id || "—"}</span>
+        {user.status !== "pending_invitation" ? (
+          <button
+            type="button"
+            className="admin-users-icon-btn"
+            aria-label={`Edit Rep ID for ${displayUserName(user)}`}
+            onClick={() => startRepIdEdit(user)}
+          >
+            ✎
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderUserRow(user) {
+    const isSelf = String(sessionUser?.id) === String(user.id);
+    const actions = buildUserRowActions(user, { canVerifySecurities, isSelf });
+    const statusKey = invitationDisplayStatus(user);
+    const isPending = user.status === "pending_invitation";
+
+    return (
+      <tr
+        key={user.id}
+        className={`admin-users-row ${isPending ? "admin-users-row--pending" : ""}`}
+      >
+        <td className="admin-users-col-name">
+          <div className="admin-users-name-cell">
+            <UserAvatar
+              photoUrl={user.photo_url}
+              name={displayUserName(user)}
+              email={user.email}
+              size="sm"
+            />
+            <span className="admin-users-name-cell__text" title={displayUserName(user)}>
+              {displayUserName(user)}
+            </span>
+          </div>
+        </td>
+        <td className="admin-users-col-email">
+          <span className="admin-users-truncate" title={user.email || ""}>
+            {user.email || "—"}
+          </span>
+        </td>
+        {activeTab === "users" ? (
+          <td className="admin-users-col-rep">{renderRepIdCell(user)}</td>
+        ) : null}
+        <td className="admin-users-col-rank">
+          {user.business_rank ? (
+            <Badge className="admin-users-badge admin-users-badge--rank" title={user.business_rank}>
+              {user.business_rank}
+            </Badge>
+          ) : (
+            "—"
+          )}
+        </td>
+        <td className="admin-users-col-role">
+          {user.role ? (
+            <Badge className="admin-users-badge admin-users-badge--role" title={user.role}>
+              {user.role}
+            </Badge>
+          ) : (
+            "—"
+          )}
+        </td>
+        <td className="admin-users-col-status">
+          <Badge className={statusBadgeClass(statusKey)}>{formatStatusLabel(statusKey)}</Badge>
+        </td>
+        {activeTab === "users" ? (
+          <td className="admin-users-col-login">
+            {user.last_login_at ? formatShortDateTime(user.last_login_at) : "—"}
+          </td>
+        ) : (
+          <>
+            <td className="admin-users-col-sent">
+              {formatShortDateTime(user.invitation?.created_at || user.created_at)}
+            </td>
+            <td className="admin-users-col-expires">
+              {formatShortDateTime(user.invitation?.expires_at)}
+            </td>
+          </>
+        )}
+        <td className="admin-users-col-actions">
+          <RowActionsMenu actions={actions} onAction={(actionId) => runAction(actionId, user)} />
+        </td>
+      </tr>
+    );
+  }
+
+  function renderUserCard(user) {
+    const isSelf = String(sessionUser?.id) === String(user.id);
+    const actions = buildUserRowActions(user, { canVerifySecurities, isSelf });
+    const statusKey = invitationDisplayStatus(user);
+    const isPending = user.status === "pending_invitation";
+
+    return (
+      <article
+        key={user.id}
+        className={`admin-users-card ${isPending ? "admin-users-card--pending" : ""}`}
+      >
+        <div className="admin-users-card__top">
+          <div className="admin-users-name-cell">
+            <UserAvatar
+              photoUrl={user.photo_url}
+              name={displayUserName(user)}
+              email={user.email}
+              size="sm"
+            />
+            <div>
+              <div className="admin-users-card__name">{displayUserName(user)}</div>
+              <Badge className={statusBadgeClass(statusKey)}>{formatStatusLabel(statusKey)}</Badge>
+            </div>
+          </div>
+          <RowActionsMenu actions={actions} onAction={(actionId) => runAction(actionId, user)} />
+        </div>
+        <div className="admin-users-card__meta">
+          {user.business_rank ? (
+            <Badge className="admin-users-badge admin-users-badge--rank">{user.business_rank}</Badge>
+          ) : null}
+          {user.role ? (
+            <Badge className="admin-users-badge admin-users-badge--role">{user.role}</Badge>
+          ) : null}
+        </div>
+        <div className="admin-users-card__email" title={user.email || ""}>
+          {user.email || "—"}
+        </div>
+        {activeTab === "users" ? (
+          <div className="admin-users-card__row">
+            <span className="admin-users-card__label">Rep ID</span>
+            {renderRepIdCell(user)}
+          </div>
+        ) : (
+          <div className="admin-users-card__row">
+            <span className="admin-users-card__label">Expires</span>
+            <span>{formatShortDateTime(user.invitation?.expires_at)}</span>
+          </div>
+        )}
+      </article>
+    );
+  }
+
+  return (
+    <div className="identity-page admin-users-page">
+      <div className="identity-header admin-users-header">
+        <div>
+          <h1>Administration — Users</h1>
+          <p className="admin-users-subtitle">
+            {activeTab === "invitations"
+              ? `${filteredUsers.length} pending invitation${filteredUsers.length === 1 ? "" : "s"}`
+              : `${filteredUsers.length} shown${total ? ` · ${total} in organization` : ""}`}
+          </p>
+        </div>
+        <Link className="identity-button-secondary" to={appPath("my-account")}>
+          My Account
+        </Link>
       </div>
 
-      <div className="identity-card identity-actions">
+      <div className="identity-tabs admin-users-tabs" role="tablist" aria-label="Users and invitations">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "users"}
+          className={`identity-tab ${activeTab === "users" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("users")}
+        >
+          Users
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "invitations"}
+          className={`identity-tab ${activeTab === "invitations" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("invitations")}
+        >
+          Invitations
+        </button>
+      </div>
+
+      <div className="admin-users-toolbar">
         <input
-          placeholder="Search name, email, or Rep ID"
+          className="admin-users-toolbar__search"
+          placeholder="Search users..."
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          aria-label="Search users by name, email, or Rep ID"
         />
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="pending_invitation">Pending Invitation</option>
-          <option value="suspended">Suspended</option>
-          <option value="archived">Archived</option>
+        {activeTab === "users" ? (
+          <select
+            className="admin-users-toolbar__filter"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            aria-label="Filter by status"
+          >
+            <option value={USERS_DEFAULT_STATUS_FILTER}>Active + Pending</option>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="pending_invitation">Pending</option>
+            <option value="suspended">Suspended</option>
+            <option value="archived">Archived</option>
+          </select>
+        ) : null}
+        <select
+          className="admin-users-toolbar__filter"
+          value={rankFilter}
+          onChange={(event) => setRankFilter(event.target.value)}
+          aria-label="Filter by business rank"
+        >
+          <option value="">All ranks</option>
+          {BUSINESS_RANK_ORDER.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
         </select>
-        <input
-          placeholder="Transfer ownership to user ID"
-          value={transferTarget}
-          onChange={(event) => setTransferTarget(event.target.value)}
-        />
+        <select
+          className="admin-users-toolbar__filter"
+          value={roleFilter}
+          onChange={(event) => setRoleFilter(event.target.value)}
+          aria-label="Filter by permission role"
+        >
+          <option value="">All roles</option>
+          {PERMISSION_ROLES.map((role) => (
+            <option key={role} value={role}>
+              {role}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="identity-button admin-users-toolbar__invite"
+          onClick={() => {
+            setShowCreate(true);
+            setActiveTab("invitations");
+          }}
+        >
+          Invite User
+        </button>
       </div>
 
       {error ? <p className="identity-error">{error}</p> : null}
 
       {showCreate ? (
-        <div className="identity-card">
-          <h2>Create User</h2>
+        <div className="identity-card admin-users-invite-panel">
+          <h2>Invite User</h2>
+          <p className="identity-muted">
+            Business rank is the field hierarchy. Permission role controls platform access and
+            defaults to a non-admin field role.
+          </p>
           <form className="identity-form" onSubmit={handleCreate}>
             <label>
               First Name
@@ -352,15 +769,6 @@ export default function AdminUsers() {
               />
             </label>
             <label>
-              Rep ID
-              <input
-                value={form.repId}
-                onChange={(event) => setForm({ ...form, repId: event.target.value.toUpperCase() })}
-                placeholder="4TJLK"
-                maxLength={5}
-              />
-            </label>
-            <label>
               Email
               <input
                 type="email"
@@ -370,28 +778,65 @@ export default function AdminUsers() {
               />
             </label>
             <label>
-              Phone
-              <input
-                value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value })}
-              />
+              Business Rank
+              <select
+                value={form.businessRank}
+                onChange={(event) => updateBusinessRank(event.target.value)}
+                required
+              >
+                {BUSINESS_RANK_OPTIONS.map((rank) => (
+                  <option key={rank.code} value={rank.code}>
+                    {rank.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
-              Role
+              Reporting Leader
+              <select
+                value={form.reportsToUserId}
+                onChange={(event) => setForm({ ...form, reportsToUserId: event.target.value })}
+              >
+                <option value="">None</option>
+                {activeLeaders.map((leader) => (
+                  <option key={leader.id} value={leader.id}>
+                    {displayUserName(leader)} ({leader.business_rank || leader.role})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Permission Role
               <select
                 value={form.role}
                 onChange={(event) => setForm({ ...form, role: event.target.value })}
               >
-                {ROLES.map((role) => (
+                {PERMISSION_ROLES.map((role) => (
                   <option key={role} value={role}>
                     {role}
                   </option>
                 ))}
               </select>
             </label>
+            <label>
+              Rep ID
+              <input
+                value={form.repId}
+                onChange={(event) => setForm({ ...form, repId: event.target.value.toUpperCase() })}
+                placeholder="Optional"
+                maxLength={5}
+              />
+            </label>
+            <label>
+              Phone
+              <input
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
+              />
+            </label>
             <div className="identity-actions">
               <button type="submit" className="identity-button">
-                Create User & Send Invitation
+                Send Invitation
               </button>
               <button
                 type="button"
@@ -405,12 +850,92 @@ export default function AdminUsers() {
         </div>
       ) : null}
 
+      {capabilitiesTarget ? (
+        <div className="identity-card" data-testid="admin-capabilities-panel">
+          <h2>Capabilities</h2>
+          <p className="securities-access-meta">
+            {displayUserName(capabilitiesTarget)} — lead channels and personal integrations
+            (not derived from business rank)
+          </p>
+          <form className="identity-form" onSubmit={saveCapabilities}>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.canReceiveOrganizationLeads}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    canReceiveOrganizationLeads: event.target.checked
+                  })
+                }
+              />
+              Receive organization leads
+            </label>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.roundRobinEligible}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    roundRobinEligible: event.target.checked
+                  })
+                }
+              />
+              Eligible for Round Robin (future — no routing yet)
+            </label>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.personalWhatsAppEnabled}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    personalWhatsAppEnabled: event.target.checked
+                  })
+                }
+              />
+              Allow Personal WhatsApp
+            </label>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.personalLeadSourcesEnabled}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    personalLeadSourcesEnabled: event.target.checked
+                  })
+                }
+              />
+              Allow Personal Lead Sources
+            </label>
+            <label className="admin-capability-toggle admin-capability-toggle--disabled">
+              <input type="checkbox" checked={false} disabled readOnly />
+              Allow Meta Ads — Future / Disabled
+            </label>
+            <div className="identity-actions">
+              <button type="submit" className="identity-button" disabled={capabilitiesSaving}>
+                {capabilitiesSaving ? "Saving…" : "Save Capabilities"}
+              </button>
+              <button
+                type="button"
+                className="identity-button-secondary"
+                onClick={() => setCapabilitiesTarget(null)}
+                disabled={capabilitiesSaving}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       {securitiesTarget ? (
         <div className="identity-card">
           <h2>Securities Authorization</h2>
           <p className="securities-access-meta">
-            {securitiesTarget.display_name || securitiesTarget.email} — firm verification only (not
-            self-attestation)
+            {displayUserName(securitiesTarget)} — firm verification only (not self-attestation)
           </p>
           {!canVerifySecurities ? (
             <p className="identity-error">
@@ -542,151 +1067,48 @@ export default function AdminUsers() {
         </div>
       ) : null}
 
-      <div className="identity-card">
-        {loading ? <p>Loading users…</p> : null}
-        {!loading ? (
-          <table className="identity-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Rep ID</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Securities Access</th>
-                <th>Last Login</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <div className="profile-photo-editor__table-cell">
-                      <UserAvatar
-                        photoUrl={user.photo_url}
-                        name={user.display_name || `${user.first_name} ${user.last_name}`}
-                        email={user.email}
-                        size="sm"
-                      />
-                      <div className="profile-photo-editor__table-name">
-                        <span>{user.display_name || `${user.first_name} ${user.last_name}`}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="identity-actions">
-                      <input
-                        value={repIdDrafts[user.id] ?? user.rep_id ?? ""}
-                        onChange={(event) =>
-                          setRepIdDrafts((current) => ({
-                            ...current,
-                            [user.id]: event.target.value.toUpperCase()
-                          }))
-                        }
-                        placeholder="4TJLK"
-                        maxLength={5}
-                        aria-label={`Rep ID for ${user.email}`}
-                      />
-                      <button
-                        type="button"
-                        className="identity-button-secondary"
-                        onClick={() => saveRepId(user.id)}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </td>
-                  <td>{user.email}</td>
-                  <td>{user.role}</td>
-                  <td>
-                    <span className={`identity-status ${user.status}`}>{user.status}</span>
-                  </td>
-                  <td>
-                    <SecuritiesAccessBadge access={user.securities_access} />
-                    {canVerifySecurities && String(sessionUser?.id) !== String(user.id) ? (
-                      <button
-                        type="button"
-                        className="identity-button-secondary"
-                        style={{ marginTop: "0.35rem" }}
-                        onClick={() => openSecuritiesEditor(user)}
-                      >
-                        Edit Securities Access
-                      </button>
-                    ) : null}
-                  </td>
-                  <td>{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : "—"}</td>
-                  <td>{user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}</td>
-                  <td>
-                    <div className="identity-actions">
-                      {user.status === "active" ? (
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => runAction("suspend", user.id)}
-                        >
-                          Suspend
-                        </button>
-                      ) : null}
-                      {user.status === "suspended" ? (
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => runAction("reactivate", user.id)}
-                        >
-                          Reactivate
-                        </button>
-                      ) : null}
-                      {user.status === "pending_invitation" ? (
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => runAction("invite", user.id)}
-                        >
-                          Resend Invite
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="identity-button-secondary"
-                        onClick={() => runAction("reset", user.id)}
-                      >
-                        Force Reset
-                      </button>
-                      <button
-                        type="button"
-                        className="identity-button-secondary"
-                        onClick={() => runAction("logout", user.id)}
-                      >
-                        Force Logout
-                      </button>
-                      {transferTarget ? (
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => runAction("transfer", user.id)}
-                        >
-                          Transfer To Target
-                        </button>
-                      ) : null}
-                      {user.status !== "archived" ? (
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => runAction("archive", user.id)}
-                        >
-                          Archive
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="identity-card admin-users-grid-card">
+        {loading ? <p className="admin-users-loading">Loading users…</p> : null}
+
+        {!loading && filteredUsers.length === 0 ? (
+          <p className="admin-users-empty">No users match the current filters.</p>
         ) : null}
-        {!loading && activeUsers.length === 0 && users.length === 0 ? <p>No users found.</p> : null}
+
+        {!loading && filteredUsers.length > 0 ? (
+          <>
+            <div className="admin-users-table-wrap admin-users-desktop">
+              <table className="admin-users-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    {activeTab === "users" ? <th>Rep ID</th> : null}
+                    <th>Rank</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    {activeTab === "users" ? (
+                      <th>Last Login</th>
+                    ) : (
+                      <>
+                        <th>Sent</th>
+                        <th>Expires</th>
+                      </>
+                    )}
+                    <th className="admin-users-col-actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>{filteredUsers.map((user) => renderUserRow(user))}</tbody>
+              </table>
+            </div>
+            <div className="admin-users-mobile">{filteredUsers.map((user) => renderUserCard(user))}</div>
+          </>
+        ) : null}
+
+        {!loading && total > 200 ? (
+          <p className="admin-users-scale-note">
+            Showing up to 200 users. Server-side pagination recommended for larger tenants.
+          </p>
+        ) : null}
       </div>
     </div>
   );

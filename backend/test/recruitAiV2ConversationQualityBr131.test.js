@@ -232,7 +232,7 @@ test("sync turn path remains non-mutating when allowExecution true", () => {
 });
 
 const SPANISH_FIRST_TOUCH =
-  "¡Hola! Claro 😊 Es una oportunidad en servicios financieros y con gusto te explicamos cómo funciona. ¿En qué ciudad estás?";
+  "¡Hola! Claro 😊 Vi que pediste más información sobre la oportunidad. Con mucho gusto te cuento de qué se trata. ¿En qué ciudad y estado te encuentras?";
 
 const SPANISH_OVERVIEW =
   "Es una oportunidad en servicios financieros donde ayudamos a las familias con protección y planificación financiera. Ofrecemos entrenamiento y capacitación.";

@@ -24,18 +24,25 @@ async function knowledgeRequest(path) {
   if (!response.ok) {
     throw new KnowledgeHubError(body.message || "Knowledge Hub request failed.", {
       status: response.status,
-      error: body.error || null
+      error: body.error || null,
+      code: body.error || null,
+      reason: body.reason || null
     });
   }
 
   return body;
 }
 
-export async function fetchKnowledgeTree() {
-  return knowledgeRequest("/api/knowledge/tree");
+export async function fetchKnowledgeTree(locale = "en") {
+  const query = new URLSearchParams({ locale });
+  return knowledgeRequest(`/api/knowledge/tree?${query.toString()}`);
 }
 
-export async function fetchKnowledgeDocument(documentPath) {
-  const query = new URLSearchParams({ path: documentPath });
+export async function getKnowledgeHubAccess() {
+  return knowledgeRequest("/api/knowledge/access");
+}
+
+export async function fetchKnowledgeDocument(documentPath, locale = "en") {
+  const query = new URLSearchParams({ path: documentPath, locale });
   return knowledgeRequest(`/api/knowledge/document?${query.toString()}`);
 }

@@ -32,8 +32,11 @@ async function buildAlphaMorningBrief(options = {}) {
   const reference = options.reference ? new Date(options.reference) : new Date();
   const loadProspects = options.loadProductionProspects || loadProductionProspects;
   const buildExecutive = options.buildExecutiveDashboard || buildExecutiveDashboard;
-  const executive = await buildExecutive(organizationId, { reference });
-  const prospects = await loadProspects(organizationId);
+  // BR-149 — prefer caller-scoped prospect set (hierarchy/self); avoid org-wide fallback for Team Dashboard.
+  const prospects = Array.isArray(options.prospects)
+    ? options.prospects
+    : await loadProspects(organizationId);
+  const executive = await buildExecutive(organizationId, { reference, prospects });
   const queue = executive.prioritizedWorkflowQueue || [];
   const prospectByPhone = new Map(prospects.map((row) => [row.phone, row]));
 

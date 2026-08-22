@@ -109,12 +109,14 @@ function isOwnBusyWindow(range, excludedWindow) {
   );
 }
 
-async function fetchGoogleBusyRanges(organizationId, timeMin, timeMax, timezone) {
+async function fetchGoogleBusyRanges(organizationId, timeMin, timeMax, timezone, userId = null) {
+  // BR-147 — personal availability ∩ personal Google free/busy (never org/RVP calendar).
   const busy = await googleCalendarIntegrationService.queryFreeBusy(
     organizationId,
     timeMin,
     timeMax,
-    timezone
+    timezone,
+    { userId }
   );
 
   return (busy || []).map((period) => ({
@@ -226,7 +228,8 @@ async function getAvailableSlots({
           organizationId,
           dayStart.toISOString(),
           dayEnd.toISOString(),
-          timezone
+          timezone,
+          agentId
         );
         busyRanges.push(
           ...googleBusy.filter((range) => !isOwnBusyWindow(range, excludedWindow))

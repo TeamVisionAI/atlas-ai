@@ -77,18 +77,24 @@ router.get("/auth/me", requireAtlasUser, async (req, res) => {
 
     const securities = await getSecuritiesAccessSummary(req.authContext);
     const canVerify = await canVerifySecuritiesAuthorization(req.authContext);
+    const {
+      resolveAgentCapabilitiesFromUser
+    } = require("../core/agentCapabilitiesEngine");
+    const agentCaps = resolveAgentCapabilitiesFromUser(req.sanitizedUser);
 
     return res.json(
       withPlatformIdentity(
         {
           ...req.sanitizedUser,
+          agent_capabilities: agentCaps,
           securities_access_status: securities.securities_access_status,
           securities_access_verified: securities.securities_access_verified,
           permitted_product_scope: securities.permitted_product_scope,
           effective_to: securities.effective_to,
           capabilities: {
             canAccessSecuritiesContent: securities.canAccessSecuritiesContent === true,
-            canVerifySecuritiesAuthorization: canVerify === true
+            canVerifySecuritiesAuthorization: canVerify === true,
+            ...agentCaps
           }
         },
         req
@@ -96,17 +102,26 @@ router.get("/auth/me", requireAtlasUser, async (req, res) => {
     );
   } catch (error) {
     console.error("[auth/me] securities summary failed", error.message);
+    const {
+      resolveAgentCapabilitiesFromUser,
+      DEFAULT_AGENT_CAPABILITIES
+    } = require("../core/agentCapabilitiesEngine");
+    const agentCaps = resolveAgentCapabilitiesFromUser(req.sanitizedUser) || {
+      ...DEFAULT_AGENT_CAPABILITIES
+    };
     return res.json(
       withPlatformIdentity(
         {
           ...req.sanitizedUser,
+          agent_capabilities: agentCaps,
           securities_access_status: "UNKNOWN",
           securities_access_verified: false,
           permitted_product_scope: [],
           effective_to: null,
           capabilities: {
             canAccessSecuritiesContent: false,
-            canVerifySecuritiesAuthorization: false
+            canVerifySecuritiesAuthorization: false,
+            ...agentCaps
           }
         },
         req

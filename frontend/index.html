@@ -2,9 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" id="default-favicon" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Team Vision Financial</title>
+    <!-- Host-aware Atlas favicons before paint (Team Vision keeps default above). -->
+    <script>
+      (function () {
+        var host = (location.hostname || "").toLowerCase();
+        var atlas =
+          host === "useatlas-ai.com" ||
+          host === "www.useatlas-ai.com" ||
+          host === "app.useatlas-ai.com";
+        if (!atlas) return;
+        document.title = "Atlas AI";
+        var def = document.getElementById("default-favicon");
+        if (def) def.remove();
+        function link(rel, href, type, sizes) {
+          var el = document.createElement("link");
+          el.rel = rel;
+          el.href = href;
+          if (type) el.type = type;
+          if (sizes) el.sizes = sizes;
+          document.head.appendChild(el);
+        }
+        link("icon", "/brand/favicon.ico", "image/x-icon");
+        link("icon", "/brand/favicon-32x32.png", "image/png", "32x32");
+        link("icon", "/brand/favicon-16x16.png", "image/png", "16x16");
+        link("apple-touch-icon", "/brand/apple-touch-icon.png", null, "180x180");
+        link("manifest", "/brand/site.webmanifest");
+        if (host === "useatlas-ai.com" || host === "www.useatlas-ai.com") {
+          function meta(attr, key, content) {
+            var el = document.createElement("meta");
+            el.setAttribute(attr, key);
+            el.content = content;
+            document.head.appendChild(el);
+          }
+          var og = location.origin + "/brand/og-atlas-ai.png";
+          meta("property", "og:title", "Atlas AI");
+          meta("property", "og:image", og);
+          meta("property", "og:type", "website");
+          meta("property", "og:site_name", "Atlas AI");
+          meta("name", "twitter:card", "summary_large_image");
+          meta("name", "twitter:title", "Atlas AI");
+          meta("name", "twitter:image", og);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

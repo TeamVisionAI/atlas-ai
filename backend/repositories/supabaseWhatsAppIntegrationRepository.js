@@ -1,5 +1,6 @@
 /**
- * Sprint 20.1 — Supabase-backed WhatsApp integration repository.
+ * Sprint 20.1 + BR-147 — WhatsApp integration repository.
+ * Supports legacy organization-owned rows (user_id NULL) and personal rows.
  */
 
 const { supabase } = require("../services/supabaseService");
@@ -25,7 +26,9 @@ function rowToRecord(row) {
   }
 
   return {
+    id: row.id || null,
     organization_id: row.organization_id,
+    user_id: row.user_id || null,
     business_id: row.business_id,
     waba_id: row.waba_id,
     phone_number_id: row.phone_number_id,
@@ -47,11 +50,13 @@ function rowToRecord(row) {
 function createSupabaseWhatsAppIntegrationRepository(options = {}) {
   const tokenEncryption = options.tokenEncryption || createTokenEncryption();
 
+  /** Legacy org-owned channel (user_id IS NULL). */
   async function getConnection(organizationId) {
     const { data, error } = await supabase
       .from("whatsapp_integrations")
       .select("*")
       .eq("organization_id", organizationId)
+      .is("user_id", null)
       .maybeSingle();
 
     if (error) {
@@ -65,13 +70,80 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
     return rowToRecord(data);
   }
 
+  async function getUserConnection(organizationId, userId) {
+    if (!organizationId || !userId) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("whatsapp_integrations")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingWhatsAppIntegrationsTable(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+
+    return rowToRecord(data);
+  }
+
+  /**
+   * Phone Number ID → connected row (org + optional owner user).
+   * Ambiguous multi-match fails closed.
+   */
+  async function findConnectionByPhoneNumberId(phoneNumberId) {
+    const id = String(phoneNumberId || "").trim();
+    if (!id) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("whatsapp_integrations")
+      .select("*")
+      .eq("phone_number_id", id)
+      .eq("status", "connected");
+
+    if (error) {
+      if (isMissingWhatsAppIntegrationsTable(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length === 0) {
+      return null;
+    }
+
+    if (rows.length > 1) {
+      const err = new Error("WhatsApp phone_number_id maps to multiple connected owners.");
+      err.code = "WHATSAPP_PHONE_ID_AMBIGUOUS";
+      err.publicCode = "WHATSAPP_PHONE_ID_AMBIGUOUS";
+      err.statusCode = 503;
+      throw err;
+    }
+
+    return rowToRecord(rows[0]);
+  }
+
   async function saveConnection(organizationId, record) {
     const now = new Date().toISOString();
-    const existing = await getConnection(organizationId);
+    const ownerUserId = record.user_id || record.userId || null;
+    const existing = ownerUserId
+      ? await getUserConnection(organizationId, ownerUserId)
+      : await getConnection(organizationId);
     const encryptedToken = tokenEncryption.encrypt(record.access_token);
 
     const payload = {
       organization_id: organizationId,
+      user_id: ownerUserId,
       business_id: record.business_id || null,
       waba_id: record.waba_id,
       phone_number_id: record.phone_number_id,
@@ -87,11 +159,23 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
       updated_at: now
     };
 
-    const { data, error } = await supabase
-      .from("whatsapp_integrations")
-      .upsert(payload, { onConflict: "organization_id" })
-      .select("*")
-      .single();
+    let data;
+    let error;
+
+    if (existing?.id) {
+      ({ data, error } = await supabase
+        .from("whatsapp_integrations")
+        .update(payload)
+        .eq("id", existing.id)
+        .select("*")
+        .single());
+    } else {
+      ({ data, error } = await supabase
+        .from("whatsapp_integrations")
+        .insert(payload)
+        .select("*")
+        .single());
+    }
 
     if (error) {
       throw error;
@@ -99,16 +183,20 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
 
     metaLogger.info("whatsapp_integration_saved", {
       organizationId,
+      userId: ownerUserId,
       wabaId: payload.waba_id,
       phoneNumberId: payload.phone_number_id,
+      ownership: ownerUserId ? "personal" : "organization",
       storageKind: "supabase"
     });
 
     return rowToRecord(data);
   }
 
-  async function getDecryptedAccessToken(organizationId) {
-    const connection = await getConnection(organizationId);
+  async function getDecryptedAccessToken(organizationId, userId = null) {
+    const connection = userId
+      ? await getUserConnection(organizationId, userId)
+      : await getConnection(organizationId);
 
     if (!connection?.access_token_encrypted || connection.status !== "connected") {
       return null;
@@ -118,7 +206,10 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
   }
 
   async function updateConnection(organizationId, patch = {}) {
-    const existing = await getConnection(organizationId);
+    const ownerUserId = patch.user_id || patch.userId || null;
+    const existing = ownerUserId
+      ? await getUserConnection(organizationId, ownerUserId)
+      : await getConnection(organizationId);
 
     if (!existing) {
       return null;
@@ -133,11 +224,12 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
 
     delete payload.access_token;
     delete payload.organization_id;
+    delete payload.userId;
 
     const { data, error } = await supabase
       .from("whatsapp_integrations")
       .update(payload)
-      .eq("organization_id", organizationId)
+      .eq("id", existing.id)
       .select("*")
       .single();
 
@@ -148,8 +240,15 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
     return rowToRecord(data);
   }
 
-  async function disconnectConnection(organizationId) {
+  async function disconnectConnection(organizationId, userId = null) {
     const now = new Date().toISOString();
+    const existing = userId
+      ? await getUserConnection(organizationId, userId)
+      : await getConnection(organizationId);
+
+    if (!existing?.id) {
+      return null;
+    }
 
     const { data, error } = await supabase
       .from("whatsapp_integrations")
@@ -161,7 +260,7 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
         updated_at: now,
         last_sync_at: now
       })
-      .eq("organization_id", organizationId)
+      .eq("id", existing.id)
       .select("*")
       .maybeSingle();
 
@@ -179,6 +278,8 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
   return assertRepositoryImplementation({
     saveConnection,
     getConnection,
+    getUserConnection,
+    findConnectionByPhoneNumberId,
     getDecryptedAccessToken,
     updateConnection,
     disconnectConnection,

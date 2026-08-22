@@ -3,7 +3,7 @@
  * Presentation-only; counts and rankings come from backend priority engine.
  */
 
-import { appPath } from "../config/appRoutes";
+import { appPath } from "../config/appRoutes.js";
 import {
   MISSION_CONTROL_QUERY_KEYS,
   buildMissionControlQuery

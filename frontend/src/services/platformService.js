@@ -63,6 +63,19 @@ export async function getTenantBilling(id) {
   return apiFetch(`/api/platform/tenants/${id}/billing`);
 }
 
+export async function getTenantFeatures(id) {
+  return apiFetch(`/api/platform/tenants/${id}/features`);
+}
+
+export async function updateTenantFeatures(id, payload) {
+  return apiFetch(`/api/platform/tenants/${id}/features`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {})
+  });
+}
+
+
 export async function updateTenantBilling(id, payload) {
   return apiFetch(`/api/platform/tenants/${id}/billing`, {
     method: "PATCH",

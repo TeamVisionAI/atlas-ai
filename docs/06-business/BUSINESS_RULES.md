@@ -1502,27 +1502,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ## BR-120 — Canonical Prospect Identity Bridge (Legacy ↔ Core)
 
-**Implements:** One phone maps to one canonical core prospect UUID for cross-system FK/keys while legacy `prospects` remains the WhatsApp phone profile/cache  
+**Implements:** Org-scoped bridge between Mission Control `public.prospects` and recruiting-core `atlas_core_prospects` without overloading appointment FKs  
 **Domain:** Prospects / Recruit AI v2 durable context / Appointments  
 **Depends on:** BR-039, BR-049, BR-081  
-**Related:** BR-121 / BR-122 / BR-123 (incident exposed dual UUID; those rules defer identity bridging to BR-120)  
-**Status:** Implemented (map-only + dual-load; no mass DB rewrite)  
+**Related:** BR-121 / BR-122 / BR-123 (incident exposed dual UUID; those rules defer identity bridging to BR-120); **APR1** appointment prospect reference integrity  
+**Status:** Implemented (map-only + dual-load; APR1 redefines appointment FK target)  
 **Engine target:** `recruitingProspectBridge.js` (`resolveCanonicalProspectIdentity`); `recruitAiV2/contextPersistenceService.js`; `appointmentApplicationService.createAppointment`  
-**Tests:** `backend/test/prospectIdentityBridgeBr120.test.js`
+**Tests:** `backend/test/prospectIdentityBridgeBr120.test.js`; `backend/test/appointmentProspectReferenceApr1.test.js`
 
 ### Rules
 
-1. **Core is system of record** — `atlas_core_prospects.id` is the canonical prospect identity for appointment `prospect_id` and **new** durable context rows.
-2. **Legacy remains phone profile/cache** — WhatsApp resolution and phone-keyed workflow may continue using legacy `prospects.id` / phone until LC2 consolidation.
-3. **Shared resolver (org-scoped)** — `resolveCanonicalProspectIdentity({ phone, organizationId, … })` is authoritative only for **`organizationId + normalized phone`**. Never treat a phone-global core lookup as authoritative. Cache keys are `organizationId::phone`.
-4. **Fail closed** — Exactly one in-org core → use it. Zero + `ensureCore=false` → unresolved. Zero + `ensureCore=true` → ensure in requested org then verify. Foreign-org core → `PROSPECT_IDENTITY_ORG_MISMATCH`. Multiple in-org cores → `PROSPECT_IDENTITY_AMBIGUOUS`. Conflicting legacy↔lookup → `PROSPECT_IDENTITY_CONFLICT`. Do not guess.
-5. **Appointment create** — If canonical core cannot be resolved/ensured, fail **before** Calendar, capacity, appointment persist, or workflow advance. This applies to both `appointmentApplicationService.createAppointment` and the mission `executeScheduleInterview` path (identity before Calendar). Never write `atlas_appointments.prospect_id = null` on the Recruit AI booking path.
-6. **Durable context dual-load** — Load active context by **core first, then legacy** for the same phone/org/channel. Prefer an existing active row over creating a second active for the same person.
-7. **New context creates use core** — First persist for a phone/org/channel writes `prospect_id = coreProspectId` when core can be resolved/ensured.
-8. **No mass rewrite in this rule** — Do not bulk-update existing `recruit_ai_conversation_contexts.prospect_id` from legacy→core. Compare-and-save continues updating the **loaded row id** (may remain legacy-keyed) while JSON `prospectId` may reflect core.
-9. **Appointment FK stays core** — Never rewrite `atlas_appointments.prospect_id` to legacy to “match” WhatsApp.
-10. **Workflow remains phone-keyed** — `advanceProspectWorkflow` / schedule side effects continue on phone + legacy profile fields (occupation, city, etc.).
-11. **Boundaries** — Does not enable BR-111 execution, change live authoring allowlists, Calendar cancel semantics (BR-121), schedule reconcile (BR-122), or occupation optional rules (BR-123).
+1. **Appointment FK is Mission Control canonical** — `atlas_appointments.prospect_id` MUST reference the tenant’s `public.prospects.id` (Mission Control / Prospect Center / Quick Capture row). Do **not** store `atlas_core_prospects.id` in `atlas_appointments.prospect_id`.
+2. **Core remains recruiting-core identity** — `atlas_core_prospects.id` is the canonical identity for **new** Recruit AI durable context rows and bridge resolution. Persist core on appointments only as explicit metadata (`metadata.coreProspectId`), never by overloading `prospect_id`.
+3. **Legacy remains phone profile/cache** — WhatsApp resolution and phone-keyed workflow continue using `public.prospects` / phone until LC2 consolidation.
+4. **Shared resolver (org-scoped)** — `resolveCanonicalProspectIdentity({ phone, organizationId, … })` is authoritative only for **`organizationId + normalized phone`**. Never treat a phone-global core lookup as authoritative. Cache keys are `organizationId::phone`. Returns both `legacyProspectId` (`public.prospects.id`) and `coreProspectId`.
+5. **Fail closed** — Exactly one in-org core → use it. Zero + `ensureCore=false` → unresolved. Zero + `ensureCore=true` → ensure in requested org then verify. Foreign-org core → `PROSPECT_IDENTITY_ORG_MISMATCH`. Multiple in-org cores → `PROSPECT_IDENTITY_AMBIGUOUS`. Conflicting legacy↔lookup → `PROSPECT_IDENTITY_CONFLICT`. Do not guess. Foreign `prospect_id` injection on create/update → fail closed.
+6. **Appointment create** — Require a resolved in-org `public.prospects` row **and** a resolved/ensured core identity before Calendar, capacity, appointment persist, or workflow advance (MC + `executeScheduleInterview`). Persist `prospect_id = public.prospects.id` and `metadata.coreProspectId = coreProspectId`. Never write `atlas_appointments.prospect_id = null` on the Recruit AI booking path.
+7. **Durable context dual-load** — Load active context by **core first, then legacy** for the same phone/org/channel. Prefer an existing active row over creating a second active for the same person.
+8. **New context creates use core** — First persist for a phone/org/channel writes context `prospect_id = coreProspectId` when core can be resolved/ensured.
+9. **No mass rewrite of Recruit AI contexts in this rule** — Do not bulk-update existing `recruit_ai_conversation_contexts.prospect_id` from legacy→core. Compare-and-save continues updating the **loaded row id** (may remain legacy-keyed) while JSON `prospectId` may reflect core.
+10. **Do not store core as appointment FK** — Never rewrite `atlas_appointments.prospect_id` to a core UUID to “match” Recruit AI durable context.
+11. **Workflow remains phone-keyed** — `advanceProspectWorkflow` / schedule side effects continue on phone + legacy profile fields (occupation, city, etc.).
+12. **Boundaries** — Does not enable BR-111 execution, change live authoring allowlists, Calendar cancel semantics (BR-121), schedule reconcile (BR-122), or occupation optional rules (BR-123). Does not redesign the recruiting-core bridge.
 
 ---
 
@@ -1864,6 +1865,184 @@ Production outside-window messaging requires firm-approved Meta templates config
 6. **Delete / archive / reset** — Fail closed (`SEED_TENANT_PROTECTED`) for Team Vision.
 7. **Templates** — Child tenants may **read/clone** Team Vision recruiting defaults. They must never write Team Vision rows (`assertCannotMutateSeedFromOtherTenant`).
 8. **Boundaries** — Does not change BR-142/143, WhatsApp, Meta, or recruiting engines.
+
+---
+
+## BR-147 — Primerica Personal Workspace (User-Owned Integrations + Scheduling)
+
+**Implements:** Separate tenant/organization configuration from each user's personal operating setup for Primerica tenants.  
+**Domain:** Settings / integrations / scheduling / WhatsApp routing / Zoom  
+**Depends on:** BR-076, BR-108–BR-111, BR-114, hierarchy scope isolation  
+**Related:** BR-075 (WhatsApp outbound), BR-129 (tenant isolation)  
+**Status:** Implemented  
+**Engine target:** `personalIntegrationOwnership.js`, `googleCalendarIntegrationService.js`, `whatsappIntegrationService.js`, `virtualMeetingUrlResolver.js`, `appointmentSchedulingEngine.js`, Settings hub  
+**Tests:** `backend/test/personalWorkspaceBr147.test.js`, `frontend/src/config/hierarchyDisplayTitle.test.js`
+
+### Rules
+
+1. **Organization settings** — RVP/Owner (`org:write`) only by default. Lower ranks must not see Organization settings. Office hours are location metadata and must **not** constrain agent availability.
+2. **Personal workspace** — Every recruiting user may own: Google Calendar, WhatsApp Embedded Signup, Zoom URL, Mon–Sun availability, and hierarchy-scoped prospects/conversations.
+3. **Hierarchy ≠ ownership** — `reports_to` controls data visibility only. It never grants management of another user's integrations.
+4. **Scheduling formula** — personal availability ∩ personal Google free/busy ∩ duration/conflict rules. Do **not** intersect tenant office hours. Sunday / outside office hours allowed when the agent enables those blocks.
+5. **Google ownership** — `organization_integrations.user_id` + `organization_id` + `provider`. `user_id NULL` = legacy organization-owned. Personal UI never presents another user's or org-legacy row as personal. Free/busy for an agent uses **personal** calendar only.
+6. **WhatsApp ownership** — `whatsapp_integrations.user_id` nullable. Inbound Phone Number ID resolves to organization + owning user. Connected Phone Number ID remains globally unique. Personal disconnect cannot disconnect the org channel without `org:write`.
+7. **Zoom** — Prefer interviewer `appointmentProfile.virtualMeeting.personalMeetingUrl`; fall back to organization Meeting Management only as legacy.
+8. **Compatibility** — Do not destroy or silently reassign legacy org-owned rows. No ownership inference from phone/email alone.
+9. **Permissions** — `integrations:self` manages personal connectors; `org:write` manages organization channel + Organization settings.
+10. **Boundaries** — No Round Robin, Recruit AI enablement, or Meta webhook architecture redesign beyond owner-user routing.
+
+---
+
+## BR-148 — Primerica Agent Lead/Source Capabilities
+
+**Implements:** Per-user, tenant-scoped capability flags for organization vs personal lead channels. Supports future Round Robin without building it yet.  
+**Domain:** Identity / Settings / WhatsApp / lead ownership  
+**Depends on:** BR-147 (personal workspace ownership)  
+**Related:** Admin Users, My Integrations, WhatsApp Embedded Signup  
+**Status:** Implemented (flags + gating; Round Robin and Meta Ad Builder intentionally deferred)  
+**Engine target:** `agentCapabilitiesEngine.js`, `identityAdminService.js`, Admin Users Capabilities panel, My Integrations WhatsApp gate  
+**Tests:** `backend/test/agentCapabilitiesBr148.test.js`, `frontend/src/pages/identity/adminUsersGridHelpers.test.js`
+
+### Rules
+
+1. **Defaults for new agents** — `canReceiveOrganizationLeads=true`, `roundRobinEligible=false`, `personalWhatsAppEnabled=false`, `personalLeadSourcesEnabled=false`, `personalMetaAdsEnabled=false`.
+2. **Not from rank** — Capabilities are never derived from business_rank. Two RLs may differ.
+3. **Admin-only mutation** — Only `admin:users` (RVP/Admin) may change another user’s capabilities in the effective tenant (Support Mode uses effective org). Users cannot self-enable personal WhatsApp/lead sources.
+4. **Personal WhatsApp UX** — When capability is OFF: hide personal Embedded Signup card; do not show “Not Connected”; do not mark setup incomplete; optional “Lead channel managed by your organization” when `canReceiveOrganizationLeads`.
+5. **Readiness** — Agent may be ready with Profile + Google + Zoom + Availability + Organization Managed lead channel. Personal WhatsApp is required only when its capability is ON.
+6. **Ownership** — Organization/shared source → tenant → future assignment/Round Robin. Personal campaign/WhatsApp → tenant + owning user → direct ownership (skip Round Robin unless explicitly reassigned). Store ownership explicitly when campaign/ads systems are built; never infer from phone/email.
+7. **Future ads (document only)** — Client/policy ads normally agent-owned (direct). Recruiting/shared ads may be RVP/org-owned and feed Round Robin later. `personalMetaAdsEnabled` is reserved; no ad builder in this release.
+8. **Boundaries** — Do not implement Round Robin, Meta Ad Builder, or Recruit AI enablement.
+
+---
+
+## BR-149 — Team Dashboard Access (Non-RVP Field Roles)
+
+**Implements:** Restore Team Dashboard for RL / division leaders / agents / recruiters after scope isolation removed `dashboard:executive` from those roles. Keep Executive Dashboard RVP/Admin-only. Keep Team Dashboard data hierarchy-scoped (no org-wide fallback).  
+**Domain:** Identity / Workspace navigation / Dashboard aggregates  
+**Depends on:** Hierarchy scope isolation (BR-related fail-closed subtree), BR-146 Team Vision seed  
+**Related:** `permissions.js`, `workspaceExperience.js`, `/api/dashboard/*`  
+**Status:** Implemented  
+**Engine target:** Role permission matrix (`dashboard:team`), route/nav gates, `filterProspectsForAuthContext` on dashboard aggregates  
+**Tests:** `backend/test/teamDashboardAccessBr149.test.js`, `frontend/src/config/teamDashboardAccessBr149.test.js`, `hierarchyScopeIsolation.test.js`
+
+### Rules
+
+1. **Capability split** — `dashboard:team` grants Team Dashboard UI + scoped aggregate APIs. `dashboard:executive` grants Executive Dashboard UI + remains Admin/RVP only.
+2. **Role grants** — `dashboard:team` for administrator, rvp, division_leader, agent, recruiter. Do not grant `dashboard:executive` to division_leader / agent / recruiter.
+3. **Landing after login** — RVP/Admin → Executive Dashboard. SRL/RL/DIV/DIS/REP (roles with team, without executive) → Team Dashboard.
+4. **Data scope** — Team Dashboard / shared `/api/dashboard/executive` (and alpha-brief) must filter via auth hierarchy scope. Missing hierarchy remains fail-closed (self), never org-wide.
+5. **Boundaries** — Do not restore org-wide management scope for RL. Do not change Team Legacy feature gates. Production/Analytics may stay executive-gated.
+
+---
+
+## BR-150 — Team Dashboard Action-First Workspace
+
+**Implements:** Redesign `/app/team-dashboard` as a daily execution workspace for non-RVP field users (SRL/RL/DIV/DIS/REP).  
+**Domain:** Workspace UX / Dashboard presentation  
+**Depends on:** BR-149 (`dashboard:team`, hierarchy-scoped dashboard APIs)  
+**Status:** Implemented  
+**Engine target:** `teamDashboardViewModel.js`, `TeamDashboard.jsx`  
+**Tests:** `frontend/src/engines/teamDashboardViewModel.test.js`, `frontend/src/pages/teamDashboardActionFirst.test.js`
+
+### Rules
+
+1. **Not Executive** — Team Dashboard must not embed Executive Dashboard components (Agency Health, org-wide KPIs, Team Interview Board).
+2. **Action-first** — Primary screen answers “What do I need to do today?” via KPIs, priorities, pipeline, appointments, recruiting/production panels, Atlas recommendation, recent activity.
+3. **Adaptive hierarchy** — Same component adapts: self-only users see personal labels; leaders with subtree owners see team-aware appointment title. Infer team scope from scoped prospect ownership only.
+4. **Data safety** — Use existing scoped `/api/dashboard` + `/api/dashboard/executive` payloads only. No org-wide fallback.
+5. **Executive unchanged** — `/app/executive-dashboard` behavior and RVP-only access remain unchanged.
+6. **i18n** — Spanish and English labels for all Team Dashboard chrome.
+
+---
+
+## BR-151 — Knowledge Hub Field Read Access
+
+**Implements:** Restore Knowledge Hub (`/app/knowledge`) for normal field users (RL, REP, agent, recruiter). Fix blank-page crash when `useLanguage()` did not expose translation catalog `t`. Explicit `knowledge:read` for read-only reference; `knowledge:write` reserved for RVP/Admin. Never render a blank white page — show empty, 403, or error states.  
+**Domain:** Workspace navigation / Knowledge Hub API / i18n  
+**Depends on:** LC1 permission matrix, authenticated Atlas session  
+**Status:** Implemented  
+**Engine target:** `permissions.js`, `workspaceExperience.js`, `KnowledgeHub.jsx`, `LanguageContext.jsx`, `/api/knowledge/*`  
+**Tests:** `backend/test/knowledgeHubFieldAccessBr151.test.js`, `frontend/src/config/knowledgeHubFieldAccessBr151.test.js`, `frontend/src/i18n/languageContextCatalog.test.js`
+
+### Rules
+
+1. **Read capability** — `knowledge:read` grants Knowledge Hub UI + `/api/knowledge/tree` + `/api/knowledge/document`. Grant to administrator, rvp, division_leader, agent, recruiter (and support read-only).
+2. **Write capability** — `knowledge:write` is RVP/Admin only. Knowledge Hub API remains read-only in v1; write is a separate gate for future editorial flows.
+3. **No org-admin escalation** — Field roles must not gain `org:write`, `admin:users`, or other management permissions via Knowledge Hub.
+4. **Tenant session** — Knowledge reads require authenticated Atlas user context (`requireAtlasUser` + `knowledge:read`). Platform `/docs` content is shared; tenant isolation is enforced at auth boundary (no anonymous or cross-tenant session fallback).
+5. **UI resilience** — Missing content → empty state. API 403 → forbidden state. API failure → error state. Never crash on undefined `t` translation catalog.
+6. **i18n** — `knowledgeHubTitle` and error/empty copy in Spanish and English.
+
+---
+
+## BR-152 — Knowledge Hub Practical Agent Reference Library
+
+**Implements:** Repurpose Knowledge Hub as a field-agent reference library with six categories, tenant feature gate `knowledgeHubEnabled`, and read-only field UX. Hide hub from sidebar when tenant disables for field users; RVP/Admin bypass tenant gate via `knowledge:write`.  
+**Domain:** Knowledge Hub content model / tenant features / workspace navigation  
+**Depends on:** BR-151 (`knowledge:read`, `knowledge:write`)  
+**Status:** Implemented  
+**Engine target:** `knowledgeHubService.js`, `knowledgeHubCategories.js`, `knowledgeHubAccess.js`, `tenantFeatureControls.js`, `KnowledgeHubLibraryHome.jsx`  
+**Tests:** `backend/test/knowledgeHubPracticalLibraryBr152.test.js`, `frontend/src/config/knowledgeHubPracticalLibraryBr152.test.js`
+
+### Rules
+
+1. **Content root** — Agent library lives under `docs/agent-library/` with six category folders (scripts, recruiting, licensing, product, procedures, quick reference). Technical `/docs` engineering content is not exposed in the field hub API.
+2. **Tenant gate** — `knowledgeHubEnabled` controls field-user access. OFF → hide sidebar + deny API with `KNOWLEDGE_HUB_NOT_ENABLED`. RVP/Admin (`knowledge:write`) bypass tenant gate.
+3. **Read-only field UX** — Field roles browse/search only; no edit/delete/publish in v1.
+4. **Home UX** — Category cards, search, recently updated, most-used (client view counts), empty states, back navigation inside articles.
+5. **Starter content** — One generic editable article per category; no invented legal/compliance claims.
+6. **Search** — Title, category, folder, path, and frontmatter keywords.
+
+---
+
+## BR-153 — Knowledge Hub Field UX Polish
+
+**Implements:** Human-friendly titles/summaries, legacy localStorage purge, breadcrumbs, article cards, unavailable-article state. Field users never see engineering doc paths or stale history.  
+**Depends on:** BR-152 (`docs/agent-library/**`)  
+**Status:** Implemented  
+**Tests:** `backend/test/knowledgeHubFieldUxBr153.test.js`, `frontend/src/config/knowledgeHubFieldUxBr153.test.js`
+
+### Rules
+
+1. **Display metadata** — Articles expose `displayTitle`, `shortSummary`, `categoryLabelKey`, `estimatedReadTime` from frontmatter with safe filename fallback.
+2. **Storage v3** — `atlas_knowledge_activity_v3` validates recent/favorites/pinned/viewCounts against current agent-library catalog; legacy engineering paths silently purged.
+3. **Unavailable articles** — Direct legacy URLs show friendly unavailable state; never expose technical title/path.
+4. **Field UI** — No raw `.md` paths, folder slugs, or filesystem tree in sidebar; breadcrumbs use Hub → Category → Article.
+
+---
+
+## BR-154 — Knowledge Hub Single-Language Article Experience
+
+**Implements:** Locale-specific article variants (`{slug}.en.md` / `{slug}.es.md`); API resolves full article (title, summary, body) from user locale. No mixed-language fields.
+**Depends on:** BR-153
+**Status:** Implemented
+**Tests:** `backend/test/knowledgeHubSingleLanguageBr154.test.js`, `frontend/src/config/knowledgeHubSingleLanguageBr154.test.js`
+
+### Rules
+
+1. **Content variants** — Each article uses explicit locale files under `docs/agent-library/**/{slug}.{locale}.md`.
+2. **Locale-neutral article path** — API/UI use `category/slug` (no `.md`, no locale suffix in URLs or storage).
+3. **Single-language resolution** — `locale` query param on `/api/knowledge/tree` and `/document`; Spanish users get Spanish metadata and body only.
+4. **No hybrid fallback** — Missing locale variant returns unavailable/404; never mix Spanish chrome with English article fields.
+5. **Storage migration** — Activity paths normalized from legacy `*.md` to locale-neutral slugs; display refreshed from current locale catalog.
+
+---
+
+## BR-155 — Recruiting Welcome Opener + City/State Clarification
+
+**Implements:** Spanish CTWA/QR first-touch opener without leading “servicios financieros”; city+state collection; ambiguous city-only asks state without guessing.
+**Depends on:** BR-131, BR-094
+**Status:** Implemented
+**Tests:** `backend/test/recruitAiV2WelcomeLocationHotfixBr155.test.js`
+
+### Rules
+
+1. **Spanish ad-lead first touch** — Info-request openers use acknowledgment + location ask (`ciudad y estado`); no financial-services lead-in on turn one.
+2. **Direct opportunity questions** — When prospect asks what the opportunity is (post-first-touch or explicit FAQ), use existing recruiting FAQ/overview copy honestly.
+3. **Confident city resolver** — Known cities (e.g. Miami → FL) may propose/confirm state; complete `City, ST` continues without redundant state ask.
+4. **Ambiguous city-only** — Ask only: `Perfecto 😊 ¿En qué estado queda esa ciudad?` — never invent state.
+5. **Scope** — Copy/renderer only; no change to attribution, routing, ownership, execution gates, or scheduling.
 
 ---
 

@@ -77,6 +77,8 @@ export function LanguageProvider({ children }) {
 
     return {
       language,
+      /** Translation catalog for components that prefer `t.key` over `translate("key")`. */
+      t: catalog,
       setLanguage: applyLanguage,
       setLanguagePreference,
       syncFromUser,

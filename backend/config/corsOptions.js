@@ -10,6 +10,9 @@
 const DEFAULT_PRODUCTION_ORIGINS = Object.freeze([
   "https://teamvisionfinancial.com",
   "https://www.teamvisionfinancial.com",
+  "https://useatlas-ai.com",
+  "https://www.useatlas-ai.com",
+  "https://app.useatlas-ai.com",
   "http://localhost:5173"
 ]);
 

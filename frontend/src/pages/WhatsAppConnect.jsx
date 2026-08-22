@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import { appPath } from "../config/appRoutes";
 import { useFacebookSdk } from "../hooks/useFacebookSdk";
 import {
@@ -10,20 +11,27 @@ import {
 } from "../services/metaEmbeddedSignupService";
 import {
   isAllowedFacebookOrigin,
-  mergeEmbeddedSignupIds,
   parseEmbeddedSignupPostMessage
 } from "../utils/metaEmbeddedSignupEvents";
 import { buildWhatsAppErrorNavigationState } from "../utils/mapWhatsAppUserError";
-import { whatsAppConnectDebug } from "../utils/whatsappConnectDebug";
+import {
+  COMPLETION_EXTENSION_MS,
+  COMPLETION_TIMEOUT_MS,
+  applyFinishPayload,
+  applyOAuthCode,
+  buildExchangePayload,
+  createEmbeddedSignupAttempt,
+  markExchangeCompleted,
+  markExchangeStarted,
+  markTimeoutExtended,
+  resolveTimeoutAction
+} from "../engines/embeddedSignupHandoff";
+import {
+  errorEmbeddedSignupTelemetry,
+  logEmbeddedSignupTelemetry,
+  warnEmbeddedSignupTelemetry
+} from "../utils/embeddedSignupTelemetry";
 import "./WhatsAppConnect.css";
-
-const FINISH_EVENTS = new Set([
-  "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
-  "FINISH",
-  "FINISH_ONLY_WABA",
-  "FINISH_GRANT_ONLY_API_ACCESS"
-]);
-const COMPLETION_TIMEOUT_MS = 60_000;
 
 function navigateToError(navigate, details) {
   navigate(appPath("settings/whatsapp/error"), {
@@ -34,18 +42,28 @@ function navigateToError(navigate, details) {
 
 export default function WhatsAppConnect() {
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
   const navigate = useNavigate();
   const { ready, error: sdkError, appId, configId } = useFacebookSdk();
+
+  const personalWhatsAppEnabled =
+    user?.capabilities?.personalWhatsAppEnabled === true ||
+    user?.agent_capabilities?.personalWhatsAppEnabled === true;
+
+  useEffect(() => {
+    if (user && !personalWhatsAppEnabled) {
+      navigate(appPath("settings/integrations"), { replace: true });
+    }
+  }, [user, personalWhatsAppEnabled, navigate]);
 
   const [status, setStatus] = useState("disconnected");
   const [alreadyConnected, setAlreadyConnected] = useState(false);
   const [launching, setLaunching] = useState(false);
 
-  const authorizationCodeRef = useRef(null);
-  const onboardingAssetsRef = useRef({ wabaId: null, phoneNumberId: null, businessId: null });
-  const exchangeSubmittedRef = useRef(false);
-  const exchangeInFlightRef = useRef(false);
+  /** Durable per-attempt handoff state (survives React rerenders). */
+  const attemptRef = useRef(null);
   const completionTimeoutRef = useRef(null);
+  const runExchangeRef = useRef(null);
 
   const clearCompletionTimeout = useCallback(() => {
     if (completionTimeoutRef.current != null) {
@@ -54,109 +72,193 @@ export default function WhatsAppConnect() {
     }
   }, []);
 
-  const resetAttempt = useCallback(() => {
-    clearCompletionTimeout();
-    authorizationCodeRef.current = null;
-    onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null, businessId: null };
-    exchangeSubmittedRef.current = false;
-    exchangeInFlightRef.current = false;
-    setLaunching(false);
-    setStatus("disconnected");
-  }, [clearCompletionTimeout]);
+  const armCompletionTimeout = useCallback(
+    (durationMs = COMPLETION_TIMEOUT_MS) => {
+      clearCompletionTimeout();
+      completionTimeoutRef.current = setTimeout(() => {
+        void (async () => {
+          const attempt = attemptRef.current;
+          const action = resolveTimeoutAction(attempt);
 
-  const armCompletionTimeout = useCallback(() => {
-    clearCompletionTimeout();
-    completionTimeoutRef.current = setTimeout(() => {
-      if (exchangeSubmittedRef.current || exchangeInFlightRef.current) {
-        return;
-      }
+          if (action === "suppress") {
+            logEmbeddedSignupTelemetry("timeout_suppressed", attempt);
+            return;
+          }
 
-      whatsAppConnectDebug("completion timeout");
-      navigateToError(navigate, { errorKey: "TIMEOUT" });
-    }, COMPLETION_TIMEOUT_MS);
-  }, [clearCompletionTimeout, navigate]);
+          if (action === "exchange") {
+            logEmbeddedSignupTelemetry("timeout_race_exchange", attempt);
+            await runExchangeRef.current?.();
+            return;
+          }
 
-  const attemptCompletion = useCallback(async () => {
-    const code = authorizationCodeRef.current;
-    const wabaId = onboardingAssetsRef.current.wabaId;
+          if (action === "extend") {
+            attemptRef.current = markTimeoutExtended(attempt);
+            warnEmbeddedSignupTelemetry("timeout_extended_partial", attemptRef.current, {
+              waitingFor: attempt.oauthCode ? "finish" : "oauth_code"
+            });
+            armCompletionTimeout(COMPLETION_EXTENSION_MS);
+            return;
+          }
 
-    if (!code || !wabaId || exchangeSubmittedRef.current || exchangeInFlightRef.current) {
+          try {
+            const payload = await getEmbeddedSignupStatus();
+            if (payload?.connected && payload.connection) {
+              logEmbeddedSignupTelemetry("timeout_reconcile_connected", attempt);
+              navigate(appPath("settings/whatsapp/success"), {
+                replace: true,
+                state: { connection: payload.connection }
+              });
+              return;
+            }
+          } catch (error) {
+            warnEmbeddedSignupTelemetry("timeout_reconcile_failed", attempt, {
+              message: error?.message || "status_failed"
+            });
+          }
+
+          warnEmbeddedSignupTelemetry("timeout_incomplete", attempt, {
+            reason: "missing_required_handoff_events"
+          });
+          navigateToError(navigate, { errorKey: "TIMEOUT" });
+        })();
+      }, durationMs);
+    },
+    [clearCompletionTimeout, navigate]
+  );
+
+  const runExchange = useCallback(async () => {
+    const attempt = attemptRef.current;
+    if (!attempt?.oauthCode || !attempt?.wabaId) {
       return;
     }
 
-    exchangeSubmittedRef.current = true;
-    exchangeInFlightRef.current = true;
+    const started = markExchangeStarted(attempt);
+    if (!started.started) {
+      return;
+    }
+    attemptRef.current = started.attempt;
+
     clearCompletionTimeout();
     setStatus("finalizing");
     setLaunching(true);
 
-    const payload = {
-      code,
-      wabaId,
-      phoneNumberId: onboardingAssetsRef.current.phoneNumberId || undefined,
-      businessId: onboardingAssetsRef.current.businessId || undefined,
-      onboardingType: "whatsapp_business_app",
-      redirectUri: `${window.location.origin}${window.location.pathname}`
-    };
+    const payload = buildExchangePayload(
+      attemptRef.current,
+      `${window.location.origin}${window.location.pathname}`
+    );
+
+    logEmbeddedSignupTelemetry("exchange_triggered", attemptRef.current, {
+      hasRedirectUri: Boolean(payload?.redirectUri)
+    });
 
     try {
       const result = await exchangeEmbeddedSignupCode(payload);
-
-      authorizationCodeRef.current = null;
-      onboardingAssetsRef.current = { wabaId: null, phoneNumberId: null, businessId: null };
-      exchangeInFlightRef.current = false;
+      attemptRef.current = markExchangeCompleted(attemptRef.current);
       setLaunching(false);
-
+      logEmbeddedSignupTelemetry("exchange_success", attemptRef.current);
       navigate(appPath("settings/whatsapp/success"), {
         replace: true,
         state: { connection: result.connection || null }
       });
     } catch (error) {
-      whatsAppConnectDebug("exchange failed", error);
-      exchangeSubmittedRef.current = false;
-      exchangeInFlightRef.current = false;
+      errorEmbeddedSignupTelemetry("exchange_failure", attemptRef.current, {
+        stage:
+          error instanceof MetaEmbeddedSignupError
+            ? error.payload?.stage || error.payload?.error || "EXCHANGE"
+            : "EXCHANGE"
+      });
+      // Allow a single retry if Meta re-delivers events with a fresh code
+      attemptRef.current = {
+        ...attemptRef.current,
+        exchangeStarted: false
+      };
       setLaunching(false);
 
-      const payload = error instanceof MetaEmbeddedSignupError ? error.payload || {} : {};
+      const errPayload = error instanceof MetaEmbeddedSignupError ? error.payload || {} : {};
       navigateToError(navigate, {
         message: error instanceof MetaEmbeddedSignupError ? error.message : "",
-        stage: payload.stage || payload.error || "",
-        code: payload.error || payload.publicCode || ""
+        stage: errPayload.stage || errPayload.error || "",
+        code: errPayload.error || errPayload.publicCode || ""
       });
     }
   }, [clearCompletionTimeout, navigate]);
 
-  const handleEmbeddedSignupEvent = useCallback(
+  runExchangeRef.current = runExchange;
+
+  const maybeExchange = useCallback(
+    (shouldExchange, waitingFor) => {
+      if (waitingFor) {
+        logEmbeddedSignupTelemetry("waiting_for_counterpart", attemptRef.current, {
+          waitingFor
+        });
+        if (waitingFor === "oauth_code") {
+          setLaunching(true);
+          setStatus("waiting_for_qr");
+        }
+      }
+      if (shouldExchange) {
+        void runExchange();
+      }
+    },
+    [runExchange]
+  );
+
+  const ingestOAuthCode = useCallback(
+    (code) => {
+      const attempt = attemptRef.current || createEmbeddedSignupAttempt();
+      if (!attemptRef.current) {
+        attemptRef.current = attempt;
+      }
+
+      const result = applyOAuthCode(attemptRef.current, code);
+      attemptRef.current = result.attempt;
+
+      if (result.ignored) {
+        return;
+      }
+
+      logEmbeddedSignupTelemetry("oauth_code_received", attemptRef.current);
+      maybeExchange(result.shouldExchange, result.waitingFor);
+    },
+    [maybeExchange]
+  );
+
+  const ingestFinishEvent = useCallback(
     (parsed) => {
       if (!parsed) {
         return;
       }
 
-      whatsAppConnectDebug("embedded signup event", parsed.event);
-
-      if (FINISH_EVENTS.has(parsed.event)) {
-        onboardingAssetsRef.current = mergeEmbeddedSignupIds(onboardingAssetsRef.current, parsed);
-
-        if (authorizationCodeRef.current) {
-          void attemptCompletion();
-        } else {
-          setLaunching(true);
-          setStatus("waiting_for_qr");
-        }
-
-        return;
-      }
-
       if (parsed.event === "CANCEL") {
+        warnEmbeddedSignupTelemetry("meta_cancel", attemptRef.current);
         navigateToError(navigate, { errorKey: "CANCELLED" });
         return;
       }
 
       if (parsed.event === "ERROR") {
+        errorEmbeddedSignupTelemetry("meta_error", attemptRef.current);
         navigateToError(navigate, { errorKey: "EXCHANGE" });
+        return;
       }
+
+      const attempt = attemptRef.current || createEmbeddedSignupAttempt();
+      if (!attemptRef.current) {
+        attemptRef.current = attempt;
+      }
+
+      const result = applyFinishPayload(attemptRef.current, parsed);
+      attemptRef.current = result.attempt;
+
+      if (result.ignored) {
+        return;
+      }
+
+      logEmbeddedSignupTelemetry("finish_received", attemptRef.current, {
+        event: parsed.event || null
+      });
+      maybeExchange(result.shouldExchange, result.waitingFor);
     },
-    [attemptCompletion, navigate]
+    [maybeExchange, navigate]
   );
 
   useEffect(() => {
@@ -176,8 +278,8 @@ export default function WhatsAppConnect() {
           setAlreadyConnected(true);
           setStatus("connected");
         }
-      } catch (error) {
-        whatsAppConnectDebug("status load failed", error);
+      } catch {
+        // Non-fatal preload
       }
     }
 
@@ -188,18 +290,24 @@ export default function WhatsAppConnect() {
     };
   }, []);
 
+  // Stable message listener — does not tear down when exchange callbacks change.
   useEffect(() => {
     function handler(event) {
       if (!isAllowedFacebookOrigin(event.origin)) {
         return;
       }
 
-      handleEmbeddedSignupEvent(parseEmbeddedSignupPostMessage(event.data));
+      const parsed = parseEmbeddedSignupPostMessage(event.data);
+      if (!parsed) {
+        return;
+      }
+
+      ingestFinishEvent(parsed);
     }
 
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [handleEmbeddedSignupEvent]);
+  }, [ingestFinishEvent]);
 
   const fbLoginCallback = useCallback(
     (response) => {
@@ -215,23 +323,31 @@ export default function WhatsAppConnect() {
         return;
       }
 
-      authorizationCodeRef.current = code;
-      void attemptCompletion();
+      ingestOAuthCode(code);
     },
-    [attemptCompletion, navigate]
+    [ingestOAuthCode, navigate]
   );
+
+  // Keep latest FB callback on a ref so launch always uses current ingest path.
+  const fbLoginCallbackRef = useRef(fbLoginCallback);
+  fbLoginCallbackRef.current = fbLoginCallback;
 
   const launchWhatsAppSignup = useCallback(() => {
     if (launching || !ready || !window.FB || !configId) {
       return;
     }
 
-    resetAttempt();
+    clearCompletionTimeout();
+    const attempt = createEmbeddedSignupAttempt();
+    attemptRef.current = attempt;
     setLaunching(true);
     setStatus("connecting");
     armCompletionTimeout();
+    logEmbeddedSignupTelemetry("attempt_started", attempt, {
+      origin: typeof window !== "undefined" ? window.location.origin : null
+    });
 
-    window.FB.login(fbLoginCallback, {
+    window.FB.login((response) => fbLoginCallbackRef.current(response), {
       config_id: configId,
       response_type: "code",
       override_default_response_type: true,
@@ -241,7 +357,7 @@ export default function WhatsAppConnect() {
         sessionInfoVersion: "3"
       }
     });
-  }, [armCompletionTimeout, configId, fbLoginCallback, launching, ready, resetAttempt]);
+  }, [armCompletionTimeout, clearCompletionTimeout, configId, launching, ready]);
 
   const isConnectDisabled =
     launching || !ready || !appId || !configId || status === "connecting" || status === "finalizing";
@@ -270,7 +386,10 @@ export default function WhatsAppConnect() {
         {alreadyConnected ? (
           <div className="whatsapp-connect__connected-banner">
             <p>{translate("whatsappConnectAlreadyConnected")}</p>
-            <Link className="whatsapp-connect__button whatsapp-connect__button--secondary" to={appPath("settings/integrations")}>
+            <Link
+              className="whatsapp-connect__button whatsapp-connect__button--secondary"
+              to={appPath("settings/integrations")}
+            >
               {translate("whatsappErrorReturnIntegrations")}
             </Link>
           </div>

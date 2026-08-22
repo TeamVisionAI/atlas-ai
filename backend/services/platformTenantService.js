@@ -145,6 +145,19 @@ async function createTenant(input = {}, auditMeta = {}) {
     userAgent: auditMeta.userAgent
   });
 
+  // RT2 — new non-seed tenants start with operational features explicitly OFF.
+  try {
+    const {
+      initializeTenantFeaturesOff
+    } = require("./tenantFeatureService");
+    await initializeTenantFeaturesOff(data.id, auditMeta);
+  } catch (featureError) {
+    console.warn(
+      "[platformTenantService] initializeTenantFeaturesOff failed:",
+      featureError.message
+    );
+  }
+
   return presentTenant(orgRow || data, subscriptionRow);
 }
 
@@ -226,7 +239,28 @@ async function getTenant(organizationId) {
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  return presentTenant(data, subscriptionRow);
+  const tenant = presentTenant(data, subscriptionRow);
+
+  try {
+    const {
+      getTenantFeatureControlsPresentation
+    } = require("./tenantFeatureService");
+    const featurePresentation = await getTenantFeatureControlsPresentation(
+      organizationId,
+      { lifecycleStatus: tenant.lifecycleStatus }
+    );
+    tenant.features = featurePresentation.features;
+    tenant.featureControls = featurePresentation.controls;
+  } catch {
+    tenant.features = {
+      recruitAiAuthoringEnabled: false,
+      recruitAiExecutionEnabled: false,
+      qrCampaignManagerEnabled: false
+    };
+    tenant.featureControls = [];
+  }
+
+  return tenant;
 }
 
 async function setTenantStatus(organizationId, lifecycleStatusInput, auditMeta = {}) {
@@ -271,6 +305,7 @@ async function provisionTenantAdmin(organizationId, input = {}, authContext = {}
     {
       ...input,
       role: input.role || ROLES.ADMINISTRATOR,
+      businessRank: input.businessRank || input.business_rank || "RVP",
       organizationId
     },
     authContext,

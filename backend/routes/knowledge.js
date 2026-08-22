@@ -1,21 +1,81 @@
 /**
- * Atlas Knowledge Hub API — authenticated read-only /docs access.
+ * Atlas Knowledge Hub API — authenticated read-only agent reference library.
  */
 
 const express = require("express");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
+const { organizationGuard } = require("../middleware/organizationGuard");
+const { requirePermission } = require("../middleware/requirePermission");
+const { PERMISSIONS } = require("../security/permissions");
+const { getTenantOrganizationId } = require("../services/tenantContextService");
 const {
   getKnowledgeTree,
   getKnowledgeDocument
 } = require("../core/knowledgeHubService");
+const { normalizeKnowledgeLocale } = require("../core/knowledgeHubLocales");
+const {
+  assertKnowledgeHubAccessAsync,
+  resolveKnowledgeHubAccessAsync,
+  ACCESS_CODES
+} = require("../core/knowledgeHub/knowledgeHubAccess");
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
+router.use(organizationGuard());
+router.use(requirePermission(PERMISSIONS.KNOWLEDGE_READ));
+
+async function requireKnowledgeHubAccess(req, res) {
+  try {
+    await assertKnowledgeHubAccessAsync({
+      userId: req.atlasUser?.id,
+      organizationId: getTenantOrganizationId(req),
+      authContext: req.authContext
+    });
+    return true;
+  } catch (error) {
+    res.status(error.statusCode || 403).json({
+      error: error.code || ACCESS_CODES.FORBIDDEN,
+      message: error.message,
+      reason: error.reason || null
+    });
+    return false;
+  }
+}
+
+router.get("/access", async (req, res) => {
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const result = await resolveKnowledgeHubAccessAsync({
+      userId: req.atlasUser?.id,
+      organizationId,
+      authContext: req.authContext
+    });
+    res.json({
+      allowed: result.allowed === true,
+      organizationId,
+      reason: result.reason || null,
+      code: result.code || null,
+      managementBypass: result.managementBypass === true,
+      featureEnabled: result.feature?.enabled === true,
+      globalEnabled: result.feature?.global?.enabled !== false
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.code || "KNOWLEDGE_HUB_ACCESS_FAILED",
+      message: "Failed to resolve Knowledge Hub access"
+    });
+  }
+});
 
 router.get("/tree", async (req, res) => {
+  if (!(await requireKnowledgeHubAccess(req, res))) {
+    return;
+  }
+
   try {
-    const payload = getKnowledgeTree();
+    const locale = normalizeKnowledgeLocale(req.query.locale || req.query.lang);
+    const payload = getKnowledgeTree({ locale });
     res.json(payload);
   } catch (error) {
     console.error("[knowledge/tree]", error.message);
@@ -27,6 +87,10 @@ router.get("/tree", async (req, res) => {
 });
 
 router.get("/document", async (req, res) => {
+  if (!(await requireKnowledgeHubAccess(req, res))) {
+    return;
+  }
+
   try {
     const documentPath = req.query.path;
 
@@ -37,7 +101,8 @@ router.get("/document", async (req, res) => {
       });
     }
 
-    const payload = getKnowledgeDocument(documentPath);
+    const locale = normalizeKnowledgeLocale(req.query.locale || req.query.lang);
+    const payload = getKnowledgeDocument(documentPath, { locale });
     res.json(payload);
   } catch (error) {
     console.error("[knowledge/document]", error.message);

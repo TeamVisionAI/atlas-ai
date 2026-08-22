@@ -48,6 +48,32 @@ export function getRoleLabelKey(role) {
   return keys[normalized] || "workspaceRoleRepresentative";
 }
 
+/** User-facing title prefers business_rank over LC1 permission role. */
+export function getDisplayTitleLabelKey(user) {
+  if (isSuperAdminUser(user)) {
+    return "workspaceRoleSuperAdmin";
+  }
+
+  const rank = String(user?.business_rank || user?.businessRank || "")
+    .trim()
+    .toUpperCase();
+
+  const rankKeys = {
+    RVP: "businessRankRvp",
+    SRL: "businessRankSrl",
+    RL: "businessRankRl",
+    DIV: "businessRankDiv",
+    DIS: "businessRankDis",
+    REP: "businessRankRep"
+  };
+
+  if (rankKeys[rank]) {
+    return rankKeys[rank];
+  }
+
+  return getRoleLabelKey(user?.role);
+}
+
 export function getWorkspaceLabelKey(workspaceType) {
   const keys = {
     [WORKSPACE_TYPES.ADMINISTRATOR]: "workspaceLabelAdministrator",
@@ -58,14 +84,13 @@ export function getWorkspaceLabelKey(workspaceType) {
   return keys[workspaceType] || "workspaceLabelRepresentative";
 }
 
+/** BR-149 — RVP/Admin → Executive; SRL/RL/DIV/DIS/REP → Team Dashboard. */
 export function getDefaultLandingPath(role) {
-  const workspaceType = resolveWorkspaceType(role);
-
-  if (workspaceType === WORKSPACE_TYPES.ADMINISTRATOR) {
+  if (roleHasPermission(role, PERMISSIONS.DASHBOARD_EXECUTIVE)) {
     return appPath("executive-dashboard");
   }
 
-  if (workspaceType === WORKSPACE_TYPES.MANAGEMENT) {
+  if (roleHasPermission(role, PERMISSIONS.DASHBOARD_TEAM)) {
     return appPath("team-dashboard");
   }
 
@@ -78,7 +103,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     path: appPath("executive-dashboard"),
     labelKey: "navExecutiveDashboard",
     end: true,
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
   myDashboard: {
@@ -93,8 +118,12 @@ const NAV_ITEM_DEFS = Object.freeze({
     path: appPath("team-dashboard"),
     labelKey: "navTeamDashboard",
     end: true,
-    workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.DASHBOARD_EXECUTIVE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.DASHBOARD_TEAM
   },
   quickCapture: {
     id: "quick-capture",
@@ -165,7 +194,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "knowledge",
     path: appPath("knowledge"),
     labelKey: "navKnowledge",
-    permission: PERMISSIONS.PROSPECT_READ
+    permission: PERMISSIONS.KNOWLEDGE_READ
   },
   policyIntelligence: {
     id: "policy-intelligence",
@@ -192,7 +221,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "admin-users",
     path: appPath("admin/users"),
     labelKey: "navAdminUsers",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.ADMIN_USERS
   },
   operationsCenter: {
@@ -231,9 +260,9 @@ const BUSINESS_CORE_NAV_ORDER = Object.freeze([
 ]);
 
 const WORKSPACE_LANDING_NAV = Object.freeze({
-  [WORKSPACE_TYPES.ADMINISTRATOR]: ["executiveDashboard"],
-  [WORKSPACE_TYPES.MANAGEMENT]: ["teamDashboard"],
-  [WORKSPACE_TYPES.REPRESENTATIVE]: ["myDashboard"]
+  [WORKSPACE_TYPES.ADMINISTRATOR]: ["executiveDashboard", "teamDashboard"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["executiveDashboard", "teamDashboard"],
+  [WORKSPACE_TYPES.REPRESENTATIVE]: ["teamDashboard", "myDashboard"]
 });
 
 /** Leadership extensions beyond core Business (still permission-gated). */
@@ -246,7 +275,7 @@ const LEADERSHIP_EXTENSION_NAV = Object.freeze({
 /** Administration surfaces — configuration and platform operations. */
 const ADMINISTRATION_NAV = Object.freeze({
   [WORKSPACE_TYPES.ADMINISTRATOR]: ["settings", "adminUsers", "operationsCenter", "platformTenants"],
-  [WORKSPACE_TYPES.MANAGEMENT]: ["settings"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["settings", "adminUsers"],
   [WORKSPACE_TYPES.REPRESENTATIVE]: ["settings"]
 });
 
@@ -260,7 +289,7 @@ function buildNavOrderForWorkspace(workspaceType) {
 }
 
 const USER_MANAGEMENT_ROUTE_RULE = Object.freeze({
-  workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+  workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
   permission: PERMISSIONS.ADMIN_USERS
 });
 
@@ -292,15 +321,19 @@ function matchesRouteAccessRule(rule, user, { operationsAllowed = false } = {}) 
 
 export const ROUTE_ACCESS = Object.freeze({
   "executive-dashboard": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
   "my-dashboard": {
     workspaceTypes: [WORKSPACE_TYPES.REPRESENTATIVE]
   },
   "team-dashboard": {
-    workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.DASHBOARD_EXECUTIVE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.DASHBOARD_TEAM
   },
   "mission-control": { permission: PERMISSIONS.PROSPECT_READ },
   "prospect-center": { permission: PERMISSIONS.PROSPECT_READ },
@@ -321,7 +354,7 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
-  knowledge: { permission: PERMISSIONS.PROSPECT_READ },
+  knowledge: { permission: PERMISSIONS.KNOWLEDGE_READ },
   "policy-intelligence": { permission: PERMISSIONS.POLICY_READ },
   settings: {
     workspaceTypes: [
@@ -332,12 +365,16 @@ export const ROUTE_ACCESS = Object.freeze({
   },
   "settings/profile": {},
   "settings/integrations": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "settings/organization": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   "settings/scheduling": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
@@ -351,11 +388,14 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.BILLING_ACCESS
   },
-  // BR-110 — MANAGEMENT (RVP / DL / RL) may open self Appointments settings.
-  // API remains self-scoped; Review Users / org Scheduling stay admin-gated.
+  // BR-147 / BR-110 — personal availability for all recruiting roles
   "settings/appointments": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.PROSPECT_WRITE
   },
   "settings/qr-campaigns": {
     workspaceTypes: [
@@ -366,16 +406,28 @@ export const ROUTE_ACCESS = Object.freeze({
     permission: PERMISSIONS.PROSPECT_WRITE
   },
   "settings/whatsapp": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "settings/whatsapp/success": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "settings/whatsapp/error": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "admin/users": USER_MANAGEMENT_ROUTE_RULE,
   "operations-center": {
@@ -408,7 +460,10 @@ function canSeeNavItem(def, user, workspaceType, operationsAllowed) {
   return true;
 }
 
-export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
+export function buildNavItemsForUser(
+  user,
+  { operationsAllowed = false, conversationsCenterAllowed = null, knowledgeHubAllowed = null } = {}
+) {
   if (!user) {
     return [];
   }
@@ -419,6 +474,15 @@ export function buildNavItemsForUser(user, { operationsAllowed = false } = {}) {
   return order
     .map((key) => NAV_ITEM_DEFS[key])
     .filter((def) => canSeeNavItem(def, user, workspaceType, operationsAllowed))
+    .filter((def) => {
+      if (def.id === "conversations" && conversationsCenterAllowed === false) {
+        return false;
+      }
+      if (def.id === "knowledge" && knowledgeHubAllowed === false) {
+        return false;
+      }
+      return true;
+    })
     .map((def) => ({
       path: def.path,
       end: def.end,
@@ -517,7 +581,7 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     descriptionKey: "configurationHubOrganizationDescription",
     icon: "organization",
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   {
     id: "integrations",
@@ -526,8 +590,12 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "integrations",
     descriptionKey: "configurationHubIntegrationsDescription",
     icon: "integrations",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   {
     id: "scheduling",
@@ -566,9 +634,12 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "appointments",
     descriptionKey: "configurationHubAppointmentsDescription",
     icon: "scheduling",
-    // BR-110 — self appointment profile for management recruiters (RVP/DL/RL).
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.PROSPECT_WRITE
   },
   {
     id: "qr-campaigns",

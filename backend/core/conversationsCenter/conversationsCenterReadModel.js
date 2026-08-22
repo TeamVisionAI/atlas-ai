@@ -8,11 +8,10 @@ const { loadPersistedWorkflowState } = require("../workflowStateStore");
 const { OWNERSHIP } = require("../workflowConstants");
 const {
   CONVERSATION_FILTERS,
-  CONVERSATION_OWNERSHIP_STATE,
-  TEAM_VISION_ORG_ID
+  CONVERSATION_OWNERSHIP_STATE
 } = require("./constants");
 const { resolveConversationOwnershipState } = require("./conversationsCenterOwnershipService");
-const { isProspectInNiovelPilotScope } = require("./conversationsCenterAccess");
+const { isProspectInConversationsTenantScope, isProspectInConversationsUserScope } = require("./conversationsCenterAccess");
 const {
   isRecruitingConversationEligibleForInbox,
   resolveRecruitingInboxEligibility
@@ -336,20 +335,26 @@ function buildFilterCounts(items) {
  * @param {{ organizationId: string, filter?: string, search?: string, prospects?: object[] }} options
  */
 async function buildConversationsCenterReadModel(options = {}) {
-  if (String(options.organizationId || "") !== TEAM_VISION_ORG_ID) {
-    throw Object.assign(new Error("organizationId must be Team Vision for Conversations Center"), {
+  const organizationId = String(options.organizationId || "").trim();
+  if (!organizationId) {
+    throw Object.assign(new Error("organizationId is required for Conversations Center"), {
       statusCode: 403,
       code: "CONVERSATIONS_CENTER_ORG_FORBIDDEN"
     });
   }
 
   const prospects =
-    options.prospects ?? (await loadProductionProspectsSafe(options.organizationId));
+    options.prospects ?? (await loadProductionProspectsSafe(organizationId));
 
-  const pilotScoped = prospects.filter(isProspectInNiovelPilotScope);
+  const authContext = options.authContext || null;
+  const tenantScoped = prospects.filter((prospect) =>
+    authContext
+      ? isProspectInConversationsUserScope(prospect, organizationId, authContext)
+      : isProspectInConversationsTenantScope(prospect, organizationId)
+  );
   const scoped = (
     await Promise.all(
-      pilotScoped.map(async (prospect) => {
+      tenantScoped.map(async (prospect) => {
         const eligibility = await resolveRecruitingInboxEligibility(prospect);
         return eligibility.eligible ? prospect : null;
       })
@@ -394,11 +399,12 @@ async function buildConversationsCenterReadModel(options = {}) {
   };
 }
 
-async function getConversationsAttentionCount(organizationId, prospects) {
+async function getConversationsAttentionCount(organizationId, prospects, authContext = null) {
   const model = await buildConversationsCenterReadModel({
     organizationId,
     prospects,
-    filter: CONVERSATION_FILTERS.ACTIVE
+    filter: CONVERSATION_FILTERS.ACTIVE,
+    authContext
   });
 
   return {

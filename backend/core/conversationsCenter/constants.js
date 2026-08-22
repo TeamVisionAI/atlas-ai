@@ -1,6 +1,7 @@
 /**
- * Conversations Center — Niovel-only production pilot scope.
- * Do not widen these allowlists.
+ * Conversations Center constants.
+ * TEAM_VISION_ORG_ID / NIOVEL_USER_ID remain for legacy fixtures and migration notes only —
+ * they are not product access gates (see conversationsCenterAccess.js).
  */
 
 const TEAM_VISION_ORG_ID = "00000000-0000-4000-8000-000000000001";
@@ -41,6 +42,7 @@ const HANDOFF_REASONS = Object.freeze({
   TAKE_OVER: "take_over",
   RECRUITER_ESCALATION: "recruiter_escalation",
   STALL: "stall",
+  WHATSAPP_BUSINESS_APP: "whatsapp_business_app",
   UNKNOWN: "unknown"
 });
 

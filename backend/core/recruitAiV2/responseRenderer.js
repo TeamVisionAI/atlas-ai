@@ -31,6 +31,7 @@ const {
   getAuthorizationDeniedMessage,
   getAuthorizationQuestion,
   getStateQuestion,
+  getAmbiguousCityStateQuestion,
   getDayPartQuestion,
   getFirstMessage,
   getNaturalGreetingAck,
@@ -209,7 +210,7 @@ const COPY = Object.freeze({
     clarify_once:
       "Con gusto te ayudo — ¿puedes compartir el dato que te acabo de pedir para continuar?",
     confirm_location_proposal: "Perfecto. ¿{city}, {proposedStateName}?",
-    ask_state: "Perfecto. ¿En qué estado está {city}?",
+    ask_state: null,
     ask_city: "Gracias. ¿En qué ciudad de {proposedStateName} vives?",
     continue_qualification: "Gracias — eso ayuda. Continuemos.",
     continue_qualification_after_location:
@@ -262,8 +263,7 @@ const COPY = Object.freeze({
       "Perfecto, gracias por aclararlo. Entonces estás en {city}, {proposedStateName}. {resumeQuestion}",
     acknowledge_correction_confirm_location:
       "Entendido — gracias por la corrección. ¿{city}, {proposedStateName}?",
-    acknowledge_correction_ask_state:
-      "Entendido — gracias por la corrección. ¿En qué estado está {city}?",
+    acknowledge_correction_ask_state: null,
     authorization_denied: null,
     language_switch_resume:
       "Claro — podemos continuar en español. {resumeQuestion}",
@@ -699,6 +699,8 @@ function renderCustomerReply(responsePlan) {
     );
   } else if (key === "greeting_ask_location") {
     template = getFirstMessage(lang);
+  } else if (key === "ask_state" || key === "acknowledge_correction_ask_state") {
+    template = getStateQuestion(city === "there" ? null : city, lang, {});
   } else if (key === "job_overview_faq_then_resume") {
     template = composeJobOverviewThenResume(language, entities);
   } else if (key === "insurance_faq_then_resume") {

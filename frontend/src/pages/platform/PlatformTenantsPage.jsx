@@ -18,7 +18,8 @@ import {
   enterSupportMode,
   getTenant,
   listTenants,
-  updateTenantStatus
+  updateTenantStatus,
+  updateTenantFeatures
 } from "../../services/platformService";
 import {
   LIFECYCLE_FILTERS,
@@ -83,6 +84,7 @@ export default function PlatformTenantsPage() {
   const [adminForm, setAdminForm] = useState(EMPTY_ADMIN);
   const [assigning, setAssigning] = useState(false);
   const [busyTenantId, setBusyTenantId] = useState("");
+  const [featureBusyKey, setFeatureBusyKey] = useState("");
 
   const allowed = isSuperAdminUser(user);
   const counts = useMemo(() => countLifecycleStatuses(tenants), [tenants]);
@@ -222,6 +224,47 @@ export default function PlatformTenantsPage() {
       setError(err.message || "Unable to update tenant status.");
     } finally {
       setBusyTenantId("");
+    }
+  }
+
+  async function handleFeatureToggle(featureKey, nextValue) {
+    if (!detail?.id) {
+      return;
+    }
+
+    if (featureKey === "recruitAiExecutionEnabled" && nextValue === true) {
+      const confirmed = window.confirm(
+        `Enable Recruit AI Execution for ${detail.name}?\n\n` +
+          "This is a live/destructive capability. Authoring ON does not imply Execution ON — " +
+          "this toggle is independent. Global Railway kill switches still apply."
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setFeatureBusyKey(featureKey);
+    setError("");
+    setNotice("");
+
+    try {
+      const result = await updateTenantFeatures(detail.id, {
+        [featureKey]: nextValue
+      });
+      setDetail((current) =>
+        current
+          ? {
+              ...current,
+              features: result.features || current.features,
+              featureControls: result.controls || current.featureControls
+            }
+          : current
+      );
+      setNotice(`Updated ${featureKey} for ${detail.name}.`);
+    } catch (err) {
+      setError(err.message || "Unable to update tenant features.");
+    } finally {
+      setFeatureBusyKey("");
     }
   }
 
@@ -568,6 +611,57 @@ export default function PlatformTenantsPage() {
               <dd>{formatDate(detail.createdAt)}</dd>
             </div>
           </dl>
+
+          <h3 className="platform-tenants-page__features-title">Operational features</h3>
+          <p className="platform-tenants-page__lede">
+            Super Admin only. Global Railway kill switches still apply. Authoring and Execution are
+            independent — enabling Authoring never enables Execution.
+          </p>
+          <div className="platform-feature-controls" data-testid="platform-feature-controls">
+            {(detail.featureControls || []).map((control) => (
+              <div
+                key={control.featureKey}
+                className={`platform-feature-controls__row${
+                  control.destructive ? " platform-feature-controls__row--destructive" : ""
+                }`}
+              >
+                <div>
+                  <strong>{control.label}</strong>
+                  <div className="platform-feature-controls__status">{control.statusLabel}</div>
+                  {control.destructive ? (
+                    <div className="platform-feature-controls__warning">
+                      Live mutations / appointments — use with care.
+                    </div>
+                  ) : null}
+                </div>
+                <label className="platform-feature-controls__toggle">
+                  <span>Configured</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(control.configured)}
+                    disabled={featureBusyKey === control.featureKey}
+                    onChange={(event) =>
+                      handleFeatureToggle(control.featureKey, event.target.checked)
+                    }
+                    data-testid={`feature-toggle-${control.featureKey}`}
+                  />
+                </label>
+              </div>
+            ))}
+            {!detail.featureControls?.length ? (
+              <p className="platform-tenants-page__lede">Feature controls unavailable.</p>
+            ) : null}
+          </div>
+
+          <div className="identity-actions">
+            <button
+              type="button"
+              className="identity-button-secondary"
+              onClick={() => setDetail(null)}
+            >
+              Close
+            </button>
+          </div>
         </section>
       ) : null}
     </div>

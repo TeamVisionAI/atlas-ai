@@ -77,17 +77,56 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
 
   async function getConnection(organizationId) {
     const store = readRawStore();
-    return normalizeStoredConnection(store.connections?.[organizationId] || null);
+    const connection = normalizeStoredConnection(store.connections?.[organizationId] || null);
+    if (connection?.user_id) {
+      return null;
+    }
+    return connection;
+  }
+
+  async function getUserConnection(organizationId, userId) {
+    const store = readRawStore();
+    const personalKey = `${organizationId}::${userId}`;
+    const direct = normalizeStoredConnection(store.connections?.[personalKey] || null);
+    if (direct) {
+      return direct;
+    }
+    const legacy = normalizeStoredConnection(store.connections?.[organizationId] || null);
+    if (legacy && String(legacy.user_id || "") === String(userId)) {
+      return legacy;
+    }
+    return null;
+  }
+
+  async function findConnectionByPhoneNumberId(phoneNumberId) {
+    const id = String(phoneNumberId || "").trim();
+    if (!id) return null;
+    const store = readRawStore();
+    const matches = Object.values(store.connections || {})
+      .map(normalizeStoredConnection)
+      .filter((row) => row && row.status === "connected" && String(row.phone_number_id) === id);
+    if (matches.length > 1) {
+      const err = new Error("WhatsApp phone_number_id maps to multiple connected owners.");
+      err.code = "WHATSAPP_PHONE_ID_AMBIGUOUS";
+      err.publicCode = "WHATSAPP_PHONE_ID_AMBIGUOUS";
+      err.statusCode = 503;
+      throw err;
+    }
+    return matches[0] || null;
   }
 
   async function saveConnection(organizationId, record) {
     const now = new Date().toISOString();
     const store = readRawStore();
-    const existing = normalizeStoredConnection(store.connections?.[organizationId]);
+    const ownerUserId = record.user_id || record.userId || null;
+    const existing = ownerUserId
+      ? await getUserConnection(organizationId, ownerUserId)
+      : await getConnection(organizationId);
     const encryptedToken = tokenEncryption.encrypt(record.access_token);
 
     const connection = {
       organization_id: organizationId,
+      user_id: record.user_id || record.userId || null,
       business_id: record.business_id || null,
       waba_id: record.waba_id,
       phone_number_id: record.phone_number_id,
@@ -105,7 +144,10 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
       updated_at: now
     };
 
-    store.connections[organizationId] = connection;
+    const storeKey = connection.user_id
+      ? `${organizationId}::${connection.user_id}`
+      : organizationId;
+    store.connections[storeKey] = connection;
     writeRawStore(store.connections);
 
     metaLogger.info("whatsapp_integration_saved", {
@@ -153,9 +195,10 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
     return updated;
   }
 
-  async function disconnectConnection(organizationId) {
+  async function disconnectConnection(organizationId, userId = null) {
     const store = readRawStore();
-    const existing = normalizeStoredConnection(store.connections?.[organizationId]);
+    const storeKey = userId ? `${organizationId}::${userId}` : organizationId;
+    const existing = normalizeStoredConnection(store.connections?.[storeKey]);
 
     if (!existing) {
       return null;
@@ -172,7 +215,7 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
       last_sync_at: now
     };
 
-    store.connections[organizationId] = updated;
+    store.connections[storeKey] = updated;
     writeRawStore(store.connections);
     return updated;
   }
@@ -184,6 +227,8 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
   return assertRepositoryImplementation({
     saveConnection,
     getConnection,
+    getUserConnection,
+    findConnectionByPhoneNumberId,
     getDecryptedAccessToken,
     updateConnection,
     disconnectConnection,

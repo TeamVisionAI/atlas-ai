@@ -5,6 +5,7 @@ import { usePageMeta } from "../hooks/usePageMeta";
 import "./PublicSite.css";
 
 const PRIVACY_EMAIL = "privacy@teamvisionfinancial.com";
+const SUPPORT_EMAIL = "support@teamvisionfinancial.com";
 const DELETION_MAILTO = `mailto:${PRIVACY_EMAIL}?subject=${encodeURIComponent("Data Deletion Request")}`;
 
 export default function DataDeletion() {
@@ -24,7 +25,7 @@ export default function DataDeletion() {
             <p className="public-site__lead">
               Your privacy matters. Atlas AI gives you control over your personal information.
             </p>
-            <p className="public-site__legal-updated">Last updated: July 23, 2026</p>
+            <p className="public-site__legal-updated">Last updated: August 2026</p>
           </header>
 
           <h2>Request Data Deletion</h2>
@@ -81,6 +82,8 @@ export default function DataDeletion() {
           <p>
             For questions about privacy or data deletion, contact:{" "}
             <a href={`mailto:${PRIVACY_EMAIL}`}>{PRIVACY_EMAIL}</a>
+            {" "}or support at{" "}
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
           </p>
           <p>
             See also our <Link to="/privacy">Privacy Policy</Link> and{" "}

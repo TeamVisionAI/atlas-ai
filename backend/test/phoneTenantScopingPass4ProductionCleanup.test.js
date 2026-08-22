@@ -232,7 +232,7 @@ test("Conversations Center scoped prospect read cannot load foreign same-phone r
     tenantProspect(ORG_A),
     tenantProspect(ORG_B, { owner_user_id: NIOVEL })
   ]);
-  const { isProspectInNiovelPilotScope } = require("../core/conversationsCenter/conversationsCenterAccess");
+  const { isProspectInConversationsTenantScope } = require("../core/conversationsCenter/conversationsCenterAccess");
 
   const patch = patchSupabaseServiceExports(store);
 
@@ -242,7 +242,7 @@ test("Conversations Center scoped prospect read cannot load foreign same-phone r
     }
 
     const prospect = await store.findProspectInOrganization(phone, organizationId);
-    if (!prospect || !isProspectInNiovelPilotScope(prospect)) {
+    if (!prospect || !isProspectInConversationsTenantScope(prospect, organizationId)) {
       return null;
     }
     return prospect;
@@ -250,12 +250,15 @@ test("Conversations Center scoped prospect read cannot load foreign same-phone r
 
   try {
     const ownTenant = await loadScopedProspect(PHONE, ORG_A);
-    const foreignTenant = await loadScopedProspect(PHONE, ORG_B);
+    const otherTenantOwn = await loadScopedProspect(PHONE, ORG_B);
     const missingOrg = await loadScopedProspect(PHONE, null);
 
     assert.equal(ownTenant?.organization_id, ORG_A);
-    assert.equal(foreignTenant, null);
+    assert.equal(otherTenantOwn?.organization_id, ORG_B);
+    assert.notEqual(ownTenant?.id, otherTenantOwn?.id);
     assert.equal(missingOrg, null);
+    // Direct foreign org id must not leak the other tenant's row through ORG_A lookup.
+    assert.notEqual(ownTenant?.organization_id, ORG_B);
   } finally {
     patch.restore();
   }

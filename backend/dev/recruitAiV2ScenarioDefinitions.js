@@ -1803,7 +1803,9 @@ const RECRUIT_AI_V2_SCENARIOS = [
         text: "¡Hola! Quiero más información",
         inboundMessageId: "sim-wamid.pr-fixed.t01",
         expect: {
-          intent: "greeting",
+          intent: "job_opportunity_question",
+          replyIncludes: ["pediste más información", "ciudad y estado"],
+          replyExcludes: ["servicios financieros"],
           shouldEscalate: false,
           sideEffectsDenied: true
         }

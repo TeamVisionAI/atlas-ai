@@ -21,6 +21,14 @@ export async function updateAdminUser(userId, payload) {
   });
 }
 
+export async function updateUserAgentCapabilities(userId, payload) {
+  return apiFetch(`/api/admin/users/${userId}/capabilities`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function suspendAdminUser(userId) {
   return apiFetch(`/api/admin/users/${userId}/suspend`, { method: "POST" });
 }
@@ -43,6 +51,10 @@ export async function forceLogoutUser(userId) {
 
 export async function resendInvitation(userId) {
   return apiFetch(`/api/admin/users/${userId}/resend-invitation`, { method: "POST" });
+}
+
+export async function revokeInvitation(userId) {
+  return apiFetch(`/api/admin/users/${userId}/revoke-invitation`, { method: "POST" });
 }
 
 export async function transferOwnership(fromUserId, toUserId) {

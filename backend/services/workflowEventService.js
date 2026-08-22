@@ -9,6 +9,9 @@ const {
   isUniqueViolation,
   isWhatsAppInboundClaimCorrelationId
 } = require("../core/whatsappInboundClaim");
+const {
+  isHumanEchoClaimCorrelationId
+} = require("../core/whatsappHumanOutboundClaim");
 
 let workflowEventsTableAvailable = true;
 
@@ -177,6 +180,61 @@ async function claimWhatsAppInboundCorrelation({
 }
 
 /**
+ * Atomic claim for native WhatsApp Business app outbound echoes.
+ * Canonical key: whatsapp:human_echo:{providerMessageId}
+ */
+async function claimWhatsAppHumanEchoCorrelation({
+  correlationId,
+  prospectPhone,
+  organizationId = null,
+  providerMessageId = null
+} = {}) {
+  const key = String(correlationId || "").trim();
+  const phone = String(prospectPhone || "").trim();
+
+  if (!key || !phone) {
+    return { claimed: false, reason: "INVALID_CLAIM" };
+  }
+
+  if (!isHumanEchoClaimCorrelationId(key)) {
+    return { claimed: false, reason: "INVALID_CLAIM" };
+  }
+
+  const inserted = await insertWorkflowEvent({
+    prospectPhone: phone,
+    eventType: EVENT_TYPES.MESSAGE_SENT,
+    actor: "AGENT",
+    organizationId: organizationId || null,
+    correlationId: key,
+    payload: {
+      providerMessageId: providerMessageId || null,
+      humanEchoClaim: true,
+      source: "whatsapp_business_app"
+    }
+  });
+
+  if (inserted.success) {
+    return { claimed: true, event: inserted.event };
+  }
+
+  if (isUniqueViolation({ code: inserted.code, message: inserted.error })) {
+    return { claimed: false, reason: "DUPLICATE_PROVIDER_MESSAGE" };
+  }
+
+  if (inserted.error === "WORKFLOW_EVENTS_TABLE_UNAVAILABLE") {
+    const existing = await findWorkflowEventByCorrelationId(key);
+    if (existing) {
+      return { claimed: false, reason: "DUPLICATE_PROVIDER_MESSAGE" };
+    }
+    return { claimed: true, degraded: true, event: null };
+  }
+
+  const error = new Error(inserted.error || "HUMAN_ECHO_CLAIM_FAILED");
+  error.code = inserted.code || "HUMAN_ECHO_CLAIM_FAILED";
+  throw error;
+}
+
+/**
  * Read workflow events for a prospect (Mission Control / audit).
  */
 async function listWorkflowEvents(phone, limit = 50) {
@@ -234,6 +292,7 @@ module.exports = {
   findWorkflowEventByCorrelationId,
   pickCanonicalWorkflowEvent,
   claimWhatsAppInboundCorrelation,
+  claimWhatsAppHumanEchoCorrelation,
   listWorkflowEvents,
   listRecentWorkflowEvents
 };
