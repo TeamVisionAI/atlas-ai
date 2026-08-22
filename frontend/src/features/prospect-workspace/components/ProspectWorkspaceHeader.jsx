@@ -8,20 +8,24 @@ export default function ProspectWorkspaceHeader({ phone, onOpenMissionControl })
 
   return (
     <header className="prospect-workspace__toolbar">
-      <Link to={appPath()} className="prospect-workspace__back">
-        ← {translate("workspaceBack")}
-      </Link>
-      <span className="prospect-workspace__title">{translate("workspaceTitle")}</span>
-      <Link to={buildProspectCenterPath()} className="prospect-workspace__mission-link">
-        {translate("navProspectCenter")}
-      </Link>
-      <button
-        type="button"
-        className="prospect-workspace__mission-link"
-        onClick={() => onOpenMissionControl(phone)}
-      >
-        {translate("executiveOpenMissionControl")}
-      </button>
+      <div className="prospect-workspace__toolbar-start">
+        <Link to={appPath()} className="prospect-workspace__back">
+          ← {translate("workspaceBack")}
+        </Link>
+        <span className="prospect-workspace__title">{translate("workspaceTitle")}</span>
+      </div>
+      <div className="prospect-workspace__toolbar-actions">
+        <Link to={buildProspectCenterPath()} className="prospect-workspace__mission-link">
+          {translate("navProspectCenter")}
+        </Link>
+        <button
+          type="button"
+          className="prospect-workspace__mission-link"
+          onClick={() => onOpenMissionControl(phone)}
+        >
+          {translate("executiveOpenMissionControl")}
+        </button>
+      </div>
     </header>
   );
 }

@@ -5,13 +5,37 @@
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
 }
 
 .prospect-workspace__toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
+}
+
+.prospect-workspace__toolbar-start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.prospect-workspace__toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 auto;
+  margin-left: auto;
+  max-width: 100%;
 }
 
 .prospect-workspace__back {
@@ -19,15 +43,20 @@
   text-decoration: none;
   font-weight: 600;
   font-size: 14px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .prospect-workspace__title {
-  flex: 1;
+  min-width: 0;
   font-size: 14px;
   font-weight: 600;
   color: #64748b;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prospect-workspace__mission-link {
@@ -40,6 +69,11 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  flex: 0 1 auto;
+  max-width: 100%;
+  text-align: center;
+  text-decoration: none;
+  line-height: 1.25;
 }
 
 .prospect-workspace__loading,
@@ -455,8 +489,33 @@
     align-items: stretch;
   }
 
+  .prospect-workspace__toolbar-start {
+    flex-direction: column;
+    align-items: flex-start;
+    flex-basis: auto;
+  }
+
+  .prospect-workspace__toolbar-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .prospect-workspace__mission-link {
+    flex: 1 1 auto;
+  }
+
   .prospect-workspace__title {
     order: -1;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 1280px) {
+  .prospect-workspace__toolbar-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
   }
 }
 
