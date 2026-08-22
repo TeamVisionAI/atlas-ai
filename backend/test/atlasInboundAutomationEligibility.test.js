@@ -3,7 +3,7 @@
  * FACEBOOK / CLICK_TO_WHATSAPP labels and existing Recruit AI sessions are not proof.
  */
 
-require("dotenv").config();
+require("dotenv").config({ path: require("node:path").join(__dirname, "../../.env") });
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -198,24 +198,36 @@ test("valid QR pending/stored attribution => reply allowed", () => {
     evaluateAtlasInboundAutomationEligibility({
       prospect: unknownProspect({
         source: WHATSAPP_SOURCE.CAR_MAGNET,
-        entry_method: WHATSAPP_ENTRY_METHOD.QR
-      })
+        entry_method: WHATSAPP_ENTRY_METHOD.QR,
+        updated_at: new Date().toISOString()
+      }),
+      workflowState: { canonicalMilestone: MILESTONES.QUALIFICATION }
     }).eligible,
     true
   );
 });
 
-test("verified CTWA eligibility source survives later turns without referral", async () => {
+test("verified CTWA eligibility source requires active recruiting session", async () => {
   await withTempWorkflowState(async () => {
     const { shouldDeliverAutomatedReply } = require("../core/communicationHub");
-    const prospect = unknownProspect();
+    const { REOPENED_INACTIVITY_MS } = require("../core/whatsappConstants");
+    const prospect = unknownProspect({
+      updated_at: new Date(Date.now() - REOPENED_INACTIVITY_MS - 3600000).toISOString()
+    });
     assert.equal(await shouldDeliverAutomatedReply(prospect), false);
 
     await persistVerifiedAtlasEligibilitySource(prospect.phone, "CTWA_REFERRAL", {
       organizationId: prospect.organization_id,
       prospectId: prospect.id
     });
-    assert.equal(await shouldDeliverAutomatedReply(prospect), true);
+    assert.equal(await shouldDeliverAutomatedReply(prospect), false);
+
+    const activeProspect = {
+      ...prospect,
+      updated_at: new Date().toISOString(),
+      current_step: "QUALIFICATION"
+    };
+    assert.equal(await shouldDeliverAutomatedReply(activeProspect), true);
   });
 });
 
