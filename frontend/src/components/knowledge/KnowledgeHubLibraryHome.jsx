@@ -1,19 +1,80 @@
 import { KNOWLEDGE_CATEGORY_BY_ID } from "../../config/knowledgeHubCategories";
+import {
+  enrichArticleForDisplay,
+  formatArticleUpdatedAt,
+  formatReadTimeLabel,
+  getArticleDisplayTitle
+} from "../../utils/knowledgeDisplay";
+import MarkdownViewer from "./MarkdownViewer";
 import "./KnowledgeHubLibraryHome.css";
+
+export function KnowledgeHubBreadcrumbs({ trail, onNavigate }) {
+  if (!trail?.length) {
+    return null;
+  }
+
+  return (
+    <nav className="knowledge-library__breadcrumbs" aria-label="Breadcrumb">
+      {trail.map((item, index) => (
+        <span key={`${item.id}-${index}`} className="knowledge-library__breadcrumb-item">
+          {index > 0 ? <span className="knowledge-library__breadcrumb-sep">→</span> : null}
+          {index < trail.length - 1 && onNavigate ? (
+            <button type="button" className="knowledge-library__breadcrumb-link" onClick={() => onNavigate(item, index)}>
+              {item.label}
+            </button>
+          ) : (
+            <span className="knowledge-library__breadcrumb-current">{item.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
 
 function CategoryCard({ category, t, articleCount, onSelect }) {
   return (
     <button type="button" className="knowledge-library__card" onClick={() => onSelect(category)}>
+      <span className="knowledge-library__card-icon" aria-hidden="true">
+        {String(category.order || "")}
+      </span>
       <h3>{t[category.labelKey]}</h3>
       <p>{t[category.descriptionKey]}</p>
       <span className="knowledge-library__card-count">
-        {articleCount} {articleCount === 1 ? t.knowledgeHubArticleSingular : t.knowledgeHubArticlePlural}
+        {articleCount}{" "}
+        {articleCount === 1 ? t.knowledgeHubArticleSingular : t.knowledgeHubArticlePlural}
       </span>
     </button>
   );
 }
 
-function ArticleList({ title, items, emptyLabel, onSelect, selectedPath, t }) {
+export function ArticleCard({ article, t, locale, selectedPath, onSelect }) {
+  const enriched = enrichArticleForDisplay(article, t, locale);
+  if (!enriched) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      className={`knowledge-library__article-card${selectedPath === enriched.path ? " is-active" : ""}`}
+      onClick={() => onSelect(enriched)}
+    >
+      <span className="knowledge-library__article-card-title">{enriched.displayTitle}</span>
+      {enriched.categoryLabel ? (
+        <span className="knowledge-library__article-card-category">{enriched.categoryLabel}</span>
+      ) : null}
+      {enriched.shortSummary ? (
+        <span className="knowledge-library__article-card-summary">{enriched.shortSummary}</span>
+      ) : null}
+      <span className="knowledge-library__article-card-meta">
+        {enriched.readTimeLabel ? <span>{enriched.readTimeLabel}</span> : null}
+        {enriched.updatedLabel ? <span>{enriched.updatedLabel}</span> : null}
+      </span>
+    </button>
+  );
+}
+
+function ArticleList({ title, items, emptyLabel, onSelect, selectedPath, t, locale }) {
   if (!items.length) {
     return (
       <section className="knowledge-library__panel">
@@ -26,24 +87,18 @@ function ArticleList({ title, items, emptyLabel, onSelect, selectedPath, t }) {
   return (
     <section className="knowledge-library__panel">
       <h2>{title}</h2>
-      <ul className="knowledge-library__list">
+      <div className="knowledge-library__article-list">
         {items.map((item) => (
-          <li key={item.path}>
-            <button
-              type="button"
-              className={`knowledge-library__list-button${selectedPath === item.path ? " is-active" : ""}`}
-              onClick={() => onSelect(item)}
-            >
-              <span className="knowledge-library__list-title">{item.title}</span>
-              {item.categoryId && KNOWLEDGE_CATEGORY_BY_ID[item.categoryId] ? (
-                <span className="knowledge-library__list-meta">
-                  {t[KNOWLEDGE_CATEGORY_BY_ID[item.categoryId].labelKey]}
-                </span>
-              ) : null}
-            </button>
-          </li>
+          <ArticleCard
+            key={item.path}
+            article={item}
+            t={t}
+            locale={locale}
+            selectedPath={selectedPath}
+            onSelect={onSelect}
+          />
         ))}
-      </ul>
+      </div>
     </section>
   );
 }
@@ -98,6 +153,7 @@ export default function KnowledgeHubLibraryHome({
           onSelect={onSelectArticle}
           selectedPath={selectedPath}
           t={t}
+          locale={locale}
         />
         <ArticleList
           title={t.knowledgeHubMostUsed}
@@ -106,6 +162,7 @@ export default function KnowledgeHubLibraryHome({
           onSelect={onSelectArticle}
           selectedPath={selectedPath}
           t={t}
+          locale={locale}
         />
       </div>
     </div>
@@ -122,38 +179,118 @@ export function KnowledgeHubCategoryView({
   onBackHome
 }) {
   const meta = KNOWLEDGE_CATEGORY_BY_ID[category?.id] || category;
+  const trail = [
+    { id: "hub", label: t.knowledgeHubTitle, action: "hub" },
+    { id: "category", label: meta?.labelKey ? t[meta.labelKey] : category?.id, action: "category" }
+  ];
 
   return (
     <div className="knowledge-library">
-      <button type="button" className="knowledge-library__back" onClick={onBackHome}>
-        ← {t.knowledgeHubBackToHub}
-      </button>
+      <KnowledgeHubBreadcrumbs
+        trail={trail}
+        onNavigate={(item) => {
+          if (item.action === "hub") {
+            onBackHome();
+          }
+        }}
+      />
       <header className="knowledge-library__category-header">
         <h2>{meta?.labelKey ? t[meta.labelKey] : category?.id}</h2>
         {meta?.descriptionKey ? <p>{t[meta.descriptionKey]}</p> : null}
       </header>
       {articles.length ? (
-        <ul className="knowledge-library__list">
+        <div className="knowledge-library__article-list">
           {articles.map((item) => (
-            <li key={item.path}>
-              <button
-                type="button"
-                className={`knowledge-library__list-button${selectedPath === item.path ? " is-active" : ""}`}
-                onClick={() => onSelectArticle(item)}
-              >
-                <span className="knowledge-library__list-title">{item.title}</span>
-                {item.updatedAt ? (
-                  <span className="knowledge-library__list-meta">
-                    {new Date(item.updatedAt).toLocaleDateString(locale)}
-                  </span>
-                ) : null}
-              </button>
-            </li>
+            <ArticleCard
+              key={item.path}
+              article={item}
+              t={t}
+              locale={locale}
+              selectedPath={selectedPath}
+              onSelect={onSelectArticle}
+            />
           ))}
-        </ul>
+        </div>
       ) : (
         <p className="knowledge-library__empty">{t.knowledgeHubCategoryEmpty}</p>
       )}
     </div>
+  );
+}
+
+export function KnowledgeHubArticleView({
+  t,
+  locale,
+  document,
+  category,
+  isFavorite,
+  isPinned,
+  onBackHome,
+  onBackCategory,
+  onToggleFavorite,
+  onTogglePinned
+}) {
+  const displayTitle = getArticleDisplayTitle(document);
+  const categoryMeta = KNOWLEDGE_CATEGORY_BY_ID[category?.id || document?.categoryId] || category;
+  const trail = [
+    { id: "hub", label: t.knowledgeHubTitle, action: "hub" },
+    {
+      id: "category",
+      label: categoryMeta?.labelKey ? t[categoryMeta.labelKey] : "",
+      action: "category"
+    },
+    { id: "article", label: displayTitle, action: "article" }
+  ].filter((item) => item.label);
+
+  return (
+    <article className="knowledge-library__article">
+      <KnowledgeHubBreadcrumbs
+        trail={trail}
+        onNavigate={(item) => {
+          if (item.action === "hub") {
+            onBackHome();
+          }
+          if (item.action === "category") {
+            onBackCategory();
+          }
+        }}
+      />
+      <header className="knowledge-library__article-header">
+        <h1>{displayTitle}</h1>
+        <div className="knowledge-library__article-meta">
+          {categoryMeta?.labelKey ? <span>{t[categoryMeta.labelKey]}</span> : null}
+          {document?.estimatedReadTime ? (
+            <span>{formatReadTimeLabel(document, t)}</span>
+          ) : null}
+          {document?.updatedAt ? (
+            <span>
+              {t.knowledgeHubUpdatedAt}: {formatArticleUpdatedAt(document.updatedAt, locale)}
+            </span>
+          ) : null}
+        </div>
+        {document?.shortSummary ? (
+          <p className="knowledge-library__article-lead">{document.shortSummary}</p>
+        ) : null}
+        <div className="knowledge-hub__doc-actions">
+          <button
+            type="button"
+            className={`knowledge-hub__icon-button${isFavorite ? " is-active" : ""}`}
+            onClick={onToggleFavorite}
+          >
+            {isFavorite ? "★" : "☆"} {t.knowledgeHubFavoriteAction}
+          </button>
+          <button
+            type="button"
+            className={`knowledge-hub__icon-button${isPinned ? " is-active" : ""}`}
+            onClick={onTogglePinned}
+          >
+            📌 {t.knowledgeHubPinAction}
+          </button>
+        </div>
+      </header>
+      <div className="knowledge-library__article-body">
+        <MarkdownViewer content={document.content} />
+      </div>
+    </article>
   );
 }

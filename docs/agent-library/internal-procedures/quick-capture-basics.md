@@ -1,5 +1,9 @@
 ---
+displayTitle: How to Add a Prospect with Quick Capture
+shortSummary: Step-by-step for field users adding a new prospect in Atlas.
+categoryId: internal-procedures
 keywords: Quick Capture, prospect, new lead, Atlas workflow
+estimatedReadTime: 3 min
 ---
 
 # Quick Capture basics

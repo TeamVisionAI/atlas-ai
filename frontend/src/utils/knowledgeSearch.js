@@ -5,12 +5,13 @@
 export const SEARCH_STRATEGY = "keyword";
 
 const FIELD_WEIGHTS = {
+  displayTitle: 6,
   title: 5,
-  name: 4,
+  shortSummary: 4,
+  name: 3,
   categoryId: 4,
-  folder: 3,
   keywords: 3,
-  path: 2
+  path: 1
 };
 
 function tokenize(query) {

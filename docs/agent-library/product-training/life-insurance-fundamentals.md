@@ -1,5 +1,9 @@
 ---
+displayTitle: Life Insurance Fundamentals — Overview
+shortSummary: Educational talking points on term vs permanent concepts with compliance-safe framing.
+categoryId: product-training
 keywords: life insurance, term, permanent, basics, compliance
+estimatedReadTime: 4 min
 ---
 
 # Life insurance fundamentals (overview)

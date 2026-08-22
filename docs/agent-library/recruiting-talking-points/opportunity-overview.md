@@ -1,5 +1,9 @@
 ---
+displayTitle: Opportunity Overview — Talking Points
+shortSummary: A concise outline for first recruiting conversations.
+categoryId: recruiting-talking-points
 keywords: opportunity overview, recruiting, part-time, full-time
+estimatedReadTime: 3 min
 ---
 
 # Opportunity overview

@@ -1,8 +1,12 @@
 ---
+displayTitle: "Is This Sales?" — How to Respond
+shortSummary: A short script when prospects ask whether the opportunity is sales.
+categoryId: scripts-objection-handling
 keywords: sales objection, is this sales, recruiting conversation
+estimatedReadTime: 3 min
 ---
 
-# Is this sales?
+# Is This Sales?
 
 Use this as a starting script when a prospect asks whether the opportunity is sales.
 
