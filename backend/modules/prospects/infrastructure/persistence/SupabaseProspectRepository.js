@@ -363,6 +363,14 @@ class ProspectRepository {
       );
     }
 
+    if (Array.isArray(filters.ownerUserIds) && filters.ownerUserIds.length) {
+      const clauses = filters.ownerUserIds.flatMap((id) => [
+        `owner_user_id.eq.${id}`,
+        `assigned_agent_id.eq.${id}`
+      ]);
+      query = query.or(clauses.join(","));
+    }
+
     if (filters.lifecycleState) {
       query = query.eq("lifecycle_state", filters.lifecycleState);
     }

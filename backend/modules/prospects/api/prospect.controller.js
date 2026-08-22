@@ -133,6 +133,7 @@ function createProspectController(service = new ProspectApplicationService()) {
           offset: req.query.offset,
           organizationId: resolveOrganizationId(req),
           ownerUserId: scope.ownerUserId,
+          ownerUserIds: scope.ownerUserIds,
           divisionId: scope.divisionId
         });
 

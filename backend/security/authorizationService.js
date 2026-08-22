@@ -4,6 +4,10 @@
 
 const { ROLES, canUserLogin, normalizeRole } = require("./roles");
 const { permissionsForRole, roleHasPermission } = require("./permissions");
+const {
+  HIERARCHY_MODES,
+  prospectBelongsToScopedUsers
+} = require("../core/hierarchyScopeEngine");
 
 const PERMISSION_ALIASES = Object.freeze({
   "admin:users": ["admin:users", "users:manage"],
@@ -34,7 +38,7 @@ function resolveUserStatus(user) {
   return user.status || "active";
 }
 
-function buildAuthContext(user, { jwtPayload = null, permissions = null } = {}) {
+function buildAuthContext(user, { jwtPayload = null, permissions = null, hierarchy = null } = {}) {
   if (!user) {
     return null;
   }
@@ -49,21 +53,48 @@ function buildAuthContext(user, { jwtPayload = null, permissions = null } = {}) 
     String(user.role || ROLES.RECRUITER).toUpperCase();
   const legacyRole = identity.legacyRole || normalizeRole(user.role) || toLegacyRole(saasRole);
 
+  const hierarchyMode = hierarchy?.mode || null;
+  const hierarchyUserIds =
+    hierarchy && Object.prototype.hasOwnProperty.call(hierarchy, "userIds")
+      ? hierarchy.userIds
+      : undefined;
+
   return {
     userId: user.id,
     email: user.email,
     role: legacyRole,
     saasRole,
+    businessRank: user.business_rank || user.businessRank || null,
     organizationId: user.organization_id || user.organizationId || DEFAULT_ORGANIZATION_ID,
     divisionId: user.division_id || user.divisionId || null,
+    reportsToUserId: user.reports_to_user_id || user.reportsToUserId || null,
     permissions: permissions || jwtPayload?.permissions || permissionsForRole(legacyRole),
-    status: resolveUserStatus(user)
+    status: resolveUserStatus(user),
+    hierarchyMode,
+    hierarchyUserIds,
+    hierarchyReason: hierarchy?.reason || null
   };
 }
 
 async function buildAuthContextAsync(user, options = {}) {
   const permissions = user ? await resolvePermissionsForUser(user) : null;
-  return buildAuthContext(user, { ...options, permissions });
+  let hierarchy = options.hierarchy || null;
+
+  if (user && !hierarchy) {
+    try {
+      const { resolveHierarchyScopeForUser } = require("../core/hierarchyScopeEngine");
+      hierarchy = await resolveHierarchyScopeForUser(user);
+    } catch (error) {
+      console.error("[authContext] hierarchy resolve failed", error.message);
+      hierarchy = {
+        mode: HIERARCHY_MODES.SELF,
+        userIds: user.id ? [String(user.id)] : [],
+        reason: "HIERARCHY_RESOLVE_ERROR_FAIL_CLOSED"
+      };
+    }
+  }
+
+  return buildAuthContext(user, { ...options, permissions, hierarchy });
 }
 
 function isActiveContext(context) {
@@ -120,14 +151,26 @@ function canAccessProspect(context, prospect = {}) {
   const ownerUserId = prospect.owner_user_id || prospect.ownerUserId;
   const assignedAgentId = prospect.assigned_agent_id || prospect.assignedAgentId;
   const assignedDivisionId = prospect.assigned_division_id || prospect.assignedDivisionId;
-  const assignedRvpId = prospect.assigned_rvp_id || prospect.assignedRvpId;
 
   if (context.role === ROLES.DIVISION_LEADER) {
-    if (context.divisionId && assignedDivisionId) {
-      return String(context.divisionId) === String(assignedDivisionId);
+    if (context.hierarchyMode === HIERARCHY_MODES.ORGANIZATION) {
+      return true;
     }
 
-    return String(context.userId) === String(assignedRvpId);
+    if (Array.isArray(context.hierarchyUserIds)) {
+      if (prospectBelongsToScopedUsers(prospect, context.hierarchyUserIds)) {
+        return true;
+      }
+      if (context.divisionId && assignedDivisionId) {
+        return String(context.divisionId) === String(assignedDivisionId);
+      }
+      return false;
+    }
+
+    return (
+      String(context.userId) === String(ownerUserId) ||
+      String(context.userId) === String(assignedAgentId)
+    );
   }
 
   if (context.role === ROLES.AGENT || context.role === ROLES.RECRUITER) {
@@ -171,9 +214,20 @@ function getProspectListScope(context) {
   }
 
   if (context.role === ROLES.DIVISION_LEADER) {
+    if (
+      context.hierarchyMode === HIERARCHY_MODES.SUBTREE &&
+      Array.isArray(context.hierarchyUserIds) &&
+      context.hierarchyUserIds.length > 1
+    ) {
+      return {
+        organizationId: context.organizationId,
+        ownerUserIds: context.hierarchyUserIds
+      };
+    }
+
     return {
       organizationId: context.organizationId,
-      divisionId: context.divisionId
+      ownerUserId: context.userId
     };
   }
 

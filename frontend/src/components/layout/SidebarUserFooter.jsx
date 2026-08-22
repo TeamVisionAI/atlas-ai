@@ -4,12 +4,11 @@ import UserAvatar from "../ui/UserAvatar";
 import { appPath } from "../../config/appRoutes";
 import { logoutAtlasSession } from "../../services/atlasAuthService";
 import {
-  getRoleLabelKey,
+  getDisplayTitleLabelKey,
   getSettingsPathForUser,
   getWorkspaceLabelKey,
   resolveWorkspaceType
 } from "../../config/workspaceExperience";
-import { isSuperAdminUser } from "../../security/isSuperAdminUser";
 import "./SidebarUserFooter.css";
 
 export default function SidebarUserFooter({
@@ -29,9 +28,7 @@ export default function SidebarUserFooter({
     user.email;
 
   const workspaceType = resolveWorkspaceType(user.role);
-  const roleLabelKey = isSuperAdminUser(user)
-    ? "workspaceRoleSuperAdmin"
-    : getRoleLabelKey(user.role);
+  const roleLabelKey = getDisplayTitleLabelKey(user);
 
   useEffect(() => {
     if (!menuOpen) {

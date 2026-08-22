@@ -15,6 +15,7 @@ const {
   assertConversationsCenterAccessAsync,
   resolveConversationsCenterAccessAsync,
   isProspectInConversationsTenantScope,
+  isProspectInConversationsUserScope,
   ACCESS_CODES
 } = require("../core/conversationsCenter/conversationsCenterAccess");
 const {
@@ -92,7 +93,7 @@ router.get("/attention-count", async (req, res) => {
 
   try {
     const organizationId = getTenantOrganizationId(req);
-    const payload = await getConversationsAttentionCount(organizationId);
+    const payload = await getConversationsAttentionCount(organizationId, undefined, req.authContext);
     res.json(payload);
   } catch (error) {
     console.error("[conversations-center] attention-count", error.message);
@@ -113,7 +114,8 @@ router.get("/", async (req, res) => {
     const payload = await buildConversationsCenterReadModel({
       organizationId,
       filter: req.query.filter,
-      search: req.query.q
+      search: req.query.q,
+      authContext: req.authContext
     });
     res.json(payload);
   } catch (error) {
@@ -125,14 +127,22 @@ router.get("/", async (req, res) => {
   }
 });
 
-async function loadScopedProspect(phone, organizationId) {
+async function loadScopedProspect(phone, organizationId, authContext = null) {
   if (!phone || !organizationId) {
     return null;
   }
 
   const prospect = await findProspectInOrganization(phone, organizationId);
 
-  if (!prospect || !isProspectInConversationsTenantScope(prospect, organizationId)) {
+  if (!prospect) {
+    return null;
+  }
+
+  if (authContext) {
+    if (!isProspectInConversationsUserScope(prospect, organizationId, authContext)) {
+      return null;
+    }
+  } else if (!isProspectInConversationsTenantScope(prospect, organizationId)) {
     return null;
   }
 
@@ -190,7 +200,7 @@ async function takeOverHandler(req, res) {
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId);
+    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
 
     if (!prospect) {
       return res.status(404).json({
@@ -255,7 +265,7 @@ async function returnToAtlasHandler(req, res) {
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId);
+    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
 
     if (!prospect) {
       return res.status(404).json({
@@ -303,7 +313,7 @@ async function scopedLifecycleAction(req, res, actionName, run) {
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId);
+    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
 
     if (!prospect) {
       return res.status(404).json({
@@ -380,7 +390,7 @@ router.post("/mark-read", async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId);
+    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
 
     if (!prospect) {
       return res.status(404).json({
@@ -434,7 +444,7 @@ router.get("/:phone", async (req, res) => {
 
   try {
     const organizationId = getTenantOrganizationId(req);
-    const prospect = await loadScopedProspect(req.params.phone, organizationId);
+    const prospect = await loadScopedProspect(req.params.phone, organizationId, req.authContext);
 
     if (!prospect) {
       return res.status(404).json({
