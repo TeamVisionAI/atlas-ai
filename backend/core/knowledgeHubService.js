@@ -1,5 +1,6 @@
 /**
  * Atlas Knowledge Hub — read-only agent reference library under docs/agent-library.
+ * BR-154 — locale-specific article variants (no mixed-language fields).
  */
 
 const fs = require("fs");
@@ -9,12 +10,20 @@ const {
   resolveCategoryForPath
 } = require("./knowledgeHubCategories");
 const { buildArticleMetadata } = require("./knowledgeHubArticleMetadata");
+const {
+  DEFAULT_LOCALE,
+  normalizeKnowledgeLocale,
+  parseLocalizedFilename,
+  buildArticlePath,
+  normalizeArticlePath,
+  resolveArticleDiskPath
+} = require("./knowledgeHubLocales");
 
 const AGENT_LIBRARY_ROOT = path.resolve(__dirname, "../../docs/agent-library");
-const DEFAULT_DOCUMENT_PATH = "quick-reference/what-do-i-do-next.md";
+const DEFAULT_DOCUMENT_PATH = "quick-reference/what-do-i-do-next";
 
-function isMarkdownFile(name) {
-  return name.endsWith(".md") && !name.startsWith(".");
+function isLocaleMarkdownFile(name) {
+  return parseLocalizedFilename(name) !== null;
 }
 
 function toPosixRelative(relativePath) {
@@ -54,7 +63,7 @@ function parseFrontmatter(content) {
   };
 }
 
-function resolveSafeDocumentPath(relativePath) {
+function resolveSafeDocumentPath(relativePath, locale = DEFAULT_LOCALE) {
   if (!relativePath || typeof relativePath !== "string") {
     throw Object.assign(new Error("Document path is required."), {
       statusCode: 400,
@@ -62,23 +71,18 @@ function resolveSafeDocumentPath(relativePath) {
     });
   }
 
-  const normalizedInput = relativePath.trim().replace(/\\/g, "/");
+  const normalizedLocale = normalizeKnowledgeLocale(locale);
+  const articlePath = normalizeArticlePath(relativePath);
 
-  if (!normalizedInput || normalizedInput.includes("..") || path.isAbsolute(normalizedInput)) {
+  if (!articlePath || articlePath.includes("..") || path.isAbsolute(articlePath)) {
     throw Object.assign(new Error("Invalid document path."), {
       statusCode: 400,
       publicCode: "INVALID_PATH"
     });
   }
 
-  if (!isMarkdownFile(normalizedInput)) {
-    throw Object.assign(new Error("Only Markdown documents are allowed."), {
-      statusCode: 400,
-      publicCode: "INVALID_EXTENSION"
-    });
-  }
-
-  const absolutePath = path.resolve(AGENT_LIBRARY_ROOT, normalizedInput);
+  const diskRelativePath = resolveArticleDiskPath(articlePath, normalizedLocale);
+  const absolutePath = path.resolve(AGENT_LIBRARY_ROOT, diskRelativePath);
   const relativeToRoot = path.relative(AGENT_LIBRARY_ROOT, absolutePath);
 
   if (
@@ -93,47 +97,39 @@ function resolveSafeDocumentPath(relativePath) {
   }
 
   if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
-    throw Object.assign(new Error("Document not found."), {
+    throw Object.assign(new Error("Document not found for requested language."), {
       statusCode: 404,
-      publicCode: "NOT_FOUND"
+      publicCode: "LOCALE_NOT_AVAILABLE"
     });
   }
 
   return {
-    relativePath: toPosixRelative(relativeToRoot),
-    absolutePath
+    articlePath,
+    diskRelativePath: toPosixRelative(relativeToRoot),
+    absolutePath,
+    locale: normalizedLocale
   };
 }
 
-function extractTitle(markdown, fallbackName) {
-  const match = markdown.match(/^#\s+(.+)$/m);
-
-  if (match?.[1]) {
-    return match[1].trim();
-  }
-
-  return fallbackName.replace(/\.md$/i, "").replace(/[-_]/g, " ");
-}
-
-function buildFileNode(relativeFilePath, absoluteFile) {
+function buildFileNode({ articlePath, diskFilename, absoluteFile, locale }) {
   const stats = fs.statSync(absoluteFile);
   const rawContent = fs.readFileSync(absoluteFile, "utf8");
   const { body, meta } = parseFrontmatter(rawContent);
-  const posixPath = toPosixRelative(relativeFilePath);
-  const folderDir = path.posix.dirname(posixPath);
+  const folderDir = path.posix.dirname(articlePath);
   const folder = folderDir === "." ? "" : folderDir;
-  const category = resolveCategoryForPath(posixPath);
+  const category = resolveCategoryForPath(articlePath);
   const metadata = buildArticleMetadata({
     meta,
     body,
-    filename: path.basename(posixPath),
+    filename: diskFilename,
     category
   });
 
   return {
     type: "file",
-    name: path.basename(posixPath),
-    path: posixPath,
+    name: path.basename(articlePath),
+    path: articlePath,
+    locale,
     folder,
     categoryId: metadata.categoryId,
     categoryFolder: category?.folder || folder,
@@ -147,8 +143,37 @@ function buildFileNode(relativeFilePath, absoluteFile) {
   };
 }
 
-function buildCategoryDirectoryNode(categoryDef) {
+function indexCategoryArticles(categoryDef) {
   const categoryDir = path.join(AGENT_LIBRARY_ROOT, categoryDef.folder);
+  const articles = new Map();
+
+  if (!fs.existsSync(categoryDir) || !fs.statSync(categoryDir).isDirectory()) {
+    return articles;
+  }
+
+  for (const entry of fs.readdirSync(categoryDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !isLocaleMarkdownFile(entry.name)) {
+      continue;
+    }
+
+    const parsed = parseLocalizedFilename(entry.name);
+    if (!parsed) {
+      continue;
+    }
+
+    const articlePath = buildArticlePath(categoryDef.folder, parsed.slug);
+    if (!articles.has(articlePath)) {
+      articles.set(articlePath, {});
+    }
+    articles.get(articlePath)[parsed.locale] = entry.name;
+  }
+
+  return articles;
+}
+
+function buildCategoryDirectoryNode(categoryDef, locale) {
+  const categoryDir = path.join(AGENT_LIBRARY_ROOT, categoryDef.folder);
+  const indexed = indexCategoryArticles(categoryDef);
 
   if (!fs.existsSync(categoryDir) || !fs.statSync(categoryDir).isDirectory()) {
     return {
@@ -160,12 +185,17 @@ function buildCategoryDirectoryNode(categoryDef) {
     };
   }
 
-  const entries = fs
-    .readdirSync(categoryDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && isMarkdownFile(entry.name))
-    .map((entry) => {
-      const relativeFile = path.join(categoryDef.folder, entry.name);
-      return buildFileNode(relativeFile, path.join(categoryDir, entry.name));
+  const entries = [...indexed.entries()]
+    .filter(([, variants]) => variants[locale])
+    .map(([articlePath, variants]) => {
+      const diskFilename = variants[locale];
+      const absoluteFile = path.join(categoryDir, diskFilename);
+      return buildFileNode({
+        articlePath,
+        diskFilename,
+        absoluteFile,
+        locale
+      });
     })
     .sort((a, b) => a.displayTitle.localeCompare(b.displayTitle, undefined, { sensitivity: "base" }));
 
@@ -183,6 +213,7 @@ function flattenFiles(node, accumulator = []) {
     accumulator.push({
       path: node.path,
       name: node.name,
+      locale: node.locale,
       folder: node.folder,
       categoryId: node.categoryId,
       categoryFolder: node.categoryFolder,
@@ -204,8 +235,11 @@ function flattenFiles(node, accumulator = []) {
   return accumulator;
 }
 
-function getKnowledgeTree() {
-  const categoryNodes = KNOWLEDGE_HUB_CATEGORIES.map(buildCategoryDirectoryNode);
+function getKnowledgeTree({ locale = DEFAULT_LOCALE } = {}) {
+  const resolvedLocale = normalizeKnowledgeLocale(locale);
+  const categoryNodes = KNOWLEDGE_HUB_CATEGORIES.map((category) =>
+    buildCategoryDirectoryNode(category, resolvedLocale)
+  );
   const files = categoryNodes
     .flatMap((node) => flattenFiles(node))
     .sort((a, b) => a.path.localeCompare(b.path));
@@ -242,30 +276,36 @@ function getKnowledgeTree() {
     },
     files,
     categories,
+    locale: resolvedLocale,
     defaultPath: DEFAULT_DOCUMENT_PATH,
     docsRoot: "docs/agent-library",
     libraryType: "agent-reference"
   };
 }
 
-function getKnowledgeDocument(relativePath) {
-  const { relativePath: safePath, absolutePath } = resolveSafeDocumentPath(relativePath);
+function getKnowledgeDocument(relativePath, { locale = DEFAULT_LOCALE } = {}) {
+  const {
+    articlePath,
+    absolutePath,
+    locale: resolvedLocale
+  } = resolveSafeDocumentPath(relativePath, locale);
   const rawContent = fs.readFileSync(absolutePath, "utf8");
   const { body, meta } = parseFrontmatter(rawContent);
   const stats = fs.statSync(absolutePath);
-  const category = resolveCategoryForPath(safePath);
+  const category = resolveCategoryForPath(articlePath);
   const metadata = buildArticleMetadata({
     meta,
     body,
-    filename: path.basename(safePath),
+    filename: path.basename(absolutePath),
     category
   });
 
   return {
-    path: safePath,
-    name: path.basename(safePath),
+    path: articlePath,
+    locale: resolvedLocale,
+    name: path.basename(articlePath),
     folder: (() => {
-      const dir = path.posix.dirname(safePath);
+      const dir = path.posix.dirname(articlePath);
       return dir === "." ? "" : dir;
     })(),
     categoryId: metadata.categoryId,

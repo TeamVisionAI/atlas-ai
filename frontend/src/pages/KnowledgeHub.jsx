@@ -16,7 +16,8 @@ import {
   enrichArticleForDisplay,
   getArticleDisplayTitle,
   isLegacyEngineeringPath,
-  isValidAgentLibraryPath
+  isValidAgentLibraryPath,
+  normalizeArticlePath
 } from "../utils/knowledgeDisplay";
 import {
   readKnowledgeActivity,
@@ -141,15 +142,17 @@ export default function KnowledgeHub() {
   const [loadingTree, setLoadingTree] = useState(true);
   const [loadingDocument, setLoadingDocument] = useState(false);
   const [pageError, setPageError] = useState(null);
-  const initialPathRef = useRef(searchParams.get("path"));
+  const initialPathRef = useRef(normalizeArticlePath(searchParams.get("path") || ""));
   const initialCategoryRef = useRef(searchParams.get("category"));
   const locale = language === "es" ? "es-ES" : "en-US";
+  const hubLocale = language === "es" ? "es" : "en";
 
-  const catalogPaths = useMemo(() => new Set(files.map((file) => file.path)), [files]);
+  const catalogPaths = useMemo(() => new Set(files.map((file) => normalizeArticlePath(file.path))), [files]);
 
   const buildActivityEntry = useCallback(
     (fileMeta, documentPath) => {
-      const source = fileMeta || files.find((file) => file.path === documentPath);
+      const source =
+        fileMeta || files.find((file) => normalizeArticlePath(file.path) === normalizeArticlePath(documentPath));
       if (!source) {
         return null;
       }
@@ -168,11 +171,12 @@ export default function KnowledgeHub() {
 
   const loadDocument = useCallback(
     async (documentPath, { openedFrom = "tree" } = {}) => {
-      if (!documentPath) {
+      const normalizedPath = normalizeArticlePath(documentPath);
+      if (!normalizedPath) {
         return;
       }
 
-      if (isLegacyEngineeringPath(documentPath) || !isValidAgentLibraryPath(documentPath, catalogPaths)) {
+      if (isLegacyEngineeringPath(normalizedPath) || !isValidAgentLibraryPath(normalizedPath, catalogPaths)) {
         setDocument(null);
         setSelectedPath("");
         setViewMode("unavailable");
@@ -180,8 +184,8 @@ export default function KnowledgeHub() {
         return;
       }
 
-      const fileMeta = files.find((file) => file.path === documentPath);
-      const openedEntry = buildActivityEntry(fileMeta, documentPath);
+      const fileMeta = files.find((file) => normalizeArticlePath(file.path) === normalizedPath);
+      const openedEntry = buildActivityEntry(fileMeta, normalizedPath);
       if (openedEntry) {
         setActivity(recordRecentlyOpened(openedEntry));
       }
@@ -191,13 +195,13 @@ export default function KnowledgeHub() {
       setViewMode("document");
 
       try {
-        const payload = await fetchKnowledgeDocument(documentPath);
+        const payload = await fetchKnowledgeDocument(normalizedPath, hubLocale);
         setDocument(payload);
-        setSelectedPath(payload.path);
-        setSearchParams({ path: payload.path }, { replace: true });
+        setSelectedPath(normalizeArticlePath(payload.path));
+        setSearchParams({ path: normalizeArticlePath(payload.path) }, { replace: true });
 
-        const viewedEntry = buildActivityEntry(fileMeta, documentPath) || {
-          path: payload.path,
+        const viewedEntry = buildActivityEntry(fileMeta, normalizedPath) || {
+          path: normalizeArticlePath(payload.path),
           displayTitle: getArticleDisplayTitle(payload),
           shortSummary: payload.shortSummary || "",
           categoryId: payload.categoryId || null,
@@ -207,7 +211,7 @@ export default function KnowledgeHub() {
         };
         setActivity(recordRecentlyViewed(viewedEntry));
       } catch (error) {
-        console.error("[KnowledgeHub] document load failed", { documentPath, openedFrom }, error);
+        console.error("[KnowledgeHub] document load failed", { documentPath: normalizedPath, openedFrom }, error);
         if (error instanceof KnowledgeHubError && error.payload?.status === 404) {
           setDocument(null);
           setSelectedPath("");
@@ -222,22 +226,34 @@ export default function KnowledgeHub() {
         setLoadingDocument(false);
       }
     },
-    [buildActivityEntry, catalogPaths, files, setSearchParams, t.knowledgeHubDocumentError]
+    [buildActivityEntry, catalogPaths, files, hubLocale, setSearchParams, t.knowledgeHubDocumentError]
   );
 
   const loadDocumentRef = useRef(loadDocument);
   loadDocumentRef.current = loadDocument;
+  const hasBootstrappedRef = useRef(false);
+  const isFirstHubLoadRef = useRef(true);
+  const selectedPathRef = useRef(selectedPath);
+  const viewModeRef = useRef(viewMode);
+  selectedPathRef.current = selectedPath;
+  viewModeRef.current = viewMode;
 
   useEffect(() => {
     let cancelled = false;
+    const firstLoad = isFirstHubLoadRef.current;
+    isFirstHubLoadRef.current = false;
 
     async function initialize() {
       setLoadingTree(true);
       setPageError(null);
 
       try {
-        await bootstrapAtlasSession();
-        const payload = await fetchKnowledgeTree();
+        if (!hasBootstrappedRef.current) {
+          await bootstrapAtlasSession();
+          hasBootstrappedRef.current = true;
+        }
+
+        const payload = await fetchKnowledgeTree(hubLocale);
 
         if (cancelled) {
           return;
@@ -248,24 +264,38 @@ export default function KnowledgeHub() {
         setFiles(resolvedFiles);
         setActivity(syncKnowledgeActivityWithCatalog(resolvedFiles));
 
-        const requestedPath = initialPathRef.current;
-        const requestedCategory = initialCategoryRef.current;
+        if (firstLoad) {
+          const requestedPath = normalizeArticlePath(initialPathRef.current || "");
+          const requestedCategory = initialCategoryRef.current;
 
-        if (requestedPath) {
-          if (
-            isLegacyEngineeringPath(requestedPath) ||
-            !resolvedFiles.some((file) => file.path === requestedPath)
-          ) {
+          if (requestedPath) {
+            if (
+              isLegacyEngineeringPath(requestedPath) ||
+              !resolvedFiles.some((file) => normalizeArticlePath(file.path) === requestedPath)
+            ) {
+              setViewMode("unavailable");
+              setSearchParams({}, { replace: true });
+            } else {
+              await loadDocumentRef.current(requestedPath, { openedFrom: "url" });
+            }
+          } else if (requestedCategory && payload.categories?.some((c) => c.id === requestedCategory)) {
+            setSelectedCategoryId(requestedCategory);
+            setViewMode("category");
+          } else {
+            setViewMode("home");
+          }
+        } else if (selectedPathRef.current && viewModeRef.current === "document") {
+          const stillValid = resolvedFiles.some(
+            (file) => normalizeArticlePath(file.path) === normalizeArticlePath(selectedPathRef.current)
+          );
+          if (stillValid) {
+            await loadDocumentRef.current(selectedPathRef.current, { openedFrom: "locale-change" });
+          } else {
+            setDocument(null);
+            setSelectedPath("");
             setViewMode("unavailable");
             setSearchParams({}, { replace: true });
-          } else {
-            await loadDocumentRef.current(requestedPath, { openedFrom: "url" });
           }
-        } else if (requestedCategory && payload.categories?.some((c) => c.id === requestedCategory)) {
-          setSelectedCategoryId(requestedCategory);
-          setViewMode("category");
-        } else {
-          setViewMode("home");
         }
       } catch (error) {
         if (cancelled) {
@@ -309,6 +339,7 @@ export default function KnowledgeHub() {
     t.knowledgeHubForbidden,
     t.knowledgeHubLoadError,
     t.knowledgeHubNotEnabled,
+    hubLocale,
     setSearchParams
   ]);
 
@@ -341,13 +372,14 @@ export default function KnowledgeHub() {
   }, [files, searchQuery]);
 
   function handleSelectFile(file) {
-    if (!file?.path) {
+    const normalizedPath = normalizeArticlePath(file?.path);
+    if (!normalizedPath) {
       return;
     }
-    if (file.path === selectedPath && viewMode === "document") {
+    if (normalizedPath === normalizeArticlePath(selectedPath) && viewMode === "document") {
       return;
     }
-    loadDocument(file.path);
+    loadDocument(normalizedPath);
   }
 
   function handleSelectCategory(category) {

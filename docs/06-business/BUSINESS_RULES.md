@@ -1990,6 +1990,23 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-154 — Knowledge Hub Single-Language Article Experience
+
+**Implements:** Locale-specific article variants (`{slug}.en.md` / `{slug}.es.md`); API resolves full article (title, summary, body) from user locale. No mixed-language fields.
+**Depends on:** BR-153
+**Status:** Implemented
+**Tests:** `backend/test/knowledgeHubSingleLanguageBr154.test.js`, `frontend/src/config/knowledgeHubSingleLanguageBr154.test.js`
+
+### Rules
+
+1. **Content variants** — Each article uses explicit locale files under `docs/agent-library/**/{slug}.{locale}.md`.
+2. **Locale-neutral article path** — API/UI use `category/slug` (no `.md`, no locale suffix in URLs or storage).
+3. **Single-language resolution** — `locale` query param on `/api/knowledge/tree` and `/document`; Spanish users get Spanish metadata and body only.
+4. **No hybrid fallback** — Missing locale variant returns unavailable/404; never mix Spanish chrome with English article fields.
+5. **Storage migration** — Activity paths normalized from legacy `*.md` to locale-neutral slugs; display refreshed from current locale catalog.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

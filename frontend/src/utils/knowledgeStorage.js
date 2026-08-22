@@ -3,7 +3,7 @@
  * BR-153 — v3 storage validates against agent-library catalog only.
  */
 
-import { isValidAgentLibraryPath } from "./knowledgeDisplay.js";
+import { isValidAgentLibraryPath, normalizeArticlePath } from "./knowledgeDisplay.js";
 
 const STORAGE_KEY_V3 = "atlas_knowledge_activity_v3";
 const STORAGE_KEY_V2 = "atlas_knowledge_activity_v2";
@@ -24,22 +24,23 @@ function catalogMapFromFiles(files) {
   const map = new Map();
   for (const file of files || []) {
     if (file?.path) {
-      map.set(file.path, file);
+      map.set(normalizeArticlePath(file.path), file);
     }
   }
   return map;
 }
 
 function enrichEntryFromCatalog(entry, catalogMap) {
-  if (!entry?.path) {
+  const normalizedPath = normalizeArticlePath(entry?.path);
+  if (!normalizedPath) {
     return null;
   }
-  const catalog = catalogMap.get(entry.path);
+  const catalog = catalogMap.get(normalizedPath);
   if (!catalog) {
     return null;
   }
   return {
-    path: entry.path,
+    path: normalizedPath,
     displayTitle: catalog.displayTitle || catalog.title,
     shortSummary: catalog.shortSummary || "",
     categoryId: catalog.categoryId || null,
@@ -53,8 +54,9 @@ function enrichEntryFromCatalog(entry, catalogMap) {
 function filterViewCounts(viewCounts, validPaths) {
   const next = {};
   for (const [path, count] of Object.entries(viewCounts || {})) {
-    if (validPaths.has(path) && Number(count) > 0) {
-      next[path] = Number(count);
+    const normalized = normalizeArticlePath(path);
+    if (validPaths.has(normalized) && Number(count) > 0) {
+      next[normalized] = (next[normalized] || 0) + Number(count);
     }
   }
   return next;
@@ -140,18 +142,19 @@ function persistState(state) {
 }
 
 function normalizeEntry(entry, catalogMap) {
-  if (!entry?.path) {
+  const normalizedPath = normalizeArticlePath(entry?.path);
+  if (!normalizedPath) {
     return null;
   }
   if (catalogMap?.size) {
-    return enrichEntryFromCatalog(entry, catalogMap);
+    return enrichEntryFromCatalog({ ...entry, path: normalizedPath }, catalogMap);
   }
-  if (!isValidAgentLibraryPath(entry.path)) {
+  if (!isValidAgentLibraryPath(normalizedPath)) {
     return null;
   }
   return {
-    path: entry.path,
-    displayTitle: entry.displayTitle || entry.title || entry.path,
+    path: normalizedPath,
+    displayTitle: entry.displayTitle || entry.title || normalizedPath,
     shortSummary: entry.shortSummary || "",
     categoryId: entry.categoryId || null,
     categoryLabelKey: entry.categoryLabelKey || null,
@@ -201,9 +204,10 @@ export function recordRecentlyOpened(entry) {
 export function recordRecentlyViewed(entry) {
   const state = readRawState();
   state.recentlyViewed = upsertList(state.recentlyViewed, entry, catalogMapCache);
-  if (entry?.path && isValidAgentLibraryPath(entry.path, catalogMapCache.size ? catalogMapCache : null)) {
+  if (entry?.path && isValidAgentLibraryPath(normalizeArticlePath(entry.path), catalogMapCache.size ? catalogMapCache : null)) {
     state.viewCounts = state.viewCounts || {};
-    state.viewCounts[entry.path] = (state.viewCounts[entry.path] || 0) + 1;
+    const normalizedPath = normalizeArticlePath(entry.path);
+    state.viewCounts[normalizedPath] = (state.viewCounts[normalizedPath] || 0) + 1;
   }
   persistState(state);
   return state;
@@ -217,7 +221,7 @@ export function getPopularArticles(files, { limit = 8 } = {}) {
   return (Array.isArray(files) ? files : [])
     .map((file) => ({
       ...file,
-      popularity: counts[file.path] || 0
+      popularity: counts[normalizeArticlePath(file.path)] || 0
     }))
     .filter((file) => file.popularity > 0)
     .sort((a, b) => {
