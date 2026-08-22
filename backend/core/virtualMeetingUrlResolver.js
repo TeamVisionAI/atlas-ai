@@ -8,6 +8,7 @@ const { MEETING_TYPES, VIRTUAL_PROVIDERS } = require("./configuration/appointmen
 const VIRTUAL_MEETING_URL_SOURCES = Object.freeze({
   PERSISTED_APPOINTMENT: "persisted_appointment",
   EXISTING_BOOKING: "existing_booking",
+  USER_MEETING_SETTINGS: "user_meeting_settings",
   ORGANIZATION_MEETING_SETTINGS: "organization_meeting_settings",
   UNAVAILABLE: "unavailable"
 });
@@ -121,16 +122,18 @@ function buildResult({ url = null, status, source, provider = null } = {}) {
 }
 
 /**
- * Resolve the Zoom/virtual meeting URL with canonical precedence (BR-076).
+ * Resolve the Zoom/virtual meeting URL with canonical precedence (BR-076 + BR-147).
  *
  * Precedence for Zoom:
  * 1. valid persisted appointment URL (reschedule/update)
  * 2. valid URL from existingBooking
- * 3. valid same-organization Personal Meeting URL
- * 4. null + pending
+ * 3. interviewer personal Zoom URL (profile_settings)
+ * 4. organization Personal Meeting URL (legacy fallback only)
+ * 5. null + pending
  *
  * @param {object} input
  * @param {string} [input.organizationId]
+ * @param {string} [input.interviewerUserId]
  * @param {string} [input.meetingType]
  * @param {string} [input.meetingProvider]
  * @param {object|null} [input.persistedAppointment]
@@ -141,6 +144,11 @@ async function resolveCanonicalVirtualMeetingUrl(input = {}, deps = {}) {
   const meetingType = normalizeMeetingType(input.meetingType);
   const meetingProvider = normalizeProvider(input.meetingProvider);
   const organizationId = input.organizationId || null;
+  const interviewerUserId =
+    input.interviewerUserId ||
+    input.interviewer_user_id ||
+    input.agentId ||
+    null;
 
   if (!isVirtualMeeting(meetingType)) {
     return buildResult({
@@ -198,6 +206,29 @@ async function resolveCanonicalVirtualMeetingUrl(input = {}, deps = {}) {
       source: VIRTUAL_MEETING_URL_SOURCES.EXISTING_BOOKING,
       provider: VIRTUAL_PROVIDERS.ZOOM
     });
+  }
+
+  if (interviewerUserId) {
+    const getAppointmentProfile =
+      deps.getAppointmentProfile ||
+      require("../services/appointmentProfileService").getAppointmentProfile;
+
+    try {
+      const profileResult = await getAppointmentProfile(interviewerUserId);
+      const userUrl = pickApprovedZoomUrl(
+        profileResult?.appointmentProfile?.virtualMeeting?.personalMeetingUrl
+      );
+      if (userUrl) {
+        return buildResult({
+          url: userUrl,
+          status: VIRTUAL_URL_STATUSES.CONFIGURED,
+          source: VIRTUAL_MEETING_URL_SOURCES.USER_MEETING_SETTINGS,
+          provider: VIRTUAL_PROVIDERS.ZOOM
+        });
+      }
+    } catch {
+      // Fall through to organization legacy URL.
+    }
   }
 
   if (organizationId) {

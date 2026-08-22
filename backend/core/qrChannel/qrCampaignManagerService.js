@@ -93,8 +93,9 @@ function isAdministrator(user) {
 }
 
 function canManageOrgCampaigns(authContext) {
+  // BR-147 — org-wide QR visibility is tenant-admin capability, not hierarchy/PROSPECT_ASSIGN.
   return (
-    hasPermission(authContext, PERMISSIONS.PROSPECT_ASSIGN) ||
+    hasPermission(authContext, PERMISSIONS.ORG_WRITE) ||
     hasPermission(authContext, PERMISSIONS.ADMIN_USERS) ||
     authContext?.role === "administrator" ||
     isAdministrator(authContext?.user)
@@ -203,17 +204,50 @@ function createQrCampaignManagerService({
       return { ok: false, reason: gate.reason || REASON.FEATURE_DISABLED, status: 403 };
     }
 
-    const ownerFilter = canManageOrgCampaigns(authContext)
-      ? null
-      : authContext.userId;
-    const rows = await repository.listCampaignsByOrg({
+    let rows = await repository.listCampaignsByOrg({
       orgId: organizationId,
-      ownerUserId: ownerFilter
+      ownerUserId: null
     });
+
+    if (!canManageOrgCampaigns(authContext)) {
+      const { resolveHierarchyScopeForUser } = require("../hierarchyScopeEngine");
+      const scope = await resolveHierarchyScopeForUser(authContext.user || {
+        id: authContext.userId,
+        role: authContext.role,
+        organization_id: organizationId
+      });
+      const allowedIds =
+        scope.mode === "organization" && scope.userIds == null
+          ? null
+          : new Set((scope.userIds || [authContext.userId]).map((id) => String(id)));
+      if (allowedIds) {
+        rows = rows.filter((row) => allowedIds.has(String(row.owner_user_id || "")));
+      }
+    }
+
+    const users = loadUserService();
+    const ownerIds = [...new Set(rows.map((r) => r.owner_user_id).filter(Boolean))];
+    const ownerNames = new Map();
+    await Promise.all(
+      ownerIds.map(async (id) => {
+        const user = await users.findUserById(id).catch(() => null);
+        if (user) {
+          const name =
+            [user.first_name, user.last_name].filter(Boolean).join(" ").trim() ||
+            user.email ||
+            id;
+          ownerNames.set(String(id), name);
+        }
+      })
+    );
+
     return {
       ok: true,
       reason: REASON.OK,
-      campaigns: rows.map(sanitizeCampaign),
+      campaigns: rows.map((row) => ({
+        ...sanitizeCampaign(row),
+        ownerDisplayName: ownerNames.get(String(row.owner_user_id || "")) || null
+      })),
       campaignTypes: CAMPAIGN_TYPES,
       canCreateForOthers: canManageOrgCampaigns(authContext)
     };

@@ -1846,6 +1846,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-147 — Primerica Personal Workspace (User-Owned Integrations + Scheduling)
+
+**Implements:** Separate tenant/organization configuration from each user's personal operating setup for Primerica tenants.  
+**Domain:** Settings / integrations / scheduling / WhatsApp routing / Zoom  
+**Depends on:** BR-076, BR-108–BR-111, BR-114, hierarchy scope isolation  
+**Related:** BR-075 (WhatsApp outbound), BR-129 (tenant isolation)  
+**Status:** Implemented  
+**Engine target:** `personalIntegrationOwnership.js`, `googleCalendarIntegrationService.js`, `whatsappIntegrationService.js`, `virtualMeetingUrlResolver.js`, `appointmentSchedulingEngine.js`, Settings hub  
+**Tests:** `backend/test/personalWorkspaceBr147.test.js`, `frontend/src/config/hierarchyDisplayTitle.test.js`
+
+### Rules
+
+1. **Organization settings** — RVP/Owner (`org:write`) only by default. Lower ranks must not see Organization settings. Office hours are location metadata and must **not** constrain agent availability.
+2. **Personal workspace** — Every recruiting user may own: Google Calendar, WhatsApp Embedded Signup, Zoom URL, Mon–Sun availability, and hierarchy-scoped prospects/conversations.
+3. **Hierarchy ≠ ownership** — `reports_to` controls data visibility only. It never grants management of another user's integrations.
+4. **Scheduling formula** — personal availability ∩ personal Google free/busy ∩ duration/conflict rules. Do **not** intersect tenant office hours. Sunday / outside office hours allowed when the agent enables those blocks.
+5. **Google ownership** — `organization_integrations.user_id` + `organization_id` + `provider`. `user_id NULL` = legacy organization-owned. Personal UI never presents another user's or org-legacy row as personal. Free/busy for an agent uses **personal** calendar only.
+6. **WhatsApp ownership** — `whatsapp_integrations.user_id` nullable. Inbound Phone Number ID resolves to organization + owning user. Connected Phone Number ID remains globally unique. Personal disconnect cannot disconnect the org channel without `org:write`.
+7. **Zoom** — Prefer interviewer `appointmentProfile.virtualMeeting.personalMeetingUrl`; fall back to organization Meeting Management only as legacy.
+8. **Compatibility** — Do not destroy or silently reassign legacy org-owned rows. No ownership inference from phone/email alone.
+9. **Permissions** — `integrations:self` manages personal connectors; `org:write` manages organization channel + Organization settings.
+10. **Boundaries** — No Round Robin, Recruit AI enablement, or Meta webhook architecture redesign beyond owner-user routing.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

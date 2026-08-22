@@ -20,6 +20,7 @@ const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { requirePermission } = require("../middleware/requirePermission");
 const { PERMISSIONS } = require("../security/permissions");
+const { hasPermission } = require("../security/authorizationService");
 const whatsappIntegrationService = require("../services/whatsappIntegrationService");
 
 const router = express.Router();
@@ -43,7 +44,30 @@ router.get("/embedded-signup/status", async (req, res) => {
       req.authContext,
       req
     );
-    const payload = await getEmbeddedSignupStatus(organizationId);
+    // BR-147 — default status is the actor's personal connection (never org legacy as personal).
+    const personal = await whatsappIntegrationService.getPersonalIntegrationStatusForOrganization(
+      organizationId,
+      req.authContext.userId
+    );
+    const payload = {
+      connected: personal.connected,
+      status: personal.status,
+      connection: personal.connection,
+      ownership: "personal"
+    };
+
+    if (hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)) {
+      const orgOwned = await whatsappIntegrationService.getIntegrationStatusForOrganization(
+        organizationId
+      );
+      payload.organizationChannel = {
+        connected: orgOwned.connected,
+        status: orgOwned.status,
+        connection: orgOwned.connection,
+        ownership: "organization"
+      };
+    }
+
     res.json(payload);
   } catch (error) {
     metaLogger.error("embedded_signup_status_failed", { message: error.message });
@@ -65,21 +89,30 @@ router.get("/embedded-signup/health", async (req, res) => {
   }
 });
 
-router.post("/embedded-signup/disconnect", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
-  try {
-    const result = await whatsappIntegrationService.disconnectIntegration(
-      req.authContext,
-      auditMeta(req),
-      req
-    );
-    res.json(result);
-  } catch (error) {
-    res.status(error.statusCode || 500).json({
-      error: error.publicCode || "DISCONNECT_FAILED",
-      message: error.message || "Unable to disconnect WhatsApp integration."
-    });
+router.post(
+  "/embedded-signup/disconnect",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const ownership =
+        req.body?.ownership === "organization" || req.body?.ownershipMode === "organization"
+          ? "organization"
+          : "personal";
+      const result = await whatsappIntegrationService.disconnectIntegration(
+        req.authContext,
+        auditMeta(req),
+        req,
+        { ownership }
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.publicCode || "DISCONNECT_FAILED",
+        message: error.message || "Unable to disconnect WhatsApp integration."
+      });
+    }
   }
-});
+);
 
 router.post("/embedded-signup/exchange", async (req, res) => {
   try {
@@ -141,6 +174,12 @@ router.post("/embedded-signup/exchange", async (req, res) => {
 
     const result = await completeEmbeddedSignupExchange({
       organizationId,
+      userId: req.authContext?.userId || null,
+      ownershipMode:
+        req.body?.ownershipMode === "organization" &&
+        hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)
+          ? "organization"
+          : "personal",
       code,
       wabaId,
       phoneNumberId,

@@ -9,6 +9,8 @@ function toSafeConnection(connection) {
 
   return {
     organizationId: connection.organization_id || null,
+    userId: connection.user_id || null,
+    ownership: connection.user_id ? "personal" : "organization",
     businessId: connection.business_id || null,
     wabaId: connection.waba_id,
     phoneNumberId: connection.phone_number_id,

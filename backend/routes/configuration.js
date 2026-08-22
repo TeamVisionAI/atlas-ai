@@ -77,7 +77,7 @@ router.patch("/profile", async (req, res) => {
   }
 });
 
-router.get("/organization", requirePermission(PERMISSIONS.ORG_READ), async (req, res) => {
+router.get("/organization", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const organization = await organizationService.getOrganizationConfiguration(
       req.tenantContext.organizationId
@@ -174,16 +174,21 @@ router.patch(
   }
 );
 
-router.get("/organization/integrations", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
-  try {
-    const integrations = await organizationIntegrationService.getIntegrationsStatus(
-      req.tenantContext.organizationId
-    );
-    res.json({ integrations });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+router.get(
+  "/organization/integrations",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const integrations = await organizationIntegrationService.getIntegrationsStatus(
+        req.tenantContext.organizationId,
+        req.authContext
+      );
+      res.json({ integrations });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({ error: error.message });
+    }
   }
-});
+);
 
 router.get("/organization/meeting-management", async (req, res) => {
   try {
@@ -212,53 +217,103 @@ router.patch(
   }
 );
 
-router.get("/scheduling/google/auth-url", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
-  try {
-    const payload = googleCalendarIntegrationService.getAuthUrl(
-      req.tenantContext.organizationId,
-      req.tenantContext.userId,
-      { returnPath: req.query.returnPath || "settings/scheduling" }
-    );
-    res.json(payload);
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+router.get(
+  "/scheduling/google/auth-url",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const ownershipMode =
+        req.query.ownershipMode === "organization" ? "organization" : "personal";
+      if (ownershipMode === "organization") {
+        const { hasPermission } = require("../security/authorizationService");
+        if (!hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)) {
+          return res.status(403).json({ error: "ORG_WRITE_REQUIRED" });
+        }
+      }
+      const payload = googleCalendarIntegrationService.getAuthUrl(
+        req.tenantContext.organizationId,
+        req.tenantContext.userId,
+        {
+          returnPath: req.query.returnPath || "settings/integrations",
+          ownershipMode
+        }
+      );
+      res.json(payload);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({ error: error.message });
+    }
   }
-});
+);
 
-router.get("/scheduling/google/calendars", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
-  try {
-    const calendars = await googleCalendarIntegrationService.listCalendars(
-      req.tenantContext.organizationId
-    );
-    res.json({ calendars });
-  } catch (error) {
-    // Sanitize Google/OAuth upstream failures — never return raw grant payloads.
-    const failure = googleCalendarIntegrationService.presentGoogleCalendarListFailure(error);
-    res.status(failure.statusCode).json(failure.body);
+router.get(
+  "/scheduling/google/calendars",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const ownershipMode =
+        req.query.ownershipMode === "organization" ? "organization" : "personal";
+      const calendars = await googleCalendarIntegrationService.listCalendars(
+        req.tenantContext.organizationId,
+        ownershipMode === "personal"
+          ? {
+              userId: req.tenantContext.userId,
+              personalOnly: true
+            }
+          : { personalOnly: false, allowOrgLegacyFallback: true }
+      );
+      res.json({ calendars });
+    } catch (error) {
+      const failure = googleCalendarIntegrationService.presentGoogleCalendarListFailure(error);
+      res.status(failure.statusCode).json(failure.body);
+    }
   }
-});
+);
 
-router.post("/scheduling/google/calendar", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
-  try {
-    const config = await googleCalendarIntegrationService.setCalendar(
-      req.tenantContext.organizationId,
-      req.body?.calendarId
-    );
-    res.json({ calendar: config });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+router.post(
+  "/scheduling/google/calendar",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const ownershipMode =
+        req.body?.ownershipMode === "organization" ? "organization" : "personal";
+      const config = await googleCalendarIntegrationService.setCalendar(
+        req.tenantContext.organizationId,
+        req.body?.calendarId,
+        ownershipMode === "personal"
+          ? { userId: req.tenantContext.userId, personalOnly: true }
+          : { personalOnly: false }
+      );
+      res.json({ calendar: config });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({ error: error.message });
+    }
   }
-});
+);
 
-router.post("/scheduling/google/disconnect", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
-  try {
-    const result = await googleCalendarIntegrationService.disconnect(
-      req.tenantContext.organizationId
-    );
-    res.json(result);
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ error: error.message });
+router.post(
+  "/scheduling/google/disconnect",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const ownershipMode =
+        req.body?.ownershipMode === "organization" ? "organization" : "personal";
+      if (ownershipMode === "organization") {
+        const { hasPermission } = require("../security/authorizationService");
+        if (!hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)) {
+          return res.status(403).json({ error: "ORG_WRITE_REQUIRED" });
+        }
+      }
+      const result = await googleCalendarIntegrationService.disconnect(
+        req.tenantContext.organizationId,
+        ownershipMode === "personal"
+          ? { userId: req.tenantContext.userId, ownershipMode: "personal" }
+          : { ownershipMode: "organization" }
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({ error: error.message });
+    }
   }
-});
+);
 
 module.exports = router;

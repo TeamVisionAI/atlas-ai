@@ -358,12 +358,16 @@ export const ROUTE_ACCESS = Object.freeze({
   },
   "settings/profile": {},
   "settings/integrations": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_WRITE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "settings/organization": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   "settings/scheduling": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
@@ -377,11 +381,14 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     permission: PERMISSIONS.BILLING_ACCESS
   },
-  // BR-110 — MANAGEMENT (RVP / DL / RL) may open self Appointments settings.
-  // API remains self-scoped; Review Users / org Scheduling stay admin-gated.
+  // BR-147 / BR-110 — personal availability for all recruiting roles
   "settings/appointments": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.PROSPECT_WRITE
   },
   "settings/qr-campaigns": {
     workspaceTypes: [
@@ -392,16 +399,28 @@ export const ROUTE_ACCESS = Object.freeze({
     permission: PERMISSIONS.PROSPECT_WRITE
   },
   "settings/whatsapp": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_WRITE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "settings/whatsapp/success": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_WRITE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "settings/whatsapp/error": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_WRITE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   "admin/users": USER_MANAGEMENT_ROUTE_RULE,
   "operations-center": {
@@ -552,7 +571,7 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     descriptionKey: "configurationHubOrganizationDescription",
     icon: "organization",
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   {
     id: "integrations",
@@ -561,8 +580,12 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "integrations",
     descriptionKey: "configurationHubIntegrationsDescription",
     icon: "integrations",
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_WRITE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.INTEGRATIONS_SELF
   },
   {
     id: "scheduling",
@@ -601,9 +624,12 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     titleKey: "appointments",
     descriptionKey: "configurationHubAppointmentsDescription",
     icon: "scheduling",
-    // BR-110 — self appointment profile for management recruiters (RVP/DL/RL).
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.PROSPECT_WRITE
   },
   {
     id: "qr-campaigns",

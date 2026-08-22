@@ -59,8 +59,10 @@ export async function exchangeEmbeddedSignupCode(payload, debugLabel = "[META_EM
   return body;
 }
 
-export async function disconnectWhatsAppIntegration() {
+export async function disconnectWhatsAppIntegration({ ownership = "personal" } = {}) {
   return apiFetch("/api/meta/embedded-signup/disconnect", {
-    method: "POST"
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ownership })
   });
 }

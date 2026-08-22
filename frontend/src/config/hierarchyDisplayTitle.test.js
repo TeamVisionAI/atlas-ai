@@ -24,9 +24,13 @@ test("getDisplayTitleLabelKey prefers business_rank RL → Regional Leader", () 
   assert.doesNotMatch(footerSource, /getRoleLabelKey\(user\.role\)/);
 });
 
-test("Integrations settings require ORG_WRITE not ORG_READ", () => {
+test("Integrations settings require INTEGRATIONS_SELF (personal workspace)", () => {
   assert.match(
     workspaceSource,
-    /settings\/integrations[\s\S]*?permission:\s*PERMISSIONS\.ORG_WRITE/
+    /settings\/integrations[\s\S]*?permission:\s*PERMISSIONS\.INTEGRATIONS_SELF/
+  );
+  assert.match(
+    workspaceSource,
+    /settings\/organization[\s\S]*?permission:\s*PERMISSIONS\.ORG_WRITE/
   );
 });
