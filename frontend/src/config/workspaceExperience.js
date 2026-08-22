@@ -194,7 +194,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "knowledge",
     path: appPath("knowledge"),
     labelKey: "navKnowledge",
-    permission: PERMISSIONS.PROSPECT_READ
+    permission: PERMISSIONS.KNOWLEDGE_READ
   },
   policyIntelligence: {
     id: "policy-intelligence",
@@ -354,7 +354,7 @@ export const ROUTE_ACCESS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
-  knowledge: { permission: PERMISSIONS.PROSPECT_READ },
+  knowledge: { permission: PERMISSIONS.KNOWLEDGE_READ },
   "policy-intelligence": { permission: PERMISSIONS.POLICY_READ },
   settings: {
     workspaceTypes: [

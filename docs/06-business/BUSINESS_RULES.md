@@ -1934,6 +1934,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-151 — Knowledge Hub Field Read Access
+
+**Implements:** Restore Knowledge Hub (`/app/knowledge`) for normal field users (RL, REP, agent, recruiter). Fix blank-page crash when `useLanguage()` did not expose translation catalog `t`. Explicit `knowledge:read` for read-only reference; `knowledge:write` reserved for RVP/Admin. Never render a blank white page — show empty, 403, or error states.  
+**Domain:** Workspace navigation / Knowledge Hub API / i18n  
+**Depends on:** LC1 permission matrix, authenticated Atlas session  
+**Status:** Implemented  
+**Engine target:** `permissions.js`, `workspaceExperience.js`, `KnowledgeHub.jsx`, `LanguageContext.jsx`, `/api/knowledge/*`  
+**Tests:** `backend/test/knowledgeHubFieldAccessBr151.test.js`, `frontend/src/config/knowledgeHubFieldAccessBr151.test.js`, `frontend/src/i18n/languageContextCatalog.test.js`
+
+### Rules
+
+1. **Read capability** — `knowledge:read` grants Knowledge Hub UI + `/api/knowledge/tree` + `/api/knowledge/document`. Grant to administrator, rvp, division_leader, agent, recruiter (and support read-only).
+2. **Write capability** — `knowledge:write` is RVP/Admin only. Knowledge Hub API remains read-only in v1; write is a separate gate for future editorial flows.
+3. **No org-admin escalation** — Field roles must not gain `org:write`, `admin:users`, or other management permissions via Knowledge Hub.
+4. **Tenant session** — Knowledge reads require authenticated Atlas user context (`requireAtlasUser` + `knowledge:read`). Platform `/docs` content is shared; tenant isolation is enforced at auth boundary (no anonymous or cross-tenant session fallback).
+5. **UI resilience** — Missing content → empty state. API 403 → forbidden state. API failure → error state. Never crash on undefined `t` translation catalog.
+6. **i18n** — `knowledgeHubTitle` and error/empty copy in Spanish and English.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
