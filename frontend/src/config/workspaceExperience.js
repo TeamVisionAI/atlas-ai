@@ -84,14 +84,13 @@ export function getWorkspaceLabelKey(workspaceType) {
   return keys[workspaceType] || "workspaceLabelRepresentative";
 }
 
+/** BR-149 — RVP/Admin → Executive; SRL/RL/DIV/DIS/REP → Team Dashboard. */
 export function getDefaultLandingPath(role) {
-  const workspaceType = resolveWorkspaceType(role);
-
-  if (workspaceType === WORKSPACE_TYPES.ADMINISTRATOR) {
+  if (roleHasPermission(role, PERMISSIONS.DASHBOARD_EXECUTIVE)) {
     return appPath("executive-dashboard");
   }
 
-  if (workspaceType === WORKSPACE_TYPES.MANAGEMENT) {
+  if (roleHasPermission(role, PERMISSIONS.DASHBOARD_TEAM)) {
     return appPath("team-dashboard");
   }
 
@@ -104,7 +103,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     path: appPath("executive-dashboard"),
     labelKey: "navExecutiveDashboard",
     end: true,
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
   myDashboard: {
@@ -119,8 +118,12 @@ const NAV_ITEM_DEFS = Object.freeze({
     path: appPath("team-dashboard"),
     labelKey: "navTeamDashboard",
     end: true,
-    workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.DASHBOARD_EXECUTIVE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.DASHBOARD_TEAM
   },
   quickCapture: {
     id: "quick-capture",
@@ -257,9 +260,9 @@ const BUSINESS_CORE_NAV_ORDER = Object.freeze([
 ]);
 
 const WORKSPACE_LANDING_NAV = Object.freeze({
-  [WORKSPACE_TYPES.ADMINISTRATOR]: ["executiveDashboard"],
-  [WORKSPACE_TYPES.MANAGEMENT]: ["teamDashboard"],
-  [WORKSPACE_TYPES.REPRESENTATIVE]: ["myDashboard"]
+  [WORKSPACE_TYPES.ADMINISTRATOR]: ["executiveDashboard", "teamDashboard"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["executiveDashboard", "teamDashboard"],
+  [WORKSPACE_TYPES.REPRESENTATIVE]: ["teamDashboard", "myDashboard"]
 });
 
 /** Leadership extensions beyond core Business (still permission-gated). */
@@ -318,15 +321,19 @@ function matchesRouteAccessRule(rule, user, { operationsAllowed = false } = {}) 
 
 export const ROUTE_ACCESS = Object.freeze({
   "executive-dashboard": {
-    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE
   },
   "my-dashboard": {
     workspaceTypes: [WORKSPACE_TYPES.REPRESENTATIVE]
   },
   "team-dashboard": {
-    workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.DASHBOARD_EXECUTIVE
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT,
+      WORKSPACE_TYPES.REPRESENTATIVE
+    ],
+    permission: PERMISSIONS.DASHBOARD_TEAM
   },
   "mission-control": { permission: PERMISSIONS.PROSPECT_READ },
   "prospect-center": { permission: PERMISSIONS.PROSPECT_READ },

@@ -138,10 +138,13 @@ test("Conversations user scope excludes unrelated org prospects for RL", () => {
   );
 });
 
-test("division_leader lacks org:write and dashboard:executive", () => {
+test("division_leader lacks org:write and dashboard:executive; has dashboard:team", () => {
   assert.equal(roleHasPermission(ROLES.DIVISION_LEADER, PERMISSIONS.ORG_WRITE), false);
   assert.equal(roleHasPermission(ROLES.DIVISION_LEADER, PERMISSIONS.DASHBOARD_EXECUTIVE), false);
+  assert.equal(roleHasPermission(ROLES.DIVISION_LEADER, PERMISSIONS.DASHBOARD_TEAM), true);
   assert.equal(roleHasPermission(ROLES.RVP, PERMISSIONS.ORG_WRITE), true);
+  assert.equal(roleHasPermission(ROLES.RVP, PERMISSIONS.DASHBOARD_EXECUTIVE), true);
+  assert.equal(roleHasPermission(ROLES.RVP, PERMISSIONS.DASHBOARD_TEAM), true);
 });
 
 test("filterProspectsForAuthContext keeps only RL-owned when fail-closed", () => {

@@ -1,7 +1,9 @@
 const express = require("express");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
+const { requireAnyPermission } = require("../middleware/requirePermission");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
+const { PERMISSIONS } = require("../security/permissions");
 const router = express.Router();
 
 router.use(requireAtlasUser);
@@ -22,6 +24,12 @@ const {
   buildRecentActivity,
   loadProductionProspects
 } = require("../core/executiveDashboardReadModel");
+
+/** BR-149 — Team + Executive dashboards share scoped aggregate APIs. */
+const requireDashboardAccess = requireAnyPermission(
+  PERMISSIONS.DASHBOARD_EXECUTIVE,
+  PERMISSIONS.DASHBOARD_TEAM
+);
 
 router.get("/", async (req, res) => {
   const organizationId = getTenantOrganizationId(req);
@@ -64,11 +72,13 @@ router.get("/", async (req, res) => {
   res.json(dashboard);
 });
 
-/** Sprint 9.0 — Executive Dashboard aggregate read model. */
-router.get("/executive", async (req, res) => {
+/** Sprint 9.0 — Executive / Team Dashboard aggregate read model (hierarchy-scoped). */
+router.get("/executive", requireDashboardAccess, async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
-    const payload = await buildExecutiveDashboard(organizationId);
+    const productionProspects = await loadProductionProspects(organizationId);
+    const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
+    const payload = await buildExecutiveDashboard(organizationId, { prospects });
     res.json(payload);
   } catch (error) {
     console.error("[dashboard/executive] error:", error.message);
@@ -77,7 +87,7 @@ router.get("/executive", async (req, res) => {
 });
 
 /** Sprint 9.0 — Top recommendations from priority queue. */
-router.get("/recommendations", async (req, res) => {
+router.get("/recommendations", requireDashboardAccess, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 5, 20);
     const organizationId = getTenantOrganizationId(req);
@@ -96,7 +106,7 @@ router.get("/recommendations", async (req, res) => {
 });
 
 /** Sprint 9.0 — Recent workflow activity timeline. */
-router.get("/activity", async (req, res) => {
+router.get("/activity", requireDashboardAccess, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
     const organizationId = getTenantOrganizationId(req);
@@ -122,12 +132,14 @@ router.get("/activity", async (req, res) => {
   }
 });
 
-/** Sprint 12 — Alpha executive morning brief. */
-router.get("/alpha-brief", async (req, res) => {
+/** Sprint 12 — Alpha executive morning brief (hierarchy-scoped). */
+router.get("/alpha-brief", requireDashboardAccess, async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
+    const productionProspects = await loadProductionProspects(organizationId);
+    const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
     const { buildAlphaMorningBrief } = require("../core/alphaMorningBriefEngine");
-    const brief = await buildAlphaMorningBrief({ organizationId });
+    const brief = await buildAlphaMorningBrief({ organizationId, prospects });
     res.json(brief);
   } catch (error) {
     console.error("[dashboard/alpha-brief] error:", error.message);
