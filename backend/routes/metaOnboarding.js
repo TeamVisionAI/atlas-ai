@@ -18,6 +18,8 @@ const {
 } = require("../core/meta/authorizationCodeTrace");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
+const { requirePermission } = require("../middleware/requirePermission");
+const { PERMISSIONS } = require("../security/permissions");
 const whatsappIntegrationService = require("../services/whatsappIntegrationService");
 
 const router = express.Router();
@@ -63,7 +65,7 @@ router.get("/embedded-signup/health", async (req, res) => {
   }
 });
 
-router.post("/embedded-signup/disconnect", async (req, res) => {
+router.post("/embedded-signup/disconnect", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const result = await whatsappIntegrationService.disconnectIntegration(
       req.authContext,

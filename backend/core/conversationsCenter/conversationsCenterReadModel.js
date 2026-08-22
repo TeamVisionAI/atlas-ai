@@ -11,7 +11,7 @@ const {
   CONVERSATION_OWNERSHIP_STATE
 } = require("./constants");
 const { resolveConversationOwnershipState } = require("./conversationsCenterOwnershipService");
-const { isProspectInConversationsTenantScope } = require("./conversationsCenterAccess");
+const { isProspectInConversationsTenantScope, isProspectInConversationsUserScope } = require("./conversationsCenterAccess");
 const {
   isRecruitingConversationEligibleForInbox,
   resolveRecruitingInboxEligibility
@@ -346,8 +346,11 @@ async function buildConversationsCenterReadModel(options = {}) {
   const prospects =
     options.prospects ?? (await loadProductionProspectsSafe(organizationId));
 
+  const authContext = options.authContext || null;
   const tenantScoped = prospects.filter((prospect) =>
-    isProspectInConversationsTenantScope(prospect, organizationId)
+    authContext
+      ? isProspectInConversationsUserScope(prospect, organizationId, authContext)
+      : isProspectInConversationsTenantScope(prospect, organizationId)
   );
   const scoped = (
     await Promise.all(
@@ -396,11 +399,12 @@ async function buildConversationsCenterReadModel(options = {}) {
   };
 }
 
-async function getConversationsAttentionCount(organizationId, prospects) {
+async function getConversationsAttentionCount(organizationId, prospects, authContext = null) {
   const model = await buildConversationsCenterReadModel({
     organizationId,
     prospects,
-    filter: CONVERSATION_FILTERS.ACTIVE
+    filter: CONVERSATION_FILTERS.ACTIVE,
+    authContext
   });
 
   return {

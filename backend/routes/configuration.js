@@ -109,7 +109,7 @@ router.get("/organization/levels", (_req, res) => {
   res.json({ levels: ORGANIZATION_LEVEL_VALUES });
 });
 
-router.get("/whatsapp", protectedRoute, async (req, res) => {
+router.get("/whatsapp", protectedRoute, requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const organizationId = await whatsappIntegrationService.resolveOrganizationId(
       req.authContext,
@@ -174,7 +174,7 @@ router.patch(
   }
 );
 
-router.get("/organization/integrations", requirePermission(PERMISSIONS.ORG_READ), async (req, res) => {
+router.get("/organization/integrations", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const integrations = await organizationIntegrationService.getIntegrationsStatus(
       req.tenantContext.organizationId
@@ -212,7 +212,7 @@ router.patch(
   }
 );
 
-router.get("/scheduling/google/auth-url", async (req, res) => {
+router.get("/scheduling/google/auth-url", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const payload = googleCalendarIntegrationService.getAuthUrl(
       req.tenantContext.organizationId,
@@ -225,7 +225,7 @@ router.get("/scheduling/google/auth-url", async (req, res) => {
   }
 });
 
-router.get("/scheduling/google/calendars", async (req, res) => {
+router.get("/scheduling/google/calendars", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const calendars = await googleCalendarIntegrationService.listCalendars(
       req.tenantContext.organizationId
@@ -238,7 +238,7 @@ router.get("/scheduling/google/calendars", async (req, res) => {
   }
 });
 
-router.post("/scheduling/google/calendar", async (req, res) => {
+router.post("/scheduling/google/calendar", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const config = await googleCalendarIntegrationService.setCalendar(
       req.tenantContext.organizationId,
@@ -250,7 +250,7 @@ router.post("/scheduling/google/calendar", async (req, res) => {
   }
 });
 
-router.post("/scheduling/google/disconnect", async (req, res) => {
+router.post("/scheduling/google/disconnect", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
   try {
     const result = await googleCalendarIntegrationService.disconnect(
       req.tenantContext.organizationId

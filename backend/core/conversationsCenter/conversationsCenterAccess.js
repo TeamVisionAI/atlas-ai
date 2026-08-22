@@ -197,6 +197,23 @@ function isProspectInConversationsTenantScope(prospect, organizationId) {
   return String(prospect.organization_id || "") === String(organizationId);
 }
 
+/**
+ * Conversations visibility = tenant org ∩ prospect hierarchy/user scope.
+ * Fail closed when authContext cannot authorize the prospect.
+ */
+function isProspectInConversationsUserScope(prospect, organizationId, authContext = null) {
+  if (!isProspectInConversationsTenantScope(prospect, organizationId)) {
+    return false;
+  }
+
+  if (!authContext) {
+    return false;
+  }
+
+  const { canAccessProspect } = require("../../security/authorizationService");
+  return canAccessProspect(authContext, prospect);
+}
+
 /** @deprecated Use isProspectInConversationsTenantScope with effective organizationId. */
 function isProspectInNiovelPilotScope(prospect) {
   // Legacy helper retained for older tests — no longer Niovel-owner scoped.
@@ -245,6 +262,7 @@ module.exports = {
   assertConversationsCenterAccessAsync,
   resolveConversationsCenterAccessAsync,
   isProspectInConversationsTenantScope,
+  isProspectInConversationsUserScope,
   isProspectInNiovelPilotScope,
   assertConversationsCenterPilotAccess,
   isConversationsCenterPilotUser

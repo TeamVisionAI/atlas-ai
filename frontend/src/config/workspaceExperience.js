@@ -48,6 +48,32 @@ export function getRoleLabelKey(role) {
   return keys[normalized] || "workspaceRoleRepresentative";
 }
 
+/** User-facing title prefers business_rank over LC1 permission role. */
+export function getDisplayTitleLabelKey(user) {
+  if (isSuperAdminUser(user)) {
+    return "workspaceRoleSuperAdmin";
+  }
+
+  const rank = String(user?.business_rank || user?.businessRank || "")
+    .trim()
+    .toUpperCase();
+
+  const rankKeys = {
+    RVP: "businessRankRvp",
+    SRL: "businessRankSrl",
+    RL: "businessRankRl",
+    DIV: "businessRankDiv",
+    DIS: "businessRankDis",
+    REP: "businessRankRep"
+  };
+
+  if (rankKeys[rank]) {
+    return rankKeys[rank];
+  }
+
+  return getRoleLabelKey(user?.role);
+}
+
 export function getWorkspaceLabelKey(workspaceType) {
   const keys = {
     [WORKSPACE_TYPES.ADMINISTRATOR]: "workspaceLabelAdministrator",
@@ -333,7 +359,7 @@ export const ROUTE_ACCESS = Object.freeze({
   "settings/profile": {},
   "settings/integrations": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   "settings/organization": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
@@ -367,15 +393,15 @@ export const ROUTE_ACCESS = Object.freeze({
   },
   "settings/whatsapp": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   "settings/whatsapp/success": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   "settings/whatsapp/error": {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   "admin/users": USER_MANAGEMENT_ROUTE_RULE,
   "operations-center": {
@@ -536,7 +562,7 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
     descriptionKey: "configurationHubIntegrationsDescription",
     icon: "integrations",
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.ORG_READ
+    permission: PERMISSIONS.ORG_WRITE
   },
   {
     id: "scheduling",

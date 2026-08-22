@@ -172,6 +172,7 @@ class ProspectApplicationService {
       offset: query.offset,
       organizationId: query.organizationId,
       ownerUserId: query.ownerUserId,
+      ownerUserIds: query.ownerUserIds,
       divisionId: query.divisionId
     });
 
