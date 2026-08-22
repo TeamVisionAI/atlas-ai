@@ -583,6 +583,19 @@ const SETTINGS_HUB_SECTIONS = Object.freeze([
       WORKSPACE_TYPES.REPRESENTATIVE
     ],
     permission: PERMISSIONS.PROSPECT_WRITE
+  },
+  {
+    id: "campaign-intake-codes",
+    routeKey: "settings/campaign-intake-codes",
+    path: appPath("settings/campaign-intake-codes"),
+    titleKey: "campaignIntakeCodes",
+    descriptionKey: "configurationHubCampaignIntakeCodesDescription",
+    icon: "integrations",
+    workspaceTypes: [
+      WORKSPACE_TYPES.ADMINISTRATOR,
+      WORKSPACE_TYPES.MANAGEMENT
+    ],
+    permission: PERMISSIONS.ORG_WRITE
   }
 ]);
 

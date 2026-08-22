@@ -234,6 +234,7 @@ app.use("/api/configuration", configurationRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/interview-assignment", interviewAssignmentRoutes);
 app.use("/api/qr-campaigns", require("./routes/qrCampaigns"));
+app.use("/api/campaign-intake-codes", require("./routes/campaignIntakeCodes"));
 app.use("/api/missions", missionRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use(

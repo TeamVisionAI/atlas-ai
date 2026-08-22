@@ -6,18 +6,21 @@ const WHATSAPP_ENTRY_METHOD = Object.freeze({
   CLICK_TO_WHATSAPP: "CLICK_TO_WHATSAPP",
   QR: "QR",
   FACEBOOK_LEAD_ADS: "FACEBOOK_LEAD_ADS",
+  CAMPAIGN_INTAKE_CODE: "CAMPAIGN_INTAKE_CODE",
   UNATTRIBUTED: "UNATTRIBUTED"
 });
 
 const WHATSAPP_SOURCE = Object.freeze({
   FACEBOOK: "FACEBOOK",
   CAR_MAGNET: "car_magnet",
+  CAMPAIGN_INTAKE: "CAMPAIGN_INTAKE",
   UNKNOWN: "UNKNOWN"
 });
 
 const WHATSAPP_CORRELATION_PREFIX = Object.freeze({
   INBOUND: "whatsapp:inbound:",
-  OUTBOUND: "whatsapp:outbound:"
+  OUTBOUND: "whatsapp:outbound:",
+  HUMAN_ECHO: "whatsapp:human_echo:"
 });
 
 const REOPENED_INACTIVITY_MS = 72 * 60 * 60 * 1000;

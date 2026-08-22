@@ -10,13 +10,15 @@ const {
   loadPersistedWorkflowState,
   savePersistedWorkflowState
 } = require("./workflowStateStore");
+const { evaluateRecruitingSessionActive } = require("./recruitingSessionGuard");
 
 /** Durable proof that Atlas eligibility was earned from a verified event. */
 const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
   CTWA_REFERRAL: "CTWA_REFERRAL",
   QR: "QR",
   FACEBOOK_LEAD_ADS: "FACEBOOK_LEAD_ADS",
-  QUICK_CAPTURE: "QUICK_CAPTURE"
+  QUICK_CAPTURE: "QUICK_CAPTURE",
+  CAMPAIGN_INTAKE_CODE: "CAMPAIGN_INTAKE_CODE"
 });
 
 const VERIFIED_SOURCE_SET = Object.freeze(
@@ -28,6 +30,7 @@ const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
   new Set([
     WHATSAPP_ENTRY_METHOD.QR,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
+    WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
     "QUICK_CAPTURE"
   ])
 );
@@ -77,13 +80,21 @@ function resolveVerifiedAtlasEligibilitySource({
   qrAttributed = false,
   ctwaReferral = null,
   intakeSource = null,
-  sourceFields = null
+  sourceFields = null,
+  campaignIntakeMatch = null
 } = {}) {
   if (qrTouch || qrAttributed) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
   }
   if (hasPositiveCtwaReferral(ctwaReferral)) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL;
+  }
+  if (
+    campaignIntakeMatch?.matched === true &&
+    String(campaignIntakeMatch.purpose || "").toUpperCase() === "RECRUITING" &&
+    campaignIntakeMatch.recruitingEligible === true
+  ) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_CODE;
   }
   const entry = upper(sourceFields?.entryMethod || intakeSource);
   if (entry === WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS || entry === "FACEBOOK_LEAD") {
@@ -96,6 +107,49 @@ function resolveVerifiedAtlasEligibilitySource({
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
   }
   return null;
+}
+
+function hasFreshQrAttribution({ qrAttributed, qrTouch } = {}) {
+  return Boolean(qrAttributed || qrTouch);
+}
+
+/**
+ * Positive Atlas campaign intake code on this inbound (BR-147).
+ * Only RECRUITING purpose may authorize Recruit AI auto-reply.
+ */
+function hasFreshRecruitingCampaignIntakeMatch(inbound) {
+  const match = inbound?.campaignIntakeMatch;
+  return Boolean(
+    match?.matched === true &&
+      String(match.purpose || "").toUpperCase() === "RECRUITING" &&
+      match.recruitingEligible === true
+  );
+}
+
+function hasStoredQrOrigin(prospect) {
+  const entry = upper(prospect?.entry_method);
+  const source = upper(prospect?.source);
+  return (
+    entry === WHATSAPP_ENTRY_METHOD.QR ||
+    source === upper(WHATSAPP_SOURCE.CAR_MAGNET)
+  );
+}
+
+function resolveContinuationProvenance({ prospect, workflowState } = {}) {
+  const storedProof = upper(workflowState?.atlasEligibilitySource);
+  if (VERIFIED_SOURCE_SET.has(storedProof)) {
+    return { proven: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
+  }
+
+  if (hasVerifiedStoredIntakeOrigin(prospect)) {
+    return { proven: true, reason: "VERIFIED_STORED_ORIGIN" };
+  }
+
+  if (hasStoredQrOrigin(prospect)) {
+    return { proven: true, reason: "QR_STORED_ORIGIN" };
+  }
+
+  return { proven: false, reason: "NOT_ELIGIBLE" };
 }
 
 /**
@@ -125,20 +179,25 @@ function evaluateAtlasInboundAutomationEligibility({
     return { eligible: true, reason: "CTWA_REFERRAL" };
   }
 
-  if (hasQrOrigin({ prospect, qrAttributed, qrTouch })) {
+  if (hasFreshQrAttribution({ qrAttributed, qrTouch })) {
     return { eligible: true, reason: "QR_ATTRIBUTION" };
   }
 
-  const storedProof = upper(workflowState?.atlasEligibilitySource);
-  if (VERIFIED_SOURCE_SET.has(storedProof)) {
-    return { eligible: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
+  if (hasFreshRecruitingCampaignIntakeMatch(inbound)) {
+    return { eligible: true, reason: "CAMPAIGN_INTAKE_CODE" };
   }
 
-  if (hasVerifiedStoredIntakeOrigin(prospect)) {
-    return { eligible: true, reason: "VERIFIED_STORED_ORIGIN" };
+  const continuation = resolveContinuationProvenance({ prospect, workflowState });
+  if (!continuation.proven) {
+    return { eligible: false, reason: continuation.reason };
   }
 
-  return { eligible: false, reason: "NOT_ELIGIBLE" };
+  const session = evaluateRecruitingSessionActive({ prospect, workflowState });
+  if (!session.active) {
+    return { eligible: false, reason: session.reason };
+  }
+
+  return { eligible: true, reason: continuation.reason };
 }
 
 async function resolveAtlasInboundAutomationEligibility(input = {}) {
@@ -187,7 +246,12 @@ module.exports = {
   evaluateAtlasInboundAutomationEligibility,
   resolveAtlasInboundAutomationEligibility,
   hasPositiveCtwaReferral,
+  hasQrOrigin,
+  hasFreshQrAttribution,
+  hasStoredQrOrigin,
+  resolveContinuationProvenance,
   resolveVerifiedAtlasEligibilitySource,
+  hasFreshRecruitingCampaignIntakeMatch,
   persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES

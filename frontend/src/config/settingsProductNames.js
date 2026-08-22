@@ -10,5 +10,6 @@ export const SETTINGS_SECTIONS = Object.freeze({
   recruiting: "Recruiting",
   billing: "Billing",
   appointments: "Appointments",
-  qrCampaigns: "QR Campaigns"
+  qrCampaigns: "QR Campaigns",
+  campaignIntakeCodes: "Campaign Intake Codes"
 });

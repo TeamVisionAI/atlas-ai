@@ -1774,6 +1774,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-147 — Campaign Intake Codes (Safe CTWA Fallback)
+
+**Implements:** Positive Atlas campaign attribution when Meta omits `message.referral` / `ctwa_clid` on Click-to-WhatsApp inbound.  
+**Domain:** WhatsApp inbound / Recruit AI / Lead Sources  
+**Depends on:** BR-142, BR-129, recruiting session guard (PR #224)  
+**Status:** Implemented  
+**Engine target:** `campaignIntakeCode/*`, `atlasInboundAutomationEligibility.js`, `whatsappInboundPipeline.js`, `whatsappProspectResolver.js`  
+**Tests:** `backend/test/campaignIntakeCodes.test.js`
+
+### Rules
+
+1. **Positive proof only** — A registered **ACTIVE** intake code embedded in the **first inbound of a new intake episode** is positive campaign proof when it matches exact code + organization + `whatsapp_phone_number_id` + configured purpose.
+2. **No inference** — Generic greetings, campaign names without the issued token, `from_user_id`, or unknown inbound labels are **not** proof.
+3. **No Meta fabrication** — Do not invent `ctwa_clid`, Meta `referral`, or CTWA labels. Atlas provenance is `CAMPAIGN_INTAKE` / `CAMPAIGN_INTAKE_CODE`.
+4. **BR-142 path** — Fresh eligible paths: verified CTWA referral, QR match, **recruiting-purpose intake code on a fresh episode**, explicit operator enable, or continuation via stored verified source + **active recruiting session**.
+5. **Episode gate** — Intake codes do not reopen closed/archived/HUMAN-owned conversations or completed recruiting sessions. Historical tokens in later messages do not grant new automation permission.
+6. **Purpose** — `RECRUITING` codes may authorize Recruit AI auto-reply. `IUL` / `OTHER` codes may persist attribution but do **not** enter recruiting auto-reply.
+7. **Token handling** — Case-insensitive exact-boundary match; strip token from semantic text passed to Recruit AI; preserve original inbound body in conversation history.
+8. **Boundaries** — Does not weaken BR-142. Does not replace Meta referral when present. Does not require Meta Ads API.
+
+---
+
 ## BR-143 — IUL Review Ad Conversation (Policy Review Goal)
 
 **Implements:** Leads from the Spanish IUL-review ad get a natural educate → clarify → review conversation that moves toward a no-obligation review appointment without attacking IUL or sounding scripted.  

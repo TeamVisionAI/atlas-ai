@@ -54,6 +54,9 @@ const AppointmentSettings = lazy(() => import("./pages/configuration/Appointment
 const QrCampaignsConfiguration = lazy(() =>
   import("./pages/configuration/QrCampaignsConfiguration")
 );
+const CampaignIntakeCodesConfiguration = lazy(() =>
+  import("./pages/configuration/CampaignIntakeCodesConfiguration")
+);
 const RecruitingConfiguration = lazy(() => import("./pages/configuration/RecruitingConfiguration"));
 const BillingConfiguration = lazy(() => import("./pages/configuration/BillingConfiguration"));
 
@@ -169,6 +172,7 @@ export default function App() {
           <Route path="billing" element={<BillingConfiguration />} />
           <Route path="appointments" element={<AppointmentSettings />} />
           <Route path="qr-campaigns" element={<QrCampaignsConfiguration />} />
+          <Route path="campaign-intake-codes" element={<CampaignIntakeCodesConfiguration />} />
         </Route>
         <Route path="knowledge" element={<KnowledgeHub />} />
         <Route path="policy-intelligence" element={<PolicyIntelligence />} />
