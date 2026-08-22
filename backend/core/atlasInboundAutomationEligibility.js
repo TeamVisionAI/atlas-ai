@@ -10,6 +10,7 @@ const {
   loadPersistedWorkflowState,
   savePersistedWorkflowState
 } = require("./workflowStateStore");
+const { evaluateRecruitingSessionActive } = require("./recruitingSessionGuard");
 
 /** Durable proof that Atlas eligibility was earned from a verified event. */
 const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
@@ -98,6 +99,36 @@ function resolveVerifiedAtlasEligibilitySource({
   return null;
 }
 
+function hasFreshQrAttribution({ qrAttributed, qrTouch } = {}) {
+  return Boolean(qrAttributed || qrTouch);
+}
+
+function hasStoredQrOrigin(prospect) {
+  const entry = upper(prospect?.entry_method);
+  const source = upper(prospect?.source);
+  return (
+    entry === WHATSAPP_ENTRY_METHOD.QR ||
+    source === upper(WHATSAPP_SOURCE.CAR_MAGNET)
+  );
+}
+
+function resolveContinuationProvenance({ prospect, workflowState } = {}) {
+  const storedProof = upper(workflowState?.atlasEligibilitySource);
+  if (VERIFIED_SOURCE_SET.has(storedProof)) {
+    return { proven: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
+  }
+
+  if (hasVerifiedStoredIntakeOrigin(prospect)) {
+    return { proven: true, reason: "VERIFIED_STORED_ORIGIN" };
+  }
+
+  if (hasStoredQrOrigin(prospect)) {
+    return { proven: true, reason: "QR_STORED_ORIGIN" };
+  }
+
+  return { proven: false, reason: "NOT_ELIGIBLE" };
+}
+
 /**
  * @returns {{ eligible: boolean, reason: string }}
  */
@@ -125,20 +156,21 @@ function evaluateAtlasInboundAutomationEligibility({
     return { eligible: true, reason: "CTWA_REFERRAL" };
   }
 
-  if (hasQrOrigin({ prospect, qrAttributed, qrTouch })) {
+  if (hasFreshQrAttribution({ qrAttributed, qrTouch })) {
     return { eligible: true, reason: "QR_ATTRIBUTION" };
   }
 
-  const storedProof = upper(workflowState?.atlasEligibilitySource);
-  if (VERIFIED_SOURCE_SET.has(storedProof)) {
-    return { eligible: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
+  const continuation = resolveContinuationProvenance({ prospect, workflowState });
+  if (!continuation.proven) {
+    return { eligible: false, reason: continuation.reason };
   }
 
-  if (hasVerifiedStoredIntakeOrigin(prospect)) {
-    return { eligible: true, reason: "VERIFIED_STORED_ORIGIN" };
+  const session = evaluateRecruitingSessionActive({ prospect, workflowState });
+  if (!session.active) {
+    return { eligible: false, reason: session.reason };
   }
 
-  return { eligible: false, reason: "NOT_ELIGIBLE" };
+  return { eligible: true, reason: continuation.reason };
 }
 
 async function resolveAtlasInboundAutomationEligibility(input = {}) {
@@ -187,6 +219,10 @@ module.exports = {
   evaluateAtlasInboundAutomationEligibility,
   resolveAtlasInboundAutomationEligibility,
   hasPositiveCtwaReferral,
+  hasQrOrigin,
+  hasFreshQrAttribution,
+  hasStoredQrOrigin,
+  resolveContinuationProvenance,
   resolveVerifiedAtlasEligibilitySource,
   persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
