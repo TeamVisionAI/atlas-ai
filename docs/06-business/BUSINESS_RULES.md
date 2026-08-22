@@ -1914,6 +1914,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-150 — Team Dashboard Action-First Workspace
+
+**Implements:** Redesign `/app/team-dashboard` as a daily execution workspace for non-RVP field users (SRL/RL/DIV/DIS/REP).  
+**Domain:** Workspace UX / Dashboard presentation  
+**Depends on:** BR-149 (`dashboard:team`, hierarchy-scoped dashboard APIs)  
+**Status:** Implemented  
+**Engine target:** `teamDashboardViewModel.js`, `TeamDashboard.jsx`  
+**Tests:** `frontend/src/engines/teamDashboardViewModel.test.js`, `frontend/src/pages/teamDashboardActionFirst.test.js`
+
+### Rules
+
+1. **Not Executive** — Team Dashboard must not embed Executive Dashboard components (Agency Health, org-wide KPIs, Team Interview Board).
+2. **Action-first** — Primary screen answers “What do I need to do today?” via KPIs, priorities, pipeline, appointments, recruiting/production panels, Atlas recommendation, recent activity.
+3. **Adaptive hierarchy** — Same component adapts: self-only users see personal labels; leaders with subtree owners see team-aware appointment title. Infer team scope from scoped prospect ownership only.
+4. **Data safety** — Use existing scoped `/api/dashboard` + `/api/dashboard/executive` payloads only. No org-wide fallback.
+5. **Executive unchanged** — `/app/executive-dashboard` behavior and RVP-only access remain unchanged.
+6. **i18n** — Spanish and English labels for all Team Dashboard chrome.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
