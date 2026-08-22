@@ -323,7 +323,10 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     created,
     conversationLogId: logResult.log?.id || null,
     correlationId,
-    conversation
+    conversation,
+    organizationId: organizationId || prospect?.organization_id || claimedOrganizationId || null,
+    prospectId: prospect?.id || null,
+    ownerUserId: prospect?.owner_user_id || null
   };
 }
 
