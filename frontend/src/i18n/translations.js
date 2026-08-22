@@ -1812,11 +1812,23 @@ export const translations = {
       "No se pudo desconectar WhatsApp Business. Inténtalo de nuevo.",
     configurationIntegrationsIntro:
       "Conecta los servicios que tu organización usa para comunicarse y agendar con prospectos.",
+    configurationIntegrationsIntroPersonal:
+      "Tus integraciones personales: Google Calendar, WhatsApp Business y Zoom. No se muestran conexiones de otros usuarios.",
+    configurationPersonalZoom: "Zoom personal",
+    configurationPersonalZoomIntro: "Enlace de reunión Zoom usado en tus citas virtuales.",
+    configurationPersonalZoomUrl: "URL de Zoom",
+    configurationSaveZoom: "Guardar Zoom",
+    configurationZoomSaved: "Enlace de Zoom guardado.",
+    configurationOrganizationChannel: "Canal de la organización",
+    configurationOrganizationChannelIntro:
+      "Conexiones a nivel de organización (legado). Solo administradores / RVP pueden gestionarlas.",
+    configurationOrgGoogleCalendar: "Google Calendar de la organización",
+    configurationOrgGoogleCalendarIntro: "Calendario de organización legado (no personal).",
     configurationIntegrationsComingSoonTitle: "Más integraciones próximamente",
     configurationIntegrationsComingSoonDescription:
       "Pronto podrás conectar servicios adicionales desde esta página.",
     configurationGoogleCalendarIntro:
-      "Sincroniza citas con el Google Calendar de tu equipo.",
+      "Sincroniza citas con tu Google Calendar personal.",
     configurationLoadFailed:
       "No se pudieron cargar los ajustes. Actualiza la página e inténtalo de nuevo.",
     configurationIntegrationsLoadFailed:
@@ -3628,10 +3640,22 @@ export const translations = {
     whatsappIntegrationDisconnectFailed: "Unable to disconnect WhatsApp Business. Please try again.",
     configurationIntegrationsIntro:
       "Connect the services your organization uses to communicate and schedule with prospects.",
+    configurationIntegrationsIntroPersonal:
+      "Your personal integrations: Google Calendar, WhatsApp Business, and Zoom. Other users' connections are never shown here.",
+    configurationPersonalZoom: "Personal Zoom",
+    configurationPersonalZoomIntro: "Zoom meeting link used for your virtual appointments.",
+    configurationPersonalZoomUrl: "Zoom URL",
+    configurationSaveZoom: "Save Zoom",
+    configurationZoomSaved: "Zoom link saved.",
+    configurationOrganizationChannel: "Organization channel",
+    configurationOrganizationChannelIntro:
+      "Organization-owned connections (legacy). Only admins / RVP can manage these.",
+    configurationOrgGoogleCalendar: "Organization Google Calendar",
+    configurationOrgGoogleCalendarIntro: "Legacy organization calendar (not personal).",
     configurationIntegrationsComingSoonTitle: "More integrations coming soon",
     configurationIntegrationsComingSoonDescription:
       "Additional services will be available to connect from this page.",
-    configurationGoogleCalendarIntro: "Sync appointments with your team's Google Calendar.",
+    configurationGoogleCalendarIntro: "Sync appointments with your personal Google Calendar.",
     configurationLoadFailed: "Unable to load settings. Please refresh and try again.",
     configurationIntegrationsLoadFailed:
       "Unable to load integrations. Please refresh the page and try again."

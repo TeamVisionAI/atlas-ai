@@ -60,13 +60,14 @@ function buildListFilters(req) {
 async function getProfile(req, res) {
   try {
     const profile = await appointmentApplicationService.getProfile(req.tenantContext.userId);
-    const calendarStatus = await googleCalendarIntegrationService.getIntegrationStatus(
-      req.tenantContext.organizationId
+    const calendarStatus = await googleCalendarIntegrationService.getPersonalIntegrationStatus(
+      req.tenantContext.organizationId,
+      req.tenantContext.userId
     );
 
     res.json({
       profile,
-      calendarConnection: googleCalendarIntegrationService.presentIntegrationStatus(calendarStatus)
+      calendarConnection: calendarStatus
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message, code: error.code });

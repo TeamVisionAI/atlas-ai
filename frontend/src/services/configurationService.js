@@ -44,26 +44,32 @@ export async function updateSchedulingConfiguration(payload) {
   });
 }
 
-export async function fetchGoogleCalendarAuthUrl(returnPath = "settings/scheduling") {
-  const query = new URLSearchParams({ returnPath });
+export async function fetchGoogleCalendarAuthUrl(
+  returnPath = "settings/integrations",
+  { ownershipMode = "personal" } = {}
+) {
+  const query = new URLSearchParams({ returnPath, ownershipMode });
   return apiFetch(`/api/configuration/scheduling/google/auth-url?${query.toString()}`);
 }
 
-export async function fetchGoogleCalendars() {
-  return apiFetch("/api/configuration/scheduling/google/calendars");
+export async function fetchGoogleCalendars({ ownershipMode = "personal" } = {}) {
+  const query = new URLSearchParams({ ownershipMode });
+  return apiFetch(`/api/configuration/scheduling/google/calendars?${query.toString()}`);
 }
 
-export async function selectGoogleCalendar(calendarId) {
+export async function selectGoogleCalendar(calendarId, { ownershipMode = "personal" } = {}) {
   return apiFetch("/api/configuration/scheduling/google/calendar", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ calendarId })
+    body: JSON.stringify({ calendarId, ownershipMode })
   });
 }
 
-export async function disconnectGoogleCalendar() {
+export async function disconnectGoogleCalendar({ ownershipMode = "personal" } = {}) {
   return apiFetch("/api/configuration/scheduling/google/disconnect", {
-    method: "POST"
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ownershipMode })
   });
 }
 

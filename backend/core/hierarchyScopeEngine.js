@@ -105,25 +105,34 @@ async function resolveHierarchyScopeForUser(user, { loadOrgUsers } = {}) {
   }
 
   let rows = [];
-  if (typeof loadOrgUsers === "function") {
-    rows = await loadOrgUsers(organizationId);
-  } else {
-    const { supabase } = require("../services/supabaseService");
-    const { data, error } = await supabase
-      .from("atlas_users")
-      .select("id, reports_to_user_id, status")
-      .eq("organization_id", organizationId)
-      .in("status", ["active", "pending_invitation"]);
+  try {
+    if (typeof loadOrgUsers === "function") {
+      rows = await loadOrgUsers(organizationId);
+    } else {
+      const { supabase } = require("../services/supabaseService");
+      const { data, error } = await supabase
+        .from("atlas_users")
+        .select("id, reports_to_user_id, status")
+        .eq("organization_id", organizationId)
+        .in("status", ["active", "pending_invitation"]);
 
-    if (error) {
-      console.error("[hierarchyScope] load failed", error.message);
-      return {
-        mode: HIERARCHY_MODES.SELF,
-        userIds: [userId],
-        reason: "HIERARCHY_LOAD_FAILED_FAIL_CLOSED"
-      };
+      if (error) {
+        console.error("[hierarchyScope] load failed", error.message);
+        return {
+          mode: HIERARCHY_MODES.SELF,
+          userIds: [userId],
+          reason: "HIERARCHY_LOAD_FAILED_FAIL_CLOSED"
+        };
+      }
+      rows = data || [];
     }
-    rows = data || [];
+  } catch (error) {
+    console.error("[hierarchyScope] load threw", error.message);
+    return {
+      mode: HIERARCHY_MODES.SELF,
+      userIds: [userId],
+      reason: "HIERARCHY_LOAD_FAILED_FAIL_CLOSED"
+    };
   }
 
   const childrenByParent = buildChildrenByParent(rows);

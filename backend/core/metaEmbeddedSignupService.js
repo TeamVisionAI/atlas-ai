@@ -687,6 +687,10 @@ async function completeEmbeddedSignupExchange(input) {
 
   try {
     saved = await connectionRepository.saveConnection(organizationId, {
+      user_id:
+        input.ownershipMode === "organization"
+          ? null
+          : input.userId || input.user_id || null,
       business_id: assets.businessId || null,
       waba_id: assets.wabaId,
       phone_number_id: assets.phoneNumberId,
