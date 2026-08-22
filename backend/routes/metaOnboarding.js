@@ -172,14 +172,35 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       supportMode: Boolean(req.supportContext?.organizationId)
     });
 
+    const ownershipMode =
+      req.body?.ownershipMode === "organization" &&
+      hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)
+        ? "organization"
+        : "personal";
+
+    if (ownershipMode === "personal") {
+      const {
+        resolveAgentCapabilitiesFromUser
+      } = require("../core/agentCapabilitiesEngine");
+      const { findUserById } = require("../services/atlasUserService");
+      const actor =
+        req.authContext?.user ||
+        (await findUserById(req.authContext?.userId).catch(() => null)) ||
+        req.sanitizedUser;
+      const caps = resolveAgentCapabilitiesFromUser(actor);
+      if (!caps.personalWhatsAppEnabled) {
+        return res.status(403).json({
+          error: "PERSONAL_WHATSAPP_DISABLED",
+          message:
+            "Personal WhatsApp is not enabled for this user. Ask an RVP/Admin to enable it."
+        });
+      }
+    }
+
     const result = await completeEmbeddedSignupExchange({
       organizationId,
       userId: req.authContext?.userId || null,
-      ownershipMode:
-        req.body?.ownershipMode === "organization" &&
-        hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)
-          ? "organization"
-          : "personal",
+      ownershipMode,
       code,
       wabaId,
       phoneNumberId,

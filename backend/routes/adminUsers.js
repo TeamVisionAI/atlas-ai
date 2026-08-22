@@ -87,6 +87,24 @@ router.patch("/users/:id", async (req, res) => {
   }
 });
 
+router.patch("/users/:id/capabilities", async (req, res) => {
+  try {
+    const user = await identityAdminService.updateAgentCapabilities(
+      req.params.id,
+      req.body,
+      req.authContext,
+      auditMeta(req),
+      req
+    );
+    res.json({ user });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Request failed."
+    });
+  }
+});
+
 router.post("/users/:id/suspend", async (req, res) => {
   try {
     const user = await identityAdminService.setUserStatus(

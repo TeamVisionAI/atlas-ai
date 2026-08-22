@@ -226,6 +226,7 @@ export default function OrganizationIntegrations() {
   const googleCalendar = integrations.googleCalendar || {};
   const whatsapp = integrations.whatsapp || {};
   const orgChannel = integrations.organizationChannel || null;
+  const readiness = integrations.readiness || null;
 
   return (
     <ConfigurationSection title={translate("configurationIntegrations")}>
@@ -233,14 +234,43 @@ export default function OrganizationIntegrations() {
         {translate("configurationIntegrationsIntroPersonal")}
       </p>
 
+      {readiness ? (
+        <p className="configuration-integrations-intro" data-testid="agent-readiness-summary">
+          {translate("configurationAgentReadinessLabel")}:{" "}
+          {readiness.ready
+            ? translate("configurationAgentReadinessReady")
+            : translate("configurationAgentReadinessPending")}
+          {" · "}
+          {translate("configurationLeadChannelTitle")}: {readiness.leadChannelLabel}
+        </p>
+      ) : null}
+
       <div className="configuration-content configuration-content--integrations">
-        <WhatsAppIntegrationCard
-          connected={Boolean(whatsapp.connected)}
-          connection={whatsapp.connection || {}}
-          busy={whatsappBusy}
-          disconnecting={busyAction === "whatsapp-disconnect"}
-          onDisconnect={handleDisconnectWhatsApp}
-        />
+        {whatsapp.visible ? (
+          <WhatsAppIntegrationCard
+            connected={Boolean(whatsapp.connected)}
+            connection={whatsapp.connection || {}}
+            busy={whatsappBusy}
+            disconnecting={busyAction === "whatsapp-disconnect"}
+            onDisconnect={handleDisconnectWhatsApp}
+          />
+        ) : integrations.organizationLeadChannel?.managedByOrganization ? (
+          <article className="integration-card integration-card--info" data-testid="org-lead-channel-info">
+            <header className="integration-card__header">
+              <span className="integration-card__icon" aria-hidden="true">
+                <SettingsIcon name="integrations" />
+              </span>
+              <div>
+                <h3 className="integration-card__title">
+                  {translate("configurationLeadChannelTitle")}
+                </h3>
+                <p className="integration-card__subtitle">
+                  {translate("configurationLeadChannelOrganizationManaged")}
+                </p>
+              </div>
+            </header>
+          </article>
+        ) : null}
 
         <IntegrationCard
           icon="calendar"

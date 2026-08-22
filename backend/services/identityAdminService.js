@@ -26,6 +26,12 @@ const {
   normalizeBusinessRank,
   defaultPermissionRoleForBusinessRank
 } = require("../core/teamVisionBusinessRanks");
+const {
+  DEFAULT_AGENT_CAPABILITIES,
+  normalizeAgentCapabilities,
+  mergeAgentCapabilitiesPatch,
+  resolveAgentCapabilitiesFromUser
+} = require("../core/agentCapabilitiesEngine");
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -70,6 +76,7 @@ function presentAdminUser(row, extras = {}) {
     photo_url: row.photo_url || null,
     reports_to_user_id: row.reports_to_user_id || null,
     business_rank: row.business_rank || null,
+    agent_capabilities: resolveAgentCapabilitiesFromUser(row),
     notification_preferences: row.notification_preferences || {},
     timezone: row.timezone || "America/New_York",
     preferred_language: row.preferred_language || "en",
@@ -357,6 +364,9 @@ async function createUser(input, authContext, auditMeta = {}, options = {}, req 
     business_rank: businessRank,
     status,
     timezone: input.timezone || "America/New_York",
+    agent_capabilities: normalizeAgentCapabilities(
+      input.agentCapabilities || input.agent_capabilities || DEFAULT_AGENT_CAPABILITIES
+    ),
     preferred_language: input.preferredLanguage || input.preferred_language || "en",
     notification_preferences: input.notificationPreferences || input.notification_preferences || {}
   });
@@ -790,11 +800,63 @@ async function revokeInvitation(userId, authContext, auditMeta = {}, req = null)
   return { success: true, user: archived };
 }
 
+/**
+ * BR-148 — RVP/Admin updates another user's agent capabilities (same effective tenant).
+ * Users cannot self-enable personal WhatsApp / lead sources via this path for themselves
+ * unless actor has ADMIN_USERS (route-gated); self-service enablement is not offered.
+ */
+async function updateAgentCapabilities(userId, input, authContext, auditMeta = {}, req = null) {
+  const organizationId = await resolveAdminOrganizationId(authContext, req);
+  const existing = await findUserById(userId);
+
+  if (!existing) {
+    const error = new Error("User not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (String(existing.organization_id) !== String(organizationId)) {
+    const error = new Error("User is outside the effective organization.");
+    error.statusCode = 403;
+    error.publicCode = "FORBIDDEN";
+    throw error;
+  }
+
+  const patchSource =
+    input?.agentCapabilities ||
+    input?.agent_capabilities ||
+    input ||
+    {};
+
+  const next = mergeAgentCapabilitiesPatch(existing.agent_capabilities, patchSource);
+  const data = await identityWriteService.updateUser(userId, {
+    agent_capabilities: next
+  });
+
+  await writeAuditLog({
+    organizationId,
+    userId: authContext.userId,
+    userEmail: authContext.email,
+    action: "user.agent_capabilities_updated",
+    targetType: "atlas_user",
+    targetId: userId,
+    metadata: {
+      before: resolveAgentCapabilitiesFromUser(existing),
+      after: next
+    },
+    ipAddress: auditMeta.ipAddress,
+    userAgent: auditMeta.userAgent
+  });
+
+  return presentAdminUser(data);
+}
+
 module.exports = {
   listUsers,
   getUserById,
   createUser,
   updateUser,
+  updateAgentCapabilities,
   setUserStatus,
   forcePasswordReset,
   forceLogout,

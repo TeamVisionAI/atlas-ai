@@ -29,6 +29,7 @@ const ATLAS_WRITABLE_COLUMNS = new Set([
   "preferred_language",
   "notification_preferences",
   "profile_settings",
+  "agent_capabilities",
   "last_login_at",
   "archived_at",
   "created_at",

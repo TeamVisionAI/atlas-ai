@@ -1819,6 +1819,12 @@ export const translations = {
     configurationPersonalZoomUrl: "URL de Zoom",
     configurationSaveZoom: "Guardar Zoom",
     configurationZoomSaved: "Enlace de Zoom guardado.",
+    configurationLeadChannelTitle: "Canal de leads",
+    configurationLeadChannelOrganizationManaged:
+      "Canal de leads administrado por tu organización.",
+    configurationAgentReadinessLabel: "Listo para operar",
+    configurationAgentReadinessReady: "Listo",
+    configurationAgentReadinessPending: "Pendiente",
     configurationOrganizationChannel: "Canal de la organización",
     configurationOrganizationChannelIntro:
       "Conexiones a nivel de organización (legado). Solo administradores / RVP pueden gestionarlas.",
@@ -3647,6 +3653,12 @@ export const translations = {
     configurationPersonalZoomUrl: "Zoom URL",
     configurationSaveZoom: "Save Zoom",
     configurationZoomSaved: "Zoom link saved.",
+    configurationLeadChannelTitle: "Lead channel",
+    configurationLeadChannelOrganizationManaged:
+      "Lead channel managed by your organization.",
+    configurationAgentReadinessLabel: "Workspace readiness",
+    configurationAgentReadinessReady: "Ready",
+    configurationAgentReadinessPending: "Pending",
     configurationOrganizationChannel: "Organization channel",
     configurationOrganizationChannelIntro:
       "Organization-owned connections (legacy). Only admins / RVP can manage these.",
