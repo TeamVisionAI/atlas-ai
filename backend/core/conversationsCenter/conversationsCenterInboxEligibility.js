@@ -17,6 +17,8 @@ const VERIFIED_SOURCE_SET = Object.freeze(
 const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
   new Set([
     WHATSAPP_ENTRY_METHOD.QR,
+    // Written only when webhook carried positive CTWA referral at create (BR-142).
+    WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     "QUICK_CAPTURE"
   ])
