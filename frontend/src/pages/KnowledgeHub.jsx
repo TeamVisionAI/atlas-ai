@@ -476,7 +476,7 @@ export default function KnowledgeHub() {
             id="knowledge-search"
             type="search"
             className="knowledge-hub__search"
-            function buildActivityEntry fix - use normalizeArticlePath for file find:={t.knowledgeHubSearchPlaceholder}
+            placeholder={t.knowledgeHubSearchPlaceholder}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
