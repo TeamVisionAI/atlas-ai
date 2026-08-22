@@ -1894,6 +1894,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-149 — Team Dashboard Access (Non-RVP Field Roles)
+
+**Implements:** Restore Team Dashboard for RL / division leaders / agents / recruiters after scope isolation removed `dashboard:executive` from those roles. Keep Executive Dashboard RVP/Admin-only. Keep Team Dashboard data hierarchy-scoped (no org-wide fallback).  
+**Domain:** Identity / Workspace navigation / Dashboard aggregates  
+**Depends on:** Hierarchy scope isolation (BR-related fail-closed subtree), BR-146 Team Vision seed  
+**Related:** `permissions.js`, `workspaceExperience.js`, `/api/dashboard/*`  
+**Status:** Implemented  
+**Engine target:** Role permission matrix (`dashboard:team`), route/nav gates, `filterProspectsForAuthContext` on dashboard aggregates  
+**Tests:** `backend/test/teamDashboardAccessBr149.test.js`, `frontend/src/config/teamDashboardAccessBr149.test.js`, `hierarchyScopeIsolation.test.js`
+
+### Rules
+
+1. **Capability split** — `dashboard:team` grants Team Dashboard UI + scoped aggregate APIs. `dashboard:executive` grants Executive Dashboard UI + remains Admin/RVP only.
+2. **Role grants** — `dashboard:team` for administrator, rvp, division_leader, agent, recruiter. Do not grant `dashboard:executive` to division_leader / agent / recruiter.
+3. **Landing after login** — RVP/Admin → Executive Dashboard. SRL/RL/DIV/DIS/REP (roles with team, without executive) → Team Dashboard.
+4. **Data scope** — Team Dashboard / shared `/api/dashboard/executive` (and alpha-brief) must filter via auth hierarchy scope. Missing hierarchy remains fail-closed (self), never org-wide.
+5. **Boundaries** — Do not restore org-wide management scope for RL. Do not change Team Legacy feature gates. Production/Analytics may stay executive-gated.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

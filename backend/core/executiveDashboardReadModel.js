@@ -422,7 +422,10 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
   });
   const context = { organizationId, reference, todayWindow, weekWindow };
 
-  const prospects = await loadProductionProspects(organizationId);
+  // BR-149 — callers may pass hierarchy-scoped prospects (Team Dashboard); default remains org load.
+  const prospects = Array.isArray(options.prospects)
+    ? options.prospects
+    : await loadProductionProspects(organizationId);
   const queue = await buildPrioritizedWorkflowQueue(prospects);
   const todayFocus = buildTodayFocus(prospects, queue, context);
   const productionSnapshot = buildProductionSnapshot(prospects, queue, context);
