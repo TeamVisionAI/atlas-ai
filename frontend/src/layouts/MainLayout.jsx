@@ -14,6 +14,11 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
 import { getConversationsAttentionCount, getConversationsCenterAccess } from "../services/conversationsCenterService";
+import { getKnowledgeHubAccess } from "../services/knowledgeService";
+import {
+  knowledgeAccessAllowsNav,
+  resolveKnowledgeAccessStateFromPayload
+} from "../engines/knowledgeHubAccess";
 import { exitSupportMode, getSupportMode } from "../services/platformService";
 import { isSuperAdminUser } from "../security/isSuperAdminUser";
 import {
@@ -160,6 +165,7 @@ export default function MainLayout() {
   const [currentUser, setCurrentUser] = useState(null);
   const [conversationsAttentionCount, setConversationsAttentionCount] = useState(0);
   const [conversationsCenterAllowed, setConversationsCenterAllowed] = useState(null);
+  const [knowledgeHubAllowed, setKnowledgeHubAllowed] = useState(null);
   const [supportMode, setSupportMode] = useState(null);
   const [exitingSupportMode, setExitingSupportMode] = useState(false);
   const currentUserRef = useRef(null);
@@ -169,9 +175,10 @@ export default function MainLayout() {
     () =>
       buildNavItemsForUser(currentUser, {
         operationsAllowed,
-        conversationsCenterAllowed
+        conversationsCenterAllowed,
+        knowledgeHubAllowed
       }),
-    [currentUser, operationsAllowed, conversationsCenterAllowed]
+    [currentUser, operationsAllowed, conversationsCenterAllowed, knowledgeHubAllowed]
   );
 
   const refreshUser = useCallback(async () => {
@@ -291,6 +298,38 @@ export default function MainLayout() {
           return;
         }
         setConversationsCenterAllowed(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, supportMode?.active, supportMode?.organizationId, location.pathname]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setKnowledgeHubAllowed(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    getKnowledgeHubAccess()
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        const state = resolveKnowledgeAccessStateFromPayload(payload);
+        setKnowledgeHubAllowed(knowledgeAccessAllowsNav(state));
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        if (error?.payload?.status === 403 || error?.status === 403) {
+          setKnowledgeHubAllowed(false);
+          return;
+        }
+        setKnowledgeHubAllowed(null);
       });
 
     return () => {

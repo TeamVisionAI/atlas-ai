@@ -23,7 +23,9 @@ function verifyTree() {
 
   assert(tree.root?.type === "folder", "Tree root must be a folder");
   assert(Array.isArray(tree.files) && tree.files.length > 0, "Tree must include markdown files");
-  assert(tree.defaultPath === DEFAULT_DOCUMENT_PATH, "Default path must be CURRENT_STATE.md");
+  assert(tree.libraryType === "agent-reference", "Tree must be agent reference library");
+  assert(Array.isArray(tree.categories) && tree.categories.length === 6, "Six categories required");
+  assert(tree.defaultPath === DEFAULT_DOCUMENT_PATH, "Default path must match agent library default");
   assert(
     tree.files.some((file) => file.path === DEFAULT_DOCUMENT_PATH),
     "Default document must exist in tree"
@@ -36,6 +38,7 @@ function verifyDocument() {
   assert(doc.path === DEFAULT_DOCUMENT_PATH, "Document path must match request");
   assert(typeof doc.content === "string" && doc.content.length > 0, "Document content required");
   assert(doc.title.length > 0, "Document title required");
+  assert(doc.categoryId, "Document must include categoryId");
 }
 
 function verifyPathTraversal() {

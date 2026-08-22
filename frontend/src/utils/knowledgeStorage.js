@@ -11,7 +11,8 @@ function emptyState() {
     recentlyOpened: [],
     recentlyViewed: [],
     pinned: [],
-    favorites: []
+    favorites: [],
+    viewCounts: {}
   };
 }
 
@@ -97,8 +98,31 @@ export function recordRecentlyOpened(entry) {
 export function recordRecentlyViewed(entry) {
   const state = readRawState();
   state.recentlyViewed = upsertList(state.recentlyViewed, entry);
+  if (entry?.path) {
+    state.viewCounts = state.viewCounts || {};
+    state.viewCounts[entry.path] = (state.viewCounts[entry.path] || 0) + 1;
+  }
   persistState(state);
   return state;
+}
+
+export function getPopularArticles(files, { limit = 8 } = {}) {
+  const state = readRawState();
+  const counts = state.viewCounts || {};
+
+  return (Array.isArray(files) ? files : [])
+    .map((file) => ({
+      ...file,
+      popularity: counts[file.path] || 0
+    }))
+    .filter((file) => file.popularity > 0)
+    .sort((a, b) => {
+      if (b.popularity !== a.popularity) {
+        return b.popularity - a.popularity;
+      }
+      return (a.title || a.path).localeCompare(b.title || a.path);
+    })
+    .slice(0, limit);
 }
 
 export function toggleFavorite(entry) {

@@ -14,7 +14,8 @@ const TENANT_FEATURES = Object.freeze({
   RECRUIT_AI_AUTHORING: "recruitAiAuthoringEnabled",
   RECRUIT_AI_EXECUTION: "recruitAiExecutionEnabled",
   QR_CAMPAIGN_MANAGER: "qrCampaignManagerEnabled",
-  CONVERSATIONS_CENTER: "conversationsCenterEnabled"
+  CONVERSATIONS_CENTER: "conversationsCenterEnabled",
+  KNOWLEDGE_HUB: "knowledgeHubEnabled"
 });
 
 const ALL_TENANT_FEATURE_KEYS = Object.freeze(Object.values(TENANT_FEATURES));
@@ -23,14 +24,16 @@ const DEFAULT_TENANT_FEATURES = Object.freeze({
   [TENANT_FEATURES.RECRUIT_AI_AUTHORING]: false,
   [TENANT_FEATURES.RECRUIT_AI_EXECUTION]: false,
   [TENANT_FEATURES.QR_CAMPAIGN_MANAGER]: false,
-  [TENANT_FEATURES.CONVERSATIONS_CENTER]: false
+  [TENANT_FEATURES.CONVERSATIONS_CENTER]: false,
+  [TENANT_FEATURES.KNOWLEDGE_HUB]: false
 });
 
 const TENANT_FEATURE_LABELS = Object.freeze({
   [TENANT_FEATURES.RECRUIT_AI_AUTHORING]: "Recruit AI Authoring",
   [TENANT_FEATURES.RECRUIT_AI_EXECUTION]: "Recruit AI Execution",
   [TENANT_FEATURES.QR_CAMPAIGN_MANAGER]: "QR Campaign Manager",
-  [TENANT_FEATURES.CONVERSATIONS_CENTER]: "Conversations Center"
+  [TENANT_FEATURES.CONVERSATIONS_CENTER]: "Conversations Center",
+  [TENANT_FEATURES.KNOWLEDGE_HUB]: "Knowledge Hub"
 });
 
 function parseBooleanStrict(value) {
@@ -83,7 +86,9 @@ function materializedTenantFeatures(raw = null) {
     [TENANT_FEATURES.QR_CAMPAIGN_MANAGER]:
       normalized[TENANT_FEATURES.QR_CAMPAIGN_MANAGER] === true,
     [TENANT_FEATURES.CONVERSATIONS_CENTER]:
-      normalized[TENANT_FEATURES.CONVERSATIONS_CENTER] === true
+      normalized[TENANT_FEATURES.CONVERSATIONS_CENTER] === true,
+    [TENANT_FEATURES.KNOWLEDGE_HUB]:
+      normalized[TENANT_FEATURES.KNOWLEDGE_HUB] === true
   };
 }
 
@@ -107,6 +112,8 @@ function envOrgAllowlistForFeature(featureKey, env = process.env) {
       return parseIdList(env.QR_CAMPAIGN_MANAGER_ORGANIZATION_IDS);
     case TENANT_FEATURES.CONVERSATIONS_CENTER:
       return parseIdList(env.CONVERSATIONS_CENTER_ORGANIZATION_IDS);
+    case TENANT_FEATURES.KNOWLEDGE_HUB:
+      return parseIdList(env.KNOWLEDGE_HUB_ORGANIZATION_IDS);
     default:
       return [];
   }
@@ -135,6 +142,13 @@ function isGlobalMasterEnabled(featureKey, env = process.env) {
     case TENANT_FEATURES.CONVERSATIONS_CENTER: {
       // Unset defaults ON so Team Vision production keeps working until an explicit kill switch.
       const raw = env.CONVERSATIONS_CENTER_ENABLED;
+      if (raw === undefined || raw === null || String(raw).trim() === "") {
+        return { enabled: true, reason: null, present: false };
+      }
+      return resolveGlobalMasterFlag(raw);
+    }
+    case TENANT_FEATURES.KNOWLEDGE_HUB: {
+      const raw = env.KNOWLEDGE_HUB_ENABLED;
       if (raw === undefined || raw === null || String(raw).trim() === "") {
         return { enabled: true, reason: null, present: false };
       }
@@ -197,6 +211,14 @@ function resolvePersistedTenantGate({
         enabled: true,
         reason: null,
         source: "seed_conversations_compat_default_on",
+        explicit: false
+      };
+    }
+    if (featureKey === TENANT_FEATURES.KNOWLEDGE_HUB && allowlist.length === 0) {
+      return {
+        enabled: true,
+        reason: null,
+        source: "seed_knowledge_hub_compat_default_on",
         explicit: false
       };
     }
@@ -358,8 +380,9 @@ function deriveSeedFeatureBackfillFromEnv(organizationId, env = process.env) {
       TENANT_FEATURES.QR_CAMPAIGN_MANAGER,
       env
     ).includes(String(organizationId)),
-    // Preserve production Conversations access for Team Vision seed.
-    [TENANT_FEATURES.CONVERSATIONS_CENTER]: true
+    // Preserve production Conversations + Knowledge Hub access for Team Vision seed.
+    [TENANT_FEATURES.CONVERSATIONS_CENTER]: true,
+    [TENANT_FEATURES.KNOWLEDGE_HUB]: true
   };
 }
 

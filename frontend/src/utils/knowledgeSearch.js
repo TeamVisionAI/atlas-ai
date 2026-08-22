@@ -7,7 +7,9 @@ export const SEARCH_STRATEGY = "keyword";
 const FIELD_WEIGHTS = {
   title: 5,
   name: 4,
+  categoryId: 4,
   folder: 3,
+  keywords: 3,
   path: 2
 };
 
@@ -44,6 +46,10 @@ function scoreFile(file, terms) {
   let total = 0;
 
   for (const [field, weight] of Object.entries(FIELD_WEIGHTS)) {
+    if (field === "keywords" && Array.isArray(file.keywords)) {
+      total += scoreField(file.keywords.join(" "), terms) * weight;
+      continue;
+    }
     total += scoreField(file[field], terms) * weight;
   }
 

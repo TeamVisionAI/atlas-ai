@@ -1,12 +1,16 @@
 /**
- * Atlas Knowledge Hub — read-only access to /docs (filesystem source of truth).
+ * Atlas Knowledge Hub — read-only agent reference library under docs/agent-library.
  */
 
 const fs = require("fs");
 const path = require("path");
+const {
+  KNOWLEDGE_HUB_CATEGORIES,
+  resolveCategoryForPath
+} = require("./knowledgeHubCategories");
 
-const DOCS_ROOT = path.resolve(__dirname, "../../docs");
-const DEFAULT_DOCUMENT_PATH = "CURRENT_STATE.md";
+const AGENT_LIBRARY_ROOT = path.resolve(__dirname, "../../docs/agent-library");
+const DEFAULT_DOCUMENT_PATH = "quick-reference/what-do-i-do-next.md";
 
 function isMarkdownFile(name) {
   return name.endsWith(".md") && !name.startsWith(".");
@@ -14,6 +18,39 @@ function isMarkdownFile(name) {
 
 function toPosixRelative(relativePath) {
   return relativePath.split(path.sep).join("/");
+}
+
+function parseFrontmatter(content) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+  if (!match) {
+    return { body: content, meta: {} };
+  }
+
+  const meta = {};
+  for (const line of match[1].split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const separator = trimmed.indexOf(":");
+    if (separator === -1) {
+      continue;
+    }
+    const key = trimmed.slice(0, separator).trim();
+    let value = trimmed.slice(separator + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    meta[key] = value;
+  }
+
+  return {
+    body: content.slice(match[0].length),
+    meta
+  };
 }
 
 function resolveSafeDocumentPath(relativePath) {
@@ -40,15 +77,15 @@ function resolveSafeDocumentPath(relativePath) {
     });
   }
 
-  const absolutePath = path.resolve(DOCS_ROOT, normalizedInput);
-  const relativeToRoot = path.relative(DOCS_ROOT, absolutePath);
+  const absolutePath = path.resolve(AGENT_LIBRARY_ROOT, normalizedInput);
+  const relativeToRoot = path.relative(AGENT_LIBRARY_ROOT, absolutePath);
 
   if (
     relativeToRoot.startsWith("..") ||
     path.isAbsolute(relativeToRoot) ||
     relativeToRoot.includes(`..${path.sep}`)
   ) {
-    throw Object.assign(new Error("Document path escapes the docs root."), {
+    throw Object.assign(new Error("Document path escapes the agent library root."), {
       statusCode: 403,
       publicCode: "PATH_TRAVERSAL"
     });
@@ -77,70 +114,73 @@ function extractTitle(markdown, fallbackName) {
   return fallbackName.replace(/\.md$/i, "").replace(/[-_]/g, " ");
 }
 
-function buildDirectoryNode(relativeDir = "") {
-  const absoluteDir = relativeDir ? path.join(DOCS_ROOT, relativeDir) : DOCS_ROOT;
-  const entries = fs.readdirSync(absoluteDir, { withFileTypes: true });
+function buildFileNode(relativeFilePath, absoluteFile) {
+  const stats = fs.statSync(absoluteFile);
+  const rawContent = fs.readFileSync(absoluteFile, "utf8");
+  const { body, meta } = parseFrontmatter(rawContent);
+  const posixPath = toPosixRelative(relativeFilePath);
+  const folderDir = path.posix.dirname(posixPath);
+  const folder = folderDir === "." ? "" : folderDir;
+  const category = resolveCategoryForPath(posixPath);
+  const keywords = String(meta.keywords || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 
-  const children = entries
-    .filter((entry) => !entry.name.startsWith("."))
+  return {
+    type: "file",
+    name: path.basename(posixPath),
+    path: posixPath,
+    folder,
+    categoryId: category?.id || null,
+    categoryFolder: category?.folder || folder,
+    title: extractTitle(body, path.basename(posixPath)),
+    keywords,
+    updatedAt: stats.mtime.toISOString()
+  };
+}
+
+function buildCategoryDirectoryNode(categoryDef) {
+  const categoryDir = path.join(AGENT_LIBRARY_ROOT, categoryDef.folder);
+
+  if (!fs.existsSync(categoryDir) || !fs.statSync(categoryDir).isDirectory()) {
+    return {
+      type: "folder",
+      name: categoryDef.folder,
+      path: categoryDef.folder,
+      categoryId: categoryDef.id,
+      children: []
+    };
+  }
+
+  const entries = fs
+    .readdirSync(categoryDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && isMarkdownFile(entry.name))
     .map((entry) => {
-      const entryRelative = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
-      const posixPath = toPosixRelative(entryRelative);
-
-      if (entry.isDirectory()) {
-        return buildDirectoryNode(entryRelative);
-      }
-
-      if (!entry.isFile() || !isMarkdownFile(entry.name)) {
-        return null;
-      }
-
-      const absoluteFile = path.join(absoluteDir, entry.name);
-      const stats = fs.statSync(absoluteFile);
-      const content = fs.readFileSync(absoluteFile, "utf8");
-      const folderDir = path.posix.dirname(posixPath);
-      const folder = folderDir === "." ? "" : folderDir;
-
-      return {
-        type: "file",
-        name: entry.name,
-        path: posixPath,
-        folder,
-        title: extractTitle(content, entry.name),
-        updatedAt: stats.mtime.toISOString()
-      };
+      const relativeFile = path.join(categoryDef.folder, entry.name);
+      return buildFileNode(relativeFile, path.join(categoryDir, entry.name));
     })
-    .filter(Boolean)
-    .sort((a, b) => {
-      if (a.type === "folder" && b.type !== "folder") {
-        return -1;
-      }
-
-      if (a.type !== "folder" && b.type === "folder") {
-        return 1;
-      }
-
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    });
+    .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
 
   return {
     type: "folder",
-    name: relativeDir ? path.basename(relativeDir) : "docs",
-    path: relativeDir ? toPosixRelative(relativeDir) : "",
-    children
+    name: categoryDef.folder,
+    path: categoryDef.folder,
+    categoryId: categoryDef.id,
+    children: entries
   };
 }
 
 function flattenFiles(node, accumulator = []) {
   if (node.type === "file") {
-    const folderDir = path.posix.dirname(node.path);
-    const folder = folderDir === "." ? "" : folderDir;
-
     accumulator.push({
       path: node.path,
       name: node.name,
-      folder,
+      folder: node.folder,
+      categoryId: node.categoryId,
+      categoryFolder: node.categoryFolder,
       title: node.title,
+      keywords: node.keywords || [],
       updatedAt: node.updatedAt
     });
     return accumulator;
@@ -154,39 +194,81 @@ function flattenFiles(node, accumulator = []) {
 }
 
 function getKnowledgeTree() {
-  const tree = buildDirectoryNode();
-  const files = flattenFiles(tree).sort((a, b) => a.path.localeCompare(b.path));
+  const categoryNodes = KNOWLEDGE_HUB_CATEGORIES.map(buildCategoryDirectoryNode);
+  const files = categoryNodes
+    .flatMap((node) => flattenFiles(node))
+    .sort((a, b) => a.path.localeCompare(b.path));
+
+  const categories = KNOWLEDGE_HUB_CATEGORIES.map((category) => {
+    const categoryFiles = files.filter((file) => file.categoryId === category.id);
+    const latestUpdatedAt = categoryFiles.reduce((latest, file) => {
+      if (!file.updatedAt) {
+        return latest;
+      }
+      if (!latest || file.updatedAt > latest) {
+        return file.updatedAt;
+      }
+      return latest;
+    }, null);
+
+    return {
+      id: category.id,
+      folder: category.folder,
+      labelKey: category.labelKey,
+      descriptionKey: category.descriptionKey,
+      order: category.order,
+      articleCount: categoryFiles.length,
+      latestUpdatedAt
+    };
+  });
 
   return {
-    root: tree,
+    root: {
+      type: "folder",
+      name: "agent-library",
+      path: "",
+      children: categoryNodes
+    },
     files,
+    categories,
     defaultPath: DEFAULT_DOCUMENT_PATH,
-    docsRoot: "docs"
+    docsRoot: "docs/agent-library",
+    libraryType: "agent-reference"
   };
 }
 
 function getKnowledgeDocument(relativePath) {
   const { relativePath: safePath, absolutePath } = resolveSafeDocumentPath(relativePath);
-  const content = fs.readFileSync(absolutePath, "utf8");
+  const rawContent = fs.readFileSync(absolutePath, "utf8");
+  const { body, meta } = parseFrontmatter(rawContent);
   const stats = fs.statSync(absolutePath);
+  const category = resolveCategoryForPath(safePath);
+  const keywords = String(meta.keywords || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 
-      return {
-        path: safePath,
-        name: path.basename(safePath),
-        folder: (() => {
-          const dir = path.posix.dirname(safePath);
-          return dir === "." ? "" : dir;
-        })(),
-        title: extractTitle(content, path.basename(safePath)),
-        content,
-        updatedAt: stats.mtime.toISOString()
-      };
+  return {
+    path: safePath,
+    name: path.basename(safePath),
+    folder: (() => {
+      const dir = path.posix.dirname(safePath);
+      return dir === "." ? "" : dir;
+    })(),
+    categoryId: category?.id || null,
+    categoryFolder: category?.folder || null,
+    title: extractTitle(body, path.basename(safePath)),
+    keywords,
+    content: body,
+    updatedAt: stats.mtime.toISOString()
+  };
 }
 
 module.exports = {
-  DOCS_ROOT,
+  AGENT_LIBRARY_ROOT,
   DEFAULT_DOCUMENT_PATH,
   resolveSafeDocumentPath,
   getKnowledgeTree,
-  getKnowledgeDocument
+  getKnowledgeDocument,
+  parseFrontmatter
 };
