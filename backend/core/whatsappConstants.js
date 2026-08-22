@@ -17,7 +17,8 @@ const WHATSAPP_SOURCE = Object.freeze({
 
 const WHATSAPP_CORRELATION_PREFIX = Object.freeze({
   INBOUND: "whatsapp:inbound:",
-  OUTBOUND: "whatsapp:outbound:"
+  OUTBOUND: "whatsapp:outbound:",
+  HUMAN_ECHO: "whatsapp:human_echo:"
 });
 
 const REOPENED_INACTIVITY_MS = 72 * 60 * 60 * 1000;

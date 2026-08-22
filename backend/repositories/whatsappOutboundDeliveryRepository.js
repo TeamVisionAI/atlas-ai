@@ -156,7 +156,9 @@ async function recordOutboundDelivery(record, client = supabase) {
   // Initial Meta lifecycle when Graph API accepted the send (observability only).
   if (
     record.providerMessageId &&
-    (record.status === "sent_freeform" || record.status === "sent_template")
+    (record.status === "sent_freeform" ||
+      record.status === "sent_template" ||
+      record.status === "sent_native_human")
   ) {
     row.meta_delivery_status = "sent";
     row.sent_at = nowIso;

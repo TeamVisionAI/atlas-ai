@@ -3,6 +3,9 @@ const { verifyMetaWebhookSignature } = require("../middleware/metaWebhookSignatu
 const { parseWhatsAppWebhookPayload } = require("../services/whatsappWebhookParser");
 const { processInboundWhatsAppMessage } = require("../core/whatsappInboundPipeline");
 const {
+  processHumanWhatsAppOutboundEcho
+} = require("../core/whatsappHumanOutboundPipeline");
+const {
   applyWhatsAppMetaDeliveryStatus
 } = require("../core/whatsappMetaDeliveryStatusService");
 const { logWhatsAppStage } = require("../core/whatsappStructuredLogger");
@@ -55,10 +58,10 @@ router.post("/", verifyMetaWebhookSignature, async (req, res) => {
     });
   }
 
-  const { messages, statuses } = parseWhatsAppWebhookPayload(body);
+  const { messages, statuses, humanEchoes } = parseWhatsAppWebhookPayload(body);
 
-  if (!messages.length && !statuses.length) {
-    logWhatsAppStage("webhook_ignored", { reason: "no_messages_or_statuses" });
+  if (!messages.length && !statuses.length && !(humanEchoes || []).length) {
+    logWhatsAppStage("webhook_ignored", { reason: "no_messages_statuses_or_echoes" });
     return;
   }
 
@@ -68,6 +71,19 @@ router.post("/", verifyMetaWebhookSignature, async (req, res) => {
     } catch (error) {
       logWhatsAppStage("meta_delivery_status_failed", {
         providerMessageId: statusEvent.providerMessageId,
+        level: "error",
+        error: error.message
+      });
+    }
+  }
+
+  for (const echo of humanEchoes || []) {
+    try {
+      await processHumanWhatsAppOutboundEcho(echo);
+    } catch (error) {
+      logWhatsAppStage("human_echo_processing_failed", {
+        providerMessageId: echo.providerMessageId,
+        phone: echo.phone,
         level: "error",
         error: error.message
       });

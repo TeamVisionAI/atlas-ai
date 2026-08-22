@@ -42,6 +42,7 @@ const HANDOFF_REASONS = Object.freeze({
   TAKE_OVER: "take_over",
   RECRUITER_ESCALATION: "recruiter_escalation",
   STALL: "stall",
+  WHATSAPP_BUSINESS_APP: "whatsapp_business_app",
   UNKNOWN: "unknown"
 });
 
