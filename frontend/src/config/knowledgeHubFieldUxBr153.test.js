@@ -31,7 +31,7 @@ const storageSource = fs.readFileSync(
 
 const catalogFiles = [
   {
-    path: "scripts-objection-handling/is-this-sales.md",
+    path: "scripts-objection-handling/is-this-sales",
     displayTitle: '"Is This Sales?" — How to Respond',
     shortSummary: "Short script",
     categoryId: "scripts-objection-handling",
@@ -50,7 +50,7 @@ const t = {
 test("BR-153 legacy engineering paths rejected", () => {
   assert.equal(isLegacyEngineeringPath("CURRENT_STATE.md"), true);
   assert.equal(isLegacyEngineeringPath("03-engineering/KNOWLEDGE_HUB.md"), true);
-  assert.equal(isLegacyEngineeringPath("scripts-objection-handling/is-this-sales.md"), false);
+  assert.equal(isLegacyEngineeringPath("scripts-objection-handling/is-this-sales"), false);
 });
 
 test("BR-153 storage v3 purges stale engineering history", () => {
@@ -67,13 +67,13 @@ test("BR-153 syncKnowledgeActivityWithCatalog drops invalid favorites", () => {
     recentlyOpened: [],
     recentlyViewed: [
       { path: "CURRENT_STATE.md", title: "CURRENT_STATE.md" },
-      { path: "scripts-objection-handling/is-this-sales.md", title: "Old title" }
+      { path: "scripts-objection-handling/is-this-sales", title: "Old title" }
     ],
     pinned: [{ path: "00-executive/SPRINT.md", title: "Sprint 16" }],
     favorites: [],
     viewCounts: {
       "CURRENT_STATE.md": 4,
-      "scripts-objection-handling/is-this-sales.md": 2
+      "scripts-objection-handling/is-this-sales": 2
     }
   };
   globalThis.localStorage = {
@@ -93,7 +93,7 @@ test("BR-153 syncKnowledgeActivityWithCatalog drops invalid favorites", () => {
   assert.equal(state.recentlyViewed[0].displayTitle, catalogFiles[0].displayTitle);
   assert.equal(state.pinned.length, 0);
   assert.equal(state.viewCounts["CURRENT_STATE.md"], undefined);
-  assert.equal(state.viewCounts["scripts-objection-handling/is-this-sales.md"], 2);
+  assert.equal(state.viewCounts["scripts-objection-handling/is-this-sales"], 2);
 });
 
 test("BR-153 field UI hides raw paths", () => {

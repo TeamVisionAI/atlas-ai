@@ -12,6 +12,7 @@ const {
   getKnowledgeTree,
   getKnowledgeDocument
 } = require("../core/knowledgeHubService");
+const { normalizeKnowledgeLocale } = require("../core/knowledgeHubLocales");
 const {
   assertKnowledgeHubAccessAsync,
   resolveKnowledgeHubAccessAsync,
@@ -73,7 +74,8 @@ router.get("/tree", async (req, res) => {
   }
 
   try {
-    const payload = getKnowledgeTree();
+    const locale = normalizeKnowledgeLocale(req.query.locale || req.query.lang);
+    const payload = getKnowledgeTree({ locale });
     res.json(payload);
   } catch (error) {
     console.error("[knowledge/tree]", error.message);
@@ -99,7 +101,8 @@ router.get("/document", async (req, res) => {
       });
     }
 
-    const payload = getKnowledgeDocument(documentPath);
+    const locale = normalizeKnowledgeLocale(req.query.locale || req.query.lang);
+    const payload = getKnowledgeDocument(documentPath, { locale });
     res.json(payload);
   } catch (error) {
     console.error("[knowledge/document]", error.message);

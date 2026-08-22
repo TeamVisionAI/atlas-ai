@@ -32,13 +32,13 @@ test("BR-152 defines six agent-library categories", () => {
 });
 
 test("BR-152 knowledge tree serves agent-library only", () => {
-  const payload = getKnowledgeTree();
+  const payload = getKnowledgeTree({ locale: "en" });
   assert.equal(payload.libraryType, "agent-reference");
   assert.equal(payload.docsRoot, "docs/agent-library");
   assert.equal(payload.categories.length, 6);
   assert.ok(payload.files.length >= 6);
   for (const file of payload.files) {
-    assert.match(file.path, /^[a-z0-9-]+\/.+\.md$/);
+    assert.match(file.path, /^[a-z0-9-]+\/[a-z0-9-]+$/);
     assert.ok(file.categoryId);
   }
 });

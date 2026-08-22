@@ -33,15 +33,16 @@ async function knowledgeRequest(path) {
   return body;
 }
 
-export async function fetchKnowledgeTree() {
-  return knowledgeRequest("/api/knowledge/tree");
+export async function fetchKnowledgeTree(locale = "en") {
+  const query = new URLSearchParams({ locale });
+  return knowledgeRequest(`/api/knowledge/tree?${query.toString()}`);
 }
 
 export async function getKnowledgeHubAccess() {
   return knowledgeRequest("/api/knowledge/access");
 }
 
-export async function fetchKnowledgeDocument(documentPath) {
-  const query = new URLSearchParams({ path: documentPath });
+export async function fetchKnowledgeDocument(documentPath, locale = "en") {
+  const query = new URLSearchParams({ path: documentPath, locale });
   return knowledgeRequest(`/api/knowledge/document?${query.toString()}`);
 }

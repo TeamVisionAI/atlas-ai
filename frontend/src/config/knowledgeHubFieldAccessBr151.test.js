@@ -47,7 +47,7 @@ test("BR-151 KnowledgeHub exposes forbidden and error status cards", () => {
   assert.match(knowledgeHubSource, /forbiddenError/);
   assert.match(knowledgeHubSource, /knowledgeHubForbidden/);
   assert.match(knowledgeHubSource, /knowledge-hub__status-card--error/);
-  assert.match(knowledgeHubSource, /knowledgeHubTreeEmpty/);
+  assert.match(knowledgeHubSource, /knowledgeHubArticleUnavailable/);
   assert.match(knowledgeHubSource, /knowledgeHubNotEnabled/);
 });
 

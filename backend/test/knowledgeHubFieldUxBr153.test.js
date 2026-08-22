@@ -44,7 +44,7 @@ test("BR-153 fallback title derives from filename without .md", () => {
 });
 
 test("BR-153 starter articles expose human-friendly displayTitle", () => {
-  const tree = getKnowledgeTree();
+  const tree = getKnowledgeTree({ locale: "en" });
   for (const file of tree.files) {
     assert.ok(file.displayTitle, `${file.path} displayTitle`);
     assert.ok(file.shortSummary, `${file.path} shortSummary`);
@@ -54,16 +54,16 @@ test("BR-153 starter articles expose human-friendly displayTitle", () => {
 });
 
 test("BR-153 document API returns display metadata", () => {
-  const doc = getKnowledgeDocument("scripts-objection-handling/is-this-sales.md");
+  const doc = getKnowledgeDocument("scripts-objection-handling/is-this-sales", { locale: "en" });
   assert.match(doc.displayTitle, /Is This Sales/);
   assert.ok(doc.shortSummary);
   assert.ok(doc.estimatedReadTime);
 });
 
 test("BR-153 agent-library paths only in tree", () => {
-  const tree = getKnowledgeTree();
+  const tree = getKnowledgeTree({ locale: "en" });
   for (const file of tree.files) {
-    assert.match(file.path, /^[a-z0-9-]+\/[a-z0-9-]+\.md$/);
+    assert.match(file.path, /^[a-z0-9-]+\/[a-z0-9-]+$/);
     assert.ok(!file.path.startsWith("00-"));
     assert.notEqual(file.path, "CURRENT_STATE.md");
   }
@@ -71,7 +71,7 @@ test("BR-153 agent-library paths only in tree", () => {
 
 test("BR-153 starter markdown frontmatter present on disk", () => {
   const sample = fs.readFileSync(
-    path.join(__dirname, "../../docs/agent-library/scripts-objection-handling/is-this-sales.md"),
+    path.join(__dirname, "../../docs/agent-library/scripts-objection-handling/is-this-sales.en.md"),
     "utf8"
   );
   assert.match(sample, /displayTitle:/);

@@ -19,7 +19,7 @@ function assert(condition, message) {
 }
 
 function verifyTree() {
-  const tree = getKnowledgeTree();
+  const tree = getKnowledgeTree({ locale: "en" });
 
   assert(tree.root?.type === "folder", "Tree root must be a folder");
   assert(Array.isArray(tree.files) && tree.files.length > 0, "Tree must include markdown files");
@@ -33,7 +33,7 @@ function verifyTree() {
 }
 
 function verifyDocument() {
-  const doc = getKnowledgeDocument(DEFAULT_DOCUMENT_PATH);
+  const doc = getKnowledgeDocument(DEFAULT_DOCUMENT_PATH, { locale: "en" });
 
   assert(doc.path === DEFAULT_DOCUMENT_PATH, "Document path must match request");
   assert(typeof doc.content === "string" && doc.content.length > 0, "Document content required");

@@ -7,6 +7,27 @@ import { KNOWLEDGE_CATEGORY_BY_ID } from "../config/knowledgeHubCategories.js";
 const LEGACY_ENGINEERING_PATH_PATTERN =
   /^(CURRENT_STATE|README|BACKLOG)(\.md)?$/i;
 
+export function normalizeArticlePath(input) {
+  let normalized = String(input || "").trim().replace(/\\/g, "/");
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized.endsWith(".md")) {
+    normalized = normalized.slice(0, -3);
+  }
+
+  const slashIndex = normalized.lastIndexOf("/");
+  if (slashIndex === -1) {
+    return normalized.replace(/\.(en|es)$/i, "");
+  }
+
+  const folder = normalized.slice(0, slashIndex);
+  const filename = normalized.slice(slashIndex + 1);
+  const slug = filename.replace(/\.(en|es)$/i, "");
+  return `${folder}/${slug}`;
+}
+
 export function titleCaseFromFilename(filename) {
   return String(filename || "")
     .replace(/\.md$/i, "")
@@ -79,7 +100,7 @@ export function isLegacyEngineeringPath(path) {
 }
 
 export function isValidAgentLibraryPath(path, catalogPaths = null) {
-  const normalized = String(path || "").trim().replace(/\\/g, "/");
+  const normalized = normalizeArticlePath(path);
   if (!normalized || normalized.includes("..") || normalized.startsWith("/")) {
     return false;
   }
@@ -89,7 +110,7 @@ export function isValidAgentLibraryPath(path, catalogPaths = null) {
   if (catalogPaths instanceof Set) {
     return catalogPaths.has(normalized);
   }
-  return /^[a-z0-9-]+\/[a-z0-9-]+\.md$/i.test(normalized);
+  return /^[a-z0-9-]+\/[a-z0-9-]+$/i.test(normalized);
 }
 
 export function enrichArticleForDisplay(article, t, locale) {
