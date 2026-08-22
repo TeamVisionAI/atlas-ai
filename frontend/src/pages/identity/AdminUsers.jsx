@@ -18,6 +18,7 @@ import {
   revokeInvitation,
   suspendAdminUser,
   updateAdminUser,
+  updateUserAgentCapabilities,
   updateUserSecuritiesAuthorization,
   revokeUserSecuritiesAuthorization
 } from "../../services/identityService";
@@ -78,6 +79,14 @@ const EMPTY_SECURITIES_FORM = {
   jurisdiction_scope: "",
   principal_scope: "",
   status_reason: ""
+};
+
+const EMPTY_CAPABILITIES_FORM = {
+  canReceiveOrganizationLeads: true,
+  roundRobinEligible: false,
+  personalWhatsAppEnabled: false,
+  personalLeadSourcesEnabled: false,
+  personalMetaAdsEnabled: false
 };
 
 function formatScope(scope) {
@@ -212,6 +221,9 @@ export default function AdminUsers() {
   const [securitiesTarget, setSecuritiesTarget] = useState(null);
   const [securitiesForm, setSecuritiesForm] = useState(EMPTY_SECURITIES_FORM);
   const [securitiesSaving, setSecuritiesSaving] = useState(false);
+  const [capabilitiesTarget, setCapabilitiesTarget] = useState(null);
+  const [capabilitiesForm, setCapabilitiesForm] = useState(EMPTY_CAPABILITIES_FORM);
+  const [capabilitiesSaving, setCapabilitiesSaving] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
@@ -315,6 +327,41 @@ export default function AdminUsers() {
     }
   }
 
+  function openCapabilitiesEditor(user) {
+    const caps = user.agent_capabilities || {};
+    setCapabilitiesTarget(user);
+    setCapabilitiesForm({
+      canReceiveOrganizationLeads: caps.canReceiveOrganizationLeads !== false,
+      roundRobinEligible: caps.roundRobinEligible === true,
+      personalWhatsAppEnabled: caps.personalWhatsAppEnabled === true,
+      personalLeadSourcesEnabled: caps.personalLeadSourcesEnabled === true,
+      personalMetaAdsEnabled: false
+    });
+  }
+
+  async function saveCapabilities(event) {
+    event.preventDefault();
+    if (!capabilitiesTarget) {
+      return;
+    }
+
+    setCapabilitiesSaving(true);
+    setError("");
+
+    try {
+      await updateUserAgentCapabilities(capabilitiesTarget.id, {
+        ...capabilitiesForm,
+        personalMetaAdsEnabled: false
+      });
+      setCapabilitiesTarget(null);
+      await loadUsers();
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setCapabilitiesSaving(false);
+    }
+  }
+
   function openSecuritiesEditor(user) {
     const access = user.securities_access || {};
     setSecuritiesTarget(user);
@@ -407,6 +454,10 @@ export default function AdminUsers() {
     try {
       if (action === "edit-rep") {
         startRepIdEdit(user);
+        return;
+      }
+      if (action === "edit-capabilities") {
+        openCapabilitiesEditor(user);
         return;
       }
       if (action === "edit-securities") {
@@ -791,6 +842,87 @@ export default function AdminUsers() {
                 type="button"
                 className="identity-button-secondary"
                 onClick={() => setShowCreate(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {capabilitiesTarget ? (
+        <div className="identity-card" data-testid="admin-capabilities-panel">
+          <h2>Capabilities</h2>
+          <p className="securities-access-meta">
+            {displayUserName(capabilitiesTarget)} — lead channels and personal integrations
+            (not derived from business rank)
+          </p>
+          <form className="identity-form" onSubmit={saveCapabilities}>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.canReceiveOrganizationLeads}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    canReceiveOrganizationLeads: event.target.checked
+                  })
+                }
+              />
+              Receive organization leads
+            </label>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.roundRobinEligible}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    roundRobinEligible: event.target.checked
+                  })
+                }
+              />
+              Eligible for Round Robin (future — no routing yet)
+            </label>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.personalWhatsAppEnabled}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    personalWhatsAppEnabled: event.target.checked
+                  })
+                }
+              />
+              Allow Personal WhatsApp
+            </label>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={capabilitiesForm.personalLeadSourcesEnabled}
+                onChange={(event) =>
+                  setCapabilitiesForm({
+                    ...capabilitiesForm,
+                    personalLeadSourcesEnabled: event.target.checked
+                  })
+                }
+              />
+              Allow Personal Lead Sources
+            </label>
+            <label className="admin-capability-toggle admin-capability-toggle--disabled">
+              <input type="checkbox" checked={false} disabled readOnly />
+              Allow Meta Ads — Future / Disabled
+            </label>
+            <div className="identity-actions">
+              <button type="submit" className="identity-button" disabled={capabilitiesSaving}>
+                {capabilitiesSaving ? "Saving…" : "Save Capabilities"}
+              </button>
+              <button
+                type="button"
+                className="identity-button-secondary"
+                onClick={() => setCapabilitiesTarget(null)}
+                disabled={capabilitiesSaving}
               >
                 Cancel
               </button>

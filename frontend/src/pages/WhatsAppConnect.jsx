@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import { appPath } from "../config/appRoutes";
 import { useFacebookSdk } from "../hooks/useFacebookSdk";
 import {
@@ -41,8 +42,19 @@ function navigateToError(navigate, details) {
 
 export default function WhatsAppConnect() {
   const { translate } = useLanguage();
+  const { user } = useWorkspace();
   const navigate = useNavigate();
   const { ready, error: sdkError, appId, configId } = useFacebookSdk();
+
+  const personalWhatsAppEnabled =
+    user?.capabilities?.personalWhatsAppEnabled === true ||
+    user?.agent_capabilities?.personalWhatsAppEnabled === true;
+
+  useEffect(() => {
+    if (user && !personalWhatsAppEnabled) {
+      navigate(appPath("settings/integrations"), { replace: true });
+    }
+  }, [user, personalWhatsAppEnabled, navigate]);
 
   const [status, setStatus] = useState("disconnected");
   const [alreadyConnected, setAlreadyConnected] = useState(false);

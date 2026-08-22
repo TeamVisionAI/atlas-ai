@@ -81,13 +81,14 @@ test("pending invite actions exclude force logout/reset", () => {
   );
 });
 
-test("active user actions include suspend / reset / logout / archive", () => {
+test("active user actions include suspend / reset / logout / archive / capabilities", () => {
   const actions = buildUserRowActions(sampleUsers[0]);
   assert.ok(actions.some((a) => a.id === "suspend"));
   assert.ok(actions.some((a) => a.id === "reset"));
   assert.ok(actions.some((a) => a.id === "logout"));
   assert.ok(actions.some((a) => a.id === "archive"));
   assert.ok(actions.some((a) => a.id === "edit-rep"));
+  assert.ok(actions.some((a) => a.id === "edit-capabilities"));
 });
 
 test("status labels and badges are compact", () => {

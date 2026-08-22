@@ -1871,6 +1871,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-148 — Primerica Agent Lead/Source Capabilities
+
+**Implements:** Per-user, tenant-scoped capability flags for organization vs personal lead channels. Supports future Round Robin without building it yet.  
+**Domain:** Identity / Settings / WhatsApp / lead ownership  
+**Depends on:** BR-147 (personal workspace ownership)  
+**Related:** Admin Users, My Integrations, WhatsApp Embedded Signup  
+**Status:** Implemented (flags + gating; Round Robin and Meta Ad Builder intentionally deferred)  
+**Engine target:** `agentCapabilitiesEngine.js`, `identityAdminService.js`, Admin Users Capabilities panel, My Integrations WhatsApp gate  
+**Tests:** `backend/test/agentCapabilitiesBr148.test.js`, `frontend/src/pages/identity/adminUsersGridHelpers.test.js`
+
+### Rules
+
+1. **Defaults for new agents** — `canReceiveOrganizationLeads=true`, `roundRobinEligible=false`, `personalWhatsAppEnabled=false`, `personalLeadSourcesEnabled=false`, `personalMetaAdsEnabled=false`.
+2. **Not from rank** — Capabilities are never derived from business_rank. Two RLs may differ.
+3. **Admin-only mutation** — Only `admin:users` (RVP/Admin) may change another user’s capabilities in the effective tenant (Support Mode uses effective org). Users cannot self-enable personal WhatsApp/lead sources.
+4. **Personal WhatsApp UX** — When capability is OFF: hide personal Embedded Signup card; do not show “Not Connected”; do not mark setup incomplete; optional “Lead channel managed by your organization” when `canReceiveOrganizationLeads`.
+5. **Readiness** — Agent may be ready with Profile + Google + Zoom + Availability + Organization Managed lead channel. Personal WhatsApp is required only when its capability is ON.
+6. **Ownership** — Organization/shared source → tenant → future assignment/Round Robin. Personal campaign/WhatsApp → tenant + owning user → direct ownership (skip Round Robin unless explicitly reassigned). Store ownership explicitly when campaign/ads systems are built; never infer from phone/email.
+7. **Future ads (document only)** — Client/policy ads normally agent-owned (direct). Recruiting/shared ads may be RVP/org-owned and feed Round Robin later. `personalMetaAdsEnabled` is reserved; no ad builder in this release.
+8. **Boundaries** — Do not implement Round Robin, Meta Ad Builder, or Recruit AI enablement.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
