@@ -8,6 +8,7 @@ const {
   KNOWLEDGE_HUB_CATEGORIES,
   resolveCategoryForPath
 } = require("./knowledgeHubCategories");
+const { buildArticleMetadata } = require("./knowledgeHubArticleMetadata");
 
 const AGENT_LIBRARY_ROOT = path.resolve(__dirname, "../../docs/agent-library");
 const DEFAULT_DOCUMENT_PATH = "quick-reference/what-do-i-do-next.md";
@@ -122,20 +123,26 @@ function buildFileNode(relativeFilePath, absoluteFile) {
   const folderDir = path.posix.dirname(posixPath);
   const folder = folderDir === "." ? "" : folderDir;
   const category = resolveCategoryForPath(posixPath);
-  const keywords = String(meta.keywords || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const metadata = buildArticleMetadata({
+    meta,
+    body,
+    filename: path.basename(posixPath),
+    category
+  });
 
   return {
     type: "file",
     name: path.basename(posixPath),
     path: posixPath,
     folder,
-    categoryId: category?.id || null,
+    categoryId: metadata.categoryId,
     categoryFolder: category?.folder || folder,
-    title: extractTitle(body, path.basename(posixPath)),
-    keywords,
+    categoryLabelKey: metadata.categoryLabelKey,
+    displayTitle: metadata.displayTitle,
+    shortSummary: metadata.shortSummary,
+    estimatedReadTime: metadata.estimatedReadTime,
+    title: metadata.displayTitle,
+    keywords: metadata.keywords,
     updatedAt: stats.mtime.toISOString()
   };
 }
@@ -160,7 +167,7 @@ function buildCategoryDirectoryNode(categoryDef) {
       const relativeFile = path.join(categoryDef.folder, entry.name);
       return buildFileNode(relativeFile, path.join(categoryDir, entry.name));
     })
-    .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+    .sort((a, b) => a.displayTitle.localeCompare(b.displayTitle, undefined, { sensitivity: "base" }));
 
   return {
     type: "folder",
@@ -179,7 +186,11 @@ function flattenFiles(node, accumulator = []) {
       folder: node.folder,
       categoryId: node.categoryId,
       categoryFolder: node.categoryFolder,
-      title: node.title,
+      categoryLabelKey: node.categoryLabelKey,
+      displayTitle: node.displayTitle,
+      shortSummary: node.shortSummary,
+      estimatedReadTime: node.estimatedReadTime,
+      title: node.displayTitle || node.title,
       keywords: node.keywords || [],
       updatedAt: node.updatedAt
     });
@@ -243,10 +254,12 @@ function getKnowledgeDocument(relativePath) {
   const { body, meta } = parseFrontmatter(rawContent);
   const stats = fs.statSync(absolutePath);
   const category = resolveCategoryForPath(safePath);
-  const keywords = String(meta.keywords || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const metadata = buildArticleMetadata({
+    meta,
+    body,
+    filename: path.basename(safePath),
+    category
+  });
 
   return {
     path: safePath,
@@ -255,10 +268,14 @@ function getKnowledgeDocument(relativePath) {
       const dir = path.posix.dirname(safePath);
       return dir === "." ? "" : dir;
     })(),
-    categoryId: category?.id || null,
+    categoryId: metadata.categoryId,
     categoryFolder: category?.folder || null,
-    title: extractTitle(body, path.basename(safePath)),
-    keywords,
+    categoryLabelKey: metadata.categoryLabelKey,
+    displayTitle: metadata.displayTitle,
+    shortSummary: metadata.shortSummary,
+    estimatedReadTime: metadata.estimatedReadTime,
+    title: metadata.displayTitle,
+    keywords: metadata.keywords,
     content: body,
     updatedAt: stats.mtime.toISOString()
   };

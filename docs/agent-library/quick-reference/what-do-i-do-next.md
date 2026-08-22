@@ -1,5 +1,9 @@
 ---
+displayTitle: What Do I Do Next? — Daily Checklist
+shortSummary: A short daily workflow checklist for field users.
+categoryId: quick-reference
 keywords: next steps, cheat sheet, daily workflow, reference
+estimatedReadTime: 2 min
 ---
 
 # What do I do next?

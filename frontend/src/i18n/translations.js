@@ -921,6 +921,11 @@ export const translations = {
     knowledgeHubPopularEmpty: "Abre artículos para ver los más usados aquí.",
     knowledgeHubBackToHub: "Volver al Centro de Conocimiento",
     knowledgeHubNotEnabled: "El Centro de Conocimiento no está habilitado para tu organización.",
+    knowledgeHubArticleUnavailable: "Este artículo ya no está disponible",
+    knowledgeHubArticleUnavailableDetail:
+      "El contenido solicitado fue retirado o ya no forma parte de la biblioteca de referencia.",
+    knowledgeHubBrowseTitle: "Explorar por categoría",
+    knowledgeHubReadTimeMinutes: "{minutes} min de lectura",
     knowledgeHubCategoryEmpty: "No hay artículos en esta categoría todavía.",
     knowledgeHubArticleSingular: "artículo",
     knowledgeHubArticlePlural: "artículos",
@@ -2844,6 +2849,11 @@ export const translations = {
     knowledgeHubPopularEmpty: "Open articles to see your most-used items here.",
     knowledgeHubBackToHub: "Back to Knowledge Hub",
     knowledgeHubNotEnabled: "Knowledge Hub is not enabled for your organization.",
+    knowledgeHubArticleUnavailable: "This article is no longer available",
+    knowledgeHubArticleUnavailableDetail:
+      "The requested content was removed or is no longer part of the reference library.",
+    knowledgeHubBrowseTitle: "Browse by category",
+    knowledgeHubReadTimeMinutes: "{minutes} min read",
     knowledgeHubCategoryEmpty: "No articles in this category yet.",
     knowledgeHubArticleSingular: "article",
     knowledgeHubArticlePlural: "articles",

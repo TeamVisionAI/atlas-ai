@@ -1974,6 +1974,22 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-153 — Knowledge Hub Field UX Polish
+
+**Implements:** Human-friendly titles/summaries, legacy localStorage purge, breadcrumbs, article cards, unavailable-article state. Field users never see engineering doc paths or stale history.  
+**Depends on:** BR-152 (`docs/agent-library/**`)  
+**Status:** Implemented  
+**Tests:** `backend/test/knowledgeHubFieldUxBr153.test.js`, `frontend/src/config/knowledgeHubFieldUxBr153.test.js`
+
+### Rules
+
+1. **Display metadata** — Articles expose `displayTitle`, `shortSummary`, `categoryLabelKey`, `estimatedReadTime` from frontmatter with safe filename fallback.
+2. **Storage v3** — `atlas_knowledge_activity_v3` validates recent/favorites/pinned/viewCounts against current agent-library catalog; legacy engineering paths silently purged.
+3. **Unavailable articles** — Direct legacy URLs show friendly unavailable state; never expose technical title/path.
+4. **Field UI** — No raw `.md` paths, folder slugs, or filesystem tree in sidebar; breadcrumbs use Hub → Category → Article.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

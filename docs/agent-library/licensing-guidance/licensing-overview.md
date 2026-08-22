@@ -1,5 +1,9 @@
 ---
-keywords: licensing, Florida, 2-14, 2-15, exam, background check
+displayTitle: Licensing Overview — Getting Started
+shortSummary: High-level licensing steps and safe talking points for recruiting conversations.
+categoryId: licensing-guidance
+keywords: licensing, exam, background check, study flow
+estimatedReadTime: 4 min
 ---
 
 # Licensing overview (generic)
