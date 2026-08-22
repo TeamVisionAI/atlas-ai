@@ -227,4 +227,44 @@ router.get("/support-mode", async (req, res) => {
   }
 });
 
+router.get("/whatsapp-inbound-webhooks", async (req, res) => {
+  try {
+    const {
+      findInboundWebhookObservability
+    } = require("../services/whatsappInboundWebhookObservabilityService");
+
+    const phone = req.query.phone ? String(req.query.phone).trim() : null;
+    const providerMessageId = req.query.providerMessageId
+      ? String(req.query.providerMessageId).trim()
+      : null;
+    const prospectId = req.query.prospectId ? String(req.query.prospectId).trim() : null;
+    const organizationId = req.query.organizationId
+      ? String(req.query.organizationId).trim()
+      : null;
+    const since = req.query.since ? String(req.query.since).trim() : null;
+    const until = req.query.until ? String(req.query.until).trim() : null;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+
+    const rows = await findInboundWebhookObservability({
+      phone,
+      providerMessageId,
+      prospectId,
+      organizationId,
+      since,
+      until,
+      limit
+    });
+
+    res.json({
+      count: rows.length,
+      rows
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to query inbound webhook observability."
+    });
+  }
+});
+
 module.exports = router;
