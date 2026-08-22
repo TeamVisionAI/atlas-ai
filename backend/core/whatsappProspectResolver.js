@@ -12,7 +12,7 @@ const {
 } = require("../core/phoneNormalizer");
 const prospectNumberService = require("../services/prospectNumberService");
 const eventEngine = require("./eventEngine");
-const { savePersistedWorkflowState } = require("./workflowStateStore");
+const { savePersistedWorkflowState, loadPersistedWorkflowState } = require("./workflowStateStore");
 const { MILESTONES, OWNERSHIP } = require("./workflowConstants");
 const {
   WHATSAPP_ENTRY_METHOD,
@@ -46,6 +46,9 @@ const {
   resolveVerifiedAtlasEligibilitySource,
   persistVerifiedAtlasEligibilitySource
 } = require("./atlasInboundAutomationEligibility");
+const {
+  getCampaignIntakeAttributionService
+} = require("./campaignIntakeCode/campaignIntakeAttributionService");
 
 const { supabase } = supabaseService;
 const { EVENT_TYPES } = eventEngine;
@@ -123,6 +126,21 @@ function resolveCreateSourceFields(qrTouch, origin = {}) {
       entryMethod: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
       campaignAgentId: null,
       assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK
+    };
+  }
+
+  if (
+    origin.campaignIntakeMatch?.matched === true &&
+    String(origin.campaignIntakeMatch.purpose || "").toUpperCase() === "RECRUITING" &&
+    origin.campaignIntakeMatch.recruitingEligible === true
+  ) {
+    return {
+      source: WHATSAPP_SOURCE.CAMPAIGN_INTAKE,
+      entryMethod: WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
+      campaignAgentId: origin.campaignIntakeMatch.ownerUserId || null,
+      assignmentSourceHint: WHATSAPP_SOURCE.CAMPAIGN_INTAKE,
+      campaignIntakeCodeId: origin.campaignIntakeMatch.campaignIntakeCodeId || null,
+      campaignName: origin.campaignIntakeMatch.campaignName || null
     };
   }
 
@@ -317,17 +335,23 @@ async function emitProspectLifecycleEvents(
     organizationId,
     qrTouch = null,
     sourceFields = null,
-    ctwaReferral = null
+    ctwaReferral = null,
+    campaignIntakeMatch = null
   }
 ) {
   const resolved =
-    sourceFields || resolveCreateSourceFields(qrTouch, { ctwaReferral });
+    sourceFields ||
+    resolveCreateSourceFields(qrTouch, {
+      ctwaReferral,
+      campaignIntakeMatch
+    });
   const source = resolved.source || WHATSAPP_SOURCE.UNKNOWN;
   const entryMethod = resolved.entryMethod || WHATSAPP_ENTRY_METHOD.UNATTRIBUTED;
   const atlasEligibilitySource = resolveVerifiedAtlasEligibilitySource({
     qrTouch,
     ctwaReferral,
-    sourceFields: resolved
+    sourceFields: resolved,
+    campaignIntakeMatch
   });
 
   if (created) {
@@ -433,7 +457,8 @@ async function locateOrCreateWhatsAppProspect({
   organizationId: explicitOrganizationId = null,
   providerMessageId = null,
   ctwaReferral = null,
-  intakeSource = null
+  intakeSource = null,
+  campaignIntakeMatch = null
 } = {}) {
   const normalizedPhone = normalizePhoneNumber(phone);
   const storagePhone = resolveStoragePhone(phone);
@@ -461,11 +486,6 @@ async function locateOrCreateWhatsAppProspect({
     qrTouch = attribution.buildAttributionTouch(matchedCampaign, matchedScan);
   }
 
-  const origin = {
-    ctwaReferral: ctwaReferral || null,
-    intakeSource: intakeSource || null
-  };
-
   let prospect =
     (await quickCaptureEngine.findProspectByNormalizedPhone(
       normalizedPhone || phone,
@@ -479,6 +499,34 @@ async function locateOrCreateWhatsAppProspect({
     (await supabaseService.findProspectInOrganization(phone, organizationId));
 
   const created = !prospect;
+
+  let resolvedCampaignIntakeMatch = campaignIntakeMatch;
+  if (resolvedCampaignIntakeMatch?.matched) {
+    const workflowState = prospect?.phone
+      ? await loadPersistedWorkflowState(prospect.phone, {
+          organizationId,
+          prospectId: prospect.id || null
+        }).catch(() => null)
+      : null;
+    resolvedCampaignIntakeMatch =
+      await getCampaignIntakeAttributionService().resolveInboundCampaignIntakeMatch({
+        organizationId,
+        whatsappPhoneNumberId: phoneNumberId,
+        messageBody: firstMessage,
+        prospect,
+        created,
+        workflowState
+      });
+  }
+
+  const origin = {
+    ctwaReferral: ctwaReferral || null,
+    intakeSource: intakeSource || null,
+    campaignIntakeMatch: resolvedCampaignIntakeMatch?.matched
+      ? resolvedCampaignIntakeMatch
+      : null
+  };
+
   const sourceFields = resolveCreateSourceFields(qrTouch, origin);
 
   if (created) {
@@ -522,7 +570,8 @@ async function locateOrCreateWhatsAppProspect({
     organizationId,
     qrTouch,
     sourceFields,
-    ctwaReferral: origin.ctwaReferral
+    ctwaReferral: origin.ctwaReferral,
+    campaignIntakeMatch: origin.campaignIntakeMatch
   });
 
   if (!created) {
@@ -530,7 +579,8 @@ async function locateOrCreateWhatsAppProspect({
       qrTouch,
       ctwaReferral: origin.ctwaReferral,
       intakeSource: origin.intakeSource,
-      sourceFields
+      sourceFields,
+      campaignIntakeMatch: origin.campaignIntakeMatch
     });
     if (eligibilitySource) {
       await persistVerifiedAtlasEligibilitySource(
@@ -619,7 +669,8 @@ async function locateOrCreateWhatsAppProspect({
     created,
     storagePhone: prospect.phone,
     organizationId,
-    qrAttribution
+    qrAttribution,
+    campaignIntakeMatch: origin.campaignIntakeMatch || null
   };
 }
 

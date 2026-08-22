@@ -15,7 +15,12 @@ const {
 } = require("./whatsappInboundOrganizationResolver");
 const { buildInboundCorrelationId } = require("./whatsappInboundClaim");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
-const { processConversationAfterInbound } = require("./communicationHub");
+const { loadPersistedWorkflowState } = require("./workflowStateStore");
+const {
+  getCampaignIntakeAttributionService,
+  setCampaignIntakeAttributionServiceForTests
+} = require("./campaignIntakeCode/campaignIntakeAttributionService");
+const { stripCampaignIntakeToken } = require("./campaignIntakeCode/intakeCodeToken");
 const recruitingWorkflowHooks = require("./recruitingWorkflowHooks");
 const { resolveProspectCommunicationCode } = require("./prospectLanguage");
 
@@ -90,18 +95,59 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   }
 
   const body = inbound.body || `[${inbound.messageType} message]`;
+  const phoneNumberId =
+    inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null;
 
-  const { prospect, created, storagePhone, organizationId, qrAttribution } =
+  const intakeService =
+    dependencies.campaignIntakeAttributionService ||
+    getCampaignIntakeAttributionService();
+
+  let intakeLookup = await intakeService.lookupInboundMatch({
+    organizationId: claimedOrganizationId,
+    whatsappPhoneNumberId: phoneNumberId,
+    messageBody: body
+  });
+
+  const { prospect, created, storagePhone, organizationId, qrAttribution, campaignIntakeMatch } =
     await locateOrCreate({
       phone: inbound.phone,
       name: inbound.contactName,
       firstMessage: body,
       correlationBase: correlationId,
-      phoneNumberId: inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
+      phoneNumberId,
       wabaId: inbound.wabaId || null,
       providerMessageId: inbound.providerMessageId || null,
-      ctwaReferral: inbound.ctwaReferral || null
+      ctwaReferral: inbound.ctwaReferral || null,
+      campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null
     });
+
+  if (campaignIntakeMatch?.matched) {
+    const workflowState = prospect?.phone
+      ? await loadPersistedWorkflowState(prospect.phone, {
+          organizationId: organizationId || prospect.organization_id || null,
+          prospectId: prospect.id || null
+        }).catch(() => null)
+      : null;
+
+    await intakeService.establishInboundAttribution({
+      match: campaignIntakeMatch,
+      prospect,
+      created,
+      workflowState,
+      providerMessageId: inbound.providerMessageId || null,
+      phoneNumberId,
+      organizationId: organizationId || claimedOrganizationId
+    });
+  }
+
+  const semanticBody = campaignIntakeMatch?.matched
+    ? stripCampaignIntakeToken(body, campaignIntakeMatch.code)
+    : body;
+  const inboundForAutomation = {
+    ...inbound,
+    body: semanticBody,
+    campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : null
+  };
 
   logWhatsAppStage("inbound_prospect_ready", {
     phone: storagePhone,
@@ -236,7 +282,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
   try {
     conversation = await runHub({
-      inbound,
+      inbound: inboundForAutomation,
       storagePhone,
       prospect,
       contactName: prospect.name || inbound.contactName,
@@ -304,7 +350,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
         storagePhone,
         conversation,
         inboundMessageId: inbound.providerMessageId || null,
-        messageText: body,
+        messageText: semanticBody,
         channel: "whatsapp"
       });
     } catch (advisoryError) {
@@ -332,5 +378,6 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
 module.exports = {
   processInboundWhatsAppMessage,
-  buildInboundCorrelationId
+  buildInboundCorrelationId,
+  setCampaignIntakeAttributionServiceForTests
 };

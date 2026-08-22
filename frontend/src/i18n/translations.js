@@ -764,6 +764,9 @@ export const translations = {
     configurationHubAppointmentsDescription: "Horario, reuniones y preferencias de citas.",
     configurationHubQrCampaignsDescription:
       "Crea y descarga códigos QR de reclutamiento para ti o tu equipo.",
+    configurationHubCampaignIntakeCodesDescription:
+      "Genera códigos de campaña para anuncios de WhatsApp cuando Meta no envía referral.",
+    campaignIntakeCodesTitle: "Códigos de campaña",
     configurationLoading: "Cargando…",
     configurationSaved: "Configuración guardada.",
     recruitingConfigReadOnly: "Solo lectura",
@@ -2691,6 +2694,9 @@ export const translations = {
     configurationHubAppointmentsDescription: "Schedule, meetings, and appointment preferences.",
     configurationHubQrCampaignsDescription:
       "Create and download recruiting QR codes for yourself or your team.",
+    configurationHubCampaignIntakeCodesDescription:
+      "Generate campaign intake codes for WhatsApp ads when Meta omits referral data.",
+    campaignIntakeCodesTitle: "Campaign Intake Codes",
     configurationLoading: "Loading…",
     configurationSaved: "Configuration saved.",
     recruitingConfigReadOnly: "Read-only",
