@@ -49,6 +49,7 @@ function extractLinkedConversationLogId(row) {
 
 const DEFAULT_TIMEZONE = "America/New_York";
 const DEFAULT_LIMIT = 200;
+const THREAD_DEFAULT_LIMIT = 40;
 const MAX_LIMIT = 500;
 
 const MESSAGE_MIRROR_EVENT_TYPES = new Set([
@@ -776,18 +777,37 @@ async function defaultLoadConversationLogs(query) {
     return [];
   }
 
-  const { data, error } = await getSupabase()
+  const logLimit = Math.min(
+    MAX_LIMIT,
+    Math.max(Number(query.logLimit) || MAX_LIMIT, 1)
+  );
+
+  let dbQuery = getSupabase()
     .from("conversation_logs")
     .select("*")
     .in("prospect_phone", query.authorizedPhones)
-    .order("created_at", { ascending: true })
-    .limit(MAX_LIMIT);
+    .order("created_at", { ascending: false })
+    .limit(logLimit);
+
+  if (query.organizationId) {
+    dbQuery = dbQuery.or(
+      `organization_id.eq.${query.organizationId},organization_id.is.null`
+    );
+  }
+
+  if (query.before) {
+    dbQuery = dbQuery.lt("created_at", query.before);
+  }
+
+  const { data, error } = await dbQuery;
 
   if (error) {
     throw error;
   }
 
-  return filterPhoneKeyedRows(data || [], {
+  const rows = (data || []).slice().reverse();
+
+  return filterPhoneKeyedRows(rows, {
     organizationId: query.organizationId,
     authorizedPhones: phoneSet(query.authorizedPhones),
     allowNullOrgPhoneFallback: query.allowNullOrgPhoneFallback,
@@ -805,7 +825,7 @@ async function defaultLoadOutboundDeliveries(query) {
     .select("*")
     .in("prospect_phone", query.authorizedPhones)
     .order("created_at", { ascending: false })
-    .limit(MAX_LIMIT);
+    .limit(Math.min(MAX_LIMIT, Math.max(Number(query.logLimit) || MAX_LIMIT, 1)));
 
   if (query.organizationId) {
     dbQuery = dbQuery.eq("organization_id", query.organizationId);
@@ -1093,8 +1113,14 @@ async function buildCommunicationsCenterTimeline(input = {}) {
   }
 
   const timezone = input.timezone || DEFAULT_TIMEZONE;
+  const projection = String(input.projection || "full").toLowerCase();
+  const threadProjection = projection === "thread";
   const limit = Math.min(
-    Math.max(Number(input.limit) || DEFAULT_LIMIT, 1),
+    Math.max(
+      Number(input.limit) ||
+        (threadProjection ? THREAD_DEFAULT_LIMIT : DEFAULT_LIMIT),
+      1
+    ),
     MAX_LIMIT
   );
   const loaders = input.loaders || {};
@@ -1125,7 +1151,9 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     authorizedPhones,
     phoneFallbackAllowed,
     allowNullOrgPhoneFallback,
-    stats
+    stats,
+    logLimit: Math.min(limit + 20, MAX_LIMIT),
+    before: input.before || null
   };
 
   if (!phoneFallbackAllowed) {
@@ -1153,17 +1181,28 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     communicationMedia
   ] = await Promise.all([
     (loaders.loadConversationLogs || defaultLoadConversationLogs)(phoneQuery),
-    (loaders.loadOutboundDeliveries || defaultLoadOutboundDeliveries)(phoneQuery),
-    (loaders.loadWorkflowEvents || defaultLoadWorkflowEvents)(phoneQuery),
-    (loaders.loadAppointments || defaultLoadAppointments)(phoneQuery),
-    (loaders.loadBusinessEvents || defaultLoadBusinessEvents)(
-      prospectId,
-      organizationId
-    ),
-    (loaders.loadTimelineEntries || defaultLoadTimelineEntries)(
-      prospectId,
-      organizationId
-    ),
+    (loaders.loadOutboundDeliveries || defaultLoadOutboundDeliveries)({
+      ...phoneQuery,
+      logLimit: Math.min(limit + 20, MAX_LIMIT)
+    }),
+    threadProjection
+      ? Promise.resolve([])
+      : (loaders.loadWorkflowEvents || defaultLoadWorkflowEvents)(phoneQuery),
+    threadProjection
+      ? Promise.resolve([])
+      : (loaders.loadAppointments || defaultLoadAppointments)(phoneQuery),
+    threadProjection
+      ? Promise.resolve({ rows: [], gap: null })
+      : (loaders.loadBusinessEvents || defaultLoadBusinessEvents)(
+          prospectId,
+          organizationId
+        ),
+    threadProjection
+      ? Promise.resolve({ rows: [], gap: null })
+      : (loaders.loadTimelineEntries || defaultLoadTimelineEntries)(
+          prospectId,
+          organizationId
+        ),
     (loaders.loadCommunicationMedia || defaultLoadCommunicationMedia)({
       organizationId,
       prospectId
@@ -1300,6 +1339,8 @@ async function buildCommunicationsCenterTimeline(input = {}) {
 
   const truncated = items.length > limit;
   const page = truncated ? items.slice(-limit) : items;
+  const oldestTimestamp =
+    page.length > 0 ? page[0]?.timestampUtc || page[0]?.timestamp || null : null;
 
   return sanitizeCommunicationsCenterResponse({
     generatedAt: new Date().toISOString(),
@@ -1317,6 +1358,7 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     channelIdentities: input.publicChannelIdentities || [],
     organizationId,
     timezone,
+    projection: threadProjection ? "thread" : "full",
     sources: {
       conversation_logs: conversationLogs.length,
       whatsapp_outbound_deliveries: deliveries.length,
@@ -1328,8 +1370,9 @@ async function buildCommunicationsCenterTimeline(input = {}) {
     gaps,
     items: page,
     pagination: {
-      nextCursor: null,
-      hasMore: truncated
+      nextCursor: truncated && oldestTimestamp ? oldestTimestamp : null,
+      hasMore: truncated,
+      before: input.before || null
     },
     dataQuality: {
       legacyPhoneCorrelations: stats.legacyPhoneCorrelations,

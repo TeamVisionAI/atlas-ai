@@ -441,6 +441,23 @@ async function saveToDatabase(phone, next, options = {}) {
  * @param {string} phone
  * @param {{ organizationId?: string, prospectId?: string, backend?: string }} [options]
  */
+/**
+ * Read workflow_state from an already-loaded prospect row (no extra DB round-trip).
+ * Use for inbox list batching when prospects were loaded via org query.
+ */
+function workflowStateFromProspectRow(prospect = null) {
+  if (!prospect?.id || !prospect?.organization_id) {
+    return defaultWorkflowRecord();
+  }
+
+  const raw = prospect.workflow_state;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return defaultWorkflowRecord();
+  }
+
+  return normalizeRecord({ ...raw });
+}
+
 async function loadPersistedWorkflowState(phone, options = {}) {
   if (!phone) {
     return defaultWorkflowRecord();
@@ -598,6 +615,7 @@ module.exports = {
   resolveWorkflowStateBackend,
   isProductionRuntime,
   clearMemoryWorkflowStateStore,
+  workflowStateFromProspectRow,
   loadPersistedWorkflowState,
   savePersistedWorkflowState,
   resolveWorkflowState,

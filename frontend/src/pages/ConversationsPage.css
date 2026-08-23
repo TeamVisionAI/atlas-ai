@@ -226,6 +226,33 @@
   font-size: 14px;
 }
 
+.conversations-page__skeleton-list {
+  display: grid;
+  gap: 0;
+}
+
+.conversations-row--skeleton {
+  min-height: 92px;
+  cursor: default;
+  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: conversationsSkeleton 1.2s ease-in-out infinite;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+@keyframes conversationsSkeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.conversations-page__error--list {
+  margin: 0 0 8px;
+}
+
 .conversations-row {
   display: flex;
   flex-direction: column;
