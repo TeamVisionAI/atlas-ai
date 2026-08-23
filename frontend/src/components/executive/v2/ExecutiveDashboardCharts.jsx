@@ -6,45 +6,47 @@ export function ConversationDonut({ segments = [], total = 0 }) {
 
   if (!safeTotal) {
     return (
-      <div className="executive-v2__donut executive-v2__donut--empty" aria-hidden="true">
+      <div className="executive-v2__donut-empty" aria-hidden="true">
         <span>—</span>
       </div>
     );
   }
 
-  const radius = 42;
+  const radius = 62;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
 
   return (
     <div className="executive-v2__donut-wrap">
-      <svg viewBox="0 0 120 120" className="executive-v2__donut" role="img" aria-label="Conversation ownership">
-        <circle cx="60" cy="60" r={radius} className="executive-v2__donut-track" />
-        {segments.map((segment) => {
-          if (!segment.value) {
-            return null;
-          }
+      <div className="executive-v2__donut-chart">
+        <svg viewBox="0 0 180 180" className="executive-v2__donut" role="img" aria-label="Conversation ownership">
+          <circle cx="90" cy="90" r={radius} className="executive-v2__donut-track" />
+          {segments.map((segment) => {
+            if (!segment.value) {
+              return null;
+            }
 
-          const length = (segment.value / safeTotal) * circumference;
-          const circle = (
-            <circle
-              key={segment.key}
-              cx="60"
-              cy="60"
-              r={radius}
-              className="executive-v2__donut-segment"
-              stroke={segment.color}
-              strokeDasharray={`${length} ${circumference - length}`}
-              strokeDashoffset={-offset}
-            />
-          );
-          offset += length;
-          return circle;
-        })}
-        <text x="60" y="58" textAnchor="middle" className="executive-v2__donut-total">
-          {safeTotal}
-        </text>
-      </svg>
+            const length = (segment.value / safeTotal) * circumference;
+            const circle = (
+              <circle
+                key={segment.key}
+                cx="90"
+                cy="90"
+                r={radius}
+                className="executive-v2__donut-segment"
+                stroke={segment.color}
+                strokeDasharray={`${length} ${circumference - length}`}
+                strokeDashoffset={-offset}
+              />
+            );
+            offset += length;
+            return circle;
+          })}
+        </svg>
+        <div className="executive-v2__donut-center">
+          <strong>{safeTotal}</strong>
+        </div>
+      </div>
       <ul className="executive-v2__donut-legend">
         {segments.map((segment) => (
           <li key={segment.key}>
@@ -63,9 +65,9 @@ export function AppointmentTrendChart({ series = [] }) {
     return <div className="executive-v2__chart-empty">—</div>;
   }
 
-  const width = 560;
-  const height = 180;
-  const padding = { top: 16, right: 12, bottom: 28, left: 12 };
+  const width = 640;
+  const height = 240;
+  const padding = { top: 20, right: 16, bottom: 36, left: 16 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
   const maxValue = Math.max(
@@ -90,9 +92,12 @@ export function AppointmentTrendChart({ series = [] }) {
       .join(" ");
   }
 
+  const gridRatios = [0, 0.25, 0.5, 0.75, 1];
+  const lineKeys = ["scheduled", "confirmed", "completed"];
+
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="executive-v2__line-chart" role="img">
-      {[0, 0.5, 1].map((ratio) => {
+      {gridRatios.map((ratio) => {
         const yPos = padding.top + innerHeight * (1 - ratio);
         return (
           <line
@@ -105,14 +110,29 @@ export function AppointmentTrendChart({ series = [] }) {
           />
         );
       })}
-      <path d={lineFor("scheduled")} className="executive-v2__chart-line executive-v2__chart-line--scheduled" />
-      <path d={lineFor("confirmed")} className="executive-v2__chart-line executive-v2__chart-line--confirmed" />
-      <path d={lineFor("completed")} className="executive-v2__chart-line executive-v2__chart-line--completed" />
+      {lineKeys.map((key) => (
+        <path
+          key={key}
+          d={lineFor(key)}
+          className={`executive-v2__chart-line executive-v2__chart-line--${key}`}
+        />
+      ))}
+      {lineKeys.map((key) =>
+        series.map((day, index) => (
+          <circle
+            key={`${key}-${day.date || index}`}
+            cx={x(index)}
+            cy={y(day[key] || 0)}
+            r="4"
+            className={`executive-v2__chart-dot executive-v2__chart-dot--${key}`}
+          />
+        ))
+      )}
       {series.map((day, index) => (
         <text
           key={day.date || index}
           x={x(index)}
-          y={height - 8}
+          y={height - 10}
           textAnchor="middle"
           className="executive-v2__chart-label"
         >

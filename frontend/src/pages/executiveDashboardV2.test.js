@@ -51,3 +51,30 @@ test("Executive Dashboard v2 charts tolerate empty series", () => {
   assert.match(source, /if \(!series\.length\)/);
   assert.match(source, /if \(!safeTotal\)/);
 });
+
+test("Executive Dashboard v2 visual polish uses wider layout and funnel visualization", () => {
+  const css = fs.readFileSync(
+    path.join(__dirname, "../pages/ExecutiveDashboard.css"),
+    "utf8"
+  );
+  const sections = fs.readFileSync(
+    path.join(__dirname, "../components/executive/v2/ExecutiveDashboardSections.jsx"),
+    "utf8"
+  );
+
+  assert.match(css, /--exec-v2-max:\s*1580px/);
+  assert.match(css, /executive-v2__funnel-viz/);
+  assert.match(css, /height:\s*240px/);
+  assert.match(sections, /executive-v2__funnel-viz/);
+  assert.match(sections, /data-tone=/);
+});
+
+test("Executive Dashboard v2 trend chart renders data point dots", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "../components/executive/v2/ExecutiveDashboardCharts.jsx"),
+    "utf8"
+  );
+
+  assert.match(source, /executive-v2__chart-dot/);
+  assert.match(source, /height = 240/);
+});

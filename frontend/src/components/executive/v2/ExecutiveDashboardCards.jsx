@@ -2,14 +2,24 @@ function Skeleton({ className = "", style }) {
   return <div className={`executive-v2__skeleton ${className}`.trim()} style={style} aria-hidden="true" />;
 }
 
-export function ExecutiveCard({ title, action, children, className = "", loading = false }) {
+export function ExecutiveCard({
+  title,
+  action,
+  children,
+  className = "",
+  loading = false,
+  footer = null
+}) {
   return (
     <section className={`executive-v2__card ${className}`.trim()}>
       <header className="executive-v2__card-header">
         <h2 className="executive-v2__card-title">{title}</h2>
         {action || null}
       </header>
-      {loading ? <Skeleton className="executive-v2__skeleton--block" /> : children}
+      <div className="executive-v2__card-body">
+        {loading ? <Skeleton className="executive-v2__skeleton--block" /> : children}
+      </div>
+      {footer ? <footer className="executive-v2__card-footer">{footer}</footer> : null}
     </section>
   );
 }
@@ -24,6 +34,15 @@ export function KpiSkeletonRow() {
   );
 }
 
+const KPI_ACCENTS = {
+  newProspects: "blue",
+  qualified: "green",
+  appointments: "purple",
+  confirmed: "teal",
+  completed: "amber",
+  recruited: "navy"
+};
+
 export function KpiRow({ cards = [] }) {
   if (!cards.length) {
     return <KpiSkeletonRow />;
@@ -32,10 +51,16 @@ export function KpiRow({ cards = [] }) {
   return (
     <div className="executive-v2__kpi-row">
       {cards.map((card) => (
-        <article key={card.key} className="executive-v2__kpi">
-          <div className="executive-v2__kpi-icon" data-icon={card.icon} aria-hidden="true" />
+        <article
+          key={card.key}
+          className="executive-v2__kpi"
+          data-accent={KPI_ACCENTS[card.key] || "blue"}
+        >
+          <div className="executive-v2__kpi-head">
+            <div className="executive-v2__kpi-icon" data-icon={card.icon} aria-hidden="true" />
+            <div className="executive-v2__kpi-label">{card.label}</div>
+          </div>
           <div className="executive-v2__kpi-value">{card.value}</div>
-          <div className="executive-v2__kpi-label">{card.label}</div>
           {card.comparison ? (
             <div
               className={`executive-v2__kpi-delta executive-v2__kpi-delta--${card.comparison.direction}`}
@@ -44,7 +69,9 @@ export function KpiRow({ cards = [] }) {
                 ? "—"
                 : `${card.comparison.direction === "up" ? "+" : "-"}${card.comparison.value}`}
             </div>
-          ) : null}
+          ) : (
+            <div className="executive-v2__kpi-delta executive-v2__kpi-delta--flat">—</div>
+          )}
         </article>
       ))}
     </div>
