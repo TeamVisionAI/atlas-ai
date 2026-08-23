@@ -16,6 +16,7 @@ backend/data/metaWhatsAppConnection.json
 backend/data/agentActionState.json
 backend/data/workflowState.json
 .staging-*/
+.staging-access.local
 
 # Local HTTPS certificates (mkcert)
 frontend/.certs/

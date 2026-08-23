@@ -12,6 +12,7 @@
     "test": "node --test backend/test/*.test.js && npm run test --prefix frontend",
     "staging:migrate": "node backend/dev/environment/applyStagingBaselineMigrations.js",
     "staging:seed": "node backend/dev/environment/seedStagingSyntheticData.js",
+    "staging:provision-access": "node backend/dev/environment/provisionStagingAccess.js",
     "staging:verify": "node backend/dev/environment/verifyStagingBaseline.js"
   },
   "repository": {
