@@ -312,10 +312,12 @@ function mapConversationLog(row, context) {
   const direction = isInbound ? "inbound" : "outbound";
   const pipeline = String(row.pipeline || "").toUpperCase();
   const intent = String(row.intent || "").toUpperCase();
+  const isNativeHumanEcho = context.nativeHumanLogIds?.has(String(row.id)) || false;
   const isHumanOutbound =
     !isInbound &&
     !isAgentNote &&
-    (pipeline === "HUMAN" ||
+    (isNativeHumanEcho ||
+      pipeline === "HUMAN" ||
       pipeline.startsWith("HUMAN:") ||
       intent === "HUMAN_COMPOSER_REPLY" ||
       intent.startsWith("HUMAN_"));
@@ -1203,6 +1205,15 @@ async function buildCommunicationsCenterTimeline(input = {}) {
   }
 
   const linkedLogIds = new Set(conversationLogs.map((row) => String(row.id)));
+  context.nativeHumanLogIds = new Set(
+    deliveries
+      .filter(
+        (row) =>
+          String(row.status || "").toLowerCase() === "sent_native_human" &&
+          row.conversation_log_id
+      )
+      .map((row) => String(row.conversation_log_id))
+  );
 
   let items = [
     ...conversationLogs.map((row) => mapConversationLog(row, context)),

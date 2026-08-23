@@ -154,12 +154,21 @@ export function isConversationBubbleItem(item) {
     return false;
   }
 
+  const text = String(item?.content?.text || item?.content?.body || "").trim();
+
+  // Native human / composer replies mapped with human_reply — show even when legacy
+  // conversation_logs rows still carry AGENT_ACTION.
+  if (flags.includes("human_reply")) {
+    if (isOperationalCommunicationText(text)) {
+      return false;
+    }
+    return true;
+  }
+
   const intent = String(item?.ai?.intent || "").toUpperCase();
   if (INTERNAL_MESSAGE_INTENTS.has(intent)) {
     return false;
   }
-
-  const text = String(item?.content?.text || item?.content?.body || "").trim();
   if (isAudioCommunicationItem(item) || isMediaPlaceholderText(text)) {
     return true;
   }

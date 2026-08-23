@@ -207,7 +207,7 @@ test("4. native WhatsApp Business human outbound persists one Human message", as
   assert.equal(result.success, true);
   assert.equal(result.skipped, false);
   assert.equal(logs.length, 1);
-  assert.equal(logs[0].intent, "AGENT_ACTION");
+  assert.equal(logs[0].intent, "HUMAN_WHATSAPP_BUSINESS_APP_REPLY");
   assert.equal(logs[0].direction, "outgoing");
   assert.equal(logs[0].actorOverride, "AGENT");
   assert.equal(logs[0].message, "Hola, soy Christell");
@@ -451,4 +451,122 @@ test("15. Meta smb_message_echoes field documented in parser", () => {
   );
   assert.match(src, /message_echoes/);
   assert.match(src, /smb_message_echoes/);
+});
+
+test("16. native human echo appears in Communications Center transcript", async () => {
+  const {
+    buildCommunicationsCenterTimeline,
+    mapConversationLog
+  } = require("../core/communicationsCenterReadModel");
+  const {
+    isConversationBubbleItem
+  } = require("../../frontend/src/engines/communicationsCenterViewModel.js");
+
+  const logId = "log-human-echo-1";
+  const body = "Prefieres en la mañana o en la tarde?";
+
+  const legacyItem = mapConversationLog(
+    {
+      id: logId,
+      message: body,
+      direction: "outgoing",
+      intent: "AGENT_ACTION",
+      pipeline: "NEW",
+      created_at: "2026-08-23T01:19:23.102Z"
+    },
+    {
+      timezone: "America/New_York",
+      prospectDisplayName: "Tania",
+      nativeHumanLogIds: new Set([logId])
+    }
+  );
+
+  assert.equal(legacyItem.eventType, "message.outbound.human");
+  assert.equal(legacyItem.actor.displayName, "Human");
+  assert.equal(legacyItem.content.text, body);
+  assert.ok(legacyItem.flags.includes("human_reply"));
+  assert.equal(isConversationBubbleItem(legacyItem), true);
+
+  const timeline = await buildCommunicationsCenterTimeline({
+    prospectId: "prospect-tania",
+    organizationId: ORG_A,
+    prospectDisplayName: "Tania",
+    authorizedPhones: ["+14074197828"],
+    phoneFallbackAllowed: true,
+    loaders: {
+      loadConversationLogs: async () => [
+        {
+          id: logId,
+          prospect_phone: "+14074197828",
+          organization_id: ORG_A,
+          direction: "outgoing",
+          message: body,
+          intent: "AGENT_ACTION",
+          pipeline: "NEW",
+          created_at: "2026-08-23T01:19:23.102Z"
+        }
+      ],
+      loadOutboundDeliveries: async () => [
+        {
+          id: "delivery-human",
+          conversation_log_id: logId,
+          status: "sent_native_human",
+          provider_message_id: "wamid.HUMAN.ECHO.1",
+          organization_id: ORG_A,
+          prospect_phone: "+14074197828",
+          created_at: "2026-08-23T01:19:24.473Z",
+          intent: "WHATSAPP_BUSINESS_APP_OUTBOUND"
+        }
+      ],
+      loadWorkflowEvents: async () => [
+        {
+          id: "wf-human",
+          event_type: "MessageSent",
+          actor: "AGENT",
+          prospect_phone: "+14074197828",
+          payload: {
+            conversationLogId: logId,
+            bodyPreview: body
+          },
+          created_at: "2026-08-23T01:19:22.774Z"
+        }
+      ],
+      loadAppointments: async () => [],
+      loadBusinessEvents: async () => ({ rows: [], gap: null }),
+      loadTimelineEntries: async () => ({ rows: [], gap: null }),
+      loadCommunicationMedia: async () => []
+    }
+  });
+
+  const humanBubbles = timeline.items.filter(
+    (item) =>
+      item.eventType === "message.outbound.human" &&
+      isConversationBubbleItem(item)
+  );
+  assert.equal(humanBubbles.length, 1);
+  assert.equal(humanBubbles[0].content.text, body);
+  assert.equal(
+    timeline.items.filter((item) => item.eventType === "message.outbound").length,
+    0
+  );
+});
+
+test("17. new native human echo intent maps without delivery linkage", () => {
+  const { mapConversationLog } = require("../core/communicationsCenterReadModel");
+  const { HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT } = require("../core/whatsappConstants");
+  const item = mapConversationLog(
+    {
+      id: "log-new-human",
+      message: "Hola desde la app",
+      direction: "outgoing",
+      intent: HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT,
+      pipeline: "NEW",
+      created_at: "2026-08-23T02:00:00.000Z"
+    },
+    { timezone: "America/New_York", prospectDisplayName: "Prospect" }
+  );
+
+  assert.equal(item.eventType, "message.outbound.human");
+  assert.equal(item.actor.displayName, "Human");
+  assert.ok(item.flags.includes("human_reply"));
 });

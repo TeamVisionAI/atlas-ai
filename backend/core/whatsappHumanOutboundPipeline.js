@@ -12,7 +12,10 @@ const {
 } = require("./whatsappInboundOrganizationResolver");
 const { resolveStoragePhone } = require("./whatsappProspectResolver");
 const { buildHumanEchoCorrelationId } = require("./whatsappHumanOutboundClaim");
-const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
+const {
+  WHATSAPP_CORRELATION_PREFIX,
+  HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT
+} = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { resolveProspectCommunicationCode } = require("./prospectLanguage");
 const { takeOverConversation } = require("./conversationsCenter/conversationsCenterOwnershipService");
@@ -177,7 +180,7 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
     name: prospect.name || null,
     direction: "outgoing",
     message: body,
-    intent: "AGENT_ACTION",
+    intent: HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT,
     pipeline: prospect.current_step || "NEW",
     currentStep: prospect.current_step || "NEW",
     language: resolveProspectCommunicationCode(prospect),
