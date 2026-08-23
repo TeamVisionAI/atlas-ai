@@ -30,6 +30,9 @@ function buildNormalizedMessageFromWhatsApp(inbound, storagePhone) {
     messageType: inbound.messageType || "text",
     media: inbound.media || null,
     timestamp: inbound.timestamp || new Date().toISOString(),
+    phoneNumberId:
+      inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
+    wabaId: inbound.wabaId || null,
     ctwaReferral: inbound.ctwaReferral || null,
     campaignIntakeMatch: inbound.campaignIntakeMatch || null
   };

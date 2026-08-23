@@ -33,6 +33,15 @@ function createTrackingRepo(connection) {
     async getConnection() {
       return row ? structuredClone(row) : null;
     },
+    async findConnectionByPhoneNumberId(phoneNumberId) {
+      if (!row || row.status !== "connected") {
+        return null;
+      }
+      if (String(row.phone_number_id) === String(phoneNumberId)) {
+        return structuredClone(row);
+      }
+      return null;
+    },
     async getDecryptedAccessToken() {
       if (!row?.access_token_encrypted || row.status !== "connected") {
         return null;
@@ -99,6 +108,28 @@ async function withEnv(overrides, fn) {
     }
   }
 }
+
+test("inbound phone_number_id routes embedded signup even when env pin differs", async () => {
+  await withEnv(
+    {
+      WHATSAPP_ACCESS_TOKEN: ENV_8080_TOKEN,
+      WHATSAPP_PHONE_NUMBER_ID: ENV_8080_PHONE,
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ENV_8080_WABA
+    },
+    async () => {
+      const repo = createTrackingRepo(connected7338());
+      const credentials = await resolveWhatsAppSendCredentials(ORG_ID, {
+        connectionRepository: repo,
+        phoneNumberId: ORG_7338_PHONE
+      });
+
+      assert.equal(credentials.source, "embedded_signup");
+      assert.equal(credentials.phoneNumberId, ORG_7338_PHONE);
+      assert.equal(credentials.accessToken, ORG_7338_TOKEN);
+      assert.deepEqual(repo.mutations, []);
+    }
+  );
+});
 
 test("org 7338 + env 8080 selects environment 8080 credentials", async () => {
   await withEnv(
@@ -284,6 +315,8 @@ test("media-fetch source still resolves through whatsappSendCredentials", () => 
 
   assert.match(fetchSrc, /resolveWhatsAppSendCredentials/);
   assert.match(outboundSrc, /resolveWhatsAppSendCredentials/);
+  assert.match(outboundSrc, /inboundPhoneNumberId/);
+  assert.match(pinSrc, /findConnectionByPhoneNumberId/);
   assert.match(pinSrc, /isOrgConnectionEligibleForRouting/);
   assert.doesNotMatch(pinSrc, /saveConnection|updateConnection|disconnectConnection/);
 });

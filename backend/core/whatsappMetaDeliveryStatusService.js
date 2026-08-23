@@ -46,6 +46,29 @@ async function applyWhatsAppMetaDeliveryStatus(statusEvent, client, options = {}
     });
 
     if (last?.reason !== "UNKNOWN_WAMID") {
+      if (
+        last?.success &&
+        !last?.ignored &&
+        String(last?.patch?.meta_delivery_status || last?.row?.meta_delivery_status || "")
+          .trim()
+          .toLowerCase() === "failed"
+      ) {
+        try {
+          const {
+            handleAutomatedOutboundMetaFailure
+          } = require("./whatsappAutomatedReplyDelivery");
+          await handleAutomatedOutboundMetaFailure({
+            deliveryRow: last.row,
+            statusEvent
+          });
+        } catch (attentionError) {
+          logWhatsAppStage("automated_outbound_meta_failure_hook_failed", {
+            level: "warn",
+            providerMessageId: statusEvent?.providerMessageId || null,
+            error: attentionError.message
+          });
+        }
+      }
       return {
         ...last,
         attempts: attempt

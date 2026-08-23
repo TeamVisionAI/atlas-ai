@@ -13,8 +13,7 @@ const { processConversationAfterInbound } = require("./communicationHub");
 const whatsappProspectResolver = require("./whatsappProspectResolver");
 const { resolveStoragePhone } = whatsappProspectResolver;
 const {
-  findProspectInOrganization,
-  supabase
+  findProspectInOrganization
 } = require("../services/supabaseService");
 const {
   resolveWhatsAppInboundOrganizationId
@@ -29,6 +28,11 @@ const {
 const { stripCampaignIntakeToken } = require("./campaignIntakeCode/intakeCodeToken");
 const recruitingWorkflowHooks = require("./recruitingWorkflowHooks");
 const { resolveProspectCommunicationCode } = require("./prospectLanguage");
+const {
+  conversationDeliveredReply,
+  prospectHasDeliveredAutomatedOutbound,
+  prospectHasFailedAutomatedOutboundOnly
+} = require("./whatsappAutomatedReplyDelivery");
 
 function duplicateSkipResult(correlationId, providerMessageId, phone) {
   logWhatsAppStage("message_duplicate_skipped", {
@@ -42,16 +46,6 @@ function duplicateSkipResult(correlationId, providerMessageId, phone) {
     reason: "DUPLICATE_PROVIDER_MESSAGE",
     correlationId
   };
-}
-
-function conversationDeliveredReply(conversation) {
-  if (!conversation?.replied) {
-    return false;
-  }
-  if (conversation.delivery && typeof conversation.delivery === "object") {
-    return conversation.delivery.success === true;
-  }
-  return false;
 }
 
 async function applyInboundAttentionUpdate(prospect, conversation) {
@@ -84,33 +78,10 @@ async function applyInboundAttentionUpdate(prospect, conversation) {
 }
 
 async function prospectHasAutomatedOutboundReply(phone, organizationId) {
-  const storagePhone = resolveStoragePhone(phone);
-  if (!storagePhone) {
-    return false;
-  }
-
-  let query = supabase
-    .from("conversation_logs")
-    .select("id")
-    .eq("prospect_phone", storagePhone)
-    .eq("direction", "outgoing")
-    .limit(1);
-
-  if (organizationId) {
-    query = query.eq("organization_id", organizationId);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    logWhatsAppStage("inbound_first_reply_recovery_lookup_failed", {
-      level: "warn",
-      phone: storagePhone,
-      error: error.message
-    });
+  if (await prospectHasDeliveredAutomatedOutbound(phone, organizationId)) {
     return true;
   }
-
-  return Array.isArray(data) && data.length > 0;
+  return !(await prospectHasFailedAutomatedOutboundOnly(phone, organizationId));
 }
 
 async function attemptStalledFirstReplyRecovery({
