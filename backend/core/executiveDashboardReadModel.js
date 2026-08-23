@@ -21,6 +21,9 @@ const {
   getOrganizationDateWindow,
   isTimestampInWindow
 } = require("./organizationDateWindow");
+const {
+  buildExecutiveDashboardV2Metrics
+} = require("./executiveDashboardV2Metrics");
 
 const EXECUTIVE_FILTERS = Object.freeze({
   INTERVIEWS_TODAY: "interviews-today",
@@ -420,7 +423,18 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
     relativePeriod: RELATIVE_PERIODS.THIS_WEEK,
     reference
   });
-  const context = { organizationId, reference, todayWindow, weekWindow };
+  const yesterdayWindow = getOrganizationDateWindow({
+    organizationId,
+    relativePeriod: RELATIVE_PERIODS.YESTERDAY,
+    reference
+  });
+  const context = {
+    organizationId,
+    reference,
+    todayWindow,
+    weekWindow,
+    yesterdayWindow
+  };
 
   // BR-149 — callers may pass hierarchy-scoped prospects (Team Dashboard); default remains org load.
   const prospects = Array.isArray(options.prospects)
@@ -435,6 +449,8 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
   const activity = await buildRecentActivity(
     prospects.map((row) => row.phone)
   );
+
+  const v2Metrics = buildExecutiveDashboardV2Metrics(prospects, queue, context);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -452,7 +468,8 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
     recommendations,
     calendar,
     activity,
-    prioritizedWorkflowQueue: queue
+    prioritizedWorkflowQueue: queue,
+    v2Metrics
   };
 }
 

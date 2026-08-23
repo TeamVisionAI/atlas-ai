@@ -1,5 +1,5 @@
 import { apiFetch } from "./apiClient";
 
-export async function getDashboard() {
-  return apiFetch("/api/dashboard");
+export async function getDashboard(options = {}) {
+  return apiFetch("/api/dashboard", options);
 }
