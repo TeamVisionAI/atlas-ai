@@ -221,11 +221,77 @@ function createCampaignIntakeAttributionService(options = {}) {
     };
   }
 
+  /**
+   * Idempotent workflow/eligibility restore for stalled first-reply recovery.
+   * Does not insert a new attribution row when one already exists.
+   */
+  async function reconcileStalledFirstReplyAttributionState({
+    match,
+    prospect,
+    organizationId = null,
+    providerMessageId = null,
+    phoneNumberId = null,
+    workflowState = null,
+    attribution = null
+  } = {}) {
+    if (!match?.matched || !prospect?.phone) {
+      return { ok: false, reason: "NO_MATCH" };
+    }
+
+    const recruitingEligible =
+      attribution?.metadata?.recruitingEligible === true ||
+      String(attribution?.eligibilityDecision || "").toUpperCase() ===
+        "CAMPAIGN_INTAKE_CODE" ||
+      (match.recruitingEligible === true && isRecruitingPurpose(match));
+
+    if (!recruitingEligible) {
+      return {
+        ok: false,
+        reason: attribution?.eligibilityDecision || "NOT_RECRUITING_ELIGIBLE"
+      };
+    }
+
+    const scope = {
+      organizationId: organizationId || prospect.organization_id || null,
+      prospectId: prospect.id || null
+    };
+
+    await persistVerifiedAtlasEligibilitySource(
+      prospect.phone,
+      VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_CODE,
+      scope
+    ).catch(() => null);
+
+    await savePersistedWorkflowState(
+      prospect.phone,
+      {
+        campaignIntakeCodeId: match.campaignIntakeCodeId,
+        campaignIntakeCampaignName: match.campaignName,
+        campaignIntakePurpose: match.purpose,
+        campaignIntakeMatchedAt:
+          attribution?.matchedAt || workflowState?.campaignIntakeMatchedAt || new Date().toISOString(),
+        canonicalMilestone: MILESTONES.NEW_LEAD,
+        workflowOwnership: OWNERSHIP.ATLAS,
+        manualAgentOwnership: false
+      },
+      scope
+    ).catch(() => null);
+
+    return {
+      ok: true,
+      recruitingEligible: true,
+      eligibilityDecision: "CAMPAIGN_INTAKE_CODE",
+      attribution,
+      idempotent: true
+    };
+  }
+
   return {
     repository,
     lookupInboundMatch,
     resolveInboundCampaignIntakeMatch,
     establishInboundAttribution,
+    reconcileStalledFirstReplyAttributionState,
     evaluateFreshIntakeEpisode,
     isRecruitingPurpose,
     mapMatchRecord
