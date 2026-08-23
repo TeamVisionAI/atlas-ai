@@ -5,6 +5,9 @@
 const DOCUMENTED_PRODUCTION_API_BASE =
   "https://atlas-ai-production-01de.up.railway.app";
 
+const DOCUMENTED_STAGING_API_BASE =
+  "https://atlas-ai-staging-staging.up.railway.app";
+
 const PRODUCTION_RAILWAY_HOSTS = Object.freeze([
   "atlas-ai-production-01de.up.railway.app"
 ]);
@@ -65,4 +68,4 @@ export function resolveApiBaseUrl(env) {
   return DOCUMENTED_PRODUCTION_API_BASE;
 }
 
-export { DOCUMENTED_PRODUCTION_API_BASE, PRODUCTION_RAILWAY_HOSTS };
+export { DOCUMENTED_PRODUCTION_API_BASE, DOCUMENTED_STAGING_API_BASE, PRODUCTION_RAILWAY_HOSTS };
