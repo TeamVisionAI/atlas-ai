@@ -1,33 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getDashboard } from "../services/api";
-import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executiveDashboardService";
-import { buildExecutiveDashboardViewModel } from "../engines/executiveDashboardViewModel";
-import {
-  EXECUTIVE_FILTERS,
-  buildMissionControlPath
-} from "../engines/executiveFilterEngine";
 import { useLanguage } from "../i18n/LanguageContext";
-import InterviewsHero from "../components/executive/InterviewsHero";
-import MorningBrief from "../components/executive/MorningBrief";
-import FocusCards from "../components/executive/FocusCards";
-import TeamInterviewBoard from "../components/executive/TeamInterviewBoard";
-import InterviewPipeline from "../components/executive/InterviewPipeline";
-import RecommendationCards from "../components/executive/RecommendationCards";
-import ActivityTimeline from "../components/executive/ActivityTimeline";
-import AgencyHealth from "../components/executive/AgencyHealth";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { buildExecutiveDashboardV2ViewModel } from "../engines/executiveDashboardV2ViewModel";
+import { buildMissionControlPath } from "../engines/executiveFilterEngine";
+import { useExecutiveDashboardV2Data } from "../hooks/useExecutiveDashboardV2Data";
+import {
+  AppointmentTrendCard,
+  ConversationPerformanceCard,
+  ExecutiveDashboardHeader,
+  ExecutiveDashboardKpiSection,
+  InterviewsTodayCard,
+  MorningSummaryCard,
+  RecentActivityCard,
+  RecruitmentFunnelCard,
+  TodayAgendaCard,
+  TodayPrioritiesCard
+} from "../components/executive/v2/ExecutiveDashboardSections";
 import "./ExecutiveDashboard.css";
-
-function DashboardSkeleton() {
-  return (
-    <div className="executive-dashboard">
-      <div className="executive-skeleton" style={{ height: 220 }} />
-      <div className="executive-skeleton" style={{ height: 160 }} />
-      <div className="executive-skeleton" style={{ height: 120 }} />
-    </div>
-  );
-}
 
 const FOCUS_LABEL_KEYS = {
   conversion: "executiveFocusConversion",
@@ -36,108 +26,81 @@ const FOCUS_LABEL_KEYS = {
   kpis: "executiveFocusKpis"
 };
 
+function AnalyticsSection({ viewModel, loading, translate }) {
+  if (loading || !viewModel) {
+    return (
+      <section className="executive-v2__section" aria-busy="true">
+        <h2 className="executive-v2__section-title">{translate("executiveV2SectionAnalytics")}</h2>
+        <div className="executive-v2__grid executive-v2__grid--two">
+          <AppointmentTrendCard trend={[]} loading />
+          <RecentActivityCard activity={[]} loading />
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="executive-v2__section">
+      <h2 className="executive-v2__section-title">{translate("executiveV2SectionAnalytics")}</h2>
+      <div className="executive-v2__grid executive-v2__grid--two">
+        <AppointmentTrendCard trend={viewModel.trend || []} loading={false} />
+        <RecentActivityCard activity={viewModel.recentActivity || []} loading={false} />
+      </div>
+    </section>
+  );
+}
+
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { translate } = useLanguage();
-  const { user } = useWorkspace();
-  const [executive, setExecutive] = useState(null);
-  const [dashboard, setDashboard] = useState(null);
-  const [alphaBrief, setAlphaBrief] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { user, supportMode } = useWorkspace();
+  const {
+    executive,
+    alphaBrief,
+    prospects,
+    organizationName,
+    phase,
+    loadingExecutive,
+    errors
+  } = useExecutiveDashboardV2Data();
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const [executivePayload, dashboardPayload, alphaBriefPayload] = await Promise.all([
-          getExecutiveDashboard(),
-          getDashboard(),
-          getAlphaMorningBrief().catch(() => null)
-        ]);
-
-        if (!cancelled) {
-          setExecutive(executivePayload);
-          setDashboard(dashboardPayload);
-          setAlphaBrief(alphaBriefPayload);
-        }
-      } catch (err) {
-        console.error(err);
-
-        if (!cancelled) {
-          setError("executiveLoadError");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const orgLabel =
+    organizationName || supportMode?.organizationName || translate("teamDashOrganizationFallback");
 
   const viewModel = useMemo(() => {
-    if (!executive || !dashboard) {
+    if (!executive) {
       return null;
     }
 
-    return buildExecutiveDashboardViewModel(executive, dashboard, translate);
-  }, [executive, dashboard, translate]);
-
-  function openMissionControl(options = {}) {
-    navigate(buildMissionControlPath(options));
-  }
-
-  function openOperationalTarget({ to, phone, filter } = {}) {
-    if (to) {
-      navigate(to);
-      return;
-    }
-
-    if (phone || filter) {
-      openMissionControl({ phone, filter });
-      return;
-    }
-
-    openMissionControl({ filter: EXECUTIVE_FILTERS.HIGH_PRIORITY });
-  }
+    return buildExecutiveDashboardV2ViewModel({
+      executive,
+      alphaBrief,
+      prospects,
+      user,
+      organizationName: orgLabel,
+      translate
+    });
+  }, [executive, alphaBrief, prospects, user, orgLabel, translate]);
 
   const focusKey = searchParams.get("focus");
   const fromWorkspace = searchParams.get("from") === "workspace";
   const focusLabelKey = FOCUS_LABEL_KEYS[focusKey];
 
-  if (loading) {
-    return <DashboardSkeleton />;
+  function openMissionControl(path) {
+    navigate(path || buildMissionControlPath());
   }
 
-  if (error) {
+  if (errors.executive && !executive) {
     return (
-      <div className="executive-dashboard">
-        <div className="executive-error">{translate(error)}</div>
-      </div>
-    );
-  }
-
-  if (!viewModel) {
-    return (
-      <div className="executive-dashboard">
-        <p style={{ color: "#64748B" }}>{translate("executiveEmpty")}</p>
+      <div className="executive-dashboard executive-dashboard--v2">
+        <div className="executive-error">{translate(errors.executive)}</div>
       </div>
     );
   }
 
   return (
-    <div className="executive-dashboard">
+    <div className="executive-dashboard executive-dashboard--v2">
       {fromWorkspace && focusLabelKey ? (
         <div className="executive-dashboard__focus-banner" role="status">
           <p>{translate("executiveFocusFromWorkspace")}</p>
@@ -145,41 +108,68 @@ export default function ExecutiveDashboard() {
         </div>
       ) : null}
 
-      <InterviewsHero
-        hero={viewModel.hero}
-        onOpenMissionControl={() => navigate(viewModel.hero.to)}
+      <ExecutiveDashboardHeader
+        header={viewModel?.header}
+        organizationName={orgLabel}
+        loading={loadingExecutive}
+        onOpenMissionControl={() => openMissionControl(viewModel?.header?.missionControlPath)}
       />
 
-      <MorningBrief
-        brief={alphaBrief || viewModel.morningBrief}
-        onReview={(phone, filter, to) =>
-          openOperationalTarget({
-            to,
-            phone,
-            filter
-          })
-        }
+      <ExecutiveDashboardKpiSection
+        cards={viewModel?.kpiCards || []}
+        loading={loadingExecutive}
       />
 
-      <FocusCards
-        cards={viewModel.focusCards}
-        onNavigate={(to) => navigate(to)}
+      <section className="executive-v2__section">
+        <h2 className="executive-v2__section-title">{translate("executiveV2SectionOperations")}</h2>
+        <div className="executive-v2__grid executive-v2__grid--three">
+          <InterviewsTodayCard
+            interviews={viewModel?.interviewsToday}
+            loading={loadingExecutive}
+            onOpen={() => openMissionControl(viewModel?.interviewsToday?.to)}
+          />
+          <TodayAgendaCard agenda={viewModel?.agenda || []} loading={loadingExecutive} />
+          <MorningSummaryCard summary={viewModel?.morningSummary} loading={phase < 2} />
+        </div>
+      </section>
+
+      {phase >= 2 ? (
+        <section className="executive-v2__section">
+          <h2 className="executive-v2__section-title">{translate("executiveV2SectionInsights")}</h2>
+          <div className="executive-v2__grid executive-v2__grid--three">
+            <RecruitmentFunnelCard funnel={viewModel?.funnel} loading={!viewModel?.hasV2Metrics} />
+            <ConversationPerformanceCard
+              performance={viewModel?.conversationPerformance}
+              loading={!viewModel?.hasV2Metrics}
+            />
+            <TodayPrioritiesCard
+              priorities={viewModel?.priorities || []}
+              loading={!alphaBrief && phase < 2}
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="executive-v2__section" aria-busy="true">
+          <h2 className="executive-v2__section-title">{translate("executiveV2SectionInsights")}</h2>
+          <div className="executive-v2__grid executive-v2__grid--three">
+            <RecruitmentFunnelCard funnel={null} loading />
+            <ConversationPerformanceCard performance={null} loading />
+            <TodayPrioritiesCard priorities={[]} loading />
+          </div>
+        </section>
+      )}
+
+      <AnalyticsSection
+        viewModel={viewModel}
+        loading={loadingExecutive}
+        translate={translate}
       />
 
-      <div className="executive-grid-two">
-        <TeamInterviewBoard rows={viewModel.teamBoard} />
-        <InterviewPipeline pipeline={viewModel.pipeline} />
-      </div>
-
-      <div className="executive-grid-two">
-        <RecommendationCards
-          items={viewModel.recommendations}
-          onOpen={(item) => navigate(item.to)}
-        />
-        <ActivityTimeline activity={viewModel.activity} />
-      </div>
-
-      <AgencyHealth agencyPulse={viewModel.agencyPulse} />
+      {errors.alphaBrief ? (
+        <p className="executive-v2__inline-notice" role="status">
+          {translate(errors.alphaBrief)}
+        </p>
+      ) : null}
     </div>
   );
 }

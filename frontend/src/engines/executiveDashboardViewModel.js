@@ -3,7 +3,7 @@
  * Derives launch UI metrics from existing API payloads only. No business rules.
  */
 
-import { EXECUTIVE_FILTERS, buildMissionControlPath } from "./executiveFilterEngine";
+import { EXECUTIVE_FILTERS, buildMissionControlPath } from "./executiveFilterEngine.js";
 
 const MILESTONES = {
   INTERVIEW_READY: "INTERVIEW_READY",

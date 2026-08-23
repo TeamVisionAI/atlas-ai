@@ -1,7 +1,7 @@
 import { apiFetch } from "./apiClient";
 
-export async function getExecutiveDashboard() {
-  return apiFetch("/api/dashboard/executive");
+export async function getExecutiveDashboard(options = {}) {
+  return apiFetch("/api/dashboard/executive", options);
 }
 
 export async function getExecutiveRecommendations(limit = 5) {
@@ -16,6 +16,6 @@ export async function getExecutiveActivity(limit = 20) {
   );
 }
 
-export async function getAlphaMorningBrief() {
-  return apiFetch("/api/dashboard/alpha-brief");
+export async function getAlphaMorningBrief(options = {}) {
+  return apiFetch("/api/dashboard/alpha-brief", options);
 }
