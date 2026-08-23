@@ -33,6 +33,10 @@ const {
   prospectHasDeliveredAutomatedOutbound,
   prospectHasFailedAutomatedOutboundOnly
 } = require("./whatsappAutomatedReplyDelivery");
+const {
+  buildStalledFirstReplyRecoveryContext,
+  restoreStalledFirstReplyRecruitingState
+} = require("./whatsappInboundFirstReplyRecoveryContext");
 
 function duplicateSkipResult(correlationId, providerMessageId, phone) {
   logWhatsAppStage("message_duplicate_skipped", {
@@ -111,22 +115,36 @@ async function attemptStalledFirstReplyRecovery({
     return null;
   }
 
-  const body = inbound.body || `[${inbound.messageType} message]`;
-  const phoneNumberId =
-    inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null;
-  const intakeLookup = await intakeService.lookupInboundMatch({
+  if (await hasOutbound(prospect.phone, claimedOrganizationId)) {
+    return null;
+  }
+
+  const recoveryContext = await buildStalledFirstReplyRecoveryContext({
+    inbound,
+    prospect,
     organizationId: claimedOrganizationId,
-    whatsappPhoneNumberId: phoneNumberId,
-    messageBody: body
+    intakeService,
+    dependencies
   });
-  const semanticBody = intakeLookup?.matched
-    ? stripCampaignIntakeToken(body, intakeLookup.code)
-    : body;
-  const inboundForAutomation = {
-    ...inbound,
-    body: semanticBody,
-    campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null
-  };
+
+  if (!recoveryContext.ok) {
+    logWhatsAppStage("inbound_first_reply_recovery_context_failed", {
+      phone: prospect.phone,
+      providerMessageId: inbound.providerMessageId || null,
+      organizationId: claimedOrganizationId || null,
+      reason: recoveryContext.reason
+    });
+    return null;
+  }
+
+  const {
+    inboundForAutomation,
+    campaignIntakeMatch,
+    phoneNumberId,
+    workflowState,
+    attribution,
+    ctwaReferral
+  } = recoveryContext;
 
   logWhatsAppStage("inbound_first_reply_recovery_attempted", {
     phone: prospect.phone,
@@ -145,6 +163,39 @@ async function attemptStalledFirstReplyRecovery({
   });
   if (!recoveryClaim?.claimed) {
     return null;
+  }
+
+  await restoreStalledFirstReplyRecruitingState({
+    intakeService,
+    campaignIntakeMatch,
+    prospect,
+    organizationId: claimedOrganizationId,
+    providerMessageId: inbound.providerMessageId || null,
+    phoneNumberId,
+    workflowState,
+    attribution,
+    ctwaReferral: recoveryContext.ctwaReferral || null
+  }).catch((error) => {
+    logWhatsAppStage("inbound_first_reply_recovery_state_restore_failed", {
+      level: "warn",
+      phone: prospect.phone,
+      providerMessageId: inbound.providerMessageId || null,
+      error: error.message
+    });
+  });
+
+  try {
+    await recruitingWorkflowHooks.onMessageReceived({
+      phone: prospect.phone,
+      message: inbound.body || inboundForAutomation.body,
+      organizationId: claimedOrganizationId || prospect.organization_id || null
+    });
+  } catch (hookError) {
+    logWhatsAppStage("inbound_first_reply_recovery_hook_failed", {
+      level: "warn",
+      phone: prospect.phone,
+      error: hookError.message
+    });
   }
 
   let conversation = null;
@@ -174,6 +225,11 @@ async function attemptStalledFirstReplyRecovery({
   await applyInboundAttentionUpdate(prospect, conversation);
 
   if (!conversationDeliveredReply(conversation)) {
+    logWhatsAppStage("inbound_first_reply_recovery_delivery_incomplete", {
+      phone: prospect.phone,
+      providerMessageId: inbound.providerMessageId || null,
+      reason: conversation?.reason || conversation?.eligibilityReason || "DELIVERY_INCOMPLETE"
+    });
     return null;
   }
 
@@ -527,5 +583,7 @@ module.exports = {
   setCampaignIntakeAttributionServiceForTests,
   conversationDeliveredReply,
   attemptStalledFirstReplyRecovery,
-  prospectHasAutomatedOutboundReply
+  prospectHasAutomatedOutboundReply,
+  buildStalledFirstReplyRecoveryContext,
+  restoreStalledFirstReplyRecruitingState
 };

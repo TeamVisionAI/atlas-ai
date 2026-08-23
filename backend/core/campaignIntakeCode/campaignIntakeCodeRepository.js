@@ -124,6 +124,11 @@ function createMemoryCampaignIntakeCodeRepository(seed = {}) {
       });
       attributions.set(key, record);
       return { row: record, idempotent: false };
+    },
+    async getAttributionByProviderMessageId({ organizationId, providerMessageId }) {
+      const key = `${organizationId}:${providerMessageId}`;
+      const row = attributions.get(key);
+      return row ? (row.organizationId ? row : mapAttributionRow(row)) : null;
     }
   };
 }
@@ -204,6 +209,26 @@ function createSupabaseCampaignIntakeCodeRepository() {
         throw error;
       }
       return { row: mapAttributionRow(data), idempotent: false };
+    },
+    async getAttributionByProviderMessageId({ organizationId, providerMessageId }) {
+      const orgId = String(organizationId || "").trim();
+      const wamid = String(providerMessageId || "").trim();
+      if (!orgId || !wamid) {
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from("campaign_intake_attributions")
+        .select("*")
+        .eq("organization_id", orgId)
+        .eq("provider_message_id", wamid)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      return mapAttributionRow(data);
     }
   };
 }
