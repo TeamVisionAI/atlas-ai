@@ -4,7 +4,7 @@
  */
 
 const { loadPersistedWorkflowState, savePersistedWorkflowState } = require("../workflowStateStore");
-const { processConversationAfterInbound } = require("../communicationHub");
+const { processNormalizedInboundMessage } = require("../communicationHub");
 const { logWhatsAppStage } = require("../whatsappStructuredLogger");
 const { loadConversationContext } = require("../recruitAiV2/contextLoader");
 const { mergeConversationContext } = require("../recruitAiV2/conversationContext");
@@ -17,6 +17,7 @@ const {
   createSupabaseContextRepository,
   createMemoryContextRepository
 } = require("../recruitAiV2/contextRepository");
+const { HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT } = require("../whatsappConstants");
 
 const BURST_GAP_MS = 2500;
 const SHORT_FRAGMENT_MAX_LEN = 48;
@@ -53,6 +54,7 @@ function isHumanOutboundLog(row) {
     pipeline === "HUMAN" ||
     pipeline.startsWith("HUMAN:") ||
     intent === "HUMAN_COMPOSER_REPLY" ||
+    intent === String(HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT || "").toUpperCase() ||
     intent.startsWith("HUMAN_")
   );
 }
@@ -82,7 +84,14 @@ function inferPendingQuestionFromHumanText(text) {
   if (/\b(ciudad|city)\b/.test(t) && /\b(estado|state)\b/.test(t)) {
     return "ask_location";
   }
-  if (/\b(manana|tarde|morning|afternoon|day part)\b/.test(t)) {
+  if (
+    /\b(en la|por la|a la)\s+(manana|tarde)\b/.test(t) ||
+    /\b(manana|tarde|morning|afternoon)\b.*\b(o|or)\b.*\b(manana|tarde|morning|afternoon)\b/.test(
+      t
+    ) ||
+    /\b(prefieres|prefer|prefiere)\b.*\b(manana|tarde|morning|afternoon)\b/.test(t) ||
+    /\b(manana|tarde|morning|afternoon|day part)\b/.test(t)
+  ) {
     return "ask_day_part";
   }
   if (/\b(hora|time|a las)\b/.test(t)) {
@@ -189,12 +198,27 @@ function findUnresolvedProspectTurn(logs, humanTakenOverAt) {
   };
 }
 
+function phoneLookupKeys(phone) {
+  const raw = String(phone || "").trim();
+  if (!raw) {
+    return [];
+  }
+  const keys = new Set([raw]);
+  if (raw.startsWith("+")) {
+    keys.add(raw.slice(1));
+  } else {
+    keys.add(`+${raw}`);
+  }
+  return [...keys];
+}
+
 async function fetchRecentConversationLogs(phone, organizationId, limit = 40) {
   const { supabase } = require("../../services/supabaseService");
+  const lookupKeys = phoneLookupKeys(phone);
   let query = supabase
     .from("conversation_logs")
     .select("id, direction, message, intent, pipeline, created_at, organization_id")
-    .eq("prospect_phone", phone)
+    .in("prospect_phone", lookupKeys)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -256,6 +280,19 @@ async function patchResumeConversationContext({
   return patched;
 }
 
+function buildResumeNormalizedMessage({ phone, combinedText, resumeKey }) {
+  const body = String(combinedText || "").trim();
+  return {
+    channel: "whatsapp",
+    providerMessageId: `resume:${resumeKey}`,
+    phone,
+    contactName: null,
+    text: body,
+    messageType: "text",
+    timestamp: new Date().toISOString()
+  };
+}
+
 async function resumeConversationAfterReturnToAtlas({
   phone,
   prospect,
@@ -269,22 +306,58 @@ async function resumeConversationAfterReturnToAtlas({
     prospectId: prospect?.id || null
   };
 
+  logWhatsAppStage("return_to_atlas_resume_started", {
+    phone,
+    organizationId: scope.organizationId,
+    prospectId: scope.prospectId,
+    returnedToAtlasAt: returnedToAtlasAt || null,
+    humanTakenOverAt:
+      previousWorkflow.humanTakenOverAt || null
+  });
+
   const persisted = await loadPersistedWorkflowState(phone, scope);
   const resumeAt = returnedToAtlasAt || persisted.returnedToAtlasAt || new Date().toISOString();
 
-  const logs =
-    dependencies.logs ||
-    (await fetchRecentConversationLogs(phone, scope.organizationId));
+  let logs = dependencies.logs || null;
+  try {
+    logs = logs || (await fetchRecentConversationLogs(phone, scope.organizationId));
+  } catch (error) {
+    logWhatsAppStage("return_to_atlas_resume_logs_failed", {
+      level: "error",
+      phone,
+      error: error.message
+    });
+    await savePersistedWorkflowState(
+      phone,
+      {
+        returnToAtlasResumeLastError: error.message || "LOG_FETCH_FAILED",
+        returnToAtlasResumeLastAttemptAt: new Date().toISOString()
+      },
+      scope
+    );
+    return {
+      attempted: true,
+      resumed: false,
+      reason: "LOG_FETCH_FAILED",
+      error: error.message
+    };
+  }
 
-  const unresolved = findUnresolvedProspectTurn(
-    logs,
-    previousWorkflow.humanTakenOverAt || persisted.humanTakenOverAt
-  );
+  logWhatsAppStage("return_to_atlas_resume_transcript_loaded", {
+    phone,
+    logCount: logs.length
+  });
+
+  const humanTakenOverAt =
+    previousWorkflow.humanTakenOverAt || persisted.humanTakenOverAt || null;
+
+  const unresolved = findUnresolvedProspectTurn(logs, humanTakenOverAt);
 
   if (!unresolved) {
     logWhatsAppStage("return_to_atlas_resume_no_unresolved_turn", {
       phone,
-      organizationId: scope.organizationId
+      organizationId: scope.organizationId,
+      humanTakenOverAt
     });
     return {
       attempted: true,
@@ -293,7 +366,7 @@ async function resumeConversationAfterReturnToAtlas({
     };
   }
 
-  const resumeKey = `return-to-atlas:${resumeAt}:${unresolved.logIds.join(",")}`;
+  const resumeKey = `return-to-atlas:${unresolved.logIds.join(",")}`;
   if (persisted.returnToAtlasResumeKey === resumeKey) {
     logWhatsAppStage("return_to_atlas_resume_idempotent_skip", {
       phone,
@@ -306,6 +379,17 @@ async function resumeConversationAfterReturnToAtlas({
       idempotent: true
     };
   }
+
+  logWhatsAppStage("return_to_atlas_resume_unresolved_found", {
+    phone,
+    resumeKey,
+    combinedText: unresolved.combinedText,
+    pendingQuestion: unresolved.pendingQuestion || null,
+    humanOutboundPreview: String(unresolved.lastHumanOutbound?.message || "").slice(
+      0,
+      120
+    )
+  });
 
   const loaded = await loadConversationContext({
     organizationId: scope.organizationId,
@@ -324,6 +408,13 @@ async function resumeConversationAfterReturnToAtlas({
     persistence: dependencies.persistenceService || null
   });
 
+  if (unresolved.pendingQuestion) {
+    logWhatsAppStage("return_to_atlas_resume_context_patched", {
+      phone,
+      pendingQuestion: unresolved.pendingQuestion
+    });
+  }
+
   const interpretation = interpretInboundMessage({
     message: { text: unresolved.combinedText },
     context: resumeContext
@@ -335,7 +426,11 @@ async function resumeConversationAfterReturnToAtlas({
   ) {
     await savePersistedWorkflowState(
       phone,
-      { returnToAtlasResumeKey: resumeKey },
+      {
+        returnToAtlasResumeKey: resumeKey,
+        returnToAtlasResumeLastAttemptAt: new Date().toISOString(),
+        returnToAtlasResumeLastError: null
+      },
       scope
     );
     logWhatsAppStage("return_to_atlas_resume_disengaged", {
@@ -350,44 +445,121 @@ async function resumeConversationAfterReturnToAtlas({
     };
   }
 
-  const syntheticInbound = {
+  const normalized = buildResumeNormalizedMessage({
     phone,
-    text: unresolved.combinedText,
-    providerMessageId: `resume:${resumeKey}`,
-    messageType: "text",
-    channel: "whatsapp"
-  };
-
-  const processAfterInbound =
-    dependencies.processConversationAfterInbound || processConversationAfterInbound;
-
-  const conversation = await processAfterInbound({
-    inbound: syntheticInbound,
-    storagePhone: phone,
-    prospect,
-    contactName: prospect?.name || null
+    combinedText: unresolved.combinedText,
+    resumeKey
   });
 
-  await savePersistedWorkflowState(
-    phone,
-    { returnToAtlasResumeKey: resumeKey },
-    scope
-  );
+  if (!normalized.text) {
+    const reason = "EMPTY_RESUME_MESSAGE";
+    await savePersistedWorkflowState(
+      phone,
+      {
+        returnToAtlasResumeLastError: reason,
+        returnToAtlasResumeLastAttemptAt: new Date().toISOString()
+      },
+      scope
+    );
+    logWhatsAppStage("return_to_atlas_resume_failed", {
+      level: "error",
+      phone,
+      resumeKey,
+      reason
+    });
+    return {
+      attempted: true,
+      resumed: false,
+      reason
+    };
+  }
 
-  logWhatsAppStage("return_to_atlas_resume_completed", {
+  const processNormalized =
+    dependencies.processNormalizedInboundMessage || processNormalizedInboundMessage;
+
+  logWhatsAppStage("return_to_atlas_resume_processing", {
     phone,
     resumeKey,
-    replied: Boolean(conversation?.replied),
-    reason: conversation?.reason || null
+    providerMessageId: normalized.providerMessageId,
+    textPreview: normalized.text.slice(0, 80)
   });
+
+  let conversation;
+  try {
+    conversation = await processNormalized(normalized, {
+      prospect,
+      contactName: prospect?.name || null,
+      env: process.env,
+      authoringDependencies: dependencies.authoringDependencies || null
+    });
+  } catch (error) {
+    await savePersistedWorkflowState(
+      phone,
+      {
+        returnToAtlasResumeLastError: error.message || "RESUME_PROCESSING_EXCEPTION",
+        returnToAtlasResumeLastAttemptAt: new Date().toISOString()
+      },
+      scope
+    );
+    logWhatsAppStage("return_to_atlas_resume_failed", {
+      level: "error",
+      phone,
+      resumeKey,
+      reason: "RESUME_PROCESSING_EXCEPTION",
+      error: error.message
+    });
+    throw error;
+  }
+
+  const replied = Boolean(conversation?.replied);
+  const failureReason =
+    conversation?.reason ||
+    (replied ? null : conversation?.eligibilityReason || "NO_OUTBOUND_DELIVERED");
+
+  if (replied) {
+    await savePersistedWorkflowState(
+      phone,
+      {
+        returnToAtlasResumeKey: resumeKey,
+        returnToAtlasResumeLastAttemptAt: new Date().toISOString(),
+        returnToAtlasResumeLastError: null
+      },
+      scope
+    );
+    logWhatsAppStage("return_to_atlas_resume_completed", {
+      phone,
+      resumeKey,
+      replied: true,
+      reason: conversation?.reason || null
+    });
+  } else {
+    await savePersistedWorkflowState(
+      phone,
+      {
+        returnToAtlasResumeLastError: failureReason,
+        returnToAtlasResumeLastAttemptAt: new Date().toISOString()
+      },
+      scope
+    );
+    logWhatsAppStage("return_to_atlas_resume_failed", {
+      level: "warn",
+      phone,
+      resumeKey,
+      replied: false,
+      reason: failureReason
+    });
+  }
 
   return {
     attempted: true,
-    resumed: true,
-    replied: Boolean(conversation?.replied),
+    resumed: replied,
+    replied,
     resumeKey,
     combinedText: unresolved.combinedText,
-    conversation
+    pendingQuestion: unresolved.pendingQuestion || null,
+    interpretationIntent: interpretation.intent,
+    conversation,
+    reason: replied ? null : failureReason
   };
 }
 
@@ -395,5 +567,6 @@ module.exports = {
   inferPendingQuestionFromHumanText,
   findUnresolvedProspectTurn,
   combineBurstFragments,
+  buildResumeNormalizedMessage,
   resumeConversationAfterReturnToAtlas
 };

@@ -294,6 +294,9 @@ function lastQuestionImpliesDate(context) {
 
 function lastQuestionImpliesDayPart(context) {
   const lastQ = String(context?.conversation?.lastQuestionAsked || "").toLowerCase();
+  const resumeQ = String(
+    context?.conversation?.resumePendingQuestion || ""
+  ).toLowerCase();
   const lastOut = String(
     context?.conversation?.lastAtlasOutboundText || ""
   ).toLowerCase();
@@ -312,7 +315,8 @@ function lastQuestionImpliesDayPart(context) {
   if (
     lastQ.includes("day_part") ||
     lastQ.includes("daypart") ||
-    lastQ.includes("ask_day_part")
+    lastQ.includes("ask_day_part") ||
+    resumeQ === "ask_day_part"
   ) {
     return true;
   }
