@@ -13,6 +13,7 @@
  */
 
 const { FEATURE_FLAGS } = require("./constants");
+const { isEligibleForExecution } = require("./executionConfig");
 
 function parseBooleanStrictTrue(value) {
   if (value == null || value === "") {
@@ -74,8 +75,36 @@ function resolveAllowExecutionForLiveTurn({
   return isLiveExecutionPathEnabled(env) === true;
 }
 
+/**
+ * Derive allowExecution for live WhatsApp authoring (BR-114) vs live CE (BR-112).
+ * - live_ce: requires RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED (CE bridge cutover)
+ * - live_whatsapp: BR-111 execution canary only (org + user allowlist + master flag)
+ * BR-111 authorizer remains final mutation authority in orchestrator.
+ */
+function resolveAllowExecutionForAuthoringTurn({
+  env = process.env,
+  invocationSource = null,
+  organizationId = null,
+  actingUserId = null
+} = {}) {
+  if (invocationSource === "live_ce") {
+    return resolveAllowExecutionForLiveTurn({ env, invocationSource: "live_ce" });
+  }
+
+  if (invocationSource === "live_whatsapp") {
+    return isEligibleForExecution({
+      organizationId,
+      actingUserId,
+      env
+    }).eligible;
+  }
+
+  return false;
+}
+
 module.exports = {
   resolveLiveExecutionPathConfig,
   isLiveExecutionPathEnabled,
-  resolveAllowExecutionForLiveTurn
+  resolveAllowExecutionForLiveTurn,
+  resolveAllowExecutionForAuthoringTurn
 };
