@@ -235,6 +235,55 @@ async function claimWhatsAppHumanEchoCorrelation({
 }
 
 /**
+ * One-shot claim for stalled first-reply recovery on duplicate inbound replays.
+ * Canonical key: whatsapp:inbound:{providerMessageId}:first_reply_recovery
+ */
+async function claimFirstReplyRecovery({
+  correlationId,
+  prospectPhone,
+  organizationId = null,
+  providerMessageId = null
+} = {}) {
+  const base = String(correlationId || "").trim();
+  const phone = String(prospectPhone || "").trim();
+  const key = base ? `${base}:first_reply_recovery` : "";
+
+  if (!key || !phone || !isWhatsAppInboundClaimCorrelationId(base)) {
+    return { claimed: false, reason: "INVALID_CLAIM" };
+  }
+
+  const inserted = await insertWorkflowEvent({
+    prospectPhone: phone,
+    eventType: EVENT_TYPES.WORKFLOW_RESUMED,
+    actor: "SYSTEM",
+    organizationId: organizationId || null,
+    correlationId: key,
+    payload: {
+      providerMessageId: providerMessageId || null,
+      firstReplyRecoveryClaim: true
+    }
+  });
+
+  if (inserted.success) {
+    return { claimed: true, event: inserted.event };
+  }
+
+  if (isUniqueViolation({ code: inserted.code, message: inserted.error })) {
+    return { claimed: false, reason: "DUPLICATE_RECOVERY_CLAIM" };
+  }
+
+  if (inserted.error === "WORKFLOW_EVENTS_TABLE_UNAVAILABLE") {
+    const existing = await findWorkflowEventByCorrelationId(key);
+    if (existing) {
+      return { claimed: false, reason: "DUPLICATE_RECOVERY_CLAIM" };
+    }
+    return { claimed: true, degraded: true, event: null };
+  }
+
+  return { claimed: false, reason: inserted.error || "RECOVERY_CLAIM_FAILED" };
+}
+
+/**
  * Read workflow events for a prospect (Mission Control / audit).
  */
 async function listWorkflowEvents(phone, limit = 50) {
@@ -293,6 +342,7 @@ module.exports = {
   pickCanonicalWorkflowEvent,
   claimWhatsAppInboundCorrelation,
   claimWhatsAppHumanEchoCorrelation,
+  claimFirstReplyRecovery,
   listWorkflowEvents,
   listRecentWorkflowEvents
 };
