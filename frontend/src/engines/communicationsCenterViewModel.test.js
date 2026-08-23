@@ -142,6 +142,18 @@ test("conversation layout hides technical events and internal operational notes 
   assert.equal(isConversationBubbleItem(items[8]), false);
   assert.equal(isConversationBubbleItem(items[9]), false);
   assert.equal(isConversationBubbleItem(items[10]), true);
+
+  const legacyNativeHuman = {
+    id: "12",
+    category: "message",
+    direction: "outbound",
+    channel: "whatsapp",
+    actor: { type: "agent", displayName: "Human" },
+    flags: ["human_reply"],
+    ai: { intent: "AGENT_ACTION" },
+    content: { text: "Prefieres en la mañana o en la tarde?" }
+  };
+  assert.equal(isConversationBubbleItem(legacyNativeHuman), true);
   assert.equal(isAudioCommunicationItem(items[10]), true);
   assert.deepEqual(
     selectConversationLayoutBubbles(items).map((item) => item.id),

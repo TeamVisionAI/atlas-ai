@@ -33,7 +33,8 @@ function resolveMessageActor(logRow) {
     return "prospect";
   }
 
-  if (String(logRow.intent || "").toUpperCase() === "AGENT_ACTION") {
+  const intent = String(logRow.intent || "").toUpperCase();
+  if (intent === "AGENT_ACTION" || intent.startsWith("HUMAN_")) {
     return "AGENT";
   }
 
