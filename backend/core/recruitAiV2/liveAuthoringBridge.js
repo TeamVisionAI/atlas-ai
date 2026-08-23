@@ -21,7 +21,7 @@ const {
   resolveActingUserIdFromProspect,
   DEFAULT_TIMEOUT_MS
 } = require("./liveAuthoringConfig");
-const { resolveAllowExecutionForLiveTurn } = require("./liveExecutionPathConfig");
+const { resolveAllowExecutionForAuthoringTurn } = require("./liveExecutionPathConfig");
 const { buildReconstructionInput } = require("./shadowEvaluationService");
 const {
   createContextPersistenceService
@@ -674,10 +674,12 @@ async function attemptLiveV2Authoring({
     });
   }
 
-  // Authoring may be ON while execution stays OFF (BR-111 / BR-112 independent).
-  const allowExecution = resolveAllowExecutionForLiveTurn({
+  // BR-114 authoring uses BR-111 execution canary; BR-112 live_ce path stays separate.
+  const allowExecution = resolveAllowExecutionForAuthoringTurn({
     env,
-    invocationSource: "live_ce"
+    invocationSource: "live_whatsapp",
+    organizationId,
+    actingUserId
   });
 
   const persistence =

@@ -629,8 +629,8 @@ test("17. BR-112/113 remain compatible (authoring independent)", () => {
     "false"
   );
   const bridge = fs.readFileSync(BRIDGE_PATH, "utf8");
-  assert.match(bridge, /resolveAllowExecutionForLiveTurn/);
-  assert.match(bridge, /live_ce/);
+  assert.match(bridge, /resolveAllowExecutionForAuthoringTurn/);
+  assert.match(bridge, /live_whatsapp/);
 });
 
 test("18–19. BR-049/050 preserved — no new WhatsApp sender; no direct appointment writes", () => {
