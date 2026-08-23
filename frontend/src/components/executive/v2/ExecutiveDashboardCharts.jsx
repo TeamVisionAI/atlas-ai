@@ -12,15 +12,22 @@ export function ConversationDonut({ segments = [], total = 0 }) {
     );
   }
 
-  const radius = 62;
+  const radius = 70;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
+  const size = 210;
+  const center = size / 2;
 
   return (
     <div className="executive-v2__donut-wrap">
       <div className="executive-v2__donut-chart">
-        <svg viewBox="0 0 180 180" className="executive-v2__donut" role="img" aria-label="Conversation ownership">
-          <circle cx="90" cy="90" r={radius} className="executive-v2__donut-track" />
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          className="executive-v2__donut"
+          role="img"
+          aria-label="Conversation ownership"
+        >
+          <circle cx={center} cy={center} r={radius} className="executive-v2__donut-track" />
           {segments.map((segment) => {
             if (!segment.value) {
               return null;
@@ -30,8 +37,8 @@ export function ConversationDonut({ segments = [], total = 0 }) {
             const circle = (
               <circle
                 key={segment.key}
-                cx="90"
-                cy="90"
+                cx={center}
+                cy={center}
                 r={radius}
                 className="executive-v2__donut-segment"
                 stroke={segment.color}
@@ -65,9 +72,9 @@ export function AppointmentTrendChart({ series = [] }) {
     return <div className="executive-v2__chart-empty">—</div>;
   }
 
-  const width = 640;
-  const height = 240;
-  const padding = { top: 20, right: 16, bottom: 36, left: 16 };
+  const width = 680;
+  const height = 260;
+  const padding = { top: 24, right: 20, bottom: 40, left: 20 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
   const maxValue = Math.max(
@@ -123,7 +130,7 @@ export function AppointmentTrendChart({ series = [] }) {
             key={`${key}-${day.date || index}`}
             cx={x(index)}
             cy={y(day[key] || 0)}
-            r="4"
+            r="5"
             className={`executive-v2__chart-dot executive-v2__chart-dot--${key}`}
           />
         ))

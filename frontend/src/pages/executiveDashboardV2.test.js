@@ -62,10 +62,15 @@ test("Executive Dashboard v2 visual polish uses wider layout and funnel visualiz
     "utf8"
   );
 
-  assert.match(css, /--exec-v2-max:\s*1580px/);
+  assert.match(css, /--exec-v2-max:\s*1640px/);
+  assert.match(css, /--exec-v2-canvas/);
   assert.match(css, /executive-v2__funnel-viz/);
-  assert.match(css, /height:\s*240px/);
+  assert.match(css, /executive-v2__brief-list/);
+  assert.match(css, /executive-v2__agenda-marker/);
+  assert.match(css, /height:\s*260px/);
+  assert.match(sections, /executive-v2__header-toolbar/);
   assert.match(sections, /executive-v2__funnel-viz/);
+  assert.match(sections, /executive-v2__conversation-panel/);
   assert.match(sections, /data-tone=/);
 });
 
@@ -76,5 +81,6 @@ test("Executive Dashboard v2 trend chart renders data point dots", () => {
   );
 
   assert.match(source, /executive-v2__chart-dot/);
-  assert.match(source, /height = 240/);
+  assert.match(source, /height = 260/);
+  assert.match(source, /const size = 210/);
 });
