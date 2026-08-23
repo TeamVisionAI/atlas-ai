@@ -367,7 +367,10 @@ async function resumeConversationAfterReturnToAtlas({
   }
 
   const resumeKey = `return-to-atlas:${unresolved.logIds.join(",")}`;
-  if (persisted.returnToAtlasResumeKey === resumeKey) {
+  if (
+    persisted.returnToAtlasResumeKey === resumeKey &&
+    !persisted.returnToAtlasResumeLastError
+  ) {
     logWhatsAppStage("return_to_atlas_resume_idempotent_skip", {
       phone,
       resumeKey

@@ -242,6 +242,67 @@ test("resume: successful reply marks idempotent key exactly once", async () => {
   });
 });
 
+test("resume: prior failed attempt with lastError remains retryable", async () => {
+  await withTempWorkflowState(async () => {
+    const {
+      loadPersistedWorkflowState,
+      savePersistedWorkflowState
+    } = require("../core/workflowStateStore");
+    const phone = "+13055556666";
+    const logs = [
+      {
+        id: "h1",
+        direction: "outgoing",
+        pipeline: "HUMAN",
+        intent: "HUMAN_COMPOSER_REPLY",
+        message: LINDA_HUMAN_QUESTION,
+        created_at: "2026-03-10T15:00:00.000Z"
+      },
+      {
+        id: "i1",
+        direction: "incoming",
+        message: "Mañana",
+        created_at: "2026-03-10T15:01:00.000Z"
+      }
+    ];
+
+    await savePersistedWorkflowState(
+      phone,
+      {
+        returnToAtlasResumeKey: "return-to-atlas:i1",
+        returnToAtlasResumeLastError: "INVALID_NORMALIZED_MESSAGE"
+      },
+      { organizationId: "org1", prospectId: "p4" }
+    );
+
+    let hubCalls = 0;
+    const result = await resumeConversationAfterReturnToAtlas({
+      phone,
+      prospect: { phone, id: "p4", organization_id: "org1", name: "Linda" },
+      organizationId: "org1",
+      previousWorkflow: { humanTakenOverAt: "2026-03-10T14:00:00.000Z" },
+      returnedToAtlasAt: "2026-03-10T15:04:00.000Z",
+      dependencies: {
+        logs,
+        processNormalizedInboundMessage: async (normalized) => {
+          hubCalls += 1;
+          assert.equal(normalized.text, "Mañana");
+          return { success: true, replied: true };
+        }
+      }
+    });
+
+    assert.equal(result.resumed, true);
+    assert.equal(hubCalls, 1);
+
+    const persisted = await loadPersistedWorkflowState(phone, {
+      organizationId: "org1",
+      prospectId: "p4"
+    });
+    assert.equal(persisted.returnToAtlasResumeLastError, null);
+  });
+});
+
 test("resume: no unresolved inbound produces no hub call", async () => {
   await withTempWorkflowState(async () => {
     let hubCalls = 0;
