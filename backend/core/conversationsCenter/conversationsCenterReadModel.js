@@ -4,7 +4,7 @@
  * Inbox lifecycle is DERIVED presentation — Active vs Scheduled/Closed/Test/Archived.
  */
 
-const { loadPersistedWorkflowState } = require("../workflowStateStore");
+const { loadPersistedWorkflowState, workflowStateFromProspectRow } = require("../workflowStateStore");
 const { OWNERSHIP } = require("../workflowConstants");
 const {
   CONVERSATION_FILTERS,
@@ -13,6 +13,7 @@ const {
 const { resolveConversationOwnershipState } = require("./conversationsCenterOwnershipService");
 const { isProspectInConversationsTenantScope, isProspectInConversationsUserScope } = require("./conversationsCenterAccess");
 const {
+  evaluateRecruitingInboxEligibility,
   isRecruitingConversationEligibleForInbox,
   resolveRecruitingInboxEligibility
 } = require("./conversationsCenterInboxEligibility");
@@ -29,6 +30,9 @@ const {
   isRealWhatsAppCommunication
 } = require("./conversationsUnreadEngine");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../phoneNormalizer");
+
+const INBOX_LOGS_PER_PHONE = 24;
+const INBOX_LOGS_MAX = 600;
 
 function loadProductionProspectsSafe(organizationId) {
   const {
@@ -106,7 +110,7 @@ async function fetchConversationLogsByPhones(phones = [], organizationId = null)
     )
     .in("prospect_phone", unique)
     .order("created_at", { ascending: false })
-    .limit(Math.min(2000, unique.length * 80));
+    .limit(Math.min(INBOX_LOGS_MAX, unique.length * INBOX_LOGS_PER_PHONE));
 
   if (organizationId) {
     query = query.or(
@@ -168,10 +172,21 @@ function activityMs(row) {
 }
 
 async function buildConversationListItem(prospect, options = {}) {
-  const persisted = await loadPersistedWorkflowState(prospect.phone, {
-    organizationId: prospect.organization_id || null,
-    prospectId: prospect.id || null
-  });
+  let persisted = options.persisted || null;
+
+  if (!persisted) {
+    if (options.preloadedProspectRow) {
+      persisted = workflowStateFromProspectRow(prospect);
+    } else if (prospect?.phone) {
+      persisted = await loadPersistedWorkflowState(prospect.phone, {
+        organizationId: prospect.organization_id || null,
+        prospectId: prospect.id || null
+      });
+    } else {
+      persisted = workflowStateFromProspectRow(prospect);
+    }
+  }
+
   const ownershipState = resolveConversationOwnershipState(persisted);
   const lifecycleInfo = resolveInboxLifecycle({ prospect, persisted });
   const logs = options.logs || logsForPhone(options.logsByPhone, prospect.phone);
@@ -238,6 +253,27 @@ async function buildConversationListItem(prospect, options = {}) {
     inboxOutcome: lifecycleInfo.outcome,
     inboxArchivedAt: persisted.inboxArchivedAt || null,
     inboxClosedAt: persisted.inboxClosedAt || null
+  };
+}
+
+function summarizeConversationListItem(item = {}) {
+  return {
+    id: item.id || null,
+    phone: item.phone,
+    name: item.name || null,
+    prospectNumber: item.prospectNumber || null,
+    lastMessagePreview: item.lastMessagePreview || null,
+    lastMessagePreviewKind: item.lastMessagePreviewKind || null,
+    lastCommunicationAt: item.lastCommunicationAt || null,
+    lastActivityAt: item.lastActivityAt || null,
+    lastDirection: item.lastDirection || null,
+    unread: Boolean(item.unread),
+    unreadCount: item.unreadCount ?? 0,
+    source: item.source || null,
+    conversationGoal: item.conversationGoal || null,
+    ownershipState: item.ownershipState,
+    needsHumanAttention: Boolean(item.needsHumanAttention),
+    inboxLifecycle: item.inboxLifecycle || null
   };
 }
 
@@ -346,6 +382,8 @@ async function buildConversationsCenterReadModel(options = {}) {
   const prospects =
     options.prospects ?? (await loadProductionProspectsSafe(organizationId));
 
+  const useEmbeddedWorkflow = !options.prospects;
+
   const authContext = options.authContext || null;
   const tenantScoped = prospects.filter((prospect) =>
     authContext
@@ -355,6 +393,13 @@ async function buildConversationsCenterReadModel(options = {}) {
   const scoped = (
     await Promise.all(
       tenantScoped.map(async (prospect) => {
+        if (useEmbeddedWorkflow) {
+          const workflowState = workflowStateFromProspectRow(prospect);
+          return evaluateRecruitingInboxEligibility(prospect, workflowState).eligible
+            ? prospect
+            : null;
+        }
+
         const eligibility = await resolveRecruitingInboxEligibility(prospect);
         return eligibility.eligible ? prospect : null;
       })
@@ -369,6 +414,10 @@ async function buildConversationsCenterReadModel(options = {}) {
     await Promise.all(
       scoped.map((prospect) =>
         buildConversationListItem(prospect, {
+          preloadedProspectRow: useEmbeddedWorkflow,
+          persisted: useEmbeddedWorkflow
+            ? workflowStateFromProspectRow(prospect)
+            : undefined,
           logs: logsForPhone(logsByPhone, prospect.phone)
         })
       )
@@ -389,10 +438,16 @@ async function buildConversationsCenterReadModel(options = {}) {
   // unless user explicitly opens Archived/Test/All.
   items = items.filter((item) => matchesFilter(item, filter) && matchesSearch(item, search));
 
+  const useSummaryView = options.view === "summary" || options.summary === true;
+  if (useSummaryView) {
+    items = items.map(summarizeConversationListItem);
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     filter,
     search: search || null,
+    view: useSummaryView ? "summary" : "full",
     counts,
     needsAttentionCount: counts.needs_attention,
     items
@@ -417,11 +472,14 @@ module.exports = {
   buildConversationsCenterReadModel,
   getConversationsAttentionCount,
   buildConversationListItem,
+  summarizeConversationListItem,
   matchesFilter,
   extractConversationGoal,
   extractSource,
   fetchConversationLogsByPhones,
   logsForPhone,
+  INBOX_LOGS_PER_PHONE,
+  INBOX_LOGS_MAX,
   isRecruitingConversationEligibleForInbox,
   resolveRecruitingInboxEligibility
 };

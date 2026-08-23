@@ -137,6 +137,8 @@ async function getProspectCommunications({
     phoneSafety,
     timezone: query.timezone || "America/New_York",
     limit: query.limit,
+    projection: query.projection || "full",
+    before: query.before || null,
     loaders
   });
 

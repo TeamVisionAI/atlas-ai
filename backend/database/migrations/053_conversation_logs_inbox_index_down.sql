@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_conversation_logs_org_phone_created;
+DROP INDEX IF EXISTS idx_conversation_logs_phone_created;

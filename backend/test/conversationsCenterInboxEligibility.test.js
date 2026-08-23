@@ -359,7 +359,7 @@ test("inbox gate applies before ownership filters in read model source", () => {
     "utf8"
   );
   assert.match(source, /resolveRecruitingInboxEligibility/);
-  assert.match(source, /pilotScoped\.map/);
+  assert.match(source, /evaluateRecruitingInboxEligibility/);
 });
 
 test("BR-142 evaluateAtlasInboundAutomationEligibility unchanged for NOT_ELIGIBLE unknown", () => {

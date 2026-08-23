@@ -115,6 +115,7 @@ router.get("/", async (req, res) => {
       organizationId,
       filter: req.query.filter,
       search: req.query.q,
+      view: req.query.view,
       authContext: req.authContext
     });
     res.json(payload);

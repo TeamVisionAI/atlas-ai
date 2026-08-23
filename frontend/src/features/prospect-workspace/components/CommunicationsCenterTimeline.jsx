@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getProspectCommunications,
-  CommunicationsCenterError
+  CommunicationsCenterError,
+  mergeCommunicationsPages,
+  readCommunicationsCache,
+  writeCommunicationsCache,
+  buildCommunicationsRequestKey
 } from "../../../services/communicationsCenterApi";
 import { collectionNeedsTranscriptRefresh } from "../../../engines/communicationTranscriptRefresh.js";
 import { useTranscriptRefreshPoll } from "../../../hooks/useTranscriptRefreshPoll.js";
@@ -77,14 +81,16 @@ function ItemDiagnostics({ item, open, onToggle, badges = [] }) {
       }}
     >
       <summary>Diagnostics</summary>
-      {badges.length ? (
-        <ul className="cc-timeline__badges cc-timeline__badges--diagnostics">
-          {badges.map((badge) => (
-            <li key={badge.id}>{badge.label}</li>
-          ))}
-        </ul>
-      ) : null}
-      <dl>
+      {open ? (
+        <>
+          {badges.length ? (
+            <ul className="cc-timeline__badges cc-timeline__badges--diagnostics">
+              {badges.map((badge) => (
+                <li key={badge.id}>{badge.label}</li>
+              ))}
+            </ul>
+          ) : null}
+          <dl>
         <div>
           <dt>Source</dt>
           <dd>
@@ -189,6 +195,8 @@ function ItemDiagnostics({ item, open, onToggle, badges = [] }) {
           </dd>
         </div>
       </dl>
+        </>
+      ) : null}
     </details>
   );
 }
@@ -207,7 +215,17 @@ export default function CommunicationsCenterTimeline({
   const [payload, setPayload] = useState(null);
   const [filterId, setFilterId] = useState(isConversationLayout ? "messages" : "all");
   const [openDiagnostics, setOpenDiagnostics] = useState(() => new Set());
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const loadedProspectIdRef = useRef(null);
+  const threadRequestKeyRef = useRef("");
+
+  const threadFetchOptions = useMemo(
+    () =>
+      isConversationLayout
+        ? { projection: "thread", limit: 40 }
+        : { projection: "full", limit: 200 },
+    [isConversationLayout]
+  );
 
   useEffect(() => {
     if (!prospectId) {
@@ -220,6 +238,12 @@ export default function CommunicationsCenterTimeline({
     let cancelled = false;
     const requestedProspectId = String(prospectId);
     const prospectChanged = loadedProspectIdRef.current !== requestedProspectId;
+    const requestKey = buildCommunicationsRequestKey(
+      requestedProspectId,
+      threadFetchOptions
+    );
+    threadRequestKeyRef.current = requestKey;
+
     if (prospectChanged) {
       // Clear previous prospect transcript immediately so it cannot render under a new header.
       setPayload(null);
@@ -229,7 +253,13 @@ export default function CommunicationsCenterTimeline({
       loadedProspectIdRef.current = requestedProspectId;
     }
 
-    getProspectCommunications(requestedProspectId, { limit: 200 })
+    const cached = readCommunicationsCache(requestKey);
+    if (cached && prospectChanged) {
+      setPayload(cached);
+      setStatus("ready");
+    }
+
+    getProspectCommunications(requestedProspectId, threadFetchOptions)
       .then((data) => {
         if (cancelled) return;
         if (
@@ -242,6 +272,7 @@ export default function CommunicationsCenterTimeline({
         }
         setPayload(data);
         setStatus("ready");
+        writeCommunicationsCache(requestKey, data);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -263,7 +294,34 @@ export default function CommunicationsCenterTimeline({
     return () => {
       cancelled = true;
     };
-  }, [prospectId, refreshSignal]);
+  }, [prospectId, refreshSignal, threadFetchOptions]);
+
+  async function loadOlderMessages() {
+    if (!prospectId || loadingOlder || !payload?.pagination?.hasMore) {
+      return;
+    }
+
+    const before = payload.pagination?.nextCursor;
+    if (!before) {
+      return;
+    }
+
+    setLoadingOlder(true);
+    try {
+      const olderPage = await getProspectCommunications(String(prospectId), {
+        ...threadFetchOptions,
+        before,
+        force: true
+      });
+      const merged = mergeCommunicationsPages(payload, olderPage);
+      setPayload(merged);
+      writeCommunicationsCache(threadRequestKeyRef.current, merged);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   // Implements BR-141 UI: quiet revalidation while a visible transcript is pending/processing.
   const quietTranscriptRefresh = useCallback(async () => {
@@ -271,7 +329,10 @@ export default function CommunicationsCenterTimeline({
       return;
     }
     const requestedProspectId = String(prospectId);
-    const data = await getProspectCommunications(requestedProspectId, { limit: 200 });
+    const data = await getProspectCommunications(requestedProspectId, {
+      ...threadFetchOptions,
+      force: true
+    });
     if (
       !shouldCommitTimelinePayload({
         requestedProspectId,
@@ -281,7 +342,8 @@ export default function CommunicationsCenterTimeline({
       return;
     }
     setPayload(data);
-  }, [prospectId]);
+    writeCommunicationsCache(threadRequestKeyRef.current, data);
+  }, [prospectId, threadFetchOptions]);
 
   const shouldPollTranscripts =
     Boolean(prospectId) &&
@@ -474,6 +536,19 @@ export default function CommunicationsCenterTimeline({
 
       {status === "ready" && filteredItems.length > 0 && isConversationLayout ? (
         <ol className="cc-timeline__chat" data-testid="cc-conversation-chat">
+          {payload?.pagination?.hasMore ? (
+            <li className="cc-timeline__load-older">
+              <button
+                type="button"
+                className="cc-timeline__load-older-button"
+                data-testid="cc-load-older-messages"
+                disabled={loadingOlder}
+                onClick={loadOlderMessages}
+              >
+                {loadingOlder ? "Loading older messages…" : "Show older messages"}
+              </button>
+            </li>
+          ) : null}
           {filteredItems.map((item) => {
             const open = openDiagnostics.has(item.id);
             const safeBody = safeMessageBody(item);

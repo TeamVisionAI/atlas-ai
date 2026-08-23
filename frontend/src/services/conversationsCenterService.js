@@ -13,6 +13,10 @@ export class ConversationsCenterError extends Error {
   }
 }
 
+const LIST_CACHE_TTL_MS = 20000;
+const listCache = new Map();
+const listInFlight = new Map();
+
 async function wrap(path, options) {
   try {
     return await apiFetch(path, options);
@@ -22,7 +26,6 @@ async function wrap(path, options) {
       error.status || 500,
       error.code || null
     );
-    // Preserve sanitized delivery/window fields from human-reply failures (BR-075).
     if (error.delivery) {
       wrapped.delivery = error.delivery;
     }
@@ -30,11 +33,59 @@ async function wrap(path, options) {
   }
 }
 
+function listCacheKey({ filter = "active", search = "", view = "summary" } = {}) {
+  return `${filter}::${search}::${view}`;
+}
+
+export function readConversationsListCache(key) {
+  const entry = listCache.get(key);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() - entry.at > LIST_CACHE_TTL_MS) {
+    listCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+export function writeConversationsListCache(key, data) {
+  listCache.set(key, { at: Date.now(), data });
+}
+
+export function patchConversationsListCache(key, patchFn) {
+  const entry = listCache.get(key);
+  if (!entry?.data || typeof patchFn !== "function") {
+    return null;
+  }
+  const next = patchFn(entry.data);
+  listCache.set(key, { at: Date.now(), data: next });
+  return next;
+}
+
 export async function getConversationsCenterAccess() {
   return wrap("/api/conversations/access");
 }
 
-export async function getConversations({ filter = "active", search = "" } = {}) {
+export async function getConversations({
+  filter = "active",
+  search = "",
+  view = "summary",
+  force = false
+} = {}) {
+  const cacheKey = listCacheKey({ filter, search, view });
+
+  if (!force) {
+    const cached = readConversationsListCache(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    const inFlight = listInFlight.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+  }
+
   const params = new URLSearchParams();
   if (filter && filter !== "active") {
     params.set("filter", filter);
@@ -42,16 +93,56 @@ export async function getConversations({ filter = "active", search = "" } = {}) 
   if (search) {
     params.set("q", search);
   }
+  if (view && view !== "full") {
+    params.set("view", view);
+  }
   const query = params.toString();
-  return wrap(`/api/conversations${query ? `?${query}` : ""}`);
+
+  const pending = wrap(`/api/conversations${query ? `?${query}` : ""}`)
+    .then((data) => {
+      writeConversationsListCache(cacheKey, data);
+      return data;
+    })
+    .finally(() => {
+      listInFlight.delete(cacheKey);
+    });
+
+  listInFlight.set(cacheKey, pending);
+  return pending;
 }
 
 export async function getConversationsAttentionCount() {
   return wrap("/api/conversations/attention-count");
 }
 
-export async function getConversation(phone) {
-  return wrap(`/api/conversations/${encodeURIComponent(phone)}`);
+const detailCache = new Map();
+
+export async function getConversation(phone, { force = false } = {}) {
+  if (!phone) {
+    throw new ConversationsCenterError("Phone is required.", 400);
+  }
+
+  const cacheKey = String(phone);
+  if (!force) {
+    const cached = detailCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < LIST_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
+  const data = await wrap(`/api/conversations/${encodeURIComponent(phone)}`);
+  detailCache.set(cacheKey, { at: Date.now(), data });
+  return data;
+}
+
+export function patchConversationDetailCache(phone, patchFn) {
+  const entry = detailCache.get(String(phone));
+  if (!entry?.data || typeof patchFn !== "function") {
+    return null;
+  }
+  const next = patchFn(entry.data);
+  detailCache.set(String(phone), { at: Date.now(), data: next });
+  return next;
 }
 
 export async function takeOverConversation(phone, body = {}) {

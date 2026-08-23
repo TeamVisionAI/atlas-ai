@@ -45,7 +45,8 @@ import {
   closeConversation,
   markConversationAsTest,
   markConversationRead,
-  ConversationsCenterError
+  ConversationsCenterError,
+  readConversationsListCache
 } from "../services/conversationsCenterService";
 import {
   CONVERSATIONS_ACCESS_STATE,
@@ -129,6 +130,20 @@ function formatActivity(iso, locale) {
   }).format(date);
 }
 
+function inboxCacheKey(filter) {
+  return `${filter || "active"}::::summary`;
+}
+
+function ConversationListSkeleton() {
+  return (
+    <div className="conversations-page__skeleton-list" aria-busy="true" aria-label="Loading conversations">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="conversations-row conversations-row--skeleton" />
+      ))}
+    </div>
+  );
+}
+
 function ConversationRow({ item, selected, onSelect, translate, locale }) {
   const unreadUi = resolveConversationUnreadPresentation(item);
   return (
@@ -190,8 +205,9 @@ export default function ConversationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeFilter = searchParams.get("filter") || "active";
 
-  const [payload, setPayload] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [payload, setPayload] = useState(() => readConversationsListCache(inboxCacheKey(activeFilter)));
+  const [listLoading, setListLoading] = useState(() => !readConversationsListCache(inboxCacheKey(activeFilter)));
+  const [listError, setListError] = useState(null);
   const [error, setError] = useState(null);
   const [forbidden, setForbidden] = useState(false);
   const [accessState, setAccessState] = useState(CONVERSATIONS_ACCESS_STATE.UNKNOWN);
@@ -211,15 +227,32 @@ export default function ConversationsPage() {
   const lastCommunicationAtRef = useRef(null);
   const loadListRef = useRef(null);
 
-  const loadList = useCallback(async ({ quiet = false } = {}) => {
+  const loadList = useCallback(async ({ quiet = false, force = false } = {}) => {
+    const cacheKey = inboxCacheKey(activeFilter);
+    if (!quiet && !payload) {
+      const cached = readConversationsListCache(cacheKey);
+      if (cached) {
+        setPayload(cached);
+        setListLoading(false);
+      } else {
+        setListLoading(true);
+      }
+    } else if (!quiet) {
+      setListLoading(true);
+    }
+
     if (!quiet) {
-      setLoading(true);
-      setError(null);
+      setListError(null);
       setForbidden(false);
       setAccessState(CONVERSATIONS_ACCESS_STATE.UNKNOWN);
     }
+
     try {
-      const data = await getConversations({ filter: activeFilter });
+      const data = await getConversations({
+        filter: activeFilter,
+        view: "summary",
+        force
+      });
       setPayload(data);
       const selected = (data?.items || []).find(
         (row) => row.phone === selectedPhoneRef.current
@@ -242,7 +275,7 @@ export default function ConversationsPage() {
         setAccessState(resolveConversationsAccessStateFromError(err));
         setPayload(null);
       } else if (!quiet) {
-        setError(
+        setListError(
           err instanceof ConversationsCenterError
             ? translate("conversationsLoadError")
             : err.message
@@ -250,7 +283,7 @@ export default function ConversationsPage() {
       }
     } finally {
       if (!quiet) {
-        setLoading(false);
+        setListLoading(false);
       }
     }
   }, [activeFilter, translate]);
@@ -386,14 +419,24 @@ export default function ConversationsPage() {
   async function onSelectConversation(row) {
     lastCommunicationAtRef.current = row?.lastCommunicationAt || null;
     setSelectedPhone(row.phone);
-    try {
-      await markConversationRead(row.phone, {
-        lastReadInboundAt: new Date().toISOString()
-      });
-      await loadListRef.current?.({ quiet: true });
-    } catch {
-      /* unread persist failure must not block opening */
-    }
+    setPayload((current) => {
+      if (!current?.items) {
+        return current;
+      }
+      return {
+        ...current,
+        items: current.items.map((item) =>
+          item.phone === row.phone
+            ? { ...item, unread: false, unreadCount: 0 }
+            : item
+        )
+      };
+    });
+    markConversationRead(row.phone, {
+      lastReadInboundAt: new Date().toISOString()
+    })
+      .then(() => loadListRef.current?.({ quiet: true }))
+      .catch(() => {});
   }
 
   async function onJumpToLatest() {
@@ -687,12 +730,15 @@ export default function ConversationsPage() {
         })}
       </div>
 
+      {listError ? <p className="conversations-page__error conversations-page__error--list">{listError}</p> : null}
       {error ? <p className="conversations-page__error">{error}</p> : null}
 
       <div className="conversations-page__layout">
         <section className="conversations-page__list" aria-label={translate("conversationsListLabel")}>
-          {loading ? (
-            <p className="conversations-page__empty">{translate("conversationsLoading")}</p>
+          {listError && !items.length ? (
+            <p className="conversations-page__empty">{listError}</p>
+          ) : listLoading && !items.length ? (
+            <ConversationListSkeleton />
           ) : items.length === 0 ? (
             <p className="conversations-page__empty">{translate("conversationsEmpty")}</p>
           ) : (

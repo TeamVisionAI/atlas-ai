@@ -32,7 +32,9 @@ async function prospectCommunicationsHandler(req, res) {
       organizationId,
       query: {
         timezone: req.query.timezone,
-        limit: req.query.limit
+        limit: req.query.limit,
+        projection: req.query.projection,
+        before: req.query.before
       }
     });
 
