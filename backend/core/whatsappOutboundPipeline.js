@@ -238,7 +238,8 @@ async function sendAndPersistWhatsAppMessage({
   callerMetaTemplateName = null,
   idempotencyKey = null,
   pipeline = null,
-  now = new Date()
+  now = new Date(),
+  inboundPhoneNumberId = null
 } = {}) {
   if (!to) {
     return {
@@ -349,7 +350,9 @@ async function sendAndPersistWhatsAppMessage({
       providerMessageId: `mock_${providerMessageIdSeed}`
     };
   } else {
-    const credentials = await resolveWhatsAppSendCredentials(resolvedOrgId);
+    const credentials = await resolveWhatsAppSendCredentials(resolvedOrgId, {
+      phoneNumberId: inboundPhoneNumberId
+    });
 
     if (!credentials?.accessToken || !credentials?.phoneNumberId) {
       const failedAuth = {
@@ -455,7 +458,9 @@ async function sendAndPersistWhatsAppMessage({
     category: authorization.category || null,
     version: authorization.version || null,
     languageCode: authorization.languageCode || null,
-    sanitized: true
+    sanitized: true,
+    credentialSource: sendResult.credentialSource || null,
+    inboundPhoneNumberId: inboundPhoneNumberId || null
   };
 
   // A — Persist delivery SoR immediately after wamid so Meta status webhooks can match.

@@ -66,25 +66,79 @@ function isOrgConnectionEligibleForRouting(connection) {
  * @param {{ connectionRepository?: object }} [options]
  * @returns {Promise<{ accessToken: string, phoneNumberId: string, graphApiVersion: string, source: string }|null>}
  */
+async function resolveConnectionCredentials(connection, connectionRepository, orgId) {
+  if (!connection?.phone_number_id || connection.status !== "connected") {
+    return null;
+  }
+
+  const accessToken = await connectionRepository.getDecryptedAccessToken(orgId);
+  if (!accessToken) {
+    return null;
+  }
+
+  return {
+    accessToken,
+    phoneNumberId: connection.phone_number_id,
+    graphApiVersion: graphApiVersion(),
+    source: "embedded_signup",
+    wabaId: connection.waba_id || null,
+    organizationId: orgId
+  };
+}
+
 async function resolveWhatsAppSendCredentials(organizationId = null, options = {}) {
   const orgId = organizationId || process.env.DEFAULT_ORGANIZATION_ID || DEFAULT_ORGANIZATION_ID;
   const connectionRepository = options.connectionRepository || repository;
+  const inboundPhoneNumberId = trimId(options.phoneNumberId);
+
+  // Inbound-authoritative: reply from the connected asset that received the message.
+  if (
+    inboundPhoneNumberId &&
+    typeof connectionRepository.findConnectionByPhoneNumberId === "function"
+  ) {
+    try {
+      const byPhone = await connectionRepository.findConnectionByPhoneNumberId(
+        inboundPhoneNumberId
+      );
+      const resolvedOrgId = byPhone?.organization_id
+        ? String(byPhone.organization_id)
+        : null;
+
+      if (
+        byPhone?.status === "connected" &&
+        resolvedOrgId &&
+        (!orgId || sameId(resolvedOrgId, orgId))
+      ) {
+        const routed = await resolveConnectionCredentials(
+          byPhone,
+          connectionRepository,
+          resolvedOrgId
+        );
+        if (routed) {
+          return routed;
+        }
+      }
+    } catch (error) {
+      logWhatsAppStage("send_credentials_inbound_phone_lookup_failed", {
+        level: "warn",
+        phoneNumberId: inboundPhoneNumberId,
+        error: error.message,
+        organizationId: orgId
+      });
+    }
+  }
 
   try {
     const connection = await connectionRepository.getConnection(orgId);
 
     if (isOrgConnectionEligibleForRouting(connection)) {
-      const accessToken = await connectionRepository.getDecryptedAccessToken(orgId);
-
-      if (accessToken && connection.phone_number_id) {
-        return {
-          accessToken,
-          phoneNumberId: connection.phone_number_id,
-          graphApiVersion: graphApiVersion(),
-          source: "embedded_signup",
-          wabaId: connection.waba_id || null,
-          organizationId: orgId
-        };
+      const routed = await resolveConnectionCredentials(
+        connection,
+        connectionRepository,
+        orgId
+      );
+      if (routed) {
+        return routed;
       }
     }
   } catch (error) {

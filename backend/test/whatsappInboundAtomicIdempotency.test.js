@@ -520,7 +520,7 @@ test("22. duplicate inbound skips when outbound already exists", async () => {
 });
 
 test("23. markAiResponding requires delivered outbound", async () => {
-  const { conversationDeliveredReply } = require("../core/whatsappInboundPipeline");
+  const { conversationDeliveredReply } = require("../core/whatsappAutomatedReplyDelivery");
   assert.equal(
     conversationDeliveredReply({ success: true, replied: true, reason: "MOCK_REPLY" }),
     false
@@ -533,4 +533,44 @@ test("23. markAiResponding requires delivered outbound", async () => {
     }),
     true
   );
+  assert.equal(
+    conversationDeliveredReply({
+      success: true,
+      replied: true,
+      delivery: { success: true, metaDeliveryStatus: "failed" }
+    }),
+    false
+  );
+});
+
+test("24. duplicate inbound retries when only failed meta outbound exists", async () => {
+  const store = createMemoryWhatsAppInboundClaimStore();
+  const { counts, deps } = createHarness(store);
+  const msg = inbound({ providerMessageId: "wamid.RECOVERY3" });
+
+  deps.disableFirstReplyRecovery = false;
+  deps.prospectHasAutomatedOutboundReply = async () => false;
+  deps.findProspectInOrganization = async () => ({
+    id: "legacy-1",
+    phone: "+17865550336",
+    name: "Soraya",
+    current_step: "NEW",
+    organization_id: ORG_A
+  });
+  deps.processConversationAfterInbound = async () => {
+    counts.hub += 1;
+    return {
+      success: true,
+      replied: true,
+      delivery: { success: true, metaDeliveryStatus: "failed" },
+      reason: "GRAPH_ACCEPT_META_FAILED"
+    };
+  };
+
+  await processInboundWhatsAppMessage(msg, deps);
+  const second = await processInboundWhatsAppMessage(msg, deps);
+
+  assert.equal(second.recovered, undefined);
+  assert.equal(second.skipped, true);
+  assert.equal(counts.hub, 2);
 });

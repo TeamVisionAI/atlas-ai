@@ -212,7 +212,8 @@ async function deliverWhatsAppReply({
       organizationId: prospect?.organization_id || null,
       idempotencyKey: engineResult?.confirmationIdempotencyKey || null,
       templateKey,
-      templateVariables
+      templateVariables,
+      inboundPhoneNumberId: normalized.phoneNumberId || null
   });
 
   const isV2Owned =
