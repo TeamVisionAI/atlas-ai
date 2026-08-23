@@ -49,6 +49,9 @@ function createHarness(claimStore) {
     consume: 0,
     qrStamp: 0
   };
+  let outboundSent = false;
+  let hubInFlight = false;
+  const recoveryClaims = new Set();
 
   const deps = {
     resolveWhatsAppInboundOrganizationId: async () => ({
@@ -85,13 +88,29 @@ function createHarness(claimStore) {
       };
     },
     processConversationAfterInbound: async () => {
+      hubInFlight = true;
       counts.hub += 1;
-      return {
-        success: true,
-        replied: false,
-        reason: "TEST_AUTHORED_NO_DELIVERY"
-      };
-    }
+      try {
+        return {
+          success: true,
+          replied: true,
+          delivery: { success: true },
+          reason: "TEST_AUTHORED_DELIVERED"
+        };
+      } finally {
+        hubInFlight = false;
+        outboundSent = true;
+      }
+    },
+    prospectHasAutomatedOutboundReply: async () => outboundSent || hubInFlight,
+    claimFirstReplyRecovery: async ({ correlationId }) => {
+      if (recoveryClaims.has(correlationId)) {
+        return { claimed: false, reason: "DUPLICATE_RECOVERY_CLAIM" };
+      }
+      recoveryClaims.add(correlationId);
+      return { claimed: true };
+    },
+    disableFirstReplyRecovery: true
   };
 
   return { counts, deps };
@@ -363,16 +382,18 @@ test("16. pipeline source: org resolve + claim before locateOrCreate/log/hub", (
     path.join(__dirname, "../core/whatsappInboundPipeline.js"),
     "utf8"
   );
-  const orgIdx = src.indexOf("resolveOrg(");
-  const claimIdx = src.indexOf("claimInbound(");
-  const locateIdx = src.indexOf("locateOrCreate(");
-  const logIdx = src.indexOf("persistInboundLog(");
-  const hubIdx = src.indexOf("runHub(");
+  const fnStart = src.indexOf("async function processInboundWhatsAppMessage");
+  const fnBody = src.slice(fnStart, src.indexOf("module.exports"));
+  const orgIdx = fnBody.indexOf("resolveOrg(");
+  const claimIdx = fnBody.indexOf("claimInbound(");
+  const locateIdx = fnBody.indexOf("locateOrCreate(");
+  const logIdx = fnBody.indexOf("persistInboundLog(");
+  const hubIdx = fnBody.indexOf("conversation = await runHub({");
   assert.ok(orgIdx > 0 && claimIdx > orgIdx);
   assert.ok(locateIdx > claimIdx);
   assert.ok(logIdx > locateIdx);
   assert.ok(hubIdx > logIdx);
-  assert.match(src, /DUPLICATE_PROVIDER_MESSAGE/);
+  assert.match(fnBody, /DUPLICATE_PROVIDER_MESSAGE/);
 });
 
 test("17. findWorkflowEventByCorrelationId uses limit(1) (no unbounded maybeSingle)", () => {
@@ -429,5 +450,87 @@ test("20. default hub binding imports communicationHub (no ReferenceError)", () 
   assert.match(
     src,
     /const \{ processConversationAfterInbound \} = require\("\.\/communicationHub"\)/
+  );
+});
+
+test("21. duplicate inbound with no outbound recovers first reply", async () => {
+  const store = createMemoryWhatsAppInboundClaimStore();
+  const { counts, deps } = createHarness(store);
+  const msg = inbound({
+    providerMessageId: "wamid.RECOVERY1",
+    body: "¡Hola! Quiero más información. TVR-0826-A7K4"
+  });
+
+  deps.prospectHasAutomatedOutboundReply = async () => false;
+  deps.disableFirstReplyRecovery = false;
+  deps.findProspectInOrganization = async () => ({
+    id: "legacy-1",
+    phone: "+17865550336",
+    name: "Soraya",
+    current_step: "NEW",
+    organization_id: ORG_A,
+    owner_user_id: "owner-1"
+  });
+  deps.campaignIntakeAttributionService = {
+    lookupInboundMatch: async () => ({
+      matched: true,
+      code: "TVR-0826-A7K4",
+      purpose: "RECRUITING",
+      recruitingEligible: true
+    })
+  };
+  deps.processConversationAfterInbound = async () => {
+    counts.hub += 1;
+    return {
+      success: true,
+      replied: true,
+      delivery: { success: true },
+      reason: "RECOVERED_REPLY"
+    };
+  };
+
+  await processInboundWhatsAppMessage(msg, deps);
+  const recovered = await processInboundWhatsAppMessage(msg, deps);
+
+  assert.equal(recovered.recovered, true);
+  assert.equal(recovered.reason, "DUPLICATE_INBOUND_FIRST_REPLY_RECOVERED");
+  assert.equal(counts.hub, 2);
+});
+
+test("22. duplicate inbound skips when outbound already exists", async () => {
+  const store = createMemoryWhatsAppInboundClaimStore();
+  const { counts, deps } = createHarness(store);
+  const msg = inbound({ providerMessageId: "wamid.RECOVERY2" });
+
+  deps.prospectHasAutomatedOutboundReply = async () => true;
+  deps.findProspectInOrganization = async () => ({
+    id: "legacy-1",
+    phone: "+17865550336",
+    name: "Soraya",
+    current_step: "NEW",
+    organization_id: ORG_A
+  });
+
+  await processInboundWhatsAppMessage(msg, deps);
+  const second = await processInboundWhatsAppMessage(msg, deps);
+
+  assert.equal(second.skipped, true);
+  assert.equal(second.reason, "DUPLICATE_PROVIDER_MESSAGE");
+  assert.equal(counts.hub, 1);
+});
+
+test("23. markAiResponding requires delivered outbound", async () => {
+  const { conversationDeliveredReply } = require("../core/whatsappInboundPipeline");
+  assert.equal(
+    conversationDeliveredReply({ success: true, replied: true, reason: "MOCK_REPLY" }),
+    false
+  );
+  assert.equal(
+    conversationDeliveredReply({
+      success: true,
+      replied: true,
+      delivery: { success: true }
+    }),
+    true
   );
 });

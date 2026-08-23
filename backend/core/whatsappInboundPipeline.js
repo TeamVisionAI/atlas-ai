@@ -11,6 +11,11 @@ const workflowEventService = require("../services/workflowEventService");
 const { logConversation } = require("../services/logService");
 const { processConversationAfterInbound } = require("./communicationHub");
 const whatsappProspectResolver = require("./whatsappProspectResolver");
+const { resolveStoragePhone } = whatsappProspectResolver;
+const {
+  findProspectInOrganization,
+  supabase
+} = require("../services/supabaseService");
 const {
   resolveWhatsAppInboundOrganizationId
 } = require("./whatsappInboundOrganizationResolver");
@@ -36,6 +41,187 @@ function duplicateSkipResult(correlationId, providerMessageId, phone) {
     skipped: true,
     reason: "DUPLICATE_PROVIDER_MESSAGE",
     correlationId
+  };
+}
+
+function conversationDeliveredReply(conversation) {
+  if (!conversation?.replied) {
+    return false;
+  }
+  if (conversation.delivery && typeof conversation.delivery === "object") {
+    return conversation.delivery.success === true;
+  }
+  return false;
+}
+
+async function applyInboundAttentionUpdate(prospect, conversation) {
+  try {
+    const {
+      markAiResponding,
+      markHumanAttentionRequired
+    } = require("./newLeadAttentionEngine");
+
+    if (conversationDeliveredReply(conversation)) {
+      await markAiResponding(prospect, { waitingForProspect: true });
+    } else if (
+      conversation &&
+      (conversation.success === false ||
+        conversation.humanAssist ||
+        conversation.reason === "CONVERSATION_ENGINE_ERROR")
+    ) {
+      await markHumanAttentionRequired(
+        prospect,
+        conversation.reason || conversation.error || "ai_or_delivery_failure"
+      );
+    }
+  } catch (attentionError) {
+    logWhatsAppStage("br080_attention_update_failed", {
+      level: "warn",
+      phone: prospect?.phone || null,
+      error: attentionError.message
+    });
+  }
+}
+
+async function prospectHasAutomatedOutboundReply(phone, organizationId) {
+  const storagePhone = resolveStoragePhone(phone);
+  if (!storagePhone) {
+    return false;
+  }
+
+  let query = supabase
+    .from("conversation_logs")
+    .select("id")
+    .eq("prospect_phone", storagePhone)
+    .eq("direction", "outgoing")
+    .limit(1);
+
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    logWhatsAppStage("inbound_first_reply_recovery_lookup_failed", {
+      level: "warn",
+      phone: storagePhone,
+      error: error.message
+    });
+    return true;
+  }
+
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function attemptStalledFirstReplyRecovery({
+  inbound,
+  correlationId,
+  claimedOrganizationId,
+  runHub,
+  dependencies = {}
+}) {
+  const findProspect =
+    dependencies.findProspectInOrganization || findProspectInOrganization;
+  const hasOutbound =
+    dependencies.prospectHasAutomatedOutboundReply || prospectHasAutomatedOutboundReply;
+  const intakeService =
+    dependencies.campaignIntakeAttributionService ||
+    getCampaignIntakeAttributionService();
+
+  const prospect =
+    (await findProspect(inbound.phone, claimedOrganizationId)) ||
+    (await findProspect(resolveStoragePhone(inbound.phone), claimedOrganizationId));
+
+  if (!prospect?.phone) {
+    return null;
+  }
+
+  if (await hasOutbound(prospect.phone, claimedOrganizationId)) {
+    return null;
+  }
+
+  const body = inbound.body || `[${inbound.messageType} message]`;
+  const phoneNumberId =
+    inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null;
+  const intakeLookup = await intakeService.lookupInboundMatch({
+    organizationId: claimedOrganizationId,
+    whatsappPhoneNumberId: phoneNumberId,
+    messageBody: body
+  });
+  const semanticBody = intakeLookup?.matched
+    ? stripCampaignIntakeToken(body, intakeLookup.code)
+    : body;
+  const inboundForAutomation = {
+    ...inbound,
+    body: semanticBody,
+    campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null
+  };
+
+  logWhatsAppStage("inbound_first_reply_recovery_attempted", {
+    phone: prospect.phone,
+    providerMessageId: inbound.providerMessageId || null,
+    organizationId: claimedOrganizationId || null
+  });
+
+  const claimRecovery =
+    dependencies.claimFirstReplyRecovery ||
+    workflowEventService.claimFirstReplyRecovery;
+  const recoveryClaim = await claimRecovery({
+    correlationId,
+    prospectPhone: prospect.phone,
+    organizationId: claimedOrganizationId || null,
+    providerMessageId: inbound.providerMessageId || null
+  });
+  if (!recoveryClaim?.claimed) {
+    return null;
+  }
+
+  let conversation = null;
+  try {
+    conversation = await runHub({
+      inbound: inboundForAutomation,
+      storagePhone: prospect.phone,
+      prospect,
+      contactName: prospect.name || inbound.contactName,
+      qrAttributed: false
+    });
+  } catch (error) {
+    logWhatsAppStage("inbound_first_reply_recovery_failed", {
+      phone: prospect.phone,
+      providerMessageId: inbound.providerMessageId || null,
+      level: "error",
+      error: error.message
+    });
+    conversation = {
+      success: false,
+      replied: false,
+      reason: "CONVERSATION_ENGINE_ERROR",
+      error: error.message
+    };
+  }
+
+  await applyInboundAttentionUpdate(prospect, conversation);
+
+  if (!conversationDeliveredReply(conversation)) {
+    return null;
+  }
+
+  logWhatsAppStage("inbound_first_reply_recovery_succeeded", {
+    phone: prospect.phone,
+    providerMessageId: inbound.providerMessageId || null
+  });
+
+  return {
+    success: true,
+    skipped: false,
+    recovered: true,
+    reason: "DUPLICATE_INBOUND_FIRST_REPLY_RECOVERED",
+    phone: prospect.phone,
+    correlationId,
+    conversation,
+    organizationId: claimedOrganizationId || prospect.organization_id || null,
+    prospectId: prospect.id || null,
+    ownerUserId: prospect.owner_user_id || null
   };
 }
 
@@ -85,6 +271,18 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
   if (!claim?.claimed) {
     if (claim?.reason === "DUPLICATE_PROVIDER_MESSAGE") {
+      if (dependencies.disableFirstReplyRecovery !== true) {
+        const recovered = await attemptStalledFirstReplyRecovery({
+          inbound,
+          correlationId,
+          claimedOrganizationId,
+          runHub,
+          dependencies
+        });
+        if (recovered) {
+          return recovered;
+        }
+      }
       return duplicateSkipResult(correlationId, providerMessageId, inbound.phone);
     }
     return {
@@ -305,33 +503,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     };
   }
 
-  // Implements BR-080 — AI success does not acknowledge; failures raise human attention.
-  try {
-    const {
-      markAiResponding,
-      markHumanAttentionRequired
-    } = require("./newLeadAttentionEngine");
-
-    if (conversation?.success && conversation?.replied) {
-      await markAiResponding(prospect, { waitingForProspect: true });
-    } else if (
-      conversation &&
-      (conversation.success === false ||
-        conversation.humanAssist ||
-        conversation.reason === "CONVERSATION_ENGINE_ERROR")
-    ) {
-      await markHumanAttentionRequired(
-        prospect,
-        conversation.reason || conversation.error || "ai_or_delivery_failure"
-      );
-    }
-  } catch (attentionError) {
-    logWhatsAppStage("br080_attention_update_failed", {
-      level: "warn",
-      phone: storagePhone,
-      error: attentionError.message
-    });
-  }
+  // Implements BR-080 — only mark AI responding after a real outbound delivery.
+  await applyInboundAttentionUpdate(prospect, conversation);
 
   // Implements BR-081 Phase 3B — post-live advisory:
   // continuous context capture (flag-gated, target 100%) + shadow eval (10%).
@@ -380,5 +553,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 module.exports = {
   processInboundWhatsAppMessage,
   buildInboundCorrelationId,
-  setCampaignIntakeAttributionServiceForTests
+  setCampaignIntakeAttributionServiceForTests,
+  conversationDeliveredReply,
+  attemptStalledFirstReplyRecovery,
+  prospectHasAutomatedOutboundReply
 };
