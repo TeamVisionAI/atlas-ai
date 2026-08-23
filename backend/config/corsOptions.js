@@ -2,10 +2,15 @@
  * Express CORS configuration for Atlas API.
  * Production uses an explicit allowlist; development reflects all origins.
  *
+ * Staging (ATLAS_ENV=staging) additionally allows Atlas Team Vision Vercel Preview
+ * deployments (*.teamvisionfinancial.vercel.app) for PR review flows.
+ *
  * Public QR pages are served from ATLAS_PUBLIC_URL. Browser form POSTs to
  * /go/:token/bind send that host as Origin — it must be allowlisted or bind
  * never reaches the route.
  */
+
+const { resolveAtlasEnv } = require("./atlasEnvironment");
 
 const DEFAULT_PRODUCTION_ORIGINS = Object.freeze([
   "https://teamvisionfinancial.com",
@@ -58,6 +63,35 @@ function buildAllowedOrigins(env = process.env) {
   ];
 }
 
+/**
+ * Trusted Atlas Vercel Preview hostnames for the Team Vision Vercel team.
+ * Example: atlas-ai-git-feat-branch-teamvisionfinancial.vercel.app
+ */
+function isAtlasOwnedVercelPreviewOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && url.hostname.endsWith("-teamvisionfinancial.vercel.app");
+  } catch {
+    return false;
+  }
+}
+
+function isOriginAllowed(origin, env = process.env) {
+  if (!origin) {
+    return true;
+  }
+
+  if (buildAllowedOrigins(env).includes(origin)) {
+    return true;
+  }
+
+  if (resolveAtlasEnv(env) === "staging" && isAtlasOwnedVercelPreviewOrigin(origin)) {
+    return true;
+  }
+
+  return false;
+}
+
 function buildCorsOptions(env = process.env) {
   const isProduction = env.NODE_ENV === "production";
   const allowedOrigins = buildAllowedOrigins(env);
@@ -73,12 +107,7 @@ function buildCorsOptions(env = process.env) {
 
   return {
     origin(origin, callback) {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      if (allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin, env)) {
         callback(null, true);
         return;
       }
@@ -105,11 +134,9 @@ function createDisallowedOriginRejector(env = process.env) {
     };
   }
 
-  const allowedOrigins = new Set(buildAllowedOrigins(env));
-
   return function rejectDisallowedCorsOrigin(req, res, next) {
     const origin = req.get("origin");
-    if (!origin || allowedOrigins.has(origin)) {
+    if (isOriginAllowed(origin, env)) {
       return next();
     }
     return res.status(403).type("text").send("Forbidden");
@@ -120,6 +147,8 @@ module.exports = {
   DEFAULT_PRODUCTION_ORIGINS,
   normalizeOrigin,
   buildAllowedOrigins,
+  isAtlasOwnedVercelPreviewOrigin,
+  isOriginAllowed,
   buildCorsOptions,
   createDisallowedOriginRejector
 };
