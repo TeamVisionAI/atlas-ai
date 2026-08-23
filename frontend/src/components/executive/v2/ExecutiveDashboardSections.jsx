@@ -78,11 +78,13 @@ export function ExecutiveDashboardHeader({
           )}
         </div>
 
-        <div className="executive-v2__header-actions">
-          <div className="executive-v2__scope-chip" title={organizationName}>
-            {organizationName || translate("teamDashOrganizationFallback")}
+        <div className="executive-v2__header-toolbar">
+          <div className="executive-v2__header-chips">
+            <div className="executive-v2__scope-chip" title={organizationName}>
+              {organizationName || translate("teamDashOrganizationFallback")}
+            </div>
+            <div className="executive-v2__date-chip">{todayLabel}</div>
           </div>
-          <div className="executive-v2__date-chip">{todayLabel}</div>
           <button type="button" className="executive-v2__button" onClick={onOpenMissionControl}>
             {translate("executiveOpenMissionControl")}
           </button>
@@ -149,7 +151,8 @@ export function TodayAgendaCard({ agenda = [], loading }) {
       {agenda.length ? (
         <ul className="executive-v2__agenda-list">
           {agenda.map((item) => (
-            <li key={item.id}>
+            <li key={item.id} className="executive-v2__agenda-row">
+              <span className="executive-v2__agenda-marker" aria-hidden="true" />
               <Link to={item.to} className="executive-v2__agenda-item">
                 <span className="executive-v2__agenda-time">{item.timeLabel}</span>
                 <span className="executive-v2__agenda-main">
@@ -197,9 +200,9 @@ export function MorningSummaryCard({ summary, loading }) {
         </Link>
       }
     >
-      <ul className="executive-v2__brief-grid">
+      <ul className="executive-v2__brief-list">
         {summary.items.map((item) => (
-          <li key={item.key} className="executive-v2__brief-item">
+          <li key={item.key} className="executive-v2__brief-row">
             <span className="executive-v2__brief-value">{item.value}</span>
             <span className="executive-v2__brief-label">{item.label}</span>
           </li>
@@ -223,7 +226,8 @@ export function RecruitmentFunnelCard({ funnel, loading }) {
         <>
           <div className="executive-v2__funnel-viz" role="list">
             {funnel.stages.map((stage, index) => {
-              const widthPct = Math.max(32, Math.round((stage.count / topCount) * 100));
+              const ratio = stage.count / topCount;
+              const widthPct = Math.max(38, Math.round(ratio * 100 - index * 5));
 
               return (
                 <div
@@ -262,14 +266,16 @@ export function ConversationPerformanceCard({ performance, loading }) {
       loading={loading}
     >
       {performance ? (
-        <>
+        <div className="executive-v2__conversation-panel">
           <ConversationDonut segments={performance.segments} total={performance.total} />
-          <p className="executive-v2__conversation-total">{performance.totalLabel}</p>
-          <p className="executive-v2__conversation-response">
-            {translate("executiveV2AvgResponseTime")}:{" "}
-            <strong>{performance.averageResponseTimeLabel}</strong>
-          </p>
-        </>
+          <div className="executive-v2__conversation-meta">
+            <p className="executive-v2__conversation-total">{performance.totalLabel}</p>
+            <p className="executive-v2__conversation-response">
+              <span>{translate("executiveV2AvgResponseTime")}</span>
+              <strong>{performance.averageResponseTimeLabel}</strong>
+            </p>
+          </div>
+        </div>
       ) : (
         <p className="executive-v2__empty">—</p>
       )}

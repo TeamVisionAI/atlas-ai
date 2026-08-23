@@ -56,10 +56,8 @@ export function KpiRow({ cards = [] }) {
           className="executive-v2__kpi"
           data-accent={KPI_ACCENTS[card.key] || "blue"}
         >
-          <div className="executive-v2__kpi-head">
-            <div className="executive-v2__kpi-icon" data-icon={card.icon} aria-hidden="true" />
-            <div className="executive-v2__kpi-label">{card.label}</div>
-          </div>
+          <div className="executive-v2__kpi-icon" data-icon={card.icon} aria-hidden="true" />
+          <div className="executive-v2__kpi-label">{card.label}</div>
           <div className="executive-v2__kpi-value">{card.value}</div>
           {card.comparison ? (
             <div
@@ -67,7 +65,7 @@ export function KpiRow({ cards = [] }) {
             >
               {card.comparison.direction === "flat"
                 ? "—"
-                : `${card.comparison.direction === "up" ? "+" : "-"}${card.comparison.value}`}
+                : `${card.comparison.direction === "up" ? "▲" : "▼"} ${card.comparison.value}`}
             </div>
           ) : (
             <div className="executive-v2__kpi-delta executive-v2__kpi-delta--flat">—</div>
