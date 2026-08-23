@@ -241,7 +241,8 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
   }
   const t = normalizeAscii(raw);
   const pendingAuth =
-    String(context?.conversation?.lastQuestionAsked || "") === "ask_authorization";
+    String(context?.conversation?.lastQuestionAsked || "") === "ask_authorization" ||
+    String(context?.conversation?.resumePendingQuestion || "") === "ask_authorization";
 
   // License-only answers never satisfy work authorization (BR-083).
   if (mentionsLicense(raw) && !mentionsWorkAuthorization(raw)) {
@@ -334,7 +335,7 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
   const yesShort =
     pendingAuth &&
     !mentionsLicense(raw) &&
-    (/^(si|yes|yep|yeah|claro|por supuesto)([.!]?)$/i.test(raw.trim()) ||
+    (/^(si|yes|yep|yeah|claro|por supuesto)([.!]?)$/i.test(t) ||
       yesTengoShorthand ||
       (/^(si|yes).{0,40}\b(tengo|have|cuento con)\b/i.test(raw) &&
         mentionsWorkAuthorization(raw)));

@@ -79,14 +79,19 @@ test("BR-155 getAdLeadFirstTouchMessage is Spanish-only and location-free", () =
   assert.equal(getAdLeadFirstTouchMessage("es", { city: "Miami" }), null);
 });
 
-test("BR-155 Miami proposes Florida confirmation (confident resolver)", () => {
+test("BR-155 Miami resolves to Miami, FL silently (high-confidence Florida)", () => {
   const parsed = parseLocationAnswer("Miami");
-  assert.equal(parsed.completeness, "partial");
-  assert.equal(parsed.proposedState, "FL");
+  assert.equal(parsed.completeness, "complete");
+  assert.equal(parsed.state, "FL");
+  assert.equal(parsed.city, "Miami");
+  assert.equal(parsed.requiresClarification, false);
   const r = renderTurn("Miami", locationAskContext());
   assert.equal(r.interpretation.intent, INTENTS.PROVIDE_LOCATION);
-  assert.match(r.rendered.text, /Miami.*Florida/i);
-  assert.doesNotMatch(r.rendered.text, /servicios financieros/i);
+  assert.equal(r.nextContext.knownFacts.city, "Miami");
+  assert.equal(r.nextContext.knownFacts.state, "FL");
+  assert.match(r.rendered.text, /permiso de trabajo|autoriz/i);
+  assert.doesNotMatch(r.rendered.text, /en qué estado/i);
+  assert.doesNotMatch(r.rendered.text, /Miami.*Florida\?/i);
 });
 
 test("BR-155 Miami, FL completes location without redundant state ask", () => {

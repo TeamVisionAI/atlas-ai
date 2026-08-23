@@ -22,11 +22,50 @@ const CITY_TO_PROPOSED_STATE = Object.freeze({
   doral: "FL",
   jacksonville: "FL",
   "fort lauderdale": "FL",
+  "ft lauderdale": "FL",
   hialeah: "FL",
   kissimmee: "FL",
   "west palm beach": "FL",
+  wpb: "FL",
   "palm beach": "FL",
   tallahassee: "FL",
+  kendall: "FL",
+  miramar: "FL",
+  homestead: "FL",
+  "cutler bay": "FL",
+  "miami beach": "FL",
+  "north miami beach": "FL",
+  "pembroke pines": "FL",
+  hollywood: "FL",
+  "coral gables": "FL",
+  "miami gardens": "FL",
+  "north miami": "FL",
+  aventura: "FL",
+  "sunny isles": "FL",
+  "sunny isles beach": "FL",
+  "hialeah gardens": "FL",
+  sweetwater: "FL",
+  westchester: "FL",
+  pinecrest: "FL",
+  "palmetto bay": "FL",
+  "florida city": "FL",
+  davie: "FL",
+  plantation: "FL",
+  sunrise: "FL",
+  weston: "FL",
+  "cooper city": "FL",
+  hallandale: "FL",
+  "hallandale beach": "FL",
+  "pompano beach": "FL",
+  "deerfield beach": "FL",
+  "boca raton": "FL",
+  "delray beach": "FL",
+  "boynton beach": "FL",
+  "lake worth": "FL",
+  "lake worth beach": "FL",
+  wellington: "FL",
+  jupiter: "FL",
+  "palm beach gardens": "FL",
   atlanta: "GA",
   houston: "TX",
   dallas: "TX",
@@ -40,6 +79,83 @@ const CITY_TO_PROPOSED_STATE = Object.freeze({
   "san diego": "CA",
   "san francisco": "CA"
 });
+
+/** High-confidence South Florida / Florida cities — normalize silently to FL (no state ask). */
+const HIGH_CONFIDENCE_FL_CITIES = new Set(
+  Object.entries(CITY_TO_PROPOSED_STATE)
+    .filter(([, state]) => state === "FL")
+    .map(([city]) => city)
+);
+
+/** Nationally ambiguous city names — never auto-assign state. */
+const AMBIGUOUS_US_CITIES = new Set([
+  "springfield",
+  "columbus",
+  "richmond",
+  "jackson",
+  "portland",
+  "arlington",
+  "franklin",
+  "clinton",
+  "madison",
+  "georgetown",
+  "manchester",
+  "salem",
+  "fairview",
+  "greenville",
+  "bristol",
+  "clayton",
+  "oxford",
+  "milton",
+  "chester",
+  "ashland"
+]);
+
+/** Alias → canonical lookup key in CITY_TO_PROPOSED_STATE. */
+const CITY_LOOKUP_ALIASES = Object.freeze({
+  wpb: "west palm beach",
+  "ft lauderdale": "fort lauderdale",
+  "ft. lauderdale": "fort lauderdale",
+  "sunny isles": "sunny isles beach"
+});
+
+function normalizeCityLookupKey(raw) {
+  const folded = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[.,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!folded) {
+    return "";
+  }
+  return CITY_LOOKUP_ALIASES[folded] || folded;
+}
+
+function isHighConfidenceFloridaCity(city) {
+  const key = normalizeCityLookupKey(city);
+  return Boolean(key && HIGH_CONFIDENCE_FL_CITIES.has(key));
+}
+
+function buildHighConfidenceFloridaLocation(rawCity) {
+  const key = normalizeCityLookupKey(rawCity);
+  if (!key || !HIGH_CONFIDENCE_FL_CITIES.has(key)) {
+    return null;
+  }
+  if (AMBIGUOUS_US_CITIES.has(key)) {
+    return null;
+  }
+  const city = titleCaseCity(key);
+  return {
+    city,
+    state: "FL",
+    proposedState: null,
+    completeness: "complete",
+    requiresClarification: false
+  };
+}
 
 /**
  * Canonical U.S. state name / postal abbreviation → USPS code.
@@ -195,9 +311,7 @@ function normalizeStateToken(value) {
 }
 
 function proposeStateFromCity(city) {
-  const key = String(city || "")
-    .trim()
-    .toLowerCase();
+  const key = normalizeCityLookupKey(city);
   return CITY_TO_PROPOSED_STATE[key] || null;
 }
 
@@ -532,8 +646,12 @@ function parseLocationAnswerCore(raw) {
     };
   }
 
-  // Known city-only only (avoid classifying fragments as cities).
-  const cityKey = working.toLowerCase();
+  // Known city-only — high-confidence Florida cities resolve complete (no state ask).
+  const cityKey = normalizeCityLookupKey(working);
+  const highConfidenceFl = !hedged ? buildHighConfidenceFloridaLocation(working) : null;
+  if (highConfidenceFl) {
+    return highConfidenceFl;
+  }
   if (CITY_TO_PROPOSED_STATE[cityKey]) {
     const city = titleCaseCity(working);
     return {
@@ -577,6 +695,10 @@ function parseLocationAnswerCore(raw) {
       // "South Florida" regional — not city = South (BR-082 / BR-094).
       if (REGIONAL_PHRASE_RE.test(working) || REGION_ONLY_CITY_RE.test(words[0])) {
         return null;
+      }
+      const multiWordFl = !hedged ? buildHighConfidenceFloridaLocation(working) : null;
+      if (multiWordFl) {
+        return multiWordFl;
       }
       const city = titleCaseCity(working);
       return {
@@ -639,6 +761,8 @@ function stateDisplayName(code, language = "english") {
 module.exports = {
   FACT_CERTAINTY,
   CITY_TO_PROPOSED_STATE,
+  HIGH_CONFIDENCE_FL_CITIES,
+  AMBIGUOUS_US_CITIES,
   US_STATE_NAME_TO_ABBR,
   US_STATE_ABBR_TO_NAME,
   US_POSTAL_ABBREVIATIONS,
@@ -647,6 +771,9 @@ module.exports = {
   parseLocationAnswerCore,
   parseCityStatePhrase,
   extractLocationCandidateText,
+  normalizeCityLookupKey,
+  isHighConfidenceFloridaCity,
+  buildHighConfidenceFloridaLocation,
   looksLikeLocationCorrection,
   proposeStateFromCity,
   normalizeStateToken,

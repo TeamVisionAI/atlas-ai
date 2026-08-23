@@ -78,7 +78,7 @@ test("2. Hello → greeting", () => {
   assert.equal(interpretation.intent, INTENTS.GREETING);
 });
 
-test("3. Miami → partial location", () => {
+test("3. Miami → complete Florida location", () => {
   const interpretation = interpretInboundMessage({
     message: { text: "Miami" },
     context: createConversationContext({
@@ -89,12 +89,12 @@ test("3. Miami → partial location", () => {
   });
   assert.equal(interpretation.intent, INTENTS.PROVIDE_LOCATION);
   assert.equal(interpretation.entities.city, "Miami");
-  assert.equal(interpretation.entities.state, null);
-  assert.equal(interpretation.entities.completeness, "partial");
-  assert.equal(interpretation.requiresClarification, true);
+  assert.equal(interpretation.entities.state, "FL");
+  assert.equal(interpretation.entities.completeness, "complete");
+  assert.equal(interpretation.requiresClarification, false);
 });
 
-test("4. Doral → partial location", () => {
+test("4. Doral → complete Florida location", () => {
   const interpretation = interpretInboundMessage({
     message: { text: "Doral" },
     context: createConversationContext({
@@ -103,10 +103,10 @@ test("4. Doral → partial location", () => {
   });
   assert.equal(interpretation.intent, INTENTS.PROVIDE_LOCATION);
   assert.equal(interpretation.entities.city, "Doral");
-  assert.equal(interpretation.entities.state, null);
+  assert.equal(interpretation.entities.state, "FL");
 });
 
-test("5. Miami does not automatically persist FL as confirmed", () => {
+test("5. Miami auto-confirms FL for high-confidence Florida cities", () => {
   const turn = computeContextOnlyTurn({
     message: { text: "Miami" },
     context: createConversationContext({
@@ -116,10 +116,10 @@ test("5. Miami does not automatically persist FL as confirmed", () => {
     })
   });
   assert.equal(turn.nextContext.knownFacts.city, "Miami");
-  assert.equal(turn.nextContext.knownFacts.state, null);
-  assert.equal(turn.nextContext.knownFacts.cityCertainty, FACT_CERTAINTY.PARTIAL);
-  assert.notEqual(turn.nextContext.knownFacts.stateCertainty, FACT_CERTAINTY.CONFIRMED);
-  assert.equal(turn.nextContext.knownFacts.proposedState, "FL");
+  assert.equal(turn.nextContext.knownFacts.state, "FL");
+  assert.equal(turn.nextContext.knownFacts.cityCertainty, FACT_CERTAINTY.CONFIRMED);
+  assert.equal(turn.nextContext.knownFacts.stateCertainty, FACT_CERTAINTY.CONFIRMED);
+  assert.equal(turn.nextContext.knownFacts.proposedState, null);
   assert.notEqual(turn.decisionCode, NEXT_ACTIONS.ESCALATE_TO_HUMAN);
 });
 

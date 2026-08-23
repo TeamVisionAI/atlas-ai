@@ -145,6 +145,62 @@ export function patchConversationDetailCache(phone, patchFn) {
   return next;
 }
 
+/**
+ * Atomically patch list + detail caches after ownership mutation.
+ * Returns patched detail row when the selected phone matches.
+ */
+export function applyConversationOwnershipPatch(
+  phone,
+  { ownershipState, workflow = {} } = {}
+) {
+  if (!phone || !ownershipState) {
+    return null;
+  }
+
+  const patchRow = (row) => {
+    if (!row || row.phone !== phone) {
+      return row;
+    }
+    return {
+      ...row,
+      ownershipState,
+      needsHumanAttention: Boolean(workflow.needsHumanAttention),
+      manualAgentOwnership: Boolean(workflow.manualAgentOwnership)
+    };
+  };
+
+  for (const [key] of listCache) {
+    patchConversationsListCache(key, (data) => {
+      if (!data?.items?.length) {
+        return data;
+      }
+      return {
+        ...data,
+        items: data.items.map(patchRow)
+      };
+    });
+  }
+
+  return patchConversationDetailCache(phone, (detail) => {
+    if (!detail) {
+      return detail;
+    }
+    const conversation = detail.conversation
+      ? {
+          ...detail.conversation,
+          ownershipState,
+          needsHumanAttention: Boolean(workflow.needsHumanAttention)
+        }
+      : detail.conversation;
+    return {
+      ...detail,
+      ownershipState,
+      needsHumanAttention: Boolean(workflow.needsHumanAttention),
+      conversation
+    };
+  });
+}
+
 export async function takeOverConversation(phone, body = {}) {
   return wrap(`/api/conversations/take-over`, {
     method: "POST",

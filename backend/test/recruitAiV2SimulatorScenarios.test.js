@@ -92,7 +92,7 @@ test("9. first production failure scenario", () => {
   assert.equal(report.pass, true);
   assert.equal(report.turns[0].interpretedIntent, "greeting");
   assert.equal(report.turns[1].actual.city, "Miami");
-  assert.equal(report.turns[1].actual.state, null);
+  assert.equal(report.turns[1].actual.state, "FL");
   assert.notEqual(report.turns[2].interpretedIntent, "provide_name");
   assert.equal(report.turns[3].actual.state, "FL");
 });
@@ -140,7 +140,7 @@ test("15. repeated ambiguity escalation", () => {
 test("16. partial location", () => {
   const report = runRecruitAiV2ScenarioById("partial-location");
   assert.equal(report.pass, true);
-  assert.equal(report.turns[0].actual.state, null);
+  assert.equal(report.turns[0].actual.state, "FL");
   assert.equal(report.turns[3].actual.state, "FL");
 });
 

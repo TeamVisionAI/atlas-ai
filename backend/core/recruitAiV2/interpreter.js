@@ -434,6 +434,13 @@ function looksLikeDirectLackOfInterest(text) {
 
   // Spanish — bare "No me interesa" and close variants (no "ya" required).
   if (
+    /\bno dejemos asi gracias\b/.test(t) ||
+    /\bdejalo asi\b/.test(t) ||
+    /\bdejame tranquilo\b/.test(t) ||
+    /\bdejame tranquila\b/.test(t) ||
+    /\bno gracias\b/.test(t) ||
+    /\bgracias,? pero no\b/.test(t) ||
+    /\bya no\b/.test(t) ||
     /\bno me interesa( esto)?\b/.test(t) ||
     /\besto no me interesa\b/.test(t) ||
     /\bno estoy interesad[oa]( en esto)?\b/.test(t) ||

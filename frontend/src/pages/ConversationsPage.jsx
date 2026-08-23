@@ -46,7 +46,8 @@ import {
   markConversationAsTest,
   markConversationRead,
   ConversationsCenterError,
-  readConversationsListCache
+  readConversationsListCache,
+  applyConversationOwnershipPatch
 } from "../services/conversationsCenterService";
 import {
   CONVERSATIONS_ACCESS_STATE,
@@ -226,6 +227,8 @@ export default function ConversationsPage() {
   const inboundCountRef = useRef(0);
   const lastCommunicationAtRef = useRef(null);
   const loadListRef = useRef(null);
+  const ownershipRevisionRef = useRef(0);
+  const pendingOwnershipRef = useRef(null);
 
   const loadList = useCallback(async ({ quiet = false, force = false } = {}) => {
     const cacheKey = inboxCacheKey(activeFilter);
@@ -301,15 +304,16 @@ export default function ConversationsPage() {
   }, [activeFilter]);
 
   const loadDetail = useCallback(
-    async (phone) => {
+    async (phone, { force = false } = {}) => {
       if (!phone) {
         setDetail(null);
         setDetailLoading(false);
         return;
       }
+      const ownershipRevisionAtStart = ownershipRevisionRef.current;
       setDetailLoading(true);
       try {
-        const data = await getConversation(phone);
+        const data = await getConversation(phone, { force });
         // Stale async guard — rapid A→B must never keep A's detail under B.
         if (
           !shouldCommitConversationDetail({
@@ -319,7 +323,31 @@ export default function ConversationsPage() {
         ) {
           return;
         }
-        setDetail(data);
+        let nextDetail = data;
+        const pending = pendingOwnershipRef.current;
+        if (
+          pending?.phone === phone &&
+          ownershipRevisionRef.current !== ownershipRevisionAtStart
+        ) {
+          nextDetail = applyConversationOwnershipPatch(phone, {
+            ownershipState: pending.ownershipState,
+            workflow: pending.workflow
+          }) || {
+            ...data,
+            ownershipState: pending.ownershipState,
+            needsHumanAttention: Boolean(pending.workflow?.needsHumanAttention),
+            conversation: data.conversation
+              ? {
+                  ...data.conversation,
+                  ownershipState: pending.ownershipState,
+                  needsHumanAttention: Boolean(
+                    pending.workflow?.needsHumanAttention
+                  )
+                }
+              : data.conversation
+          };
+        }
+        setDetail(nextDetail);
       } catch (err) {
         if (
           !shouldCommitConversationDetail({
@@ -343,6 +371,72 @@ export default function ConversationsPage() {
     },
     [translate]
   );
+
+  function applyOwnershipMutationResult(phone, result) {
+    if (!phone || !result?.ownershipState) {
+      return;
+    }
+    const workflow = result.workflow || {};
+    ownershipRevisionRef.current += 1;
+    pendingOwnershipRef.current = {
+      phone,
+      ownershipState: result.ownershipState,
+      workflow,
+      revision: ownershipRevisionRef.current
+    };
+
+    const patchedDetail = applyConversationOwnershipPatch(phone, {
+      ownershipState: result.ownershipState,
+      workflow
+    });
+
+    setPayload((current) => {
+      if (!current?.items) {
+        return current;
+      }
+      return {
+        ...current,
+        items: current.items.map((item) =>
+          item.phone === phone
+            ? {
+                ...item,
+                ownershipState: result.ownershipState,
+                needsHumanAttention: Boolean(workflow.needsHumanAttention)
+              }
+            : item
+        )
+      };
+    });
+
+    if (
+      selectedPhoneRef.current === phone &&
+      (patchedDetail || result.ownershipState)
+    ) {
+      setDetail((current) => {
+        const base = patchedDetail || current;
+        if (!base) {
+          return {
+            phone,
+            ownershipState: result.ownershipState,
+            needsHumanAttention: Boolean(workflow.needsHumanAttention)
+          };
+        }
+        const conversation = base.conversation
+          ? {
+              ...base.conversation,
+              ownershipState: result.ownershipState,
+              needsHumanAttention: Boolean(workflow.needsHumanAttention)
+            }
+          : base.conversation;
+        return {
+          ...base,
+          ownershipState: result.ownershipState,
+          needsHumanAttention: Boolean(workflow.needsHumanAttention),
+          conversation
+        };
+      });
+    }
+  }
 
   useEffect(() => {
     // Clear prior conversation detail immediately so header never pairs with
@@ -512,9 +606,11 @@ export default function ConversationsPage() {
     if (!selectedPhone || actionBusy) return;
     setActionBusy(true);
     try {
-      await takeOverConversation(selectedPhone);
-      await loadList();
+      const result = await takeOverConversation(selectedPhone);
+      applyOwnershipMutationResult(selectedPhone, result);
+      await loadList({ force: true });
       setRefreshSignal((n) => n + 1);
+      loadDetail(selectedPhone, { force: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -526,9 +622,11 @@ export default function ConversationsPage() {
     if (!selectedPhone || actionBusy) return;
     setActionBusy(true);
     try {
-      await returnConversationToAtlas(selectedPhone);
-      await loadList();
+      const result = await returnConversationToAtlas(selectedPhone);
+      applyOwnershipMutationResult(selectedPhone, result);
+      await loadList({ force: true });
       setRefreshSignal((n) => n + 1);
+      loadDetail(selectedPhone, { force: true });
     } catch (err) {
       setError(err.message);
     } finally {
