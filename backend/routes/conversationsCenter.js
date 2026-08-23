@@ -280,12 +280,32 @@ async function returnToAtlasHandler(req, res) {
       prospectId: prospect.id || null
     });
 
+    const {
+      resumeConversationAfterReturnToAtlas
+    } = require("../core/conversationsCenter/returnToAtlasResumeService");
+
+    setImmediate(() => {
+      resumeConversationAfterReturnToAtlas({
+        phone: prospect.phone,
+        prospect,
+        organizationId: prospect.organization_id || organizationId || null,
+        previousWorkflow: result.previous,
+        returnedToAtlasAt: result.next.returnedToAtlasAt
+      }).catch((resumeError) => {
+        console.error(
+          "[conversations-center] return-to-atlas-resume",
+          resumeError.message
+        );
+      });
+    });
+
     res.json({
       success: true,
       action: "RETURN_TO_ATLAS",
       phone: prospect.phone,
       ownershipState: result.ownershipState,
       handoffReason: null,
+      resume: { scheduled: true },
       workflow: {
         workflowOwnership: result.next.workflowOwnership,
         needsHumanAttention: Boolean(result.next.needsHumanAttention),

@@ -189,15 +189,14 @@ test("19b. BR-095 case/punct/whitespace location variants", () => {
   }
 });
 
-test("20. Miami remains partial, not fabricated", () => {
+test("20. Miami high-confidence Florida resolves complete", () => {
   const parsed = parseLocationAnswer("Miami");
-  assert.equal(parsed.completeness, "partial");
+  assert.equal(parsed.completeness, "complete");
   assert.equal(parsed.city, "Miami");
-  assert.equal(parsed.state, null);
-  assert.equal(parsed.proposedState, "FL");
+  assert.equal(parsed.state, "FL");
+  assert.equal(parsed.proposedState, null);
   const r = turn("Miami", locationPendingContext());
-  assert.equal(r.nextContext.knownFacts.stateCertainty, "proposed");
-  assert.notEqual(r.nextContext.knownFacts.stateCertainty, "confirmed");
+  assert.equal(r.nextContext.knownFacts.stateCertainty, "confirmed");
 });
 
 test("21. FL remains incomplete (state-only)", () => {

@@ -37,13 +37,13 @@ const RECRUIT_AI_V2_SCENARIOS = [
         expect: {
           intent: "provide_location",
           city: "Miami",
-          state: null,
-          proposedState: "FL",
-          cityCertainty: "partial",
-          stateCertainty: "proposed",
-          requiresClarification: true,
+          state: "FL",
+          cityCertainty: "confirmed",
+          stateCertainty: "confirmed",
+          proposedState: null,
+          requiresClarification: false,
           shouldEscalate: false,
-          nextAction: "clarify_location",
+          nextAction: "continue_qualification",
           noDayPartScheduling: true,
           sideEffectsDenied: true
         }
@@ -201,7 +201,9 @@ const RECRUIT_AI_V2_SCENARIOS = [
         expect: {
           intent: "provide_location",
           preferredLanguage: "spanish",
-          requiresClarification: true
+          city: "Miami",
+          state: "FL",
+          requiresClarification: false
         }
       }
     ]
@@ -231,9 +233,9 @@ const RECRUIT_AI_V2_SCENARIOS = [
         expect: {
           intent: "provide_location",
           city: "Tampa",
-          state: null,
-          proposedState: "FL",
-          requiresClarification: true
+          state: "FL",
+          proposedState: null,
+          requiresClarification: false
         }
       }
     ]
@@ -291,9 +293,9 @@ const RECRUIT_AI_V2_SCENARIOS = [
         expect: {
           intent: "provide_location",
           city: "Miami",
-          state: null,
-          proposedState: "FL",
-          requiresClarification: true
+          state: "FL",
+          proposedState: null,
+          requiresClarification: false
         }
       },
       {
@@ -303,8 +305,8 @@ const RECRUIT_AI_V2_SCENARIOS = [
         expect: {
           intent: "provide_location",
           city: "Doral",
-          state: null,
-          proposedState: "FL"
+          state: "FL",
+          proposedState: null
         }
       },
       {
@@ -314,8 +316,8 @@ const RECRUIT_AI_V2_SCENARIOS = [
         expect: {
           intent: "provide_location",
           city: "Orlando",
-          state: null,
-          proposedState: "FL"
+          state: "FL",
+          proposedState: null
         }
       },
       {
@@ -643,7 +645,7 @@ const RECRUIT_AI_V2_SCENARIOS = [
           intent: "provide_location",
           preferredLanguage: "spanish",
           city: "Miami",
-          state: null
+          state: "FL"
         }
       }
     ]
@@ -778,7 +780,8 @@ const RECRUIT_AI_V2_SCENARIOS = [
         expect: {
           intent: "provide_location",
           city: "Orlando",
-          proposedState: "FL",
+          state: "FL",
+          proposedState: null,
           shouldEscalate: false,
           sideEffectsDenied: true
         }

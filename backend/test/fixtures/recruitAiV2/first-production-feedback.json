@@ -33,13 +33,13 @@
       "expect": {
         "intent": "provide_location",
         "city": "Miami",
-        "state": null,
-        "completeness": "partial",
-        "requiresClarification": true,
-        "stateCertainty": "proposed",
-        "proposedState": "FL",
+        "state": "FL",
+        "completeness": "complete",
+        "requiresClarification": false,
+        "stateCertainty": "confirmed",
+        "proposedState": null,
         "shouldEscalate": false,
-        "nextAction": "clarify_location",
+        "nextAction": "continue_qualification",
         "noDayPart": true
       }
     },

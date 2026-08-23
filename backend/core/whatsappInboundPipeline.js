@@ -506,9 +506,44 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
   let conversation = null;
 
+  const scheduleBurst =
+    dependencies.scheduleInboundBurstAggregation ||
+    require("./whatsappInboundBurstAggregator").scheduleInboundBurstAggregation;
+
+  let automationInbound = inboundForAutomation;
+  if (!isAudioInbound) {
+    const burstResult = await scheduleBurst({
+      phone: storagePhone,
+      text: semanticBody,
+      inbound: inboundForAutomation,
+      waitMs: dependencies.inboundBurstWaitMs
+    });
+    automationInbound = burstResult.inbound;
+    if (burstResult.burst) {
+      logWhatsAppStage("inbound_burst_aggregated", {
+        phone: storagePhone,
+        fragmentCount: burstResult.inbound.burstFragmentCount || 2,
+        anchorProviderMessageId: burstResult.anchorProviderMessageId || null
+      });
+      if (
+        burstResult.anchorProviderMessageId &&
+        burstResult.anchorProviderMessageId !== providerMessageId
+      ) {
+        return {
+          success: true,
+          skipped: false,
+          reason: "BURST_AGGREGATED_DEFERRED",
+          phone: storagePhone,
+          correlationId,
+          conversationLogId: logResult.log?.id || null
+        };
+      }
+    }
+  }
+
   try {
     conversation = await runHub({
-      inbound: inboundForAutomation,
+      inbound: automationInbound,
       storagePhone,
       prospect,
       contactName: prospect.name || inbound.contactName,
