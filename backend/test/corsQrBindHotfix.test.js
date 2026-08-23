@@ -13,6 +13,8 @@ const cors = require("cors");
 const {
   normalizeOrigin,
   buildAllowedOrigins,
+  isAtlasOwnedVercelPreviewOrigin,
+  isOriginAllowed,
   buildCorsOptions,
   createDisallowedOriginRejector
 } = require("../config/corsOptions");
@@ -124,6 +126,92 @@ test("production ATLAS_PUBLIC_URL origin is allowed by callback", async () => {
     await invokeOriginCallback(options, "https://www.teamvisionfinancial.com"),
     true
   );
+});
+
+test("staging allows Atlas Team Vision Vercel Preview origins", async () => {
+  const previewOrigin =
+    "https://atlas-ai-git-feat-executive-dashboar-f26c50-teamvisionfinancial.vercel.app";
+  const stagingEnv = {
+    NODE_ENV: "production",
+    ATLAS_ENV: "staging"
+  };
+
+  assert.equal(isAtlasOwnedVercelPreviewOrigin(previewOrigin), true);
+  assert.equal(isOriginAllowed(previewOrigin, stagingEnv), true);
+
+  const options = buildCorsOptions(stagingEnv);
+  assert.equal(await invokeOriginCallback(options, previewOrigin), true);
+});
+
+test("production rejects Atlas Vercel Preview origins without explicit allowlist", async () => {
+  const previewOrigin =
+    "https://atlas-ai-git-feat-executive-dashboar-f26c50-teamvisionfinancial.vercel.app";
+  const productionEnv = {
+    NODE_ENV: "production",
+    ATLAS_ENV: "production"
+  };
+
+  assert.equal(isOriginAllowed(previewOrigin, productionEnv), false);
+
+  const options = buildCorsOptions(productionEnv);
+  assert.equal(await invokeOriginCallback(options, previewOrigin), false);
+});
+
+test("staging rejects unrelated vercel.app preview origins", async () => {
+  const foreignPreview = "https://some-other-project.vercel.app";
+  const stagingEnv = {
+    NODE_ENV: "production",
+    ATLAS_ENV: "staging"
+  };
+
+  assert.equal(isOriginAllowed(foreignPreview, stagingEnv), false);
+});
+
+test("staging OPTIONS preflight for /api/auth/login allows Vercel Preview origin", async () => {
+  const previewOrigin =
+    "https://atlas-ai-git-feat-executive-dashboar-f26c50-teamvisionfinancial.vercel.app";
+  const env = {
+    NODE_ENV: "production",
+    ATLAS_ENV: "staging"
+  };
+  const app = express();
+  app.use(cors(buildCorsOptions(env)));
+  app.use(createDisallowedOriginRejector(env));
+  app.post("/api/auth/login", (_req, res) => {
+    res.status(401).json({ error: "INVALID_CREDENTIALS" });
+  });
+
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, resolve));
+  const { port } = server.address();
+
+  try {
+    const optionsRes = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: previewOrigin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,authorization"
+      }
+    });
+
+    assert.equal(optionsRes.status, 204);
+    assert.equal(optionsRes.headers.get("access-control-allow-origin"), previewOrigin);
+
+    const postRes = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        Origin: previewOrigin,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email: "missing@example.com", password: "wrong" })
+    });
+
+    assert.equal(postRes.status, 401);
+    assert.equal(postRes.headers.get("access-control-allow-origin"), previewOrigin);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 async function seedCarMagnet(repo) {
