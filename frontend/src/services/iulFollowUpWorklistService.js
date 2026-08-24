@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient";
+import { apiFetch } from "./apiClient";
 
 export async function getIulFollowUpWorklist({ filter, owner, campaign, nearExpiry } = {}) {
   const params = new URLSearchParams();
@@ -7,6 +7,6 @@ export async function getIulFollowUpWorklist({ filter, owner, campaign, nearExpi
   if (campaign) params.set("campaign", campaign);
   if (nearExpiry) params.set("nearExpiry", "1");
   const query = params.toString();
-  const path = query ? `/iul-follow-up-worklist?${query}` : "/iul-follow-up-worklist";
-  return apiClient.get(path);
+  const path = query ? `/api/iul-follow-up-worklist?${query}` : "/api/iul-follow-up-worklist";
+  return apiFetch(path);
 }
