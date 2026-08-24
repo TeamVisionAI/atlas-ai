@@ -8,6 +8,10 @@
 "use strict";
 
 const {
+  shouldCorrectLegacyLocation
+} = require("./factCertainty");
+const { normalizeEmail } = require("../emailNormalization");
+const {
   parseQualificationCapture,
   markCapturedFields,
   mergeNotesWithQualificationCapture
@@ -189,7 +193,12 @@ function planQualificationFactSync({
 
   if (durable.city) {
     if (legacyCity && !citiesEqual(legacyCity, durable.city)) {
-      conflicts.push({ field: "city", legacy: legacyCity, durable: durable.city });
+      if (shouldCorrectLegacyLocation(legacyCity, legacyState, durable.city, durable.state)) {
+        capturedPatch.city = durable.city;
+        legacyUpdates.city = durable.city;
+      } else {
+        conflicts.push({ field: "city", legacy: legacyCity, durable: durable.city });
+      }
     } else {
       capturedPatch.city = durable.city;
       if (!legacyCity) {
@@ -200,7 +209,12 @@ function planQualificationFactSync({
 
   if (durable.state) {
     if (legacyState && legacyState !== durable.state) {
-      conflicts.push({ field: "state", legacy: legacyState, durable: durable.state });
+      if (shouldCorrectLegacyLocation(legacyCity, legacyState, durable.city, durable.state)) {
+        capturedPatch.state = durable.state;
+        legacyUpdates.state = durable.state;
+      } else {
+        conflicts.push({ field: "state", legacy: legacyState, durable: durable.state });
+      }
     } else {
       capturedPatch.state = durable.state;
       if (!legacyState) {
@@ -243,6 +257,20 @@ function planQualificationFactSync({
     conflicts: [],
     durable
   };
+}
+
+function extractDurableInterviewType(durableContext = null) {
+  const facts = durableContext?.knownFacts || {};
+  const meetingType = String(
+    facts.preferredMeetingType || facts.meetingTypeRequested || ""
+  ).toLowerCase();
+  if (meetingType === "zoom" || String(facts.coverage || "").toUpperCase() === "OUTSIDE") {
+    return "Zoom";
+  }
+  if (meetingType === "in_person" && String(facts.coverage || "").toUpperCase() === "LOCAL") {
+    return "In Person";
+  }
+  return null;
 }
 
 function buildCaptureNotesPatch(prospect, confirmed = {}) {
@@ -467,6 +495,33 @@ async function synchronizeQualificationFactsForMissionControl({
       updateProspectFn
     });
 
+    const supplementalUpdates = {};
+    const durableEmail = normalizeEmail(durableContext?.knownFacts?.email);
+    if (durableEmail && !normalizeEmail(nextProspect?.email)) {
+      supplementalUpdates.email = durableEmail;
+    }
+    const interviewType = extractDurableInterviewType(durableContext);
+    if (interviewType && !nextProspect?.interview_type) {
+      supplementalUpdates.interview_type = interviewType;
+    }
+    if (result.ok && updateProspectFn && Object.keys(supplementalUpdates).length > 0) {
+      try {
+        const notesPatch = supplementalUpdates.email
+          ? require("./prospectContactFactSync").buildEmailNotesPatch(
+              result.prospect || nextProspect,
+              supplementalUpdates.email
+            )
+          : {};
+        await updateProspectFn((result.prospect || nextProspect).phone, {
+          ...supplementalUpdates,
+          ...notesPatch
+        });
+        result.prospect = { ...(result.prospect || nextProspect), ...supplementalUpdates, ...notesPatch };
+      } catch {
+        // Soft-fail supplemental hydration.
+      }
+    }
+
     if (result.ok && result.prospect && updateProspectFn && result.prospect.phone) {
       const notesPatch = buildCaptureNotesPatch(result.prospect, confirmed);
       if (Object.keys(notesPatch).length > 0) {
@@ -514,5 +569,6 @@ module.exports = {
   planQualificationFactSync,
   synchronizeQualificationFactsForSchedule,
   synchronizeQualificationFactsForMissionControl,
+  extractDurableInterviewType,
   persistInterviewReadyIfQualificationComplete
 };

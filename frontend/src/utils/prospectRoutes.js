@@ -1,9 +1,7 @@
 import { appPath } from "../config/appRoutes";
+import { normalizeProspectRoutePhone } from "./prospectRoutePhone";
 
-/**
- * Prospect Workspace navigation helpers.
- * Prospect Workspace is distinct from Mission Control queue navigation.
- */
+export { normalizeProspectRoutePhone } from "./prospectRoutePhone";
 
 export function resolveProspectPhone(prospect) {
   if (prospect == null) {

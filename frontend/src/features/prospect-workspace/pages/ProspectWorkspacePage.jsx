@@ -35,6 +35,7 @@ import CommunicationPreviewDialog from "../../../components/communication/Commun
 import { resolveNoteContextFromWorkspace } from "../../../engines/notesEngine";
 import { useWorkspaceKeyboardShortcuts } from "../hooks/useWorkspaceKeyboardShortcuts";
 import { appPath } from "../../../config/appRoutes";
+import { normalizeProspectRoutePhone } from "../../../utils/prospectRoutes";
 import ProspectEditorDrawer from "../components/ProspectEditorDrawer";
 import ScheduleInterviewDialog from "../components/ScheduleInterviewDialog";
 import RescheduleAppointmentDialog from "../../../components/appointments/RescheduleAppointmentDialog";
@@ -50,7 +51,7 @@ export default function ProspectWorkspacePage() {
   const { prompt, promptDialog } = usePromptDialog();
   const isDesktop = useIsDesktop();
   const timelineRef = useRef(null);
-  const phone = decodeURIComponent(routePhone || "");
+  const phone = normalizeProspectRoutePhone(routePhone);
 
   const {
     payload,
@@ -70,7 +71,7 @@ export default function ProspectWorkspacePage() {
       enabled: Boolean(workspace) && !loading
     });
 
-  const [workflowState, setWorkflowState] = useState(null);
+  const [workflowState, setWorkflowState] = useState(() => createDefaultWorkflowState());
   const [workflowComplete, setWorkflowComplete] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activityRefreshSignal, setActivityRefreshSignal] = useState(0);
@@ -175,14 +176,14 @@ export default function ProspectWorkspacePage() {
   );
 
   const workspaceContext = useMemo(() => {
-    if (!workspace || workflowState === null || !organizationSettings) {
+    if (!workspace || !organizationSettings) {
       return null;
     }
 
     return buildWorkspaceContext({
       workspace,
       organizationSettings,
-      workflowState,
+      workflowState: workflowState || createDefaultWorkflowState(),
       translate,
       handlers: {
         onAction: actions.handleMissionAction,
@@ -211,6 +212,9 @@ export default function ProspectWorkspacePage() {
   }
 
   if (!workspace || !workspaceContext) {
+    if (loading) {
+      return <WorkspaceSkeleton />;
+    }
     return (
       <div className="prospect-workspace">
         <ErrorState

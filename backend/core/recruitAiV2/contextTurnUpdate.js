@@ -9,6 +9,7 @@ const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine"
 const { mergeConversationContext } = require("./conversationContext");
 const { loadConversationContext } = require("./contextLoader");
 const { FACT_CERTAINTY } = require("./locationFacts");
+const { shouldBlockLocationOverwrite } = require("./factCertainty");
 
 /**
  * Apply interpretation + decision patches to context without rendering copy.
@@ -70,6 +71,11 @@ function buildNextContextFromInterpretation({
     interpretation.intent === "provide_location" ||
     interpretation.intent === "correct_location"
   ) {
+    if (
+      shouldBlockLocationOverwrite(nextContext.knownFacts || loaded.knownFacts || {}, interpretation)
+    ) {
+      // Keep confirmed canonical location; do not apply junk overwrite (e.g. "Me parece" → Parece, ME).
+    } else {
     const completeness = interpretation.entities?.completeness;
     const city =
       interpretation.entities?.city || nextContext.knownFacts?.city || null;
@@ -112,6 +118,14 @@ function buildNextContextFromInterpretation({
         proposedState: proposedState || null
       };
     }
+    }
+  }
+
+  if (interpretation.intent === "provide_email" && interpretation.entities?.email) {
+    nextContext.knownFacts = {
+      ...nextContext.knownFacts,
+      email: interpretation.entities.email
+    };
   }
 
   // provide_authorization, or same-turn auth captured beside job FAQ (pending compounds).
