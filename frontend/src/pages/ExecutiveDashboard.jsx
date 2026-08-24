@@ -26,25 +26,29 @@ const FOCUS_LABEL_KEYS = {
   kpis: "executiveFocusKpis"
 };
 
-function AnalyticsSection({ viewModel, loading, translate }) {
-  if (loading || !viewModel) {
-    return (
-      <section className="executive-v2__section" aria-busy="true">
-        <h2 className="executive-v2__section-title">{translate("executiveV2SectionAnalytics")}</h2>
-        <div className="executive-v2__grid executive-v2__grid--two">
-          <AppointmentTrendCard trend={[]} loading />
-          <RecentActivityCard activity={[]} loading />
-        </div>
-      </section>
-    );
-  }
-
+function AnalyticsSection({
+  viewModel,
+  metricsLoading,
+  metricsUnavailable,
+  activityLoading,
+  unavailableMessage,
+  retryLabel,
+  onRetry,
+  translate
+}) {
   return (
-    <section className="executive-v2__section">
+    <section className="executive-v2__section" aria-busy={metricsLoading || activityLoading || undefined}>
       <h2 className="executive-v2__section-title">{translate("executiveV2SectionAnalytics")}</h2>
       <div className="executive-v2__grid executive-v2__grid--two">
-        <AppointmentTrendCard trend={viewModel.trend || []} loading={false} />
-        <RecentActivityCard activity={viewModel.recentActivity || []} loading={false} />
+        <AppointmentTrendCard
+          trend={viewModel?.trend || []}
+          loading={metricsLoading}
+          unavailable={metricsUnavailable}
+          unavailableMessage={unavailableMessage}
+          onRetry={onRetry}
+          retryLabel={retryLabel}
+        />
+        <RecentActivityCard activity={viewModel?.recentActivity || []} loading={activityLoading} />
       </div>
     </section>
   );
@@ -62,11 +66,16 @@ export default function ExecutiveDashboard() {
     organizationName,
     phase,
     loadingExecutive,
-    errors
+    metricsLoading,
+    metricsUnavailable,
+    errors,
+    reload
   } = useExecutiveDashboardV2Data();
 
   const orgLabel =
     organizationName || supportMode?.organizationName || translate("teamDashOrganizationFallback");
+  const metricsUnavailableMessage = translate("executiveV2MetricsUnavailable");
+  const retryLabel = translate("executiveV2Retry");
 
   const viewModel = useMemo(() => {
     if (!executive) {
@@ -94,7 +103,12 @@ export default function ExecutiveDashboard() {
   if (errors.executive && !executive) {
     return (
       <div className="executive-dashboard executive-dashboard--v2">
-        <div className="executive-error">{translate(errors.executive)}</div>
+        <div className="executive-error">
+          <p>{translate(errors.executive)}</p>
+          <button type="button" className="executive-v2__button" onClick={reload}>
+            {retryLabel}
+          </button>
+        </div>
       </div>
     );
   }
@@ -117,12 +131,16 @@ export default function ExecutiveDashboard() {
 
       <ExecutiveDashboardKpiSection
         cards={viewModel?.kpiCards || []}
-        loading={loadingExecutive}
+        loading={metricsLoading}
+        unavailable={metricsUnavailable}
+        unavailableMessage={metricsUnavailableMessage}
+        onRetry={reload}
+        retryLabel={retryLabel}
       />
 
       <section className="executive-v2__section">
         <h2 className="executive-v2__section-title">{translate("executiveV2SectionOperations")}</h2>
-        <div className="executive-v2__grid executive-v2__grid--three">
+        <div className="executive-v2__grid executive-v2__grid--three executive-v2__grid--operations">
           <InterviewsTodayCard
             interviews={viewModel?.interviewsToday}
             loading={loadingExecutive}
@@ -133,35 +151,40 @@ export default function ExecutiveDashboard() {
         </div>
       </section>
 
-      {phase >= 2 ? (
-        <section className="executive-v2__section">
-          <h2 className="executive-v2__section-title">{translate("executiveV2SectionInsights")}</h2>
-          <div className="executive-v2__grid executive-v2__grid--three">
-            <RecruitmentFunnelCard funnel={viewModel?.funnel} loading={!viewModel?.hasV2Metrics} />
-            <ConversationPerformanceCard
-              performance={viewModel?.conversationPerformance}
-              loading={!viewModel?.hasV2Metrics}
-            />
-            <TodayPrioritiesCard
-              priorities={viewModel?.priorities || []}
-              loading={!alphaBrief && phase < 2}
-            />
-          </div>
-        </section>
-      ) : (
-        <section className="executive-v2__section" aria-busy="true">
-          <h2 className="executive-v2__section-title">{translate("executiveV2SectionInsights")}</h2>
-          <div className="executive-v2__grid executive-v2__grid--three">
-            <RecruitmentFunnelCard funnel={null} loading />
-            <ConversationPerformanceCard performance={null} loading />
-            <TodayPrioritiesCard priorities={[]} loading />
-          </div>
-        </section>
-      )}
+      <section className="executive-v2__section">
+        <h2 className="executive-v2__section-title">{translate("executiveV2SectionInsights")}</h2>
+        <div className="executive-v2__grid executive-v2__grid--three executive-v2__grid--insights">
+          <RecruitmentFunnelCard
+            funnel={viewModel?.funnel}
+            loading={metricsLoading}
+            unavailable={metricsUnavailable}
+            unavailableMessage={metricsUnavailableMessage}
+            onRetry={reload}
+            retryLabel={retryLabel}
+          />
+          <ConversationPerformanceCard
+            performance={viewModel?.conversationPerformance}
+            loading={metricsLoading}
+            unavailable={metricsUnavailable}
+            unavailableMessage={metricsUnavailableMessage}
+            onRetry={reload}
+            retryLabel={retryLabel}
+          />
+          <TodayPrioritiesCard
+            priorities={viewModel?.priorities || []}
+            loading={!alphaBrief && phase < 2}
+          />
+        </div>
+      </section>
 
       <AnalyticsSection
         viewModel={viewModel}
-        loading={loadingExecutive}
+        metricsLoading={metricsLoading}
+        metricsUnavailable={metricsUnavailable}
+        activityLoading={loadingExecutive}
+        unavailableMessage={metricsUnavailableMessage}
+        retryLabel={retryLabel}
+        onRetry={reload}
         translate={translate}
       />
 

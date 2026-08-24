@@ -42,14 +42,26 @@ function formatComparison(delta) {
 function buildKpiCards(v2Metrics, translate) {
   const kpi = v2Metrics?.kpi || {};
   const comparison = kpi.comparison || {};
+  const periodToday = translate("executiveV2KpiPeriodToday");
+  const periodPipeline = translate("executiveV2KpiPeriodPipeline");
 
   const defs = [
-    { key: "newProspects", labelKey: "executiveV2KpiNewProspects", icon: "users" },
-    { key: "qualified", labelKey: "executiveV2KpiQualified", icon: "check" },
-    { key: "appointments", labelKey: "executiveV2KpiAppointments", icon: "calendar" },
-    { key: "confirmed", labelKey: "executiveV2KpiConfirmed", icon: "badge" },
-    { key: "completed", labelKey: "executiveV2KpiCompleted", icon: "flag" },
-    { key: "recruited", labelKey: "executiveV2KpiRecruited", icon: "star" }
+    {
+      key: "newProspects",
+      labelKey: "executiveV2KpiNewProspects",
+      icon: "users",
+      periodLabel: periodToday
+    },
+    { key: "qualified", labelKey: "executiveV2KpiQualified", icon: "check", periodLabel: periodPipeline },
+    {
+      key: "appointments",
+      labelKey: "executiveV2KpiAppointments",
+      icon: "calendar",
+      periodLabel: periodPipeline
+    },
+    { key: "confirmed", labelKey: "executiveV2KpiConfirmed", icon: "badge", periodLabel: periodPipeline },
+    { key: "completed", labelKey: "executiveV2KpiCompleted", icon: "flag", periodLabel: periodPipeline },
+    { key: "recruited", labelKey: "executiveV2KpiRecruited", icon: "star", periodLabel: periodPipeline }
   ];
 
   return defs.map((def) => ({

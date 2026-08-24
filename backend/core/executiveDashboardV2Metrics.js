@@ -108,7 +108,8 @@ function buildKpiMetrics(prospects, queue, context) {
   };
 }
 
-function buildRecruitmentFunnel(queue) {
+function buildRecruitmentFunnel(queue, prospects) {
+  const byPhone = prospectByPhone(prospects);
   const stages = [
     {
       key: "newLeads",
@@ -133,11 +134,10 @@ function buildRecruitmentFunnel(queue) {
     },
     {
       key: "confirmed",
-      count: (queue || []).filter(
-        (row) =>
-          row.canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED ||
-          row.canonicalMilestone === MILESTONES.INTERVIEW_DUE
-      ).length
+      count: (queue || []).filter((row) => {
+        const prospect = byPhone.get(row.phone) || {};
+        return prospect.current_step === "CONFIRMED";
+      }).length
     },
     {
       key: "completed",
@@ -281,7 +281,7 @@ function buildExecutiveDashboardV2Metrics(prospects, queue, context = {}) {
 
   return {
     kpi: buildKpiMetrics(prospects, queue, metricsContext),
-    funnel: buildRecruitmentFunnel(queue),
+    funnel: buildRecruitmentFunnel(queue, prospects),
     conversationOwnership: buildConversationOwnership(queue),
     trend7Day: buildSevenDayAppointmentTrend(prospects, queue, metricsContext)
   };

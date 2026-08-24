@@ -440,7 +440,7 @@
 /* ── Executive Dashboard v2 ───────────────────────────────────────── */
 
 .executive-dashboard--v2 {
-  --exec-v2-max: 1580px;
+  --exec-v2-max: 1620px;
   --exec-v2-gutter: 28px;
   --exec-v2-radius: 13px;
   --exec-v2-accent-blue: #1e40af;
@@ -455,8 +455,10 @@
   max-width: var(--exec-v2-max);
   width: 100%;
   margin: 0 auto;
-  padding: 4px var(--exec-v2-gutter) 36px;
+  padding: 8px var(--exec-v2-gutter) 40px;
   box-sizing: border-box;
+  background: #f4f6f8;
+  min-height: calc(100vh - 64px);
 }
 
 .executive-v2__header {
@@ -503,7 +505,10 @@
   border: 1px solid var(--exec-border);
   border-radius: 999px;
   background: var(--exec-surface);
-  padding: 10px 16px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
   font-size: 14px;
   font-weight: 500;
   color: #334155;
@@ -571,6 +576,47 @@
 
 .executive-v2__grid--three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.executive-v2__grid--operations .executive-v2__card,
+.executive-v2__grid--insights .executive-v2__card {
+  min-height: 360px;
+}
+
+.executive-v2__kpi-period {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--exec-subtle);
+}
+
+.executive-v2__section-unavailable {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  min-height: 120px;
+  padding: 8px 0;
+  color: var(--exec-muted);
+}
+
+.executive-v2__section-unavailable p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.executive-v2__kpi-row--unavailable {
+  grid-column: 1 / -1;
+  display: block;
+  background: var(--exec-surface);
+  border: 1px solid var(--exec-border);
+  border-radius: var(--exec-v2-radius);
+  padding: 24px;
+  box-shadow: var(--exec-shadow);
 }
 
 .executive-v2__card {
@@ -984,32 +1030,32 @@
 
 .executive-v2__donut-wrap {
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: 200px 1fr;
   gap: 20px;
   align-items: center;
 }
 
 .executive-v2__donut-chart {
   position: relative;
-  width: 180px;
-  height: 180px;
+  width: 200px;
+  height: 200px;
 }
 
 .executive-v2__donut {
-  width: 180px;
-  height: 180px;
+  width: 200px;
+  height: 200px;
   transform: rotate(-90deg);
 }
 
 .executive-v2__donut-track {
   fill: none;
   stroke: #e2e8f0;
-  stroke-width: 16;
+  stroke-width: 20;
 }
 
 .executive-v2__donut-segment {
   fill: none;
-  stroke-width: 16;
+  stroke-width: 20;
   stroke-linecap: round;
 }
 
@@ -1169,7 +1215,8 @@
 
 .executive-v2__line-chart {
   width: 100%;
-  height: 240px;
+  height: 260px;
+  min-height: 260px;
 }
 
 .executive-v2__chart-grid {

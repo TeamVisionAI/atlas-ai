@@ -196,6 +196,22 @@ test("conversation performance shows em dash for unsupported avg response time",
   assert.equal(model.conversationPerformance.averageResponseTimeLabel, "—");
 });
 
+test("missing v2Metrics yields empty KPI cards and hasV2Metrics false", () => {
+  const model = buildExecutiveDashboardV2ViewModel({
+    executive: { ...executiveFixture, v2Metrics: undefined },
+    alphaBrief: null,
+    prospects: [],
+    user: null,
+    organizationName: "Team Vision",
+    translate
+  });
+
+  assert.equal(model.hasV2Metrics, false);
+  assert.equal(model.kpiCards.length, 0);
+  assert.equal(model.funnel, null);
+  assert.equal(model.conversationPerformance, null);
+});
+
 test("zero-state agenda and activity render empty-safe models", () => {
   const model = buildExecutiveDashboardV2ViewModel({
     executive: {
