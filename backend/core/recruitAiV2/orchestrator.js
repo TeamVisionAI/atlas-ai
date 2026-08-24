@@ -23,6 +23,7 @@ const { interpretInboundMessage } = require("./interpreter");
 const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine");
 const { buildResponsePlan } = require("./responsePlan");
 const { renderCustomerReply } = require("./responseRenderer");
+const { enforceQualificationNoDeadEnd } = require("./qualificationProgressGuard");
 const {
   authorizeSideEffects,
   resolveActingUserId
@@ -71,6 +72,19 @@ async function processNonTextMediaTurn({
   });
   let responsePlan = buildResponsePlan(structuredDecision);
   let rendered = renderCustomerReply(responsePlan);
+  let qualificationDiagnostics = null;
+
+  ({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    diagnostics: qualificationDiagnostics
+  } = enforceQualificationNoDeadEnd({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    context: loaded
+  }));
 
   if (containsInternalDiagnostics(rendered.text)) {
     structuredDecision = decideSafeFailure({
@@ -202,6 +216,19 @@ function processNonTextMediaTurnSync({ message, loaded, media, options = {} } = 
   });
   let responsePlan = buildResponsePlan(structuredDecision);
   let rendered = renderCustomerReply(responsePlan);
+  let qualificationDiagnostics = null;
+
+  ({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    diagnostics: qualificationDiagnostics
+  } = enforceQualificationNoDeadEnd({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    context: loaded
+  }));
 
   if (containsInternalDiagnostics(rendered.text)) {
     structuredDecision = decideSafeFailure({
@@ -496,6 +523,19 @@ async function processRecruitAiV2Turn({
 
   let responsePlan = buildResponsePlan(structuredDecision);
   let rendered = renderCustomerReply(responsePlan);
+  let qualificationDiagnostics = null;
+
+  ({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    diagnostics: qualificationDiagnostics
+  } = enforceQualificationNoDeadEnd({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    context: loaded
+  }));
 
   if (containsInternalDiagnostics(rendered.text)) {
     structuredDecision = decideSafeFailure({
@@ -740,7 +780,19 @@ async function processRecruitAiV2Turn({
       executionAuthorized: Boolean(authorization.authorized),
       actionPerformed: (execution.performed || []).map((p) => p.type),
       sideEffectsAuthorized: Boolean(authorization.authorized),
-      contextPersisted: Boolean(persistenceResult?.ok)
+      contextPersisted: Boolean(persistenceResult?.ok),
+      qualification_next_required_field:
+        qualificationDiagnostics?.qualification_next_required_field || null,
+      qualification_next_action:
+        qualificationDiagnostics?.qualification_next_action || null,
+      qualification_progress_stall: Boolean(
+        qualificationDiagnostics?.qualification_progress_stall
+      ),
+      rendered_response_type:
+        qualificationDiagnostics?.rendered_response_type || null,
+      acknowledgment_only_detected: Boolean(
+        qualificationDiagnostics?.acknowledgment_only_detected
+      )
     }
   };
 }
@@ -798,6 +850,19 @@ function processRecruitAiV2TurnSync(args = {}) {
 
   let responsePlan = buildResponsePlan(structuredDecision);
   let rendered = renderCustomerReply(responsePlan);
+  let qualificationDiagnostics = null;
+
+  ({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    diagnostics: qualificationDiagnostics
+  } = enforceQualificationNoDeadEnd({
+    rendered,
+    responsePlan,
+    structuredDecision,
+    context: loaded
+  }));
 
   if (containsInternalDiagnostics(rendered.text)) {
     structuredDecision = decideSafeFailure({

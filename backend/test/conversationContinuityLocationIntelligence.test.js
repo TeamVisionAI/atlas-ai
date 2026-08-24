@@ -49,7 +49,8 @@ const FL_CITIES = [
   ["Kissimmee", "Kissimmee"],
   ["Tampa", "Tampa"],
   ["Ft Lauderdale", "Ft Lauderdale"],
-  ["Fort Lauderdale", "Fort Lauderdale"]
+  ["Fort Lauderdale", "Fort Lauderdale"],
+  ["Fort Myers", "Fort Myers"]
 ];
 
 for (const [input, expectedCity] of FL_CITIES) {

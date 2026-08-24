@@ -777,6 +777,24 @@ function renderCustomerReply(responsePlan) {
       language,
       entities
     );
+  } else if (key === "continue_qualification") {
+    // BR-088 — never emit bare Continuemos; always resume the next required field.
+    const resumeKey =
+      entities.resumeTemplateKey ||
+      resolveFaqResumeTemplateKeyFromFacts({
+        city: entities.city,
+        state: entities.state,
+        proposedState: entities.proposedState,
+        cityCertainty: entities.city ? "confirmed" : null,
+        stateCertainty: entities.state || entities.proposedState ? "confirmed" : null,
+        workAuthorization: entities.workAuthorization,
+        workAuthorizationStatus: entities.workAuthorizationStatus,
+        preferredDayPart: entities.dayPart || entities.preferredDayPart
+      }).templateKey;
+    const resume = resolveResumeQuestion(resumeKey, language, entities);
+    const ack =
+      language === LANGUAGES.SPANISH ? "Gracias — eso ayuda." : "Thanks — that helps.";
+    template = composeAnswerThenOneQuestion(ack, resume);
   } else if (key === "acknowledge_fixed_employment_preference") {
     template = getFixedEmploymentPreferenceMessage(lang);
   } else if (key === "acknowledge_current_not_fit_no_write") {

@@ -1434,7 +1434,9 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       looksLikeName(text) &&
       !context?.knownFacts?.fullName &&
       !dayPartCtx &&
-      context?.conversation?.lastQuestionAsked !== "ask_authorization"
+      context?.conversation?.lastQuestionAsked !== "ask_authorization" &&
+      !locationCtx &&
+      !lastQuestionImpliesLocation(context)
     ) {
       intent = INTENTS.PROVIDE_NAME;
       confidence = 0.78;

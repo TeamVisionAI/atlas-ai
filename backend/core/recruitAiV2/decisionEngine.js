@@ -2024,8 +2024,29 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.PROVIDE_NAME) {
+    const resume = resolveQualificationResume({
+      ...context,
+      knownFacts: {
+        ...context.knownFacts,
+        fullName: interpretation.entities?.name || context.knownFacts?.fullName || null,
+        name: interpretation.entities?.name || context.knownFacts?.name || null
+      }
+    });
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
-    structured.customerReplyPlan.templateKey = "continue_qualification";
+    structured.customerReplyPlan.templateKey = resume.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ...(resume.entities || {})
+    };
+    structured.contextPatch = {
+      knownFacts: {
+        name: interpretation.entities?.name || null,
+        fullName: interpretation.entities?.name || null
+      },
+      conversation: {
+        lastQuestionAsked: resume.lastQuestionAsked
+      }
+    };
     return structured;
   }
 

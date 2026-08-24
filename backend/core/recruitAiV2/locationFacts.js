@@ -23,6 +23,9 @@ const CITY_TO_PROPOSED_STATE = Object.freeze({
   jacksonville: "FL",
   "fort lauderdale": "FL",
   "ft lauderdale": "FL",
+  "fort myers": "FL",
+  "cape coral": "FL",
+  naples: "FL",
   hialeah: "FL",
   kissimmee: "FL",
   "west palm beach": "FL",
@@ -356,6 +359,18 @@ function extractLocationCandidateText(text) {
   if (live) {
     t = String(live[1] || "").trim();
     strippedCorrection = strippedCorrection || true;
+  }
+
+  // Spanish "En Fort Myers" / "en Miami" — location answer, not a name (Claudia prod stall).
+  const bareEn = t.match(/^en\s+([A-Za-zÁÉÍÓÚÑáéíóúñ].+)$/i);
+  if (bareEn) {
+    const candidate = String(bareEn[1] || "").trim();
+    if (
+      candidate &&
+      !/^(que|qué|donde|dónde|cual|cuál|que estado|qué estado)\b/i.test(candidate)
+    ) {
+      t = candidate;
+    }
   }
 
   return { text: t, correctionSignal: strippedCorrection };
