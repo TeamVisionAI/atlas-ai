@@ -37,6 +37,10 @@ const {
   buildStalledFirstReplyRecoveryContext,
   restoreStalledFirstReplyRecruitingState
 } = require("./whatsappInboundFirstReplyRecoveryContext");
+const {
+  isRecruitingCampaignIntakeFirstTurnBurst,
+  shouldSkipDuplicateRecruitingFirstTurnReply
+} = require("./recruitingFirstTurnBurst");
 
 function duplicateSkipResult(correlationId, providerMessageId, phone) {
   logWhatsAppStage("message_duplicate_skipped", {
@@ -509,6 +513,16 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   const scheduleBurst =
     dependencies.scheduleInboundBurstAggregation ||
     require("./whatsappInboundBurstAggregator").scheduleInboundBurstAggregation;
+  const hasDeliveredAutomatedOutbound =
+    dependencies.prospectHasDeliveredAutomatedOutbound ||
+    prospectHasDeliveredAutomatedOutbound;
+  const recruitingFirstTurnBurst = isRecruitingCampaignIntakeFirstTurnBurst({
+    campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : null,
+    hasDeliveredAutomatedOutbound: await hasDeliveredAutomatedOutbound(
+      storagePhone,
+      organizationId || prospect?.organization_id || claimedOrganizationId || null
+    )
+  });
 
   let automationInbound = inboundForAutomation;
   if (!isAudioInbound) {
@@ -516,14 +530,16 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       phone: storagePhone,
       text: semanticBody,
       inbound: inboundForAutomation,
-      waitMs: dependencies.inboundBurstWaitMs
+      waitMs: dependencies.inboundBurstWaitMs,
+      recruitingFirstTurnBurst
     });
     automationInbound = burstResult.inbound;
     if (burstResult.burst) {
       logWhatsAppStage("inbound_burst_aggregated", {
         phone: storagePhone,
         fragmentCount: burstResult.inbound.burstFragmentCount || 2,
-        anchorProviderMessageId: burstResult.anchorProviderMessageId || null
+        anchorProviderMessageId: burstResult.anchorProviderMessageId || null,
+        recruitingFirstTurnBurst: Boolean(burstResult.inbound.recruitingFirstTurnBurst)
       });
       if (
         burstResult.anchorProviderMessageId &&
@@ -538,6 +554,39 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
           conversationLogId: logResult.log?.id || null
         };
       }
+    }
+  }
+
+  if (!isAudioInbound) {
+    const workflowState = prospect?.phone
+      ? await loadPersistedWorkflowState(prospect.phone, {
+          organizationId: organizationId || prospect.organization_id || null,
+          prospectId: prospect.id || null
+        }).catch(() => null)
+      : null;
+    const skipDuplicateFirstTurn = shouldSkipDuplicateRecruitingFirstTurnReply({
+      campaignIntakeMatch: automationInbound.campaignIntakeMatch,
+      hasDeliveredAutomatedOutbound: await hasDeliveredAutomatedOutbound(
+        storagePhone,
+        organizationId || prospect?.organization_id || claimedOrganizationId || null
+      ),
+      workflowState,
+      semanticBody: automationInbound.body || semanticBody
+    });
+    if (skipDuplicateFirstTurn) {
+      logWhatsAppStage("recruiting_first_turn_burst_dedup_skipped", {
+        phone: storagePhone,
+        providerMessageId: inbound.providerMessageId,
+        recruitingFirstTurnBurst
+      });
+      return {
+        success: true,
+        skipped: false,
+        reason: "RECRUITING_FIRST_TURN_BURST_DEDUP_SKIPPED",
+        phone: storagePhone,
+        correlationId,
+        conversationLogId: logResult.log?.id || null
+      };
     }
   }
 
