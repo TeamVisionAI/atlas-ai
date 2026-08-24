@@ -3,6 +3,11 @@
  * Inbound messages and delivery status updates (observability).
  */
 
+const {
+  extractWhatsAppSenderIdentity,
+  resolveContactForMessage
+} = require("../core/whatsappSenderIdentity");
+
 function normalizeMessageBody(message) {
   if (!message) {
     return null;
@@ -150,7 +155,8 @@ function parseWhatsAppWebhookPayload(body) {
         continue;
       }
 
-      const contactName = value.contacts?.[0]?.profile?.name || "Unknown";
+      const contacts = Array.isArray(value.contacts) ? value.contacts : [];
+      const contactName = contacts?.[0]?.profile?.name || "Unknown";
       const phoneNumberId = value.metadata?.phone_number_id
         ? String(value.metadata.phone_number_id)
         : null;
@@ -160,10 +166,22 @@ function parseWhatsAppWebhookPayload(body) {
           continue;
         }
 
+        const contact = resolveContactForMessage(message, contacts);
+        const senderIdentity = extractWhatsAppSenderIdentity(
+          message,
+          contact,
+          contactName
+        );
+
         messages.push({
           providerMessageId: message.id,
-          phone: message.from,
-          contactName,
+          phone: senderIdentity.storageKey || message.from,
+          phoneE164: senderIdentity.phoneE164 || null,
+          whatsappSenderId: senderIdentity.whatsappSenderId || message.from,
+          whatsappUsername: senderIdentity.whatsappUsername || null,
+          contactName: senderIdentity.displayName || contactName,
+          senderIdentity,
+          rawContact: contact || null,
           messageType: message.type || "unknown",
           body: normalizeMessageBody(message),
           timestamp: message.timestamp

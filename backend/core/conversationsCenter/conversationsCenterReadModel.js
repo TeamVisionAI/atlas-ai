@@ -30,6 +30,7 @@ const {
   isRealWhatsAppCommunication
 } = require("./conversationsUnreadEngine");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../phoneNormalizer");
+const { formatProspectWhatsAppDisplayIdentity } = require("../whatsappSenderIdentity");
 
 const INBOX_LOGS_PER_PHONE = 24;
 const INBOX_LOGS_MAX = 600;
@@ -225,6 +226,12 @@ async function buildConversationListItem(prospect, options = {}) {
   return {
     id: prospect.id || null,
     phone: prospect.phone,
+    displayIdentity: formatProspectWhatsAppDisplayIdentity(prospect),
+    whatsappUsername: prospect.whatsapp_username || null,
+    whatsappSenderId: prospect.whatsapp_sender_id || null,
+    hasVisiblePhone: Boolean(
+      prospect.phone && !String(prospect.phone).startsWith("wa:bsuid:")
+    ),
     name: prospect.name || null,
     prospectNumber: prospect.prospect_number || null,
     lastMessagePreview,
@@ -260,6 +267,9 @@ function summarizeConversationListItem(item = {}) {
   return {
     id: item.id || null,
     phone: item.phone,
+    displayIdentity: item.displayIdentity || item.name || item.phone || null,
+    whatsappUsername: item.whatsappUsername || null,
+    hasVisiblePhone: item.hasVisiblePhone !== false,
     name: item.name || null,
     prospectNumber: item.prospectNumber || null,
     lastMessagePreview: item.lastMessagePreview || null,

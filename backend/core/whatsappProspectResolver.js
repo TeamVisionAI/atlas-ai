@@ -49,6 +49,10 @@ const {
 const {
   getCampaignIntakeAttributionService
 } = require("./campaignIntakeCode/campaignIntakeAttributionService");
+const {
+  resolveWhatsAppSenderIdentityFromInbound,
+  mergeWhatsAppSenderIdentityOntoProspect
+} = require("./whatsappSenderIdentity");
 
 const { supabase } = supabaseService;
 const { EVENT_TYPES } = eventEngine;
@@ -88,7 +92,9 @@ function isMissingWhatsAppColumn(error) {
     message.includes("attention_status") ||
     message.includes("new_lead_received_at") ||
     message.includes("acknowledged_at") ||
-    message.includes("escalation_level")
+    message.includes("escalation_level") ||
+    message.includes("whatsapp_sender_id") ||
+    message.includes("whatsapp_username")
   );
 }
 
@@ -177,8 +183,9 @@ async function insertWhatsAppProspectRow({
   firstMessage,
   organizationId,
   qrTouch = null,
-  origin = {}
-}) {
+  origin = {},
+  senderIdentity = null
+} = {}) {
   if (!organizationId) {
     throw new WhatsAppInboundOrganizationError(
       "Refusing to create WhatsApp prospect without organization_id."
@@ -203,6 +210,8 @@ async function insertWhatsAppProspectRow({
   const insertRow = {
     phone: storagePhone,
     normalized_phone: normalizedPhone,
+    whatsapp_sender_id: senderIdentity?.whatsappSenderId || null,
+    whatsapp_username: senderIdentity?.whatsappUsername || null,
     name: fullName,
     first_name: fullName.split(" ")[0] || fullName,
     last_name: fullName.split(" ").slice(1).join(" ") || null,
@@ -458,10 +467,21 @@ async function locateOrCreateWhatsAppProspect({
   providerMessageId = null,
   ctwaReferral = null,
   intakeSource = null,
-  campaignIntakeMatch = null
+  campaignIntakeMatch = null,
+  senderIdentity = null
 } = {}) {
-  const normalizedPhone = normalizePhoneNumber(phone);
-  const storagePhone = resolveStoragePhone(phone);
+  const resolvedIdentity =
+    senderIdentity ||
+    resolveWhatsAppSenderIdentityFromInbound({
+      phone,
+      contactName: name,
+      whatsappSenderId: null
+    });
+  const normalizedPhone =
+    resolvedIdentity.phoneE164 != null
+      ? normalizePhoneNumber(resolvedIdentity.phoneE164)
+      : normalizePhoneNumber(phone);
+  const storagePhone = resolvedIdentity.storageKey || resolveStoragePhone(phone);
 
   const { organizationId, source: organizationSource } =
     await whatsappInboundOrganizationResolver.resolveWhatsAppInboundOrganizationId({
@@ -487,6 +507,12 @@ async function locateOrCreateWhatsAppProspect({
   }
 
   let prospect =
+    (resolvedIdentity.whatsappSenderId
+      ? await supabaseService.findProspectByWhatsAppSenderIdInOrganization(
+          resolvedIdentity.whatsappSenderId,
+          organizationId
+        )
+      : null) ||
     (await quickCaptureEngine.findProspectByNormalizedPhone(
       normalizedPhone || phone,
       organizationId
@@ -533,16 +559,18 @@ async function locateOrCreateWhatsAppProspect({
     prospect = await insertWhatsAppProspectRow({
       storagePhone,
       normalizedPhone,
-      name,
+      name: resolvedIdentity.displayName || name,
       firstMessage,
       organizationId,
       qrTouch,
-      origin
+      origin,
+      senderIdentity: resolvedIdentity
     });
   } else if (firstMessage) {
     const updates = {
       last_message: firstMessage,
-      name: prospect.name || name || prospect.name
+      name: prospect.name || resolvedIdentity.displayName || name || prospect.name,
+      ...mergeWhatsAppSenderIdentityOntoProspect(prospect, resolvedIdentity)
     };
 
     if (!prospect.organization_id) {
@@ -556,8 +584,15 @@ async function locateOrCreateWhatsAppProspect({
       organizationId,
       updates
     );
+    const linkedPhone = updates.phone || prospect.phone;
     prospect =
       (await supabaseService.findProspectInOrganization(prospect.phone, organizationId)) ||
+      (resolvedIdentity.whatsappSenderId
+        ? await supabaseService.findProspectByWhatsAppSenderIdInOrganization(
+            resolvedIdentity.whatsappSenderId,
+            organizationId
+          )
+        : null) ||
       prospect;
   }
 
