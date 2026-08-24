@@ -294,3 +294,16 @@ test("Conversations Center newest-first keeps older messages deterministic below
     ["new", "mid", "old"]
   );
 });
+
+test("username-only header hides synthetic storage key and shows phone unavailable", () => {
+  const header = buildConversationHeaderModel({
+    name: "Paid Ad Lead",
+    displayIdentity: "@paid_ad_lead",
+    hasVisiblePhone: false,
+    phone: "wa:bsuid:CC.A7K4BSUID1234567890"
+  });
+  assert.equal(header.displayIdentity, "@paid_ad_lead");
+  assert.equal(header.phone, null);
+  assert.equal(header.phoneLabel, "Phone unavailable");
+  assert.equal(header.phoneCopyable, false);
+});

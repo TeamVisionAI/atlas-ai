@@ -6,6 +6,7 @@
 const { supabase } = require("../services/supabaseService");
 const { normalizePhoneNumber } = require("./phoneNormalizer");
 const { resolveStoragePhone } = require("./whatsappProspectResolver");
+const { isSyntheticWhatsAppStorageKey } = require("./whatsappSenderIdentity");
 
 /** Single source of truth for the customer-care window duration. */
 const CUSTOMER_CARE_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -16,6 +17,12 @@ const WINDOW_SOURCE = Object.freeze({
 
 function resolvePhoneCandidates(phone) {
   const raw = String(phone || "").trim();
+  if (!raw) {
+    return [];
+  }
+  if (isSyntheticWhatsAppStorageKey(raw)) {
+    return [raw];
+  }
   const normalized = normalizePhoneNumber(raw) || raw.replace(/\D/g, "");
   const storage = resolveStoragePhone(normalized);
   return [...new Set([raw, normalized, storage, `+${normalized}`].filter(Boolean))];

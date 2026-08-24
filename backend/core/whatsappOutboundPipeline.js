@@ -7,9 +7,13 @@ const crypto = require("crypto");
 const axios = require("axios");
 const { shouldMockExternalComms } = require("../dev/simulatorGuard");
 const { logConversation } = require("../services/logService");
-const { findProspectInOrganization } = require("../services/supabaseService");
+const { findProspectInOrganization, findProspectByWhatsAppSenderIdInOrganization } = require("../services/supabaseService");
 const { normalizePhoneNumber } = require("./phoneNormalizer");
 const { resolveStoragePhone } = require("./whatsappProspectResolver");
+const {
+  resolveMetaWhatsAppRecipient,
+  isSyntheticWhatsAppStorageKey
+} = require("./whatsappSenderIdentity");
 const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { resolveWhatsAppSendCredentials } = require("./whatsappSendCredentials");
@@ -82,18 +86,46 @@ function buildTemplateComponents(
 }
 
 async function resolveProspectForOutbound(to, organizationId = null) {
-  const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
-  const storagePhone = resolveStoragePhone(metaTo);
+  const storagePhone = resolveStoragePhone(to) || String(to || "").trim();
 
   if (!organizationId) {
     return null;
   }
+
+  if (isSyntheticWhatsAppStorageKey(storagePhone)) {
+    const senderId = storagePhone.replace(/^wa:bsuid:/, "");
+    const bySender = await findProspectByWhatsAppSenderIdInOrganization(
+      senderId,
+      organizationId
+    );
+    if (bySender) {
+      return bySender;
+    }
+  }
+
+  const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
 
   return (
     (await findProspectInOrganization(storagePhone, organizationId)) ||
     (await findProspectInOrganization(to, organizationId)) ||
     (await findProspectInOrganization(`+${metaTo}`, organizationId)) ||
     null
+  );
+}
+
+function resolveOutboundMetaRecipient(to, prospect = null) {
+  return (
+    resolveMetaWhatsAppRecipient({
+      storageKey: prospect?.phone || to,
+      phoneE164:
+        prospect?.phone && !isSyntheticWhatsAppStorageKey(prospect.phone)
+          ? prospect.phone
+          : null,
+      normalizedPhone: prospect?.normalized_phone || null,
+      whatsappSenderId: prospect?.whatsapp_sender_id || null
+    }) ||
+    normalizePhoneNumber(to) ||
+    String(to || "").replace(/\D/g, "")
   );
 }
 
@@ -250,9 +282,10 @@ async function sendAndPersistWhatsAppMessage({
     };
   }
 
-  const metaTo = normalizePhoneNumber(to) || String(to || "").replace(/\D/g, "");
-  const storagePhone = resolveStoragePhone(metaTo);
   const prospectRecord = await resolveProspectForOutbound(to, organizationId);
+  const metaTo = resolveOutboundMetaRecipient(to, prospectRecord);
+  const storagePhone =
+    prospectRecord?.phone || resolveStoragePhone(to) || String(to || "").trim();
   const prospect = prospectRecord || {};
   const resolvedOrgId = organizationId || prospectRecord?.organization_id || null;
 

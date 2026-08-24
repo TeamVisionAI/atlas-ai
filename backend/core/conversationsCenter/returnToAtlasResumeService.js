@@ -6,6 +6,7 @@
 const { loadPersistedWorkflowState, savePersistedWorkflowState } = require("../workflowStateStore");
 const { processNormalizedInboundMessage } = require("../communicationHub");
 const { logWhatsAppStage } = require("../whatsappStructuredLogger");
+const { isSyntheticWhatsAppStorageKey } = require("../whatsappSenderIdentity");
 const { loadConversationContext } = require("../recruitAiV2/contextLoader");
 const { mergeConversationContext } = require("../recruitAiV2/conversationContext");
 const { INTENTS } = require("../recruitAiV2/constants");
@@ -206,6 +207,9 @@ function phoneLookupKeys(phone) {
   const raw = String(phone || "").trim();
   if (!raw) {
     return [];
+  }
+  if (isSyntheticWhatsAppStorageKey(raw)) {
+    return [raw];
   }
   const keys = new Set([raw]);
   if (raw.startsWith("+")) {

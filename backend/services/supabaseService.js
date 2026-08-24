@@ -86,6 +86,32 @@ async function findProspectInOrganization(phone, organizationId) {
   return data;
 }
 
+async function findProspectByWhatsAppSenderIdInOrganization(
+  whatsappSenderId,
+  organizationId
+) {
+  const senderId = String(whatsappSenderId || "").trim();
+  if (!senderId || !organizationId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("prospects")
+    .select("*")
+    .eq("whatsapp_sender_id", senderId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "42703" || error.code === "PGRST204") {
+      return null;
+    }
+    throw error;
+  }
+
+  return data;
+}
+
 async function loadProspectsForOrganization(organizationId) {
   if (!organizationId) {
     return [];
@@ -243,6 +269,7 @@ module.exports = {
   findProspect,
   findProspectForSystemIngress,
   findProspectInOrganization,
+  findProspectByWhatsAppSenderIdInOrganization,
   findProspectByNormalizedPhoneInOrganization,
   loadProspectsForOrganization,
   findLatestActiveProspect,

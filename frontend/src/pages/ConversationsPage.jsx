@@ -146,6 +146,16 @@ function ConversationListSkeleton() {
   );
 }
 
+function conversationPhoneLabel(item) {
+  if (item?.hasVisiblePhone === false) {
+    return "Phone unavailable";
+  }
+  if (item?.phone && String(item.phone).startsWith("wa:bsuid:")) {
+    return "Phone unavailable";
+  }
+  return item?.phone || "Phone unavailable";
+}
+
 function ConversationRow({ item, selected, onSelect, translate, locale }) {
   const unreadUi = resolveConversationUnreadPresentation(item);
   return (
@@ -157,7 +167,7 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
       <div className="conversations-row__top">
         <div className="conversations-row__identity">
           <strong className="conversations-row__name">
-            {item.name || item.phone}
+            {item.displayIdentity || item.name || item.phone}
           </strong>
           {unreadUi.showDot ? (
             <span className="conversations-row__dot" aria-hidden="true" />
@@ -175,7 +185,7 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
           {ownershipLabel(item.ownershipState, translate)}
         </StatusBadge>
       </div>
-      <div className="conversations-row__phone">{item.phone}</div>
+      <div className="conversations-row__phone">{conversationPhoneLabel(item)}</div>
       {item.inboxLifecycle && item.inboxLifecycle !== "ACTIVE" ? (
         <div className="conversations-row__lifecycle">
           {lifecycleLabel(item.inboxLifecycle, translate)}
@@ -758,6 +768,14 @@ export default function ConversationsPage() {
   const lifecycleActionIds = resolveLifecycleActionIds({ inboxLifecycle });
   const headerModel = buildConversationHeaderModel({
     name: selectedItem?.name || matchedDetail?.conversation?.name || null,
+    displayIdentity:
+      selectedItem?.displayIdentity ||
+      matchedDetail?.conversation?.displayIdentity ||
+      null,
+    hasVisiblePhone:
+      selectedItem?.hasVisiblePhone ??
+      matchedDetail?.conversation?.hasVisiblePhone ??
+      null,
     phone:
       selectedItem?.phone ||
       matchedDetail?.phone ||
@@ -883,9 +901,12 @@ export default function ConversationsPage() {
                         className="conversations-thread__title"
                         data-testid="conversations-thread-name"
                       >
-                        {headerModel.name || headerModel.phone || selectedPhone}
+                        {headerModel.displayIdentity ||
+                          headerModel.name ||
+                          headerModel.phone ||
+                          selectedPhone}
                       </h2>
-                      {headerModel.phone ? (
+                      {headerModel.phoneCopyable ? (
                         <div className="conversations-thread__phone-row">
                           <p
                             className="conversations-thread__phone"
@@ -906,7 +927,14 @@ export default function ConversationsPage() {
                                 : translate("conversationsCopyPhone")}
                           </button>
                         </div>
-                      ) : null}
+                      ) : (
+                        <p
+                          className="conversations-thread__phone conversations-thread__phone--unavailable"
+                          data-testid="conversations-full-phone"
+                        >
+                          {headerModel.phoneLabel || "Phone unavailable"}
+                        </p>
+                      )}
                       <div
                         className="conversations-thread__status"
                         data-testid="conversations-thread-badges"

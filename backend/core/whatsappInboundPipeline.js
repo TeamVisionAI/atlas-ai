@@ -38,6 +38,9 @@ const {
   restoreStalledFirstReplyRecruitingState
 } = require("./whatsappInboundFirstReplyRecoveryContext");
 const {
+  resolveWhatsAppSenderIdentityFromInbound
+} = require("./whatsappSenderIdentity");
+const {
   isRecruitingCampaignIntakeFirstTurnBurst,
   shouldSkipDuplicateRecruitingFirstTurnReply
 } = require("./recruitingFirstTurnBurst");
@@ -327,6 +330,33 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   const body = inbound.body || `[${inbound.messageType} message]`;
   const phoneNumberId =
     inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null;
+  const senderIdentity = resolveWhatsAppSenderIdentityFromInbound(inbound);
+
+  if (!senderIdentity?.isUsable) {
+    logWhatsAppStage("whatsapp_sender_identity_unusable", {
+      level: "error",
+      providerMessageId: inbound.providerMessageId,
+      phone: inbound.phone || null,
+      whatsappSenderId: inbound.whatsappSenderId || null,
+      reason: senderIdentity?.reason || "WHATSAPP_SENDER_IDENTITY_UNUSABLE"
+    });
+    return {
+      success: false,
+      skipped: false,
+      error: senderIdentity?.reason || "WHATSAPP_SENDER_IDENTITY_UNUSABLE",
+      correlationId
+    };
+  }
+
+  const inboundWithIdentity = {
+    ...inbound,
+    phone: senderIdentity.storageKey,
+    phoneE164: senderIdentity.phoneE164 || null,
+    whatsappSenderId: senderIdentity.whatsappSenderId,
+    whatsappUsername: senderIdentity.whatsappUsername || null,
+    contactName: senderIdentity.displayName || inbound.contactName,
+    senderIdentity
+  };
 
   const intakeService =
     dependencies.campaignIntakeAttributionService ||
@@ -340,15 +370,16 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
   const { prospect, created, storagePhone, organizationId, qrAttribution, campaignIntakeMatch } =
     await locateOrCreate({
-      phone: inbound.phone,
-      name: inbound.contactName,
+      phone: inboundWithIdentity.phone,
+      name: inboundWithIdentity.contactName,
       firstMessage: body,
       correlationBase: correlationId,
       phoneNumberId,
       wabaId: inbound.wabaId || null,
       providerMessageId: inbound.providerMessageId || null,
       ctwaReferral: inbound.ctwaReferral || null,
-      campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null
+      campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null,
+      senderIdentity
     });
 
   if (campaignIntakeMatch?.matched) {
