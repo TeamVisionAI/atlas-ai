@@ -119,7 +119,8 @@ const CITY_LOOKUP_ALIASES = Object.freeze({
   wpb: "west palm beach",
   "ft lauderdale": "fort lauderdale",
   "ft. lauderdale": "fort lauderdale",
-  "sunny isles": "sunny isles beach"
+  "sunny isles": "sunny isles beach",
+  pompano: "pompano beach"
 });
 
 function normalizeCityLookupKey(raw) {
@@ -394,6 +395,9 @@ function isPlausibleCityName(city) {
   if (REGION_ONLY_CITY_RE.test(t)) {
     return false;
   }
+  if (looksLikeConversationalProseCity(t)) {
+    return false;
+  }
   // Reject bare state tokens as cities ("Florida", "FL").
   // Allow multi-word places that share a state name (e.g. city "New York" + state NY).
   if (!/\s/.test(t) && normalizeStateToken(t)) {
@@ -433,7 +437,9 @@ function buildCompleteLocation(cityParts, state) {
   if (!state || !cityParts || !cityParts.length) {
     return null;
   }
-  const city = titleCaseCity(cityParts.join(" "));
+  const joined = cityParts.join(" ");
+  const canonicalKey = normalizeCityLookupKey(joined);
+  const city = titleCaseCity(canonicalKey || joined);
   if (!isPlausibleCityName(city)) {
     return null;
   }
@@ -453,15 +459,50 @@ function isNonLocationPhrase(folded) {
   }
   return (
     /^(me parece|parece bien|me parece bien|parece que|me parece que)$/.test(t) ||
+    /^(me gustaria|me gustaria saber|me gustaría|me gustaría saber)$/.test(t) ||
+    /^(dime|escribeme|escriba me|escribeme por favor)$/.test(t) ||
     /^(perfecto|gracias|ok|dale|claro|entendido|listo|bueno|bien|si|sí|todo bien)$/.test(t) ||
     /^(mañana|manana|hoy|tarde|noche)$/.test(t) ||
-    /^(mejor|thanks|thank you|got it|sounds good)$/.test(t)
+    /^(mejor|thanks|thank you|got it|sounds good)$/.test(t) ||
+    // Bare Spanish pronoun / conversational "me" is never Maine.
+    /^(me)$/.test(t)
   );
 }
 
 function isFalsePositiveStateToken(token) {
   const t = String(token || "").trim().toLowerCase();
   return ["me", "in", "or", "ok", "la", "ma", "pa", "id", "hi", "de", "al"].includes(t);
+}
+
+function looksLikeConversationalProseCity(text) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return false;
+  }
+  const folded = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = folded.split(/\s+/).filter(Boolean);
+  if (raw.length > 48 || words.length > 5) {
+    return true;
+  }
+  if (
+    /\b(gustaria|quisiera|quiero|saber|consisten|posiciones|disponibles|trabajo|gracias|documento|firmando|escribio|telefono|cargando)\b/.test(
+      folded
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(me gustaria|me interesa|dime|escribeme|por favor|muchas gracias)\b/.test(folded)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function splitCityThenState(parts) {
@@ -573,6 +614,10 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
+  if (looksLikeConversationalProseCity(raw) || looksLikeConversationalProseCity(folded)) {
+    return null;
+  }
+
   // Never invent cities from company-identity / info-request / FAQ phrasing.
   if (
     /\b(empresa|compania|companias)\b/.test(folded) ||
@@ -580,6 +625,7 @@ function parseLocationAnswerCore(raw) {
       folded
     ) ||
     /\bme interesa saber\b/.test(folded) ||
+    /\bme gustaria saber\b/.test(folded) ||
     /\b(que|cual|como)\b.{0,40}\b(empresa|compania)\b/.test(folded) ||
     /\bcon que (empresa|compania)\b/.test(folded) ||
     /\bpara que (empresa|compania)\b/.test(folded) ||
@@ -680,8 +726,13 @@ function parseLocationAnswerCore(raw) {
   }
 
   // State-only confirmation when city already known is handled by caller.
+  // Never treat conversational Spanish "me" (or other false-positive tokens) as Maine/etc.
   const stateOnly = normalizeStateToken(working);
-  if (stateOnly && working.split(/\s+/).length <= 2) {
+  if (
+    stateOnly &&
+    working.split(/\s+/).length <= 2 &&
+    !isFalsePositiveStateToken(working)
+  ) {
     return {
       city: null,
       state: stateOnly,
@@ -698,7 +749,7 @@ function parseLocationAnswerCore(raw) {
     return highConfidenceFl;
   }
   if (CITY_TO_PROPOSED_STATE[cityKey]) {
-    const city = titleCaseCity(working);
+    const city = titleCaseCity(cityKey);
     return {
       city,
       state: null,
@@ -714,6 +765,9 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
   if (/^[A-Za-z][A-Za-z'-]{2,40}$/.test(working) && !/\s/.test(working)) {
+    if (isFalsePositiveStateToken(working)) {
+      return null;
+    }
     if (normalizeStateToken(working)) {
       return {
         city: null,
@@ -724,6 +778,9 @@ function parseLocationAnswerCore(raw) {
       };
     }
     const city = titleCaseCity(working);
+    if (!isPlausibleCityName(city)) {
+      return null;
+    }
     return {
       city,
       state: null,
@@ -741,11 +798,17 @@ function parseLocationAnswerCore(raw) {
       if (REGIONAL_PHRASE_RE.test(working) || REGION_ONLY_CITY_RE.test(words[0])) {
         return null;
       }
+      if (looksLikeConversationalProseCity(working)) {
+        return null;
+      }
       const multiWordFl = !hedged ? buildHighConfidenceFloridaLocation(working) : null;
       if (multiWordFl) {
         return multiWordFl;
       }
       const city = titleCaseCity(working);
+      if (!isPlausibleCityName(city)) {
+        return null;
+      }
       return {
         city,
         state: null,
@@ -821,6 +884,7 @@ module.exports = {
   buildHighConfidenceFloridaLocation,
   isNonLocationPhrase,
   isFalsePositiveStateToken,
+  looksLikeConversationalProseCity,
   looksLikeLocationCorrection,
   proposeStateFromCity,
   normalizeStateToken,

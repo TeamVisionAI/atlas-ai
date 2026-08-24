@@ -51,6 +51,7 @@ const {
   WORK_AUTHORIZATION,
   FINANCIAL_LICENSE_STATUS
 } = require("./qualificationFacts");
+const { shouldBlockLocationOverwrite } = require("./factCertainty");
 const {
   resolveFaqResumeTemplateKeyFromFacts
 } = require("../recruitConversationSequencing");
@@ -1998,6 +1999,23 @@ function decideConversationTurn({
     }
 
     // Complete location — continue qualification (auth / next canonical step).
+    if (shouldBlockLocationOverwrite(context.knownFacts || {}, interpretation)) {
+      structured.reasonCodes.push(REASON_CODES.LOCATION_OVERWRITE_BLOCKED);
+      const resume = resolveQualificationResume(context);
+      structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+      structured.customerReplyPlan.templateKey =
+        resume.templateKey || "continue_qualification_after_location";
+      structured.contextPatch = {
+        conversation: {
+          clarificationCount: 0,
+          pendingClarification: null,
+          lastQuestionAsked: resume.lastQuestionAsked || "ask_authorization",
+          lastProspectIntent: INTENTS.PROVIDE_LOCATION
+        }
+      };
+      return structured;
+    }
+
     const modality = resolveMeetingModalityForLocation({ city, state });
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
     structured.customerReplyPlan.templateKey = "continue_qualification_after_location";

@@ -57,6 +57,102 @@ export function shouldCommitTimelinePayload({ requestedProspectId, payload }) {
 }
 
 /**
+ * Latest message cursor for open-thread freshness (sidebar vs thread convergence).
+ */
+export function getTimelineFreshnessCursor(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  let latestAt = null;
+  let latestId = null;
+
+  for (const item of items) {
+    const at =
+      item?.occurredAt ||
+      item?.createdAt ||
+      item?.timestamp ||
+      item?.created_at ||
+      null;
+    if (!at) {
+      continue;
+    }
+    const id = item?.id != null ? String(item.id) : "";
+    if (
+      !latestAt ||
+      String(at) > String(latestAt) ||
+      (String(at) === String(latestAt) && id > String(latestId || ""))
+    ) {
+      latestAt = String(at);
+      latestId = id || null;
+    }
+  }
+
+  return {
+    latestAt,
+    latestId,
+    itemCount: items.length
+  };
+}
+
+/**
+ * Newest thread data wins. Stale in-flight responses must not replace fresher state.
+ * requestGeneration < committedGeneration → reject (out-of-order completion).
+ */
+export function shouldCommitFresherTimelinePayload({
+  requestedProspectId,
+  incoming,
+  current = null,
+  requestGeneration = null,
+  committedGeneration = null
+} = {}) {
+  if (
+    !shouldCommitTimelinePayload({
+      requestedProspectId,
+      payload: incoming
+    })
+  ) {
+    return false;
+  }
+
+  if (
+    typeof requestGeneration === "number" &&
+    typeof committedGeneration === "number" &&
+    requestGeneration < committedGeneration
+  ) {
+    return false;
+  }
+
+  if (!current) {
+    return true;
+  }
+
+  const incomingFresh = getTimelineFreshnessCursor(incoming);
+  const currentFresh = getTimelineFreshnessCursor(current);
+
+  if (!incomingFresh.latestAt) {
+    return true;
+  }
+  if (!currentFresh.latestAt) {
+    return true;
+  }
+  if (String(incomingFresh.latestAt) < String(currentFresh.latestAt)) {
+    return false;
+  }
+  if (String(incomingFresh.latestAt) > String(currentFresh.latestAt)) {
+    return true;
+  }
+
+  // Same timestamp: prefer equal-or-newer id; never shrink to older id.
+  if (
+    incomingFresh.latestId &&
+    currentFresh.latestId &&
+    String(incomingFresh.latestId) < String(currentFresh.latestId)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Simulate rapid A→B→C selection commits; last selected phone wins.
  * Used for regression coverage of stale async overwrite prevention.
  */

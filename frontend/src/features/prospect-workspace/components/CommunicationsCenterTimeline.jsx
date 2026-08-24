@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getProspectCommunications,
   CommunicationsCenterError,
+  invalidateProspectCommunicationsCache,
   mergeCommunicationsPages,
   readCommunicationsCache,
   writeCommunicationsCache,
@@ -26,7 +27,9 @@ import {
   buildCommunicationsCacheKey,
   resolveConversationBubbleSide
 } from "../../../engines/communicationsCenterViewModel";
-import { shouldCommitTimelinePayload } from "../../../engines/conversationsSelectionConsistency";
+import {
+  shouldCommitFresherTimelinePayload
+} from "../../../engines/conversationsSelectionConsistency";
 import { isAudioCommunicationItem } from "../../../engines/communicationClassification.js";
 import CommunicationAudioBubble from "../../../components/communication/CommunicationAudioBubble";
 import "./CommunicationsCenterTimeline.css";
@@ -218,6 +221,9 @@ export default function CommunicationsCenterTimeline({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const loadedProspectIdRef = useRef(null);
   const threadRequestKeyRef = useRef("");
+  const payloadRef = useRef(null);
+  const fetchGenerationRef = useRef(0);
+  const committedGenerationRef = useRef(0);
 
   const threadFetchOptions = useMemo(
     () =>
@@ -228,10 +234,16 @@ export default function CommunicationsCenterTimeline({
   );
 
   useEffect(() => {
+    payloadRef.current = payload;
+  }, [payload]);
+
+  useEffect(() => {
     if (!prospectId) {
       setStatus("missing_id");
       setPayload(null);
       loadedProspectIdRef.current = null;
+      fetchGenerationRef.current = 0;
+      committedGenerationRef.current = 0;
       return undefined;
     }
 
@@ -243,6 +255,9 @@ export default function CommunicationsCenterTimeline({
       threadFetchOptions
     );
     threadRequestKeyRef.current = requestKey;
+    const generation = ++fetchGenerationRef.current;
+    // Force network fetch when sidebar signals newer activity or prospect switches.
+    const forceNetwork = prospectChanged || Number(refreshSignal) > 0;
 
     if (prospectChanged) {
       // Clear previous prospect transcript immediately so it cannot render under a new header.
@@ -251,25 +266,36 @@ export default function CommunicationsCenterTimeline({
       setError(null);
       setOpenDiagnostics(new Set());
       loadedProspectIdRef.current = requestedProspectId;
+      committedGenerationRef.current = 0;
+      if (forceNetwork) {
+        invalidateProspectCommunicationsCache(requestedProspectId);
+      }
     }
 
     const cached = readCommunicationsCache(requestKey);
-    if (cached && prospectChanged) {
+    if (cached && prospectChanged && !forceNetwork) {
       setPayload(cached);
       setStatus("ready");
     }
 
-    getProspectCommunications(requestedProspectId, threadFetchOptions)
+    getProspectCommunications(requestedProspectId, {
+      ...threadFetchOptions,
+      force: forceNetwork
+    })
       .then((data) => {
         if (cancelled) return;
         if (
-          !shouldCommitTimelinePayload({
+          !shouldCommitFresherTimelinePayload({
             requestedProspectId,
-            payload: data
+            incoming: data,
+            current: payloadRef.current,
+            requestGeneration: generation,
+            committedGeneration: committedGenerationRef.current
           })
         ) {
           return;
         }
+        committedGenerationRef.current = generation;
         setPayload(data);
         setStatus("ready");
         writeCommunicationsCache(requestKey, data);
@@ -329,18 +355,23 @@ export default function CommunicationsCenterTimeline({
       return;
     }
     const requestedProspectId = String(prospectId);
+    const generation = ++fetchGenerationRef.current;
     const data = await getProspectCommunications(requestedProspectId, {
       ...threadFetchOptions,
       force: true
     });
     if (
-      !shouldCommitTimelinePayload({
+      !shouldCommitFresherTimelinePayload({
         requestedProspectId,
-        payload: data
+        incoming: data,
+        current: payloadRef.current,
+        requestGeneration: generation,
+        committedGeneration: committedGenerationRef.current
       })
     ) {
       return;
     }
+    committedGenerationRef.current = generation;
     setPayload(data);
     writeCommunicationsCache(threadRequestKeyRef.current, data);
   }, [prospectId, threadFetchOptions]);

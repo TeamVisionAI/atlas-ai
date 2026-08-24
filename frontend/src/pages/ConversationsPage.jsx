@@ -35,6 +35,7 @@ import {
   shouldForceScrollToLatest
 } from "../engines/conversationsTranscriptAnchor";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
+import { invalidateProspectCommunicationsCache } from "../services/communicationsCenterApi";
 import {
   getConversations,
   getConversation,
@@ -267,6 +268,9 @@ export default function ConversationsPage() {
         lastCommunicationAtRef.current &&
         nextCommAt !== lastCommunicationAtRef.current
       ) {
+        if (selected?.id) {
+          invalidateProspectCommunicationsCache(selected.id);
+        }
         setRefreshSignal((n) => n + 1);
       }
       if (nextCommAt) {
@@ -298,7 +302,9 @@ export default function ConversationsPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      loadListRef.current?.({ quiet: true });
+      // Force network so sidebar/thread can converge within poll interval
+      // (list cache TTL is otherwise longer than CONVERSATIONS_POLL_MS).
+      loadListRef.current?.({ quiet: true, force: true });
     }, CONVERSATIONS_POLL_MS);
     return () => window.clearInterval(timer);
   }, [activeFilter]);
@@ -550,7 +556,7 @@ export default function ConversationsPage() {
 
   useEffect(() => {
     if (selectedPhone && refreshSignal > 0) {
-      loadDetail(selectedPhone);
+      loadDetail(selectedPhone, { force: true });
     }
   }, [refreshSignal, selectedPhone, loadDetail]);
 
