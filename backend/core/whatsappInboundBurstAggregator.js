@@ -1,7 +1,12 @@
 /**
  * Short inbound burst aggregation — combine rapid short fragments into one logical turn.
  * Only delays processing for short text fragments; long messages flush immediately.
+ * Recruiting campaign-intake first turns use a longer bounded window (see recruitingFirstTurnBurst.js).
  */
+
+const {
+  RECRUITING_FIRST_TURN_BURST_WAIT_MS
+} = require("./recruitingFirstTurnBurst");
 
 const SHORT_FRAGMENT_MAX_LEN = 48;
 const BURST_WAIT_MS = 500;
@@ -13,11 +18,33 @@ function burstKey(phone) {
   return String(phone || "").trim();
 }
 
-function isShortFragment(text) {
-  return (
-    String(text || "").trim().length > 0 &&
-    String(text || "").trim().length <= SHORT_FRAGMENT_MAX_LEN
-  );
+function isShortFragment(text, { recruitingFirstTurnBurst = false } = {}) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (recruitingFirstTurnBurst) {
+    return true;
+  }
+  return trimmed.length <= SHORT_FRAGMENT_MAX_LEN;
+}
+
+function mergeBurstInbound(fragments, fallbackInbound) {
+  const anchorInbound =
+    fragments[fragments.length - 1]?.inbound || fallbackInbound || {};
+  const campaignIntakeMatch =
+    fragments.map((f) => f.inbound?.campaignIntakeMatch).find((m) => m?.matched) ||
+    anchorInbound.campaignIntakeMatch ||
+    null;
+  const ctwaReferral =
+    fragments.map((f) => f.inbound?.ctwaReferral).find(Boolean) ||
+    anchorInbound.ctwaReferral ||
+    null;
+  return {
+    ...anchorInbound,
+    campaignIntakeMatch,
+    ctwaReferral
+  };
 }
 
 /**
@@ -28,12 +55,16 @@ function scheduleInboundBurstAggregation({
   phone,
   text,
   inbound,
-  waitMs = BURST_WAIT_MS
+  waitMs = BURST_WAIT_MS,
+  recruitingFirstTurnBurst = false
 } = {}) {
   const key = burstKey(phone);
   const trimmed = String(text || "").trim();
+  const effectiveWaitMs = recruitingFirstTurnBurst
+    ? RECRUITING_FIRST_TURN_BURST_WAIT_MS
+    : waitMs;
 
-  if (!key || !trimmed || !isShortFragment(trimmed)) {
+  if (!key || !trimmed || !isShortFragment(trimmed, { recruitingFirstTurnBurst })) {
     return Promise.resolve({
       combinedText: trimmed,
       inbound,
@@ -45,18 +76,41 @@ function scheduleInboundBurstAggregation({
   return new Promise((resolve) => {
     let entry = bursts.get(key);
     if (!entry) {
-      entry = { fragments: [], timer: null, waiters: [] };
+      entry = {
+        fragments: [],
+        timer: null,
+        waiters: [],
+        recruitingFirstTurnBurst: false,
+        firstFragmentAt: Date.now()
+      };
       bursts.set(key, entry);
+    }
+
+    entry.recruitingFirstTurnBurst =
+      entry.recruitingFirstTurnBurst || recruitingFirstTurnBurst;
+    const participates = isShortFragment(trimmed, {
+      recruitingFirstTurnBurst: entry.recruitingFirstTurnBurst
+    });
+    if (!participates) {
+      resolve({
+        combinedText: trimmed,
+        inbound,
+        burst: false,
+        anchorProviderMessageId: String(inbound?.providerMessageId || "").trim()
+      });
+      return;
     }
 
     entry.fragments.push({ text: trimmed, inbound });
     entry.waiters.push(resolve);
 
-    if (entry.timer) {
-      clearTimeout(entry.timer);
-    }
+    const windowMs = entry.recruitingFirstTurnBurst
+      ? RECRUITING_FIRST_TURN_BURST_WAIT_MS
+      : effectiveWaitMs;
+    const elapsed = Date.now() - (entry.firstFragmentAt || Date.now());
+    const remaining = Math.max(0, windowMs - elapsed);
 
-    entry.timer = setTimeout(() => {
+    const flushBurst = () => {
       const current = bursts.get(key);
       bursts.delete(key);
       if (!current?.waiters?.length) {
@@ -68,26 +122,37 @@ function scheduleInboundBurstAggregation({
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();
-      const anchorInbound =
-        current.fragments[current.fragments.length - 1]?.inbound || inbound;
+      const mergedInbound = mergeBurstInbound(current.fragments, inbound);
       const result = {
         combinedText,
         inbound: {
-          ...anchorInbound,
+          ...mergedInbound,
           text: combinedText,
           body: combinedText,
-          burstFragmentCount: current.fragments.length
+          burstFragmentCount: current.fragments.length,
+          recruitingFirstTurnBurst: Boolean(current.recruitingFirstTurnBurst)
         },
         burst: current.fragments.length > 1,
         anchorProviderMessageId: String(
-          anchorInbound?.providerMessageId || ""
+          mergedInbound?.providerMessageId || ""
         ).trim()
       };
 
       for (const waiter of current.waiters) {
         waiter(result);
       }
-    }, waitMs);
+    };
+
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+    }
+
+    if (remaining === 0) {
+      flushBurst();
+      return;
+    }
+
+    entry.timer = setTimeout(flushBurst, remaining);
   });
 }
 
@@ -103,6 +168,8 @@ function resetInboundBurstAggregationForTests() {
 module.exports = {
   SHORT_FRAGMENT_MAX_LEN,
   BURST_WAIT_MS,
+  RECRUITING_FIRST_TURN_BURST_WAIT_MS,
   scheduleInboundBurstAggregation,
-  resetInboundBurstAggregationForTests
+  resetInboundBurstAggregationForTests,
+  mergeBurstInbound
 };
