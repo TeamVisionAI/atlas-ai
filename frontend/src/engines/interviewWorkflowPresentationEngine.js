@@ -206,13 +206,15 @@ export function resolveAppointmentCardActionPlan(appointment = {}) {
     showAddNote: true,
     showOpenWorkspace: true,
     openWorkspacePrimary: !showJoinZoom,
-    openWorkspaceLabelKey: "appointmentsOpenProspect",
+    openWorkspaceLabelKey: "appointmentsCardWorkspace",
     showCommunicationHistory: false,
     showJoinZoom,
     showJoinZoomPrimary: showJoinZoom,
     showReschedule: showLifecycle,
     showCancel: showLifecycle,
     showCompleteInterview: showLifecycle,
+    cancelLabelKey: "appointmentsCancel",
+    completeLabelKey: "appointmentsComplete",
     completeInterviewPrimary: false,
     cancelDanger: true
   };

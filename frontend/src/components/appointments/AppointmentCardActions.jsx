@@ -84,13 +84,13 @@ export default function AppointmentCardActions({
           className="appointment-card-actions__danger"
           onClick={onCancel}
         >
-          {translate("appointmentsCancelInterview")}
+          {translate(plan.cancelLabelKey || "appointmentsCancelInterview")}
         </AtlasButton>
       ) : null}
 
       {plan.showCompleteInterview ? (
         <AtlasButton variant="secondary" size="sm" onClick={onComplete}>
-          {translate("appointmentsCompleteInterview")}
+          {translate(plan.completeLabelKey || "appointmentsCompleteInterview")}
         </AtlasButton>
       ) : null}
     </div>
