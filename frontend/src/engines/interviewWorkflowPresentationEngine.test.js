@@ -88,6 +88,28 @@ test("resolveAppointmentCardActionPlan shows terminal actions only when complete
   assert.equal(plan.openWorkspaceLabelKey, "appointmentsViewWorkspace");
 });
 
+test("resolveAppointmentCardActionPlan uses compact card action labels for active appointments", () => {
+  const zoomPlan = resolveAppointmentCardActionPlan({
+    status: "scheduled",
+    meetingType: "virtual",
+    meetingProvider: "zoom",
+    virtualMeetingUrl: "https://us02web.zoom.us/j/123"
+  });
+  const inPersonPlan = resolveAppointmentCardActionPlan({
+    status: "scheduled",
+    meetingType: "in_person",
+    meetingLocationType: "office",
+    meetingAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+  });
+
+  assert.equal(zoomPlan.openWorkspaceLabelKey, "appointmentsCardWorkspace");
+  assert.equal(zoomPlan.cancelLabelKey, "appointmentsCancel");
+  assert.equal(zoomPlan.completeLabelKey, "appointmentsComplete");
+  assert.equal(zoomPlan.showJoinZoom, true);
+  assert.equal(inPersonPlan.showJoinZoom, false);
+  assert.equal(inPersonPlan.openWorkspaceLabelKey, "appointmentsCardWorkspace");
+});
+
 test("resolveOperationalInterviewActionPlan hides actions when result pending", () => {
   const plan = resolveOperationalInterviewActionPlan(
     { gateActive: true },

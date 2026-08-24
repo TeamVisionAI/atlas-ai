@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { translations } from "../i18n/translations.js";
+import { resolveAppointmentCardActionPlan } from "./interviewWorkflowPresentationEngine.js";
 import {
   appointmentCardAllowsHorizontalOverflow,
   buildAppointmentCardAddressModel,
@@ -230,4 +232,45 @@ test("resolveAppointmentMeetingLabel standardizes Zoom terminology", () => {
 
 test("formatInPersonAddressLines preserves short addresses", () => {
   assert.deepEqual(formatInPersonAddressLines("123 Main St"), ["123 Main St"]);
+});
+
+test("appointment card compact action labels render expected English copy", () => {
+  const en = translations.en;
+  const zoomPlan = resolveAppointmentCardActionPlan({
+    status: "scheduled",
+    meetingType: "virtual",
+    meetingProvider: "zoom",
+    virtualMeetingUrl: "https://us02web.zoom.us/j/123"
+  });
+
+  assert.equal(en[zoomPlan.openWorkspaceLabelKey], "📂 Workspace");
+  assert.equal(en.appointmentsJoinZoom, "🎥 Join Zoom");
+  assert.equal(en.appointmentsRescheduleInterview, "📅 Reschedule");
+  assert.equal(en[zoomPlan.cancelLabelKey], "❌ Cancel");
+  assert.equal(en[zoomPlan.completeLabelKey], "✅ Complete");
+  assert.doesNotMatch(en[zoomPlan.openWorkspaceLabelKey], /Open Workspace/i);
+  assert.doesNotMatch(en[zoomPlan.cancelLabelKey], /Interview/i);
+  assert.doesNotMatch(en[zoomPlan.completeLabelKey], /Interview/i);
+});
+
+test("compact card action labels reduce desktop row width estimate", () => {
+  const en = translations.en;
+  const compact = [
+    "Add Note",
+    en.appointmentsCardWorkspace,
+    en.appointmentsJoinZoom,
+    en.appointmentsRescheduleInterview,
+    en.appointmentsCancel,
+    en.appointmentsComplete
+  ].join(" | ");
+  const legacy = [
+    "Add Note",
+    en.appointmentsOpenProspect,
+    en.appointmentsJoinZoom,
+    en.appointmentsRescheduleInterview,
+    en.appointmentsCancelInterview,
+    en.appointmentsCompleteInterview
+  ].join(" | ");
+
+  assert.ok(compact.length < legacy.length);
 });
