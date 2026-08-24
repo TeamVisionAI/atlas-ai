@@ -149,12 +149,13 @@ test("ROUTING 1-2: IUL intake code routes to policy_review and not Recruit AI", 
     created: true
   });
   assert.equal(resolved.recruitingEligible, false);
+  assert.equal(resolved.iulReviewEligible, true);
   const eligibility = evaluateAtlasInboundAutomationEligibility({
     prospect: { phone: "+17865550001", organization_id: TEAM_VISION_ORG },
-    campaignIntakeMatch: resolved,
-    created: true
+    inbound: { campaignIntakeMatch: resolved }
   });
-  assert.equal(eligibility.eligible, false);
+  assert.equal(eligibility.eligible, true);
+  assert.equal(eligibility.reason, "CAMPAIGN_INTAKE_IUL");
 });
 
 test("ROUTING 3: recruiting code still enters recruiting", async () => {
