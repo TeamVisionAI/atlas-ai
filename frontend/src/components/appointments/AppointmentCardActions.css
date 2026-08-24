@@ -27,10 +27,16 @@
   font-weight: 600;
   padding: 0.35rem 0.65rem;
   border-radius: 8px;
+  flex: 0 0 auto;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .appointment-card-actions {
     gap: 0.4rem;
+  }
+
+  .appointment-card-actions .atlas-ui-button,
+  .appointment-card-actions__link {
+    min-height: 2rem;
   }
 }

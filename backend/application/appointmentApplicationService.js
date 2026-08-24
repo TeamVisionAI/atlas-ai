@@ -192,22 +192,38 @@ function resolveLocationDetails(profile, payload = {}) {
 }
 
 async function enrichWithProspect(appointment) {
+  const {
+    formatProspectWhatsAppDisplayIdentity,
+    resolveProspectVisiblePhone
+  } = require("../core/whatsappSenderIdentity");
   const prospect = await findProspectInOrganization(
     appointment.prospectPhone,
     appointment.organizationId
   );
+  const prospectIdentitySource = prospect || {
+    phone: appointment.prospectPhone,
+    name: appointment.metadata?.prospectName || null
+  };
 
   const email =
     prospect?.email ||
     extractEmailFromProspectNotes(prospect?.notes) ||
     appointment.metadata?.prospectEmail ||
     null;
+  const prospectVisiblePhone = resolveProspectVisiblePhone(prospectIdentitySource);
 
   return {
     ...appointment,
-    prospectName: prospect?.name || appointment.metadata?.prospectName || appointment.prospectPhone,
+    prospectName:
+      prospect?.name ||
+      appointment.metadata?.prospectName ||
+      formatProspectWhatsAppDisplayIdentity(prospectIdentitySource),
     prospectEmail: email,
-    emailStatus: resolveEmailStatus(email)
+    emailStatus: resolveEmailStatus(email),
+    prospectDisplayIdentity: formatProspectWhatsAppDisplayIdentity(prospectIdentitySource),
+    prospectVisiblePhone,
+    prospectWhatsAppUsername: prospect?.whatsapp_username || null,
+    prospectHasVisiblePhone: Boolean(prospectVisiblePhone)
   };
 }
 

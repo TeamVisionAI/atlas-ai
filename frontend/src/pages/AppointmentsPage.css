@@ -5,9 +5,10 @@
   flex-direction: column;
   gap: 0.75rem;
   width: 100%;
-  max-width: none;
+  max-width: 100%;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
 }
 
 .appointments-page__header {
@@ -229,6 +230,82 @@
   cursor: pointer;
 }
 
+.appointments-page__contact {
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.appointments-page__contact-link {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.appointments-page__contact-link:hover,
+.appointments-page__contact-link:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.appointments-page__contact-username {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.appointments-page__contact-label {
+  color: #334155;
+  font-weight: 600;
+}
+
+.appointments-page__contact-copy {
+  appearance: none;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 6px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.appointments-page__contact-copy:hover,
+.appointments-page__contact-copy:focus-visible {
+  border-color: #cbd5e1;
+  background: #fff;
+  outline: none;
+}
+
+.appointments-page__contact-unavailable {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.appointments-page__address {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 0.35rem;
+  color: #2563eb;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.appointments-page__address:hover,
+.appointments-page__address:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.appointments-page__address-line {
+  display: block;
+}
+
 .appointments-page__card-select:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 3px;
@@ -287,10 +364,29 @@
 .appointments-page__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.35rem;
   align-items: center;
   padding-top: 0.15rem;
   border-top: 1px solid #f1f5f9;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .appointments-page__actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .appointments-page__actions .atlas-ui-button,
+  .appointments-page__actions .appointment-card-actions__link {
+    flex: 0 0 auto;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.75rem;
+    gap: 0.35rem;
+    min-height: 1.85rem;
+    white-space: nowrap;
+  }
 }
 
 .appointments-page__loading {
