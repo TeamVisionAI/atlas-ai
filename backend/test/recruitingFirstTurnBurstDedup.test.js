@@ -484,6 +484,99 @@ test("late supplement skipped when first reply already delivered", () => {
   assert.equal(skip, true);
 });
 
+test("PR246 safety 1: Miami after opener is not dedup-skipped", () => {
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      campaignIntakeMatch: RECRUITING_MATCH,
+      hasDeliveredAutomatedOutbound: true,
+      workflowState: {
+        canonicalMilestone: "GREETING_SENT",
+        conversation: { lastQuestionAsked: "ask_location" }
+      },
+      semanticBody: "Miami"
+    }),
+    false
+  );
+});
+
+test("PR246 safety 2: Pompano after opener is not dedup-skipped", () => {
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      campaignIntakeMatch: RECRUITING_MATCH,
+      hasDeliveredAutomatedOutbound: true,
+      workflowState: {
+        canonicalMilestone: "GREETING_SENT",
+        conversation: { lastQuestionAsked: "ask_location" }
+      },
+      semanticBody: "Pompano"
+    }),
+    false
+  );
+});
+
+test("PR246 safety: outbound alone does not trigger dedup skip", () => {
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      campaignIntakeMatch: RECRUITING_MATCH,
+      hasDeliveredAutomatedOutbound: true,
+      workflowState: {
+        canonicalMilestone: "GREETING_SENT",
+        conversation: { lastQuestionAsked: "ask_location" }
+      },
+      semanticBody: "Ok"
+    }),
+    false
+  );
+});
+
+test("PR246 safety: dedup requires first-turn supplement semantics", () => {
+  const base = {
+    campaignIntakeMatch: RECRUITING_MATCH,
+    hasDeliveredAutomatedOutbound: true,
+    workflowState: {
+      canonicalMilestone: "GREETING_SENT",
+      conversation: { lastQuestionAsked: "ask_location" }
+    }
+  };
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      ...base,
+      semanticBody: "Hola busco trabajo"
+    }),
+    true
+  );
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      ...base,
+      semanticBody: "Miami FL"
+    }),
+    false
+  );
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      ...base,
+      hasDeliveredAutomatedOutbound: false,
+      semanticBody: "Hola busco trabajo"
+    }),
+    false
+  );
+});
+
+test("PR246 safety: no dedup when workflow moved past initial location ask", () => {
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      campaignIntakeMatch: RECRUITING_MATCH,
+      hasDeliveredAutomatedOutbound: true,
+      workflowState: {
+        canonicalMilestone: "QUALIFYING",
+        conversation: { lastQuestionAsked: "ask_day_part" }
+      },
+      semanticBody: "Hola busco trabajo"
+    }),
+    false
+  );
+});
+
 test("aggregator: recruiting burst deadline does not extend on second fragment", async () => {
   resetInboundBurstAggregationForTests();
 
