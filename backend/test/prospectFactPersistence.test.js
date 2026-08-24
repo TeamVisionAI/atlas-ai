@@ -56,6 +56,48 @@ test('me parece cannot become Parece, ME', () => {
   assert.notEqual(interpretation.intent, INTENTS.PROVIDE_LOCATION);
 });
 
+test('bare Spanish "me" is never Maine', () => {
+  assert.equal(parseLocationAnswer("me"), null);
+  assert.equal(parseLocationAnswer("Me"), null);
+});
+
+test("me gustaria saber prose is never a city/ME", () => {
+  const text =
+    "Me gustaría saber en qué consisten las posiciones de trabajo que tienen disponibles y si alguna de ellas es de tiempo completo muchas gracias";
+  assert.equal(parseLocationAnswer(text), null);
+});
+
+test("long conversational prose is rejected as city", () => {
+  assert.equal(
+    parseLocationAnswer(
+      "Nice quiet neighborhood near the waterfront with good schools"
+    ),
+    null
+  );
+});
+
+test("Portland, ME and Maine remain valid locations", () => {
+  const portland = parseLocationAnswer("Portland, ME");
+  assert.equal(portland?.city, "Portland");
+  assert.equal(portland?.state, "ME");
+  assert.equal(portland?.completeness, "complete");
+
+  const maineOnly = parseLocationAnswer("Maine");
+  assert.equal(maineOnly?.state, "ME");
+  assert.equal(maineOnly?.completeness, "state_only");
+});
+
+test("florida + pompano burst resolves to Pompano Beach, FL", () => {
+  const parsed = parseLocationAnswer("florida pompano");
+  assert.equal(parsed?.city, "Pompano Beach");
+  assert.equal(parsed?.state, "FL");
+  assert.equal(parsed?.completeness, "complete");
+
+  const reverse = parseLocationAnswer("pompano florida");
+  assert.equal(reverse?.city, "Pompano Beach");
+  assert.equal(reverse?.state, "FL");
+});
+
 test("confirmed location cannot be overwritten by inferred junk", () => {
   const ctx = createConversationContext({
     knownFacts: {
@@ -70,6 +112,23 @@ test("confirmed location cannot be overwritten by inferred junk", () => {
     entities: { city: "Parece", state: "ME", completeness: "complete" }
   });
   assert.equal(blocked, true);
+
+  const interpretation = {
+    intent: INTENTS.PROVIDE_LOCATION,
+    entities: { city: "Parece", state: "ME", completeness: "complete" }
+  };
+  const decision = decideConversationTurn({ context: ctx, interpretation });
+  assert.equal(
+    decision.reasonCodes.includes("LOCATION_OVERWRITE_BLOCKED"),
+    true
+  );
+  const next = buildNextContextFromInterpretation({
+    loaded: ctx,
+    interpretation,
+    structuredDecision: decision
+  });
+  assert.equal(next.knownFacts.city, "Fort Myers");
+  assert.equal(next.knownFacts.state, "FL");
 });
 
 test("explicit email extracts and persists to prospect", async () => {

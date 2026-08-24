@@ -5,6 +5,8 @@ import {
   resolveSelectedTranscriptProspectId,
   shouldCommitConversationDetail,
   shouldCommitTimelinePayload,
+  shouldCommitFresherTimelinePayload,
+  getTimelineFreshnessCursor,
   resolveWinningSelection
 } from "./conversationsSelectionConsistency.js";
 
@@ -83,6 +85,68 @@ test("stale timeline payload cannot overwrite current prospect", () => {
     shouldCommitTimelinePayload({
       requestedProspectId: WAJAIRO.id,
       payload: { items: [{ id: "orphan" }] }
+    }),
+    false
+  );
+});
+
+test("fresher timeline wins over stale in-flight response", () => {
+  const older = {
+    prospect: { id: WAJAIRO.id },
+    items: [{ id: "m1", occurredAt: "2026-08-24T02:30:00.000Z", body: "tarde" }]
+  };
+  const newer = {
+    prospect: { id: WAJAIRO.id },
+    items: [
+      { id: "m1", occurredAt: "2026-08-24T02:30:00.000Z", body: "tarde" },
+      {
+        id: "m2",
+        occurredAt: "2026-08-24T02:33:30.000Z",
+        body: "trabajamos en la asesoria"
+      }
+    ]
+  };
+
+  assert.equal(
+    shouldCommitFresherTimelinePayload({
+      requestedProspectId: WAJAIRO.id,
+      incoming: newer,
+      current: older,
+      requestGeneration: 2,
+      committedGeneration: 1
+    }),
+    true
+  );
+  assert.equal(
+    shouldCommitFresherTimelinePayload({
+      requestedProspectId: WAJAIRO.id,
+      incoming: older,
+      current: newer,
+      requestGeneration: 1,
+      committedGeneration: 2
+    }),
+    false
+  );
+  assert.equal(
+    getTimelineFreshnessCursor(newer).latestAt,
+    "2026-08-24T02:33:30.000Z"
+  );
+});
+
+test("stale request generation cannot replace committed newer generation", () => {
+  assert.equal(
+    shouldCommitFresherTimelinePayload({
+      requestedProspectId: WAJAIRO.id,
+      incoming: {
+        prospect: { id: WAJAIRO.id },
+        items: [{ id: "late", occurredAt: "2026-08-24T03:00:00.000Z" }]
+      },
+      current: {
+        prospect: { id: WAJAIRO.id },
+        items: [{ id: "early", occurredAt: "2026-08-24T02:00:00.000Z" }]
+      },
+      requestGeneration: 3,
+      committedGeneration: 5
     }),
     false
   );

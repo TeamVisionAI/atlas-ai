@@ -19,10 +19,36 @@ function buildNextContextFromInterpretation({
   interpretation,
   structuredDecision
 }) {
-  let nextContext = mergeConversationContext(
-    loaded,
-    structuredDecision.contextPatch || {}
-  );
+  const rawPatch = structuredDecision.contextPatch || {};
+  let safePatch = rawPatch;
+
+  // Confirmed location must not be overwritten by a weaker decisionEngine contextPatch.
+  if (
+    shouldBlockLocationOverwrite(loaded.knownFacts || {}, interpretation) &&
+    rawPatch.knownFacts
+  ) {
+    const {
+      city: _c,
+      state: _s,
+      cityCertainty: _cc,
+      stateCertainty: _sc,
+      proposedState: _ps,
+      ...nonLocationFacts
+    } = rawPatch.knownFacts;
+    safePatch = {
+      ...rawPatch,
+      knownFacts: {
+        ...nonLocationFacts,
+        city: loaded.knownFacts.city,
+        state: loaded.knownFacts.state,
+        cityCertainty: loaded.knownFacts.cityCertainty,
+        stateCertainty: loaded.knownFacts.stateCertainty,
+        proposedState: loaded.knownFacts.proposedState ?? null
+      }
+    };
+  }
+
+  let nextContext = mergeConversationContext(loaded, safePatch);
 
   nextContext.conversation = {
     ...nextContext.conversation,
