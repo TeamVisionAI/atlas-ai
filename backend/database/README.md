@@ -501,3 +501,24 @@ Additive STT audit columns on existing `communication_media` (does not rewrite 0
 
 Contract tests: `backend/test/whatsappAudioPhase2Stt.test.js`
 
+## BR-147 — Campaign Intake Codes (migration 052)
+
+Apply before enabling `/app/settings/campaign-intake-codes` in production:
+
+```
+backend/database/migrations/052_campaign_intake_codes.sql
+backend/database/migrations/052_campaign_intake_codes_down.sql
+```
+
+Production apply (after verified backup):
+
+```bash
+CONFIRM_CAMPAIGN_INTAKE_MIGRATION_052=yes node -r dotenv/config \
+  backend/dev/applyCampaignIntakeCodesMigration052.js
+```
+
+Creates `campaign_intake_codes` + `campaign_intake_attributions` with backend-only RLS (service role).  
+If tables already exist without RLS, the apply script runs `052_campaign_intake_codes_rls.sql` and reloads PostgREST schema.
+
+Tests: `backend/test/campaignIntakeCodes.test.js`
+
