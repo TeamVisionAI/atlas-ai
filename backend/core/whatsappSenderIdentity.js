@@ -224,6 +224,16 @@ function mergeWhatsAppSenderIdentityOntoProspect(prospect = {}, identity = {}) {
   return updates;
 }
 
+function resolveProspectVisiblePhone(prospect = {}) {
+  if (prospect.normalized_phone) {
+    return formatPhoneForStorage(prospect.normalized_phone);
+  }
+  if (prospect.phone && !isSyntheticWhatsAppStorageKey(prospect.phone)) {
+    return prospect.phone;
+  }
+  return null;
+}
+
 module.exports = {
   SYNTHETIC_BSUID_PREFIX,
   looksLikeE164Phone,
@@ -235,5 +245,6 @@ module.exports = {
   extractWhatsAppSenderIdFromStorageKey,
   resolveMetaWhatsAppRecipient,
   formatProspectWhatsAppDisplayIdentity,
-  mergeWhatsAppSenderIdentityOntoProspect
+  mergeWhatsAppSenderIdentityOntoProspect,
+  resolveProspectVisiblePhone
 };

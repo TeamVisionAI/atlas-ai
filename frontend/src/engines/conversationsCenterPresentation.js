@@ -13,6 +13,8 @@
 export function buildConversationHeaderModel({
   name = null,
   phone = null,
+  displayIdentity = null,
+  hasVisiblePhone = null,
   source = null,
   ownershipState = null,
   appointmentStatus = null,
@@ -24,10 +26,20 @@ export function buildConversationHeaderModel({
   needsHumanAttention = false
 } = {}) {
   const normalizedPhone = phone ? String(phone).trim() : null;
+  const synthetic =
+    normalizedPhone != null && String(normalizedPhone).startsWith("wa:bsuid:");
+  const visiblePhone =
+    hasVisiblePhone === false || synthetic ? null : normalizedPhone;
   return {
     name: name || null,
-    phone: normalizedPhone,
-    phoneCopyable: Boolean(normalizedPhone),
+    displayIdentity:
+      displayIdentity ||
+      name ||
+      (visiblePhone ? visiblePhone : null) ||
+      null,
+    phone: visiblePhone,
+    phoneLabel: visiblePhone || "Phone unavailable",
+    phoneCopyable: Boolean(visiblePhone),
     source: source || null,
     ownershipState: ownershipState || null,
     appointmentStatus: appointmentStatus || null,

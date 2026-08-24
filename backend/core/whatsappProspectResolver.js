@@ -51,7 +51,8 @@ const {
 } = require("./campaignIntakeCode/campaignIntakeAttributionService");
 const {
   resolveWhatsAppSenderIdentityFromInbound,
-  mergeWhatsAppSenderIdentityOntoProspect
+  mergeWhatsAppSenderIdentityOntoProspect,
+  isSyntheticWhatsAppStorageKey
 } = require("./whatsappSenderIdentity");
 
 const { supabase } = supabaseService;
@@ -73,8 +74,15 @@ function setQrAttributionServiceForTests(service) {
 }
 
 function resolveStoragePhone(rawPhone) {
-  const normalized = normalizePhoneNumber(rawPhone);
-  return formatPhoneForStorage(normalized) || String(rawPhone || "").trim();
+  const raw = String(rawPhone || "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (isSyntheticWhatsAppStorageKey(raw)) {
+    return raw;
+  }
+  const normalized = normalizePhoneNumber(raw);
+  return formatPhoneForStorage(normalized) || raw;
 }
 
 function isMissingWhatsAppColumn(error) {

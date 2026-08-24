@@ -30,7 +30,7 @@ const {
   isRealWhatsAppCommunication
 } = require("./conversationsUnreadEngine");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../phoneNormalizer");
-const { formatProspectWhatsAppDisplayIdentity } = require("../whatsappSenderIdentity");
+const { formatProspectWhatsAppDisplayIdentity, isSyntheticWhatsAppStorageKey, resolveProspectVisiblePhone } = require("../whatsappSenderIdentity");
 
 const INBOX_LOGS_PER_PHONE = 24;
 const INBOX_LOGS_MAX = 600;
@@ -65,11 +65,15 @@ function extractSource(prospect) {
 }
 
 function phoneLookupKeys(phone) {
-  const keys = new Set();
   const raw = String(phone || "").trim();
-  if (raw) {
-    keys.add(raw);
+  if (!raw) {
+    return [];
   }
+  if (isSyntheticWhatsAppStorageKey(raw)) {
+    return [raw];
+  }
+  const keys = new Set();
+  keys.add(raw);
   const digits = raw.replace(/\D/g, "");
   if (digits) {
     keys.add(digits);
@@ -230,7 +234,8 @@ async function buildConversationListItem(prospect, options = {}) {
     whatsappUsername: prospect.whatsapp_username || null,
     whatsappSenderId: prospect.whatsapp_sender_id || null,
     hasVisiblePhone: Boolean(
-      prospect.phone && !String(prospect.phone).startsWith("wa:bsuid:")
+      resolveProspectVisiblePhone(prospect) ||
+        (prospect.phone && !isSyntheticWhatsAppStorageKey(prospect.phone))
     ),
     name: prospect.name || null,
     prospectNumber: prospect.prospect_number || null,

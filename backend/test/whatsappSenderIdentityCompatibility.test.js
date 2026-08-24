@@ -347,3 +347,194 @@ test("extractWhatsAppSenderIdentity fails closed without sender id", () => {
   const identity = extractWhatsAppSenderIdentity({ from: "" }, null, null);
   assert.equal(identity.isUsable, false);
 });
+
+test("6. outbound never digit-normalizes BSUID storage key", () => {
+  const { normalizePhoneNumber } = require("../core/phoneNormalizer");
+  const { resolveStoragePhone } = require("../core/whatsappProspectResolver");
+  const storageKey = `wa:bsuid:${BSUID}`;
+
+  assert.equal(resolveStoragePhone(storageKey), storageKey);
+  assert.notEqual(resolveMetaWhatsAppRecipient({ storageKey, whatsappSenderId: BSUID }), BSUID.replace(/\D/g, ""));
+  assert.notEqual(
+    resolveMetaWhatsAppRecipient({ storageKey, whatsappSenderId: BSUID }),
+    normalizePhoneNumber(storageKey)
+  );
+  assert.equal(resolveMetaWhatsAppRecipient({ storageKey, whatsappSenderId: BSUID }), BSUID);
+});
+
+test("5. UI displayIdentity hides synthetic storage key", () => {
+  assert.equal(
+    formatProspectWhatsAppDisplayIdentity({
+      phone: `wa:bsuid:${BSUID}`,
+      whatsapp_username: USERNAME,
+      name: "Paid Ad Lead"
+    }),
+    `@${USERNAME}`
+  );
+  assert.doesNotMatch(
+    formatProspectWhatsAppDisplayIdentity({
+      phone: `wa:bsuid:${BSUID}`,
+      whatsapp_username: USERNAME
+    }),
+    /wa:bsuid:/i
+  );
+});
+
+test("7. phone later links to same prospect without changing storage key", () => {
+  const existing = {
+    id: "prospect-a",
+    phone: `wa:bsuid:${BSUID}`,
+    whatsapp_sender_id: BSUID,
+    normalized_phone: null,
+    organization_id: ORG_A
+  };
+  const updates = mergeWhatsAppSenderIdentityOntoProspect(existing, {
+    whatsappSenderId: BSUID,
+    phoneE164: "+17865550999"
+  });
+  assert.equal(existing.phone, `wa:bsuid:${BSUID}`);
+  assert.equal(updates.normalized_phone, "17865550999");
+  assert.equal(updates.phone, undefined);
+});
+
+test("8. existing E.164 prospect later links BSUID without duplicate phone key", () => {
+  const existing = {
+    id: "prospect-b",
+    phone: "+17865550111",
+    normalized_phone: "17865550111",
+    whatsapp_sender_id: null
+  };
+  const updates = mergeWhatsAppSenderIdentityOntoProspect(existing, {
+    whatsappSenderId: BSUID,
+    whatsappUsername: USERNAME,
+    phoneE164: "+17865550111"
+  });
+  assert.equal(existing.phone, "+17865550111");
+  assert.equal(updates.whatsapp_sender_id, BSUID);
+  assert.equal(updates.whatsapp_username, USERNAME);
+  assert.equal(updates.phone, undefined);
+});
+
+test("9. transcript lookup keys preserve synthetic storage key", () => {
+  const {
+    fetchConversationLogsByPhones
+  } = require("../core/conversationsCenter/conversationsCenterReadModel");
+  assert.equal(typeof fetchConversationLogsByPhones, "function");
+  const { resolvePhoneCandidates } = require("../core/whatsappCustomerCareWindow");
+  const storageKey = `wa:bsuid:${BSUID}`;
+  assert.deepEqual(resolvePhoneCandidates(storageKey), [storageKey]);
+});
+
+test("10. workflow storage key remains synthetic after phone link", () => {
+  const prospect = {
+    phone: `wa:bsuid:${BSUID}`,
+    normalized_phone: "17865550999",
+    whatsapp_sender_id: BSUID
+  };
+  const { resolveProspectVisiblePhone } = require("../core/whatsappSenderIdentity");
+  assert.equal(prospect.phone, `wa:bsuid:${BSUID}`);
+  assert.equal(resolveProspectVisiblePhone(prospect), "+17865550999");
+});
+
+test("11. Return-to-Atlas log lookup uses synthetic key only", () => {
+  const storageKey = `wa:bsuid:${BSUID}`;
+  const resume = require("../core/conversationsCenter/returnToAtlasResumeService");
+  assert.ok(resume);
+  const { resolvePhoneCandidates } = require("../core/whatsappCustomerCareWindow");
+  assert.deepEqual(resolvePhoneCandidates(storageKey), [storageKey]);
+});
+
+test("12. scheduling/outbound can target BSUID when no linked phone", () => {
+  assert.equal(
+    resolveMetaWhatsAppRecipient({
+      storageKey: `wa:bsuid:${BSUID}`,
+      whatsappSenderId: BSUID
+    }),
+    BSUID
+  );
+});
+
+test("13. customer-care window resolves synthetic inbound key", () => {
+  const { resolvePhoneCandidates, evaluateCustomerCareWindowFromInboundAt } = require("../core/whatsappCustomerCareWindow");
+  const storageKey = `wa:bsuid:${BSUID}`;
+  assert.deepEqual(resolvePhoneCandidates(storageKey), [storageKey]);
+  const open = evaluateCustomerCareWindowFromInboundAt({
+    latestInboundAt: new Date().toISOString()
+  });
+  assert.equal(open.open, true);
+});
+
+test("14. burst aggregation accepts synthetic sender storage key", async () => {
+  const {
+    scheduleInboundBurstAggregation,
+    resetInboundBurstAggregationForTests
+  } = require("../core/whatsappInboundBurstAggregator");
+  resetInboundBurstAggregationForTests();
+  const storageKey = `wa:bsuid:${BSUID}`;
+  const p1 = scheduleInboundBurstAggregation({
+    phone: storageKey,
+    text: "Hola",
+    inbound: { providerMessageId: "wamid.b1", phone: storageKey }
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  const p2 = scheduleInboundBurstAggregation({
+    phone: storageKey,
+    text: "busco trabajo",
+    inbound: { providerMessageId: "wamid.b2", phone: storageKey }
+  });
+  const [r1, r2] = await Promise.all([p1, p2]);
+  assert.equal(r1.combinedText, "Hola busco trabajo");
+  assert.equal(r2.combinedText, "Hola busco trabajo");
+  resetInboundBurstAggregationForTests();
+});
+
+test("15. cross-tenant sender lookup remains org-scoped in harness", async () => {
+  const { messages } = parseWhatsAppWebhookPayload(
+    bsuidWebhook({ providerMessageId: "wamid.XORG" })
+  );
+  const orgA = createHarness({ organizationId: ORG_A });
+  const orgB = createHarness({ organizationId: ORG_B, campaignIntakeMatch: null });
+  await processInboundWhatsAppMessage(messages[0], orgA.deps);
+  await processInboundWhatsAppMessage(
+    { ...messages[0], providerMessageId: "wamid.YORG" },
+    orgB.deps
+  );
+  assert.equal(orgA.prospects.size, 1);
+  assert.equal(orgB.prospects.size, 1);
+});
+
+test("16. invalid identity fails closed with diagnostic", async () => {
+  const result = await processInboundWhatsAppMessage(
+    {
+      providerMessageId: "wamid.INVALID",
+      phone: "",
+      body: "Hola",
+      phoneNumberId: PHONE_ID,
+      senderIdentity: { isUsable: false, reason: "WHATSAPP_SENDER_IDENTITY_UNUSABLE" }
+    },
+    createHarness().deps
+  );
+  assert.equal(result.error, "WHATSAPP_SENDER_IDENTITY_UNUSABLE");
+});
+
+test("17. normal E.164 resolveStoragePhone unchanged", () => {
+  const { resolveStoragePhone } = require("../core/whatsappProspectResolver");
+  assert.equal(resolveStoragePhone("7865550111"), "+17865550111");
+});
+
+test("end-to-end fixture: username-only recruiting intake identity chain", () => {
+  const { messages } = parseWhatsAppWebhookPayload(bsuidWebhook());
+  const inbound = messages[0];
+  assert.equal(inbound.phoneE164, null);
+  assert.equal(inbound.whatsappSenderId, BSUID);
+  assert.match(inbound.body, /TVR-0826-A7K4/);
+  assert.equal(inbound.senderIdentity.storageKey, `wa:bsuid:${BSUID}`);
+  assert.equal(
+    formatProspectWhatsAppDisplayIdentity({
+      phone: inbound.phone,
+      whatsapp_username: USERNAME,
+      name: inbound.contactName
+    }),
+    `@${USERNAME}`
+  );
+});
