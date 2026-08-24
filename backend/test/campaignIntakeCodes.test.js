@@ -315,7 +315,8 @@ test("17. IUL-purpose token does NOT enter Recruit AI recruiting flow", async ()
     prospect: unknownProspect(),
     inbound: { campaignIntakeMatch: match }
   });
-  assert.equal(result.eligible, false);
+  assert.equal(result.eligible, true);
+  assert.equal(result.reason, "CAMPAIGN_INTAKE_IUL");
 });
 
 test("18. duplicate inbound/wamid attribution is idempotent", async () => {

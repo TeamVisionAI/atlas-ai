@@ -133,9 +133,24 @@ function createCampaignIntakeAttributionService(options = {}) {
       }
     }
 
+    let iulReviewEligible = false;
+    if (isIulReviewPurpose(lookup)) {
+      if (created) {
+        iulReviewEligible = true;
+      } else {
+        const episode = evaluateFreshIntakeEpisode({
+          prospect,
+          workflowState,
+          created: false
+        });
+        iulReviewEligible = episode.allowed;
+      }
+    }
+
     return {
       ...lookup,
-      recruitingEligible
+      recruitingEligible,
+      iulReviewEligible
     };
   }
 
@@ -231,6 +246,11 @@ function createCampaignIntakeAttributionService(options = {}) {
           iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD,
           workflowOwnership: OWNERSHIP.ATLAS
         },
+        scope
+      ).catch(() => null);
+      await persistVerifiedAtlasEligibilitySource(
+        prospect.phone,
+        VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_IUL,
         scope
       ).catch(() => null);
     }

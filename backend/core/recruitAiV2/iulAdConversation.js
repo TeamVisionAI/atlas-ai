@@ -132,6 +132,12 @@ function isIulReviewAdContext(context = {}, extras = {}) {
   if (context.conversationGoal === CONVERSATION_GOAL) {
     return true;
   }
+  const intakePurpose = String(
+    context.campaignIntakePurpose || extras.campaignIntakePurpose || ""
+  ).toUpperCase();
+  if (intakePurpose === "IUL" || intakePurpose === "IUL_REVIEW") {
+    return true;
+  }
   if (isIulAsk(context.conversation?.lastQuestionAsked)) {
     return true;
   }
@@ -259,6 +265,14 @@ function parseOfferedSlotSelection(text, context) {
   return null;
 }
 
+function isCampaignIntakeIulFirstTurn(context = {}) {
+  const purpose = String(context.campaignIntakePurpose || "").toUpperCase();
+  if (purpose !== "IUL" && purpose !== "IUL_REVIEW") {
+    return false;
+  }
+  return !context?.conversation?.lastQuestionAsked;
+}
+
 function classifyIulAdInbound({ text, context } = {}) {
   const lastAsk = context?.conversation?.lastQuestionAsked || null;
   const known = context?.knownFacts || {};
@@ -294,6 +308,9 @@ function classifyIulAdInbound({ text, context } = {}) {
   }
   if (looksLikeSendInfoHere(text)) {
     return { intent: INTENTS.IUL_SEND_INFO_HERE, confidence: 0.94, entities: {} };
+  }
+  if (isCampaignIntakeIulFirstTurn(context)) {
+    return { intent: INTENTS.IUL_GREETING, confidence: 0.92, entities: {} };
   }
   if (looksLikeInfoOnly(text)) {
     return { intent: INTENTS.IUL_INFO_ONLY, confidence: 0.94, entities: {} };
@@ -374,6 +391,24 @@ function classifyIulAdInbound({ text, context } = {}) {
     };
   }
 
+  if (lastAsk === ASK.POLICY_ACTIVE) {
+    const t = fold(text);
+    if (/^(si|sí|yes|yeah|yep|claro|activa|active)\b/.test(t)) {
+      return {
+        intent: INTENTS.IUL_POLICY_ACTIVE_YES,
+        confidence: 0.92,
+        entities: { iulPolicyActive: true, policyType: "IUL" }
+      };
+    }
+    if (/^(no|not|inactive|cancelada|cancelled|inactiva)\b/.test(t)) {
+      return {
+        intent: INTENTS.IUL_POLICY_ACTIVE_NO,
+        confidence: 0.9,
+        entities: { iulPolicyActive: false }
+      };
+    }
+  }
+
   if (lastAsk === ASK.POLICY_TYPE || lastAsk === ASK.POLICY_ACTIVE) {
     const policyType = classifyPolicyType(text);
     return {
@@ -416,6 +451,12 @@ function copy(language) {
     opener: es
       ? "¡Hola! 👋 Gracias por escribirnos. Vi que quieres revisar tu póliza. ¿Qué tipo de póliza tienes: IUL, otro seguro de vida, o no estás seguro/a?"
       : "Hi! 👋 Thanks for writing. I saw you want to review your policy. What type of policy do you have: IUL, other life insurance, or not sure?",
+    intakeOpener: es
+      ? "¡Claro! Con gusto te ayudamos a revisar tu póliza. Para comenzar, ¿tu póliza IUL está actualmente activa?"
+      : "Of course! We're happy to help you review your policy. To start, is your IUL policy currently active?",
+    policyActiveAsk: es
+      ? "¿Tu póliza IUL está actualmente activa?"
+      : "Is your IUL policy currently active?",
     policyTypeAsk: es
       ? "¿Qué tipo de póliza tienes: IUL, otro seguro de vida, o no estás seguro/a?"
       : "What type of policy do you have: IUL, other life insurance, or not sure?",
@@ -480,6 +521,8 @@ function renderIulAdReply(templateKey, language) {
   const c = copy(language);
   const map = {
     iul_ad_opener: c.opener,
+    iul_intake_opener: c.intakeOpener,
+    iul_ask_policy_active: c.policyActiveAsk,
     iul_ask_policy_type: c.policyTypeAsk,
     iul_ask_carrier: c.carrierAsk,
     iul_ask_original_purpose: c.originalPurposeAsk,
@@ -597,6 +640,7 @@ function nextDiscoveryAsk(knownFacts = {}) {
 function discoveryTemplateForAsk(ask) {
   const map = {
     [ASK.POLICY_TYPE]: "iul_ask_policy_type",
+    [ASK.POLICY_ACTIVE]: "iul_ask_policy_active",
     [ASK.CARRIER]: "iul_ask_carrier",
     [ASK.ORIGINAL_PURPOSE]: "iul_ask_original_purpose",
     [ASK.POLICY_AGE]: "iul_ask_policy_age",
@@ -610,6 +654,7 @@ function discoveryTemplateForAsk(ask) {
 function discoveryNextActionForAsk(ask) {
   const map = {
     [ASK.POLICY_TYPE]: NEXT_ACTIONS.IUL_ASK_POLICY_TYPE,
+    [ASK.POLICY_ACTIVE]: NEXT_ACTIONS.IUL_ASK_POLICY_ACTIVE,
     [ASK.CARRIER]: NEXT_ACTIONS.IUL_ASK_CARRIER,
     [ASK.ORIGINAL_PURPOSE]: NEXT_ACTIONS.IUL_ASK_ORIGINAL_PURPOSE,
     [ASK.POLICY_AGE]: NEXT_ACTIONS.IUL_ASK_POLICY_AGE,
@@ -709,6 +754,8 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     "";
   const iulIntents = new Set([
     INTENTS.IUL_GREETING,
+    INTENTS.IUL_POLICY_ACTIVE_YES,
+    INTENTS.IUL_POLICY_ACTIVE_NO,
     INTENTS.IUL_POLICY_TYPE,
     INTENTS.IUL_CARRIER,
     INTENTS.IUL_ORIGINAL_POLICY_PURPOSE,
@@ -748,6 +795,30 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
       templateKey: "iul_policy_is_bad_safe",
       nextAction: discoveryNextActionForAsk(nextAsk),
       lastQuestionAsked: nextAsk,
+      reasonCodes: [REASON_CODES.IUL_POLICY_IS_BAD_SAFE_RESPONSE]
+    });
+  }
+
+  if (intent === INTENTS.IUL_POLICY_ACTIVE_YES) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_ask_carrier",
+      nextAction: NEXT_ACTIONS.IUL_ASK_CARRIER,
+      lastQuestionAsked: ASK.CARRIER,
+      knownFacts: {
+        iulPolicyActive: true,
+        policyType: "IUL",
+        iulWorkflowStage: IUL_STAGES.ENGAGED
+      },
+      iulWorkflowStage: IUL_STAGES.ENGAGED
+    });
+  }
+
+  if (intent === INTENTS.IUL_POLICY_ACTIVE_NO) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_policy_is_bad_safe",
+      nextAction: NEXT_ACTIONS.IUL_ASK_POLICY_TYPE,
+      lastQuestionAsked: ASK.POLICY_TYPE,
+      knownFacts: { iulPolicyActive: false },
       reasonCodes: [REASON_CODES.IUL_POLICY_IS_BAD_SAFE_RESPONSE]
     });
   }
@@ -966,7 +1037,11 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
   }
 
   const pending = context.conversation?.lastQuestionAsked;
-  if (pending && pending !== ASK.POLICY_TYPE) {
+  if (
+    pending &&
+    pending !== ASK.POLICY_TYPE &&
+    pending !== ASK.POLICY_ACTIVE
+  ) {
     const replayAsk =
       pending === ASK.CARRIER
         ? ASK.CARRIER
@@ -987,6 +1062,17 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
       templateKey: discoveryTemplateForAsk(replayAsk),
       nextAction: discoveryNextActionForAsk(replayAsk),
       lastQuestionAsked: replayAsk
+    });
+  }
+
+  if (isCampaignIntakeIulFirstTurn(context)) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_intake_opener",
+      nextAction: NEXT_ACTIONS.IUL_ASK_POLICY_ACTIVE,
+      lastQuestionAsked: ASK.POLICY_ACTIVE,
+      knownFacts: { iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD },
+      reasonCodes: [REASON_CODES.IUL_SPANISH_FIRST_OPENER],
+      iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD
     });
   }
 
@@ -1035,6 +1121,7 @@ module.exports = {
   TOPICS,
   IUL_SOURCE_IDS_ENV,
   isIulReviewAdContext,
+  isCampaignIntakeIulFirstTurn,
   isIulReviewAdTurn,
   looksLikeIulReferral,
   looksLikeIulPolicyLanguage,

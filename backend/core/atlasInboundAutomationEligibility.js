@@ -10,7 +10,13 @@ const {
   loadPersistedWorkflowState,
   savePersistedWorkflowState
 } = require("./workflowStateStore");
-const { evaluateRecruitingSessionActive } = require("./recruitingSessionGuard");
+const {
+  evaluateRecruitingSessionActive,
+  resolveLastRecruitingActivityMs
+} = require("./recruitingSessionGuard");
+const { REOPENED_INACTIVITY_MS } = require("./whatsappConstants");
+const { isIulWorkflowProspect } = require("./iulWorkflowConstants");
+const { INTAKE_CODE_STATUS } = require("./campaignIntakeCode/constants");
 
 /** Durable proof that Atlas eligibility was earned from a verified event. */
 const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
@@ -18,7 +24,9 @@ const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
   QR: "QR",
   FACEBOOK_LEAD_ADS: "FACEBOOK_LEAD_ADS",
   QUICK_CAPTURE: "QUICK_CAPTURE",
-  CAMPAIGN_INTAKE_CODE: "CAMPAIGN_INTAKE_CODE"
+  CAMPAIGN_INTAKE_CODE: "CAMPAIGN_INTAKE_CODE",
+  /** BR-147 — validated ACTIVE IUL campaign intake (policy_review lane only). */
+  CAMPAIGN_INTAKE_IUL: "CAMPAIGN_INTAKE_IUL"
 });
 
 const VERIFIED_SOURCE_SET = Object.freeze(
@@ -126,6 +134,53 @@ function hasFreshRecruitingCampaignIntakeMatch(inbound) {
   );
 }
 
+/**
+ * Positive ACTIVE IUL campaign intake on this inbound (BR-147).
+ * Policy-review lane only — never Recruit AI recruiting qualification.
+ */
+function hasFreshIulCampaignIntakeMatch(inbound) {
+  const match = inbound?.campaignIntakeMatch;
+  return Boolean(
+    match?.matched === true &&
+      String(match.purpose || "").toUpperCase() === "IUL" &&
+      upper(match.status) === INTAKE_CODE_STATUS.ACTIVE &&
+      match.iulReviewEligible === true &&
+      match.recruitingEligible !== true
+  );
+}
+
+function evaluateIulReviewSessionActive({
+  prospect = null,
+  workflowState = null,
+  now = Date.now()
+} = {}) {
+  if (!prospect) {
+    return { active: false, reason: "MISSING_PROSPECT" };
+  }
+
+  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  if (!isIulWorkflowProspect(wf, {})) {
+    return { active: false, reason: "IUL_SESSION_INACTIVE" };
+  }
+
+  if (wf.inboxClosedAt || wf.inboxArchivedAt) {
+    return { active: false, reason: "CONVERSATION_CLOSED_OR_ARCHIVED" };
+  }
+  if (wf.manualAgentOwnership === true || Boolean(wf.humanTakenOverAt)) {
+    return { active: false, reason: "HUMAN_OWNED" };
+  }
+
+  const lastActivityMs = resolveLastRecruitingActivityMs(prospect, wf);
+  if (
+    lastActivityMs != null &&
+    now - lastActivityMs > REOPENED_INACTIVITY_MS
+  ) {
+    return { active: false, reason: "IUL_SESSION_EXPIRED" };
+  }
+
+  return { active: true, reason: "ACTIVE_IUL_REVIEW_WORKFLOW" };
+}
+
 function hasStoredQrOrigin(prospect) {
   const entry = upper(prospect?.entry_method);
   const source = upper(prospect?.source);
@@ -187,9 +242,24 @@ function evaluateAtlasInboundAutomationEligibility({
     return { eligible: true, reason: "CAMPAIGN_INTAKE_CODE" };
   }
 
+  if (hasFreshIulCampaignIntakeMatch(inbound)) {
+    return { eligible: true, reason: "CAMPAIGN_INTAKE_IUL" };
+  }
+
   const continuation = resolveContinuationProvenance({ prospect, workflowState });
   if (!continuation.proven) {
     return { eligible: false, reason: continuation.reason };
+  }
+
+  if (
+    upper(workflowState?.atlasEligibilitySource) ===
+    VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_IUL
+  ) {
+    const iulSession = evaluateIulReviewSessionActive({ prospect, workflowState });
+    if (!iulSession.active) {
+      return { eligible: false, reason: iulSession.reason };
+    }
+    return { eligible: true, reason: continuation.reason };
   }
 
   const session = evaluateRecruitingSessionActive({ prospect, workflowState });
@@ -252,6 +322,8 @@ module.exports = {
   resolveContinuationProvenance,
   resolveVerifiedAtlasEligibilitySource,
   hasFreshRecruitingCampaignIntakeMatch,
+  hasFreshIulCampaignIntakeMatch,
+  evaluateIulReviewSessionActive,
   persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES

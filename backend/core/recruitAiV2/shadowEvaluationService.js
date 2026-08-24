@@ -126,7 +126,12 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
     prospectClosed: closed,
     conversationGoal: iulCampaign.conversationGoal,
     campaignKind: iulCampaign.campaignKind,
-    ctwaReferral: iulCampaign.ctwaReferral
+    ctwaReferral: iulCampaign.ctwaReferral,
+    campaignIntakePurpose:
+      extras.campaignIntakePurpose ||
+      prospect.campaignIntakePurpose ||
+      extras.workflowState?.campaignIntakePurpose ||
+      null
   };
 }
 

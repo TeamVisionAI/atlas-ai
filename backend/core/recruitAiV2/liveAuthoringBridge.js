@@ -39,6 +39,7 @@ const {
 } = require("./schedulingConfirmation");
 const { renderCustomerReply } = require("./responseRenderer");
 const { APPOINTMENT_STATUS } = require("./conversationContext");
+const { loadPersistedWorkflowState } = require("../workflowStateStore");
 
 const STAGES = Object.freeze({
   ATTEMPTED: "recruit_ai_v2_live_authoring_attempted",
@@ -720,7 +721,14 @@ async function attemptLiveV2Authoring({
     ctwaReferral: normalized.ctwaReferral || null,
     conversationGoal: prospect.lead_source?.conversationGoal || prospect.conversationGoal || null,
     campaignKind: prospect.lead_source?.campaignKind || prospect.campaignKind || null,
-    leadSource: prospect.lead_source || prospect.leadSource || null
+    leadSource: prospect.lead_source || prospect.leadSource || null,
+    workflowState: await loadPersistedWorkflowState(prospectPhone, {
+      organizationId,
+      prospectId: canonicalProspectId
+    }).catch(() => null),
+    campaignIntakePurpose:
+      normalized.campaignIntakeMatch?.purpose ||
+      null
   });
 
   try {
