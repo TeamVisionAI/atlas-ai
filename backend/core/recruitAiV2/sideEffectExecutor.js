@@ -14,6 +14,12 @@ const { buildIsoTimestamp } = require("../../services/availabilityService");
 const {
   appointmentMatchesProspectIdentity
 } = require("../appointmentProspectIdentity");
+const { buildSchedulingAttemptId } = require("../sharedScheduling/schedulingIdempotency");
+const { resolveSchedulingConfig } = require("../sharedScheduling/sharedSchedulingConfig");
+const {
+  buildSchedulingDiagnostics,
+  logSchedulingDiagnostics
+} = require("../sharedScheduling/schedulingObservability");
 
 function resolveProspectPhone({ context, options } = {}) {
   return (
@@ -300,6 +306,18 @@ async function executeAuthorizedSideEffects({
     options.inboundMessageId ||
     options.messageId ||
     null;
+  const schedulingConfig = resolveSchedulingConfig(context, options);
+  const schedulingAttemptId = buildSchedulingAttemptId({
+    organizationId,
+    agentId,
+    prospectId: context?.prospectId || options.prospectId || null,
+    prospectPhone: phone,
+    appointmentType: schedulingConfig.appointmentType,
+    dateKey,
+    timeKey,
+    timezone: context?.timezone || "America/New_York",
+    inboundMessageId
+  });
   const base = telemetryBase({
     authorization,
     structuredDecision,
@@ -449,7 +467,7 @@ async function executeAuthorizedSideEffects({
       agentId,
       date: dateKey,
       dateEnd: dateKey,
-      purpose: "recruiting_interview",
+      purpose: schedulingConfig.purpose,
       timePreference: "any",
       maxResults: 48
     });
@@ -495,6 +513,16 @@ async function executeAuthorizedSideEffects({
 
   let scheduleResult;
   try {
+    logSchedulingDiagnostics("shared_scheduling_booking_attempt", {
+      ...buildSchedulingDiagnostics({
+        workflowConfig: schedulingConfig,
+        booking: { idempotencyKey: schedulingAttemptId }
+      }),
+      organizationId,
+      agentId,
+      dateKey,
+      timeKey
+    });
     scheduleResult = await executeScheduleInterview(
       phone,
       {
@@ -508,6 +536,7 @@ async function executeAuthorizedSideEffects({
         agentId,
         userId: agentId,
         inboundMessageId,
+        schedulingAttemptId,
         // Implements BR-127 — pass durable knownFacts for workflow qual sync.
         recruitAiV2Context: context || null,
         recruitAiV2CoreProspectId: context?.prospectId || options.prospectId || null

@@ -12,6 +12,16 @@ const {
   partsInZone,
   zonedTimeToUtcMs
 } = require("../organizationDateWindow");
+const { mergeSchedulingConstraints } = require("../sharedScheduling/schedulingNegotiationState");
+const {
+  enrichReadResultWithNearestAlternatives
+} = require("../sharedScheduling/sharedSchedulingOffer");
+const { resolveSchedulingConfig } = require("../sharedScheduling/sharedSchedulingConfig");
+const {
+  buildSchedulingDiagnostics,
+  logSchedulingDiagnostics
+} = require("../sharedScheduling/schedulingObservability");
+const { buildNegotiationState } = require("../sharedScheduling/schedulingNegotiationState");
 
 const DEFAULT_MAX_CANDIDATES = 2;
 const DEFAULT_TIMEZONE = ATLAS_DEFAULT_TIMEZONE || "America/New_York";
@@ -188,7 +198,12 @@ function resolveConcreteScheduleDate({ context = {}, interpretation = null } = {
 function resolveConstraints({ context = {}, interpretation = null } = {}) {
   const fromIntent = interpretation?.entities?.availabilityConstraint || null;
   const fromContext = context.knownFacts?.availabilityConstraint || null;
-  const constraint = fromIntent || fromContext || null;
+  const constraint = mergeSchedulingConstraints(
+    fromContext,
+    fromIntent,
+    context,
+    interpretation
+  );
   const {
     resolveEarliestTimeInclusive
   } = require("./schedulingConstraints");
@@ -504,8 +519,26 @@ function toDecisionAvailability(readResult) {
     failureReason: null,
     rolling: Boolean(readResult.rolling),
     searchMeta: readResult.searchMeta || null,
+    alternativeToConstraint: Boolean(readResult.alternativeToConstraint),
     readResult
   };
+}
+
+function finalizeReadResultWithAlternatives(
+  readResult,
+  { constraints = {}, requestedDate = null, maxCandidates = DEFAULT_MAX_CANDIDATES } = {}
+) {
+  if (!readResult || readResult.status === READ_STATUS.UNAVAILABLE) {
+    return readResult;
+  }
+  if (Array.isArray(readResult.offeredSlots) && readResult.offeredSlots.length > 0) {
+    return readResult;
+  }
+  return enrichReadResultWithNearestAlternatives(readResult, {
+    constraints,
+    requestedDate: requestedDate || readResult.date || null,
+    maxCandidates
+  });
 }
 
 /**
@@ -590,32 +623,37 @@ async function readCandidateSlots({
     });
   }
 
-  const filtered = filterSlotsByConstraints(rawSlots, constraints);
+  const unconstrainedFutureSlots = rawSlots;
+  const filtered = filterSlotsByConstraints(unconstrainedFutureSlots, constraints);
   const offered = selectCandidateSlots(filtered, {
     maxCandidates,
     rejectTimes
   });
 
-  return {
-    status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
-    organizationId,
-    agentId,
-    date,
-    timezone: resolvedTimezone,
-    constraints: {
-      earliestTime: constraints.earliestTime || null,
-      latestTime: constraints.latestTime || null,
-      earliestTimeInclusive:
-        typeof constraints.earliestTimeInclusive === "boolean"
-          ? constraints.earliestTimeInclusive
-          : true
+  return finalizeReadResultWithAlternatives(
+    {
+      status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+      organizationId,
+      agentId,
+      date,
+      timezone: resolvedTimezone,
+      constraints: {
+        earliestTime: constraints.earliestTime || null,
+        latestTime: constraints.latestTime || null,
+        earliestTimeInclusive:
+          typeof constraints.earliestTimeInclusive === "boolean"
+            ? constraints.earliestTimeInclusive
+            : true
+      },
+      slots: filtered,
+      unconstrainedFutureSlots,
+      offeredSlots: offered,
+      source: "sprint22",
+      agentResolutionSource,
+      failureReason: null
     },
-    slots: filtered,
-    offeredSlots: offered,
-    source: "sprint22",
-    agentResolutionSource,
-    failureReason: null
-  };
+    { constraints, requestedDate: date, maxCandidates }
+  );
 }
 
 /**
@@ -791,16 +829,20 @@ async function readRollingCandidateSlots({
       .map((slot) => normalizeSlot(slot, tz))
       .filter(Boolean);
     const future = filterFutureSlots(normalized, nowMs, tz);
-    return filterSlotsByConstraints(future, constraints);
+    const qualifying = filterSlotsByConstraints(future, constraints);
+    return { future, qualifying };
   };
 
   let qualifying = [];
+  let unconstrainedFutureSlots = [];
   let resolvedTimezone = tz;
   let providerFailed = false;
 
   try {
     if (Array.isArray(fixtureSlots)) {
-      qualifying = collectFromRaw(fixtureSlots);
+      const collected = collectFromRaw(fixtureSlots);
+      qualifying = collected.qualifying;
+      unconstrainedFutureSlots = collected.future;
     } else {
       const getSlotsFn =
         sync && typeof getSlotsSync === "function"
@@ -823,7 +865,9 @@ async function readRollingCandidateSlots({
         })
       );
       resolvedTimezone = initialResult?.timezone || resolvedTimezone;
-      qualifying = collectFromRaw(initialResult?.slots || []);
+      const initialCollected = collectFromRaw(initialResult?.slots || []);
+      qualifying = initialCollected.qualifying;
+      unconstrainedFutureSlots = initialCollected.future;
 
       let offeredProbe = selectCrossDateCandidateSlots(qualifying, {
         maxCandidates,
@@ -846,9 +890,17 @@ async function readRollingCandidateSlots({
           })
         );
         resolvedTimezone = dayResult?.timezone || resolvedTimezone;
-        const dayQualifying = collectFromRaw(dayResult?.slots || []);
+        const dayCollected = collectFromRaw(dayResult?.slots || []);
+        const seenFuture = new Set(unconstrainedFutureSlots.map(slotIdentity));
+        for (const slot of dayCollected.future) {
+          const id = slotIdentity(slot);
+          if (!seenFuture.has(id)) {
+            unconstrainedFutureSlots.push(slot);
+            seenFuture.add(id);
+          }
+        }
         const seen = new Set(qualifying.map(slotIdentity));
-        for (const slot of dayQualifying) {
+        for (const slot of dayCollected.qualifying) {
           const id = slotIdentity(slot);
           if (!seen.has(id)) {
             qualifying.push(slot);
@@ -884,6 +936,10 @@ async function readRollingCandidateSlots({
       const dk = slot.dateKey || slot.date;
       return dk && dk >= startDateKey && dk <= maxEndDateKey;
     });
+    unconstrainedFutureSlots = unconstrainedFutureSlots.filter((slot) => {
+      const dk = slot.dateKey || slot.date;
+      return dk && dk >= startDateKey && dk <= maxEndDateKey;
+    });
   }
 
   const offered = selectCrossDateCandidateSlots(qualifying, {
@@ -891,38 +947,42 @@ async function readRollingCandidateSlots({
     rejectIds
   });
 
-  return {
-    status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
-    organizationId,
-    agentId,
-    date: null,
-    dateStart: startDateKey,
-    dateEnd: offered.length
-      ? offered[offered.length - 1].dateKey || offered[offered.length - 1].date
-      : maxEndDateKey,
-    rolling: true,
-    timezone: resolvedTimezone,
-    constraints: {
-      earliestTime: constraints.earliestTime || null,
-      latestTime: constraints.latestTime || null,
-      earliestTimeInclusive:
-        typeof constraints.earliestTimeInclusive === "boolean"
-          ? constraints.earliestTimeInclusive
-          : true
+  return finalizeReadResultWithAlternatives(
+    {
+      status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+      organizationId,
+      agentId,
+      date: null,
+      dateStart: startDateKey,
+      dateEnd: offered.length
+        ? offered[offered.length - 1].dateKey || offered[offered.length - 1].date
+        : maxEndDateKey,
+      rolling: true,
+      timezone: resolvedTimezone,
+      constraints: {
+        earliestTime: constraints.earliestTime || null,
+        latestTime: constraints.latestTime || null,
+        earliestTimeInclusive:
+          typeof constraints.earliestTimeInclusive === "boolean"
+            ? constraints.earliestTimeInclusive
+            : true
+      },
+      slots: sortSlotsChronologically(qualifying),
+      unconstrainedFutureSlots: sortSlotsChronologically(unconstrainedFutureSlots),
+      offeredSlots: offered,
+      source: "sprint22",
+      agentResolutionSource,
+      failureReason: null,
+      searchMeta: {
+        initialHorizonHours: INITIAL_HORIZON_HOURS,
+        maxExpansionDays: MAX_EXPANSION_DAYS,
+        startDateKey,
+        initialEndDateKey,
+        maxEndDateKey
+      }
     },
-    slots: sortSlotsChronologically(qualifying),
-    offeredSlots: offered,
-    source: "sprint22",
-    agentResolutionSource,
-    failureReason: null,
-    searchMeta: {
-      initialHorizonHours: INITIAL_HORIZON_HOURS,
-      maxExpansionDays: MAX_EXPANSION_DAYS,
-      startDateKey,
-      initialEndDateKey,
-      maxEndDateKey
-    }
-  };
+    { constraints, requestedDate: null, maxCandidates }
+  );
 }
 
 function readRollingCandidateSlotsSync(params = {}) {
@@ -936,7 +996,8 @@ function readRollingCandidateSlotsSync(params = {}) {
     rejectIds = [],
     fixtureSlots = null,
     getSlotsSync = null,
-    now = null
+    now = null,
+    purpose = "recruiting_interview"
   } = params;
 
   if (!agentId) {
@@ -970,18 +1031,22 @@ function readRollingCandidateSlotsSync(params = {}) {
   const initialEndDateKey = dateKeyInZone(horizonEndMs, tz);
   const maxEndDateKey = addDaysToDateKey(startDateKey, MAX_EXPANSION_DAYS - 1);
 
-  const collect = (rawSlots) =>
-    filterSlotsByConstraints(
-      filterFutureSlots(
-        (rawSlots || []).map((s) => normalizeSlot(s, tz)).filter(Boolean),
-        nowMs,
-        tz
-      ),
-      constraints
-    );
+  const collectPair = (rawSlots) => {
+    const normalized = (rawSlots || [])
+      .map((s) => normalizeSlot(s, tz))
+      .filter(Boolean);
+    const future = filterFutureSlots(normalized, nowMs, tz);
+    const qualifying = filterSlotsByConstraints(future, constraints);
+    return { future, qualifying };
+  };
 
   if (Array.isArray(fixtureSlots)) {
-    const qualifying = collect(fixtureSlots).filter((slot) => {
+    const collected = collectPair(fixtureSlots);
+    const qualifying = collected.qualifying.filter((slot) => {
+      const dk = slot.dateKey || slot.date;
+      return dk && dk >= startDateKey && dk <= maxEndDateKey;
+    });
+    const unconstrainedFutureSlots = collected.future.filter((slot) => {
       const dk = slot.dateKey || slot.date;
       return dk && dk >= startDateKey && dk <= maxEndDateKey;
     });
@@ -989,48 +1054,55 @@ function readRollingCandidateSlotsSync(params = {}) {
       maxCandidates,
       rejectIds
     });
-    return {
-      status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
-      organizationId,
-      agentId,
-      date: null,
-      rolling: true,
-      timezone: tz,
-      constraints: {
-        earliestTime: constraints.earliestTime || null,
-        latestTime: constraints.latestTime || null,
-        earliestTimeInclusive:
-          typeof constraints.earliestTimeInclusive === "boolean"
-            ? constraints.earliestTimeInclusive
-            : true
+    return finalizeReadResultWithAlternatives(
+      {
+        status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+        organizationId,
+        agentId,
+        date: null,
+        rolling: true,
+        timezone: tz,
+        constraints: {
+          earliestTime: constraints.earliestTime || null,
+          latestTime: constraints.latestTime || null,
+          earliestTimeInclusive:
+            typeof constraints.earliestTimeInclusive === "boolean"
+              ? constraints.earliestTimeInclusive
+              : true
+        },
+        slots: sortSlotsChronologically(qualifying),
+        unconstrainedFutureSlots: sortSlotsChronologically(unconstrainedFutureSlots),
+        offeredSlots: offered,
+        source: "sprint22",
+        agentResolutionSource,
+        failureReason: null,
+        searchMeta: {
+          initialHorizonHours: INITIAL_HORIZON_HOURS,
+          maxExpansionDays: MAX_EXPANSION_DAYS,
+          startDateKey,
+          initialEndDateKey,
+          maxEndDateKey
+        }
       },
-      slots: sortSlotsChronologically(qualifying),
-      offeredSlots: offered,
-      source: "sprint22",
-      agentResolutionSource,
-      failureReason: null,
-      searchMeta: {
-        initialHorizonHours: INITIAL_HORIZON_HOURS,
-        maxExpansionDays: MAX_EXPANSION_DAYS,
-        startDateKey,
-        initialEndDateKey,
-        maxEndDateKey
-      }
-    };
+      { constraints, requestedDate: null, maxCandidates }
+    );
   }
 
   try {
-    let qualifying = collect(
+    let unconstrainedFutureSlots = [];
+    const initialCollected = collectPair(
       getSlotsSync({
         agentId,
         organizationId,
         date: startDateKey,
         dateEnd: initialEndDateKey,
-        purpose: "recruiting_interview",
+        purpose,
         timePreference: "any",
         maxResults: 0
       })?.slots || []
     );
+    let qualifying = initialCollected.qualifying;
+    unconstrainedFutureSlots = initialCollected.future;
     let offered = selectCrossDateCandidateSlots(qualifying, {
       maxCandidates,
       rejectIds
@@ -1040,18 +1112,26 @@ function readRollingCandidateSlotsSync(params = {}) {
       offered.length < maxCandidates &&
       daysBetweenDateKeys(startDateKey, cursor) < MAX_EXPANSION_DAYS
     ) {
-      const daySlots = collect(
+      const dayCollected = collectPair(
         getSlotsSync({
           agentId,
           organizationId,
           date: cursor,
-          purpose: "recruiting_interview",
+          purpose,
           timePreference: "any",
           maxResults: 24
         })?.slots || []
       );
+      const seenFuture = new Set(unconstrainedFutureSlots.map(slotIdentity));
+      for (const slot of dayCollected.future) {
+        const id = slotIdentity(slot);
+        if (!seenFuture.has(id)) {
+          unconstrainedFutureSlots.push(slot);
+          seenFuture.add(id);
+        }
+      }
       const seen = new Set(qualifying.map(slotIdentity));
-      for (const slot of daySlots) {
+      for (const slot of dayCollected.qualifying) {
         if (!seen.has(slotIdentity(slot))) {
           qualifying.push(slot);
           seen.add(slotIdentity(slot));
@@ -1063,34 +1143,38 @@ function readRollingCandidateSlotsSync(params = {}) {
       });
       cursor = addDaysToDateKey(cursor, 1);
     }
-    return {
-      status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
-      organizationId,
-      agentId,
-      date: null,
-      rolling: true,
-      timezone: tz,
-      constraints: {
-        earliestTime: constraints.earliestTime || null,
-        latestTime: constraints.latestTime || null,
-        earliestTimeInclusive:
-          typeof constraints.earliestTimeInclusive === "boolean"
-            ? constraints.earliestTimeInclusive
-            : true
+    return finalizeReadResultWithAlternatives(
+      {
+        status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+        organizationId,
+        agentId,
+        date: null,
+        rolling: true,
+        timezone: tz,
+        constraints: {
+          earliestTime: constraints.earliestTime || null,
+          latestTime: constraints.latestTime || null,
+          earliestTimeInclusive:
+            typeof constraints.earliestTimeInclusive === "boolean"
+              ? constraints.earliestTimeInclusive
+              : true
+        },
+        slots: sortSlotsChronologically(qualifying),
+        unconstrainedFutureSlots: sortSlotsChronologically(unconstrainedFutureSlots),
+        offeredSlots: offered,
+        source: "sprint22",
+        agentResolutionSource,
+        failureReason: null,
+        searchMeta: {
+          initialHorizonHours: INITIAL_HORIZON_HOURS,
+          maxExpansionDays: MAX_EXPANSION_DAYS,
+          startDateKey,
+          initialEndDateKey,
+          maxEndDateKey
+        }
       },
-      slots: sortSlotsChronologically(qualifying),
-      offeredSlots: offered,
-      source: "sprint22",
-      agentResolutionSource,
-      failureReason: null,
-      searchMeta: {
-        initialHorizonHours: INITIAL_HORIZON_HOURS,
-        maxExpansionDays: MAX_EXPANSION_DAYS,
-        startDateKey,
-        initialEndDateKey,
-        maxEndDateKey
-      }
-    };
+      { constraints, requestedDate: null, maxCandidates }
+    );
   } catch (_error) {
     return buildUnavailableResult({
       organizationId,
@@ -1148,6 +1232,8 @@ async function resolveAvailabilityForTurn({
     DEFAULT_TIMEZONE;
   const organizationId = context.organizationId || options.organizationId || null;
   const now = options.now || context._testNow || null;
+  const schedulingConfig = resolveSchedulingConfig(context, options);
+  const negotiationState = buildNegotiationState({ context, interpretation });
 
   // BR-108 — no concrete date → bounded rolling multi-date search.
   if (!date) {
@@ -1157,16 +1243,27 @@ async function resolveAvailabilityForTurn({
       agentResolutionSource,
       timezone,
       constraints,
+      purpose: schedulingConfig.purpose,
       fixtureSlots,
       getSlots: options.getSlots || null,
       rejectIds,
       maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
       now
     });
-    return enrichAvailabilityForRequestedTime(
+    const resolvedAvailability = enrichAvailabilityForRequestedTime(
       toDecisionAvailability(readResult),
       interpretation?.entities?.requestedTime || null
     );
+    logSchedulingDiagnostics("shared_scheduling_availability_read", {
+      ...buildSchedulingDiagnostics({
+        workflowConfig: schedulingConfig,
+        negotiationState,
+        availability: resolvedAvailability
+      }),
+      organizationId,
+      agentId
+    });
+    return resolvedAvailability;
   }
 
   // BR-107 — concrete date → single-day read.
@@ -1177,16 +1274,28 @@ async function resolveAvailabilityForTurn({
     date,
     timezone,
     constraints,
+    purpose: schedulingConfig.purpose,
     fixtureSlots,
     getSlots: options.getSlots || null,
     rejectTimes,
     maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
   });
 
-  return enrichAvailabilityForRequestedTime(
+  const resolvedAvailability = enrichAvailabilityForRequestedTime(
     toDecisionAvailability(readResult),
     interpretation?.entities?.requestedTime || null
   );
+  logSchedulingDiagnostics("shared_scheduling_availability_read", {
+    ...buildSchedulingDiagnostics({
+      workflowConfig: schedulingConfig,
+      negotiationState,
+      availability: resolvedAvailability
+    }),
+    organizationId,
+    agentId,
+    date
+  });
+  return resolvedAvailability;
 }
 
 /**
@@ -1275,32 +1384,37 @@ function readCandidateSlotsSync(params = {}) {
     });
   }
 
-  const filtered = filterSlotsByConstraints(rawSlots, constraints);
+  const unconstrainedFutureSlots = rawSlots;
+  const filtered = filterSlotsByConstraints(unconstrainedFutureSlots, constraints);
   const offered = selectCandidateSlots(filtered, {
     maxCandidates,
     rejectTimes
   });
 
-  return {
-    status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
-    organizationId,
-    agentId,
-    date,
-    timezone: resolvedTimezone,
-    constraints: {
-      earliestTime: constraints.earliestTime || null,
-      latestTime: constraints.latestTime || null,
-      earliestTimeInclusive:
-        typeof constraints.earliestTimeInclusive === "boolean"
-          ? constraints.earliestTimeInclusive
-          : true
+  return finalizeReadResultWithAlternatives(
+    {
+      status: offered.length ? READ_STATUS.AVAILABLE : READ_STATUS.ZERO_SLOTS,
+      organizationId,
+      agentId,
+      date,
+      timezone: resolvedTimezone,
+      constraints: {
+        earliestTime: constraints.earliestTime || null,
+        latestTime: constraints.latestTime || null,
+        earliestTimeInclusive:
+          typeof constraints.earliestTimeInclusive === "boolean"
+            ? constraints.earliestTimeInclusive
+            : true
+      },
+      slots: filtered,
+      unconstrainedFutureSlots,
+      offeredSlots: offered,
+      source: "sprint22",
+      agentResolutionSource,
+      failureReason: null
     },
-    slots: filtered,
-    offeredSlots: offered,
-    source: "sprint22",
-    agentResolutionSource,
-    failureReason: null
-  };
+    { constraints, requestedDate: date, maxCandidates }
+  );
 }
 
 /** Sync variant for playground/simulator — fixture or injected getSlotsSync only. */

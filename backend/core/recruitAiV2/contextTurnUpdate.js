@@ -285,13 +285,20 @@ function buildNextContextFromInterpretation({
     interpretation.intent === "provide_availability_constraint" &&
     interpretation.entities?.availabilityConstraint
   ) {
+    const { mergeSchedulingConstraints } = require("../sharedScheduling/schedulingNegotiationState");
+    const merged = mergeSchedulingConstraints(
+      nextContext.knownFacts?.availabilityConstraint || null,
+      interpretation.entities.availabilityConstraint,
+      nextContext,
+      interpretation
+    );
     // Implements BR-105 — keep confirmed day_part; do not overwrite afternoon→evening.
     nextContext.knownFacts = {
       ...nextContext.knownFacts,
-      availabilityConstraint: interpretation.entities.availabilityConstraint,
+      availabilityConstraint: merged,
       preferredDayPart:
         nextContext.knownFacts?.preferredDayPart ||
-        interpretation.entities.availabilityConstraint.dayPart ||
+        merged?.dayPart ||
         null
     };
   }

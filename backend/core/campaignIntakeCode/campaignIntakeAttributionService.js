@@ -11,6 +11,7 @@ const {
 } = require("../atlasInboundAutomationEligibility");
 const { savePersistedWorkflowState } = require("../workflowStateStore");
 const { MILESTONES, OWNERSHIP } = require("../workflowConstants");
+const { IUL_STAGES, isIulReviewPurpose, IUL_CONVERSATION_GOAL, IUL_CAMPAIGN_KIND } = require("../iulWorkflowConstants");
 
 function upper(value) {
   return String(value || "").trim().toUpperCase();
@@ -212,9 +213,32 @@ function createCampaignIntakeAttributionService(options = {}) {
       ).catch(() => null);
     }
 
+    // IUL review intake — route to policy_review track; never Recruit AI (BR-142).
+    if (isIulReviewPurpose(match) && prospect?.phone && episode.allowed) {
+      const scope = {
+        organizationId: organizationId || prospect.organization_id || null,
+        prospectId: prospect.id || null
+      };
+      await savePersistedWorkflowState(
+        prospect.phone,
+        {
+          campaignIntakeCodeId: match.campaignIntakeCodeId,
+          campaignIntakeCampaignName: match.campaignName,
+          campaignIntakePurpose: match.purpose,
+          campaignIntakeMatchedAt: new Date().toISOString(),
+          conversationGoal: IUL_CONVERSATION_GOAL,
+          campaignKind: IUL_CAMPAIGN_KIND,
+          iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD,
+          workflowOwnership: OWNERSHIP.ATLAS
+        },
+        scope
+      ).catch(() => null);
+    }
+
     return {
       ok: true,
       recruitingEligible,
+      iulReviewEligible: isIulReviewPurpose(match) && episode.allowed,
       eligibilityDecision,
       episode,
       attribution

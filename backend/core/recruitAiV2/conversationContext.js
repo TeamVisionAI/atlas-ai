@@ -60,6 +60,29 @@ function emptyKnownFacts() {
     prospectGoalTheme: null,
     /** BR-143 — IUL review ad facts (not recruiting qualification). */
     iulPolicyActive: null,
+    /** IUL V1 discovery A */
+    policyType: null,
+    /** IUL V1 discovery B */
+    carrier: null,
+    carrierRaw: null,
+    carrierResolved: false,
+    /** BR-143 C */
+    originalPolicyPurpose: null,
+    originalPolicyPurposeRaw: null,
+    originalPurposeAsked: false,
+    /** IUL V1 discovery D */
+    policyAgeRange: null,
+    /** IUL V1 discovery E */
+    reviewReason: null,
+    reviewReasonRaw: null,
+    /** IUL V1 discovery F */
+    documentsAvailable: null,
+    /** IUL V1 scheduling */
+    reviewMeetingType: null,
+    reviewPreferredDayPart: null,
+    reviewProposedDate: null,
+    reviewProposedTime: null,
+    iulWorkflowStage: null,
     iulReviewTopic: null,
     iulReviewDayPart: null
   };

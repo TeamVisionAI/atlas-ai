@@ -180,6 +180,7 @@ const COPY = Object.freeze({
       "What time after {earliestTime} works best for you?",
     // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
     offer_available_slots: null,
+    offer_nearest_alternatives: null,
     acknowledge_no_qualifying_availability:
       "I don't have availability after {earliestTime} that day. What other day or time window works for you?",
     clarify_am_pm: "Do you mean {ambiguousHour} in the morning or {ambiguousHour} in the afternoon/evening?",
@@ -333,6 +334,7 @@ const COPY = Object.freeze({
       "¿Qué hora después de las {earliestTime} te funciona mejor?",
     // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
     offer_available_slots: null,
+    offer_nearest_alternatives: null,
     acknowledge_no_qualifying_availability:
       "No tengo disponibilidad después de las {earliestTime} ese día. ¿Qué otro día o horario te funciona?",
     clarify_am_pm:
@@ -888,7 +890,7 @@ function renderCustomerReply(responsePlan) {
   }
 
   // Implements BR-107 / BR-108 — build offer copy from real offeredSlots only (never invent).
-  if (key === "offer_available_slots") {
+  if (key === "offer_available_slots" || key === "offer_nearest_alternatives") {
     const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
     const dayOptions = {
       now: entities.now || null,
@@ -900,6 +902,18 @@ function renderCustomerReply(responsePlan) {
     const multiDate =
       Boolean(entities.rollingSearch) ||
       (dates.length >= 2 && new Set(dates).size > 1);
+    const earliestLabel = formatRequestedTime(entities.earliestTime || null, language);
+    const dateLabel = entities.dateLabel || null;
+    const constraintPrefix =
+      key === "offer_nearest_alternatives" && entities.earliestTime
+        ? language === LANGUAGES.SPANISH
+          ? dateLabel
+            ? `Después de las ${earliestLabel} el ${dateLabel} no tengo disponibilidad. Lo más cercano que tengo es `
+            : `Después de las ${earliestLabel} no tengo disponibilidad. Lo más cercano que tengo es `
+          : dateLabel
+            ? `I don't have availability after ${earliestLabel} on ${dateLabel}. The closest I have is `
+            : `I don't have availability after ${earliestLabel}. The closest I have is `
+        : "";
 
     if (offered.length >= 2) {
       if (multiDate) {
@@ -907,8 +921,8 @@ function renderCustomerReply(responsePlan) {
         const phraseB = formatOfferedSlotPhrase(offered[1], language, dayOptions);
         template =
           language === LANGUAGES.SPANISH
-            ? `Tengo disponible ${phraseA} y ${phraseB}. ¿Cuál te funciona mejor?`
-            : `I have availability ${phraseA} and ${phraseB}. Which works better for you?`;
+            ? `${constraintPrefix}disponible ${phraseA} y ${phraseB}. ¿Cuál te funciona mejor?`
+            : `${constraintPrefix}availability ${phraseA} and ${phraseB}. Which works better for you?`;
       } else {
         const day = formatSlotDayPhrase(
           offered[0]?.date || offered[0]?.dateKey,
@@ -926,13 +940,13 @@ function renderCustomerReply(responsePlan) {
         if (day) {
           template =
             language === LANGUAGES.SPANISH
-              ? `Tengo disponible ${day} a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
-              : `I have availability ${day} at ${slotA} and ${slotB}. Which works better for you?`;
+              ? `${constraintPrefix || "Tengo disponible "}${day} a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
+              : `${constraintPrefix || "I have availability "}${day} at ${slotA} and ${slotB}. Which works better for you?`;
         } else {
           template =
             language === LANGUAGES.SPANISH
-              ? `Tengo disponible a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
-              : `I have availability at ${slotA} and ${slotB}. Which works better for you?`;
+              ? `${constraintPrefix || "Tengo disponible "}a las ${slotA} y a las ${slotB}. ¿Cuál te funciona mejor?`
+              : `${constraintPrefix || "I have availability "}at ${slotA} and ${slotB}. Which works better for you?`;
         }
       }
     } else if (offered.length >= 1 || entities.slotA) {
@@ -941,8 +955,8 @@ function renderCustomerReply(responsePlan) {
         : formatRequestedTime(entities.slotA, language);
       template =
         language === LANGUAGES.SPANISH
-          ? `Tengo disponible ${offered[0] ? phrase : `a las ${phrase}`}. ¿Te funciona?`
-          : `I have availability ${offered[0] ? phrase : `at ${phrase}`}. Does that work for you?`;
+          ? `${constraintPrefix || "Tengo disponible "}${offered[0] ? phrase : `a las ${phrase}`}. ¿Te funciona?`
+          : `${constraintPrefix || "I have availability "}${offered[0] ? phrase : `at ${phrase}`}. Does that work for you?`;
     } else {
       template = pack.acknowledge_no_qualifying_availability;
     }
