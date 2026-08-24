@@ -20,7 +20,12 @@ import { captureAppointmentError } from "../utils/appointmentErrors";
 import { useUniversalNote } from "../hooks/useUniversalNote";
 import { buildAppointmentNoteContext } from "../engines/notesEngine";
 import AppointmentCardActions from "../components/appointments/AppointmentCardActions";
-import { formatAppointmentMetaLabel } from "../engines/appointmentCardPresentation";
+import AppointmentCardContactLine from "../components/appointments/AppointmentCardContactLine";
+import {
+  buildAppointmentCardAddressModel,
+  buildAppointmentCardContactModel,
+  formatAppointmentMetaLabel
+} from "../engines/appointmentCardPresentation";
 import { resolveAppointmentDisplayStatus } from "../engines/interviewWorkflowPresentationEngine";
 import "../styles/atlas-ui.css";
 import "./AppointmentsPage.css";
@@ -352,25 +357,40 @@ export default function AppointmentsPage() {
               {appointments.map((appointment) => {
                 const isSelected = selectedAppointment?.id === appointment.id;
                 const displayStatus = resolveAppointmentDisplayStatus(appointment);
+                const contactModel = buildAppointmentCardContactModel(appointment, {
+                  phoneUnavailableLabel: "Phone unavailable"
+                });
+                const addressModel = buildAppointmentCardAddressModel(appointment);
 
                 return (
                   <li
                     key={appointment.id}
                     className={`appointments-page__card${isSelected ? " appointments-page__card--selected" : ""}`}
                   >
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       className="appointments-page__card-select"
                       onClick={() => setSelectedAppointment(appointment)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedAppointment(appointment);
+                        }
+                      }}
                     >
                       <div className="appointments-page__card-top">
                         <strong className="appointments-page__prospect">
-                          {appointment.prospectName || appointment.prospectPhone}
+                          {appointment.prospectName || contactModel.contactLabel}
                         </strong>
                         <StatusBadge variant={statusVariant(displayStatus)}>
                           {statusLabel(displayStatus, translate)}
                         </StatusBadge>
                       </div>
+                      <AppointmentCardContactLine
+                        contact={contactModel}
+                        translate={translate}
+                      />
                       <p className="appointments-page__when">{formatWhen(appointment.startDateTime, locale)}</p>
                       <p className="appointments-page__meta">
                         {formatAppointmentMetaLabel(
@@ -379,6 +399,21 @@ export default function AppointmentsPage() {
                           purposeLabel(appointment.purpose, translate)
                         )}
                       </p>
+                      {addressModel ? (
+                        <a
+                          className="appointments-page__address"
+                          href={addressModel.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {addressModel.lines.map((line) => (
+                            <span key={line} className="appointments-page__address-line">
+                              {line}
+                            </span>
+                          ))}
+                        </a>
+                      ) : null}
                       {(appointment.rescheduleCount > 0 ||
                         appointment.emailStatus === "missing" ||
                         appointment.humanAssistRequired) && (
@@ -400,7 +435,7 @@ export default function AppointmentsPage() {
                           ) : null}
                         </div>
                       )}
-                    </button>
+                    </div>
 
                     {appointment.humanAssistRequired ? (
                       <HumanAssistPanel

@@ -1,34 +1,192 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
+  appointmentCardAllowsHorizontalOverflow,
+  buildAppointmentCardAddressModel,
+  buildAppointmentCardContactModel,
+  buildMapsDirectionsUrl,
   formatAppointmentMetaLabel,
+  formatInPersonAddressLines,
+  isSyntheticWhatsAppStorageKey,
+  isZoomMeetingMode,
+  resolveAppointmentActionRowLayoutMode,
   resolveAppointmentMeetingLabel,
+  shouldShowInPersonAddress,
   shouldShowJoinZoomAction,
   shouldShowLifecycleActions
 } from "./appointmentCardPresentation.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const translate = (key) =>
   ({
     appointmentsMeetingProvider_zoom: "Zoom",
     appointmentsMeetingType_virtual: "Virtual",
-    appointmentsMeetingType_in_person: "In person"
+    appointmentsMeetingType_in_person: "In person",
+    appointmentsMeetingLocation_office: "Office",
+    appointmentsMeetingLocation_public_location: "Public location"
   })[key] || key;
 
-test("shouldShowJoinZoomAction requires valid zoom url and active status", () => {
+test("real phone renders formatted/clickable contact model", () => {
+  const contact = buildAppointmentCardContactModel({
+    prospectName: "Mayra",
+    prospectPhone: "+17865551234",
+    prospectVisiblePhone: "+17865551234",
+    prospectHasVisiblePhone: true
+  });
+
+  assert.equal(contact.contactKind, "phone");
+  assert.equal(contact.contactLabel, "+17865551234");
+  assert.equal(contact.telHref, "tel:+17865551234");
+  assert.equal(contact.exposesSyntheticKey, false);
+});
+
+test("username-only prospect shows @username", () => {
+  const contact = buildAppointmentCardContactModel({
+    prospectName: "Paid Ad Lead",
+    prospectPhone: "wa:bsuid:CC.A7K4BSUID1234567890",
+    prospectWhatsAppUsername: "paid_ad_lead",
+    prospectHasVisiblePhone: false
+  });
+
+  assert.equal(contact.contactKind, "username");
+  assert.equal(contact.contactLabel, "@paid_ad_lead");
+  assert.equal(contact.telHref, null);
+  assert.equal(contact.copyValue, "@paid_ad_lead");
+});
+
+test("synthetic wa:bsuid key never rendered as phone contact", () => {
+  const contact = buildAppointmentCardContactModel({
+    prospectPhone: "wa:bsuid:CC.A7K4BSUID1234567890",
+    prospectHasVisiblePhone: false
+  });
+
+  assert.equal(contact.contactKind, "unavailable");
+  assert.equal(isSyntheticWhatsAppStorageKey("wa:bsuid:CC.A7K4BSUID1234567890"), true);
+  assert.equal(contact.exposesSyntheticKey, true);
+  assert.doesNotMatch(contact.contactLabel, /wa:bsuid:/);
+});
+
+test("phone unavailable fallback when no phone or username", () => {
+  const contact = buildAppointmentCardContactModel({}, { phoneUnavailableLabel: "Phone unavailable" });
+  assert.equal(contact.contactKind, "unavailable");
+  assert.equal(contact.contactLabel, "Phone unavailable");
+});
+
+test("Zoom appointment shows Join Zoom when url and mode match", () => {
   assert.equal(
     shouldShowJoinZoomAction({
       status: "scheduled",
-      virtualMeetingUrl: "https://us02web.zoom.us/j/123",
-      meetingProvider: "zoom"
+      meetingType: "virtual",
+      meetingProvider: "zoom",
+      virtualMeetingUrl: "https://us02web.zoom.us/j/123"
     }),
     true
+  );
+});
+
+test("non-Zoom appointment does not show Join Zoom", () => {
+  assert.equal(
+    shouldShowJoinZoomAction({
+      status: "scheduled",
+      meetingType: "in_person",
+      meetingLocationType: "office",
+      meetingAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+    }),
+    false
   );
 
   assert.equal(
     shouldShowJoinZoomAction({
+      status: "scheduled",
+      meetingType: "virtual",
+      meetingProvider: "google_meet",
+      virtualMeetingUrl: "https://meet.google.com/abc-defg-hij"
+    }),
+    false
+  );
+});
+
+test("in-person appointment shows clickable address model", () => {
+  const appointment = {
+    meetingType: "in_person",
+    meetingLocationType: "office",
+    meetingAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+  };
+
+  assert.equal(shouldShowInPersonAddress(appointment), true);
+
+  const address = buildAppointmentCardAddressModel(appointment);
+  assert.ok(address);
+  assert.equal(address.lines.length, 2);
+  assert.equal(address.lines[0], "2500 NW 79th Ave, Suite 189");
+  assert.equal(address.lines[1], "Doral, FL 33122");
+  assert.equal(
+    address.mapsUrl,
+    buildMapsDirectionsUrl("2500 NW 79th Ave, Suite 189, Doral, FL 33122")
+  );
+});
+
+test("Zoom appointment does not show in-person address", () => {
+  const appointment = {
+    meetingType: "virtual",
+    meetingProvider: "zoom",
+    virtualMeetingUrl: "https://us02web.zoom.us/j/123",
+    meetingAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+  };
+
+  assert.equal(isZoomMeetingMode(appointment), true);
+  assert.equal(shouldShowInPersonAddress(appointment), false);
+  assert.equal(buildAppointmentCardAddressModel(appointment), null);
+});
+
+test("meta label uses meeting mode without duplicating address", () => {
+  assert.equal(
+    formatAppointmentMetaLabel(
+      {
+        meetingType: "in_person",
+        meetingLocationType: "office",
+        meetingAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
+      },
+      translate,
+      "Recruiting Interview"
+    ),
+    "Recruiting Interview · Office"
+  );
+});
+
+test("action row stays compact at desktop width", () => {
+  assert.equal(resolveAppointmentActionRowLayoutMode(1280), "compact-single-row");
+
+  const css = fs.readFileSync(
+    path.join(__dirname, "../pages/AppointmentsPage.css"),
+    "utf8"
+  );
+  assert.match(css, /@media \(min-width: 768px\)[\s\S]*flex-wrap: nowrap/);
+  assert.doesNotMatch(css, /Directions/i);
+});
+
+test("mobile layout avoids page horizontal overflow", () => {
+  assert.equal(resolveAppointmentActionRowLayoutMode(375), "wrap");
+  assert.equal(appointmentCardAllowsHorizontalOverflow(375), true);
+
+  const css = fs.readFileSync(
+    path.join(__dirname, "../pages/AppointmentsPage.css"),
+    "utf8"
+  );
+  assert.match(css, /\.appointments-page[\s\S]*overflow-x: hidden/);
+});
+
+test("shouldShowJoinZoomAction requires valid zoom url and active status", () => {
+  assert.equal(
+    shouldShowJoinZoomAction({
       status: "completed",
-      virtualMeetingUrl: "https://us02web.zoom.us/j/123",
-      meetingProvider: "zoom"
+      meetingType: "virtual",
+      meetingProvider: "zoom",
+      virtualMeetingUrl: "https://us02web.zoom.us/j/123"
     }),
     false
   );
@@ -36,8 +194,9 @@ test("shouldShowJoinZoomAction requires valid zoom url and active status", () =>
   assert.equal(
     shouldShowJoinZoomAction({
       status: "cancelled",
-      virtualMeetingUrl: "https://us02web.zoom.us/j/123",
-      meetingProvider: "zoom"
+      meetingType: "virtual",
+      meetingProvider: "zoom",
+      virtualMeetingUrl: "https://us02web.zoom.us/j/123"
     }),
     false
   );
@@ -45,8 +204,9 @@ test("shouldShowJoinZoomAction requires valid zoom url and active status", () =>
   assert.equal(
     shouldShowJoinZoomAction({
       status: "scheduled",
-      virtualMeetingUrl: "",
-      meetingProvider: "zoom"
+      meetingType: "virtual",
+      meetingProvider: "zoom",
+      virtualMeetingUrl: ""
     }),
     false
   );
@@ -68,13 +228,6 @@ test("resolveAppointmentMeetingLabel standardizes Zoom terminology", () => {
   );
 });
 
-test("formatAppointmentMetaLabel joins purpose and meeting label", () => {
-  assert.equal(
-    formatAppointmentMetaLabel(
-      { meetingType: "virtual", meetingProvider: "zoom" },
-      translate,
-      "Recruiting Interview"
-    ),
-    "Recruiting Interview · Zoom"
-  );
+test("formatInPersonAddressLines preserves short addresses", () => {
+  assert.deepEqual(formatInPersonAddressLines("123 Main St"), ["123 Main St"]);
 });
