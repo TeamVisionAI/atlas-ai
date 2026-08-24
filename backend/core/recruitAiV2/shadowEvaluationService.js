@@ -65,7 +65,12 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
     conversationGoal: extras.conversationGoal || prospect.conversationGoal || null,
     campaignKind: extras.campaignKind || prospect.campaignKind || null,
     ctwaReferral: extras.ctwaReferral || extras.referral || null,
-    leadSource
+    leadSource,
+    campaignIntakePurpose:
+      extras.campaignIntakePurpose ||
+      prospect.campaignIntakePurpose ||
+      extras.workflowState?.campaignIntakePurpose ||
+      null
   });
 
   return {

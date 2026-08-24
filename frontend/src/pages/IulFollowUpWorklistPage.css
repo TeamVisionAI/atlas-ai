@@ -1,0 +1,69 @@
+.iul-worklist-page {
+  padding: 1.5rem;
+}
+
+.iul-worklist-page__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.iul-worklist-page__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.iul-worklist-page__summary {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.iul-worklist-page__near-expiry {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.iul-worklist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.iul-worklist-table th,
+.iul-worklist-table td {
+  border: 1px solid #d1d5db;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.iul-worklist-table tr.is-near-expiry {
+  background: #fff7ed;
+}
+
+.iul-worklist-link {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .iul-worklist-page {
+    padding: 0.5rem;
+  }
+
+  .iul-worklist-table {
+    font-size: 10pt;
+  }
+}

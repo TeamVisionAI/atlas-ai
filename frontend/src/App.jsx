@@ -32,6 +32,7 @@ import PolicyIntelligence from "./pages/PolicyIntelligence";
 import PolicyIntelligencePreviewPage from "./pages/PolicyIntelligencePreviewPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
+import IulFollowUpWorklistPage from "./pages/IulFollowUpWorklistPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import Prospect from "./pages/Prospect";
 import PublicRoot from "./components/PublicRoot";
@@ -141,6 +142,7 @@ export default function App() {
         <Route path="conversations" element={<ConversationsPage />} />
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="follow-ups" element={<FollowUpsPage />} />
+        <Route path="iul-follow-up-worklist" element={<IulFollowUpWorklistPage />} />
         <Route
           path="analytics"
           element={

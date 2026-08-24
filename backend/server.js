@@ -61,6 +61,7 @@ const {
 } = require("./routes/communicationMedia");
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const followUpsRoutes = require("./routes/followUps");
+const iulFollowUpWorklistRoutes = require("./routes/iulFollowUpWorklist");
 const conversationsCenterRoutes = require("./routes/conversationsCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
 const knowledgeRoutes = require("./routes/knowledge");
@@ -205,6 +206,7 @@ app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/new-lead-attention", require("./routes/newLeadAttention"));
 app.use("/api/follow-ups", followUpsRoutes);
+app.use("/api/iul-follow-up-worklist", iulFollowUpWorklistRoutes);
 app.use("/api/conversations", conversationsCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);
 app.use("/api/knowledge", knowledgeRoutes);

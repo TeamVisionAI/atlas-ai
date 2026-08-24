@@ -1,16 +1,40 @@
 /**
- * BR-143 — Spanish IUL-review ad conversation (Lead AI / policy_review).
- * Educate → clarify → review → soft appointment ask.
- * Does not book (BR-132 unimplemented). Does not change BR-142 eligibility.
+ * BR-143 / IUL Policy Review V1 — discovery A→G + Zoom scheduling.
+ * Educate → qualify → schedule policy review. Does not change BR-142 eligibility.
  */
 
-const { INTENTS, NEXT_ACTIONS, REASON_CODES, LANGUAGES, STAGES } =
+const { INTENTS, NEXT_ACTIONS, REASON_CODES, LANGUAGES, STAGES, APPOINTMENT_STATUS } =
   require("./constants");
+const { classifyOriginalPolicyPurpose } = require("./originalPolicyPurpose");
+const {
+  classifyPolicyType,
+  classifyCarrier,
+  classifyPolicyAgeRange,
+  classifyReviewReason,
+  classifyDocumentsAvailable,
+  looksLikePolicyIsBadQuestion,
+  isDiscoveryComplete
+} = require("./iulDiscoveryFacts");
+const {
+  readPolicyReviewAvailabilitySync,
+  READ_STATUS
+} = require("./iulPolicyReviewScheduling");
+const { IUL_STAGES, IUL_REVIEW_MEETING_TYPE } = require("../iulWorkflowConstants");
 
 const CAMPAIGN_KIND = "iul_review_ad";
 const CONVERSATION_GOAL = "policy_review";
 
 const ASK = Object.freeze({
+  POLICY_TYPE: "iul_ask_policy_type",
+  CARRIER: "iul_ask_carrier",
+  ORIGINAL_PURPOSE: "iul_ask_original_purpose",
+  POLICY_AGE: "iul_ask_policy_age",
+  REVIEW_REASON: "iul_ask_review_reason",
+  DOCUMENTS: "iul_ask_documents",
+  SCHEDULING_DAY_PART: "iul_ask_scheduling_day_part",
+  OFFER_SLOTS: "iul_offer_review_slots",
+  CONFIRM_SLOT: "iul_confirm_review_slot",
+  /** Legacy keys kept for in-flight threads */
   POLICY_ACTIVE: "iul_ask_policy_active",
   REVIEW_TOPIC: "iul_ask_review_topic",
   REVIEW_DAY_PART: "iul_ask_review_day_part"
@@ -98,7 +122,7 @@ function looksLikeIulReferral(referral) {
 
 function isIulAsk(lastQuestionAsked) {
   const key = String(lastQuestionAsked || "");
-  return key === ASK.POLICY_ACTIVE || key === ASK.REVIEW_TOPIC || key === ASK.REVIEW_DAY_PART;
+  return Object.values(ASK).includes(key);
 }
 
 function isIulReviewAdContext(context = {}, extras = {}) {
@@ -190,64 +214,6 @@ function looksLikeReviewCostQuestion(text) {
   );
 }
 
-function looksLikePolicyActiveYes(text) {
-  const t = fold(text);
-  if (!t) {
-    return false;
-  }
-  if (looksLikePolicyActiveNo(text)) {
-    return false;
-  }
-  return (
-    /^(si|yes|yep|yeah|claro|correcto|afirmativo)$/.test(t) ||
-    /\b(si|yes),?\s*(la tengo|esta activa|sigue activa|todavia)\b/.test(t) ||
-    /\bla tengo( activa)?\b/.test(t) ||
-    /\besta activa\b/.test(t) ||
-    /\bstill active\b/.test(t) ||
-    /\bi (still )?have it\b/.test(t)
-  );
-}
-
-function looksLikePolicyActiveNo(text) {
-  const t = fold(text);
-  return (
-    /^(no|nope)$/.test(t) ||
-    /\bno la tengo\b/.test(t) ||
-    /\bno esta activa\b/.test(t) ||
-    /\bya no( la tengo| esta)?\b/.test(t) ||
-    /\bnot active\b/.test(t) ||
-    /\bi don'?t have (it|one)\b/.test(t) ||
-    /\bno longer( have)?\b/.test(t)
-  );
-}
-
-function classifyReviewTopic(text) {
-  const t = fold(text);
-  if (/\bvalor acumulado\b/.test(t) || /\bcash value\b/.test(t) || /\bcreciendo\b/.test(t)) {
-    return TOPICS.CASH_VALUE;
-  }
-  if (/\bcostos?\b/.test(t) || /\bcargos\b/.test(t) || /\bfees?\b/.test(t) || /\bcosts?\b/.test(t)) {
-    return TOPICS.COSTS;
-  }
-  if (
-    /\bproyect/.test(t) ||
-    /\bfuturo\b/.test(t) ||
-    /\bprojection\b/.test(t) ||
-    /\blong[- ]term\b/.test(t)
-  ) {
-    return TOPICS.PROJECTION;
-  }
-  if (
-    /\botra estrategia\b/.test(t) ||
-    /\bmejor( a)? (mis |sus )?objetivos\b/.test(t) ||
-    /\balternativ/.test(t) ||
-    /\bbetter fit\b/.test(t)
-  ) {
-    return TOPICS.ALTERNATIVE;
-  }
-  return null;
-}
-
 function parseIulReviewDayPart(text) {
   const t = fold(text);
   if (
@@ -271,8 +237,48 @@ function parseIulReviewDayPart(text) {
   return null;
 }
 
+function parseOfferedSlotSelection(text, context) {
+  const offered = context.appointment?.previouslyOfferedSlots || [];
+  if (!offered.length) {
+    return null;
+  }
+  const t = fold(text);
+  if (/^(si|yes|ok|okay|claro|perfecto|perfect)$/.test(t) && offered.length === 1) {
+    return offered[0];
+  }
+  for (const slot of offered) {
+    const time = String(slot.time || slot.timeKey || "");
+    const date = String(slot.date || slot.dateKey || "");
+    if (time && t.includes(fold(time))) {
+      return slot;
+    }
+    if (date && t.includes(fold(date))) {
+      return slot;
+    }
+  }
+  return null;
+}
+
 function classifyIulAdInbound({ text, context } = {}) {
   const lastAsk = context?.conversation?.lastQuestionAsked || null;
+  const known = context?.knownFacts || {};
+
+  if (looksLikePolicyIsBadQuestion(text)) {
+    return { intent: INTENTS.IUL_POLICY_IS_BAD_QUESTION, confidence: 0.96, entities: {} };
+  }
+
+  if (lastAsk === ASK.CARRIER) {
+    const carrier = classifyCarrier(text);
+    return {
+      intent: INTENTS.IUL_CARRIER,
+      confidence: 0.88,
+      entities: {
+        carrier: carrier.carrier,
+        carrierRaw: carrier.carrierRaw,
+        carrierResolved: carrier.resolved
+      }
+    };
+  }
 
   if (looksLikePrimericaQuestion(text)) {
     return { intent: INTENTS.IUL_PRIMERICA_QUESTION, confidence: 0.95, entities: {} };
@@ -293,55 +299,107 @@ function classifyIulAdInbound({ text, context } = {}) {
     return { intent: INTENTS.IUL_INFO_ONLY, confidence: 0.94, entities: {} };
   }
 
-  const topic = classifyReviewTopic(text);
-  if (topic) {
-    return {
-      intent: INTENTS.IUL_CHOOSE_REVIEW_TOPIC,
-      confidence: 0.92,
-      entities: { iulReviewTopic: topic }
-    };
+  if (lastAsk === ASK.OFFER_SLOTS || lastAsk === ASK.CONFIRM_SLOT) {
+    const slot = parseOfferedSlotSelection(text, context);
+    if (slot) {
+      return {
+        intent: INTENTS.IUL_SELECT_OFFERED_SLOT,
+        confidence: 0.92,
+        entities: {
+          selectedSlot: slot,
+          reviewProposedDate: slot.date || slot.dateKey || null,
+          reviewProposedTime: slot.time || slot.timeKey || null
+        }
+      };
+    }
+    if (/^(si|yes|confirmo|confirm|ok|okay)$/.test(fold(text))) {
+      return {
+        intent: INTENTS.IUL_SCHEDULE_CONFIRM,
+        confidence: 0.9,
+        entities: {}
+      };
+    }
   }
 
-  if (lastAsk === ASK.REVIEW_DAY_PART) {
+  if (lastAsk === ASK.SCHEDULING_DAY_PART || lastAsk === ASK.REVIEW_DAY_PART) {
     const dayPart = parseIulReviewDayPart(text);
     if (dayPart) {
       return {
         intent: INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
         confidence: 0.93,
-        entities: { iulReviewDayPart: dayPart }
+        entities: { iulReviewDayPart: dayPart, reviewPreferredDayPart: dayPart }
       };
     }
   }
 
-  if (lastAsk === ASK.POLICY_ACTIVE) {
-    if (looksLikePolicyActiveYes(text)) {
-      return {
-        intent: INTENTS.IUL_POLICY_ACTIVE_YES,
-        confidence: 0.93,
-        entities: { iulPolicyActive: true }
-      };
-    }
-    if (looksLikePolicyActiveNo(text)) {
-      return {
-        intent: INTENTS.IUL_POLICY_ACTIVE_NO,
-        confidence: 0.93,
-        entities: { iulPolicyActive: false }
-      };
-    }
-  }
-
-  if (looksLikePolicyActiveYes(text) && lastAsk !== ASK.REVIEW_DAY_PART) {
+  if (lastAsk === ASK.DOCUMENTS) {
+    const docs = classifyDocumentsAvailable(text);
     return {
-      intent: INTENTS.IUL_POLICY_ACTIVE_YES,
-      confidence: 0.86,
-      entities: { iulPolicyActive: true }
+      intent: INTENTS.IUL_DOCUMENTS_AVAILABLE,
+      confidence: docs.value ? 0.9 : 0.75,
+      entities: { documentsAvailable: docs.value, documentsAvailableRaw: docs.raw }
     };
   }
-  if (looksLikePolicyActiveNo(text) && lastAsk !== ASK.REVIEW_DAY_PART) {
+
+  if (lastAsk === ASK.REVIEW_REASON) {
+    const reason = classifyReviewReason(text);
     return {
-      intent: INTENTS.IUL_POLICY_ACTIVE_NO,
-      confidence: 0.86,
-      entities: { iulPolicyActive: false }
+      intent: INTENTS.IUL_REVIEW_REASON,
+      confidence: reason.value ? 0.9 : 0.75,
+      entities: {
+        reviewReason: reason.value,
+        reviewReasonRaw: reason.raw
+      }
+    };
+  }
+
+  if (lastAsk === ASK.POLICY_AGE) {
+    const age = classifyPolicyAgeRange(text);
+    return {
+      intent: INTENTS.IUL_POLICY_AGE,
+      confidence: 0.9,
+      entities: { policyAgeRange: age.value, policyAgeRangeRaw: age.raw }
+    };
+  }
+
+  if (lastAsk === ASK.ORIGINAL_PURPOSE) {
+    const purpose = classifyOriginalPolicyPurpose(text);
+    return {
+      intent: INTENTS.IUL_ORIGINAL_POLICY_PURPOSE,
+      confidence: purpose.category ? 0.9 : 0.75,
+      entities: {
+        originalPolicyPurpose: purpose.category,
+        originalPolicyPurposeRaw: purpose.raw
+      }
+    };
+  }
+
+  if (lastAsk === ASK.POLICY_TYPE || lastAsk === ASK.POLICY_ACTIVE) {
+    const policyType = classifyPolicyType(text);
+    return {
+      intent: INTENTS.IUL_POLICY_TYPE,
+      confidence: policyType.value ? 0.9 : 0.75,
+      entities: {
+        policyType: policyType.value,
+        policyTypeRaw: policyType.raw,
+        iulPolicyActive: policyType.value === "IUL" ? true : null
+      }
+    };
+  }
+
+  if (
+    !known.policyType &&
+    looksLikeIulPolicyLanguage(text) &&
+    classifyPolicyType(text).value
+  ) {
+    const policyType = classifyPolicyType(text);
+    return {
+      intent: INTENTS.IUL_POLICY_TYPE,
+      confidence: 0.82,
+      entities: {
+        policyType: policyType.value,
+        policyTypeRaw: policyType.raw
+      }
     };
   }
 
@@ -356,78 +414,91 @@ function copy(language) {
   const es = localeCode(language) !== "en";
   return {
     opener: es
-      ? "¡Hola! 👋 Gracias por escribirnos. Vi que quieres revisar tu póliza IUL. ¿Actualmente la tienes activa?"
-      : "Hi! 👋 Thanks for writing. I saw you want to review your IUL policy. Is it currently active?",
-    topicAsk: es
-      ? "Perfecto. ¿Qué te gustaría entender mejor: cómo está creciendo el valor acumulado, los costos de la póliza, cómo está proyectada a futuro, o si existe otra estrategia que pueda ajustarse mejor a tus objetivos?"
-      : "Perfect. What would you like to understand better: how the cash value is growing, the policy costs, how it’s projected going forward, or whether another strategy might fit your goals better?",
-    topicAskInactive: es
-      ? "Entendido. Aun así podemos aclarar cómo funciona este tipo de póliza. ¿Qué te gustaría entender mejor: el valor acumulado, los costos, la proyección a futuro, u otra estrategia según tus objetivos?"
-      : "Understood. We can still clarify how this type of policy works. What would you like to understand better: cash value, costs, the future projection, or another strategy for your goals?",
-    topicCash: es
-      ? "El valor acumulado es la parte de efectivo de un seguro de vida IUL; puede variar según el índice, el fondeo y los cargos. Para ver cómo está creciendo el tuyo hay que revisar la póliza."
-      : "Cash value is the cash-value feature of IUL life insurance; it can vary with the index, funding, and charges. To see how yours is growing, we review the policy.",
-    topicCosts: es
-      ? "Toda póliza IUL tiene costos (seguro y cargos). No se puede decir si los tuyos están altos o bajos sin ver el contrato y los estados."
-      : "Every IUL policy has costs (insurance and charges). We can’t tell if yours are high or low without the contract and statements.",
-    topicProjection: es
-      ? "Las proyecciones son ilustraciones, no una garantía. Revisamos supuestos y fondeo para ver cómo está planteada a futuro."
-      : "Projections are illustrations, not a guarantee. We review assumptions and funding to see how yours is set up going forward.",
-    topicAlternative: es
-      ? "Puede existir otra estrategia según tus objetivos. Eso se ve en una revisión de tu póliza, no con una recomendación genérica."
-      : "Another strategy may fit your goals. That comes from reviewing your policy — not a generic recommendation.",
+      ? "¡Hola! 👋 Gracias por escribirnos. Vi que quieres revisar tu póliza. ¿Qué tipo de póliza tienes: IUL, otro seguro de vida, o no estás seguro/a?"
+      : "Hi! 👋 Thanks for writing. I saw you want to review your policy. What type of policy do you have: IUL, other life insurance, or not sure?",
+    policyTypeAsk: es
+      ? "¿Qué tipo de póliza tienes: IUL, otro seguro de vida, o no estás seguro/a?"
+      : "What type of policy do you have: IUL, other life insurance, or not sure?",
+    carrierAsk: es
+      ? "¿Recuerdas con qué compañía o aseguradora está la póliza? Si no lo sabes, no hay problema."
+      : "Do you remember which company or carrier the policy is with? If you don't know, that's okay.",
+    originalPurposeAsk: es
+      ? "¿Cuál fue la razón principal por la que adquiriste esa póliza originalmente?"
+      : "What was the main reason you originally bought that policy?",
+    policyAgeAsk: es
+      ? "¿Hace aproximadamente cuánto tiempo la adquiriste?"
+      : "Approximately how long ago did you get it?",
+    reviewReasonAsk: es
+      ? "¿Qué te gustaría entender o revisar ahora mismo sobre la póliza?"
+      : "What would you most like to understand or review about the policy right now?",
+    documentsAsk: es
+      ? "¿Tienes a mano una ilustración reciente, estado de cuenta o resumen de la póliza?"
+      : "Do you have a recent illustration, statement, or policy summary handy?",
+    schedulingTransition: es
+      ? "Perfecto. Lo mejor es hacer una revisión breve por Zoom para ver la póliza contigo y explicarte lo que estás viendo. ¿Prefieres en la mañana o en la tarde?"
+      : "Perfect. The best next step is a brief Zoom review to look at the policy with you and explain what you're seeing. Do you prefer morning or afternoon/evening?",
+    policyIsBadSafe: es
+      ? "Eso no se puede determinar correctamente sin revisar los detalles de la póliza. Podemos verla contigo y explicarte cómo está funcionando."
+      : "That can't be determined correctly without reviewing the policy details. We can look at it with you and explain how it's working.",
     infoOnly: es
       ? "Claro. Un IUL es un seguro de vida con valor en efectivo; no es “solo una inversión”. Te explicamos lo básico con tu póliza delante."
       : "Of course. An IUL is life insurance with cash-value features — not “just an investment.” We explain the basics with your policy in front of us.",
     noReplace: es
       ? "La revisión es informativa y no te obliga a cambiar ni reemplazar nada. Solo vemos cómo está estructurada tu póliza."
-      : "The review is informational and doesn’t obligate you to change or replace anything. We just look at how your policy is structured.",
+      : "The review is informational and doesn't obligate you to change or replace anything. We just look at how your policy is structured.",
     agentInvestment: es
       ? "La póliza combina seguro de vida con características de valor en efectivo. No discutimos con tu agente; si quieres, revisamos cómo está estructurada la tuya."
-      : "The policy combines life insurance with cash-value features. We won’t argue with your agent; if you’d like, we can review how yours is structured.",
+      : "The policy combines life insurance with cash-value features. We won't argue with your agent; if you’d like, we can review how yours is structured.",
     sendHere: es
       ? "En WhatsApp: es un seguro de vida con valor en efectivo, costos internos y una ilustración a futuro. Sin ver tu póliza no hacemos una recomendación personalizada."
-      : "Over WhatsApp: it’s life insurance with cash-value features, internal costs, and a future illustration. We don’t make a personalized recommendation without reviewing your policy.",
+      : "Over WhatsApp: it's life insurance with cash-value features, internal costs, and a future illustration. We don't make a personalized recommendation without reviewing your policy.",
     primerica: es
       ? "Sí: trabajamos con Primerica. La revisión es para entender tu póliza IUL con claridad, sin compromiso."
       : "Yes — we work with Primerica. The review is to understand your IUL policy clearly, with no obligation.",
     cost: es
       ? "La revisión es gratis. Cualquier recomendación financiera depende de tu situación y necesidades, después de ver la póliza."
       : "The review is free. Any financial recommendation depends on your needs and situation, after we look at the policy.",
-    softAsk: es
-      ? "Podemos hacer una revisión contigo sin compromiso y mostrarte lo que vemos. ¿Te funciona mejor conversar durante el día o en la tarde/noche?"
-      : "We can do a no-obligation review with you and show you what we see. Does daytime or evening/night work better to talk?",
     dayPartAck: es
-      ? "Perfecto. Coordinamos la revisión en ese horario, sin compromiso."
-      : "Perfect. We’ll coordinate the review in that window, with no obligation.",
+      ? "Perfecto. Te comparto opciones para la revisión por Zoom."
+      : "Perfect. I'll share options for the Zoom review.",
+    offerSlots: es
+      ? "Tengo estos horarios disponibles para la revisión por Zoom. ¿Cuál te funciona mejor?"
+      : "I have these times available for the Zoom review. Which works best for you?",
+    zeroSlots: es
+      ? "Por ahora no veo un horario disponible en ese rango. ¿Te funciona mejor otro día u horario?"
+      : "I don't see an available time in that range right now. Would another day or time work better?",
+    confirmDeferred: es
+      ? "Perfecto. Confirmo la revisión por Zoom en ese horario."
+      : "Perfect. I'll confirm the Zoom review at that time.",
     clarify: es
-      ? "Para seguir con claridad: ¿tu póliza IUL está activa ahora?"
-      : "To keep this clear: is your IUL policy active now?"
+      ? "Para seguir con claridad: ¿qué tipo de póliza quieres revisar?"
+      : "To keep this clear: what type of policy would you like to review?"
   };
-}
-
-function composeEducateThenAsk(body, ask) {
-  return `${body} ${ask}`.replace(/\s+/g, " ").trim();
 }
 
 function renderIulAdReply(templateKey, language) {
   const c = copy(language);
   const map = {
     iul_ad_opener: c.opener,
-    iul_ask_review_topic: c.topicAsk,
-    iul_ask_review_topic_inactive: c.topicAskInactive,
-    iul_topic_cash_value_then_review: composeEducateThenAsk(c.topicCash, c.softAsk),
-    iul_topic_costs_then_review: composeEducateThenAsk(c.topicCosts, c.softAsk),
-    iul_topic_projection_then_review: composeEducateThenAsk(c.topicProjection, c.softAsk),
-    iul_topic_alternative_then_review: composeEducateThenAsk(c.topicAlternative, c.softAsk),
-    iul_info_only_then_review: composeEducateThenAsk(c.infoOnly, c.softAsk),
-    iul_no_replace_then_review: composeEducateThenAsk(c.noReplace, c.softAsk),
-    iul_agent_investment_then_review: composeEducateThenAsk(c.agentInvestment, c.softAsk),
-    iul_send_info_then_review: composeEducateThenAsk(c.sendHere, c.softAsk),
-    iul_primerica_then_continue: composeEducateThenAsk(c.primerica, c.softAsk),
-    iul_review_cost_then_continue: composeEducateThenAsk(c.cost, c.softAsk),
+    iul_ask_policy_type: c.policyTypeAsk,
+    iul_ask_carrier: c.carrierAsk,
+    iul_ask_original_purpose: c.originalPurposeAsk,
+    iul_ask_policy_age: c.policyAgeAsk,
+    iul_ask_review_reason: c.reviewReasonAsk,
+    iul_ask_documents: c.documentsAsk,
+    iul_scheduling_transition: c.schedulingTransition,
+    iul_policy_is_bad_safe: c.policyIsBadSafe,
+    iul_info_only_then_review: `${c.infoOnly} ${c.schedulingTransition}`,
+    iul_no_replace_then_review: `${c.noReplace} ${c.schedulingTransition}`,
+    iul_agent_investment_then_review: `${c.agentInvestment} ${c.schedulingTransition}`,
+    iul_send_info_then_review: `${c.sendHere} ${c.schedulingTransition}`,
+    iul_primerica_then_continue: `${c.primerica} ${c.schedulingTransition}`,
+    iul_review_cost_then_continue: `${c.cost} ${c.schedulingTransition}`,
     iul_review_day_part_ack: c.dayPartAck,
-    iul_clarify_policy_active: c.clarify
+    iul_offer_review_slots: c.offerSlots,
+    iul_zero_review_slots: c.zeroSlots,
+    iul_confirm_review_deferred: c.confirmDeferred,
+    iul_clarify_policy_type: c.clarify
   };
   return map[templateKey] || c.opener;
 }
@@ -435,13 +506,22 @@ function renderIulAdReply(templateKey, language) {
 function iulContextPatch(context, {
   lastQuestionAsked,
   knownFacts = {},
-  lastProspectIntent
+  lastProspectIntent,
+  iulWorkflowStage = null,
+  appointmentPatch = null
 } = {}) {
-  return {
+  const mergedFacts = {
+    ...(context.knownFacts || {}),
+    ...knownFacts
+  };
+  if (knownFacts.originalPolicyPurpose != null || knownFacts.originalPolicyPurposeRaw) {
+    mergedFacts.originalPurposeAsked = true;
+  }
+  const patch = {
     conversationGoal: CONVERSATION_GOAL,
     campaignKind: CAMPAIGN_KIND,
     currentStage: STAGES.QUALIFICATION,
-    knownFacts,
+    knownFacts: mergedFacts,
     conversation: {
       lastQuestionAsked,
       lastProspectIntent,
@@ -449,6 +529,16 @@ function iulContextPatch(context, {
       clarificationCount: 0
     }
   };
+  if (iulWorkflowStage) {
+    patch.knownFacts.iulWorkflowStage = iulWorkflowStage;
+  }
+  if (appointmentPatch) {
+    patch.appointment = {
+      ...(context.appointment || {}),
+      ...appointmentPatch
+    };
+  }
+  return patch;
 }
 
 function finishIulDecision(structured, context, {
@@ -456,10 +546,13 @@ function finishIulDecision(structured, context, {
   nextAction,
   lastQuestionAsked,
   knownFacts = {},
-  reasonCodes = []
+  reasonCodes = [],
+  mayCreateAppointment = false,
+  iulWorkflowStage = null,
+  appointmentPatch = null
 }) {
   structured.decision.nextAction = nextAction;
-  structured.decision.mayCreateAppointment = false;
+  structured.decision.mayCreateAppointment = mayCreateAppointment;
   structured.decision.shouldEscalate = false;
   structured.customerReplyPlan.acknowledgeRequest = true;
   structured.customerReplyPlan.templateKey = templateKey;
@@ -472,9 +565,135 @@ function finishIulDecision(structured, context, {
   structured.contextPatch = iulContextPatch(context, {
     lastQuestionAsked,
     knownFacts,
-    lastProspectIntent: structured.intent
+    lastProspectIntent: structured.intent,
+    iulWorkflowStage,
+    appointmentPatch
   });
   return structured;
+}
+
+function nextDiscoveryAsk(knownFacts = {}) {
+  if (!knownFacts.policyType) {
+    return ASK.POLICY_TYPE;
+  }
+  if (!knownFacts.carrierResolved) {
+    return ASK.CARRIER;
+  }
+  if (!knownFacts.originalPurposeAsked && knownFacts.originalPolicyPurpose == null) {
+    return ASK.ORIGINAL_PURPOSE;
+  }
+  if (!knownFacts.policyAgeRange) {
+    return ASK.POLICY_AGE;
+  }
+  if (!knownFacts.reviewReason) {
+    return ASK.REVIEW_REASON;
+  }
+  if (!knownFacts.documentsAvailable) {
+    return ASK.DOCUMENTS;
+  }
+  return ASK.SCHEDULING_DAY_PART;
+}
+
+function discoveryTemplateForAsk(ask) {
+  const map = {
+    [ASK.POLICY_TYPE]: "iul_ask_policy_type",
+    [ASK.CARRIER]: "iul_ask_carrier",
+    [ASK.ORIGINAL_PURPOSE]: "iul_ask_original_purpose",
+    [ASK.POLICY_AGE]: "iul_ask_policy_age",
+    [ASK.REVIEW_REASON]: "iul_ask_review_reason",
+    [ASK.DOCUMENTS]: "iul_ask_documents",
+    [ASK.SCHEDULING_DAY_PART]: "iul_scheduling_transition"
+  };
+  return map[ask] || "iul_ad_opener";
+}
+
+function discoveryNextActionForAsk(ask) {
+  const map = {
+    [ASK.POLICY_TYPE]: NEXT_ACTIONS.IUL_ASK_POLICY_TYPE,
+    [ASK.CARRIER]: NEXT_ACTIONS.IUL_ASK_CARRIER,
+    [ASK.ORIGINAL_PURPOSE]: NEXT_ACTIONS.IUL_ASK_ORIGINAL_PURPOSE,
+    [ASK.POLICY_AGE]: NEXT_ACTIONS.IUL_ASK_POLICY_AGE,
+    [ASK.REVIEW_REASON]: NEXT_ACTIONS.IUL_ASK_REVIEW_REASON,
+    [ASK.DOCUMENTS]: NEXT_ACTIONS.IUL_ASK_DOCUMENTS,
+    [ASK.SCHEDULING_DAY_PART]: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE
+  };
+  return map[ask] || NEXT_ACTIONS.IUL_ASK_POLICY_TYPE;
+}
+
+function advanceDiscovery(structured, context, {
+  knownFacts = {},
+  reasonCodes = [],
+  iulWorkflowStage = IUL_STAGES.REVIEW_QUALIFICATION
+} = {}) {
+  const merged = { ...(context.knownFacts || {}), ...knownFacts };
+  const nextAsk = nextDiscoveryAsk(merged);
+  if (nextAsk === ASK.SCHEDULING_DAY_PART && isDiscoveryComplete(merged)) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_scheduling_transition",
+      nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
+      knownFacts: {
+        ...merged,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY,
+        reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+      },
+      reasonCodes: [...reasonCodes, REASON_CODES.IUL_DISCOVERY_COMPLETE],
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    });
+  }
+  return finishIulDecision(structured, context, {
+    templateKey: discoveryTemplateForAsk(nextAsk),
+    nextAction: discoveryNextActionForAsk(nextAsk),
+    lastQuestionAsked: nextAsk,
+    knownFacts: merged,
+    reasonCodes,
+    iulWorkflowStage
+  });
+}
+
+function applySlotOfferDecision(structured, context, availability) {
+  const offered =
+    availability?.offeredSlots ||
+    availability?.nearestAlternatives ||
+    availability?.alternatives ||
+    [];
+  const status =
+    availability?.status ||
+    availability?.readResult?.status ||
+    null;
+  if (status === READ_STATUS.AVAILABLE && offered.length > 0) {
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      offeredSlots: offered,
+      slotA: offered[0]?.time || null,
+      slotB: offered[1]?.time || null
+    };
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_offer_review_slots",
+      nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+      lastQuestionAsked: ASK.OFFER_SLOTS,
+      knownFacts: {
+        reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [
+        REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
+        REASON_CODES.AVAILABLE_SLOTS_OFFERED
+      ],
+      appointmentPatch: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        previouslyOfferedSlots: offered,
+        meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+      },
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    });
+  }
+  return finishIulDecision(structured, context, {
+    templateKey: "iul_zero_review_slots",
+    nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+    lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
+    reasonCodes: [REASON_CODES.ZERO_QUALIFYING_SLOTS, REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING]
+  });
 }
 
 function applyIulAdDecision({ structured, context, interpretation } = {}) {
@@ -488,10 +707,16 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     "";
   const iulIntents = new Set([
     INTENTS.IUL_GREETING,
-    INTENTS.IUL_POLICY_ACTIVE_YES,
-    INTENTS.IUL_POLICY_ACTIVE_NO,
-    INTENTS.IUL_CHOOSE_REVIEW_TOPIC,
+    INTENTS.IUL_POLICY_TYPE,
+    INTENTS.IUL_CARRIER,
+    INTENTS.IUL_ORIGINAL_POLICY_PURPOSE,
+    INTENTS.IUL_POLICY_AGE,
+    INTENTS.IUL_REVIEW_REASON,
+    INTENTS.IUL_DOCUMENTS_AVAILABLE,
+    INTENTS.IUL_POLICY_IS_BAD_QUESTION,
     INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
+    INTENTS.IUL_SELECT_OFFERED_SLOT,
+    INTENTS.IUL_SCHEDULE_CONFIRM,
     INTENTS.IUL_INFO_ONLY,
     INTENTS.IUL_NO_REPLACE,
     INTENTS.IUL_AGENT_SAID_INVESTMENT,
@@ -506,81 +731,22 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     return null;
   }
 
-  if (intent === INTENTS.REQUEST_LANGUAGE_SWITCH) {
-    const requested = interpretation.entities?.requestedLanguage || interpretation.preferredLanguage;
-    structured.preferredLanguage = requested;
-    structured.customerReplyPlan.language = requested;
-    structured.decision.nextAction = NEXT_ACTIONS.SWITCH_LANGUAGE_CONTINUE;
-    structured.decision.mayCreateAppointment = false;
-    const pending = context.conversation?.lastQuestionAsked;
-    structured.customerReplyPlan.templateKey =
-      pending === ASK.REVIEW_TOPIC
-        ? "iul_ask_review_topic"
-        : pending === ASK.REVIEW_DAY_PART
-          ? "iul_info_only_then_review"
-          : "iul_ad_opener";
-    structured.reasonCodes.push(REASON_CODES.IUL_AD_CONVERSATION);
-    structured.reasonCodes.push(REASON_CODES.LANGUAGE_EXPLICIT_SWITCH);
-    structured.contextPatch = {
-      ...iulContextPatch(context, {
-        lastQuestionAsked: context.conversation?.lastQuestionAsked || ASK.POLICY_ACTIVE,
-        lastProspectIntent: intent
-      }),
-      preferredLanguage: requested,
-      languageMeta: { source: "explicit", lastMessageLanguage: requested }
-    };
-    return structured;
-  }
-
-  const topicKey = interpretation.entities?.iulReviewTopic;
-  const topicTemplates = {
-    [TOPICS.CASH_VALUE]: "iul_topic_cash_value_then_review",
-    [TOPICS.COSTS]: "iul_topic_costs_then_review",
-    [TOPICS.PROJECTION]: "iul_topic_projection_then_review",
-    [TOPICS.ALTERNATIVE]: "iul_topic_alternative_then_review"
-  };
-
-  if (intent === INTENTS.IUL_POLICY_ACTIVE_YES) {
+  if (intent === INTENTS.IUL_POLICY_IS_BAD_QUESTION) {
+    const merged = { ...(context.knownFacts || {}) };
+    if (isDiscoveryComplete(merged)) {
+      return finishIulDecision(structured, context, {
+        templateKey: "iul_policy_is_bad_safe",
+        nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+        lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
+        reasonCodes: [REASON_CODES.IUL_POLICY_IS_BAD_SAFE_RESPONSE]
+      });
+    }
+    const nextAsk = nextDiscoveryAsk(merged);
     return finishIulDecision(structured, context, {
-      templateKey: "iul_ask_review_topic",
-      nextAction: NEXT_ACTIONS.IUL_ASK_REVIEW_TOPIC,
-      lastQuestionAsked: ASK.REVIEW_TOPIC,
-      knownFacts: { iulPolicyActive: true },
-      reasonCodes: [REASON_CODES.IUL_POLICY_ACTIVE_CAPTURED]
-    });
-  }
-
-  if (intent === INTENTS.IUL_POLICY_ACTIVE_NO) {
-    return finishIulDecision(structured, context, {
-      templateKey: "iul_ask_review_topic_inactive",
-      nextAction: NEXT_ACTIONS.IUL_ASK_REVIEW_TOPIC,
-      lastQuestionAsked: ASK.REVIEW_TOPIC,
-      knownFacts: { iulPolicyActive: false },
-      reasonCodes: [REASON_CODES.IUL_POLICY_ACTIVE_CAPTURED]
-    });
-  }
-
-  if (intent === INTENTS.IUL_CHOOSE_REVIEW_TOPIC && topicTemplates[topicKey]) {
-    return finishIulDecision(structured, context, {
-      templateKey: topicTemplates[topicKey],
-      nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
-      knownFacts: { iulReviewTopic: topicKey },
-      reasonCodes: [REASON_CODES.IUL_TOPIC_CAPTURED, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
-    });
-  }
-
-  if (intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART) {
-    const dayPart = interpretation.entities?.iulReviewDayPart || null;
-    return finishIulDecision(structured, context, {
-      templateKey: "iul_review_day_part_ack",
-      nextAction: NEXT_ACTIONS.IUL_CAPTURE_REVIEW_DAY_PART,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
-      knownFacts: {
-        iulReviewDayPart: dayPart,
-        preferredDayPart: dayPart === "day" ? "morning" : "evening"
-      },
-      reasonCodes: [REASON_CODES.IUL_REVIEW_WINDOW_CAPTURED, REASON_CODES.PREMATURE_BOOKING_BLOCKED]
+      templateKey: "iul_policy_is_bad_safe",
+      nextAction: discoveryNextActionForAsk(nextAsk),
+      lastQuestionAsked: nextAsk,
+      reasonCodes: [REASON_CODES.IUL_POLICY_IS_BAD_SAFE_RESPONSE]
     });
   }
 
@@ -588,25 +754,23 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     return finishIulDecision(structured, context, {
       templateKey: "iul_info_only_then_review",
       nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
+      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_INFO_THEN_REVIEW, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
-
   if (intent === INTENTS.IUL_NO_REPLACE) {
     return finishIulDecision(structured, context, {
       templateKey: "iul_no_replace_then_review",
       nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
+      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_NO_OBLIGATION, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
-
   if (intent === INTENTS.IUL_AGENT_SAID_INVESTMENT) {
     return finishIulDecision(structured, context, {
       templateKey: "iul_agent_investment_then_review",
       nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
+      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [
         REASON_CODES.IUL_NOT_JUST_INVESTMENT,
         REASON_CODES.IUL_NO_AGENT_ARGUMENT,
@@ -614,59 +778,223 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
       ]
     });
   }
-
   if (intent === INTENTS.IUL_SEND_INFO_HERE) {
     return finishIulDecision(structured, context, {
       templateKey: "iul_send_info_then_review",
       nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
+      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [
         REASON_CODES.IUL_WHATSAPP_BASICS_ONLY,
         REASON_CODES.IUL_SOFT_APPOINTMENT_ASK
       ]
     });
   }
-
   if (intent === INTENTS.IUL_PRIMERICA_QUESTION) {
     return finishIulDecision(structured, context, {
       templateKey: "iul_primerica_then_continue",
       nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
+      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_PRIMERICA_TRANSPARENT, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
-
   if (intent === INTENTS.IUL_REVIEW_COST_QUESTION) {
     return finishIulDecision(structured, context, {
       templateKey: "iul_review_cost_then_continue",
       nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
+      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_REVIEW_IS_FREE, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
 
-  if (context.conversation?.lastQuestionAsked === ASK.REVIEW_TOPIC) {
-    return finishIulDecision(structured, context, {
-      templateKey: "iul_ask_review_topic",
-      nextAction: NEXT_ACTIONS.IUL_ASK_REVIEW_TOPIC,
-      lastQuestionAsked: ASK.REVIEW_TOPIC
+  if (intent === INTENTS.IUL_POLICY_TYPE) {
+    return advanceDiscovery(structured, context, {
+      knownFacts: {
+        policyType: interpretation.entities?.policyType || null,
+        iulPolicyActive: interpretation.entities?.iulPolicyActive ?? null,
+        iulWorkflowStage: IUL_STAGES.ENGAGED
+      },
+      reasonCodes: [REASON_CODES.IUL_POLICY_TYPE_CAPTURED]
     });
   }
 
-  if (context.conversation?.lastQuestionAsked === ASK.REVIEW_DAY_PART) {
+  if (intent === INTENTS.IUL_CARRIER) {
+    return advanceDiscovery(structured, context, {
+      knownFacts: {
+        carrier: interpretation.entities?.carrier ?? null,
+        carrierRaw: interpretation.entities?.carrierRaw ?? null,
+        carrierResolved: true
+      },
+      reasonCodes: [REASON_CODES.IUL_CARRIER_CAPTURED]
+    });
+  }
+
+  if (intent === INTENTS.IUL_ORIGINAL_POLICY_PURPOSE) {
+    return advanceDiscovery(structured, context, {
+      knownFacts: {
+        originalPolicyPurpose: interpretation.entities?.originalPolicyPurpose ?? null,
+        originalPolicyPurposeRaw: interpretation.entities?.originalPolicyPurposeRaw ?? null,
+        originalPurposeAsked: true
+      },
+      reasonCodes: [REASON_CODES.IUL_ORIGINAL_PURPOSE_CAPTURED]
+    });
+  }
+
+  if (intent === INTENTS.IUL_POLICY_AGE) {
+    return advanceDiscovery(structured, context, {
+      knownFacts: {
+        policyAgeRange: interpretation.entities?.policyAgeRange || null
+      },
+      reasonCodes: [REASON_CODES.IUL_POLICY_AGE_CAPTURED]
+    });
+  }
+
+  if (intent === INTENTS.IUL_REVIEW_REASON) {
+    return advanceDiscovery(structured, context, {
+      knownFacts: {
+        reviewReason: interpretation.entities?.reviewReason || null,
+        reviewReasonRaw: interpretation.entities?.reviewReasonRaw || null
+      },
+      reasonCodes: [REASON_CODES.IUL_REVIEW_REASON_CAPTURED]
+    });
+  }
+
+  if (intent === INTENTS.IUL_DOCUMENTS_AVAILABLE) {
+    return advanceDiscovery(structured, context, {
+      knownFacts: {
+        documentsAvailable: interpretation.entities?.documentsAvailable || null
+      },
+      reasonCodes: [REASON_CODES.IUL_DOCUMENTS_CAPTURED]
+    });
+  }
+
+  if (intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART) {
+    const dayPart = interpretation.entities?.iulReviewDayPart || null;
+    const mergedFacts = {
+      iulReviewDayPart: dayPart,
+      reviewPreferredDayPart: dayPart,
+      preferredDayPart: dayPart === "day" ? "morning" : dayPart,
+      reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+    };
+    const schedulingContext = {
+      ...context,
+      knownFacts: { ...(context.knownFacts || {}), ...mergedFacts }
+    };
+    const availability = readPolicyReviewAvailabilitySync({
+      context: schedulingContext,
+      interpretation,
+      options: {
+        availabilityFixture: context._availabilityFixture,
+        organizationId: context.organizationId || null
+      }
+    });
+    structured.customerReplyPlan.templateKey = "iul_review_day_part_ack";
+    return applySlotOfferDecision(structured, schedulingContext, availability);
+  }
+
+  if (intent === INTENTS.IUL_SELECT_OFFERED_SLOT) {
+    const slot = interpretation.entities?.selectedSlot || null;
     return finishIulDecision(structured, context, {
-      templateKey: "iul_info_only_then_review",
-      nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
-      lastQuestionAsked: ASK.REVIEW_DAY_PART,
-      reasonCodes: [REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
+      templateKey: "iul_confirm_review_deferred",
+      nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
+      lastQuestionAsked: ASK.CONFIRM_SLOT,
+      mayCreateAppointment: true,
+      knownFacts: {
+        reviewProposedDate:
+          interpretation.entities?.reviewProposedDate ||
+          slot?.date ||
+          slot?.dateKey ||
+          null,
+        reviewProposedTime:
+          interpretation.entities?.reviewProposedTime ||
+          slot?.time ||
+          slot?.timeKey ||
+          null,
+        reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
+        iulWorkflowStage: IUL_STAGES.REVIEW_SCHEDULED
+      },
+      reasonCodes: [
+        REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
+        REASON_CODES.APPOINTMENT_CREATE_PROPOSED
+      ],
+      appointmentPatch: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate: slot?.date || slot?.dateKey || null,
+        proposedTime: slot?.time || slot?.timeKey || null,
+        meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
+        previouslyOfferedSlots: context.appointment?.previouslyOfferedSlots || []
+      },
+      iulWorkflowStage: IUL_STAGES.REVIEW_SCHEDULED
+    });
+  }
+
+  if (intent === INTENTS.IUL_SCHEDULE_CONFIRM) {
+    const offered = context.appointment?.previouslyOfferedSlots || [];
+    const slot = offered.length === 1 ? offered[0] : null;
+    if (!slot) {
+      return finishIulDecision(structured, context, {
+        templateKey: "iul_offer_review_slots",
+        nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+        lastQuestionAsked: ASK.OFFER_SLOTS
+      });
+    }
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_confirm_review_deferred",
+      nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
+      lastQuestionAsked: ASK.CONFIRM_SLOT,
+      mayCreateAppointment: true,
+      knownFacts: {
+        reviewProposedDate: slot.date || slot.dateKey || null,
+        reviewProposedTime: slot.time || slot.timeKey || null,
+        reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
+        iulWorkflowStage: IUL_STAGES.REVIEW_SCHEDULED
+      },
+      reasonCodes: [
+        REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
+        REASON_CODES.APPOINTMENT_CREATE_PROPOSED,
+        REASON_CODES.EXPLICIT_CONFIRMATION_RECEIVED
+      ],
+      appointmentPatch: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate: slot.date || slot.dateKey || null,
+        proposedTime: slot.time || slot.timeKey || null,
+        meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+      },
+      iulWorkflowStage: IUL_STAGES.REVIEW_SCHEDULED
+    });
+  }
+
+  const pending = context.conversation?.lastQuestionAsked;
+  if (pending && pending !== ASK.POLICY_TYPE) {
+    const replayAsk =
+      pending === ASK.CARRIER
+        ? ASK.CARRIER
+        : pending === ASK.ORIGINAL_PURPOSE
+          ? ASK.ORIGINAL_PURPOSE
+          : pending === ASK.POLICY_AGE
+            ? ASK.POLICY_AGE
+            : pending === ASK.REVIEW_REASON
+              ? ASK.REVIEW_REASON
+              : pending === ASK.DOCUMENTS
+                ? ASK.DOCUMENTS
+                : pending === ASK.SCHEDULING_DAY_PART
+                  ? ASK.SCHEDULING_DAY_PART
+                  : pending === ASK.OFFER_SLOTS
+                    ? ASK.OFFER_SLOTS
+                    : nextDiscoveryAsk(context.knownFacts || {});
+    return finishIulDecision(structured, context, {
+      templateKey: discoveryTemplateForAsk(replayAsk),
+      nextAction: discoveryNextActionForAsk(replayAsk),
+      lastQuestionAsked: replayAsk
     });
   }
 
   return finishIulDecision(structured, context, {
     templateKey: "iul_ad_opener",
-    nextAction: NEXT_ACTIONS.IUL_ASK_POLICY_ACTIVE,
-    lastQuestionAsked: ASK.POLICY_ACTIVE,
-    reasonCodes: [REASON_CODES.IUL_SPANISH_FIRST_OPENER]
+    nextAction: NEXT_ACTIONS.IUL_ASK_POLICY_TYPE,
+    lastQuestionAsked: ASK.POLICY_TYPE,
+    knownFacts: { iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD },
+    reasonCodes: [REASON_CODES.IUL_SPANISH_FIRST_OPENER],
+    iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD
   });
 }
 
@@ -674,16 +1002,21 @@ function resolveIulCampaignFields({
   conversationGoal = null,
   campaignKind = null,
   ctwaReferral = null,
-  leadSource = null
+  leadSource = null,
+  campaignIntakePurpose = null
 } = {}) {
+  const intakeIul =
+    String(campaignIntakePurpose || "").toUpperCase() === "IUL" ||
+    String(campaignIntakePurpose || "").toUpperCase() === "IUL_REVIEW";
   const goal =
     conversationGoal ||
     leadSource?.conversationGoal ||
+    (intakeIul ? CONVERSATION_GOAL : null) ||
     (looksLikeIulReferral(ctwaReferral) ? CONVERSATION_GOAL : null);
   const kind =
     campaignKind ||
     leadSource?.campaignKind ||
-    (looksLikeIulReferral(ctwaReferral) || goal === CONVERSATION_GOAL
+    (intakeIul || looksLikeIulReferral(ctwaReferral) || goal === CONVERSATION_GOAL
       ? CAMPAIGN_KIND
       : null);
   return {
@@ -708,10 +1041,13 @@ module.exports = {
   applyIulAdDecision,
   renderIulAdReply,
   resolveIulCampaignFields,
+  nextDiscoveryAsk,
+  isDiscoveryComplete,
   looksLikeInfoOnly,
   looksLikeNoReplace,
   looksLikeAgentSaidInvestment,
   looksLikeSendInfoHere,
   looksLikePrimericaQuestion,
-  looksLikeReviewCostQuestion
+  looksLikeReviewCostQuestion,
+  looksLikePolicyIsBadQuestion
 };
