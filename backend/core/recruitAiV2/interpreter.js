@@ -62,6 +62,7 @@ const {
   proposeStateFromCity,
   isCompleteCityStatePhrase
 } = require("./locationFacts");
+const { extractExplicitEmailFromText } = require("./prospectContactFactSync");
 const {
   normalizeInboundText,
   normalizeIntentText
@@ -927,6 +928,12 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.alsoWithdraw = Boolean(cancellation.alsoWithdraw);
     entities.alsoOptOut = Boolean(cancellation.alsoOptOut);
     entities.directLackOfInterest = Boolean(cancellation.directLackOfInterest);
+  } else if (extractExplicitEmailFromText(text) || extractExplicitEmailFromText(originalText)) {
+    const email =
+      extractExplicitEmailFromText(text) || extractExplicitEmailFromText(originalText);
+    intent = INTENTS.PROVIDE_EMAIL;
+    confidence = 0.94;
+    entities.email = email;
   } else if (languageSwitchTo) {
     intent = INTENTS.REQUEST_LANGUAGE_SWITCH;
     confidence = 0.95;

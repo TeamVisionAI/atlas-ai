@@ -52,6 +52,8 @@ const DURABLE_RUNTIME_FIELDS = Object.freeze([
   "humanTakenOverAt",
   "returnedToAtlasAt",
   "returnToAtlasResumeKey",
+  "returnToAtlasResumeLastError",
+  "returnToAtlasResumeLastAttemptAt",
   "atlasAutomationEnabled",
   "atlasEligibilitySource"
 ]);
@@ -105,6 +107,8 @@ function defaultWorkflowRecord() {
     humanTakenOverAt: null,
     returnedToAtlasAt: null,
     returnToAtlasResumeKey: null,
+    returnToAtlasResumeLastError: null,
+    returnToAtlasResumeLastAttemptAt: null,
     inboxArchivedAt: null,
     inboxClosedAt: null,
     inboxCloseReason: null,

@@ -314,6 +314,26 @@ async function processNormalizedInboundMessage(
 
   const name = contactName || normalized.contactName || prospect?.name || "Unknown";
 
+  // Explicit email in any inbound (including human-takeover turns) → persist to prospect.
+  try {
+    const {
+      synchronizeExplicitEmailFromInbound
+    } = require("./recruitAiV2/prospectContactFactSync");
+    const organizationId = prospect?.organization_id || prospect?.organizationId || null;
+    if (organizationId && prospect?.phone) {
+      const { updateProspectInOrganization } = require("../services/supabaseService");
+      await synchronizeExplicitEmailFromInbound({
+        messageText: normalized.text,
+        prospect,
+        organizationId,
+        updateProspectFn: (phone, patch) =>
+          updateProspectInOrganization(phone, organizationId, patch)
+      });
+    }
+  } catch {
+    // Soft-fail — never block inbound processing.
+  }
+
   // Implements BR-141 — webhook audio must not BR-118-ack or enter V2/CE.
   // Persist already happened; STT + semantic replay run on the media poller.
   const { classifyInboundMedia } = require("./recruitAiV2/nonTextMedia");

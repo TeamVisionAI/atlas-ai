@@ -76,6 +76,7 @@ const INTENTS = Object.freeze({
   AMBIGUOUS_LICENSE_STATEMENT: "ambiguous_license_statement",
   PROVIDE_LICENSE_CLARIFICATION: "provide_license_clarification",
   PROVIDE_NAME: "provide_name",
+  PROVIDE_EMAIL: "provide_email",
   PROVIDE_DAY_PART: "provide_day_part",
   INCOMPLETE_DAY_PART: "incomplete_day_part",
   AMBIGUOUS_FRAGMENT: "ambiguous_fragment",

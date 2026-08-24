@@ -1998,7 +1998,7 @@ function decideConversationTurn({
     }
 
     // Complete location — continue qualification (auth / next canonical step).
-    // Do not jump to day-part / scheduling from location alone.
+    const modality = resolveMeetingModalityForLocation({ city, state });
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
     structured.customerReplyPlan.templateKey = "continue_qualification_after_location";
     structured.contextPatch = {
@@ -2008,7 +2008,10 @@ function decideConversationTurn({
         state: state || null,
         cityCertainty: "confirmed",
         stateCertainty: "confirmed",
-        proposedState: null
+        proposedState: null,
+        coverage: modality.coverage,
+        preferredMeetingType: modality.meetingType,
+        meetingPreferenceSource: modality.meetingPreferenceSource
       },
       conversation: {
         clarificationCount: 0,
@@ -2024,8 +2027,48 @@ function decideConversationTurn({
   }
 
   if (intent === INTENTS.PROVIDE_NAME) {
+    const resume = resolveQualificationResume({
+      ...context,
+      knownFacts: {
+        ...context.knownFacts,
+        fullName: interpretation.entities?.name || context.knownFacts?.fullName || null,
+        name: interpretation.entities?.name || context.knownFacts?.name || null
+      }
+    });
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
-    structured.customerReplyPlan.templateKey = "continue_qualification";
+    structured.customerReplyPlan.templateKey = resume.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ...(resume.entities || {})
+    };
+    structured.contextPatch = {
+      knownFacts: {
+        name: interpretation.entities?.name || null,
+        fullName: interpretation.entities?.name || null
+      },
+      conversation: {
+        lastQuestionAsked: resume.lastQuestionAsked
+      }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.PROVIDE_EMAIL) {
+    const resume = resolveQualificationResume(context);
+    structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+    structured.customerReplyPlan.templateKey = resume.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ...(resume.entities || {})
+    };
+    structured.contextPatch = {
+      knownFacts: {
+        email: interpretation.entities?.email || null
+      },
+      conversation: {
+        lastQuestionAsked: resume.lastQuestionAsked
+      }
+    };
     return structured;
   }
 

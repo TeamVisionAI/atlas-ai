@@ -4,6 +4,7 @@ import MainLayout from "./layouts/MainLayout";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Dashboard from "./pages/Dashboard";
 import ProspectWorkspace from "./pages/ProspectWorkspace";
+import { normalizeProspectRoutePhone } from "./utils/prospectRoutes";
 import ProspectCenter from "./pages/ProspectCenter";
 import ConfigurationLayout from "./pages/configuration/ConfigurationLayout";
 import ConfigurationHub from "./pages/configuration/ConfigurationHub";
@@ -77,6 +78,12 @@ function LegacyProspectWorkspaceRedirect() {
   );
 }
 
+function ProspectWorkspaceRoute() {
+  const { phone } = useParams();
+  const normalizedPhone = normalizeProspectRoutePhone(phone);
+  return <ProspectWorkspace key={normalizedPhone || "missing-phone"} />;
+}
+
 function LegacyProspectRedirect() {
   const { id } = useParams();
   const location = useLocation();
@@ -126,7 +133,7 @@ export default function App() {
         <Route path="my-dashboard" element={<MyDashboard />} />
         <Route path="team-dashboard" element={<TeamDashboard />} />
         <Route path="mission-control" element={<Dashboard />} />
-        <Route path="prospect-workspace/:phone" element={<ProspectWorkspace />} />
+        <Route path="prospect-workspace/:phone" element={<ProspectWorkspaceRoute />} />
         <Route path="prospect-center" element={<ProspectCenter />} />
         <Route path="quick-capture" element={<QuickCapture />} />
         <Route path="prospect/:id" element={<Prospect />} />

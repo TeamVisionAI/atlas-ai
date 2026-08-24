@@ -23,6 +23,9 @@ const CITY_TO_PROPOSED_STATE = Object.freeze({
   jacksonville: "FL",
   "fort lauderdale": "FL",
   "ft lauderdale": "FL",
+  "fort myers": "FL",
+  "cape coral": "FL",
+  naples: "FL",
   hialeah: "FL",
   kissimmee: "FL",
   "west palm beach": "FL",
@@ -358,6 +361,17 @@ function extractLocationCandidateText(text) {
     strippedCorrection = strippedCorrection || true;
   }
 
+  const bareEn = t.match(/^en\s+([A-Za-zÁÉÍÓÚÑáéíóúñ].+)$/i);
+  if (bareEn) {
+    const candidate = String(bareEn[1] || "").trim();
+    if (
+      candidate &&
+      !/^(que|qué|donde|dónde|cual|cuál|que estado|qué estado)\b/i.test(candidate)
+    ) {
+      t = candidate;
+    }
+  }
+
   return { text: t, correctionSignal: strippedCorrection };
 }
 
@@ -432,6 +446,24 @@ function buildCompleteLocation(cityParts, state) {
   };
 }
 
+function isNonLocationPhrase(folded) {
+  const t = String(folded || "").trim();
+  if (!t) {
+    return false;
+  }
+  return (
+    /^(me parece|parece bien|me parece bien|parece que|me parece que)$/.test(t) ||
+    /^(perfecto|gracias|ok|dale|claro|entendido|listo|bueno|bien|si|sí|todo bien)$/.test(t) ||
+    /^(mañana|manana|hoy|tarde|noche)$/.test(t) ||
+    /^(mejor|thanks|thank you|got it|sounds good)$/.test(t)
+  );
+}
+
+function isFalsePositiveStateToken(token) {
+  const t = String(token || "").trim().toLowerCase();
+  return ["me", "in", "or", "ok", "la", "ma", "pa", "id", "hi", "de", "al"].includes(t);
+}
+
 function splitCityThenState(parts) {
   let state = null;
   let cityParts = null;
@@ -445,7 +477,11 @@ function splitCityThenState(parts) {
   }
 
   if (!state) {
-    state = normalizeStateToken(parts[parts.length - 1]);
+    const lastToken = parts[parts.length - 1];
+    if (isFalsePositiveStateToken(lastToken)) {
+      return null;
+    }
+    state = normalizeStateToken(lastToken);
     if (state) {
       cityParts = parts.slice(0, -1);
     }
@@ -467,7 +503,11 @@ function splitStateThenCity(parts) {
   }
 
   if (!state) {
-    state = normalizeStateToken(parts[0]);
+    const firstToken = parts[0];
+    if (isFalsePositiveStateToken(firstToken)) {
+      return null;
+    }
+    state = normalizeStateToken(firstToken);
     if (state) {
       cityParts = parts.slice(1);
     }
@@ -529,6 +569,11 @@ function parseLocationAnswerCore(raw) {
     .replace(/[?!¡¿.,;:]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  if (isNonLocationPhrase(folded)) {
+    return null;
+  }
+
+  // Never invent cities from company-identity / info-request / FAQ phrasing.
   if (
     /\b(empresa|compania|companias)\b/.test(folded) ||
     /\b(quiero|dame|quisiera|necesito)\b.{0,40}\b(informacion|detalles)\b/.test(
@@ -774,6 +819,8 @@ module.exports = {
   normalizeCityLookupKey,
   isHighConfidenceFloridaCity,
   buildHighConfidenceFloridaLocation,
+  isNonLocationPhrase,
+  isFalsePositiveStateToken,
   looksLikeLocationCorrection,
   proposeStateFromCity,
   normalizeStateToken,

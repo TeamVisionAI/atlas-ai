@@ -27,6 +27,7 @@ const {
   restoreConversation,
   markConversationAsTest
 } = require("../core/conversationsCenter/conversationsCenterOwnershipService");
+const { logWhatsAppStage } = require("../core/whatsappStructuredLogger");
 const {
   sendHumanComposerReply
 } = require("../core/conversationsCenter/conversationsCenterHumanReplyService");
@@ -284,6 +285,12 @@ async function returnToAtlasHandler(req, res) {
       resumeConversationAfterReturnToAtlas
     } = require("../core/conversationsCenter/returnToAtlasResumeService");
 
+    logWhatsAppStage("return_to_atlas_resume_scheduled", {
+      phone: prospect.phone,
+      organizationId: prospect.organization_id || organizationId || null,
+      returnedToAtlasAt: result.next.returnedToAtlasAt || null
+    });
+
     setImmediate(() => {
       resumeConversationAfterReturnToAtlas({
         phone: prospect.phone,
@@ -292,6 +299,12 @@ async function returnToAtlasHandler(req, res) {
         previousWorkflow: result.previous,
         returnedToAtlasAt: result.next.returnedToAtlasAt
       }).catch((resumeError) => {
+        logWhatsAppStage("return_to_atlas_resume_failed", {
+          level: "error",
+          phone: prospect.phone,
+          reason: "UNHANDLED_RESUME_EXCEPTION",
+          error: resumeError.message
+        });
         console.error(
           "[conversations-center] return-to-atlas-resume",
           resumeError.message
