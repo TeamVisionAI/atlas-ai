@@ -209,7 +209,14 @@ export function MorningSummaryCard({ summary, loading }) {
   );
 }
 
-export function RecruitmentFunnelCard({ funnel, loading }) {
+export function RecruitmentFunnelCard({
+  funnel,
+  loading = false,
+  unavailable = false,
+  unavailableMessage = "",
+  onRetry = null,
+  retryLabel = "Retry"
+}) {
   const { translate } = useLanguage();
   const topCount = funnel?.stages?.[0]?.count || 1;
 
@@ -218,6 +225,10 @@ export function RecruitmentFunnelCard({ funnel, loading }) {
       title={translate("executiveV2RecruitmentFunnel")}
       className="executive-v2__card--funnel"
       loading={loading}
+      unavailable={unavailable}
+      unavailableMessage={unavailableMessage}
+      onRetry={onRetry}
+      retryLabel={retryLabel}
     >
       {funnel?.stages?.length ? (
         <>
@@ -252,7 +263,14 @@ export function RecruitmentFunnelCard({ funnel, loading }) {
   );
 }
 
-export function ConversationPerformanceCard({ performance, loading }) {
+export function ConversationPerformanceCard({
+  performance,
+  loading = false,
+  unavailable = false,
+  unavailableMessage = "",
+  onRetry = null,
+  retryLabel = "Retry"
+}) {
   const { translate } = useLanguage();
 
   return (
@@ -260,6 +278,10 @@ export function ConversationPerformanceCard({ performance, loading }) {
       title={translate("executiveV2ConversationPerformance")}
       className="executive-v2__card--conversation"
       loading={loading}
+      unavailable={unavailable}
+      unavailableMessage={unavailableMessage}
+      onRetry={onRetry}
+      retryLabel={retryLabel}
     >
       {performance ? (
         <>
@@ -314,11 +336,25 @@ export function TodayPrioritiesCard({ priorities = [], loading }) {
   );
 }
 
-export function AppointmentTrendCard({ trend = [], loading }) {
+export function AppointmentTrendCard({
+  trend = [],
+  loading = false,
+  unavailable = false,
+  unavailableMessage = "",
+  onRetry = null,
+  retryLabel = "Retry"
+}) {
   const { translate } = useLanguage();
 
   return (
-    <ExecutiveCard title={translate("executiveV2AppointmentTrend")} loading={loading}>
+    <ExecutiveCard
+      title={translate("executiveV2AppointmentTrend")}
+      loading={loading}
+      unavailable={unavailable}
+      unavailableMessage={unavailableMessage}
+      onRetry={onRetry}
+      retryLabel={retryLabel}
+    >
       <AppointmentTrendChart series={trend} />
       <div className="executive-v2__chart-legend">
         <span className="executive-v2__legend-item executive-v2__legend-item--scheduled">
@@ -365,10 +401,25 @@ export function RecentActivityCard({ activity = [], loading }) {
   );
 }
 
-export function ExecutiveDashboardKpiSection({ cards, loading }) {
-  if (loading && !cards.length) {
+export function ExecutiveDashboardKpiSection({
+  cards,
+  loading = false,
+  unavailable = false,
+  unavailableMessage = "",
+  onRetry = null,
+  retryLabel = "Retry"
+}) {
+  if (loading && !cards.length && !unavailable) {
     return <KpiSkeletonRow />;
   }
 
-  return <KpiRow cards={cards} />;
+  return (
+    <KpiRow
+      cards={cards}
+      unavailable={unavailable}
+      unavailableMessage={unavailableMessage}
+      onRetry={onRetry}
+      retryLabel={retryLabel}
+    />
+  );
 }

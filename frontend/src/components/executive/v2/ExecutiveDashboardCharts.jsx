@@ -12,15 +12,15 @@ export function ConversationDonut({ segments = [], total = 0 }) {
     );
   }
 
-  const radius = 62;
+  const radius = 58;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
 
   return (
     <div className="executive-v2__donut-wrap">
       <div className="executive-v2__donut-chart">
-        <svg viewBox="0 0 180 180" className="executive-v2__donut" role="img" aria-label="Conversation ownership">
-          <circle cx="90" cy="90" r={radius} className="executive-v2__donut-track" />
+        <svg viewBox="0 0 200 200" className="executive-v2__donut" role="img" aria-label="Conversation ownership">
+          <circle cx="100" cy="100" r={radius} className="executive-v2__donut-track" />
           {segments.map((segment) => {
             if (!segment.value) {
               return null;
@@ -30,8 +30,8 @@ export function ConversationDonut({ segments = [], total = 0 }) {
             const circle = (
               <circle
                 key={segment.key}
-                cx="90"
-                cy="90"
+                cx="100"
+                cy="100"
                 r={radius}
                 className="executive-v2__donut-segment"
                 stroke={segment.color}
@@ -66,7 +66,7 @@ export function AppointmentTrendChart({ series = [] }) {
   }
 
   const width = 640;
-  const height = 240;
+  const height = 260;
   const padding = { top: 20, right: 16, bottom: 36, left: 16 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;

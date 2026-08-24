@@ -52,6 +52,31 @@ test("Executive Dashboard v2 charts tolerate empty series", () => {
   assert.match(source, /if \(!safeTotal\)/);
 });
 
+test("Executive Dashboard v2 hook exposes bounded metrics loading states", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "../hooks/useExecutiveDashboardV2Data.js"),
+    "utf8"
+  );
+
+  assert.match(source, /EXECUTIVE_LOAD_TIMEOUT_MS/);
+  assert.match(source, /metricsLoading/);
+  assert.match(source, /metricsUnavailable/);
+  assert.match(source, /reload/);
+});
+
+test("Executive Dashboard v2 never keeps KPI skeleton after unavailable metrics", () => {
+  const cards = fs.readFileSync(
+    path.join(__dirname, "../components/executive/v2/ExecutiveDashboardCards.jsx"),
+    "utf8"
+  );
+  const page = fs.readFileSync(path.join(__dirname, "../pages/ExecutiveDashboard.jsx"), "utf8");
+
+  assert.doesNotMatch(cards, /if \(!cards\.length\) \{\s*return <KpiSkeletonRow/);
+  assert.match(cards, /SectionUnavailable/);
+  assert.match(page, /metricsUnavailable/);
+  assert.match(page, /unavailable=\{metricsUnavailable\}/);
+});
+
 test("Executive Dashboard v2 visual polish uses wider layout and funnel visualization", () => {
   const css = fs.readFileSync(
     path.join(__dirname, "../pages/ExecutiveDashboard.css"),
@@ -62,9 +87,9 @@ test("Executive Dashboard v2 visual polish uses wider layout and funnel visualiz
     "utf8"
   );
 
-  assert.match(css, /--exec-v2-max:\s*1580px/);
+  assert.match(css, /--exec-v2-max:\s*1620px/);
   assert.match(css, /executive-v2__funnel-viz/);
-  assert.match(css, /height:\s*240px/);
+  assert.match(css, /height:\s*260px/);
   assert.match(sections, /executive-v2__funnel-viz/);
   assert.match(sections, /data-tone=/);
 });
@@ -76,5 +101,5 @@ test("Executive Dashboard v2 trend chart renders data point dots", () => {
   );
 
   assert.match(source, /executive-v2__chart-dot/);
-  assert.match(source, /height = 240/);
+  assert.match(source, /height = 260/);
 });

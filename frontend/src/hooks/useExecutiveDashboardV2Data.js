@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executiveDashboardService";
 import { getDashboard } from "../services/api";
 import { fetchOrganizationBranding } from "../services/organizationBrandingService";
+
+export const EXECUTIVE_LOAD_TIMEOUT_MS = 5000;
 
 /**
  * Progressive Executive Dashboard data loading.
@@ -16,18 +18,35 @@ export function useExecutiveDashboardV2Data() {
   const [organizationName, setOrganizationName] = useState("");
   const [phase, setPhase] = useState(1);
   const [loadingExecutive, setLoadingExecutive] = useState(true);
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const [errors, setErrors] = useState({});
+  const [reloadToken, setReloadToken] = useState(0);
   const abortRef = useRef(null);
+
+  const reload = useCallback(() => {
+    setReloadToken((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     abortRef.current = controller;
     let cancelled = false;
 
-    async function loadPhase1() {
-      setLoadingExecutive(true);
-      setErrors({});
+    setExecutive(null);
+    setAlphaBrief(null);
+    setDashboard(null);
+    setPhase(1);
+    setLoadingExecutive(true);
+    setLoadingTimedOut(false);
+    setErrors({});
 
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        setLoadingTimedOut(true);
+      }
+    }, EXECUTIVE_LOAD_TIMEOUT_MS);
+
+    async function loadPhase1() {
       try {
         const executivePayload = await getExecutiveDashboard({
           signal: controller.signal
@@ -35,6 +54,12 @@ export function useExecutiveDashboardV2Data() {
 
         if (!cancelled) {
           setExecutive(executivePayload);
+          if (!executivePayload?.v2Metrics) {
+            setErrors((prev) => ({
+              ...prev,
+              v2Metrics: "executiveV2MetricsUnavailable"
+            }));
+          }
           setPhase(2);
         }
       } catch (error) {
@@ -44,6 +69,7 @@ export function useExecutiveDashboardV2Data() {
       } finally {
         if (!cancelled) {
           setLoadingExecutive(false);
+          clearTimeout(timeoutId);
         }
       }
     }
@@ -110,9 +136,18 @@ export function useExecutiveDashboardV2Data() {
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       controller.abort();
     };
-  }, []);
+  }, [reloadToken]);
+
+  const v2MetricsMissing = Boolean(executive && !executive.v2Metrics);
+  const metricsResolved = Boolean(executive?.v2Metrics);
+  const metricsLoading = loadingExecutive && !loadingTimedOut && !metricsResolved;
+  const metricsUnavailable =
+    Boolean(errors.v2Metrics) ||
+    v2MetricsMissing ||
+    (loadingTimedOut && !metricsResolved);
 
   return {
     executive,
@@ -121,7 +156,13 @@ export function useExecutiveDashboardV2Data() {
     organizationName,
     phase,
     loadingExecutive,
+    loadingTimedOut,
+    metricsLoading,
+    metricsUnavailable,
+    metricsResolved,
+    v2MetricsMissing,
     errors,
+    reload,
     prospects: dashboard?.prospects || []
   };
 }

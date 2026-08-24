@@ -47,6 +47,22 @@ test("buildConversationOwnership uses ATLAS / HUMAN / NEEDS_ATTENTION semantics"
   assert.equal(result.averageResponseTimeMs, null);
 });
 
+test("buildRecruitmentFunnel counts confirmed from prospect current_step", () => {
+  const prospects = [
+    prospect({ phone: "+15550003333", current_step: "CONFIRMED" })
+  ];
+  const funnel = buildRecruitmentFunnel(
+    [
+      summary({ canonicalMilestone: MILESTONES.NEW_LEAD }),
+      summary({ phone: "+15550003333", canonicalMilestone: MILESTONES.INTERVIEW_SCHEDULED })
+    ],
+    prospects
+  );
+
+  const confirmedStage = funnel.stages.find((stage) => stage.key === "confirmed");
+  assert.equal(confirmedStage.count, 1);
+});
+
 test("buildRecruitmentFunnel returns stage conversion without fabricating totals", () => {
   const funnel = buildRecruitmentFunnel([
     summary({ canonicalMilestone: MILESTONES.NEW_LEAD }),

@@ -2,23 +2,56 @@ function Skeleton({ className = "", style }) {
   return <div className={`executive-v2__skeleton ${className}`.trim()} style={style} aria-hidden="true" />;
 }
 
+export function SectionUnavailable({
+  message,
+  onRetry = null,
+  retryLabel = "Retry"
+}) {
+  return (
+    <div className="executive-v2__section-unavailable" role="status">
+      <p>{message}</p>
+      {typeof onRetry === "function" ? (
+        <button type="button" className="executive-v2__button executive-v2__button--secondary" onClick={onRetry}>
+          {retryLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function ExecutiveCard({
   title,
   action,
   children,
   className = "",
   loading = false,
+  unavailable = false,
+  unavailableMessage = "",
+  onRetry = null,
+  retryLabel = "Retry",
   footer = null
 }) {
+  let body = children;
+
+  if (loading) {
+    body = <Skeleton className="executive-v2__skeleton--block" />;
+  } else if (unavailable) {
+    body = (
+      <SectionUnavailable
+        message={unavailableMessage}
+        onRetry={onRetry}
+        retryLabel={retryLabel}
+      />
+    );
+  }
+
   return (
     <section className={`executive-v2__card ${className}`.trim()}>
       <header className="executive-v2__card-header">
         <h2 className="executive-v2__card-title">{title}</h2>
         {action || null}
       </header>
-      <div className="executive-v2__card-body">
-        {loading ? <Skeleton className="executive-v2__skeleton--block" /> : children}
-      </div>
+      <div className="executive-v2__card-body">{body}</div>
       {footer ? <footer className="executive-v2__card-footer">{footer}</footer> : null}
     </section>
   );
@@ -43,9 +76,26 @@ const KPI_ACCENTS = {
   recruited: "navy"
 };
 
-export function KpiRow({ cards = [] }) {
+export function KpiRow({
+  cards = [],
+  unavailable = false,
+  unavailableMessage = "",
+  onRetry = null,
+  retryLabel = "Retry"
+}) {
   if (!cards.length) {
-    return <KpiSkeletonRow />;
+    if (unavailable) {
+      return (
+        <div className="executive-v2__kpi-row executive-v2__kpi-row--unavailable">
+          <SectionUnavailable
+            message={unavailableMessage}
+            onRetry={onRetry}
+            retryLabel={retryLabel}
+          />
+        </div>
+      );
+    }
+    return null;
   }
 
   return (
@@ -72,6 +122,9 @@ export function KpiRow({ cards = [] }) {
           ) : (
             <div className="executive-v2__kpi-delta executive-v2__kpi-delta--flat">—</div>
           )}
+          {card.periodLabel ? (
+            <div className="executive-v2__kpi-period">{card.periodLabel}</div>
+          ) : null}
         </article>
       ))}
     </div>
