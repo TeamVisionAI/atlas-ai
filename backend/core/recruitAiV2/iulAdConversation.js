@@ -662,14 +662,16 @@ function applySlotOfferDecision(structured, context, availability) {
     availability?.readResult?.status ||
     null;
   if (status === READ_STATUS.AVAILABLE && offered.length > 0) {
+    const isNearest = Boolean(availability?.alternativeToConstraint);
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
       offeredSlots: offered,
       slotA: offered[0]?.time || null,
-      slotB: offered[1]?.time || null
+      slotB: offered[1]?.time || null,
+      nearestAlternatives: isNearest
     };
     return finishIulDecision(structured, context, {
-      templateKey: "iul_offer_review_slots",
+      templateKey: isNearest ? "iul_offer_nearest_review_slots" : "iul_offer_review_slots",
       nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
       lastQuestionAsked: ASK.OFFER_SLOTS,
       knownFacts: {

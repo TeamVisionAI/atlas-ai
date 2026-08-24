@@ -12,6 +12,8 @@ const {
   resolveAvailabilityAgent
 } = require("./schedulingAvailabilityReader");
 const { IUL_REVIEW_MEETING_TYPE } = require("../iulWorkflowConstants");
+const { resolveSchedulingConfig, WORKFLOW_TYPES } = require("../sharedScheduling/sharedSchedulingConfig");
+const { mapSlotsForDecision } = require("../sharedScheduling/sharedSchedulingOffer");
 
 function dayPartConstraints(dayPart) {
   if (dayPart === "evening" || dayPart === "night") {
@@ -81,29 +83,35 @@ function readPolicyReviewAvailabilitySync({ context, interpretation, options } =
     options?.agentId ||
     schedulingContext.agentId ||
     (fixtureSlots ? "fixture-agent" : null);
+  const schedulingConfig = resolveSchedulingConfig(schedulingContext, {
+    workflowType: WORKFLOW_TYPES.IUL_POLICY_REVIEW,
+    ...options
+  });
   const readResult = readRollingCandidateSlotsSync({
     organizationId: schedulingContext.organizationId || options?.organizationId || null,
     agentId,
     agentResolutionSource,
     timezone: schedulingContext.timezone || options?.timezone || "America/New_York",
     constraints,
+    purpose: schedulingConfig.purpose,
     fixtureSlots,
     getSlotsSync: options?.getSlotsSync || null,
     now: options?.now || schedulingContext._testNow || null
   });
-  const offered = (readResult?.offeredSlots || []).map((slot) => ({
-    date: slot.date || slot.dateKey,
-    time: slot.time || slot.timeKey,
-    timezone: slot.timezone || readResult.timezone
-  }));
+  const offered = mapSlotsForDecision(
+    readResult?.offeredSlots || [],
+    readResult?.timezone || schedulingContext.timezone
+  );
   return {
     checked: true,
     status: readResult?.status || READ_STATUS.UNAVAILABLE,
     nearestAlternatives: offered,
     offeredSlots: offered,
+    alternativeToConstraint: Boolean(readResult?.alternativeToConstraint),
     readResult,
-    appointmentPurpose: APPOINTMENT_PURPOSES.POLICY_REVIEW,
-    meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+    appointmentPurpose: schedulingConfig.appointmentType,
+    meetingType: schedulingConfig.defaultMeetingMode,
+    schedulingConfig
   };
 }
 

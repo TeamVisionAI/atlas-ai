@@ -62,6 +62,7 @@ const {
   violatesEarliestConstraint
 } = require("./schedulingConstraints");
 const { READ_STATUS } = require("./schedulingAvailabilityReader");
+const { mergeSchedulingConstraints } = require("../sharedScheduling/schedulingNegotiationState");
 const { applyIulAdDecision } = require("./iulAdConversation");
 
 function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
@@ -315,11 +316,17 @@ function tryApplyAvailabilityOffer({
   }
 
   if (status === READ_STATUS.AVAILABLE && alternatives.length > 0) {
+    const isNearest = Boolean(
+      availability.alternativeToConstraint ||
+        availability.readResult?.alternativeToConstraint
+    );
     structured.decision.nextAction = NEXT_ACTIONS.OFFER_AVAILABLE_SLOTS;
     structured.decision.shouldEscalate = false;
     structured.decision.mayCreateAppointment = false;
     structured.customerReplyPlan.acknowledgeRequest = true;
-    structured.customerReplyPlan.templateKey = "offer_available_slots";
+    structured.customerReplyPlan.templateKey = isNearest
+      ? "offer_nearest_alternatives"
+      : "offer_available_slots";
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
       earliestTime,
@@ -329,22 +336,29 @@ function tryApplyAvailabilityOffer({
       slotA: alternatives[0]?.time || null,
       slotB: alternatives[1]?.time || null,
       rollingSearch: rolling,
+      nearestAlternatives: isNearest,
       now: context._testNow || null,
       timezone: context.timezone || alternatives[0]?.timezone || null
     };
     structured.reasonCodes.push(REASON_CODES.AVAILABLE_SLOTS_OFFERED);
+    if (isNearest) {
+      structured.reasonCodes.push(REASON_CODES.ZERO_QUALIFYING_SLOTS);
+    }
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
     if (rolling) {
       structured.reasonCodes.push(REASON_CODES.ROLLING_AVAILABILITY_SEARCH);
     }
+    const mergedConstraint = mergeSchedulingConstraints(
+      context.knownFacts?.availabilityConstraint || null,
+      interpretation?.entities?.availabilityConstraint || null,
+      context,
+      interpretation
+    );
     structured.contextPatch = {
       ...(constraintPatch || {}),
       knownFacts: {
         ...(constraintPatch?.knownFacts || {}),
-        availabilityConstraint:
-          interpretation?.entities?.availabilityConstraint ||
-          context.knownFacts?.availabilityConstraint ||
-          null
+        availabilityConstraint: mergedConstraint
       },
       appointment: {
         ...(constraintPatch?.appointment || {}),
@@ -2504,6 +2518,12 @@ function decideConversationTurn({
   if (intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT) {
     const constraint = interpretation.entities?.availabilityConstraint || null;
     const prior = context.knownFacts?.availabilityConstraint || null;
+    const mergedConstraint = mergeSchedulingConstraints(
+      prior,
+      constraint,
+      context,
+      interpretation
+    );
     // Implements BR-117 — "tienes razón / me dijiste" only on genuine reassertion signals.
     // Matching prior.earliestTime alone is NOT correction language (stale durable context).
     const genuineRepetition = Boolean(interpretation.entities?.repetitionSignal);
@@ -2531,10 +2551,10 @@ function decideConversationTurn({
         availability,
         constraintPatch: {
           knownFacts: {
-            availabilityConstraint: constraint || prior,
+            availabilityConstraint: mergedConstraint,
             preferredDayPart:
               context.knownFacts?.preferredDayPart ||
-              constraint?.dayPart ||
+              mergedConstraint?.dayPart ||
               prior?.dayPart ||
               null
           }
@@ -2567,15 +2587,15 @@ function decideConversationTurn({
     structured.reasonCodes.push(REASON_CODES.SKIP_REDUNDANT_DAY_PART);
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
-      earliestTime: constraint?.earliestTime || prior?.earliestTime || null,
-      dayPart: constraint?.dayPart || prior?.dayPart || null,
+      earliestTime: mergedConstraint?.earliestTime || prior?.earliestTime || null,
+      dayPart: mergedConstraint?.dayPart || prior?.dayPart || null,
       // Only surface proposedTime for confirm when day is known — else renderer stays neutral.
       requestedTime: confirmableSlot || genuineRepetition ? proposedTime : null,
       dateLabel: confirmableSlot ? dateLabel : null
     };
     structured.contextPatch = {
       knownFacts: {
-        availabilityConstraint: constraint || prior,
+        availabilityConstraint: mergedConstraint,
         // Implements BR-105 — keep confirmed day_part (afternoon) over constraint evening bias.
         preferredDayPart:
           context.knownFacts?.preferredDayPart ||

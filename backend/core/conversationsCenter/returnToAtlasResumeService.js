@@ -17,6 +17,7 @@ const {
   createSupabaseContextRepository,
   createMemoryContextRepository
 } = require("../recruitAiV2/contextRepository");
+const { shouldSuppressSchedulingReopen } = require("../sharedScheduling/schedulingNegotiationState");
 const { HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT } = require("../whatsappConstants");
 
 const BURST_GAP_MS = 2500;
@@ -96,6 +97,9 @@ function inferPendingQuestionFromHumanText(text) {
   }
   if (/\b(hora|time|a las)\b/.test(t)) {
     return "ask_time_preference";
+  }
+  if (/\b(zoom|descarga|download|preparacion|preparation|enlace|link)\b/.test(t)) {
+    return null;
   }
   if (/\b(cita|appointment|entrevista|interview)\b/.test(t)) {
     return "confirm_slot";
@@ -244,6 +248,21 @@ async function patchResumeConversationContext({
   prospectPhone,
   persistence = null
 }) {
+  const schedulingQuestions = new Set([
+    "ask_time_preference",
+    "ask_date",
+    "ask_day_part",
+    "confirm_slot",
+    "offer_time_choices"
+  ]);
+  if (
+    shouldSuppressSchedulingReopen(loaded) &&
+    pendingQuestion &&
+    schedulingQuestions.has(pendingQuestion)
+  ) {
+    return loaded;
+  }
+
   if (!pendingQuestion) {
     return loaded;
   }
