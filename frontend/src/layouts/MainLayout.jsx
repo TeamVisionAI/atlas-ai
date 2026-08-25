@@ -26,6 +26,7 @@ import {
   resolveConversationsAccessStateFromPayload
 } from "../engines/conversationsCenterAccess";
 import SupportModeBanner from "../components/layout/SupportModeBanner";
+import UrgentAppointmentHandoffBanner from "../components/layout/UrgentAppointmentHandoffBanner";
 import "./MainLayout.css";
 
 function useLayoutMode() {
@@ -481,6 +482,7 @@ export default function MainLayout() {
 
           <main className="atlas-layout__main">
             <div className="atlas-layout__content">
+              <UrgentAppointmentHandoffBanner enabled={Boolean(currentUser)} />
               <RequireWorkspaceAccess>
                 <Outlet />
               </RequireWorkspaceAccess>

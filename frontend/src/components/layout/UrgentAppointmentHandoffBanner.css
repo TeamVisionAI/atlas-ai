@@ -1,0 +1,54 @@
+.urgent-handoff-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.urgent-handoff-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid #f0b429;
+  background: #fff8e6;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(176, 98, 0, 0.08);
+}
+
+.urgent-handoff-banner__title {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+  color: #8a4b00;
+}
+
+.urgent-handoff-banner__meta {
+  margin: 0;
+  color: #5c3d00;
+  font-size: 0.92rem;
+}
+
+.urgent-handoff-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.urgent-handoff-banner__link {
+  color: #8a4b00;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+  .urgent-handoff-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .urgent-handoff-banner__actions {
+    justify-content: space-between;
+  }
+}
