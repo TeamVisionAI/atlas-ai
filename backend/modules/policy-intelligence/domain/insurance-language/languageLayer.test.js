@@ -109,7 +109,7 @@ function run() {
     analysis.recommendations.every((item) => item.source === "findings"),
     "recommendations sourced from findings"
   );
-  assert(analysis.execution.rulesExecutedCount === 10, "all PI rules executed");
+  assert(analysis.execution.rulesExecutedCount === 15, "all PI rules executed");
   assert(analysis.execution.rulesTriggeredCount > 0, "some rules triggered");
   assert(typeof analysis.execution.executionTimeMs === "number", "execution time recorded");
 

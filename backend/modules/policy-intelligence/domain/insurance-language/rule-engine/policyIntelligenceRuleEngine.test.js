@@ -1,6 +1,6 @@
 /**
  * Sprint 3 — Deterministic Policy Intelligence Rule Engine tests (BR-059).
- * Every rule PI-001…PI-010 is independently testable.
+ * Every rule PI-001…PI-015 is independently testable.
  */
 
 const { buildInsuranceFactsFromExtract } = require("../InsuranceFacts");
@@ -30,7 +30,7 @@ function runRule(ruleId, partial, thresholds) {
 }
 
 function run() {
-  assert(INITIAL_RULE_LIBRARY.length === 10, "library has PI-001…PI-010");
+  assert(INITIAL_RULE_LIBRARY.length === 15, "library has PI-001…PI-015");
   assert(
     INITIAL_RULE_LIBRARY.every((rule) => rule.id && rule.category && typeof rule.evaluate === "function"),
     "every rule has id, category, evaluate"
@@ -172,7 +172,7 @@ function run() {
     })
   );
 
-  assert(full.execution.rulesExecutedCount === 10, "rulesExecuted count");
+  assert(full.execution.rulesExecutedCount === 15, "rulesExecuted count");
   assert(full.execution.rulesTriggered.includes("PI-001"), "PI-001 in triggered");
   assert(full.execution.rulesTriggered.includes("PI-005"), "PI-005 in triggered");
   assert(

@@ -140,7 +140,7 @@ function RiderCard({ card }) {
           {chargeText(card.riderCharges) || chargeText(card.administrativeFees)}
         </p>
       ) : null}
-      {accelerated && card.discountMethodology ? (
+      {accelerated && card.discountMethodology && !card.actuarialAdjustment?.applies ? (
         <p className="pi-rider-card__body">
           <span className="pi-rider-card__kicker">Discount methodology</span>
           {String(card.discountMethodology).replace(/_/g, " ")}
@@ -148,6 +148,22 @@ function RiderCard({ card }) {
             <span className="pi-rider-card__illustrative">
               {" "}
               Sample {Number(card.discountSampleInterestRate) * 100}% is illustrative only.
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+
+      {accelerated && card.actuarialAdjustment?.applies ? (
+        <p className="pi-rider-card__body" data-testid="pi-actuarial-adjustment">
+          <span className="pi-rider-card__kicker">
+            {card.actuarialAdjustment.displayLabel || "Actuarial Adjustment Factor"}
+          </span>
+          {card.actuarialAdjustment.uiNote || "Factor/formula not disclosed in policy."}
+          {card.actuarialAdjustment.administrativeCharge != null ? (
+            <span className="pi-rider-card__illustrative">
+              {" "}
+              Administrative charge $
+              {Number(card.actuarialAdjustment.administrativeCharge).toLocaleString("en-US")}.
             </span>
           ) : null}
         </p>

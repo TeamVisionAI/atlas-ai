@@ -32,7 +32,9 @@ function emptyPremium() {
   return {
     amount: null,
     currency: "USD",
-    frequency: null
+    frequency: null,
+    annualIfPaidAnnually: null,
+    annualizedCurrentMode: null
   };
 }
 
@@ -45,8 +47,12 @@ function createEmptyPolicyExtractionData() {
     insured: emptyInsured(),
     premium: emptyPremium(),
     faceAmount: null,
+    initialDeathBenefit: null,
+    cashValue: null,
     paymentMode: null,
     deathBenefitOption: null,
+    effectiveDate: null,
+    expirationDate: null,
     illustratedRate: null,
     guaranteedRate: null,
     illustratedDuration: null,
@@ -61,6 +67,8 @@ function createEmptyPolicyExtractionData() {
     coverages: [],
     policyYears: null,
     policyCostTerms: null,
+    // Exact year-by-year declining DB schedule (Decreasing Term). Prefer exact rows; never interpolate.
+    deathBenefitSchedule: [],
     // Sprint 4A — raw annual illustration table (Annual Values Engine input).
     // Not Insurance Facts; normalized separately (BR-060).
     annualValues: [],
@@ -230,7 +238,16 @@ function normalizeRider(entry) {
     ...economics,
     type,
     amount: asNumber(entry.amount),
-    notes: asTrimmedString(entry.notes)
+    notes: asTrimmedString(entry.notes),
+    deathBenefitSchedule: Array.isArray(entry.deathBenefitSchedule)
+      ? entry.deathBenefitSchedule
+          .filter((row) => row && typeof row === "object")
+          .map((row) => ({
+            year: asNumber(row.year),
+            deathBenefit: asNumber(row.deathBenefit ?? row.amount)
+          }))
+          .filter((row) => row.year != null && row.deathBenefit != null)
+      : []
   };
 }
 
@@ -305,12 +322,20 @@ function normalizePolicyExtractionData(input = {}) {
   base.premium = {
     amount: asNumber(premium.amount),
     currency: asTrimmedString(premium.currency) || "USD",
-    frequency: asTrimmedString(premium.frequency)
+    frequency: asTrimmedString(premium.frequency),
+    annualIfPaidAnnually: asNumber(premium.annualIfPaidAnnually),
+    annualizedCurrentMode: asNumber(premium.annualizedCurrentMode)
   };
 
   base.faceAmount = asNumber(source.faceAmount);
+  base.initialDeathBenefit = asNumber(
+    source.initialDeathBenefit ?? source.faceAmount
+  );
+  base.cashValue = asNumber(source.cashValue);
   base.paymentMode = asTrimmedString(source.paymentMode || premium.frequency);
   base.deathBenefitOption = mapToAtlasTerm(source.deathBenefitOption, "deathBenefitOption");
+  base.effectiveDate = asTrimmedString(source.effectiveDate);
+  base.expirationDate = asTrimmedString(source.expirationDate);
   base.illustratedRate = asNumber(source.illustratedRate);
   base.guaranteedRate = asNumber(source.guaranteedRate);
   base.illustratedDuration = asNumber(source.illustratedDuration);
@@ -368,6 +393,16 @@ function normalizePolicyExtractionData(input = {}) {
     : [];
 
   // BR-060: preserve raw annual table rows for Annual Values Engine (not Facts).
+  base.deathBenefitSchedule = Array.isArray(source.deathBenefitSchedule)
+    ? source.deathBenefitSchedule
+        .filter((row) => row && typeof row === "object" && !Array.isArray(row))
+        .map((row) => ({
+          year: asNumber(row.year),
+          deathBenefit: asNumber(row.deathBenefit ?? row.amount)
+        }))
+        .filter((row) => row.year != null && row.deathBenefit != null)
+    : [];
+
   base.annualValues = Array.isArray(source.annualValues)
     ? source.annualValues
         .filter((row) => row && typeof row === "object" && !Array.isArray(row))
@@ -377,6 +412,30 @@ function normalizePolicyExtractionData(input = {}) {
           .filter((row) => row && typeof row === "object" && !Array.isArray(row))
           .map((row) => stripForbiddenKeys(row))
       : [];
+
+  // When only a decreasing-term schedule is provided, materialize annualValues (exact rows).
+  if (!base.annualValues.length && base.deathBenefitSchedule.length) {
+    const issueAge = base.insured?.issueAge;
+    const annualized =
+      base.premium?.annualizedCurrentMode ??
+      (base.premium?.amount != null && String(base.premium.frequency || "").toLowerCase() === "monthly"
+        ? Number((base.premium.amount * 12).toFixed(2))
+        : base.premium?.amount);
+    base.annualValues = base.deathBenefitSchedule.map((row) => ({
+      policyYear: row.year,
+      insuredAge: issueAge != null ? issueAge + row.year : null,
+      annualPremium: row.deathBenefit === 0 ? 0 : annualized,
+      scheduledPremium: annualized,
+      cashValue: base.cashValue ?? 0,
+      cashSurrenderValue: base.cashValue ?? 0,
+      accountValue: 0,
+      deathBenefit: row.deathBenefit,
+      loanBalance: 0,
+      withdrawals: 0,
+      netCashValue: base.cashValue ?? 0,
+      expired: row.deathBenefit === 0
+    }));
+  }
 
   base.policyCostTerms =
     source.policyCostTerms && typeof source.policyCostTerms === "object"
@@ -397,8 +456,12 @@ function normalizePolicyExtractionData(input = {}) {
     "insured",
     "premium",
     "faceAmount",
+    "initialDeathBenefit",
+    "cashValue",
     "paymentMode",
     "deathBenefitOption",
+    "effectiveDate",
+    "expirationDate",
     "illustratedRate",
     "guaranteedRate",
     "illustratedDuration",
@@ -413,6 +476,7 @@ function normalizePolicyExtractionData(input = {}) {
     "riders",
     "coverages",
     "policyCostTerms",
+    "deathBenefitSchedule",
     "annualValues",
     "annual_values",
     "findings",
@@ -481,6 +545,8 @@ function buildRulesHintsFromDocument({ fileName, mimeType } = {}) {
 
   if (name.includes("iul") || name.includes("indexed")) {
     hints.suggestedProductType = "Indexed Universal Life";
+  } else if (name.includes("decreasing") && name.includes("term")) {
+    hints.suggestedProductType = "Decreasing Term";
   } else if (name.includes("term")) {
     hints.suggestedProductType = "Term Life";
   } else if (name.includes("whole")) {
