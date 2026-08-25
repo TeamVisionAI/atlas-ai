@@ -123,7 +123,7 @@ router.post(
       });
     }
   }
-});
+);
 
 router.post("/embedded-signup/telemetry", async (req, res) => {
   try {
