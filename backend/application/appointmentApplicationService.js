@@ -694,6 +694,21 @@ async function createAppointment(input, context = {}) {
     });
   }
 
+  if (!skipReminders) {
+    const {
+      processUrgentHandoffOnCreate
+    } = require("../core/appointmentUrgentHandoffEngine");
+    await processUrgentHandoffOnCreate(saved, {
+      organizationId,
+      prospect,
+      reference: new Date()
+    }).catch((error) => {
+      console.error("[appointments] urgent handoff failed:", error.message, {
+        appointmentId: saved.id
+      });
+    });
+  }
+
   if (!skipProspectUpdate) {
     await updateProspectInOrganization(prospectPhone, organizationId, {
       calendar_event_id: bookingResult.googleCalendarEventId,
@@ -974,6 +989,11 @@ async function cancelAppointment(id, input, context = {}) {
   }
 
   await appointmentReminderEngine.cancelReminders(appointment.id);
+
+  const { cancelUrgentHandoffForAppointment } = require("../core/appointmentUrgentHandoffEngine");
+  await cancelUrgentHandoffForAppointment(appointment.id).catch((error) => {
+    console.error("[appointments] urgent handoff cancel failed:", error.message);
+  });
 
   const domainUpdated = await appointmentDomainService.cancelAppointment(appointment, {
     actor: agentId || "agent",
@@ -1272,6 +1292,32 @@ async function reconcileAppointmentGoogleCalendar(id, context = {}) {
   return enrichWithProspect(saved);
 }
 
+async function listUrgentHandoffs(context = {}) {
+  const {
+    listOpenUrgentHandoffsForUser
+  } = require("../core/appointmentUrgentHandoffEngine");
+  const items = await listOpenUrgentHandoffsForUser(context);
+
+  return {
+    items: items.map((handoff) => ({
+      ...handoff,
+      prospectWorkspacePath: `/app/prospect-workspace/${encodeURIComponent(handoff.prospectPhone)}`,
+      purposeLabel: require("../core/appointmentUrgentHandoffEngine").resolvePurposeLabel(
+        handoff.purpose
+      ),
+      meetingTypeLabel: require("../core/appointmentUrgentHandoffEngine").resolveMeetingTypeLabel(
+        handoff
+      )
+    })),
+    total: items.length
+  };
+}
+
+async function acknowledgeUrgentHandoff(handoffId, context = {}) {
+  const { acknowledgeUrgentHandoff: acknowledge } = require("../core/appointmentUrgentHandoffEngine");
+  return acknowledge(handoffId, context);
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -1292,5 +1338,7 @@ module.exports = {
   collectProspectEmail,
   enrichWithProspect,
   findActiveAppointmentForProspect,
-  findPersistedAppointmentForProspect: findActiveAppointmentForProspect
+  findPersistedAppointmentForProspect: findActiveAppointmentForProspect,
+  listUrgentHandoffs,
+  acknowledgeUrgentHandoff
 };

@@ -1,0 +1,3 @@
+DROP POLICY IF EXISTS atlas_urgent_handoffs_deny_authenticated ON public.atlas_urgent_appointment_handoffs;
+DROP POLICY IF EXISTS atlas_urgent_handoffs_deny_anon ON public.atlas_urgent_appointment_handoffs;
+DROP TABLE IF EXISTS atlas_urgent_appointment_handoffs;
