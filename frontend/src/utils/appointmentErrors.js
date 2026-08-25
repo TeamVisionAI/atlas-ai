@@ -11,6 +11,10 @@ export function logAppointmentError(scope, error, meta = {}) {
 }
 
 export function parseHttpStatus(error) {
+  if (typeof error?.status === "number" && Number.isFinite(error.status)) {
+    return error.status;
+  }
+
   const message = error?.message;
   if (!message) {
     return null;

@@ -35,6 +35,9 @@ const ALLOWED_LIFECYCLE_TRANSITIONS = Object.freeze({
     APPOINTMENT_LIFECYCLE_STATES.BECAME_CLIENT
   ],
   [APPOINTMENT_LIFECYCLE_STATES.RESCHEDULED]: [
+    // Same-state re-reschedule is intentional: agents may move an already-
+    // rescheduled appointment again without an intermediate confirm step.
+    APPOINTMENT_LIFECYCLE_STATES.RESCHEDULED,
     APPOINTMENT_LIFECYCLE_STATES.CONFIRMED,
     APPOINTMENT_LIFECYCLE_STATES.COMPLETED,
     APPOINTMENT_LIFECYCLE_STATES.NO_SHOW,
@@ -108,10 +111,12 @@ function isTerminalLifecycleState(state) {
 }
 
 function canTransitionLifecycle(fromState, toState) {
-  if (!fromState || !toState || fromState === toState) {
+  if (!fromState || !toState) {
     return false;
   }
 
+  // Same-state transitions are allowed only when explicitly listed
+  // (e.g. RESCHEDULED → RESCHEDULED for subsequent reschedules).
   return (ALLOWED_LIFECYCLE_TRANSITIONS[fromState] || []).includes(toState);
 }
 

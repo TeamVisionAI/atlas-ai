@@ -100,3 +100,121 @@ test("rescheduleAppointment with skipSlotValidation uses canonical repository pe
   delete require.cache[domainServicePath];
   delete require.cache[servicePath];
 });
+
+test("rescheduleAppointment from already-rescheduled status succeeds (Raquelita regression)", async () => {
+  const repoPath = require.resolve("../repositories/appointmentRepository");
+  const reminderPath = require.resolve("../services/appointmentReminderEngine");
+  const supabaseServicePath = require.resolve("../services/supabaseService");
+  const eventAdapterPath = require.resolve("../modules/appointments/application/appointmentEventAdapter");
+  const googleSyncPath = require.resolve("../core/appointmentGoogleSyncEngine");
+  const virtualUrlPath = require.resolve("../core/virtualMeetingUrlResolver");
+  const servicePath = require.resolve("../application/appointmentApplicationService");
+
+  const repoModule = require(repoPath);
+  const reminderModule = require(reminderPath);
+  const supabaseService = require(supabaseServicePath);
+  const eventAdapter = require(eventAdapterPath);
+  const googleSync = require(googleSyncPath);
+  const virtualUrl = require(virtualUrlPath);
+
+  const originalFindById = repoModule.findById;
+  const originalSave = repoModule.save;
+  const originalCancelReminders = reminderModule.cancelReminders;
+  const originalReplaceReminders = reminderModule.replaceReminders;
+  const originalUpdateProspect = supabaseService.updateProspectInOrganization;
+  const originalFindProspectInOrganization = supabaseService.findProspectInOrganization;
+  const originalEmitLifecycle = eventAdapter.emitAppointmentLifecycleEvent;
+  const originalSync = googleSync.syncAppointmentGoogleCalendar;
+  const originalVirtualUrl = virtualUrl.resolveCanonicalVirtualMeetingUrl;
+
+  const savedRows = [];
+  const calendarEventId = "gcal-raquelita-1";
+
+  const baseAppointment = {
+    id: PERSISTED_APPOINTMENT_ID,
+    organizationId: ORGANIZATION_ID,
+    prospectPhone: "+12392004377",
+    agentId: "agent-1",
+    purpose: "recruiting_interview",
+    status: "rescheduled",
+    rescheduleCount: 1,
+    durationMinutes: 30,
+    timezone: "America/New_York",
+    meetingType: "virtual",
+    meetingProvider: "zoom",
+    confirmationStatus: "confirmed",
+    reminderStatus: "scheduled",
+    calendarEventId,
+    calendarProvider: "google_calendar",
+    startDateTime: "2026-08-25T00:30:00.000Z",
+    endDateTime: "2026-08-25T01:00:00.000Z",
+    metadata: { lifecycleState: "rescheduled", prospectName: "Raquelita" }
+  };
+
+  repoModule.findById = async (id, organizationId) =>
+    id === PERSISTED_APPOINTMENT_ID && organizationId === ORGANIZATION_ID ? { ...baseAppointment } : null;
+  repoModule.save = async (appointment) => {
+    savedRows.push(appointment);
+    return appointment;
+  };
+  reminderModule.cancelReminders = async () => null;
+  reminderModule.replaceReminders = async () => ({ status: "scheduled" });
+  supabaseService.updateProspectInOrganization = async () => null;
+  supabaseService.findProspectInOrganization = async () => ({
+    name: "Raquelita",
+    phone: "+12392004377"
+  });
+  eventAdapter.emitAppointmentLifecycleEvent = async () => null;
+  googleSync.syncAppointmentGoogleCalendar = async (appointment) => ({
+    calendarEventId: appointment.calendarEventId || calendarEventId,
+    calendarProvider: "google_calendar",
+    calendarSyncStatus: "synced",
+    calendarSyncError: null,
+    action: "updated",
+    createdDuplicatePrevented: true
+  });
+  virtualUrl.resolveCanonicalVirtualMeetingUrl = async () => ({
+    url: "https://us02web.zoom.us/j/123",
+    status: "configured",
+    source: "persisted"
+  });
+
+  const domainServicePath = require.resolve("../modules/appointments/application/appointmentDomainService");
+  delete require.cache[domainServicePath];
+  delete require.cache[servicePath];
+  const { rescheduleAppointment } = require(servicePath);
+
+  const scheduledTime = "2026-08-25T15:30:00.000Z";
+  const saved = await rescheduleAppointment(
+    PERSISTED_APPOINTMENT_ID,
+    {
+      reason: "agent_requested",
+      dateKey: "2026-08-25",
+      timeKey: "11:30",
+      scheduledTime,
+      endDateTime: "2026-08-25T16:00:00.000Z",
+      skipSlotValidation: true,
+      skipWorkflowAdvance: true
+    },
+    { organizationId: ORGANIZATION_ID, agentId: "agent-1" }
+  );
+
+  assert.equal(saved.status, "rescheduled");
+  assert.equal(saved.rescheduleCount, 2);
+  assert.equal(saved.startDateTime, scheduledTime);
+  assert.equal(saved.calendarEventId, calendarEventId);
+  assert.equal(savedRows[0].calendarEventId, calendarEventId);
+  assert.equal(savedRows[0].metadata.calendarSyncAction, "updated");
+
+  repoModule.findById = originalFindById;
+  repoModule.save = originalSave;
+  reminderModule.cancelReminders = originalCancelReminders;
+  reminderModule.replaceReminders = originalReplaceReminders;
+  supabaseService.updateProspectInOrganization = originalUpdateProspect;
+  supabaseService.findProspectInOrganization = originalFindProspectInOrganization;
+  eventAdapter.emitAppointmentLifecycleEvent = originalEmitLifecycle;
+  googleSync.syncAppointmentGoogleCalendar = originalSync;
+  virtualUrl.resolveCanonicalVirtualMeetingUrl = originalVirtualUrl;
+  delete require.cache[domainServicePath];
+  delete require.cache[servicePath];
+});
