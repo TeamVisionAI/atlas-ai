@@ -153,6 +153,18 @@ export const translations = {
 
     supportModeBannerHint: "Estás operando en este tenant. Tu identidad Super Admin no cambia.",
     supportModeExit: "Salir de Support Mode",
+    unsupportedWhatsAppLeadReviewTitle: "Posible lead de WhatsApp necesita revisión",
+    unsupportedWhatsAppLeadReviewBody:
+      "Meta no pudo entregar el contenido de este mensaje. Atlas no respondió automáticamente porque no pudo verificar su origen.",
+    unsupportedWhatsAppLeadReviewContact: "Contacto",
+    unsupportedWhatsAppLeadReviewSender: "Teléfono",
+    unsupportedWhatsAppLeadReviewReceived: "Recibido",
+    unsupportedWhatsAppLeadReviewDestination: "Línea WhatsApp",
+    unsupportedWhatsAppLeadReviewOpenProspect: "Abrir prospecto",
+    unsupportedWhatsAppLeadReviewConfirmLead: "Confirmar como lead Atlas",
+    unsupportedWhatsAppLeadReviewDismiss: "Ya lo revisé",
+    unsupportedWhatsAppLeadReviewConfirmPrompt:
+      "Opcional: ingresa el código de campaña (TVR-####-XXXX o TVI-####-XXXX) si lo ves en WhatsApp.",
 
     myDashboardTitle: "My Dashboard",
     myDashboardIntro: "Your personal recruiting workspace — active prospects, follow-ups, and quick actions.",
@@ -2175,6 +2187,18 @@ export const translations = {
 
     supportModeBannerHint: "You are operating in this tenant. Your Super Admin identity is unchanged.",
     supportModeExit: "Exit Support Mode",
+    unsupportedWhatsAppLeadReviewTitle: "Possible WhatsApp lead needs review",
+    unsupportedWhatsAppLeadReviewBody:
+      "Meta could not deliver this message content. Atlas did not auto-reply because it could not verify the lead origin.",
+    unsupportedWhatsAppLeadReviewContact: "Contact",
+    unsupportedWhatsAppLeadReviewSender: "Phone",
+    unsupportedWhatsAppLeadReviewReceived: "Received",
+    unsupportedWhatsAppLeadReviewDestination: "WhatsApp line",
+    unsupportedWhatsAppLeadReviewOpenProspect: "Open prospect",
+    unsupportedWhatsAppLeadReviewConfirmLead: "Confirm as Atlas lead",
+    unsupportedWhatsAppLeadReviewDismiss: "I reviewed it",
+    unsupportedWhatsAppLeadReviewConfirmPrompt:
+      "Optional: enter the campaign code (TVR-####-XXXX or TVI-####-XXXX) if you see it in WhatsApp.",
 
     myDashboardTitle: "My Dashboard",
     myDashboardIntro: "Your personal recruiting workspace — active prospects, follow-ups, and quick actions.",

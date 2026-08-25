@@ -205,6 +205,10 @@ app.use("/api/financial-intelligence", financialIntelligenceModule.routes);
 app.use("/api/prospect-workspace", prospectWorkspaceRoutes);
 app.use("/api/prospect-center", prospectCenterRoutes);
 app.use("/api/new-lead-attention", require("./routes/newLeadAttention"));
+app.use(
+  "/api/unsupported-whatsapp-inbound-reviews",
+  require("./routes/unsupportedWhatsAppInboundReview")
+);
 app.use("/api/follow-ups", followUpsRoutes);
 app.use("/api/iul-follow-up-worklist", iulFollowUpWorklistRoutes);
 app.use("/api/conversations", conversationsCenterRoutes);

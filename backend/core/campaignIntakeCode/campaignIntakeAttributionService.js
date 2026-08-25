@@ -43,6 +43,9 @@ function evaluateFreshIntakeEpisode({ prospect, workflowState, created }) {
   }
 
   const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  if (wf.pendingUnsupportedMetaRecovery === true) {
+    return { allowed: true, reason: "UNSUPPORTED_META_FOLLOWUP_RECOVERY" };
+  }
   if (wf.inboxClosedAt || wf.inboxArchivedAt) {
     return { allowed: false, reason: "CONVERSATION_CLOSED_OR_ARCHIVED" };
   }
