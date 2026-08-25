@@ -163,6 +163,12 @@ async function rescheduleAppointment(req, res) {
 
     res.json({ appointment });
   } catch (error) {
+    console.error("[appointments/reschedule]", {
+      appointmentId: req.params.id,
+      code: error.code || null,
+      statusCode: error.statusCode || 500,
+      message: error.message
+    });
     res.status(error.statusCode || 500).json({ error: error.message, code: error.code });
   }
 }

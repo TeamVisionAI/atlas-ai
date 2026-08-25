@@ -95,6 +95,36 @@ test("rescheduleAppointment transitions to rescheduled and increments count", as
   assert.equal(updated.startDateTime, "2026-08-02T15:00:00.000Z");
 });
 
+test("rescheduleAppointment allows subsequent reschedule from rescheduled state", async () => {
+  const first = await rescheduleAppointment(baseAppointment({ status: "scheduled" }), {
+    actor: "agent-1",
+    scheduledTime: "2026-08-02T15:00:00.000Z",
+    endDateTime: "2026-08-02T15:30:00.000Z"
+  });
+
+  assert.equal(first.status, "rescheduled");
+  assert.equal(first.rescheduleCount, 1);
+  assert.equal(canTransitionLifecycle("rescheduled", "rescheduled"), true);
+
+  const second = await rescheduleAppointment(first, {
+    actor: "agent-1",
+    reason: "agent_requested",
+    scheduledTime: "2026-08-03T15:30:00.000Z",
+    endDateTime: "2026-08-03T16:00:00.000Z"
+  });
+
+  assert.equal(second.status, "rescheduled");
+  assert.equal(second.rescheduleCount, 2);
+  assert.equal(second.startDateTime, "2026-08-03T15:30:00.000Z");
+  assert.equal(resolveLifecycleState(second), APPOINTMENT_LIFECYCLE_STATES.RESCHEDULED);
+});
+
+test("canTransitionLifecycle rejects unlisted same-state transitions", () => {
+  assert.equal(canTransitionLifecycle("scheduled", "scheduled"), false);
+  assert.equal(canTransitionLifecycle("confirmed", "confirmed"), false);
+  assert.equal(canTransitionLifecycle("rescheduled", "rescheduled"), true);
+});
+
 test("complete, no-show, cancel, recruit, and client transitions map correctly", async () => {
   const confirmed = baseAppointment({ status: "confirmed" });
 
