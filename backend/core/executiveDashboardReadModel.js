@@ -24,6 +24,27 @@ const {
 const {
   buildExecutiveDashboardV2Metrics
 } = require("./executiveDashboardV2Metrics");
+const {
+  listPersistedAppointments
+} = require("../services/appointmentListService");
+
+/**
+ * Scope appointments to the same prospect set the dashboard already loaded
+ * (production filter + BR-149 hierarchy). Preserves tenant isolation.
+ */
+function filterAppointmentsForProspects(appointments, prospects) {
+  const phones = new Set(
+    (prospects || []).map((row) => row.phone).filter(Boolean)
+  );
+
+  if (!phones.size) {
+    return [];
+  }
+
+  return (appointments || []).filter((appointment) =>
+    phones.has(appointment.prospectPhone)
+  );
+}
 
 const EXECUTIVE_FILTERS = Object.freeze({
   INTERVIEWS_TODAY: "interviews-today",
@@ -441,6 +462,16 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
     ? options.prospects
     : await loadProductionProspects(organizationId);
   const queue = await buildPrioritizedWorkflowQueue(prospects);
+
+  // Completed KPI SoT: persisted atlas_appointments via Appointments completion path.
+  const appointmentList = Array.isArray(options.appointments)
+    ? { items: options.appointments }
+    : await listPersistedAppointments({ organizationId });
+  const appointments = filterAppointmentsForProspects(
+    appointmentList.items || [],
+    prospects
+  );
+
   const todayFocus = buildTodayFocus(prospects, queue, context);
   const productionSnapshot = buildProductionSnapshot(prospects, queue, context);
   const agencyPulse = buildAgencyPulse(prospects, queue, todayFocus);
@@ -450,7 +481,10 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
     prospects.map((row) => row.phone)
   );
 
-  const v2Metrics = buildExecutiveDashboardV2Metrics(prospects, queue, context);
+  const v2Metrics = buildExecutiveDashboardV2Metrics(prospects, queue, {
+    ...context,
+    appointments
+  });
 
   return {
     generatedAt: new Date().toISOString(),
