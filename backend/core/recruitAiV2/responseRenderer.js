@@ -670,7 +670,7 @@ function renderCustomerReply(responsePlan) {
   if (
     String(key).startsWith("iul_")
   ) {
-    template = renderIulAdReply(key, language);
+    template = renderIulAdReply(key, language, entities);
   } else if (
     key === "value_prop_then_qualify" ||
     key === "job_opportunity_faq_then_resume"
@@ -1102,7 +1102,8 @@ function renderCustomerReply(responsePlan) {
     .replace(/\{city\}/g, city)
     .replace(/\{proposedStateName\}/g, proposed || "your state")
     .replace(/\{proposedState\}/g, entities.proposedState || "")
-    .replace(/\{resumeQuestion\}/g, entities.resumeQuestion || "");
+    .replace(/\{resumeQuestion\}/g, entities.resumeQuestion || "")
+    .replace(/\{firstName\}/g, entities.firstName || "");
 
   const fallback = pack.safe_failure_escalate || pack.default;
   const sanitized = sanitizeCustomerCopy(rendered, fallback);

@@ -34,7 +34,8 @@ function buildNormalizedMessageFromWhatsApp(inbound, storagePhone) {
       inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
     wabaId: inbound.wabaId || null,
     ctwaReferral: inbound.ctwaReferral || null,
-    campaignIntakeMatch: inbound.campaignIntakeMatch || null
+    campaignIntakeMatch: inbound.campaignIntakeMatch || null,
+    interactiveReply: inbound.interactiveReply || null
   };
 }
 

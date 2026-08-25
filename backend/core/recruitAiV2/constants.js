@@ -119,6 +119,13 @@ const INTENTS = Object.freeze({
   IUL_SEND_INFO_HERE: "iul_send_info_here",
   IUL_PRIMERICA_QUESTION: "iul_primerica_question",
   IUL_REVIEW_COST_QUESTION: "iul_review_cost_question",
+  /** BR-157 — button-first qualification */
+  IUL_STATUS_ACTIVE: "iul_status_active",
+  IUL_STATUS_RESEARCH: "iul_status_research",
+  IUL_STATUS_UNSURE: "iul_status_unsure",
+  IUL_REVIEW_INTENT: "iul_review_intent",
+  IUL_OTHER_FREE_TEXT: "iul_other_free_text",
+  IUL_POLICY_IN_HAND: "iul_policy_in_hand",
   UNKNOWN: "unknown"
 });
 
@@ -159,6 +166,11 @@ const NEXT_ACTIONS = Object.freeze({
   IUL_ASK_REVIEW_REASON: "iul_ask_review_reason",
   IUL_ASK_DOCUMENTS: "iul_ask_documents",
   IUL_ASK_REVIEW_TOPIC: "iul_ask_review_topic",
+  IUL_ASK_QUALIFICATION_STATUS: "iul_ask_qualification_status",
+  IUL_ASK_REVIEW_INTENT: "iul_ask_review_intent",
+  IUL_ASK_RESEARCH_INTENT: "iul_ask_research_intent",
+  IUL_ASK_POLICY_IN_HAND: "iul_ask_policy_in_hand",
+  IUL_ASK_OTHER_DETAIL: "iul_ask_other_detail",
   IUL_SOFT_REVIEW_INVITE: "iul_soft_review_invite",
   IUL_CAPTURE_REVIEW_DAY_PART: "iul_capture_review_day_part",
   IUL_ANSWER_THEN_REVIEW: "iul_answer_then_review",
@@ -320,6 +332,10 @@ const REASON_CODES = Object.freeze({
   POLICY_REVIEW_GOAL: "POLICY_REVIEW_GOAL",
   NO_IUL_ATTACK: "NO_IUL_ATTACK",
   IUL_SPANISH_FIRST_OPENER: "IUL_SPANISH_FIRST_OPENER",
+  IUL_BUTTON_FIRST_QUALIFICATION: "IUL_BUTTON_FIRST_QUALIFICATION",
+  IUL_STATUS_CAPTURED: "IUL_STATUS_CAPTURED",
+  IUL_REVIEW_INTENT_CAPTURED: "IUL_REVIEW_INTENT_CAPTURED",
+  IUL_OTHER_DETAIL_CAPTURED: "IUL_OTHER_DETAIL_CAPTURED",
   IUL_POLICY_ACTIVE_CAPTURED: "IUL_POLICY_ACTIVE_CAPTURED",
   IUL_POLICY_TYPE_CAPTURED: "IUL_POLICY_TYPE_CAPTURED",
   IUL_CARRIER_CAPTURED: "IUL_CARRIER_CAPTURED",

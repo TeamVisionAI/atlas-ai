@@ -84,7 +84,12 @@ function emptyKnownFacts() {
     reviewProposedTime: null,
     iulWorkflowStage: null,
     iulReviewTopic: null,
-    iulReviewDayPart: null
+    iulReviewDayPart: null,
+    /** BR-157 — button-first qualification */
+    iulQualificationStatus: null,
+    iulReviewIntent: null,
+    iulOtherDetail: null,
+    iulPolicyInHand: null
   };
 }
 
@@ -165,6 +170,7 @@ function createConversationContext(overrides = {}) {
     schemaVersion: 1,
     conversationGoal: null,
     campaignKind: null,
+    campaignIntakePurpose: null,
     ctwaReferral: null
   };
 
@@ -211,6 +217,10 @@ function mergeConversationContext(base, patch = {}) {
         : base.conversationGoal || null,
     campaignKind:
       patch.campaignKind !== undefined ? patch.campaignKind : base.campaignKind || null,
+    campaignIntakePurpose:
+      patch.campaignIntakePurpose !== undefined
+        ? patch.campaignIntakePurpose
+        : base.campaignIntakePurpose || null,
     ctwaReferral:
       patch.ctwaReferral !== undefined ? patch.ctwaReferral : base.ctwaReferral || null
   };

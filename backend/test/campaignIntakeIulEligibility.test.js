@@ -234,16 +234,17 @@ test("BR-142 CTWA still eligible without intake", () => {
 test("Spanish prefilled IUL text uses intake opener not info-only education", () => {
   const { interpretation, decision, rendered } = renderPrefilledTurn(IUL_CODE);
   assert.equal(interpretation.intent, INTENTS.IUL_GREETING);
-  assert.match(rendered.text, /activa/i);
+  assert.match(rendered.text, /orientarle/i);
   assert.doesNotMatch(rendered.text, /solo una inversión/i);
-  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.POLICY_ACTIVE);
+  assert.doesNotMatch(rendered.text, /Zoom/i);
+  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.QUALIFICATION_STATUS);
   assert.equal(decision.decision.mayCreateAppointment, false);
 });
 
 test("IUL intake turn routes to policy_review not recruiting city ask", () => {
   const { rendered } = renderPrefilledTurn(IUL_CODE);
   assert.doesNotMatch(rendered.text, /ciudad/i);
-  assert.match(rendered.text, /póliza/i);
+  assert.match(rendered.text, /orientarle|situación/i);
 });
 
 test("execution and appointment gates remain OFF", () => {

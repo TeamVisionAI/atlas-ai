@@ -739,7 +739,8 @@ async function attemptLiveV2Authoring({
           providerMessageId: normalized.providerMessageId || null,
           text: String(normalized.text || "").trim(),
           // Implements BR-118 — structured WhatsApp media type for dialogue guard.
-          messageType: normalized.messageType || null
+          messageType: normalized.messageType || null,
+          interactiveReply: normalized.interactiveReply || null
         },
         contextInput,
         persistenceService: persistence,

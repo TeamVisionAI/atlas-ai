@@ -1811,8 +1811,8 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Track** — Activate when `conversationGoal=policy_review`, campaign kind `iul_review_ad`, CTWA referral headline/body/source_id identifies an IUL review ad, or the prospect explicitly asks to review an IUL policy. Do **not** treat recruiting CTWA or FACEBOOK labels as IUL ads.
 2. **Spanish-first** — Default replies in Spanish for this campaign. Switch naturally when the prospect writes in English (existing language policy).
-3. **Opener** — First IUL-ad turn asks whether the policy is currently active. Do not open with recruiting city/state or job-opportunity copy.
-4. **If active** — Ask what they want to understand better: cash-value growth, policy costs, future projection, or whether another strategy may fit their goals.
+3. **Opener** — First IUL-ad / `IUL_REVIEW` turn uses BR-157 button-first qualification (status, then intent). Do **not** open with recruiting city/state, job-opportunity copy, IUL education, or a Zoom push.
+4. **If active** — Second tap asks what they want to review (costs, growth, benefits, understand the policy, or other). Do **not** interrogate carrier, policy age, or premium before scheduling. In-flight threads that already have a legacy discovery `lastQuestionAsked` may continue A→G.
 5. **Safety copy** — Never say or imply the IUL is bad before reviewing it. Never argue with the prospect’s current agent. Never call an IUL simply an “investment”; describe it as life insurance with cash-value features when relevant.
 6. **Branches** — Info-only: answer briefly, then offer the review. “I don’t want to change my policy”: the review is informational and does not obligate replacement. “My agent said it’s an investment”: do not confront; explain life insurance + cash-value features; offer to review their policy. “Send the info here”: basics on WhatsApp; no personalized recommendation without a review. “Is this Primerica?”: answer clearly. “How much does it cost?”: the review is free; any financial recommendation depends on their needs/situation.
 7. **Soft appointment** — After educate/clarify, invite a no-obligation review (day vs evening/night). Do **not** call `create_appointment` / recruiting interview booking (BR-132 still specified-only; BR-111/112 gates unchanged).
@@ -2043,6 +2043,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 3. **Confident city resolver** — Known cities (e.g. Miami → FL) may propose/confirm state; complete `City, ST` continues without redundant state ask.
 4. **Ambiguous city-only** — Ask only: `Perfecto 😊 ¿En qué estado queda esa ciudad?` — never invent state.
 5. **Scope** — Copy/renderer only; no change to attribution, routing, ownership, execution gates, or scheduling.
+
+---
+
+## BR-157 — IUL Review Button-First Qualification (Formal Spanish)
+
+**Implements:** WhatsApp `IUL_REVIEW` leads qualify with tap-first options (status → intent) then a Zoom-review transition, in consistent formal Spanish.  
+**Domain:** Recruit / Lead AI v2 / WhatsApp Cloud API / IUL policy review  
+**Depends on:** BR-143, BR-049, BR-075, BR-114, BR-142  
+**Related:** BR-118 (media not ingested in this flow), BR-132 (booking still gated), BR-155 (recruiting opener must not apply)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/iulAdConversation.js`, `recruitAiV2/iulQualificationOptions.js`, `whatsappInteractiveMessage.js`, `whatsappOutboundPipeline.js`, webhook parser  
+**Tests:** `backend/test/iulButtonFirstQualificationBr157.test.js`
+
+### Rules
+
+1. **Track** — Continue `IUL_REVIEW` / `policy_review` / `iul_review_ad`. Never route these leads into Recruit AI city/state qualification.
+2. **First response** — After Atlas identifies an IUL lead: `Hola, {firstName} 👋 Gracias por escribirnos. Para orientarle mejor, ¿cuál describe su situación?` Options (IDs): `IUL_STATUS_ACTIVE`, `IUL_STATUS_RESEARCH`, `IUL_STATUS_UNSURE`. Do not explain IUL or push Zoom on this turn.
+3. **Active** — `Perfecto. ¿Qué le gustaría revisar principalmente?` Options: Costos / Crecimiento / Beneficios / Entender mi póliza / Otro (`IUL_REVIEW_*` IDs). Persist the selected ID in IUL workflow `knownFacts`.
+4. **Research** — `Claro. ¿Qué le interesa entender mejor?` Options include Cómo funciona. Atlas may answer briefly, then continue to the review transition. No replacement claims or product recommendations.
+5. **Unsure** — `No hay problema. Podemos ayudarle a identificar qué tipo de póliza tiene.` Options: Tengo la póliza / No la tengo a mano. Do **not** pretend WhatsApp attachment ingestion/analysis exists (BR-118). After either tap, continue to the Zoom transition.
+6. **Otro** — `Cuénteme brevemente qué le gustaría revisar.` Resume the IUL workflow after the free-text answer (counts as the prospect asking for more, not a third interrogation).
+7. **Zoom transition** — Once Atlas has enough context (max two tap steps): `Gracias. Con eso ya tengo una mejor idea. Lo ideal es revisar su póliza con usted y explicarle exactamente lo que tiene. ¿Qué horario le funciona mejor?` Options: Mañana / Tarde. Then existing availability/slot offer. Never hard-code an appointment time.
+8. **Conversation** — Formal Spanish only (`usted`, `su póliza`, `le`, `tiene`). Do not mix `tú` / `tu`. Spanish-first. Concise. Do not ask carrier, policy age, or monthly premium one-by-one before scheduling. Preserve campaign/owner/org/Meta attribution and CTWA eligibility (BR-142).
+9. **Interactive send** — Prefer Cloud API reply buttons when ≤3 options and titles fit Meta’s 20-character limit; otherwise the existing list-message pattern. Branch on stable IDs, never display labels. Persist the human-readable label in conversation history. If interactive delivery fails, fall back to numbered text (`1.` / `2.` / `3.`) and accept those digits.
+10. **Boundaries** — No full IUL analysis over WhatsApp. No replacement/cancellation recommendation. No unsupported guarantees or tax claims. Ordinary text-only WhatsApp conversations stay unchanged.
 
 ---
 

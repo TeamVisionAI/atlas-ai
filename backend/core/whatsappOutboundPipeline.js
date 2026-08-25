@@ -200,6 +200,24 @@ async function persistBlockedOrFailedAttempt({
   return logResult;
 }
 
+function buildFreeformGraphBody({ metaTo, text, interactive = null }) {
+  if (interactive && (interactive.type === "button" || interactive.type === "list")) {
+    return {
+      messaging_product: "whatsapp",
+      to: metaTo,
+      type: "interactive",
+      interactive
+    };
+  }
+
+  return {
+    messaging_product: "whatsapp",
+    to: metaTo,
+    type: "text",
+    text: { body: text }
+  };
+}
+
 async function sendViaGraphApi({
   credentials,
   metaTo,
@@ -210,7 +228,8 @@ async function sendViaGraphApi({
   expectedVariableKeys,
   variables,
   expectedButtonVariableKeys = [],
-  buttonVariables = {}
+  buttonVariables = {},
+  interactive = null
 }) {
   const components = buildTemplateComponents(
     expectedVariableKeys,
@@ -230,12 +249,7 @@ async function sendViaGraphApi({
             ...(components ? { components } : {})
           }
         }
-      : {
-          messaging_product: "whatsapp",
-          to: metaTo,
-          type: "text",
-          text: { body: text }
-        };
+      : buildFreeformGraphBody({ metaTo, text, interactive });
 
   const response = await axios.post(
     `https://graph.facebook.com/${credentials.graphApiVersion}/${credentials.phoneNumberId}/messages`,
@@ -268,6 +282,8 @@ async function sendAndPersistWhatsAppMessage({
   templateVariables = {},
   templateButtonVariables = {},
   callerMetaTemplateName = null,
+  interactive = null,
+  interactiveFallbackText = null,
   idempotencyKey = null,
   pipeline = null,
   now = new Date(),
@@ -416,18 +432,47 @@ async function sendAndPersistWhatsAppMessage({
     }
 
     try {
-      const graphResult = await sendViaGraphApi({
-        credentials,
-        metaTo,
-        mode,
-        text: authorization.message || message,
-        metaTemplateName: authorization.metaTemplateName,
-        languageCode: authorization.languageCode,
-        expectedVariableKeys: authorization.expectedVariableKeys || [],
-        variables: authorization.variables || templateVariables,
-        expectedButtonVariableKeys: authorization.expectedButtonVariableKeys || [],
-        buttonVariables: authorization.buttonVariables || templateButtonVariables
-      });
+      let graphResult;
+      try {
+        graphResult = await sendViaGraphApi({
+          credentials,
+          metaTo,
+          mode,
+          text: authorization.message || message,
+          metaTemplateName: authorization.metaTemplateName,
+          languageCode: authorization.languageCode,
+          expectedVariableKeys: authorization.expectedVariableKeys || [],
+          variables: authorization.variables || templateVariables,
+          expectedButtonVariableKeys: authorization.expectedButtonVariableKeys || [],
+          buttonVariables: authorization.buttonVariables || templateButtonVariables,
+          interactive: mode === "freeform" ? interactive : null
+        });
+      } catch (interactiveError) {
+        if (!interactive || mode !== "freeform") {
+          throw interactiveError;
+        }
+        logWhatsAppStage("outbound_interactive_fallback_text", {
+          to,
+          level: "warn",
+          error:
+            interactiveError.response?.data?.error?.message ||
+            interactiveError.message ||
+            "INTERACTIVE_SEND_FAILED"
+        });
+        graphResult = await sendViaGraphApi({
+          credentials,
+          metaTo,
+          mode,
+          text: interactiveFallbackText || authorization.message || message,
+          metaTemplateName: authorization.metaTemplateName,
+          languageCode: authorization.languageCode,
+          expectedVariableKeys: authorization.expectedVariableKeys || [],
+          variables: authorization.variables || templateVariables,
+          expectedButtonVariableKeys: authorization.expectedButtonVariableKeys || [],
+          buttonVariables: authorization.buttonVariables || templateButtonVariables,
+          interactive: null
+        });
+      }
 
       sendResult = {
         success: true,
@@ -660,5 +705,6 @@ module.exports = {
   sendAndPersistWhatsAppMessage,
   buildOutboundCorrelationId,
   buildTemplateComponents,
+  buildFreeformGraphBody,
   resolveProspectForOutbound
 };
