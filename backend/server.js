@@ -323,6 +323,10 @@ async function main() {
   const { startNewLeadEscalationPoller } = require("./core/newLeadAttentionEngine");
   startNewLeadEscalationPoller(60_000);
   const {
+    startUrgentHandoffEscalationPoller
+  } = require("./core/appointmentUrgentHandoffEngine");
+  startUrgentHandoffEscalationPoller(60_000);
+  const {
     startWhatsAppMediaFetchPoller
   } = require("./core/communicationMedia/whatsappMediaFetchPoller");
   startWhatsAppMediaFetchPoller();

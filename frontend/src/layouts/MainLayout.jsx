@@ -27,6 +27,7 @@ import {
 } from "../engines/conversationsCenterAccess";
 import SupportModeBanner from "../components/layout/SupportModeBanner";
 import UnsupportedWhatsAppLeadReviewBanner from "../components/layout/UnsupportedWhatsAppLeadReviewBanner";
+import UrgentAppointmentHandoffBanner from "../components/layout/UrgentAppointmentHandoffBanner";
 import {
   confirmUnsupportedWhatsAppInboundReview,
   dismissUnsupportedWhatsAppInboundReview,
@@ -597,6 +598,7 @@ export default function MainLayout() {
 
           <main className="atlas-layout__main">
             <div className="atlas-layout__content">
+              <UrgentAppointmentHandoffBanner enabled={Boolean(currentUser)} />
               <RequireWorkspaceAccess>
                 <Outlet />
               </RequireWorkspaceAccess>

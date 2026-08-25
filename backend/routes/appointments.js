@@ -15,6 +15,12 @@ router.use(...protectedRoute());
 router.get("/profile", appointmentController.getProfile);
 router.patch("/profile", appointmentController.updateProfile);
 router.get("/availability", appointmentController.getAvailableSlots);
+router.get("/urgent-handoffs", appointmentController.listUrgentHandoffs);
+router.post(
+  "/urgent-handoffs/:handoffId/acknowledge",
+  requirePermission(PERMISSIONS.PROSPECT_WRITE),
+  appointmentController.acknowledgeUrgentHandoff
+);
 
 router.get("/", appointmentController.listAppointments);
 router.post("/", requirePermission(PERMISSIONS.PROSPECT_WRITE), appointmentController.createAppointment);

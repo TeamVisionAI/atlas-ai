@@ -399,6 +399,41 @@ async function sendOfficeLocation(req, res) {
   }
 }
 
+async function listUrgentHandoffs(req, res) {
+  try {
+    const result = await appointmentApplicationService.listUrgentHandoffs({
+      organizationId: req.tenantContext.organizationId,
+      userId: req.tenantContext.userId
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
+async function acknowledgeUrgentHandoff(req, res) {
+  try {
+    const result = await appointmentApplicationService.acknowledgeUrgentHandoff(
+      req.params.handoffId,
+      {
+        organizationId: req.tenantContext.organizationId,
+        userId: req.tenantContext.userId
+      }
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.code || "SERVER_ERROR",
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -419,5 +454,7 @@ module.exports = {
   previewZoomInvitationCommunication,
   sendZoomInvitation,
   previewOfficeLocationCommunication,
-  sendOfficeLocation
+  sendOfficeLocation,
+  listUrgentHandoffs,
+  acknowledgeUrgentHandoff
 };
