@@ -6,6 +6,8 @@ export const WHATSAPP_ERROR_KEYS = Object.freeze({
   DEFAULT: "whatsappErrorDefault",
   CANCELLED: "whatsappErrorCancelled",
   TIMEOUT: "whatsappErrorTimeout",
+  PARTIAL_HANDOFF: "whatsappErrorPartialHandoff",
+  STATUS_VERIFY_FAILED: "whatsappErrorStatusVerifyFailed",
   PERMISSIONS: "whatsappErrorPermissions",
   EXPIRED: "whatsappErrorExpired",
   EXCHANGE: "whatsappErrorExchange",
@@ -15,6 +17,14 @@ export const WHATSAPP_ERROR_KEYS = Object.freeze({
 export function resolveWhatsAppErrorKey({ errorKey, message = "", stage = "", code = "" } = {}) {
   if (errorKey && WHATSAPP_ERROR_KEYS[errorKey]) {
     return WHATSAPP_ERROR_KEYS[errorKey];
+  }
+
+  if (errorKey === "PARTIAL_HANDOFF") {
+    return WHATSAPP_ERROR_KEYS.PARTIAL_HANDOFF;
+  }
+
+  if (errorKey === "STATUS_VERIFY_FAILED") {
+    return WHATSAPP_ERROR_KEYS.STATUS_VERIFY_FAILED;
   }
 
   const normalized = String(message || "").toLowerCase();

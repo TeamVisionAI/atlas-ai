@@ -1951,6 +1951,10 @@ export const translations = {
     whatsappErrorCancelled: "Conexión cancelada. Puedes intentarlo cuando quieras.",
     whatsappErrorTimeout:
       "La conexión expiró. Inténtalo de nuevo y completa la autorización de Meta.",
+    whatsappErrorPartialHandoff:
+      "Meta terminó la configuración, pero Atlas no pudo completar la conexión. Inténtalo de nuevo.",
+    whatsappErrorStatusVerifyFailed:
+      "Atlas no pudo confirmar la conexión de WhatsApp Business. Inténtalo de nuevo.",
     whatsappErrorPermissions:
       "No se pudieron verificar los permisos. Inténtalo de nuevo y concede el acceso requerido.",
     whatsappErrorExpired: "La autorización de Meta expiró. Inicia la conexión de nuevo.",
@@ -3958,6 +3962,10 @@ export const translations = {
     whatsappErrorDefault: "We couldn't complete the WhatsApp Business connection. Please try again.",
     whatsappErrorCancelled: "Connection cancelled. You can try again whenever you're ready.",
     whatsappErrorTimeout: "Connection timed out. Please try again and complete the Meta authorization.",
+    whatsappErrorPartialHandoff:
+      "Meta setup finished, but Atlas could not complete the connection. Please retry.",
+    whatsappErrorStatusVerifyFailed:
+      "Atlas could not confirm your WhatsApp Business connection. Please retry.",
     whatsappErrorPermissions: "Unable to verify permissions. Please try again and grant the required access.",
     whatsappErrorExpired: "Meta authorization expired. Please start the connection again.",
     whatsappErrorExchange: "We couldn't finish connecting your WhatsApp Business account. Please try again.",

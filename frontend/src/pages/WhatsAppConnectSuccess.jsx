@@ -2,42 +2,52 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { appPath } from "../config/appRoutes";
-import { getEmbeddedSignupStatus } from "../services/metaEmbeddedSignupService";
+import { verifyEmbeddedSignupConnected } from "../services/metaEmbeddedSignupService";
+import { buildWhatsAppErrorNavigationState } from "../utils/mapWhatsAppUserError";
 import "./WhatsAppConnect.css";
 
 export default function WhatsAppConnectSuccess() {
   const { translate } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
-  const [connection, setConnection] = useState(location.state?.connection || null);
+  const [connection, setConnection] = useState(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (connection) {
-      return undefined;
-    }
-
     let cancelled = false;
 
-    getEmbeddedSignupStatus()
-      .then((payload) => {
-        if (!cancelled && payload.connected && payload.connection) {
-          setConnection(payload.connection);
-        } else if (!cancelled) {
-          navigate(appPath("settings/integrations"), { replace: true });
+    verifyEmbeddedSignupConnected()
+      .then((verified) => {
+        if (cancelled) {
+          return;
         }
+
+        if (verified.verified && verified.connection) {
+          setConnection(verified.connection);
+          setChecking(false);
+          return;
+        }
+
+        navigate(appPath("settings/whatsapp/error"), {
+          replace: true,
+          state: buildWhatsAppErrorNavigationState({ errorKey: "STATUS_VERIFY_FAILED" })
+        });
       })
       .catch(() => {
         if (!cancelled) {
-          navigate(appPath("settings/integrations"), { replace: true });
+          navigate(appPath("settings/whatsapp/error"), {
+            replace: true,
+            state: buildWhatsAppErrorNavigationState({ errorKey: "STATUS_VERIFY_FAILED" })
+          });
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [connection, navigate]);
+  }, [location.state, navigate]);
 
-  if (!connection) {
+  if (checking || !connection) {
     return null;
   }
 

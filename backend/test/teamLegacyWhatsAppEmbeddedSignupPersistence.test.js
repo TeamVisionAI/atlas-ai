@@ -69,18 +69,19 @@ test("meta onboarding routes pass req into resolveOrganizationId", () => {
     routeSrc,
     /resolveOrganizationId\(\s*req\.authContext\s*,\s*req\s*\)/
   );
-  assert.match(routeSrc, /embedded_signup_exchange_org_resolved/);
+  assert.match(routeSrc, /embedded_signup_exchange_requested/);
+  assert.match(routeSrc, /embedded-signup\/telemetry/);
 });
 
-test("WhatsAppConnect timeout reconciles connected status before TIMEOUT error", () => {
+test("WhatsAppConnect verifies durable status after exchange and surfaces partial timeout", () => {
   const src = fs.readFileSync(
     path.join(__dirname, "../../frontend/src/pages/WhatsAppConnect.jsx"),
     "utf8"
   );
-  assert.match(src, /COMPLETION_TIMEOUT_MS = 120_000/);
-  assert.match(src, /getEmbeddedSignupStatus\(\)/);
-  assert.match(src, /timeout reconcile — already connected/);
-  assert.match(src, /timeout race — attempting completion/);
+  assert.match(src, /verifyEmbeddedSignupConnected/);
+  assert.match(src, /PARTIAL_HANDOFF/);
+  assert.match(src, /persistHandoffAttempt/);
+  assert.match(src, /restoreHandoffAttempt/);
   assert.match(src, /COMPLETION_EXTENSION_MS/);
 });
 
