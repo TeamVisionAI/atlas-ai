@@ -1,10 +1,12 @@
 /**
  * Executive Dashboard v2 — derived metrics from existing prospect + queue data.
+ * Completed KPI uses canonical atlas_appointments completion (Appointments page SoT).
  * No new business rules; presentation aggregates only.
  */
 
 const { MILESTONES } = require("./workflowConstants");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
+const { isCompletedAppointmentForList } = require("./appointmentListQuery");
 const {
   RELATIVE_PERIODS,
   getOrganizationDateWindow,
@@ -15,13 +17,31 @@ function prospectByPhone(prospects) {
   return new Map((prospects || []).map((row) => [row.phone, row]));
 }
 
-function countPipelineMetrics(prospects, queue) {
+/**
+ * Canonical Completed count — same semantics as Appointments "completed" view:
+ * status completed|no_show, or lifecycle recruited|became_client.
+ * Does not use transient INTERVIEW_COMPLETED workflow milestone.
+ */
+function countCompletedAppointments(appointments = []) {
+  return (appointments || []).filter(isCompletedAppointmentForList).length;
+}
+
+function appointmentStartMs(appointment = {}) {
+  const raw = appointment.startDateTime || appointment.start_date_time;
+  if (!raw) {
+    return null;
+  }
+
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function countPipelineMetrics(prospects, queue, appointments = []) {
   const byPhone = prospectByPhone(prospects);
   let newProspects = 0;
   let qualified = 0;
-  let appointments = 0;
+  let appointmentsScheduled = 0;
   let confirmed = 0;
-  let completed = 0;
   let recruited = 0;
 
   for (const summary of queue || []) {
@@ -42,15 +62,11 @@ function countPipelineMetrics(prospects, queue) {
       summary.canonicalMilestone === MILESTONES.INTERVIEW_SCHEDULED ||
       summary.canonicalMilestone === MILESTONES.INTERVIEW_DUE
     ) {
-      appointments += 1;
+      appointmentsScheduled += 1;
     }
 
     if (prospect.current_step === "CONFIRMED") {
       confirmed += 1;
-    }
-
-    if (summary.canonicalMilestone === MILESTONES.INTERVIEW_COMPLETED) {
-      completed += 1;
     }
 
     if (
@@ -65,9 +81,9 @@ function countPipelineMetrics(prospects, queue) {
   return {
     newProspects,
     qualified,
-    appointments,
+    appointments: appointmentsScheduled,
     confirmed,
-    completed,
+    completed: countCompletedAppointments(appointments),
     recruited
   };
 }
@@ -86,7 +102,8 @@ function countWindowNewProspects(prospects, window) {
 }
 
 function buildKpiMetrics(prospects, queue, context) {
-  const pipeline = countPipelineMetrics(prospects, queue);
+  const appointments = context.appointments || [];
+  const pipeline = countPipelineMetrics(prospects, queue, appointments);
   const todayNew = countWindowNewProspects(prospects, context.todayWindow);
   const yesterdayNew = countWindowNewProspects(prospects, context.yesterdayWindow);
 
@@ -108,7 +125,7 @@ function buildKpiMetrics(prospects, queue, context) {
   };
 }
 
-function buildRecruitmentFunnel(queue, prospects) {
+function buildRecruitmentFunnel(queue, prospects, appointments = []) {
   const byPhone = prospectByPhone(prospects);
   const stages = [
     {
@@ -141,9 +158,7 @@ function buildRecruitmentFunnel(queue, prospects) {
     },
     {
       key: "completed",
-      count: (queue || []).filter(
-        (row) => row.canonicalMilestone === MILESTONES.INTERVIEW_COMPLETED
-      ).length
+      count: countCompletedAppointments(appointments)
     },
     {
       key: "recruited",
@@ -206,6 +221,7 @@ function buildConversationOwnership(queue) {
 
 function buildSevenDayAppointmentTrend(prospects, queue, context) {
   const byPhone = prospectByPhone(prospects);
+  const appointments = context.appointments || [];
   const organizationId = context.organizationId;
   const reference = context.reference || new Date();
   const days = [];
@@ -235,8 +251,15 @@ function buildSevenDayAppointmentTrend(prospects, queue, context) {
       if (prospect.current_step === "CONFIRMED") {
         confirmed += 1;
       }
+    }
 
-      if (summary.canonicalMilestone === MILESTONES.INTERVIEW_COMPLETED) {
+    for (const appointment of appointments) {
+      const at = appointmentStartMs(appointment);
+      if (!at || !isTimestampInWindow(at, window)) {
+        continue;
+      }
+
+      if (isCompletedAppointmentForList(appointment)) {
         completed += 1;
       }
     }
@@ -276,12 +299,13 @@ function buildExecutiveDashboardV2Metrics(prospects, queue, context = {}) {
     organizationId,
     reference,
     todayWindow,
-    yesterdayWindow
+    yesterdayWindow,
+    appointments: context.appointments || []
   };
 
   return {
     kpi: buildKpiMetrics(prospects, queue, metricsContext),
-    funnel: buildRecruitmentFunnel(queue, prospects),
+    funnel: buildRecruitmentFunnel(queue, prospects, metricsContext.appointments),
     conversationOwnership: buildConversationOwnership(queue),
     trend7Day: buildSevenDayAppointmentTrend(prospects, queue, metricsContext)
   };
@@ -293,5 +317,6 @@ module.exports = {
   buildRecruitmentFunnel,
   buildConversationOwnership,
   buildSevenDayAppointmentTrend,
-  countPipelineMetrics
+  countPipelineMetrics,
+  countCompletedAppointments
 };
