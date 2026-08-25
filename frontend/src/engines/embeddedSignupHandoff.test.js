@@ -4,13 +4,22 @@ import {
   applyFinishPayload,
   applyOAuthCode,
   buildExchangePayload,
+  clearPersistedHandoffAttempt,
   createEmbeddedSignupAttempt,
   describeAttemptForTelemetry,
+  describePartialHandoffTimeout,
+  deserializeHandoffAttempt,
+  evaluatePostExchangeStatus,
+  HANDOFF_SESSION_STORAGE_KEY,
+  isPartialHandoffTimeout,
   isStaleAttemptEvent,
   markExchangeCompleted,
   markExchangeStarted,
   markTimeoutExtended,
-  resolveTimeoutAction
+  persistHandoffAttempt,
+  resolveTimeoutAction,
+  restoreHandoffAttempt,
+  serializeHandoffAttempt
 } from "./embeddedSignupHandoff.js";
 import {
   isAllowedFacebookOrigin,
@@ -155,12 +164,14 @@ test("11. exchange payload matches backend contract (code + wabaId)", () => {
   );
   assert.deepEqual(
     {
+      attemptId: payload.attemptId,
       code: payload.code,
       wabaId: payload.wabaId,
       onboardingType: payload.onboardingType,
       redirectUri: payload.redirectUri
     },
     {
+      attemptId: attempt.attemptId,
       code: "auth-code",
       wabaId: "waba-tl",
       onboardingType: "whatsapp_business_app",
@@ -199,4 +210,82 @@ test("telemetry descriptor never includes oauth code", () => {
   const snap = describeAttemptForTelemetry(attempt);
   assert.equal(snap.hasOAuthCode, true);
   assert.equal(Object.values(snap).includes("super-secret-code"), false);
+});
+
+test("FINISH without OAuth resolves to partial timeout", () => {
+  let attempt = createEmbeddedSignupAttempt();
+  attempt = applyFinishPayload(attempt, finish()).attempt;
+  assert.equal(describePartialHandoffTimeout(attempt), "missing_oauth");
+  assert.equal(isPartialHandoffTimeout(attempt), true);
+  attempt = markTimeoutExtended(attempt);
+  assert.equal(resolveTimeoutAction(attempt), "timeout");
+});
+
+test("OAuth without FINISH resolves to partial timeout", () => {
+  let attempt = createEmbeddedSignupAttempt();
+  attempt = applyOAuthCode(attempt, "code-only").attempt;
+  assert.equal(describePartialHandoffTimeout(attempt), "missing_finish");
+  assert.equal(isPartialHandoffTimeout(attempt), true);
+});
+
+test("exchange success requires connected status payload", () => {
+  assert.equal(
+    evaluatePostExchangeStatus({ connected: true, connection: { displayPhoneNumber: "+1" } })
+      .verified,
+    true
+  );
+  assert.equal(evaluatePostExchangeStatus({ connected: false }).verified, false);
+  assert.equal(evaluatePostExchangeStatus(null).reason, "status_disconnected");
+});
+
+test("sessionStorage round-trip preserves handoff without logging secrets", () => {
+  const storage = new Map();
+  global.sessionStorage = {
+    setItem(key, value) {
+      storage.set(key, value);
+    },
+    getItem(key) {
+      return storage.get(key) || null;
+    },
+    removeItem(key) {
+      storage.delete(key);
+    }
+  };
+
+  let attempt = createEmbeddedSignupAttempt(1000);
+  attempt = applyOAuthCode(attempt, "secret-code", 1001).attempt;
+  attempt = applyFinishPayload(attempt, finish("waba-mobile"), 5000).attempt;
+  persistHandoffAttempt(attempt);
+
+  const stored = storage.get(HANDOFF_SESSION_STORAGE_KEY);
+  assert.match(String(stored), /secret-code/);
+
+  const restored = restoreHandoffAttempt(6000);
+  assert.equal(restored.oauthCode, "secret-code");
+  assert.equal(restored.wabaId, "waba-mobile");
+  assert.equal(describeAttemptForTelemetry(restored).hasOAuthCode, true);
+  assert.equal(Object.values(describeAttemptForTelemetry(restored)).includes("secret-code"), false);
+
+  clearPersistedHandoffAttempt();
+  assert.equal(restoreHandoffAttempt(6000), null);
+
+  delete global.sessionStorage;
+});
+
+test("mobile-style delayed FINISH then OAuth still exchanges once", () => {
+  let attempt = createEmbeddedSignupAttempt(1);
+  attempt = applyFinishPayload(attempt, finish(), 50).attempt;
+  assert.equal(resolveTimeoutAction(attempt), "extend");
+  attempt = markTimeoutExtended(attempt);
+  const late = applyOAuthCode(attempt, "mobile-delayed-code", 120_000);
+  assert.equal(late.shouldExchange, true);
+  const started = markExchangeStarted(late.attempt);
+  assert.equal(started.started, true);
+  assert.equal(applyOAuthCode(started.attempt, "mobile-delayed-code", 120_001).shouldExchange, false);
+});
+
+test("serialize/deserialize drops expired attempts", () => {
+  const attempt = createEmbeddedSignupAttempt(0);
+  const serialized = serializeHandoffAttempt(attempt);
+  assert.equal(deserializeHandoffAttempt(serialized, 999_999), null);
 });

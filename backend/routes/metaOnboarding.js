@@ -25,6 +25,17 @@ const whatsappIntegrationService = require("../services/whatsappIntegrationServi
 
 const router = express.Router();
 
+const EMBEDDED_SIGNUP_TELEMETRY_STAGES = new Set([
+  "embedded_signup_client_started",
+  "embedded_signup_oauth_received",
+  "embedded_signup_finish_received",
+  "embedded_signup_exchange_requested",
+  "embedded_signup_exchange_completed",
+  "embedded_signup_status_verified",
+  "embedded_signup_partial_timeout",
+  "embedded_signup_status_verify_failed"
+]);
+
 router.use(requireAtlasUser);
 router.use(organizationGuard());
 
@@ -112,7 +123,42 @@ router.post(
       });
     }
   }
-);
+});
+
+router.post("/embedded-signup/telemetry", async (req, res) => {
+  try {
+    const stage = String(req.body?.stage || "").trim();
+    if (!EMBEDDED_SIGNUP_TELEMETRY_STAGES.has(stage)) {
+      return res.status(400).json({ error: "INVALID_STAGE" });
+    }
+
+    const organizationId = await whatsappIntegrationService.resolveOrganizationId(
+      req.authContext,
+      req
+    );
+    const ownershipMode =
+      req.body?.ownershipMode === "organization" &&
+      hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)
+        ? "organization"
+        : "personal";
+
+    metaLogger.info(stage, {
+      organizationId,
+      userId: req.authContext?.userId || null,
+      ownershipMode,
+      attemptId: req.body?.attemptId ? String(req.body.attemptId).trim() : null,
+      partialHandoff: req.body?.partialHandoff || null,
+      hasOAuthCode: req.body?.hasOAuthCode === true,
+      hasWabaId: req.body?.hasWabaId === true,
+      reason: req.body?.reason ? String(req.body.reason) : null
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    metaLogger.error("embedded_signup_telemetry_failed", { message: error.message });
+    res.status(500).json({ error: "TELEMETRY_FAILED" });
+  }
+});
 
 router.post("/embedded-signup/exchange", async (req, res) => {
   try {
@@ -151,6 +197,7 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       ? String(req.body.onboardingType).trim()
       : "whatsapp_business_app";
     const redirectUri = req.body?.redirectUri ? String(req.body.redirectUri).trim() : undefined;
+    const attemptId = req.body?.attemptId ? String(req.body.attemptId).trim() : null;
 
     const allowedOnboardingTypes = new Set(["whatsapp_business_app"]);
 
@@ -166,17 +213,20 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       req
     );
 
-    metaLogger.info("embedded_signup_exchange_org_resolved", {
-      organizationId,
-      homeOrganizationId: req.tenantContext?.homeOrganizationId || null,
-      supportMode: Boolean(req.supportContext?.organizationId)
-    });
-
     const ownershipMode =
       req.body?.ownershipMode === "organization" &&
       hasPermission(req.authContext, PERMISSIONS.ORG_WRITE)
         ? "organization"
         : "personal";
+
+    metaLogger.info("embedded_signup_exchange_requested", {
+      organizationId,
+      userId: req.authContext?.userId || null,
+      ownershipMode,
+      attemptId,
+      homeOrganizationId: req.tenantContext?.homeOrganizationId || null,
+      supportMode: Boolean(req.supportContext?.organizationId)
+    });
 
     if (ownershipMode === "personal") {
       const {
@@ -207,6 +257,15 @@ router.post("/embedded-signup/exchange", async (req, res) => {
       businessId,
       onboardingType,
       redirectUri
+    });
+
+    metaLogger.info("embedded_signup_exchange_completed", {
+      organizationId,
+      userId: req.authContext?.userId || null,
+      ownershipMode,
+      attemptId,
+      wabaId: result?.connection?.wabaId || wabaId || null,
+      phoneNumberId: result?.connection?.phoneNumberId || phoneNumberId || null
     });
 
     res.json(result);

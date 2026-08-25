@@ -66,3 +66,42 @@ export async function disconnectWhatsAppIntegration({ ownership = "personal" } =
     body: JSON.stringify({ ownership })
   });
 }
+
+/**
+ * Fire-and-forget structured stage log (no secrets).
+ */
+export async function reportEmbeddedSignupStage(
+  stage,
+  { attemptId = null, ownershipMode = "personal", ...extra } = {}
+) {
+  try {
+    await apiRequest("/api/meta/embedded-signup/telemetry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stage,
+        attemptId,
+        ownershipMode,
+        ...extra
+      })
+    });
+  } catch {
+    // Observability must not block the handoff UX.
+  }
+}
+
+export async function verifyEmbeddedSignupConnected() {
+  const status = await getEmbeddedSignupStatus();
+  if (status?.connected === true && status?.connection) {
+    return {
+      verified: true,
+      connection: status.connection,
+      status
+    };
+  }
+  return {
+    verified: false,
+    status,
+    reason: "status_disconnected"
+  };
+}
