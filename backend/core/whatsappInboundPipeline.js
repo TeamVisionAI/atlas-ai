@@ -44,6 +44,10 @@ const {
   isRecruitingCampaignIntakeFirstTurnBurst,
   shouldSkipDuplicateRecruitingFirstTurnReply
 } = require("./recruitingFirstTurnBurst");
+const {
+  maybeCreateUnsupportedInboundReview,
+  markPendingReviewsRecoveredAutomatically
+} = require("./unsupportedWhatsAppInboundReview/unsupportedWhatsAppInboundReviewService");
 
 function duplicateSkipResult(correlationId, providerMessageId, phone) {
   logWhatsAppStage("message_duplicate_skipped", {
@@ -290,7 +294,10 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
 
   // Read-only org/WABA fail-closed MUST precede claim so a mismatched asset
   // cannot poison the provider-message lock (replay with the correct WABA still works).
-  const { organizationId: claimedOrganizationId } = await resolveOrg({
+  const {
+    organizationId: claimedOrganizationId,
+    source: organizationSource = null
+  } = await resolveOrg({
     phoneNumberId:
       inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
     wabaId: inbound.wabaId || null
@@ -390,7 +397,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
         }).catch(() => null)
       : null;
 
-    await intakeService.establishInboundAttribution({
+    const attributionResult = await intakeService.establishInboundAttribution({
       match: campaignIntakeMatch,
       prospect,
       created,
@@ -399,6 +406,23 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       phoneNumberId,
       organizationId: organizationId || claimedOrganizationId
     });
+
+    if (
+      attributionResult?.ok &&
+      (attributionResult.recruitingEligible || attributionResult.iulReviewEligible)
+    ) {
+      await markPendingReviewsRecoveredAutomatically({
+        prospect,
+        organizationId: organizationId || claimedOrganizationId || null,
+        campaignCode: campaignIntakeMatch.code || null
+      }).catch((recoveryError) => {
+        logWhatsAppStage("unsupported_whatsapp_inbound_review_auto_recover_failed", {
+          level: "warn",
+          phone: prospect?.phone || null,
+          error: recoveryError.message
+        });
+      });
+    }
   }
 
   const semanticBody = campaignIntakeMatch?.matched
@@ -457,6 +481,27 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     providerMessageId: inbound.providerMessageId,
     conversationLogId: logResult.log?.id || null
   });
+
+  try {
+    await maybeCreateUnsupportedInboundReview({
+      inbound,
+      organizationSource,
+      organizationId: organizationId || claimedOrganizationId || null,
+      prospect,
+      campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : intakeLookup,
+      conversationLogId: logResult.log?.id || null,
+      correlationId,
+      qrAttributed: Boolean(qrAttribution?.matched),
+      dependencies
+    });
+  } catch (reviewError) {
+    logWhatsAppStage("unsupported_whatsapp_inbound_review_create_failed", {
+      level: "warn",
+      phone: storagePhone,
+      providerMessageId: inbound.providerMessageId,
+      error: reviewError.message
+    });
+  }
 
   // BR-140 — persist structured audio metadata immediately; fetch bytes asynchronously.
   // Must not block webhook completion or change ownership / BR-080 / qualification.

@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS unsupported_whatsapp_inbound_reviews;

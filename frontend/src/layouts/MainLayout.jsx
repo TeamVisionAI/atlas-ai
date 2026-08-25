@@ -26,6 +26,12 @@ import {
   resolveConversationsAccessStateFromPayload
 } from "../engines/conversationsCenterAccess";
 import SupportModeBanner from "../components/layout/SupportModeBanner";
+import UnsupportedWhatsAppLeadReviewBanner from "../components/layout/UnsupportedWhatsAppLeadReviewBanner";
+import {
+  confirmUnsupportedWhatsAppInboundReview,
+  dismissUnsupportedWhatsAppInboundReview,
+  fetchPendingUnsupportedWhatsAppInboundReviews
+} from "../services/unsupportedWhatsAppInboundReviewService";
 import "./MainLayout.css";
 
 function useLayoutMode() {
@@ -168,6 +174,9 @@ export default function MainLayout() {
   const [knowledgeHubAllowed, setKnowledgeHubAllowed] = useState(null);
   const [supportMode, setSupportMode] = useState(null);
   const [exitingSupportMode, setExitingSupportMode] = useState(false);
+  const [unsupportedWhatsAppReviews, setUnsupportedWhatsAppReviews] = useState([]);
+  const [unsupportedReviewBusyId, setUnsupportedReviewBusyId] = useState(null);
+  const lastUnsupportedReviewSignalRef = useRef("");
   const currentUserRef = useRef(null);
   currentUserRef.current = currentUser;
 
@@ -369,6 +378,105 @@ export default function MainLayout() {
   }, [conversationsCenterAllowed, currentUser, location.pathname]);
 
   useEffect(() => {
+    if (!currentUser) {
+      setUnsupportedWhatsAppReviews([]);
+      lastUnsupportedReviewSignalRef.current = "";
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    function playAttentionTone() {
+      try {
+        const context = new window.AudioContext();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 880;
+        gain.gain.value = 0.04;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.18);
+        oscillator.onended = () => {
+          context.close().catch(() => {});
+        };
+      } catch {
+        /* optional tone only */
+      }
+    }
+
+    function refreshUnsupportedReviews() {
+      fetchPendingUnsupportedWhatsAppInboundReviews()
+        .then((payload) => {
+          if (cancelled) {
+            return;
+          }
+          const reviews = Array.isArray(payload?.reviews) ? payload.reviews : [];
+          const signal = reviews.map((review) => review.id).join("|");
+          if (
+            signal &&
+            lastUnsupportedReviewSignalRef.current &&
+            signal !== lastUnsupportedReviewSignalRef.current
+          ) {
+            playAttentionTone();
+          }
+          lastUnsupportedReviewSignalRef.current = signal;
+          setUnsupportedWhatsAppReviews(reviews);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setUnsupportedWhatsAppReviews([]);
+          }
+        });
+    }
+
+    refreshUnsupportedReviews();
+    const timer = window.setInterval(refreshUnsupportedReviews, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [currentUser, location.pathname, supportMode?.active, supportMode?.organizationId]);
+
+  const handleDismissUnsupportedReview = useCallback(async (review) => {
+    if (!review?.id) {
+      return;
+    }
+
+    setUnsupportedReviewBusyId(review.id);
+    try {
+      await dismissUnsupportedWhatsAppInboundReview(review.id);
+      setUnsupportedWhatsAppReviews((current) => current.filter((row) => row.id !== review.id));
+    } finally {
+      setUnsupportedReviewBusyId(null);
+    }
+  }, []);
+
+  const handleConfirmUnsupportedReview = useCallback(
+    async (review) => {
+      if (!review?.id) {
+        return;
+      }
+
+      const campaignCode = window.prompt(translate("unsupportedWhatsAppLeadReviewConfirmPrompt"), "");
+      if (campaignCode === null) {
+        return;
+      }
+
+      setUnsupportedReviewBusyId(review.id);
+      try {
+        await confirmUnsupportedWhatsAppInboundReview(review.id, campaignCode.trim() || null);
+        setUnsupportedWhatsAppReviews((current) => current.filter((row) => row.id !== review.id));
+      } finally {
+        setUnsupportedReviewBusyId(null);
+      }
+    },
+    [translate]
+  );
+
+  useEffect(() => {
     setPhoneNavOpen(false);
   }, [location.pathname]);
 
@@ -460,6 +568,14 @@ export default function MainLayout() {
             onExit={handleExitSupportMode}
             exiting={exitingSupportMode}
             translate={translate}
+          />
+          <UnsupportedWhatsAppLeadReviewBanner
+            reviews={unsupportedWhatsAppReviews}
+            translate={translate}
+            language={language}
+            onDismiss={handleDismissUnsupportedReview}
+            onConfirm={handleConfirmUnsupportedReview}
+            busyReviewId={unsupportedReviewBusyId}
           />
           {isStagingUi() ? (
             <div className="atlas-layout__staging-banner" role="status" data-atlas-env="staging">
