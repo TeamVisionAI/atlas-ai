@@ -65,12 +65,13 @@ test("execution and live booking gates remain OFF", () => {
   assert.equal(isLiveExecutionPathEnabled({ env: process.env }), false);
 });
 
-test("IUL ad greeting asks policy type, not recruiting location", () => {
+test("IUL ad greeting asks qualification status, not recruiting location", () => {
   const { interpretation, rendered, decision } = renderTurn("Hola", iulContext());
   assert.equal(interpretation.intent, INTENTS.IUL_GREETING);
-  assert.match(rendered.text, /IUL/i);
+  assert.match(rendered.text, /orientarle/i);
   assert.doesNotMatch(rendered.text, /ciudad/i);
-  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.POLICY_TYPE);
+  assert.doesNotMatch(rendered.text, /Zoom/i);
+  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.QUALIFICATION_STATUS);
   assertSafety(rendered.text);
 });
 
@@ -93,11 +94,15 @@ test("original purpose ask follows carrier capture", () => {
   assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.ORIGINAL_PURPOSE);
 });
 
-test("solo quiero información answers briefly then offers scheduling", () => {
-  const { rendered, interpretation } = renderTurn("solo quiero información", iulContext());
-  assert.equal(interpretation.intent, INTENTS.IUL_INFO_ONLY);
-  assert.match(rendered.text, /seguro de vida/i);
-  assert.match(rendered.text, /Zoom/i);
+test("solo quiero información after the qualification ask advances to research intent, not Zoom", () => {
+  const { rendered, interpretation, decision } = renderTurn(
+    "solo quiero información",
+    iulContext({ conversation: { lastQuestionAsked: ASK.QUALIFICATION_STATUS } })
+  );
+  assert.equal(interpretation.intent, INTENTS.IUL_STATUS_RESEARCH);
+  assert.match(rendered.text, /entender mejor/i);
+  assert.doesNotMatch(rendered.text, /Zoom/i);
+  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.RESEARCH_INTENT);
   assertSafety(rendered.text);
 });
 

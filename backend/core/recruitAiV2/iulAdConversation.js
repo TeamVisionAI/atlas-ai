@@ -1,6 +1,8 @@
 /**
- * BR-143 / IUL Policy Review V1 — discovery A→G + Zoom scheduling.
- * Educate → qualify → schedule policy review. Does not change BR-142 eligibility.
+ * BR-143 / BR-157 — IUL Policy Review: button-first qualification + Zoom scheduling.
+ * Fresh IUL_REVIEW leads: two taps (status → intent) then Zoom. Formal Spanish.
+ * Legacy A→G discovery remains for in-flight lastQuestionAsked keys only.
+ * Does not change BR-142 eligibility. Never routes to Recruit AI.
  */
 
 const { INTENTS, NEXT_ACTIONS, REASON_CODES, LANGUAGES, STAGES, APPOINTMENT_STATUS } =
@@ -20,6 +22,11 @@ const {
   READ_STATUS
 } = require("./iulPolicyReviewScheduling");
 const { IUL_STAGES, IUL_REVIEW_MEETING_TYPE } = require("../iulWorkflowConstants");
+const {
+  IUL_OPTION_IDS,
+  resolveIulOption,
+  buildIulInteractive
+} = require("./iulQualificationOptions");
 
 const CAMPAIGN_KIND = "iul_review_ad";
 const CONVERSATION_GOAL = "policy_review";
@@ -37,7 +44,12 @@ const ASK = Object.freeze({
   /** Legacy keys kept for in-flight threads */
   POLICY_ACTIVE: "iul_ask_policy_active",
   REVIEW_TOPIC: "iul_ask_review_topic",
-  REVIEW_DAY_PART: "iul_ask_review_day_part"
+  REVIEW_DAY_PART: "iul_ask_review_day_part",
+  QUALIFICATION_STATUS: "iul_ask_qualification_status",
+  REVIEW_INTENT: "iul_ask_review_intent",
+  RESEARCH_INTENT: "iul_ask_research_intent",
+  POLICY_IN_HAND: "iul_ask_policy_in_hand",
+  OTHER_DETAIL: "iul_ask_other_detail"
 });
 
 const TOPICS = Object.freeze({
@@ -273,7 +285,33 @@ function isCampaignIntakeIulFirstTurn(context = {}) {
   return !context?.conversation?.lastQuestionAsked;
 }
 
-function classifyIulAdInbound({ text, context } = {}) {
+function resolveIulFirstName(context = {}, extras = {}) {
+  const raw =
+    extras.firstName ||
+    context.name ||
+    context.displayName ||
+    context.knownFacts?.name ||
+    context.knownFacts?.fullName ||
+    "";
+  const first = String(raw)
+    .trim()
+    .split(/\s+/)
+    .find(Boolean);
+  if (!first || /unknown|prospect/i.test(first)) {
+    return "";
+  }
+  return first;
+}
+
+function matchQualificationInput(catalog, { text, interactiveReply } = {}) {
+  return resolveIulOption(catalog, {
+    id: interactiveReply?.id || null,
+    title: interactiveReply?.title || null,
+    text
+  });
+}
+
+function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
   const lastAsk = context?.conversation?.lastQuestionAsked || null;
   const known = context?.knownFacts || {};
 
@@ -308,6 +346,113 @@ function classifyIulAdInbound({ text, context } = {}) {
   }
   if (looksLikeSendInfoHere(text)) {
     return { intent: INTENTS.IUL_SEND_INFO_HERE, confidence: 0.94, entities: {} };
+  }
+
+  if (lastAsk === ASK.QUALIFICATION_STATUS || !lastAsk) {
+    const status = matchQualificationInput("status", { text, interactiveReply });
+    if (status?.id === IUL_OPTION_IDS.STATUS_ACTIVE) {
+      return {
+        intent: INTENTS.IUL_STATUS_ACTIVE,
+        confidence: 0.96,
+        entities: {
+          iulQualificationStatus: IUL_OPTION_IDS.STATUS_ACTIVE,
+          iulPolicyActive: true,
+          policyType: "IUL"
+        }
+      };
+    }
+    if (status?.id === IUL_OPTION_IDS.STATUS_RESEARCH) {
+      return {
+        intent: INTENTS.IUL_STATUS_RESEARCH,
+        confidence: 0.96,
+        entities: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_RESEARCH }
+      };
+    }
+    if (status?.id === IUL_OPTION_IDS.STATUS_UNSURE) {
+      return {
+        intent: INTENTS.IUL_STATUS_UNSURE,
+        confidence: 0.96,
+        entities: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_UNSURE }
+      };
+    }
+  }
+
+  if (lastAsk === ASK.REVIEW_INTENT || lastAsk === ASK.RESEARCH_INTENT) {
+    const catalog = lastAsk === ASK.RESEARCH_INTENT ? "researchIntent" : "reviewIntent";
+    const picked = matchQualificationInput(catalog, { text, interactiveReply });
+    if (picked) {
+      if (picked.id === IUL_OPTION_IDS.REVIEW_OTHER) {
+        return {
+          intent: INTENTS.IUL_REVIEW_INTENT,
+          confidence: 0.95,
+          entities: {
+            iulReviewIntent: picked.id,
+            wantsOtherDetail: true
+          }
+        };
+      }
+      return {
+        intent: INTENTS.IUL_REVIEW_INTENT,
+        confidence: 0.95,
+        entities: { iulReviewIntent: picked.id }
+      };
+    }
+  }
+
+  if (lastAsk === ASK.POLICY_IN_HAND) {
+    const picked = matchQualificationInput("policyInHand", { text, interactiveReply });
+    if (picked) {
+      return {
+        intent: INTENTS.IUL_POLICY_IN_HAND,
+        confidence: 0.95,
+        entities: {
+          iulPolicyInHand: picked.id === IUL_OPTION_IDS.POLICY_IN_HAND_YES
+        }
+      };
+    }
+  }
+
+  if (lastAsk === ASK.OTHER_DETAIL) {
+    const detail = String(text || "").trim();
+    if (detail) {
+      return {
+        intent: INTENTS.IUL_OTHER_FREE_TEXT,
+        confidence: 0.9,
+        entities: { iulOtherDetail: detail, reviewReasonRaw: detail }
+      };
+    }
+  }
+
+  if (lastAsk === ASK.SCHEDULING_DAY_PART || lastAsk === ASK.REVIEW_DAY_PART) {
+    const day = matchQualificationInput("dayPart", { text, interactiveReply });
+    if (day?.id === IUL_OPTION_IDS.DAY_MORNING) {
+      return {
+        intent: INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
+        confidence: 0.95,
+        entities: { iulReviewDayPart: "day", reviewPreferredDayPart: "day" }
+      };
+    }
+    if (day?.id === IUL_OPTION_IDS.DAY_AFTERNOON) {
+      return {
+        intent: INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
+        confidence: 0.95,
+        entities: { iulReviewDayPart: "evening", reviewPreferredDayPart: "evening" }
+      };
+    }
+  }
+
+  if (looksLikeInfoOnly(text) && lastAsk === ASK.QUALIFICATION_STATUS) {
+    return {
+      intent: INTENTS.IUL_STATUS_RESEARCH,
+      confidence: 0.93,
+      entities: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_RESEARCH }
+    };
+  }
+
+  if (isCampaignIntakeIulFirstTurn(context) || !lastAsk) {
+    if (isIulReviewAdContext(context) && !lastAsk) {
+      return { intent: INTENTS.IUL_GREETING, confidence: 0.92, entities: {} };
+    }
   }
   if (isCampaignIntakeIulFirstTurn(context)) {
     return { intent: INTENTS.IUL_GREETING, confidence: 0.92, entities: {} };
@@ -449,79 +594,121 @@ function copy(language) {
   const es = localeCode(language) !== "en";
   return {
     opener: es
-      ? "¡Hola! 👋 Gracias por escribirnos. Vi que quieres revisar tu póliza. ¿Qué tipo de póliza tienes: IUL, otro seguro de vida, o no estás seguro/a?"
-      : "Hi! 👋 Thanks for writing. I saw you want to review your policy. What type of policy do you have: IUL, other life insurance, or not sure?",
+      ? "Hola{firstNameGreeting} 👋 Gracias por escribirnos. Para orientarle mejor, ¿cuál describe su situación?"
+      : "Hi{firstNameGreeting} 👋 Thanks for writing. To help you better, which describes your situation?",
     intakeOpener: es
-      ? "¡Claro! Con gusto te ayudamos a revisar tu póliza. Para comenzar, ¿tu póliza IUL está actualmente activa?"
-      : "Of course! We're happy to help you review your policy. To start, is your IUL policy currently active?",
+      ? "Hola{firstNameGreeting} 👋 Gracias por escribirnos. Para orientarle mejor, ¿cuál describe su situación?"
+      : "Hi{firstNameGreeting} 👋 Thanks for writing. To help you better, which describes your situation?",
+    qualificationAsk: es
+      ? "Hola{firstNameGreeting} 👋 Gracias por escribirnos. Para orientarle mejor, ¿cuál describe su situación?"
+      : "Hi{firstNameGreeting} 👋 Thanks for writing. To help you better, which describes your situation?",
+    reviewIntentAsk: es
+      ? "Perfecto. ¿Qué le gustaría revisar principalmente?"
+      : "Perfect. What would you most like to review?",
+    researchIntentAsk: es
+      ? "Claro. ¿Qué le interesa entender mejor?"
+      : "Of course. What would you like to understand better?",
+    unsureAsk: es
+      ? "No hay problema. Podemos ayudarle a identificar qué tipo de póliza tiene."
+      : "No problem. We can help you identify what type of policy you have.",
+    otherAsk: es
+      ? "Cuénteme brevemente qué le gustaría revisar."
+      : "Please tell me briefly what you would like to review.",
+    briefHow: es
+      ? "Un IUL es un seguro de vida con valor en efectivo. En la revisión le explicamos cómo está estructurada su póliza."
+      : "An IUL is life insurance with cash-value features. In the review we explain how your policy is structured.",
+    briefCosts: es
+      ? "Los costos internos varían según cada póliza. Lo correcto es revisarlos con usted."
+      : "Internal costs vary by policy. The right next step is to review them with you.",
+    briefGrowth: es
+      ? "El crecimiento del valor en efectivo depende de cómo está diseñada su póliza. Podemos revisarlo juntos."
+      : "Cash-value growth depends on how your policy is designed. We can review it together.",
+    briefBenefits: es
+      ? "Los beneficios dependen de la estructura de su póliza. Podemos explicárselos con claridad en la revisión."
+      : "Benefits depend on how your policy is structured. We can explain them clearly in the review.",
+    briefUnderstand: es
+      ? "Con gusto le ayudamos a entender su póliza con claridad, sin compromiso."
+      : "We are happy to help you understand your policy clearly, with no obligation.",
     policyActiveAsk: es
-      ? "¿Tu póliza IUL está actualmente activa?"
+      ? "¿Su póliza IUL está actualmente activa?"
       : "Is your IUL policy currently active?",
     policyTypeAsk: es
-      ? "¿Qué tipo de póliza tienes: IUL, otro seguro de vida, o no estás seguro/a?"
+      ? "¿Qué tipo de póliza tiene: IUL, otro seguro de vida, o no está seguro?"
       : "What type of policy do you have: IUL, other life insurance, or not sure?",
     carrierAsk: es
-      ? "¿Recuerdas con qué compañía o aseguradora está la póliza? Si no lo sabes, no hay problema."
+      ? "¿Recuerda con qué compañía o aseguradora está la póliza? Si no lo sabe, no hay problema."
       : "Do you remember which company or carrier the policy is with? If you don't know, that's okay.",
     originalPurposeAsk: es
-      ? "¿Cuál fue la razón principal por la que adquiriste esa póliza originalmente?"
+      ? "¿Cuál fue la razón principal por la que adquirió esa póliza originalmente?"
       : "What was the main reason you originally bought that policy?",
     policyAgeAsk: es
-      ? "¿Hace aproximadamente cuánto tiempo la adquiriste?"
+      ? "¿Hace aproximadamente cuánto tiempo la adquirió?"
       : "Approximately how long ago did you get it?",
     reviewReasonAsk: es
-      ? "¿Qué te gustaría entender o revisar ahora mismo sobre la póliza?"
+      ? "¿Qué le gustaría entender o revisar ahora mismo sobre la póliza?"
       : "What would you most like to understand or review about the policy right now?",
     documentsAsk: es
-      ? "¿Tienes a mano una ilustración reciente, estado de cuenta o resumen de la póliza?"
+      ? "¿Tiene a mano una ilustración reciente, estado de cuenta o resumen de la póliza?"
       : "Do you have a recent illustration, statement, or policy summary handy?",
     schedulingTransition: es
-      ? "Perfecto. Lo mejor es hacer una revisión breve por Zoom para ver la póliza contigo y explicarte lo que estás viendo. ¿Prefieres en la mañana o en la tarde?"
-      : "Perfect. The best next step is a brief Zoom review to look at the policy with you and explain what you're seeing. Do you prefer morning or afternoon/evening?",
+      ? "Gracias. Con eso ya tengo una mejor idea. Lo ideal es revisar su póliza con usted y explicarle exactamente lo que tiene. ¿Qué horario le funciona mejor?"
+      : "Thank you. That gives me a better idea. The best next step is to review your policy with you and explain exactly what you have. What time of day works best?",
     policyIsBadSafe: es
-      ? "Eso no se puede determinar correctamente sin revisar los detalles de la póliza. Podemos verla contigo y explicarte cómo está funcionando."
+      ? "Eso no se puede determinar correctamente sin revisar los detalles de la póliza. Podemos verla con usted y explicarle cómo está funcionando."
       : "That can't be determined correctly without reviewing the policy details. We can look at it with you and explain how it's working.",
     infoOnly: es
-      ? "Claro. Un IUL es un seguro de vida con valor en efectivo; no es “solo una inversión”. Te explicamos lo básico con tu póliza delante."
+      ? "Claro. Un IUL es un seguro de vida con valor en efectivo; no es “solo una inversión”. Le explicamos lo básico con su póliza delante."
       : "Of course. An IUL is life insurance with cash-value features — not “just an investment.” We explain the basics with your policy in front of us.",
     noReplace: es
-      ? "La revisión es informativa y no te obliga a cambiar ni reemplazar nada. Solo vemos cómo está estructurada tu póliza."
+      ? "La revisión es informativa y no le obliga a cambiar ni reemplazar nada. Solo vemos cómo está estructurada su póliza."
       : "The review is informational and doesn't obligate you to change or replace anything. We just look at how your policy is structured.",
     agentInvestment: es
-      ? "La póliza combina seguro de vida con características de valor en efectivo. No discutimos con tu agente; si quieres, revisamos cómo está estructurada la tuya."
+      ? "La póliza combina seguro de vida con características de valor en efectivo. No discutimos con su agente; si desea, revisamos cómo está estructurada la suya."
       : "The policy combines life insurance with cash-value features. We won't argue with your agent; if you’d like, we can review how yours is structured.",
     sendHere: es
-      ? "En WhatsApp: es un seguro de vida con valor en efectivo, costos internos y una ilustración a futuro. Sin ver tu póliza no hacemos una recomendación personalizada."
+      ? "En WhatsApp: es un seguro de vida con valor en efectivo, costos internos y una ilustración a futuro. Sin ver su póliza no hacemos una recomendación personalizada."
       : "Over WhatsApp: it's life insurance with cash-value features, internal costs, and a future illustration. We don't make a personalized recommendation without reviewing your policy.",
     primerica: es
-      ? "Sí: trabajamos con Primerica. La revisión es para entender tu póliza IUL con claridad, sin compromiso."
+      ? "Sí: trabajamos con Primerica. La revisión es para entender su póliza IUL con claridad, sin compromiso."
       : "Yes — we work with Primerica. The review is to understand your IUL policy clearly, with no obligation.",
     cost: es
-      ? "La revisión es gratis. Cualquier recomendación financiera depende de tu situación y necesidades, después de ver la póliza."
+      ? "La revisión es gratis. Cualquier recomendación financiera depende de su situación y necesidades, después de ver la póliza."
       : "The review is free. Any financial recommendation depends on your needs and situation, after we look at the policy.",
     dayPartAck: es
-      ? "Perfecto. Te comparto opciones para la revisión por Zoom."
+      ? "Perfecto. Le comparto opciones para la revisión por Zoom."
       : "Perfect. I'll share options for the Zoom review.",
     offerSlots: es
-      ? "Tengo estos horarios disponibles para la revisión por Zoom. ¿Cuál te funciona mejor?"
+      ? "Tengo estos horarios disponibles para la revisión por Zoom. ¿Cuál le funciona mejor?"
       : "I have these times available for the Zoom review. Which works best for you?",
     zeroSlots: es
-      ? "Por ahora no veo un horario disponible en ese rango. ¿Te funciona mejor otro día u horario?"
+      ? "Por ahora no veo un horario disponible en ese rango. ¿Le funciona mejor otro día u horario?"
       : "I don't see an available time in that range right now. Would another day or time work better?",
     confirmDeferred: es
       ? "Perfecto. Confirmo la revisión por Zoom en ese horario."
       : "Perfect. I'll confirm the Zoom review at that time.",
     clarify: es
-      ? "Para seguir con claridad: ¿qué tipo de póliza quieres revisar?"
-      : "To keep this clear: what type of policy would you like to review?"
+      ? "Para seguir con claridad: ¿cuál describe su situación?"
+      : "To keep this clear: which describes your situation?"
   };
 }
 
-function renderIulAdReply(templateKey, language) {
+function renderIulAdReply(templateKey, language, entities = {}) {
   const c = copy(language);
+  const firstName = String(entities.firstName || "").trim();
+  const firstNameGreeting = firstName ? `, ${firstName}` : "";
   const map = {
-    iul_ad_opener: c.opener,
-    iul_intake_opener: c.intakeOpener,
+    iul_ad_opener: c.qualificationAsk,
+    iul_intake_opener: c.qualificationAsk,
+    iul_ask_qualification_status: c.qualificationAsk,
+    iul_ask_review_intent: c.reviewIntentAsk,
+    iul_ask_research_intent: c.researchIntentAsk,
+    iul_ask_policy_in_hand: c.unsureAsk,
+    iul_ask_other_detail: c.otherAsk,
+    iul_brief_how_then_review: `${c.briefHow} ${c.schedulingTransition}`,
+    iul_brief_costs_then_review: `${c.briefCosts} ${c.schedulingTransition}`,
+    iul_brief_growth_then_review: `${c.briefGrowth} ${c.schedulingTransition}`,
+    iul_brief_benefits_then_review: `${c.briefBenefits} ${c.schedulingTransition}`,
+    iul_brief_understand_then_review: `${c.briefUnderstand} ${c.schedulingTransition}`,
     iul_ask_policy_active: c.policyActiveAsk,
     iul_ask_policy_type: c.policyTypeAsk,
     iul_ask_carrier: c.carrierAsk,
@@ -543,7 +730,10 @@ function renderIulAdReply(templateKey, language) {
     iul_confirm_review_deferred: c.confirmDeferred,
     iul_clarify_policy_type: c.clarify
   };
-  return map[templateKey] || c.opener;
+  return String(map[templateKey] || c.qualificationAsk).replace(
+    /\{firstNameGreeting\}/g,
+    firstNameGreeting
+  );
 }
 
 function iulContextPatch(context, {
@@ -563,6 +753,8 @@ function iulContextPatch(context, {
   const patch = {
     conversationGoal: CONVERSATION_GOAL,
     campaignKind: CAMPAIGN_KIND,
+    campaignIntakePurpose: context.campaignIntakePurpose || "IUL_REVIEW",
+    ctwaReferral: context.ctwaReferral || null,
     currentStage: STAGES.QUALIFICATION,
     knownFacts: mergedFacts,
     conversation: {
@@ -582,6 +774,28 @@ function iulContextPatch(context, {
     };
   }
   return patch;
+}
+
+function interactiveCatalogForAsk(lastQuestionAsked) {
+  if (lastQuestionAsked === ASK.QUALIFICATION_STATUS) {
+    return "status";
+  }
+  if (lastQuestionAsked === ASK.REVIEW_INTENT) {
+    return "reviewIntent";
+  }
+  if (lastQuestionAsked === ASK.RESEARCH_INTENT) {
+    return "researchIntent";
+  }
+  if (lastQuestionAsked === ASK.POLICY_IN_HAND) {
+    return "policyInHand";
+  }
+  if (
+    lastQuestionAsked === ASK.SCHEDULING_DAY_PART ||
+    lastQuestionAsked === ASK.REVIEW_DAY_PART
+  ) {
+    return "dayPart";
+  }
+  return null;
 }
 
 function finishIulDecision(structured, context, {
@@ -612,6 +826,18 @@ function finishIulDecision(structured, context, {
     iulWorkflowStage,
     appointmentPatch
   });
+  const firstName = resolveIulFirstName(context);
+  const catalog = interactiveCatalogForAsk(lastQuestionAsked);
+  const body = renderIulAdReply(templateKey, structured.preferredLanguage, { firstName });
+  structured.customerReplyPlan.entities = {
+    ...(structured.customerReplyPlan.entities || {}),
+    firstName
+  };
+  if (catalog) {
+    const built = buildIulInteractive(catalog, body);
+    structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
+    structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
+  }
   return structured;
 }
 
@@ -743,6 +969,44 @@ function applySlotOfferDecision(structured, context, availability) {
   });
 }
 
+function beginZoomTransition(structured, context, {
+  knownFacts = {},
+  reasonCodes = [],
+  templateKey = "iul_scheduling_transition"
+} = {}) {
+  return finishIulDecision(structured, context, {
+    templateKey,
+    nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+    lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
+    knownFacts: {
+      ...knownFacts,
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY,
+      reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+    },
+    reasonCodes: [...reasonCodes, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK],
+    iulWorkflowStage: IUL_STAGES.REVIEW_READY
+  });
+}
+
+function briefTemplateForIntent(intentId) {
+  if (intentId === IUL_OPTION_IDS.REVIEW_HOW) {
+    return "iul_brief_how_then_review";
+  }
+  if (intentId === IUL_OPTION_IDS.REVIEW_COSTS) {
+    return "iul_brief_costs_then_review";
+  }
+  if (intentId === IUL_OPTION_IDS.REVIEW_GROWTH) {
+    return "iul_brief_growth_then_review";
+  }
+  if (intentId === IUL_OPTION_IDS.REVIEW_BENEFITS) {
+    return "iul_brief_benefits_then_review";
+  }
+  if (intentId === IUL_OPTION_IDS.REVIEW_UNDERSTAND) {
+    return "iul_brief_understand_then_review";
+  }
+  return "iul_scheduling_transition";
+}
+
 function applyIulAdDecision({ structured, context, interpretation } = {}) {
   const intent = interpretation?.intent;
   if (SAFETY_INTENTS.has(intent)) {
@@ -771,13 +1035,124 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     INTENTS.IUL_AGENT_SAID_INVESTMENT,
     INTENTS.IUL_SEND_INFO_HERE,
     INTENTS.IUL_PRIMERICA_QUESTION,
-    INTENTS.IUL_REVIEW_COST_QUESTION
+    INTENTS.IUL_REVIEW_COST_QUESTION,
+    INTENTS.IUL_STATUS_ACTIVE,
+    INTENTS.IUL_STATUS_RESEARCH,
+    INTENTS.IUL_STATUS_UNSURE,
+    INTENTS.IUL_REVIEW_INTENT,
+    INTENTS.IUL_OTHER_FREE_TEXT,
+    INTENTS.IUL_POLICY_IN_HAND
   ]);
   if (
     !isIulReviewAdTurn({ context, text: inboundText }) &&
     !iulIntents.has(intent)
   ) {
     return null;
+  }
+
+  if (intent === INTENTS.IUL_STATUS_ACTIVE) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_ask_review_intent",
+      nextAction: NEXT_ACTIONS.IUL_ASK_REVIEW_INTENT,
+      lastQuestionAsked: ASK.REVIEW_INTENT,
+      knownFacts: {
+        iulQualificationStatus: IUL_OPTION_IDS.STATUS_ACTIVE,
+        iulPolicyActive: true,
+        policyType: "IUL",
+        iulWorkflowStage: IUL_STAGES.ENGAGED
+      },
+      reasonCodes: [
+        REASON_CODES.IUL_BUTTON_FIRST_QUALIFICATION,
+        REASON_CODES.IUL_STATUS_CAPTURED
+      ],
+      iulWorkflowStage: IUL_STAGES.ENGAGED
+    });
+  }
+
+  if (intent === INTENTS.IUL_STATUS_RESEARCH) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_ask_research_intent",
+      nextAction: NEXT_ACTIONS.IUL_ASK_RESEARCH_INTENT,
+      lastQuestionAsked: ASK.RESEARCH_INTENT,
+      knownFacts: {
+        iulQualificationStatus: IUL_OPTION_IDS.STATUS_RESEARCH,
+        iulWorkflowStage: IUL_STAGES.ENGAGED
+      },
+      reasonCodes: [
+        REASON_CODES.IUL_BUTTON_FIRST_QUALIFICATION,
+        REASON_CODES.IUL_STATUS_CAPTURED
+      ],
+      iulWorkflowStage: IUL_STAGES.ENGAGED
+    });
+  }
+
+  if (intent === INTENTS.IUL_STATUS_UNSURE) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_ask_policy_in_hand",
+      nextAction: NEXT_ACTIONS.IUL_ASK_POLICY_IN_HAND,
+      lastQuestionAsked: ASK.POLICY_IN_HAND,
+      knownFacts: {
+        iulQualificationStatus: IUL_OPTION_IDS.STATUS_UNSURE,
+        iulWorkflowStage: IUL_STAGES.ENGAGED
+      },
+      reasonCodes: [
+        REASON_CODES.IUL_BUTTON_FIRST_QUALIFICATION,
+        REASON_CODES.IUL_STATUS_CAPTURED
+      ],
+      iulWorkflowStage: IUL_STAGES.ENGAGED
+    });
+  }
+
+  if (intent === INTENTS.IUL_REVIEW_INTENT) {
+    const reviewIntent = interpretation.entities?.iulReviewIntent || null;
+    if (interpretation.entities?.wantsOtherDetail || reviewIntent === IUL_OPTION_IDS.REVIEW_OTHER) {
+      return finishIulDecision(structured, context, {
+        templateKey: "iul_ask_other_detail",
+        nextAction: NEXT_ACTIONS.IUL_ASK_OTHER_DETAIL,
+        lastQuestionAsked: ASK.OTHER_DETAIL,
+        knownFacts: {
+          iulReviewIntent: IUL_OPTION_IDS.REVIEW_OTHER,
+          iulWorkflowStage: IUL_STAGES.REVIEW_QUALIFICATION
+        },
+        reasonCodes: [REASON_CODES.IUL_REVIEW_INTENT_CAPTURED],
+        iulWorkflowStage: IUL_STAGES.REVIEW_QUALIFICATION
+      });
+    }
+    const researchPath =
+      context.knownFacts?.iulQualificationStatus === IUL_OPTION_IDS.STATUS_RESEARCH ||
+      context.conversation?.lastQuestionAsked === ASK.RESEARCH_INTENT;
+    return beginZoomTransition(structured, context, {
+      templateKey: researchPath
+        ? briefTemplateForIntent(reviewIntent)
+        : "iul_scheduling_transition",
+      knownFacts: {
+        iulReviewIntent: reviewIntent,
+        reviewReason: reviewIntent,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [REASON_CODES.IUL_REVIEW_INTENT_CAPTURED]
+    });
+  }
+
+  if (intent === INTENTS.IUL_OTHER_FREE_TEXT) {
+    return beginZoomTransition(structured, context, {
+      knownFacts: {
+        iulOtherDetail: interpretation.entities?.iulOtherDetail || null,
+        reviewReasonRaw: interpretation.entities?.reviewReasonRaw || null,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [REASON_CODES.IUL_OTHER_DETAIL_CAPTURED]
+    });
+  }
+
+  if (intent === INTENTS.IUL_POLICY_IN_HAND) {
+    return beginZoomTransition(structured, context, {
+      knownFacts: {
+        iulPolicyInHand: interpretation.entities?.iulPolicyInHand === true,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [REASON_CODES.IUL_REVIEW_INTENT_CAPTURED]
+    });
   }
 
   if (intent === INTENTS.IUL_POLICY_IS_BAD_QUESTION) {
@@ -1038,6 +1413,40 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
 
   const pending = context.conversation?.lastQuestionAsked;
   if (
+    pending === ASK.QUALIFICATION_STATUS ||
+    pending === ASK.REVIEW_INTENT ||
+    pending === ASK.RESEARCH_INTENT ||
+    pending === ASK.POLICY_IN_HAND ||
+    pending === ASK.OTHER_DETAIL
+  ) {
+    const replayTemplate =
+      pending === ASK.REVIEW_INTENT
+        ? "iul_ask_review_intent"
+        : pending === ASK.RESEARCH_INTENT
+          ? "iul_ask_research_intent"
+          : pending === ASK.POLICY_IN_HAND
+            ? "iul_ask_policy_in_hand"
+            : pending === ASK.OTHER_DETAIL
+              ? "iul_ask_other_detail"
+              : "iul_ask_qualification_status";
+    const replayAction =
+      pending === ASK.REVIEW_INTENT
+        ? NEXT_ACTIONS.IUL_ASK_REVIEW_INTENT
+        : pending === ASK.RESEARCH_INTENT
+          ? NEXT_ACTIONS.IUL_ASK_RESEARCH_INTENT
+          : pending === ASK.POLICY_IN_HAND
+            ? NEXT_ACTIONS.IUL_ASK_POLICY_IN_HAND
+            : pending === ASK.OTHER_DETAIL
+              ? NEXT_ACTIONS.IUL_ASK_OTHER_DETAIL
+              : NEXT_ACTIONS.IUL_ASK_QUALIFICATION_STATUS;
+    return finishIulDecision(structured, context, {
+      templateKey: replayTemplate,
+      nextAction: replayAction,
+      lastQuestionAsked: pending
+    });
+  }
+
+  if (
     pending &&
     pending !== ASK.POLICY_TYPE &&
     pending !== ASK.POLICY_ACTIVE
@@ -1065,23 +1474,29 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     });
   }
 
-  if (isCampaignIntakeIulFirstTurn(context)) {
+  if (isCampaignIntakeIulFirstTurn(context) || !context?.conversation?.lastQuestionAsked) {
     return finishIulDecision(structured, context, {
-      templateKey: "iul_intake_opener",
-      nextAction: NEXT_ACTIONS.IUL_ASK_POLICY_ACTIVE,
-      lastQuestionAsked: ASK.POLICY_ACTIVE,
+      templateKey: "iul_ask_qualification_status",
+      nextAction: NEXT_ACTIONS.IUL_ASK_QUALIFICATION_STATUS,
+      lastQuestionAsked: ASK.QUALIFICATION_STATUS,
       knownFacts: { iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD },
-      reasonCodes: [REASON_CODES.IUL_SPANISH_FIRST_OPENER],
+      reasonCodes: [
+        REASON_CODES.IUL_SPANISH_FIRST_OPENER,
+        REASON_CODES.IUL_BUTTON_FIRST_QUALIFICATION
+      ],
       iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD
     });
   }
 
   return finishIulDecision(structured, context, {
-    templateKey: "iul_ad_opener",
-    nextAction: NEXT_ACTIONS.IUL_ASK_POLICY_TYPE,
-    lastQuestionAsked: ASK.POLICY_TYPE,
+    templateKey: "iul_ask_qualification_status",
+    nextAction: NEXT_ACTIONS.IUL_ASK_QUALIFICATION_STATUS,
+    lastQuestionAsked: ASK.QUALIFICATION_STATUS,
     knownFacts: { iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD },
-    reasonCodes: [REASON_CODES.IUL_SPANISH_FIRST_OPENER],
+    reasonCodes: [
+      REASON_CODES.IUL_SPANISH_FIRST_OPENER,
+      REASON_CODES.IUL_BUTTON_FIRST_QUALIFICATION
+    ],
     iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD
   });
 }

@@ -804,6 +804,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   // BR-095 — raw preserved for audit; comparisonText used for deterministic matching.
   const inbound = normalizeInboundText(message?.text ?? message ?? "");
   const originalText = inbound.trimmedText;
+  const interactiveReply =
+    message?.interactiveReply ||
+    options.interactiveReply ||
+    null;
   const text = inbound.comparisonText;
   const flexible =
     options.flexible !== undefined
@@ -940,7 +944,11 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.requestedLanguage = languageSwitchTo;
   } else if (isIulReviewAdTurn({ context, text: originalText || text })) {
     // Implements BR-143 — IUL-ad / policy_review track outranks recruiting FAQ.
-    const iul = classifyIulAdInbound({ text: originalText || text, context });
+    const iul = classifyIulAdInbound({
+      text: originalText || text,
+      context,
+      interactiveReply
+    });
     intent = iul.intent;
     confidence = iul.confidence;
     Object.assign(entities, iul.entities || {});

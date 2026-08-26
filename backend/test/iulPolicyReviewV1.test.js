@@ -232,8 +232,11 @@ test("SCHEDULING 12-14: enough facts transitions to Zoom scheduling ask", () => 
     conversation: { lastQuestionAsked: ASK.DOCUMENTS }
   });
   const { rendered, decision } = renderTurn("no", ctx);
-  assert.match(rendered.text, /Zoom/i);
-  assert.match(rendered.text, /mañana|tarde/i);
+  assert.match(rendered.text, /revisar su póliza|horario le funciona/i);
+  assert.match(
+    decision.customerReplyPlan.entities.interactiveFallbackText || rendered.text,
+    /Mañana|Tarde/i
+  );
   assert.equal(
     decision.contextPatch.knownFacts.reviewMeetingType || decision.contextPatch.knownFacts.reviewMeetingType,
     "ZOOM"
@@ -367,9 +370,10 @@ test("recruiting greeting unchanged without IUL context", () => {
   assert.equal(isIulReviewAdContext(createConversationContext()), false);
 });
 
-test("IUL opener asks policy type, not recruiting location", () => {
+test("IUL opener asks qualification status, not recruiting location", () => {
   const { rendered, decision } = renderTurn("Hola", iulContext());
-  assert.match(rendered.text, /IUL/i);
+  assert.match(rendered.text, /orientarle|situación/i);
   assert.doesNotMatch(rendered.text, /ciudad/i);
-  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.POLICY_TYPE);
+  assert.doesNotMatch(rendered.text, /Zoom/i);
+  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.QUALIFICATION_STATUS);
 });

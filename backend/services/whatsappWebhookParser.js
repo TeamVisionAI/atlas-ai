@@ -7,6 +7,8 @@ const {
   extractWhatsAppSenderIdentity,
   resolveContactForMessage
 } = require("../core/whatsappSenderIdentity");
+const { extractInteractiveReply } = require("../core/whatsappInteractiveMessage");
+const { historyLabelForId } = require("../core/recruitAiV2/iulQualificationOptions");
 
 function normalizeMessageBody(message) {
   if (!message) {
@@ -22,11 +24,13 @@ function normalizeMessageBody(message) {
   }
 
   if (message.type === "interactive") {
-    const interactive = message.interactive || {};
+    const reply = extractInteractiveReply(message);
     return String(
-      interactive.button_reply?.title ||
-        interactive.list_reply?.title ||
-        interactive.list_reply?.description ||
+      historyLabelForId(reply?.id, reply?.title) ||
+        reply?.title ||
+        message.interactive?.button_reply?.title ||
+        message.interactive?.list_reply?.title ||
+        message.interactive?.list_reply?.description ||
         ""
     ).trim();
   }
@@ -191,6 +195,7 @@ function parseWhatsAppWebhookPayload(body) {
           wabaId,
           media: extractWhatsAppMedia(message),
           ctwaReferral: extractClickToWhatsAppReferral(message),
+          interactiveReply: extractInteractiveReply(message),
           rawMessage: message,
           rawValue: value
         });

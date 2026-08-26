@@ -204,6 +204,11 @@ async function deliverWhatsAppReply({
     );
   }
 
+  const replyEntities =
+    engineResult?.v2Result?.responsePlan?.entities ||
+    engineResult?.v2Result?.structuredDecision?.customerReplyPlan?.entities ||
+    {};
+
   const delivery = await whatsappOutboundPipeline.sendAndPersistWhatsAppMessage({
       to: normalized.phone,
       message: replyText,
@@ -213,7 +218,9 @@ async function deliverWhatsAppReply({
       idempotencyKey: engineResult?.confirmationIdempotencyKey || null,
       templateKey,
       templateVariables,
-      inboundPhoneNumberId: normalized.phoneNumberId || null
+      inboundPhoneNumberId: normalized.phoneNumberId || null,
+      interactive: replyEntities.whatsappInteractive || null,
+      interactiveFallbackText: replyEntities.interactiveFallbackText || replyText
   });
 
   const isV2Owned =
