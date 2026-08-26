@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import {
   getProspectCenter,
   acknowledgeProspectLead,
@@ -178,6 +179,7 @@ export default function ProspectCenter() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { translate, language } = useLanguage();
+  const { supportMode } = useWorkspace();
   const locale = language === "es" ? "es-US" : "en-US";
 
   const activeFilter = searchParams.get("filter") || "all";
@@ -338,7 +340,7 @@ export default function ProspectCenter() {
 
   useEffect(() => {
     loadCenter({ mode: "replace" });
-  }, [activeFilter, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional filter/search replace load
+  }, [activeFilter, searchQuery, supportMode?.active, supportMode?.organizationId]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional filter/search/support-mode replace load
 
   useEffect(() => {
     const refreshLiveCenter = () => {

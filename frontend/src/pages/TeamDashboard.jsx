@@ -72,7 +72,7 @@ function PriorityRow({ item, translate, onNavigate }) {
 export default function TeamDashboard() {
   const navigate = useNavigate();
   const { translate } = useLanguage();
-  const { user } = useWorkspace();
+  const { user, supportMode } = useWorkspace();
   const [executive, setExecutive] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [organizationName, setOrganizationName] = useState("");
@@ -115,7 +115,7 @@ export default function TeamDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [supportMode?.active, supportMode?.organizationId]);
 
   const viewModel = useMemo(() => {
     if (!executive || !dashboard || !user) {

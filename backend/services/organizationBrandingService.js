@@ -3,9 +3,11 @@
  */
 
 const { supabase } = require("./supabaseService");
-const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 
-async function getOrganizationBranding(organizationId = DEFAULT_ORGANIZATION_ID) {
+async function getOrganizationBranding(organizationId) {
+  if (!organizationId) {
+    throw new Error("organizationId is required to load organization branding");
+  }
   const { data, error } = await supabase
     .from("organizations")
     .select(

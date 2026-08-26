@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import { appPath } from "../config/appRoutes";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
 import { buildProspectMilestoneLabel } from "../engines/prospectCenterViewModel";
@@ -9,6 +10,7 @@ import "./WorkspaceDashboard.css";
 
 export default function MyDashboard() {
   const { translate } = useLanguage();
+  const { supportMode } = useWorkspace();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -41,7 +43,7 @@ export default function MyDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [translate]);
+  }, [translate, supportMode?.active, supportMode?.organizationId]);
 
   const prospects = dashboard?.prospects || [];
   const activeProspects = useMemo(

@@ -1,20 +1,35 @@
 /**
  * Sprint 16.9 — Tenant context helpers for organization-scoped queries.
+ * BR-146 — never fall back to the Team Vision seed tenant when effective org is missing.
  */
 
 const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
 
+function missingTenantContextError(statusCode = 403) {
+  const error = new Error("Effective organization is required.");
+  error.statusCode = statusCode;
+  error.publicCode = statusCode === 401 ? "UNAUTHORIZED" : "TENANT_CONTEXT_REQUIRED";
+  return error;
+}
+
 function getTenantOrganizationId(req) {
-  return getEffectiveOrganizationId(req) || DEFAULT_ORGANIZATION_ID;
+  const organizationId =
+    req?.tenantContext?.organizationId || getEffectiveOrganizationId(req) || null;
+
+  if (!organizationId) {
+    throw missingTenantContextError();
+  }
+
+  return organizationId;
 }
 
 function resolveTenantOrganizationId(req, requestedOrganizationId) {
   if (!req?.authContext) {
-    return DEFAULT_ORGANIZATION_ID;
+    throw missingTenantContextError(401);
   }
 
-  const effectiveOrganizationId = getEffectiveOrganizationId(req);
+  const effectiveOrganizationId = getTenantOrganizationId(req);
   const requested =
     requestedOrganizationId ||
     req.query?.organizationId ||
@@ -39,8 +54,8 @@ function withOrganizationFilter(query, organizationId) {
 }
 
 function assertSameOrganization(context, recordOrganizationId) {
-  if (!recordOrganizationId) {
-    return true;
+  if (!context?.organizationId || !recordOrganizationId) {
+    return false;
   }
 
   return String(context.organizationId) === String(recordOrganizationId);

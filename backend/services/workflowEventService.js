@@ -315,12 +315,19 @@ async function listWorkflowEvents(phone, limit = 50) {
 /**
  * Recent workflow events across all prospects (Executive Dashboard activity feed).
  */
-async function listRecentWorkflowEvents(limit = 50) {
-  const { data, error } = await supabase
+async function listRecentWorkflowEvents(limit = 50, organizationId = null) {
+  if (!organizationId) {
+    return [];
+  }
+
+  let query = supabase
     .from("workflow_events")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  const { data, error } = await query;
 
   if (error) {
     if (

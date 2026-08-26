@@ -24,6 +24,40 @@ const { requirePermission } = require("../middleware/requirePermission");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
 const { PERMISSIONS } = require("../security/permissions");
 
+function snapshotItemOrganizationId(item) {
+  return (
+    item?.organizationId ||
+    item?.organization_id ||
+    item?.prospect?.organization_id ||
+    item?.prospect?.organizationId ||
+    null
+  );
+}
+
+function scopeLiveSnapshot(snapshot, organizationId) {
+  const matches = (item) => {
+    const itemOrganizationId = snapshotItemOrganizationId(item);
+    return itemOrganizationId && String(itemOrganizationId) === String(organizationId);
+  };
+
+  const activeConversations = (snapshot.activeConversations || []).filter(matches);
+  const waitingQueue = (snapshot.waitingQueue || []).filter(matches);
+  const activityFeed = (snapshot.activityFeed || []).filter(matches);
+
+  return {
+    ...snapshot,
+    organizationId,
+    counters: {
+      ...(snapshot.counters || {}),
+      activeConversations: activeConversations.length,
+      waitingQueue: waitingQueue.length
+    },
+    activeConversations,
+    waitingQueue,
+    activityFeed
+  };
+}
+
 function tenantMissionControlOptions(req) {
   const userId = req.tenantContext?.userId || req.authContext?.userId || req.atlasUser?.id || null;
 
@@ -42,10 +76,14 @@ router.use(organizationGuard());
 
 router.get("/live/snapshot", (req, res) => {
   try {
+    const organizationId = getTenantOrganizationId(req);
     const { missionControlService } = getCommunicationGateway();
-    res.json(missionControlService.getSnapshot());
+    res.json(scopeLiveSnapshot(missionControlService.getSnapshot(), organizationId));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message
+    });
   }
 });
 

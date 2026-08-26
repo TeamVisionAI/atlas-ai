@@ -71,4 +71,5 @@ test("scoped data loads from hierarchy-filtered dashboard APIs only", () => {
   assert.match(teamDashboardSource, /getExecutiveDashboard\(\)/);
   assert.match(teamDashboardSource, /getDashboard\(\)/);
   assert.match(teamDashboardSource, /buildTeamDashboardViewModel/);
+  assert.match(teamDashboardSource, /supportMode\?\.organizationId/);
 });

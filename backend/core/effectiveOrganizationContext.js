@@ -1,14 +1,13 @@
 /**
  * Canonical effective tenant organization resolution.
  * Support Mode (super admin) overrides home org; normal users always use home org.
+ * BR-146 — never substitute the Team Vision seed tenant when org context is missing.
  */
 
-const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { isSuperAdmin } = require("../security/saasRoles");
 
 function resolveEffectiveOrganizationId(authContext = null, supportContext = null) {
-  const homeOrgId =
-    authContext?.organizationId || authContext?.organization_id || DEFAULT_ORGANIZATION_ID;
+  const homeOrgId = authContext?.organizationId || authContext?.organization_id || null;
 
   if (
     supportContext?.organizationId &&

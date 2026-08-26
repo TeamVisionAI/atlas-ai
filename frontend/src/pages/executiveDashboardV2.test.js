@@ -17,6 +17,20 @@ test("Executive Dashboard v2 uses progressive hook instead of blocking Promise.a
   assert.match(source, /executive-dashboard--v2/);
 });
 
+test("operational surfaces refetch when Support Mode tenant changes", () => {
+  const missionControl = fs.readFileSync(
+    path.join(__dirname, "../pages/Dashboard.jsx"),
+    "utf8"
+  );
+  const prospectCenter = fs.readFileSync(
+    path.join(__dirname, "../pages/ProspectCenter.jsx"),
+    "utf8"
+  );
+
+  assert.match(missionControl, /supportMode\?\.organizationId/);
+  assert.match(prospectCenter, /supportMode\?\.organizationId/);
+});
+
 test("Executive Dashboard v2 progressive hook phases requests", () => {
   const source = fs.readFileSync(
     path.join(__dirname, "../hooks/useExecutiveDashboardV2Data.js"),
@@ -28,6 +42,7 @@ test("Executive Dashboard v2 progressive hook phases requests", () => {
   assert.match(source, /getDashboard/);
   assert.match(source, /AbortController/);
   assert.match(source, /setPhase\(2\)/);
+  assert.match(source, /supportMode\?\.organizationId/);
 });
 
 test("Executive Dashboard route remains executive-dashboard with BR-149 gate", () => {

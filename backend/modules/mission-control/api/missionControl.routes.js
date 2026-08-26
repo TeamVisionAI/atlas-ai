@@ -4,6 +4,7 @@
 
 const express = require("express");
 const { requireAtlasUser } = require("../../../middleware/requireAtlasUser");
+const { organizationGuard } = require("../../../middleware/organizationGuard");
 const { createMissionControlController } = require("./missionControl.controller");
 const { MissionControlService } = require("../application/MissionControlService");
 
@@ -13,6 +14,7 @@ function createMissionControlRoutes(deps = {}) {
   const controller = createMissionControlController(service);
 
   router.use(requireAtlasUser);
+  router.use(organizationGuard());
 
   router.get("/", controller.getReadModel.bind(controller));
   router.get("/summary", controller.getSummary.bind(controller));

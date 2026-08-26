@@ -6,7 +6,6 @@
  */
 
 const { isSuperAdmin } = require("../security/saasRoles");
-const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
 
 function resolveRequestedOrganizationId(req) {
@@ -33,10 +32,17 @@ function organizationGuard(options = {}) {
       });
     }
 
-    const homeOrganizationId = context.organizationId || DEFAULT_ORGANIZATION_ID;
+    const homeOrganizationId = context.organizationId || null;
     const effectiveOrganizationId =
       getEffectiveOrganizationId(req) || homeOrganizationId;
     const requestedOrgId = resolveRequestedOrganizationId(req);
+
+    if (!effectiveOrganizationId) {
+      return res.status(403).json({
+        error: "TENANT_CONTEXT_REQUIRED",
+        message: "Effective organization is required."
+      });
+    }
 
     if (requestedOrgId && String(requestedOrgId) !== String(effectiveOrganizationId)) {
       return res.status(403).json({

@@ -26,7 +26,10 @@ router.get("/", async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error("[follow-ups]", error.message);
-    res.status(500).json({ error: "Failed to load follow-ups queue" });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "Failed to load follow-ups queue",
+      message: error.message
+    });
   }
 });
 

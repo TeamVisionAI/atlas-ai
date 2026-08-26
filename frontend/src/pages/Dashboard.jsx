@@ -218,7 +218,7 @@ export default function Dashboard() {
   const [qualificationDraftActive, setQualificationDraftActive] = useState(false);
   const showMissionExecutionSuccess = useMissionExecutionSuccessToast();
   const { showSuccess, showError, showInfo } = useToast();
-  const { user: currentUser } = useWorkspace();
+  const { user: currentUser, supportMode } = useWorkspace();
   const { prompt, promptDialog } = usePromptDialog();
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
@@ -348,7 +348,14 @@ export default function Dashboard() {
     }
 
     loadDashboard();
-  }, [executiveFilter, deepLinkPhone, deepLinkProspectId, translate]);
+  }, [
+    executiveFilter,
+    deepLinkPhone,
+    deepLinkProspectId,
+    translate,
+    supportMode?.active,
+    supportMode?.organizationId
+  ]);
 
   const phone = workspace?.phone;
 
