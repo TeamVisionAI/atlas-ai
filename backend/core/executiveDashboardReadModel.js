@@ -4,7 +4,10 @@
  */
 
 const { supabase } = require("../services/supabaseService");
-const { filterProductionProspects } = require("./productionProspectFilter");
+const {
+  filterProductionProspects,
+  filterOperationalProspects
+} = require("./productionProspectFilter");
 const {
   filterOutOperationalTestProspects
 } = require("./missionControlOperationalTestFilter");
@@ -83,7 +86,7 @@ function isThisLocalWeek(timestampMs, reference = new Date(), organizationId = n
   return isTimestampInWindow(timestampMs, window);
 }
 
-async function loadProductionProspects(organizationId) {
+async function loadProductionProspects(organizationId, options = {}) {
   if (!organizationId) {
     throw new Error("organizationId is required to load production prospects");
   }
@@ -97,9 +100,16 @@ async function loadProductionProspects(organizationId) {
     throw error;
   }
 
-  return filterOutOperationalTestProspects(
+  const production = filterOutOperationalTestProspects(
     filterProductionProspects(data || [])
   );
+
+  // Implements BR-159 — Dashboard / MC / Prospect Center / KPIs are operational-only.
+  if (options.includeNonOperationalContacts === true) {
+    return production;
+  }
+
+  return filterOperationalProspects(production);
 }
 
 function findProspectByPhone(prospects, phone) {

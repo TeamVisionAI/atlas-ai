@@ -43,9 +43,13 @@ const {
 const { resolveWhatsAppCreateLanguageFields } = require("./prospectLanguage");
 const {
   hasPositiveCtwaReferral,
+  hasFreshIulCampaignIntakeMatch,
   resolveVerifiedAtlasEligibilitySource,
   persistVerifiedAtlasEligibilitySource
 } = require("./atlasInboundAutomationEligibility");
+const {
+  evaluateProspectPromotion
+} = require("./prospectPromotionEligibility");
 const {
   getCampaignIntakeAttributionService
 } = require("./campaignIntakeCode/campaignIntakeAttributionService");
@@ -145,8 +149,11 @@ function resolveCreateSourceFields(qrTouch, origin = {}) {
 
   if (
     origin.campaignIntakeMatch?.matched === true &&
-    String(origin.campaignIntakeMatch.purpose || "").toUpperCase() === "RECRUITING" &&
-    origin.campaignIntakeMatch.recruitingEligible === true
+    ((String(origin.campaignIntakeMatch.purpose || "").toUpperCase() === "RECRUITING" &&
+      origin.campaignIntakeMatch.recruitingEligible === true) ||
+      hasFreshIulCampaignIntakeMatch({
+        campaignIntakeMatch: origin.campaignIntakeMatch
+      }))
   ) {
     return {
       source: WHATSAPP_SOURCE.CAMPAIGN_INTAKE,
@@ -200,7 +207,9 @@ async function insertWhatsAppProspectRow({
     );
   }
 
-  const prospectNumber = await prospectNumberService.generateNextProspectNumber();
+  const prospectNumber = await prospectNumberService.generateNextProspectNumber(
+    organizationId
+  );
   const fullName = String(name || "Unknown").trim() || "Unknown";
   const sourceFields = resolveCreateSourceFields(qrTouch, origin);
   // Always set preferred_language — DB DEFAULT 'english' must not override Spanish WhatsApp leads.
@@ -562,6 +571,32 @@ async function locateOrCreateWhatsAppProspect({
   };
 
   const sourceFields = resolveCreateSourceFields(qrTouch, origin);
+  const promotion = evaluateProspectPromotion({
+    existingProspect: created ? null : prospect,
+    qrTouch,
+    ctwaReferral: origin.ctwaReferral,
+    campaignIntakeMatch: origin.campaignIntakeMatch,
+    intakeSource: origin.intakeSource,
+    sourceFields
+  });
+
+  if (created && !promotion.promote) {
+    logWhatsAppStage("prospect_promotion_denied", {
+      phone: storagePhone,
+      organizationId,
+      reason: promotion.reason
+    });
+    return {
+      prospect: null,
+      created: false,
+      storagePhone,
+      organizationId,
+      contactOnly: true,
+      promotionDeniedReason: promotion.reason,
+      qrAttribution: null,
+      campaignIntakeMatch: origin.campaignIntakeMatch || null
+    };
+  }
 
   if (created) {
     prospect = await insertWhatsAppProspectRow({

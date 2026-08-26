@@ -20,6 +20,7 @@ const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
     // Written only when webhook carried positive CTWA referral at create (BR-142).
     WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
+    WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
     "QUICK_CAPTURE"
   ])
 );
