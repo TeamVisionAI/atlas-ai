@@ -32,7 +32,11 @@ const {
   buildMissionId
 } = require("./configuration/missionTypes");
 const { MISSION_PRIORITIES, sortMissions } = require("./configuration/missionPriorities");
-const { isProductionProspect, filterProductionProspects } = require("./productionProspectFilter");
+const {
+  isProductionProspect,
+  filterProductionProspects,
+  filterOperationalProspects
+} = require("./productionProspectFilter");
 
 const INTERESTED_OUTCOMES = new Set(["Interested", "Information Collected"]);
 
@@ -893,7 +897,7 @@ async function getHighestPriorityMissionForProspect(phone, organizationId) {
 
 async function loadOrganizationProspects(organizationId) {
   const data = await loadProspectsForOrganization(organizationId);
-  return filterProductionProspects(data || []);
+  return filterOperationalProspects(filterProductionProspects(data || []));
 }
 
 async function generateMissionsForOrganization(organizationId, options = {}) {

@@ -104,6 +104,9 @@ function resolveVerifiedAtlasEligibilitySource({
   ) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_CODE;
   }
+  if (hasFreshIulCampaignIntakeMatch({ campaignIntakeMatch })) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_IUL;
+  }
   const entry = upper(sourceFields?.entryMethod || intakeSource);
   if (entry === WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS || entry === "FACEBOOK_LEAD") {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.FACEBOOK_LEAD_ADS;

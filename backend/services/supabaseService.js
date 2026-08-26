@@ -207,7 +207,12 @@ async function findLatestActiveProspectInOrganization(organizationId) {
   const {
     isTerminalClosedForMissionControlQueue
   } = require("../core/missionControlTerminalOutcomeFilter");
-  const eligibleProspects = filterOutOperationalTestProspects(productionProspects).filter(
+  const {
+    filterOperationalProspects
+  } = require("../core/prospectPromotionEligibility");
+  const eligibleProspects = filterOperationalProspects(
+    filterOutOperationalTestProspects(productionProspects)
+  ).filter(
     (prospect) =>
       !isTerminalClosedForMissionControlQueue({
         prospect,

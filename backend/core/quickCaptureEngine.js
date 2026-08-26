@@ -322,7 +322,7 @@ async function createQuickCaptureProspect(payload, atlasUser, options = {}) {
     return existingConflict;
   }
 
-  const prospectNumber = await generateNextProspectNumber();
+  const prospectNumber = await generateNextProspectNumber(organizationId);
   const fullName = `${data.firstName} ${data.lastName}`.trim();
   const userId = atlasUser.id;
 

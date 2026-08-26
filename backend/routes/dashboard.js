@@ -13,7 +13,10 @@ const { supabase } = require("../services/supabaseService");
 const {
   buildPrioritizedWorkflowQueue
 } = require("../core/missionControlPriorityEngine");
-const { filterProductionProspects } = require("../core/productionProspectFilter");
+const {
+  filterProductionProspects,
+  filterOperationalProspects
+} = require("../core/productionProspectFilter");
 const {
   filterOutOperationalTestProspects
 } = require("../core/missionControlOperationalTestFilter");
@@ -44,8 +47,8 @@ router.get("/", async (req, res) => {
       return res.status(500).json(error);
     }
 
-    const productionProspects = filterOutOperationalTestProspects(
-      filterProductionProspects(data || [])
+    const productionProspects = filterOperationalProspects(
+      filterOutOperationalTestProspects(filterProductionProspects(data || []))
     );
     const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
 
@@ -128,7 +131,9 @@ router.get("/activity", requireDashboardAccess, async (req, res) => {
       .from("prospects")
       .select("*")
       .eq("organization_id", organizationId);
-    const productionProspects = filterProductionProspects(data || []);
+    const productionProspects = filterOperationalProspects(
+      filterProductionProspects(data || [])
+    );
     const prospects = filterProspectsForAuthContext(
       req.authContext,
       filterOutOperationalTestProspects(productionProspects)

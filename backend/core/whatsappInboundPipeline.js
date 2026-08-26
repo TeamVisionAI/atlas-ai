@@ -375,7 +375,16 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     messageBody: body
   });
 
-  const { prospect, created, storagePhone, organizationId, qrAttribution, campaignIntakeMatch } =
+  const {
+    prospect,
+    created,
+    storagePhone,
+    organizationId,
+    qrAttribution,
+    campaignIntakeMatch,
+    contactOnly,
+    promotionDeniedReason
+  } =
     await locateOrCreate({
       phone: inboundWithIdentity.phone,
       name: inboundWithIdentity.contactName,
@@ -388,6 +397,91 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null,
       senderIdentity
     });
+
+  // Implements BR-159 — unknown/personal inbound is logged, not promoted.
+  if (!prospect) {
+    const logResult = await persistInboundLog({
+      phone: storagePhone || inboundWithIdentity.phone,
+      name: inboundWithIdentity.contactName || inbound.contactName || "Unknown",
+      direction: "incoming",
+      message: body,
+      intent: "WHATSAPP_INBOUND",
+      pipeline: "CONTACT",
+      currentStep: "CONTACT",
+      language: null,
+      city: null,
+      state: null,
+      eventCorrelationId: correlationId,
+      providerMessageId: inbound.providerMessageId,
+      rawWebhookPayload: {
+        message: inbound.rawMessage,
+        valueMetadata: {
+          messaging_product: inbound.rawValue?.messaging_product || "whatsapp",
+          metadata: inbound.rawValue?.metadata || null
+        }
+      }
+    });
+
+    if (!logResult.success) {
+      logWhatsAppStage("message_persist_failed", {
+        phone: storagePhone || inboundWithIdentity.phone,
+        providerMessageId: inbound.providerMessageId,
+        level: "error",
+        error: logResult.error?.message || "unknown"
+      });
+      return {
+        success: false,
+        error: "MESSAGE_PERSIST_FAILED"
+      };
+    }
+
+    logWhatsAppStage("contact_logged_not_promoted", {
+      phone: storagePhone || inboundWithIdentity.phone,
+      organizationId: organizationId || claimedOrganizationId || null,
+      reason: promotionDeniedReason || "NO_VALID_PROMOTION_SIGNAL",
+      conversationLogId: logResult.log?.id || null
+    });
+
+    try {
+      await maybeCreateUnsupportedInboundReview({
+        inbound,
+        organizationSource,
+        organizationId: organizationId || claimedOrganizationId || null,
+        prospect: null,
+        campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : intakeLookup,
+        conversationLogId: logResult.log?.id || null,
+        correlationId,
+        qrAttributed: false,
+        dependencies
+      });
+    } catch (reviewError) {
+      logWhatsAppStage("unsupported_whatsapp_inbound_review_create_failed", {
+        level: "warn",
+        phone: storagePhone || inboundWithIdentity.phone,
+        providerMessageId: inbound.providerMessageId,
+        error: reviewError.message
+      });
+    }
+
+    return {
+      success: true,
+      skipped: false,
+      created: false,
+      contactOnly: true,
+      reason: promotionDeniedReason || "CONTACT_NOT_PROMOTED",
+      phone: storagePhone || inboundWithIdentity.phone,
+      conversationLogId: logResult.log?.id || null,
+      correlationId,
+      conversation: {
+        success: true,
+        replied: false,
+        reason: "ATLAS_AUTOMATION_NOT_ELIGIBLE"
+      },
+      organizationId: organizationId || claimedOrganizationId || null,
+      prospectId: null,
+      ownerUserId: null
+    };
+  }
 
   if (campaignIntakeMatch?.matched) {
     const workflowState = prospect?.phone

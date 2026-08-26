@@ -1769,7 +1769,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Fail closed** — Auto-reply only with a positive signal. Do not infer eligibility from message text (`Hi`, `Hola`, …), contact name, or “someone texted 7338”.
 2. **Eligible origins** — Click-to-WhatsApp Meta ad referral (`referral.source_type=ad` or `ctwa_clid`); trusted QR pending-inbound match (BR-129); stored QR / `car_magnet` / `FACEBOOK_LEAD_ADS` / `QUICK_CAPTURE` written by those verified events; durable `atlasEligibilitySource` from a verified event; or explicit `atlasAutomationEnabled=true`. `FACEBOOK` / `CLICK_TO_WHATSAPP` labels alone are **not** proof. An existing Recruit AI session / qualification step does **not** override a fail-closed inbound.
-3. **Unknown inbound** — May persist the message (and create an `UNATTRIBUTED` prospect). Must not live-author, run CE for a customer reply, or send automated WhatsApp. Must not stamp FACEBOOK / CLICK_TO_WHATSAPP by default.
+3. **Unknown inbound** — May persist the message and conversation/audit history. Must **not** create or promote an operational prospect (BR-159). Must not live-author, run CE for a customer reply, or send automated WhatsApp. Must not stamp FACEBOOK / CLICK_TO_WHATSAPP by default.
 4. **Explicit enable** — Operators may set `atlasAutomationEnabled` so a previously silent contact starts receiving Atlas replies. Explicit `false` keeps Atlas silent.
 5. **Boundaries** — Does not change TAKE OVER / RETURN TO ATLAS, BR-075, QR matching, or execution flags. Does not guess CTWA from greetings. Does not rewrite historical production rows.
 
@@ -2068,6 +2068,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 8. **Conversation** — Formal Spanish only (`usted`, `su póliza`, `le`, `tiene`). Do not mix `tú` / `tu`. Spanish-first. Concise. Do not ask carrier, policy age, or monthly premium one-by-one before scheduling. Preserve campaign/owner/org/Meta attribution and CTWA eligibility (BR-142).
 9. **Interactive send** — Prefer Cloud API reply buttons when ≤3 options and titles fit Meta’s 20-character limit; otherwise the existing list-message pattern. Branch on stable IDs, never display labels. Persist the human-readable label in conversation history. If interactive delivery fails, fall back to numbered text (`1.` / `2.` / `3.`) and accept those digits.
 10. **Boundaries** — No full IUL analysis over WhatsApp. No replacement/cancellation recommendation. No unsupported guarantees or tax claims. Ordinary text-only WhatsApp conversations stay unchanged.
+
+---
+
+## BR-159 — Prospect Promotion Requires a Valid Signal
+
+**Implements:** A WhatsApp/contact record may be stored for audit/history, but must not become an operational prospect merely because Atlas received, synced, or saw the contact. The same rule applies to every tenant.
+**Domain:** Prospects / WhatsApp inbound / Team Dashboard / Mission Control / Prospect Center / KPIs
+**Depends on:** BR-142, BR-129, BR-147, BR-080
+**Related:** BR-075, BR-143, BR-157
+**Status:** Implemented
+**Engine target:** `prospectPromotionEligibility.js`, `whatsappProspectResolver.js`, `whatsappInboundPipeline.js`, `productionProspectFilter.js`, `prospectNumberService.js`
+**Tests:** `backend/test/prospectPromotionEligibilityBr159.test.js`
+
+### Rules
+
+1. **Fail closed** — A contact becomes a prospect only after an explicit valid signal: verified CTWA/ad referral; trusted QR pending-inbound; valid campaign intake (recruiting or IUL); Facebook Lead Ads intake; Quick Capture explicit create; explicit manual convert/create; stored verified lead-origin evidence; or explicit `atlasAutomationEnabled=true`.
+2. **Not enough** — Receiving, syncing, or seeing a WhatsApp contact is not promotion. Message text, contact name, and “someone texted the business number” are not promotion.
+3. **Operational surfaces** — Personal/unknown contacts must not appear in Team Dashboard prospect lists/priorities, Mission Control queues, Prospect Center, or New/Hot/Follow-up/Appointment prospect KPIs. They must not enter Recruit AI or IUL workflow, must not trigger Atlas auto-reply (BR-142), and must not receive prospect lifecycle/status merely from contact creation.
+4. **Persistence** — Conversation logs, WhatsApp archive, and audit history may remain as contact/conversation records.
+5. **Multi-tenant** — Do not branch on Team Vision UUID. Team Vision, Team Legacy, and every future tenant inherit this rule automatically.
+6. **Prospect identity** — Generate/display `prospect_number` from the record `organization_id` (configured prefix, or slug/name-derived: Team Vision → TV, Team Legacy → TL). Never mint a TV identity because `DEFAULT_ORGANIZATION_ID` is missing. `organization_id` remains authoritative; do not infer organization from the prefix.
+7. **Boundaries** — Does not weaken CTWA, QR, IUL, or recruiting eligibility. Does not change Google Calendar, Meta ownership, billing, or appointment scheduling logic.
 
 ---
 

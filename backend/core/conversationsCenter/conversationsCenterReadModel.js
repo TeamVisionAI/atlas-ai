@@ -39,7 +39,9 @@ function loadProductionProspectsSafe(organizationId) {
   const {
     loadProductionProspects
   } = require("../executiveDashboardReadModel");
-  return loadProductionProspects(organizationId);
+  return loadProductionProspects(organizationId, {
+    includeNonOperationalContacts: true
+  });
 }
 
 function extractConversationGoal(prospect) {
