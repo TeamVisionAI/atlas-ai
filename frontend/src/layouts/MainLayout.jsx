@@ -224,6 +224,7 @@ export default function MainLayout() {
     setExitingSupportMode(true);
 
     try {
+      setSupportMode(null);
       await exitSupportMode();
       await refreshSupportMode();
       await refreshUser();

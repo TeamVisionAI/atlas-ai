@@ -140,7 +140,10 @@ async function authenticate(req, res, next) {
     }
 
     const supportModeService = require("../services/supportModeService");
-    const { resolveEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
+    const {
+      resolveEffectiveOrganizationId,
+      isGlobalSuperAdminControlPlane
+    } = require("../core/effectiveOrganizationContext");
     const authSessionId = resolveAuthSessionId({
       jwtPayload,
       sessionToken: token
@@ -158,7 +161,9 @@ async function authenticate(req, res, next) {
     req.sanitizedUser = sanitizeUser(user);
     req.jwtPayload = jwtPayload;
     req.supportContext = supportContext;
+    const controlPlaneOnly = isGlobalSuperAdminControlPlane(authContext, supportContext);
     req.effectiveOrganizationId = effectiveOrganizationId;
+    req.controlPlaneOnly = controlPlaneOnly;
     req.tenantContext = {
       organizationId: effectiveOrganizationId,
       homeOrganizationId: authContext.organizationId,
@@ -167,6 +172,7 @@ async function authenticate(req, res, next) {
       saasRole: authContext.saasRole,
       permissions: authContext.permissions || [],
       isSuperAdmin: isSuperAdmin(authContext.saasRole),
+      controlPlaneOnly,
       supportMode: supportContext
         ? {
             organizationId: supportContext.organizationId,

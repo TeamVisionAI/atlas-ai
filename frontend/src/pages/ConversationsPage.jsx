@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import AtlasButton from "../components/ui/AtlasButton";
 import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
@@ -213,6 +216,8 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
 
 export default function ConversationsPage() {
   const { translate, language } = useLanguage();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const locale = language === "es" ? "es-US" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
   const activeFilter = searchParams.get("filter") || "active";
@@ -242,6 +247,12 @@ export default function ConversationsPage() {
   const pendingOwnershipRef = useRef(null);
 
   const loadList = useCallback(async ({ quiet = false, force = false } = {}) => {
+    if (controlPlane) {
+      setPayload(null);
+      setListLoading(false);
+      setListError(null);
+      return;
+    }
     const cacheKey = inboxCacheKey(activeFilter);
     if (!quiet && !payload) {
       const cached = readConversationsListCache(cacheKey);
@@ -303,7 +314,7 @@ export default function ConversationsPage() {
         setListLoading(false);
       }
     }
-  }, [activeFilter, translate]);
+  }, [activeFilter, translate, controlPlane]);
   loadListRef.current = loadList;
 
   useEffect(() => {
@@ -724,6 +735,10 @@ export default function ConversationsPage() {
     if (selectedPhone) {
       await loadDetail(selectedPhone);
     }
+  }
+
+  if (controlPlane) {
+    return <ControlPlaneEmptyState translate={translate} />;
   }
 
   if (forbidden) {

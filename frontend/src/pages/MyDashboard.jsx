@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { getDashboard } from "../services/api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import { appPath } from "../config/appRoutes";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
 import { buildProspectMilestoneLabel } from "../engines/prospectCenterViewModel";
@@ -10,13 +12,21 @@ import "./WorkspaceDashboard.css";
 
 export default function MyDashboard() {
   const { translate } = useLanguage();
-  const { supportMode } = useWorkspace();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
+
+    if (controlPlane) {
+      setDashboard(null);
+      setError("");
+      setLoading(false);
+      return undefined;
+    }
 
     async function load() {
       setLoading(true);
@@ -43,7 +53,7 @@ export default function MyDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [translate, supportMode?.active, supportMode?.organizationId]);
+  }, [controlPlane, translate, supportMode?.active, supportMode?.organizationId]);
 
   const prospects = dashboard?.prospects || [];
   const activeProspects = useMemo(
@@ -55,6 +65,14 @@ export default function MyDashboard() {
     const queue = dashboard?.prioritizedWorkflowQueue || [];
     return new Map(queue.map((entry) => [entry.phone, entry]));
   }, [dashboard?.prioritizedWorkflowQueue]);
+
+  if (controlPlane) {
+    return (
+      <div className="workspace-dashboard">
+        <ControlPlaneEmptyState translate={translate} />
+      </div>
+    );
+  }
 
   return (
     <div className="workspace-dashboard">

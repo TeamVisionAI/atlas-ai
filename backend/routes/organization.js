@@ -17,6 +17,9 @@ router.get("/settings", (req, res) => {
 
 router.get("/branding", async (req, res) => {
   try {
+    if (req.controlPlaneOnly || !req.tenantContext?.organizationId) {
+      return res.json({ name: null, controlPlane: true });
+    }
     const branding = await getOrganizationBranding(req.tenantContext.organizationId);
     return res.json(branding);
   } catch (error) {

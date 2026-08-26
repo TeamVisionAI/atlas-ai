@@ -15,6 +15,9 @@ import {
   getFollowUpSortOptions
 } from "../engines/followUpsViewModel";
 import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
+import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import "./FollowUpsPage.css";
 
 function statusVariant(status) {
@@ -89,6 +92,8 @@ export default function FollowUpsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { translate, language } = useLanguage();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const locale = language === "es" ? "es-US" : "en-US";
 
   const activeFilter = searchParams.get("filter") || "all";
@@ -101,6 +106,12 @@ export default function FollowUpsPage() {
   const [error, setError] = useState(null);
 
   const loadFollowUps = useCallback(async () => {
+    if (controlPlane) {
+      setPayload(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -119,7 +130,7 @@ export default function FollowUpsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, activeSort, searchQuery, translate]);
+  }, [activeFilter, activeSort, searchQuery, translate, controlPlane]);
 
   useEffect(() => {
     loadFollowUps();
@@ -209,6 +220,10 @@ export default function FollowUpsPage() {
 
   function handleOpenWorkspace(phone) {
     navigateToProspectWorkspace(navigate, phone);
+  }
+
+  if (controlPlane) {
+    return <ControlPlaneEmptyState translate={translate} />;
   }
 
   return (

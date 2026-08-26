@@ -22,6 +22,10 @@ const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireLegacyProspectAccess } = require("../middleware/requireProspectAccess");
 const { requirePermission } = require("../middleware/requirePermission");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
+const {
+  operationalControlPlaneEmpty,
+  emptyMissionControlSummary
+} = require("../core/operationalControlPlane");
 const { PERMISSIONS } = require("../security/permissions");
 
 function snapshotItemOrganizationId(item) {
@@ -74,7 +78,14 @@ const router = express.Router();
 router.use(requireAtlasUser);
 router.use(organizationGuard());
 
-router.get("/live/snapshot", (req, res) => {
+router.get("/live/snapshot", operationalControlPlaneEmpty(() => ({
+  organizationId: null,
+  controlPlane: true,
+  counters: { activeConversations: 0, waitingQueue: 0 },
+  activeConversations: [],
+  waitingQueue: [],
+  activityFeed: []
+})), (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
     const { missionControlService } = getCommunicationGateway();

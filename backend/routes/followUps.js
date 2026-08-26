@@ -7,13 +7,17 @@ const { buildFollowUpsReadModel } = require("../core/followUpsReadModel");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
+const {
+  operationalControlPlaneEmpty,
+  emptyFollowUps
+} = require("../core/operationalControlPlane");
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
 router.use(organizationGuard());
 
-router.get("/", async (req, res) => {
+router.get("/", operationalControlPlaneEmpty(emptyFollowUps), async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
     const payload = await buildFollowUpsReadModel({

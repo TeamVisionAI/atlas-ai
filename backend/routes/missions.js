@@ -15,13 +15,22 @@ const {
   recalculate,
   listProspectMissions
 } = require("../controllers/missionController");
+const {
+  operationalControlPlaneEmpty,
+  emptyMissions
+} = require("../core/operationalControlPlane");
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
 router.use(organizationGuard());
 
-router.get("/", requirePermission(PERMISSIONS.PROSPECT_READ), listMissions);
+router.get(
+  "/",
+  requirePermission(PERMISSIONS.PROSPECT_READ),
+  operationalControlPlaneEmpty(emptyMissions),
+  listMissions
+);
 
 router.post(
   "/recalculate",

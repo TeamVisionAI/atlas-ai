@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { getMissionControlSummary } from "../services/missionControlReadModelApi";
 import { useWorkspace } from "../../../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../../../security/isGlobalSuperAdminControlPlane";
 
 export function useMissionControlContext(prospectCoreId, { enabled = true } = {}) {
-  const { supportMode } = useWorkspace();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || controlPlane) {
+      setSummary(null);
+      setLoading(false);
+      setError(null);
       return undefined;
     }
 
@@ -43,7 +48,7 @@ export function useMissionControlContext(prospectCoreId, { enabled = true } = {}
     return () => {
       cancelled = true;
     };
-  }, [enabled, supportMode?.active, supportMode?.organizationId]);
+  }, [enabled, supportMode?.active, supportMode?.organizationId, controlPlane]);
 
   const prospectContext = useMemo(() => {
     if (!summary || !prospectCoreId) {

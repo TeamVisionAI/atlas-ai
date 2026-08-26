@@ -3,10 +3,14 @@
  * Ensures requests operate within the authenticated user's organization boundary.
  * Support Mode: rebinds authContext.organizationId to the effective tenant so
  * filterProspectsForAuthContext / canAccessProspect see Support Mode org, not home org.
+ * BR-160 — Super Admin without Support Mode is control-plane only (no home-org fallback).
  */
 
 const { isSuperAdmin } = require("../security/saasRoles");
-const { getEffectiveOrganizationId } = require("../core/effectiveOrganizationContext");
+const {
+  getEffectiveOrganizationId,
+  isGlobalSuperAdminControlPlane
+} = require("../core/effectiveOrganizationContext");
 
 function resolveRequestedOrganizationId(req) {
   return (
@@ -32,10 +36,39 @@ function organizationGuard(options = {}) {
       });
     }
 
-    const homeOrganizationId = context.organizationId || null;
-    const effectiveOrganizationId =
-      getEffectiveOrganizationId(req) || homeOrganizationId;
+    const homeOrganizationId = context.homeOrganizationId || context.organizationId || null;
+    const controlPlane = isGlobalSuperAdminControlPlane(context, req.supportContext);
+    const effectiveOrganizationId = getEffectiveOrganizationId(req);
     const requestedOrgId = resolveRequestedOrganizationId(req);
+
+    if (controlPlane) {
+      if (requestedOrgId) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "Cross-organization access is not permitted."
+        });
+      }
+
+      req.effectiveOrganizationId = null;
+      req.controlPlaneOnly = true;
+      req.authContext = {
+        ...context,
+        organizationId: null,
+        homeOrganizationId
+      };
+      req.tenantContext = {
+        organizationId: null,
+        homeOrganizationId,
+        userId: context.userId,
+        role: context.role,
+        saasRole: context.saasRole,
+        permissions: context.permissions || [],
+        isSuperAdmin: isSuperAdmin(context.saasRole),
+        controlPlaneOnly: true,
+        supportMode: null
+      };
+      return next();
+    }
 
     if (!effectiveOrganizationId) {
       return res.status(403).json({
@@ -52,6 +85,7 @@ function organizationGuard(options = {}) {
     }
 
     req.effectiveOrganizationId = effectiveOrganizationId;
+    req.controlPlaneOnly = false;
     // Prospect visibility (MC / Prospect Center) keys off authContext.organizationId.
     // Keep homeOrganizationId for audit / Support Mode exit; bind org to effective tenant.
     req.authContext = {
@@ -67,6 +101,7 @@ function organizationGuard(options = {}) {
       saasRole: context.saasRole,
       permissions: context.permissions || [],
       isSuperAdmin: isSuperAdmin(context.saasRole),
+      controlPlaneOnly: false,
       supportMode: req.supportContext
         ? {
             organizationId: req.supportContext.organizationId,

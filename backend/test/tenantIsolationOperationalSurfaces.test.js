@@ -108,6 +108,9 @@ function createSurfaceApp({ authContext, supportContext = null, store }) {
   app.use(organizationGuard());
 
   function scopedProspects(req) {
+    if (req.controlPlaneOnly) {
+      return { organizationId: null, prospects: [] };
+    }
     const organizationId = getTenantOrganizationId(req);
     const rows = store.filter(
       (row) => String(row.organization_id) === String(organizationId)
@@ -271,7 +274,7 @@ test("6. Search / filter / pagination cannot surface another tenant", async () =
   });
 });
 
-test("7-8. Support Mode Vision → Legacy then exit restores Vision", async () => {
+test("7-8. Support Mode Vision → Legacy then exit returns to control plane", async () => {
   const store = [TV_PROSPECT, TL_PROSPECT];
   const home = superAdmin(ORG_TV);
 
@@ -299,10 +302,11 @@ test("7-8. Support Mode Vision → Legacy then exit restores Vision", async () =
     const dashboard = await getJson(port, "/api/dashboard");
     const mission = await getJson(port, "/api/mission-control/summary");
     const center = await getJson(port, "/api/prospect-center");
-    assert.deepEqual(dashboard.body.prospects.map((row) => row.id), [TV_PROSPECT.id]);
-    assert.deepEqual(mission.body.activeProspectIds, [TV_PROSPECT.id]);
-    assert.deepEqual(center.body.items.map((row) => row.id), [TV_PROSPECT.id]);
-    assert.equal(dashboard.body.organizationId, ORG_TV);
+    assert.deepEqual(dashboard.body.prospects, []);
+    assert.equal(dashboard.body.totalProspects, 0);
+    assert.deepEqual(mission.body.activeProspectIds, []);
+    assert.deepEqual(center.body.items, []);
+    assert.equal(dashboard.body.organizationId, null);
   });
 });
 

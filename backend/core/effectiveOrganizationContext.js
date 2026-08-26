@@ -2,27 +2,49 @@
  * Canonical effective tenant organization resolution.
  * Support Mode (super admin) overrides home org; normal users always use home org.
  * BR-146 — never substitute the Team Vision seed tenant when org context is missing.
+ * BR-160 — Super Admin without Support Mode is control-plane only (no home-org workload).
  */
 
 const { isSuperAdmin } = require("../security/saasRoles");
+
+function resolveSupportOrganizationId(supportContext = null) {
+  return supportContext?.organizationId || supportContext?.organization_id || null;
+}
+
+function isGlobalSuperAdminControlPlane(authContext = null, supportContext = null) {
+  if (!authContext) {
+    return false;
+  }
+
+  return (
+    isSuperAdmin(authContext.saasRole || authContext.role) &&
+    !resolveSupportOrganizationId(supportContext)
+  );
+}
 
 function resolveEffectiveOrganizationId(authContext = null, supportContext = null) {
   const homeOrgId = authContext?.organizationId || authContext?.organization_id || null;
 
   if (
-    supportContext?.organizationId &&
+    supportContext &&
+    resolveSupportOrganizationId(supportContext) &&
     authContext &&
     isSuperAdmin(authContext.saasRole || authContext.role)
   ) {
-    return supportContext.organizationId;
+    return resolveSupportOrganizationId(supportContext);
+  }
+
+  // Implements BR-160 — do not use home org / DEFAULT_ORGANIZATION_ID as operational tenant.
+  if (isGlobalSuperAdminControlPlane(authContext, supportContext)) {
+    return null;
   }
 
   return homeOrgId;
 }
 
 function getEffectiveOrganizationId(req) {
-  if (req?.effectiveOrganizationId) {
-    return req.effectiveOrganizationId;
+  if (req && Object.prototype.hasOwnProperty.call(req, "effectiveOrganizationId")) {
+    return req.effectiveOrganizationId || null;
   }
 
   return resolveEffectiveOrganizationId(req?.authContext, req?.supportContext);
@@ -30,14 +52,24 @@ function getEffectiveOrganizationId(req) {
 
 function isSupportModeActive(req) {
   return Boolean(
-    req?.supportContext?.organizationId &&
+    resolveSupportOrganizationId(req?.supportContext) &&
       req?.authContext &&
       isSuperAdmin(req.authContext.saasRole || req.authContext.role)
+  );
+}
+
+function isControlPlaneRequest(req) {
+  return Boolean(
+    req?.controlPlaneOnly === true ||
+      isGlobalSuperAdminControlPlane(req?.authContext, req?.supportContext)
   );
 }
 
 module.exports = {
   resolveEffectiveOrganizationId,
   getEffectiveOrganizationId,
-  isSupportModeActive
+  isSupportModeActive,
+  isGlobalSuperAdminControlPlane,
+  isControlPlaneRequest,
+  resolveSupportOrganizationId
 };

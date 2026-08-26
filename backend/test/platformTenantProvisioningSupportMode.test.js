@@ -321,14 +321,13 @@ test("tenantOperationalGuard blocks suspended tenant for normal users", async ()
   tenantBillingService.expireTrialIfNeeded = originalExpire;
 });
 
-test("getEffectiveOrganizationId returns home org after support exit", () => {
+test("getEffectiveOrganizationId returns no tenant after support exit", () => {
   const req = {
     authContext: authContext({ organizationId: ORG_A, saasRole: SAAS_ROLES.SUPER_ADMIN }),
-    supportContext: null,
-    effectiveOrganizationId: ORG_A
+    supportContext: null
   };
 
-  assert.equal(getEffectiveOrganizationId(req), ORG_A);
+  assert.equal(getEffectiveOrganizationId(req), null);
 });
 
 test("support mode is isolated across authenticated sessions of the same super admin", async () => {

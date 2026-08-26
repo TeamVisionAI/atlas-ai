@@ -8,6 +8,11 @@ const { protectedRoute } = require("../middleware/protectedRoute");
 const { requirePermission } = require("../middleware/requirePermission");
 const { PERMISSIONS } = require("../security/permissions");
 
+const {
+  operationalControlPlaneEmpty,
+  emptyAppointments
+} = require("../core/operationalControlPlane");
+
 const router = express.Router();
 
 router.use(...protectedRoute());
@@ -15,14 +20,18 @@ router.use(...protectedRoute());
 router.get("/profile", appointmentController.getProfile);
 router.patch("/profile", appointmentController.updateProfile);
 router.get("/availability", appointmentController.getAvailableSlots);
-router.get("/urgent-handoffs", appointmentController.listUrgentHandoffs);
+router.get(
+  "/urgent-handoffs",
+  operationalControlPlaneEmpty(() => ({ items: [], handoffs: [] })),
+  appointmentController.listUrgentHandoffs
+);
 router.post(
   "/urgent-handoffs/:handoffId/acknowledge",
   requirePermission(PERMISSIONS.PROSPECT_WRITE),
   appointmentController.acknowledgeUrgentHandoff
 );
 
-router.get("/", appointmentController.listAppointments);
+router.get("/", operationalControlPlaneEmpty(emptyAppointments), appointmentController.listAppointments);
 router.post("/", requirePermission(PERMISSIONS.PROSPECT_WRITE), appointmentController.createAppointment);
 router.get("/:id", appointmentController.getAppointment);
 router.post(

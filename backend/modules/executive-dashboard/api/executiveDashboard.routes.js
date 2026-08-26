@@ -9,6 +9,10 @@ const { requirePermission } = require("../../../middleware/requirePermission");
 const { PERMISSIONS } = require("../../../security/permissions");
 const { createExecutiveDashboardController } = require("./executiveDashboard.controller");
 const { ExecutiveDashboardService } = require("../application/ExecutiveDashboardService");
+const {
+  operationalControlPlaneEmpty,
+  emptyExecutiveDashboard
+} = require("../../../core/operationalControlPlane");
 
 function createExecutiveDashboardRoutes(deps = {}) {
   const router = express.Router();
@@ -19,10 +23,10 @@ function createExecutiveDashboardRoutes(deps = {}) {
   router.use(organizationGuard());
   router.use(requirePermission(PERMISSIONS.DASHBOARD_EXECUTIVE));
 
-  router.get("/", controller.getReadModel.bind(controller));
-  router.get("/summary", controller.getSummary.bind(controller));
-  router.get("/trends", controller.getTrends.bind(controller));
-  router.get("/kpis", controller.getKpis.bind(controller));
+  router.get("/", operationalControlPlaneEmpty(emptyExecutiveDashboard), controller.getReadModel.bind(controller));
+  router.get("/summary", operationalControlPlaneEmpty(emptyExecutiveDashboard), controller.getSummary.bind(controller));
+  router.get("/trends", operationalControlPlaneEmpty(emptyExecutiveDashboard), controller.getTrends.bind(controller));
+  router.get("/kpis", operationalControlPlaneEmpty(emptyExecutiveDashboard), controller.getKpis.bind(controller));
 
   return router;
 }

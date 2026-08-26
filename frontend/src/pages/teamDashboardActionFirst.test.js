@@ -72,4 +72,7 @@ test("scoped data loads from hierarchy-filtered dashboard APIs only", () => {
   assert.match(teamDashboardSource, /getDashboard\(\)/);
   assert.match(teamDashboardSource, /buildTeamDashboardViewModel/);
   assert.match(teamDashboardSource, /supportMode\?\.organizationId/);
+  assert.match(teamDashboardSource, /isGlobalSuperAdminControlPlane/);
+  assert.match(teamDashboardSource, /ControlPlaneEmptyState/);
+  assert.match(translations, /controlPlaneEnterSupportMode/);
 });

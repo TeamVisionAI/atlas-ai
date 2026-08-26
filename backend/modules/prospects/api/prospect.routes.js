@@ -8,6 +8,10 @@ const { organizationGuard } = require("../../../middleware/organizationGuard");
 const { requireProspectAccessById } = require("../../../middleware/requireProspectAccess");
 const { createProspectController } = require("./prospect.controller");
 const { ProspectApplicationService } = require("../application/ProspectApplicationService");
+const {
+  operationalControlPlaneEmpty,
+  emptyProspectList
+} = require("../../../core/operationalControlPlane");
 
 function createProspectRoutes(deps = {}) {
   const router = express.Router();
@@ -18,7 +22,7 @@ function createProspectRoutes(deps = {}) {
   router.use(organizationGuard({ allowSuperAdminCrossOrg: true }));
 
   router.post("/merge", controller.merge.bind(controller));
-  router.get("/", controller.list.bind(controller));
+  router.get("/", operationalControlPlaneEmpty(emptyProspectList), controller.list.bind(controller));
   router.post("/", controller.create.bind(controller));
 
   if (deps.prospectEventsHandler) {
