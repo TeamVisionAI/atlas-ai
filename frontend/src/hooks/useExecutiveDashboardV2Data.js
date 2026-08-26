@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executiveDashboardService";
 import { getDashboard } from "../services/api";
 import { fetchOrganizationBranding } from "../services/organizationBrandingService";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 
 export const EXECUTIVE_LOAD_TIMEOUT_MS = 5000;
 
@@ -12,6 +13,7 @@ export const EXECUTIVE_LOAD_TIMEOUT_MS = 5000;
  * Phase 3: dashboard prospects (agenda enrichment) — deferred, non-blocking
  */
 export function useExecutiveDashboardV2Data() {
+  const { supportMode } = useWorkspace();
   const [executive, setExecutive] = useState(null);
   const [alphaBrief, setAlphaBrief] = useState(null);
   const [dashboard, setDashboard] = useState(null);
@@ -139,7 +141,7 @@ export function useExecutiveDashboardV2Data() {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [reloadToken]);
+  }, [reloadToken, supportMode?.active, supportMode?.organizationId]);
 
   const v2MetricsMissing = Boolean(executive && !executive.v2Metrics);
   const metricsResolved = Boolean(executive?.v2Metrics);

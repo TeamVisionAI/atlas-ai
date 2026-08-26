@@ -26,7 +26,6 @@ function permissionMatches(context, permission) {
 
   return aliases.some((code) => context.permissions.includes(code));
 }
-const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 const { normalizeSaasRole, toLegacyRole, resolveCanonicalIdentity } = require("./saasRoles");
 const { resolvePermissionsForUser } = require("./permissionService");
 
@@ -65,7 +64,7 @@ function buildAuthContext(user, { jwtPayload = null, permissions = null, hierarc
     role: legacyRole,
     saasRole,
     businessRank: user.business_rank || user.businessRank || null,
-    organizationId: user.organization_id || user.organizationId || DEFAULT_ORGANIZATION_ID,
+    organizationId: user.organization_id || user.organizationId || null,
     divisionId: user.division_id || user.divisionId || null,
     reportsToUserId: user.reports_to_user_id || user.reportsToUserId || null,
     permissions: permissions || jwtPayload?.permissions || permissionsForRole(legacyRole),
@@ -122,8 +121,8 @@ function hasPermission(context, permission) {
 }
 
 function sameOrganization(context, organizationId) {
-  if (!organizationId) {
-    return true;
+  if (!context?.organizationId || !organizationId) {
+    return false;
   }
 
   return String(context.organizationId) === String(organizationId);
@@ -134,7 +133,7 @@ function canAccessProspect(context, prospect = {}) {
     return false;
   }
 
-  const orgId = prospect.organization_id || prospect.organizationId || DEFAULT_ORGANIZATION_ID;
+  const orgId = prospect.organization_id || prospect.organizationId || null;
 
   if (!sameOrganization(context, orgId)) {
     return false;
@@ -253,15 +252,11 @@ function canAccessOperationsCenter(context) {
 }
 
 function resolveOrganizationId(context, requestedOrganizationId, options = {}) {
-  if (!context) {
-    return DEFAULT_ORGANIZATION_ID;
-  }
-
   if (options.effectiveOrganizationId) {
     return options.effectiveOrganizationId;
   }
 
-  return context.organizationId || DEFAULT_ORGANIZATION_ID;
+  return context?.organizationId || null;
 }
 
 module.exports = {

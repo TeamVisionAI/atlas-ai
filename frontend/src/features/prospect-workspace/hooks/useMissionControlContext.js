@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { getMissionControlSummary } from "../services/missionControlReadModelApi";
+import { useWorkspace } from "../../../contexts/WorkspaceContext";
 
 export function useMissionControlContext(prospectCoreId, { enabled = true } = {}) {
+  const { supportMode } = useWorkspace();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -41,7 +43,7 @@ export function useMissionControlContext(prospectCoreId, { enabled = true } = {}
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, supportMode?.active, supportMode?.organizationId]);
 
   const prospectContext = useMemo(() => {
     if (!summary || !prospectCoreId) {

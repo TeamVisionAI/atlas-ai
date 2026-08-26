@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useLanguage } from "../i18n/LanguageContext";
-import { useUrgentAppointmentHandoffs } from "../hooks/useUrgentAppointmentHandoffs";
-import AtlasButton from "./ui/AtlasButton";
+import { useLanguage } from "../../i18n/LanguageContext";
+import { useUrgentAppointmentHandoffs } from "../../hooks/useUrgentAppointmentHandoffs";
+import AtlasButton from "../ui/AtlasButton";
 import "./UrgentAppointmentHandoffBanner.css";
 
 function formatStartTime(value, translate) {

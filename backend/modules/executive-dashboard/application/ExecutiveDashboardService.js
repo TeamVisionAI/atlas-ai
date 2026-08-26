@@ -3,7 +3,17 @@
  */
 
 const { ExecutiveDashboardRepository } = require("../infrastructure/ExecutiveDashboardRepository");
-const { DEFAULT_ORGANIZATION_ID } = require("../../prospects/domain/constants");
+
+function requireOrganizationId(organizationId) {
+  if (!organizationId) {
+    const error = new Error("organizationId is required for Executive Dashboard reads.");
+    error.statusCode = 403;
+    error.publicCode = "TENANT_CONTEXT_REQUIRED";
+    throw error;
+  }
+
+  return organizationId;
+}
 
 class ExecutiveDashboardService {
   /**
@@ -15,25 +25,25 @@ class ExecutiveDashboardService {
   }
 
   async getReadModel(filters = {}) {
-    const organizationId = filters.organizationId || DEFAULT_ORGANIZATION_ID;
+    const organizationId = requireOrganizationId(filters.organizationId);
     const readModel = await this.repository.loadReadModel(organizationId);
     return readModel.toJSON();
   }
 
   async getSummary(filters = {}) {
-    const organizationId = filters.organizationId || DEFAULT_ORGANIZATION_ID;
+    const organizationId = requireOrganizationId(filters.organizationId);
     const readModel = await this.repository.loadReadModel(organizationId);
     return readModel.getSummary();
   }
 
   async getTrends(filters = {}) {
-    const organizationId = filters.organizationId || DEFAULT_ORGANIZATION_ID;
+    const organizationId = requireOrganizationId(filters.organizationId);
     const readModel = await this.repository.loadReadModel(organizationId);
     return readModel.getTrends();
   }
 
   async getKpis(filters = {}) {
-    const organizationId = filters.organizationId || DEFAULT_ORGANIZATION_ID;
+    const organizationId = requireOrganizationId(filters.organizationId);
     const readModel = await this.repository.loadReadModel(organizationId);
     return readModel.getKpis();
   }

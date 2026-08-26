@@ -389,8 +389,8 @@ function formatActivitySummary(event) {
   }
 }
 
-async function buildRecentActivity(productionPhones, limit = 20) {
-  const events = await listRecentWorkflowEvents(limit * 3);
+async function buildRecentActivity(productionPhones, limit = 20, organizationId = null) {
+  const events = await listRecentWorkflowEvents(limit * 3, organizationId);
   const phoneSet = new Set(productionPhones);
 
   return events
@@ -478,7 +478,9 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
   const recommendations = buildRecommendations(queue, prospects);
   const calendar = buildTodayCalendar(prospects, queue, context);
   const activity = await buildRecentActivity(
-    prospects.map((row) => row.phone)
+    prospects.map((row) => row.phone),
+    20,
+    organizationId
   );
 
   const v2Metrics = buildExecutiveDashboardV2Metrics(prospects, queue, {

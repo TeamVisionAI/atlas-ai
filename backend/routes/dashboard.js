@@ -32,44 +32,52 @@ const requireDashboardAccess = requireAnyPermission(
 );
 
 router.get("/", async (req, res) => {
-  const organizationId = getTenantOrganizationId(req);
-
-  const { data, error } = await supabase
-    .from("prospects")
-    .select("*")
-    .eq("organization_id", organizationId);
-
-  if (error) {
-    return res.status(500).json(error);
-  }
-
-  const productionProspects = filterOutOperationalTestProspects(
-    filterProductionProspects(data || [])
-  );
-  const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
-
-  const dashboard = {
-    totalProspects: prospects.length,
-
-    activeConversations: prospects.filter(
-      p => p.current_step !== "CONFIRMED"
-    ).length,
-
-    confirmed: prospects.filter(
-      p => p.current_step === "CONFIRMED"
-    ).length,
-
-    prospects
-  };
-
   try {
-    dashboard.prioritizedWorkflowQueue = await buildPrioritizedWorkflowQueue(prospects);
-  } catch (queueError) {
-    console.error("[dashboard] prioritizedWorkflowQueue error:", queueError.message);
-    dashboard.prioritizedWorkflowQueue = [];
-  }
+    const organizationId = getTenantOrganizationId(req);
 
-  res.json(dashboard);
+    const { data, error } = await supabase
+      .from("prospects")
+      .select("*")
+      .eq("organization_id", organizationId);
+
+    if (error) {
+      return res.status(500).json(error);
+    }
+
+    const productionProspects = filterOutOperationalTestProspects(
+      filterProductionProspects(data || [])
+    );
+    const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
+
+    const dashboard = {
+      totalProspects: prospects.length,
+
+      activeConversations: prospects.filter(
+        p => p.current_step !== "CONFIRMED"
+      ).length,
+
+      confirmed: prospects.filter(
+        p => p.current_step === "CONFIRMED"
+      ).length,
+
+      prospects
+    };
+
+    try {
+      dashboard.prioritizedWorkflowQueue = await buildPrioritizedWorkflowQueue(prospects);
+    } catch (queueError) {
+      console.error("[dashboard] prioritizedWorkflowQueue error:", queueError.message);
+      dashboard.prioritizedWorkflowQueue = [];
+    }
+
+    return res.json(dashboard);
+  } catch (error) {
+    console.error("[dashboard] error:", error.message);
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || "Failed to load dashboard",
+      message: error.message
+    });
+  }
 });
 
 /** Sprint 9.0 — Executive / Team Dashboard aggregate read model (hierarchy-scoped). */
@@ -82,7 +90,10 @@ router.get("/executive", requireDashboardAccess, async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error("[dashboard/executive] error:", error.message);
-    res.status(500).json({ error: "Failed to load executive dashboard" });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "Failed to load executive dashboard",
+      message: error.message
+    });
   }
 });
 
@@ -101,7 +112,10 @@ router.get("/recommendations", requireDashboardAccess, async (req, res) => {
     });
   } catch (error) {
     console.error("[dashboard/recommendations] error:", error.message);
-    res.status(500).json({ error: "Failed to load recommendations" });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "Failed to load recommendations",
+      message: error.message
+    });
   }
 });
 
@@ -120,7 +134,7 @@ router.get("/activity", requireDashboardAccess, async (req, res) => {
       filterOutOperationalTestProspects(productionProspects)
     );
     const phones = prospects.map((row) => row.phone);
-    const activity = await buildRecentActivity(phones, limit);
+    const activity = await buildRecentActivity(phones, limit, organizationId);
 
     res.json({
       generatedAt: new Date().toISOString(),
@@ -128,7 +142,10 @@ router.get("/activity", requireDashboardAccess, async (req, res) => {
     });
   } catch (error) {
     console.error("[dashboard/activity] error:", error.message);
-    res.status(500).json({ error: "Failed to load activity" });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "Failed to load activity",
+      message: error.message
+    });
   }
 });
 
@@ -143,7 +160,10 @@ router.get("/alpha-brief", requireDashboardAccess, async (req, res) => {
     res.json(brief);
   } catch (error) {
     console.error("[dashboard/alpha-brief] error:", error.message);
-    res.status(500).json({ error: "Failed to load alpha morning brief" });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "Failed to load alpha morning brief",
+      message: error.message
+    });
   }
 });
 

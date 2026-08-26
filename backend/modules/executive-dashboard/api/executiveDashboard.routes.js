@@ -4,6 +4,7 @@
 
 const express = require("express");
 const { requireAtlasUser } = require("../../../middleware/requireAtlasUser");
+const { organizationGuard } = require("../../../middleware/organizationGuard");
 const { requirePermission } = require("../../../middleware/requirePermission");
 const { PERMISSIONS } = require("../../../security/permissions");
 const { createExecutiveDashboardController } = require("./executiveDashboard.controller");
@@ -15,6 +16,7 @@ function createExecutiveDashboardRoutes(deps = {}) {
   const controller = createExecutiveDashboardController(service);
 
   router.use(requireAtlasUser);
+  router.use(organizationGuard());
   router.use(requirePermission(PERMISSIONS.DASHBOARD_EXECUTIVE));
 
   router.get("/", controller.getReadModel.bind(controller));

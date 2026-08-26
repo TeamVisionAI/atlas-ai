@@ -5,7 +5,6 @@
 
 const { supabase } = require("../services/supabaseService");
 const { TABLE_NAME } = require("../modules/prospects/domain/constants");
-const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constants");
 
 async function loadLegacyProspectByPhone(phone, organizationId = null) {
   let query = supabase.from("prospects").select("*").eq("phone", phone);
@@ -123,7 +122,7 @@ async function loadCoreProspectById(prospectId, organizationId) {
 }
 
 function resolveProspectOrganizationId(prospect) {
-  return prospect?.organization_id || prospect?.organizationId || DEFAULT_ORGANIZATION_ID;
+  return prospect?.organization_id || prospect?.organizationId || null;
 }
 
 module.exports = {

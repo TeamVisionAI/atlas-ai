@@ -33,7 +33,10 @@ router.get("/", async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error("[prospect-center]", error.message);
-    res.status(500).json({ error: "Failed to load prospect center" });
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "Failed to load prospect center",
+      message: error.message
+    });
   }
 });
 

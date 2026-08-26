@@ -3,7 +3,17 @@
  */
 
 const { MissionControlRepository } = require("../infrastructure/MissionControlRepository");
-const { DEFAULT_ORGANIZATION_ID } = require("../../prospects/domain/constants");
+
+function requireOrganizationId(organizationId) {
+  if (!organizationId) {
+    const error = new Error("organizationId is required for Mission Control reads.");
+    error.statusCode = 403;
+    error.publicCode = "TENANT_CONTEXT_REQUIRED";
+    throw error;
+  }
+
+  return organizationId;
+}
 
 class MissionControlService {
   /**
@@ -18,7 +28,7 @@ class MissionControlService {
    * @param {Object} [filters]
    */
   async getReadModel(filters = {}) {
-    const organizationId = filters.organizationId || DEFAULT_ORGANIZATION_ID;
+    const organizationId = requireOrganizationId(filters.organizationId);
     const readModel = await this.repository.loadReadModel(organizationId);
     return readModel.toJSON();
   }
@@ -27,7 +37,7 @@ class MissionControlService {
    * @param {Object} [filters]
    */
   async getSummary(filters = {}) {
-    const organizationId = filters.organizationId || DEFAULT_ORGANIZATION_ID;
+    const organizationId = requireOrganizationId(filters.organizationId);
     const readModel = await this.repository.loadReadModel(organizationId);
     return readModel.getSummary();
   }
@@ -36,7 +46,7 @@ class MissionControlService {
    * @param {Object} [filters]
    */
   async getMetrics(filters = {}) {
-    const organizationId = filters.organizationId || DEFAULT_ORGANIZATION_ID;
+    const organizationId = requireOrganizationId(filters.organizationId);
     const readModel = await this.repository.loadReadModel(organizationId);
     return readModel.getMetrics();
   }
