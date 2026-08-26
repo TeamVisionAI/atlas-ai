@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import AtlasButton from "../components/ui/AtlasButton";
 import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
@@ -93,6 +96,8 @@ function meetingTypeLabel(type, translate) {
 
 export default function AppointmentsPage() {
   const { translate, locale } = useLanguage();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeView = searchParams.get("view") || "today";
@@ -132,6 +137,12 @@ export default function AppointmentsPage() {
   );
 
   const load = useCallback(async ({ silent = false } = {}) => {
+    if (controlPlane) {
+      setAppointments([]);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
     if (!silent) {
       setLoading(true);
     }
@@ -154,7 +165,7 @@ export default function AppointmentsPage() {
         setLoading(false);
       }
     }
-  }, [activeView, filters.meetingType, filters.purpose, translate]);
+  }, [activeView, filters.meetingType, filters.purpose, translate, controlPlane]);
 
   useEffect(() => {
     load();
@@ -243,6 +254,10 @@ export default function AppointmentsPage() {
     }
 
     navigate("/app/settings/appointments");
+  }
+
+  if (controlPlane) {
+    return <ControlPlaneEmptyState translate={translate} />;
   }
 
   return (

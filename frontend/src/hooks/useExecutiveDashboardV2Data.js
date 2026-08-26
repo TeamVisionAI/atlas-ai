@@ -3,6 +3,7 @@ import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executi
 import { getDashboard } from "../services/api";
 import { fetchOrganizationBranding } from "../services/organizationBrandingService";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
 
 export const EXECUTIVE_LOAD_TIMEOUT_MS = 5000;
 
@@ -13,7 +14,8 @@ export const EXECUTIVE_LOAD_TIMEOUT_MS = 5000;
  * Phase 3: dashboard prospects (agenda enrichment) — deferred, non-blocking
  */
 export function useExecutiveDashboardV2Data() {
-  const { supportMode } = useWorkspace();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const [executive, setExecutive] = useState(null);
   const [alphaBrief, setAlphaBrief] = useState(null);
   const [dashboard, setDashboard] = useState(null);
@@ -33,6 +35,21 @@ export function useExecutiveDashboardV2Data() {
     const controller = new AbortController();
     abortRef.current = controller;
     let cancelled = false;
+
+    if (controlPlane) {
+      setExecutive(null);
+      setAlphaBrief(null);
+      setDashboard(null);
+      setOrganizationName("");
+      setPhase(1);
+      setLoadingExecutive(false);
+      setLoadingTimedOut(false);
+      setErrors({});
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
 
     setExecutive(null);
     setAlphaBrief(null);
@@ -141,7 +158,7 @@ export function useExecutiveDashboardV2Data() {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [reloadToken, supportMode?.active, supportMode?.organizationId]);
+  }, [reloadToken, supportMode?.active, supportMode?.organizationId, controlPlane]);
 
   const v2MetricsMissing = Boolean(executive && !executive.v2Metrics);
   const metricsResolved = Boolean(executive?.v2Metrics);

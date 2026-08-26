@@ -7,6 +7,8 @@ import { buildTeamDashboardViewModel } from "../engines/teamDashboardViewModel";
 import { getDisplayTitleLabelKey } from "../config/workspaceExperience";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import { formatAtlasDateTime } from "../utils/dateFormatter";
 import "./TeamDashboard.css";
 
@@ -78,9 +80,19 @@ export default function TeamDashboard() {
   const [organizationName, setOrganizationName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
 
   useEffect(() => {
     let cancelled = false;
+
+    if (controlPlane) {
+      setExecutive(null);
+      setDashboard(null);
+      setOrganizationName("");
+      setError(null);
+      setLoading(false);
+      return undefined;
+    }
 
     async function load() {
       setLoading(true);
@@ -115,7 +127,7 @@ export default function TeamDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [supportMode?.active, supportMode?.organizationId]);
+  }, [controlPlane, supportMode?.active, supportMode?.organizationId]);
 
   const viewModel = useMemo(() => {
     if (!executive || !dashboard || !user) {
@@ -127,6 +139,14 @@ export default function TeamDashboard() {
 
   const rankLabel = user ? translate(getDisplayTitleLabelKey(user)) : "";
   const orgLabel = organizationName || translate("teamDashOrganizationFallback");
+
+  if (controlPlane) {
+    return (
+      <div className="team-dash">
+        <ControlPlaneEmptyState translate={translate} />
+      </div>
+    );
+  }
 
   if (loading) {
     return <TeamDashboardSkeleton />;

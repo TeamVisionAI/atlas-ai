@@ -3,6 +3,11 @@ const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireAnyPermission } = require("../middleware/requirePermission");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
+const {
+  operationalControlPlaneEmpty,
+  emptyDashboard,
+  emptyExecutiveDashboard
+} = require("../core/operationalControlPlane");
 const { PERMISSIONS } = require("../security/permissions");
 const router = express.Router();
 
@@ -34,7 +39,7 @@ const requireDashboardAccess = requireAnyPermission(
   PERMISSIONS.DASHBOARD_TEAM
 );
 
-router.get("/", async (req, res) => {
+router.get("/", operationalControlPlaneEmpty(emptyDashboard), async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
 
@@ -84,7 +89,7 @@ router.get("/", async (req, res) => {
 });
 
 /** Sprint 9.0 — Executive / Team Dashboard aggregate read model (hierarchy-scoped). */
-router.get("/executive", requireDashboardAccess, async (req, res) => {
+router.get("/executive", requireDashboardAccess, operationalControlPlaneEmpty(emptyExecutiveDashboard), async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
     const productionProspects = await loadProductionProspects(organizationId);
@@ -101,7 +106,10 @@ router.get("/executive", requireDashboardAccess, async (req, res) => {
 });
 
 /** Sprint 9.0 — Top recommendations from priority queue. */
-router.get("/recommendations", requireDashboardAccess, async (req, res) => {
+router.get("/recommendations", requireDashboardAccess, operationalControlPlaneEmpty(() => ({
+  generatedAt: new Date().toISOString(),
+  recommendations: []
+})), async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 5, 20);
     const organizationId = getTenantOrganizationId(req);
@@ -123,7 +131,10 @@ router.get("/recommendations", requireDashboardAccess, async (req, res) => {
 });
 
 /** Sprint 9.0 — Recent workflow activity timeline. */
-router.get("/activity", requireDashboardAccess, async (req, res) => {
+router.get("/activity", requireDashboardAccess, operationalControlPlaneEmpty(() => ({
+  generatedAt: new Date().toISOString(),
+  activity: []
+})), async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 100);
     const organizationId = getTenantOrganizationId(req);
@@ -155,7 +166,11 @@ router.get("/activity", requireDashboardAccess, async (req, res) => {
 });
 
 /** Sprint 12 — Alpha executive morning brief (hierarchy-scoped). */
-router.get("/alpha-brief", requireDashboardAccess, async (req, res) => {
+router.get("/alpha-brief", requireDashboardAccess, operationalControlPlaneEmpty(() => ({
+  generatedAt: new Date().toISOString(),
+  items: [],
+  priorities: []
+})), async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
     const productionProspects = await loadProductionProspects(organizationId);

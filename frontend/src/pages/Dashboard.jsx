@@ -21,6 +21,8 @@ import MissionControlExecutionPanel from "../components/mission-control/MissionC
 import { useMissionExecutionSuccessToast } from "../components/mission-control/MissionExecutionSuccessToast";
 import { useToast } from "../components/ui/ToastProvider";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import {
   isWhatsAppCopyAction
 } from "../services/whatsappCommunicationService";
@@ -219,6 +221,7 @@ export default function Dashboard() {
   const showMissionExecutionSuccess = useMissionExecutionSuccessToast();
   const { showSuccess, showError, showInfo } = useToast();
   const { user: currentUser, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(currentUser, supportMode);
   const { prompt, promptDialog } = usePromptDialog();
 
   const loadProspectAtIndex = useCallback(async (index, queueItems, dashboardData) => {
@@ -261,6 +264,15 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (controlPlane) {
+      setDashboard(null);
+      setQueue([]);
+      setWorkspace(null);
+      setLoadError(null);
+      setInitialLoading(false);
+      return undefined;
+    }
+
     async function loadDashboard() {
       try {
         const [dashboardData, orgSettings] = await Promise.all([
@@ -354,7 +366,8 @@ export default function Dashboard() {
     deepLinkProspectId,
     translate,
     supportMode?.active,
-    supportMode?.organizationId
+    supportMode?.organizationId,
+    controlPlane
   ]);
 
   const phone = workspace?.phone;
@@ -1190,6 +1203,10 @@ export default function Dashboard() {
     }
 
     return translate(error.key, error.params);
+  }
+
+  if (controlPlane) {
+    return <ControlPlaneEmptyState translate={translate} />;
   }
 
   if (initialLoading) {

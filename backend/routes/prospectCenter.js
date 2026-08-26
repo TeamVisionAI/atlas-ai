@@ -11,13 +11,17 @@ const { filterProspectsForAuthContext } = require("../security/authorizationServ
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
+const {
+  operationalControlPlaneEmpty,
+  emptyProspectCenter
+} = require("../core/operationalControlPlane");
 
 const router = express.Router();
 
 router.use(requireAtlasUser);
 router.use(organizationGuard());
 
-router.get("/", async (req, res) => {
+router.get("/", operationalControlPlaneEmpty(emptyProspectCenter), async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
     const productionProspects = await loadProductionProspects(organizationId);

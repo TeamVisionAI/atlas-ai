@@ -88,7 +88,8 @@ test("Support Mode SA: authContext rebinds to effective org for prospect filter"
   });
 });
 
-test("without Support Mode, SA home org still filters TV-only", async () => {
+test("without Support Mode, Super Admin is control-plane only (no home-org workload)", async () => {
+  const tvRow = { ...TL_CANARY, id: "tv-row", organization_id: ORG_TV };
   const app = express();
   app.use((req, _res, next) => {
     req.authContext = {
@@ -105,10 +106,12 @@ test("without Support Mode, SA home org still filters TV-only", async () => {
   });
   app.use(organizationGuard());
   app.get("/probe", (req, res) => {
-    const visible = filterProspectsForAuthContext(req.authContext, [TL_CANARY]);
+    const visible = filterProspectsForAuthContext(req.authContext, [TL_CANARY, tvRow]);
     res.json({
       authOrg: req.authContext.organizationId,
-      canAccess: canAccessProspect(req.authContext, TL_CANARY),
+      controlPlaneOnly: req.controlPlaneOnly === true,
+      canAccessLegacy: canAccessProspect(req.authContext, TL_CANARY),
+      canAccessVision: canAccessProspect(req.authContext, tvRow),
       visibleIds: visible.map((row) => row.id)
     });
   });
@@ -116,8 +119,10 @@ test("without Support Mode, SA home org still filters TV-only", async () => {
   await withServer(app, async (port) => {
     const response = await fetch(`http://127.0.0.1:${port}/probe`);
     const body = await response.json();
-    assert.equal(body.authOrg, ORG_TV);
-    assert.equal(body.canAccess, false);
+    assert.equal(body.authOrg, null);
+    assert.equal(body.controlPlaneOnly, true);
+    assert.equal(body.canAccessLegacy, false);
+    assert.equal(body.canAccessVision, false);
     assert.deepEqual(body.visibleIds, []);
   });
 });

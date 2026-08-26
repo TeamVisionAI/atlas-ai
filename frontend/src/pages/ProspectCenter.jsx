@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import {
   getProspectCenter,
   acknowledgeProspectLead,
@@ -179,7 +181,8 @@ export default function ProspectCenter() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { translate, language } = useLanguage();
-  const { supportMode } = useWorkspace();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const locale = language === "es" ? "es-US" : "en-US";
 
   const activeFilter = searchParams.get("filter") || "all";
@@ -339,8 +342,15 @@ export default function ProspectCenter() {
   );
 
   useEffect(() => {
+    if (controlPlane) {
+      setPayload(null);
+      setPendingPayload(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     loadCenter({ mode: "replace" });
-  }, [activeFilter, searchQuery, supportMode?.active, supportMode?.organizationId]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional filter/search/support-mode replace load
+  }, [activeFilter, searchQuery, supportMode?.active, supportMode?.organizationId, controlPlane]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional filter/search/support-mode replace load
 
   useEffect(() => {
     const refreshLiveCenter = () => {
@@ -654,6 +664,10 @@ export default function ProspectCenter() {
         setActionBusyPhone(null);
       }
     }
+  }
+
+  if (controlPlane) {
+    return <ControlPlaneEmptyState translate={translate} />;
   }
 
   return (

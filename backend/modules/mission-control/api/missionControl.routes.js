@@ -7,6 +7,11 @@ const { requireAtlasUser } = require("../../../middleware/requireAtlasUser");
 const { organizationGuard } = require("../../../middleware/organizationGuard");
 const { createMissionControlController } = require("./missionControl.controller");
 const { MissionControlService } = require("../application/MissionControlService");
+const {
+  operationalControlPlaneEmpty,
+  emptyMissionControlReadModel,
+  emptyMissionControlSummary
+} = require("../../../core/operationalControlPlane");
 
 function createMissionControlRoutes(deps = {}) {
   const router = express.Router();
@@ -16,9 +21,9 @@ function createMissionControlRoutes(deps = {}) {
   router.use(requireAtlasUser);
   router.use(organizationGuard());
 
-  router.get("/", controller.getReadModel.bind(controller));
-  router.get("/summary", controller.getSummary.bind(controller));
-  router.get("/metrics", controller.getMetrics.bind(controller));
+  router.get("/", operationalControlPlaneEmpty(emptyMissionControlReadModel), controller.getReadModel.bind(controller));
+  router.get("/summary", operationalControlPlaneEmpty(emptyMissionControlSummary), controller.getSummary.bind(controller));
+  router.get("/metrics", operationalControlPlaneEmpty(emptyMissionControlSummary), controller.getMetrics.bind(controller));
 
   return router;
 }

@@ -2093,6 +2093,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-160 — Super Admin Control Plane Has No Home-Org Workload
+
+**Implements:** A global Super Admin is a platform control-plane actor. Operational prospect workload loads only while Support Mode is explicitly active for one tenant.
+**Domain:** Auth / Tenant context / Team Dashboard / Mission Control / Prospect Center / Follow-ups / Appointments / Conversations / KPIs
+**Depends on:** BR-146, Support Mode
+**Related:** BR-149, BR-159
+**Status:** Implemented
+**Engine target:** `effectiveOrganizationContext.js`, `organizationGuard.js`, `operationalControlPlane.js`
+**Tests:** `backend/test/superAdminControlPlaneBr160.test.js`, `backend/test/tenantIsolationOperationalSurfaces.test.js`
+
+### Rules
+
+1. **Control plane** — `SUPER_ADMIN` and no Support Mode organization = no operational tenant. Do not use `users.organization_id`, `atlas_users.organization_id`, or `DEFAULT_ORGANIZATION_ID` as the operational org.
+2. **Empty, not error** — Operational list/count endpoints return safe empty payloads. Do not query the Super Admin home org.
+3. **Support Mode** — Entering Support Mode binds effective org to that tenant only. Exit clears operational tenant immediately.
+4. **No query bypass** — `?organizationId=` while control-plane Super Admin is forbidden.
+5. **Tenant users unchanged** — ADMIN, RVP, SRL, RL, DIVISION_LEADER, DISTRICT_LEADER, REPRESENTATIVE keep existing home-org / hierarchy scope.
+6. **Boundaries** — Does not change WhatsApp eligibility, Recruit AI, IUL, Google Calendar, billing, appointment scheduling engines, BR-159 promotion, or prospect-number identity.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

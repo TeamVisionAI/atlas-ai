@@ -8,6 +8,10 @@ const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
 const {
+  operationalControlPlaneEmpty,
+  emptyConversations
+} = require("../core/operationalControlPlane");
+const {
   buildConversationsCenterReadModel,
   getConversationsAttentionCount
 } = require("../core/conversationsCenter/conversationsCenterReadModel");
@@ -63,7 +67,14 @@ async function requireConversationsAccess(req, res) {
   }
 }
 
-router.get("/access", async (req, res) => {
+router.get("/access", operationalControlPlaneEmpty(() => ({
+  allowed: false,
+  organizationId: null,
+  reason: "CONTROL_PLANE_NO_TENANT",
+  code: "CONTROL_PLANE_NO_TENANT",
+  featureEnabled: false,
+  globalEnabled: true
+})), async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
     const result = await resolveConversationsCenterAccessAsync({
@@ -87,7 +98,10 @@ router.get("/access", async (req, res) => {
   }
 });
 
-router.get("/attention-count", async (req, res) => {
+router.get("/attention-count", operationalControlPlaneEmpty(() => ({
+  needsAttentionCount: 0,
+  generatedAt: new Date().toISOString()
+})), async (req, res) => {
   if (!(await requireConversationsAccess(req, res))) {
     return;
   }
@@ -105,7 +119,7 @@ router.get("/attention-count", async (req, res) => {
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", operationalControlPlaneEmpty(emptyConversations), async (req, res) => {
   if (!(await requireConversationsAccess(req, res))) {
     return;
   }

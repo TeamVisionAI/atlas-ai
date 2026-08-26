@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import { buildExecutiveDashboardV2ViewModel } from "../engines/executiveDashboardV2ViewModel";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import { useExecutiveDashboardV2Data } from "../hooks/useExecutiveDashboardV2Data";
@@ -59,6 +61,7 @@ export default function ExecutiveDashboard() {
   const [searchParams] = useSearchParams();
   const { translate } = useLanguage();
   const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const {
     executive,
     alphaBrief,
@@ -72,8 +75,9 @@ export default function ExecutiveDashboard() {
     reload
   } = useExecutiveDashboardV2Data();
 
-  const orgLabel =
-    organizationName || supportMode?.organizationName || translate("teamDashOrganizationFallback");
+  const orgLabel = controlPlane
+    ? ""
+    : organizationName || supportMode?.organizationName || translate("teamDashOrganizationFallback");
   const metricsUnavailableMessage = translate("executiveV2MetricsUnavailable");
   const retryLabel = translate("executiveV2Retry");
 
@@ -98,6 +102,14 @@ export default function ExecutiveDashboard() {
 
   function openMissionControl(path) {
     navigate(path || buildMissionControlPath());
+  }
+
+  if (controlPlane) {
+    return (
+      <div className="executive-dashboard executive-dashboard--v2">
+        <ControlPlaneEmptyState translate={translate} />
+      </div>
+    );
   }
 
   if (errors.executive && !executive) {
