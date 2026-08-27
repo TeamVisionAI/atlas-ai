@@ -15,7 +15,8 @@ async function logConversation(data) {
         current_step: data.currentStep,
         language: data.language,
         city: data.city,
-        state: data.state
+        state: data.state,
+        organization_id: data.organizationId || data.organization_id || null
       }
     ])
     .select()

@@ -240,7 +240,15 @@ async function fetchRecentConversationLogs(phone, organizationId, limit = 40) {
   if (error) {
     throw error;
   }
-  return data || [];
+  if (!organizationId) {
+    return [];
+  }
+  const {
+    filterConversationLogsForTenant,
+    loadProspectPhoneOrgIndex
+  } = require("../conversationLogTenantScope");
+  const orgsByAlias = await loadProspectPhoneOrgIndex(lookupKeys);
+  return filterConversationLogsForTenant(data || [], organizationId, orgsByAlias);
 }
 
 async function patchResumeConversationContext({
