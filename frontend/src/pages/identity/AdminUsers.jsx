@@ -155,6 +155,8 @@ export default function AdminUsers() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingRepId, setEditingRepId] = useState(null);
   const [repIdDraft, setRepIdDraft] = useState("");
+  const [editingNameId, setEditingNameId] = useState(null);
+  const [nameDraft, setNameDraft] = useState({ firstName: "", lastName: "" });
   const [securitiesTarget, setSecuritiesTarget] = useState(null);
   const [securitiesForm, setSecuritiesForm] = useState(EMPTY_SECURITIES_FORM);
   const [securitiesSaving, setSecuritiesSaving] = useState(false);
@@ -249,6 +251,39 @@ export default function AdminUsers() {
       businessRank: nextRank,
       role: BUSINESS_RANK_DEFAULT_PERMISSION_ROLE[nextRank] || current.role
     }));
+  }
+
+  function startNameEdit(user) {
+    setEditingNameId(user.id);
+    setNameDraft({
+      firstName: user.first_name || "",
+      lastName: user.last_name || ""
+    });
+  }
+
+  function cancelNameEdit() {
+    setEditingNameId(null);
+    setNameDraft({ firstName: "", lastName: "" });
+  }
+
+  async function saveName(userId) {
+    const firstName = String(nameDraft.firstName || "").trim();
+    const lastName = String(nameDraft.lastName || "").trim();
+
+    if (!firstName || !lastName) {
+      setError("First and last name are required.");
+      return;
+    }
+
+    setError("");
+
+    try {
+      await updateAdminUser(userId, { firstName, lastName });
+      cancelNameEdit();
+      await loadUsers();
+    } catch (saveError) {
+      setError(saveError.message);
+    }
   }
 
   function startRepIdEdit(user) {
@@ -398,6 +433,10 @@ export default function AdminUsers() {
     setError("");
 
     try {
+      if (action === "edit-name") {
+        startNameEdit(user);
+        return;
+      }
       if (action === "edit-rep") {
         startRepIdEdit(user);
         return;
@@ -422,6 +461,54 @@ export default function AdminUsers() {
     } catch (actionError) {
       setError(actionError.message);
     }
+  }
+
+  function renderNameEditor(user) {
+    return (
+      <div className="admin-users-name-edit">
+        <input
+          className="admin-users-name-edit__input"
+          value={nameDraft.firstName}
+          onChange={(event) => setNameDraft((current) => ({ ...current, firstName: event.target.value }))}
+          placeholder="First name"
+          aria-label={`Edit first name for ${user.email}`}
+          autoFocus
+        />
+        <input
+          className="admin-users-name-edit__input"
+          value={nameDraft.lastName}
+          onChange={(event) => setNameDraft((current) => ({ ...current, lastName: event.target.value }))}
+          placeholder="Last name"
+          aria-label={`Edit last name for ${user.email}`}
+        />
+        <button type="button" className="identity-button" onClick={() => saveName(user.id)}>
+          Save
+        </button>
+        <button type="button" className="identity-button-secondary" onClick={cancelNameEdit}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  function renderNameDisplay(user) {
+    return (
+      <div className="admin-users-name-display">
+        <span className="admin-users-name-cell__text" title={displayUserName(user)}>
+          {displayUserName(user)}
+        </span>
+        {user.status !== "pending_invitation" ? (
+          <button
+            type="button"
+            className="admin-users-icon-btn"
+            aria-label={`Edit name for ${displayUserName(user)}`}
+            onClick={() => startNameEdit(user)}
+          >
+            ✎
+          </button>
+        ) : null}
+      </div>
+    );
   }
 
   function renderRepIdCell(user) {
@@ -483,9 +570,7 @@ export default function AdminUsers() {
               email={user.email}
               size="sm"
             />
-            <span className="admin-users-name-cell__text" title={displayUserName(user)}>
-              {displayUserName(user)}
-            </span>
+            {editingNameId === user.id ? renderNameEditor(user) : renderNameDisplay(user)}
           </div>
         </td>
         <td className="admin-users-col-email">
@@ -562,7 +647,11 @@ export default function AdminUsers() {
               size="sm"
             />
             <div>
-              <div className="admin-users-card__name">{displayUserName(user)}</div>
+              {editingNameId === user.id ? (
+                renderNameEditor(user)
+              ) : (
+                <div className="admin-users-card__name">{renderNameDisplay(user)}</div>
+              )}
               <Badge className={statusBadgeClass(statusKey)}>{formatStatusLabel(statusKey)}</Badge>
             </div>
           </div>

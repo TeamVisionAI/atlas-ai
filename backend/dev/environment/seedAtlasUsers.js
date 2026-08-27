@@ -16,8 +16,8 @@ const LC1_USERS = [
     id: "00000000-0000-4000-8000-000000000001",
     email: "ana@teamvision.ai",
     firstName: "Ana",
-    lastName: "Recruiter",
-    displayName: "Ana",
+    lastName: "Perez",
+    displayName: "Ana Perez",
     role: "recruiter"
   },
   {
