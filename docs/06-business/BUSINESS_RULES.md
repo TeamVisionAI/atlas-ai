@@ -2114,6 +2114,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-161 — Personal iCloud Availability Overlay (Read-Only)
+
+**Implements:** A user who keeps personal appointments in Apple Calendar / iCloud can connect that calendar so Atlas reads busy windows and excludes them from interview slots. Google remains the booking/write calendar.  
+**Domain:** Scheduling / personal integrations / availability  
+**Depends on:** BR-147, BR-050, BR-079  
+**Related:** BR-039 (confirm-time slot recheck), BR-049 (conversation still delegates to the same slot engine)  
+**Status:** Implemented (feature-flagged)  
+**Engine target:** `appointmentSchedulingEngine.js`, `availabilityTypes.js`, `icsBusyWindowCalculator.js`, `icloudCalDavClient.js`, `icloudCalendarIntegrationService.js`  
+**Tests:** `backend/test/icloudAvailabilityBr161.test.js`
+
+### Rules
+
+1. **One engine** — Slot authority remains `appointmentSchedulingEngine.getAvailableSlots`. Do not create a second scheduler. Recruit AI / IUL continue to read this engine.
+2. **Read-only iCloud** — iCloud is an additional personal availability source. Atlas does not create, edit, or delete Apple Calendar events.
+3. **Google unchanged** — Google remains the booking calendar. Google free/busy fail-open behavior is unchanged.
+4. **Formula** — personal working schedule ∩ Atlas appointment conflicts ∩ personal Google busy ∩ connected personal iCloud busy. A slot is unavailable if any connected source is busy. Overlaps are unioned; do not infer event identity across providers.
+5. **Ownership** — Per-user only (`organization_id` + `user_id` + `provider=icloud_calendar`). Never tenant-wide. Hierarchy does not grant credential management. Support Mode may see connection status, never the app-specific password.
+6. **Credentials** — Apple Account email + app-specific password. Encrypt the password with existing token encryption. Never store the password in `config`. Never log passwords, Basic Auth, raw ICS, titles, attendees, or descriptions.
+7. **Busy math** — Do not depend on Apple free/busy. Discover CalDAV calendars, `REPORT calendar-query` a time range, and compute busy from ICS (timed, RRULE, EXDATE, RECURRENCE-ID, cancelled, TRANSPARENT, all-day, TZID/DST). Expand only inside the requested window and cap pathological recurrence.
+8. **Fail closed** — If iCloud is not connected, ignore it. If connected and readable, merge busy. If connected and 401/403, offer no slots and require reconnect. If connected and transiently unavailable, offer no slots for that request. Never assume the user is free because Apple failed.
+9. **Feature flag** — Default off (`ATLAS_ICLOUD_CALENDAR_AVAILABILITY_ENABLED`). Optional org/user allowlists for canary.
+10. **Boundaries** — No WhatsApp, Recruit AI dialogue, IUL, billing, prospect-identity, or appointment-lifecycle changes.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

@@ -21,6 +21,14 @@ const {
 } = require("./appointmentProfileService");
 const googleCalendarIntegrationService = require("./googleCalendarIntegrationService");
 const { getSchedulingSettings } = require("./organizationService");
+const { PROVIDERS } = require("../core/availability/availabilityTypes");
+const {
+  isAvailabilityAuthError,
+  isAvailabilityUnavailableError
+} = require("../core/availability/availabilityTypes");
+const { isIcloudAvailabilityEnabled } = require("../core/availability/icloudAvailabilityFlag");
+const icloudAvailabilityProvider = require("../core/availability/icloudAvailabilityProvider");
+const googleAvailabilityProvider = require("../core/availability/googleAvailabilityProvider");
 
 function parseTimeKey(timeKey) {
   const [hour, minute] = String(timeKey).split(":").map(Number);
@@ -110,20 +118,30 @@ function isOwnBusyWindow(range, excludedWindow) {
 }
 
 async function fetchGoogleBusyRanges(organizationId, timeMin, timeMax, timezone, userId = null) {
-  // BR-147 — personal availability ∩ personal Google free/busy (never org/RVP calendar).
-  const busy = await googleCalendarIntegrationService.queryFreeBusy(
+  // BR-147 / BR-161 — Google adapter wraps queryFreeBusy; behavior unchanged.
+  return googleAvailabilityProvider.listBusyWindows({
     organizationId,
+    userId,
     timeMin,
     timeMax,
     timezone,
-    { userId }
-  );
+    queryFreeBusyFn: googleCalendarIntegrationService.queryFreeBusy
+  });
+}
 
-  return (busy || []).map((period) => ({
-    start: new Date(period.start).getTime(),
-    end: new Date(period.end).getTime(),
-    source: "google_calendar"
-  }));
+async function fetchIcloudBusyRanges(organizationId, timeMin, timeMax, timezone, userId = null) {
+  // Implements BR-161 — personal iCloud busy overlay only when flagged + connected.
+  if (!userId || !isIcloudAvailabilityEnabled({ organizationId, userId })) {
+    return [];
+  }
+
+  return icloudAvailabilityProvider.listBusyWindows({
+    organizationId,
+    userId,
+    timeMin,
+    timeMax,
+    timezone
+  });
 }
 
 /**
@@ -160,6 +178,8 @@ async function getAvailableSlots({
     dependencies.getSchedulingSettingsFn || getSchedulingSettings;
   const loadGoogleBusy =
     dependencies.queryFreeBusyFn || fetchGoogleBusyRanges;
+  const loadIcloudBusy =
+    dependencies.queryIcloudBusyFn || fetchIcloudBusyRanges;
   const now = Number.isFinite(dependencies.nowMs) ? dependencies.nowMs : Date.now();
 
   const profileResult = await loadProfile(agentId);
@@ -235,7 +255,41 @@ async function getAvailableSlots({
           ...googleBusy.filter((range) => !isOwnBusyWindow(range, excludedWindow))
         );
       } catch {
-        // Graceful fallback when calendar not connected
+        // Google overlay remains fail-open (unchanged).
+      }
+
+      try {
+        const icloudBusy = await loadIcloudBusy(
+          organizationId,
+          dayStart.toISOString(),
+          dayEnd.toISOString(),
+          timezone,
+          agentId
+        );
+        busyRanges.push(
+          ...(icloudBusy || []).filter((range) => !isOwnBusyWindow(range, excludedWindow))
+        );
+      } catch (icloudError) {
+        // Implements BR-161 — connected iCloud auth/unavailable fails closed.
+        if (
+          isAvailabilityAuthError(icloudError) ||
+          isAvailabilityUnavailableError(icloudError)
+        ) {
+          return {
+            agentId,
+            organizationId,
+            purpose,
+            durationMinutes: duration,
+            timePreference,
+            timezone,
+            slots: [],
+            conflictExplanation: isAvailabilityAuthError(icloudError)
+              ? "Apple Calendar authorization expired. Reconnect Apple Calendar / iCloud to continue."
+              : "Apple Calendar is temporarily unavailable. Slots are not offered until it can be read.",
+            availabilityBlockedReason: icloudError.code || icloudError.publicCode || "ICLOUD_UNAVAILABLE"
+          };
+        }
+        throw icloudError;
       }
     }
 
@@ -286,7 +340,13 @@ async function getAvailableSlots({
           endTimeISO: new Date(slotEndMs).toISOString(),
           durationMinutes: duration,
           timezone,
-          availabilitySource: busyRanges.some((r) => r.source === "google_calendar")
+          availabilitySource: busyRanges.some(
+            (r) =>
+              r.source === PROVIDERS.GOOGLE_CALENDAR ||
+              r.source === PROVIDERS.ICLOUD_CALENDAR ||
+              String(r.source || "").includes(PROVIDERS.GOOGLE_CALENDAR) ||
+              String(r.source || "").includes(PROVIDERS.ICLOUD_CALENDAR)
+          )
             ? "agent_schedule_and_calendar"
             : "agent_schedule",
           preferred: matchesTimePreference(startMinutes, "morning")

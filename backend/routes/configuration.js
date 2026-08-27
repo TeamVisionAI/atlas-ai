@@ -7,6 +7,7 @@ const profileService = require("../services/profileService");
 const organizationService = require("../services/organizationService");
 const organizationIntegrationService = require("../services/organizationIntegrationService");
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
+const icloudCalendarIntegrationService = require("../services/icloudCalendarIntegrationService");
 const meetingManagementService = require("../services/meetingManagementService");
 const whatsappIntegrationService = require("../services/whatsappIntegrationService");
 const { checkMetaConnectionHealth } = require("../core/meta/metaConnectionHealthService");
@@ -291,8 +292,89 @@ router.post(
 );
 
 router.post(
+  "/scheduling/icloud/connect",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const result = await icloudCalendarIntegrationService.connect({
+        organizationId: req.tenantContext.organizationId,
+        userId: req.tenantContext.userId,
+        appleAccountEmail: req.body?.appleAccountEmail,
+        appSpecificPassword: req.body?.appSpecificPassword
+      });
+      res.json({ icloudCalendar: result });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.publicCode || "ICLOUD_CONNECT_FAILED",
+        message: error.message
+      });
+    }
+  }
+);
+
+router.get(
+  "/scheduling/icloud/calendars",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const result = await icloudCalendarIntegrationService.listCalendars(
+        req.tenantContext.organizationId,
+        req.tenantContext.userId
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.publicCode || "ICLOUD_CALENDAR_LIST_FAILED",
+        message: error.message
+      });
+    }
+  }
+);
+
+router.post(
+  "/scheduling/icloud/calendar",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const calendar = await icloudCalendarIntegrationService.selectCalendar(
+        req.tenantContext.organizationId,
+        req.tenantContext.userId,
+        req.body?.calendarHref,
+        req.body?.calendarDisplayName
+      );
+      res.json({ calendar });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.publicCode || "ICLOUD_CALENDAR_SELECT_FAILED",
+        message: error.message
+      });
+    }
+  }
+);
+
+router.post(
+  "/scheduling/icloud/disconnect",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const result = await icloudCalendarIntegrationService.disconnect(
+        req.tenantContext.organizationId,
+        req.tenantContext.userId
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.publicCode || "ICLOUD_DISCONNECT_FAILED",
+        message: error.message
+      });
+    }
+  }
+);
+
+router.post(
   "/scheduling/google/disconnect",
   requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+
   async (req, res) => {
     try {
       const ownershipMode =

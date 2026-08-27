@@ -940,6 +940,26 @@ export const translations = {
     configurationRespectPersonalCalendar: "Respetar calendario personal",
     configurationIntegrations: "Integraciones",
     configurationGoogleCalendar: "Google Calendar",
+    configurationIcloudCalendar: "Apple Calendar / iCloud",
+    configurationIcloudCalendarIntro:
+      "Conecta el calendario que usas en tu iPhone para que Atlas evite agendar entrevistas cuando ya estás ocupado.",
+    configurationIcloudAppleAccount: "Cuenta de Apple",
+    configurationIcloudAppPassword: "Contraseña de app de Apple",
+    configurationIcloudAppPasswordHelp:
+      "En account.apple.com, con la verificación en dos factores activada, crea una contraseña de app e introdúcela aquí. No uses la contraseña de tu cuenta Apple.",
+    configurationIcloudReadOnlyNote:
+      "Atlas puede usar este calendario para ver cuándo estás ocupado. Atlas todavía no agrega ni edita eventos de Apple Calendar.",
+    configurationConnectIcloud: "Conectar Apple Calendar / iCloud",
+    configurationReconnectIcloud: "Reconectar Apple Calendar / iCloud",
+    configurationDisconnectIcloud: "Desconectar",
+    configurationIcloudConnected: "Apple Calendar / iCloud conectado.",
+    configurationIcloudConnectFailed: "No se pudo conectar Apple Calendar / iCloud.",
+    configurationIcloudReconnectRequired:
+      "La autorización de Apple Calendar expiró. Genera una nueva contraseña de app y vuelve a conectar.",
+    configurationIcloudDisconnected: "Apple Calendar / iCloud desconectado.",
+    configurationIcloudSelectCalendar: "Seleccionar calendario de Apple",
+    configurationIcloudCalendarSelected: "Calendario de Apple seleccionado.",
+    configurationIcloudFeatureUnavailable: "Apple Calendar / iCloud todavía no está habilitado para esta cuenta.",
     configurationMeetingManagement: "Gestión de reuniones",
     configurationMeetingManagementDescription:
       "Configure la URL de reunión virtual y la dirección de oficina que Atlas usará al programar entrevistas.",
@@ -2006,7 +2026,7 @@ export const translations = {
     configurationIntegrationsIntro:
       "Conecta los servicios que tu organización usa para comunicarse y agendar con prospectos.",
     configurationIntegrationsIntroPersonal:
-      "Tus integraciones personales: Google Calendar, WhatsApp Business y Zoom. No se muestran conexiones de otros usuarios.",
+      "Tus integraciones personales: Google Calendar, Apple Calendar / iCloud, WhatsApp Business y Zoom. No se muestran conexiones de otros usuarios.",
     configurationPersonalZoom: "Zoom personal",
     configurationPersonalZoomIntro: "Enlace de reunión Zoom usado en tus citas virtuales.",
     configurationPersonalZoomUrl: "URL de Zoom",
@@ -2975,6 +2995,26 @@ export const translations = {
     configurationRespectPersonalCalendar: "Respect Personal Calendar",
     configurationIntegrations: "Integrations",
     configurationGoogleCalendar: "Google Calendar",
+    configurationIcloudCalendar: "Apple Calendar / iCloud",
+    configurationIcloudCalendarIntro:
+      "Connect the calendar you use on your iPhone so Atlas can avoid scheduling interviews when you’re already busy.",
+    configurationIcloudAppleAccount: "Apple Account",
+    configurationIcloudAppPassword: "Apple app-specific password",
+    configurationIcloudAppPasswordHelp:
+      "At account.apple.com, with two-factor authentication on, create an app-specific password and enter it here. Do not use your Apple Account password.",
+    configurationIcloudReadOnlyNote:
+      "Atlas can use this calendar to check when you’re busy. Atlas does not add or edit Apple Calendar events yet.",
+    configurationConnectIcloud: "Connect Apple Calendar / iCloud",
+    configurationReconnectIcloud: "Reconnect Apple Calendar / iCloud",
+    configurationDisconnectIcloud: "Disconnect",
+    configurationIcloudConnected: "Apple Calendar / iCloud connected.",
+    configurationIcloudConnectFailed: "Unable to connect Apple Calendar / iCloud.",
+    configurationIcloudReconnectRequired:
+      "Apple Calendar authorization expired. Generate a new app-specific password and reconnect.",
+    configurationIcloudDisconnected: "Apple Calendar / iCloud disconnected.",
+    configurationIcloudSelectCalendar: "Select Apple calendar",
+    configurationIcloudCalendarSelected: "Apple calendar selected.",
+    configurationIcloudFeatureUnavailable: "Apple Calendar / iCloud is not enabled for this account yet.",
     configurationMeetingManagement: "Meeting Management",
     configurationMeetingManagementDescription:
       "Configure the virtual meeting URL and office address Atlas uses when scheduling interviews.",
@@ -4032,7 +4072,7 @@ export const translations = {
     configurationIntegrationsIntro:
       "Connect the services your organization uses to communicate and schedule with prospects.",
     configurationIntegrationsIntroPersonal:
-      "Your personal integrations: Google Calendar, WhatsApp Business, and Zoom. Other users' connections are never shown here.",
+      "Your personal integrations: Google Calendar, Apple Calendar / iCloud, WhatsApp Business, and Zoom. Other users' connections are never shown here.",
     configurationPersonalZoom: "Personal Zoom",
     configurationPersonalZoomIntro: "Zoom meeting link used for your virtual appointments.",
     configurationPersonalZoomUrl: "Zoom URL",

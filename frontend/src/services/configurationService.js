@@ -73,6 +73,34 @@ export async function disconnectGoogleCalendar({ ownershipMode = "personal" } = 
   });
 }
 
+export async function connectIcloudCalendar({ appleAccountEmail, appSpecificPassword }) {
+  return apiFetch("/api/configuration/scheduling/icloud/connect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ appleAccountEmail, appSpecificPassword })
+  });
+}
+
+export async function fetchIcloudCalendars() {
+  return apiFetch("/api/configuration/scheduling/icloud/calendars");
+}
+
+export async function selectIcloudCalendar(calendarHref, calendarDisplayName) {
+  return apiFetch("/api/configuration/scheduling/icloud/calendar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ calendarHref, calendarDisplayName })
+  });
+}
+
+export async function disconnectIcloudCalendar() {
+  return apiFetch("/api/configuration/scheduling/icloud/disconnect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({})
+  });
+}
+
 export async function fetchOrganizationIntegrations() {
   return apiFetch("/api/configuration/organization/integrations");
 }

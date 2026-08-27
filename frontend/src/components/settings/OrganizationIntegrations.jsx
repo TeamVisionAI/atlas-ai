@@ -9,11 +9,15 @@ import SettingsIcon from "../../components/icons/SettingsIcons";
 import WhatsAppIntegrationCard from "../../components/settings/WhatsAppIntegrationCard";
 import AtlasButton from "../../components/ui/AtlasButton";
 import {
+  connectIcloudCalendar,
   disconnectGoogleCalendar,
+  disconnectIcloudCalendar,
   fetchGoogleCalendarAuthUrl,
   fetchGoogleCalendars,
+  fetchIcloudCalendars,
   fetchOrganizationIntegrations,
-  selectGoogleCalendar
+  selectGoogleCalendar,
+  selectIcloudCalendar
 } from "../../services/configurationService";
 import {
   resolveGoogleCalendarListUiFailure,
@@ -29,6 +33,9 @@ export default function OrganizationIntegrations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [integrations, setIntegrations] = useState(null);
   const [calendars, setCalendars] = useState([]);
+  const [icloudCalendars, setIcloudCalendars] = useState([]);
+  const [icloudEmail, setIcloudEmail] = useState("");
+  const [icloudPassword, setIcloudPassword] = useState("");
   const [zoomUrl, setZoomUrl] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -62,6 +69,18 @@ export default function OrganizationIntegrations() {
       }
     } else {
       setCalendars([]);
+    }
+
+    const icloudCalendar = result.integrations?.icloudCalendar || {};
+    if (icloudCalendar.available && icloudCalendar.connected && !icloudCalendar.reconnectRequired) {
+      try {
+        const icloudResult = await fetchIcloudCalendars();
+        setIcloudCalendars(icloudResult.calendars || []);
+      } catch {
+        setIcloudCalendars([]);
+      }
+    } else {
+      setIcloudCalendars([]);
     }
   }, [translate]);
 
@@ -189,6 +208,67 @@ export default function OrganizationIntegrations() {
     }
   }
 
+  async function handleConnectIcloud() {
+    setError("");
+    setMessage("");
+    setBusyAction("icloud-connect");
+
+    try {
+      const result = await connectIcloudCalendar({
+        appleAccountEmail: icloudEmail,
+        appSpecificPassword: icloudPassword
+      });
+      setIcloudPassword("");
+      setIcloudCalendars(result.icloudCalendar?.calendars || []);
+      setMessage(translate("configurationIcloudConnected"));
+      await load();
+    } catch {
+      setError(translate("configurationIcloudConnectFailed"));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleDisconnectIcloud() {
+    setError("");
+    setMessage("");
+    setBusyAction("icloud-disconnect");
+
+    try {
+      await disconnectIcloudCalendar();
+      setIcloudCalendars([]);
+      setIcloudPassword("");
+      setMessage(translate("configurationIcloudDisconnected"));
+      await load();
+    } catch {
+      setError(translate("configurationIcloudConnectFailed"));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleIcloudCalendarSelect(event) {
+    const calendarHref = event.target.value;
+    if (!calendarHref) {
+      return;
+    }
+
+    const selected = icloudCalendars.find((calendar) => calendar.href === calendarHref);
+    setError("");
+    setMessage("");
+    setBusyAction("icloud-calendar");
+
+    try {
+      await selectIcloudCalendar(calendarHref, selected?.displayName || "");
+      setMessage(translate("configurationIcloudCalendarSelected"));
+      await load();
+    } catch {
+      setError(translate("configurationLoadFailed"));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function handleSaveZoom() {
     setError("");
     setMessage("");
@@ -212,6 +292,10 @@ export default function OrganizationIntegrations() {
     busyAction === "google-disconnect" ||
     busyAction === "google-calendar";
   const whatsappBusy = busyAction === "whatsapp-disconnect";
+  const icloudBusy =
+    busyAction === "icloud-connect" ||
+    busyAction === "icloud-disconnect" ||
+    busyAction === "icloud-calendar";
 
   if (!integrations) {
     return error ? (
@@ -224,6 +308,7 @@ export default function OrganizationIntegrations() {
   }
 
   const googleCalendar = integrations.googleCalendar || {};
+  const icloudCalendar = integrations.icloudCalendar || {};
   const whatsapp = integrations.whatsapp || {};
   const orgChannel = integrations.organizationChannel || null;
   const readiness = integrations.readiness || null;
@@ -246,6 +331,7 @@ export default function OrganizationIntegrations() {
       ) : null}
 
       <div className="configuration-content configuration-content--integrations">
+        {/* Meta Review Integrations is WhatsApp-only — calendar failures must not hide this page. */}
         {whatsapp.visible ? (
           <WhatsAppIntegrationCard
             connected={Boolean(whatsapp.connected)}
@@ -317,6 +403,90 @@ export default function OrganizationIntegrations() {
             </label>
           ) : null}
         </IntegrationCard>
+
+        {icloudCalendar.available ? (
+          <IntegrationCard
+            icon="calendar"
+            title={translate("configurationIcloudCalendar")}
+            subtitle={translate("configurationIcloudCalendarIntro")}
+            connected={Boolean(icloudCalendar.connected) && !icloudCalendar.reconnectRequired}
+            connecting={busyAction === "icloud-connect"}
+            disconnecting={busyAction === "icloud-disconnect"}
+            showDetailsWhenDisconnected
+            connectedLabel={
+              icloudCalendar.reconnectRequired
+                ? translate("configurationIcloudReconnectRequired")
+                : null
+            }
+            detailRows={[
+              {
+                key: "icloud-account",
+                label: translate("configurationIcloudAppleAccount"),
+                value: icloudCalendar.appleAccountEmail
+              },
+              {
+                key: "icloud-calendar",
+                label: translate("configurationCalendar"),
+                value: icloudCalendar.calendarDisplayName || icloudCalendar.calendarHref
+              }
+            ]}
+            connectLabel={
+              icloudCalendar.reconnectRequired
+                ? translate("configurationReconnectIcloud")
+                : translate("configurationConnectIcloud")
+            }
+            disconnectLabel={translate("configurationDisconnectIcloud")}
+            onConnect={handleConnectIcloud}
+            onDisconnect={handleDisconnectIcloud}
+            busy={icloudBusy}
+          >
+            <p className="integration-card__subtitle">{translate("configurationIcloudReadOnlyNote")}</p>
+            {!icloudCalendar.connected || icloudCalendar.reconnectRequired ? (
+              <div className="configuration-form">
+                <label>
+                  {translate("configurationIcloudAppleAccount")}
+                  <input
+                    type="email"
+                    autoComplete="username"
+                    value={icloudEmail}
+                    onChange={(event) => setIcloudEmail(event.target.value)}
+                    disabled={icloudBusy}
+                  />
+                </label>
+                <label>
+                  {translate("configurationIcloudAppPassword")}
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={icloudPassword}
+                    onChange={(event) => setIcloudPassword(event.target.value)}
+                    disabled={icloudBusy}
+                  />
+                </label>
+                <p className="integration-card__subtitle">
+                  {translate("configurationIcloudAppPasswordHelp")}
+                </p>
+              </div>
+            ) : null}
+            {icloudCalendar.connected && !icloudCalendar.reconnectRequired && icloudCalendars.length > 0 ? (
+              <label className="configuration-form integration-card__calendar-select">
+                {translate("configurationIcloudSelectCalendar")}
+                <select
+                  value={icloudCalendar.calendarHref || ""}
+                  onChange={handleIcloudCalendarSelect}
+                  disabled={icloudBusy}
+                >
+                  <option value="">{translate("configurationSelectCalendarPlaceholder")}</option>
+                  {icloudCalendars.map((calendar) => (
+                    <option key={calendar.href} value={calendar.href}>
+                      {calendar.displayName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </IntegrationCard>
+        ) : null}
 
         <article className="integration-card">
           <header className="integration-card__header">
