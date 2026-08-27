@@ -59,7 +59,7 @@ export function createInitialSchedulingForm({
     duration: defaultDuration,
     interviewType: defaultInterviewType ? normalizeInterviewType(defaultInterviewType) : "",
     recruiter: defaultRecruiter,
-    interviewerSelection: "self",
+    interviewerSelection: "auto",
     interviewerUserId: defaultInterviewerUserId,
     officeLocation: "",
     meetingLocationName: "",

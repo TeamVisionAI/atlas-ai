@@ -29,6 +29,12 @@ const {
 const { isIcloudAvailabilityEnabled } = require("../core/availability/icloudAvailabilityFlag");
 const icloudAvailabilityProvider = require("../core/availability/icloudAvailabilityProvider");
 const googleAvailabilityProvider = require("../core/availability/googleAvailabilityProvider");
+const {
+  ASSIGNMENT_MODES,
+  appointmentBelongsToInterviewer,
+  mergePooledSlots,
+  resolveAssignmentMode
+} = require("../core/interviewerPoolEngine");
 
 function parseTimeKey(timeKey) {
   const [hour, minute] = String(timeKey).split(":").map(Number);
@@ -155,6 +161,8 @@ async function fetchIcloudBusyRanges(organizationId, timeMin, timeMax, timezone,
  * @param {string} [params.timePreference] - morning | afternoon | any
  * @param {number} [params.maxResults]
  * @param {string} [params.excludeAppointmentId] - reschedule: ignore this appointment's own block
+ * @param {string} [params.interviewerUserId] - explicit interviewer (BR-162)
+ * @param {string} [params.assignmentMode] - auto | explicit
  * @param {Object} [params.dependencies] - test seams only
  */
 async function getAvailableSlots({
@@ -167,6 +175,8 @@ async function getAvailableSlots({
   timePreference = "any",
   maxResults = FULL_DAY_MAX_SLOT_RESULTS,
   excludeAppointmentId = null,
+  interviewerUserId = null,
+  assignmentMode = null,
   dependencies = {}
 } = {}) {
   const loadProfile =
@@ -199,7 +209,65 @@ async function getAvailableSlots({
 
   const scheduling = organizationId
     ? await loadScheduling(organizationId)
-    : { respectPersonalCalendar: true };
+    : { respectPersonalCalendar: true, interviewerPool: { enabled: false, members: [] } };
+
+  const pool = scheduling.interviewerPool || { enabled: false, members: [] };
+  const mode = resolveAssignmentMode({
+    assignmentMode,
+    poolEnabled: pool.enabled
+  });
+  const explicitInterviewerId = String(interviewerUserId || "").trim() || null;
+
+  if (mode === ASSIGNMENT_MODES.AUTO && pool.enabled) {
+    const memberSlotLists = [];
+
+    for (const member of pool.members) {
+      const single = await getAvailableSlots({
+        agentId: member.userId,
+        interviewerUserId: member.userId,
+        assignmentMode: ASSIGNMENT_MODES.EXPLICIT,
+        organizationId,
+        date,
+        dateEnd,
+        purpose,
+        durationMinutes,
+        timePreference,
+        maxResults,
+        excludeAppointmentId,
+        dependencies: {
+          ...dependencies,
+          getSchedulingSettingsFn: async () => ({
+            ...scheduling,
+            interviewerPool: { enabled: false, members: [] }
+          })
+        }
+      });
+
+      memberSlotLists.push({
+        member,
+        slots: single.slots || []
+      });
+    }
+
+    const pooledSlots = mergePooledSlots(memberSlotLists);
+    return {
+      agentId,
+      organizationId,
+      purpose,
+      durationMinutes: durationMinutes || pooledSlots[0]?.durationMinutes || null,
+      timePreference,
+      timezone: pooledSlots[0]?.timezone || "America/New_York",
+      assignmentMode: ASSIGNMENT_MODES.AUTO,
+      slots: pooledSlots,
+      conflictExplanation: pooledSlots.length
+        ? null
+        : "No available slots in the requested range. Check working schedule, existing appointments, or calendar conflicts."
+    };
+  }
+
+  if (explicitInterviewerId) {
+    agentId = explicitInterviewerId;
+  }
 
   const slots = [];
   let conflictExplanation = null;
@@ -221,15 +289,18 @@ async function getAvailableSlots({
 
     const { items: dayAppointments } = await searchAppointments({
       organizationId,
-      agentId,
       from: dayStart.toISOString(),
       to: dayEnd.toISOString(),
       status: ["scheduled", "confirmed", "pending_confirmation", "in_progress"]
     });
 
-    const conflictingAppointments = (dayAppointments || []).filter(
-      (appointment) => !excludedId || String(appointment.id) !== excludedId
-    );
+    const conflictingAppointments = (dayAppointments || []).filter((appointment) => {
+      if (excludedId && String(appointment.id) === excludedId) {
+        return false;
+      }
+
+      return appointmentBelongsToInterviewer(appointment, agentId);
+    });
     const excludedAppointment = (dayAppointments || []).find(
       (appointment) => excludedId && String(appointment.id) === excludedId
     );
@@ -340,6 +411,8 @@ async function getAvailableSlots({
           endTimeISO: new Date(slotEndMs).toISOString(),
           durationMinutes: duration,
           timezone,
+          assignedInterviewerUserId: agentId || null,
+          assignmentMode: ASSIGNMENT_MODES.EXPLICIT,
           availabilitySource: busyRanges.some(
             (r) =>
               r.source === PROVIDERS.GOOGLE_CALENDAR ||

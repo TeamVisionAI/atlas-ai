@@ -133,6 +133,8 @@ async function getAvailableSlots(req, res) {
   try {
     const result = await appointmentApplicationService.getSlots({
       agentId: req.query.agentId || req.tenantContext.userId,
+      interviewerUserId: req.query.interviewerUserId || null,
+      assignmentMode: req.query.assignmentMode || null,
       organizationId: req.tenantContext.organizationId,
       date: req.query.date,
       dateEnd: req.query.dateEnd,

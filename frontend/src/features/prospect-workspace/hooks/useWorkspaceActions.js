@@ -491,7 +491,9 @@ export function useWorkspaceActions({
           timeKey: form.timeKey,
           duration: form.duration,
           interviewType,
-          interviewerUserId: form.interviewerUserId || undefined,
+          assignmentMode: form.interviewerSelection === "auto" ? "auto" : "explicit",
+          interviewerUserId:
+            form.interviewerSelection === "auto" ? undefined : form.interviewerUserId || undefined,
           officeLocation: form.officeLocation?.trim() || undefined,
           meetingLocationName: form.meetingLocationName?.trim() || undefined,
           meetingLocationAddress: form.meetingLocationAddress?.trim() || undefined,

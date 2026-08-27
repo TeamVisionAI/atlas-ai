@@ -78,6 +78,18 @@ export default function InterviewAssignmentSection({
           <input
             type="radio"
             name="interviewer-assignment"
+            value="auto"
+            checked={form.interviewerSelection === "auto"}
+            disabled={disabled}
+            onChange={() => selectAssignment("auto", "")}
+          />
+          <span>{translate("interviewAssignmentAuto")}</span>
+        </label>
+
+        <label className="interview-assignment__option">
+          <input
+            type="radio"
+            name="interviewer-assignment"
             value="self"
             checked={form.interviewerSelection === "self"}
             disabled={disabled || !currentUserId}

@@ -941,7 +941,11 @@ export default function Dashboard() {
           timeKey: form.timeKey,
           duration: form.duration,
           interviewType,
-          interviewerUserId: form.interviewerUserId || currentUser?.id || undefined,
+          assignmentMode: form.interviewerSelection === "auto" ? "auto" : "explicit",
+          interviewerUserId:
+            form.interviewerSelection === "auto"
+              ? undefined
+              : form.interviewerUserId || currentUser?.id || undefined,
           officeLocation: form.officeLocation?.trim() || undefined,
           meetingLocationName: form.meetingLocationName?.trim() || undefined,
           meetingLocationAddress: form.meetingLocationAddress?.trim() || undefined,

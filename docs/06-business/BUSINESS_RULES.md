@@ -2139,6 +2139,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-162 — Ordered Interviewer Pool + Interviewer-Owned Zoom
+
+**Implements:** Recruiting slots are interviewer-owned, not globally blocked by any appointment at a timestamp. Zoom belongs to the assigned interviewer.  
+**Domain:** Scheduling / interview assignment / Zoom  
+**Depends on:** BR-006, BR-007, BR-042, BR-048, BR-076, BR-147  
+**Related:** BR-043 (Join Zoom reads appointment snapshot), BR-161 (personal iCloud overlay unchanged)  
+**Status:** Implemented  
+**Engine target:** `interviewerPoolEngine.js`, `appointmentSchedulingEngine.js`, `virtualMeetingUrlResolver.js`, `appointmentApplicationService.js`  
+**Tests:** `backend/test/interviewerPoolCapacity.test.js`, `backend/test/interviewerOwnedZoom.test.js`
+
+### Rules
+
+1. **Generic pool** — Tenants may configure an ordered interviewer pool (`primary`, then overflow). The scheduler must not hardcode a tenant UUID. Tenants without a pool keep single-interviewer availability.
+2. **Availability** — A slot is available when at least one pool member is free on working schedule ∩ Atlas interviewer-owned appointments ∩ personal Google ∩ personal iCloud. Auto-assign walks the ordered pool and persists that interviewer.
+3. **Explicit selection** — Showing Ana-only or Niovel-only availability must use that interviewer’s conflicts and calendars only.
+4. **Zoom owner** — Assigned `interviewer_user_id` is the Zoom authority. Snapshot that user’s personal Zoom URL on the appointment. Confirmations, 24h/1h/15m reminders, reschedule, and Join Zoom use the snapshot.
+5. **No identity leak** — Do not resolve Zoom from the logged-in admin, Support Mode actor, or another interviewer. Do not use tenant default Zoom when a personal interviewer is assigned. If the assigned interviewer has no personal Zoom, fail closed.
+6. **Boundaries** — Does not change daypart logic, BR-159, BR-161 fail-closed iCloud behavior, WhatsApp tenant isolation, billing, or appointment lifecycle states.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
