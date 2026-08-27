@@ -586,7 +586,7 @@ export const translations = {
     appointmentsReschedule: "📅 Reprogramar",
     appointmentsCancel: "❌ Cancelar",
     appointmentsComplete: "✅ Completar",
-    appointmentsRescheduleInterview: "📅 Reprogramar entrevista",
+    appointmentsRescheduleInterview: "📅 Reprogramar",
     appointmentsCancelInterview: "❌ Cancelar entrevista",
     appointmentsCompleteInterview: "✅ Completar entrevista",
     appointmentsViewWorkspace: "📂 Ver workspace",

@@ -269,15 +269,11 @@ export function buildAppointmentCardAddressModel(appointment = {}) {
   };
 }
 
-/** Desktop vs mobile action-row layout hint for tests and CSS hooks. */
-export function resolveAppointmentActionRowLayoutMode(viewportWidth = 1280) {
-  if (viewportWidth >= 768) {
-    return "compact-single-row";
-  }
-
+/** Action buttons wrap at every width so localized labels stay inside the card. */
+export function resolveAppointmentActionRowLayoutMode(_viewportWidth = 1280) {
   return "wrap";
 }
 
-export function appointmentCardAllowsHorizontalOverflow(viewportWidth = 375) {
-  return viewportWidth >= 320;
+export function appointmentCardAllowsHorizontalOverflow(_viewportWidth = 375) {
+  return false;
 }
