@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import ProspectWorkspace from "./pages/ProspectWorkspace";
 import { normalizeProspectRoutePhone } from "./utils/prospectRoutes";
 import ProspectCenter from "./pages/ProspectCenter";
+import ProspectReportPage from "./pages/ProspectReportPage";
 import ConfigurationLayout from "./pages/configuration/ConfigurationLayout";
 import ConfigurationHub from "./pages/configuration/ConfigurationHub";
 import WhatsAppConnect from "./pages/WhatsAppConnect";
@@ -136,6 +137,7 @@ export default function App() {
         <Route path="mission-control" element={<Dashboard />} />
         <Route path="prospect-workspace/:phone" element={<ProspectWorkspaceRoute />} />
         <Route path="prospect-center" element={<ProspectCenter />} />
+        <Route path="prospect-report" element={<ProspectReportPage />} />
         <Route path="quick-capture" element={<QuickCapture />} />
         <Route path="prospect/:id" element={<Prospect />} />
         <Route path="pipeline" element={<Navigate to="/app/prospect-center" replace />} />

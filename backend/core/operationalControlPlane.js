@@ -80,6 +80,20 @@ function emptyProspectCenter() {
   };
 }
 
+function emptyProspectReport() {
+  return {
+    generatedAt: new Date().toISOString(),
+    controlPlane: true,
+    organizationId: null,
+    emptyReason: "SUPER_ADMIN_CONTROL_PLANE",
+    totalCount: 0,
+    filteredCount: 0,
+    items: [],
+    offset: 0,
+    limit: 100
+  };
+}
+
 function emptyFollowUps() {
   return {
     generatedAt: new Date().toISOString(),
@@ -213,6 +227,7 @@ module.exports = {
   emptyDashboard,
   emptyExecutiveDashboard,
   emptyProspectCenter,
+  emptyProspectReport,
   emptyFollowUps,
   emptyMissionControlSummary,
   emptyMissionControlReadModel,

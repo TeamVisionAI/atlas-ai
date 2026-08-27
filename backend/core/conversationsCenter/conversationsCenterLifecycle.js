@@ -22,6 +22,7 @@ const INBOX_CLOSE_REASONS = Object.freeze({
   NOT_NOW: "NOT_NOW",
   WRONG_NUMBER: "WRONG_NUMBER",
   DO_NOT_CONTACT: "DO_NOT_CONTACT",
+  WINDOW_EXPIRED: "WINDOW_EXPIRED",
   OTHER: "OTHER"
 });
 
@@ -175,14 +176,15 @@ function isClosedFromCanonical(prospect = {}, persisted = {}, agentState = null)
 
 /**
  * Derive inbox lifecycle for one conversation list/detail item.
- * Priority: TEST → manual ARCHIVED → CLOSED → SCHEDULED → ACTIVE
+ * Priority: TEST → persisted ARCHIVED → CLOSED → SCHEDULED → window-expired ARCHIVED → ACTIVE
  *
  * @returns {{ lifecycle: string, closeReason: string|null, scheduled: boolean, closed: boolean, test: boolean, archived: boolean, outcome: string|null }}
  */
 function resolveInboxLifecycle({
   prospect = {},
   persisted = {},
-  agentState = null
+  agentState = null,
+  customerCareWindow = null
 } = {}) {
   const agent = agentState || (prospect.phone ? loadAgentState(prospect.phone) : null);
   const test = isTestProspect(prospect, persisted);
@@ -233,6 +235,22 @@ function resolveInboxLifecycle({
       closed: false,
       test: false,
       archived: false,
+      outcome: agent?.outcome || null
+    };
+  }
+
+  if (
+    customerCareWindow &&
+    customerCareWindow.open === false &&
+    customerCareWindow.reason === "WINDOW_EXPIRED"
+  ) {
+    return {
+      lifecycle: INBOX_LIFECYCLE.ARCHIVED,
+      closeReason: persisted.inboxCloseReason || INBOX_CLOSE_REASONS.WINDOW_EXPIRED,
+      scheduled: false,
+      closed: false,
+      test: false,
+      archived: true,
       outcome: agent?.outcome || null
     };
   }

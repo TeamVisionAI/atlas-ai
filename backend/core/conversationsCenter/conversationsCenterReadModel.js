@@ -29,6 +29,11 @@ const {
   activitySortMs,
   isRealWhatsAppCommunication
 } = require("./conversationsUnreadEngine");
+const {
+  evaluateWindowFromLogs,
+  shouldPersistWindowExpiredArchive,
+  persistWindowExpiredArchive
+} = require("./conversationWindowInboxEngine");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../phoneNormalizer");
 const { formatProspectWhatsAppDisplayIdentity, isSyntheticWhatsAppStorageKey, resolveProspectVisiblePhone } = require("../whatsappSenderIdentity");
 const {
@@ -199,8 +204,13 @@ async function buildConversationListItem(prospect, options = {}) {
   }
 
   const ownershipState = resolveConversationOwnershipState(persisted);
-  const lifecycleInfo = resolveInboxLifecycle({ prospect, persisted });
   const logs = options.logs || logsForPhone(options.logsByPhone, prospect.phone);
+  const customerCareWindow = evaluateWindowFromLogs(logs, options.now);
+  const lifecycleInfo = resolveInboxLifecycle({
+    prospect,
+    persisted,
+    customerCareWindow
+  });
   const lastCommunication = computeLastCommunication(logs);
   const unreadState = computeUnreadState({
     logs,
@@ -270,7 +280,9 @@ async function buildConversationListItem(prospect, options = {}) {
     inboxCloseReason: lifecycleInfo.closeReason,
     inboxOutcome: lifecycleInfo.outcome,
     inboxArchivedAt: persisted.inboxArchivedAt || null,
-    inboxClosedAt: persisted.inboxClosedAt || null
+    inboxClosedAt: persisted.inboxClosedAt || null,
+    inboxWindowExpiredAt: persisted.inboxWindowExpiredAt || null,
+    customerCareWindow
   };
 }
 
@@ -426,10 +438,16 @@ async function buildConversationsCenterReadModel(options = {}) {
       })
     )
   ).filter(Boolean);
+  const injectedLogs =
+    options.conversationLogsByPhone !== undefined
+      ? options.conversationLogsByPhone
+      : options.prospects
+        ? {}
+        : undefined;
   const logsByPhone = await resolveConversationLogsByPhone(
     scoped.map((row) => row.phone).filter(Boolean),
     options.organizationId,
-    options.conversationLogsByPhone
+    injectedLogs
   );
   let items = (
     await Promise.all(
@@ -439,11 +457,19 @@ async function buildConversationsCenterReadModel(options = {}) {
           persisted: useEmbeddedWorkflow
             ? workflowStateFromProspectRow(prospect)
             : undefined,
-          logs: logsForPhone(logsByPhone, prospect.phone)
+          logs: logsForPhone(logsByPhone, prospect.phone),
+          now: options.now
         })
       )
     )
   ).filter((item) => item.phone);
+
+  const shouldPersistWindowArchive =
+    options.persistWindowArchive === true ||
+    (options.persistWindowArchive !== false && !options.prospects);
+  if (shouldPersistWindowArchive) {
+    await persistDerivedWindowArchives(scoped, items, organizationId);
+  }
 
   items.sort(
     (left, right) =>
@@ -473,6 +499,48 @@ async function buildConversationsCenterReadModel(options = {}) {
     needsAttentionCount: counts.needs_attention,
     items
   };
+}
+
+async function persistDerivedWindowArchives(prospects, items, organizationId) {
+  const orgId = String(organizationId || "").trim();
+  if (!orgId) {
+    return;
+  }
+
+  const byPhone = new Map((prospects || []).map((row) => [row.phone, row]));
+  await Promise.all(
+    (items || [])
+      .filter(
+        (item) =>
+          item.inboxLifecycle === INBOX_LIFECYCLE.ARCHIVED &&
+          !item.inboxArchivedAt &&
+          item.customerCareWindow?.reason === "WINDOW_EXPIRED"
+      )
+      .map(async (item) => {
+        const prospect = byPhone.get(item.phone);
+        if (!prospect?.organization_id || String(prospect.organization_id) !== orgId) {
+          return;
+        }
+        const persisted = workflowStateFromProspectRow(prospect);
+        if (
+          !shouldPersistWindowExpiredArchive({
+            persisted,
+            customerCareWindow: item.customerCareWindow
+          })
+        ) {
+          return;
+        }
+        try {
+          await persistWindowExpiredArchive({
+            phone: prospect.phone,
+            organizationId: orgId,
+            prospectId: prospect.id || null
+          });
+        } catch {
+          /* fail closed — derived archive still hides the thread from Active */
+        }
+      })
+  );
 }
 
 async function getConversationsAttentionCount(organizationId, prospects, authContext = null) {

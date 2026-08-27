@@ -137,6 +137,7 @@ module.exports = {
   isRealWhatsAppCommunication,
   isAudioCommunication,
   isProspectInbound,
+  logTimestampMs,
   computeLastCommunication,
   computeUnreadState,
   activitySortMs

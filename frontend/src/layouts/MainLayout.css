@@ -213,8 +213,28 @@
 }
 
 @media print {
-  .atlas-layout__staging-banner {
+  .atlas-layout__staging-banner,
+  .atlas-layout__sidebar,
+  .atlas-layout__backdrop,
+  .atlas-layout__header,
+  .atlas-layout__menu-button,
+  .support-mode-banner,
+  .atlas-layout__meta-review-banner {
     display: none !important;
+  }
+
+  .atlas-layout,
+  .atlas-layout__frame,
+  .atlas-layout__main,
+  .atlas-layout__content {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
   }
 }
 

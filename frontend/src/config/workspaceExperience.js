@@ -337,6 +337,7 @@ export const ROUTE_ACCESS = Object.freeze({
   },
   "mission-control": { permission: PERMISSIONS.PROSPECT_READ },
   "prospect-center": { permission: PERMISSIONS.PROSPECT_READ },
+  "prospect-report": { permission: PERMISSIONS.PROSPECT_READ },
   "prospect-workspace": { permission: PERMISSIONS.PROSPECT_READ },
   "quick-capture": { permission: PERMISSIONS.PROSPECT_WRITE },
   conversations: { permission: PERMISSIONS.PROSPECT_COMMUNICATE },

@@ -238,7 +238,8 @@ test("Restore explicitly clears soft flags; unrelated writes cannot", async () =
       "inboxArchivedAt",
       "inboxClosedAt",
       "inboxCloseReason",
-      "inboxMarkedTestAt"
+      "inboxMarkedTestAt",
+      "inboxWindowExpiredAt"
     ]);
 
     const clean = sanitizeWorkflowPatch({

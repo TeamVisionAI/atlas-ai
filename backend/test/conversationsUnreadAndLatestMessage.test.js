@@ -330,7 +330,8 @@ test("read model: inbound unread + sort + system event does not reorder", async 
     const model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
       prospects,
-      conversationLogsByPhone: logsByPhone
+      conversationLogsByPhone: logsByPhone,
+      now: "2026-08-13T20:00:00.000Z"
     });
 
     assert.equal(model.items[0].phone, "+17865558111");
@@ -353,6 +354,7 @@ test("read model: blocked_template_missing does not become preview or sort key",
 
     const model = await buildConversationsCenterReadModel({
       organizationId: TEAM_VISION,
+      now: "2026-08-13T22:00:00.000Z",
       prospects: [
         recruitingProspectFixture({
           id: "p-block",
