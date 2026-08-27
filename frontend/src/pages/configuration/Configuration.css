@@ -237,6 +237,13 @@
   color: var(--config-text);
 }
 
+.configuration-card__description {
+  margin: -0.65rem 0 1.25rem;
+  color: var(--config-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
 .configuration-form {
   display: grid;
   gap: 1rem;
@@ -268,7 +275,8 @@
 }
 
 .configuration-form input,
-.configuration-form select {
+.configuration-form select,
+.configuration-form textarea {
   width: 100%;
   box-sizing: border-box;
   padding: 0.65rem 0.8rem;
@@ -277,19 +285,27 @@
   background: var(--config-surface);
   color: var(--config-text);
   font-size: 0.875rem;
+  font-family: inherit;
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
 }
 
+.configuration-form textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
 .configuration-form input:focus-visible,
-.configuration-form select:focus-visible {
+.configuration-form select:focus-visible,
+.configuration-form textarea:focus-visible {
   outline: none;
   border-color: var(--config-accent);
   box-shadow: var(--config-focus);
 }
 
-.configuration-form input:disabled {
+.configuration-form input:disabled,
+.configuration-form textarea:disabled {
   background: var(--config-surface-muted);
   color: var(--config-text-muted);
   cursor: not-allowed;
@@ -819,5 +835,149 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 0.5rem;
+}
+
+.appointment-settings.configuration-form {
+  max-width: 52rem;
+  margin: 0;
+  gap: 1.25rem;
+}
+
+.appointment-settings__header {
+  margin-bottom: 0.25rem;
+}
+
+.appointment-settings__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--config-text);
+}
+
+.appointment-settings__subtitle {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--config-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.appointment-settings__field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--config-text);
+}
+
+.appointment-settings__status-field {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+}
+
+.appointment-settings__link {
+  color: var(--config-accent);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.appointment-settings__link:hover,
+.appointment-settings__link:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.appointment-settings__link:focus-visible {
+  box-shadow: var(--config-focus);
+  border-radius: 4px;
+}
+
+.appointment-settings__note {
+  margin: 0 0 1rem;
+  color: var(--config-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.appointment-settings__error {
+  color: #b91c1c;
+  font-size: 0.8125rem;
+}
+
+.appointment-settings__locations {
+  display: grid;
+  gap: 1rem;
+}
+
+.appointment-location-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--config-border);
+  border-radius: var(--config-radius-sm);
+  background: var(--config-surface-muted);
+}
+
+.appointment-location-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.appointment-location-card__name {
+  margin: 0 0 0.25rem;
+  font-size: 0.975rem;
+  font-weight: 600;
+  color: var(--config-text);
+}
+
+.appointment-location-card__address {
+  margin: 0;
+  color: var(--config-text-muted);
+  font-size: 0.875rem;
+}
+
+.favorite-location-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.appointment-settings__calendar-grid {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.appointment-settings__calendar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--config-border);
+  border-radius: var(--config-radius-sm);
+  background: var(--config-surface-muted);
+}
+
+.appointment-settings__save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 1rem 0 0.25rem;
+  background: linear-gradient(to top, var(--config-surface) 70%, transparent);
+}
+
+@media (max-width: 639px) {
+  .appointment-settings__calendar-row,
+  .appointment-location-card__top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
