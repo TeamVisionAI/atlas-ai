@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
 import {
@@ -33,6 +33,9 @@ import {
   invitationDisplayStatus,
   statusBadgeClass
 } from "./adminUsersGridHelpers";
+import OverflowMenu from "../../components/ui/OverflowMenu";
+import TablePagination from "../../components/ui/TablePagination";
+import { USERS_PAGE_SIZE, paginateItems } from "../platform/platformTenantDisplay";
 import "./identity.css";
 
 /** LC1 permission roles (platform access) — separate from business ranks. */
@@ -134,73 +137,6 @@ function Badge({ className, children, title }) {
   );
 }
 
-function RowActionsMenu({ actions, onAction }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-
-    function onPointerDown(event) {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    }
-
-    function onKeyDown(event) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  if (!actions.length) {
-    return null;
-  }
-
-  return (
-    <div className="admin-users-menu" ref={rootRef}>
-      <button
-        type="button"
-        className="admin-users-menu__trigger"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="Row actions"
-        onClick={() => setOpen((current) => !current)}
-      >
-        •••
-      </button>
-      {open ? (
-        <div className="admin-users-menu__panel" role="menu">
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              role="menuitem"
-              className="admin-users-menu__item"
-              onClick={() => {
-                setOpen(false);
-                onAction(action.id);
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export default function AdminUsers() {
   const { user: sessionUser } = useWorkspace();
   const canVerifySecurities =
@@ -208,6 +144,7 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState(USERS_DEFAULT_STATUS_FILTER);
   const [rankFilter, setRankFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -267,6 +204,15 @@ export default function AdminUsers() {
       }),
     [users, query, statusFilter, rankFilter, roleFilter, activeTab]
   );
+
+  const pagedUsers = useMemo(
+    () => paginateItems(filteredUsers, page, USERS_PAGE_SIZE),
+    [filteredUsers, page]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, rankFilter, roleFilter, activeTab]);
 
   const activeLeaders = useMemo(
     () => users.filter((user) => user.status === "active"),
@@ -586,7 +532,11 @@ export default function AdminUsers() {
           </>
         )}
         <td className="admin-users-col-actions">
-          <RowActionsMenu actions={actions} onAction={(actionId) => runAction(actionId, user)} />
+          <OverflowMenu
+            ariaLabel={`More actions for ${displayUserName(user)}`}
+            actions={actions}
+            onAction={(actionId) => runAction(actionId, user)}
+          />
         </td>
       </tr>
     );
@@ -616,7 +566,11 @@ export default function AdminUsers() {
               <Badge className={statusBadgeClass(statusKey)}>{formatStatusLabel(statusKey)}</Badge>
             </div>
           </div>
-          <RowActionsMenu actions={actions} onAction={(actionId) => runAction(actionId, user)} />
+          <OverflowMenu
+            ariaLabel={`More actions for ${displayUserName(user)}`}
+            actions={actions}
+            onAction={(actionId) => runAction(actionId, user)}
+          />
         </div>
         <div className="admin-users-card__meta">
           {user.business_rank ? (
@@ -1097,10 +1051,20 @@ export default function AdminUsers() {
                     <th className="admin-users-col-actions">Actions</th>
                   </tr>
                 </thead>
-                <tbody>{filteredUsers.map((user) => renderUserRow(user))}</tbody>
+                <tbody>{pagedUsers.items.map((user) => renderUserRow(user))}</tbody>
               </table>
             </div>
-            <div className="admin-users-mobile">{filteredUsers.map((user) => renderUserCard(user))}</div>
+            <div className="admin-users-mobile">
+              {pagedUsers.items.map((user) => renderUserCard(user))}
+            </div>
+            <TablePagination
+              page={pagedUsers.page}
+              pageCount={pagedUsers.pageCount}
+              total={pagedUsers.total}
+              pageSize={USERS_PAGE_SIZE}
+              onPageChange={setPage}
+              label={activeTab === "invitations" ? "invitations" : "users"}
+            />
           </>
         ) : null}
 

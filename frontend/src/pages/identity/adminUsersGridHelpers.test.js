@@ -103,7 +103,8 @@ test("AdminUsers grid UI structure is present", () => {
   assert.match(adminUsersSource, /admin-users-toolbar/);
   assert.match(adminUsersSource, /Search users/);
   assert.match(adminUsersSource, /Invite User/);
-  assert.match(adminUsersSource, /RowActionsMenu|•••/);
+  assert.match(adminUsersSource, /OverflowMenu|•••/);
+  assert.match(adminUsersSource, /createPortal|OverflowMenu/);
   assert.match(adminUsersSource, /admin-users-mobile/);
   assert.match(adminUsersSource, /Active \+ Pending/);
   assert.doesNotMatch(adminUsersSource, /Team Vision hierarchy/);
@@ -116,4 +117,5 @@ test("CSS provides sticky header, badges, and responsive cards", () => {
   assert.match(cssSource, /admin-users-badge/);
   assert.match(cssSource, /admin-users-mobile/);
   assert.match(cssSource, /admin-users-row--pending/);
+  assert.match(cssSource, /height:\s*60px/);
 });

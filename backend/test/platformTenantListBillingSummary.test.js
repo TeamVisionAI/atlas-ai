@@ -46,6 +46,8 @@ test("presentTenant list summary includes lightweight billing fields without led
   assert.equal(dto.nextDueAt, "2026-09-01T00:00:00.000Z");
   assert.equal(dto.trialStartsAt, "2026-08-01T00:00:00.000Z");
   assert.equal(dto.isSeedTenant, false);
+  assert.equal(dto.hasFirstAdmin, true);
+  assert.equal(dto.firstAdmin, null);
   assert.equal("billingNotes" in dto, false);
   assert.equal("payments" in dto, false);
   assert.equal("paymentLink" in dto, false);

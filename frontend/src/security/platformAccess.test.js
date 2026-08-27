@@ -199,6 +199,9 @@ describe("app shell wiring", () => {
     assert.match(tenantsPage, /subscriptionStatus/);
     assert.match(tenantsPage, /createTenant/);
     assert.match(tenantsPage, /assignTenantAdmin\(selectedTenant\.id/);
+    assert.match(tenantsPage, /canAssignFirstAdmin/);
+    assert.match(tenantsPage, /OverflowMenu/);
+    assert.match(tenantsPage, /ownerAdminLabel/);
     assert.match(tenantsPage, /requiresSuspendConfirmation/);
     assert.match(tenantsPage, /canEnterSupportMode/);
     assert.match(tenantsPage, /Support Mode unavailable while suspended/);

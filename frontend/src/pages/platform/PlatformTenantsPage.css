@@ -1,7 +1,176 @@
+.platform-tenants-page {
+  max-width: 1280px;
+}
+
 .platform-tenants-page__lede {
   margin: 0.25rem 0 0;
   color: #475569;
   font-size: 0.9rem;
+}
+
+.platform-create-card {
+  padding: 1rem 1.15rem;
+}
+
+.platform-create-card h2,
+.platform-tenants-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.platform-create-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem 1rem;
+  align-items: end;
+}
+
+.platform-create-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  color: #334155;
+}
+
+.platform-create-form input,
+.platform-create-form select {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  background: #fff;
+}
+
+.platform-create-form__actions {
+  display: flex;
+  align-items: end;
+}
+
+.platform-tenants-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.platform-tenants-search {
+  min-width: 16rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.platform-tenants-table-wrap {
+  overflow-x: auto;
+}
+
+.platform-tenants-table {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.platform-tenants-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.platform-tenants-table tbody td {
+  height: 60px;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.8125rem;
+  vertical-align: middle;
+}
+
+.platform-tenants-col-name {
+  width: 22%;
+}
+
+.platform-tenants-col-status,
+.platform-tenants-col-plan {
+  width: 10%;
+}
+
+.platform-tenants-col-trial,
+.platform-tenants-col-due {
+  width: 13%;
+  white-space: nowrap;
+}
+
+.platform-tenants-col-owner {
+  width: 18%;
+}
+
+.platform-tenants-col-actions {
+  width: 14%;
+}
+
+.platform-tenants-page__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+.platform-tenants-page__actions .identity-button {
+  white-space: nowrap;
+}
+
+.platform-tenants-page__owner-email {
+  color: #64748b;
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-table-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0 0;
+}
+
+.atlas-table-pagination__meta {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.atlas-table-pagination__controls {
+  display: flex;
+  gap: 0.4rem;
+}
+
+@media (max-width: 800px) {
+  .platform-create-form {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-tenants-card__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .platform-tenants-search {
+    min-width: 0;
+  }
 }
 
 .platform-tenants-page__row--suspended td {
