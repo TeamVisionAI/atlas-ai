@@ -50,6 +50,7 @@ import {
   markConversationAsTest,
   markConversationRead,
   ConversationsCenterError,
+  clearConversationsCaches,
   readConversationsListCache,
   applyConversationOwnershipPatch
 } from "../services/conversationsCenterService";
@@ -135,8 +136,15 @@ function formatActivity(iso, locale) {
   }).format(date);
 }
 
-function inboxCacheKey(filter) {
-  return `${filter || "active"}::::summary`;
+function conversationsTenantKey({ user, supportMode, controlPlane }) {
+  if (controlPlane) {
+    return "control-plane";
+  }
+  return supportMode?.organizationId || user?.organizationId || "none";
+}
+
+function inboxCacheKey(filter, organizationId) {
+  return `${organizationId || "none"}::${filter || "active"}::::summary`;
 }
 
 function ConversationListSkeleton() {
@@ -218,12 +226,17 @@ export default function ConversationsPage() {
   const { translate, language } = useLanguage();
   const { user, supportMode } = useWorkspace();
   const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
+  const tenantCacheKey = conversationsTenantKey({ user, supportMode, controlPlane });
   const locale = language === "es" ? "es-US" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
   const activeFilter = searchParams.get("filter") || "active";
 
-  const [payload, setPayload] = useState(() => readConversationsListCache(inboxCacheKey(activeFilter)));
-  const [listLoading, setListLoading] = useState(() => !readConversationsListCache(inboxCacheKey(activeFilter)));
+  const [payload, setPayload] = useState(() =>
+    readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey))
+  );
+  const [listLoading, setListLoading] = useState(
+    () => !readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey))
+  );
   const [listError, setListError] = useState(null);
   const [error, setError] = useState(null);
   const [forbidden, setForbidden] = useState(false);
@@ -253,7 +266,7 @@ export default function ConversationsPage() {
       setListError(null);
       return;
     }
-    const cacheKey = inboxCacheKey(activeFilter);
+    const cacheKey = inboxCacheKey(activeFilter, tenantCacheKey);
     if (!quiet && !payload) {
       const cached = readConversationsListCache(cacheKey);
       if (cached) {
@@ -274,6 +287,7 @@ export default function ConversationsPage() {
 
     try {
       const data = await getConversations({
+        organizationId: tenantCacheKey,
         filter: activeFilter,
         view: "summary",
         force
@@ -314,8 +328,16 @@ export default function ConversationsPage() {
         setListLoading(false);
       }
     }
-  }, [activeFilter, translate, controlPlane]);
+  }, [activeFilter, translate, controlPlane, tenantCacheKey]);
   loadListRef.current = loadList;
+
+  useEffect(() => {
+    clearConversationsCaches();
+    setPayload(null);
+    setDetail(null);
+    setSelectedPhone(null);
+    loadList({ force: true });
+  }, [tenantCacheKey]); // eslint-disable-line react-hooks/exhaustive-deps -- Support Mode rebind must drop the prior tenant inbox
 
   useEffect(() => {
     loadList();
@@ -328,7 +350,7 @@ export default function ConversationsPage() {
       loadListRef.current?.({ quiet: true, force: true });
     }, CONVERSATIONS_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [activeFilter]);
+  }, [activeFilter, tenantCacheKey]);
 
   const loadDetail = useCallback(
     async (phone, { force = false } = {}) => {
@@ -340,7 +362,7 @@ export default function ConversationsPage() {
       const ownershipRevisionAtStart = ownershipRevisionRef.current;
       setDetailLoading(true);
       try {
-        const data = await getConversation(phone, { force });
+        const data = await getConversation(phone, { organizationId: tenantCacheKey, force });
         // Stale async guard — rapid A→B must never keep A's detail under B.
         if (
           !shouldCommitConversationDetail({
@@ -396,7 +418,7 @@ export default function ConversationsPage() {
         }
       }
     },
-    [translate]
+    [translate, tenantCacheKey]
   );
 
   function applyOwnershipMutationResult(phone, result) {

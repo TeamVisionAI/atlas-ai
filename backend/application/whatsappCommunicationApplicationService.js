@@ -12,7 +12,7 @@ const { parseInterviewDatetime } = require("../core/parseInterviewDatetime");
 const { isProductionProspect } = require("../core/productionProspectFilter");
 const { loadAgentState, mergeAgentState } = require("../core/agentActionState");
 const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
-const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
+const { loadTenantOperationalIdentity } = require("../core/tenantOperationalIdentity");
 const { buildAgentActionTimelineMessage } = require("../core/agentActionCopy");
 const { logConversation } = require("../services/logService");
 const {
@@ -120,7 +120,7 @@ async function buildMessageContext(prospect, template, options = {}) {
 
   const resolvedInterviewType =
     interviewType || resolveInterviewTypeFromAppointment(appointment, prospect);
-  const organizationSettings = getOrganizationSettings();
+  const tenantIdentity = await loadTenantOperationalIdentity(organizationId);
 
   const context = {
     language,
@@ -128,8 +128,8 @@ async function buildMessageContext(prospect, template, options = {}) {
     recruiterName,
     interviewAtMs,
     timezone,
-    office: organizationSettings.office,
-    organizationName: organizationSettings.organizationName,
+    office: tenantIdentity.office,
+    organizationName: tenantIdentity.organizationName,
     interviewType: resolvedInterviewType
   };
 

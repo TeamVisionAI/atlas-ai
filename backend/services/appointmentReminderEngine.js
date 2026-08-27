@@ -21,6 +21,10 @@ const {
 const {
   resolveAppointmentReminderRepository
 } = require("../repositories/appointmentReminderRepository");
+const {
+  NEUTRAL_ATLAS_DISPLAY_NAME,
+  loadTenantOperationalIdentity
+} = require("../core/tenantOperationalIdentity");
 
 const REMINDER_TYPES = Object.freeze({
   // Immediate booking confirmation is owned by appointment persistence → Conversation
@@ -71,8 +75,8 @@ function buildReminderMessage(appointment, reminderType, prospect, identity = {}
       identity.handoffDisplayName ||
         identity.displayName ||
         appointment.metadata?.organizationDisplayName ||
-        "Team Vision"
-    ).trim() || "Team Vision";
+        NEUTRAL_ATLAS_DISPLAY_NAME
+    ).trim() || NEUTRAL_ATLAS_DISPLAY_NAME;
 
   if (language === "es") {
     const greeting = first ? `Hola ${first},` : "Hola,";
@@ -398,10 +402,7 @@ async function deliverReminder(entry, appointment) {
   let identity = {};
   if (entry.organizationId) {
     try {
-      const { loadTenantRuntimeContext } = require("../core/tenantRuntimeContext");
-      const tenantRuntime = await loadTenantRuntimeContext(entry.organizationId, {
-        requireOrganizationId: true
-      });
+      const tenantRuntime = await loadTenantOperationalIdentity(entry.organizationId);
       identity = {
         handoffDisplayName: tenantRuntime.handoffDisplayName,
         displayName: tenantRuntime.displayName

@@ -29,6 +29,14 @@ test("operational surfaces refetch when Support Mode tenant changes", () => {
 
   assert.match(missionControl, /supportMode\?\.organizationId/);
   assert.match(prospectCenter, /supportMode\?\.organizationId/);
+
+  const conversations = fs.readFileSync(
+    path.join(__dirname, "../pages/ConversationsPage.jsx"),
+    "utf8"
+  );
+  assert.match(conversations, /supportMode\?\.organizationId/);
+  assert.match(conversations, /clearConversationsCaches/);
+  assert.match(conversations, /tenantCacheKey/);
 });
 
 test("Executive Dashboard v2 progressive hook phases requests", () => {

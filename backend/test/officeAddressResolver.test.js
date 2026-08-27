@@ -65,6 +65,7 @@ test("3. confirmation uses canonical full address (not truncated hardcode)", () 
   const confirmation = buildPersistedAppointmentConfirmation(
     {
       id: "appt-1",
+      organizationId: ORG,
       meetingType: "in_person",
       meetingAddress: null,
       startDateTime: "2026-08-10T15:00:00.000Z",
@@ -200,4 +201,30 @@ test("12. incomplete request does not suppress Meeting Management / org profile"
   );
   assert.equal(result.address, FULL);
   assert.equal(result.source, OFFICE_ADDRESS_SOURCES.ORGANIZATION_PROFILE);
+});
+
+test("13. non-seed tenant does not inherit Team Vision office", async () => {
+  const result = await resolveCanonicalOfficeAddress(
+    {
+      organizationId: "af8fb707-f26c-4152-ad77-2d079d30bc8a",
+      meetingType: "in_person"
+    },
+    { getMeetingManagement: mmResolver(null) }
+  );
+  assert.equal(result.address, null);
+  assert.equal(result.status, OFFICE_ADDRESS_STATUSES.UNAVAILABLE);
+  assert.doesNotMatch(String(result.address || ""), /79th/);
+
+  const confirmation = buildPersistedAppointmentConfirmation(
+    {
+      id: "appt-tl",
+      organizationId: "af8fb707-f26c-4152-ad77-2d079d30bc8a",
+      meetingType: "in_person",
+      meetingAddress: null,
+      startDateTime: "2026-08-10T15:00:00.000Z",
+      timezone: "America/New_York"
+    },
+    { preferred_language: "en" }
+  );
+  assert.doesNotMatch(confirmation.text, /79th|Suite 189|Team Vision/i);
 });

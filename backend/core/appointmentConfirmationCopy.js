@@ -5,6 +5,7 @@
  */
 
 const { getOfficeLocation } = require("./businessRulesEngine");
+const { isTeamVisionSeedTenant } = require("./teamVisionSeedTenant");
 const {
   resolveProspectPreferredLanguage,
   preferredLanguageToCommunicationCode
@@ -87,8 +88,12 @@ function resolveOfficeAddress(appointment = {}) {
     return String(snapshotted).trim();
   }
 
-  // Implements BR-077 — never use truncated hardcoded Miami fallback.
-  return getOfficeLocation().fullAddress || null;
+  // Implements BR-146 — BR-018 office is Team Vision seed only.
+  const organizationId = appointment.organizationId || appointment.organization_id || null;
+  if (isTeamVisionSeedTenant(organizationId)) {
+    return getOfficeLocation().fullAddress || null;
+  }
+  return null;
 }
 
 /**
