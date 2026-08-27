@@ -119,6 +119,7 @@ export function buildUserRowActions(user, { canVerifySecurities = false, isSelf 
   }
 
   actions.push({ id: "edit-name", label: "Edit Name" });
+  actions.push({ id: "edit-email", label: "Edit Email" });
   actions.push({ id: "edit-rep", label: "Edit Rep ID" });
   actions.push({ id: "edit-capabilities", label: "Capabilities" });
 

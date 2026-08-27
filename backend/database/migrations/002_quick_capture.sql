@@ -24,10 +24,10 @@ INSERT INTO atlas_users (id, email, first_name, last_name, display_name)
 VALUES
   (
     '00000000-0000-4000-8000-000000000001',
-    'ana@teamvision.ai',
+    'ana.reyes1510@gmail.com',
     'Ana',
-    'Recruiter',
-    'Ana'
+    'Perez',
+    'Ana Perez'
   ),
   (
     '00000000-0000-4000-8000-000000000002',

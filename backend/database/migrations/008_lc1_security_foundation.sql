@@ -106,17 +106,17 @@ WHERE email = 'niovel@teamvision.ai';
 
 UPDATE atlas_users
 SET role = 'recruiter', status = 'active', updated_at = now()
-WHERE email = 'ana@teamvision.ai';
+WHERE id = '00000000-0000-4000-8000-000000000001';
 
 -- Ensure seed users exist before prospect ownership backfill (migration 002 may have been skipped).
 INSERT INTO atlas_users (id, email, first_name, last_name, display_name)
 VALUES
   (
     '00000000-0000-4000-8000-000000000001',
-    'ana@teamvision.ai',
+    'ana.reyes1510@gmail.com',
     'Ana',
-    'Recruiter',
-    'Ana'
+    'Perez',
+    'Ana Perez'
   ),
   (
     '00000000-0000-4000-8000-000000000002',

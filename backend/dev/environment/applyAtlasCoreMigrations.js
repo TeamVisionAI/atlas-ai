@@ -46,7 +46,7 @@ const ENSURE_ATLAS_SEED_USERS_SQL = `
   VALUES
     (
       '00000000-0000-4000-8000-000000000001',
-      'ana@teamvision.ai',
+      'ana.reyes1510@gmail.com',
       'Ana',
       'Perez',
       'Ana Perez'

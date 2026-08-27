@@ -114,7 +114,7 @@ Dev seeded users (`seedAtlasUsers.js`):
 
 | Email | Role | Default password |
 |-------|------|------------------|
-| ana@teamvision.ai | recruiter | `AtlasDev2026!` |
+| ana.reyes1510@gmail.com | recruiter | `AtlasDev2026!` |
 | niovel@teamvision.ai | administrator | `AtlasDev2026!` |
 | ops@teamvision.ai | operations | `AtlasDev2026!` |
 | agent@teamvision.ai | agent | `AtlasDev2026!` |

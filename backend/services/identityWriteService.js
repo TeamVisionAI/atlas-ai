@@ -54,6 +54,13 @@ function mapIdentityWriteError(error) {
       conflict.publicCode = "REP_ID_CONFLICT";
       throw conflict;
     }
+
+    if (haystack.includes("email")) {
+      const conflict = new Error("A user with this email already exists.");
+      conflict.statusCode = 409;
+      conflict.publicCode = "EMAIL_CONFLICT";
+      throw conflict;
+    }
   }
 
   throw error;
@@ -193,6 +200,34 @@ async function fetchAtlasUser(userId, client = null) {
   }
 
   const { data, error } = await supabase.from("atlas_users").select("*").eq("id", userId).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function fetchAtlasUserByEmail(email, client = null) {
+  const normalized = normalizeEmail(email);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (client) {
+    const { rows } = await client.query(
+      "SELECT * FROM atlas_users WHERE lower(email) = $1 LIMIT 1",
+      [normalized]
+    );
+    return rows[0] || null;
+  }
+
+  const { data, error } = await supabase
+    .from("atlas_users")
+    .select("*")
+    .eq("email", normalized)
+    .maybeSingle();
 
   if (error) {
     throw error;
@@ -409,11 +444,33 @@ async function updateUser(userId, patch) {
 }
 
 async function changeEmail(userId, email) {
+  // In-place identity update only — never create a second auth user.
   const normalized = normalizeEmail(email);
 
   if (!normalized) {
     const error = new Error("Email is required.");
     error.statusCode = 400;
+    throw error;
+  }
+
+  const existing = await fetchAtlasUser(userId);
+
+  if (!existing) {
+    const error = new Error("User not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (existing.email === normalized) {
+    return existing;
+  }
+
+  const conflict = await fetchAtlasUserByEmail(normalized);
+
+  if (conflict && String(conflict.id) !== String(userId)) {
+    const error = new Error("A user with this email already exists.");
+    error.statusCode = 409;
+    error.publicCode = "EMAIL_CONFLICT";
     throw error;
   }
 

@@ -851,11 +851,42 @@ async function updateAgentCapabilities(userId, input, authContext, auditMeta = {
   return presentAdminUser(data);
 }
 
+async function changeEmail(userId, input, authContext, auditMeta = {}, req = null) {
+  const existing = await getUserById(userId, authContext, req);
+  const email = String(input.email || "").trim().toLowerCase();
+
+  if (!email) {
+    const error = new Error("Email is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const data = await identityWriteService.changeEmail(userId, email);
+
+  await writeAuditLog({
+    organizationId: data.organization_id,
+    userId: authContext.userId,
+    userEmail: authContext.email,
+    action: "user.email_changed",
+    targetType: "atlas_user",
+    targetId: userId,
+    metadata: {
+      previousEmail: existing.email,
+      email: data.email
+    },
+    ipAddress: auditMeta.ipAddress,
+    userAgent: auditMeta.userAgent
+  });
+
+  return presentAdminUser(data);
+}
+
 module.exports = {
   listUsers,
   getUserById,
   createUser,
   updateUser,
+  changeEmail,
   updateAgentCapabilities,
   setUserStatus,
   forcePasswordReset,
