@@ -3,6 +3,7 @@
  */
 
 const googleCalendarIntegrationService = require("./googleCalendarIntegrationService");
+const icloudCalendarIntegrationService = require("./icloudCalendarIntegrationService");
 const whatsappIntegrationService = require("./whatsappIntegrationService");
 const appointmentProfileService = require("./appointmentProfileService");
 const { hasPermission } = require("../security/authorizationService");
@@ -27,8 +28,9 @@ async function getIntegrationsStatus(organizationId, authContext = null) {
 
   const capabilities = resolveAgentCapabilitiesFromUser(capabilityUser);
 
-  const [googleCalendar, whatsappRaw] = await Promise.all([
+  const [googleCalendar, icloudCalendar, whatsappRaw] = await Promise.all([
     googleCalendarIntegrationService.getPersonalIntegrationStatus(organizationId, userId),
+    icloudCalendarIntegrationService.getIntegrationStatus(organizationId, userId),
     capabilities.personalWhatsAppEnabled
       ? whatsappIntegrationService.getPersonalIntegrationStatusForOrganization(
           organizationId,
@@ -78,6 +80,7 @@ async function getIntegrationsStatus(organizationId, authContext = null) {
 
   const result = {
     googleCalendar,
+    icloudCalendar,
     whatsapp,
     zoom: {
       connected: Boolean(personalZoomUrl),
