@@ -81,14 +81,31 @@ test("pending invite actions exclude force logout/reset", () => {
   );
 });
 
-test("active user actions include suspend / reset / logout / archive / capabilities", () => {
+test("active user actions include name edit / suspend / reset / logout / archive / capabilities", () => {
   const actions = buildUserRowActions(sampleUsers[0]);
   assert.ok(actions.some((a) => a.id === "suspend"));
   assert.ok(actions.some((a) => a.id === "reset"));
   assert.ok(actions.some((a) => a.id === "logout"));
   assert.ok(actions.some((a) => a.id === "archive"));
+  assert.ok(actions.some((a) => a.id === "edit-name"));
   assert.ok(actions.some((a) => a.id === "edit-rep"));
   assert.ok(actions.some((a) => a.id === "edit-capabilities"));
+});
+
+test("seeded-shaped users still get Edit Name without changing identity actions", () => {
+  const seeded = {
+    id: "00000000-0000-4000-8000-000000000001",
+    first_name: "Ana",
+    last_name: "Ana",
+    display_name: "Ana Ana",
+    email: "ana@example.com",
+    status: "active",
+    role: "recruiter"
+  };
+  const actions = buildUserRowActions(seeded);
+  assert.ok(actions.some((a) => a.id === "edit-name"));
+  assert.equal(actions.some((a) => a.id === "transfer-ownership"), false);
+  assert.equal(displayUserName(seeded), "Ana Ana");
 });
 
 test("status labels and badges are compact", () => {
@@ -107,6 +124,8 @@ test("AdminUsers grid UI structure is present", () => {
   assert.match(adminUsersSource, /createPortal|OverflowMenu/);
   assert.match(adminUsersSource, /admin-users-mobile/);
   assert.match(adminUsersSource, /Active \+ Pending/);
+  assert.match(adminUsersSource, /startNameEdit/);
+  assert.match(adminUsersSource, /updateAdminUser\(userId, \{ firstName, lastName \}\)/);
   assert.doesNotMatch(adminUsersSource, /Team Vision hierarchy/);
   assert.doesNotMatch(adminUsersSource, /00000000-0000-4000-8000-000000000001/);
   assert.doesNotMatch(adminUsersSource, /af8fb707-f26c-4152-ad77-2d079d30bc8a/);

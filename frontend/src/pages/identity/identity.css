@@ -360,6 +360,28 @@
   font-weight: 500;
 }
 
+.admin-users-name-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.admin-users-name-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.admin-users-name-edit__input {
+  width: 7.5rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
 .admin-users-truncate {
   display: block;
   overflow: hidden;
