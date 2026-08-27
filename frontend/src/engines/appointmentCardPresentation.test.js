@@ -160,26 +160,38 @@ test("meta label uses meeting mode without duplicating address", () => {
   );
 });
 
-test("action row stays compact at desktop width", () => {
-  assert.equal(resolveAppointmentActionRowLayoutMode(1280), "compact-single-row");
+test("action row wraps at desktop and tablet widths", () => {
+  assert.equal(resolveAppointmentActionRowLayoutMode(1280), "wrap");
+  assert.equal(resolveAppointmentActionRowLayoutMode(900), "wrap");
+  assert.equal(appointmentCardAllowsHorizontalOverflow(1280), false);
 
   const css = fs.readFileSync(
     path.join(__dirname, "../pages/AppointmentsPage.css"),
     "utf8"
   );
-  assert.match(css, /@media \(min-width: 768px\)[\s\S]*flex-wrap: nowrap/);
+  const actionsSource = fs.readFileSync(
+    path.join(__dirname, "../components/appointments/AppointmentCardActions.jsx"),
+    "utf8"
+  );
+  assert.match(css, /\.appointments-page__actions\s*\{[^}]*flex-wrap:\s*wrap/);
+  assert.match(css, /\.appointments-page__actions\s*\{[^}]*overflow-x:\s*hidden/);
+  assert.doesNotMatch(css, /flex-wrap:\s*nowrap/);
+  assert.doesNotMatch(css, /overflow-x:\s*auto/);
+  assert.match(actionsSource, /data-action-row-layout="wrap"/);
   assert.doesNotMatch(css, /Directions/i);
 });
 
-test("mobile layout avoids page horizontal overflow", () => {
+test("mobile layout avoids page and card horizontal overflow", () => {
   assert.equal(resolveAppointmentActionRowLayoutMode(375), "wrap");
-  assert.equal(appointmentCardAllowsHorizontalOverflow(375), true);
+  assert.equal(appointmentCardAllowsHorizontalOverflow(375), false);
 
   const css = fs.readFileSync(
     path.join(__dirname, "../pages/AppointmentsPage.css"),
     "utf8"
   );
   assert.match(css, /\.appointments-page[\s\S]*overflow-x: hidden/);
+  assert.match(css, /\.appointments-page__card\s*\{[^}]*min-width:\s*0/);
+  assert.match(css, /\.appointments-page__prospect\s*\{[^}]*overflow-wrap:\s*anywhere/);
 });
 
 test("shouldShowJoinZoomAction requires valid zoom url and active status", () => {
@@ -253,8 +265,29 @@ test("appointment card compact action labels render expected English copy", () =
   assert.doesNotMatch(en[zoomPlan.completeLabelKey], /Interview/i);
 });
 
+test("appointment card action labels stay concise and natural in Spanish", () => {
+  const es = translations.es;
+  const zoomPlan = resolveAppointmentCardActionPlan({
+    status: "scheduled",
+    meetingType: "virtual",
+    meetingProvider: "zoom",
+    virtualMeetingUrl: "https://us02web.zoom.us/j/123"
+  });
+
+  assert.equal(es.missionControlActionNotes, "📝 Agregar nota");
+  assert.equal(es[zoomPlan.openWorkspaceLabelKey], "📂 Workspace");
+  assert.equal(es.appointmentsJoinZoom, "🎥 Unirse a Zoom");
+  assert.equal(es.appointmentsRescheduleInterview, "📅 Reprogramar");
+  assert.equal(es[zoomPlan.cancelLabelKey], "❌ Cancelar");
+  assert.equal(es[zoomPlan.completeLabelKey], "✅ Completar");
+  assert.doesNotMatch(es.appointmentsRescheduleInterview, /entrevista/i);
+  assert.doesNotMatch(es[zoomPlan.cancelLabelKey], /entrevista/i);
+  assert.doesNotMatch(es[zoomPlan.completeLabelKey], /entrevista/i);
+});
+
 test("compact card action labels reduce desktop row width estimate", () => {
   const en = translations.en;
+  const es = translations.es;
   const compact = [
     "Add Note",
     en.appointmentsCardWorkspace,
@@ -271,6 +304,16 @@ test("compact card action labels reduce desktop row width estimate", () => {
     en.appointmentsCancelInterview,
     en.appointmentsCompleteInterview
   ].join(" | ");
+  const spanishRow = [
+    es.missionControlActionNotes,
+    es.appointmentsCardWorkspace,
+    es.appointmentsJoinZoom,
+    es.appointmentsRescheduleInterview,
+    es.appointmentsCancel,
+    es.appointmentsComplete
+  ].join(" | ");
 
   assert.ok(compact.length < legacy.length);
+  assert.ok(spanishRow.includes("Reprogramar"));
+  assert.doesNotMatch(spanishRow, /Reprogramar entrevista/);
 });

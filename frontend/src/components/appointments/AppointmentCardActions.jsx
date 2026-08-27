@@ -36,6 +36,7 @@ export default function AppointmentCardActions({
       data-appointment-id={appointment.id || undefined}
       data-interview-workflow-state={plan.state}
       data-join-zoom-visible={plan.showJoinZoom ? "true" : "false"}
+      data-action-row-layout="wrap"
     >
       {plan.showAddNote ? (
         <UniversalNoteButton size="sm" busy={noteSaving} onClick={onAddNote} />

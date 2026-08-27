@@ -1,5 +1,5 @@
 .appointment-card-actions {
-  /* Hook for future live-state / countdown / timer styling (BR-043). */
+  /* BR-043 — wrap so Spanish and other localized labels stay inside the card. */
 }
 
 .appointment-card-actions__join-zoom {
