@@ -64,6 +64,19 @@ describe("platform tenant owner display", () => {
     const page = paginateItems(tenants, 3, 25);
     assert.equal(page.pageCount, 3);
     assert.equal(page.items.length, 2);
+    const clamped = paginateItems(tenants, 99, 25);
+    assert.equal(clamped.page, 3);
+    assert.equal(clamped.items.length, 2);
+  });
+
+  it("TablePagination uses pageSize inside the component, not at module scope", () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, "../../components/ui/TablePagination.jsx"),
+      "utf8"
+    );
+    assert.doesNotMatch(source, /^void pageSize/m);
+    assert.match(source, /\{pageSize\} per page/);
+    assert.match(source, /export default function TablePagination/);
   });
 
   it("tenants page uses the shared overflow menu and hides raw owner ids", () => {
@@ -72,6 +85,8 @@ describe("platform tenant owner display", () => {
     assert.match(source, /canAssignFirstAdmin/);
     assert.match(source, /ownerAdminLabel/);
     assert.match(source, /Enter Support Mode/);
+    assert.match(source, /setPage\(1\)/);
+    assert.match(source, /TENANTS_PAGE_SIZE/);
     assert.doesNotMatch(source, /tenant\?\.ownerUserId \|\| "—"/);
     const menu = fs.readFileSync(
       path.join(__dirname, "../../components/ui/OverflowMenu.jsx"),
