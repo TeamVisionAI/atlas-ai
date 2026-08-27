@@ -58,7 +58,10 @@ const {
 const { getPrimaryMissionFromContext } = require("../core/missionEngine");
 const { buildRecruiterBrief } = require("../core/recruiterBriefBuilder");
 const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
-const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
+const {
+  loadTenantOperationalIdentity,
+  presentOrganizationSettingsFromIdentity
+} = require("../core/tenantOperationalIdentity");
 const { onConversationProgress } = require("../core/recruitingWorkflowOrchestrator");
 const { buildPersistedAgentNote } = require("../core/notesEngine");
 const {
@@ -199,7 +202,12 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
         );
       }
 
-      const message = buildZoomLinkMessage({ url, language });
+      const tenantIdentity = await loadTenantOperationalIdentity(organizationId);
+      const message = buildZoomLinkMessage({
+        url,
+        language,
+        organizationName: tenantIdentity.organizationName
+      });
       // Implements BR-078 — outside-window uses zoom_invitation; flags only after success.
       const sendError = await sendWhatsAppOrFail(prospect, message, {
         organizationId,
@@ -251,7 +259,8 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
         appointment = {};
       }
 
-      const orgOffice = getOrganizationSettings().office;
+      const tenantIdentity = await loadTenantOperationalIdentity(organizationId);
+      const orgOffice = tenantIdentity.office;
       const fallbackAddress = composeOfficeAddressFromOfficeModel(orgOffice);
       const locationVars = buildOfficeLocationVariables(appointment, prospect, {
         fallbackAddress
@@ -267,10 +276,11 @@ async function executeAgentAction(phone, action, payload = {}, options = {}) {
 
       const message = buildOfficeLocationMessage({
         office: {
-          name: orgOffice?.name || "Office",
+          name: orgOffice?.name || tenantIdentity.organizationName || "Office",
           fullAddress: locationVars.variables.meeting_address
         },
-        language
+        language,
+        organizationName: tenantIdentity.organizationName
       });
       // Implements BR-078 — outside-window uses office_location with canonical meeting_address.
       const sendError = await sendWhatsAppOrFail(prospect, message, {
@@ -546,7 +556,11 @@ async function getMissionControlWithActions(phone, options = {}) {
     tenantScoped
   });
   const agentState = loadAgentState(resolvedPhone);
-  const organizationSettings = getOrganizationSettings();
+  const tenantIdentity = await loadTenantOperationalIdentity(organizationId);
+  const organizationSettings = presentOrganizationSettingsFromIdentity(
+    tenantIdentity,
+    organizationId
+  );
 
   const workflow = await buildWorkflowReadModel({
     prospect,

@@ -16,6 +16,11 @@ export class ConversationsCenterError extends Error {
 const LIST_CACHE_TTL_MS = 20000;
 const listCache = new Map();
 const listInFlight = new Map();
+const detailCache = new Map();
+
+function detailCacheKey(organizationId, phone) {
+  return `${organizationId || "none"}::${String(phone)}`;
+}
 
 async function wrap(path, options) {
   try {
@@ -33,8 +38,23 @@ async function wrap(path, options) {
   }
 }
 
-function listCacheKey({ filter = "active", search = "", view = "summary" } = {}) {
-  return `${filter}::${search}::${view}`;
+function listCacheKey({
+  organizationId = "",
+  filter = "active",
+  search = "",
+  view = "summary"
+} = {}) {
+  return `${organizationId || "none"}::${filter}::${search}::${view}`;
+}
+
+export function conversationsListCacheKey(options = {}) {
+  return listCacheKey(options);
+}
+
+export function clearConversationsCaches() {
+  listCache.clear();
+  listInFlight.clear();
+  detailCache.clear();
 }
 
 export function readConversationsListCache(key) {
@@ -68,12 +88,13 @@ export async function getConversationsCenterAccess() {
 }
 
 export async function getConversations({
+  organizationId = "",
   filter = "active",
   search = "",
   view = "summary",
   force = false
 } = {}) {
-  const cacheKey = listCacheKey({ filter, search, view });
+  const cacheKey = listCacheKey({ organizationId, filter, search, view });
 
   if (!force) {
     const cached = readConversationsListCache(cacheKey);
@@ -115,14 +136,12 @@ export async function getConversationsAttentionCount() {
   return wrap("/api/conversations/attention-count");
 }
 
-const detailCache = new Map();
-
-export async function getConversation(phone, { force = false } = {}) {
+export async function getConversation(phone, { organizationId = "", force = false } = {}) {
   if (!phone) {
     throw new ConversationsCenterError("Phone is required.", 400);
   }
 
-  const cacheKey = String(phone);
+  const cacheKey = detailCacheKey(organizationId, phone);
   if (!force) {
     const cached = detailCache.get(cacheKey);
     if (cached && Date.now() - cached.at < LIST_CACHE_TTL_MS) {
@@ -135,14 +154,28 @@ export async function getConversation(phone, { force = false } = {}) {
   return data;
 }
 
-export function patchConversationDetailCache(phone, patchFn) {
-  const entry = detailCache.get(String(phone));
-  if (!entry?.data || typeof patchFn !== "function") {
+export function patchConversationDetailCache(phone, patchFn, organizationId = "") {
+  if (!phone || typeof patchFn !== "function") {
     return null;
   }
-  const next = patchFn(entry.data);
-  detailCache.set(String(phone), { at: Date.now(), data: next });
-  return next;
+
+  const suffix = `::${String(phone)}`;
+  let patched = null;
+  for (const [key, entry] of detailCache) {
+    if (!entry?.data) {
+      continue;
+    }
+    if (organizationId && key !== detailCacheKey(organizationId, phone)) {
+      continue;
+    }
+    if (!organizationId && !key.endsWith(suffix)) {
+      continue;
+    }
+    const next = patchFn(entry.data);
+    detailCache.set(key, { at: Date.now(), data: next });
+    patched = next;
+  }
+  return patched;
 }
 
 /**

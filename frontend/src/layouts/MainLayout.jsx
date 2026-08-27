@@ -13,7 +13,12 @@ import SidebarUserFooter from "../components/layout/SidebarUserFooter";
 import { useLanguage } from "../i18n/LanguageContext";
 import { ensureAtlasSession, fetchCurrentUser } from "../services/atlasAuthService";
 import { fetchOperationsAccess } from "../services/operationsCenterService";
-import { getConversationsAttentionCount, getConversationsCenterAccess } from "../services/conversationsCenterService";
+import {
+  clearConversationsCaches,
+  getConversationsAttentionCount,
+  getConversationsCenterAccess
+} from "../services/conversationsCenterService";
+import { fetchOrganizationBranding } from "../services/organizationBrandingService";
 import { getKnowledgeHubAccess } from "../services/knowledgeService";
 import {
   knowledgeAccessAllowsNav,
@@ -85,13 +90,15 @@ function SidebarNav({
   onCollapse,
   navItems,
   currentUser,
-  conversationsAttentionCount = 0
+  conversationsAttentionCount = 0,
+  organizationName = ""
 }) {
+  const brandName = String(organizationName || "").trim() || translate("layoutBrandSubtitleFallback");
   return (
     <>
       <div className="atlas-layout__sidebar-header">
         <Link to="/" className="atlas-layout__public-link">
-          ← Team Vision Financial
+          {translate("layoutPublicHomeLink")}
         </Link>
 
         <div className="atlas-layout__sidebar-head">
@@ -120,7 +127,7 @@ function SidebarNav({
           </div>
         </div>
 
-        <p className="atlas-layout__brand-subtitle">{translate("teamVisionRecruiting")}</p>
+        <p className="atlas-layout__brand-subtitle">{brandName}</p>
       </div>
 
       <nav className="atlas-layout__nav" aria-label={translate("layoutNavLabel")}>
@@ -154,7 +161,7 @@ function SidebarNav({
             onNavigate={onNavigate}
           />
         ) : (
-          <div className="atlas-layout__sidebar-foot">{translate("teamVision")}</div>
+          <div className="atlas-layout__sidebar-foot">{translate("layoutBrandSubtitleFallback")}</div>
         )}
       </div>
     </>
@@ -174,6 +181,7 @@ export default function MainLayout() {
   const [conversationsCenterAllowed, setConversationsCenterAllowed] = useState(null);
   const [knowledgeHubAllowed, setKnowledgeHubAllowed] = useState(null);
   const [supportMode, setSupportMode] = useState(null);
+  const [organizationBranding, setOrganizationBranding] = useState(null);
   const [exitingSupportMode, setExitingSupportMode] = useState(false);
   const [unsupportedWhatsAppReviews, setUnsupportedWhatsAppReviews] = useState([]);
   const [unsupportedReviewBusyId, setUnsupportedReviewBusyId] = useState(null);
@@ -226,6 +234,8 @@ export default function MainLayout() {
     try {
       setSupportMode(null);
       await exitSupportMode();
+      clearConversationsCaches();
+      setOrganizationBranding(null);
       await refreshSupportMode();
       await refreshUser();
       navigate(appPath("platform/tenants"));
@@ -315,6 +325,30 @@ export default function MainLayout() {
       cancelled = true;
     };
   }, [currentUser, supportMode?.active, supportMode?.organizationId, location.pathname]);
+
+  useEffect(() => {
+    if (!currentUser || (isSuperAdminUser(currentUser) && !supportMode?.organizationId)) {
+      setOrganizationBranding(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    fetchOrganizationBranding()
+      .then((branding) => {
+        if (!cancelled) {
+          setOrganizationBranding(branding);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOrganizationBranding(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, supportMode?.active, supportMode?.organizationId]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -561,6 +595,7 @@ export default function MainLayout() {
             navItems={navItems}
             currentUser={currentUser}
             conversationsAttentionCount={conversationsAttentionCount}
+            organizationName={organizationBranding?.name || ""}
           />
         </aside>
 

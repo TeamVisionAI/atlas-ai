@@ -192,6 +192,23 @@ test("6-8. TV/TL identity and location copy unchanged for 30m", () => {
   assert.doesNotMatch(tlMsg, /7862967254/);
 });
 
+test("missing identity never signs a reminder as Team Vision", () => {
+  const msg = buildReminderMessage(
+    {
+      startDateTime: "2030-06-01T15:00:00.000Z",
+      timezone: "America/New_York",
+      meetingType: "virtual",
+      virtualMeetingUrl: "https://zoom.example/x",
+      organizationId: ORG_TL
+    },
+    REMINDER_TYPES.REMINDER_30M,
+    { name: "Sam", preferred_language: "en" },
+    {}
+  );
+  assert.match(msg, /Atlas/);
+  assert.doesNotMatch(msg, /Team Vision/);
+});
+
 test("pending reminder_15m migrates to 30m without dual delivery", async () => {
   const appointmentId = crypto.randomUUID();
   const start = new Date(Date.now() + 48 * 60 * 60 * 1000);

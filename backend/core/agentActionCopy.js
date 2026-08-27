@@ -1,22 +1,31 @@
-const { getOfficeLocation } = require("./businessRulesEngine");
-const { getOrganizationSettings } = require("./organizationSettingsEngine");
+const { resolveTenantDisplayName } = require("./tenantOperationalIdentity");
 
-function buildZoomLinkMessage({ url, language }) {
-  if (language === "es") {
-    return `Aquí está el enlace de Zoom para tu entrevista con Team Vision:\n${url}`;
-  }
-
-  return `Here is your Team Vision interview Zoom link:\n${url}`;
+function resolveOrganizationLabel(organizationName) {
+  return resolveTenantDisplayName({ brandingName: organizationName });
 }
 
-function buildOfficeLocationMessage({ office, language }) {
-  const location = office || getOfficeLocation();
+function buildZoomLinkMessage({ url, language, organizationName } = {}) {
+  const org = resolveOrganizationLabel(organizationName);
 
   if (language === "es") {
-    return `Nuestra oficina de Team Vision está en:\n${location.name}\n${location.fullAddress}`;
+    return `Aquí está el enlace de Zoom para tu entrevista con ${org}:\n${url}`;
   }
 
-  return `Our Team Vision office is located at:\n${location.name}\n${location.fullAddress}`;
+  return `Here is your ${org} interview Zoom link:\n${url}`;
+}
+
+function buildOfficeLocationMessage({ office, language, organizationName } = {}) {
+  const location = office || null;
+  if (!location?.fullAddress) {
+    return "";
+  }
+  const org = resolveOrganizationLabel(organizationName || location.name);
+
+  if (language === "es") {
+    return `Nuestra oficina de ${org} está en:\n${location.name || org}\n${location.fullAddress}`;
+  }
+
+  return `Our ${org} office is located at:\n${location.name || org}\n${location.fullAddress}`;
 }
 
 function buildMissedAppointmentMessage({ name, language }) {

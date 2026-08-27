@@ -5,6 +5,7 @@
  */
 
 const { MEETING_TYPES } = require("./configuration/appointmentDomain");
+const { isTeamVisionSeedTenant } = require("./teamVisionSeedTenant");
 
 const OFFICE_ADDRESS_SOURCES = Object.freeze({
   PERSISTED_APPOINTMENT: "persisted_appointment",
@@ -103,8 +104,8 @@ function buildResult({ address = null, status, source } = {}) {
  * 1. valid persisted appointment meeting_address (preserve)
  * 2. valid explicit request/appointment address
  * 3. Meeting Management officeAddress
- * 4. BR-018 organization fullAddress
- * 5. unavailable
+ * 4. BR-018 organization fullAddress (Team Vision seed only)
+ * 5. unavailable — never substitute Team Vision for another tenant (BR-146)
  *
  * @param {object} input
  * @param {string} [input.organizationId]
@@ -162,19 +163,22 @@ async function resolveCanonicalOfficeAddress(input = {}, deps = {}) {
     }
   }
 
-  const getOrganizationSettings =
-    deps.getOrganizationSettings ||
-    require("./organizationSettingsEngine").getOrganizationSettings;
+  // Implements BR-146 — seed office profile is Team Vision only.
+  if (isTeamVisionSeedTenant(organizationId)) {
+    const getOrganizationSettings =
+      deps.getOrganizationSettings ||
+      require("./organizationSettingsEngine").getOrganizationSettings;
 
-  const orgOffice = getOrganizationSettings()?.office || null;
-  const orgAddress = composeOfficeAddressFromOfficeModel(orgOffice);
+    const orgOffice = getOrganizationSettings()?.office || null;
+    const orgAddress = composeOfficeAddressFromOfficeModel(orgOffice);
 
-  if (isCompleteOfficeAddress(orgAddress)) {
-    return buildResult({
-      address: orgAddress,
-      status: OFFICE_ADDRESS_STATUSES.CONFIGURED,
-      source: OFFICE_ADDRESS_SOURCES.ORGANIZATION_PROFILE
-    });
+    if (isCompleteOfficeAddress(orgAddress)) {
+      return buildResult({
+        address: orgAddress,
+        status: OFFICE_ADDRESS_STATUSES.CONFIGURED,
+        source: OFFICE_ADDRESS_SOURCES.ORGANIZATION_PROFILE
+      });
+    }
   }
 
   return buildResult({
