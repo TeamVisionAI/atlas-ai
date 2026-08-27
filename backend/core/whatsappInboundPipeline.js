@@ -579,6 +579,24 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   });
 
   try {
+    const reactivate =
+      dependencies.reactivateWindowExpiredConversation ||
+      require("./conversationsCenter/conversationWindowInboxEngine")
+        .reactivateWindowExpiredConversation;
+    await reactivate({
+      phone: storagePhone,
+      organizationId: organizationId || prospect?.organization_id || claimedOrganizationId || null,
+      prospectId: prospect?.id || null
+    });
+  } catch (reactivateError) {
+    logWhatsAppStage("conversation_window_reactivate_failed", {
+      level: "warn",
+      phone: storagePhone,
+      error: reactivateError.message
+    });
+  }
+
+  try {
     await maybeCreateUnsupportedInboundReview({
       inbound,
       organizationSource,

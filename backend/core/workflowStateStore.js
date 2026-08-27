@@ -26,7 +26,8 @@ const SOFT_INBOX_FIELDS = Object.freeze([
   "inboxArchivedAt",
   "inboxClosedAt",
   "inboxCloseReason",
-  "inboxMarkedTestAt"
+  "inboxMarkedTestAt",
+  "inboxWindowExpiredAt"
 ]);
 
 /**
@@ -113,6 +114,7 @@ function defaultWorkflowRecord() {
     inboxClosedAt: null,
     inboxCloseReason: null,
     inboxMarkedTestAt: null,
+    inboxWindowExpiredAt: null,
     conversationsLastReadInboundAt: null,
     conversationsLastSeenInboundMessageId: null,
     atlasAutomationEnabled: null,

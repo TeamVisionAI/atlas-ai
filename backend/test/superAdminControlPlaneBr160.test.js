@@ -116,6 +116,19 @@ function createOperationalApp({ authContext, supportContext = null, onLoad }) {
       res.json({ leaked: true });
     }
   );
+  app.get(
+    "/api/prospect-center/report",
+    operationalControlPlaneEmpty(() => ({
+      controlPlane: true,
+      organizationId: null,
+      emptyReason: "SUPER_ADMIN_CONTROL_PLANE",
+      items: []
+    })),
+    (_req, res) => {
+      load();
+      res.json({ leaked: true });
+    }
+  );
   app.get("/api/follow-ups", operationalControlPlaneEmpty(emptyFollowUps), (_req, res) => {
     load();
     res.json({ leaked: true });
@@ -147,6 +160,7 @@ test("A. global Super Admin / Support Mode OFF returns empty operational surface
     const dashboard = await getJson(port, "/api/dashboard");
     const mission = await getJson(port, "/api/mission-control/summary");
     const center = await getJson(port, "/api/prospect-center");
+    const report = await getJson(port, "/api/prospect-center/report");
     const followUps = await getJson(port, "/api/follow-ups");
 
     assert.equal(dashboard.status, 200);
@@ -155,6 +169,8 @@ test("A. global Super Admin / Support Mode OFF returns empty operational surface
     assert.deepEqual(dashboard.body.prioritizedWorkflowQueue, []);
     assert.equal(mission.body.activeProspectIds.length, 0);
     assert.deepEqual(center.body.items, []);
+    assert.deepEqual(report.body.items, []);
+    assert.equal(report.body.emptyReason, "SUPER_ADMIN_CONTROL_PLANE");
     assert.equal(followUps.body.totalCount, 0);
     assert.equal(loaderCalled, false);
     assert.notEqual(resolveEffectiveOrganizationId(superAdmin(ORG_TV), null), ORG_TV);

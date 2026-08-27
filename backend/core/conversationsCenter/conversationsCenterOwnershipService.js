@@ -212,7 +212,13 @@ async function archiveConversation(phone, options = {}) {
   const next = await savePersistedWorkflowState(
     phone,
     {
-      inboxArchivedAt: new Date().toISOString()
+      inboxArchivedAt: new Date().toISOString(),
+      inboxWindowExpiredAt: options.windowExpired
+        ? new Date().toISOString()
+        : previous.inboxWindowExpiredAt || null,
+      inboxCloseReason: options.windowExpired
+        ? INBOX_CLOSE_REASONS.WINDOW_EXPIRED
+        : previous.inboxCloseReason || null
     },
     scope
   );
@@ -259,7 +265,8 @@ async function restoreConversation(phone, options = {}) {
       inboxArchivedAt: null,
       inboxClosedAt: null,
       inboxCloseReason: null,
-      inboxMarkedTestAt: null
+      inboxMarkedTestAt: null,
+      inboxWindowExpiredAt: null
     },
     scope
   );

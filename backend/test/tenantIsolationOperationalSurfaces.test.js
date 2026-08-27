@@ -419,6 +419,8 @@ test("production routes keep organizationGuard + effective-org helpers", () => {
   const liveMc = fs.readFileSync(path.join(__dirname, "../routes/missionControl.js"), "utf8");
   assert.match(dashboard, /getTenantOrganizationId\(req\)/);
   assert.match(prospectCenter, /getTenantOrganizationId\(req\)/);
+  assert.match(prospectCenter, /\/report/);
+  assert.match(prospectCenter, /buildProspectReport/);
   assert.match(liveMc, /scopeLiveSnapshot/);
   assert.match(liveMc, /getTenantOrganizationId\(req\)/);
 });

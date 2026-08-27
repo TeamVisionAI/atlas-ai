@@ -1,0 +1,142 @@
+.prospect-report {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.prospect-report__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.prospect-report__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.prospect-report__subtitle {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.prospect-report__actions,
+.prospect-report__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.prospect-report__filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.prospect-report__filters input,
+.prospect-report__filters select {
+  min-width: 140px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 13px;
+}
+
+.prospect-report__link,
+.prospect-report__button {
+  appearance: none;
+  border: 1px solid #1e3a8a;
+  background: #1e3a8a;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.prospect-report__button--secondary,
+.prospect-report__link {
+  background: #fff;
+  color: #1e3a8a;
+}
+
+.prospect-report__meta {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+}
+
+.prospect-report__status,
+.prospect-report__hint,
+.prospect-report__error {
+  margin: 0;
+  font-size: 14px;
+}
+
+.prospect-report__error {
+  color: #b91c1c;
+}
+
+.prospect-report__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.prospect-report__table th,
+.prospect-report__table td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.prospect-report__table thead {
+  display: table-header-group;
+}
+
+.prospect-report__table th {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  @page {
+    size: letter;
+    margin: 0.6in 0.5in 0.75in;
+  }
+
+  .prospect-report {
+    max-width: none;
+    gap: 8px;
+  }
+
+  .prospect-report__table {
+    font-size: 9pt;
+  }
+
+  .prospect-report__table th {
+    background: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

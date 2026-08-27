@@ -36,6 +36,7 @@ import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import {
   navigateToProspectWorkspace
 } from "../utils/prospectRoutes";
+import { appPath } from "../config/appRoutes";
 import "./ProspectCenter.css";
 
 function ProspectRow({
@@ -677,9 +678,14 @@ export default function ProspectCenter() {
           <h1 className="prospect-center__title">{translate("prospectCenterTitle")}</h1>
           <p className="prospect-center__subtitle">{translate("prospectCenterSubtitle")}</p>
         </div>
-        <Link to="/mission-control" className="prospect-center__mission-link">
-          {translate("prospectCenterGoMissionControl")}
-        </Link>
+        <div className="prospect-center__header-actions">
+          <Link to={appPath("prospect-report")} className="prospect-center__mission-link">
+            {translate("prospectCenterOpenReport")}
+          </Link>
+          <Link to="/mission-control" className="prospect-center__mission-link">
+            {translate("prospectCenterGoMissionControl")}
+          </Link>
+        </div>
       </header>
 
       <div className="prospect-center__toolbar">

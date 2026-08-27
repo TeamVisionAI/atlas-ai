@@ -2160,6 +2160,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-163 — 24-Hour Conversation Window Archive + Tenant Prospect Report
+
+**Implements:** Keep Conversations operationally clean after the WhatsApp customer-care window expires, and provide a tenant-scoped printable prospect report.  
+**Domain:** Conversations inbox lifecycle / Prospect Center reporting / multi-tenant isolation  
+**Depends on:** BR-075 (customer-care window), BR-135 (soft inbox), BR-140 (qualifying communication), BR-146 / BR-160 (tenant + Super Admin control plane)  
+**Related:** BR-034 / BR-080 (ownership and silence unchanged on reactivation)  
+**Status:** Implemented  
+**Engine target:** `conversationWindowInboxEngine.js`, `conversationsCenterLifecycle.js`, `prospectReportReadModel.js`  
+**Tests:** `backend/test/conversationWindowInboxBr163.test.js`, `backend/test/prospectReportReadModelBr163.test.js`
+
+### Rules
+
+1. **Window source** — The 24-hour customer-care window is the latest **qualifying prospect inbound** only (BR-075 + BR-140). Delivery/read receipts, reactions, diagnostics, ownership changes, system events, and Atlas outbound must not extend the window.
+2. **Archive, do not delete** — When an Active WhatsApp thread has no qualifying inbound inside the window, derive **ARCHIVED** with reason `WINDOW_EXPIRED`. Persist `inboxArchivedAt` + `inboxWindowExpiredAt` without deleting history, prospect state, campaign attribution, appointments, ownership, notes, or diagnostics.
+3. **Do not auto-archive** TEST, CLOSED, or DNC threads. SCHEDULED stays Scheduled (already off Active). Fail closed without authoritative `organization_id`. Never use phone as tenant identity.
+4. **Reactivate on inbound** — A later qualifying inbound restores the same tenant-scoped thread to Active (`inboxArchivedAt` / `inboxWindowExpiredAt` cleared). Do not create a duplicate prospect/thread. Re-evaluate ownership with existing rules. Do not auto-reply if eligibility/ownership says stay silent. Do not unclose CLOSED / DNC / TEST.
+5. **Human ownership** — Window archive must not destroy HUMAN/ATLAS ownership history. Operator Archive/Close remains distinct from system `WINDOW_EXPIRED`.
+6. **System backfill exception to BR-135 #9** — One-time / idempotent **system** window-expiry marks for Active threads already outside the 24h window are authorized. Do not invent operator TEST/CLOSED/HUMAN marks. Skip Test unless current TEST rules already apply. Report before/after counts by tenant. Ambiguous/null-org rows fail closed.
+7. **Prospect report** — Tenant-scoped printable/exportable report (Prospect Center). Same authorization/hierarchy filters as Prospect Center. Super Admin without Support Mode = empty control plane. Support Mode = selected tenant only. No diagnostics, credentials, or cross-tenant data.
+8. **Boundaries** — Does not change Recruit AI copy, IUL logic, scheduling/daypart, BR-161, BR-162, billing, or WhatsApp send-eligibility beyond inbox archive/reactivation state.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  

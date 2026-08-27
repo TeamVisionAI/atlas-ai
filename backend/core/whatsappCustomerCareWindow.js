@@ -7,13 +7,11 @@ const { supabase } = require("../services/supabaseService");
 const { normalizePhoneNumber } = require("./phoneNormalizer");
 const { resolveStoragePhone } = require("./whatsappProspectResolver");
 const { isSyntheticWhatsAppStorageKey } = require("./whatsappSenderIdentity");
-
-/** Single source of truth for the customer-care window duration. */
-const CUSTOMER_CARE_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-const WINDOW_SOURCE = Object.freeze({
-  CONVERSATION_LOGS_INBOUND: "conversation_logs.inbound"
-});
+const {
+  CUSTOMER_CARE_WINDOW_MS,
+  WINDOW_SOURCE,
+  evaluateCustomerCareWindowFromInboundAt
+} = require("./whatsappCustomerCareWindowMath");
 
 function resolvePhoneCandidates(phone) {
   const raw = String(phone || "").trim();
@@ -26,80 +24,6 @@ function resolvePhoneCandidates(phone) {
   const normalized = normalizePhoneNumber(raw) || raw.replace(/\D/g, "");
   const storage = resolveStoragePhone(normalized);
   return [...new Set([raw, normalized, storage, `+${normalized}`].filter(Boolean))];
-}
-
-function parseInboundTimestamp(value) {
-  if (value == null || value === "") {
-    return null;
-  }
-
-  const ms = Date.parse(value);
-
-  if (!Number.isFinite(ms)) {
-    return null;
-  }
-
-  return ms;
-}
-
-/**
- * @param {object} params
- * @param {string|null} params.latestInboundAt - ISO timestamp of latest inbound
- * @param {Date|number|string} [params.now]
- * @param {number} [params.windowMs]
- */
-function evaluateCustomerCareWindowFromInboundAt({
-  latestInboundAt,
-  now = new Date(),
-  windowMs = CUSTOMER_CARE_WINDOW_MS
-} = {}) {
-  const nowMs = typeof now === "number" ? now : Date.parse(now);
-  const inboundMs = parseInboundTimestamp(latestInboundAt);
-
-  if (!Number.isFinite(nowMs)) {
-    return {
-      open: false,
-      reason: "INVALID_SERVER_TIME",
-      latestInboundAt: null,
-      expiresAt: null,
-      windowMs,
-      source: WINDOW_SOURCE.CONVERSATION_LOGS_INBOUND
-    };
-  }
-
-  if (inboundMs == null) {
-    return {
-      open: false,
-      reason: "NO_INBOUND_TIMESTAMP",
-      latestInboundAt: null,
-      expiresAt: null,
-      windowMs,
-      source: WINDOW_SOURCE.CONVERSATION_LOGS_INBOUND
-    };
-  }
-
-  if (inboundMs > nowMs + 60_000) {
-    return {
-      open: false,
-      reason: "FUTURE_INBOUND_TIMESTAMP",
-      latestInboundAt: new Date(inboundMs).toISOString(),
-      expiresAt: null,
-      windowMs,
-      source: WINDOW_SOURCE.CONVERSATION_LOGS_INBOUND
-    };
-  }
-
-  const expiresAtMs = inboundMs + windowMs;
-  const open = nowMs <= expiresAtMs;
-
-  return {
-    open,
-    reason: open ? "WINDOW_OPEN" : "WINDOW_EXPIRED",
-    latestInboundAt: new Date(inboundMs).toISOString(),
-    expiresAt: new Date(expiresAtMs).toISOString(),
-    windowMs,
-    source: WINDOW_SOURCE.CONVERSATION_LOGS_INBOUND
-  };
 }
 
 async function queryLatestInbound(client, candidates, organizationId = null) {
