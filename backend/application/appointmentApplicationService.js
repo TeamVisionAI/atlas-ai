@@ -364,15 +364,31 @@ async function createAppointment(input, context = {}) {
   const meeting = mapInterviewTypeToMeeting(meetingType, meetingProvider || profile.virtualMeeting.preferredProvider);
   const location = resolveLocationDetails(profile, input);
 
+  const assignmentMode = input.assignmentMode || null;
   const slotCheck = existingBooking
-    ? { slots: [{ dateKey, timeKey, startTimeISO: existingBooking.startTimeISO, endTimeISO: existingBooking.endTimeISO }] }
+    ? {
+        slots: [
+          {
+            dateKey,
+            timeKey,
+            startTimeISO: existingBooking.startTimeISO,
+            endTimeISO: existingBooking.endTimeISO,
+            assignedInterviewerUserId:
+              existingBooking.assignedInterviewerUserId ||
+              input.interviewerUserId ||
+              null
+          }
+        ]
+      }
     : await appointmentSchedulingEngine.getAvailableSlots({
         agentId,
         organizationId,
         date: dateKey,
         purpose,
         durationMinutes,
-        maxResults: 50
+        maxResults: 50,
+        assignmentMode,
+        interviewerUserId: input.interviewerUserId || null
       });
 
   const matchedSlot = slotCheck.slots.find(
@@ -382,6 +398,12 @@ async function createAppointment(input, context = {}) {
   if (!matchedSlot && !existingBooking) {
     throw buildError("UNAVAILABLE", "Selected slot is no longer available.");
   }
+
+  const assignedInterviewerUserId =
+    matchedSlot?.assignedInterviewerUserId ||
+    input.interviewerUserId ||
+    input.interviewer_user_id ||
+    null;
 
   const prospect = await findProspectInOrganization(prospectPhone, organizationId);
 
@@ -457,24 +479,36 @@ async function createAppointment(input, context = {}) {
     source: OFFICE_ADDRESS_SOURCES.UNAVAILABLE
   };
 
+  const interviewAssignment = await resolveInterviewAssignmentForSchedule(
+    {
+      ...input,
+      interviewerUserId: assignedInterviewerUserId || input.interviewerUserId
+    },
+    {
+      organizationId,
+      userId: createdBy || agentId,
+      agentId
+    }
+  );
+
   if (isVirtual) {
+    // Implements BR-162 — assigned interviewer owns Zoom; never admin/Support identity.
     virtualUrlResult = await resolveCanonicalVirtualMeetingUrl({
       organizationId,
+      interviewerUserId: interviewAssignment.interviewerUserId,
       meetingType: meeting.meetingType,
-      meetingProvider: meeting.meetingProvider,
-      existingBooking
+      meetingProvider: meeting.meetingProvider
     });
 
     meetingUrl = virtualUrlResult.url;
 
     if (
-      !existingBooking &&
       isZoomProvider(meeting.meetingProvider, meeting.meetingType) &&
       !meetingUrl
     ) {
       throw buildError(
-        "MEETING_URL_NOT_CONFIGURED",
-        "Personal meeting URL is not configured. Add it under Organization → Meeting Management.",
+        "INTERVIEWER_ZOOM_NOT_CONFIGURED",
+        "The assigned interviewer does not have a personal Zoom URL configured.",
         400
       );
     }
@@ -536,6 +570,7 @@ async function createAppointment(input, context = {}) {
       dateKey,
       timeKey,
       duration: durationMinutes,
+      interviewerUserId: interviewAssignment.interviewerUserId,
       metadata: {
         name: prospect.name,
         prospectName: prospect.name,
@@ -549,7 +584,8 @@ async function createAppointment(input, context = {}) {
         location: isVirtual ? meetingUrl : officeLocation,
         meetingUrl,
         zoomUrl: meetingUrl,
-        attendeeEmail
+        attendeeEmail,
+        interviewerUserId: interviewAssignment.interviewerUserId
       },
       timezone
     }));
@@ -559,22 +595,13 @@ async function createAppointment(input, context = {}) {
   }
 
   if (isVirtual) {
-    // Re-resolve after booking so booking-echoed URLs still win over org settings.
+    // Re-resolve from assigned interviewer / already snapshotted URL only.
     virtualUrlResult = await resolveCanonicalVirtualMeetingUrl({
       organizationId,
+      interviewerUserId: interviewAssignment.interviewerUserId,
       meetingType: meeting.meetingType,
       meetingProvider: meeting.meetingProvider,
-      existingBooking: {
-        success: existingBooking?.success,
-        startTimeISO: bookingResult.startTimeISO || existingBooking?.startTimeISO,
-        endTimeISO: bookingResult.endTimeISO || existingBooking?.endTimeISO,
-        googleCalendarEventId:
-          bookingResult.googleCalendarEventId || existingBooking?.googleCalendarEventId || null,
-        meetingUrl: bookingResult.meetingUrl || existingBooking?.meetingUrl || meetingUrl,
-        zoomLink: bookingResult.zoomLink || existingBooking?.zoomLink || null,
-        zoomUrl: bookingResult.zoomUrl || existingBooking?.zoomUrl || null,
-        meetLink: bookingResult.meetLink || existingBooking?.meetLink || null
-      }
+      persistedAppointment: { virtualMeetingUrl: meetingUrl }
     });
     meetingUrl = virtualUrlResult.url;
   }
@@ -585,11 +612,6 @@ async function createAppointment(input, context = {}) {
 
   const timestamp = nowIso();
   const ownerRepId = input.ownerRepId || (await resolveOwnerRepId(agentId));
-  const interviewAssignment = await resolveInterviewAssignmentForSchedule(input, {
-    organizationId,
-    userId: createdBy || agentId,
-    agentId
-  });
 
   logInterviewerTrace({
     authenticatedUserId: createdBy || agentId,
@@ -809,7 +831,10 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
       purpose: appointment.purpose,
       durationMinutes: appointment.durationMinutes,
       maxResults: 50,
-      excludeAppointmentId: appointment.id
+      excludeAppointmentId: appointment.id,
+      assignmentMode: "explicit",
+      interviewerUserId:
+        appointment.interviewerUserId || appointment.interviewer_user_id || appointment.agentId
     });
 
     matchedSlot = slotCheck.slots.find(
@@ -824,9 +849,11 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   const previousStart = appointment.startDateTime;
   const { dateKey, timeKey } = matchedSlot;
 
-  // Implements BR-076 — preserve persisted Zoom URL; fill missing from org settings only.
+  // Implements BR-076 / BR-162 — preserve snapshotted Zoom; if missing, use assigned interviewer.
   const virtualUrlResolution = await resolveCanonicalVirtualMeetingUrl({
     organizationId: appointment.organizationId || organizationId,
+    interviewerUserId:
+      appointment.interviewerUserId || appointment.interviewer_user_id || null,
     meetingType: appointment.meetingType,
     meetingProvider: appointment.meetingProvider,
     persistedAppointment: appointment

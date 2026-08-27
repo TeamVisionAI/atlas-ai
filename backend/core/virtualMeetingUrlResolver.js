@@ -124,12 +124,12 @@ function buildResult({ url = null, status, source, provider = null } = {}) {
 /**
  * Resolve the Zoom/virtual meeting URL with canonical precedence (BR-076 + BR-147).
  *
- * Precedence for Zoom:
- * 1. valid persisted appointment URL (reschedule/update)
- * 2. valid URL from existingBooking
- * 3. interviewer personal Zoom URL (profile_settings)
- * 4. organization Personal Meeting URL (legacy fallback only)
- * 5. null + pending
+ * Precedence for Zoom (BR-076 + BR-147 + BR-162):
+ * 1. valid persisted appointment URL (same appointment snapshot)
+ * 2. assigned interviewer personal Zoom URL
+ * 3. existingBooking URL only when no interviewer is assigned
+ * 4. organization Personal Meeting URL only when no interviewer is assigned (legacy)
+ * 5. null + pending — never another interviewer's Zoom, never Support/admin identity
  *
  * @param {object} input
  * @param {string} [input.organizationId]
@@ -138,17 +138,18 @@ function buildResult({ url = null, status, source, provider = null } = {}) {
  * @param {string} [input.meetingProvider]
  * @param {object|null} [input.persistedAppointment]
  * @param {object|null} [input.existingBooking]
+ * @param {boolean} [input.allowTenantZoomFallback]
  * @param {object} [deps]
  */
 async function resolveCanonicalVirtualMeetingUrl(input = {}, deps = {}) {
   const meetingType = normalizeMeetingType(input.meetingType);
   const meetingProvider = normalizeProvider(input.meetingProvider);
   const organizationId = input.organizationId || null;
-  const interviewerUserId =
-    input.interviewerUserId ||
-    input.interviewer_user_id ||
-    input.agentId ||
-    null;
+  const interviewerUserId = String(
+    input.interviewerUserId || input.interviewer_user_id || ""
+  ).trim() || null;
+  const allowTenantZoomFallback =
+    input.allowTenantZoomFallback === true || !interviewerUserId;
 
   if (!isVirtualMeeting(meetingType)) {
     return buildResult({
@@ -197,15 +198,17 @@ async function resolveCanonicalVirtualMeetingUrl(input = {}, deps = {}) {
     });
   }
 
-  const bookingUrl = extractBookingUrl(input.existingBooking);
+  if (!interviewerUserId) {
+    const bookingUrl = extractBookingUrl(input.existingBooking);
 
-  if (bookingUrl) {
-    return buildResult({
-      url: bookingUrl,
-      status: VIRTUAL_URL_STATUSES.CONFIGURED,
-      source: VIRTUAL_MEETING_URL_SOURCES.EXISTING_BOOKING,
-      provider: VIRTUAL_PROVIDERS.ZOOM
-    });
+    if (bookingUrl) {
+      return buildResult({
+        url: bookingUrl,
+        status: VIRTUAL_URL_STATUSES.CONFIGURED,
+        source: VIRTUAL_MEETING_URL_SOURCES.EXISTING_BOOKING,
+        provider: VIRTUAL_PROVIDERS.ZOOM
+      });
+    }
   }
 
   if (interviewerUserId) {
@@ -227,11 +230,20 @@ async function resolveCanonicalVirtualMeetingUrl(input = {}, deps = {}) {
         });
       }
     } catch {
-      // Fall through to organization legacy URL.
+      // Assigned interviewer with no readable personal Zoom fails closed.
+    }
+
+    if (!allowTenantZoomFallback) {
+      return buildResult({
+        url: null,
+        status: VIRTUAL_URL_STATUSES.PENDING,
+        source: VIRTUAL_MEETING_URL_SOURCES.UNAVAILABLE,
+        provider: VIRTUAL_PROVIDERS.ZOOM
+      });
     }
   }
 
-  if (organizationId) {
+  if (organizationId && allowTenantZoomFallback) {
     const getMeetingManagement =
       deps.getMeetingManagement ||
       require("../services/meetingManagementService").getMeetingManagement;

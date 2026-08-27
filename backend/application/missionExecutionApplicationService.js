@@ -136,6 +136,7 @@ async function createPersistedScheduleAppointment({
       notes: payload.notes,
       contact: attendeeEmail ? { email: attendeeEmail } : {},
       interviewerUserId: payload.interviewerUserId || agentId,
+      assignmentMode: payload.assignmentMode || null,
       existingBooking: bookingResult,
       skipWorkflowSideEffects: true,
       metadata: isPublicLocation
@@ -447,7 +448,7 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   }
 
   const location = locationResult.location;
-  const meetingUrl = locationResult.meetingUrl;
+  let meetingUrl = locationResult.meetingUrl;
 
   const scheduleAgentId = resolveScheduleAgentId(options);
   const effectiveInterviewerUserId =
@@ -554,6 +555,61 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     }
   }
 
+  const assignmentMode = payload.assignmentMode || (payload.interviewerUserId ? "explicit" : "auto");
+  const getSlots =
+    deps.getSlots ||
+    ((params) => appointmentApplicationService.getSlots(params));
+  const slotCheck = await getSlots({
+    agentId: scheduleAgentId,
+    organizationId,
+    date: payload.dateKey,
+    purpose: "recruiting_interview",
+    durationMinutes: duration,
+    assignmentMode,
+    interviewerUserId: assignmentMode === "explicit" ? effectiveInterviewerUserId : null,
+    maxResults: 50
+  });
+  const matchedSlot = (slotCheck?.slots || []).find(
+    (slot) => slot.dateKey === payload.dateKey && slot.timeKey === payload.timeKey
+  );
+
+  if (!matchedSlot) {
+    return buildActionError(
+      ACTION_IDS.SCHEDULE,
+      "UNAVAILABLE",
+      "Selected slot is no longer available."
+    );
+  }
+
+  const assignedInterviewerUserId =
+    matchedSlot.assignedInterviewerUserId || effectiveInterviewerUserId;
+
+  if (isZoom) {
+    const {
+      resolveCanonicalVirtualMeetingUrl
+    } = require("../core/virtualMeetingUrlResolver");
+    const interviewerZoom = await resolveCanonicalVirtualMeetingUrl({
+      organizationId,
+      interviewerUserId: assignedInterviewerUserId,
+      meetingType: "virtual",
+      meetingProvider: "zoom"
+    });
+    if (!interviewerZoom.url) {
+      return buildActionError(
+        ACTION_IDS.SCHEDULE,
+        "INTERVIEWER_ZOOM_NOT_CONFIGURED",
+        "The assigned interviewer does not have a personal Zoom URL configured."
+      );
+    }
+    meetingUrl = interviewerZoom.url;
+  }
+
+  payload = {
+    ...payload,
+    interviewerUserId: assignedInterviewerUserId,
+    assignmentMode
+  };
+
   let bookingResult;
 
   try {
@@ -563,6 +619,7 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
       dateKey: payload.dateKey,
       timeKey: payload.timeKey,
       duration,
+      interviewerUserId: assignedInterviewerUserId,
       metadata: {
         name: prospect.name,
         prospectName: prospect.name,
@@ -573,7 +630,9 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
         location: isZoom ? meetingUrl : location,
         meetingUrl: isZoom ? meetingUrl : null,
         zoomUrl: isZoom ? meetingUrl : null,
-        attendeeEmail
+        attendeeEmail,
+        interviewerUserId: assignedInterviewerUserId,
+        assignedInterviewerUserId
       },
       timezone: payload.timezone || "America/New_York"
     });

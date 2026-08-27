@@ -58,16 +58,18 @@ export function recordSchedulingAvailabilityBlocked(key) {
  */
 export function buildSchedulingAvailabilityFetchKey({
   interviewType = "",
-  interviewerUserId = ""
+  interviewerUserId = "",
+  interviewerSelection = ""
 } = {}) {
   const type = String(interviewType || "").trim().toLowerCase();
   const interviewer = String(interviewerUserId || "").trim();
+  const selection = String(interviewerSelection || "").trim().toLowerCase();
 
   if (!type) {
     return "";
   }
 
-  return `${type}|${interviewer}`;
+  return `${type}|${selection || "auto"}|${interviewer}`;
 }
 
 /**
@@ -101,14 +103,14 @@ export function resolveAvailabilityFetchReason(previousKey, nextKey) {
     return "initial";
   }
 
-  const [prevType, prevInterviewer] = previousKey.split("|");
-  const [nextType, nextInterviewer] = nextKey.split("|");
+  const [prevType, prevSelection, prevInterviewer] = previousKey.split("|");
+  const [nextType, nextSelection, nextInterviewer] = nextKey.split("|");
 
   if (prevType !== nextType) {
     return "interview_type";
   }
 
-  if (prevInterviewer !== nextInterviewer) {
+  if (prevSelection !== nextSelection || prevInterviewer !== nextInterviewer) {
     return "interviewer";
   }
 

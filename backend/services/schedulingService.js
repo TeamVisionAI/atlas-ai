@@ -61,7 +61,8 @@ async function scheduleAppointment({
   timeKey,
   duration,
   metadata = {},
-  timezone = "America/New_York"
+  timezone = "America/New_York",
+  interviewerUserId = null
 }) {
   if (!isValidAppointmentType(appointmentType)) {
     const error = new Error("Invalid appointment type.");
@@ -105,7 +106,8 @@ async function scheduleAppointment({
         endTimeISO,
         timezone,
         location: metadata.meetingUrl || metadata.zoomUrl || metadata.location || null,
-        attendeeEmail: metadata.attendeeEmail || null
+        attendeeEmail: metadata.attendeeEmail || null,
+        interviewerUserId: interviewerUserId || metadata.interviewerUserId || null
       });
     } catch (calendarError) {
       releaseSlotByIso(startTimeISO, appointmentType);

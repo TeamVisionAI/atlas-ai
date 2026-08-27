@@ -121,7 +121,7 @@ export function useSchedulingFormController({
       createInitialSchedulingForm({
         defaultInterviewType,
         defaultRecruiter: recruiterName,
-        defaultInterviewerUserId: currentUser?.id || "",
+        defaultInterviewerUserId: "",
         defaultDuration: 30
       })
     );
@@ -179,7 +179,10 @@ export function useSchedulingFormController({
       const availabilityFetcher = (params) =>
         fetchAvailability({
           ...params,
-          ...(interviewerUserId ? { agentId: interviewerUserId } : {})
+          assignmentMode: interviewerUserId ? "explicit" : "auto",
+          ...(interviewerUserId
+            ? { agentId: interviewerUserId, interviewerUserId }
+            : {})
         });
 
       const result = await loadInitialSchedulingSlots(availabilityFetcher, duration);
@@ -220,9 +223,10 @@ export function useSchedulingFormController({
     () =>
       buildSchedulingAvailabilityFetchKey({
         interviewType: form.interviewType,
-        interviewerUserId: form.interviewerUserId
+        interviewerUserId: form.interviewerUserId,
+        interviewerSelection: form.interviewerSelection
       }),
-    [form.interviewType, form.interviewerUserId]
+    [form.interviewType, form.interviewerUserId, form.interviewerSelection]
   );
 
   useEffect(() => {
@@ -294,7 +298,10 @@ export function useSchedulingFormController({
         const availabilityFetcher = (params) =>
           fetchAvailability({
             ...params,
-            ...(interviewerUserId ? { agentId: interviewerUserId } : {})
+            assignmentMode: interviewerUserId ? "explicit" : "auto",
+          ...(interviewerUserId
+            ? { agentId: interviewerUserId, interviewerUserId }
+            : {})
           });
 
         const daySlots = await loadDaySchedulingSlots(
@@ -332,7 +339,10 @@ export function useSchedulingFormController({
       const availabilityFetcher = (params) =>
         fetchAvailability({
           ...params,
-          ...(interviewerUserId ? { agentId: interviewerUserId } : {})
+          assignmentMode: interviewerUserId ? "explicit" : "auto",
+          ...(interviewerUserId
+            ? { agentId: interviewerUserId, interviewerUserId }
+            : {})
         });
 
       const weekSlots = await loadWeekSchedulingSlots(

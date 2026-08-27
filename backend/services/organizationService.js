@@ -5,6 +5,7 @@
 const { supabase } = require("./supabaseService");
 const { isValidOrganizationLevel } = require("../core/configuration/organizationLevels");
 const { writeAuditLog } = require("../security/auditLogService");
+const { normalizeInterviewerPool } = require("../core/interviewerPoolEngine");
 
 const DEFAULT_SCHEDULING_SETTINGS = Object.freeze({
   workingHours: { start: "09:00", end: "17:00", days: [1, 2, 3, 4, 5] },
@@ -97,7 +98,8 @@ function normalizeSchedulingSettings(raw) {
     allowBusinessOverlap:
       source.allowBusinessOverlap ?? DEFAULT_SCHEDULING_SETTINGS.allowBusinessOverlap,
     respectPersonalCalendar:
-      source.respectPersonalCalendar ?? DEFAULT_SCHEDULING_SETTINGS.respectPersonalCalendar
+      source.respectPersonalCalendar ?? DEFAULT_SCHEDULING_SETTINGS.respectPersonalCalendar,
+    interviewerPool: normalizeInterviewerPool(source.interviewerPool)
   };
 }
 
