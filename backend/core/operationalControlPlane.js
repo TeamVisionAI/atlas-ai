@@ -181,6 +181,19 @@ function emptyProspectList() {
   };
 }
 
+function emptyAppointmentProfile() {
+  return {
+    profile: null,
+    calendarConnection: { connected: false, status: "disconnected" },
+    calendarSources: {
+      google: { connected: false, available: true, ownership: "personal" },
+      icloud: { connected: false, available: false, ownership: "personal" }
+    },
+    zoomStatus: { connected: false, source: null },
+    organizationOffice: { address: null, configured: false }
+  };
+}
+
 function operationalControlPlaneEmpty(buildEmpty) {
   return function operationalControlPlaneEmptyMiddleware(req, res, next) {
     if (!isControlPlaneRequest(req) && !isGlobalSuperAdminControlPlane(req.authContext, req.supportContext)) {
@@ -208,5 +221,6 @@ module.exports = {
   emptyIulWorklist,
   emptyMissions,
   emptyProspectList,
+  emptyAppointmentProfile,
   operationalControlPlaneEmpty
 };

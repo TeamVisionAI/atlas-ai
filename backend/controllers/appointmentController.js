@@ -4,6 +4,8 @@
 
 const appointmentApplicationService = require("../application/appointmentApplicationService");
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
+const icloudCalendarIntegrationService = require("../services/icloudCalendarIntegrationService");
+const meetingManagementService = require("../services/meetingManagementService");
 const { resolveAppointmentViewFilters } = require("../core/appointmentListQuery");
 const {
   FULL_DAY_MAX_SLOT_RESULTS
@@ -57,17 +59,56 @@ function buildListFilters(req) {
   return filters;
 }
 
+function presentCalendarSource(status = {}, { available = true } = {}) {
+  return {
+    available,
+    connected: status.connected === true,
+    status: status.status || (status.connected ? "connected" : "disconnected"),
+    reconnectRequired: Boolean(status.reconnectRequired),
+    ownership: status.ownership || "personal",
+    googleAccountEmail: status.googleAccountEmail || null,
+    appleAccountEmail: status.appleAccountEmail || null,
+    calendarDisplayName: status.calendarDisplayName || status.calendarId || null
+  };
+}
+
 async function getProfile(req, res) {
   try {
-    const profile = await appointmentApplicationService.getProfile(req.tenantContext.userId);
-    const calendarStatus = await googleCalendarIntegrationService.getPersonalIntegrationStatus(
-      req.tenantContext.organizationId,
-      req.tenantContext.userId
-    );
+    const organizationId = req.tenantContext.organizationId;
+    const userId = req.tenantContext.userId;
+    const profile = await appointmentApplicationService.getProfile(userId);
+
+    const [googleStatus, icloudStatus, meetingManagement] = await Promise.all([
+      googleCalendarIntegrationService.getPersonalIntegrationStatus(organizationId, userId),
+      icloudCalendarIntegrationService.getIntegrationStatus(organizationId, userId),
+      meetingManagementService.getMeetingManagement(organizationId).catch(() => null)
+    ]);
+
+    const personalZoomUrl = profile?.appointmentProfile?.virtualMeeting?.personalMeetingUrl || "";
+    const orgZoomUrl = meetingManagement?.personalMeetingUrl || "";
+    const zoomConnected = Boolean(String(personalZoomUrl).trim() || String(orgZoomUrl).trim());
 
     res.json({
       profile,
-      calendarConnection: calendarStatus
+      calendarConnection: googleStatus,
+      calendarSources: {
+        google: presentCalendarSource(googleStatus, { available: true }),
+        icloud: presentCalendarSource(icloudStatus, {
+          available: icloudStatus?.available === true
+        })
+      },
+      zoomStatus: {
+        connected: zoomConnected,
+        source: String(personalZoomUrl).trim()
+          ? "personal"
+          : String(orgZoomUrl).trim()
+            ? "organization"
+            : null
+      },
+      organizationOffice: {
+        address: meetingManagement?.officeAddress || null,
+        configured: Boolean(meetingManagement?.officeAddress)
+      }
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message, code: error.code });

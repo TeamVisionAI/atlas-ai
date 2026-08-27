@@ -10,15 +10,24 @@ const { PERMISSIONS } = require("../security/permissions");
 
 const {
   operationalControlPlaneEmpty,
-  emptyAppointments
+  emptyAppointments,
+  emptyAppointmentProfile
 } = require("../core/operationalControlPlane");
 
 const router = express.Router();
 
 router.use(...protectedRoute());
 
-router.get("/profile", appointmentController.getProfile);
-router.patch("/profile", appointmentController.updateProfile);
+router.get(
+  "/profile",
+  operationalControlPlaneEmpty(emptyAppointmentProfile),
+  appointmentController.getProfile
+);
+router.patch(
+  "/profile",
+  operationalControlPlaneEmpty(emptyAppointmentProfile),
+  appointmentController.updateProfile
+);
 router.get("/availability", appointmentController.getAvailableSlots);
 router.get(
   "/urgent-handoffs",
