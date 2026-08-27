@@ -31,6 +31,10 @@ const {
 } = require("./conversationsUnreadEngine");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../phoneNormalizer");
 const { formatProspectWhatsAppDisplayIdentity, isSyntheticWhatsAppStorageKey, resolveProspectVisiblePhone } = require("../whatsappSenderIdentity");
+const {
+  filterConversationLogsForTenant,
+  loadProspectPhoneOrgIndex
+} = require("../conversationLogTenantScope");
 
 const INBOX_LOGS_PER_PHONE = 24;
 const INBOX_LOGS_MAX = 600;
@@ -130,17 +134,17 @@ async function fetchConversationLogsByPhones(phones = [], organizationId = null)
     throw error;
   }
 
+  const orgsByAlias = organizationId
+    ? await loadProspectPhoneOrgIndex(unique)
+    : new Map();
+  const scopedRows = organizationId
+    ? filterConversationLogsForTenant(data || [], organizationId, orgsByAlias)
+    : [];
+
   const grouped = new Map();
-  for (const row of data || []) {
+  for (const row of scopedRows) {
     const phone = row.prospect_phone;
     if (!phone) {
-      continue;
-    }
-    if (
-      organizationId &&
-      row.organization_id &&
-      String(row.organization_id) !== String(organizationId)
-    ) {
       continue;
     }
     const list = grouped.get(phone) || [];
