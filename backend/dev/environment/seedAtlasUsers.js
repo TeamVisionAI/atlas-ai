@@ -14,7 +14,7 @@ const DEFAULT_DEV_PASSWORD = process.env.ATLAS_DEV_DEFAULT_PASSWORD || "AtlasDev
 const LC1_USERS = [
   {
     id: "00000000-0000-4000-8000-000000000001",
-    email: "ana@teamvision.ai",
+    email: "ana.reyes1510@gmail.com",
     firstName: "Ana",
     lastName: "Perez",
     displayName: "Ana Perez",

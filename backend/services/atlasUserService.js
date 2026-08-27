@@ -267,7 +267,7 @@ function resolveBootstrapUser(token) {
 
   return {
     id: process.env.ATLAS_DEFAULT_USER_ID || DEFAULT_USER_ID,
-    email: process.env.ATLAS_DEFAULT_USER_EMAIL || "ana@teamvision.ai",
+    email: process.env.ATLAS_DEFAULT_USER_EMAIL || "ana.reyes1510@gmail.com",
     display_name: process.env.ATLAS_DEFAULT_USER_NAME || "Ana Perez",
     first_name: "Ana",
     last_name: "Perez",

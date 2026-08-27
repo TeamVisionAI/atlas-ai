@@ -382,6 +382,31 @@
   font-size: 0.8rem;
 }
 
+.admin-users-email-display,
+.admin-users-email-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.admin-users-email-edit__input {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.admin-users-email-edit__hint {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
 .admin-users-truncate {
   display: block;
   overflow: hidden;

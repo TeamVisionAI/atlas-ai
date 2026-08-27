@@ -9,6 +9,7 @@ import {
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import {
   archiveAdminUser,
+  changeAdminUserEmail,
   createAdminUser,
   forceLogoutUser,
   forcePasswordReset,
@@ -157,6 +158,8 @@ export default function AdminUsers() {
   const [repIdDraft, setRepIdDraft] = useState("");
   const [editingNameId, setEditingNameId] = useState(null);
   const [nameDraft, setNameDraft] = useState({ firstName: "", lastName: "" });
+  const [editingEmailId, setEditingEmailId] = useState(null);
+  const [emailDraft, setEmailDraft] = useState("");
   const [securitiesTarget, setSecuritiesTarget] = useState(null);
   const [securitiesForm, setSecuritiesForm] = useState(EMPTY_SECURITIES_FORM);
   const [securitiesSaving, setSecuritiesSaving] = useState(false);
@@ -280,6 +283,35 @@ export default function AdminUsers() {
     try {
       await updateAdminUser(userId, { firstName, lastName });
       cancelNameEdit();
+      await loadUsers();
+    } catch (saveError) {
+      setError(saveError.message);
+    }
+  }
+
+  function startEmailEdit(user) {
+    setEditingEmailId(user.id);
+    setEmailDraft(user.email || "");
+  }
+
+  function cancelEmailEdit() {
+    setEditingEmailId(null);
+    setEmailDraft("");
+  }
+
+  async function saveEmail(userId) {
+    const email = String(emailDraft || "").trim().toLowerCase();
+
+    if (!email || !email.includes("@")) {
+      setError("A valid email is required.");
+      return;
+    }
+
+    setError("");
+
+    try {
+      await changeAdminUserEmail(userId, email);
+      cancelEmailEdit();
       await loadUsers();
     } catch (saveError) {
       setError(saveError.message);
@@ -437,6 +469,10 @@ export default function AdminUsers() {
         startNameEdit(user);
         return;
       }
+      if (action === "edit-email") {
+        startEmailEdit(user);
+        return;
+      }
       if (action === "edit-rep") {
         startRepIdEdit(user);
         return;
@@ -511,6 +547,50 @@ export default function AdminUsers() {
     );
   }
 
+  function renderEmailEditor(user) {
+    return (
+      <div className="admin-users-email-edit">
+        <input
+          className="admin-users-email-edit__input"
+          type="email"
+          value={emailDraft}
+          onChange={(event) => setEmailDraft(event.target.value)}
+          aria-label={`Edit login email for ${displayUserName(user)}`}
+          autoFocus
+        />
+        <button type="button" className="identity-button" onClick={() => saveEmail(user.id)}>
+          Save
+        </button>
+        <button type="button" className="identity-button-secondary" onClick={cancelEmailEdit}>
+          Cancel
+        </button>
+        <p className="admin-users-email-edit__hint">
+          Changes the login email on this same account. Does not create a new user.
+        </p>
+      </div>
+    );
+  }
+
+  function renderEmailDisplay(user) {
+    return (
+      <div className="admin-users-email-display">
+        <span className="admin-users-truncate" title={user.email || ""}>
+          {user.email || "—"}
+        </span>
+        {user.status !== "pending_invitation" ? (
+          <button
+            type="button"
+            className="admin-users-icon-btn"
+            aria-label={`Edit email for ${displayUserName(user)}`}
+            onClick={() => startEmailEdit(user)}
+          >
+            ✎
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   function renderRepIdCell(user) {
     if (editingRepId === user.id) {
       return (
@@ -574,9 +654,7 @@ export default function AdminUsers() {
           </div>
         </td>
         <td className="admin-users-col-email">
-          <span className="admin-users-truncate" title={user.email || ""}>
-            {user.email || "—"}
-          </span>
+          {editingEmailId === user.id ? renderEmailEditor(user) : renderEmailDisplay(user)}
         </td>
         {activeTab === "users" ? (
           <td className="admin-users-col-rep">{renderRepIdCell(user)}</td>
@@ -669,8 +747,8 @@ export default function AdminUsers() {
             <Badge className="admin-users-badge admin-users-badge--role">{user.role}</Badge>
           ) : null}
         </div>
-        <div className="admin-users-card__email" title={user.email || ""}>
-          {user.email || "—"}
+        <div className="admin-users-card__email">
+          {editingEmailId === user.id ? renderEmailEditor(user) : renderEmailDisplay(user)}
         </div>
         {activeTab === "users" ? (
           <div className="admin-users-card__row">

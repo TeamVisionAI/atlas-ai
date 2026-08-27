@@ -71,8 +71,8 @@ test("users.name split of Ana Perez does not invent last=Ana", () => {
 });
 
 test("identity write rebuilds display_name from first + last", () => {
-  assert.equal(buildDisplayName("Ana", "Perez", "ana@teamvision.ai"), "Ana Perez");
-  assert.notEqual(buildDisplayName("Ana", "Perez", "ana@teamvision.ai"), "Ana Ana");
+  assert.equal(buildDisplayName("Ana", "Perez", "ana.reyes1510@gmail.com"), "Ana Perez");
+  assert.notEqual(buildDisplayName("Ana", "Perez", "ana.reyes1510@gmail.com"), "Ana Ana");
 });
 
 test("users mirror uses first + last so first-only display cannot corrupt last name", () => {
@@ -80,7 +80,7 @@ test("users mirror uses first + last so first-only display cannot corrupt last n
     firstName: "Ana",
     lastName: "Perez",
     displayName: "Ana",
-    email: "ana@teamvision.ai"
+    email: "ana.reyes1510@gmail.com"
   });
   const syncSource = fs.readFileSync(
     path.join(__dirname, "../services/userIdentitySyncService.js"),

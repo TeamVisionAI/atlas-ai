@@ -21,6 +21,14 @@ export async function updateAdminUser(userId, payload) {
   });
 }
 
+export async function changeAdminUserEmail(userId, email) {
+  return apiFetch(`/api/admin/users/${userId}/email`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+}
+
 export async function updateUserAgentCapabilities(userId, payload) {
   return apiFetch(`/api/admin/users/${userId}/capabilities`, {
     method: "PATCH",

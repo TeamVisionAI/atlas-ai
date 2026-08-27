@@ -88,6 +88,7 @@ test("active user actions include name edit / suspend / reset / logout / archive
   assert.ok(actions.some((a) => a.id === "logout"));
   assert.ok(actions.some((a) => a.id === "archive"));
   assert.ok(actions.some((a) => a.id === "edit-name"));
+  assert.ok(actions.some((a) => a.id === "edit-email"));
   assert.ok(actions.some((a) => a.id === "edit-rep"));
   assert.ok(actions.some((a) => a.id === "edit-capabilities"));
 });
@@ -104,6 +105,7 @@ test("seeded-shaped users still get Edit Name without changing identity actions"
   };
   const actions = buildUserRowActions(seeded);
   assert.ok(actions.some((a) => a.id === "edit-name"));
+  assert.ok(actions.some((a) => a.id === "edit-email"));
   assert.equal(actions.some((a) => a.id === "transfer-ownership"), false);
   assert.equal(displayUserName(seeded), "Ana Ana");
 });
@@ -125,6 +127,8 @@ test("AdminUsers grid UI structure is present", () => {
   assert.match(adminUsersSource, /admin-users-mobile/);
   assert.match(adminUsersSource, /Active \+ Pending/);
   assert.match(adminUsersSource, /startNameEdit/);
+  assert.match(adminUsersSource, /startEmailEdit/);
+  assert.match(adminUsersSource, /changeAdminUserEmail/);
   assert.match(adminUsersSource, /updateAdminUser\(userId, \{ firstName, lastName \}\)/);
   assert.doesNotMatch(adminUsersSource, /Team Vision hierarchy/);
   assert.doesNotMatch(adminUsersSource, /00000000-0000-4000-8000-000000000001/);
