@@ -13,7 +13,7 @@ export default function TablePagination({
   return (
     <div className="atlas-table-pagination" data-testid="table-pagination">
       <span className="atlas-table-pagination__meta">
-        {total} {label} · Page {page} of {pageCount}
+        {total} {label} · {pageSize} per page · Page {page} of {pageCount}
       </span>
       <div className="atlas-table-pagination__controls">
         <button
@@ -36,5 +36,3 @@ export default function TablePagination({
     </div>
   );
 }
-
-void pageSize;
