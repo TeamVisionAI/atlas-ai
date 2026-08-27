@@ -1,0 +1,80 @@
+.overflow-menu {
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.overflow-menu__trigger {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 6px;
+  width: 2rem;
+  height: 1.85rem;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.overflow-menu__trigger:hover,
+.overflow-menu__trigger[aria-expanded="true"] {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.overflow-menu__panel {
+  position: fixed;
+  z-index: 80;
+  min-width: 11.5rem;
+  padding: 0.25rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+}
+
+.overflow-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.overflow-menu__item:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.overflow-menu__item:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.overflow-menu__extra {
+  padding: 0.35rem 0.45rem 0.5rem;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0.2rem;
+}
+
+.overflow-menu__extra label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.overflow-menu__extra select {
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #0f172a;
+}

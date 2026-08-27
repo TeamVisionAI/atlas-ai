@@ -57,7 +57,7 @@ test("AdminUsers invite UI has Users/Invitations tabs and Invite User", () => {
   assert.match(adminUsersSource, /Business Rank/);
   assert.match(adminUsersSource, /Permission Role/);
   assert.match(adminUsersSource, /admin-users-toolbar/);
-  assert.match(adminUsersSource, /•••|RowActionsMenu/);
+  assert.match(adminUsersSource, /OverflowMenu|•••|RowActionsMenu/);
   assert.match(helpersSource, /Resend Invite/);
   assert.match(helpersSource, /Revoke Invite/);
 });

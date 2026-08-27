@@ -6,7 +6,12 @@
 const { supabase } = require("./supabaseService");
 const { writeAuditLog } = require("../security/auditLogService");
 const identityAdminService = require("./identityAdminService");
-const { ROLES, USER_STATUSES } = require("../security/roles");
+const { ROLES } = require("../security/roles");
+const {
+  FIRST_ADMIN_STATUSES,
+  resolveFirstAdminFromLoadedUsers,
+  hasAssignedFirstAdmin
+} = require("../core/platformTenantFirstAdmin");
 const tenantBillingService = require("./tenantBillingService");
 const {
   TENANT_STATUS,
@@ -38,12 +43,13 @@ function deriveLifecycleStatus(row = {}, subscriptionRow = null) {
   return deriveLifecycleStatusFromOrg(row);
 }
 
-function presentTenant(row, subscriptionRow = null) {
+function presentTenant(row, subscriptionRow = null, firstAdmin = null) {
   if (!row) {
     return null;
   }
 
   const lifecycleStatus = deriveLifecycleStatus(row, subscriptionRow);
+  const ownerUserId = row.owner_user_id || null;
 
   return {
     id: row.id,
@@ -63,7 +69,9 @@ function presentTenant(row, subscriptionRow = null) {
     trialEndsAt: subscriptionRow?.trial_ends_at || null,
     lastPaidAt: subscriptionRow?.last_paid_at || null,
     nextDueAt: subscriptionRow?.next_due_at || null,
-    ownerUserId: row.owner_user_id || null,
+    ownerUserId,
+    firstAdmin: firstAdmin || null,
+    hasFirstAdmin: hasAssignedFirstAdmin({ ownerUserId, firstAdmin }),
     timezone: row.timezone || null,
     logoUrl: row.logo_url || null,
     primaryColor: row.primary_color || null,
@@ -72,6 +80,63 @@ function presentTenant(row, subscriptionRow = null) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+async function loadFirstAdminSummaries(organizationRows = []) {
+  const rows = organizationRows.filter((row) => row?.id);
+  const byOrg = new Map();
+
+  if (!rows.length) {
+    return byOrg;
+  }
+
+  const organizationIds = rows.map((row) => row.id);
+  const ownerIds = [...new Set(rows.map((row) => row.owner_user_id).filter(Boolean))];
+  const loaded = [];
+
+  if (ownerIds.length) {
+    const { data, error } = await supabase
+      .from("atlas_users")
+      .select(
+        "id, organization_id, first_name, last_name, display_name, email, status, role, business_rank, created_at"
+      )
+      .in("id", ownerIds);
+
+    if (error) {
+      throw error;
+    }
+
+    loaded.push(...(data || []));
+  }
+
+  const { data: candidates, error: candidateError } = await supabase
+    .from("atlas_users")
+    .select(
+      "id, organization_id, first_name, last_name, display_name, email, status, role, business_rank, created_at"
+    )
+    .in("organization_id", organizationIds)
+    .in("status", FIRST_ADMIN_STATUSES)
+    .or("role.eq.administrator,business_rank.eq.RVP")
+    .order("created_at", { ascending: true });
+
+  if (candidateError) {
+    throw candidateError;
+  }
+
+  loaded.push(...(candidates || []));
+
+  for (const row of rows) {
+    byOrg.set(
+      row.id,
+      resolveFirstAdminFromLoadedUsers({
+        ownerUserId: row.owner_user_id,
+        organizationId: row.id,
+        users: loaded
+      })
+    );
+  }
+
+  return byOrg;
 }
 
 async function createTenant(input = {}, auditMeta = {}) {
@@ -184,9 +249,16 @@ async function listTenants(query = {}) {
 
   const rows = data || [];
   const subscriptionsByOrgId = await loadSubscriptionSummaries(rows.map((row) => row.id));
+  const firstAdminsByOrgId = await loadFirstAdminSummaries(rows);
 
   return {
-    items: rows.map((row) => presentTenant(row, subscriptionsByOrgId.get(row.id) || null)),
+    items: rows.map((row) =>
+      presentTenant(
+        row,
+        subscriptionsByOrgId.get(row.id) || null,
+        firstAdminsByOrgId.get(row.id) || null
+      )
+    ),
     total: count ?? rows.length,
     limit,
     offset
@@ -239,7 +311,8 @@ async function getTenant(organizationId) {
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  const tenant = presentTenant(data, subscriptionRow);
+  const firstAdminsByOrgId = await loadFirstAdminSummaries([data]);
+  const tenant = presentTenant(data, subscriptionRow, firstAdminsByOrgId.get(data.id) || null);
 
   try {
     const {
@@ -298,6 +371,13 @@ async function provisionTenantAdmin(organizationId, input = {}, authContext = {}
     const error = new Error("Organization not found.");
     error.statusCode = 404;
     error.publicCode = "ORGANIZATION_NOT_FOUND";
+    throw error;
+  }
+
+  if (hasAssignedFirstAdmin({ ownerUserId: tenant.ownerUserId, firstAdmin: tenant.firstAdmin })) {
+    const error = new Error("This tenant already has a first admin assigned.");
+    error.statusCode = 409;
+    error.publicCode = "FIRST_ADMIN_ALREADY_ASSIGNED";
     throw error;
   }
 
@@ -373,6 +453,7 @@ module.exports = {
   deriveLifecycleStatus,
   mapTenantStatusToOrganizationFields,
   presentTenant,
+  loadFirstAdminSummaries,
   isTenantOperational,
   createTenant,
   listTenants,

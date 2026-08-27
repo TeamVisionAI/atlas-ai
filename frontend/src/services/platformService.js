@@ -7,8 +7,19 @@ import {
   buildUpdateTenantStatusPayload
 } from "../security/platformAccess";
 
-export async function listTenants() {
-  return apiFetch("/api/platform/tenants");
+export async function listTenants(query = {}) {
+  const params = new URLSearchParams();
+  if (query.q) {
+    params.set("q", query.q);
+  }
+  if (query.limit) {
+    params.set("limit", String(query.limit));
+  }
+  if (query.offset) {
+    params.set("offset", String(query.offset));
+  }
+  const suffix = params.toString() ? `?${params}` : "";
+  return apiFetch(`/api/platform/tenants${suffix}`);
 }
 
 export async function getTenant(id) {

@@ -24,14 +24,21 @@ import {
 import {
   LIFECYCLE_FILTERS,
   countLifecycleStatuses,
-  filterTenantsByLifecycle,
   formatLifecycleBadge,
-  formatPaymentMethod,
-  formatPrice,
   isSeedTenant,
   nextDueLabel,
   trialDueLabel
 } from "./platformBillingHelpers";
+import {
+  TENANTS_PAGE_SIZE,
+  canAssignFirstAdmin,
+  filterTenantsForConsole,
+  ownerAdminEmail,
+  ownerAdminLabel,
+  paginateItems
+} from "./platformTenantDisplay";
+import OverflowMenu from "../../components/ui/OverflowMenu";
+import TablePagination from "../../components/ui/TablePagination";
 import TenantBillingPanel from "./TenantBillingPanel";
 import "../identity/identity.css";
 import "./PlatformTenantsPage.css";
@@ -57,10 +64,6 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString();
 }
 
-function ownerLabel(tenant) {
-  return tenant?.ownerUserId || "—";
-}
-
 function LifecycleBadge({ status }) {
   const normalized = String(status || "").trim().toUpperCase();
   const className = `platform-status-badge platform-status-badge--${normalized.toLowerCase() || "unknown"}`;
@@ -73,6 +76,8 @@ export default function PlatformTenantsPage() {
   const { user, landingPath, supportMode, refreshSupportMode } = useWorkspace();
   const [tenants, setTenants] = useState([]);
   const [lifecycleFilter, setLifecycleFilter] = useState("ALL");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -88,13 +93,22 @@ export default function PlatformTenantsPage() {
 
   const allowed = isSuperAdminUser(user);
   const counts = useMemo(() => countLifecycleStatuses(tenants), [tenants]);
-  const rows = useMemo(
-    () => filterTenantsByLifecycle(tenants, lifecycleFilter),
-    [tenants, lifecycleFilter]
+  const filteredRows = useMemo(
+    () =>
+      filterTenantsForConsole(tenants, {
+        query: search,
+        lifecycleFilter
+      }),
+    [tenants, search, lifecycleFilter]
   );
+  const paged = useMemo(
+    () => paginateItems(filteredRows, page, TENANTS_PAGE_SIZE),
+    [filteredRows, page]
+  );
+  const rows = paged.items;
 
   async function refreshList() {
-    const result = await listTenants();
+    const result = await listTenants({ limit: 200 });
     setTenants(result.items || result.tenants || []);
   }
 
@@ -106,7 +120,7 @@ export default function PlatformTenantsPage() {
     let cancelled = false;
 
     setLoading(true);
-    listTenants()
+    listTenants({ limit: 200 })
       .then((result) => {
         if (!cancelled) {
           setTenants(result.items || result.tenants || []);
@@ -128,6 +142,10 @@ export default function PlatformTenantsPage() {
       cancelled = true;
     };
   }, [allowed]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [lifecycleFilter, search]);
 
   if (!allowed) {
     return null;
@@ -288,6 +306,7 @@ export default function PlatformTenantsPage() {
         : `Status: ${result.user?.status || "created"}.`;
       setNotice(`Tenant Admin ${email} created. ${invitationStatus}`);
       setAdminForm(EMPTY_ADMIN);
+      setSelectedTenant(null);
       await refreshList();
     } catch (err) {
       setError(err.message || "Unable to assign tenant admin.");
@@ -339,9 +358,9 @@ export default function PlatformTenantsPage() {
       {error ? <p className="identity-error">{error}</p> : null}
       {notice ? <p className="identity-success">{notice}</p> : null}
 
-      <section className="identity-card">
+      <section className="identity-card platform-create-card">
         <h2>Create tenant</h2>
-        <form className="identity-form" onSubmit={handleCreate}>
+        <form className="platform-create-form" onSubmit={handleCreate}>
           <label>
             Name
             <input
@@ -371,7 +390,7 @@ export default function PlatformTenantsPage() {
               ))}
             </select>
           </label>
-          <div className="identity-actions">
+          <div className="platform-create-form__actions">
             <button type="submit" className="identity-button" disabled={creating}>
               {creating ? "Creating…" : "Create tenant"}
             </button>
@@ -379,8 +398,17 @@ export default function PlatformTenantsPage() {
         </form>
       </section>
 
-      <section className="identity-card">
-        <h2>Tenants</h2>
+      <section className="identity-card platform-tenants-card">
+        <div className="platform-tenants-card__head">
+          <h2>Tenants</h2>
+          <input
+            className="platform-tenants-search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search tenants…"
+            aria-label="Search tenants by name, slug, or admin"
+          />
+        </div>
         <div className="platform-lifecycle-filters" data-testid="platform-lifecycle-filters">
           {LIFECYCLE_FILTERS.map((filter) => (
             <button
@@ -397,32 +425,40 @@ export default function PlatformTenantsPage() {
           ))}
         </div>
         {loading ? <p>Loading tenants…</p> : null}
-        <div className="identity-table-wrap">
-          <table className="identity-table">
+        <div className="platform-tenants-table-wrap">
+          <table className="platform-tenants-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Plan</th>
-                <th>Price</th>
-                <th>Payment Method</th>
-                <th>Trial / Due</th>
-                <th>Next Due</th>
-                <th>Owner / admin</th>
-                <th>Actions</th>
+                <th className="platform-tenants-col-name">Name</th>
+                <th className="platform-tenants-col-status">Status</th>
+                <th className="platform-tenants-col-plan">Plan</th>
+                <th className="platform-tenants-col-trial">Trial / Due</th>
+                <th className="platform-tenants-col-due">Next Due</th>
+                <th className="platform-tenants-col-owner">Owner / Admin</th>
+                <th className="platform-tenants-col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((tenant) => {
                 const suspended = isTenantSuspended(tenant);
                 const seed = isSeedTenant(tenant);
+                const assignable = canAssignFirstAdmin(tenant);
+                const ownerEmail = ownerAdminEmail(tenant);
+                const menuActions = [
+                  { id: "view", label: "View" },
+                  { id: "billing", label: "Billing" }
+                ];
+
+                if (assignable) {
+                  menuActions.push({ id: "assign", label: "Assign first admin" });
+                }
 
                 return (
                   <tr
                     key={tenant.id}
                     className={suspended ? "platform-tenants-page__row--suspended" : ""}
                   >
-                    <td>
+                    <td className="platform-tenants-col-name">
                       <div className="platform-tenants-page__name">
                         <strong>{tenant.name}</strong>
                         {seed ? (
@@ -433,57 +469,24 @@ export default function PlatformTenantsPage() {
                       </div>
                       <div className="platform-tenants-page__slug">{tenant.slug || "—"}</div>
                     </td>
-                    <td>
+                    <td className="platform-tenants-col-status">
                       <LifecycleBadge status={tenant.lifecycleStatus || tenant.status} />
                     </td>
-                    <td>{tenant.plan || tenant.subscriptionPlan || "—"}</td>
-                    <td>{formatPrice(tenant.monthlyPriceCents, tenant.currency)}</td>
-                    <td>{formatPaymentMethod(tenant.paymentMethod)}</td>
-                    <td>{trialDueLabel(tenant)}</td>
-                    <td>{nextDueLabel(tenant)}</td>
-                    <td className="platform-tenants-page__owner">{ownerLabel(tenant)}</td>
-                    <td>
-                      <div className="identity-actions">
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => handleView(tenant)}
-                          disabled={busyTenantId === tenant.id}
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          data-testid="view-billing"
-                          onClick={() => setBillingTenant(tenant)}
-                        >
-                          View Billing
-                        </button>
-                        <button
-                          type="button"
-                          className="identity-button-secondary"
-                          onClick={() => {
-                            setSelectedTenant(tenant);
-                            setAdminForm(EMPTY_ADMIN);
-                            setNotice("");
-                          }}
-                        >
-                          Assign first admin
-                        </button>
-                        {/* BR-146: Super Admin may still manually PATCH Team Vision lifecycle. */}
-                        <select
-                          aria-label={`Change status for ${tenant.name}`}
-                          value={tenant.lifecycleStatus || ""}
-                          onChange={(event) => handleStatusChange(tenant, event.target.value)}
-                          disabled={busyTenantId === tenant.id}
-                        >
-                          {TENANT_LIFECYCLE_STATUSES.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
+                    <td className="platform-tenants-col-plan">
+                      {tenant.plan || tenant.subscriptionPlan || "—"}
+                    </td>
+                    <td className="platform-tenants-col-trial">{trialDueLabel(tenant)}</td>
+                    <td className="platform-tenants-col-due">{nextDueLabel(tenant)}</td>
+                    <td className="platform-tenants-col-owner" data-testid="tenant-owner-admin">
+                      <div className="platform-tenants-page__owner">
+                        {ownerAdminLabel(tenant)}
+                      </div>
+                      {ownerEmail ? (
+                        <div className="platform-tenants-page__owner-email">{ownerEmail}</div>
+                      ) : null}
+                    </td>
+                    <td className="platform-tenants-col-actions">
+                      <div className="platform-tenants-page__actions">
                         <button
                           type="button"
                           className="identity-button"
@@ -497,6 +500,40 @@ export default function PlatformTenantsPage() {
                         >
                           Enter Support Mode
                         </button>
+                        <OverflowMenu
+                          ariaLabel={`More actions for ${tenant.name}`}
+                          actions={menuActions}
+                          onAction={(actionId) => {
+                            if (actionId === "view") {
+                              handleView(tenant);
+                            }
+                            if (actionId === "billing") {
+                              setBillingTenant(tenant);
+                            }
+                            if (actionId === "assign" && canAssignFirstAdmin(tenant)) {
+                              setSelectedTenant(tenant);
+                              setAdminForm(EMPTY_ADMIN);
+                              setNotice("");
+                            }
+                          }}
+                        >
+                          {/* BR-146: Super Admin may still manually PATCH Team Vision lifecycle. */}
+                          <label>
+                            Status
+                            <select
+                              aria-label={`Change status for ${tenant.name}`}
+                              value={tenant.lifecycleStatus || ""}
+                              onChange={(event) => handleStatusChange(tenant, event.target.value)}
+                              disabled={busyTenantId === tenant.id}
+                            >
+                              {TENANT_LIFECYCLE_STATUSES.map((status) => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </OverflowMenu>
                       </div>
                       {suspended ? (
                         <p className="platform-tenants-page__suspended-hint">
@@ -510,9 +547,17 @@ export default function PlatformTenantsPage() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={paged.page}
+          pageCount={paged.pageCount}
+          total={paged.total}
+          pageSize={TENANTS_PAGE_SIZE}
+          onPageChange={setPage}
+          label="tenants"
+        />
       </section>
 
-      {selectedTenant ? (
+      {selectedTenant && canAssignFirstAdmin(selectedTenant) ? (
         <section className="identity-card">
           <h2>Assign first admin — {selectedTenant.name}</h2>
           <p className="platform-tenants-page__lede">
@@ -604,7 +649,7 @@ export default function PlatformTenantsPage() {
             </div>
             <div>
               <dt>Owner / admin</dt>
-              <dd>{ownerLabel(detail)}</dd>
+              <dd>{ownerAdminLabel(detail)}</dd>
             </div>
             <div>
               <dt>Created</dt>
