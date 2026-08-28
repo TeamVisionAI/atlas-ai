@@ -266,8 +266,8 @@ function resolveConstraints({ context = {}, interpretation = null } = {}) {
  * Explicit earliest/latest outrank day-part. Do not use engine afternoon (ends 18:00)
  * when earliestTime is set — pass timePreference "any" and filter here.
  * Exclusive earliestTime → minutes > bound; inclusive → minutes >= bound.
- * BR-119 — dayPart alone filters: morning <12; afternoon (tarde) ≥12 (afternoon+evening);
- * evening ≥17.
+ * BR-119 / BR-164 — dayPart alone filters: morning <12; afternoon strictly after 12:00
+ * (noon is not afternoon); evening ≥17.
  */
 function filterSlotsByConstraints(slots, constraints = {}) {
   const earliest = timeKeyToMinutes(constraints.earliestTime);
@@ -302,7 +302,7 @@ function filterSlotsByConstraints(slots, constraints = {}) {
       if (dayPart === "morning" && minutes >= 12 * 60) {
         return false;
       }
-      if (dayPart === "afternoon" && minutes < 12 * 60) {
+      if (dayPart === "afternoon" && minutes <= 12 * 60) {
         return false;
       }
       if (dayPart === "evening" && minutes < 17 * 60) {
@@ -386,9 +386,9 @@ function slotIdentity(slot) {
 }
 
 /**
- * BR-108 — prefer meaningful choice across dates when real options exist:
- * Slot A = earliest qualifying slot
- * Slot B = earliest slot on a later date when available; else same-day latest (BR-107)
+ * BR-108 / BR-164 — exhaust same-day remaining slots before introducing another date:
+ * If the first date has 2+ valid slots, offer same-day earliest+latest.
+ * Only take a later date when the first date has a single remaining slot.
  */
 function selectCrossDateCandidateSlots(
   slots,
@@ -411,6 +411,13 @@ function selectCrossDateCandidateSlots(
   }
 
   const firstDate = String(first.dateKey || first.date || "");
+  const sameDay = ordered.filter(
+    (slot) => String(slot.dateKey || slot.date || "") === firstDate
+  );
+  // Implements BR-164 — do not jump to tomorrow while same-day options remain.
+  if (sameDay.length >= 2) {
+    return selectCandidateSlots(sameDay, { maxCandidates, rejectTimes: [] });
+  }
   const otherDate = ordered.find(
     (slot) => String(slot.dateKey || slot.date || "") !== firstDate
   );
@@ -524,6 +531,16 @@ function toDecisionAvailability(readResult) {
   };
 }
 
+function slotsOnRequestedDate(slots, date) {
+  const dateKey = date ? String(date) : null;
+  if (!dateKey) {
+    return slots || [];
+  }
+  return (slots || []).filter(
+    (slot) => String(slot.dateKey || slot.date || "") === dateKey
+  );
+}
+
 function finalizeReadResultWithAlternatives(
   readResult,
   { constraints = {}, requestedDate = null, maxCandidates = DEFAULT_MAX_CANDIDATES } = {}
@@ -532,6 +549,11 @@ function finalizeReadResultWithAlternatives(
     return readResult;
   }
   if (Array.isArray(readResult.offeredSlots) && readResult.offeredSlots.length > 0) {
+    return readResult;
+  }
+  // Implements BR-108 / BR-164 — rolling horizon already exhausted; do not
+  // reintroduce constraint-violating slots as if they qualified.
+  if (readResult.rolling === true) {
     return readResult;
   }
   return enrichReadResultWithNearestAlternatives(readResult, {
@@ -589,9 +611,12 @@ async function readCandidateSlots({
 
   try {
     if (Array.isArray(fixtureSlots)) {
-      rawSlots = fixtureSlots
-        .map((slot) => normalizeSlot(slot, resolvedTimezone))
-        .filter(Boolean);
+      rawSlots = slotsOnRequestedDate(
+        fixtureSlots
+          .map((slot) => normalizeSlot(slot, resolvedTimezone))
+          .filter(Boolean),
+        date
+      );
     } else {
       const getSlotsFn =
         getSlots ||
@@ -607,9 +632,12 @@ async function readCandidateSlots({
         maxResults
       });
       resolvedTimezone = result?.timezone || resolvedTimezone;
-      rawSlots = (result?.slots || [])
-        .map((slot) => normalizeSlot(slot, resolvedTimezone))
-        .filter(Boolean);
+      rawSlots = slotsOnRequestedDate(
+        (result?.slots || [])
+          .map((slot) => normalizeSlot(slot, resolvedTimezone))
+          .filter(Boolean),
+        date
+      );
     }
   } catch (error) {
     return buildUnavailableResult({
@@ -690,12 +718,19 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL &&
     Boolean(interpretation?.entities?.requestsLaterAlternatives);
 
+  // Implements BR-164 — named day + persisted daypart searches that date only.
+  const datedDayPartSearch =
+    intent === INTENTS.SCHEDULING_DATE_PROPOSAL &&
+    Boolean(resolveConcreteScheduleDate({ context, interpretation })) &&
+    Boolean(constraints.dayPart || context.knownFacts?.preferredDayPart);
+
   if (
     !constraints.earliestTime &&
     !constraints.latestTime &&
     !counterofferNeedsSlots &&
     !dayPartNeedsSlots &&
-    !laterAlternatives
+    !laterAlternatives &&
+    !datedDayPartSearch
   ) {
     return false;
   }
@@ -705,7 +740,8 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL ||
     intent === INTENTS.REASSERT_KNOWN_FACT ||
     intent === INTENTS.PROVIDE_DAY_PART ||
-    counterofferNeedsSlots;
+    counterofferNeedsSlots ||
+    datedDayPartSearch;
   if (!allowedIntent) {
     return false;
   }
@@ -724,12 +760,17 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
  * BR-116 — mark whether the prospect's requested time is in the read result,
  * and bias offered alternatives toward matching wall-clock slots when present.
  */
-function enrichAvailabilityForRequestedTime(availability, requestedTime) {
+function enrichAvailabilityForRequestedTime(
+  availability,
+  requestedTime,
+  requestedDate = null
+) {
   if (!availability || !requestedTime || availability.checked !== true) {
     return availability;
   }
 
   const time = String(requestedTime);
+  const dateKey = requestedDate ? String(requestedDate) : null;
   const rawSlots = availability.readResult?.slots || [];
   const matching = rawSlots
     .map((slot) => ({
@@ -737,7 +778,15 @@ function enrichAvailabilityForRequestedTime(availability, requestedTime) {
       time: slot.time || slot.timeKey || null,
       timezone: slot.timezone || availability.readResult?.timezone || null
     }))
-    .filter((slot) => slot.time && String(slot.time) === time);
+    .filter((slot) => {
+      if (!slot.time || String(slot.time) !== time) {
+        return false;
+      }
+      if (dateKey && slot.date && String(slot.date) !== dateKey) {
+        return false;
+      }
+      return true;
+    });
 
   const requestedSlotAvailable = matching.length > 0;
   let nearestAlternatives = Array.isArray(availability.nearestAlternatives)
@@ -745,6 +794,7 @@ function enrichAvailabilityForRequestedTime(availability, requestedTime) {
     : [];
 
   if (requestedSlotAvailable) {
+    // Implements BR-164 — exact match must not reintroduce unrelated slots.
     const preferred = [];
     const seen = new Set();
     for (const slot of matching) {
@@ -758,18 +808,11 @@ function enrichAvailabilityForRequestedTime(availability, requestedTime) {
         break;
       }
     }
-    for (const alt of nearestAlternatives) {
-      if (preferred.length >= 2) {
-        break;
-      }
-      const key = `${alt.date || ""}|${alt.time || ""}`;
-      if (seen.has(key)) {
-        continue;
-      }
-      seen.add(key);
-      preferred.push(alt);
-    }
     nearestAlternatives = preferred;
+  } else if (dateKey) {
+    nearestAlternatives = nearestAlternatives.filter(
+      (slot) => !slot.date || String(slot.date) === dateKey
+    );
   }
 
   return {
@@ -1252,7 +1295,8 @@ async function resolveAvailabilityForTurn({
     });
     const resolvedAvailability = enrichAvailabilityForRequestedTime(
       toDecisionAvailability(readResult),
-      interpretation?.entities?.requestedTime || null
+      interpretation?.entities?.requestedTime || null,
+      null
     );
     logSchedulingDiagnostics("shared_scheduling_availability_read", {
       ...buildSchedulingDiagnostics({
@@ -1283,7 +1327,8 @@ async function resolveAvailabilityForTurn({
 
   const resolvedAvailability = enrichAvailabilityForRequestedTime(
     toDecisionAvailability(readResult),
-    interpretation?.entities?.requestedTime || null
+    interpretation?.entities?.requestedTime || null,
+    date
   );
   logSchedulingDiagnostics("shared_scheduling_availability_read", {
     ...buildSchedulingDiagnostics({
@@ -1345,9 +1390,12 @@ function readCandidateSlotsSync(params = {}) {
 
   try {
     if (Array.isArray(fixtureSlots)) {
-      rawSlots = fixtureSlots
-        .map((slot) => normalizeSlot(slot, resolvedTimezone))
-        .filter(Boolean);
+      rawSlots = slotsOnRequestedDate(
+        fixtureSlots
+          .map((slot) => normalizeSlot(slot, resolvedTimezone))
+          .filter(Boolean),
+        date
+      );
     } else if (typeof getSlotsSync === "function") {
       const result = getSlotsSync({
         agentId,
@@ -1358,9 +1406,12 @@ function readCandidateSlotsSync(params = {}) {
         maxResults
       });
       resolvedTimezone = result?.timezone || resolvedTimezone;
-      rawSlots = (result?.slots || [])
-        .map((slot) => normalizeSlot(slot, resolvedTimezone))
-        .filter(Boolean);
+      rawSlots = slotsOnRequestedDate(
+        (result?.slots || [])
+          .map((slot) => normalizeSlot(slot, resolvedTimezone))
+          .filter(Boolean),
+        date
+      );
     } else {
       return buildUnavailableResult({
         organizationId,
@@ -1478,7 +1529,8 @@ function resolveAvailabilityForTurnSync(args = {}) {
     });
     return enrichAvailabilityForRequestedTime(
       toDecisionAvailability(readResult),
-      interpretation?.entities?.requestedTime || null
+      interpretation?.entities?.requestedTime || null,
+      null
     );
   }
 
@@ -1497,7 +1549,8 @@ function resolveAvailabilityForTurnSync(args = {}) {
 
   return enrichAvailabilityForRequestedTime(
     toDecisionAvailability(readResult),
-    interpretation?.entities?.requestedTime || null
+    interpretation?.entities?.requestedTime || null,
+    date
   );
 }
 

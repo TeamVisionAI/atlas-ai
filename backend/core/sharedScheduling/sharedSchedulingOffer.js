@@ -57,6 +57,16 @@ function selectCrossDateCandidateSlots(slots, { maxCandidates = 3 } = {}) {
   }
   const first = ordered[0];
   const firstDate = String(first.dateKey || first.date || "");
+  const sameDay = ordered.filter(
+    (slot) => String(slot.dateKey || slot.date || "") === firstDate
+  );
+  if (sameDay.length >= 2) {
+    const last = sameDay[sameDay.length - 1];
+    if (slotIdentity(first) === slotIdentity(last)) {
+      return [first];
+    }
+    return [first, last].slice(0, maxCandidates);
+  }
   const otherDate = ordered.find(
     (slot) => String(slot.dateKey || slot.date || "") !== firstDate
   );
@@ -138,7 +148,7 @@ function findNearestAlternativeSlots(
       if (dayPart === "morning" && slotMinutes >= 12 * 60) {
         score += 300;
       }
-      if (dayPart === "afternoon" && slotMinutes < 12 * 60) {
+      if (dayPart === "afternoon" && slotMinutes <= 12 * 60) {
         score += 300;
       }
       if (dayPart === "evening" && slotMinutes < 17 * 60) {

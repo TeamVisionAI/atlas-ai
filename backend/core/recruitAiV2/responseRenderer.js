@@ -921,8 +921,8 @@ function renderCustomerReply(responsePlan) {
         const phraseB = formatOfferedSlotPhrase(offered[1], language, dayOptions);
         template =
           language === LANGUAGES.SPANISH
-            ? `${constraintPrefix}disponible ${phraseA} y ${phraseB}. ¿Cuál te funciona mejor?`
-            : `${constraintPrefix}availability ${phraseA} and ${phraseB}. Which works better for you?`;
+            ? `${constraintPrefix || "Tengo "}disponible ${phraseA} y ${phraseB}. ¿Cuál te funciona mejor?`
+            : `${constraintPrefix || "I have "}availability ${phraseA} and ${phraseB}. Which works better for you?`;
       } else {
         const day = formatSlotDayPhrase(
           offered[0]?.date || offered[0]?.dateKey,

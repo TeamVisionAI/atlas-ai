@@ -1260,8 +1260,9 @@ Production outside-window messaging requires firm-approved Meta templates config
 1. **Same-turn lookup** — `SCHEDULING_COUNTEROFFER` with known availability constraint / scheduling pending state enables `resolveAvailabilityForTurn` (reader → `getSlots` → Sprint 22 engine → appointment profile).
 2. **Reuse offer path** — Successful reads apply `tryApplyAvailabilityOffer` / `offer_available_slots` (or zero-slot ack). Do not invent a parallel offer pipeline.
 3. **Prefer requested wall clock when available** — Bias `nearestAlternatives` toward matching `requestedTime` when present in the read result.
-4. **Unavailable requested time** — Still offer real nearby alternatives same turn; do not wait for “OK”.
-5. **State** — Retain `proposedTime` preference; persist `previouslyOfferedSlots`; set `lastQuestionAsked=offer_time_choices` so BR-115 selection works next.
+3b. **Exact time + concrete date available → confirm only** — When the requested wall-clock exists on the known date (BR-164), confirm that slot only. Do not reintroduce unrelated times.
+4. **Unavailable requested time** — Still offer real nearby alternatives same turn that honor the active date/daypart; do not wait for “OK”.
+5. **State** — Retain `proposedTime` preference; persist `previouslyOfferedSlots`; set `lastQuestionAsked=offer_time_choices` (or `confirm_slot` on exact-time confirm) so BR-115 selection works next.
 6. **Dead-end deferred ack is last resort** — `acknowledge_and_check_availability` only when availability cannot be checked (provider failure / no slots path unavailable).
 7. **Execution independent** — Authoring only; BR-111 remains fail-closed. No Calendar / appointment / BR-080 writes from this path.
 8. **Canonical path only** — No legacy `buildOfferedTimes`. Org office hours must not invent RVP truncation beyond Sprint 22 profile rules.
@@ -1328,7 +1329,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 2b. **Same-day no-op** — If every previously offered slot already sits on the named day (e.g. Mon 7:30 + Mon 8:00 → `Lunes`), do **not** re-render the full availability sentence. Preserve both slots and ask time only (`clarify_offered_slot_time`: “¿Prefieres 7:30 PM u 8:00 PM?”). Reason: `OFFERED_SLOT_DAY_ALREADY_FIXED`.
 3. **BR-115 time narrowing unchanged** — Natural times (`7:30`) and exact day+time (`El lunes a las 7:30`) continue under BR-115.
 4. **Outside / later alternatives** — Phrases like `El lunes, pero más tarde` leave the offered set: push `REQUESTED_LATER_ALTERNATIVES`, set exclusive earliest after the latest same-day offered time, avoid prior offered identities, and offer real later slots via BR-107 / BR-116 paths.
-5. **Day-part proactive offer** — `PROVIDE_DAY_PART` (e.g. `Tarde`) attempts same-turn canonical availability filtered by dayPart (Spanish afternoon includes afternoon+evening ≥12:00). Offer ≤2 slots. Fall back to ask-preferred-time only when no useful slots are available.
+5. **Day-part proactive offer** — `PROVIDE_DAY_PART` (e.g. `Tarde`) attempts same-turn canonical availability filtered by dayPart. Afternoon is **strictly after 12:00** (noon is not afternoon; 12:30+ qualifies). Evening remains ≥17:00. Offer ≤2 **same-day remaining** slots first. Fall back to ask-preferred-time only when no useful slots are available.
 6. **State preservation** — Narrowing reduces the active candidate set (date/time/timezone/proposed slot/`previouslyOfferedSlots`). It must not reset to a broad fresh query unless Case D / rejection / empty match.
 7. **Stale availability** — Full live revalidation of a narrowed slot before confirmation remains deferred to confirm-time canonical recheck (Case E); this rule does not invent a parallel revalidation scheduler.
 8. **Execution independent** — Authoring/decision only; BR-111 remains fail-closed. No Calendar / appointment / BR-080 writes. No authoring-allowlist changes. No timezone behavior changes.
@@ -2183,6 +2184,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-164 — Recruit AI v2 Fact Persistence + Scheduling Constraint Continuity
+
+**Implements:** Resolved Recruit AI v2 facts must not regress; FAQ interruptions answer then resume the next unresolved step; scheduling daypart/date/time constraints persist and filter offered slots.  
+**Domain:** Recruit AI v2 orchestration / durable context / shared scheduler  
+**Depends on:** BR-081, BR-098, BR-105, BR-107, BR-108, BR-116, BR-119, BR-120, BR-131  
+**Related:** BR-101 (day-part clock inheritance), BR-115 (offered-slot selection)  
+**Status:** Implemented (execution remains OFF)  
+**Engine target:** `decisionEngine` FAQ resume; `recruitConversationSequencing`; `contextPersistenceService.protectResolvedQualificationFacts`; `schedulingAvailabilityReader` day-part + same-day selection  
+**Tests:** `backend/test/recruitAiV2FactRegressionSchedulerBr164.test.js`
+
+### Rules
+
+1. **Resolved facts stick** — City, state, work authorization, day-part, and availability constraints stay resolved unless the prospect explicitly supplies a replacement value.
+2. **FAQ then forward** — Job/work FAQs (`what is the work`, `where would I work`, `que es el trabajo`, `donde trabajaria`, equivalents) are answered, then the flow resumes at the next **unresolved** step. Never re-ask a prior resolved datum.
+3. **`lastQuestionAsked` cannot regress facts** — Rebuild the next action from latest persisted knownFacts before every send. Stale lastQ / lastAtlasOutboundText must not override newer facts.
+4. **Stale version drop** — A write whose inbound `contextVersion` is older than the current row is rejected (`CONTEXT_STALE_VERSION_DROPPED`). Queued/outbound authored against an older version must not overwrite newer resolved facts.
+5. **Tenant + channel + contact scope** — Persist and load only under organizationId + channel + canonical prospect identity. Never phone-only (BR-120).
+6. **Afternoon excludes noon** — `12:00` is not afternoon. Afternoon is strictly after 12:00. Search today’s remaining afternoon window first; return multiple valid same-day options when available.
+7. **Exact requested time** — Thursday + afternoon + `3` → 15:00. If that slot is available, confirm only that time. If unavailable, offer nearby alternatives that still honor date/daypart. Do not reintroduce unrelated slots (including noon).
+8. **No silent terminal** — Every turn ends with explicit `respond` | `wait` | `suppress` plus a reason. Empty customer replies are not allowed on recoverable paths.
+9. **Boundaries** — Shared orchestration/scheduler only. No Team Vision-specific copy. No IUL, billing, or WhatsApp isolation changes. Execution remains OFF.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
@@ -2433,7 +2458,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 1. **Read ≠ write** — Rolling search may call Sprint 22 availability for multiple dates; never reserve, book, Calendar-write, WhatsApp, or mutate BR-080 while execution is OFF.
 2. **Constraint-first proactive offer** — With a confirmed time constraint and no concrete date, do not default to “¿Qué día…?” / “¿Qué hora después de las 5…?”; search and offer real options.
 3. **Bounded search** — Preferred initial horizon **48 hours** from org-local NOW; if fewer than 2 useful slots, expand date-by-date up to **14 calendar days** from org-local today. Never unbounded search.
-4. **Cross-date selection** — Prefer earliest slot + earliest slot on a later date when real options exist; else same-day earliest+latest (BR-107). Never invent slots.
+4. **Same-day remaining first** — If the first qualifying date has 2+ valid remaining slots, offer same-day earliest+latest (BR-107 / BR-164). Do not jump to the next date while those remain. Introduce another date only when the first date has a single remaining slot (or the prospect asks for another day). Never invent slots.
 5. **Past slots** — Never offer slots at/before NOW; skip exhausted current-day windows automatically.
 6. **Boundaries preserved** — BR-107 exclusive/inclusive earliestTime semantics apply on every searched date.
 7. **Zero vs unread** — Successful zero across the allowed horizon → truthful no-availability + ask different time preference; provider/agent failure → BR-105-style fallback (do not claim zero).

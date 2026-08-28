@@ -376,7 +376,8 @@ function resolveUniqueOfferedDaySelection(offeredSlots = [], dateIso = null) {
 }
 
 /**
- * Filter previously offered slots by morning (<12) vs afternoon/evening (>=12).
+ * Filter previously offered slots by morning (<12), afternoon (after 12:00),
+ * or evening (>=17). Noon is not afternoon (BR-164).
  */
 function filterOfferedSlotsByDayPart(offeredSlots = [], dayPart = null) {
   const part = String(dayPart || "").toLowerCase();
@@ -389,11 +390,16 @@ function filterOfferedSlotsByDayPart(offeredSlots = [], dayPart = null) {
       return false;
     }
     const hour = Number(t.slice(0, 2));
+    const minute = Number(t.slice(3, 5) || 0);
+    const minutes = hour * 60 + minute;
     if (part === "morning") {
-      return hour < 12;
+      return minutes < 12 * 60;
     }
-    if (part === "afternoon" || part === "evening") {
-      return hour >= 12;
+    if (part === "afternoon") {
+      return minutes > 12 * 60;
+    }
+    if (part === "evening") {
+      return minutes >= 17 * 60;
     }
     return false;
   });

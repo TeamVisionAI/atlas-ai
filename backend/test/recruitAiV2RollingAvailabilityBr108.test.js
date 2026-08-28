@@ -156,7 +156,7 @@ test("3. Saturday multi + Sunday → cross-date choice", () => {
   );
   assert.deepEqual(
     offered.map((s) => `${s.dateKey}|${s.timeKey}`),
-    ["2026-08-08|17:30", "2026-08-09|18:30"]
+    ["2026-08-08|17:30", "2026-08-08|19:00"]
   );
 });
 

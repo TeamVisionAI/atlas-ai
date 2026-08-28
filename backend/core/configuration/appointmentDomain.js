@@ -108,7 +108,7 @@ const COMMON_SCHEDULE_PRESETS = Object.freeze({
 });
 
 const MORNING_RANGE = Object.freeze({ start: "08:00", end: "12:00" });
-const AFTERNOON_RANGE = Object.freeze({ start: "12:00", end: "18:00" });
+const AFTERNOON_RANGE = Object.freeze({ start: "12:01", end: "18:00" });
 
 const SLOT_INTERVAL_MINUTES = 30;
 

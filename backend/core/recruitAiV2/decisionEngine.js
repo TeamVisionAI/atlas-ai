@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116 / BR-119.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116 / BR-119 / BR-164.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -53,7 +53,8 @@ const {
 } = require("./qualificationFacts");
 const { shouldBlockLocationOverwrite } = require("./factCertainty");
 const {
-  resolveFaqResumeTemplateKeyFromFacts
+  resolveFaqResumeTemplateKeyFromFacts,
+  factsAheadOfLastQuestion
 } = require("../recruitConversationSequencing");
 const {
   hasConfirmableAppointmentProposal
@@ -75,6 +76,93 @@ function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
     pendingQ === "offer_alternatives" ||
     pendingQ === "offer_available_slots"
   );
+}
+
+function factResumeFromContext(context) {
+  return resolveFaqResumeTemplateKeyFromFacts({
+    city: context?.knownFacts?.city,
+    state: context?.knownFacts?.state,
+    proposedState: context?.knownFacts?.proposedState,
+    cityCertainty: context?.knownFacts?.cityCertainty,
+    stateCertainty: context?.knownFacts?.stateCertainty,
+    workAuthorization: context?.knownFacts?.workAuthorization,
+    workAuthorizationStatus: context?.knownFacts?.workAuthorizationStatus,
+    preferredDayPart: context?.knownFacts?.preferredDayPart,
+    dayPart: context?.knownFacts?.preferredDayPart
+  });
+}
+
+function looksLikeMissedJobFaq(interpretation) {
+  const text = inboundTextFromInterpretation(interpretation);
+  return (
+    looksLikeSpanishInfoRequest(text) ||
+    looksLikeEnglishInfoRequest(text) ||
+    looksLikeJobOverviewQuestion(text) ||
+    looksLikeJobOpportunityQuestion(text)
+  );
+}
+
+function applyMissedJobFaq(structured, context, interpretation) {
+  if (!looksLikeMissedJobFaq(interpretation)) {
+    return false;
+  }
+  const text = inboundTextFromInterpretation(interpretation);
+  const templateKey = looksLikeJobOverviewQuestion(text)
+    ? "job_overview_faq_then_resume"
+    : "job_opportunity_faq_then_resume";
+  buildFaqResumeDecision(
+    structured,
+    context,
+    INTENTS.JOB_OPPORTUNITY_QUESTION,
+    templateKey,
+    interpretation
+  );
+  structured.decision.nextAction = NEXT_ACTIONS.ANSWER_JOB_OPPORTUNITY_THEN_RESUME;
+  structured.reasonCodes.push(REASON_CODES.JOB_OVERVIEW_FAQ);
+  structured.reasonCodes.push(REASON_CODES.FAQ_RESUME_NEXT_UNRESOLVED);
+  return true;
+}
+
+/** Implements BR-164 — every turn must declare respond|wait|suppress + reason. */
+function ensureExplicitOutboundDecision(structured) {
+  if (!structured) {
+    return structured;
+  }
+  if (structured.outboundDecision?.action && structured.outboundDecision?.reason) {
+    return structured;
+  }
+  const next = structured.decision?.nextAction || "";
+  const templateKey = structured.customerReplyPlan?.templateKey || "";
+  const reason =
+    (Array.isArray(structured.reasonCodes) && structured.reasonCodes[0]) ||
+    next ||
+    "explicit_outbound";
+  if (next === "wait" || next === NEXT_ACTIONS.WAIT) {
+    structured.outboundDecision = { action: "wait", reason };
+    return structured;
+  }
+  if (next === "suppress" || next === NEXT_ACTIONS.SUPPRESS) {
+    structured.outboundDecision = { action: "suppress", reason };
+    return structured;
+  }
+  if (!templateKey) {
+    structured.decision = structured.decision || {};
+    structured.decision.nextAction =
+      structured.decision.nextAction || NEXT_ACTIONS.CLARIFY_ONCE;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan = structured.customerReplyPlan || {};
+    structured.customerReplyPlan.templateKey = "clarify_once";
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.reasonCodes = structured.reasonCodes || [];
+    structured.reasonCodes.push(REASON_CODES.NO_SILENT_TERMINAL);
+    structured.outboundDecision = {
+      action: "respond",
+      reason: REASON_CODES.NO_SILENT_TERMINAL
+    };
+    return structured;
+  }
+  structured.outboundDecision = { action: "respond", reason };
+  return structured;
 }
 
 /**
@@ -317,6 +405,59 @@ function tryApplyAvailabilityOffer({
   }
 
   if (status === READ_STATUS.AVAILABLE && alternatives.length > 0) {
+    const requestedClock =
+      interpretation?.entities?.requestedTime ||
+      context.appointment?.proposedTime ||
+      null;
+    const exactMatches = alternatives.filter((slot) => {
+      const time = slot.time || slot.timeKey || null;
+      const date = slot.date || slot.dateKey || null;
+      if (!requestedClock || String(time) !== String(requestedClock)) {
+        return false;
+      }
+      if (proposedDate && date && String(date) !== String(proposedDate)) {
+        return false;
+      }
+      return true;
+    });
+    // Implements BR-164 / BR-116 — exact requested time + date → confirm that slot only.
+    if (
+      availability.requestedSlotAvailable === true &&
+      requestedClock &&
+      exactMatches.length === 1
+    ) {
+      applySelectedOfferedSlotDecision(structured, exactMatches[0], exactMatches, {
+        reasonCodes: [
+          REASON_CODES.EXACT_REQUESTED_TIME_CONFIRMED,
+          REASON_CODES.AVAILABLE_SLOTS_OFFERED,
+          REASON_CODES.SCHEDULING_HANDOFF_GUARD
+        ],
+        context
+      });
+      const mergedConstraint = mergeSchedulingConstraints(
+        context.knownFacts?.availabilityConstraint || null,
+        interpretation?.entities?.availabilityConstraint || null,
+        context,
+        interpretation
+      );
+      structured.contextPatch = {
+        ...(constraintPatch || {}),
+        ...(structured.contextPatch || {}),
+        knownFacts: {
+          ...(constraintPatch?.knownFacts || {}),
+          ...(structured.contextPatch?.knownFacts || {}),
+          availabilityConstraint: mergedConstraint
+        },
+        appointment: {
+          ...(constraintPatch?.appointment || {}),
+          ...(structured.contextPatch?.appointment || {}),
+          previouslyOfferedSlots: exactMatches
+        },
+        attention: { needsHumanAttention: false, reason: null }
+      };
+      return structured;
+    }
+
     const isNearest = Boolean(
       availability.alternativeToConstraint ||
         availability.readResult?.alternativeToConstraint
@@ -687,6 +828,11 @@ function resolvePendingResume(context) {
       lastQuestionAsked: "clarify_license_type"
     };
   }
+  const factResume = factResumeFromContext(context);
+  // Implements BR-164 — persisted facts outrank stale lastQuestionAsked.
+  if (factsAheadOfLastQuestion(lastQ, factResume)) {
+    return factResume;
+  }
   if (lastQ === "ask_authorization") {
     const facts = context?.knownFacts || {};
     const authKnown =
@@ -944,6 +1090,9 @@ function buildFaqResumeDecision(
     guarded.templateKey !== "greeting_ask_location"
   ) {
     resume = guarded;
+  } else if (factsAheadOfLastQuestion(resume.lastQuestionAsked, guarded)) {
+    // Implements BR-164 — FAQ resume uses next unresolved fact, not stale lastQ.
+    resume = guarded;
   }
   structured.decision.shouldEscalate = false;
   structured.customerReplyPlan.acknowledgeRequest = true;
@@ -1032,7 +1181,7 @@ function buildFaqResumeDecision(
  * Decide next business action from context + interpretation.
  * Availability is optional injected tool result (read-only).
  */
-function decideConversationTurn({
+function decideConversationTurnCore({
   context,
   interpretation,
   availability = null
@@ -3443,6 +3592,9 @@ function decideConversationTurn({
     if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
       return structured;
     }
+    if (applyMissedJobFaq(structured, context, interpretation)) {
+      return structured;
+    }
     structured.reasonCodes.push(REASON_CODES.RECOVERABLE_AMBIGUITY);
     if (shouldEscalateAfterClarifications(context)) {
       structured.decision.nextAction = NEXT_ACTIONS.ESCALATE_TO_HUMAN;
@@ -3480,6 +3632,9 @@ function decideConversationTurn({
   }
 
   if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
+    return structured;
+  }
+  if (applyMissedJobFaq(structured, context, interpretation)) {
     return structured;
   }
 
@@ -3525,7 +3680,11 @@ function decideSafeFailure({ context, interpretation, failureReason = null } = {
     },
     currentStage: STAGES.HUMAN_REQUIRED
   };
-  return structured;
+  return ensureExplicitOutboundDecision(structured);
+}
+
+function decideConversationTurn(args = {}) {
+  return ensureExplicitOutboundDecision(decideConversationTurnCore(args));
 }
 
 module.exports = {

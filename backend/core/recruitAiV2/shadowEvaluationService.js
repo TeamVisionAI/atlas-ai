@@ -99,7 +99,23 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
       stateCertainty: prospect.state ? "confirmed" : "unknown",
       proposedState: null,
       // Implements BR-117 — hydrate invitation email from canonical sources only.
-      email: resolveCanonicalProspectEmail(prospect)
+      email: resolveCanonicalProspectEmail(prospect),
+      // Implements BR-164 — reconstruction must not drop resolved authorization.
+      workAuthorization:
+        prospect.work_authorized === true || prospect.work_authorized === false
+          ? Boolean(prospect.work_authorized)
+          : prospect.workAuthorization ?? null,
+      workAuthorizationStatus:
+        prospect.work_authorized === true
+          ? "authorized"
+          : prospect.work_authorized === false
+            ? "not_authorized"
+            : prospect.workAuthorizationStatus || null,
+      preferredDayPart:
+        extras.preferredDayPart ||
+        prospect.preferred_day_part ||
+        prospect.preferredDayPart ||
+        null
     },
     appointment: {
       status: prospect.appointment_date ? "confirmed" : "none",
