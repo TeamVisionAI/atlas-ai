@@ -42,8 +42,14 @@ function createTrackingRepo(connection) {
       }
       return null;
     },
-    async getDecryptedAccessToken() {
+    async getDecryptedAccessToken(_organizationId, userId = null) {
       if (!row?.access_token_encrypted || row.status !== "connected") {
+        return null;
+      }
+      if (userId && row.user_id && String(userId) === String(row.user_id)) {
+        return row.personalAccessToken || "personal-access-token";
+      }
+      if (userId && (!row.user_id || String(userId) !== String(row.user_id))) {
         return null;
       }
       return ORG_7338_TOKEN;
@@ -302,6 +308,63 @@ test("rollback env 8080 with leftover org 7338 row returns env credentials", asy
   );
 });
 
+test("personal inbound phone uses that connection token, not the org token", async () => {
+  const PERSONAL_PHONE = "misleisys-phone-id";
+  const PERSONAL_USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const PERSONAL_TOKEN = "personal-misleisys-token";
+
+  await withEnv(
+    {
+      WHATSAPP_ACCESS_TOKEN: ENV_8080_TOKEN,
+      WHATSAPP_PHONE_NUMBER_ID: ENV_8080_PHONE,
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ENV_8080_WABA
+    },
+    async () => {
+      const personalRow = {
+        organization_id: ORG_ID,
+        user_id: PERSONAL_USER,
+        status: "connected",
+        phone_number_id: PERSONAL_PHONE,
+        waba_id: "personal-waba",
+        access_token_encrypted: "enc:v1:personal",
+        personalAccessToken: PERSONAL_TOKEN
+      };
+      const orgRow = connected7338();
+      const tokenCalls = [];
+      const repo = {
+        async getConnection() {
+          return structuredClone(orgRow);
+        },
+        async findConnectionByPhoneNumberId(phoneNumberId) {
+          if (String(phoneNumberId) === PERSONAL_PHONE) {
+            return structuredClone(personalRow);
+          }
+          return null;
+        },
+        async getDecryptedAccessToken(organizationId, userId = null) {
+          tokenCalls.push({ organizationId, userId });
+          if (userId && String(userId) === PERSONAL_USER) {
+            return PERSONAL_TOKEN;
+          }
+          return ORG_7338_TOKEN;
+        },
+        mutations: []
+      };
+
+      const credentials = await resolveWhatsAppSendCredentials(ORG_ID, {
+        connectionRepository: repo,
+        phoneNumberId: PERSONAL_PHONE
+      });
+
+      assert.equal(credentials.source, "embedded_signup");
+      assert.equal(credentials.phoneNumberId, PERSONAL_PHONE);
+      assert.equal(credentials.accessToken, PERSONAL_TOKEN);
+      assert.equal(credentials.accessToken === ORG_7338_TOKEN, false);
+      assert.deepEqual(tokenCalls, [{ organizationId: ORG_ID, userId: PERSONAL_USER }]);
+    }
+  );
+});
+
 test("media-fetch source still resolves through whatsappSendCredentials", () => {
   const fetchSrc = fs.readFileSync(
     path.join(__dirname, "../core/communicationMedia/whatsappMediaFetchService.js"),
@@ -318,5 +381,7 @@ test("media-fetch source still resolves through whatsappSendCredentials", () => 
   assert.match(outboundSrc, /inboundPhoneNumberId/);
   assert.match(pinSrc, /findConnectionByPhoneNumberId/);
   assert.match(pinSrc, /isOrgConnectionEligibleForRouting/);
+  assert.match(pinSrc, /getDecryptedAccessToken\(/);
+  assert.match(pinSrc, /ownerUserId/);
   assert.doesNotMatch(pinSrc, /saveConnection|updateConnection|disconnectConnection/);
 });

@@ -271,6 +271,21 @@ test("audio pending/failed states are distinct from operational brackets", () =>
   assert.equal(isConversationBubbleItem(operational), false);
 });
 
+test("failed WhatsApp outbound audit is not a Conversations bubble", () => {
+  const failedOutbound = {
+    category: "message",
+    direction: "outbound",
+    channel: "whatsapp",
+    actor: { type: "atlas" },
+    eventType: "message.outbound",
+    ai: { intent: "WHATSAPP_OUTBOUND_PROVIDER_FAILED" },
+    content: {
+      text: "[whatsapp_outbound:provider_failed] intent=RECRUIT_AI_REPLY; reason=PROVIDER_FAILED"
+    }
+  };
+  assert.equal(isConversationBubbleItem(failedOutbound), false);
+});
+
 test("UI leak detector catches E.164 and formatted phones", () => {
   assert.equal(containsRawPhoneLeak("advance:+13059997338:x"), true);
   assert.equal(containsRawPhoneLeak("Call (305) 999-7338"), true);

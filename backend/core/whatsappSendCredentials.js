@@ -71,7 +71,14 @@ async function resolveConnectionCredentials(connection, connectionRepository, or
     return null;
   }
 
-  const accessToken = await connectionRepository.getDecryptedAccessToken(orgId);
+  // Implements BR-147 / BR-165 — decrypt the same integration row that owns
+  // phone_number_id. Org-owned getDecryptedAccessToken(orgId) would send a
+  // personal Graph request with the Team Vision token (Meta 400, no wamid).
+  const ownerUserId = connection.user_id || connection.userId || null;
+  const accessToken = await connectionRepository.getDecryptedAccessToken(
+    orgId,
+    ownerUserId
+  );
   if (!accessToken) {
     return null;
   }
