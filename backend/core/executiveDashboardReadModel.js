@@ -86,6 +86,11 @@ function isThisLocalWeek(timestampMs, reference = new Date(), organizationId = n
   return isTimestampInWindow(timestampMs, window);
 }
 
+// Implements BR-165 — operational lists query public.prospects, which has
+// owner_user_id (002_quick_capture). The core assignment column lives on
+// atlas_core_prospects only. Filtering that missing column made PostgREST
+// return 42703 ("column prospects.assigned_agent_id does not exist") and
+// 500 both Prospect Center and Conversations for every role after PR #276.
 function applyProspectListScopeToQuery(query, listScope) {
   if (!listScope || listScope.denied === true) {
     return query;
@@ -96,8 +101,7 @@ function applyProspectListScopeToQuery(query, listScope) {
   } = require("../security/authorizationService");
 
   if (listScope.ownerUserId && isSafeListScopeId(listScope.ownerUserId)) {
-    const id = String(listScope.ownerUserId);
-    return query.or(`owner_user_id.eq.${id},assigned_agent_id.eq.${id}`);
+    return query.eq("owner_user_id", String(listScope.ownerUserId));
   }
 
   if (Array.isArray(listScope.ownerUserIds) && listScope.ownerUserIds.length > 0) {
@@ -107,10 +111,7 @@ function applyProspectListScopeToQuery(query, listScope) {
     if (ids.length === 0) {
       return query.eq("owner_user_id", "__invalid_list_scope__");
     }
-    const joined = ids.join(",");
-    return query.or(
-      `owner_user_id.in.(${joined}),assigned_agent_id.in.(${joined})`
-    );
+    return query.in("owner_user_id", ids);
   }
 
   return query;
