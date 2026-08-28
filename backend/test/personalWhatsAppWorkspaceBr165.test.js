@@ -9,6 +9,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY =
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   ASSIGNMENT_SOURCES,
@@ -212,19 +214,83 @@ test("default workspace lists are mine; oversight is explicit; deep-link stays o
 });
 
 test("list-scope query filter is applied before pagination", () => {
-  const calls = [];
+  const eqCalls = [];
+  const inCalls = [];
+  const orCalls = [];
   const query = {
     or(value) {
-      calls.push(value);
+      orCalls.push(value);
       return query;
     },
-    eq() {
+    eq(column, value) {
+      eqCalls.push({ column, value });
+      return query;
+    },
+    in(column, values) {
+      inCalls.push({ column, values });
       return query;
     }
   };
   applyProspectListScopeToQuery(query, { ownerUserId: MISLEISYS });
-  assert.equal(calls.length, 1);
-  assert.match(calls[0], new RegExp(MISLEISYS));
-  assert.match(calls[0], /owner_user_id/);
-  assert.match(calls[0], /assigned_agent_id/);
+  assert.deepEqual(eqCalls, [{ column: "owner_user_id", value: MISLEISYS }]);
+  assert.deepEqual(orCalls, []);
+  assert.deepEqual(inCalls, []);
+
+  applyProspectListScopeToQuery(query, {
+    ownerUserIds: [MISLEISYS, NIOVEL]
+  });
+  assert.deepEqual(inCalls, [{ column: "owner_user_id", values: [MISLEISYS, NIOVEL] }]);
+});
+
+test("prospects list query never filters assigned_agent_id (42703 regression)", () => {
+  const listQuery = fs.readFileSync(
+    path.join(__dirname, "../core/executiveDashboardReadModel.js"),
+    "utf8"
+  );
+  const applyFn = listQuery.slice(
+    listQuery.indexOf("function applyProspectListScopeToQuery"),
+    listQuery.indexOf("async function loadProductionProspects")
+  );
+  assert.match(applyFn, /owner_user_id/);
+  assert.doesNotMatch(applyFn, /assigned_agent_id/);
+  assert.match(listQuery, /\.from\("prospects"\)/);
+
+  const prospectsMigration = fs.readFileSync(
+    path.join(__dirname, "../database/migrations/002_quick_capture.sql"),
+    "utf8"
+  );
+  const coreMigration = fs.readFileSync(
+    path.join(__dirname, "../database/migrations/003_atlas_core_prospects.sql"),
+    "utf8"
+  );
+  assert.match(prospectsMigration, /ALTER TABLE prospects ADD COLUMN IF NOT EXISTS owner_user_id/);
+  assert.doesNotMatch(prospectsMigration, /assigned_agent_id/);
+  assert.match(coreMigration, /assigned_agent_id UUID REFERENCES atlas_users/);
+});
+
+test("Team Vision / Team Legacy / personal mine scopes stay isolated", () => {
+  const TV = ORG;
+  const TL = "af8fb707-f26c-4152-ad77-2d079d30bc8a";
+  const tvMine = resolveWorkspaceListScope(auth(ROLES.AGENT, MISLEISYS));
+  const tlRvp = {
+    userId: NIOVEL,
+    organizationId: TL,
+    role: ROLES.RVP,
+    status: "active",
+    permissions: ["prospect:read", "dashboard:team", "dashboard:executive"]
+  };
+  const tlMine = resolveWorkspaceListScope(tlRvp);
+  const tvOversight = resolveWorkspaceListScope(auth(ROLES.RVP, NIOVEL), "oversight");
+
+  const misleisysLead = { organization_id: TV, owner_user_id: MISLEISYS };
+  const niovelTvLead = { organization_id: TV, owner_user_id: NIOVEL };
+  const tlLead = { organization_id: TL, owner_user_id: NIOVEL };
+
+  assert.equal(isProspectInWorkspaceListScope(misleisysLead, tvMine), true);
+  assert.equal(isProspectInWorkspaceListScope(niovelTvLead, tvMine), false);
+  assert.equal(isProspectInWorkspaceListScope(tlLead, tvMine), false);
+  assert.equal(isProspectInWorkspaceListScope(tlLead, tlMine), true);
+  assert.equal(isProspectInWorkspaceListScope(misleisysLead, tlMine), false);
+  assert.equal(isProspectInWorkspaceListScope(misleisysLead, tvOversight), true);
+  assert.equal(isProspectInWorkspaceListScope(tlLead, tvOversight), false);
 });
