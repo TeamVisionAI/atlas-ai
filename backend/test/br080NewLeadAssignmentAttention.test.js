@@ -137,6 +137,20 @@ test("1-5. create-time assignment precedence: explicit, default recruiter, RVP, 
     }
   });
   assert.equal(creator.assignmentSource, ASSIGNMENT_SOURCES.CREATOR);
+
+  const personal = await resolveNewLeadAssignment({
+    organizationId: ORG_A,
+    whatsappOwnerUserId: AGENT,
+    deps: {
+      findUserById: async (id) => USERS[id] || null,
+      findActiveOrganizationRvp: async () => USERS[RVP],
+      organizationSettings: {
+        scheduling: { defaultRecruiterUserId: RVP }
+      }
+    }
+  });
+  assert.equal(personal.ownerUserId, AGENT);
+  assert.equal(personal.assignmentSource, ASSIGNMENT_SOURCES.PERSONAL_WHATSAPP);
 });
 
 test("6-9. invalid/disabled/cross-org rejected; no eligible → unassigned", async () => {

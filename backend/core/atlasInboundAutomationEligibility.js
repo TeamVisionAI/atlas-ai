@@ -26,7 +26,9 @@ const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
   QUICK_CAPTURE: "QUICK_CAPTURE",
   CAMPAIGN_INTAKE_CODE: "CAMPAIGN_INTAKE_CODE",
   /** BR-147 — validated ACTIVE IUL campaign intake (policy_review lane only). */
-  CAMPAIGN_INTAKE_IUL: "CAMPAIGN_INTAKE_IUL"
+  CAMPAIGN_INTAKE_IUL: "CAMPAIGN_INTAKE_IUL",
+  /** BR-165 — inbound to a user-owned WhatsApp connection (not the shared org number). */
+  PERSONAL_WHATSAPP: "PERSONAL_WHATSAPP"
 });
 
 const VERIFIED_SOURCE_SET = Object.freeze(
@@ -39,9 +41,14 @@ const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
     WHATSAPP_ENTRY_METHOD.QR,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
+    WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
     "QUICK_CAPTURE"
   ])
 );
+
+function isPersonalWhatsAppConnection(source) {
+  return String(source || "").trim() === "whatsapp_personal_connection";
+}
 
 function upper(value) {
   return String(value || "").trim().toUpperCase();
@@ -89,7 +96,8 @@ function resolveVerifiedAtlasEligibilitySource({
   ctwaReferral = null,
   intakeSource = null,
   sourceFields = null,
-  campaignIntakeMatch = null
+  campaignIntakeMatch = null,
+  whatsappConnectionSource = null
 } = {}) {
   if (qrTouch || qrAttributed) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
@@ -116,6 +124,13 @@ function resolveVerifiedAtlasEligibilitySource({
   }
   if (upper(sourceFields?.source) === upper(WHATSAPP_SOURCE.CAR_MAGNET)) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
+  }
+  if (
+    isPersonalWhatsAppConnection(whatsappConnectionSource) ||
+    entry === WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP ||
+    upper(sourceFields?.source) === "PERSONAL_WHATSAPP"
+  ) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP;
   }
   return null;
 }
@@ -249,6 +264,14 @@ function evaluateAtlasInboundAutomationEligibility({
     return { eligible: true, reason: "CAMPAIGN_INTAKE_IUL" };
   }
 
+  if (
+    isPersonalWhatsAppConnection(
+      inbound?.whatsappConnectionSource || inbound?.organizationSource
+    )
+  ) {
+    return { eligible: true, reason: "PERSONAL_WHATSAPP" };
+  }
+
   const continuation = resolveContinuationProvenance({ prospect, workflowState });
   if (!continuation.proven) {
     return { eligible: false, reason: continuation.reason };
@@ -329,5 +352,6 @@ module.exports = {
   evaluateIulReviewSessionActive,
   persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
+  isPersonalWhatsAppConnection,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES
 };

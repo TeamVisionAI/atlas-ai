@@ -9,7 +9,8 @@ const {
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
   hasPositiveCtwaReferral,
   hasFreshRecruitingCampaignIntakeMatch,
-  hasFreshIulCampaignIntakeMatch
+  hasFreshIulCampaignIntakeMatch,
+  isPersonalWhatsAppConnection
 } = require("./atlasInboundAutomationEligibility");
 const { MILESTONES } = require("./workflowConstants");
 const { isIulWorkflowProspect } = require("./iulWorkflowConstants");
@@ -25,6 +26,7 @@ const VERIFIED_PROMOTION_ENTRY_METHODS = Object.freeze(
     WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
+    WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
     "QUICK_CAPTURE",
     "MANUAL_CONVERT",
     "MANUAL_CREATE"
@@ -166,7 +168,8 @@ function evaluateProspectPromotion({
   intakeSource = null,
   sourceFields = null,
   explicitPromote = false,
-  atlasAutomationEnabled = null
+  atlasAutomationEnabled = null,
+  whatsappConnectionSource = null
 } = {}) {
   if (existingProspect) {
     return { promote: true, reason: "EXISTING_PROSPECT" };
@@ -202,6 +205,15 @@ function evaluateProspectPromotion({
 
   if (hasFreshQuickCaptureOrigin({ intakeSource, sourceFields, explicitPromote })) {
     return { promote: true, reason: "EXPLICIT_PROSPECT_CREATE" };
+  }
+
+  // Implements BR-165 — user-owned WhatsApp inbound is a promotion signal.
+  // Shared org numbers stay fail-closed (BR-142 / BR-159).
+  if (
+    isPersonalWhatsAppConnection(whatsappConnectionSource) ||
+    upper(sourceFields?.entryMethod) === WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP
+  ) {
+    return { promote: true, reason: "PERSONAL_WHATSAPP" };
   }
 
   return { promote: false, reason: "NO_VALID_PROMOTION_SIGNAL" };

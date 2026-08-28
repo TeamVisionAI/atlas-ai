@@ -1,13 +1,16 @@
 /**
  * Sprint 10.3 — Prospect Center routes (thin API).
  * Sprint 19 — Tenant-scoped via organizationGuard.
- * Authorization — same pipeline as GET /api/dashboard (filterProspectsForAuthContext in route).
+ * Authorization — BR-165 default mine workspace; oversight via workspaceScope.
  */
 
 const express = require("express");
 const { buildProspectCenterReadModel } = require("../core/prospectCenterReadModel");
 const { loadProductionProspects } = require("../core/executiveDashboardReadModel");
-const { filterProspectsForAuthContext } = require("../security/authorizationService");
+const {
+  resolveWorkspaceListScope,
+  isProspectInWorkspaceListScope
+} = require("../security/authorizationService");
 const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { organizationGuard } = require("../middleware/organizationGuard");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
@@ -34,8 +37,16 @@ router.use(organizationGuard());
 router.get("/", operationalControlPlaneEmpty(emptyProspectCenter), async (req, res) => {
   try {
     const organizationId = getTenantOrganizationId(req);
-    const productionProspects = await loadProductionProspects(organizationId);
-    const prospects = filterProspectsForAuthContext(req.authContext, productionProspects);
+    const listScope = resolveWorkspaceListScope(
+      req.authContext,
+      req.query.workspaceScope
+    );
+    const productionProspects = await loadProductionProspects(organizationId, {
+      listScope
+    });
+    const prospects = productionProspects.filter((prospect) =>
+      isProspectInWorkspaceListScope(prospect, listScope)
+    );
 
     const payload = await buildProspectCenterReadModel({
       filter: req.query.filter,

@@ -185,7 +185,8 @@ async function attemptStalledFirstReplyRecovery({
     phoneNumberId,
     workflowState,
     attribution,
-    ctwaReferral: recoveryContext.ctwaReferral || null
+    ctwaReferral: recoveryContext.ctwaReferral || null,
+    whatsappConnectionSource: inboundForAutomation.whatsappConnectionSource || null
   }).catch((error) => {
     logWhatsAppStage("inbound_first_reply_recovery_state_restore_failed", {
       level: "warn",
@@ -296,7 +297,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   // cannot poison the provider-message lock (replay with the correct WABA still works).
   const {
     organizationId: claimedOrganizationId,
-    source: organizationSource = null
+    source: organizationSource = null,
+    ownerUserId: claimedOwnerUserId = null
   } = await resolveOrg({
     phoneNumberId:
       inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
@@ -395,7 +397,9 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       providerMessageId: inbound.providerMessageId || null,
       ctwaReferral: inbound.ctwaReferral || null,
       campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null,
-      senderIdentity
+      senderIdentity,
+      whatsappConnectionOwnerUserId: claimedOwnerUserId,
+      whatsappConnectionSource: organizationSource
     });
 
   // Implements BR-159 — unknown/personal inbound is logged, not promoted.
@@ -526,7 +530,9 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   const inboundForAutomation = {
     ...inbound,
     body: semanticBody,
-    campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : null
+    campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : null,
+    whatsappConnectionSource: organizationSource,
+    whatsappConnectionOwnerUserId: claimedOwnerUserId
   };
 
   logWhatsAppStage("inbound_prospect_ready", {

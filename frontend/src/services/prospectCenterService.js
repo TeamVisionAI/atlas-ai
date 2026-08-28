@@ -26,6 +26,10 @@ export async function getProspectCenter(options = {}) {
     params.set("q", options.search);
   }
 
+  if (options.workspaceScope) {
+    params.set("workspaceScope", options.workspaceScope);
+  }
+
   const query = params.toString();
 
   try {

@@ -143,8 +143,8 @@ function conversationsTenantKey({ user, supportMode, controlPlane }) {
   return supportMode?.organizationId || user?.organizationId || "none";
 }
 
-function inboxCacheKey(filter, organizationId) {
-  return `${organizationId || "none"}::${filter || "active"}::::summary`;
+function inboxCacheKey(filter, organizationId, workspaceScope = "") {
+  return `${organizationId || "none"}::${filter || "active"}::::summary::${workspaceScope || "mine"}`;
 }
 
 function ConversationListSkeleton() {
@@ -230,12 +230,13 @@ export default function ConversationsPage() {
   const locale = language === "es" ? "es-US" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
   const activeFilter = searchParams.get("filter") || "active";
+  const workspaceScope = searchParams.get("workspaceScope") || "";
 
   const [payload, setPayload] = useState(() =>
-    readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey))
+    readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope))
   );
   const [listLoading, setListLoading] = useState(
-    () => !readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey))
+    () => !readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope))
   );
   const [listError, setListError] = useState(null);
   const [error, setError] = useState(null);
@@ -266,7 +267,7 @@ export default function ConversationsPage() {
       setListError(null);
       return;
     }
-    const cacheKey = inboxCacheKey(activeFilter, tenantCacheKey);
+    const cacheKey = inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope);
     if (!quiet && !payload) {
       const cached = readConversationsListCache(cacheKey);
       if (cached) {
@@ -290,6 +291,7 @@ export default function ConversationsPage() {
         organizationId: tenantCacheKey,
         filter: activeFilter,
         view: "summary",
+        workspaceScope,
         force
       });
       setPayload(data);
@@ -328,7 +330,7 @@ export default function ConversationsPage() {
         setListLoading(false);
       }
     }
-  }, [activeFilter, translate, controlPlane, tenantCacheKey]);
+  }, [activeFilter, workspaceScope, translate, controlPlane, tenantCacheKey]);
   loadListRef.current = loadList;
 
   useEffect(() => {
@@ -350,7 +352,7 @@ export default function ConversationsPage() {
       loadListRef.current?.({ quiet: true, force: true });
     }, CONVERSATIONS_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [activeFilter, tenantCacheKey]);
+  }, [activeFilter, workspaceScope, tenantCacheKey]);
 
   const loadDetail = useCallback(
     async (phone, { force = false } = {}) => {

@@ -42,9 +42,10 @@ function listCacheKey({
   organizationId = "",
   filter = "active",
   search = "",
-  view = "summary"
+  view = "summary",
+  workspaceScope = ""
 } = {}) {
-  return `${organizationId || "none"}::${filter}::${search}::${view}`;
+  return `${organizationId || "none"}::${filter}::${search}::${view}::${workspaceScope || "mine"}`;
 }
 
 export function conversationsListCacheKey(options = {}) {
@@ -92,9 +93,10 @@ export async function getConversations({
   filter = "active",
   search = "",
   view = "summary",
+  workspaceScope = "",
   force = false
 } = {}) {
-  const cacheKey = listCacheKey({ organizationId, filter, search, view });
+  const cacheKey = listCacheKey({ organizationId, filter, search, view, workspaceScope });
 
   if (!force) {
     const cached = readConversationsListCache(cacheKey);
@@ -117,6 +119,9 @@ export async function getConversations({
   if (view && view !== "full") {
     params.set("view", view);
   }
+  if (workspaceScope) {
+    params.set("workspaceScope", workspaceScope);
+  }
   const query = params.toString();
 
   const pending = wrap(`/api/conversations${query ? `?${query}` : ""}`)
@@ -132,8 +137,13 @@ export async function getConversations({
   return pending;
 }
 
-export async function getConversationsAttentionCount() {
-  return wrap("/api/conversations/attention-count");
+export async function getConversationsAttentionCount({ workspaceScope = "" } = {}) {
+  const params = new URLSearchParams();
+  if (workspaceScope) {
+    params.set("workspaceScope", workspaceScope);
+  }
+  const query = params.toString();
+  return wrap(`/api/conversations/attention-count${query ? `?${query}` : ""}`);
 }
 
 export async function getConversation(phone, { organizationId = "", force = false } = {}) {

@@ -203,6 +203,92 @@ function filterProspectsForAuthContext(context, prospects = []) {
   return prospects.filter((prospect) => canAccessProspect(context, prospect));
 }
 
+const WORKSPACE_LIST_SCOPES = Object.freeze({
+  MINE: "mine",
+  OVERSIGHT: "oversight"
+});
+
+function canUseOversightWorkspaceList(context) {
+  if (!isActiveContext(context)) {
+    return false;
+  }
+
+  if (
+    context.role === ROLES.ADMINISTRATOR ||
+    context.role === ROLES.RVP ||
+    context.role === ROLES.DIVISION_LEADER
+  ) {
+    return true;
+  }
+
+  return (
+    hasPermission(context, "dashboard:executive") ||
+    hasPermission(context, "dashboard:team")
+  );
+}
+
+/**
+ * BR-165 — default lists are the signed-in user's owned/assigned rows.
+ * Org/subtree lists require an explicit oversight/team/org view.
+ */
+function resolveWorkspaceListScope(context, workspaceScope = null) {
+  if (!isActiveContext(context)) {
+    return { denied: true };
+  }
+
+  const requested = String(workspaceScope || "").trim().toLowerCase();
+  if (requested === WORKSPACE_LIST_SCOPES.OVERSIGHT && canUseOversightWorkspaceList(context)) {
+    return {
+      ...getProspectListScope(context),
+      workspaceScope: WORKSPACE_LIST_SCOPES.OVERSIGHT
+    };
+  }
+
+  return {
+    organizationId: context.organizationId,
+    ownerUserId: context.userId,
+    workspaceScope: WORKSPACE_LIST_SCOPES.MINE
+  };
+}
+
+function isSafeListScopeId(value) {
+  return /^[A-Za-z0-9_-]{1,64}$/.test(String(value || ""));
+}
+
+function prospectMatchesOwnerScope(prospect, ownerIds) {
+  const ownerUserId = prospect?.owner_user_id || prospect?.ownerUserId || null;
+  const assignedAgentId = prospect?.assigned_agent_id || prospect?.assignedAgentId || null;
+  const ids = new Set((ownerIds || []).map((id) => String(id)));
+  return Boolean(
+    (ownerUserId && ids.has(String(ownerUserId))) ||
+    (assignedAgentId && ids.has(String(assignedAgentId)))
+  );
+}
+
+function isProspectInWorkspaceListScope(prospect, listScope) {
+  if (!prospect || !listScope || listScope.denied === true) {
+    return false;
+  }
+
+  const orgId = prospect.organization_id || prospect.organizationId || null;
+  if (
+    listScope.organizationId &&
+    String(orgId || "") !== String(listScope.organizationId)
+  ) {
+    return false;
+  }
+
+  if (listScope.ownerUserId) {
+    return prospectMatchesOwnerScope(prospect, [listScope.ownerUserId]);
+  }
+
+  if (Array.isArray(listScope.ownerUserIds)) {
+    return prospectMatchesOwnerScope(prospect, listScope.ownerUserIds);
+  }
+
+  return true;
+}
+
 function getProspectListScope(context) {
   if (!isActiveContext(context)) {
     return { denied: true };
@@ -268,6 +354,11 @@ module.exports = {
   filterProspectsForAuthContext,
   assertProspectAccess,
   getProspectListScope,
+  resolveWorkspaceListScope,
+  canUseOversightWorkspaceList,
+  isProspectInWorkspaceListScope,
+  isSafeListScopeId,
+  WORKSPACE_LIST_SCOPES,
   canAccessOperationsCenter,
   resolveOrganizationId,
   sameOrganization

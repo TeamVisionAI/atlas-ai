@@ -132,6 +132,7 @@ test("2. Team Vision cannot see Team Legacy conversation", async () => {
   const model = await buildConversationsCenterReadModel({
     organizationId: ORG_TV,
     authContext: tenantAdmin(ORG_TV),
+    workspaceScope: "oversight",
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map([
       [PHONE, filterConversationLogsForTenant([NULL_ORG_LOG, TL_LOG, TV_LOG], ORG_TV, COLLISION_INDEX)]
@@ -146,6 +147,7 @@ test("3. Team Legacy cannot see Team Vision conversation", async () => {
   const model = await buildConversationsCenterReadModel({
     organizationId: ORG_TL,
     authContext: tenantAdmin(ORG_TL),
+    workspaceScope: "oversight",
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map([
       [PHONE, filterConversationLogsForTenant([NULL_ORG_LOG, TL_LOG, TV_LOG], ORG_TL, COLLISION_INDEX)]
@@ -182,12 +184,14 @@ test("7. direct tenant login stays isolated", async () => {
   const tv = await buildConversationsCenterReadModel({
     organizationId: ORG_TV,
     authContext: tenantAdmin(ORG_TV),
+    workspaceScope: "oversight",
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map()
   });
   const tl = await buildConversationsCenterReadModel({
     organizationId: ORG_TL,
     authContext: tenantAdmin(ORG_TL),
+    workspaceScope: "oversight",
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map()
   });
@@ -205,6 +209,7 @@ test("9. arbitrary third tenant is isolated", async () => {
   const model = await buildConversationsCenterReadModel({
     organizationId: ORG_NEW,
     authContext: tenantAdmin(ORG_NEW),
+    workspaceScope: "oversight",
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map([[PHONE, [NULL_ORG_LOG, TV_LOG, TL_LOG]]])
   });

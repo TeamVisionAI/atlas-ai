@@ -231,6 +231,18 @@ test("verified CTWA eligibility source requires active recruiting session", asyn
   });
 });
 
+test("personal WhatsApp connection inbound is eligible without greeting-as-CTWA", () => {
+  const result = evaluateAtlasInboundAutomationEligibility({
+    prospect: unknownProspect(),
+    inbound: {
+      text: "Hola. ¿Puedes darme más información sobre esto?",
+      whatsappConnectionSource: "whatsapp_personal_connection"
+    }
+  });
+  assert.equal(result.eligible, true);
+  assert.equal(result.reason, "PERSONAL_WHATSAPP");
+});
+
 test("create path still stamps CTWA only from verified referral", () => {
   const unknown = resolveCreateSourceFields(null);
   assert.equal(unknown.entryMethod, WHATSAPP_ENTRY_METHOD.UNATTRIBUTED);

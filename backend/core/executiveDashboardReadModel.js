@@ -86,15 +86,53 @@ function isThisLocalWeek(timestampMs, reference = new Date(), organizationId = n
   return isTimestampInWindow(timestampMs, window);
 }
 
+function applyProspectListScopeToQuery(query, listScope) {
+  if (!listScope || listScope.denied === true) {
+    return query;
+  }
+
+  const {
+    isSafeListScopeId
+  } = require("../security/authorizationService");
+
+  if (listScope.ownerUserId && isSafeListScopeId(listScope.ownerUserId)) {
+    const id = String(listScope.ownerUserId);
+    return query.or(`owner_user_id.eq.${id},assigned_agent_id.eq.${id}`);
+  }
+
+  if (Array.isArray(listScope.ownerUserIds) && listScope.ownerUserIds.length > 0) {
+    const ids = listScope.ownerUserIds
+      .map((id) => String(id))
+      .filter((id) => isSafeListScopeId(id));
+    if (ids.length === 0) {
+      return query.eq("owner_user_id", "__invalid_list_scope__");
+    }
+    const joined = ids.join(",");
+    return query.or(
+      `owner_user_id.in.(${joined}),assigned_agent_id.in.(${joined})`
+    );
+  }
+
+  return query;
+}
+
 async function loadProductionProspects(organizationId, options = {}) {
   if (!organizationId) {
     throw new Error("organizationId is required to load production prospects");
   }
 
-  const { data, error } = await supabase
+  if (options.listScope?.denied === true) {
+    return [];
+  }
+
+  let query = supabase
     .from("prospects")
     .select("*")
     .eq("organization_id", organizationId);
+
+  query = applyProspectListScopeToQuery(query, options.listScope);
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -528,6 +566,7 @@ module.exports = {
   buildTodayCalendar,
   buildAgencyPulse,
   loadProductionProspects,
+  applyProspectListScopeToQuery,
   EXECUTIVE_FILTERS,
   isSameLocalDay
 };

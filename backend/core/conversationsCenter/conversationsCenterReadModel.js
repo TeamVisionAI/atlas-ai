@@ -44,12 +44,13 @@ const {
 const INBOX_LOGS_PER_PHONE = 24;
 const INBOX_LOGS_MAX = 600;
 
-function loadProductionProspectsSafe(organizationId) {
+function loadProductionProspectsSafe(organizationId, options = {}) {
   const {
     loadProductionProspects
   } = require("../executiveDashboardReadModel");
   return loadProductionProspects(organizationId, {
-    includeNonOperationalContacts: true
+    includeNonOperationalContacts: true,
+    listScope: options.listScope || null
   });
 }
 
@@ -412,17 +413,33 @@ async function buildConversationsCenterReadModel(options = {}) {
     });
   }
 
+  const authContext = options.authContext || null;
+  const {
+    resolveWorkspaceListScope,
+    isProspectInWorkspaceListScope
+  } = require("../../security/authorizationService");
+  const listScope = authContext
+    ? resolveWorkspaceListScope(authContext, options.workspaceScope)
+    : null;
+
   const prospects =
-    options.prospects ?? (await loadProductionProspectsSafe(organizationId));
+    options.prospects ??
+    (await loadProductionProspectsSafe(organizationId, { listScope }));
 
   const useEmbeddedWorkflow = !options.prospects;
 
-  const authContext = options.authContext || null;
-  const tenantScoped = prospects.filter((prospect) =>
-    authContext
-      ? isProspectInConversationsUserScope(prospect, organizationId, authContext)
-      : isProspectInConversationsTenantScope(prospect, organizationId)
-  );
+  const tenantScoped = prospects.filter((prospect) => {
+    if (!isProspectInConversationsTenantScope(prospect, organizationId)) {
+      return false;
+    }
+    if (!authContext) {
+      return true;
+    }
+    if (listScope) {
+      return isProspectInWorkspaceListScope(prospect, listScope);
+    }
+    return isProspectInConversationsUserScope(prospect, organizationId, authContext);
+  });
   const scoped = (
     await Promise.all(
       tenantScoped.map(async (prospect) => {
@@ -543,12 +560,18 @@ async function persistDerivedWindowArchives(prospects, items, organizationId) {
   );
 }
 
-async function getConversationsAttentionCount(organizationId, prospects, authContext = null) {
+async function getConversationsAttentionCount(
+  organizationId,
+  prospects,
+  authContext = null,
+  workspaceScope = null
+) {
   const model = await buildConversationsCenterReadModel({
     organizationId,
     prospects,
     filter: CONVERSATION_FILTERS.ACTIVE,
-    authContext
+    authContext,
+    workspaceScope
   });
 
   return {

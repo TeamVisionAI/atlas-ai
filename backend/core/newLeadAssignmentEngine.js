@@ -23,7 +23,9 @@ const ASSIGNMENT_SOURCES = Object.freeze({
   DEFAULT_RECRUITER: "default_recruiter",
   ORGANIZATION_RVP: "organization_rvp",
   CREATOR: "creator",
-  UNASSIGNED: "unassigned"
+  UNASSIGNED: "unassigned",
+  /** BR-147 / BR-165 — inbound to a user-owned WhatsApp connection. */
+  PERSONAL_WHATSAPP: "personal_whatsapp"
 });
 
 function isEligibleNewLeadOwner(user, organizationId) {
@@ -96,6 +98,7 @@ async function resolveNewLeadAssignment({
   explicitAgentId = null,
   createdByUserId = null,
   campaignAgentId = null,
+  whatsappOwnerUserId = null,
   preferCreator = false,
   deps = {}
 } = {}) {
@@ -119,13 +122,24 @@ async function resolveNewLeadAssignment({
     });
   }
 
+  // Implements BR-165 — personal WhatsApp owner is not org default-recruiter/RVP.
+  const personalWhatsAppOwnerId = whatsappOwnerUserId || null;
+  if (personalWhatsAppOwnerId) {
+    candidates.push({
+      id: personalWhatsAppOwnerId,
+      source: ASSIGNMENT_SOURCES.PERSONAL_WHATSAPP
+    });
+  }
+
   if (preferCreator && createdByUserId) {
     candidates.push({ id: createdByUserId, source: ASSIGNMENT_SOURCES.CREATOR });
   }
 
+  const skipOrganizationFallback = Boolean(personalWhatsAppOwnerId);
+
   const settings = await loadOrganizationSettings(orgId, deps);
   const defaultRecruiterId = readConfiguredDefaultRecruiterId(settings);
-  if (defaultRecruiterId) {
+  if (defaultRecruiterId && !skipOrganizationFallback) {
     candidates.push({
       id: defaultRecruiterId,
       source: ASSIGNMENT_SOURCES.DEFAULT_RECRUITER
@@ -165,7 +179,7 @@ async function resolveNewLeadAssignment({
   }
 
   const findRvp = deps.findActiveOrganizationRvp || findActiveOrganizationRvp;
-  const rvp = await findRvp(orgId);
+  const rvp = skipOrganizationFallback ? null : await findRvp(orgId);
   if (rvp && isEligibleNewLeadOwner(rvp, orgId)) {
     const result = {
       ownerUserId: rvp.id,
