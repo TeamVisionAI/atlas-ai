@@ -499,7 +499,7 @@ async function sendAndPersistWhatsAppMessage({
 
       const failedAuth = {
         ...authorization,
-        reason: "PROVIDER_FAILED",
+        reason: safeReason,
         status: DELIVERY_STATUSES.PROVIDER_FAILED,
         retryable: true
       };
@@ -581,7 +581,9 @@ async function sendAndPersistWhatsAppMessage({
   const persistBody =
     mode === "template"
       ? `[whatsapp_template:${authorization.metaTemplateName}] intent=${intent}`
-      : String(authorization.message || message || "").trim();
+      : String(
+          authorization.message || message || interactiveFallbackText || ""
+        ).trim();
 
   const logResult = await logConversation({
     phone: prospect?.phone || storagePhone,

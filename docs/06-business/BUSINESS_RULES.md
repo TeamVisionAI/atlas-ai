@@ -2216,7 +2216,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Related:** BR-129 (tenant isolation), BR-149 (team/oversight views)
 **Status:** Implemented
 **Engine target:** `whatsappInboundOrganizationResolver`, `whatsappProspectResolver`, `newLeadAssignmentEngine`, `atlasInboundAutomationEligibility`, `prospectPromotionEligibility`, `authorizationService.resolveWorkspaceListScope`, `loadProductionProspects`
-**Tests:** `backend/test/personalWhatsAppWorkspaceBr165.test.js`, `backend/test/atlasInboundAutomationEligibility.test.js`, `backend/test/br080NewLeadAssignmentAttention.test.js`
+**Tests:** `backend/test/personalWhatsAppWorkspaceBr165.test.js`, `backend/test/atlasInboundAutomationEligibility.test.js`, `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/whatsappSendCredentialsCutoverPin.test.js`
 
 ### Rules
 
@@ -2226,7 +2226,8 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Default workspace lists** — Conversations Center and Prospect Center default to `mine` (owner or assigned = signed-in user). Filter in the backend query before pagination. Administrator / RVP org-wide `canAccessProspect` remains for single-thread / deep-link access only.
 5. **Oversight is explicit** — Org/subtree lists require `workspaceScope=oversight` (authorized RVP/Admin/DL / team-executive permission) or an existing team/org surface (Team Dashboard, Mission Control, Executive Dashboard). Unauthorized oversight requests stay `mine`.
 6. **No silent reassignment** — Repeated inbound does not move an existing valid `owner_user_id` (BR-080). Existing mis-assigned rows need an explicit data correction.
-7. **Boundaries** — Do not weaken tenant/RBAC isolation. Do not unlock the Conversations composer for ATLAS-owned threads. Do not treat FACEBOOK / CLICK_TO_WHATSAPP labels as eligibility.
+7. **Outbound token matches inbound asset** — A reply from a personal inbound `phone_number_id` decrypts that same `whatsapp_integrations` row (`getDecryptedAccessToken(orgId, user_id)`). Do not send to a personal Graph `phone_number_id` with the org-owned / Team Vision token. Org-owned (`user_id` null) send stays the org token / env pin (BR-075). Do not change WABA, Meta, routing, or eligibility to paper over a token mismatch.
+8. **Boundaries** — Do not weaken tenant/RBAC isolation. Do not unlock the Conversations composer for ATLAS-owned threads. Do not treat FACEBOOK / CLICK_TO_WHATSAPP labels as eligibility. Failed outbound audit rows (`WHATSAPP_OUTBOUND_*`, `[whatsapp_outbound:…]`) stay Diagnostics-only — they are not Atlas transcript bubbles.
 
 ---
 
