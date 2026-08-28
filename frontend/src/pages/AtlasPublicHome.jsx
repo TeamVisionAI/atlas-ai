@@ -59,7 +59,7 @@ export default function AtlasPublicHome() {
   usePageMeta({
     title: "Atlas AI | Connect • Automate • Grow",
     description:
-      "Atlas AI helps insurance and recruiting organizations connect with prospects, automate follow-up, schedule meetings, and execute as a team.",
+      "Atlas AI is a business operations platform that helps insurance organizations manage prospects, recruiting conversations, appointments, follow-ups, and calendar scheduling.",
     ogTitle: "Atlas AI",
     ogImage: `${typeof window !== "undefined" ? window.location.origin : "https://useatlas-ai.com"}${ATLAS_BRAND_ASSETS.ogImage}`
   });
@@ -78,13 +78,13 @@ export default function AtlasPublicHome() {
               </p>
               <h1 id="atlas-home-heading" className="atlas-hero__title">
                 Atlas AI
-                <span className="atlas-hero__subtitle">Connect • Automate • Grow</span>
               </h1>
+              <p className="atlas-hero__subtitle">Connect • Automate • Grow</p>
               <div className="atlas-hero__lead">
                 <p>
-                  Atlas is an AI-powered operations platform for organizations that recruit, follow
-                  up, and schedule at scale—starting with insurance teams that need reliable
-                  prospect engagement without losing the human touch.
+                  Atlas AI is a business operations platform that helps insurance organizations
+                  manage prospects, recruiting conversations, appointments, follow-ups, and calendar
+                  scheduling.
                 </p>
                 <p>
                   Connect your channels, automate the repetitive work, and grow pipeline with a
