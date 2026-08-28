@@ -108,7 +108,12 @@ router.get("/attention-count", operationalControlPlaneEmpty(() => ({
 
   try {
     const organizationId = getTenantOrganizationId(req);
-    const payload = await getConversationsAttentionCount(organizationId, undefined, req.authContext);
+    const payload = await getConversationsAttentionCount(
+      organizationId,
+      undefined,
+      req.authContext,
+      req.query.workspaceScope
+    );
     res.json(payload);
   } catch (error) {
     console.error("[conversations-center] attention-count", error.message);
@@ -131,7 +136,8 @@ router.get("/", operationalControlPlaneEmpty(emptyConversations), async (req, re
       filter: req.query.filter,
       search: req.query.q,
       view: req.query.view,
-      authContext: req.authContext
+      authContext: req.authContext,
+      workspaceScope: req.query.workspaceScope
     });
     res.json(payload);
   } catch (error) {

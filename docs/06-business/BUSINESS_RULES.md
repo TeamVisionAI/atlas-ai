@@ -1761,7 +1761,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** The production WhatsApp Cloud API number may also be a personal/business line. Atlas may auto-reply (live authoring, Conversation Engine, automated outbound) only when the sender is **positively eligible**. Unknown and personal inbound default to silence.
 **Domain:** WhatsApp inbound / Recruit AI / Conversation Engine
 **Depends on:** BR-075, BR-114, BR-129, BR-135, BR-138
-**Related:** BR-080 (unknown inbound may persist; silence is not a BR-080 AI failure), BR-049
+**Related:** BR-080 (unknown inbound may persist; silence is not a BR-080 AI failure), BR-049, BR-165 (user-owned WhatsApp is eligible)
 **Status:** Implemented
 **Engine target:** `atlasInboundAutomationEligibility.js`, `communicationHub.js` (before live authoring and `shouldDeliverAutomatedReply`), `whatsappProspectResolver.resolveCreateSourceFields`, `whatsappWebhookParser.extractClickToWhatsAppReferral`
 **Tests:** `backend/test/atlasInboundAutomationEligibility.test.js`
@@ -2205,6 +2205,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Exact requested time** — Thursday + afternoon + `3` → 15:00. If that slot is available, confirm only that time. If unavailable, offer nearby alternatives that still honor date/daypart. Do not reintroduce unrelated slots (including noon).
 8. **No silent terminal** — Every turn ends with explicit `respond` | `wait` | `suppress` plus a reason. Empty customer replies are not allowed on recoverable paths.
 9. **Boundaries** — Shared orchestration/scheduler only. No Team Vision-specific copy. No IUL, billing, or WhatsApp isolation changes. Execution remains OFF.
+
+---
+
+## BR-165 — Personal WhatsApp Workspace Ownership + Default Mine Lists
+
+**Implements:** Inbound to a user-owned WhatsApp connection is assigned to that user, promoted, and eligible for Recruit AI. Default Conversations / Prospect Center lists are the signed-in user's owned/assigned rows only.
+**Domain:** WhatsApp inbound / assignment / workspace lists / Recruit AI eligibility
+**Depends on:** BR-080, BR-142, BR-147 (personal workspace), BR-148, BR-159
+**Related:** BR-129 (tenant isolation), BR-149 (team/oversight views)
+**Status:** Implemented
+**Engine target:** `whatsappInboundOrganizationResolver`, `whatsappProspectResolver`, `newLeadAssignmentEngine`, `atlasInboundAutomationEligibility`, `prospectPromotionEligibility`, `authorizationService.resolveWorkspaceListScope`, `loadProductionProspects`
+**Tests:** `backend/test/personalWhatsAppWorkspaceBr165.test.js`, `backend/test/atlasInboundAutomationEligibility.test.js`, `backend/test/br080NewLeadAssignmentAttention.test.js`
+
+### Rules
+
+1. **Personal connection owner** — `phone_number_id` → `whatsapp_integrations` with `user_id` (`whatsapp_personal_connection`) is the CRM owner. Do not fall through to org `defaultRecruiterUserId` or organization RVP. If that user is ineligible, leave the lead Unassigned. Never invent Niovel / first-RVP / default-user ownership for a personal connection.
+2. **Shared org number unchanged** — `user_id` null (`whatsapp_organization_connection`) keeps BR-080 (campaign → default recruiter → RVP) and BR-142 fail-closed. Greeting text is not CTWA. Team Vision 7338 routing stays intact. Do not change Meta/WABA configuration.
+3. **Promotion + first reply** — A personal WhatsApp connection is a valid BR-159 promotion signal and a valid BR-142 eligibility source (`PERSONAL_WHATSAPP`). CTWA referral, QR, and intake codes still win when present. Unknown inbound to an org-owned number stays silent and unpromoted.
+4. **Default workspace lists** — Conversations Center and Prospect Center default to `mine` (owner or assigned = signed-in user). Filter in the backend query before pagination. Administrator / RVP org-wide `canAccessProspect` remains for single-thread / deep-link access only.
+5. **Oversight is explicit** — Org/subtree lists require `workspaceScope=oversight` (authorized RVP/Admin/DL / team-executive permission) or an existing team/org surface (Team Dashboard, Mission Control, Executive Dashboard). Unauthorized oversight requests stay `mine`.
+6. **No silent reassignment** — Repeated inbound does not move an existing valid `owner_user_id` (BR-080). Existing mis-assigned rows need an explicit data correction.
+7. **Boundaries** — Do not weaken tenant/RBAC isolation. Do not unlock the Conversations composer for ATLAS-owned threads. Do not treat FACEBOOK / CLICK_TO_WHATSAPP labels as eligibility.
 
 ---
 

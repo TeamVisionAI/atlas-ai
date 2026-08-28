@@ -95,6 +95,7 @@ async function inbox(organizationId, authContext) {
   return buildConversationsCenterReadModel({
     organizationId,
     authContext,
+    workspaceScope: "oversight",
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map()
   });
@@ -122,6 +123,7 @@ test("4. Team Legacy search cannot see Vision name/phone", async () => {
   const model = await buildConversationsCenterReadModel({
     organizationId: ORG_TL,
     authContext: tenantAdmin(ORG_TL),
+    workspaceScope: "oversight",
     search: "Vision",
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map()
@@ -131,6 +133,7 @@ test("4. Team Legacy search cannot see Vision name/phone", async () => {
   const byPhone = await buildConversationsCenterReadModel({
     organizationId: ORG_TL,
     authContext: tenantAdmin(ORG_TL),
+    workspaceScope: "oversight",
     search: TV_PROSPECT.phone,
     prospects: [TV_PROSPECT, TL_PROSPECT],
     conversationLogsByPhone: new Map()

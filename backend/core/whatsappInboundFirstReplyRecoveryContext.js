@@ -189,6 +189,25 @@ async function buildStalledFirstReplyRecoveryContext({
   const phoneNumberId = resolvePhoneNumberId(inbound, observabilityRow, attribution);
   const wabaId = resolveWabaId(inbound, observabilityRow);
 
+  const { isPersonalWhatsAppConnection } = require("./atlasInboundAutomationEligibility");
+  let connectionSource =
+    inbound.whatsappConnectionSource || inbound.organizationSource || null;
+  if (!connectionSource && phoneNumberId) {
+    try {
+      const {
+        resolveWhatsAppInboundOrganizationId
+      } = require("./whatsappInboundOrganizationResolver");
+      const resolved = await resolveWhatsAppInboundOrganizationId({
+        phoneNumberId,
+        wabaId
+      });
+      connectionSource = resolved?.source || null;
+    } catch {
+      connectionSource = null;
+    }
+  }
+  const hasPersonalWhatsApp = isPersonalWhatsAppConnection(connectionSource);
+
   if (organizationId && phoneNumberId && attribution?.organizationId) {
     if (String(attribution.organizationId) !== String(organizationId)) {
       return { ok: false, reason: "ORG_MISMATCH" };
@@ -204,15 +223,17 @@ async function buildStalledFirstReplyRecoveryContext({
 
   if (!campaignIntakeMatch?.matched) {
     const hasDurableInboundProof = Boolean(observabilityRow || attribution);
-    if (!hasDurableInboundProof) {
+    if (!hasDurableInboundProof && !hasPersonalWhatsApp) {
       return { ok: false, reason: "NO_DURABLE_INBOUND_EVIDENCE" };
     }
 
-    const lookup = await intakeService.lookupInboundMatch({
-      organizationId,
-      whatsappPhoneNumberId: phoneNumberId,
-      messageBody: body
-    });
+    const lookup = hasDurableInboundProof
+      ? await intakeService.lookupInboundMatch({
+          organizationId,
+          whatsappPhoneNumberId: phoneNumberId,
+          messageBody: body
+        })
+      : null;
 
     if (lookup?.matched) {
       const episode = evaluateStalledFirstReplyRecoveryEpisode({
@@ -232,7 +253,7 @@ async function buildStalledFirstReplyRecoveryContext({
           : "campaign_intake_attributions"
       };
       intakeEvidenceSource = campaignIntakeMatch.evidenceSource;
-    } else if (!hasVerifiedCtwaEarly) {
+    } else if (!hasVerifiedCtwaEarly && !hasPersonalWhatsApp) {
       return { ok: false, reason: lookup?.reason || "INTAKE_NOT_VERIFIED" };
     }
   }
@@ -254,6 +275,7 @@ async function buildStalledFirstReplyRecoveryContext({
     wabaId,
     ctwaReferral,
     campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : null,
+    whatsappConnectionSource: connectionSource,
     rawValue: {
       ...(inbound.rawValue || {}),
       metadata: {
@@ -268,7 +290,12 @@ async function buildStalledFirstReplyRecoveryContext({
   const hasVerifiedCtwa = Boolean(ctwaReferral);
   const storedEligibility = String(workflowState?.atlasEligibilitySource || "").trim();
 
-  if (!hasVerifiedIntake && !hasVerifiedCtwa && !storedEligibility) {
+  if (
+    !hasVerifiedIntake &&
+    !hasVerifiedCtwa &&
+    !storedEligibility &&
+    !hasPersonalWhatsApp
+  ) {
     return { ok: false, reason: "NO_VERIFIED_ELIGIBILITY_EVIDENCE" };
   }
 
@@ -308,7 +335,8 @@ async function restoreStalledFirstReplyRecruitingState({
   phoneNumberId,
   workflowState,
   attribution,
-  ctwaReferral = null
+  ctwaReferral = null,
+  whatsappConnectionSource = null
 }) {
   if (campaignIntakeMatch?.matched && prospect?.phone) {
     if (attribution) {
@@ -375,6 +403,35 @@ async function restoreStalledFirstReplyRecruitingState({
     ).catch(() => null);
 
     return { ok: true, recruitingEligible: true, eligibilityDecision: "CTWA_REFERRAL", idempotent: true };
+  }
+
+  const {
+    persistVerifiedAtlasEligibilitySource,
+    VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
+    isPersonalWhatsAppConnection
+  } = require("./atlasInboundAutomationEligibility");
+
+  if (
+    prospect?.phone &&
+    (isPersonalWhatsAppConnection(whatsappConnectionSource) ||
+      String(workflowState?.atlasEligibilitySource || "").toUpperCase() ===
+        VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP)
+  ) {
+    const scope = {
+      organizationId: organizationId || prospect.organization_id || null,
+      prospectId: prospect.id || null
+    };
+    await persistVerifiedAtlasEligibilitySource(
+      prospect.phone,
+      VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP,
+      scope
+    ).catch(() => null);
+    return {
+      ok: true,
+      recruitingEligible: true,
+      eligibilityDecision: "PERSONAL_WHATSAPP",
+      idempotent: true
+    };
   }
 
   return { ok: false, reason: "NO_MATCH" };

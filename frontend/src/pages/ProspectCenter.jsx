@@ -188,6 +188,7 @@ export default function ProspectCenter() {
 
   const activeFilter = searchParams.get("filter") || "all";
   const searchQuery = searchParams.get("q") || "";
+  const workspaceScope = searchParams.get("workspaceScope") || "";
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [payload, setPayload] = useState(null);
   const [pendingPayload, setPendingPayload] = useState(null);
@@ -282,7 +283,8 @@ export default function ProspectCenter() {
       try {
         const data = await getProspectCenter({
           filter: activeFilter,
-          search: searchQuery
+          search: searchQuery,
+          workspaceScope
         });
 
         const decision = decideRefreshApply({
@@ -339,7 +341,7 @@ export default function ProspectCenter() {
         }
       }
     },
-    [activeFilter, searchQuery, translate, applyPayload]
+    [activeFilter, searchQuery, workspaceScope, translate, applyPayload]
   );
 
   useEffect(() => {
@@ -351,7 +353,7 @@ export default function ProspectCenter() {
       return;
     }
     loadCenter({ mode: "replace" });
-  }, [activeFilter, searchQuery, supportMode?.active, supportMode?.organizationId, controlPlane]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional filter/search/support-mode replace load
+  }, [activeFilter, searchQuery, workspaceScope, supportMode?.active, supportMode?.organizationId, controlPlane]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional filter/search/support-mode replace load
 
   useEffect(() => {
     const refreshLiveCenter = () => {
@@ -579,7 +581,8 @@ export default function ProspectCenter() {
 
       const data = await getProspectCenter({
         filter: activeFilter,
-        search: searchQuery
+        search: searchQuery,
+        workspaceScope
       });
 
       if (reconcileGeneration !== requestGenerationRef.current) {
@@ -637,7 +640,8 @@ export default function ProspectCenter() {
 
       const data = await getProspectCenter({
         filter: activeFilter,
-        search: searchQuery
+        search: searchQuery,
+        workspaceScope
       });
 
       if (reconcileGeneration !== requestGenerationRef.current) {

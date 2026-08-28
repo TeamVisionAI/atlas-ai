@@ -45,7 +45,8 @@ const {
   hasPositiveCtwaReferral,
   hasFreshIulCampaignIntakeMatch,
   resolveVerifiedAtlasEligibilitySource,
-  persistVerifiedAtlasEligibilitySource
+  persistVerifiedAtlasEligibilitySource,
+  isPersonalWhatsAppConnection
 } = require("./atlasInboundAutomationEligibility");
 const {
   evaluateProspectPromotion
@@ -143,7 +144,8 @@ function resolveCreateSourceFields(qrTouch, origin = {}) {
       source: WHATSAPP_SOURCE.FACEBOOK,
       entryMethod: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
       campaignAgentId: null,
-      assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK
+      assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK,
+      whatsappOwnerUserId: origin.whatsappConnectionOwnerUserId || null
     };
   }
 
@@ -175,7 +177,19 @@ function resolveCreateSourceFields(qrTouch, origin = {}) {
       source: WHATSAPP_SOURCE.FACEBOOK,
       entryMethod: WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
       campaignAgentId: null,
-      assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK
+      assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK,
+      whatsappOwnerUserId: origin.whatsappConnectionOwnerUserId || null
+    };
+  }
+
+  // Implements BR-165 — user-owned WhatsApp inbound is not org-default assignment.
+  if (isPersonalWhatsAppConnection(origin.whatsappConnectionSource)) {
+    return {
+      source: WHATSAPP_SOURCE.PERSONAL_WHATSAPP,
+      entryMethod: WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
+      campaignAgentId: null,
+      assignmentSourceHint: "personal_whatsapp",
+      whatsappOwnerUserId: origin.whatsappConnectionOwnerUserId || null
     };
   }
 
@@ -184,7 +198,8 @@ function resolveCreateSourceFields(qrTouch, origin = {}) {
     source: WHATSAPP_SOURCE.UNKNOWN,
     entryMethod: WHATSAPP_ENTRY_METHOD.UNATTRIBUTED,
     campaignAgentId: null,
-    assignmentSourceHint: null
+    assignmentSourceHint: null,
+    whatsappOwnerUserId: null
   };
 }
 
@@ -220,7 +235,9 @@ async function insertWhatsAppProspectRow({
   const assignment = await resolveNewLeadAssignment({
     organizationId,
     source: sourceFields.assignmentSourceHint,
-    campaignAgentId: sourceFields.campaignAgentId
+    campaignAgentId: sourceFields.campaignAgentId,
+    whatsappOwnerUserId:
+      sourceFields.whatsappOwnerUserId || origin.whatsappConnectionOwnerUserId || null
   });
   const attentionFields = buildNewLeadAttentionFields(assignment);
 
@@ -362,14 +379,16 @@ async function emitProspectLifecycleEvents(
     qrTouch = null,
     sourceFields = null,
     ctwaReferral = null,
-    campaignIntakeMatch = null
+    campaignIntakeMatch = null,
+    whatsappConnectionSource = null
   }
 ) {
   const resolved =
     sourceFields ||
     resolveCreateSourceFields(qrTouch, {
       ctwaReferral,
-      campaignIntakeMatch
+      campaignIntakeMatch,
+      whatsappConnectionSource
     });
   const source = resolved.source || WHATSAPP_SOURCE.UNKNOWN;
   const entryMethod = resolved.entryMethod || WHATSAPP_ENTRY_METHOD.UNATTRIBUTED;
@@ -377,7 +396,8 @@ async function emitProspectLifecycleEvents(
     qrTouch,
     ctwaReferral,
     sourceFields: resolved,
-    campaignIntakeMatch
+    campaignIntakeMatch,
+    whatsappConnectionSource
   });
 
   if (created) {
@@ -485,7 +505,9 @@ async function locateOrCreateWhatsAppProspect({
   ctwaReferral = null,
   intakeSource = null,
   campaignIntakeMatch = null,
-  senderIdentity = null
+  senderIdentity = null,
+  whatsappConnectionOwnerUserId = null,
+  whatsappConnectionSource = null
 } = {}) {
   const resolvedIdentity =
     senderIdentity ||
@@ -500,12 +522,19 @@ async function locateOrCreateWhatsAppProspect({
       : normalizePhoneNumber(phone);
   const storagePhone = resolvedIdentity.storageKey || resolveStoragePhone(phone);
 
-  const { organizationId, source: organizationSource } =
+  const {
+    organizationId,
+    source: organizationSource,
+    ownerUserId: resolvedOwnerUserId = null
+  } =
     await whatsappInboundOrganizationResolver.resolveWhatsAppInboundOrganizationId({
       phoneNumberId,
       wabaId,
       explicitOrganizationId
     });
+  const connectionOwnerUserId =
+    resolvedOwnerUserId || whatsappConnectionOwnerUserId || null;
+  const connectionSource = organizationSource || whatsappConnectionSource || null;
 
   // Phase 2 — match QR pending_inbound BEFORE create-time assignment.
   const attribution = getAttributionService();
@@ -567,7 +596,9 @@ async function locateOrCreateWhatsAppProspect({
     intakeSource: intakeSource || null,
     campaignIntakeMatch: resolvedCampaignIntakeMatch?.matched
       ? resolvedCampaignIntakeMatch
-      : null
+      : null,
+    whatsappConnectionOwnerUserId: connectionOwnerUserId,
+    whatsappConnectionSource: connectionSource
   };
 
   const sourceFields = resolveCreateSourceFields(qrTouch, origin);
@@ -577,7 +608,8 @@ async function locateOrCreateWhatsAppProspect({
     ctwaReferral: origin.ctwaReferral,
     campaignIntakeMatch: origin.campaignIntakeMatch,
     intakeSource: origin.intakeSource,
-    sourceFields
+    sourceFields,
+    whatsappConnectionSource: origin.whatsappConnectionSource
   });
 
   if (created && !promotion.promote) {
@@ -649,7 +681,8 @@ async function locateOrCreateWhatsAppProspect({
     qrTouch,
     sourceFields,
     ctwaReferral: origin.ctwaReferral,
-    campaignIntakeMatch: origin.campaignIntakeMatch
+    campaignIntakeMatch: origin.campaignIntakeMatch,
+    whatsappConnectionSource: origin.whatsappConnectionSource
   });
 
   if (!created) {
@@ -658,7 +691,8 @@ async function locateOrCreateWhatsAppProspect({
       ctwaReferral: origin.ctwaReferral,
       intakeSource: origin.intakeSource,
       sourceFields,
-      campaignIntakeMatch: origin.campaignIntakeMatch
+      campaignIntakeMatch: origin.campaignIntakeMatch,
+      whatsappConnectionSource: origin.whatsappConnectionSource
     });
     if (eligibilitySource) {
       await persistVerifiedAtlasEligibilitySource(
