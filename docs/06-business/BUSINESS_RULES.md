@@ -2567,12 +2567,12 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Related:** BR-087 (scheduling memory), BR-100 (auth), BR-080 (read-only; no mutation from v2)  
 **Status:** Implemented in Recruit AI v2 engines (execution remains OFF until separately authorized)  
 **Engine target:** `recruitAiV2/schedulingConstraints.js`, `interpreter.js`, `decisionEngine.js`, `contextTurnUpdate.js`, `responseRenderer.js`, `locationFacts.js`  
-**Tests:** `backend/test/recruitAiV2PartialStateAfterTimeBr102.test.js`  
+**Tests:** `backend/test/recruitAiV2PartialStateAfterTimeBr102.test.js`, `backend/test/recruitAiV2PartialLocationFloridaNeedAttention.test.js`  
 **Docs:** `docs/03-engineering/recruit-ai-v2/30_PARTIAL_STATE_AFTER_TIME.md`
 
 ### Rules
 
-1. **State-only partial** — Valid U.S. state/DC while location is pending → `completeness=state_only`, retain state, ask only for city (“¿En qué ciudad de {State} vives?”). Do not discard the state or re-ask city+state.
+1. **State-only partial** — Valid U.S. state/DC while city is unresolved → `completeness=state_only`, retain state, ask only for city (“¿En qué ciudad de {State} vives?”). Last-ask evidence is not required. Do not discard the state, re-ask city+state, escalate, or go silent. Confirmed state does not regress.
 2. **City completes retained state** — After state-only, a compatible city (e.g. `miami` after `florida`) confirms city+state per BR-094 completeness.
 3. **City-only preserved** — Bare city without prior state still uses BR-094 proposal/confirmation (`¿Miami, Florida?`).
 4. **New York** — Bare `New York` is state-only NY; do not invent New York City.

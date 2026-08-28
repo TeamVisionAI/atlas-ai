@@ -677,6 +677,23 @@ function lastQuestionImpliesLocation(context) {
   return /ciudad|estado|city and state|which state|florida\?/.test(lastOut);
 }
 
+/** City is missing or not yet a usable fact (BR-102 location-pending). */
+function isCityUnresolved(context) {
+  const city = context?.knownFacts?.city;
+  const certainty = String(context?.knownFacts?.cityCertainty || "unknown").toLowerCase();
+  return !city || certainty === "unknown";
+}
+
+/** Confirmed state must not be replaced by a later state-only token (BR-102). */
+function retainResolvedState(context, incomingState) {
+  const prior = context?.knownFacts?.state || null;
+  const priorCertainty = String(context?.knownFacts?.stateCertainty || "").toLowerCase();
+  if (prior && priorCertainty === "confirmed") {
+    return prior;
+  }
+  return incomingState || prior || null;
+}
+
 function parseDayPart(text) {
   const t = String(text || "")
     .trim()
@@ -1387,18 +1404,19 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       intent = INTENTS.PROVIDE_LOCATION;
       confidence = 0.9;
       entities.city = context?.knownFacts?.city || null;
-      entities.state = location.state;
+      entities.state = retainResolvedState(context, location.state);
       entities.completeness = "complete";
       entities.requiresClarification = false;
     } else if (
-      // Implements BR-102 — state-only answers while asking city+state (no city yet).
+      // Implements BR-102 — state-only while city is unresolved. Last-ask
+      // evidence is optional; a parseable US state is enough (no city invent).
       location?.completeness === "state_only" &&
-      (locationCtx || lastQuestionImpliesLocation(context))
+      isCityUnresolved(context)
     ) {
       intent = INTENTS.PROVIDE_LOCATION;
       confidence = 0.9;
       entities.city = null;
-      entities.state = location.state;
+      entities.state = retainResolvedState(context, location.state);
       entities.proposedState = null;
       entities.completeness = "state_only";
       entities.requiresClarification = true;
@@ -1464,19 +1482,18 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     }
   }
 
-  // State token alone while awaiting location confirmation.
-  if (intent === INTENTS.UNKNOWN && locationCtx && normalizeStateToken(text)) {
+  // State token alone while city is still unresolved (BR-102). Last-ask optional.
+  if (intent === INTENTS.UNKNOWN && normalizeStateToken(text) && isCityUnresolved(context)) {
     intent = INTENTS.PROVIDE_LOCATION;
     confidence = 0.9;
     if (context?.knownFacts?.city) {
       entities.city = context.knownFacts.city;
-      entities.state = normalizeStateToken(text);
+      entities.state = retainResolvedState(context, normalizeStateToken(text));
       entities.completeness = "complete";
       entities.requiresClarification = false;
     } else {
-      // Implements BR-102 — state-only partial (ask city next).
       entities.city = null;
-      entities.state = normalizeStateToken(text);
+      entities.state = retainResolvedState(context, normalizeStateToken(text));
       entities.completeness = "state_only";
       entities.requiresClarification = true;
     }
