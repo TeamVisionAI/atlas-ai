@@ -16,7 +16,7 @@ Playground regressions after BR-101:
 
 ## Rules
 
-1. **State-only partial** — Valid U.S. state / DC tokens while location is pending → retain `state`, `city=null`, `stateCertainty=partial`, ask city in that state (“¿En qué ciudad de Florida vives?”).
+1. **State-only partial** — Valid U.S. state / DC tokens while city is unresolved → retain `state`, `city=null`, `stateCertainty=partial`, ask city in that state (“¿En qué ciudad de Florida vives?”). Last-ask / last-outbound evidence is optional. Do not escalate or go silent. Confirmed state does not regress.
 2. **City completes state** — After state-only, a city answer that is compatible with the retained state completes `city+state` (e.g. Florida → Miami → Miami, FL).
 3. **City-only unchanged** — Bare `Miami` without prior state still proposes Florida confirmation (BR-094).
 4. **New York** — `New York` alone remains state-only NY; do not invent New York City.

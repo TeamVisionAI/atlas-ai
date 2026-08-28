@@ -64,6 +64,7 @@ const {
 const { READ_STATUS } = require("./schedulingAvailabilityReader");
 const { mergeSchedulingConstraints } = require("../sharedScheduling/schedulingNegotiationState");
 const { applyIulAdDecision } = require("./iulAdConversation");
+const { parseLocationAnswer } = require("./locationFacts");
 
 function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
   if (!Array.isArray(offeredSlots) || offeredSlots.length === 0) {
@@ -435,6 +436,54 @@ function bumpClarification(context, templateKey) {
     lastClarificationTemplateKey: templateKey,
     pendingClarification: templateKey
   };
+}
+
+/**
+ * Implements BR-102 — retain parseable state, ask city only, stay Active.
+ * Confirmed state does not regress to partial or a different code.
+ */
+function applyStateOnlyAskCity(structured, context, interpretation, state) {
+  const priorState = context?.knownFacts?.state || null;
+  const priorConfirmed =
+    Boolean(priorState) &&
+    String(context?.knownFacts?.stateCertainty || "").toLowerCase() === "confirmed";
+  const retainedState = priorConfirmed ? priorState : state || priorState || null;
+
+  structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LOCATION;
+  structured.decision.shouldEscalate = false;
+  structured.reasonCodes.push(REASON_CODES.PARTIAL_LOCATION);
+  structured.reasonCodes.push(REASON_CODES.STATE_ONLY_LOCATION);
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey = "ask_city";
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    city: null,
+    state: retainedState,
+    proposedState: retainedState
+  };
+  structured.contextPatch = {
+    currentStage: STAGES.QUALIFICATION,
+    knownFacts: {
+      city: null,
+      state: retainedState,
+      cityCertainty: "unknown",
+      stateCertainty: priorConfirmed ? "confirmed" : "partial",
+      proposedState: null
+    },
+    conversation: {
+      ...bumpClarification(context, "ask_city"),
+      lastQuestionAsked: "ask_city",
+      lastProspectIntent: interpretation?.intent || INTENTS.PROVIDE_LOCATION
+    },
+    attention: { needsHumanAttention: false, reason: null }
+  };
+  return structured;
+}
+
+function isCityUnresolvedForStateOnly(context) {
+  const city = context?.knownFacts?.city;
+  const certainty = String(context?.knownFacts?.cityCertainty || "unknown").toLowerCase();
+  return !city || certainty === "unknown";
 }
 
 function mergeConversationMetaReset(context) {
@@ -1952,33 +2001,7 @@ function decideConversationTurn({
 
     // Implements BR-102 — state-only partial asks for city in that state.
     if (completeness === "state_only" || (state && !city)) {
-      structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LOCATION;
-      structured.reasonCodes.push(REASON_CODES.PARTIAL_LOCATION);
-      structured.reasonCodes.push(REASON_CODES.STATE_ONLY_LOCATION);
-      structured.customerReplyPlan.acknowledgeRequest = true;
-      structured.customerReplyPlan.templateKey = "ask_city";
-      structured.customerReplyPlan.entities = {
-        ...structured.customerReplyPlan.entities,
-        city: null,
-        state: state || null,
-        proposedState: state || null
-      };
-      structured.contextPatch = {
-        currentStage: STAGES.QUALIFICATION,
-        knownFacts: {
-          city: null,
-          state: state || null,
-          cityCertainty: "unknown",
-          stateCertainty: "partial",
-          proposedState: null
-        },
-        conversation: {
-          ...bumpClarification(context, "ask_city"),
-          lastQuestionAsked: "ask_city",
-          lastProspectIntent: INTENTS.PROVIDE_LOCATION
-        }
-      };
-      return structured;
+      return applyStateOnlyAskCity(structured, context, interpretation, state);
     }
 
     if (completeness === "partial" || (city && !state)) {
@@ -3393,6 +3416,24 @@ function decideConversationTurn({
       currentStage: STAGES.PROPOSED
     };
     return structured;
+  }
+
+  // Implements BR-102 — parseable state-only must never take a silent/escalate
+  // terminal while city is still unresolved.
+  if (intent === INTENTS.UNKNOWN || intent === INTENTS.AMBIGUOUS_FRAGMENT) {
+    const inbound = inboundTextFromInterpretation(interpretation);
+    const parsed = parseLocationAnswer(inbound);
+    if (
+      parsed?.completeness === "state_only" &&
+      isCityUnresolvedForStateOnly(context)
+    ) {
+      return applyStateOnlyAskCity(
+        structured,
+        context,
+        interpretation,
+        parsed.state
+      );
+    }
   }
 
   // Recoverable unknown — clarify first; escalate only after repeats.
