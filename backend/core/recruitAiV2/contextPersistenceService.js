@@ -180,6 +180,65 @@ function rowToContext(row, { canonicalProspectId = null } = {}) {
  * Never let advisory/capture overwrite a confirmed booking back to proposed.
  * Allows intentional reschedule_requested progression. Blocks confirmed → proposed.
  */
+function isResolvedAuthorization(facts = {}) {
+  return (
+    facts.workAuthorization === true ||
+    facts.workAuthorization === false ||
+    String(facts.workAuthorizationStatus || "").toLowerCase() === "authorized" ||
+    String(facts.workAuthorizationStatus || "").toLowerCase() === "not_authorized"
+  );
+}
+
+/**
+ * Implements BR-164 — confirmed qualification / scheduling facts must not regress
+ * unless the inbound patch carries a replacement value.
+ */
+function protectResolvedQualificationFacts(previousContext, nextContext) {
+  if (!previousContext || !nextContext) {
+    return nextContext;
+  }
+  const prevFacts = previousContext.knownFacts || {};
+  const nextFacts = { ...(nextContext.knownFacts || {}) };
+
+  if (prevFacts.city && !nextFacts.city) {
+    nextFacts.city = prevFacts.city;
+    nextFacts.cityCertainty = prevFacts.cityCertainty || nextFacts.cityCertainty;
+  }
+  if (prevFacts.state && !nextFacts.state) {
+    nextFacts.state = prevFacts.state;
+    nextFacts.stateCertainty = prevFacts.stateCertainty || nextFacts.stateCertainty;
+    if (prevFacts.proposedState && !nextFacts.proposedState) {
+      nextFacts.proposedState = prevFacts.proposedState;
+    }
+  }
+  if (isResolvedAuthorization(prevFacts) && !isResolvedAuthorization(nextFacts)) {
+    nextFacts.workAuthorization = prevFacts.workAuthorization;
+    nextFacts.workAuthorizationStatus = prevFacts.workAuthorizationStatus;
+  }
+  if (prevFacts.preferredDayPart && !nextFacts.preferredDayPart) {
+    nextFacts.preferredDayPart = prevFacts.preferredDayPart;
+  }
+  if (prevFacts.availabilityConstraint && !nextFacts.availabilityConstraint) {
+    nextFacts.availabilityConstraint = prevFacts.availabilityConstraint;
+  }
+
+  const {
+    resolveFaqResumeTemplateKeyFromFacts,
+    factsAheadOfLastQuestion
+  } = require("../recruitConversationSequencing");
+  const factResume = resolveFaqResumeTemplateKeyFromFacts(nextFacts);
+  const nextConversation = { ...(nextContext.conversation || {}) };
+  if (factsAheadOfLastQuestion(nextConversation.lastQuestionAsked, factResume)) {
+    nextConversation.lastQuestionAsked = factResume.lastQuestionAsked;
+  }
+
+  return {
+    ...nextContext,
+    knownFacts: nextFacts,
+    conversation: nextConversation
+  };
+}
+
 function protectConfirmedAppointmentFromDowngrade(previousContext, nextContext) {
   const prev = previousContext?.appointment || {};
   const next = nextContext?.appointment || {};
@@ -420,10 +479,24 @@ function createContextPersistenceService({
       channel
     });
 
+    const previous = row ? rowToContext(row, { canonicalProspectId }) : null;
+    const inboundVersion = nextContext?._persistence?.contextVersion;
+    if (
+      row &&
+      inboundVersion != null &&
+      Number(inboundVersion) < Number(row.context_version)
+    ) {
+      const error = new Error("Stale context version cannot overwrite newer facts");
+      error.code = "CONTEXT_STALE_VERSION_DROPPED";
+      error.statusCode = 409;
+      error.current = previous;
+      throw error;
+    }
+
     const sanitized = sanitizeContextForPersistence({
-      ...protectConfirmedAppointmentFromDowngrade(
-        row ? rowToContext(row, { canonicalProspectId }) : null,
-        nextContext
+      ...protectResolvedQualificationFacts(
+        previous,
+        protectConfirmedAppointmentFromDowngrade(previous, nextContext)
       ),
       organizationId,
       prospectId: canonicalProspectId
@@ -630,6 +703,7 @@ module.exports = {
   createContextPersistenceService,
   rowToContext,
   protectConfirmedAppointmentFromDowngrade,
+  protectResolvedQualificationFacts,
   resolvePersistenceIdentityScope,
   findActiveRowByIdentity
 };

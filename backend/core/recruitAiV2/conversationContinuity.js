@@ -157,7 +157,15 @@ function looksLikeJobOverviewQuestion(text) {
     /\btell me more\b/.test(t) ||
     /\bcan you tell me more\b/.test(t) ||
     /\bcan i get more info\b/.test(t) ||
-    /\bmore info on this\b/.test(t)
+    /\bmore info on this\b/.test(t) ||
+    /\bwhat is the work\b/.test(t) ||
+    /\bwhat'?s the work\b/.test(t) ||
+    /\bwhere (would|do|will) i work\b/.test(t) ||
+    /\bwhere (would|do|will) we work\b/.test(t) ||
+    /\bque es el (trabajo|empleo)\b/.test(t) ||
+    /\bcual es el (trabajo|empleo)\b/.test(t) ||
+    /\bdonde (trabajaria|trabajo|trabajare|seria el trabajo)\b/.test(t) ||
+    /\ben donde (seria|seria el|quedo|queda) (el )?trabajo\b/.test(t)
   );
 }
 
@@ -246,7 +254,10 @@ function looksLikeJobOpportunityQuestion(text) {
     /\bis this (part[- ]?time|full[- ]?time)\b/.test(t) ||
     /\bwhat kind of job\b/.test(t) ||
     /\bis this a business opportunity\b/.test(t) ||
-    /\b(que es esto|what is the (job|role|position|opportunity))\b/.test(t) ||
+    /\b(que es esto|what is the (job|role|position|opportunity|work))\b/.test(t) ||
+    /\bwhere (would|do|will) i work\b/.test(t) ||
+    /\bque es el (trabajo|empleo)\b/.test(t) ||
+    /\bdonde (trabajaria|trabajo|trabajare|seria el trabajo)\b/.test(t) ||
     /\btell me more\b/.test(t)
   );
 }

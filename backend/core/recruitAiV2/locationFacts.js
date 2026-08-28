@@ -465,7 +465,10 @@ function isNonLocationPhrase(folded) {
     /^(mañana|manana|hoy|tarde|noche)$/.test(t) ||
     /^(mejor|thanks|thank you|got it|sounds good)$/.test(t) ||
     // Bare Spanish pronoun / conversational "me" is never Maine.
-    /^(me)$/.test(t)
+    /^(me)$/.test(t) ||
+    /\bdonde trabaj/.test(t) ||
+    /\bwhere (would|do|will) i work\b/.test(t) ||
+    /\bwhat is the work\b/.test(t)
   );
 }
 
@@ -491,7 +494,7 @@ function looksLikeConversationalProseCity(text) {
     return true;
   }
   if (
-    /\b(gustaria|quisiera|quiero|saber|consisten|posiciones|disponibles|trabajo|gracias|documento|firmando|escribio|telefono|cargando)\b/.test(
+    /\b(gustaria|quisiera|quiero|saber|consisten|posiciones|disponibles|trabajo|trabajaria|gracias|documento|firmando|escribio|telefono|cargando)\b/.test(
       folded
     )
   ) {

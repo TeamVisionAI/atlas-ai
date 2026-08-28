@@ -249,8 +249,53 @@ function resolveFaqResumeTemplateKeyFromFacts(facts = {}) {
   };
 }
 
+/** Implements BR-164 — lastQuestionAsked must never outrank newer persisted facts. */
+const LAST_QUESTION_RANK = Object.freeze({
+  ask_location: 0,
+  greeting_ask_location: 0,
+  ask_city: 0,
+  ask_state: 0,
+  confirm_location: 0,
+  ask_authorization: 1,
+  continue_qualification_after_location: 1,
+  ask_day_part: 2,
+  ask_day_part_simple: 2,
+  continue_qualification_after_authorization: 2,
+  ask_time_preference: 3,
+  ask_time_after_day_part: 3,
+  ask_time_after_constraint: 3,
+  acknowledge_morning_ask_time: 3,
+  acknowledge_afternoon_ask_time: 3,
+  explain_pending_time: 3,
+  offer_time_choices: 4,
+  confirm_slot: 4,
+  awaiting_availability: 4,
+  clarify_license_type: 99
+});
+
+function lastQuestionRank(key) {
+  return LAST_QUESTION_RANK[String(key || "")] ?? 0;
+}
+
+function factsAheadOfLastQuestion(lastQuestionAsked, factResume) {
+  if (!factResume) {
+    return false;
+  }
+  const lastQ = String(lastQuestionAsked || "");
+  if (lastQ === "clarify_license_type") {
+    return false;
+  }
+  const factRank = Math.max(
+    lastQuestionRank(factResume.lastQuestionAsked),
+    lastQuestionRank(factResume.templateKey)
+  );
+  return factRank > lastQuestionRank(lastQ);
+}
+
 module.exports = {
   composeAnswerThenOneQuestion,
   resolveRecruitFaqAnswer,
-  resolveFaqResumeTemplateKeyFromFacts
+  resolveFaqResumeTemplateKeyFromFacts,
+  lastQuestionRank,
+  factsAheadOfLastQuestion
 };
