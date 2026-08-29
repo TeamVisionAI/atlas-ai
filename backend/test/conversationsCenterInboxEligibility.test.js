@@ -95,6 +95,36 @@ function phonesIn(model) {
   return model.items.map((item) => item.phone);
 }
 
+test("evaluateRecruitingInboxEligibility: historical PERSONAL_WHATSAPP source is not inbox eligible", () => {
+  const {
+    evaluateRecruitingInboxEligibility
+  } = require("../core/conversationsCenter/conversationsCenterInboxEligibility");
+  const result = evaluateRecruitingInboxEligibility(
+    prospect({
+      source: "UNKNOWN",
+      entry_method: "UNATTRIBUTED"
+    }),
+    { atlasEligibilitySource: "PERSONAL_WHATSAPP" }
+  );
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "PERSONAL_WHATSAPP_NOT_ELIGIBLE");
+});
+
+test("evaluateRecruitingInboxEligibility: personal-channel CTWA remains eligible", () => {
+  const {
+    evaluateRecruitingInboxEligibility
+  } = require("../core/conversationsCenter/conversationsCenterInboxEligibility");
+  const result = evaluateRecruitingInboxEligibility(
+    prospect({
+      source: "PERSONAL_WHATSAPP",
+      entry_method: "PERSONAL_WHATSAPP"
+    }),
+    { atlasEligibilitySource: "CTWA_REFERRAL" }
+  );
+  assert.equal(result.eligible, true);
+  assert.equal(result.reason, "VERIFIED_ELIGIBILITY_SOURCE");
+});
+
 test("evaluateRecruitingInboxEligibility: UNKNOWN + UNATTRIBUTED => not eligible", () => {
   const {
     evaluateRecruitingInboxEligibility

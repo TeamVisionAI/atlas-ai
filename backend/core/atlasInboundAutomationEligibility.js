@@ -53,6 +53,41 @@ function isPersonalWhatsAppConnection(source) {
   return String(source || "").trim() === "whatsapp_personal_connection";
 }
 
+function isPersonalWhatsAppOriginMarker(prospect = {}, workflowState = {}) {
+  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  return (
+    upper(wf.atlasEligibilitySource) === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP ||
+    upper(prospect?.entry_method) === WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP ||
+    upper(prospect?.source) === WHATSAPP_SOURCE.PERSONAL_WHATSAPP
+  );
+}
+
+function hasAtlasBusinessEligibilityEvidence(prospect = {}, workflowState = {}) {
+  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  if (wf.atlasAutomationEnabled === true) {
+    return true;
+  }
+  if (VERIFIED_SOURCE_SET.has(upper(wf.atlasEligibilitySource))) {
+    return true;
+  }
+  if (hasQrOrigin({ prospect })) {
+    return true;
+  }
+  const entry = upper(prospect?.entry_method);
+  return (
+    entry === WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP ||
+    hasVerifiedStoredIntakeOrigin(prospect)
+  );
+}
+
+/** Personal connection / historical PERSONAL_WHATSAPP marker without a real Atlas origin. */
+function isOrdinaryPersonalWhatsAppContact(prospect = {}, workflowState = {}) {
+  if (!prospect || !isPersonalWhatsAppOriginMarker(prospect, workflowState)) {
+    return false;
+  }
+  return !hasAtlasBusinessEligibilityEvidence(prospect, workflowState);
+}
+
 function upper(value) {
   return String(value || "").trim().toUpperCase();
 }
@@ -354,5 +389,9 @@ module.exports = {
   persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
   isPersonalWhatsAppConnection,
-  VERIFIED_ATLAS_ELIGIBILITY_SOURCES
+  isPersonalWhatsAppOriginMarker,
+  hasAtlasBusinessEligibilityEvidence,
+  isOrdinaryPersonalWhatsAppContact,
+  VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
+  VERIFIED_SOURCE_SET
 };

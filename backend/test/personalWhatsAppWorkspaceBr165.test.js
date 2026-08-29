@@ -118,15 +118,15 @@ test("org-owned WhatsApp still uses default recruiter", async () => {
   assert.equal(assignment.assignmentSource, ASSIGNMENT_SOURCES.DEFAULT_RECRUITER);
 });
 
-test("personal connection promotes/assigns owner but is not Recruit AI eligible by itself", () => {
+test("personal connection assigns owner but is not promotion or Recruit AI eligibility", () => {
   assert.equal(isPersonalWhatsAppConnection("whatsapp_personal_connection"), true);
   assert.equal(isPersonalWhatsAppConnection("whatsapp_organization_connection"), false);
 
   const promotion = evaluateProspectPromotion({
     whatsappConnectionSource: "whatsapp_personal_connection"
   });
-  assert.equal(promotion.promote, true);
-  assert.equal(promotion.reason, "PERSONAL_WHATSAPP");
+  assert.equal(promotion.promote, false);
+  assert.equal(promotion.reason, "NO_VALID_PROMOTION_SIGNAL");
 
   const eligibility = evaluateAtlasInboundAutomationEligibility({
     prospect: { id: "p1", phone: "+17863061884", organization_id: ORG },

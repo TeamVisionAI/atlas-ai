@@ -6,18 +6,14 @@
 
 const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("./whatsappConstants");
 const {
-  VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
+  VERIFIED_SOURCE_SET,
   hasPositiveCtwaReferral,
   hasFreshRecruitingCampaignIntakeMatch,
   hasFreshIulCampaignIntakeMatch,
-  isPersonalWhatsAppConnection
+  isOrdinaryPersonalWhatsAppContact
 } = require("./atlasInboundAutomationEligibility");
 const { MILESTONES } = require("./workflowConstants");
 const { isIulWorkflowProspect } = require("./iulWorkflowConstants");
-
-const VERIFIED_SOURCE_SET = Object.freeze(
-  new Set(Object.values(VERIFIED_ATLAS_ELIGIBILITY_SOURCES))
-);
 
 /** Stored origins written only by a verified create/convert path. */
 const VERIFIED_PROMOTION_ENTRY_METHODS = Object.freeze(
@@ -26,7 +22,6 @@ const VERIFIED_PROMOTION_ENTRY_METHODS = Object.freeze(
     WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
-    WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
     "QUICK_CAPTURE",
     "MANUAL_CONVERT",
     "MANUAL_CREATE"
@@ -207,15 +202,7 @@ function evaluateProspectPromotion({
     return { promote: true, reason: "EXPLICIT_PROSPECT_CREATE" };
   }
 
-  // Implements BR-165 — user-owned WhatsApp inbound is a promotion signal.
-  // Shared org numbers stay fail-closed (BR-142 / BR-159).
-  if (
-    isPersonalWhatsAppConnection(whatsappConnectionSource) ||
-    upper(sourceFields?.entryMethod) === WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP
-  ) {
-    return { promote: true, reason: "PERSONAL_WHATSAPP" };
-  }
-
+  // Implements BR-159 / BR-165 — personal connection is routing/ownership only.
   return { promote: false, reason: "NO_VALID_PROMOTION_SIGNAL" };
 }
 
@@ -234,6 +221,11 @@ function evaluateOperationalProspectRecord(prospect = null, workflowState = null
 
   const wf = resolveWorkflowState(prospect, workflowState);
   const promotion = resolvePromotionRecord(prospect, wf);
+
+  // Existing ordinary personal-contact rows stay persisted; hide from operational surfaces.
+  if (isOrdinaryPersonalWhatsAppContact(prospect, wf) && promotion?.operational !== true) {
+    return { operational: false, reason: "PERSONAL_WHATSAPP_NOT_ELIGIBLE" };
+  }
 
   if (promotion?.operational === false) {
     return { operational: false, reason: "EXPLICITLY_DEPROMOTED" };
