@@ -528,6 +528,7 @@ export default function OrganizationIntegrations() {
             {translate("configurationOrganizationChannelIntro")}
           </p>
           <WhatsAppIntegrationCard
+            ownershipMode="organization"
             connected={Boolean(orgChannel.whatsapp?.connected)}
             connection={orgChannel.whatsapp?.connection || {}}
             busy={false}

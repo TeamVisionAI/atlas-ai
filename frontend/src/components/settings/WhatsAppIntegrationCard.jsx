@@ -2,13 +2,19 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { appPath } from "../../config/appRoutes";
 import IntegrationCard from "./IntegrationCard";
 import { formatIntegrationDate, formatWebhookStatus } from "../../utils/integrationLifecycle";
+import {
+  OWNERSHIP_ORGANIZATION,
+  OWNERSHIP_PERSONAL,
+  buildWhatsAppConnectHref
+} from "../../engines/whatsappEmbeddedSignupOwnership";
 
 export default function WhatsAppIntegrationCard({
   connected,
   connection = {},
   busy = false,
   disconnecting = false,
-  onDisconnect
+  onDisconnect,
+  ownershipMode = OWNERSHIP_PERSONAL
 }) {
   const { translate, language } = useLanguage();
   const locale = language === "es" ? "es-US" : "en-US";
@@ -48,6 +54,9 @@ export default function WhatsAppIntegrationCard({
       ]
     : [];
 
+  const connectHref = buildWhatsAppConnectHref(appPath("settings/whatsapp"), ownershipMode);
+  const isOrgChannel = ownershipMode === OWNERSHIP_ORGANIZATION;
+
   return (
     <IntegrationCard
       icon="whatsapp"
@@ -57,10 +66,12 @@ export default function WhatsAppIntegrationCard({
       disconnecting={disconnecting}
       detailRows={detailRows}
       connectLabel={translate("whatsappConnectButton")}
-      connectTo={appPath("settings/whatsapp")}
+      connectTo={connectHref}
       disconnectLabel={translate("whatsappIntegrationDisconnect")}
       viewDetailsLabel={translate("whatsappIntegrationViewDetails")}
-      viewDetailsTo={appPath("settings/whatsapp")}
+      viewDetailsTo={connectHref}
+      reconnectLabel={isOrgChannel ? translate("whatsappIntegrationReconnect") : null}
+      reconnectTo={isOrgChannel ? connectHref : null}
       onDisconnect={onDisconnect}
       busy={busy}
     />

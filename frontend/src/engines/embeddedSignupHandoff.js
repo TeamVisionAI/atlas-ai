@@ -19,8 +19,12 @@ export const HANDOFF_MAX_AGE_MS = COMPLETION_TIMEOUT_MS + COMPLETION_EXTENSION_M
 
 let attemptCounter = 0;
 
-export function createEmbeddedSignupAttempt(now = Date.now()) {
+export function createEmbeddedSignupAttempt(now = Date.now(), extras = {}) {
   attemptCounter += 1;
+  const ownershipMode =
+    String(extras?.ownershipMode || "").trim().toLowerCase() === "organization"
+      ? "organization"
+      : "personal";
   return {
     attemptId: `wa-es-${attemptCounter}-${now}`,
     oauthCode: null,
@@ -35,7 +39,8 @@ export function createEmbeddedSignupAttempt(now = Date.now()) {
     timeoutExtended: false,
     timeoutDeadlineAt: null,
     metaFinishReceived: false,
-    oauthReceived: false
+    oauthReceived: false,
+    ownershipMode
   };
 }
 
@@ -156,6 +161,10 @@ export function buildExchangePayload(attempt, redirectUri) {
   if (!attempt?.oauthCode || !attempt?.wabaId) {
     return null;
   }
+  const ownershipMode =
+    String(attempt.ownershipMode || "").trim().toLowerCase() === "organization"
+      ? "organization"
+      : "personal";
   return {
     attemptId: attempt.attemptId,
     code: attempt.oauthCode,
@@ -163,7 +172,8 @@ export function buildExchangePayload(attempt, redirectUri) {
     phoneNumberId: attempt.phoneNumberId || undefined,
     businessId: attempt.businessId || undefined,
     onboardingType: "whatsapp_business_app",
-    redirectUri
+    redirectUri,
+    ownershipMode
   };
 }
 
@@ -331,6 +341,7 @@ export function describeAttemptForTelemetry(attempt) {
   }
   return {
     attemptId: attempt.attemptId,
+    ownershipMode: attempt.ownershipMode === "organization" ? "organization" : "personal",
     hasOAuthCode: Boolean(attempt.oauthCode),
     hasWabaId: Boolean(attempt.wabaId),
     hasPhoneNumberId: Boolean(attempt.phoneNumberId),

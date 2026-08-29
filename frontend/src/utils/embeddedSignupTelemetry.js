@@ -42,7 +42,7 @@ function buildTelemetryContext(attempt, extra = {}) {
   const attemptSnapshot = describeAttemptForTelemetry(attempt);
   return {
     attemptId: attemptSnapshot.attemptId,
-    ownershipMode: extra.ownershipMode || "personal",
+    ownershipMode: extra.ownershipMode || attemptSnapshot.ownershipMode || "personal",
     ...attemptSnapshot,
     ...extra
   };
