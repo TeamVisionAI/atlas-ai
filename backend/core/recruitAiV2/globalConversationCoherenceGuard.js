@@ -34,6 +34,29 @@ const REASONS = Object.freeze({
   GUARD_ERROR: "COHERENCE_GUARD_ERROR"
 });
 
+const SEQUENCED_QUESTION_KEYS = new Set([
+  "ask_location",
+  "greeting_ask_location",
+  "ask_city",
+  "ask_state",
+  "confirm_location",
+  "ask_authorization",
+  "continue_qualification_after_location",
+  "ask_day_part",
+  "ask_day_part_simple",
+  "continue_qualification_after_authorization",
+  "ask_time_preference",
+  "ask_time_after_day_part",
+  "ask_time_after_constraint",
+  "acknowledge_morning_ask_time",
+  "acknowledge_afternoon_ask_time",
+  "explain_pending_time",
+  "offer_time_choices",
+  "confirm_slot",
+  "awaiting_availability",
+  "clarify_license_type"
+]);
+
 function isV2Owned(engineResult = {}) {
   return (
     engineResult?.source === "recruit_ai_v2_live_authoring" ||
@@ -138,13 +161,18 @@ function asksAlreadyResolvedFact(questionKey, latestContext = {}) {
   return false;
 }
 
+/**
+ * Inspect what the turn actually authored, not the post-save nextContext. BR-164
+ * may repair nextContext.lastQuestionAsked during persistence, while rendered
+ * copy from the stale decision is still waiting to be sent.
+ */
 function resolveAuthoredQuestionKey(engineResult = {}) {
   const v2 = engineResult.v2Result || {};
   return (
-    v2.nextContext?.conversation?.lastQuestionAsked ||
     v2.structuredDecision?.contextPatch?.conversation?.lastQuestionAsked ||
-    v2.responsePlan?.templateKey ||
     v2.structuredDecision?.customerReplyPlan?.templateKey ||
+    v2.responsePlan?.templateKey ||
+    v2.nextContext?.conversation?.lastQuestionAsked ||
     null
   );
 }
@@ -206,7 +234,12 @@ function evaluateAgainstLatestContext({
   const factResume = resolveFaqResumeTemplateKeyFromFacts(
     latestContext.knownFacts || {}
   );
-  const rankRegressed = factsAheadOfLastQuestion(questionKey, factResume);
+  // Only apply BR-164's rank comparison to keys that belong to that sequence.
+  // Unknown scheduling/dialogue keys (for example ask_date) must not be treated
+  // as rank 0 and falsely suppressed.
+  const rankRegressed =
+    SEQUENCED_QUESTION_KEYS.has(String(questionKey || "")) &&
+    factsAheadOfLastQuestion(questionKey, factResume);
   const semanticReask = asksAlreadyResolvedFact(questionKey, latestContext);
 
   if (rankRegressed || semanticReask) {
@@ -279,6 +312,7 @@ async function guardOutboundConversationCoherence({
 
 module.exports = {
   REASONS,
+  SEQUENCED_QUESTION_KEYS,
   isV2Owned,
   isResolvedAuthorization,
   asksAlreadyResolvedFact,
