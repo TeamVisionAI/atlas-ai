@@ -70,6 +70,7 @@ const {
 const {
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
+  looksLikeSsnPrivacyObjection,
   looksLikeDriversLicense,
   looksLikeFinancialLicense,
   looksLikeLicenseRequirementQuestion,
@@ -1194,6 +1195,18 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.driversLicense = Boolean(licenseStatement.driversLicense);
       entities.ambiguousLicense = Boolean(licenseStatement.ambiguous);
       entities.requiresClarification = Boolean(licenseStatement.ambiguous);
+    }
+  } else if (looksLikeSsnPrivacyObjection(text) || looksLikeSsnPrivacyObjection(originalText)) {
+    // Implements BR-170 — SSN/privacy outranks in-person preference so we
+    // reassure and keep any same-turn citizenship authorization.
+    intent = INTENTS.SSN_PRIVACY_OBJECTION;
+    confidence = 0.95;
+    entities.ssnPrivacyObjection = true;
+    if (authAnswer === true || authAnswer === false) {
+      entities.workAuthorization = authAnswer;
+    }
+    if (looksLikeInPersonPreference(text) || looksLikeInPersonPreference(originalText)) {
+      entities.appointmentType = "in_person";
     }
   } else if (authAnswer !== null) {
     intent = INTENTS.PROVIDE_AUTHORIZATION;

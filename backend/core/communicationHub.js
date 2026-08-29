@@ -499,6 +499,31 @@ async function processNormalizedInboundMessage(
     // timeout remains fail-closed here.
     if (
       authoringAttempt?.eligible === true &&
+      (authoringAttempt.reason === "V2_HUMAN_REQUIRED_HOLD" ||
+        authoringAttempt.reason === "V2_HUMAN_REQUIRED_HOLD_UNRESOLVED")
+    ) {
+      logWhatsAppStage(
+        authoringAttempt.reason === "V2_HUMAN_REQUIRED_HOLD_UNRESOLVED"
+          ? "recruit_ai_v2_human_required_hold_unresolved_no_qualification"
+          : "recruit_ai_v2_human_required_hold_no_qualification",
+        {
+          phone: normalized.phone,
+          organizationId: prospect.organization_id || prospect.organizationId || null,
+          prospectId: prospect.id || null,
+          providerMessageId: normalized.providerMessageId || null,
+          reason: authoringAttempt.reason
+        }
+      );
+      return {
+        success: true,
+        replied: false,
+        reason: authoringAttempt.reason,
+        authoringReason: authoringAttempt.reason
+      };
+    }
+
+    if (
+      authoringAttempt?.eligible === true &&
       (authoringAttempt.reason === "LIVE_AUTHORING_TIMEOUT" ||
         authoringAttempt.reason === "LIVE_AUTHORING_TECHNICAL_FAILURE")
     ) {

@@ -124,6 +124,10 @@ const COPY = Object.freeze({
     meeting_preference_in_person:
       "Got it — we can do the interview in person. Do you prefer morning or afternoon?",
     meeting_preference_in_person_then_auth: null,
+    ssn_privacy_reassure: null,
+    ssn_privacy_reassure_in_person: null,
+    ssn_privacy_reassure_then_day_part: null,
+    ssn_privacy_reassure_in_person_then_day_part: null,
     meeting_preference_in_person_confirm_slot:
       "Perfect. Does {dateLabel} at {requestedTime} still work for an in-person interview?",
     meeting_preference_in_person_office_confirm_slot:
@@ -278,6 +282,10 @@ const COPY = Object.freeze({
     meeting_preference_in_person:
       "Entendido — podemos hacer la entrevista en persona. ¿Prefieres en la mañana o en la tarde?",
     meeting_preference_in_person_then_auth: null,
+    ssn_privacy_reassure: null,
+    ssn_privacy_reassure_in_person: null,
+    ssn_privacy_reassure_then_day_part: null,
+    ssn_privacy_reassure_in_person_then_day_part: null,
     meeting_preference_in_person_confirm_slot:
       "Perfecto. ¿Te funciona el {dateLabel} a las {requestedTime} para la entrevista en persona?",
     meeting_preference_in_person_office_confirm_slot:
@@ -820,6 +828,24 @@ function renderCustomerReply(responsePlan) {
     const bridge =
       language === LANGUAGES.SPANISH ? "Por cierto" : "By the way";
     template = `${ack} ${bridge}, ${resume}`;
+  } else if (String(key || "").startsWith("ssn_privacy_reassure")) {
+    const ssn =
+      language === LANGUAGES.SPANISH
+        ? "No te pedimos el social ni ningún número de Seguro Social por WhatsApp. Esa información no se pide en este chat."
+        : "We do not ask for your Social Security number over WhatsApp. That is never requested in this chat.";
+    const inPerson = String(key).includes("in_person")
+      ? language === LANGUAGES.SPANISH
+        ? " Podemos hacer la entrevista en persona."
+        : " We can do the interview in person."
+      : "";
+    const dayPart = String(key).includes("day_part")
+      ? ` ${resolveResumeQuestion(
+          "continue_qualification_after_authorization",
+          language,
+          entities
+        )}`
+      : "";
+    template = `${ssn}${inPerson}${dayPart}`.trim();
   } else if (
     key === "meeting_preference_zoom_then_auth" ||
     key === "meeting_preference_in_person_then_auth"
