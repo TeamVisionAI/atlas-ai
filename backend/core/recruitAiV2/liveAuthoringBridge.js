@@ -58,6 +58,47 @@ const STAGES = Object.freeze({
   LATE_RESULT_REJECTED: "recruit_ai_v2_live_authoring_late_result_rejected"
 });
 
+const HUMAN_REQUIRED_HOLD_REASON = "V2_HUMAN_REQUIRED_HOLD";
+const HUMAN_REQUIRED_HOLD_UNRESOLVED_REASON =
+  "V2_HUMAN_REQUIRED_HOLD_UNRESOLVED";
+
+function contextRequiresHumanHold(context) {
+  return Boolean(
+    context &&
+      (context.currentStage === "human_required" ||
+        context.attention?.needsHumanAttention === true)
+  );
+}
+
+function hasExplicitReturnToAtlas(workflowState) {
+  return (
+    Boolean(workflowState?.returnedToAtlasAt) &&
+    workflowState.manualAgentOwnership !== true &&
+    !workflowState.humanTakenOverAt
+  );
+}
+
+function humanRequiredHoldResult({
+  reason,
+  heldContext = null,
+  actingUserId,
+  organizationId
+}) {
+  return {
+    eligible: true,
+    authored: false,
+    fallThrough: false,
+    reason,
+    replyText: null,
+    v2Result: heldContext ? { nextContext: heldContext } : null,
+    actingUserId,
+    organizationId,
+    nextAction: null,
+    allowExecution: false,
+    stage: STAGES.SKIPPED
+  };
+}
+
 /** Extra wait after soft timeout so in-flight processTurn can finish. */
 const POST_TIMEOUT_GRACE_MS = 12000;
 const POST_TIMEOUT_GRACE_MS_ENV =
@@ -903,6 +944,14 @@ async function attemptLiveV2Authoring({
     // Fail soft to legacy id — persistence dual-load still helps when phone is present.
   }
 
+  const workflowState =
+    dependencies.workflowState !== undefined
+      ? dependencies.workflowState
+      : await loadPersistedWorkflowState(prospectPhone, {
+          organizationId,
+          prospectId: canonicalProspectId
+        }).catch(() => null);
+
   const contextInput = buildReconstructionInput(prospect, {
     organizationId,
     prospectId: canonicalProspectId,
@@ -913,10 +962,7 @@ async function attemptLiveV2Authoring({
     conversationGoal: prospect.lead_source?.conversationGoal || prospect.conversationGoal || null,
     campaignKind: prospect.lead_source?.campaignKind || prospect.campaignKind || null,
     leadSource: prospect.lead_source || prospect.leadSource || null,
-    workflowState: await loadPersistedWorkflowState(prospectPhone, {
-      organizationId,
-      prospectId: canonicalProspectId
-    }).catch(() => null),
+    workflowState,
     campaignIntakePurpose:
       normalized.campaignIntakeMatch?.purpose ||
       null
@@ -932,26 +978,44 @@ async function attemptLiveV2Authoring({
       ensureCore: false
     });
     if (
-      heldContext &&
-      (heldContext.currentStage === "human_required" ||
-        heldContext.attention?.needsHumanAttention === true)
+      contextRequiresHumanHold(heldContext) &&
+      !hasExplicitReturnToAtlas(workflowState)
     ) {
-      return {
-        eligible: true,
-        authored: false,
-        fallThrough: false,
-        reason: "V2_HUMAN_REQUIRED_HOLD",
-        replyText: null,
-        v2Result: { nextContext: heldContext },
+      if (typeof logStage === "function") {
+        logStage("recruit_ai_v2_human_required_hold_no_qualification", {
+          phone: prospectPhone,
+          organizationId,
+          prospectId: canonicalProspectId,
+          providerMessageId: normalized.providerMessageId || null,
+          reason: HUMAN_REQUIRED_HOLD_REASON
+        });
+      }
+      return humanRequiredHoldResult({
+        reason: HUMAN_REQUIRED_HOLD_REASON,
+        heldContext,
         actingUserId,
-        organizationId,
-        nextAction: null,
-        allowExecution: false,
-        stage: STAGES.SKIPPED
-      };
+        organizationId
+      });
     }
-  } catch {
-    // Fail open to normal authoring if the hold snapshot cannot be read.
+  } catch (error) {
+    // Implements BR-170 — cannot prove the thread is not in HUMAN_REQUIRED.
+    // Fail closed for this turn only; do not author or fall through to CE.
+    if (typeof logStage === "function") {
+      logStage("recruit_ai_v2_human_required_hold_unresolved_no_qualification", {
+        phone: prospectPhone,
+        organizationId,
+        prospectId: canonicalProspectId,
+        providerMessageId: normalized.providerMessageId || null,
+        reason: HUMAN_REQUIRED_HOLD_UNRESOLVED_REASON,
+        code: error?.code || null,
+        message: error?.message || "HOLD_CONTEXT_UNAVAILABLE"
+      });
+    }
+    return humanRequiredHoldResult({
+      reason: HUMAN_REQUIRED_HOLD_UNRESOLVED_REASON,
+      actingUserId,
+      organizationId
+    });
   }
 
   try {
@@ -1258,5 +1322,7 @@ module.exports = {
   isEligibleForLiveAuthoring,
   resolveActingUserIdFromProspect,
   resolveLiveAuthoringConfig: require("./liveAuthoringConfig").resolveLiveAuthoringConfig,
-  isLiveAuthoringFlagEnabled: require("./liveAuthoringConfig").isLiveAuthoringFlagEnabled
+  isLiveAuthoringFlagEnabled: require("./liveAuthoringConfig").isLiveAuthoringFlagEnabled,
+  HUMAN_REQUIRED_HOLD_REASON,
+  HUMAN_REQUIRED_HOLD_UNRESOLVED_REASON
 };

@@ -2481,7 +2481,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 3. **No re-ask** — Once `workAuthorization` / `workAuthorizationStatus` is authorized or not-authorized, do not ask work authorization again unless the prospect explicitly contradicts it. BR-166 still suppresses a residual re-ask against durable facts.
 4. **SSN/privacy** — `no pienso darle mi social` and similar objections do not erase a resolved eligibility fact. Atlas must explicitly say SSN is not requested over WhatsApp.
 5. **In-person is scheduling** — Preferring an in-person interview is a meeting preference, not qualification uncertainty, and must not by itself reopen work authorization.
-6. **Handoff hold** — After V2 `safe_uncertain_escalate` / `HUMAN_REQUIRED`, do not continue automated qualification until TAKE OVER is returned to Atlas. Do not fall through to legacy CE for that hold.
+6. **Handoff hold** — After V2 `safe_uncertain_escalate` / `HUMAN_REQUIRED`, do not continue automated qualification until TAKE OVER is returned to Atlas. Do not fall through to legacy CE for that hold. If the hold snapshot cannot be read, fail closed for that turn (`V2_HUMAN_REQUIRED_HOLD_UNRESOLVED`) — do not resume qualification. Explicit Return to Atlas still resumes.
 7. **No tenant/user exceptions** — Same rules for every V2-eligible user, including Niovel and Misleisys.
 8. **Boundaries** — Do not special-case a prospect or phone. Do not change WhatsApp privacy, campaign eligibility, TAKE OVER write rules, or live execution path.
 

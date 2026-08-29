@@ -193,17 +193,21 @@ test("no soy ciudadana remains not authorized while auth is pending", () => {
   );
 });
 
-test("HUMAN_REQUIRED hold does not continue automated qualification", async () => {
-  const { attemptLiveV2Authoring } = require("../core/recruitAiV2/liveAuthoringBridge");
+function holdAuthoringArgs({
+  processed,
+  loadContext,
+  workflowState = null,
+  logStage = null,
+  providerMessageId = "wamid.br170-hold"
+} = {}) {
   const orgId = "00000000-0000-4000-8000-000000000001";
   const userId = "33ad243a-9d00-4a4d-810b-df2762c0f076";
-  let processed = 0;
-  const attempt = await attemptLiveV2Authoring({
+  return {
     normalized: {
       phone: "+15555550199",
       text: PHRASES.inPersonOk,
       channel: "whatsapp",
-      providerMessageId: "wamid.br170-hold"
+      providerMessageId
     },
     prospect: {
       id: "prospect-br170-hold",
@@ -217,12 +221,39 @@ test("HUMAN_REQUIRED hold does not continue automated qualification", async () =
       RECRUIT_AI_V2_LIVE_AUTHORING_USER_IDS: userId,
       RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED: "false"
     },
-    dependencies: { v2Grant: { tenantSuspended: false } },
+    dependencies: {
+      v2Grant: { tenantSuspended: false },
+      workflowState
+    },
+    logStage,
     processTurn: async () => {
-      processed += 1;
-      return { rendered: { text: "should not author after handoff" } };
+      processed.count += 1;
+      return {
+        rendered: {
+          text: "¿Tienes permiso de trabajo o documentación legal para trabajar en Estados Unidos?"
+        },
+        structuredDecision: {
+          decision: { nextAction: "continue_qualification" }
+        }
+      };
     },
     persistenceService: {
+      loadContext,
+      loadOrReconstruct: async () => ({
+        context: { organizationId: orgId, prospectId: "prospect-br170-hold" },
+        source: "reconstructed"
+      }),
+      compareAndSaveContext: async () => ({ ok: true })
+    }
+  };
+}
+
+test("HUMAN_REQUIRED hold does not continue automated qualification", async () => {
+  const { attemptLiveV2Authoring } = require("../core/recruitAiV2/liveAuthoringBridge");
+  const processed = { count: 0 };
+  const attempt = await attemptLiveV2Authoring(
+    holdAuthoringArgs({
+      processed,
       loadContext: async () => ({
         currentStage: "human_required",
         attention: {
@@ -231,12 +262,102 @@ test("HUMAN_REQUIRED hold does not continue automated qualification", async () =
         },
         knownFacts: { city: "Davie", state: "FL", workAuthorization: true }
       })
-    }
-  });
-  assert.equal(processed, 0);
+    })
+  );
+  assert.equal(processed.count, 0);
   assert.equal(attempt.reason, "V2_HUMAN_REQUIRED_HOLD");
   assert.equal(attempt.authored, false);
   assert.equal(attempt.fallThrough, false);
+  assert.equal(attempt.replyText, null);
+});
+
+test("hold context-read failure cannot produce another qualification message", async () => {
+  const {
+    attemptLiveV2Authoring,
+    HUMAN_REQUIRED_HOLD_UNRESOLVED_REASON
+  } = require("../core/recruitAiV2/liveAuthoringBridge");
+  const processed = { count: 0 };
+  const stages = [];
+  const attempt = await attemptLiveV2Authoring(
+    holdAuthoringArgs({
+      processed,
+      providerMessageId: "wamid.br170-hold-unresolved",
+      logStage: (stage, details) => stages.push({ stage, details }),
+      loadContext: async () => {
+        const error = new Error("HOLD_CONTEXT_UNAVAILABLE");
+        error.code = "HOLD_CONTEXT_UNAVAILABLE";
+        throw error;
+      }
+    })
+  );
+  assert.equal(processed.count, 0);
+  assert.equal(attempt.reason, HUMAN_REQUIRED_HOLD_UNRESOLVED_REASON);
+  assert.equal(attempt.authored, false);
+  assert.equal(attempt.fallThrough, false);
+  assert.equal(attempt.replyText, null);
+  assert.doesNotMatch(String(attempt.replyText || ""), /permiso de trabajo/i);
+  assert.ok(
+    stages.some(
+      (row) =>
+        row.stage ===
+          "recruit_ai_v2_human_required_hold_unresolved_no_qualification" &&
+        row.details?.reason === HUMAN_REQUIRED_HOLD_UNRESOLVED_REASON
+    )
+  );
+
+  const hub = fs.readFileSync(
+    path.join(__dirname, "../core/communicationHub.js"),
+    "utf8"
+  );
+  assert.match(hub, /V2_HUMAN_REQUIRED_HOLD_UNRESOLVED/);
+  assert.match(hub, /recruit_ai_v2_human_required_hold_unresolved_no_qualification/);
+});
+
+test("missing context row is not a generic hold suppression", async () => {
+  const { attemptLiveV2Authoring } = require("../core/recruitAiV2/liveAuthoringBridge");
+  const processed = { count: 0 };
+  const attempt = await attemptLiveV2Authoring(
+    holdAuthoringArgs({
+      processed,
+      providerMessageId: "wamid.br170-no-context-row",
+      loadContext: async () => null
+    })
+  );
+  assert.equal(processed.count, 1);
+  assert.equal(attempt.authored, true);
+  assert.notEqual(attempt.reason, "V2_HUMAN_REQUIRED_HOLD");
+  assert.notEqual(attempt.reason, "V2_HUMAN_REQUIRED_HOLD_UNRESOLVED");
+});
+
+test("Return to Atlas still resumes normally after HUMAN_REQUIRED", async () => {
+  const { attemptLiveV2Authoring } = require("../core/recruitAiV2/liveAuthoringBridge");
+  const processed = { count: 0 };
+  const attempt = await attemptLiveV2Authoring(
+    holdAuthoringArgs({
+      processed,
+      providerMessageId: "wamid.br170-return-to-atlas",
+      workflowState: {
+        workflowOwnership: "ATLAS",
+        needsHumanAttention: false,
+        manualAgentOwnership: false,
+        humanTakenOverAt: null,
+        returnedToAtlasAt: "2026-08-29T20:00:00.000Z"
+      },
+      loadContext: async () => ({
+        currentStage: "human_required",
+        attention: {
+          needsHumanAttention: true,
+          reason: "repeated_clarification_ambiguity"
+        },
+        knownFacts: { city: "Davie", state: "FL", workAuthorization: true }
+      })
+    })
+  );
+  assert.equal(processed.count, 1);
+  assert.equal(attempt.authored, true);
+  assert.equal(attempt.fallThrough, false);
+  assert.notEqual(attempt.reason, "V2_HUMAN_REQUIRED_HOLD");
+  assert.notEqual(attempt.reason, "V2_HUMAN_REQUIRED_HOLD_UNRESOLVED");
 });
 
 test("fix is systemic: no prospect, phone, or user special-case", () => {
