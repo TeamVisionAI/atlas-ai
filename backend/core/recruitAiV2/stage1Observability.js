@@ -24,6 +24,10 @@ const EVENTS = Object.freeze({
     "recruit_ai_v2.mismatch.active_unconfirmed_durable",
   CE_FALLTHROUGH_AFTER_V2_OWNERSHIP:
     "recruit_ai_v2.ce_fallthrough.after_v2_ownership",
+  LIVE_AUTHORING_LATE_RESULT_RECOVERED:
+    "recruit_ai_v2.live_authoring.late_result_recovered",
+  LIVE_AUTHORING_LATE_RESULT_REJECTED:
+    "recruit_ai_v2.live_authoring.late_result_rejected",
   CALENDAR_CREATE_FAILED: "recruit_ai_v2.calendar.create_failed",
   CALENDAR_ROLLBACK_FAILED: "recruit_ai_v2.calendar.rollback_failed",
   EXECUTION_AUTHZ_DENIED: "recruit_ai_v2.execution.authz_denied",

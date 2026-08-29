@@ -40,6 +40,10 @@ const {
 const { renderCustomerReply } = require("./responseRenderer");
 const { APPOINTMENT_STATUS } = require("./conversationContext");
 const { loadPersistedWorkflowState } = require("../workflowStateStore");
+const {
+  LATE_RESULT_REASONS,
+  classifyLateSettledV2Result
+} = require("./lateSettledAuthoringResult");
 
 const STAGES = Object.freeze({
   ATTEMPTED: "recruit_ai_v2_live_authoring_attempted",
@@ -48,11 +52,76 @@ const STAGES = Object.freeze({
   SKIPPED: "recruit_ai_v2_live_authoring_skipped",
   OWNED_AFTER_MUTATION: "recruit_ai_v2_live_authoring_owned_after_mutation",
   // Implements BR-126 — protect confirmable proposed from CE fallthrough.
-  OWNED_CONFIRMABLE_PROPOSAL: "recruit_ai_v2_live_authoring_owned_confirmable_proposal"
+  OWNED_CONFIRMABLE_PROPOSAL: "recruit_ai_v2_live_authoring_owned_confirmable_proposal",
+  // Implements BR-168 — late-settled conversational reply after soft timeout.
+  LATE_RESULT_RECOVERED: "recruit_ai_v2_live_authoring_late_result_recovered",
+  LATE_RESULT_REJECTED: "recruit_ai_v2_live_authoring_late_result_rejected"
 });
 
-/** Extra wait after soft timeout so in-flight mission creates can finish ownership. */
+/** Extra wait after soft timeout so in-flight processTurn can finish. */
 const POST_TIMEOUT_GRACE_MS = 12000;
+const POST_TIMEOUT_GRACE_MS_ENV =
+  "RECRUIT_AI_V2_LIVE_AUTHORING_POST_TIMEOUT_GRACE_MS";
+
+function resolvePostTimeoutGraceMs(env = process.env) {
+  const raw = env?.[POST_TIMEOUT_GRACE_MS_ENV];
+  if (raw == null || raw === "") {
+    return POST_TIMEOUT_GRACE_MS;
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > 60000) {
+    return POST_TIMEOUT_GRACE_MS;
+  }
+  return Math.floor(n);
+}
+
+async function awaitLateTrackedResult(error, env = process.env) {
+  if (!error) {
+    return { late: null, reason: LATE_RESULT_REASONS.UNRESOLVED };
+  }
+
+  if (typeof error.awaitTracked === "function") {
+    try {
+      const late = await Promise.race([
+        error.awaitTracked(),
+        new Promise((_, reject) => {
+          const timeoutError = new Error("POST_TIMEOUT_GRACE_EXCEEDED");
+          timeoutError.code = "POST_TIMEOUT_GRACE_EXCEEDED";
+          setTimeout(
+            () => reject(timeoutError),
+            resolvePostTimeoutGraceMs(env)
+          );
+        })
+      ]);
+      return { late, reason: null };
+    } catch (waitError) {
+      const snapshot =
+        typeof error.getLateResult === "function" ? error.getLateResult() : null;
+      if (snapshot) {
+        return { late: snapshot, reason: null };
+      }
+      if (waitError?.code === "CONTEXT_VERSION_CONFLICT") {
+        return { late: null, reason: LATE_RESULT_REASONS.CONFLICTED };
+      }
+      if (
+        waitError?.code === "POST_TIMEOUT_GRACE_EXCEEDED" ||
+        waitError?.message === "POST_TIMEOUT_GRACE_EXCEEDED"
+      ) {
+        return { late: null, reason: LATE_RESULT_REASONS.UNRESOLVED };
+      }
+      return { late: null, reason: LATE_RESULT_REASONS.FAILED };
+    }
+  }
+
+  if (typeof error.getLateResult === "function") {
+    const snapshot = error.getLateResult();
+    return snapshot
+      ? { late: snapshot, reason: null }
+      : { late: null, reason: LATE_RESULT_REASONS.UNRESOLVED };
+  }
+
+  return { late: null, reason: LATE_RESULT_REASONS.UNRESOLVED };
+}
 
 function resolveSupabaseClient() {
   try {
@@ -116,7 +185,8 @@ async function reclaimOwnershipAfterAuthoringLoss({
   allowExecution = false,
   persistence = null,
   findActiveAppointment = null,
-  logStage = null
+  logStage = null,
+  env = process.env
 } = {}) {
   let EVENTS = null;
   let emitRecruitAiV2Signal = () => false;
@@ -131,19 +201,8 @@ async function reclaimOwnershipAfterAuthoringLoss({
   }
 
   let late = v2Result;
-  if (!late && typeof error?.awaitTracked === "function") {
-    try {
-      late = await Promise.race([
-        error.awaitTracked(),
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("POST_TIMEOUT_GRACE_EXCEEDED")), POST_TIMEOUT_GRACE_MS);
-        })
-      ]);
-    } catch {
-      late = typeof error.getLateResult === "function" ? error.getLateResult() : null;
-    }
-  } else if (!late && typeof error?.getLateResult === "function") {
-    late = error.getLateResult();
+  if (!late) {
+    late = (await awaitLateTrackedResult(error, env)).late;
   }
 
   const proposedDate =
@@ -453,22 +512,12 @@ async function ownConfirmableProposalAfterAuthoringLoss({
   actingUserId = null,
   allowExecution = false,
   persistence = null,
-  logStage = null
+  logStage = null,
+  env = process.env
 } = {}) {
   let late = v2Result;
-  if (!late && typeof error?.awaitTracked === "function") {
-    try {
-      late = await Promise.race([
-        error.awaitTracked(),
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("POST_TIMEOUT_GRACE_EXCEEDED")), POST_TIMEOUT_GRACE_MS);
-        })
-      ]);
-    } catch {
-      late = typeof error.getLateResult === "function" ? error.getLateResult() : null;
-    }
-  } else if (!late && typeof error?.getLateResult === "function") {
-    late = error.getLateResult();
+  if (!late) {
+    late = (await awaitLateTrackedResult(error, env)).late;
   }
 
   const durable = await loadDurableForConfirmableGuard({
@@ -612,6 +661,130 @@ function extractAuthoredReplyText(v2Result) {
     return "";
   }
   return text;
+}
+
+function emitLateResultSignal(event, fields, logStage) {
+  try {
+    const { EVENTS, emitRecruitAiV2Signal } = require("./stage1Observability");
+    emitRecruitAiV2Signal(event || EVENTS.LIVE_AUTHORING_LATE_RESULT_REJECTED, fields, {
+      logStage
+    });
+  } catch {
+    // Telemetry optional.
+  }
+}
+
+/**
+ * Implements BR-168 — after LIVE_AUTHORING_TIMEOUT, recover a late-settled
+ * conversational V2 reply. Mutation turns stay with BR-125 / BR-126.
+ */
+async function recoverLateSettledAuthoringReply({
+  error = null,
+  prospect = {},
+  normalized = {},
+  organizationId = null,
+  actingUserId = null,
+  allowExecution = false,
+  env = process.env,
+  logStage = null
+} = {}) {
+  const awaited = await awaitLateTrackedResult(error, env);
+  const classification = awaited.late
+    ? classifyLateSettledV2Result(awaited.late, extractAuthoredReplyText)
+    : {
+        recoverable: false,
+        reason: awaited.reason || LATE_RESULT_REASONS.UNRESOLVED,
+        replyText: null,
+        nextAction: null
+      };
+
+  const phone = normalized.phone || prospect.phone || null;
+  const prospectId =
+    awaited.late?.nextContext?.prospectId ||
+    awaited.late?.context?.prospectId ||
+    prospect.id ||
+    null;
+  const nextAction = classification.nextAction || null;
+
+  if (!classification.recoverable || !classification.replyText) {
+    if (typeof logStage === "function") {
+      logStage(STAGES.LATE_RESULT_REJECTED, {
+        level: "info",
+        phone,
+        organizationId,
+        agentId: actingUserId,
+        prospectId,
+        providerMessageId: normalized.providerMessageId || null,
+        reason: classification.reason,
+        nextAction
+      });
+    }
+  emitLateResultSignal(
+    require("./stage1Observability").EVENTS.LIVE_AUTHORING_LATE_RESULT_REJECTED,
+      {
+        organizationId,
+        agentId: actingUserId,
+        prospectId,
+        phone,
+        decisionCode: nextAction,
+        correlationId: normalized.providerMessageId || null,
+        allowExecution,
+        reasonCodes: [classification.reason],
+        outcome: "rejected",
+        detail: classification.reason
+      },
+      logStage
+    );
+    return {
+      authored: false,
+      reason: classification.reason,
+      v2Result: awaited.late || null,
+      nextAction
+    };
+  }
+
+  if (typeof logStage === "function") {
+    logStage(STAGES.LATE_RESULT_RECOVERED, {
+      phone,
+      organizationId,
+      agentId: actingUserId,
+      prospectId,
+      providerMessageId: normalized.providerMessageId || null,
+      reason: classification.reason,
+      nextAction
+    });
+  }
+  emitLateResultSignal(
+    require("./stage1Observability").EVENTS.LIVE_AUTHORING_LATE_RESULT_RECOVERED,
+    {
+      organizationId,
+      agentId: actingUserId,
+      prospectId,
+      phone,
+      decisionCode: nextAction,
+      correlationId: normalized.providerMessageId || null,
+      allowExecution,
+      reasonCodes: [classification.reason],
+      outcome: "recovered",
+      detail: "LIVE_AUTHORING_LATE_RESULT_RECOVERED"
+    },
+    logStage
+  );
+
+  return {
+    eligible: true,
+    authored: true,
+    fallThrough: false,
+    reason: "LIVE_AUTHORING_LATE_RESULT_RECOVERED",
+    replyText: classification.replyText,
+    v2Result: awaited.late,
+    actingUserId,
+    organizationId,
+    nextAction,
+    allowExecution,
+    stage: STAGES.LATE_RESULT_RECOVERED,
+    lateResultReason: classification.reason
+  };
 }
 
 /**
@@ -841,7 +1014,8 @@ async function attemptLiveV2Authoring({
         allowExecution,
         persistence,
         findActiveAppointment: dependencies.findActiveAppointmentForProspect,
-        logStage
+        logStage,
+        env
       });
       if (protectedReply) {
         return protectedReply;
@@ -933,10 +1107,30 @@ async function attemptLiveV2Authoring({
       allowExecution,
       persistence,
       findActiveAppointment: dependencies.findActiveAppointmentForProspect,
-      logStage
+      logStage,
+      env
     });
     if (protectedReply) {
       return protectedReply;
+    }
+
+    // Implements BR-168 — recover a late-settled safe conversational reply
+    // instead of BR-167 silence when processTurn finished after the 8s budget.
+    let lateRecovered = null;
+    if (reason === "LIVE_AUTHORING_TIMEOUT") {
+      lateRecovered = await recoverLateSettledAuthoringReply({
+        error,
+        prospect,
+        normalized,
+        organizationId,
+        actingUserId,
+        allowExecution,
+        env,
+        logStage
+      });
+      if (lateRecovered?.authored && lateRecovered.replyText) {
+        return lateRecovered;
+      }
     }
 
     if (typeof logStage === "function") {
@@ -984,21 +1178,27 @@ async function attemptLiveV2Authoring({
       fallThrough: true,
       reason,
       replyText: null,
-      v2Result: null,
+      v2Result: lateRecovered?.v2Result || null,
       actingUserId,
       organizationId,
-      nextAction: null,
+      nextAction: lateRecovered?.nextAction || null,
       allowExecution,
-      stage: STAGES.FALLBACK
+      stage: STAGES.FALLBACK,
+      lateResultReason: lateRecovered?.reason || null
     };
   }
 }
 
 module.exports = {
   STAGES,
+  POST_TIMEOUT_GRACE_MS,
+  POST_TIMEOUT_GRACE_MS_ENV,
   attemptLiveV2Authoring,
   extractAuthoredReplyText,
   withTimeout,
+  awaitLateTrackedResult,
+  recoverLateSettledAuthoringReply,
+  resolvePostTimeoutGraceMs,
   reclaimOwnershipAfterAuthoringLoss,
   ownConfirmableProposalAfterAuthoringLoss,
   reclaimOrProtectConfirmableProposal,
