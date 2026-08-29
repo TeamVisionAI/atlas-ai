@@ -67,6 +67,7 @@ const {
   normalizeInboundText,
   normalizeIntentText
 } = require("./inputNormalization");
+const { looksLikeRescheduleRequest } = require("./rescheduleRequestFacts");
 const {
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
@@ -654,12 +655,6 @@ function shouldTreatAsDateOnlyProposal(schedule, text, context) {
   return true;
 }
 
-function looksLikeRescheduleRequest(text) {
-  return /\b(reschedule|reprogram|change (the )?(time|appointment|it)|can we change|cambiar (la )?hora|podemos cambiar)\b/i.test(
-    String(text || "")
-  );
-}
-
 function lastQuestionImpliesDayPart(context) {
   return continuityImpliesDayPart(context);
 }
@@ -877,8 +872,18 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     !hasTimeEntity &&
     !needsAmPmClarification &&
     shouldTreatAsDateOnlyProposal(schedule, text, context);
-  const dateCandidateHint =
+  let dateCandidateHint =
     schedule?.dayHint || (dateOnlyProposal ? extractDateCandidateHint(text) : null);
+  if (
+    !dateCandidateHint &&
+    (looksLikeRescheduleRequest(text, context) ||
+      looksLikeRescheduleRequest(originalText, context))
+  ) {
+    // Implements BR-171 — "reprogramar para el lunes" still carries a day even
+    // when the utterance is not classified as a date-only booking.
+    dateCandidateHint =
+      extractDateCandidateHint(text) || extractDateCandidateHint(originalText);
+  }
   const dateExclusions = parseDateExclusions(text);
   const resolvedDate = dateCandidateHint
     ? resolveDateCandidate(dateCandidateHint, {
@@ -1217,11 +1222,13 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.puertoRicoOrigin = true;
     }
   } else if (
-    looksLikeRescheduleRequest(text) ||
-    (isConfirmed && looksLikeRescheduleRequest(text))
+    looksLikeRescheduleRequest(text, context) ||
+    looksLikeRescheduleRequest(originalText, context)
   ) {
+    // Implements BR-171 — reprogramar / move-the-interview outranks date-only
+    // booking so an existing appointment is not treated as a new create.
     intent = INTENTS.RESCHEDULE_REQUEST;
-    confidence = 0.88;
+    confidence = 0.92;
   } else if (looksLikeZoomPreference(text)) {
     intent = INTENTS.PROVIDE_MEETING_PREFERENCE;
     confidence = 0.9;
@@ -1596,6 +1603,7 @@ module.exports = {
   looksLikeWorkAuthorizationAnswer,
   looksLikeExplicitLanguageSwitch,
   looksLikePuertoRicoOriginStatement,
+  looksLikeRescheduleRequest,
   looksLikeFixedEmploymentPreference,
   looksLikeCurrentJobSearchFocus,
   lastQuestionImpliesDate,

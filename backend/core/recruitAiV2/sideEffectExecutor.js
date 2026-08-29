@@ -4,8 +4,9 @@
  * Translates an authorized v2 action into a canonical Atlas application service call.
  * Does NOT own appointment lifecycle, Calendar, WhatsApp, or prospect writes.
  *
- * First canary surface: confirmed create_appointment only →
- * missionExecutionApplicationService.executeScheduleInterview (BR-049 / BR-050).
+ * Executable surfaces:
+ * - create_appointment → missionExecutionApplicationService.executeScheduleInterview
+ * - reschedule_appointment → appointmentApplicationService.rescheduleAppointment (BR-171)
  */
 
 const { REASON_CODES, V2_EXECUTABLE_ACTIONS } = require("./constants");
@@ -243,6 +244,288 @@ function finishCreateResult(result, base, extras = {}) {
   return result;
 }
 
+function filterActiveAppointments(items = []) {
+  return (Array.isArray(items) ? items : []).filter(isActiveAppointment);
+}
+
+async function resolveRescheduleTargetAppointment({
+  context,
+  options,
+  organizationId,
+  agentId,
+  phone,
+  dependencies
+}) {
+  const prospectId = context?.prospectId || options?.prospectId || null;
+  const contextAppointmentId = context?.appointment?.appointmentId || null;
+  const findById =
+    dependencies.findAppointmentById ||
+    ((id, orgId) =>
+      require("../activeAppointmentResolver").findAppointmentById(id, orgId));
+  const listActive =
+    dependencies.listActiveAppointmentsForProspect ||
+    (async (phoneArg, orgId, agent) => {
+      const { listPersistedAppointments } = require("../../services/appointmentListService");
+      const filters = { organizationId: orgId, prospectPhone: phoneArg };
+      if (agent) {
+        filters.agentId = agent;
+      }
+      const result = await listPersistedAppointments(filters);
+      return filterActiveAppointments(result?.items);
+    });
+
+  if (contextAppointmentId) {
+    const found = await findById(contextAppointmentId, organizationId);
+    if (!found?.id) {
+      return { appointment: null, reason: REASON_CODES.EXECUTION_AMBIGUOUS_APPOINTMENT };
+    }
+    const foundOrg = found.organizationId || found.organization_id || null;
+    if (foundOrg && foundOrg !== organizationId) {
+      return { appointment: null, reason: REASON_CODES.EXECUTION_AMBIGUOUS_APPOINTMENT };
+    }
+    if (prospectId && !appointmentMatchesProspectIdentity(found, prospectId)) {
+      return { appointment: null, reason: REASON_CODES.EXECUTION_AMBIGUOUS_APPOINTMENT };
+    }
+    if (!isActiveAppointment(found)) {
+      return { appointment: null, reason: REASON_CODES.EXECUTION_AMBIGUOUS_APPOINTMENT };
+    }
+    return { appointment: found, reason: null };
+  }
+
+  const actives = await listActive(phone, organizationId, agentId);
+  if (!Array.isArray(actives) || actives.length !== 1) {
+    return { appointment: null, reason: REASON_CODES.EXECUTION_AMBIGUOUS_APPOINTMENT };
+  }
+  return { appointment: actives[0], reason: null };
+}
+
+async function executeAuthorizedReschedule({
+  authorization,
+  structuredDecision,
+  context,
+  options,
+  dependencies,
+  performed,
+  failed,
+  skipped
+}) {
+  const organizationId = authorization.organizationId || context?.organizationId || null;
+  const agentId = authorization.actingUserId || null;
+  const phone = resolveProspectPhone({ context, options });
+  const { dateKey, timeKey } = resolveConfirmedSlot({ context, structuredDecision });
+  const inboundMessageId = options.inboundMessageId || options.messageId || null;
+  const base = telemetryBase({
+    authorization,
+    structuredDecision,
+    context,
+    options,
+    phone
+  });
+
+  if (!organizationId || !agentId || !dateKey || !timeKey) {
+    failed.push({
+      type: V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT,
+      reason: REASON_CODES.EXECUTION_DENIED,
+      detail: "missing_execution_scope_or_slot"
+    });
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_DENIED
+      },
+      base,
+      { detail: "missing_execution_scope_or_slot" }
+    );
+  }
+
+  let target;
+  try {
+    target = await resolveRescheduleTargetAppointment({
+      context,
+      options,
+      organizationId,
+      agentId,
+      phone,
+      dependencies
+    });
+  } catch {
+    failed.push({
+      type: V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT,
+      reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
+      detail: "active_appointment_lookup_failed"
+    });
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_CANONICAL_FAILED
+      },
+      base,
+      { detail: "active_appointment_lookup_failed" }
+    );
+  }
+
+  if (!target?.appointment?.id) {
+    failed.push({
+      type: V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT,
+      reason: target?.reason || REASON_CODES.EXECUTION_AMBIGUOUS_APPOINTMENT,
+      detail: "ambiguous_or_missing_active_appointment"
+    });
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: target?.reason || REASON_CODES.EXECUTION_AMBIGUOUS_APPOINTMENT
+      },
+      base,
+      { detail: "ambiguous_or_missing_active_appointment" }
+    );
+  }
+
+  const existing = target.appointment;
+  const timezone = context?.timezone || existing.timezone || "America/New_York";
+  if (
+    appointmentMatchesRequestedSlot(existing, dateKey, timeKey, timezone, {
+      organizationId,
+      agentId,
+      prospectId: context?.prospectId || options.prospectId || null
+    })
+  ) {
+    performed.push({
+      type: V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT,
+      appointmentId: existing.id,
+      idempotent: true,
+      inboundMessageId,
+      dateKey,
+      timeKey,
+      timezone
+    });
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: true,
+        idempotent: true,
+        appointmentId: existing.id,
+        reason: REASON_CODES.EXECUTION_IDEMPOTENT_REPLAY
+      },
+      base,
+      {
+        calendarEventId: existing.calendar_event_id || existing.calendarEventId || null
+      }
+    );
+  }
+
+  const rescheduleAppointment =
+    dependencies.rescheduleAppointment ||
+    ((id, input, ctx) =>
+      require("../../application/appointmentApplicationService").rescheduleAppointment(
+        id,
+        input,
+        ctx
+      ));
+
+  let saved;
+  try {
+    saved = await rescheduleAppointment(
+      existing.id,
+      {
+        dateKey,
+        timeKey,
+        reason: "prospect_requested",
+        channel: "whatsapp"
+      },
+      { organizationId, agentId }
+    );
+  } catch (error) {
+    failed.push({
+      type: V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT,
+      reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
+      detail: error?.code || error?.message || "rescheduleAppointment_threw"
+    });
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_CANONICAL_FAILED
+      },
+      base,
+      { detail: error?.code || error?.message || "rescheduleAppointment_threw" }
+    );
+  }
+
+  const appointmentId = saved?.id || saved?.appointment?.id || existing.id;
+  if (!appointmentId || String(appointmentId) !== String(existing.id)) {
+    failed.push({
+      type: V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT,
+      reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
+      detail: "reschedule_did_not_preserve_appointment_id"
+    });
+    return finishCreateResult(
+      {
+        attempted: true,
+        performed,
+        failed,
+        skipped,
+        success: false,
+        reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
+        appointmentId
+      },
+      base,
+      { detail: "reschedule_did_not_preserve_appointment_id" }
+    );
+  }
+
+  performed.push({
+    type: V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT,
+    appointmentId,
+    idempotent: false,
+    inboundMessageId,
+    dateKey,
+    timeKey,
+    calendarEventId: saved?.calendarEventId || saved?.calendar_event_id || null
+  });
+
+  for (const proposal of authorization.proposals || []) {
+    if (proposal.type !== V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT) {
+      skipped.push(proposal.type);
+    }
+  }
+
+  return finishCreateResult(
+    {
+      attempted: true,
+      performed,
+      failed,
+      skipped,
+      success: true,
+      idempotent: false,
+      appointmentId,
+      scheduleResult: saved,
+      reason: null
+    },
+    base,
+    {
+      calendarEventId: saved?.calendarEventId || saved?.calendar_event_id || null
+    }
+  );
+}
+
 /**
  * Execute authorized side effects. Call only after SideEffectAuthorizer grants.
  * Re-authorizes nothing itself — caller must re-authorize immediately before this.
@@ -267,6 +550,22 @@ async function executeAuthorizedSideEffects({
       success: false,
       reason: REASON_CODES.EXECUTION_DENIED
     };
+  }
+
+  const rescheduleProposal = (authorization.proposals || []).find(
+    (p) => p.type === V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT && p.authorized
+  );
+  if (rescheduleProposal) {
+    return executeAuthorizedReschedule({
+      authorization,
+      structuredDecision,
+      context,
+      options,
+      dependencies,
+      performed,
+      failed,
+      skipped
+    });
   }
 
   const createProposal = (authorization.proposals || []).find(
@@ -690,5 +989,6 @@ module.exports = {
   resolveInterviewType,
   slotsInclude,
   appointmentMatchesRequestedSlot,
-  resolveAttemptAppointmentId
+  resolveAttemptAppointmentId,
+  resolveRescheduleTargetAppointment
 };

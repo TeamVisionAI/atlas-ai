@@ -168,6 +168,22 @@ function ensureExplicitOutboundDecision(structured) {
 /**
  * BR-115 / SELECT_OPTION — shared confirmation transition for an offered slot.
  */
+function isExistingAppointmentReschedule(context = {}) {
+  const status = String(context?.appointment?.status || "").toLowerCase();
+  if (status === APPOINTMENT_STATUS.RESCHEDULE_REQUESTED) {
+    return true;
+  }
+  const appointmentId = context?.appointment?.appointmentId || null;
+  if (!appointmentId) {
+    return false;
+  }
+  return (
+    status === APPOINTMENT_STATUS.CONFIRMED ||
+    status === "scheduled" ||
+    status === "rescheduled"
+  );
+}
+
 function applySelectedOfferedSlotDecision(
   structured,
   selected,
@@ -176,9 +192,11 @@ function applySelectedOfferedSlotDecision(
 ) {
   const selectedDate = slotDate(selected);
   const selectedTime = slotTime(selected);
+  const reschedule = isExistingAppointmentReschedule(context);
   structured.decision.nextAction = NEXT_ACTIONS.ASK_EXPLICIT_CONFIRMATION;
   structured.decision.requiresExplicitConfirmation = true;
   structured.decision.mayCreateAppointment = false;
+  structured.decision.mayRescheduleAppointment = false;
   structured.decision.shouldEscalate = false;
   structured.customerReplyPlan.acknowledgeRequest = true;
   structured.customerReplyPlan.templateKey = "confirm_selected_slot";
@@ -197,7 +215,10 @@ function applySelectedOfferedSlotDecision(
   structured.reasonCodes.push(REASON_CODES.PREMATURE_BOOKING_BLOCKED);
   structured.contextPatch = {
     appointment: {
-      status: APPOINTMENT_STATUS.PROPOSED,
+      status: reschedule
+        ? APPOINTMENT_STATUS.RESCHEDULE_REQUESTED
+        : APPOINTMENT_STATUS.PROPOSED,
+      appointmentId: context?.appointment?.appointmentId || null,
       proposedDate: selectedDate,
       proposedTime: selectedTime,
       previouslyOfferedSlots: offered
@@ -207,7 +228,7 @@ function applySelectedOfferedSlotDecision(
       pendingClarification: null,
       clarificationCount: 0
     },
-    currentStage: STAGES.PROPOSED
+    currentStage: reschedule ? STAGES.RESCHEDULING : STAGES.PROPOSED
   };
   return structured;
 }
@@ -553,6 +574,7 @@ function buildBaseDecision({ context, interpretation }) {
       nextAction: NEXT_ACTIONS.NOOP,
       requiresExplicitConfirmation: true,
       mayCreateAppointment: false,
+      mayRescheduleAppointment: false,
       shouldEscalate: false,
       maySendOutbound: false,
       sideEffectsEnabled: false
@@ -3205,18 +3227,44 @@ function decideConversationTurnCore({
   }
 
   if (intent === INTENTS.RESCHEDULE_REQUEST) {
-    structured.decision.nextAction = NEXT_ACTIONS.OFFER_RESCHEDULE_FLOW;
+    // Implements BR-171 — never create; load real interviewer slots when a day is given.
     structured.decision.mayCreateAppointment = false;
+    structured.decision.mayRescheduleAppointment = false;
+    const reschedulePatch = {
+      appointment: {
+        status: APPOINTMENT_STATUS.RESCHEDULE_REQUESTED,
+        appointmentId: context.appointment?.appointmentId || null
+      },
+      currentStage: STAGES.RESCHEDULING
+    };
+    const offeredFromReschedule = tryApplyAvailabilityOffer({
+      structured,
+      context,
+      interpretation,
+      availability,
+      constraintPatch: reschedulePatch
+    });
+    if (offeredFromReschedule) {
+      offeredFromReschedule.decision.mayCreateAppointment = false;
+      offeredFromReschedule.decision.mayRescheduleAppointment = false;
+      offeredFromReschedule.contextPatch = {
+        ...(offeredFromReschedule.contextPatch || {}),
+        appointment: {
+          ...(offeredFromReschedule.contextPatch?.appointment || {}),
+          status: APPOINTMENT_STATUS.RESCHEDULE_REQUESTED,
+          appointmentId: context.appointment?.appointmentId || null
+        },
+        currentStage: STAGES.RESCHEDULING
+      };
+      offeredFromReschedule.reasonCodes.push(REASON_CODES.RESCHEDULE_AFTER_CONFIRMATION);
+      return offeredFromReschedule;
+    }
+    structured.decision.nextAction = NEXT_ACTIONS.OFFER_RESCHEDULE_FLOW;
     structured.customerReplyPlan.acknowledgeRequest = true;
     structured.customerReplyPlan.templateKey = "offer_reschedule_flow";
     structured.reasonCodes.push(REASON_CODES.RESCHEDULE_AFTER_CONFIRMATION);
     structured.reasonCodes.push(REASON_CODES.APPOINTMENT_ALREADY_CONFIRMED);
-    structured.contextPatch = {
-      appointment: {
-        status: APPOINTMENT_STATUS.RESCHEDULE_REQUESTED
-      },
-      currentStage: STAGES.RESCHEDULING
-    };
+    structured.contextPatch = reschedulePatch;
     return structured;
   }
 
@@ -3631,9 +3679,13 @@ function decideConversationTurnCore({
       singleOffer?.timeKey ||
       null;
 
-    structured.decision.nextAction = NEXT_ACTIONS.CREATE_APPOINTMENT;
+    const rescheduleExisting = isExistingAppointmentReschedule(context);
+    structured.decision.nextAction = rescheduleExisting
+      ? NEXT_ACTIONS.RESCHEDULE_APPOINTMENT
+      : NEXT_ACTIONS.CREATE_APPOINTMENT;
     structured.decision.requiresExplicitConfirmation = true;
-    structured.decision.mayCreateAppointment = true;
+    structured.decision.mayCreateAppointment = !rescheduleExisting;
+    structured.decision.mayRescheduleAppointment = rescheduleExisting;
     structured.decision.executionAuthorized = false;
     structured.decision.maySendOutbound = false;
     structured.decision.sideEffectsEnabled = false;
@@ -3644,10 +3696,17 @@ function decideConversationTurnCore({
       requestedTime: confirmTime
     };
     structured.reasonCodes.push(REASON_CODES.EXPLICIT_CONFIRMATION_RECEIVED);
-    structured.reasonCodes.push(REASON_CODES.APPOINTMENT_CREATE_PROPOSED);
+    structured.reasonCodes.push(
+      rescheduleExisting
+        ? REASON_CODES.APPOINTMENT_RESCHEDULE_PROPOSED
+        : REASON_CODES.APPOINTMENT_CREATE_PROPOSED
+    );
     structured.contextPatch = {
       appointment: {
-        status: APPOINTMENT_STATUS.PROPOSED,
+        status: rescheduleExisting
+          ? APPOINTMENT_STATUS.RESCHEDULE_REQUESTED
+          : APPOINTMENT_STATUS.PROPOSED,
+        appointmentId: context.appointment?.appointmentId || null,
         proposedDate: confirmDate,
         proposedTime: confirmTime,
         previouslyOfferedSlots: offeredSlots
@@ -3790,5 +3849,6 @@ module.exports = {
   decideSafeFailure,
   buildBaseDecision,
   resolveQualificationResume,
-  resolveMeetingModalityForLocation
+  resolveMeetingModalityForLocation,
+  isExistingAppointmentReschedule
 };

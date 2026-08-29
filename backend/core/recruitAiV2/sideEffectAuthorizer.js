@@ -70,6 +70,10 @@ function collectProposedMutationTypes(structuredDecision, responsePlan) {
     types.push(V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT);
   }
 
+  if (nextAction === V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT) {
+    types.push(V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT);
+  }
+
   if (
     nextAction === "acknowledge_cancel_no_write" ||
     intent === "cancel_request" ||
@@ -116,7 +120,10 @@ function collectProposedMutationTypes(structuredDecision, responsePlan) {
 }
 
 function isSupportedExecutableAction(type) {
-  return type === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT;
+  return (
+    type === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT ||
+    type === V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT
+  );
 }
 
 /**
@@ -172,10 +179,14 @@ function authorizeSideEffects({
     denyReasons.push(REASON_CODES.EXECUTION_PROFILE_NOT_CONFIGURED);
   }
 
-  // mayCreateAppointment / nextAction are proposal signals only — never permission.
+  // mayCreate / mayReschedule / nextAction are proposal signals only — never permission.
   const decisionProposesCreate =
     structuredDecision?.decision?.nextAction === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT;
   const decisionMayCreate = structuredDecision?.decision?.mayCreateAppointment === true;
+  const decisionProposesReschedule =
+    structuredDecision?.decision?.nextAction === V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT;
+  const decisionMayReschedule =
+    structuredDecision?.decision?.mayRescheduleAppointment === true;
 
   for (const type of proposedTypes) {
     const supported = isSupportedExecutableAction(type);
@@ -186,7 +197,14 @@ function authorizeSideEffects({
       reason = REASON_CODES.EXECUTION_UNSUPPORTED_ACTION;
     } else if (denyReasons.length > 0) {
       reason = denyReasons[0];
-    } else if (!decisionProposesCreate || !decisionMayCreate) {
+    } else if (type === V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT) {
+      if (!decisionProposesReschedule || !decisionMayReschedule || decisionMayCreate) {
+        reason = REASON_CODES.PREMATURE_BOOKING_BLOCKED;
+      } else {
+        authorized = true;
+        reason = REASON_CODES.EXECUTION_AUTHORIZED;
+      }
+    } else if (!decisionProposesCreate || !decisionMayCreate || decisionMayReschedule) {
       // Create must be an explicit confirmed proposal, not a bare nextAction string.
       reason = REASON_CODES.PREMATURE_BOOKING_BLOCKED;
     } else {

@@ -63,12 +63,16 @@ function duplicateSkipResult(correlationId, providerMessageId, phone) {
   };
 }
 
-async function applyInboundAttentionUpdate(prospect, conversation) {
+async function applyInboundAttentionUpdate(prospect, conversation, inboundText = "") {
   try {
     const {
       markAiResponding,
       markHumanAttentionRequired
     } = require("./newLeadAttentionEngine");
+    const {
+      looksLikeHumanOwnedRescheduleAttention,
+      HUMAN_ATTENTION_RESCHEDULE_REASON
+    } = require("./recruitAiV2/rescheduleRequestFacts");
 
     if (conversationDeliveredReply(conversation)) {
       await markAiResponding(prospect, { waitingForProspect: true });
@@ -82,6 +86,15 @@ async function applyInboundAttentionUpdate(prospect, conversation) {
         prospect,
         conversation.reason || conversation.error || "ai_or_delivery_failure"
       );
+    } else if (
+      conversation &&
+      conversation.replied !== true &&
+      conversation.reason === "REPLY_SUPPRESSED" &&
+      looksLikeHumanOwnedRescheduleAttention(inboundText)
+    ) {
+      // Implements BR-171 — TAKE OVER stays silent, but reschedule/cannot-attend
+      // must surface as human attention instead of disappearing.
+      await markHumanAttentionRequired(prospect, HUMAN_ATTENTION_RESCHEDULE_REASON);
     }
   } catch (attentionError) {
     logWhatsAppStage("br080_attention_update_failed", {
@@ -234,7 +247,11 @@ async function attemptStalledFirstReplyRecovery({
     };
   }
 
-  await applyInboundAttentionUpdate(prospect, conversation);
+  await applyInboundAttentionUpdate(
+    prospect,
+    conversation,
+    inbound.body || inboundForAutomation.body || ""
+  );
 
   if (!conversationDeliveredReply(conversation)) {
     logWhatsAppStage("inbound_first_reply_recovery_delivery_incomplete", {
@@ -811,7 +828,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   }
 
   // Implements BR-080 — only mark AI responding after a real outbound delivery.
-  await applyInboundAttentionUpdate(prospect, conversation);
+  await applyInboundAttentionUpdate(prospect, conversation, semanticBody);
 
   // Implements BR-081 Phase 3B — post-live advisory:
   // continuous context capture (flag-gated, target 100%) + shadow eval (10%).
@@ -865,5 +882,6 @@ module.exports = {
   attemptStalledFirstReplyRecovery,
   prospectHasAutomatedOutboundReply,
   buildStalledFirstReplyRecoveryContext,
-  restoreStalledFirstReplyRecruitingState
+  restoreStalledFirstReplyRecruitingState,
+  applyInboundAttentionUpdate
 };

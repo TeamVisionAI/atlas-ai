@@ -199,7 +199,11 @@ const COPY = Object.freeze({
     // BR-111 — only after canonical appointment success.
     appointment_confirmed:
       "Perfect — your interview is confirmed for {dateLabel} at {requestedTime}.",
+    appointment_rescheduled:
+      "Done — your interview is now scheduled for {dateLabel} at {requestedTime}.",
     appointment_create_failed:
+      "Thanks — I want to make sure this is handled correctly. A Team Vision teammate will follow up with you shortly.",
+    appointment_reschedule_failed:
       "Thanks — I want to make sure this is handled correctly. A Team Vision teammate will follow up with you shortly.",
     safe_failure_escalate:
       "Thanks — I want to make sure this is handled correctly. A Team Vision teammate will follow up with you shortly.",
@@ -358,7 +362,11 @@ const COPY = Object.freeze({
     // BR-111 — solo después del éxito canónico de la cita.
     appointment_confirmed:
       "Perfecto — tu entrevista quedó confirmada para el {dateLabel} a las {requestedTime}.",
+    appointment_rescheduled:
+      "Listo — tu entrevista quedó reprogramada para el {dateLabel} a las {requestedTime}.",
     appointment_create_failed:
+      "Gracias — quiero asegurarme de manejar esto correctamente. Un compañero de Team Vision te contactará pronto.",
+    appointment_reschedule_failed:
       "Gracias — quiero asegurarme de manejar esto correctamente. Un compañero de Team Vision te contactará pronto.",
     safe_failure_escalate:
       "Gracias — quiero asegurarme de manejar esto correctamente. Un compañero de Team Vision te contactará pronto.",

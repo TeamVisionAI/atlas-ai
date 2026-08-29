@@ -724,13 +724,19 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     Boolean(resolveConcreteScheduleDate({ context, interpretation })) &&
     Boolean(constraints.dayPart || context.knownFacts?.preferredDayPart);
 
+  // Implements BR-171 — date-only reschedule ("el lunes") loads interviewer availability.
+  const rescheduleDatedSearch =
+    intent === INTENTS.RESCHEDULE_REQUEST &&
+    Boolean(resolveConcreteScheduleDate({ context, interpretation }));
+
   if (
     !constraints.earliestTime &&
     !constraints.latestTime &&
     !counterofferNeedsSlots &&
     !dayPartNeedsSlots &&
     !laterAlternatives &&
-    !datedDayPartSearch
+    !datedDayPartSearch &&
+    !rescheduleDatedSearch
   ) {
     return false;
   }
@@ -740,8 +746,10 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL ||
     intent === INTENTS.REASSERT_KNOWN_FACT ||
     intent === INTENTS.PROVIDE_DAY_PART ||
+    intent === INTENTS.RESCHEDULE_REQUEST ||
     counterofferNeedsSlots ||
-    datedDayPartSearch;
+    datedDayPartSearch ||
+    rescheduleDatedSearch;
   if (!allowedIntent) {
     return false;
   }

@@ -2266,7 +2266,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Production SoR** — Durable state lives in `prospects.workflow_state` JSONB, scoped by `organization_id` + prospect `id`. Phone is lookup only.
-2. **Phase 1 durable fields** — Soft inbox: `inboxMarkedTestAt`, `inboxArchivedAt`, `inboxClosedAt`, `inboxCloseReason`. Human/runtime: `workflowOwnership`, `manualAgentOwnership`, `needsHumanAttention`, `handoffReason`, `handoffAt`, `humanTakenOverAt`, `returnedToAtlasAt`. Conversations messaging cursor (not attention/ownership): `conversationsLastReadInboundAt`, `conversationsLastSeenInboundMessageId`.
+2. **Phase 1 durable fields** — Soft inbox: `inboxMarkedTestAt`, `inboxArchivedAt`, `inboxClosedAt`, `inboxCloseReason`. Human/runtime: `workflowOwnership`, `manualAgentOwnership`, `needsHumanAttention`, `handoffReason`, `handoffAt`, `humanTakenOverAt`, `keepWithHuman`, `returnedToAtlasAt`. Conversations messaging cursor (not attention/ownership): `conversationsLastReadInboundAt`, `conversationsLastSeenInboundMessageId`.
 3. **Exclude competing DNC** — Do not treat `doNotContact` as Phase 1 durable SoR (no `do_not_contact` column competition).
 4. **Preserve-on-write** — Unrelated patches omit durable keys. File/memory re-read and preserve; database writes only the patch keys.
 5. **Atomic DB merge** — Production persist uses `merge_prospect_workflow_state` (top-level `jsonb ||` under row update) so concurrent writers cannot erase omitted durable fields. Full JSONB replace is reserved for wipe/delete only.
@@ -2275,7 +2275,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 8. **Async adapter** — Load/save are awaited at call sites (including HUMAN silence gate).
 9. **No mass backfill** — After deploy, operators re-mark TEST/CLOSED/ARCHIVED / HUMAN as needed. Do not invent historical marks.
 10. **Out of Phase 1** — Preferred language, occupation, interview type, receipts, wholesale `agentActionState`, and BR-111 execution enablement. V2 mid-flow knownFacts continuity remains `recruit_ai_conversation_contexts` (BR-081+), not this JSONB.
-11. **Sticky TAKE OVER vs attention / advancement (clarification)** — Manual TAKE OVER (`manualAgentOwnership=true` + `humanTakenOverAt`) is authoritative Conversations ownership (**HUMAN**) until explicit RETURN TO ATLAS (or another explicit human ownership release). It must survive BR-034 stall/attention evaluation, BR-035 human advancement / Complete Qualification, Mission Control / Prospect Center workflow evaluation, and page refresh. `needsHumanAttention` / stall / follow-up metadata may coexist as an attention warning but must not demote or mask HUMAN, disable the composer, or re-offer TAKE OVER. BR-035 must not write `manualAgentOwnership=false` or derive `workflowOwnership=ATLAS` while the sticky hold is active. Atlas automated outbound (including `allowHandoffAck`) stays suppressed while the sticky hold is active. Stall-only escalations without `humanTakenOverAt` continue to present as **NEEDS_ATTENTION**. `workflowOwnership=AGENT` without the sticky seal is **not** Conversations HUMAN — use NEEDS_ATTENTION when `needsHumanAttention` is true, otherwise ATLAS. BR-080 `human_required` without TAKE OVER is NEEDS_ATTENTION.
+11. **Sticky TAKE OVER vs attention / advancement (clarification)** — Manual TAKE OVER (`manualAgentOwnership=true` + `humanTakenOverAt`) is authoritative Conversations ownership (**HUMAN**) until explicit RETURN TO ATLAS (or another explicit human ownership release). **BR-172** may release *temporary* TAKE OVER automatically after a successful appointment create; it must not release HUMAN_REQUIRED, keep-with-human, opt-out, or other durable human seals. Sticky HUMAN must survive BR-034 stall/attention evaluation, BR-035 human advancement / Complete Qualification, Mission Control / Prospect Center workflow evaluation, and page refresh. `needsHumanAttention` / stall / follow-up metadata may coexist as an attention warning but must not demote or mask HUMAN, disable the composer, or re-offer TAKE OVER. BR-035 must not write `manualAgentOwnership=false` or derive `workflowOwnership=ATLAS` while the sticky hold is active. Atlas automated outbound (including `allowHandoffAck`) stays suppressed while the sticky hold is active. Stall-only escalations without `humanTakenOverAt` continue to present as **NEEDS_ATTENTION**. `workflowOwnership=AGENT` without the sticky seal is **not** Conversations HUMAN — use NEEDS_ATTENTION when `needsHumanAttention` is true, otherwise ATLAS. BR-080 `human_required` without TAKE OVER is NEEDS_ATTENTION.
 12. **TAKE OVER acknowledges the current BR-080 attention episode** — Explicit TAKE OVER means the human is handling the prospect and therefore acknowledges the **current** BR-080 episode via the canonical `acknowledgeLead` path (`acknowledged_at`, `acknowledged_by_user_id`, `attention_status=acknowledged`). This clears Prospect Center New / unacknowledged and BR-080-driven Human Attention for that episode and resolves `NewLeadAttention` as acknowledged. It does **not** Return to Atlas, clear sticky HUMAN, or permanently suppress future alerts. A later genuine BR-034 stall / new `human_required` episode may warn again while HUMAN remains sticky; it must not resurrect the old unacknowledged New episode.
 13. **Conversations status badge is allowlisted** — The third Conversations header badge may show a user-facing lifecycle/status (`NEW`, `QUALIFICATION`, `INTERVIEW_READY`, appointment lifecycle, canonical milestone). It must not render raw qualification-brain tokens (`DAY_PART`, `CITY`, `WORK_AUTHORIZATION`, …). Presentation uses a centralized allowlist; unknown enums fail closed (omit badge).
 14. **Conversations unread ≠ attention / ownership** — Messaging unread is prospect inbound WhatsApp the operator has not viewed. Source of truth is `conversation_logs` plus the Conversations-only cursor (`conversationsLastReadInboundAt` / optional `conversationsLastSeenInboundMessageId`). Unread must not be derived from `needsHumanAttention`, `workflowOwnership`, BR-080 acknowledgement, or inbox lifecycle. Mark-read on open/select updates the cursor only — it must not acknowledge BR-080, TAKE OVER, RETURN TO ATLAS, or change Archive/Close. Thread sort uses `lastCommunicationAt` from real WhatsApp only (prospect inbound + Atlas/Human outbound). System logs, qualification saves, workflow events, diagnostics, and internal notes must not create unread or reorder the list.
@@ -2484,6 +2484,52 @@ Production outside-window messaging requires firm-approved Meta templates config
 6. **Handoff hold** — After V2 `safe_uncertain_escalate` / `HUMAN_REQUIRED`, do not continue automated qualification until TAKE OVER is returned to Atlas. Do not fall through to legacy CE for that hold. If the hold snapshot cannot be read, fail closed for that turn (`V2_HUMAN_REQUIRED_HOLD_UNRESOLVED`) — do not resume qualification. Explicit Return to Atlas still resumes.
 7. **No tenant/user exceptions** — Same rules for every V2-eligible user, including Niovel and Misleisys.
 8. **Boundaries** — Do not special-case a prospect or phone. Do not change WhatsApp privacy, campaign eligibility, TAKE OVER write rules, or live execution path.
+
+---
+
+## BR-171 — WhatsApp Natural-Language Appointment Rescheduling
+
+**Implements:** When a prospect asks in Spanish or English to reschedule an existing appointment (including inflections such as `reprogramar` / `reprogramarla`), Atlas must correlate to that appointment, offer real interviewer availability for a supplied day, and move the same appointment through the canonical reschedule path. TAKE OVER / HUMAN ownership stays silent and does not mutate the appointment, but the request must surface as human attention.  
+**Domain:** Recruit AI / Scheduling + conversation ownership  
+**Depends on:** BR-049, BR-050, BR-080, BR-107, BR-111, BR-124, BR-172  
+**Related:** BR-039 (calendar move), BR-076 (reminders), BR-142 (automation eligibility)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/rescheduleRequestFacts.js`; interpreter; decisionEngine; schedulingAvailabilityReader; sideEffectAuthorizer; sideEffectExecutor → `appointmentApplicationService.rescheduleAppointment`; whatsappInboundPipeline  
+**Tests:** `backend/test/recruitAiV2NaturalLanguageRescheduleBr171.test.js`
+
+### Rules
+
+1. **ATLAS ownership — detect** — Recognize ES/EN reschedule language, including `reprogramar`, `reprogramarla`, `reprogramarlo`, `reprogramación`, `cambiar la cita`, `mover la cita`, `no podré asistir` plus an alternate date, and `Can we move my interview to Monday?`. Correlate to the existing active appointment. Do not treat this as a new create.
+2. **ATLAS ownership — offer real slots** — If the prospect names a day/date (`el lunes`), load that interviewer’s real availability for that date and offer valid slots. Do not invent times.
+3. **ATLAS ownership — confirm executes canonical reschedule** — After the prospect selects/confirms, call `appointmentApplicationService.rescheduleAppointment` only. Preserve prospect id and appointment id. Move the existing calendar event. Do not create a duplicate appointment. Cancel prior reminders and schedule reminders for the new slot. `missing_email` or lack of reminder confirmation must not block the reschedule.
+4. **Fail closed** — Ambiguous appointment match (zero or more than one active) or a thrown calendar/canonical error must not invent a write. Tenant-scoped and interviewer-scoped.
+5. **HUMAN / AGENT TAKE OVER** — Do not auto-reply and do not move the appointment. A detected reschedule or cannot-attend request must mark human attention with reason `appointment_reschedule_requested`. Do not Return to Atlas automatically on the reschedule *request*. If BR-172 already returned temporary ownership after booking, Atlas may continue the reschedule flow.
+6. **Reminders under HUMAN ownership** — Automatic reminder pause/cancel when a human-owned prospect says they cannot attend is **out of scope**. Do not mutate the appointment or reminder schedule under HUMAN ownership until a separate business rule is established.
+7. **No tenant/user/prospect exceptions** — Same rules for every V2-eligible thread. Do not special-case a phone or named prospect.
+8. **Boundaries** — Do not duplicate calendar/reschedule logic in V2. Do not add reschedule to `allowHandoffAck`. Do not Return to Atlas from a reschedule request. Booking-time ownership return is BR-172.
+
+---
+
+## BR-172 — Return Temporary Ownership to Atlas After Successful Scheduling
+
+**Implements:** When an appointment is successfully created, temporary human/manual ownership returns to ATLAS so Atlas can manage reminders, confirmation, reschedule, cancellation, Zoom/location questions, and follow-up. Explicit sticky human-required conditions stay HUMAN.  
+**Domain:** Conversations ownership + canonical appointment lifecycle  
+**Depends on:** BR-050, BR-080, BR-135  
+**Related:** BR-124 (explicit Return to Atlas), BR-171 (reschedule after Atlas owns the thread)  
+**Status:** Implemented  
+**Engine target:** `appointmentSchedulingOwnership.js` → `appointmentApplicationService.createAppointment` (shared create for every tenant, agent, and purpose)  
+**Tests:** `backend/test/appointmentSchedulingOwnershipBr172.test.js`
+
+### Rules
+
+1. **Global** — Same invariant for every tenant, agent, and supported appointment purpose (`recruiting_interview`, `fna`, `policy_review`, `client_service`, `training`, `other`). No Team Vision, user, or phone special-case.
+2. **Canonical hook** — Run only after `appointmentApplicationService.createAppointment` persists the appointment. Mission Control, V2, interview-outcome, and repair creates share that path. Do not implement this in a tenant-specific controller.
+3. **Temporary holds return** — Ordinary Conversations TAKE OVER (`take_over`) and WhatsApp Business App takeover (`whatsapp_business_app`) clear `manualAgentOwnership`, restore `workflowOwnership=ATLAS`, and stamp `returnedToAtlasAt`.
+4. **Durable human seals stay HUMAN** — Do not clear HUMAN_REQUIRED, compliance/safety escalation, opt-out / do-not-contact, explicit `keepWithHuman`, or any other unclassified durable human-only seal.
+5. **Audit** — Successful automatic return writes `conversation.returned_to_atlas_after_scheduling`.
+6. **Fail open** — Ownership-return failure must not roll back the booked appointment.
+7. **Reschedule requests** — BR-171 still does not Return to Atlas from inbound reschedule language. This rule fires at booking success only.
+8. **Boundaries** — Do not change the explicit Return to Atlas button. Do not mutate appointments. Tenant isolation of workflow state is unchanged.
 
 ---
 

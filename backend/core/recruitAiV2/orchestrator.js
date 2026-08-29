@@ -310,6 +310,10 @@ function applyExecutionOutcomeToReply({
   if (execution.success) {
     // Populate slot entities from THIS execution so appointment_confirmed is concrete.
     const performed = execution.performed?.[0] || {};
+    const rescheduled =
+      performed.type === "reschedule_appointment" ||
+      structuredDecision?.decision?.nextAction === "reschedule_appointment";
+    const successKey = rescheduled ? "appointment_rescheduled" : "appointment_confirmed";
     if (performed.dateKey && !entities.dateLabel && !entities.requestedDateLabel) {
       entities.dateLabel = performed.dateKey;
       entities.requestedDate = performed.dateKey;
@@ -319,7 +323,7 @@ function applyExecutionOutcomeToReply({
     }
     const plan = {
       ...responsePlan,
-      templateKey: "appointment_confirmed",
+      templateKey: successKey,
       entities
     };
     const nextDecision = {
@@ -331,7 +335,7 @@ function applyExecutionOutcomeToReply({
       },
       customerReplyPlan: {
         ...structuredDecision.customerReplyPlan,
-        templateKey: "appointment_confirmed",
+        templateKey: successKey,
         entities
       }
     };
@@ -342,9 +346,15 @@ function applyExecutionOutcomeToReply({
     };
   }
 
+  const failedType = execution.failed?.[0]?.type || execution.performed?.[0]?.type;
+  const failKey =
+    failedType === "reschedule_appointment" ||
+    structuredDecision?.decision?.nextAction === "reschedule_appointment"
+      ? "appointment_reschedule_failed"
+      : "appointment_create_failed";
   const plan = {
     ...responsePlan,
-    templateKey: "appointment_create_failed",
+    templateKey: failKey,
     entities
   };
   return {
@@ -352,7 +362,7 @@ function applyExecutionOutcomeToReply({
       ...structuredDecision,
       customerReplyPlan: {
         ...structuredDecision.customerReplyPlan,
-        templateKey: "appointment_create_failed"
+        templateKey: failKey
       }
     },
     responsePlan: plan,
