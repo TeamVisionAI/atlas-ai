@@ -139,7 +139,8 @@ test("authorized leader sees downstream user under Team Prospects", async () => 
 
   const teamScope = resolveWorkspaceListScope(dlContext, "oversight");
   assert.equal(teamScope.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
-  assert.deepEqual(teamScope.ownerUserIds, [USER_DL, USER_AGENT]);
+  assert.deepEqual(teamScope.ownerUserIds, [USER_AGENT]);
+  assert.equal(teamScope.excludeOwnerUserId, USER_DL);
 
   const model = await loadInbox({
     authContext: dlContext,
@@ -165,7 +166,7 @@ test("authorized leader sees downstream user under Team Prospects", async () => 
 
   assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
   const ids = model.items.map((item) => item.id).sort();
-  assert.deepEqual(ids, ["dl-own", "downstream"]);
+  assert.deepEqual(ids, ["downstream"]);
   assert.ok(
     model.items.every((item) => item.ownershipState === "ATLAS" || item.ownershipState === "HUMAN")
   );

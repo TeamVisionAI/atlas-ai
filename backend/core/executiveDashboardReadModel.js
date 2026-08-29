@@ -100,18 +100,24 @@ function applyProspectListScopeToQuery(query, listScope) {
     isSafeListScopeId
   } = require("../security/authorizationService");
 
-  if (listScope.ownerUserId && isSafeListScopeId(listScope.ownerUserId)) {
-    return query.eq("owner_user_id", String(listScope.ownerUserId));
+  if (Array.isArray(listScope.ownerUserIds) && listScope.ownerUserIds.length === 0) {
+    return query.eq("owner_user_id", "__empty_list_scope__");
   }
 
-  if (Array.isArray(listScope.ownerUserIds) && listScope.ownerUserIds.length > 0) {
+  if (listScope.ownerUserId && isSafeListScopeId(listScope.ownerUserId)) {
+    query = query.eq("owner_user_id", String(listScope.ownerUserId));
+  } else if (Array.isArray(listScope.ownerUserIds) && listScope.ownerUserIds.length > 0) {
     const ids = listScope.ownerUserIds
       .map((id) => String(id))
       .filter((id) => isSafeListScopeId(id));
     if (ids.length === 0) {
       return query.eq("owner_user_id", "__invalid_list_scope__");
     }
-    return query.in("owner_user_id", ids);
+    query = query.in("owner_user_id", ids);
+  }
+
+  if (listScope.excludeOwnerUserId && isSafeListScopeId(listScope.excludeOwnerUserId)) {
+    query = query.neq("owner_user_id", String(listScope.excludeOwnerUserId));
   }
 
   return query;
