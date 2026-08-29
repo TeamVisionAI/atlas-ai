@@ -296,6 +296,7 @@ function summarizeConversationListItem(item = {}) {
     hasVisiblePhone: item.hasVisiblePhone !== false,
     name: item.name || null,
     prospectNumber: item.prospectNumber || null,
+    ownerUserId: item.ownerUserId || null,
     lastMessagePreview: item.lastMessagePreview || null,
     lastMessagePreviewKind: item.lastMessagePreviewKind || null,
     lastCommunicationAt: item.lastCommunicationAt || null,
@@ -512,6 +513,7 @@ async function buildConversationsCenterReadModel(options = {}) {
     filter,
     search: search || null,
     view: useSummaryView ? "summary" : "full",
+    workspaceScope: listScope?.workspaceScope || null,
     counts,
     needsAttentionCount: counts.needs_attention,
     items
