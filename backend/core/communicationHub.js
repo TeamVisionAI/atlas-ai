@@ -16,9 +16,7 @@ const { isWorkflowGateActive } = require("./agentActionEngine");
 const { OWNERSHIP } = require("./workflowConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const liveAuthoringBridge = require("./recruitAiV2/liveAuthoringBridge");
-const {
-  guardOutboundConversationCoherence
-} = require("./recruitAiV2/globalConversationCoherenceGuard");
+const conversationCoherenceGuard = require("./recruitAiV2/globalConversationCoherenceGuard");
 const {
   evaluateAtlasInboundAutomationEligibility,
   resolveAtlasInboundAutomationEligibility
@@ -181,7 +179,7 @@ async function deliverWhatsAppReply({
 
   // Implements BR-166 — every live V2 reply is rechecked against the newest
   // durable tenant+prospect context immediately before transport sends it.
-  const coherence = await guardOutboundConversationCoherence({
+  const coherence = await conversationCoherenceGuard.guardOutboundConversationCoherence({
     normalized,
     prospect,
     engineResult
@@ -495,10 +493,10 @@ async function processNormalizedInboundMessage(
     }
 
     // BR-167 — once live V2 was authoritative for the turn, a timeout or
-    // technical failure must never hand the same inbound to legacy CE. A
-    // context-version race is a normal example: the newer durable turn wins,
-    // and the older turn stays silent. Other technical loss also fails closed
-    // rather than risking a contradictory/repeated legacy reply.
+    // technical failure must never hand the same inbound to legacy CE.
+    // BR-168 recovers a late-settled safe conversational reply inside
+    // attemptLiveV2Authoring first (authored=true). Only unresolved / unsafe
+    // timeout remains fail-closed here.
     if (
       authoringAttempt?.eligible === true &&
       (authoringAttempt.reason === "LIVE_AUTHORING_TIMEOUT" ||

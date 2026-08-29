@@ -2231,6 +2231,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-168 — Late-Settled Live Authoring Reply Recovery
+
+**Implements:** When live V2 `processTurn` exceeds the soft authoring timeout during legitimate work (including calendar I/O) but then settles with a valid authored conversational reply, Atlas must deliver that V2 reply once instead of BR-167 silence  
+**Domain:** Recruit AI v2 live WhatsApp runtime / authoring timeout  
+**Depends on:** BR-114, BR-125, BR-126, BR-166  
+**Related:** BR-111, BR-112, BR-167 (authoring-loss fail-closed)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/lateSettledAuthoringResult.js`, `recruitAiV2/liveAuthoringBridge.js`, `communicationHub.js`  
+**Tests:** `backend/test/liveAuthoringLateResultRecoveryBr168.test.js`
+
+### Rules
+
+1. **Late result is inspected** — On `LIVE_AUTHORING_TIMEOUT`, await the already-tracked `processTurn` within the existing post-timeout grace window. Do not start a second turn. Do not raise the 8s authoring timeout as the fix.
+2. **Recover sendable conversational results** — If the late result settled successfully and has safe `replyText`, deliver it on the normal V2 outbound path (`authored=true`, no legacy CE). Classification is by mutation vs conversational outcome, not by a single action name. `offer_available_slots` is included because it is a non-mutation authored decision.
+3. **BR-166 still applies** — Recovered replies go through `deliverWhatsAppReply` and the pre-send coherence guard. Stale or fact-regressive copy stays suppressed.
+4. **Idempotent send** — One inbound turn yields at most one outbound. Recovery must not re-execute `processTurn` or double-send.
+5. **Mutations stay fail-closed here** — Failed, partial, conflicted, or unverified mutation turns (`create_appointment` and other executable mutations, any `execution.attempted`) are not recovered by this rule. BR-125 / BR-126 remain the only post-timeout mutation owners.
+6. **Unresolved timeout stays BR-167** — If the tracked turn does not settle in grace, or the late result is empty/unsafe/conflicted/unrecoverable, keep BR-167: no legacy CE fallback.
+7. **Boundaries** — Does not change calendar hours, interview-hour configuration, or tenant-specific copy. Does not special-case a prospect, city, day-part word, or calendar provider.
+
+---
+
 ## BR-135 — Durable Conversations Workflow State (prospects.workflow_state)
 
 **Implements:** Soft Conversations Center inbox marks (TEST / ARCHIVED / CLOSED) and HUMAN ownership / needs-attention runtime fields must survive Railway deploy and process restart; stop treating ephemeral `workflowState.json` as production SoR  
