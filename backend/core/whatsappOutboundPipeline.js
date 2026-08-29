@@ -479,14 +479,16 @@ async function sendAndPersistWhatsAppMessage({
         success: true,
         simulated: false,
         providerMessageId: graphResult.providerMessageId || providerMessageIdSeed,
-        credentialSource: graphResult.credentialSource
+        credentialSource: graphResult.credentialSource,
+        outboundPhoneNumberId: credentials.phoneNumberId || null
       };
 
       logWhatsAppStage("outbound_delivery_sent", {
         to,
         mode,
         providerMessageId: sendResult.providerMessageId,
-        credentialSource: sendResult.credentialSource
+        credentialSource: sendResult.credentialSource,
+        outboundPhoneNumberId: sendResult.outboundPhoneNumberId || null
       });
     } catch (error) {
       const safeReason = error.response?.data?.error?.message || error.message || "PROVIDER_FAILED";
@@ -539,7 +541,8 @@ async function sendAndPersistWhatsAppMessage({
     languageCode: authorization.languageCode || null,
     sanitized: true,
     credentialSource: sendResult.credentialSource || null,
-    inboundPhoneNumberId: inboundPhoneNumberId || null
+    inboundPhoneNumberId: inboundPhoneNumberId || null,
+    outboundPhoneNumberId: sendResult.outboundPhoneNumberId || null
   };
 
   // A — Persist delivery SoR immediately after wamid so Meta status webhooks can match.
@@ -683,6 +686,8 @@ async function sendAndPersistWhatsAppMessage({
     providerMessageId: sendResult.providerMessageId,
     conversationLogId: logResult.log?.id || null,
     deliveryId: earlyDelivery?.row?.id || null,
+    inboundPhoneNumberId: inboundPhoneNumberId || null,
+    outboundPhoneNumberId: sendResult.outboundPhoneNumberId || null,
     retryable: false,
     delivery: buildDeliveryResult({
       status,
