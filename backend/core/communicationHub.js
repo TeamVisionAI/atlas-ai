@@ -490,10 +490,35 @@ async function processNormalizedInboundMessage(
           });
         }
       } catch {
-        // Fall through to legacy CE once.
+        // Continue to BR-167 fail-closed handling below.
       }
     }
-    // Technical failure / empty / ineligible → fall through to legacy CE once.
+
+    // BR-167 — once live V2 was authoritative for the turn, a timeout or
+    // technical failure must never hand the same inbound to legacy CE. A
+    // context-version race is a normal example: the newer durable turn wins,
+    // and the older turn stays silent. Other technical loss also fails closed
+    // rather than risking a contradictory/repeated legacy reply.
+    if (
+      authoringAttempt?.eligible === true &&
+      (authoringAttempt.reason === "LIVE_AUTHORING_TIMEOUT" ||
+        authoringAttempt.reason === "LIVE_AUTHORING_TECHNICAL_FAILURE")
+    ) {
+      logWhatsAppStage("recruit_ai_v2_authoring_loss_suppressed_no_legacy_fallback", {
+        phone: normalized.phone,
+        organizationId: prospect.organization_id || prospect.organizationId || null,
+        prospectId: prospect.id || null,
+        providerMessageId: normalized.providerMessageId || null,
+        reason: authoringAttempt.reason
+      });
+      return {
+        success: true,
+        replied: false,
+        reason: "V2_AUTHORING_LOSS_SUPPRESSED",
+        authoringReason: authoringAttempt.reason
+      };
+    }
+    // Empty/unsafe/ineligible paths retain the bounded legacy fallback behavior.
   }
 
   // BR-118 / BR-140 — remaining non-text media (image/video/document) must not enter legacy CE.
