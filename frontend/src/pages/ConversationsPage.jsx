@@ -58,6 +58,11 @@ import {
   CONVERSATIONS_ACCESS_STATE,
   resolveConversationsAccessStateFromError
 } from "../engines/conversationsCenterAccess";
+import {
+  CONVERSATIONS_WORKSPACE_TABS,
+  canSeeConversationsTeamProspects,
+  resolveConversationsWorkspaceTab
+} from "../engines/conversationsWorkspaceScope";
 import "./ConversationsPage.css";
 
 const FILTERS = [
@@ -230,7 +235,12 @@ export default function ConversationsPage() {
   const locale = language === "es" ? "es-US" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
   const activeFilter = searchParams.get("filter") || "active";
-  const workspaceScope = searchParams.get("workspaceScope") || "";
+  const canSeeTeamProspects = canSeeConversationsTeamProspects(user);
+  const workspaceTab = resolveConversationsWorkspaceTab({
+    workspaceScopeParam: searchParams.get("workspaceScope") || "",
+    canSeeTeam: canSeeTeamProspects
+  });
+  const workspaceScope = workspaceTab.workspaceScope;
 
   const [payload, setPayload] = useState(() =>
     readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope))
@@ -332,6 +342,15 @@ export default function ConversationsPage() {
     }
   }, [activeFilter, workspaceScope, translate, controlPlane, tenantCacheKey]);
   loadListRef.current = loadList;
+
+  useEffect(() => {
+    if (!workspaceTab.unauthorizedTeam) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("workspaceScope");
+    setSearchParams(next, { replace: true });
+  }, [workspaceTab.unauthorizedTeam, searchParams, setSearchParams]);
 
   useEffect(() => {
     clearConversationsCaches();
@@ -653,6 +672,16 @@ export default function ConversationsPage() {
     setSearchParams(next);
   }
 
+  function setWorkspaceListTab(tab) {
+    const next = new URLSearchParams(searchParams);
+    if (tab === CONVERSATIONS_WORKSPACE_TABS.TEAM && canSeeTeamProspects) {
+      next.set("workspaceScope", "oversight");
+    } else {
+      next.delete("workspaceScope");
+    }
+    setSearchParams(next);
+  }
+
   async function onTakeOver() {
     if (!selectedPhone || actionBusy) return;
     setActionBusy(true);
@@ -866,6 +895,37 @@ export default function ConversationsPage() {
           </StatusBadge>
         ) : null}
       </header>
+
+      {canSeeTeamProspects ? (
+        <div
+          className="conversations-page__workspace-tabs"
+          role="tablist"
+          aria-label={translate("conversationsWorkspaceTabsLabel")}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.MINE}
+            className={`conversations-page__workspace-tab${
+              workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.MINE ? " is-active" : ""
+            }`}
+            onClick={() => setWorkspaceListTab(CONVERSATIONS_WORKSPACE_TABS.MINE)}
+          >
+            {translate("conversationsMyProspects")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.TEAM}
+            className={`conversations-page__workspace-tab${
+              workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.TEAM ? " is-active" : ""
+            }`}
+            onClick={() => setWorkspaceListTab(CONVERSATIONS_WORKSPACE_TABS.TEAM)}
+          >
+            {translate("conversationsTeamProspects")}
+          </button>
+        </div>
+      ) : null}
 
       <div className="conversations-page__filters" role="tablist">
         {FILTERS.map((filter) => {

@@ -221,15 +221,13 @@ function canUseOversightWorkspaceList(context) {
     return true;
   }
 
-  return (
-    hasPermission(context, "dashboard:executive") ||
-    hasPermission(context, "dashboard:team")
-  );
+  // dashboard:team is Team Dashboard (BR-149), including agents — not Conversations Team Prospects.
+  return hasPermission(context, "dashboard:executive");
 }
 
 /**
- * BR-165 — default lists are the signed-in user's owned/assigned rows.
- * Org/subtree lists require an explicit oversight/team/org view.
+ * BR-165 — default My Prospects lists are owner_user_id = signed-in user.
+ * Same-org visibility is not ownership. Team Prospects / oversight is explicit.
  */
 function resolveWorkspaceListScope(context, workspaceScope = null) {
   if (!isActiveContext(context)) {
@@ -256,13 +254,10 @@ function isSafeListScopeId(value) {
 }
 
 function prospectMatchesOwnerScope(prospect, ownerIds) {
+  // Implements BR-165 — list ownership is owner_user_id only (not assigned_agent_id).
   const ownerUserId = prospect?.owner_user_id || prospect?.ownerUserId || null;
-  const assignedAgentId = prospect?.assigned_agent_id || prospect?.assignedAgentId || null;
   const ids = new Set((ownerIds || []).map((id) => String(id)));
-  return Boolean(
-    (ownerUserId && ids.has(String(ownerUserId))) ||
-    (assignedAgentId && ids.has(String(assignedAgentId)))
-  );
+  return Boolean(ownerUserId && ids.has(String(ownerUserId)));
 }
 
 function isProspectInWorkspaceListScope(prospect, listScope) {

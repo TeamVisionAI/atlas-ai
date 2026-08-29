@@ -29,6 +29,34 @@
   line-height: 1.5;
 }
 
+.conversations-page__workspace-tabs {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.conversations-page__workspace-tab {
+  border: 0;
+  background: #fff;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.conversations-page__workspace-tab + .conversations-page__workspace-tab {
+  border-left: 1px solid #cbd5e1;
+}
+
+.conversations-page__workspace-tab.is-active {
+  background: #0f766e;
+  color: #fff;
+}
+
 .conversations-page__filters {
   display: flex;
   flex-wrap: wrap;
