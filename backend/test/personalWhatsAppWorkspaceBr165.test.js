@@ -218,7 +218,9 @@ test("default workspace lists are mine; oversight is explicit; deep-link stays o
   );
   assert.equal(rvpOversight.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
   assert.equal(rvpOversight.ownerUserId, undefined);
+  assert.equal(rvpOversight.excludeOwnerUserId, NIOVEL);
   assert.equal(isProspectInWorkspaceListScope(javier, rvpOversight), true);
+  assert.equal(isProspectInWorkspaceListScope(niovelLead, rvpOversight), false);
 
   assert.equal(canAccessProspect(auth(ROLES.RVP, NIOVEL), javier), true);
   assert.equal(canAccessProspect(auth(ROLES.AGENT, MISLEISYS), javier), true);
@@ -229,6 +231,7 @@ test("list-scope query filter is applied before pagination", () => {
   const eqCalls = [];
   const inCalls = [];
   const orCalls = [];
+  const neqCalls = [];
   const query = {
     or(value) {
       orCalls.push(value);
@@ -241,6 +244,10 @@ test("list-scope query filter is applied before pagination", () => {
     in(column, values) {
       inCalls.push({ column, values });
       return query;
+    },
+    neq(column, value) {
+      neqCalls.push({ column, value });
+      return query;
     }
   };
   applyProspectListScopeToQuery(query, { ownerUserId: MISLEISYS });
@@ -252,6 +259,9 @@ test("list-scope query filter is applied before pagination", () => {
     ownerUserIds: [MISLEISYS, NIOVEL]
   });
   assert.deepEqual(inCalls, [{ column: "owner_user_id", values: [MISLEISYS, NIOVEL] }]);
+
+  applyProspectListScopeToQuery(query, { excludeOwnerUserId: NIOVEL });
+  assert.deepEqual(neqCalls, [{ column: "owner_user_id", value: NIOVEL }]);
 });
 
 test("prospects list query never filters assigned_agent_id (42703 regression)", () => {

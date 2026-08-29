@@ -236,16 +236,44 @@ function resolveWorkspaceListScope(context, workspaceScope = null) {
 
   const requested = String(workspaceScope || "").trim().toLowerCase();
   if (requested === WORKSPACE_LIST_SCOPES.OVERSIGHT && canUseOversightWorkspaceList(context)) {
-    return {
-      ...getProspectListScope(context),
-      workspaceScope: WORKSPACE_LIST_SCOPES.OVERSIGHT
-    };
+    return excludeSelfFromOversightScope(getProspectListScope(context), context.userId);
   }
 
   return {
     organizationId: context.organizationId,
     ownerUserId: context.userId,
     workspaceScope: WORKSPACE_LIST_SCOPES.MINE
+  };
+}
+
+function excludeSelfFromOversightScope(scope, userId) {
+  if (!scope || scope.denied === true) {
+    return scope;
+  }
+
+  const excludeOwnerUserId = userId || null;
+  if (Array.isArray(scope.ownerUserIds)) {
+    return {
+      ...scope,
+      ownerUserIds: scope.ownerUserIds.filter((id) => String(id) !== String(userId)),
+      excludeOwnerUserId,
+      workspaceScope: WORKSPACE_LIST_SCOPES.OVERSIGHT
+    };
+  }
+
+  if (scope.ownerUserId && String(scope.ownerUserId) === String(userId)) {
+    return {
+      organizationId: scope.organizationId,
+      ownerUserIds: [],
+      excludeOwnerUserId,
+      workspaceScope: WORKSPACE_LIST_SCOPES.OVERSIGHT
+    };
+  }
+
+  return {
+    ...scope,
+    excludeOwnerUserId,
+    workspaceScope: WORKSPACE_LIST_SCOPES.OVERSIGHT
   };
 }
 
@@ -269,6 +297,15 @@ function isProspectInWorkspaceListScope(prospect, listScope) {
   if (
     listScope.organizationId &&
     String(orgId || "") !== String(listScope.organizationId)
+  ) {
+    return false;
+  }
+
+  const ownerUserId = prospect.owner_user_id || prospect.ownerUserId || null;
+  if (
+    listScope.excludeOwnerUserId &&
+    ownerUserId &&
+    String(ownerUserId) === String(listScope.excludeOwnerUserId)
   ) {
     return false;
   }
