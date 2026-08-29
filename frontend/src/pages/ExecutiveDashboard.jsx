@@ -28,6 +28,62 @@ const FOCUS_LABEL_KEYS = {
   kpis: "executiveFocusKpis"
 };
 
+function translatedOrFallback(translate, key, fallback) {
+  const value = translate(key);
+  return value && value !== key ? value : fallback;
+}
+
+function standaloneAgendaItem(appointment, translate, timeZone) {
+  const purpose = appointment.metadata?.agendaKind || appointment.purpose || "other";
+  const type = translatedOrFallback(
+    translate,
+    `appointmentsPurpose_${purpose}`,
+    String(purpose).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+  const meetingType = appointment.meetingType || "virtual";
+  const locationLabel = translatedOrFallback(
+    translate,
+    `appointmentsMeetingType_${meetingType}`,
+    String(meetingType).replace(/_/g, " ")
+  );
+  const status = appointment.status || "scheduled";
+  const statusLabel = translatedOrFallback(
+    translate,
+    `appointmentsStatus_${status}`,
+    String(status).replace(/_/g, " ")
+  );
+  let timeLabel = "—";
+  try {
+    timeLabel = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: timeZone || undefined
+    }).format(new Date(appointment.startDateTime));
+  } catch {
+    timeLabel = new Date(appointment.startDateTime).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  }
+
+  return {
+    id: `agenda-${appointment.id}`,
+    time: appointment.startDateTime,
+    timeLabel,
+    name:
+      appointment.metadata?.agendaContactName ||
+      appointment.metadata?.prospectName ||
+      appointment.prospectPhone ||
+      translatedOrFallback(translate, "appointmentsUnknownContact", "Agenda contact"),
+    type,
+    locationLabel,
+    status,
+    statusLabel,
+    phone: appointment.metadata?.agendaContactPhone || appointment.prospectPhone || null,
+    to: "/app/appointments"
+  };
+}
+
 function AnalyticsSection({
   viewModel,
   metricsLoading,
@@ -66,6 +122,7 @@ export default function ExecutiveDashboard() {
     executive,
     alphaBrief,
     prospects,
+    standaloneAgenda,
     organizationName,
     phase,
     loadingExecutive,
@@ -95,6 +152,16 @@ export default function ExecutiveDashboard() {
       translate
     });
   }, [executive, alphaBrief, prospects, user, orgLabel, translate]);
+
+  const unifiedAgenda = useMemo(() => {
+    const base = viewModel?.agenda || [];
+    const standalone = (standaloneAgenda || []).map((appointment) =>
+      standaloneAgendaItem(appointment, translate, executive?.timeZone)
+    );
+    return [...base, ...standalone]
+      .sort((left, right) => Date.parse(left.time || 0) - Date.parse(right.time || 0))
+      .slice(0, 5);
+  }, [viewModel?.agenda, standaloneAgenda, translate, executive?.timeZone]);
 
   const focusKey = searchParams.get("focus");
   const fromWorkspace = searchParams.get("from") === "workspace";
@@ -158,7 +225,7 @@ export default function ExecutiveDashboard() {
             loading={loadingExecutive}
             onOpen={() => openMissionControl(viewModel?.interviewsToday?.to)}
           />
-          <TodayAgendaCard agenda={viewModel?.agenda || []} loading={loadingExecutive} />
+          <TodayAgendaCard agenda={unifiedAgenda} loading={loadingExecutive} />
           <MorningSummaryCard summary={viewModel?.morningSummary} loading={phase < 2} />
         </div>
       </section>
