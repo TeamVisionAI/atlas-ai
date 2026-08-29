@@ -30,6 +30,9 @@ const {
   REASON_CODES: PROSPECT_IDENTITY_REASON_CODES
 } = require("../core/recruitingProspectBridge");
 const { onInterviewScheduled } = require("../core/recruitingWorkflowOrchestrator");
+const {
+  maybeReturnTemporaryOwnershipToAtlasAfterScheduling
+} = require("../core/appointmentSchedulingOwnership");
 const { advanceProspectWorkflow } = require("../core/humanAdvancementEngine");
 const { APPOINTMENT_EVENTS } = require("../modules/business-events/domain/EventTypes");
 const { MILESTONES } = require("../core/workflowConstants");
@@ -696,6 +699,22 @@ async function createAppointment(input, context = {}) {
   const appointment = scheduledResult.appointment;
 
   const saved = await appointmentRepository.save(appointment);
+
+  // Implements BR-172 — release temporary TAKE OVER after any successful create.
+  // Fail-open: a booking must not roll back if ownership write fails.
+  await maybeReturnTemporaryOwnershipToAtlasAfterScheduling({
+    phone: prospectPhone,
+    organizationId,
+    prospectId,
+    prospect,
+    appointmentId: saved.id,
+    appointmentPurpose: purpose,
+    source: "appointmentApplicationService.createAppointment"
+  }).catch((error) => {
+    console.warn("[appointments] BR-172 ownership return failed:", error.message, {
+      appointmentId: saved.id
+    });
+  });
 
   logInterviewerTrace({
     authenticatedUserId: createdBy || agentId,
