@@ -231,7 +231,7 @@ test("verified CTWA eligibility source requires active recruiting session", asyn
   });
 });
 
-test("personal WhatsApp connection inbound is eligible without greeting-as-CTWA", () => {
+test("personal WhatsApp connection alone is not Atlas automation eligibility", () => {
   const result = evaluateAtlasInboundAutomationEligibility({
     prospect: unknownProspect(),
     inbound: {
@@ -239,8 +239,21 @@ test("personal WhatsApp connection inbound is eligible without greeting-as-CTWA"
       whatsappConnectionSource: "whatsapp_personal_connection"
     }
   });
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "NOT_ELIGIBLE");
+});
+
+test("personal WhatsApp with positive CTWA referral remains eligible", () => {
+  const result = evaluateAtlasInboundAutomationEligibility({
+    prospect: unknownProspect(),
+    inbound: {
+      text: "Hola",
+      whatsappConnectionSource: "whatsapp_personal_connection",
+      ctwaReferral: { source_type: "ad", ctwa_clid: "clid-personal-1" }
+    }
+  });
   assert.equal(result.eligible, true);
-  assert.equal(result.reason, "PERSONAL_WHATSAPP");
+  assert.equal(result.reason, "CTWA_REFERRAL");
 });
 
 test("create path still stamps CTWA only from verified referral", () => {

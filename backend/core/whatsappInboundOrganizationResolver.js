@@ -43,6 +43,16 @@ function sameId(a, b) {
   return Boolean(a && b && String(a) === String(b));
 }
 
+function connectionResolution(connection) {
+  return {
+    organizationId: String(connection.organization_id),
+    ownerUserId: connection.user_id ? String(connection.user_id) : null,
+    source: connection.user_id
+      ? "whatsapp_personal_connection"
+      : "whatsapp_organization_connection"
+  };
+}
+
 /**
  * @returns {Promise<{ organizationId: string, source: string, ownerUserId: string|null }>}
  */
@@ -54,23 +64,24 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
     connectionRepository = defaultConnectionRepository()
   } = input;
 
-  if (explicitOrganizationId && String(explicitOrganizationId).trim()) {
-    return {
-      organizationId: String(explicitOrganizationId).trim(),
-      ownerUserId: null,
-      source: "explicit"
-    };
-  }
-
+  const explicitOrg = String(explicitOrganizationId || "").trim() || null;
   const defaultOrganizationId = canonicalDefaultOrganizationId();
   const envPhoneNumberId = configuredEnvPhoneNumberId();
   const envWabaId = configuredEnvWabaId();
 
-  // 1) Preferred: Phone Number ID → connected whatsapp_integrations row (org + owner)
+  // BR-165A / tenant isolation: even when a caller already knows the tenant,
+  // a concrete WhatsApp phone asset remains authoritative for personal owner.
+  // Never let explicit org scoping erase user_id/source from the integration row.
   if (phoneNumberId && typeof connectionRepository.findConnectionByPhoneNumberId === "function") {
     try {
       const byPhone = await connectionRepository.findConnectionByPhoneNumberId(phoneNumberId);
       if (byPhone?.organization_id && byPhone.status === "connected") {
+        if (explicitOrg && !sameId(explicitOrg, byPhone.organization_id)) {
+          throw new WhatsAppInboundOrganizationError(
+            "Inbound WhatsApp phone asset belongs to a different organization.",
+            { code: "WHATSAPP_TENANT_ASSET_MISMATCH" }
+          );
+        }
         if (wabaId && byPhone.waba_id && !sameId(wabaId, byPhone.waba_id)) {
           throw new WhatsAppInboundOrganizationError(
             "Inbound WhatsApp WABA id does not match connected phone asset.",
@@ -78,13 +89,7 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
           );
         }
 
-        return {
-          organizationId: String(byPhone.organization_id),
-          ownerUserId: byPhone.user_id ? String(byPhone.user_id) : null,
-          source: byPhone.user_id
-            ? "whatsapp_personal_connection"
-            : "whatsapp_organization_connection"
-        };
+        return connectionResolution(byPhone);
       }
     } catch (error) {
       if (error instanceof WhatsAppInboundOrganizationError) {
@@ -98,6 +103,29 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
         error: error.message
       });
     }
+  }
+
+  // Explicit organization is a tenant constraint/fallback, never an owner signal.
+  // It is only accepted after the phone-asset lookup above had a chance to preserve
+  // the exact personal connection owner.
+  if (explicitOrg) {
+    if (phoneNumberId && envPhoneNumberId && !sameId(phoneNumberId, envPhoneNumberId)) {
+      throw new WhatsAppInboundOrganizationError(
+        "Inbound WhatsApp phone_number_id is not mapped to the explicit organization.",
+        { code: "WHATSAPP_PHONE_ASSET_MISMATCH" }
+      );
+    }
+    if (wabaId && envWabaId && !sameId(wabaId, envWabaId)) {
+      throw new WhatsAppInboundOrganizationError(
+        "Inbound WhatsApp WABA id does not match configured production WABA asset.",
+        { code: "WHATSAPP_WABA_ASSET_MISMATCH" }
+      );
+    }
+    return {
+      organizationId: explicitOrg,
+      ownerUserId: null,
+      source: "explicit"
+    };
   }
 
   if (phoneNumberId && envPhoneNumberId && !sameId(phoneNumberId, envPhoneNumberId)) {
@@ -114,7 +142,7 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
     );
   }
 
-  // 2) Legacy: default-org organization-owned connection
+  // Legacy: default-org organization-owned connection.
   if (defaultOrganizationId && connectionRepository?.getConnection) {
     try {
       const connection = await connectionRepository.getConnection(defaultOrganizationId);
@@ -127,7 +155,9 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
         return {
           organizationId: defaultOrganizationId,
           ownerUserId: connection.user_id ? String(connection.user_id) : null,
-          source: "whatsapp_connection"
+          source: connection.user_id
+            ? "whatsapp_personal_connection"
+            : "whatsapp_connection"
         };
       }
     } catch (error) {

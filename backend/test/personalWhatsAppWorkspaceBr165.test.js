@@ -1,6 +1,6 @@
 /**
- * BR-165 — Personal WhatsApp assigns the connection owner, is eligible for
- * Recruit AI, and default workspace lists are mine-only.
+ * BR-165 / BR-165A — Personal WhatsApp assigns the connection owner and default
+ * workspace lists are mine-only, but personal connection alone is NOT Recruit AI eligibility.
  */
 
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -19,8 +19,7 @@ const {
 const {
   evaluateAtlasInboundAutomationEligibility,
   resolveVerifiedAtlasEligibilitySource,
-  isPersonalWhatsAppConnection,
-  VERIFIED_ATLAS_ELIGIBILITY_SOURCES
+  isPersonalWhatsAppConnection
 } = require("../core/atlasInboundAutomationEligibility");
 const { evaluateProspectPromotion } = require("../core/prospectPromotionEligibility");
 const { resolveCreateSourceFields } = require("../core/whatsappProspectResolver");
@@ -119,7 +118,7 @@ test("org-owned WhatsApp still uses default recruiter", async () => {
   assert.equal(assignment.assignmentSource, ASSIGNMENT_SOURCES.DEFAULT_RECRUITER);
 });
 
-test("personal connection promotes and is Recruit AI eligible without CTWA referral", () => {
+test("personal connection promotes/assigns owner but is not Recruit AI eligible by itself", () => {
   assert.equal(isPersonalWhatsAppConnection("whatsapp_personal_connection"), true);
   assert.equal(isPersonalWhatsAppConnection("whatsapp_organization_connection"), false);
 
@@ -142,8 +141,21 @@ test("personal connection promotes and is Recruit AI eligible without CTWA refer
       whatsappConnectionSource: "whatsapp_personal_connection"
     }
   });
+  assert.equal(personal.eligible, false);
+  assert.equal(personal.reason, "NOT_ELIGIBLE");
+});
+
+test("personal connection with verified CTWA is still Recruit AI eligible", () => {
+  const personal = evaluateAtlasInboundAutomationEligibility({
+    prospect: { id: "p1", phone: "+17863061884", organization_id: ORG },
+    inbound: {
+      text: "Hola",
+      whatsappConnectionSource: "whatsapp_personal_connection",
+      ctwaReferral: { source_type: "ad", ctwa_clid: "personal-ctwa-1" }
+    }
+  });
   assert.equal(personal.eligible, true);
-  assert.equal(personal.reason, "PERSONAL_WHATSAPP");
+  assert.equal(personal.reason, "CTWA_REFERRAL");
 });
 
 test("shared org connection without referral stays silent and unpromoted", () => {
@@ -162,7 +174,7 @@ test("shared org connection without referral stays silent and unpromoted", () =>
   assert.equal(eligibility.eligible, false);
 });
 
-test("create fields stamp personal WhatsApp owner, not default CTWA labels", () => {
+test("create fields stamp personal WhatsApp owner but not verified automation eligibility", () => {
   const fields = resolveCreateSourceFields(null, {
     whatsappConnectionSource: "whatsapp_personal_connection",
     whatsappConnectionOwnerUserId: MISLEISYS
@@ -174,7 +186,7 @@ test("create fields stamp personal WhatsApp owner, not default CTWA labels", () 
     resolveVerifiedAtlasEligibilitySource({
       whatsappConnectionSource: "whatsapp_personal_connection"
     }),
-    VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP
+    null
   );
 });
 
