@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getExecutiveDashboard, getAlphaMorningBrief } from "../services/executiveDashboardService";
 import { getDashboard } from "../services/api";
 import { fetchOrganizationBranding } from "../services/organizationBrandingService";
+import { fetchTodayAgenda } from "../services/agendaService";
 import { useWorkspace } from "../contexts/WorkspaceContext";
 import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
 
@@ -11,7 +12,7 @@ export const EXECUTIVE_LOAD_TIMEOUT_MS = 5000;
  * Progressive Executive Dashboard data loading.
  * Phase 1: executive aggregate (KPI + interviews shell)
  * Phase 2: alpha brief + branding (morning summary, priorities)
- * Phase 3: dashboard prospects (agenda enrichment) — deferred, non-blocking
+ * Phase 3: dashboard prospects + individually owned standalone Agenda appointments.
  */
 export function useExecutiveDashboardV2Data() {
   const { user, supportMode } = useWorkspace();
@@ -19,6 +20,7 @@ export function useExecutiveDashboardV2Data() {
   const [executive, setExecutive] = useState(null);
   const [alphaBrief, setAlphaBrief] = useState(null);
   const [dashboard, setDashboard] = useState(null);
+  const [standaloneAgenda, setStandaloneAgenda] = useState([]);
   const [organizationName, setOrganizationName] = useState("");
   const [phase, setPhase] = useState(1);
   const [loadingExecutive, setLoadingExecutive] = useState(true);
@@ -40,6 +42,7 @@ export function useExecutiveDashboardV2Data() {
       setExecutive(null);
       setAlphaBrief(null);
       setDashboard(null);
+      setStandaloneAgenda([]);
       setOrganizationName("");
       setPhase(1);
       setLoadingExecutive(false);
@@ -54,6 +57,7 @@ export function useExecutiveDashboardV2Data() {
     setExecutive(null);
     setAlphaBrief(null);
     setDashboard(null);
+    setStandaloneAgenda([]);
     setPhase(1);
     setLoadingExecutive(true);
     setLoadingTimedOut(false);
@@ -127,27 +131,35 @@ export function useExecutiveDashboardV2Data() {
     }
 
     async function loadPhase3() {
-      try {
-        const dashboardPayload = await getDashboard({ signal: controller.signal });
-        if (!cancelled) {
-          setDashboard(dashboardPayload);
-        }
-      } catch {
-        if (!cancelled) {
-          setErrors((prev) => ({ ...prev, dashboard: "executiveV2AgendaEnrichmentUnavailable" }));
-        }
-      }
+      const dashboardTask = getDashboard({ signal: controller.signal })
+        .then((dashboardPayload) => {
+          if (!cancelled) setDashboard(dashboardPayload);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setErrors((prev) => ({ ...prev, dashboard: "executiveV2AgendaEnrichmentUnavailable" }));
+          }
+        });
+
+      const agendaTask = fetchTodayAgenda({ signal: controller.signal })
+        .then((payload) => {
+          if (!cancelled) setStandaloneAgenda(payload?.items || []);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setStandaloneAgenda([]);
+            setErrors((prev) => ({ ...prev, standaloneAgenda: "executiveV2AgendaEnrichmentUnavailable" }));
+          }
+        });
+
+      await Promise.all([dashboardTask, agendaTask]);
     }
 
     async function run() {
       await loadPhase1();
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
       await loadPhase2();
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
       await loadPhase3();
     }
 
@@ -172,6 +184,7 @@ export function useExecutiveDashboardV2Data() {
     executive,
     alphaBrief,
     dashboard,
+    standaloneAgenda,
     organizationName,
     phase,
     loadingExecutive,
