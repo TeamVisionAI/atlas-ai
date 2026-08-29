@@ -1,0 +1,125 @@
+.agenda-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.agenda-dialog {
+  width: min(620px, 100%);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  border-radius: 18px;
+  background: var(--atlas-surface, #fff);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
+.agenda-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 14px;
+}
+
+.agenda-dialog__header h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+}
+
+.agenda-dialog__header p {
+  margin: 0;
+  color: var(--atlas-text-muted, #64748b);
+}
+
+.agenda-dialog__close {
+  border: 0;
+  background: transparent;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agenda-dialog__form {
+  display: grid;
+  gap: 16px;
+  padding: 10px 24px 24px;
+}
+
+.agenda-dialog__form label {
+  display: grid;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.agenda-dialog__form input,
+.agenda-dialog__form select,
+.agenda-dialog__form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--atlas-border, #d8dee8);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--atlas-surface, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+.agenda-dialog__two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.agenda-dialog__error {
+  margin: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.agenda-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.agenda-dialog__button {
+  border-radius: 10px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.agenda-dialog__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.agenda-dialog__button--primary {
+  border: 1px solid #1e3a5f;
+  background: #1e3a5f;
+  color: #fff;
+}
+
+.agenda-dialog__button--secondary {
+  border: 1px solid var(--atlas-border, #d8dee8);
+  background: transparent;
+  color: inherit;
+}
+
+@media (max-width: 640px) {
+  .agenda-dialog__two {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-dialog__backdrop {
+    padding: 10px;
+  }
+}
