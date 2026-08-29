@@ -2,6 +2,9 @@
  * Short inbound burst aggregation — combine rapid short fragments into one logical turn.
  * Only delays processing for short text fragments; long messages flush immediately.
  * Recruiting campaign-intake first turns use a longer bounded window (see recruitingFirstTurnBurst.js).
+ *
+ * BR-167 — burst identity is channel-asset scoped, never phone-only. The same
+ * customer may legitimately exist in multiple Atlas tenants / WhatsApp assets.
  */
 
 const {
@@ -14,8 +17,32 @@ const BURST_WAIT_MS = 500;
 /** @type {Map<string, { fragments: Array<{ text: string, inbound: object }>, timer: NodeJS.Timeout | null, waiters: Array<Function> }>} */
 const bursts = new Map();
 
-function burstKey(phone) {
-  return String(phone || "").trim();
+function normalizedPart(value) {
+  return String(value || "").trim();
+}
+
+/**
+ * BR-167 — use the concrete receiving WhatsApp asset + sender identity.
+ * phoneNumberId is preferred because it is the exact Cloud API number asset;
+ * WABA is a secondary discriminator. This prevents a phone shared across two
+ * tenants/assets from being merged into one logical turn.
+ */
+function burstKey(phone, inbound = {}) {
+  const sender =
+    normalizedPart(inbound.whatsappSenderId) ||
+    normalizedPart(inbound.phone) ||
+    normalizedPart(phone);
+  const phoneNumberId =
+    normalizedPart(inbound.phoneNumberId) ||
+    normalizedPart(inbound.rawValue?.metadata?.phone_number_id);
+  const wabaId = normalizedPart(inbound.wabaId);
+
+  if (!sender) {
+    return "";
+  }
+
+  const asset = phoneNumberId || wabaId || "unknown_asset";
+  return `${asset}::${sender}`;
 }
 
 function isShortFragment(text, { recruitingFirstTurnBurst = false } = {}) {
@@ -58,7 +85,7 @@ function scheduleInboundBurstAggregation({
   waitMs = BURST_WAIT_MS,
   recruitingFirstTurnBurst = false
 } = {}) {
-  const key = burstKey(phone);
+  const key = burstKey(phone, inbound || {});
   const trimmed = String(text || "").trim();
   const effectiveWaitMs = recruitingFirstTurnBurst
     ? RECRUITING_FIRST_TURN_BURST_WAIT_MS
@@ -169,6 +196,7 @@ module.exports = {
   SHORT_FRAGMENT_MAX_LEN,
   BURST_WAIT_MS,
   RECRUITING_FIRST_TURN_BURST_WAIT_MS,
+  burstKey,
   scheduleInboundBurstAggregation,
   resetInboundBurstAggregationForTests,
   mergeBurstInbound
