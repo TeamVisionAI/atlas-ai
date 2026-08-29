@@ -4,6 +4,7 @@ const { organizationGuard } = require("../middleware/organizationGuard");
 const { requireAnyPermission } = require("../middleware/requirePermission");
 const { PERMISSIONS } = require("../security/permissions");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
+const { listPersistedAppointments } = require("../services/appointmentListService");
 const {
   createAgendaContact,
   listAgendaContacts,
@@ -35,6 +36,23 @@ function sendError(res, error) {
     message: error.message
   });
 }
+
+router.get("/today", async (req, res) => {
+  try {
+    const scope = context(req);
+    const result = await listPersistedAppointments({
+      organizationId: scope.organizationId,
+      agentId: scope.userId,
+      view: "today"
+    });
+    const items = (result.items || []).filter(
+      (appointment) => appointment.metadata?.standaloneAgenda === true
+    );
+    return res.json({ items, total: items.length });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
 
 router.get("/contacts", async (req, res) => {
   try {
