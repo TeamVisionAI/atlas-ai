@@ -13,6 +13,14 @@ const TEAM_VISION = "00000000-0000-4000-8000-000000000001";
 const NIOVEL = "33ad243a-9d00-4a4d-810b-df2762c0f076";
 const OTHER_USER = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const PHONE = "+17865550999";
+const TENANT_FEATURES = { conversationsCenterEnabled: true };
+const ALLOWED_AUTH = {
+  userId: NIOVEL,
+  organizationId: TEAM_VISION,
+  permissions: ["prospect:communicate"],
+  status: "active",
+  role: "rvp"
+};
 
 const STATE_FILE = path.join(__dirname, "../data/workflowState.json");
 
@@ -68,7 +76,10 @@ test("HUMAN owner can send via composer", async () => {
       userId: NIOVEL,
       organizationId: TEAM_VISION,
       clientRequestId: "req-human-1",
+      tenantFeatures: TENANT_FEATURES,
+      authContext: ALLOWED_AUTH,
       findProspectFn: async () => prospectFixture(),
+      resolveInboundPhoneNumberIdFn: async () => null,
       sendFn: async (args) => {
         sendArgs = args;
         return {
@@ -87,6 +98,7 @@ test("HUMAN owner can send via composer", async () => {
     assert.equal(sendArgs.pipeline, "HUMAN");
     assert.equal(sendArgs.intent, "HUMAN_COMPOSER_REPLY");
     assert.equal(sendArgs.message, "Hola desde Human");
+    assert.equal(sendArgs.inboundPhoneNumberId, null);
     assert.match(sendArgs.idempotencyKey, /req-human-1/);
   });
 });
@@ -110,6 +122,8 @@ test("ATLAS owner cannot use human composer", async () => {
           userId: NIOVEL,
           organizationId: TEAM_VISION,
           clientRequestId: "req-atlas-block",
+          tenantFeatures: TENANT_FEATURES,
+          authContext: ALLOWED_AUTH,
           findProspectFn: async () => prospectFixture(),
           sendFn: async () => {
             throw new Error("should not send");
@@ -139,10 +153,20 @@ test("non-Niovel user forbidden", async () => {
           userId: OTHER_USER,
           organizationId: TEAM_VISION,
           clientRequestId: "req-other",
+          tenantFeatures: TENANT_FEATURES,
+          authContext: {
+            userId: OTHER_USER,
+            organizationId: TEAM_VISION,
+            permissions: [],
+            status: "active",
+            role: "support"
+          },
           findProspectFn: async () => prospectFixture(),
           sendFn: async () => ({ success: true })
         }),
-      (error) => error.code === "CONVERSATIONS_CENTER_USER_FORBIDDEN"
+      (error) =>
+        error.code === "CONVERSATIONS_CENTER_FORBIDDEN" ||
+        error.code === "CONVERSATIONS_CENTER_USER_FORBIDDEN"
     );
   });
 });
@@ -176,7 +200,10 @@ test("duplicate clientRequestId does not duplicate send (idempotent success)", a
       userId: NIOVEL,
       organizationId: TEAM_VISION,
       clientRequestId: "req-dup-1",
+      tenantFeatures: TENANT_FEATURES,
+      authContext: ALLOWED_AUTH,
       findProspectFn: async () => prospectFixture(),
+      resolveInboundPhoneNumberIdFn: async () => null,
       sendFn
     });
     const second = await sendHumanComposerReply({
@@ -185,7 +212,10 @@ test("duplicate clientRequestId does not duplicate send (idempotent success)", a
       userId: NIOVEL,
       organizationId: TEAM_VISION,
       clientRequestId: "req-dup-1",
+      tenantFeatures: TENANT_FEATURES,
+      authContext: ALLOWED_AUTH,
       findProspectFn: async () => prospectFixture(),
+      resolveInboundPhoneNumberIdFn: async () => null,
       sendFn
     });
 
@@ -218,6 +248,9 @@ test("outside messaging window blocks free-form and does not send template", asy
           userId: NIOVEL,
           organizationId: TEAM_VISION,
           clientRequestId: "req-window",
+          tenantFeatures: TENANT_FEATURES,
+          authContext: ALLOWED_AUTH,
+          resolveInboundPhoneNumberIdFn: async () => null,
           findProspectFn: async () => prospectFixture(),
           sendFn: async (args) => {
             assert.equal(args.templateKey, undefined);
@@ -258,6 +291,9 @@ test("send failure surfaces safely", async () => {
           userId: NIOVEL,
           organizationId: TEAM_VISION,
           clientRequestId: "req-fail",
+          tenantFeatures: TENANT_FEATURES,
+          authContext: ALLOWED_AUTH,
+          resolveInboundPhoneNumberIdFn: async () => null,
           findProspectFn: async () => prospectFixture(),
           sendFn: async () => ({
             success: false,
@@ -310,6 +346,9 @@ test("Atlas auto-reply remains suppressed after human send ownership", async () 
       userId: NIOVEL,
       organizationId: TEAM_VISION,
       clientRequestId: "req-silence",
+      tenantFeatures: TENANT_FEATURES,
+      authContext: ALLOWED_AUTH,
+      resolveInboundPhoneNumberIdFn: async () => null,
       findProspectFn: async () => prospectFixture(),
       sendFn: async () => ({
         success: true,

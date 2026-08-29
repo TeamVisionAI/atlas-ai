@@ -20,6 +20,10 @@ const {
 } = require("../whatsappOutboundPipeline");
 const { DELIVERY_STATUSES } = require("../whatsappOutboundAuthorizationGate");
 const { findProspect } = require("../../services/supabaseService");
+const {
+  resolveLastInboundWhatsAppPhoneNumberId
+} = require("../whatsappLastInboundAsset");
+const { logWhatsAppStage } = require("../whatsappStructuredLogger");
 
 const HUMAN_COMPOSER_INTENT = "HUMAN_COMPOSER_REPLY";
 
@@ -44,7 +48,9 @@ function buildWindowClosedError(delivery) {
  *   tenantFeatures?: object,
  *   accessAlreadyAsserted?: boolean,
  *   sendFn?: Function,
- *   findProspectFn?: Function
+ *   findProspectFn?: Function,
+ *   resolveInboundPhoneNumberIdFn?: Function,
+ *   workflowStateOptions?: object
  * }} input
  */
 async function sendHumanComposerReply(input = {}) {
@@ -58,7 +64,9 @@ async function sendHumanComposerReply(input = {}) {
     tenantFeatures = null,
     accessAlreadyAsserted = false,
     sendFn = sendAndPersistWhatsAppMessage,
-    findProspectFn = findProspect
+    findProspectFn = findProspect,
+    resolveInboundPhoneNumberIdFn = resolveLastInboundWhatsAppPhoneNumberId,
+    workflowStateOptions = {}
   } = input;
 
   if (accessAlreadyAsserted !== true) {
@@ -107,7 +115,8 @@ async function sendHumanComposerReply(input = {}) {
 
   const persisted = await loadPersistedWorkflowState(prospect.phone, {
     organizationId: prospect.organization_id || null,
-    prospectId: prospect.id || null
+    prospectId: prospect.id || null,
+    ...workflowStateOptions
   });
   const ownershipState = resolveConversationOwnershipState(persisted);
 
@@ -121,6 +130,24 @@ async function sendHumanComposerReply(input = {}) {
 
   const idempotencyKey = `cc-human-reply:${organizationId}:${prospect.phone}:${requestId}`;
 
+  // Implements BR-165 — reply from the same receiving WhatsApp asset.
+  const inboundPhoneNumberId = await resolveInboundPhoneNumberIdFn({
+    organizationId,
+    prospectId: prospect.id || null,
+    prospectPhone: prospect.phone || null
+  });
+
+  const inboundAssetTail = inboundPhoneNumberId
+    ? String(inboundPhoneNumberId).slice(-6)
+    : null;
+
+  logWhatsAppStage("human_composer_inbound_asset_resolved", {
+    organizationId,
+    prospectId: prospect.id || null,
+    inboundPhoneNumberIdTail: inboundAssetTail,
+    resolved: Boolean(inboundPhoneNumberId)
+  });
+
   const result = await sendFn({
     to: prospect.phone,
     message: text,
@@ -128,7 +155,8 @@ async function sendHumanComposerReply(input = {}) {
     intent: HUMAN_COMPOSER_INTENT,
     organizationId,
     idempotencyKey,
-    pipeline: "HUMAN"
+    pipeline: "HUMAN",
+    inboundPhoneNumberId: inboundPhoneNumberId || null
   });
 
   if (!result?.success) {
@@ -171,7 +199,10 @@ async function sendHumanComposerReply(input = {}) {
     simulated: Boolean(result.simulated),
     actor: "HUMAN",
     prospectPhone: prospect.phone,
-    prospectId: prospect.id || null
+    prospectId: prospect.id || null,
+    inboundPhoneNumberId: inboundPhoneNumberId || null,
+    outboundPhoneNumberId:
+      result.outboundPhoneNumberId || inboundPhoneNumberId || null
   };
 }
 
