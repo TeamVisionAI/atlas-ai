@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
 import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
 import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
+import NewAgendaAppointmentDialog from "../components/agenda/NewAgendaAppointmentDialog";
 import { buildExecutiveDashboardV2ViewModel } from "../engines/executiveDashboardV2ViewModel";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import { useExecutiveDashboardV2Data } from "../hooks/useExecutiveDashboardV2Data";
@@ -115,9 +116,10 @@ function AnalyticsSection({
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { translate } = useLanguage();
+  const { translate, locale } = useLanguage();
   const { user, supportMode } = useWorkspace();
   const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
+  const [agendaDialogOpen, setAgendaDialogOpen] = useState(false);
   const {
     executive,
     alphaBrief,
@@ -137,6 +139,9 @@ export default function ExecutiveDashboard() {
     : organizationName || supportMode?.organizationName || translate("teamDashOrganizationFallback");
   const metricsUnavailableMessage = translate("executiveV2MetricsUnavailable");
   const retryLabel = translate("executiveV2Retry");
+  const addAgendaLabel = String(locale || "").toLowerCase().startsWith("es")
+    ? "+ Agregar a la Agenda"
+    : "+ Add to Agenda";
 
   const viewModel = useMemo(() => {
     if (!executive) {
@@ -218,7 +223,16 @@ export default function ExecutiveDashboard() {
       />
 
       <section className="executive-v2__section">
-        <h2 className="executive-v2__section-title">{translate("executiveV2SectionOperations")}</h2>
+        <div className="executive-v2__header-main">
+          <h2 className="executive-v2__section-title">{translate("executiveV2SectionOperations")}</h2>
+          <button
+            type="button"
+            className="executive-v2__button executive-v2__button--secondary"
+            onClick={() => setAgendaDialogOpen(true)}
+          >
+            {addAgendaLabel}
+          </button>
+        </div>
         <div className="executive-v2__grid executive-v2__grid--three executive-v2__grid--operations">
           <InterviewsTodayCard
             interviews={viewModel?.interviewsToday}
@@ -272,6 +286,12 @@ export default function ExecutiveDashboard() {
           {translate(errors.alphaBrief)}
         </p>
       ) : null}
+
+      <NewAgendaAppointmentDialog
+        open={agendaDialogOpen}
+        onClose={() => setAgendaDialogOpen(false)}
+        onCreated={() => reload()}
+      />
     </div>
   );
 }
