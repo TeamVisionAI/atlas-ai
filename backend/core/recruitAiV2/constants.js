@@ -210,6 +210,8 @@ const NEXT_ACTIONS = Object.freeze({
   CLARIFY_AM_PM: "clarify_am_pm",
   ASK_EXPLICIT_CONFIRMATION: "ask_explicit_confirmation",
   CREATE_APPOINTMENT: "create_appointment",
+  /** BR-171 — confirmed slot on an existing appointment; executor uses canonical reschedule only. */
+  RESCHEDULE_APPOINTMENT: "reschedule_appointment",
   OFFER_RESCHEDULE_FLOW: "offer_reschedule_flow",
   SAFE_FAILURE_AND_ESCALATE: "safe_failure_and_escalate",
   ESCALATE_TO_HUMAN: "escalate_to_human",
@@ -391,6 +393,8 @@ const REASON_CODES = Object.freeze({
   DIRECT_LACK_OF_INTEREST_RECOGNIZED: "DIRECT_LACK_OF_INTEREST_RECOGNIZED",
   /** BR-111 — decision proposes create; authorization is independent. */
   APPOINTMENT_CREATE_PROPOSED: "APPOINTMENT_CREATE_PROPOSED",
+  /** BR-171 — decision proposes canonical reschedule; authorization is independent. */
+  APPOINTMENT_RESCHEDULE_PROPOSED: "APPOINTMENT_RESCHEDULE_PROPOSED",
   /** BR-118 — inbound classified as non-text media (not free-form language). */
   NON_TEXT_MEDIA_RECEIVED: "NON_TEXT_MEDIA_RECEIVED",
   /** BR-118 — skipped text interpreter / clarify_once for media. */
@@ -408,6 +412,8 @@ const REASON_CODES = Object.freeze({
   EXECUTION_IDEMPOTENT_REPLAY: "EXECUTION_IDEMPOTENT_REPLAY",
   EXECUTION_ACTIVE_SLOT_CONFLICT: "EXECUTION_ACTIVE_SLOT_CONFLICT",
   EXECUTION_CANONICAL_FAILED: "EXECUTION_CANONICAL_FAILED",
+  /** BR-171 — 0 or >1 active appointments; do not guess which to move. */
+  EXECUTION_AMBIGUOUS_APPOINTMENT: "EXECUTION_AMBIGUOUS_APPOINTMENT",
   /** BR-122 — canonical reported failure but an active appointment remains. */
   EXECUTION_RECONCILED_ACTIVE_APPOINTMENT: "EXECUTION_RECONCILED_ACTIVE_APPOINTMENT"
 });
@@ -448,7 +454,9 @@ const FEATURE_FLAGS = Object.freeze({
 
 /** BR-111 — only these mutation types may be authorized for the first canary. */
 const V2_EXECUTABLE_ACTIONS = Object.freeze({
-  CREATE_APPOINTMENT: "create_appointment"
+  CREATE_APPOINTMENT: "create_appointment",
+  /** BR-171 — canonical appointmentApplicationService.rescheduleAppointment only. */
+  RESCHEDULE_APPOINTMENT: "reschedule_appointment"
 });
 
 const SHADOW_DIVERGENCE = Object.freeze({

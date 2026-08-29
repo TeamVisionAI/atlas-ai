@@ -2487,6 +2487,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-171 — WhatsApp Natural-Language Appointment Rescheduling
+
+**Implements:** When a prospect asks in Spanish or English to reschedule an existing appointment (including inflections such as `reprogramar` / `reprogramarla`), Atlas must correlate to that appointment, offer real interviewer availability for a supplied day, and move the same appointment through the canonical reschedule path. TAKE OVER / HUMAN ownership stays silent and does not mutate the appointment, but the request must surface as human attention.  
+**Domain:** Recruit AI / Scheduling + conversation ownership  
+**Depends on:** BR-049, BR-050, BR-080, BR-107, BR-111, BR-124  
+**Related:** BR-039 (calendar move), BR-076 (reminders), BR-142 (automation eligibility)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/rescheduleRequestFacts.js`; interpreter; decisionEngine; schedulingAvailabilityReader; sideEffectAuthorizer; sideEffectExecutor → `appointmentApplicationService.rescheduleAppointment`; whatsappInboundPipeline  
+**Tests:** `backend/test/recruitAiV2NaturalLanguageRescheduleBr171.test.js`
+
+### Rules
+
+1. **ATLAS ownership — detect** — Recognize ES/EN reschedule language, including `reprogramar`, `reprogramarla`, `reprogramarlo`, `reprogramación`, `cambiar la cita`, `mover la cita`, `no podré asistir` plus an alternate date, and `Can we move my interview to Monday?`. Correlate to the existing active appointment. Do not treat this as a new create.
+2. **ATLAS ownership — offer real slots** — If the prospect names a day/date (`el lunes`), load that interviewer’s real availability for that date and offer valid slots. Do not invent times.
+3. **ATLAS ownership — confirm executes canonical reschedule** — After the prospect selects/confirms, call `appointmentApplicationService.rescheduleAppointment` only. Preserve prospect id and appointment id. Move the existing calendar event. Do not create a duplicate appointment. Cancel prior reminders and schedule reminders for the new slot. `missing_email` or lack of reminder confirmation must not block the reschedule.
+4. **Fail closed** — Ambiguous appointment match (zero or more than one active) or a thrown calendar/canonical error must not invent a write. Tenant-scoped and interviewer-scoped.
+5. **HUMAN / AGENT TAKE OVER** — Do not auto-reply and do not move the appointment. A detected reschedule or cannot-attend request must mark human attention with reason `appointment_reschedule_requested`. Do not Return to Atlas automatically. The human reschedules from the existing appointment.
+6. **Reminders under HUMAN ownership** — Automatic reminder pause/cancel when a human-owned prospect says they cannot attend is **out of scope**. Do not mutate the appointment or reminder schedule under HUMAN ownership until a separate business rule is established.
+7. **No tenant/user/prospect exceptions** — Same rules for every V2-eligible thread. Do not special-case a phone or named prospect.
+8. **Boundaries** — Do not duplicate calendar/reschedule logic in V2. Do not add reschedule to `allowHandoffAck`. Do not change TAKE OVER write rules or Return to Atlas.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  
