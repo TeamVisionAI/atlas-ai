@@ -816,11 +816,28 @@ async function attemptLiveV2Authoring({
   const organizationId = prospect.organization_id || prospect.organizationId || null;
   const actingUserId = resolveActingUserIdFromProspect(prospect);
 
+  let grant = dependencies.v2Grant || null;
+  if (!grant) {
+    try {
+      const {
+        loadRecruitAiV2EligibilityGrant
+      } = require("../../services/recruitAiV2CertificationService");
+      grant = await loadRecruitAiV2EligibilityGrant({
+        organizationId,
+        userId: actingUserId
+      });
+    } catch {
+      const { emptyGrant } = require("./v2CertificationGrants");
+      grant = emptyGrant();
+    }
+  }
+
   const eligibility = isEligibleForLiveAuthoring({
     organizationId,
     actingUserId,
     env,
-    invocationSource: "live_whatsapp"
+    invocationSource: "live_whatsapp",
+    grant
   });
 
   if (!eligibility.eligible) {
@@ -853,7 +870,8 @@ async function attemptLiveV2Authoring({
     env,
     invocationSource: "live_whatsapp",
     organizationId,
-    actingUserId
+    actingUserId,
+    grant
   });
 
   const persistence =
@@ -927,6 +945,7 @@ async function attemptLiveV2Authoring({
           actingUserId,
           agentId: actingUserId,
           organizationId,
+          v2Grant: grant,
           prospectPhone,
           legacyProspectId,
           inboundMessageId: normalized.providerMessageId || null,

@@ -18,6 +18,9 @@
  */
 
 const { FEATURE_FLAGS } = require("./constants");
+const {
+  grantAuthorizesAuthoring
+} = require("./v2CertificationGrants");
 
 const DEFAULT_TIMEOUT_MS = 8000;
 
@@ -135,7 +138,8 @@ function isEligibleForLiveAuthoring({
   organizationId,
   actingUserId,
   env = process.env,
-  invocationSource = null
+  invocationSource = null,
+  grant = null
 } = {}) {
   // Shadow / advisory / playground must never take the live authoring path.
   if (invocationSource != null && invocationSource !== "live_whatsapp") {
@@ -164,7 +168,22 @@ function isEligibleForLiveAuthoring({
     return { eligible: false, reason: "MISSING_SCOPE", config };
   }
 
-  if (!isOrganizationAllowlisted(organizationId, config)) {
+  if (grant?.tenantSuspended === true) {
+    return { eligible: false, reason: "TENANT_SUSPENDED", config };
+  }
+
+  const envOrg = isOrganizationAllowlisted(organizationId, config);
+  const envUser = isUserAllowlisted(actingUserId, config);
+  if (envOrg && envUser) {
+    return { eligible: true, reason: null, config, source: "env_allowlist" };
+  }
+
+  // Implements BR-169 — durable certified-tenant + user authoring grant.
+  if (grantAuthorizesAuthoring(grant)) {
+    return { eligible: true, reason: null, config, source: "durable_grant" };
+  }
+
+  if (!envOrg) {
     return {
       eligible: false,
       reason:
@@ -175,18 +194,14 @@ function isEligibleForLiveAuthoring({
     };
   }
 
-  if (!isUserAllowlisted(actingUserId, config)) {
-    return {
-      eligible: false,
-      reason:
-        Array.isArray(config.userIds) && config.userIds.length === 0
-          ? "USER_ALLOWLIST_EMPTY"
-          : "USER_NOT_ALLOWLISTED",
-      config
-    };
-  }
-
-  return { eligible: true, reason: null, config };
+  return {
+    eligible: false,
+    reason:
+      Array.isArray(config.userIds) && config.userIds.length === 0
+        ? "USER_ALLOWLIST_EMPTY"
+        : "USER_NOT_ALLOWLISTED",
+    config
+  };
 }
 
 function resolveActingUserIdFromProspect(prospect = {}) {

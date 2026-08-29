@@ -282,4 +282,64 @@ router.get("/users/:id/login-history", async (req, res) => {
   }
 });
 
+router.get("/recruit-ai-v2", async (req, res) => {
+  try {
+    const service = require("../services/recruitAiV2CertificationService");
+    const organizationId = req.authContext?.organizationId;
+    const status = await service.getTenantV2Status(organizationId);
+    return res.json({
+      tenant: status.tenant,
+      canManageUserGrants: status.canManageUserGrants
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to load Recruit AI v2 status."
+    });
+  }
+});
+
+router.get("/users/:id/recruit-ai-v2", async (req, res) => {
+  try {
+    const service = require("../services/recruitAiV2CertificationService");
+    const organizationId = req.authContext?.organizationId;
+    await service.assertUserInOrganization(organizationId, req.params.id);
+    const grant = await service.getUserGrant(organizationId, req.params.id);
+    const status = await service.getTenantV2Status(organizationId);
+    return res.json({
+      grant,
+      tenant: status.tenant,
+      canManageUserGrants: status.canManageUserGrants
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to load Recruit AI v2 user grant."
+    });
+  }
+});
+
+router.patch("/users/:id/recruit-ai-v2", async (req, res) => {
+  try {
+    const service = require("../services/recruitAiV2CertificationService");
+    const grant = await service.upsertUserGrant({
+      organizationId: req.authContext?.organizationId,
+      userId: req.params.id,
+      authoringEnabled: req.body?.authoringEnabled,
+      executionEnabled: req.body?.executionEnabled,
+      actor: {
+        userId: req.authContext?.userId,
+        userEmail: req.authContext?.email
+      },
+      requireTenantEnabled: true
+    });
+    return res.json({ grant });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to update Recruit AI v2 user grant."
+    });
+  }
+});
+
 module.exports = router;

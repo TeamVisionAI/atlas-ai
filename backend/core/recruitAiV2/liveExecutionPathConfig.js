@@ -85,7 +85,8 @@ function resolveAllowExecutionForAuthoringTurn({
   env = process.env,
   invocationSource = null,
   organizationId = null,
-  actingUserId = null
+  actingUserId = null,
+  grant = null
 } = {}) {
   if (invocationSource === "live_ce") {
     return resolveAllowExecutionForLiveTurn({ env, invocationSource: "live_ce" });
@@ -95,7 +96,8 @@ function resolveAllowExecutionForAuthoringTurn({
     return isEligibleForExecution({
       organizationId,
       actingUserId,
-      env
+      env,
+      grant
     }).eligible;
   }
 

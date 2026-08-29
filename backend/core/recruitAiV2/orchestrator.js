@@ -411,6 +411,24 @@ async function processRecruitAiV2Turn({
     options.inboundMessageId ||
     null;
   const env = options.env || process.env;
+  if (!options.v2Grant) {
+    try {
+      const {
+        loadRecruitAiV2EligibilityGrant
+      } = require("../../services/recruitAiV2CertificationService");
+      options.v2Grant = await loadRecruitAiV2EligibilityGrant({
+        organizationId,
+        userId:
+          options.actingUserId ||
+          context?.identity?.owner_user_id ||
+          contextInput?.ownerUserId ||
+          null
+      });
+    } catch {
+      const { emptyGrant } = require("./v2CertificationGrants");
+      options.v2Grant = emptyGrant();
+    }
+  }
   // Implements BR-120 — phone + legacy id enable dual-load of durable context.
   const prospectPhone =
     options.prospectPhone ||

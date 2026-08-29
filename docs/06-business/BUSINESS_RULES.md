@@ -2441,6 +2441,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-169 — Recruit AI v2 Tenant/User Certification & Enablement
+
+**Implements:** Durable, audited V2 onboarding so Super Admin certifies a tenant and certified-tenant Admins grant per-user authoring/execution — without requiring Railway org/user allowlist edits for normal activation.  
+**Domain:** Recruit AI / tenant certification / user enablement  
+**Depends on:** BR-111, BR-114, BR-129, BR-145  
+**Related:** BR-112 (live CE path remains a separate global flag), BR-142, BR-165, BR-166, BR-167, BR-168  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/v2CertificationGrants.js`; `recruitAiV2CertificationService.js`; `liveAuthoringConfig.js`; `executionConfig.js`; platform tenant routes; Administration — Users  
+**Tests:** `backend/test/recruitAiV2CertificationBr169.test.js`; `frontend/src/pages/platform/recruitAiV2CertificationHelpers.test.js`
+
+### Rules
+
+1. **Global kill switches remain fail-closed** — `RECRUIT_AI_V2_LIVE_AUTHORING_ENABLED` and `RECRUIT_AI_V2_EXECUTION_ENABLED` must still be exact `"true"`. Malformed/missing master flags deny everyone, including certified tenants.
+2. **Railway allowlists remain valid during migration** — Existing `*_ORGANIZATION_IDS` + `*_USER_IDS` still authorize. Durable grants are an additional path, not a replacement, until allowlists are emptied later.
+3. **Tenant certified + enabled** — Super Admin only. Default off. Enable is refused until certified. Un-certify also disables the tenant. Certification never grants a user authoring or execution.
+4. **Per-user authoring_enabled** — Certified-tenant Admin (`admin:users`) may grant live authoring for a same-org user. Role never authorizes.
+5. **Per-user execution_enabled** — Independent of authoring. Execution is never implied by authoring, role, or tenant enablement.
+6. **Suspended tenant fails closed** — `lifecycleStatus=SUSPENDED` denies live authoring and execution even if env allowlists or grants exist.
+7. **Audit** — Persist `recruit_ai_v2.tenant_certified|uncertified|enabled|disabled` and `recruit_ai_v2.user_authoring_updated|user_execution_updated`.
+8. **Boundaries** — Do not change WhatsApp eligibility/privacy, owner routing, BR-166 coherence, BR-167/168 timeout recovery, TAKE OVER / Return to Atlas, or `RECRUIT_AI_V2_LIVE_EXECUTION_PATH_ENABLED`. Do not treat existing `recruitAiAuthoringEnabled` / `recruitAiExecutionEnabled` tenant feature toggles as live WhatsApp authority.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

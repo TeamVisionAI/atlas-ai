@@ -91,6 +91,14 @@ test("active user actions include name edit / suspend / reset / logout / archive
   assert.ok(actions.some((a) => a.id === "edit-email"));
   assert.ok(actions.some((a) => a.id === "edit-rep"));
   assert.ok(actions.some((a) => a.id === "edit-capabilities"));
+  assert.equal(actions.some((a) => a.id === "edit-v2"), false);
+});
+
+test("Recruit AI v2 grant action appears only when tenant Admin may manage grants", () => {
+  const hidden = buildUserRowActions(sampleUsers[0], { canManageV2: false });
+  const visible = buildUserRowActions(sampleUsers[0], { canManageV2: true });
+  assert.equal(hidden.some((a) => a.id === "edit-v2"), false);
+  assert.ok(visible.some((a) => a.id === "edit-v2"));
 });
 
 test("seeded-shaped users still get Edit Name without changing identity actions", () => {
@@ -133,6 +141,8 @@ test("AdminUsers grid UI structure is present", () => {
   assert.doesNotMatch(adminUsersSource, /Team Vision hierarchy/);
   assert.doesNotMatch(adminUsersSource, /00000000-0000-4000-8000-000000000001/);
   assert.doesNotMatch(adminUsersSource, /af8fb707-f26c-4152-ad77-2d079d30bc8a/);
+  assert.match(adminUsersSource, /admin-recruit-ai-v2-panel/);
+  assert.match(adminUsersSource, /Execution is never implied by authoring or role/);
 });
 
 test("CSS provides sticky header, badges, and responsive cards", () => {

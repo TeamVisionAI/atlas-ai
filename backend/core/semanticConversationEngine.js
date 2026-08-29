@@ -509,10 +509,27 @@ async function completeInterview(prospect, profile, language, options = {}) {
     DENY_STAGE: CE_MUTATION_DENIED_STAGE
   } = require("./recruitAiV2/legacyCeAppointmentMutationGate");
   const emitStageEarly = options.logStage || logWhatsAppStage;
+  const actingUserIdForGate = prospect.owner_user_id || agentId;
+  let v2Grant = options.v2Grant || null;
+  if (!v2Grant) {
+    try {
+      const {
+        loadRecruitAiV2EligibilityGrant
+      } = require("../services/recruitAiV2CertificationService");
+      v2Grant = await loadRecruitAiV2EligibilityGrant({
+        organizationId,
+        userId: actingUserIdForGate
+      });
+    } catch {
+      const { emptyGrant } = require("./recruitAiV2/v2CertificationGrants");
+      v2Grant = emptyGrant();
+    }
+  }
   const mutationGate = evaluateLegacyCeAppointmentMutation({
     organizationId,
-    actingUserId: prospect.owner_user_id || agentId,
-    env: options.env || process.env
+    actingUserId: actingUserIdForGate,
+    env: options.env || process.env,
+    grant: v2Grant
   });
   if (!mutationGate.allowed) {
     emitStageEarly(CE_MUTATION_DENIED_STAGE, {

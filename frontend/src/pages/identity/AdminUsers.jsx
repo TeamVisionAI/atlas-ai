@@ -19,6 +19,9 @@ import {
   revokeInvitation,
   suspendAdminUser,
   updateAdminUser,
+  getRecruitAiV2Status,
+  getUserRecruitAiV2Grant,
+  updateUserRecruitAiV2Grant,
   updateUserAgentCapabilities,
   updateUserSecuritiesAuthorization,
   revokeUserSecuritiesAuthorization
@@ -166,6 +169,16 @@ export default function AdminUsers() {
   const [capabilitiesTarget, setCapabilitiesTarget] = useState(null);
   const [capabilitiesForm, setCapabilitiesForm] = useState(EMPTY_CAPABILITIES_FORM);
   const [capabilitiesSaving, setCapabilitiesSaving] = useState(false);
+  const [v2Status, setV2Status] = useState({
+    canManageUserGrants: false,
+    tenant: null
+  });
+  const [v2Target, setV2Target] = useState(null);
+  const [v2Form, setV2Form] = useState({
+    authoringEnabled: false,
+    executionEnabled: false
+  });
+  const [v2Saving, setV2Saving] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
@@ -188,6 +201,16 @@ export default function AdminUsers() {
 
   useEffect(() => {
     loadUsers();
+    getRecruitAiV2Status()
+      .then((result) => {
+        setV2Status({
+          canManageUserGrants: Boolean(result.canManageUserGrants),
+          tenant: result.tenant || null
+        });
+      })
+      .catch(() => {
+        setV2Status({ canManageUserGrants: false, tenant: null });
+      });
   }, []);
 
   useEffect(() => {
@@ -375,6 +398,45 @@ export default function AdminUsers() {
     }
   }
 
+  async function openV2Editor(user) {
+    setV2Target(user);
+    setV2Form({ authoringEnabled: false, executionEnabled: false });
+    try {
+      const result = await getUserRecruitAiV2Grant(user.id);
+      setV2Form({
+        authoringEnabled: Boolean(result.grant?.authoringEnabled),
+        executionEnabled: Boolean(result.grant?.executionEnabled)
+      });
+      setV2Status({
+        canManageUserGrants: Boolean(result.canManageUserGrants),
+        tenant: result.tenant || v2Status.tenant
+      });
+    } catch (loadError) {
+      setError(loadError.message);
+    }
+  }
+
+  async function saveV2Grant(event) {
+    event.preventDefault();
+    if (!v2Target) {
+      return;
+    }
+    if (!v2Status.canManageUserGrants) {
+      setError("Tenant must be certified and enabled before Recruit AI v2 grants can change.");
+      return;
+    }
+    setV2Saving(true);
+    setError("");
+    try {
+      await updateUserRecruitAiV2Grant(v2Target.id, v2Form);
+      setV2Target(null);
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setV2Saving(false);
+    }
+  }
+
   function openSecuritiesEditor(user) {
     const access = user.securities_access || {};
     setSecuritiesTarget(user);
@@ -479,6 +541,10 @@ export default function AdminUsers() {
       }
       if (action === "edit-capabilities") {
         openCapabilitiesEditor(user);
+        return;
+      }
+      if (action === "edit-v2") {
+        openV2Editor(user);
         return;
       }
       if (action === "edit-securities") {
@@ -633,7 +699,11 @@ export default function AdminUsers() {
 
   function renderUserRow(user) {
     const isSelf = String(sessionUser?.id) === String(user.id);
-    const actions = buildUserRowActions(user, { canVerifySecurities, isSelf });
+    const actions = buildUserRowActions(user, {
+      canVerifySecurities,
+      isSelf,
+      canManageV2: v2Status.canManageUserGrants
+    });
     const statusKey = invitationDisplayStatus(user);
     const isPending = user.status === "pending_invitation";
 
@@ -707,7 +777,11 @@ export default function AdminUsers() {
 
   function renderUserCard(user) {
     const isSelf = String(sessionUser?.id) === String(user.id);
-    const actions = buildUserRowActions(user, { canVerifySecurities, isSelf });
+    const actions = buildUserRowActions(user, {
+      canVerifySecurities,
+      isSelf,
+      canManageV2: v2Status.canManageUserGrants
+    });
     const statusKey = invitationDisplayStatus(user);
     const isPending = user.status === "pending_invitation";
 
@@ -963,6 +1037,66 @@ export default function AdminUsers() {
                 type="button"
                 className="identity-button-secondary"
                 onClick={() => setShowCreate(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {v2Target ? (
+        <div className="identity-card" data-testid="admin-recruit-ai-v2-panel">
+          <h2>Recruit AI v2</h2>
+          <p className="securities-access-meta">
+            {displayUserName(v2Target)} — authoring and execution are independent.
+            Execution is never implied by authoring or role.
+            {v2Status.canManageUserGrants
+              ? ""
+              : " Tenant must be certified and enabled before grants can change."}
+          </p>
+          <form className="identity-form" onSubmit={saveV2Grant}>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={v2Form.authoringEnabled}
+                disabled={!v2Status.canManageUserGrants || v2Saving}
+                onChange={(event) =>
+                  setV2Form({
+                    ...v2Form,
+                    authoringEnabled: event.target.checked
+                  })
+                }
+              />
+              Live authoring
+            </label>
+            <label className="admin-capability-toggle">
+              <input
+                type="checkbox"
+                checked={v2Form.executionEnabled}
+                disabled={!v2Status.canManageUserGrants || v2Saving}
+                onChange={(event) =>
+                  setV2Form({
+                    ...v2Form,
+                    executionEnabled: event.target.checked
+                  })
+                }
+              />
+              Live booking / execution
+            </label>
+            <div className="identity-actions">
+              <button
+                type="submit"
+                className="identity-button"
+                disabled={v2Saving || !v2Status.canManageUserGrants}
+              >
+                {v2Saving ? "Saving…" : "Save Recruit AI v2"}
+              </button>
+              <button
+                type="button"
+                className="identity-button-secondary"
+                onClick={() => setV2Target(null)}
+                disabled={v2Saving}
               >
                 Cancel
               </button>

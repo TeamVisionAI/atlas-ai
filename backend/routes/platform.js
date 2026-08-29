@@ -104,6 +104,39 @@ router.get("/tenants/:id/features", async (req, res) => {
   }
 });
 
+router.get("/tenants/:id/recruit-ai-v2", async (req, res) => {
+  try {
+    const service = require("../services/recruitAiV2CertificationService");
+    const tenant = await service.getTenantGrant(req.params.id);
+    return res.json({ tenant });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to load Recruit AI v2 certification."
+    });
+  }
+});
+
+router.patch("/tenants/:id/recruit-ai-v2", async (req, res) => {
+  try {
+    const service = require("../services/recruitAiV2CertificationService");
+    const tenant = await service.upsertTenantGrant(
+      req.params.id,
+      {
+        certified: req.body?.certified,
+        enabled: req.body?.enabled
+      },
+      auditMeta(req)
+    );
+    return res.json({ tenant });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to update Recruit AI v2 certification."
+    });
+  }
+});
+
 router.patch("/tenants/:id/features", async (req, res) => {
   try {
     const tenantFeatureService = require("../services/tenantFeatureService");
