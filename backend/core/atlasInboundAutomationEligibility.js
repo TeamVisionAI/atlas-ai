@@ -27,12 +27,16 @@ const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
   CAMPAIGN_INTAKE_CODE: "CAMPAIGN_INTAKE_CODE",
   /** BR-147 — validated ACTIVE IUL campaign intake (policy_review lane only). */
   CAMPAIGN_INTAKE_IUL: "CAMPAIGN_INTAKE_IUL",
-  /** BR-165 — inbound to a user-owned WhatsApp connection (not the shared org number). */
+  /** Historical BR-165 marker only. Personal connection is NOT verified eligibility. */
   PERSONAL_WHATSAPP: "PERSONAL_WHATSAPP"
 });
 
 const VERIFIED_SOURCE_SET = Object.freeze(
-  new Set(Object.values(VERIFIED_ATLAS_ELIGIBILITY_SOURCES))
+  new Set(
+    Object.values(VERIFIED_ATLAS_ELIGIBILITY_SOURCES).filter(
+      (source) => source !== VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP
+    )
+  )
 );
 
 /** Stored origins that are only written by a verified intake path (not default CTWA). */
@@ -41,7 +45,6 @@ const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
     WHATSAPP_ENTRY_METHOD.QR,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
-    WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
     "QUICK_CAPTURE"
   ])
 );
@@ -125,12 +128,15 @@ function resolveVerifiedAtlasEligibilitySource({
   if (upper(sourceFields?.source) === upper(WHATSAPP_SOURCE.CAR_MAGNET)) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
   }
+
+  // BR-165A — a personal WhatsApp connection establishes owner/routing only.
+  // It must never be persisted as positive Atlas automation eligibility.
   if (
     isPersonalWhatsAppConnection(whatsappConnectionSource) ||
     entry === WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP ||
     upper(sourceFields?.source) === "PERSONAL_WHATSAPP"
   ) {
-    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP;
+    return null;
   }
   return null;
 }
@@ -264,14 +270,9 @@ function evaluateAtlasInboundAutomationEligibility({
     return { eligible: true, reason: "CAMPAIGN_INTAKE_IUL" };
   }
 
-  if (
-    isPersonalWhatsAppConnection(
-      inbound?.whatsappConnectionSource || inbound?.organizationSource
-    )
-  ) {
-    return { eligible: true, reason: "PERSONAL_WHATSAPP" };
-  }
-
+  // BR-165A — personal connection alone is not consent/eligibility.
+  // Legitimate personal-number leads continue below only if they previously earned
+  // a verified CTWA/QR/intake source or automation was explicitly enabled.
   const continuation = resolveContinuationProvenance({ prospect, workflowState });
   if (!continuation.proven) {
     return { eligible: false, reason: continuation.reason };
