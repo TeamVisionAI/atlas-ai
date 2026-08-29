@@ -3,7 +3,10 @@ const agendaContactRepository = require("../repositories/agendaContactRepository
 const appointmentRepository = require("../repositories/appointmentRepository");
 const appointmentSchedulingEngine = require("../services/appointmentSchedulingEngine");
 const { getAppointmentProfile, resolveDurationForPurpose } = require("../services/appointmentProfileService");
-const { scheduleAppointment } = require("../services/schedulingService");
+const {
+  scheduleAppointment,
+  cancelAppointment: cancelScheduledAppointment
+} = require("../services/schedulingService");
 const { findUserById } = require("../services/atlasUserService");
 const { resolveCanonicalVirtualMeetingUrl, isZoomProvider } = require("../core/virtualMeetingUrlResolver");
 const { resolveCanonicalOfficeAddress } = require("../core/officeAddressResolver");
@@ -138,6 +141,8 @@ async function createStandaloneAppointment(input, context) {
     });
     meetingAddress = office.address || meetingAddress;
     meetingLocationName = meetingLocationName || profile.office?.name || "Office";
+  } else if (meetingType === MEETING_TYPES.PHONE) {
+    meetingLocationType = null;
   }
 
   const booking = await scheduleAppointment({
@@ -163,61 +168,73 @@ async function createStandaloneAppointment(input, context) {
 
   const owner = await findUserById(userId);
   const now = new Date().toISOString();
-  const appointment = await appointmentRepository.save({
-    id: crypto.randomUUID(),
-    organizationId,
-    prospectId: null,
-    agendaContactId: contact.id,
-    // Kept only as attendee contact data for legacy display compatibility. The
-    // standaloneAgenda marker prevents this row from entering recruiting KPIs.
-    prospectPhone: contact.phone,
-    agentId: userId,
-    ownerRepId: owner?.rep_id || null,
-    interviewerUserId: userId,
-    interviewerName: [owner?.first_name, owner?.last_name].filter(Boolean).join(" ") || owner?.name || null,
-    purpose,
-    status: "scheduled",
-    source: APPOINTMENT_SOURCES.AGENT_MANUAL,
-    startDateTime: booking.startTimeISO,
-    endDateTime: booking.endTimeISO,
-    durationMinutes,
-    timezone,
-    meetingType,
-    meetingProvider: meetingType === MEETING_TYPES.VIRTUAL ? provider : null,
-    meetingLocationType: meetingType === MEETING_TYPES.IN_PERSON ? meetingLocationType : null,
-    meetingLocationName,
-    meetingAddress,
-    meetingNotes: clean(input.notes),
-    virtualMeetingUrl: meetingUrl,
-    calendarEventId: booking.googleCalendarEventId || null,
-    calendarProvider: booking.googleCalendarEventId ? "google" : null,
-    confirmationStatus: CONFIRMATION_STATUSES.CONFIRMED || "confirmed",
-    emailInvitationStatus: contact.email ? "sent" : "not_applicable",
-    reminderStatus: REMINDER_STATUSES.PENDING || "pending",
-    humanAssistRequired: false,
-    rescheduleCount: 0,
-    outcome: null,
-    outcomeNotes: null,
-    history: [{
-      type: "agenda_appointment_created",
-      actor: userId,
-      timestamp: now,
-      summary: "Standalone Agenda appointment scheduled"
-    }],
-    metadata: {
-      lifecycleState: "scheduled",
-      standaloneAgenda: true,
-      noRecruitAi: true,
-      agendaContactName: contact.name,
-      agendaContactPhone: contact.phone,
-      agendaContactEmail: contact.email,
-      agendaKind: clean(input.agendaKind) || purpose,
-      notes: clean(input.notes)
-    },
-    createdBy: userId,
-    createdAt: now,
-    updatedAt: now
-  });
+  let appointment;
+  try {
+    appointment = await appointmentRepository.save({
+      id: crypto.randomUUID(),
+      organizationId,
+      prospectId: null,
+      agendaContactId: contact.id,
+      // BR-168 hard boundary: attendee phone is Agenda contact data, never prospect identity.
+      prospectPhone: null,
+      agentId: userId,
+      ownerRepId: owner?.rep_id || null,
+      interviewerUserId: userId,
+      interviewerName: [owner?.first_name, owner?.last_name].filter(Boolean).join(" ") || owner?.name || null,
+      purpose,
+      status: "scheduled",
+      source: APPOINTMENT_SOURCES.AGENT_MANUAL,
+      startDateTime: booking.startTimeISO,
+      endDateTime: booking.endTimeISO,
+      durationMinutes,
+      timezone,
+      meetingType,
+      meetingProvider: meetingType === MEETING_TYPES.VIRTUAL ? provider : null,
+      meetingLocationType: meetingType === MEETING_TYPES.IN_PERSON ? meetingLocationType : null,
+      meetingLocationName,
+      meetingAddress,
+      meetingNotes: clean(input.notes),
+      virtualMeetingUrl: meetingUrl,
+      calendarEventId: booking.googleCalendarEventId || null,
+      calendarProvider: booking.googleCalendarEventId ? "google" : null,
+      confirmationStatus: CONFIRMATION_STATUSES.CONFIRMED,
+      emailInvitationStatus: contact.email ? "sent" : "not_applicable",
+      reminderStatus: REMINDER_STATUSES.PENDING,
+      humanAssistRequired: false,
+      rescheduleCount: 0,
+      outcome: null,
+      outcomeNotes: null,
+      history: [{
+        type: "agenda_appointment_created",
+        actor: userId,
+        timestamp: now,
+        summary: "Standalone Agenda appointment scheduled"
+      }],
+      metadata: {
+        lifecycleState: "scheduled",
+        standaloneAgenda: true,
+        noRecruitAi: true,
+        prospectName: contact.name,
+        prospectEmail: contact.email,
+        agendaContactName: contact.name,
+        agendaContactPhone: contact.phone,
+        agendaContactEmail: contact.email,
+        agendaKind: clean(input.agendaKind) || purpose,
+        notes: clean(input.notes)
+      },
+      createdBy: userId,
+      createdAt: now,
+      updatedAt: now
+    });
+  } catch (saveError) {
+    await cancelScheduledAppointment({
+      appointmentType: APPOINTMENT_TYPES.MEETING,
+      startTimeISO: booking.startTimeISO,
+      googleCalendarEventId: booking.googleCalendarEventId || null,
+      organizationId
+    }).catch(() => {});
+    throw saveError;
+  }
 
   return { contact, appointment };
 }
