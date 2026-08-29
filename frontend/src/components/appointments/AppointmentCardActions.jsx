@@ -7,6 +7,8 @@ import "./AppointmentCardActions.css";
 
 /**
  * Operational actions for an appointment list card (BR-043, BR-045).
+ * BR-168: standalone Agenda meetings are not prospects; prospect-workflow actions
+ * remain hidden until an explicit Agenda outcome/promotion UI owns them.
  */
 export default function AppointmentCardActions({
   appointment,
@@ -19,6 +21,7 @@ export default function AppointmentCardActions({
   onComplete
 }) {
   const plan = resolveAppointmentCardActionPlan(appointment);
+  const standaloneAgenda = appointment?.metadata?.standaloneAgenda === true;
 
   function handleJoinZoom() {
     const url = String(appointment.virtualMeetingUrl || "").trim();
@@ -28,6 +31,27 @@ export default function AppointmentCardActions({
     }
 
     window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  if (standaloneAgenda) {
+    return (
+      <div
+        className="appointment-card-actions appointments-page__actions"
+        data-appointment-id={appointment.id || undefined}
+        data-agenda-standalone="true"
+      >
+        {appointment.virtualMeetingUrl ? (
+          <AtlasButton
+            variant="primary"
+            size="sm"
+            className="appointment-card-actions__join-zoom"
+            onClick={handleJoinZoom}
+          >
+            {translate("appointmentsJoinZoom")}
+          </AtlasButton>
+        ) : null}
+      </div>
+    );
   }
 
   return (
