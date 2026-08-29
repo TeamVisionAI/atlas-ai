@@ -17,6 +17,9 @@ const { OWNERSHIP } = require("./workflowConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const liveAuthoringBridge = require("./recruitAiV2/liveAuthoringBridge");
 const {
+  guardOutboundConversationCoherence
+} = require("./recruitAiV2/globalConversationCoherenceGuard");
+const {
   evaluateAtlasInboundAutomationEligibility,
   resolveAtlasInboundAutomationEligibility
 } = require("./atlasInboundAutomationEligibility");
@@ -173,6 +176,39 @@ async function deliverWhatsAppReply({
       reason: "REPLY_SUPPRESSED",
       replyText,
       engineResult
+    };
+  }
+
+  // Implements BR-166 — every live V2 reply is rechecked against the newest
+  // durable tenant+prospect context immediately before transport sends it.
+  const coherence = await guardOutboundConversationCoherence({
+    normalized,
+    prospect,
+    engineResult
+  });
+  if (!coherence.allowed) {
+    logWhatsAppStage("automated_reply_suppressed_conversation_coherence", {
+      phone: normalized.phone,
+      organizationId: prospect?.organization_id || prospect?.organizationId || null,
+      prospectId:
+        engineResult?.v2Result?.nextContext?.prospectId ||
+        engineResult?.v2Result?.context?.prospectId ||
+        prospect?.id ||
+        null,
+      providerMessageId: normalized.providerMessageId || null,
+      reason: coherence.reason,
+      authoredVersion: coherence.authoredVersion ?? null,
+      latestVersion: coherence.latestVersion ?? null,
+      questionKey: coherence.questionKey || null,
+      nextUnresolvedQuestion: coherence.nextUnresolvedQuestion || null
+    });
+    return {
+      success: true,
+      replied: false,
+      reason: coherence.reason,
+      replyText,
+      engineResult,
+      coherence
     };
   }
 
