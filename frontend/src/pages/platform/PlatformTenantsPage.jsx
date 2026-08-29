@@ -19,8 +19,13 @@ import {
   getTenant,
   listTenants,
   updateTenantStatus,
-  updateTenantFeatures
+  updateTenantFeatures,
+  updateTenantRecruitAiV2
 } from "../../services/platformService";
+import {
+  canEnableRecruitAiV2,
+  recruitAiV2StatusLabel
+} from "./recruitAiV2CertificationHelpers";
 import {
   LIFECYCLE_FILTERS,
   countLifecycleStatuses,
@@ -90,6 +95,7 @@ export default function PlatformTenantsPage() {
   const [assigning, setAssigning] = useState(false);
   const [busyTenantId, setBusyTenantId] = useState("");
   const [featureBusyKey, setFeatureBusyKey] = useState("");
+  const [v2BusyKey, setV2BusyKey] = useState("");
 
   const allowed = isSuperAdminUser(user);
   const counts = useMemo(() => countLifecycleStatuses(tenants), [tenants]);
@@ -283,6 +289,30 @@ export default function PlatformTenantsPage() {
       setError(err.message || "Unable to update tenant features.");
     } finally {
       setFeatureBusyKey("");
+    }
+  }
+
+  async function handleV2Toggle(field, nextValue) {
+    if (!detail?.id) {
+      return;
+    }
+    if (field === "enabled" && nextValue === true && !detail.recruitAiV2?.certified) {
+      setError("Certify the tenant before enabling Recruit AI v2.");
+      return;
+    }
+    setV2BusyKey(field);
+    setError("");
+    setNotice("");
+    try {
+      const result = await updateTenantRecruitAiV2(detail.id, { [field]: nextValue });
+      setDetail((current) =>
+        current ? { ...current, recruitAiV2: result.tenant || current.recruitAiV2 } : current
+      );
+      setNotice(`Updated Recruit AI v2 ${field} for ${detail.name}.`);
+    } catch (err) {
+      setError(err.message || "Unable to update Recruit AI v2 certification.");
+    } finally {
+      setV2BusyKey("");
     }
   }
 
@@ -696,6 +726,54 @@ export default function PlatformTenantsPage() {
             {!detail.featureControls?.length ? (
               <p className="platform-tenants-page__lede">Feature controls unavailable.</p>
             ) : null}
+          </div>
+
+          <h3 className="platform-tenants-page__features-title">Recruit AI v2 certification</h3>
+          <p className="platform-tenants-page__lede">
+            Super Admin certifies the tenant, then enables V2. Default off. Suspended tenants
+            fail closed. Railway kill switches still apply. User grants are managed in
+            Administration — Users after the tenant is certified and enabled.
+          </p>
+          <div className="platform-feature-controls" data-testid="platform-recruit-ai-v2">
+            <div className="platform-feature-controls__row">
+              <div>
+                <strong>Certified</strong>
+                <div className="platform-feature-controls__status">
+                  {recruitAiV2StatusLabel(detail.recruitAiV2)}
+                </div>
+              </div>
+              <label className="platform-feature-controls__toggle">
+                <span>Certified</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(detail.recruitAiV2?.certified)}
+                  disabled={v2BusyKey === "certified" || Boolean(detail.recruitAiV2?.suspended)}
+                  onChange={(event) => handleV2Toggle("certified", event.target.checked)}
+                  data-testid="recruit-ai-v2-certified"
+                />
+              </label>
+            </div>
+            <div className="platform-feature-controls__row">
+              <div>
+                <strong>Enabled</strong>
+                <div className="platform-feature-controls__status">
+                  Requires certification. Does not grant any user authoring or execution.
+                </div>
+              </div>
+              <label className="platform-feature-controls__toggle">
+                <span>Enabled</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(detail.recruitAiV2?.enabled)}
+                  disabled={
+                    v2BusyKey === "enabled" ||
+                    !canEnableRecruitAiV2(detail.recruitAiV2)
+                  }
+                  onChange={(event) => handleV2Toggle("enabled", event.target.checked)}
+                  data-testid="recruit-ai-v2-enabled"
+                />
+              </label>
+            </div>
           </div>
 
           <div className="identity-actions">

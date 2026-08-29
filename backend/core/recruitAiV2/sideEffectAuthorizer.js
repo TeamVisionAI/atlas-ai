@@ -145,7 +145,8 @@ function authorizeSideEffects({
   const eligibility = isEligibleForExecution({
     organizationId: orgId,
     actingUserId: userId,
-    env
+    env,
+    grant: options.v2Grant || options.grant || null
   });
 
   if (!executionEnabled || config.failClosed) {

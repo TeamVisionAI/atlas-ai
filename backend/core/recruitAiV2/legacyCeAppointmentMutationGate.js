@@ -29,13 +29,15 @@ const DENY_STAGE = "ce_appointment_mutation_denied_authoring_canary";
 function evaluateLegacyCeAppointmentMutation({
   organizationId,
   actingUserId,
-  env = process.env
+  env = process.env,
+  grant = null
 } = {}) {
   const authoring = isEligibleForLiveAuthoring({
     organizationId,
     actingUserId,
     env,
-    invocationSource: "live_whatsapp"
+    invocationSource: "live_whatsapp",
+    grant
   });
 
   if (!authoring.eligible) {
@@ -50,7 +52,8 @@ function evaluateLegacyCeAppointmentMutation({
   const execution = isEligibleForExecution({
     organizationId,
     actingUserId,
-    env
+    env,
+    grant
   });
 
   if (execution.eligible) {

@@ -29,6 +29,22 @@ export async function changeAdminUserEmail(userId, email) {
   });
 }
 
+export async function getRecruitAiV2Status() {
+  return apiFetch("/api/admin/recruit-ai-v2");
+}
+
+export async function getUserRecruitAiV2Grant(userId) {
+  return apiFetch(`/api/admin/users/${userId}/recruit-ai-v2`);
+}
+
+export async function updateUserRecruitAiV2Grant(userId, payload) {
+  return apiFetch(`/api/admin/users/${userId}/recruit-ai-v2`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {})
+  });
+}
+
 export async function updateUserAgentCapabilities(userId, payload) {
   return apiFetch(`/api/admin/users/${userId}/capabilities`, {
     method: "PATCH",

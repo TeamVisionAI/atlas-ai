@@ -333,6 +333,20 @@ async function getTenant(organizationId) {
     tenant.featureControls = [];
   }
 
+  try {
+    const {
+      getTenantGrant
+    } = require("./recruitAiV2CertificationService");
+    tenant.recruitAiV2 = await getTenantGrant(organizationId);
+  } catch {
+    tenant.recruitAiV2 = {
+      certified: false,
+      enabled: false,
+      suspended: tenant.lifecycleStatus === "SUSPENDED",
+      lifecycleStatus: tenant.lifecycleStatus || null
+    };
+  }
+
   return tenant;
 }
 

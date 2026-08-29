@@ -78,6 +78,18 @@ export async function getTenantFeatures(id) {
   return apiFetch(`/api/platform/tenants/${id}/features`);
 }
 
+export async function getTenantRecruitAiV2(id) {
+  return apiFetch(`/api/platform/tenants/${id}/recruit-ai-v2`);
+}
+
+export async function updateTenantRecruitAiV2(id, payload) {
+  return apiFetch(`/api/platform/tenants/${id}/recruit-ai-v2`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {})
+  });
+}
+
 export async function updateTenantFeatures(id, payload) {
   return apiFetch(`/api/platform/tenants/${id}/features`, {
     method: "PATCH",

@@ -13,6 +13,9 @@
  */
 
 const { FEATURE_FLAGS } = require("./constants");
+const {
+  grantAuthorizesExecution
+} = require("./v2CertificationGrants");
 
 const DEFAULT_CONFIG = Object.freeze({
   enabled: false,
@@ -114,7 +117,8 @@ function isUserAllowlisted(userId, config) {
 function isEligibleForExecution({
   organizationId,
   actingUserId,
-  env = process.env
+  env = process.env,
+  grant = null
 } = {}) {
   const config = resolveExecutionConfig(env);
 
@@ -134,7 +138,22 @@ function isEligibleForExecution({
     return { eligible: false, reason: "MISSING_SCOPE", config };
   }
 
-  if (!isOrganizationAllowlisted(organizationId, config)) {
+  if (grant?.tenantSuspended === true) {
+    return { eligible: false, reason: "TENANT_SUSPENDED", config };
+  }
+
+  const envOrg = isOrganizationAllowlisted(organizationId, config);
+  const envUser = isUserAllowlisted(actingUserId, config);
+  if (envOrg && envUser) {
+    return { eligible: true, reason: null, config, source: "env_allowlist" };
+  }
+
+  // Implements BR-169 — execution is never implied by authoring or role.
+  if (grantAuthorizesExecution(grant)) {
+    return { eligible: true, reason: null, config, source: "durable_grant" };
+  }
+
+  if (!envOrg) {
     return {
       eligible: false,
       reason:
@@ -145,18 +164,14 @@ function isEligibleForExecution({
     };
   }
 
-  if (!isUserAllowlisted(actingUserId, config)) {
-    return {
-      eligible: false,
-      reason:
-        Array.isArray(config.userIds) && config.userIds.length === 0
-          ? "USER_ALLOWLIST_EMPTY"
-          : "USER_NOT_ALLOWLISTED",
-      config
-    };
-  }
-
-  return { eligible: true, reason: null, config };
+  return {
+    eligible: false,
+    reason:
+      Array.isArray(config.userIds) && config.userIds.length === 0
+        ? "USER_ALLOWLIST_EMPTY"
+        : "USER_NOT_ALLOWLISTED",
+    config
+  };
 }
 
 module.exports = {

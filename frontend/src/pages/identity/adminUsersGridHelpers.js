@@ -108,7 +108,10 @@ export function filterAdminUsers(users, { query = "", statusFilter = "", rankFil
   });
 }
 
-export function buildUserRowActions(user, { canVerifySecurities = false, isSelf = false } = {}) {
+export function buildUserRowActions(
+  user,
+  { canVerifySecurities = false, isSelf = false, canManageV2 = false } = {}
+) {
   const status = user?.status;
   const actions = [];
 
@@ -122,6 +125,9 @@ export function buildUserRowActions(user, { canVerifySecurities = false, isSelf 
   actions.push({ id: "edit-email", label: "Edit Email" });
   actions.push({ id: "edit-rep", label: "Edit Rep ID" });
   actions.push({ id: "edit-capabilities", label: "Capabilities" });
+  if (canManageV2) {
+    actions.push({ id: "edit-v2", label: "Recruit AI v2" });
+  }
 
   if (canVerifySecurities && !isSelf) {
     actions.push({ id: "edit-securities", label: "Edit Securities Access" });
