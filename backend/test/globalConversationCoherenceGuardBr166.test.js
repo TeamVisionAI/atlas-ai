@@ -6,7 +6,8 @@ const assert = require("node:assert/strict");
 const {
   REASONS,
   evaluateAgainstLatestContext,
-  asksAlreadyResolvedFact
+  asksAlreadyResolvedFact,
+  guardOutboundConversationCoherence
 } = require("../core/recruitAiV2/globalConversationCoherenceGuard");
 
 function v2EngineResult({ version = 5, question = "ask_authorization" } = {}) {
@@ -176,4 +177,66 @@ test("known exact time prevents a time-preference re-ask", () => {
 
   assert.equal(result.allowed, false);
   assert.equal(result.reason, REASONS.RESOLVED_FACT_REASK);
+});
+
+test("async guard loads latest state under explicit tenant+prospect scope", async () => {
+  const calls = [];
+  const persistenceService = {
+    async loadContext(args) {
+      calls.push(args);
+      return latestContext({
+        version: 22,
+        facts: {
+          city: "Orlando",
+          state: "FL",
+          workAuthorization: true,
+          workAuthorizationStatus: "authorized",
+          preferredDayPart: null
+        }
+      });
+    }
+  };
+
+  const result = await guardOutboundConversationCoherence({
+    normalized: {
+      channel: "whatsapp",
+      phone: "+13055551212",
+      providerMessageId: "wamid-current"
+    },
+    prospect: {
+      id: "legacy-prospect-id",
+      organization_id: "00000000-0000-4000-8000-000000000001",
+      phone: "+13055551212"
+    },
+    engineResult: v2EngineResult({ version: 22, question: "ask_day_part" }),
+    persistenceService
+  });
+
+  assert.equal(result.allowed, true);
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0].organizationId,
+    "00000000-0000-4000-8000-000000000001"
+  );
+  assert.equal(
+    calls[0].prospectId,
+    "11111111-1111-4111-8111-111111111111"
+  );
+  assert.equal(calls[0].channel, "whatsapp");
+});
+
+test("async guard fails closed when tenant/prospect scope is missing", async () => {
+  const result = await guardOutboundConversationCoherence({
+    normalized: { channel: "whatsapp", providerMessageId: "wamid-current" },
+    prospect: {},
+    engineResult: {
+      source: "recruit_ai_v2_live_authoring",
+      owner: "v2",
+      v2Result: {}
+    },
+    persistenceService: { loadContext: async () => latestContext() }
+  });
+
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, REASONS.SCOPE_MISSING);
 });
