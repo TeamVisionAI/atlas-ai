@@ -1181,6 +1181,20 @@ function buildFaqResumeDecision(
  * Decide next business action from context + interpretation.
  * Availability is optional injected tool result (read-only).
  */
+// Implements BR-170 — same-turn citizenship / work-auth must outrank a stale
+// lastQuestionAsked so meeting-preference and SSN replies never re-ask it.
+function mergeWorkAuthFacts(context, interpretation) {
+  const facts = { ...(context?.knownFacts || {}) };
+  const wa = interpretation?.entities?.workAuthorization;
+  if (wa === true || wa === false) {
+    facts.workAuthorization = wa;
+    facts.workAuthorizationStatus = wa
+      ? WORK_AUTHORIZATION.AUTHORIZED
+      : WORK_AUTHORIZATION.NOT_AUTHORIZED;
+  }
+  return facts;
+}
+
 function decideConversationTurnCore({
   context,
   interpretation,
@@ -2276,11 +2290,89 @@ function decideConversationTurnCore({
     return structured;
   }
 
+  if (intent === INTENTS.SSN_PRIVACY_OBJECTION) {
+    const merged = mergeWorkAuthFacts(context, interpretation);
+    const workAuthResolved =
+      merged.workAuthorization === true ||
+      merged.workAuthorization === false ||
+      merged.workAuthorizationStatus === WORK_AUTHORIZATION.AUTHORIZED ||
+      merged.workAuthorizationStatus === WORK_AUTHORIZATION.NOT_AUTHORIZED;
+    const meetingType = interpretation.entities?.appointmentType || null;
+    const resume = resolveQualificationResume({
+      ...context,
+      knownFacts: merged
+    });
+
+    structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.reasonCodes.push(REASON_CODES.PENDING_QUESTION_DEFERRED);
+    if (workAuthResolved) {
+      structured.reasonCodes.push(REASON_CODES.AUTHORIZATION_CAPTURED);
+    }
+
+    let templateKey = "ssn_privacy_reassure";
+    if (meetingType === "in_person" && workAuthResolved) {
+      templateKey = "ssn_privacy_reassure_in_person_then_day_part";
+    } else if (meetingType === "in_person") {
+      templateKey = "ssn_privacy_reassure_in_person";
+    } else if (workAuthResolved) {
+      templateKey = "ssn_privacy_reassure_then_day_part";
+    }
+    structured.customerReplyPlan.templateKey = templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      preferredMeetingType: meetingType,
+      city: merged.city || null
+    };
+
+    structured.contextPatch = {
+      knownFacts: {
+        ...(merged.workAuthorization === true || merged.workAuthorization === false
+          ? {
+              workAuthorization: merged.workAuthorization,
+              workAuthorizationStatus: merged.workAuthorizationStatus
+            }
+          : {}),
+        ...(meetingType
+          ? {
+              preferredMeetingType: meetingType,
+              meetingPreferenceSource: "prospect",
+              meetingTypeRequested: meetingType,
+              meetingTypeConfirmed: true
+            }
+          : {})
+      },
+      ...(meetingType ? { appointment: { meetingType } } : {}),
+      conversation: {
+        lastProspectIntent: intent,
+        lastQuestionAsked: workAuthResolved
+          ? resume.lastQuestionAsked
+          : context.conversation?.lastQuestionAsked || "ask_authorization",
+        clarificationCount: 0,
+        pendingClarification: null,
+        confirmedFields: workAuthResolved
+          ? Array.from(
+              new Set([
+                ...(context.conversation?.confirmedFields || []),
+                "workAuthorization"
+              ])
+            )
+          : context.conversation?.confirmedFields
+      }
+    };
+    return structured;
+  }
+
   if (intent === INTENTS.PROVIDE_MEETING_PREFERENCE) {
     const meetingType = interpretation.entities?.appointmentType || null;
-    const workAuth = String(context.knownFacts?.workAuthorizationStatus || "").toLowerCase();
+    const merged = mergeWorkAuthFacts(context, interpretation);
+    const workAuth = String(merged.workAuthorizationStatus || "").toLowerCase();
     const workAuthResolved =
-      workAuth === "authorized" || workAuth === "not_authorized";
+      merged.workAuthorization === true ||
+      merged.workAuthorization === false ||
+      workAuth === "authorized" ||
+      workAuth === "not_authorized";
     const resume = resolvePendingResume(context);
     const coverageFact = String(context.knownFacts?.coverage || "").toUpperCase();
     const hasLocation = Boolean(
@@ -2355,6 +2447,12 @@ function decideConversationTurnCore({
 
     structured.contextPatch = {
       knownFacts: {
+        ...(merged.workAuthorization === true || merged.workAuthorization === false
+          ? {
+              workAuthorization: merged.workAuthorization,
+              workAuthorizationStatus: merged.workAuthorizationStatus
+            }
+          : {}),
         preferredMeetingType: meetingType,
         meetingPreferenceSource: "prospect",
         meetingTypeRequested: meetingType,

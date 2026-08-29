@@ -287,42 +287,67 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     return WORK_AUTHORIZATION.NOT_AUTHORIZED;
   }
 
-  // Implements BR-096 / BR-100 — status / birthplace shorthand while ask_authorization
-  // is pending. Optional affirmative discourse prefix (sí/si/claro/yes) is ignored for
-  // matching so "si soy ciudadano" never falls through to schedule_confirm/handoff.
-  // Compound mid-flow utterances ("Soy ciudadana dime como es el trabajo") require an
-  // explicit soy / I'm-a clause so bare "ciudadano/residente" mid-sentence never authorizes.
-  const affirmPrefix = "((si|claro|correcto|por supuesto|yes|yeah|yep)[,:]?\\s+)?";
+  // First-person denial of citizenship/residency is not authorization.
+  if (
+    /\bno soy (una? )?(ciudadan|residente)/.test(t) ||
+    /\bi am not (a )?(citizen|resident)/.test(t)
+  ) {
+    return pendingAuth ? WORK_AUTHORIZATION.NOT_AUTHORIZED : null;
+  }
+
+  // Implements BR-096 / BR-100 / BR-170 — status / birthplace shorthand while
+  // ask_authorization is pending. Stacked prefixes (sí claro), optional yo, and
+  // duration ("hace mucho") still satisfy work authorization.
+  const stackedPrefix = "((si|claro|correcto|por supuesto|yes|yeah|yep)[,:]?\\s+)*";
+  const optionalYo = "(yo\\s+)?";
+  const durationTail =
+    "(\\s+(hace mucho|desde hace( mucho| anos)?|toda la vida|de toda la vida))?";
   const statusNounEs =
-    "(residente( permanente)?|ciudadan[oa]( americano| americana)?)";
+    "(residente( permanente)?|ciudadan[oa]s?( american[oa]s?)?)";
   const statusNounEn =
-    "((permanent )?resident|(us |u\\.s\\.? |american )?citizen)";
+    "((permanent )?resident|(us |u\\.s\\.? |american )?citizens?)";
+  const firstPersonCitizen = new RegExp(
+    `\\b${optionalYo}(soy|i'?m|i am) (una? |an? )?${statusNounEs}\\b`
+  ).test(t);
+  const firstPersonCitizenEn = new RegExp(
+    `\\b(i'?m|i am) (an? )?${statusNounEn}\\b`
+  ).test(t);
   const pendingStatusShorthand =
     pendingAuth &&
     !mentionsLicense(raw) &&
     (new RegExp(
-      `^${affirmPrefix}(soy )?${statusNounEs}([.!]?)?$`
+      `^${stackedPrefix}${optionalYo}(soy )?${statusNounEs}${durationTail}([.!]?)?$`
     ).test(t) ||
       new RegExp(
-        `^${affirmPrefix}(i'?m a |i am a )?${statusNounEn}([.!]?)?$`
+        `^${stackedPrefix}(i'?m a |i am a )?${statusNounEn}${durationTail}([.!]?)?$`
       ).test(t) ||
-      // Same-turn compound: require soy / I'm a … as a leading clause.
-      new RegExp(`^${affirmPrefix}soy ${statusNounEs}\\b`).test(t) ||
-      new RegExp(
-        `^${affirmPrefix}(i'?m a |i am a )${statusNounEn}\\b`
-      ).test(t));
+      firstPersonCitizen ||
+      firstPersonCitizenEn);
+
+  // Pending-auth mention of American citizenship (not a work-permit denial).
+  const pendingCitizenMention =
+    pendingAuth &&
+    !mentionsLicense(raw) &&
+    /\b(ciudadan[oa]s? american[oa]s?|american citizens?|us citizens?)\b/.test(t);
+
+  // "American citizens do not need a work permit" is an authorization correction.
+  const citizenPermitCorrection =
+    /\blos ciudadanos americanos no necesitan (permiso( de trabajo)?|autorizacion)/.test(
+      t
+    ) ||
+    /\b(us |american )?citizens? (do not|don't) need (a )?(work )?permit/.test(t);
 
   // Birthplace affirmatives (EN/ES) — not a location correction when auth is pending.
   const pendingBornHereAffirmative =
     pendingAuth &&
     !mentionsLicense(raw) &&
     (new RegExp(
-      `^${affirmPrefix}(yo )?(naci|nacio) (aqui|en (estados unidos|ee\\.? ?uu\\.?|usa|us|eeuu))([.!]?)?$`
+      `^${stackedPrefix}(yo )?(naci|nacio) (aqui|en (estados unidos|ee\\.? ?uu\\.?|usa|us|eeuu))([.!]?)?$`
     ).test(t) ||
       new RegExp(
-        `^${affirmPrefix}(i )?(was )?born (here|in the (us|u\\.s\\.?|usa|united states))([.!]?)?$`
+        `^${stackedPrefix}(i )?(was )?born (here|in the (us|u\\.s\\.?|usa|united states))([.!]?)?$`
       ).test(t) ||
-      new RegExp(`^${affirmPrefix}born here([.!]?)?$`).test(t));
+      new RegExp(`^${stackedPrefix}born here([.!]?)?$`).test(t));
 
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);
@@ -346,6 +371,8 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
 
   if (
     pendingStatusShorthand ||
+    pendingCitizenMention ||
+    citizenPermitCorrection ||
     pendingBornHereAffirmative ||
     yesAuth ||
     yesShort ||
@@ -358,6 +385,31 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
   // clarification behavior can run — never auto-satisfy work authorization.
 
   return null;
+}
+
+/**
+ * BR-170 — SSN / Social Security privacy objection. Never treated as
+ * qualification uncertainty and never erases a resolved work-auth fact.
+ */
+function looksLikeSsnPrivacyObjection(text) {
+  const t = normalizeAscii(text);
+  if (!t) {
+    return false;
+  }
+  const mentionsSsn = /\b(ssn|social security|seguridad social|numero de social|mi social|el social|su social)\b/.test(
+    t
+  );
+  if (!mentionsSsn) {
+    return false;
+  }
+  return (
+    /\bno (pienso|voy a|quiero|doy|daria)\b/.test(t) ||
+    /\basi como asi/.test(t) ||
+    /\bno conozco/.test(t) ||
+    /\bprivacidad|privacy/.test(t) ||
+    /\bnot (giving|sharing)/.test(t) ||
+    /\bwon'?t (give|share)/.test(t)
+  );
 }
 
 function toBooleanWorkAuthorization(status) {
@@ -383,6 +435,7 @@ module.exports = {
   looksLikeAmbiguousLicenseFragment,
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
+  looksLikeSsnPrivacyObjection,
   toBooleanWorkAuthorization,
   looksLikePuertoRicoOriginStatement
 };

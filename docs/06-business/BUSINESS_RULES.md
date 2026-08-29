@@ -2464,6 +2464,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-170 — Citizenship / Legal-Authorization Durability + SSN Privacy
+
+**Implements:** Clear citizenship or legal-authorization statements durably resolve `workAuthorization=true`; Atlas must not re-ask that fact, must not treat SSN/privacy objections as qualification uncertainty, and must not continue automated qualification after a spoken handoff unless ownership is returned.  
+**Domain:** Recruit AI / Qualification + conversation coherence  
+**Depends on:** BR-083, BR-096, BR-100, BR-166  
+**Related:** BR-114, BR-124 (TAKE OVER / Return to Atlas)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/qualificationFacts.js`; interpreter; decisionEngine; responseRenderer; liveAuthoringBridge; communicationHub  
+**Tests:** `backend/test/recruitAiV2CitizenshipWorkAuthSsnBr170.test.js`
+
+### Rules
+
+1. **Citizenship resolves work authorization YES** — Pending `ask_authorization` accepts stacked prefixes (`sí claro`), optional `yo`, duration (`hace mucho`), `soy ciudadana americana`, and first-person citizenship clauses.
+2. **Correction is authorization** — `Los ciudadanos americanos no necesitan permiso de trabajo` (and EN equivalents) resolve work authorization YES. The word `no` in that correction is not a denial of authorization.
+3. **No re-ask** — Once `workAuthorization` / `workAuthorizationStatus` is authorized or not-authorized, do not ask work authorization again unless the prospect explicitly contradicts it. BR-166 still suppresses a residual re-ask against durable facts.
+4. **SSN/privacy** — `no pienso darle mi social` and similar objections do not erase a resolved eligibility fact. Atlas must explicitly say SSN is not requested over WhatsApp.
+5. **In-person is scheduling** — Preferring an in-person interview is a meeting preference, not qualification uncertainty, and must not by itself reopen work authorization.
+6. **Handoff hold** — After V2 `safe_uncertain_escalate` / `HUMAN_REQUIRED`, do not continue automated qualification until TAKE OVER is returned to Atlas. Do not fall through to legacy CE for that hold.
+7. **No tenant/user exceptions** — Same rules for every V2-eligible user, including Niovel and Misleisys.
+8. **Boundaries** — Do not special-case a prospect or phone. Do not change WhatsApp privacy, campaign eligibility, TAKE OVER write rules, or live execution path.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

@@ -923,6 +923,38 @@ async function attemptLiveV2Authoring({
   });
 
   try {
+    const heldContext = await persistence.loadContext({
+      organizationId,
+      prospectId: canonicalProspectId,
+      channel: "whatsapp",
+      legacyProspectId,
+      prospectPhone,
+      ensureCore: false
+    });
+    if (
+      heldContext &&
+      (heldContext.currentStage === "human_required" ||
+        heldContext.attention?.needsHumanAttention === true)
+    ) {
+      return {
+        eligible: true,
+        authored: false,
+        fallThrough: false,
+        reason: "V2_HUMAN_REQUIRED_HOLD",
+        replyText: null,
+        v2Result: { nextContext: heldContext },
+        actingUserId,
+        organizationId,
+        nextAction: null,
+        allowExecution: false,
+        stage: STAGES.SKIPPED
+      };
+    }
+  } catch {
+    // Fail open to normal authoring if the hold snapshot cannot be read.
+  }
+
+  try {
     const v2Result = await withTimeout(
       processTurn({
         message: {
