@@ -7,12 +7,9 @@
 const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("../whatsappConstants");
 const { loadPersistedWorkflowState } = require("../workflowStateStore");
 const {
-  VERIFIED_ATLAS_ELIGIBILITY_SOURCES
+  VERIFIED_SOURCE_SET,
+  isOrdinaryPersonalWhatsAppContact
 } = require("../atlasInboundAutomationEligibility");
-
-const VERIFIED_SOURCE_SET = Object.freeze(
-  new Set(Object.values(VERIFIED_ATLAS_ELIGIBILITY_SOURCES))
-);
 
 const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
   new Set([
@@ -21,7 +18,6 @@ const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
     WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
-    WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
     "QUICK_CAPTURE"
   ])
 );
@@ -67,6 +63,11 @@ function evaluateRecruitingInboxEligibility(prospect = null, workflowState = nul
   }
 
   const wf = workflowState || resolveEmbeddedWorkflowState(prospect);
+
+  // Implements BR-159 / BR-165 — ordinary personal WhatsApp contacts stay out of Conversations.
+  if (isOrdinaryPersonalWhatsAppContact(prospect, wf)) {
+    return { eligible: false, reason: "PERSONAL_WHATSAPP_NOT_ELIGIBLE" };
+  }
 
   if (wf.atlasAutomationEnabled === true) {
     return { eligible: true, reason: "EXPLICITLY_ENABLED" };

@@ -189,7 +189,6 @@ async function buildStalledFirstReplyRecoveryContext({
   const phoneNumberId = resolvePhoneNumberId(inbound, observabilityRow, attribution);
   const wabaId = resolveWabaId(inbound, observabilityRow);
 
-  const { isPersonalWhatsAppConnection } = require("./atlasInboundAutomationEligibility");
   let connectionSource =
     inbound.whatsappConnectionSource || inbound.organizationSource || null;
   if (!connectionSource && phoneNumberId) {
@@ -206,7 +205,6 @@ async function buildStalledFirstReplyRecoveryContext({
       connectionSource = null;
     }
   }
-  const hasPersonalWhatsApp = isPersonalWhatsAppConnection(connectionSource);
 
   if (organizationId && phoneNumberId && attribution?.organizationId) {
     if (String(attribution.organizationId) !== String(organizationId)) {
@@ -223,7 +221,7 @@ async function buildStalledFirstReplyRecoveryContext({
 
   if (!campaignIntakeMatch?.matched) {
     const hasDurableInboundProof = Boolean(observabilityRow || attribution);
-    if (!hasDurableInboundProof && !hasPersonalWhatsApp) {
+    if (!hasDurableInboundProof) {
       return { ok: false, reason: "NO_DURABLE_INBOUND_EVIDENCE" };
     }
 
@@ -253,7 +251,7 @@ async function buildStalledFirstReplyRecoveryContext({
           : "campaign_intake_attributions"
       };
       intakeEvidenceSource = campaignIntakeMatch.evidenceSource;
-    } else if (!hasVerifiedCtwaEarly && !hasPersonalWhatsApp) {
+    } else if (!hasVerifiedCtwaEarly) {
       return { ok: false, reason: lookup?.reason || "INTAKE_NOT_VERIFIED" };
     }
   }
@@ -285,16 +283,19 @@ async function buildStalledFirstReplyRecoveryContext({
     }
   };
 
+  const { VERIFIED_SOURCE_SET } = require("./atlasInboundAutomationEligibility");
   const hasVerifiedIntake =
     campaignIntakeMatch?.matched && campaignIntakeMatch.recruitingEligible === true;
   const hasVerifiedCtwa = Boolean(ctwaReferral);
-  const storedEligibility = String(workflowState?.atlasEligibilitySource || "").trim();
+  const storedEligibility = String(workflowState?.atlasEligibilitySource || "")
+    .trim()
+    .toUpperCase();
+  const hasVerifiedStoredEligibility = VERIFIED_SOURCE_SET.has(storedEligibility);
 
   if (
     !hasVerifiedIntake &&
     !hasVerifiedCtwa &&
-    !storedEligibility &&
-    !hasPersonalWhatsApp
+    !hasVerifiedStoredEligibility
   ) {
     return { ok: false, reason: "NO_VERIFIED_ELIGIBILITY_EVIDENCE" };
   }
@@ -403,35 +404,6 @@ async function restoreStalledFirstReplyRecruitingState({
     ).catch(() => null);
 
     return { ok: true, recruitingEligible: true, eligibilityDecision: "CTWA_REFERRAL", idempotent: true };
-  }
-
-  const {
-    persistVerifiedAtlasEligibilitySource,
-    VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
-    isPersonalWhatsAppConnection
-  } = require("./atlasInboundAutomationEligibility");
-
-  if (
-    prospect?.phone &&
-    (isPersonalWhatsAppConnection(whatsappConnectionSource) ||
-      String(workflowState?.atlasEligibilitySource || "").toUpperCase() ===
-        VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP)
-  ) {
-    const scope = {
-      organizationId: organizationId || prospect.organization_id || null,
-      prospectId: prospect.id || null
-    };
-    await persistVerifiedAtlasEligibilitySource(
-      prospect.phone,
-      VERIFIED_ATLAS_ELIGIBILITY_SOURCES.PERSONAL_WHATSAPP,
-      scope
-    ).catch(() => null);
-    return {
-      ok: true,
-      recruitingEligible: true,
-      eligibilityDecision: "PERSONAL_WHATSAPP",
-      idempotent: true
-    };
   }
 
   return { ok: false, reason: "NO_MATCH" };
