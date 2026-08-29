@@ -4,6 +4,7 @@
 
 import { apiFetch, apiRequest } from "./apiClient";
 import { logAuthorizationCodeTrace } from "../utils/authorizationCodeTrace";
+import { selectEmbeddedSignupConnectionState } from "../engines/whatsappEmbeddedSignupOwnership";
 
 export class MetaEmbeddedSignupError extends Error {
   constructor(message, payload = {}) {
@@ -90,12 +91,13 @@ export async function reportEmbeddedSignupStage(
   }
 }
 
-export async function verifyEmbeddedSignupConnected() {
+export async function verifyEmbeddedSignupConnected(ownershipMode = "personal") {
   const status = await getEmbeddedSignupStatus();
-  if (status?.connected === true && status?.connection) {
+  const selected = selectEmbeddedSignupConnectionState(status, ownershipMode);
+  if (selected.connected === true && selected.connection) {
     return {
       verified: true,
-      connection: status.connection,
+      connection: selected.connection,
       status
     };
   }

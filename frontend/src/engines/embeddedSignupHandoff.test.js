@@ -179,6 +179,7 @@ test("11. exchange payload matches backend contract (code + wabaId)", () => {
     }
   );
   assert.equal(payload.phoneNumberId, "phone-1");
+  assert.equal(payload.ownershipMode, "personal");
 });
 
 test("12. slower mobile ordering: FINISH then delayed code", () => {

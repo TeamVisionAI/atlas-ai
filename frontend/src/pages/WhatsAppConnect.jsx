@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
 import { appPath } from "../config/appRoutes";
 import { useFacebookSdk } from "../hooks/useFacebookSdk";
+import { PERMISSIONS, roleHasPermission } from "../security/workspacePermissions";
 import {
   exchangeEmbeddedSignupCode,
   getEmbeddedSignupStatus,
   MetaEmbeddedSignupError,
   verifyEmbeddedSignupConnected
 } from "../services/metaEmbeddedSignupService";
+import {
+  OWNERSHIP_ORGANIZATION,
+  isPersonalWhatsAppEnabled,
+  resolveEmbeddedSignupLaunchBlocker,
+  resolveWhatsAppConnectAccess,
+  resolveWhatsAppSignupOwnership,
+  selectEmbeddedSignupConnectionState
+} from "../engines/whatsappEmbeddedSignupOwnership";
 import {
   isAllowedFacebookOrigin,
   parseEmbeddedSignupPostMessage
@@ -52,21 +61,30 @@ export default function WhatsAppConnect() {
   const { translate } = useLanguage();
   const { user } = useWorkspace();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { ready, error: sdkError, appId, configId } = useFacebookSdk();
 
-  const personalWhatsAppEnabled =
-    user?.capabilities?.personalWhatsAppEnabled === true ||
-    user?.agent_capabilities?.personalWhatsAppEnabled === true;
+  const ownershipMode = resolveWhatsAppSignupOwnership(searchParams);
+  const isOrgMode = ownershipMode === OWNERSHIP_ORGANIZATION;
+  const personalWhatsAppEnabled = isPersonalWhatsAppEnabled(user);
+  const canWriteOrg = roleHasPermission(user?.role, PERMISSIONS.ORG_WRITE);
+  const connectAccess = resolveWhatsAppConnectAccess({
+    ownershipMode,
+    userLoaded: Boolean(user),
+    personalWhatsAppEnabled,
+    canWriteOrg
+  });
 
   useEffect(() => {
-    if (user && !personalWhatsAppEnabled) {
+    if (connectAccess.redirectToIntegrations) {
       navigate(appPath("settings/integrations"), { replace: true });
     }
-  }, [user, personalWhatsAppEnabled, navigate]);
+  }, [connectAccess.redirectToIntegrations, navigate]);
 
   const [status, setStatus] = useState("disconnected");
   const [alreadyConnected, setAlreadyConnected] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [launchError, setLaunchError] = useState(null);
 
   const attemptRef = useRef(null);
   const completionTimeoutRef = useRef(null);
@@ -184,12 +202,13 @@ export default function WhatsAppConnect() {
     }
 
     logEmbeddedSignupTelemetry("exchange_triggered", attemptRef.current, {
-      hasRedirectUri: Boolean(payload?.redirectUri)
+      hasRedirectUri: Boolean(payload?.redirectUri),
+      ownershipMode
     });
 
     try {
       await exchangeEmbeddedSignupCode(payload);
-      const verified = await verifyEmbeddedSignupConnected();
+      const verified = await verifyEmbeddedSignupConnected(ownershipMode);
 
       if (!verified.verified) {
         errorEmbeddedSignupTelemetry("status_verify_failed", attemptRef.current, {
@@ -206,7 +225,7 @@ export default function WhatsAppConnect() {
       attemptRef.current = commitAttempt(markExchangeCompleted(attemptRef.current));
       clearPersistedHandoffAttempt();
       setLaunching(false);
-      logEmbeddedSignupTelemetry("status_verified", attemptRef.current);
+      logEmbeddedSignupTelemetry("status_verified", attemptRef.current, { ownershipMode });
       navigate(appPath("settings/whatsapp/success"), {
         replace: true,
         state: { connection: verified.connection }
@@ -231,7 +250,7 @@ export default function WhatsAppConnect() {
         code: errPayload.error || errPayload.publicCode || ""
       });
     }
-  }, [clearCompletionTimeout, commitAttempt, finalizeHandoffFailure, navigate]);
+  }, [clearCompletionTimeout, commitAttempt, finalizeHandoffFailure, navigate, ownershipMode]);
 
   runExchangeRef.current = runExchange;
 
@@ -259,7 +278,7 @@ export default function WhatsAppConnect() {
 
   const ingestOAuthCode = useCallback(
     (code) => {
-      const attempt = attemptRef.current || createEmbeddedSignupAttempt();
+      const attempt = attemptRef.current || createEmbeddedSignupAttempt(Date.now(), { ownershipMode });
       if (!attemptRef.current) {
         attemptRef.current = commitAttempt(attempt);
       }
@@ -274,7 +293,7 @@ export default function WhatsAppConnect() {
       logEmbeddedSignupTelemetry("oauth_code_received", attemptRef.current);
       maybeExchange(result.shouldExchange, result.waitingFor);
     },
-    [commitAttempt, maybeExchange]
+    [commitAttempt, maybeExchange, ownershipMode]
   );
 
   const ingestFinishEvent = useCallback(
@@ -295,7 +314,7 @@ export default function WhatsAppConnect() {
         return;
       }
 
-      const attempt = attemptRef.current || createEmbeddedSignupAttempt();
+      const attempt = attemptRef.current || createEmbeddedSignupAttempt(Date.now(), { ownershipMode });
       if (!attemptRef.current) {
         attemptRef.current = commitAttempt(attempt);
       }
@@ -312,7 +331,7 @@ export default function WhatsAppConnect() {
       });
       maybeExchange(result.shouldExchange, result.waitingFor);
     },
-    [commitAttempt, finalizeHandoffFailure, maybeExchange]
+    [commitAttempt, finalizeHandoffFailure, maybeExchange, ownershipMode]
   );
 
   const resumePersistedHandoff = useCallback(() => {
@@ -369,10 +388,16 @@ export default function WhatsAppConnect() {
       try {
         const payload = await getEmbeddedSignupStatus();
 
-        if (!cancelled && payload.connected && payload.connection) {
-          setAlreadyConnected(true);
-          setStatus("connected");
-          clearPersistedHandoffAttempt();
+        const selected = selectEmbeddedSignupConnectionState(payload, ownershipMode);
+        if (!cancelled && selected.connected && selected.connection) {
+          if (!isOrgMode) {
+            setAlreadyConnected(true);
+            setStatus("connected");
+            clearPersistedHandoffAttempt();
+          } else {
+            setAlreadyConnected(false);
+            setStatus("connected");
+          }
         }
       } catch {
         // Non-fatal preload
@@ -384,7 +409,7 @@ export default function WhatsAppConnect() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isOrgMode, ownershipMode]);
 
   useEffect(() => {
     function handler(event) {
@@ -426,19 +451,43 @@ export default function WhatsAppConnect() {
   const fbLoginCallbackRef = useRef(fbLoginCallback);
   fbLoginCallbackRef.current = fbLoginCallback;
 
+  const launchBlocker = resolveEmbeddedSignupLaunchBlocker({
+    ready,
+    appId,
+    configId,
+    hasFacebookSdk: Boolean(typeof window !== "undefined" && window.FB),
+    sdkError
+  });
+
   const launchWhatsAppSignup = useCallback(() => {
-    if (launching || !ready || !window.FB || !configId) {
+    if (launching || status === "connecting" || status === "finalizing") {
+      return;
+    }
+
+    const blocker = resolveEmbeddedSignupLaunchBlocker({
+      ready,
+      appId,
+      configId,
+      hasFacebookSdk: Boolean(typeof window !== "undefined" && window.FB),
+      sdkError
+    });
+    if (blocker) {
+      setLaunchError(translate("whatsappConnectLaunchFailed"));
       return;
     }
 
     clearCompletionTimeout();
-    const attempt = armHandoffTimeoutDeadline(createEmbeddedSignupAttempt());
+    setLaunchError(null);
+    const attempt = armHandoffTimeoutDeadline(
+      createEmbeddedSignupAttempt(Date.now(), { ownershipMode })
+    );
     attemptRef.current = commitAttempt(attempt);
     setLaunching(true);
     setStatus("connecting");
     armCompletionTimeout();
     logEmbeddedSignupTelemetry("attempt_started", attemptRef.current, {
-      origin: typeof window !== "undefined" ? window.location.origin : null
+      origin: typeof window !== "undefined" ? window.location.origin : null,
+      ownershipMode
     });
 
     window.FB.login((response) => fbLoginCallbackRef.current(response), {
@@ -452,17 +501,27 @@ export default function WhatsAppConnect() {
       }
     });
   }, [
+    appId,
     armCompletionTimeout,
     clearCompletionTimeout,
     commitAttempt,
     configId,
     launching,
-    ready
+    ownershipMode,
+    ready,
+    sdkError,
+    status,
+    translate
   ]);
 
-  const isConnectDisabled =
-    launching || !ready || !appId || !configId || status === "connecting" || status === "finalizing";
-  const configurationMissing = !appId || !configId;
+  const isConnectDisabled = launching || status === "connecting" || status === "finalizing";
+  const showLaunchButton = isOrgMode || !alreadyConnected;
+  const connectButtonLabel =
+    launching || status === "connecting" || status === "finalizing"
+      ? translate("whatsappConnectButtonLoading")
+      : isOrgMode && status === "connected"
+        ? translate("whatsappIntegrationReconnect")
+        : translate("whatsappConnectButton");
 
   return (
     <div className="whatsapp-connect">
@@ -476,15 +535,15 @@ export default function WhatsAppConnect() {
         <h1 className="whatsapp-connect__title">{translate("whatsappConnectTitle")}</h1>
         <p className="whatsapp-connect__subtitle">{translate("whatsappConnectSubtitle")}</p>
 
-        {configurationMissing ? (
-          <p className="whatsapp-connect__notice">{translate("whatsappConnectUnavailable")}</p>
+        {launchError ||
+        launchBlocker === "missing_config" ||
+        launchBlocker === "sdk_load_failed" ? (
+          <p className="whatsapp-connect__notice" role="alert">
+            {launchError || translate("whatsappConnectLaunchFailed")}
+          </p>
         ) : null}
 
-        {sdkError ? (
-          <p className="whatsapp-connect__notice">{translate("whatsappConnectUnavailable")}</p>
-        ) : null}
-
-        {alreadyConnected ? (
+        {alreadyConnected && !isOrgMode ? (
           <div className="whatsapp-connect__connected-banner">
             <p>{translate("whatsappConnectAlreadyConnected")}</p>
             <Link
@@ -496,7 +555,7 @@ export default function WhatsAppConnect() {
           </div>
         ) : null}
 
-        {!alreadyConnected && !configurationMissing && !sdkError ? (
+        {showLaunchButton ? (
           <>
             <button
               type="button"
@@ -504,9 +563,7 @@ export default function WhatsAppConnect() {
               onClick={launchWhatsAppSignup}
               disabled={isConnectDisabled}
             >
-              {launching || status === "connecting" || status === "finalizing"
-                ? translate("whatsappConnectButtonLoading")
-                : translate("whatsappConnectButton")}
+              {connectButtonLabel}
             </button>
 
             {status === "waiting_for_qr" ? (
@@ -519,7 +576,7 @@ export default function WhatsAppConnect() {
           </>
         ) : null}
 
-        {!alreadyConnected && !configurationMissing && !sdkError ? (
+        {showLaunchButton ? (
           <p className="whatsapp-connect__hint">{translate("whatsappConnectHint")}</p>
         ) : null}
       </section>

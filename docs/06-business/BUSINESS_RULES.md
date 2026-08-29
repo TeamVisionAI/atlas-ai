@@ -1877,7 +1877,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Related:** BR-075 (WhatsApp outbound), BR-129 (tenant isolation)  
 **Status:** Implemented  
 **Engine target:** `personalIntegrationOwnership.js`, `googleCalendarIntegrationService.js`, `whatsappIntegrationService.js`, `virtualMeetingUrlResolver.js`, `appointmentSchedulingEngine.js`, Settings hub  
-**Tests:** `backend/test/personalWorkspaceBr147.test.js`, `frontend/src/config/hierarchyDisplayTitle.test.js`
+**Tests:** `backend/test/personalWorkspaceBr147.test.js`, `frontend/src/config/hierarchyDisplayTitle.test.js`, `frontend/src/engines/whatsappEmbeddedSignupOwnership.test.js`
 
 ### Rules
 
@@ -1889,7 +1889,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 6. **WhatsApp ownership** — `whatsapp_integrations.user_id` nullable. Inbound Phone Number ID resolves to organization + owning user. Connected Phone Number ID remains globally unique. Personal disconnect cannot disconnect the org channel without `org:write`.
 7. **Zoom** — Prefer interviewer `appointmentProfile.virtualMeeting.personalMeetingUrl`; fall back to organization Meeting Management only as legacy.
 8. **Compatibility** — Do not destroy or silently reassign legacy org-owned rows. No ownership inference from phone/email alone.
-9. **Permissions** — `integrations:self` manages personal connectors; `org:write` manages organization channel + Organization settings.
+9. **Permissions** — `integrations:self` manages personal connectors; `org:write` manages organization channel + Organization settings. Org-channel Connect / Reconnect uses `/settings/whatsapp?ownership=organization` and must not bounce on `personalWhatsAppEnabled`. Do not enable personal WhatsApp capability as a substitute for org reconnect.
 10. **Boundaries** — No Round Robin, Recruit AI enablement, or Meta webhook architecture redesign beyond owner-user routing.
 
 ---

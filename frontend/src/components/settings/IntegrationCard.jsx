@@ -33,6 +33,8 @@ export default function IntegrationCard({
   disconnectLabel,
   viewDetailsLabel,
   viewDetailsTo = null,
+  reconnectLabel = null,
+  reconnectTo = null,
   onConnect,
   connectTo = null,
   onDisconnect,
@@ -111,6 +113,11 @@ export default function IntegrationCard({
           )
         ) : (
           <>
+            {reconnectTo && reconnectLabel ? (
+              <Link className="atlas-ui-button atlas-ui-button--primary" to={reconnectTo}>
+                {reconnectLabel}
+              </Link>
+            ) : null}
             {viewDetailsTo && viewDetailsLabel ? (
               <Link className="atlas-ui-button atlas-ui-button--secondary" to={viewDetailsTo}>
                 {viewDetailsLabel}

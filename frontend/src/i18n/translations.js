@@ -2019,6 +2019,8 @@ export const translations = {
       "Autorizarás con Meta y volverás a Atlas cuando la conexión esté completa.",
     whatsappConnectUnavailable:
       "La conexión con WhatsApp Business no está disponible temporalmente. Contacta a tu administrador.",
+    whatsappConnectLaunchFailed:
+      "No se pudo abrir Meta Embedded Signup. Recarga la página e inténtalo de nuevo. Si continúa, contacta a tu administrador.",
     whatsappConnectAlreadyConnected:
       "Esta organización ya tiene una cuenta de WhatsApp Business conectada.",
     whatsappConnectButton: "Conectar WhatsApp Business",
@@ -4125,6 +4127,8 @@ export const translations = {
       "You will authorize through Meta and return to Atlas when the connection is complete.",
     whatsappConnectUnavailable:
       "WhatsApp Business connection is temporarily unavailable. Please contact your administrator.",
+    whatsappConnectLaunchFailed:
+      "Meta Embedded Signup could not start. Reload the page and try again. If it continues, contact your administrator.",
     whatsappConnectAlreadyConnected:
       "This organization already has a connected WhatsApp Business account.",
     whatsappConnectButton: "Connect WhatsApp Business",
