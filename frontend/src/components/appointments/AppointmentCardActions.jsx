@@ -8,7 +8,7 @@ import "./AppointmentCardActions.css";
 /**
  * Operational actions for an appointment list card (BR-043, BR-045).
  * BR-168: standalone Agenda meetings are not prospects; prospect-workflow actions
- * remain hidden and a dedicated Agenda outcome action owns completion instead.
+ * remain hidden until an explicit Agenda outcome/promotion UI owns them.
  */
 export default function AppointmentCardActions({
   appointment,
@@ -18,9 +18,7 @@ export default function AppointmentCardActions({
   onOpenWorkspace,
   onReschedule,
   onCancel,
-  onComplete,
-  onAgendaOutcome,
-  agendaOutcomeLabel = "Record outcome"
+  onComplete
 }) {
   const plan = resolveAppointmentCardActionPlan(appointment);
   const standaloneAgenda = appointment?.metadata?.standaloneAgenda === true;
@@ -36,17 +34,13 @@ export default function AppointmentCardActions({
   }
 
   if (standaloneAgenda) {
-    const terminal = ["completed", "cancelled", "no_show"].includes(
-      String(appointment.status || "").toLowerCase()
-    );
-
     return (
       <div
         className="appointment-card-actions appointments-page__actions"
         data-appointment-id={appointment.id || undefined}
         data-agenda-standalone="true"
       >
-        {appointment.virtualMeetingUrl && !terminal ? (
+        {appointment.virtualMeetingUrl ? (
           <AtlasButton
             variant="primary"
             size="sm"
@@ -54,11 +48,6 @@ export default function AppointmentCardActions({
             onClick={handleJoinZoom}
           >
             {translate("appointmentsJoinZoom")}
-          </AtlasButton>
-        ) : null}
-        {!terminal ? (
-          <AtlasButton variant="secondary" size="sm" onClick={onAgendaOutcome}>
-            {agendaOutcomeLabel}
           </AtlasButton>
         ) : null}
       </div>
