@@ -38,6 +38,7 @@ import {
   shouldForceScrollToLatest
 } from "../engines/conversationsTranscriptAnchor";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
+import { resolveConversationListRow } from "../engines/agentNotificationPath";
 import { invalidateProspectCommunicationsCache } from "../services/communicationsCenterApi";
 import {
   getConversations,
@@ -235,6 +236,8 @@ export default function ConversationsPage() {
   const locale = language === "es" ? "es-US" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
   const activeFilter = searchParams.get("filter") || "active";
+  const deepLinkProspectId = searchParams.get("prospectId") || "";
+  const deepLinkPhone = searchParams.get("phone") || "";
   const canSeeTeamProspects = canSeeConversationsTeamProspects(user);
   const workspaceTab = resolveConversationsWorkspaceTab({
     workspaceScopeParam: searchParams.get("workspaceScope") || "",
@@ -269,6 +272,7 @@ export default function ConversationsPage() {
   const loadListRef = useRef(null);
   const ownershipRevisionRef = useRef(0);
   const pendingOwnershipRef = useRef(null);
+  const appliedConversationDeepLinkRef = useRef("");
 
   const loadList = useCallback(async ({ quiet = false, force = false } = {}) => {
     if (controlPlane) {
@@ -526,6 +530,22 @@ export default function ConversationsPage() {
       lastCommunicationAtRef.current = null;
     }
   }, [selectedPhone, loadDetail]);
+
+  useEffect(() => {
+    const key = `${deepLinkProspectId}|${deepLinkPhone}`;
+    if ((!deepLinkProspectId && !deepLinkPhone) || appliedConversationDeepLinkRef.current === key) {
+      return;
+    }
+    const row = resolveConversationListRow({
+      items: payload?.items || [],
+      prospectId: deepLinkProspectId,
+      phone: deepLinkPhone
+    });
+    if (row?.phone) {
+      appliedConversationDeepLinkRef.current = key;
+      setSelectedPhone(row.phone);
+    }
+  }, [payload, deepLinkProspectId, deepLinkPhone]);
 
   function scrollTranscriptToLatest() {
     const el = transcriptRef.current;
