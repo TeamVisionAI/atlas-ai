@@ -740,6 +740,29 @@ async function processRecruitAiV2Turn({
     }
   }
 
+  // Implements BR-175 — optional quality capture after the turn is decided.
+  // Never applies semantic facts, never changes replies or scheduling.
+  try {
+    const capture =
+      typeof options.captureAiQuality === "function"
+        ? options.captureAiQuality
+        : require("../../services/aiQualityService").captureTurn;
+    await capture({
+      observation: semanticShadow,
+      organizationId: organizationId || options.organizationId || loaded.organizationId || null,
+      actingUserId: options.actingUserId || null,
+      prospectId: options.legacyProspectId || prospectId || loaded.prospectId || null,
+      inboundMessageId: options.inboundMessageId || null,
+      inboundText: typeof message === "string" ? message : message?.text || "",
+      context: loaded,
+      interpretation,
+      structuredDecision,
+      env: options.env || process.env
+    });
+  } catch {
+    // Quality capture must never change the authored turn.
+  }
+
   return {
     context: loaded,
     nextContext,

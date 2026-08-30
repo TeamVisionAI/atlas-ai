@@ -2578,6 +2578,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-175 — AI Quality & Learning Review Center
+
+**Implements:** A global Atlas platform capability that turns production quality signals into a human-reviewed queue and approved regression candidates. Atlas never autonomously modifies production business rules or prompts from this system.  
+**Domain:** Platform / AI quality / learning loop  
+**Depends on:** BR-160, BR-169, BR-174  
+**Related:** BR-049, BR-081, BR-114, BR-146  
+**Status:** V1 implemented — capture default off, observe/review only  
+**Engine target:** `aiQuality/*`; `aiQualityService`; platform `/ai-quality` routes; Super Admin AI Quality page  
+**Tests:** `backend/test/aiQualityLearningCenterBr175.test.js`; `frontend/src/pages/platform/aiQualityHelpers.test.js`
+
+### Rules
+
+1. **Global, not tenant-special** — Same capture, review, and isolation model for every organization. No Team Vision, user, or phone special-case.
+2. **Fail-closed master switch** — `ATLAS_AI_QUALITY_CAPTURE_ENABLED` must be exact `"true"` and `ATLAS_AI_QUALITY_MODE` must be `OBSERVE` or `REVIEW`. Missing/malformed/OFF captures nothing. Tenant settings cannot override platform OFF.
+3. **New tenants default off** — `ai_quality_tenant_settings.participation_enabled` defaults false. Capture requires platform on + tenant participation.
+4. **Modes** — `OFF`, `OBSERVE`, `REVIEW`. Do not implement autonomous APPLY. Semantic apply remains hard-off (BR-174).
+5. **Capture** — Persist structured cases from semantic vs legacy disagreement, low-confidence/timeout/invalid JSON, missed high-confidence objections, repeated-question, frustration phrases, HUMAN_REQUIRED-then-qualification, and unacted reschedule/cancel. Deduplicate open cases per organization + episode key. Do not copy raw WhatsApp bodies into quality tables.
+6. **Review** — Humans mark semantic correct, legacy correct, both wrong, expected behavior, ignore, or promote a regression candidate. Promotion is mandatory before a case enters the regression library.
+7. **Regression library** — An approved case becomes a copyable spec (input turns, prior facts, expected intent/facts/action, forbidden behavior, source/future BR, proposed/implemented/verified). Do not auto-edit source or tests.
+8. **Access** — Super Admin sees cross-tenant platform quality. Tenant Admin sees only their organization. Normal agents have no quality console. Support Mode keeps Super Admin operationally bound to one tenant on tenant APIs.
+9. **Audit** — Record tenant participation changes, reviewer decisions, expected-behavior definitions, regression promotion, and ignore/resolve in `atlas_audit_log`.
+10. **Boundaries** — Do not enable capture in production in this foundation. Do not change Recruit AI replies, scheduling, ownership, or semantic apply. Do not expose provider secrets or hidden model chain-of-thought.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  
