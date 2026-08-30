@@ -1,8 +1,16 @@
+import { useEffect, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import AtlasButton from "../ui/AtlasButton";
 import { buildProspectWorkspacePath } from "../../utils/prospectRoutes";
 import { presentHistoryActorLabel } from "../../engines/agentNotificationPresentation";
+import { shouldShowLifecycleActions } from "../../engines/appointmentCardPresentation";
+import { fetchAgendaContact } from "../../services/agendaService";
 import { Link } from "react-router-dom";
+
+function displayOrDash(value) {
+  const text = String(value || "").trim();
+  return text || "—";
+}
 
 export function HumanAssistPanel({ appointment, onReschedule, onResolve, translate: translateProp }) {
   const { translate: translateHook } = useLanguage();
@@ -55,11 +63,13 @@ export function AppointmentHistoryPanel({ appointment, locale }) {
   return (
     <ol className="appointment-history">
       {history.map((event, index) => (
-        <li key={`${event.type}-${event.at}-${index}`} className="appointment-history__item">
+        <li key={`${event.type}-${event.at || event.timestamp}-${index}`} className="appointment-history__item">
           <div className="appointment-history__top">
             <strong>{translate(`appointmentsHistory_${event.type}`) || event.type}</strong>
-            <time dateTime={event.at}>
-              {event.at ? new Date(event.at).toLocaleString(locale) : "—"}
+            <time dateTime={event.at || event.timestamp}>
+              {event.at || event.timestamp
+                ? new Date(event.at || event.timestamp).toLocaleString(locale)
+                : "—"}
             </time>
           </div>
           {presentHistoryActorLabel(event.actor, event.actorName) ? (
@@ -75,8 +85,104 @@ export function AppointmentHistoryPanel({ appointment, locale }) {
   );
 }
 
-export function AppointmentDetailsPanel({ appointment, onClose, locale }) {
+function AgendaContactDetails({ appointment, contact }) {
   const { translate } = useLanguage();
+  const phone =
+    contact?.phone ||
+    appointment.prospectVisiblePhone ||
+    appointment.metadata?.agendaContactPhone ||
+    null;
+  const email = contact?.email || appointment.metadata?.agendaContactEmail || appointment.prospectEmail;
+  const language =
+    contact?.preferredLanguage || appointment.metadata?.agendaContactLanguage || null;
+  const owner = contact?.ownerDisplayName || appointment.interviewerName || null;
+  const source = contact?.source || appointment.metadata?.agendaContactSource || null;
+  const notes = contact?.notes || appointment.metadata?.agendaContactNotes || appointment.meetingNotes;
+
+  return (
+    <section className="agenda-contact-details" data-agenda-contact="true">
+      <h3>{translate("agendaContactDetailsTitle")}</h3>
+      <dl className="agenda-contact-details__list">
+        <div>
+          <dt>{translate("agendaContactName")}</dt>
+          <dd>{displayOrDash(contact?.name || appointment.metadata?.agendaContactName || appointment.prospectName)}</dd>
+        </div>
+        <div>
+          <dt>{translate("agendaContactPhone")}</dt>
+          <dd>
+            {phone ? (
+              <a href={`tel:${phone}`}>{phone}</a>
+            ) : (
+              translate("agendaContactPhoneUnavailable")
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>{translate("agendaContactEmail")}</dt>
+          <dd>{displayOrDash(email)}</dd>
+        </div>
+        <div>
+          <dt>{translate("agendaContactLanguage")}</dt>
+          <dd>{displayOrDash(language)}</dd>
+        </div>
+        <div>
+          <dt>{translate("agendaContactOwner")}</dt>
+          <dd>{displayOrDash(owner)}</dd>
+        </div>
+        <div>
+          <dt>{translate("agendaContactSource")}</dt>
+          <dd>{displayOrDash(source)}</dd>
+        </div>
+        <div>
+          <dt>{translate("agendaContactNotes")}</dt>
+          <dd>{displayOrDash(notes)}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+export function AppointmentDetailsPanel({
+  appointment,
+  onClose,
+  locale,
+  onReschedule,
+  onCancel,
+  onComplete,
+  onPromoteRecruit,
+  onPromoteClient
+}) {
+  const { translate } = useLanguage();
+  const standaloneAgenda = appointment?.metadata?.standaloneAgenda === true;
+  const canMutate = shouldShowLifecycleActions(appointment);
+  const promotedRecruit = Boolean(appointment?.metadata?.promotedToRecruit || appointment?.prospectId);
+  const promotedClient = Boolean(appointment?.metadata?.promotedToClient);
+  const [contact, setContact] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setContact(null);
+
+    if (!appointment?.agendaContactId) {
+      return undefined;
+    }
+
+    fetchAgendaContact(appointment.agendaContactId)
+      .then((result) => {
+        if (!cancelled) {
+          setContact(result?.contact || result || null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setContact(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appointment?.agendaContactId]);
 
   return (
     <aside className="appointment-details-panel">
@@ -90,6 +196,41 @@ export function AppointmentDetailsPanel({ appointment, onClose, locale }) {
         {appointment.humanAssistRequired ? (
           <HumanAssistPanel appointment={appointment} translate={translate} />
         ) : null}
+
+        {standaloneAgenda || appointment.agendaContactId ? (
+          <AgendaContactDetails appointment={appointment} contact={contact} />
+        ) : null}
+
+        {standaloneAgenda ? (
+          <section className="appointment-details-panel__actions" aria-label={translate("agendaActionsLabel")}>
+            {canMutate ? (
+              <AtlasButton variant="secondary" size="sm" onClick={() => onComplete?.(appointment)}>
+                {translate("agendaRecordOutcome")}
+              </AtlasButton>
+            ) : null}
+            {canMutate ? (
+              <AtlasButton variant="secondary" size="sm" onClick={() => onReschedule?.(appointment)}>
+                {translate("appointmentsRescheduleInterview")}
+              </AtlasButton>
+            ) : null}
+            {canMutate ? (
+              <AtlasButton variant="ghost" size="sm" onClick={() => onCancel?.(appointment)}>
+                {translate("appointmentsCancel")}
+              </AtlasButton>
+            ) : null}
+            {!promotedRecruit ? (
+              <AtlasButton variant="secondary" size="sm" onClick={() => onPromoteRecruit?.(appointment)}>
+                {translate("agendaPromoteRecruit")}
+              </AtlasButton>
+            ) : null}
+            {!promotedClient ? (
+              <AtlasButton variant="secondary" size="sm" onClick={() => onPromoteClient?.(appointment)}>
+                {translate("agendaPromoteClient")}
+              </AtlasButton>
+            ) : null}
+          </section>
+        ) : null}
+
         <section>
           <h3>{translate("appointmentsHistoryTitle")}</h3>
           <AppointmentHistoryPanel appointment={appointment} locale={locale} />

@@ -2629,6 +2629,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-177 — Unified Agenda Actions & Promotion
+
+**Implements:** Turn Agenda from a read-only appointment list into an operational workflow: Agenda Contact → Appointment → Outcome → explicit Promote to Recruit or Client, without treating unpromoted Agenda contacts as prospects.  
+**Domain:** Agenda / appointments / promotion  
+**Depends on:** BR-168 Unified Agenda V1; appointment application services; BR-176 notification hooks  
+**Related:** BR-043, BR-045, BR-080, BR-142, BR-160, BR-176  
+**Status:** V1 implemented  
+**Engine target:** `agendaApplicationService`; `/api/agenda`; existing `/api/appointments` reschedule/cancel/complete  
+**Tests:** `backend/test/unifiedAgendaBr177.test.js`; `frontend/src/engines/appointmentCardPresentation.test.js`  
+**Docs:** `docs/06-business/BR-177-agenda-actions-promotion.md`
+
+### Rules
+
+1. **Canonical actions** — Record Outcome, Reschedule, Cancel, Promote to Recruit, Promote to Client. Reuse `rescheduleAppointment`, `cancelAppointment`, and `completeAppointment`. Do not duplicate scheduling in the UI.
+2. **Record Outcome** — Vocabulary: `recruited`, `client`, `follow_up`, `no_show`, `cancelled`, `not_interested`, `rescheduled`, `other`. Outcome belongs to the appointment with actor + timestamp + optional note + history. Idempotent when the same outcome is already recorded. `recruited` / `client` do not auto-promote.
+3. **Reschedule** — Same appointment ID; move the same calendar event where supported; keep owner/interviewer unless intentionally changed; remake reminders; no duplicate appointments. BR-176 emits `APPOINTMENT_RESCHEDULED` from the appointment service only. UI picks a real availability slot.
+4. **Cancel** — Reuse canonical cancel: history, calendar, stop reminders. BR-176 emits `APPOINTMENT_CANCELLED` from the appointment service only. Reason optional.
+5. **Promote to Recruit** — Explicit only. Create or link one same-org prospect; preserve `organization_id`, `owner_user_id`, name, phone, email, language, source/notes; link appointment/history. Phone required. Entry method is `AGENDA_PROMOTION` (not QR / CTWA / Quick Capture). Second promote returns the existing link. Do not start Recruit AI unless existing eligibility rules already allow it.
+6. **Promote to Client** — Explicit only. Persist `atlas_agenda_clients` as the smallest durable client foundation. Do not invent a recruiting prospect to represent a client. Full Client CRM workspace remains a documented gap.
+7. **Workspace separation** — Unpromoted Agenda contacts stay out of Prospect Center, Mission Control recruiting metrics, Recruit AI queues, and recruiting conversion metrics. Client promotion enters only the Agenda client record.
+8. **Contact details** — `atlas_agenda_contacts` is source of truth for name, phone, email, preferred language, owner, source, and notes. Phone must display when stored.
+9. **Lifecycle views** — Today, Upcoming, Pending Confirmation, Human Assist, Completed, Cancelled stay consistent. Deep-linked `appointmentId` still opens off-tab.
+10. **Permissions** — Same-org appointment/Agenda scope. Super Admin control-plane sees no operational Agenda data unless Support Mode is active. No cross-tenant access by appointment or contact ID.
+11. **Audit** — Outcome, reschedule, cancel, promote recruit, and promote client write appointment history with friendly actor display names (not raw UUIDs).
+12. **Boundaries** — Do not change Recruit AI qualification, semantic apply, AI Quality, WhatsApp eligibility, ownership semantics, or campaign intake. No Team Vision-specific code.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

@@ -72,6 +72,22 @@ test("synthetic wa:bsuid key never rendered as phone contact", () => {
   assert.doesNotMatch(contact.contactLabel, /wa:bsuid:/);
 });
 
+test("standalone Agenda contact phone displays from atlas contact metadata", () => {
+  const contact = buildAppointmentCardContactModel({
+    prospectName: "Warm Market Person",
+    prospectPhone: null,
+    metadata: {
+      standaloneAgenda: true,
+      agendaContactPhone: "+13055550123",
+      agendaContactName: "Warm Market Person"
+    }
+  });
+
+  assert.equal(contact.contactKind, "phone");
+  assert.equal(contact.contactLabel, "+13055550123");
+  assert.equal(contact.telHref, "tel:+13055550123");
+});
+
 test("phone unavailable fallback when no phone or username", () => {
   const contact = buildAppointmentCardContactModel({}, { phoneUnavailableLabel: "Phone unavailable" });
   assert.equal(contact.contactKind, "unavailable");

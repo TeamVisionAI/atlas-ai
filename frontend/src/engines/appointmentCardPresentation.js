@@ -39,7 +39,8 @@ function resolveVisibleProspectPhone(appointment = {}) {
     return String(appointment.prospectVisiblePhone).trim();
   }
 
-  const phone = String(appointment.prospectPhone || "").trim();
+  const agendaPhone = String(appointment.metadata?.agendaContactPhone || "").trim();
+  const phone = String(appointment.prospectPhone || agendaPhone || "").trim();
 
   if (!phone || isSyntheticWhatsAppStorageKey(phone)) {
     return null;

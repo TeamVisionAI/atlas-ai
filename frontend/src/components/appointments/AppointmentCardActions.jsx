@@ -2,13 +2,13 @@ import { Link } from "react-router-dom";
 import AtlasButton from "../ui/AtlasButton";
 import UniversalNoteButton from "../notes/UniversalNoteButton";
 import { resolveAppointmentCardActionPlan } from "../../engines/interviewWorkflowPresentationEngine";
+import { shouldShowLifecycleActions } from "../../engines/appointmentCardPresentation";
 import { buildProspectWorkspaceCommunicationHistoryPath } from "../../utils/prospectRoutes";
 import "./AppointmentCardActions.css";
 
 /**
- * Operational actions for an appointment list card (BR-043, BR-045).
- * BR-168: standalone Agenda meetings are not prospects; prospect-workflow actions
- * remain hidden until an explicit Agenda outcome/promotion UI owns them.
+ * Operational actions for an appointment list card (BR-043, BR-045, BR-177).
+ * Standalone Agenda meetings stay off Prospect/Recruit AI until explicit promotion.
  */
 export default function AppointmentCardActions({
   appointment,
@@ -18,10 +18,17 @@ export default function AppointmentCardActions({
   onOpenWorkspace,
   onReschedule,
   onCancel,
-  onComplete
+  onComplete,
+  onPromoteRecruit,
+  onPromoteClient
 }) {
   const plan = resolveAppointmentCardActionPlan(appointment);
   const standaloneAgenda = appointment?.metadata?.standaloneAgenda === true;
+  const canMutate = shouldShowLifecycleActions(appointment);
+  const promotedRecruit = Boolean(
+    appointment?.metadata?.promotedToRecruit || appointment?.prospectId
+  );
+  const promotedClient = Boolean(appointment?.metadata?.promotedToClient);
 
   function handleJoinZoom() {
     const url = String(appointment.virtualMeetingUrl || "").trim();
@@ -39,6 +46,7 @@ export default function AppointmentCardActions({
         className="appointment-card-actions appointments-page__actions"
         data-appointment-id={appointment.id || undefined}
         data-agenda-standalone="true"
+        data-action-row-layout="wrap"
       >
         {appointment.virtualMeetingUrl ? (
           <AtlasButton
@@ -48,6 +56,45 @@ export default function AppointmentCardActions({
             onClick={handleJoinZoom}
           >
             {translate("appointmentsJoinZoom")}
+          </AtlasButton>
+        ) : null}
+
+        {canMutate ? (
+          <AtlasButton variant="secondary" size="sm" onClick={onComplete}>
+            {translate("agendaRecordOutcome")}
+          </AtlasButton>
+        ) : null}
+
+        {canMutate ? (
+          <AtlasButton variant="secondary" size="sm" onClick={onReschedule}>
+            {translate("appointmentsRescheduleInterview")}
+          </AtlasButton>
+        ) : null}
+
+        {canMutate ? (
+          <AtlasButton
+            variant="ghost"
+            size="sm"
+            className="appointment-card-actions__danger"
+            onClick={onCancel}
+          >
+            {translate("appointmentsCancel")}
+          </AtlasButton>
+        ) : null}
+
+        {!promotedRecruit ? (
+          <AtlasButton variant="secondary" size="sm" onClick={onPromoteRecruit}>
+            {translate("agendaPromoteRecruit")}
+          </AtlasButton>
+        ) : (
+          <AtlasButton variant="secondary" size="sm" onClick={onOpenWorkspace}>
+            {translate("appointmentsCardWorkspace")}
+          </AtlasButton>
+        )}
+
+        {!promotedClient ? (
+          <AtlasButton variant="secondary" size="sm" onClick={onPromoteClient}>
+            {translate("agendaPromoteClient")}
           </AtlasButton>
         ) : null}
       </div>

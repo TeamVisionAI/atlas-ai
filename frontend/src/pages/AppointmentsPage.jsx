@@ -18,6 +18,7 @@ import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import RescheduleAppointmentDialog from "../components/appointments/RescheduleAppointmentDialog";
 import CancelAppointmentDialog from "../components/appointments/CancelAppointmentDialog";
 import CompleteAppointmentDialog from "../components/appointments/CompleteAppointmentDialog";
+import PromoteAgendaContactDialog from "../components/agenda/PromoteAgendaContactDialog";
 import ResolveHumanAssistDialog from "../components/appointments/ResolveHumanAssistDialog";
 import {
   AppointmentDetailsPanel,
@@ -504,6 +505,8 @@ export default function AppointmentsPage() {
                       onReschedule={() => openDialog("reschedule", appointment)}
                       onCancel={() => openDialog("cancel", appointment)}
                       onComplete={() => openDialog("complete", appointment)}
+                      onPromoteRecruit={() => openDialog("promote-recruit", appointment)}
+                      onPromoteClient={() => openDialog("promote-client", appointment)}
                     />
                   </li>
                 );
@@ -517,6 +520,11 @@ export default function AppointmentsPage() {
             appointment={selectedAppointment}
             locale={locale}
             onClose={() => setSelectedAppointment(null)}
+            onReschedule={(item) => openDialog("reschedule", item)}
+            onCancel={(item) => openDialog("cancel", item)}
+            onComplete={(item) => openDialog("complete", item)}
+            onPromoteRecruit={(item) => openDialog("promote-recruit", item)}
+            onPromoteClient={(item) => openDialog("promote-client", item)}
           />
         ) : null}
       </div>
@@ -542,6 +550,34 @@ export default function AppointmentsPage() {
         onClose={closeDialog}
         onSuccess={(updatedAppointment) =>
           handleActionSuccess(translate("appointmentsCompleted"), updatedAppointment)
+        }
+      />
+      <PromoteAgendaContactDialog
+        open={dialog?.type === "promote-recruit"}
+        mode="recruit"
+        appointment={dialog?.appointment}
+        onClose={closeDialog}
+        onSuccess={(result) =>
+          handleActionSuccess(
+            result?.alreadyPromoted
+              ? translate("agendaPromoteRecruitExisting")
+              : translate("agendaPromoteRecruitSuccess"),
+            result?.appointment
+          )
+        }
+      />
+      <PromoteAgendaContactDialog
+        open={dialog?.type === "promote-client"}
+        mode="client"
+        appointment={dialog?.appointment}
+        onClose={closeDialog}
+        onSuccess={(result) =>
+          handleActionSuccess(
+            result?.alreadyPromoted
+              ? translate("agendaPromoteClientExisting")
+              : translate("agendaPromoteClientSuccess"),
+            result?.appointment
+          )
         }
       />
       <ResolveHumanAssistDialog

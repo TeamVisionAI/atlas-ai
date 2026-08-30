@@ -8,10 +8,12 @@ import { captureAppointmentError } from "../../utils/appointmentErrors";
 const OUTCOMES = [
   "recruited",
   "client",
-  "rescheduled",
-  "no_show",
   "follow_up",
-  "not_interested"
+  "no_show",
+  "cancelled",
+  "not_interested",
+  "rescheduled",
+  "other"
 ];
 
 export default function CompleteAppointmentDialog({ open, appointment, onClose, onSuccess }) {

@@ -5,11 +5,15 @@ const { requireAnyPermission } = require("../middleware/requirePermission");
 const { PERMISSIONS } = require("../security/permissions");
 const { getTenantOrganizationId } = require("../services/tenantContextService");
 const { listPersistedAppointments } = require("../services/appointmentListService");
+const { operationalControlPlaneEmpty, emptyAgenda } = require("../core/operationalControlPlane");
 const {
   createAgendaContact,
   listAgendaContacts,
+  getAgendaContact,
   createStandaloneAppointment,
-  recordStandaloneOutcome
+  recordStandaloneOutcome,
+  promoteToRecruit,
+  promoteToClient
 } = require("../application/agendaApplicationService");
 
 const router = express.Router();
@@ -37,7 +41,7 @@ function sendError(res, error) {
   });
 }
 
-router.get("/today", async (req, res) => {
+router.get("/today", operationalControlPlaneEmpty(emptyAgenda), async (req, res) => {
   try {
     const scope = context(req);
     const result = await listPersistedAppointments({
@@ -54,13 +58,22 @@ router.get("/today", async (req, res) => {
   }
 });
 
-router.get("/contacts", async (req, res) => {
+router.get("/contacts", operationalControlPlaneEmpty(emptyAgenda), async (req, res) => {
   try {
     const items = await listAgendaContacts(context(req), {
       status: req.query.status || null,
       limit: req.query.limit || 100
     });
     return res.json({ items, total: items.length });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get("/contacts/:id", operationalControlPlaneEmpty(emptyAgenda), async (req, res) => {
+  try {
+    const contact = await getAgendaContact(req.params.id, context(req));
+    return res.json({ success: true, contact });
   } catch (error) {
     return sendError(res, error);
   }
@@ -95,6 +108,32 @@ router.post(
         context(req)
       );
       return res.json({ success: true, appointment });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+);
+
+router.post(
+  "/appointments/:id/promote-recruit",
+  requireAnyPermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      const result = await promoteToRecruit(req.params.id, req.body || {}, context(req));
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+);
+
+router.post(
+  "/appointments/:id/promote-client",
+  requireAnyPermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      const result = await promoteToClient(req.params.id, req.body || {}, context(req));
+      return res.json({ success: true, ...result });
     } catch (error) {
       return sendError(res, error);
     }
