@@ -37,6 +37,7 @@ import AppointmentsPage from "./pages/AppointmentsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
 import TodayPage from "./pages/TodayPage";
 import ClientsPage from "./pages/ClientsPage";
+import ProductionPage from "./pages/ProductionPage";
 import IulFollowUpWorklistPage from "./pages/IulFollowUpWorklistPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import Prospect from "./pages/Prospect";
@@ -161,15 +162,7 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="production"
-          element={
-            <PlaceholderPage
-              titleKey="placeholderProductionTitle"
-              descriptionKey="placeholderProductionDescription"
-            />
-          }
-        />
+        <Route path="production" element={<ProductionPage />} />
         <Route
           path="recruiting"
           element={
@@ -214,6 +207,7 @@ export default function App() {
       <Route path="/appointments" element={<Navigate to="/app/appointments" replace />} />
       <Route path="/follow-ups" element={<Navigate to="/app/follow-ups" replace />} />
       <Route path="/clients" element={<Navigate to="/app/clients" replace />} />
+      <Route path="/production" element={<Navigate to="/app/production" replace />} />
       <Route path="/analytics" element={<Navigate to="/app/analytics" replace />} />
       <Route path="/settings/whatsapp" element={<Navigate to="/app/settings/whatsapp" replace />} />
       <Route path="/settings" element={<Navigate to="/app/settings" replace />} />

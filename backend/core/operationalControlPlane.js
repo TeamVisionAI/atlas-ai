@@ -221,6 +221,32 @@ function emptyClientDetail() {
   };
 }
 
+function emptyProduction() {
+  return {
+    generatedAt: new Date().toISOString(),
+    controlPlane: true,
+    organizationId: null,
+    scope: "mine",
+    teamAvailable: false,
+    search: "",
+    totalCount: 0,
+    filteredCount: 0,
+    counts: { submitted: 0, pending: 0, issued: 0, paid: 0 },
+    amounts: { submitted: null, pending: null, issued: null, paid: null },
+    items: []
+  };
+}
+
+function emptyProductionDetail() {
+  return {
+    controlPlane: true,
+    organizationId: null,
+    id: null,
+    clientId: null,
+    history: []
+  };
+}
+
 function emptyIulWorklist() {
   return {
     controlPlane: true,
@@ -287,6 +313,8 @@ module.exports = {
   emptyClients,
   emptyToday,
   emptyClientDetail,
+  emptyProduction,
+  emptyProductionDetail,
   emptyMissionControlSummary,
   emptyMissionControlReadModel,
   emptyConversations,

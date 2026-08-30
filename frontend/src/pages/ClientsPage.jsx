@@ -21,6 +21,16 @@ import {
   FollowUpsError
 } from "../services/followUpsService";
 import {
+  createProduction,
+  createProductionFollowUp,
+  getProductionList,
+  ProductionError,
+  updateProduction,
+  updateProductionStatus
+} from "../services/productionService";
+import { emptyProductionForm } from "../engines/productionViewModel";
+import { ProductionDialogs, ProductionRecordCard } from "./ProductionRecordsBlock";
+import {
   buildClientStatusLabel,
   formatClientTimestamp,
   presentClientHistoryEvent
@@ -80,6 +90,7 @@ export default function ClientsPage() {
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [production, setProduction] = useState(null);
 
   const loadList = useCallback(async () => {
     if (controlPlane) {
@@ -106,10 +117,20 @@ export default function ClientsPage() {
     setLoading(true);
     setError(null);
     try {
-      setDetail(await getClient(clientId));
+      const [clientDetail, productionPayload] = await Promise.all([
+        getClient(clientId),
+        getProductionList({ clientId })
+      ]);
+      setDetail(clientDetail);
+      setProduction(productionPayload);
     } catch (err) {
-      setError(err instanceof ClientsError ? translate("clientsLoadError") : err.message);
+      setError(
+        err instanceof ClientsError || err instanceof ProductionError
+          ? translate("clientsLoadError")
+          : err.message
+      );
       setDetail(null);
+      setProduction(null);
     } finally {
       setLoading(false);
     }
@@ -177,6 +198,32 @@ export default function ClientsPage() {
         await rescheduleFollowUp(dialog.item.id, { dueDate: form.dueDate, dueTime: form.dueTime || null });
       } else if (dialog?.type === "cancel-follow-up") {
         await cancelFollowUp(dialog.item.id, { notes: form.notes });
+      } else if (dialog?.type === "create") {
+        await createProduction({
+          clientId,
+          activityType: form.activityType,
+          status: form.status,
+          carrier: form.carrier || null,
+          productType: form.productType || null,
+          amount: form.amount === undefined || form.amount === null || String(form.amount).trim() === "" ? null : form.amount,
+          notes: form.notes || null
+        });
+      } else if (dialog?.type === "edit") {
+        await updateProduction(dialog.item.id, {
+          activityType: form.activityType,
+          carrier: form.carrier || null,
+          productType: form.productType || null,
+          amount: form.amount === undefined || form.amount === null || String(form.amount).trim() === "" ? null : form.amount,
+          notes: form.notes || null
+        });
+      } else if (dialog?.type === "production-status") {
+        await updateProductionStatus(dialog.item.id, { status: form.status });
+      } else if (dialog?.type === "production-follow-up") {
+        await createProductionFollowUp(dialog.item.id, {
+          dueDate: form.dueDate,
+          dueTime: form.dueTime || null,
+          notes: form.notes || null
+        });
       }
       setDialog(null);
       await refresh();
@@ -281,6 +328,56 @@ export default function ClientsPage() {
                         </ol>
                       ) : null}
                     </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="clients-section">
+              <h2>{translate("productionSectionTitle")}</h2>
+              <div className="clients-profile__actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm(emptyProductionForm());
+                    setDialog({ type: "create" });
+                  }}
+                >
+                  {translate("productionAdd")}
+                </button>
+              </div>
+              {(production?.items || []).length === 0 ? (
+                <p className="clients-page__status">{translate("productionEmptyClient")}</p>
+              ) : (
+                <ul className="clients-list">
+                  {(production?.items || []).map((item) => (
+                    <ProductionRecordCard
+                      key={item.id}
+                      item={item}
+                      translate={translate}
+                      locale={locale}
+                      showClient={false}
+                      onEdit={(record) => {
+                        setForm(
+                          emptyProductionForm({
+                            activityType: record.activityType,
+                            carrier: record.carrier || "",
+                            productType: record.productType || "",
+                            amount: record.amount == null ? "" : String(record.amount),
+                            notes: record.notes || ""
+                          })
+                        );
+                        setDialog({ type: "edit", item: record });
+                      }}
+                      onStatus={(record) => {
+                        setForm(emptyProductionForm({ status: record.status }));
+                        setDialog({ type: "production-status", item: record });
+                      }}
+                      onFollowUp={(record) => {
+                        setForm(emptyProductionForm());
+                        setDialog({ type: "production-follow-up", item: record });
+                      }}
+                    />
                   ))}
                 </ul>
               )}
@@ -395,6 +492,24 @@ export default function ClientsPage() {
             </label>
           </ClientDialog>
         ) : null}
+
+        <ProductionDialogs
+          dialog={
+            dialog?.type === "production-status"
+              ? { ...dialog, type: "status" }
+              : dialog?.type === "production-follow-up"
+                ? { ...dialog, type: "follow-up" }
+                : dialog?.type === "create" || dialog?.type === "edit"
+                  ? dialog
+                  : null
+          }
+          form={form}
+          setForm={setForm}
+          translate={translate}
+          saving={saving}
+          onClose={() => setDialog(null)}
+          onConfirm={submitDialog}
+        />
 
         <RescheduleAppointmentDialog
           open={dialog?.type === "reschedule-appointment"}

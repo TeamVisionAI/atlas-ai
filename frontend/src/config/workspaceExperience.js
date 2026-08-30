@@ -185,8 +185,7 @@ const NAV_ITEM_DEFS = Object.freeze({
     id: "production",
     path: appPath("production"),
     labelKey: "navProduction",
-    workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.DASHBOARD_EXECUTIVE
+    permission: PERMISSIONS.PROSPECT_READ
   },
   recruiting: {
     id: "recruiting",
@@ -276,6 +275,7 @@ const BUSINESS_CORE_NAV_ORDER = Object.freeze([
   "appointments",
   "followUps",
   "clients",
+  "production",
   "knowledge",
   "policyIntelligence"
 ]);
@@ -289,7 +289,7 @@ const WORKSPACE_LANDING_NAV = Object.freeze({
 /** Leadership extensions beyond core Business (still permission-gated). */
 const LEADERSHIP_EXTENSION_NAV = Object.freeze({
   [WORKSPACE_TYPES.ADMINISTRATOR]: ["analytics"],
-  [WORKSPACE_TYPES.MANAGEMENT]: ["production", "recruiting", "analytics"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["recruiting", "analytics"],
   [WORKSPACE_TYPES.REPRESENTATIVE]: []
 });
 
@@ -372,10 +372,7 @@ export const ROUTE_ACCESS = Object.freeze({
   appointments: { permission: PERMISSIONS.PROSPECT_READ },
   "follow-ups": { permission: PERMISSIONS.PROSPECT_READ },
   clients: { permission: PERMISSIONS.PROSPECT_READ },
-  production: {
-    workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
-    permission: PERMISSIONS.DASHBOARD_EXECUTIVE
-  },
+  production: { permission: PERMISSIONS.PROSPECT_READ },
   recruiting: {
     workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.PROSPECT_ASSIGN

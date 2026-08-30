@@ -4,7 +4,7 @@ Status: V1 implemented.
 
 ## Goal
 
-Agenda Contact → Appointment → Client → Follow-ups, with later room for FNA / Policy Review / Production.
+Agenda Contact → Appointment → Client → Follow-ups, with later room for FNA / Policy Review. Production tracking is BR-181.
 
 Clients stay completely separate from recruiting prospects and Recruit AI.
 
@@ -42,4 +42,4 @@ Same owner / hierarchy model as BR-178. Wrong-org IDs → 404. Super Admin contr
 
 ## Out of scope
 
-FNA, Policy Review, Policy Intelligence, production/premium tracking, service-appointment productization, and household relationships.
+FNA, Policy Review, Policy Intelligence, service-appointment productization, and household relationships. Production/premium tracking is BR-181.
