@@ -63,6 +63,7 @@ const {
 const prospectCenterRoutes = require("./routes/prospectCenter");
 const followUpsRoutes = require("./routes/followUps");
 const clientsRoutes = require("./routes/clients");
+const todayRoutes = require("./routes/today");
 const iulFollowUpWorklistRoutes = require("./routes/iulFollowUpWorklist");
 const conversationsCenterRoutes = require("./routes/conversationsCenter");
 const metaOnboardingRoutes = require("./routes/metaOnboarding");
@@ -213,6 +214,7 @@ app.use(
 );
 app.use("/api/follow-ups", followUpsRoutes);
 app.use("/api/clients", clientsRoutes);
+app.use("/api/today", todayRoutes);
 app.use("/api/iul-follow-up-worklist", iulFollowUpWorklistRoutes);
 app.use("/api/conversations", conversationsCenterRoutes);
 app.use("/api/meta", metaOnboardingRoutes);

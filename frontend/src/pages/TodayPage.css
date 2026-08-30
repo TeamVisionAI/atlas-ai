@@ -1,0 +1,275 @@
+.today-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.today-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.today-page__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.today-page__subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.today-page__scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.today-page__scope-btn,
+.today-page__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.today-page__scope-btn {
+  cursor: pointer;
+}
+
+.today-page__scope-btn.is-active,
+.today-page__chip.is-active {
+  border-color: #1e3a8a;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.today-page__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.today-page__count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.today-page__status,
+.today-page__empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 16px;
+}
+
+.today-page__empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 28px 20px;
+  text-align: center;
+  color: #334155;
+  font-weight: 600;
+}
+
+.today-page__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.today-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.today-page__section-title {
+  margin: 0;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.today-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.today-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.today-row__main {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.today-row__main:hover,
+.today-row__main:focus-visible {
+  background: #f8fafc;
+}
+
+.today-row__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.today-row__title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+  color: #0f172a;
+}
+
+.today-row__details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.today-row__details dt {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.today-row__details dd {
+  margin: 0;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.today-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.today-row__actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.today-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 16px;
+}
+
+.today-dialog {
+  width: min(480px, 100%);
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.today-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.today-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.today-dialog input,
+.today-dialog textarea {
+  font-weight: 400;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.today-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.today-dialog__primary,
+.today-dialog__secondary {
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.today-dialog__primary {
+  border: 0;
+  background: #1e3a8a;
+  color: #fff;
+}
+
+.today-dialog__secondary {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}
+
+@media (min-width: 720px) {
+  .today-row__details {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 719px) {
+  .today-page__title {
+    font-size: 24px;
+  }
+}

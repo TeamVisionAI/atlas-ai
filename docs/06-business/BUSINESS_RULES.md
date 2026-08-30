@@ -2712,6 +2712,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-180 — Today / Action Center
+
+**Implements:** One tenant-safe Today screen that answers “What needs my attention today?” by aggregating existing operational work.  
+**Domain:** Operations / Needs Attention / appointments / follow-ups / notifications  
+**Depends on:** BR-079 org-local dates; BR-080 acknowledgement; BR-160 control plane; BR-176 notifications; BR-178 follow-ups; BR-179 clients  
+**Related:** BR-043 appointments; BR-034/080 human attention (unchanged)  
+**Status:** V1 implemented — read model only; no new operational table  
+**Engine target:** `today/*`; `todayActionCenterApplicationService`; `GET /api/today`; `/app/today`  
+**Tests:** `backend/test/todayActionCenterBr180.test.js`; `frontend/src/pages/todayPageBr180.test.js`  
+**Docs:** `docs/06-business/BR-180-today-action-center.md`
+
+### Rules
+
+1. **Aggregation only** — `/app/today` is a read model. Do not duplicate Needs Attention, appointments, follow-ups, leads, or notifications into a new operational table.
+2. **Default My Today** — Team Today only when existing hierarchy permissions already allow team visibility. Preserve org isolation, owner/subtree rules, Support Mode tenant binding, and Super Admin control-plane empty.
+3. **Sections** — Needs Attention (real cases only; no healed BR-080 SLA false positives), today’s appointments (org-local today), follow-ups due (Due Today / Overdue / Needs Date, recruiting and client), new actionable inbound conversations, unread BR-176 notifications.
+4. **Display priority** — Human takeover / real NA → overdue follow-ups → appointment soon/today → due-today follow-ups → needs-date → new actionable conversations → notifications. Do not mutate underlying priority/state because an item appears on Today.
+5. **Timezone** — “Today” is the resolved operational timezone (BR-079), not server UTC. Friendly times only in UI.
+6. **Actions** — Reuse existing appointment, follow-up, acknowledgement, and notification-read services/routes. Refresh only Today data after mutations.
+7. **Refresh** — Fetch on entry, My/Team change, after mutations, and optional stale window focus. No blind 1–2 minute full-page polling. NotificationBell polling stays separate.
+8. **Counts** — Compact counts derive from the same items shown below. No conflicting dashboard math.
+9. **Empty** — If nothing needs action: “You’re caught up for today.” Do not manufacture tasks.
+10. **Deep links** — Prospect/conversation → existing prospect or conversation route; appointment → appointment details; prospect follow-up → prospect; client follow-up → `/app/clients/:id`; notification → existing entity-aware deep link.
+11. **Clients** — Participate only through real actionable items. Do not add clients to recruiting metrics.
+12. **Boundaries** — Do not change Recruit AI, semantic apply, AI Quality, WhatsApp eligibility, campaign intake, scheduling rules, BR-176 engine, or BR-178/179 sources of truth. No Team Vision-specific code.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  
