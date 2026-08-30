@@ -39,6 +39,8 @@ export function ServiceCaseCard({
   translate,
   locale,
   showClient = true,
+  linkedRequests = [],
+  linkedDocuments = [],
   onEdit,
   onStatus,
   onFollowUp,
@@ -70,6 +72,17 @@ export function ServiceCaseCard({
           <div>
             <dt>{translate("serviceAppointment")}</dt>
             <dd>{translate("serviceAppointmentLinked")}</dd>
+          </div>
+        ) : null}
+        {linkedRequests.length || linkedDocuments.length ? (
+          <div>
+            <dt>{translate("documentsSectionTitle")}</dt>
+            <dd>
+              {linkedRequests.filter((request) => request.status === "OPEN").length
+                ? `${linkedRequests.filter((request) => request.status === "OPEN").length} ${translate("documentsOpenRequests")}`
+                : translate("documentsLinked")}
+              {linkedDocuments.length ? ` · ${linkedDocuments.length} ${translate("documentsReceivedCount")}` : ""}
+            </dd>
           </div>
         ) : null}
       </dl>

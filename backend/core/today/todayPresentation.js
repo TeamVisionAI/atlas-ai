@@ -238,6 +238,25 @@ function followUpPriority(status) {
   return DISPLAY_PRIORITY.FOLLOW_UP_NEEDS_DATE;
 }
 
+function presentDocumentRequestItem(item) {
+  return {
+    id: `docreq:${item.id}`,
+    kind: TODAY_KINDS.DOCUMENT_REQUEST,
+    displayPriority: followUpPriority(item.status),
+    title: item.title || item.name || "Document request",
+    subtitle: item.name && item.name !== item.title ? item.name : item.source?.documentType || null,
+    whenLabel: item.dueDate || null,
+    status: item.status,
+    ownerName: item.ownerName || null,
+    href: item.href || (item.entityId ? `/app/clients/${item.entityId}` : "/app/clients"),
+    entityType: "document_request",
+    entityId: item.id,
+    phone: null,
+    actions: ["open"],
+    source: item.source || item
+  };
+}
+
 function presentServiceCaseItem(item) {
   return {
     id: `svc:${item.id}`,
@@ -346,6 +365,7 @@ module.exports = {
   presentAppointment,
   presentFollowUpItem,
   presentServiceCaseItem,
+  presentDocumentRequestItem,
   presentNewLead,
   presentNotification,
   compareTodayItems

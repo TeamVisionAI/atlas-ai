@@ -272,6 +272,52 @@ function emptyServiceCaseDetail() {
   };
 }
 
+function emptyDocumentRequests() {
+  return {
+    generatedAt: new Date().toISOString(),
+    controlPlane: true,
+    organizationId: null,
+    scope: "mine",
+    teamAvailable: false,
+    search: "",
+    totalCount: 0,
+    filteredCount: 0,
+    counts: { open: 0, overdue: 0, dueToday: 0, needsDate: 0 },
+    items: []
+  };
+}
+
+function emptyDocumentRequestDetail() {
+  return {
+    controlPlane: true,
+    organizationId: null,
+    id: null,
+    clientId: null,
+    history: []
+  };
+}
+
+function emptyDocuments() {
+  return {
+    generatedAt: new Date().toISOString(),
+    controlPlane: true,
+    organizationId: null,
+    scope: "mine",
+    teamAvailable: false,
+    items: []
+  };
+}
+
+function emptyDocumentDetail() {
+  return {
+    controlPlane: true,
+    organizationId: null,
+    id: null,
+    clientId: null,
+    history: []
+  };
+}
+
 function emptyIulWorklist() {
   return {
     controlPlane: true,
@@ -342,6 +388,10 @@ module.exports = {
   emptyProductionDetail,
   emptyServiceCases,
   emptyServiceCaseDetail,
+  emptyDocumentRequests,
+  emptyDocumentRequestDetail,
+  emptyDocuments,
+  emptyDocumentDetail,
   emptyMissionControlSummary,
   emptyMissionControlReadModel,
   emptyConversations,

@@ -14,7 +14,8 @@ const TODAY_KINDS = Object.freeze({
   FOLLOW_UP: "follow_up",
   NEW_LEAD: "new_lead",
   NOTIFICATION: "notification",
-  SERVICE_CASE: "service_case"
+  SERVICE_CASE: "service_case",
+  DOCUMENT_REQUEST: "document_request"
 });
 
 const TODAY_SECTIONS = Object.freeze({

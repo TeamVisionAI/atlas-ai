@@ -41,6 +41,23 @@ import {
 import { emptyServiceForm } from "../engines/serviceViewModel";
 import { ServiceCaseCard, ServiceDialogs } from "./ServiceRecordsBlock";
 import {
+  createDocumentRequest,
+  createDocumentRequestFollowUp,
+  downloadDocument,
+  getDocumentRequests,
+  getDocuments,
+  linkDocumentToRequest,
+  updateDocumentRequestStatus,
+  updateDocumentStatus,
+  uploadDocument,
+  ClientDocumentsError
+} from "../services/clientDocumentsService";
+import {
+  emptyDocumentRequestForm,
+  emptyDocumentUploadForm
+} from "../engines/documentsViewModel";
+import { DocumentCard, DocumentDialogs, DocumentRequestCard } from "./DocumentsRecordsBlock";
+import {
   buildClientStatusLabel,
   formatClientTimestamp,
   presentClientHistoryEvent
@@ -102,6 +119,8 @@ export default function ClientsPage() {
   const [saving, setSaving] = useState(false);
   const [production, setProduction] = useState(null);
   const [service, setService] = useState(null);
+  const [documentRequests, setDocumentRequests] = useState(null);
+  const [documents, setDocuments] = useState(null);
 
   const loadList = useCallback(async () => {
     if (controlPlane) {
@@ -128,23 +147,33 @@ export default function ClientsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [clientDetail, productionPayload, servicePayload] = await Promise.all([
-        getClient(clientId),
-        getProductionList({ clientId }),
-        getServiceCases({ clientId })
-      ]);
+      const [clientDetail, productionPayload, servicePayload, requestPayload, documentPayload] =
+        await Promise.all([
+          getClient(clientId),
+          getProductionList({ clientId }),
+          getServiceCases({ clientId }),
+          getDocumentRequests({ clientId }),
+          getDocuments({ clientId })
+        ]);
       setDetail(clientDetail);
       setProduction(productionPayload);
       setService(servicePayload);
+      setDocumentRequests(requestPayload);
+      setDocuments(documentPayload);
     } catch (err) {
       setError(
-        err instanceof ClientsError || err instanceof ProductionError || err instanceof ServiceCasesError
+        err instanceof ClientsError ||
+        err instanceof ProductionError ||
+        err instanceof ServiceCasesError ||
+        err instanceof ClientDocumentsError
           ? translate("clientsLoadError")
           : err.message
       );
       setDetail(null);
       setProduction(null);
       setService(null);
+      setDocumentRequests(null);
+      setDocuments(null);
     } finally {
       setLoading(false);
     }
@@ -263,6 +292,36 @@ export default function ClientsPage() {
           dueTime: form.dueTime || null,
           notes: form.notes || null
         });
+      } else if (dialog?.type === "request-create") {
+        await createDocumentRequest({
+          clientId,
+          documentType: form.documentType,
+          title: form.title,
+          instructions: form.instructions || null,
+          dueDate: form.dueDate || null,
+          serviceCaseId: form.serviceCaseId || null
+        });
+      } else if (dialog?.type === "request-status") {
+        await updateDocumentRequestStatus(dialog.item.id, { status: form.status });
+      } else if (dialog?.type === "request-follow-up") {
+        await createDocumentRequestFollowUp(dialog.item.id, {
+          dueDate: form.dueDate,
+          dueTime: form.dueTime || null,
+          notes: form.notes || null
+        });
+      } else if (dialog?.type === "document-upload") {
+        await uploadDocument({
+          file: form.file,
+          clientId,
+          documentType: form.documentType,
+          requestId: form.requestId || null,
+          serviceCaseId: form.serviceCaseId || null,
+          notes: form.notes || null
+        });
+      } else if (dialog?.type === "document-status") {
+        await updateDocumentStatus(dialog.item.id, { status: form.status });
+      } else if (dialog?.type === "document-link") {
+        await linkDocumentToRequest(dialog.item.id, { requestId: form.requestId });
       }
       setDialog(null);
       await refresh();
@@ -423,6 +482,100 @@ export default function ClientsPage() {
             </section>
 
             <section className="clients-section">
+              <h2>{translate("documentsSectionTitle")}</h2>
+              <div className="clients-profile__actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm(emptyDocumentRequestForm());
+                    setDialog({ type: "request-create" });
+                  }}
+                >
+                  {translate("documentsRequestAdd")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm(emptyDocumentUploadForm());
+                    setDialog({ type: "document-upload" });
+                  }}
+                >
+                  {translate("documentsUpload")}
+                </button>
+              </div>
+              {(documentRequests?.items || []).length === 0 && (documents?.items || []).length === 0 ? (
+                <p className="clients-page__status">{translate("documentsEmptyClient")}</p>
+              ) : (
+                <>
+                  {(documentRequests?.items || []).length ? (
+                    <ul className="clients-list">
+                      {(documentRequests?.items || []).map((item) => (
+                        <DocumentRequestCard
+                          key={item.id}
+                          item={item}
+                          translate={translate}
+                          locale={locale}
+                          onStatus={(record) => {
+                            setForm(emptyDocumentRequestForm({ status: record.status }));
+                            setDialog({ type: "request-status", item: record });
+                          }}
+                          onFollowUp={(record) => {
+                            setForm(emptyDocumentRequestForm({ title: record.title }));
+                            setDialog({ type: "request-follow-up", item: record });
+                          }}
+                          onUpload={(record) => {
+                            setForm(
+                              emptyDocumentUploadForm({
+                                requestId: record.id,
+                                documentType: record.documentType,
+                                serviceCaseId: record.serviceCaseId || ""
+                              })
+                            );
+                            setDialog({ type: "document-upload", item: record });
+                          }}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                  {(documents?.items || []).length ? (
+                    <ul className="clients-list">
+                      {(documents?.items || []).map((item) => (
+                        <DocumentCard
+                          key={item.id}
+                          item={item}
+                          translate={translate}
+                          locale={locale}
+                          openRequests={(documentRequests?.items || []).filter((request) => request.status === "OPEN")}
+                          onStatus={(record) => {
+                            setForm(emptyDocumentUploadForm({ status: record.status }));
+                            setDialog({ type: "document-status", item: record });
+                          }}
+                          onDownload={async (record) => {
+                            try {
+                              const blob = await downloadDocument(record.id);
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement("a");
+                              link.href = url;
+                              link.download = record.originalFilename || "document";
+                              link.click();
+                              URL.revokeObjectURL(url);
+                            } catch (err) {
+                              setError(err.message);
+                            }
+                          }}
+                          onLink={(record) => {
+                            setForm(emptyDocumentUploadForm());
+                            setDialog({ type: "document-link", item: record });
+                          }}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              )}
+            </section>
+
+            <section className="clients-section">
               <h2>{translate("serviceSectionTitle")}</h2>
               <div className="clients-profile__actions">
                 <button
@@ -446,6 +599,8 @@ export default function ClientsPage() {
                       translate={translate}
                       locale={locale}
                       showClient={false}
+                      linkedRequests={(documentRequests?.items || []).filter((request) => request.serviceCaseId === item.id)}
+                      linkedDocuments={(documents?.items || []).filter((doc) => doc.serviceCaseId === item.id)}
                       onEdit={(record) => {
                         setForm(
                           emptyServiceForm({
@@ -599,6 +754,24 @@ export default function ClientsPage() {
           translate={translate}
           saving={saving}
           appointments={detail?.appointments || []}
+          onClose={() => setDialog(null)}
+          onConfirm={submitDialog}
+        />
+
+        <DocumentDialogs
+          dialog={
+            ["request-create", "request-status", "request-follow-up", "document-upload", "document-status", "document-link"].includes(
+              dialog?.type
+            )
+              ? dialog
+              : null
+          }
+          form={form}
+          setForm={setForm}
+          translate={translate}
+          saving={saving}
+          serviceCases={service?.items || []}
+          openRequests={(documentRequests?.items || []).filter((item) => item.status === "OPEN")}
           onClose={() => setDialog(null)}
           onConfirm={submitDialog}
         />
