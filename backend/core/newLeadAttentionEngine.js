@@ -7,7 +7,10 @@ const supabaseService = require("../services/supabaseService");
 const { writeAuditLog } = require("../security/auditLogService");
 const { ROLES } = require("../security/roles");
 const { canAccessProspect } = require("../security/authorizationService");
-const { savePersistedWorkflowState } = require("./workflowStateStore");
+const {
+  loadPersistedWorkflowState,
+  savePersistedWorkflowState
+} = require("./workflowStateStore");
 const { MILESTONES, OWNERSHIP } = require("./workflowConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const {
@@ -96,6 +99,86 @@ function isHealthyAtlasWaitingAttention(prospect = {}) {
     attention === ATTENTION_STATUS.AI_RESPONDING ||
     attention === ATTENTION_STATUS.WAITING_FOR_PROSPECT
   );
+}
+
+const FIRST_RESPONSE_SLA_REASONS = new Set([
+  "unacknowledged_sla_15m",
+  "unassigned_sla_15m"
+]);
+
+function isFirstResponseSlaReason(reason) {
+  return FIRST_RESPONSE_SLA_REASONS.has(String(reason || "").trim());
+}
+
+/**
+ * A delivered Atlas reply satisfies the first-response SLA.
+ * Does not acknowledge the New mission (BR-080 human ack stays explicit).
+ */
+function isFirstResponseSlaSatisfied(prospect = {}, extras = {}) {
+  if (isHealthyAtlasWaitingAttention(prospect)) {
+    return true;
+  }
+  return extras.deliveredAutomatedOutbound === true;
+}
+
+async function resolveBr080WorkflowState(prospect = {}, workflowState = null) {
+  if (workflowState && typeof workflowState === "object") {
+    return workflowState;
+  }
+  const embedded =
+    prospect.workflow_state && typeof prospect.workflow_state === "object"
+      ? prospect.workflow_state
+      : {};
+  if (!prospect.phone) {
+    return embedded;
+  }
+  try {
+    const loaded = await loadPersistedWorkflowState(prospect.phone, {
+      organizationId: prospect.organization_id || prospect.organizationId || null,
+      prospectId: prospect.id || null
+    });
+    return { ...embedded, ...loaded };
+  } catch {
+    return embedded;
+  }
+}
+
+async function lookupDeliveredAutomatedFirstResponse(prospect = {}, lookupFn = null) {
+  if (typeof lookupFn === "function") {
+    return Boolean(await lookupFn(prospect));
+  }
+  if (!prospect.phone) {
+    return false;
+  }
+  try {
+    const {
+      queryOutboundDeliveries,
+      isAutomatedReplyIntent,
+      DELIVERED_META_STATUSES
+    } = require("./whatsappAutomatedReplyDelivery");
+    const rows = await queryOutboundDeliveries(
+      prospect.phone,
+      prospect.organization_id || prospect.organizationId || null
+    );
+    return (rows || []).some((row) => {
+      if (!isAutomatedReplyIntent(row.intent)) {
+        return false;
+      }
+      const meta = String(row.meta_delivery_status || "").trim().toLowerCase();
+      if (!meta) {
+        return true;
+      }
+      return DELIVERED_META_STATUSES.has(meta);
+    });
+  } catch (error) {
+    logWhatsAppStage("br080_first_response_lookup_failed", {
+      level: "warn",
+      phone: maskPhone(prospect.phone),
+      error: error.message
+    });
+    // Fail closed — a lookup error must not skip a real unacknowledged SLA.
+    return false;
+  }
 }
 
 function isNewLeadAttentionOpen(prospect = {}) {
@@ -212,7 +295,11 @@ async function markAiResponding(prospect, options = {}) {
     return prospect;
   }
 
-  if (!isRecruitingProspectForBr080(prospect, options.workflowState || null)) {
+  const workflowState = await resolveBr080WorkflowState(
+    prospect,
+    options.workflowState || null
+  );
+  if (!isRecruitingProspectForBr080(prospect, workflowState)) {
     return prospect;
   }
 
@@ -500,7 +587,7 @@ async function claimLead(prospect, actor = {}) {
   return { prospect: data, claimed: true };
 }
 
-function evaluateEscalation(prospect, nowMs = Date.now()) {
+function evaluateEscalation(prospect, nowMs = Date.now(), extras = {}) {
   if (!isRecruitingProspectForBr080(prospect)) {
     return { shouldEscalate: false, level: prospect.escalation_level || 0 };
   }
@@ -526,6 +613,14 @@ function evaluateEscalation(prospect, nowMs = Date.now()) {
   }
 
   if (age >= ESCALATION_UNACKNOWLEDGED_MS && current < 2) {
+    // Implements BR-080 — delivered Atlas reply satisfies first-response SLA.
+    if (isFirstResponseSlaSatisfied(prospect, extras)) {
+      return {
+        shouldEscalate: false,
+        level: current,
+        reason: "first_response_satisfied"
+      };
+    }
     return {
       shouldEscalate: true,
       level: ESCALATION_LEVELS.HUMAN_REQUIRED,
@@ -538,12 +633,68 @@ function evaluateEscalation(prospect, nowMs = Date.now()) {
   return { shouldEscalate: false, level: current };
 }
 
+/**
+ * Restore Atlas-owned waiting after a false unacknowledged-SLA Needs Attention.
+ * Does not acknowledge New. Does not clear stall, TAKE OVER, or real failure reasons.
+ */
+async function repairFalseFirstResponseSlaAttention(prospect, options = {}) {
+  if (!prospect?.phone || isAcknowledged(prospect)) {
+    return { repaired: false, prospect };
+  }
+  if (!isFirstResponseSlaReason(prospect.human_attention_reason)) {
+    return { repaired: false, prospect };
+  }
+
+  const workflowState = await resolveBr080WorkflowState(prospect, options.workflowState || null);
+  if (workflowState.humanTakenOverAt || workflowState.stalledAt) {
+    return { repaired: false, prospect };
+  }
+  if (workflowState.handoffReason && !isFirstResponseSlaReason(workflowState.handoffReason)) {
+    return { repaired: false, prospect };
+  }
+
+  const updates = {
+    attention_status: ATTENTION_STATUS.WAITING_FOR_PROSPECT,
+    human_attention_reason: null
+  };
+  await updateProspectAttention(prospect.phone, prospect.organization_id, updates);
+
+  if (workflowState.needsHumanAttention === true && !workflowState.humanTakenOverAt) {
+    await savePersistedWorkflowState(
+      prospect.phone,
+      {
+        needsHumanAttention: false,
+        workflowOwnership: OWNERSHIP.ATLAS,
+        manualAgentOwnership: false
+      },
+      {
+        organizationId: prospect.organization_id || null,
+        prospectId: prospect.id || null,
+        prospect
+      }
+    );
+  }
+
+  return {
+    repaired: true,
+    prospect: { ...prospect, ...updates }
+  };
+}
+
 async function applyEscalation(prospect, decision) {
   if (!decision?.shouldEscalate || !prospect?.phone) {
     return { escalated: false, prospect };
   }
 
   if (!isRecruitingProspectForBr080(prospect)) {
+    return { escalated: false, prospect };
+  }
+
+  // Implements BR-080 — never seize Needs Attention for a satisfied first-response SLA.
+  if (
+    decision.level >= ESCALATION_LEVELS.HUMAN_REQUIRED &&
+    isFirstResponseSlaSatisfied(prospect)
+  ) {
     return { escalated: false, prospect };
   }
 
@@ -608,10 +759,44 @@ async function processLeadEscalationsForOrganization(organizationId, options = {
 
   const prospects = (await load()) || [];
   let escalated = 0;
+  let repaired = 0;
 
   for (const prospect of prospects) {
-    const decision = evaluateEscalation(prospect, nowMs);
+    const preview = evaluateEscalation(prospect, nowMs);
+    let delivered = isFirstResponseSlaSatisfied(prospect);
+    const needsDeliveryLookup =
+      !delivered &&
+      (isFirstResponseSlaReason(prospect.human_attention_reason) ||
+        (preview.shouldEscalate && preview.level >= ESCALATION_LEVELS.HUMAN_REQUIRED));
+
+    if (needsDeliveryLookup) {
+      delivered = await lookupDeliveredAutomatedFirstResponse(
+        prospect,
+        options.lookupDeliveredFirstResponse
+      );
+    }
+
+    const decision = delivered
+      ? evaluateEscalation(prospect, nowMs, { deliveredAutomatedOutbound: true })
+      : preview;
+
+    if (delivered && isFirstResponseSlaReason(prospect.human_attention_reason)) {
+      const heal = await repairFalseFirstResponseSlaAttention(prospect);
+      if (heal.repaired) {
+        repaired += 1;
+      }
+      continue;
+    }
+
     if (!decision.shouldEscalate) {
+      if (
+        delivered &&
+        !isAcknowledged(prospect) &&
+        !isHealthyAtlasWaitingAttention(prospect) &&
+        prospect.attention_status !== ATTENTION_STATUS.HUMAN_REQUIRED
+      ) {
+        await markAiResponding(prospect, { waitingForProspect: true });
+      }
       continue;
     }
 
@@ -621,7 +806,7 @@ async function processLeadEscalationsForOrganization(organizationId, options = {
     }
   }
 
-  return { processed: prospects.length, escalated };
+  return { processed: prospects.length, escalated, repaired };
 }
 
 let escalationTimer = null;
@@ -662,8 +847,11 @@ module.exports = {
   isAcknowledged,
   isUnassigned,
   isNewLeadAttentionOpen,
+  isFirstResponseSlaSatisfied,
+  isFirstResponseSlaReason,
   markAiResponding,
   markHumanAttentionRequired,
+  repairFalseFirstResponseSlaAttention,
   canAcknowledgeProspect,
   canClaimUnassigned,
   acknowledgeLead,

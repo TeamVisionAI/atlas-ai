@@ -3363,7 +3363,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Status:** Implemented  
 **Engine target:** `newLeadAssignmentEngine.js`, `newLeadAttentionEngine.js`, WhatsApp/Quick Capture create paths, Mission `NewLeadAttention`, Prospect Center badges/filters, escalation poller  
 **Migration:** `031_br080_new_lead_attention.sql` (additive; no ownership backfill)  
-**Tests:** `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/newLeadAssignmentAttentionAudit.test.js`, `backend/test/br080SlaMustNotSilenceHealthyAtlas.test.js`
+**Tests:** `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/newLeadAssignmentAttentionAudit.test.js`, `backend/test/br080SlaMustNotSilenceHealthyAtlas.test.js`, `backend/test/br080FirstResponseSlaSatisfied.test.js`
 
 ### Rules
 
@@ -3373,7 +3373,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **New persists until acknowledgement** — `attention_status` remains new/ai_responding/waiting/human_required until explicit Acknowledge or Claim & Acknowledge. Page open, card render, dashboard load, AI reply, prospect inbound, and workflow read-model rebuild do **not** clear New or silently resolve `human_required`. BR-080 attention is not a BR-034 stall and must not be cleared by stall-clearance / `WorkflowResumed` logic.
 5. **New Lead mission** — Mission type `NewLeadAttention` surfaces for unassigned, assigned-unacknowledged, and human-required leads. Priority: Unassigned new and unresolved Update Outcome share CRITICAL rank 1 (Update Outcome not weakened); Human Attention / assigned-unacknowledged at rank 2.
 6. **Blocked/failed AI creates human-visible attention** — Conversation engine failure and humanAssist paths set Human Attention Required with sanitized reason and durable mission visibility. BR-075/078 blocked sends remain fail-closed and must not mark sent/handled.
-7. **Escalation** — Elapsed UTC SLA: 5 minutes unassigned → escalation level 1; 15 minutes unassigned or unacknowledged → level 2 + Human Attention Required (CRM: `escalation_level`, `last_escalated_at`, `attention_status=human_required`, `human_attention_reason`). Idempotent. Acknowledged/closed leads stop escalating. No email/SMS/Slack/browser push in v1. Level-2 SLA must not set `needsHumanAttention` or move `workflowOwnership` off ATLAS while `attention_status` is `ai_responding` or `waiting_for_prospect`; the next inbound remains Atlas-authored without TAKE OVER. Real AI/provider/humanAssist/policy/scheduling hard-fail still use `markHumanAttentionRequired`. TAKE OVER and BR-034 24h stall are unchanged.
+7. **Escalation** — Elapsed UTC SLA: 5 minutes unassigned → escalation level 1; 15 minutes unassigned or unacknowledged → level 2 + Human Attention Required (CRM: `escalation_level`, `last_escalated_at`, `attention_status=human_required`, `human_attention_reason`). Idempotent. Acknowledged/closed leads stop escalating. No email/SMS/Slack/browser push in v1. **A successfully delivered Atlas reply to an eligible new lead satisfies the first-response SLA.** After that delivery, the 15-minute unacknowledged/unassigned timer must not set `needsHumanAttention`, must not move `workflowOwnership` off ATLAS, and must not write `human_required` / `unacknowledged_sla_15m` solely because New is still unacknowledged. `markAiResponding` persists `waiting_for_prospect` using durable recruiting eligibility (including workflow-state CTWA/QR proof when `entry_method`/`source` are blank). Real AI/provider/humanAssist/policy/scheduling hard-fail still use `markHumanAttentionRequired`. TAKE OVER and BR-034 24h stall are unchanged.
 8. **Claim is compare-and-set** — Claim only when `owner_user_id IS NULL`; concurrent claims return conflict. Claim assigns and acknowledges.
 9. **No lead disappears because owner is null** — Unassigned leads remain visible to Admin/RVP filters (`unassigned`, `new-unacknowledged`, `human-attention`). Agents see owned leads immediately after assignment.
 10. **Tenant isolation** — Cross-org denial unchanged. Assignments, claims, acknowledgements, and escalations write sanitized audit events.
@@ -3388,6 +3388,8 @@ Only these clear New:
 - Explicit Conversations **TAKE OVER** (acknowledges the current episode via canonical `acknowledgeLead`; does not Return to Atlas; sticky HUMAN remains)
 
 Not automatic in v1: page open, AI reply, prospect inbound, mission list render, Mission Control / dashboard / Prospect Center / Follow-ups / queue reads, schedule booking (booking may stamp owner if null but does not acknowledge).
+
+A delivered Atlas reply **satisfies first-response SLA only**. It does not call `acknowledgeLead` and does not clear the New mission.
 
 ---
 

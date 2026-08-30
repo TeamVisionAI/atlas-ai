@@ -181,8 +181,10 @@ async function handleAutomatedOutboundMetaFailure({ deliveryRow, statusEvent } =
 
 module.exports = {
   AUTOMATED_REPLY_INTENTS,
+  DELIVERED_META_STATUSES,
   isAutomatedReplyIntent,
   conversationDeliveredReply,
+  queryOutboundDeliveries,
   prospectHasDeliveredAutomatedOutbound,
   prospectHasFailedAutomatedOutboundOnly,
   handleAutomatedOutboundMetaFailure,
