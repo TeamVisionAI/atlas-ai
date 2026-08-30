@@ -12,7 +12,11 @@ const {
   resolveSemanticInterpreterConfig,
   isSemanticShadowEligible
 } = require("./semanticInterpreterConfig");
-const { observeSemanticInterpretation } = require("./semanticInterpreter");
+const {
+  observeSemanticInterpretation,
+  SEMANTIC_SHADOW_STAGE,
+  summarizeFacts
+} = require("./semanticInterpreter");
 const { projectLegacyInterpretation } = require("./legacySemanticProjection");
 const { compareSemanticVsLegacy } = require("./semanticShadowCompare");
 const { routeSemanticInterpretation, PROVIDERS } = require("./semanticProviderRouter");
@@ -31,6 +35,8 @@ module.exports = {
   resolveSemanticInterpreterConfig,
   isSemanticShadowEligible,
   observeSemanticInterpretation,
+  SEMANTIC_SHADOW_STAGE,
+  summarizeFacts,
   projectLegacyInterpretation,
   compareSemanticVsLegacy,
   routeSemanticInterpretation,

@@ -16,6 +16,8 @@ const {
   resolveSemanticInterpreterConfig,
   isSemanticShadowEligible,
   observeSemanticInterpretation,
+  SEMANTIC_SHADOW_STAGE,
+  summarizeFacts,
   projectLegacyInterpretation,
   compareSemanticVsLegacy,
   routeSemanticInterpretation,
@@ -118,6 +120,132 @@ test("shadow disabled skips provider and reports not eligible", async () => {
   assert.equal(observed.eligible, false);
   assert.equal(observed.applied, false);
   assert.equal(observed.semantic, null);
+});
+
+test("production allowlist is on only for Niovel and Misleisys in Team Vision", () => {
+  const env = {
+    [FEATURE_FLAGS.SEMANTIC_SHADOW_ENABLED_ENV]: "true",
+    [FEATURE_FLAGS.SEMANTIC_CANARY_ENABLED_ENV]: "false",
+    [FEATURE_FLAGS.SEMANTIC_ORGANIZATION_IDS_ENV]:
+      "00000000-0000-4000-8000-000000000001",
+    [FEATURE_FLAGS.SEMANTIC_USER_IDS_ENV]:
+      "33ad243a-9d00-4a4d-810b-df2762c0f076,d8d75c0e-d93e-42c9-950e-004fbfabdc8d"
+  };
+  const teamVision = "00000000-0000-4000-8000-000000000001";
+  const teamLegacy = "af8fb707-f26c-4152-ad77-2d079d30bc8a";
+  const niovel = "33ad243a-9d00-4a4d-810b-df2762c0f076";
+  const misleisys = "d8d75c0e-d93e-42c9-950e-004fbfabdc8d";
+  const otherVisionUser = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+  assert.equal(
+    isSemanticShadowEligible({ organizationId: teamVision, actingUserId: niovel, env }).eligible,
+    true
+  );
+  assert.equal(
+    isSemanticShadowEligible({ organizationId: teamVision, actingUserId: misleisys, env }).eligible,
+    true
+  );
+  assert.equal(
+    isSemanticShadowEligible({
+      organizationId: teamVision,
+      actingUserId: otherVisionUser,
+      env
+    }).eligible,
+    false
+  );
+  assert.equal(
+    isSemanticShadowEligible({ organizationId: teamLegacy, actingUserId: niovel, env }).eligible,
+    false
+  );
+  assert.equal(resolveSemanticInterpreterConfig(env).applyEnabled, false);
+});
+
+test("eligible shadow emits structured telemetry without inbound text", async () => {
+  const lines = [];
+  const original = console.log;
+  console.log = (line) => {
+    lines.push(String(line));
+  };
+  try {
+    await observeSemanticInterpretation({
+      message: { text: "SECRET_INBOUND_TEXT" },
+      context: locationAskContext(),
+      legacyInterpretation: { intent: "provide_location" },
+      options: {
+        organizationId: "00000000-0000-4000-8000-000000000001",
+        actingUserId: "33ad243a-9d00-4a4d-810b-df2762c0f076",
+        env: {
+          [FEATURE_FLAGS.SEMANTIC_SHADOW_ENABLED_ENV]: "true",
+          [FEATURE_FLAGS.SEMANTIC_ORGANIZATION_IDS_ENV]:
+            "00000000-0000-4000-8000-000000000001",
+          [FEATURE_FLAGS.SEMANTIC_USER_IDS_ENV]:
+            "33ad243a-9d00-4a4d-810b-df2762c0f076"
+        },
+        semanticAdapters: {
+          openai: async () => ({
+            ok: true,
+            interpretation: createEmptySemanticInterpretation({
+              intent: "provide_location",
+              facts: { state: "SC" },
+              confidence: 0.91
+            }),
+            usage: {
+              provider: "openai",
+              model: "gpt-4o-mini",
+              latencyMs: 22,
+              promptTokens: 10,
+              completionTokens: 4,
+              totalTokens: 14,
+              estimatedCostUsd: 0.000001
+            }
+          })
+        }
+      }
+    });
+  } finally {
+    console.log = original;
+  }
+  const entry = lines
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .find((row) => row?.stage === SEMANTIC_SHADOW_STAGE);
+  assert.ok(entry);
+  assert.equal(entry.applied, false);
+  assert.equal(entry.eligible, true);
+  assert.equal(entry.provider, "openai");
+  assert.equal(entry.model, "gpt-4o-mini");
+  assert.equal(entry.latencyMs, 22);
+  assert.equal(entry.promptTokens, 10);
+  assert.equal(entry.completionTokens, 4);
+  assert.equal(entry.estimatedCostUsd, 0.000001);
+  assert.equal(entry.semanticIntent, "provide_location");
+  assert.equal(entry.legacyIntent, "provide_location");
+  assert.equal(entry.confidence, 0.91);
+  assert.equal(entry.timedOut, false);
+  assert.equal(entry.invalidJson, false);
+  assert.ok(!JSON.stringify(entry).includes("SECRET_INBOUND_TEXT"));
+});
+
+test("summarizeFacts omits email and name", () => {
+  assert.deepEqual(
+    summarizeFacts({
+      city: "Bluffton",
+      state: "SC",
+      email: "hidden@example.com",
+      name: "Hidden"
+    }),
+    {
+      city: "Bluffton",
+      state: "SC",
+      workAuthorization: null,
+      workAuthorizationStatus: null
+    }
+  );
 });
 
 test("allowlist miss does not call provider", async () => {

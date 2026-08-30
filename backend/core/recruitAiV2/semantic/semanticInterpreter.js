@@ -3,11 +3,65 @@
  * The model interprets. Atlas persists. This module never writes context.
  */
 
+const { logWhatsAppStage } = require("../../whatsappStructuredLogger");
 const { isSemanticShadowEligible } = require("./semanticInterpreterConfig");
 const { routeSemanticInterpretation } = require("./semanticProviderRouter");
 const { projectLegacyInterpretation } = require("./legacySemanticProjection");
 const { compareSemanticVsLegacy } = require("./semanticShadowCompare");
 const { stripProviderMetadata } = require("./semanticInterpretationSchema");
+
+const SEMANTIC_SHADOW_STAGE = "recruit_ai_v2_semantic_shadow_evaluated";
+
+function summarizeFacts(facts) {
+  if (!facts || typeof facts !== "object") {
+    return null;
+  }
+  return {
+    city: facts.city || null,
+    state: facts.state || null,
+    workAuthorization: facts.workAuthorization ?? null,
+    workAuthorizationStatus: facts.workAuthorizationStatus || null
+  };
+}
+
+/**
+ * BR-174 — structured shadow telemetry only. Never includes inbound text or PII.
+ */
+function emitSemanticShadowTelemetry(observation, meta = {}) {
+  try {
+    logWhatsAppStage(SEMANTIC_SHADOW_STAGE, {
+      organizationId: meta.organizationId || null,
+      agentId: meta.actingUserId || null,
+      shadow: true,
+      applied: false,
+      eligible: Boolean(observation?.eligible),
+      reason: observation?.reason || null,
+      provider: observation?.provider || null,
+      model: observation?.model || null,
+      latencyMs: observation?.latencyMs ?? null,
+      promptTokens: observation?.tokenUsage?.promptTokens ?? null,
+      completionTokens: observation?.tokenUsage?.completionTokens ?? null,
+      totalTokens: observation?.tokenUsage?.totalTokens ?? null,
+      estimatedCostUsd: observation?.estimatedCostUsd ?? null,
+      confidence: observation?.confidence ?? null,
+      semanticIntent: observation?.semantic?.intent || null,
+      legacyIntent: observation?.legacy?.intent || null,
+      semanticFacts: summarizeFacts(observation?.semantic?.facts),
+      legacyFacts: summarizeFacts(observation?.legacy?.facts),
+      disagreementCount: observation?.comparison?.disagreementCount ?? null,
+      agree: observation?.comparison?.agree ?? null,
+      disagreements: observation?.comparison?.disagreements || null,
+      providerOk: observation?.providerOk ?? null,
+      providerReason: observation?.providerReason || null,
+      timedOut: observation?.reason === "PROVIDER_TIMEOUT" || observation?.providerReason === "PROVIDER_TIMEOUT",
+      invalidJson:
+        observation?.reason === "INVALID_SEMANTIC_JSON" ||
+        observation?.providerReason === "INVALID_SEMANTIC_JSON"
+    });
+  } catch {
+    // Observability must never break the authored turn.
+  }
+}
 
 function resolveInboundText(message) {
   if (message == null) {
@@ -64,18 +118,25 @@ async function observeSemanticInterpretation({
   options = {}
 } = {}) {
   const env = options.env || process.env;
+  const organizationId = options.organizationId || context?.organizationId || null;
+  const actingUserId = options.actingUserId || null;
   const gate = isSemanticShadowEligible({
-    organizationId: options.organizationId || context?.organizationId || null,
-    actingUserId: options.actingUserId || null,
+    organizationId,
+    actingUserId,
     env
   });
+  const telemetryMeta = { organizationId, actingUserId };
 
   if (!gate.eligible) {
-    return buildObservation({
+    const skipped = buildObservation({
       eligible: false,
       reason: gate.reason,
       config: gate.config
     });
+    if (gate.config.shadowEnabled) {
+      emitSemanticShadowTelemetry(skipped, telemetryMeta);
+    }
+    return skipped;
   }
 
   const inboundText = resolveInboundText(message);
@@ -91,7 +152,7 @@ async function observeSemanticInterpretation({
       adapters: options.semanticAdapters || {}
     });
   } catch {
-    return buildObservation({
+    const failed = buildObservation({
       eligible: true,
       reason: "PROVIDER_FAILURE",
       config: gate.config,
@@ -103,20 +164,24 @@ async function observeSemanticInterpretation({
         usage: null
       }
     });
+    emitSemanticShadowTelemetry(failed, telemetryMeta);
+    return failed;
   }
 
   if (!providerResult?.ok || !providerResult.interpretation) {
-    return buildObservation({
+    const invalid = buildObservation({
       eligible: true,
       reason: providerResult?.reason || "INVALID_SEMANTIC_JSON",
       config: gate.config,
       providerResult,
       legacyProjection
     });
+    emitSemanticShadowTelemetry(invalid, telemetryMeta);
+    return invalid;
   }
 
   const comparison = compareSemanticVsLegacy(legacyProjection, providerResult.interpretation);
-  return buildObservation({
+  const observed = buildObservation({
     eligible: true,
     reason: null,
     config: gate.config,
@@ -124,8 +189,13 @@ async function observeSemanticInterpretation({
     comparison,
     legacyProjection
   });
+  emitSemanticShadowTelemetry(observed, telemetryMeta);
+  return observed;
 }
 
 module.exports = {
-  observeSemanticInterpretation
+  SEMANTIC_SHADOW_STAGE,
+  observeSemanticInterpretation,
+  emitSemanticShadowTelemetry,
+  summarizeFacts
 };
