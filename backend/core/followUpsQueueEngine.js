@@ -12,6 +12,7 @@ const {
 
 const FOLLOW_UP_FILTERS = Object.freeze({
   ALL: "all",
+  NEEDS_DATE: "needs-date",
   DUE_TODAY: "due-today",
   OVERDUE: "overdue",
   UPCOMING: "upcoming",
@@ -70,8 +71,9 @@ function classifyFollowUpStatus({
     return null;
   }
 
-  if (followUpAtMs === null) {
-    return "overdue";
+  // Implements BR-178 — no due date is Needs Date, never Overdue.
+  if (followUpAtMs == null || !Number.isFinite(followUpAtMs)) {
+    return "needs-date";
   }
 
   const window =
@@ -159,6 +161,7 @@ function compareFollowUpItems(a, b, sortKey) {
 function buildFilterCounts(items) {
   const counts = {
     [FOLLOW_UP_FILTERS.ALL]: 0,
+    [FOLLOW_UP_FILTERS.NEEDS_DATE]: 0,
     [FOLLOW_UP_FILTERS.DUE_TODAY]: 0,
     [FOLLOW_UP_FILTERS.OVERDUE]: 0,
     [FOLLOW_UP_FILTERS.UPCOMING]: 0,
@@ -173,7 +176,9 @@ function buildFilterCounts(items) {
 
     counts[FOLLOW_UP_FILTERS.ALL] += 1;
 
-    if (item.status === "due-today") {
+    if (item.status === "needs-date") {
+      counts[FOLLOW_UP_FILTERS.NEEDS_DATE] += 1;
+    } else if (item.status === "due-today") {
       counts[FOLLOW_UP_FILTERS.DUE_TODAY] += 1;
     } else if (item.status === "overdue") {
       counts[FOLLOW_UP_FILTERS.OVERDUE] += 1;

@@ -140,6 +140,10 @@ function buildOutcomeDedupKey({
   ].join(":");
 }
 
+function buildLegacyConversionDedupKey({ entityType, entityId }) {
+  return ["legacy", String(entityType || "unknown"), String(entityId || "none")].join(":");
+}
+
 function buildManualDedupKey({ entityType, entityId, dueDate, notes = "" }) {
   const noteToken = String(notes || "")
     .trim()
@@ -155,5 +159,6 @@ module.exports = {
   normalizeOutcomeKey,
   planFollowUpFromOutcome,
   buildOutcomeDedupKey,
+  buildLegacyConversionDedupKey,
   buildManualDedupKey
 };
