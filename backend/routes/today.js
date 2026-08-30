@@ -18,13 +18,17 @@ const router = express.Router();
 router.use(requireAtlasUser);
 router.use(organizationGuard());
 
+/**
+ * Reuse the canonical `req.authContext` from buildAuthContext + organizationGuard.
+ * Implements BR-180 — filterProspectsForAuthContext / isActiveContext need status.
+ * Do not invent a thinner actor shape. Do not hardcode status.
+ */
 function actorContext(req) {
+  const context = req.authContext || {};
   return {
-    userId: req.tenantContext?.userId || req.authContext?.userId,
-    organizationId: getTenantOrganizationId(req),
-    role: req.authContext?.role,
-    hierarchyMode: req.authContext?.hierarchyMode,
-    hierarchyUserIds: req.authContext?.hierarchyUserIds
+    ...context,
+    userId: req.tenantContext?.userId || context.userId,
+    organizationId: getTenantOrganizationId(req) || context.organizationId
   };
 }
 
@@ -51,3 +55,4 @@ router.get("/", operationalControlPlaneEmpty(emptyToday), async (req, res) => {
 });
 
 module.exports = router;
+module.exports.actorContext = actorContext;
