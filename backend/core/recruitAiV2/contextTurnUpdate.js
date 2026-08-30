@@ -8,7 +8,7 @@ const { interpretInboundMessage } = require("./interpreter");
 const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine");
 const { mergeConversationContext } = require("./conversationContext");
 const { loadConversationContext } = require("./contextLoader");
-const { FACT_CERTAINTY } = require("./locationFacts");
+const { FACT_CERTAINTY, canonicalizeCityName, isStateNameNotCity } = require("./locationFacts");
 const { shouldBlockLocationOverwrite } = require("./factCertainty");
 
 /**
@@ -103,14 +103,28 @@ function buildNextContextFromInterpretation({
       // Keep confirmed canonical location; do not apply junk overwrite (e.g. "Me parece" → Parece, ME).
     } else {
     const completeness = interpretation.entities?.completeness;
-    const city =
+    const rawCity =
       interpretation.entities?.city || nextContext.knownFacts?.city || null;
+    const city =
+      rawCity && !isStateNameNotCity(rawCity)
+        ? canonicalizeCityName(rawCity) || rawCity
+        : null;
     const state = interpretation.entities?.state || null;
     const proposedState =
       interpretation.entities?.proposedState ||
       (completeness === "partial"
         ? interpretation.entities?.proposedState
         : null);
+    const priorState = nextContext.knownFacts?.state || loaded.knownFacts?.state || null;
+    const priorStateCertainty = String(
+      nextContext.knownFacts?.stateCertainty || loaded.knownFacts?.stateCertainty || ""
+    ).toLowerCase();
+    const retainState =
+      Boolean(priorState) &&
+      (priorStateCertainty === FACT_CERTAINTY.CONFIRMED ||
+        priorStateCertainty === FACT_CERTAINTY.PARTIAL ||
+        priorStateCertainty === "confirmed" ||
+        priorStateCertainty === "partial");
 
     if (completeness === "complete" && city && state) {
       // Correction overwrites prior city; no competing active city fact.
@@ -130,6 +144,16 @@ function buildNextContextFromInterpretation({
         state,
         cityCertainty: FACT_CERTAINTY.UNKNOWN,
         stateCertainty: FACT_CERTAINTY.PARTIAL,
+        proposedState: null
+      };
+    } else if (city && retainState) {
+      // Implements BR-173 — later city merges with previously resolved state.
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        city,
+        state: priorState,
+        cityCertainty: FACT_CERTAINTY.CONFIRMED,
+        stateCertainty: FACT_CERTAINTY.CONFIRMED,
         proposedState: null
       };
     } else if (city) {

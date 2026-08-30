@@ -2533,6 +2533,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-173 — Order-Independent Location Facts + Safe City/State Normalization
+
+**Implements:** Location facts may arrive in any order. Spanish/English South Carolina normalizes to SC. Common city misspellings such as Bluftton resolve to Bluffton when confidence is sufficient. A later turn merges with a previously resolved partial location instead of replacing it. Once city and state are both resolved, Atlas must not re-ask either unless the prospect explicitly corrects the location.  
+**Domain:** Recruit AI / Qualification location  
+**Depends on:** BR-082, BR-094, BR-095, BR-102, BR-166  
+**Related:** BR-155 (city/state clarification), BR-164 (fact persistence)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/locationFacts.js`; interpreter; contextTurnUpdate; decisionEngine  
+**Tests:** `backend/test/recruitAiV2LocationOrderNormalizationBr173.test.js`
+
+### Rules
+
+1. **Any order** — State first then city, city first then state, or both in one phrase must complete the same canonical pair. Do not replace a retained state when a later city arrives, and do not replace a retained city when a later state arrives.
+2. **Spanish/English states** — `Sur Carolina` / `south carolina` / `carolina del sur` → SC. Equivalent Spanish aliases for other two-word U.S. states follow the same fold-then-lookup path. Do not treat those phrases as cities.
+3. **Safe city typos** — High-confidence unique edit-distance-1 matches against known city spellings (and explicit aliases such as `bluftton` → Bluffton) canonicalize the city. Do not invent a state for nationally ambiguous cities.
+4. **No re-ask** — After city+state are confirmed, do not ask city or state again unless the prospect explicitly corrects location. Repeated state while city is still missing asks city only.
+5. **BR-166** — Coherence still suppresses `ask_state` / `ask_location` once the corresponding facts exist. This rule makes those facts resolvable so the guard can fire.
+6. **Global** — Same parser/merge for every V2 conversation. No phone, prospect, tenant, or campaign special-case.
+7. **Boundaries** — Do not change work authorization, scheduling, ownership, WhatsApp transport, or IUL routing.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  
