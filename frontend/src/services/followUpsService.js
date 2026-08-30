@@ -1,5 +1,5 @@
 /**
- * Sprint 12.5.2 — Follow-ups queue API client.
+ * BR-178 — Follow-up Engine V2 API client.
  */
 
 import { apiFetch } from "./apiClient";
@@ -12,8 +12,13 @@ export class FollowUpsError extends Error {
   }
 }
 
+function wrap(error, fallback) {
+  const match = String(error.message || "").match(/^API (\d+):/);
+  throw new FollowUpsError(fallback, match ? Number(match[1]) : undefined);
+}
+
 /**
- * @param {{ filter?: string, search?: string, sort?: string }} [options]
+ * @param {{ filter?: string, search?: string, sort?: string, scope?: string }} [options]
  */
 export async function getFollowUps(options = {}) {
   const params = new URLSearchParams();
@@ -30,12 +35,63 @@ export async function getFollowUps(options = {}) {
     params.set("sort", options.sort);
   }
 
+  if (options.scope && options.scope !== "mine") {
+    params.set("scope", options.scope);
+  }
+
   const query = params.toString();
 
   try {
     return await apiFetch(`/api/follow-ups${query ? `?${query}` : ""}`);
   } catch (error) {
-    const match = error.message.match(/^API (\d+):/);
-    throw new FollowUpsError("Failed to load follow-ups queue", match ? Number(match[1]) : undefined);
+    wrap(error, "Failed to load follow-ups queue");
+  }
+}
+
+export async function createFollowUp(payload) {
+  try {
+    return await apiFetch("/api/follow-ups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    wrap(error, "Failed to create follow-up");
+  }
+}
+
+export async function completeFollowUp(id, payload = {}) {
+  try {
+    return await apiFetch(`/api/follow-ups/${id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    wrap(error, "Failed to complete follow-up");
+  }
+}
+
+export async function rescheduleFollowUp(id, payload) {
+  try {
+    return await apiFetch(`/api/follow-ups/${id}/reschedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    wrap(error, "Failed to reschedule follow-up");
+  }
+}
+
+export async function cancelFollowUp(id, payload = {}) {
+  try {
+    return await apiFetch(`/api/follow-ups/${id}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    wrap(error, "Failed to cancel follow-up");
   }
 }

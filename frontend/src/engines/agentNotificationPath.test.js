@@ -43,6 +43,18 @@ test("needs attention and takeover deep-link to the conversation prospect", () =
   );
 });
 
+test("follow-up due events open the follow-ups workspace", () => {
+  assert.equal(
+    resolveAgentNotificationPath({
+      eventType: "FOLLOW_UP_DUE",
+      entityType: "follow_up",
+      entityId: "follow-1",
+      actionUrl: "/app/follow-ups"
+    }),
+    "/app/follow-ups"
+  );
+});
+
 test("missing entity falls back to stored action url", () => {
   assert.equal(
     resolveAgentNotificationPath({

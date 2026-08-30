@@ -8,10 +8,12 @@ import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState"
 import { appPath } from "../config/appRoutes";
 import { buildProspectWorkspacePath } from "../utils/prospectRoutes";
 import { buildProspectMilestoneLabel } from "../engines/prospectCenterViewModel";
+import { buildFollowUpDueDate } from "../engines/followUpsViewModel";
 import "./WorkspaceDashboard.css";
 
 export default function MyDashboard() {
-  const { translate } = useLanguage();
+  const { translate, language } = useLanguage();
+  const locale = language === "es" ? "es-US" : "en-US";
   const { user, supportMode } = useWorkspace();
   const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const [dashboard, setDashboard] = useState(null);
@@ -110,6 +112,35 @@ export default function MyDashboard() {
               <span>{translate("myDashboardMetricFollowUps")}</span>
               <strong>{dashboard?.followUpsDue ?? 0}</strong>
             </article>
+            <article className="workspace-dashboard__metric">
+              <span>{translate("myDashboardMetricFollowUpsOverdue")}</span>
+              <strong>{dashboard?.followUpsOverdue ?? 0}</strong>
+            </article>
+          </section>
+
+          <section className="workspace-dashboard__panel">
+            <div className="workspace-dashboard__panel-head">
+              <h2>{translate("myDashboardNextFollowUps")}</h2>
+              <Link to={appPath("follow-ups")}>{translate("myDashboardOpenFollowUps")}</Link>
+            </div>
+            {(dashboard?.nextFollowUps || []).length === 0 ? (
+              <p>{translate("followUpsEmpty")}</p>
+            ) : (
+              <ul className="workspace-dashboard__list">
+                {(dashboard?.nextFollowUps || []).map((item) => (
+                  <li key={item.id || `${item.phone}:${item.dueDate}`}>
+                    <div>
+                      <strong>{item.name || item.title}</strong>
+                      <span>
+                        {buildFollowUpDueDate(item.dueDate || item.followUpDate, item.dueTime || item.followUpTime, locale) ||
+                          translate("followUpsDueNotSet")}
+                      </span>
+                    </div>
+                    <Link to={appPath("follow-ups")}>{translate("myDashboardOpenFollowUps")}</Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="workspace-dashboard__panel">

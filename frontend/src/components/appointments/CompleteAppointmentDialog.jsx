@@ -20,6 +20,8 @@ export default function CompleteAppointmentDialog({ open, appointment, onClose, 
   const { translate } = useLanguage();
   const [outcome, setOutcome] = useState("follow_up");
   const [outcomeNotes, setOutcomeNotes] = useState("");
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [followUpTime, setFollowUpTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -27,6 +29,8 @@ export default function CompleteAppointmentDialog({ open, appointment, onClose, 
     if (open) {
       setOutcome("follow_up");
       setOutcomeNotes("");
+      setFollowUpDate("");
+      setFollowUpTime("");
       setError(null);
     }
   }, [open]);
@@ -40,7 +44,13 @@ export default function CompleteAppointmentDialog({ open, appointment, onClose, 
     setError(null);
 
     try {
-      const result = await completeAppointment(appointment.id, { outcome, outcomeNotes });
+      const result = await completeAppointment(appointment.id, {
+        outcome,
+        outcomeNotes,
+        followUpDate: followUpDate || undefined,
+        followUpTime: followUpTime || undefined,
+        futureReminder: outcome === "not_interested" ? followUpDate || undefined : undefined
+      });
       onSuccess?.(result?.appointment);
       onClose();
     } catch (requestError) {
@@ -89,6 +99,32 @@ export default function CompleteAppointmentDialog({ open, appointment, onClose, 
         value={outcomeNotes}
         onChange={(event) => setOutcomeNotes(event.target.value)}
       />
+      {outcome === "follow_up" || outcome === "no_show" || outcome === "not_interested" ? (
+        <>
+          <label htmlFor="complete-follow-up-date">
+            {outcome === "not_interested"
+              ? translate("appointmentsFutureReminder")
+              : translate("appointmentsFollowUpDate")}
+          </label>
+          <input
+            id="complete-follow-up-date"
+            type="date"
+            value={followUpDate}
+            onChange={(event) => setFollowUpDate(event.target.value)}
+          />
+          {outcome !== "not_interested" ? (
+            <>
+              <label htmlFor="complete-follow-up-time">{translate("appointmentsFollowUpTime")}</label>
+              <input
+                id="complete-follow-up-time"
+                type="time"
+                value={followUpTime}
+                onChange={(event) => setFollowUpTime(event.target.value)}
+              />
+            </>
+          ) : null}
+        </>
+      ) : null}
     </AppointmentModalShell>
   );
 }

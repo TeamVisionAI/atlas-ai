@@ -2657,6 +2657,33 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-178 — Follow-up Engine V2
+
+**Implements:** Turn operational outcomes into durable next-action obligations so leads, recruits, and clients do not fall through the cracks: outcome → follow-up → owner queue → due/overdue → in-app notification.  
+**Domain:** Follow-ups / Agenda outcomes / interview outcomes / notifications  
+**Depends on:** BR-035/036/037 workflow follow-up fields; BR-079 org-local dates; BR-160 control plane; BR-176 notifications; BR-177 Agenda outcomes  
+**Related:** BR-044 interview outcomes; BR-080 ownership (unchanged)  
+**Status:** V1 implemented — in-app only; no automatic WhatsApp/SMS/email  
+**Engine target:** `followUps/*`; `followUpApplicationService`; `/api/follow-ups`; `/app/follow-ups`; dashboard summary  
+**Tests:** `backend/test/followUpEngineV2Br178.test.js`; `frontend/src/engines/followUpsViewModel.test.js`  
+**Docs:** `docs/06-business/BR-178-follow-up-engine-v2.md`
+
+### Rules
+
+1. **Durable SoT** — `atlas_follow_ups` is the source of truth for the follow-up queue, dashboard chips, and due/overdue notifications. `agentState.followUpDate` / `followUpTime` / `futureReminder` remain workflow milestone fields and are still written by interview outcomes. Leftover agentState-only items may appear as read-only legacy rows until they have a durable match. No silent mass backfill.
+2. **Outcome mapping** — Canonical services only (`recordInterviewOutcome`, `recordStandaloneOutcome`). `follow_up` creates/updates an obligation (date required or default 3 days / 10:00 from existing interview config). `no_show` creates a retry (existing 7-day / 10:00 default). `not_interested` creates only when a recycle/future date is provided. `recruited` creates the existing IBA/onboarding check-in. Interview `Became Client` creates the existing 2-day service check-in. Agenda `client` does not (no Client CRM). `rescheduled` and `cancelled` create no automatic obligation.
+3. **Manual create** — Authorized users may create a follow-up for prospect, conversation, appointment, Agenda contact, or client foundation. Date required; time optional; owner defaults to the current responsible owner. Date-only stays date-only.
+4. **Owner queue** — `/app/follow-ups` defaults to My Follow-ups with Due Today / Upcoming / Overdue / Completed. Team scope only when existing hierarchy permissions already allow it. No phone-based tenant identity.
+5. **Dashboard** — Personal Today / My Dashboard surfaces due-today count, overdue count, and the next few follow-ups. Do not build a second dashboard.
+6. **Completion** — Complete, reschedule, and cancel are durable and history-aware. Completing a follow-up does not change prospect outcome. A reschedule may start a new due notification episode.
+7. **Notifications** — BR-176 in-app only: `FOLLOW_UP_DUE`, `FOLLOW_UP_OVERDUE`. Owner only. Deterministic dedup by follow-up + due date. No notify-every-poll spam. No WhatsApp, email, or push.
+8. **Entity separation** — One follow-up system may reference prospect, appointment, Agenda contact, conversation, or client. Agenda contact is not a prospect. Client stays client-side.
+9. **Dedup** — Outcome retries, API retries, and duplicate UI submits reuse `organization_id + dedup_key`.
+10. **Permissions** — Users manage only authorized follow-ups. Wrong-org IDs fail closed (404). Super Admin control-plane sees none unless Support Mode (tenant-bound).
+11. **Boundaries** — Do not change Recruit AI qualification, semantic apply, AI Quality, WhatsApp eligibility, campaign intake, ownership, or appointment scheduling rules. No Team Vision-specific code.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

@@ -41,6 +41,8 @@ function resolveConversationRecipient(payload = {}) {
 
 function resolveRecipient(event) {
   return firstUserId(
+    event.recipientUserId,
+    event.ownerUserId,
     resolveAppointmentRecipient(event.appointment || event.entity || {}, event.recipientUserId),
     resolveConversationRecipient(event)
   );

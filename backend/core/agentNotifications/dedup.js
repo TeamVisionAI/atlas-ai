@@ -30,6 +30,10 @@ function buildDedupKey(event = {}) {
       `${entityId}:${utcDayKey(event.occurredAt || new Date())}`;
     return `${type}:${org}:${episode}`;
   }
+  if (type === EVENT_TYPES.FOLLOW_UP_DUE || type === EVENT_TYPES.FOLLOW_UP_OVERDUE) {
+    const episode = event.dueDate || event.episodeKey || utcDayKey(event.occurredAt || new Date());
+    return `${type}:${org}:${entityId}:${episode}`;
+  }
   return `${type}:${org}:${entityId}`;
 }
 

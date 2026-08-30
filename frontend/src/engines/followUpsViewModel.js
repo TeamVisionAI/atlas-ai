@@ -69,19 +69,26 @@ export function buildFollowUpDueDate(followUpDate, followUpTime, locale) {
     return null;
   }
 
-  const parsed = Date.parse(`${followUpDate}T${followUpTime || "00:00"}`);
+  const hasTime = Boolean(followUpTime);
+  const parsed = Date.parse(`${followUpDate}T${hasTime ? followUpTime : "12:00"}`);
 
   if (Number.isNaN(parsed)) {
     return followUpDate;
   }
 
-  return new Date(parsed).toLocaleString(locale, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
+  return new Date(parsed).toLocaleString(locale, hasTime
+    ? {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+      }
+    : {
+        weekday: "short",
+        month: "short",
+        day: "numeric"
+      });
 }
 
 export function buildFollowUpPriorityLabel(item, translate) {
