@@ -2690,7 +2690,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Domain:** Clients / Agenda / appointments / follow-ups  
 **Depends on:** BR-177 Agenda client foundation; BR-178 follow-ups; BR-168 Unified Agenda; BR-160 control plane; BR-176 notifications  
 **Related:** BR-043 appointments; BR-080 ownership (unchanged)  
-**Status:** V1 implemented — workspace only; FNA / Policy Review / production tracking remain later  
+**Status:** V1 implemented — workspace only; FNA / Policy Review remain later. Production tracking is BR-181.  
 **Engine target:** `clients/*`; `clientWorkspaceApplicationService`; `/api/clients`; `/app/clients`  
 **Tests:** `backend/test/clientWorkspaceBr179.test.js`; `frontend/src/engines/clientsViewModel.test.js`  
 **Docs:** `docs/06-business/BR-179-client-workspace-v1.md`
@@ -2737,6 +2737,33 @@ Production outside-window messaging requires firm-approved Meta templates config
 10. **Deep links** — Prospect/conversation → existing prospect or conversation route; appointment → appointment details; prospect follow-up → prospect; client follow-up → `/app/clients/:id`; notification → existing entity-aware deep link.
 11. **Clients** — Participate only through real actionable items. Do not add clients to recruiting metrics.
 12. **Boundaries** — Do not change Recruit AI, semantic apply, AI Quality, WhatsApp eligibility, campaign intake, scheduling rules, BR-176 engine, or BR-178/179 sources of truth. No Team Vision-specific code.
+
+---
+
+## BR-181 — Production & Client Activity Foundation
+
+**Implements:** A global, tenant-safe production/activity record so Atlas can answer what client business was submitted, issued, paid, pending, or closed — and who owns it — without mixing that work into recruiting prospects or Recruit AI.  
+**Domain:** Clients / production / activity  
+**Depends on:** BR-179 Client Workspace; BR-178 follow-ups; BR-160 control plane  
+**Related:** BR-180 Today (unchanged — no automatic production items)  
+**Status:** V1 implemented — manual records only; no carrier APIs, commissions, or inferred status  
+**Engine target:** `clientProduction/*`; `clientProductionApplicationService`; `/api/production`; `/app/production`  
+**Tests:** `backend/test/clientProductionBr181.test.js`; `frontend/src/pages/productionPageBr181.test.js`  
+**Docs:** `docs/06-business/BR-181-client-production.md`
+
+### Rules
+
+1. **Durable SoT** — `atlas_client_production` is the canonical V1 production/activity entity, linked to `atlas_agenda_clients`, owning user, and organization. Do not store production on generic client notes or appointments.
+2. **Types** — LIFE, INVESTMENT, ANNUITY, POLICY_REVIEW, OTHER. No product-specific schemas in V1.
+3. **Statuses** — Manual only: DRAFT, SUBMITTED, PENDING, ISSUED, PAID, DECLINED, WITHDRAWN, CLOSED. Do not infer status from appointments or conversations.
+4. **Amounts** — Nullable. Persist only a real stored value. Never invent 0, commissions, projections, persistency, or compensation.
+5. **Workspace** — Client profile (`/app/clients/:clientId`) shows Production / Activity. `/app/production` defaults to My Production. Team Production only when existing hierarchy permissions already allow it.
+6. **Metrics** — Top-level counts for Submitted, Pending, Issued, Paid. Sum amounts only when a real value exists.
+7. **History** — Append created, status changed, amount changed, carrier/product changed, and notes changed. Store actor id; present a friendly name.
+8. **Permissions** — Own production by default. Wrong-org and unauthorized peer IDs fail closed (404). Super Admin control-plane empty. Support Mode tenant-bound. No phone-based tenant identity.
+9. **Recruiting separation** — Production records do not create recruiting prospects, enter Recruit AI, or change recruiting Mission Control / conversion metrics.
+10. **Today / follow-ups** — Do not add production to Today. Do not auto-create follow-ups on status change. Authorized users may manually create a BR-178 client follow-up from a production record.
+11. **Boundaries** — Do not change Recruit AI, semantic apply, WhatsApp, campaign intake, BR-176, BR-178 SoT, BR-179 client SoT, or BR-180 Today behavior. No Team Vision-specific code. Carrier APIs, commissions, compensation hierarchy, policy ingestion, FNA, and Policy Intelligence stay out of V1.
 
 ---
 
