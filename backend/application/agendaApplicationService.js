@@ -28,6 +28,11 @@ const {
 const { recordHistoryEvent } = require("../core/appointmentHistory");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../core/phoneNormalizer");
 const { normalizePreferredLanguage } = require("../core/prospectLanguage");
+const {
+  normalizeEmail,
+  validateEmailFormat,
+  formatEmailForProspectNotes
+} = require("../core/emailNormalization");
 const { generateNextProspectNumber } = require("../services/prospectNumberService");
 const {
   supabase,
@@ -96,6 +101,18 @@ function contactSource(contact = {}, fallback = null) {
 
 function contactNotes(contact = {}, fallback = null) {
   return clean(contact.notes || contact.metadata?.notes || fallback);
+}
+
+// Live production prospects has no email column. Canonical store is notes EMAIL: token.
+function buildPromotedRecruitNotes(contact = {}) {
+  const notes = contactNotes(contact);
+  const email = normalizeEmail(contact.email);
+  const emailToken =
+    email && validateEmailFormat(email) ? formatEmailForProspectNotes(email) : null;
+  if (notes && emailToken) {
+    return String(notes).includes(emailToken) ? notes : `${notes} | ${emailToken}`;
+  }
+  return notes || emailToken || null;
 }
 
 async function createAgendaContact(input, context) {
@@ -423,18 +440,19 @@ async function insertPromotedRecruitProspect({ contact, context, storagePhone, n
   const { firstName, lastName } = splitPersonName(contact.name);
   const preferredLanguage = contactLanguage(contact) || "english";
   const source = contactSource(contact, AGENDA_SOURCE);
-  const notes = contactNotes(contact);
+  const notes = buildPromotedRecruitNotes(contact);
   const actor = resolveActorId(context);
   const prospectNumber = await generateNextProspectNumber(context.organizationId).catch(() => null);
   const communicationLanguage = preferredLanguage === "spanish" ? "es" : "en";
 
+  // Implements BR-177 — same live prospects insert shape as Quick Capture / WhatsApp create.
+  // Do not write prospects.email; production schema has no such column (PGRST204).
   const insertRow = {
     phone: storagePhone,
     normalized_phone: normalizedPhone,
     name: contact.name,
     first_name: firstName,
     last_name: lastName,
-    email: contact.email || null,
     preferred_language: preferredLanguage,
     communication_language: communicationLanguage,
     language: communicationLanguage,
@@ -446,9 +464,9 @@ async function insertPromotedRecruitProspect({ contact, context, storagePhone, n
     status: "NEW",
     current_step: "NEW",
     prospect_number: prospectNumber,
-    preferred_communication_channel: storagePhone ? "WHATSAPP" : contact.email ? "EMAIL" : "WHATSAPP",
+    preferred_communication_channel: "WHATSAPP",
     last_message: "",
-    notes: notes || null,
+    notes,
     assignment_status: "assigned",
     assignment_source: AGENDA_ENTRY_METHOD,
     attention_status: "none",
