@@ -85,6 +85,10 @@ export default function MyDashboard() {
           <p className="workspace-dashboard__intro">{translate("myDashboardIntro")}</p>
         </div>
         <div className="workspace-dashboard__actions">
+          <Link className="workspace-dashboard__button" to={appPath("today")}>
+            {translate("myDashboardOpenToday")}
+            {dashboard?.followUpsOverdue ? ` · ${dashboard.followUpsOverdue}` : ""}
+          </Link>
           <Link className="workspace-dashboard__button" to={appPath("quick-capture")}>
             {translate("navQuickCapture")}
           </Link>

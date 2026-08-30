@@ -49,7 +49,7 @@ Manual only: `OPEN`, `WAITING_ON_CLIENT`, `WAITING_ON_AGENT`, `SCHEDULED`, `COMP
 
 ## Today
 
-Actionable open cases only: overdue, due today, and Needs Date. Normalized into the existing Today follow-ups section as `kind=service_case`. Upcoming open cases stay off Today.
+Actionable open cases only: overdue and due today. Normalized into the BR-184 Today list as `kind=service_case`. Needs Date and upcoming open cases stay off Today.
 
 ## Out of scope
 

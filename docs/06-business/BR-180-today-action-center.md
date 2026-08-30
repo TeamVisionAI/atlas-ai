@@ -1,6 +1,6 @@
 # BR-180 — Today / Action Center
 
-Status: V1 implemented.
+Status: V1 implemented. Daily list, filters, and notification dedup are superseded by BR-184.
 
 ## Goal
 

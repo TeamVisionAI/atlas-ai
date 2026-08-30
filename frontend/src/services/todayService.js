@@ -1,5 +1,5 @@
 /**
- * BR-180 — Today / Action Center API client.
+ * BR-184 — Today / Action Center API client.
  */
 
 import { apiFetch } from "./apiClient";
@@ -13,12 +13,15 @@ export class TodayError extends Error {
 }
 
 /**
- * @param {{ scope?: string }} [options]
+ * @param {{ scope?: string, filter?: string }} [options]
  */
 export async function getToday(options = {}) {
   const params = new URLSearchParams();
   if (options.scope && options.scope !== "mine") {
     params.set("scope", options.scope);
+  }
+  if (options.filter && options.filter !== "all") {
+    params.set("filter", options.filter);
   }
   const query = params.toString();
   try {

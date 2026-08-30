@@ -1,5 +1,5 @@
 /**
- * BR-180 — Today / Action Center routes.
+ * BR-184 — Today / Action Center routes.
  * Aggregation read model. My scope by default. Team only when hierarchy already allows it.
  */
 
@@ -45,7 +45,8 @@ router.get("/", operationalControlPlaneEmpty(emptyToday), async (req, res) => {
     const payload = await todayActionCenterApplicationService.getToday({
       organizationId,
       authContext: actorContext(req),
-      scope: req.query.scope
+      scope: req.query.scope,
+      filter: req.query.filter
     });
     res.json(payload);
   } catch (error) {
