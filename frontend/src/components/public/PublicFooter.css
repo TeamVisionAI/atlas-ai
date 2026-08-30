@@ -58,6 +58,11 @@
   max-width: 52rem;
 }
 
+.public-footer__disclaimer--meta {
+  font-size: 0.75rem !important;
+  max-width: 40rem;
+}
+
 @media (max-width: 768px) {
   .public-footer__inner {
     flex-direction: column;

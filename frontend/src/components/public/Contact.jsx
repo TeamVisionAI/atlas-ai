@@ -5,6 +5,7 @@ import {
   submitContactForm,
   validateContactFormFields,
 } from "../../services/contactFormService";
+import { TEAM_VISION_FORM_CONSENT } from "../../config/teamVisionMessagingCompliance";
 
 const INITIAL_FORM = {
   name: "",
@@ -205,6 +206,7 @@ export default function Contact() {
               onChange={updateField}
             />
           </div>
+          <p className="public-section__consent">{TEAM_VISION_FORM_CONSENT}</p>
           <PrimaryButton type="submit" disabled={isSubmitting}>
             Send message
           </PrimaryButton>

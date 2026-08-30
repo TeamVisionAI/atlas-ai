@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { PUBLIC_SITE_BRAND } from "../../config/publicSiteHost";
 import { usePublicSiteBrand } from "../../hooks/usePublicSiteBrand";
+import { TEAM_VISION_META_DISCLAIMER } from "../../config/teamVisionMessagingCompliance";
 import "./PublicFooter.css";
 
 export default function Footer() {
@@ -52,8 +53,9 @@ export default function Footer() {
         <nav className="public-footer__nav" aria-label="Footer">
           <Link to="/atlas">Atlas</Link>
           <Link to="/privacy">Privacy Policy</Link>
-          <Link to="/legal">Legal</Link>
           <Link to="/terms">Terms of Service</Link>
+          <Link to="/legal">Legal</Link>
+          <Link to="/contact">Contact</Link>
           <Link to="/data-deletion">Privacy & Data Deletion</Link>
         </nav>
       </div>
@@ -63,6 +65,9 @@ export default function Footer() {
         <p className="public-footer__disclaimer">
           Information on this website is for general purposes only and does not constitute
           investment, legal, or tax advice.
+        </p>
+        <p className="public-footer__disclaimer public-footer__disclaimer--meta">
+          {TEAM_VISION_META_DISCLAIMER}
         </p>
       </div>
     </footer>

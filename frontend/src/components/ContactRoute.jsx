@@ -1,5 +1,5 @@
-import { Navigate } from "react-router-dom";
 import AtlasContact from "../pages/AtlasContact";
+import TeamVisionContact from "../pages/TeamVisionContact";
 import {
   PUBLIC_SITE_BRAND,
   resolvePublicSiteBrand
@@ -7,13 +7,13 @@ import {
 
 /**
  * Atlas marketing/app hosts serve the Atlas support form.
- * Team Vision marketing keeps the homepage #contact section as the primary form.
+ * Team Vision marketing serves a crawlable /contact page (homepage also keeps #contact).
  */
 export default function ContactRoute() {
   const brand = resolvePublicSiteBrand();
 
   if (brand === PUBLIC_SITE_BRAND.TEAM_VISION) {
-    return <Navigate to="/#contact" replace />;
+    return <TeamVisionContact />;
   }
 
   return <AtlasContact />;

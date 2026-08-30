@@ -3,16 +3,25 @@ import Footer from "../components/public/Footer";
 import { PUBLIC_SITE_BRAND } from "../config/publicSiteHost";
 import { usePublicSiteBrand } from "../hooks/usePublicSiteBrand";
 import { usePageMeta } from "../hooks/usePageMeta";
+import {
+  TEAM_VISION_CONTACT_PHONE_DISPLAY,
+  TEAM_VISION_CONTACT_PHONE_TEL,
+  TEAM_VISION_INFO_EMAIL,
+  TEAM_VISION_PRIVACY_EMAIL,
+  TEAM_VISION_SUPPORT_EMAIL,
+  TEAM_VISION_WHATSAPP_DISCLOSURE_PARAGRAPHS,
+  TEAM_VISION_WHATSAPP_SECTION_TITLE
+} from "../config/teamVisionMessagingCompliance";
 import "./PublicSite.css";
 
-const SUPPORT_EMAIL = "support@teamvisionfinancial.com";
-const PRIVACY_EMAIL = "privacy@teamvisionfinancial.com";
+const SUPPORT_EMAIL = TEAM_VISION_SUPPORT_EMAIL;
+const PRIVACY_EMAIL = TEAM_VISION_PRIVACY_EMAIL;
 
 function TeamVisionPrivacy() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="public-site__legal-updated">Last updated: July 2026</p>
+      <p className="public-site__legal-updated">Last updated: August 2026</p>
 
       <p>
         Team Vision Financial (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) respects your
@@ -47,6 +56,11 @@ function TeamVisionPrivacy() {
         or as required by law.
       </p>
 
+      <h2>{TEAM_VISION_WHATSAPP_SECTION_TITLE}</h2>
+      {TEAM_VISION_WHATSAPP_DISCLOSURE_PARAGRAPHS.map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
+
       <h2>Your choices</h2>
       <p>
         You may request access, correction, or deletion of certain personal information by
@@ -55,8 +69,12 @@ function TeamVisionPrivacy() {
 
       <h2>Contact</h2>
       <p>
-        Questions about this policy may be sent to{" "}
-        <a href={`mailto:${PRIVACY_EMAIL}`}>{PRIVACY_EMAIL}</a>.
+        Team Vision Financial. Questions about this policy may be sent to{" "}
+        <a href={`mailto:${PRIVACY_EMAIL}`}>{PRIVACY_EMAIL}</a>
+        {", "}
+        <a href={`mailto:${TEAM_VISION_INFO_EMAIL}`}>{TEAM_VISION_INFO_EMAIL}</a>
+        {", or by phone at "}
+        <a href={`tel:${TEAM_VISION_CONTACT_PHONE_TEL}`}>{TEAM_VISION_CONTACT_PHONE_DISPLAY}</a>.
       </p>
     </>
   );
@@ -196,7 +214,7 @@ export default function Privacy() {
     title: isAtlas ? "Privacy Policy | Atlas AI" : "Privacy Policy | Team Vision Financial",
     description: isAtlas
       ? "How Atlas AI collects, uses, and protects account, prospect, Google Calendar, and WhatsApp data."
-      : "Team Vision Financial privacy policy."
+      : "How Team Vision Financial collects, uses, and protects information, including WhatsApp and SMS communications."
   });
 
   return (

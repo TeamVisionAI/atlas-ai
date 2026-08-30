@@ -1,16 +1,24 @@
 import { Link } from "react-router-dom";
 import Navbar from "../components/public/Navbar";
 import Footer from "../components/public/Footer";
+import { usePageMeta } from "../hooks/usePageMeta";
+import { TEAM_VISION_META_DISCLAIMER } from "../config/teamVisionMessagingCompliance";
 import "./PublicSite.css";
 
 export default function Legal() {
+  usePageMeta({
+    title: "Legal | Team Vision Financial",
+    description:
+      "Legal information about Team Vision Financial, including regulatory notices and Meta/Facebook independence."
+  });
+
   return (
     <div className="public-site">
       <Navbar />
       <main id="main-content" className="public-site__legal">
         <div className="public-site__container">
           <h1>Legal</h1>
-          <p className="public-site__legal-updated">Last updated: {/* TODO: Set official publish date. */} July 2026</p>
+          <p className="public-site__legal-updated">Last updated: {/* TODO: Set official publish date. */} August 2026</p>
 
           <p>
             This page provides general legal information about Team Vision Financial and the use of
@@ -23,6 +31,11 @@ export default function Legal() {
             Team Vision Financial provides financial services including life insurance and retirement
             planning guidance. Products and services may be offered through licensed professionals
             and affiliated entities as required by applicable state and federal law.
+          </p>
+          <p>
+            We also provide financial education, appointment scheduling, and related customer
+            support. Where a product or service requires a license, it is offered through
+            appropriately licensed professionals.
           </p>
 
           <h2>No professional advice</h2>
@@ -38,6 +51,9 @@ export default function Legal() {
             third-party carriers and institutions. Product availability, features, and approvals vary
             by state and individual eligibility.
           </p>
+
+          <h2>Meta / Facebook disclaimer</h2>
+          <p>{TEAM_VISION_META_DISCLAIMER}</p>
 
           <h2>Website use</h2>
           <p>
