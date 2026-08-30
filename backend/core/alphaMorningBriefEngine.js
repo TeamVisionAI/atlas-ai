@@ -7,6 +7,7 @@ const { DEFAULT_ORGANIZATION_ID } = require("../modules/prospects/domain/constan
 const { buildExecutiveDashboard, loadProductionProspects } = require("./executiveDashboardReadModel");
 const { MILESTONES } = require("./workflowConstants");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
+const { needsManualAcknowledge } = require("./newLeadAttentionEngine");
 const {
   RELATIVE_PERIODS,
   getOrganizationDateWindow,
@@ -122,14 +123,7 @@ async function buildAlphaMorningBrief(options = {}) {
       unassignedLeads += 1;
     }
 
-    if (
-      !prospect.acknowledged_at &&
-      (prospect.attention_status === "new" ||
-        prospect.attention_status === "ai_responding" ||
-        prospect.attention_status === "waiting_for_prospect" ||
-        prospect.attention_status === "human_required" ||
-        prospect.new_lead_received_at)
-    ) {
+    if (needsManualAcknowledge(prospect)) {
       newUnacknowledgedLeads += 1;
     }
 

@@ -11,6 +11,7 @@ const {
 } = require("./appointmentListQuery");
 const { loadAgentState } = require("./agentActionState");
 const { MILESTONES, PRIORITY_TIERS } = require("./workflowConstants");
+const { needsManualAcknowledge } = require("./newLeadAttentionEngine");
 
 const EXECUTIVE_FILTERS = Object.freeze({
   INTERVIEWS_TODAY: "interviews-today",
@@ -108,17 +109,7 @@ function resolveExecutiveFilterPhones(
       return queue
         .filter((summary) => {
           const prospect = findProspectByPhone(prospects, summary.phone);
-          if (!prospect || prospect.acknowledged_at) {
-            return false;
-          }
-
-          return (
-            prospect.attention_status === "new" ||
-            prospect.attention_status === "ai_responding" ||
-            prospect.attention_status === "waiting_for_prospect" ||
-            prospect.attention_status === "human_required" ||
-            Boolean(prospect.new_lead_received_at)
-          );
+          return Boolean(prospect) && needsManualAcknowledge(prospect);
         })
         .map((row) => row.phone);
 

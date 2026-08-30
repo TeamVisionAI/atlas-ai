@@ -222,10 +222,13 @@ export function mergeOptimisticAcknowledge(payload, phone) {
       ...item,
       acknowledgedAt: item.acknowledgedAt || new Date().toISOString(),
       attentionStatus: "acknowledged",
-      isNew: false,
+      isNew: String(item.currentStep || "").toUpperCase() === "NEW",
+      isNewUnacknowledged: false,
+      needsManualAcknowledge: false,
       badges: {
         ...(item.badges || {}),
-        new: false,
+        new: String(item.currentStep || "").toUpperCase() === "NEW",
+        needsManualAcknowledge: false,
         aiResponding: false
       }
     };
@@ -251,11 +254,14 @@ export function mergeOptimisticClaim(payload, phone, ownerUserId = "self") {
       isUnassigned: false,
       acknowledgedAt: item.acknowledgedAt || new Date().toISOString(),
       attentionStatus: "acknowledged",
-      isNew: false,
+      isNew: String(item.currentStep || "").toUpperCase() === "NEW",
+      isNewUnacknowledged: false,
+      needsManualAcknowledge: false,
       badges: {
         ...(item.badges || {}),
         unassigned: false,
-        new: false,
+        new: String(item.currentStep || "").toUpperCase() === "NEW",
+        needsManualAcknowledge: false,
         aiResponding: false
       }
     };

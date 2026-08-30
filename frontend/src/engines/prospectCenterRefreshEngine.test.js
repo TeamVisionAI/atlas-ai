@@ -275,7 +275,15 @@ test("14. BR-080 actions still work", () => {
 
   const acked = mergeOptimisticAcknowledge(payload([item()]), "+10000000001");
   assert.equal(acked.items[0].badges.new, false);
+  assert.equal(acked.items[0].badges.needsManualAcknowledge, false);
   assert.equal(acked.items[0].attentionStatus, "acknowledged");
+
+  const stillNew = mergeOptimisticAcknowledge(
+    payload([item({ currentStep: "NEW", badges: { new: true, needsManualAcknowledge: true } })]),
+    "+10000000001"
+  );
+  assert.equal(stillNew.items[0].badges.new, true);
+  assert.equal(stillNew.items[0].badges.needsManualAcknowledge, false);
 });
 
 test("background poll stages when locked and applies when idle unlock", () => {

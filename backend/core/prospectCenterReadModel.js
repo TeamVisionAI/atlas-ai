@@ -13,6 +13,10 @@ const {
 } = require("./executiveFilterResolver");
 const appointmentListService = require("../services/appointmentListService");
 const { MILESTONES } = require("./workflowConstants");
+const {
+  isLifecycleNew,
+  needsManualAcknowledge
+} = require("./newLeadAttentionEngine");
 
 function buildProspectCenterItem(prospect, summary, options = {}) {
   const interviewMs = parseInterviewDatetime(prospect);
@@ -30,15 +34,9 @@ function buildProspectCenterItem(prospect, summary, options = {}) {
   }
 
   const unassigned = !prospect?.owner_user_id;
-  const acknowledged = Boolean(prospect?.acknowledged_at);
   const attentionStatus = prospect?.attention_status || (unassigned ? "new" : null);
-  const isNewUnacknowledged =
-    !acknowledged &&
-    (attentionStatus === "new" ||
-      attentionStatus === "ai_responding" ||
-      attentionStatus === "waiting_for_prospect" ||
-      attentionStatus === "human_required" ||
-      Boolean(prospect?.new_lead_received_at));
+  const lifecycleNew = isLifecycleNew(prospect);
+  const manualAcknowledge = needsManualAcknowledge(prospect);
 
   return {
     phone: summary.phone,
@@ -72,11 +70,14 @@ function buildProspectCenterItem(prospect, summary, options = {}) {
     source: prospect?.source || null,
     entryMethod: prospect?.entry_method || null,
     isUnassigned: unassigned,
-    isNew: isNewUnacknowledged,
+    isNew: lifecycleNew,
+    isNewUnacknowledged: manualAcknowledge,
+    needsManualAcknowledge: manualAcknowledge,
     isHumanAttentionRequired:
       summary.needsHumanAttention || attentionStatus === "human_required",
     badges: {
-      new: isNewUnacknowledged,
+      new: lifecycleNew,
+      needsManualAcknowledge: manualAcknowledge,
       unassigned,
       humanAttention:
         summary.needsHumanAttention || attentionStatus === "human_required",

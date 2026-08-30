@@ -153,8 +153,10 @@ test("B/C. Prospect Center New + humanAttention clear for acknowledged episode",
   });
 
   assert.equal(item.badges.new, false);
+  assert.equal(item.badges.needsManualAcknowledge, false);
   assert.equal(item.badges.humanAttention, false);
   assert.equal(item.isNew, false);
+  assert.equal(item.needsManualAcknowledge, false);
 });
 
 test("C2. Pre-ack human_required still red; post-ack clears BR-080 humanAttention", () => {
@@ -171,7 +173,7 @@ test("C2. Pre-ack human_required still red; post-ack clears BR-080 humanAttentio
     }
   );
   assert.equal(before.badges.humanAttention, true);
-  assert.equal(before.badges.new, true);
+  assert.equal(before.badges.needsManualAcknowledge, true);
 
   const after = buildProspectCenterItem(
     unackedProspect({
@@ -312,6 +314,7 @@ test("I. After TAKE OVER, qualification-style workflow patch keeps HUMAN + BR-08
       stalledAt: null
     });
     assert.equal(item.badges.new, false);
+    assert.equal(item.badges.needsManualAcknowledge, false);
   });
 });
 
@@ -358,6 +361,7 @@ test("J. Later NEW stall: HUMAN sticky; new attention may surface; Old New does 
     });
     // New/unacknowledged must NOT resurrect; stall may show humanAttention via workflow flag.
     assert.equal(item.badges.new, false);
+    assert.equal(item.badges.needsManualAcknowledge, false);
     assert.equal(item.badges.humanAttention, true);
     assert.equal(shouldGenerateNewLeadAttentionMission({ prospect: ackedProspect }), false);
   });
