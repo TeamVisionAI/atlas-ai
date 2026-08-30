@@ -35,6 +35,7 @@ import PolicyIntelligence from "./pages/PolicyIntelligence";
 import PolicyIntelligencePreviewPage from "./pages/PolicyIntelligencePreviewPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
+import TodayPage from "./pages/TodayPage";
 import ClientsPage from "./pages/ClientsPage";
 import IulFollowUpWorklistPage from "./pages/IulFollowUpWorklistPage";
 import ConversationsPage from "./pages/ConversationsPage";
@@ -145,6 +146,7 @@ export default function App() {
         <Route path="prospect/:id" element={<Prospect />} />
         <Route path="pipeline" element={<Navigate to="/app/prospect-center" replace />} />
         <Route path="conversations" element={<ConversationsPage />} />
+        <Route path="today" element={<TodayPage />} />
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="follow-ups" element={<FollowUpsPage />} />
         <Route path="clients" element={<ClientsPage />} />
@@ -208,6 +210,7 @@ export default function App() {
       <Route path="/prospect-workspace/:phone" element={<LegacyProspectWorkspaceRedirect />} />
       <Route path="/quick-capture" element={<Navigate to="/app/quick-capture" replace />} />
       <Route path="/conversations" element={<Navigate to="/app/conversations" replace />} />
+      <Route path="/today" element={<Navigate to="/app/today" replace />} />
       <Route path="/appointments" element={<Navigate to="/app/appointments" replace />} />
       <Route path="/follow-ups" element={<Navigate to="/app/follow-ups" replace />} />
       <Route path="/clients" element={<Navigate to="/app/clients" replace />} />

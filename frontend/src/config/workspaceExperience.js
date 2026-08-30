@@ -153,6 +153,12 @@ const NAV_ITEM_DEFS = Object.freeze({
     labelKey: "navConversations",
     permission: PERMISSIONS.PROSPECT_COMMUNICATE
   },
+  today: {
+    id: "today",
+    path: appPath("today"),
+    labelKey: "navToday",
+    permission: PERMISSIONS.PROSPECT_READ
+  },
   appointments: {
     id: "appointments",
     path: appPath("appointments"),
@@ -266,6 +272,7 @@ const BUSINESS_CORE_NAV_ORDER = Object.freeze([
   "missionControl",
   "prospectCenter",
   "conversations",
+  "today",
   "appointments",
   "followUps",
   "clients",
@@ -361,6 +368,7 @@ export const ROUTE_ACCESS = Object.freeze({
   "prospect-workspace": { permission: PERMISSIONS.PROSPECT_READ },
   "quick-capture": { permission: PERMISSIONS.PROSPECT_WRITE },
   conversations: { permission: PERMISSIONS.PROSPECT_COMMUNICATE },
+  today: { permission: PERMISSIONS.PROSPECT_READ },
   appointments: { permission: PERMISSIONS.PROSPECT_READ },
   "follow-ups": { permission: PERMISSIONS.PROSPECT_READ },
   clients: { permission: PERMISSIONS.PROSPECT_READ },

@@ -186,6 +186,16 @@ function emptyAgenda() {
   };
 }
 
+function emptyToday() {
+  const { emptyToday: buildEmptyToday } = require("./today/todayConstants");
+  return buildEmptyToday({
+    controlPlane: true,
+    organizationId: null,
+    teamAvailable: false,
+    caughtUp: true
+  });
+}
+
 function emptyClients() {
   return {
     generatedAt: new Date().toISOString(),
@@ -275,6 +285,7 @@ module.exports = {
   emptyProspectReport,
   emptyFollowUps,
   emptyClients,
+  emptyToday,
   emptyClientDetail,
   emptyMissionControlSummary,
   emptyMissionControlReadModel,

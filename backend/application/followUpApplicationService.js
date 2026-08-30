@@ -775,6 +775,7 @@ module.exports = {
   setStoreForTests,
   createMemoryFollowUpStore,
   canViewTeamFollowUps,
+  resolveOwnerFilter,
   syncFromOperationalOutcome,
   createManualFollowUp,
   completeFollowUp,

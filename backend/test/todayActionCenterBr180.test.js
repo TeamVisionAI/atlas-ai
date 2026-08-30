@@ -1,0 +1,499 @@
+/**
+ * BR-180 — Today / Action Center.
+ * Synthetic fixtures only. No live tenant data, WhatsApp, SMS, or email.
+ */
+
+process.env.NODE_ENV = "test";
+process.env.NODE_TEST_CONTEXT = process.env.NODE_TEST_CONTEXT || "1";
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
+process.env.SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "test-service-role-key";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const todayService = require("../application/todayActionCenterApplicationService");
+const followUpApplicationService = require("../application/followUpApplicationService");
+const agentNotificationService = require("../services/agentNotificationService");
+const { createMemoryFollowUpStore } = require("../core/followUps");
+const { createMemoryNotificationStore, EVENT_TYPES } = require("../core/agentNotifications");
+const { emptyToday } = require("../core/operationalControlPlane");
+const { isHealedBr080Stale, isRealNeedsAttention, isActionableNewLead } = require("../core/today/todayPresentation");
+const { HIERARCHY_MODES } = require("../core/hierarchyScopeEngine");
+
+const ORG_A = "21000000-0000-4000-8000-000000000001";
+const ORG_B = "21000000-0000-4000-8000-000000000099";
+const USER_A = "41000000-0000-4000-8000-000000000001";
+const USER_B = "41000000-0000-4000-8000-000000000002";
+const PROSPECT_NA = "51000000-0000-4000-8000-000000000001";
+const PROSPECT_HEALED = "51000000-0000-4000-8000-000000000002";
+const PROSPECT_ANSWERED = "51000000-0000-4000-8000-000000000003";
+const PROSPECT_NEW = "51000000-0000-4000-8000-000000000004";
+const CLIENT_ID = "32000000-0000-4000-8000-000000000001";
+const APPT_TODAY = "61000000-0000-4000-8000-000000000001";
+const APPT_TOMORROW = "61000000-0000-4000-8000-000000000002";
+const REFERENCE = new Date("2026-08-30T16:00:00.000Z");
+
+function auth(userId = USER_A, extras = {}) {
+  return {
+    userId,
+    organizationId: extras.organizationId || ORG_A,
+    role: extras.role || "agent",
+    status: extras.status || "active",
+    hierarchyMode: extras.hierarchyMode || HIERARCHY_MODES.SELF,
+    hierarchyUserIds: extras.hierarchyUserIds || [userId],
+    ...extras
+  };
+}
+
+function prospect(overrides = {}) {
+  return {
+    id: PROSPECT_NEW,
+    phone: "+15550001111",
+    name: "New Lead",
+    organization_id: ORG_A,
+    owner_user_id: USER_A,
+    current_step: "NEW",
+    status: "NEW",
+    attention_status: "new",
+    acknowledged_at: null,
+    needs_human_attention: false,
+    ...overrides
+  };
+}
+
+function appointment(overrides = {}) {
+  return {
+    id: APPT_TODAY,
+    organizationId: ORG_A,
+    agentId: USER_A,
+    prospectId: PROSPECT_NEW,
+    prospectPhone: "+15550001111",
+    prospectName: "Alex Interview",
+    purpose: "recruiting_interview",
+    status: "scheduled",
+    startDateTime: "2026-08-30T20:00:00.000Z",
+    ...overrides
+  };
+}
+
+function useRealFollowUps() {
+  todayService.setSourcesForTests({
+    listFollowUps: (...args) => followUpApplicationService.listFollowUps(...args)
+  });
+}
+
+function useRealNotifications() {
+  todayService.setSourcesForTests({
+    listNotifications: (...args) => agentNotificationService.listMyNotifications(...args)
+  });
+}
+
+async function loadToday(options = {}) {
+  return todayService.getToday({
+    organizationId: options.organizationId || ORG_A,
+    authContext: options.authContext || auth(),
+    scope: options.scope || "mine",
+    reference: options.reference || REFERENCE,
+    sources: options.sources
+  });
+}
+
+test.beforeEach(() => {
+  followUpApplicationService.setStoreForTests(createMemoryFollowUpStore());
+  agentNotificationService.setStoreForTests(createMemoryNotificationStore());
+  todayService.setSourcesForTests({
+    loadProspects: async () => [],
+    loadAppointments: async () => [],
+    timezoneDeps: {
+      getOrganizationSettings: () => ({ timezone: "America/New_York" }),
+      getOrganizationProfileTimezone: () => "America/New_York"
+    },
+    listFollowUps: async () => ({
+      items: [],
+      scope: "mine",
+      teamAvailable: false
+    }),
+    listNotifications: async () => []
+  });
+});
+
+test.afterEach(() => {
+  followUpApplicationService.setStoreForTests(null);
+  agentNotificationService.setStoreForTests(null);
+  todayService.setSourcesForTests(null);
+});
+
+test("empty Today is caught up and counts are zero", async () => {
+  const payload = await loadToday();
+  assert.equal(payload.caughtUp, true);
+  assert.equal(payload.counts.needsAttention, 0);
+  assert.equal(payload.counts.appointmentsToday, 0);
+  assert.equal(payload.counts.followUpsDueOverdue, 0);
+  assert.equal(payload.counts.newActionable, 0);
+  assert.equal(payload.sections.needsAttention.length, 0);
+  assert.equal(payload.today, "2026-08-30");
+  assert.equal(payload.timeZone, "America/New_York");
+});
+
+test("real Needs Attention appears and healed BR-080 stale case does not", async () => {
+  const real = prospect({
+    id: PROSPECT_NA,
+    name: "Takeover Case",
+    phone: "+15550001001",
+    attention_status: "human_required",
+    human_attention_reason: "provider_send_failed",
+    needs_human_attention: true
+  });
+  const healed = prospect({
+    id: PROSPECT_HEALED,
+    name: "Healed SLA",
+    phone: "+15550001002",
+    attention_status: "waiting_for_prospect",
+    human_attention_reason: "unacknowledged_sla_15m",
+    needs_human_attention: true
+  });
+
+  assert.equal(isRealNeedsAttention(real), true);
+  assert.equal(isHealedBr080Stale(healed), true);
+  assert.equal(isRealNeedsAttention(healed), false);
+
+  todayService.setSourcesForTests({
+    loadProspects: async () => [real, healed],
+    loadAppointments: async () => []
+  });
+
+  const payload = await loadToday();
+  assert.equal(payload.counts.needsAttention, 1);
+  assert.equal(payload.sections.needsAttention[0].entityId, PROSPECT_NA);
+  assert.match(payload.sections.needsAttention[0].href, /prospect-workspace/);
+  assert.equal(
+    payload.sections.needsAttention.some((item) => item.entityId === PROSPECT_HEALED),
+    false
+  );
+});
+
+test("today appointment appears in org timezone and tomorrow does not", async () => {
+  todayService.setSourcesForTests({
+    loadProspects: async () => [],
+    loadAppointments: async () => [
+      appointment(),
+      appointment({
+        id: APPT_TOMORROW,
+        startDateTime: "2026-08-31T16:00:00.000Z",
+        prospectName: "Tomorrow Interview"
+      })
+    ]
+  });
+
+  const payload = await loadToday();
+  assert.equal(payload.counts.appointmentsToday, 1);
+  assert.equal(payload.sections.appointmentsToday[0].entityId, APPT_TODAY);
+  assert.equal(payload.sections.appointmentsToday[0].whenLabel, "4:00 PM");
+  assert.doesNotMatch(payload.sections.appointmentsToday[0].whenLabel, /T\d{2}:\d{2}/);
+  assert.equal(payload.sections.appointmentsToday[0].href, `/app/appointments?appointmentId=${APPT_TODAY}`);
+});
+
+test("overdue, due-today, and needs-date follow-ups classify correctly", async () => {
+  useRealFollowUps();
+  const store = createMemoryFollowUpStore();
+  followUpApplicationService.setStoreForTests(store);
+
+  const dueToday = await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_A,
+      entityType: "prospect",
+      entityId: PROSPECT_NEW,
+      subjectLabel: "Due Today Prospect",
+      dueDate: "2026-08-30",
+      title: "Call today",
+      reference: REFERENCE
+    },
+    auth()
+  );
+  const overdue = await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_A,
+      entityType: "prospect",
+      entityId: "51000000-0000-4000-8000-000000000099",
+      subjectLabel: "Overdue Prospect",
+      dueDate: "2026-08-28",
+      title: "Missed call",
+      reference: REFERENCE
+    },
+    auth()
+  );
+  await store.upsert({
+    id: "fu-needs-date",
+    organizationId: ORG_A,
+    ownerUserId: USER_A,
+    entityType: "prospect",
+    entityId: PROSPECT_ANSWERED,
+    subjectLabel: "Needs Date Prospect",
+    title: "Set a date",
+    dueDate: null,
+    status: "OPEN",
+    dedupKey: "needs-date-1",
+    source: "durable",
+    createdAt: "2026-08-30T12:00:00.000Z",
+    updatedAt: "2026-08-30T12:00:00.000Z",
+    history: []
+  });
+
+  const payload = await loadToday();
+  const statuses = payload.sections.followUps.map((item) => item.status).sort();
+  assert.deepEqual(statuses, ["due-today", "needs-date", "overdue"]);
+  assert.equal(payload.counts.followUpsDueOverdue, 2);
+  assert.ok(payload.sections.followUps.find((item) => item.source?.id === dueToday.followUp.id));
+  assert.ok(payload.sections.followUps.find((item) => item.source?.id === overdue.followUp.id));
+});
+
+test("client follow-up appears and links to the client workspace", async () => {
+  useRealFollowUps();
+  await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_A,
+      entityType: "client",
+      entityId: CLIENT_ID,
+      subjectLabel: "Alex Client",
+      dueDate: "2026-08-30",
+      title: "Service check-in",
+      reference: REFERENCE
+    },
+    auth()
+  );
+
+  const payload = await loadToday();
+  assert.equal(payload.sections.followUps.length, 1);
+  assert.equal(payload.sections.followUps[0].entityType, "client");
+  assert.equal(payload.sections.followUps[0].href, `/app/clients/${CLIENT_ID}`);
+});
+
+test("Atlas-answered New lead is not actionable; true unhandled lead is", async () => {
+  const answered = prospect({
+    id: PROSPECT_ANSWERED,
+    name: "Atlas Answered",
+    phone: "+15550001003",
+    attention_status: "waiting_for_prospect"
+  });
+  const unhandled = prospect({
+    id: PROSPECT_NEW,
+    name: "Unhandled Lead",
+    phone: "+15550001004",
+    attention_status: "new"
+  });
+
+  assert.equal(isActionableNewLead(answered), false);
+  assert.equal(isActionableNewLead(unhandled), true);
+
+  todayService.setSourcesForTests({
+    loadProspects: async () => [answered, unhandled],
+    loadAppointments: async () => []
+  });
+
+  const payload = await loadToday();
+  assert.equal(payload.counts.newActionable, 1);
+  assert.equal(payload.sections.newLeads[0].entityId, PROSPECT_NEW);
+});
+
+test("My scope hides peer work; Team scope shows it only when hierarchy allows", async () => {
+  useRealFollowUps();
+  todayService.setSourcesForTests({
+    loadProspects: async () => [
+      prospect({
+        id: PROSPECT_NA,
+        name: "Peer NA",
+        owner_user_id: USER_B,
+        attention_status: "human_required",
+        human_attention_reason: "provider_send_failed",
+        needs_human_attention: true
+      })
+    ],
+    loadAppointments: async () => [appointment({ agentId: USER_B, prospectName: "Peer Appt" })]
+  });
+  await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_A,
+      entityType: "prospect",
+      entityId: PROSPECT_NA,
+      ownerUserId: USER_B,
+      subjectLabel: "Peer Follow-up",
+      dueDate: "2026-08-30",
+      title: "Peer call",
+      reference: REFERENCE
+    },
+    auth(USER_B)
+  );
+
+  const mine = await loadToday({ authContext: auth(USER_A), scope: "team" });
+  assert.equal(mine.scope, "mine");
+  assert.equal(mine.teamAvailable, false);
+  assert.equal(mine.counts.needsAttention, 0);
+  assert.equal(mine.counts.appointmentsToday, 0);
+  assert.equal(mine.counts.followUpsDueOverdue, 0);
+
+  const team = await loadToday({
+    authContext: auth(USER_A, {
+      role: "administrator",
+      hierarchyMode: HIERARCHY_MODES.ORGANIZATION,
+      hierarchyUserIds: [USER_A, USER_B]
+    }),
+    scope: "team"
+  });
+  assert.equal(team.scope, "team");
+  assert.equal(team.teamAvailable, true);
+  assert.equal(team.counts.needsAttention, 1);
+  assert.equal(team.counts.appointmentsToday, 1);
+  assert.equal(team.counts.followUpsDueOverdue, 1);
+});
+
+test("wrong-org entities fail closed", async () => {
+  useRealFollowUps();
+  todayService.setSourcesForTests({
+    loadProspects: async () => [
+      prospect({
+        organization_id: ORG_B,
+        attention_status: "human_required",
+        human_attention_reason: "provider_send_failed",
+        needs_human_attention: true
+      })
+    ],
+    loadAppointments: async () => [appointment({ organizationId: ORG_B })]
+  });
+  await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_B,
+      entityType: "prospect",
+      entityId: PROSPECT_NEW,
+      subjectLabel: "Other org",
+      dueDate: "2026-08-30",
+      reference: REFERENCE
+    },
+    auth(USER_A, { organizationId: ORG_B })
+  );
+
+  const payload = await loadToday();
+  assert.equal(payload.caughtUp, true);
+  assert.equal(payload.counts.needsAttention, 0);
+  assert.equal(payload.counts.appointmentsToday, 0);
+  assert.equal(payload.counts.followUpsDueOverdue, 0);
+});
+
+test("Super Admin control-plane Today is empty", () => {
+  const empty = emptyToday();
+  assert.equal(empty.controlPlane, true);
+  assert.equal(empty.caughtUp, true);
+  assert.equal(empty.counts.needsAttention, 0);
+  assert.equal(empty.sections.appointmentsToday.length, 0);
+  assert.equal(empty.organizationId, null);
+});
+
+test("Support Mode stays tenant-bound via organization id", async () => {
+  todayService.setSourcesForTests({
+    loadProspects: async () => [
+      prospect({
+        organization_id: ORG_A,
+        attention_status: "human_required",
+        human_attention_reason: "provider_send_failed",
+        needs_human_attention: true,
+        name: "Tenant A"
+      }),
+      prospect({
+        id: PROSPECT_HEALED,
+        organization_id: ORG_B,
+        attention_status: "human_required",
+        human_attention_reason: "provider_send_failed",
+        needs_human_attention: true,
+        name: "Tenant B"
+      })
+    ],
+    loadAppointments: async () => []
+  });
+
+  const bound = await loadToday({
+    organizationId: ORG_A,
+    authContext: auth(USER_A, {
+      role: "administrator",
+      hierarchyMode: HIERARCHY_MODES.ORGANIZATION
+    }),
+    scope: "team"
+  });
+  assert.equal(bound.counts.needsAttention, 1);
+  assert.equal(bound.sections.needsAttention[0].title, "Tenant A");
+});
+
+test("completing a follow-up updates Today items and counts", async () => {
+  useRealFollowUps();
+  const created = await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_A,
+      entityType: "prospect",
+      entityId: PROSPECT_NEW,
+      subjectLabel: "Complete me",
+      dueDate: "2026-08-30",
+      title: "Due now",
+      reference: REFERENCE
+    },
+    auth()
+  );
+
+  const before = await loadToday();
+  assert.equal(before.counts.followUpsDueOverdue, 1);
+  assert.equal(before.caughtUp, false);
+
+  await followUpApplicationService.completeFollowUp(
+    created.followUp.id,
+    { organizationId: ORG_A, completionNote: "Done" },
+    auth()
+  );
+
+  const after = await loadToday();
+  assert.equal(after.counts.followUpsDueOverdue, 0);
+  assert.equal(after.sections.followUps.length, 0);
+});
+
+test("unread BR-176 notifications appear without a second notification system", async () => {
+  useRealNotifications();
+  await agentNotificationService.notifyOperationalEvent({
+    eventType: EVENT_TYPES.NEEDS_ATTENTION,
+    organizationId: ORG_A,
+    recipientUserId: USER_A,
+    ownerUserId: USER_A,
+    entityType: "prospect",
+    entityId: PROSPECT_NA,
+    title: "Needs attention",
+    actionUrl: `/app/conversations?prospectId=${PROSPECT_NA}`
+  });
+
+  const payload = await loadToday();
+  assert.equal(payload.sections.notifications.length, 1);
+  assert.match(payload.sections.notifications[0].href, /conversations/);
+});
+
+test("BR-180 routes, refresh, and source boundaries stay aggregation-only", () => {
+  const routes = fs.readFileSync(path.join(__dirname, "../routes/today.js"), "utf8");
+  const service = fs.readFileSync(
+    path.join(__dirname, "../application/todayActionCenterApplicationService.js"),
+    "utf8"
+  );
+  const page = fs.readFileSync(path.join(__dirname, "../../frontend/src/pages/TodayPage.jsx"), "utf8");
+  const nav = fs.readFileSync(path.join(__dirname, "../../frontend/src/config/workspaceExperience.js"), "utf8");
+  const app = fs.readFileSync(path.join(__dirname, "../../frontend/src/App.jsx"), "utf8");
+  const recruitDecision = fs.readFileSync(path.join(__dirname, "../core/recruitAiV2/decisionEngine.js"), "utf8");
+  const notifications = fs.readFileSync(path.join(__dirname, "../services/agentNotificationService.js"), "utf8");
+  const followUps = fs.readFileSync(path.join(__dirname, "../application/followUpApplicationService.js"), "utf8");
+
+  assert.match(routes, /operationalControlPlaneEmpty\(emptyToday\)/);
+  assert.match(routes, /organizationGuard/);
+  assert.match(routes, /getTenantOrganizationId/);
+  assert.match(service, /Read model only/);
+  assert.match(page, /todayCaughtUp/);
+  assert.doesNotMatch(page, /setInterval/);
+  assert.match(nav, /path: appPath\("today"\)/);
+  assert.match(app, /path="today"/);
+  assert.doesNotMatch(recruitDecision, /todayActionCenterApplicationService/);
+  assert.doesNotMatch(notifications, /todayActionCenterApplicationService/);
+  assert.match(followUps, /resolveOwnerFilter/);
+});
