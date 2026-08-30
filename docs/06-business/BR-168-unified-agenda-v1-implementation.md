@@ -13,11 +13,12 @@
 
 ## Explicitly not included yet
 
-- Automatic or one-click promotion into Recruit or Client workflow.
 - Hierarchy/RVP roll-up for standalone Agenda meetings.
 - WhatsApp reminders for standalone Agenda contacts.
-- Dedicated standalone Agenda reschedule/cancel UI.
 - Tenant-requested temporary Support Access. Existing Support Mode rules remain unchanged.
+- Full Client CRM workspace (BR-177 stores only a durable Agenda client foundation).
+
+Promotion, outcome, reschedule, and cancel actions are delivered by BR-177.
 
 ## Safety rules
 

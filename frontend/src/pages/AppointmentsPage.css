@@ -595,6 +595,46 @@
   font-weight: 600;
 }
 
+.agenda-contact-details {
+  margin-bottom: 1rem;
+}
+
+.agenda-contact-details h3,
+.appointment-details-panel__body h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+}
+
+.agenda-contact-details__list {
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.agenda-contact-details__list div {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.agenda-contact-details__list dt {
+  margin: 0;
+  color: #64748b;
+}
+
+.agenda-contact-details__list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.appointment-details-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
 .appointment-history {
   list-style: none;
   margin: 0;

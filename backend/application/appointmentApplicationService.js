@@ -227,23 +227,29 @@ async function enrichWithProspect(appointment) {
     appointment.prospectPhone,
     appointment.organizationId
   );
+  const agendaName =
+    appointment.metadata?.agendaContactName || appointment.metadata?.prospectName || null;
+  const agendaPhone = appointment.metadata?.agendaContactPhone || null;
   const prospectIdentitySource = prospect || {
-    phone: appointment.prospectPhone,
-    name: appointment.metadata?.prospectName || null
+    phone: appointment.prospectPhone || agendaPhone,
+    name: agendaName
   };
 
   const email =
     prospect?.email ||
     extractEmailFromProspectNotes(prospect?.notes) ||
     appointment.metadata?.prospectEmail ||
+    appointment.metadata?.agendaContactEmail ||
     null;
-  const prospectVisiblePhone = resolveProspectVisiblePhone(prospectIdentitySource);
+  const prospectVisiblePhone =
+    resolveProspectVisiblePhone(prospectIdentitySource) ||
+    (appointment.metadata?.standaloneAgenda ? agendaPhone : null);
 
   return {
     ...appointment,
     prospectName:
       prospect?.name ||
-      appointment.metadata?.prospectName ||
+      agendaName ||
       formatProspectWhatsAppDisplayIdentity(prospectIdentitySource),
     prospectEmail: email,
     emailStatus: resolveEmailStatus(email),
@@ -367,8 +373,14 @@ async function listAppointments(filters) {
       console.error("[appointments] enrich failed:", error.message);
       items.push({
         ...appointment,
-        prospectName: appointment.metadata?.prospectName || appointment.prospectPhone,
-        prospectEmail: appointment.metadata?.prospectEmail || null,
+        prospectName:
+          appointment.metadata?.prospectName ||
+          appointment.metadata?.agendaContactName ||
+          appointment.prospectPhone,
+        prospectEmail:
+          appointment.metadata?.prospectEmail ||
+          appointment.metadata?.agendaContactEmail ||
+          null,
         emailStatus: "missing"
       });
     }
@@ -1152,6 +1164,17 @@ async function completeAppointment(id, input, context = {}) {
 
   if (!isValidOutcome(outcome)) {
     throw buildError("INVALID_OUTCOME", "Valid outcome is required to complete appointment.");
+  }
+
+  // Implements BR-177 — standalone Agenda outcomes stay on the appointment; no prospect workflow or auto-promotion.
+  if (resolved.metadata?.standaloneAgenda) {
+    const { recordStandaloneOutcome } = require("./agendaApplicationService");
+    const saved = await recordStandaloneOutcome(id, input, {
+      organizationId,
+      userId: agentId,
+      agentId
+    });
+    return enrichWithProspect(saved);
   }
 
   const result = await recordInterviewOutcomeFromAppointmentSlug({

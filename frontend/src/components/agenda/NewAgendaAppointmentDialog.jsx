@@ -23,6 +23,10 @@ const COPY = {
     in_person: "In person",
     phone_call: "Phone",
     notes: "Notes (optional)",
+    language: "Preferred language (optional)",
+    languageEnglish: "English",
+    languageSpanish: "Spanish",
+    source: "Source (optional)",
     cancel: "Cancel",
     save: "Add to Agenda",
     saving: "Scheduling…",
@@ -48,6 +52,10 @@ const COPY = {
     in_person: "En persona",
     phone_call: "Teléfono",
     notes: "Notas (opcional)",
+    language: "Idioma preferido (opcional)",
+    languageEnglish: "Inglés",
+    languageSpanish: "Español",
+    source: "Origen (opcional)",
     cancel: "Cancelar",
     save: "Agregar a la Agenda",
     saving: "Agendando…",
@@ -79,7 +87,9 @@ export default function NewAgendaAppointmentDialog({ open, onClose, onCreated })
     dateKey: initialDate(),
     timeKey: "10:00",
     meetingType: "virtual",
-    notes: ""
+    notes: "",
+    preferredLanguage: "",
+    source: ""
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -102,7 +112,10 @@ export default function NewAgendaAppointmentDialog({ open, onClose, onCreated })
         contact: {
           name: form.name.trim(),
           phone: form.phone.trim() || null,
-          email: form.email.trim() || null
+          email: form.email.trim() || null,
+          preferredLanguage: form.preferredLanguage || null,
+          source: form.source.trim() || null,
+          notes: form.notes.trim() || null
         },
         agendaKind: form.agendaKind,
         purpose: purposeForKind(form.agendaKind),
@@ -117,7 +130,9 @@ export default function NewAgendaAppointmentDialog({ open, onClose, onCreated })
         name: "",
         phone: "",
         email: "",
-        notes: ""
+        notes: "",
+        preferredLanguage: "",
+        source: ""
       }));
       onClose?.();
     } catch (requestError) {
@@ -189,6 +204,20 @@ export default function NewAgendaAppointmentDialog({ open, onClose, onCreated })
               <option value="phone">{copy.phone_call}</option>
             </select>
           </label>
+          <div className="agenda-dialog__two">
+            <label>
+              <span>{copy.language}</span>
+              <select value={form.preferredLanguage} onChange={(e) => update("preferredLanguage", e.target.value)}>
+                <option value=""></option>
+                <option value="english">{copy.languageEnglish}</option>
+                <option value="spanish">{copy.languageSpanish}</option>
+              </select>
+            </label>
+            <label>
+              <span>{copy.source}</span>
+              <input value={form.source} onChange={(e) => update("source", e.target.value)} />
+            </label>
+          </div>
           <label>
             <span>{copy.notes}</span>
             <textarea rows="3" value={form.notes} onChange={(e) => update("notes", e.target.value)} />

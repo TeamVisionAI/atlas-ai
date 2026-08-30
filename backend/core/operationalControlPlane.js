@@ -166,6 +166,18 @@ function emptyAppointments() {
   };
 }
 
+function emptyAgenda() {
+  return {
+    controlPlane: true,
+    organizationId: null,
+    items: [],
+    contacts: [],
+    contact: null,
+    appointment: null,
+    total: 0
+  };
+}
+
 function emptyIulWorklist() {
   return {
     controlPlane: true,
@@ -233,6 +245,7 @@ module.exports = {
   emptyMissionControlReadModel,
   emptyConversations,
   emptyAppointments,
+  emptyAgenda,
   emptyIulWorklist,
   emptyMissions,
   emptyProspectList,
