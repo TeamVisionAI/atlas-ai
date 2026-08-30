@@ -26,6 +26,8 @@ import {
 } from "../engines/knowledgeHubAccess";
 import { exitSupportMode, getSupportMode } from "../services/platformService";
 import { isSuperAdminUser } from "../security/isSuperAdminUser";
+import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import { resolveAuthenticatedShellBrand } from "../engines/authenticatedShellBrand";
 import NotificationBell from "../components/layout/NotificationBell";
 import {
   conversationsAccessAllowsNav,
@@ -92,8 +94,10 @@ function SidebarNav({
   navItems,
   currentUser,
   conversationsAttentionCount = 0,
-  organizationName = ""
+  organizationName = "",
+  brandTitle = ""
 }) {
+  const title = String(brandTitle || "").trim() || translate("layoutAppTitle");
   const brandName = String(organizationName || "").trim() || translate("layoutBrandSubtitleFallback");
   return (
     <>
@@ -103,7 +107,7 @@ function SidebarNav({
         </Link>
 
         <div className="atlas-layout__sidebar-head">
-          <h2 className="atlas-layout__brand-title">{translate("layoutAppTitle")}</h2>
+          <h2 className="atlas-layout__brand-title">{title}</h2>
           <div style={{ display: "flex", gap: 8 }}>
             {showCollapse ? (
               <button
@@ -328,8 +332,25 @@ export default function MainLayout() {
     };
   }, [currentUser, supportMode?.active, supportMode?.organizationId, location.pathname]);
 
+  const shellBrand = useMemo(
+    () =>
+      resolveAuthenticatedShellBrand({
+        user: currentUser,
+        supportMode,
+        branding: organizationBranding,
+        atlasLabel: translate("layoutBrandSubtitleFallback")
+      }),
+    [currentUser, supportMode, organizationBranding, translate]
+  );
+  const shellBrandTitle =
+    shellBrand.controlPlane || !shellBrand.name
+      ? translate("layoutAppTitle")
+      : shellBrand.name;
+  const shellBrandSubtitle =
+    shellBrand.name || translate("layoutBrandSubtitleFallback");
+
   useEffect(() => {
-    if (!currentUser || (isSuperAdminUser(currentUser) && !supportMode?.organizationId)) {
+    if (!currentUser || isGlobalSuperAdminControlPlane(currentUser, supportMode)) {
       setOrganizationBranding(null);
       return undefined;
     }
@@ -338,7 +359,7 @@ export default function MainLayout() {
     fetchOrganizationBranding()
       .then((branding) => {
         if (!cancelled) {
-          setOrganizationBranding(branding);
+          setOrganizationBranding(branding?.controlPlane ? null : branding);
         }
       })
       .catch(() => {
@@ -597,7 +618,8 @@ export default function MainLayout() {
             navItems={navItems}
             currentUser={currentUser}
             conversationsAttentionCount={conversationsAttentionCount}
-            organizationName={organizationBranding?.name || ""}
+            organizationName={shellBrandSubtitle}
+            brandTitle={shellBrandTitle}
           />
         </aside>
 
@@ -631,7 +653,7 @@ export default function MainLayout() {
             >
               ☰
             </button>
-            <span className="atlas-layout__header-title">{translate("layoutAppTitle")}</span>
+            <span className="atlas-layout__header-title">{shellBrandTitle}</span>
             <NotificationBell enabled={Boolean(currentUser)} />
           </header>
 
