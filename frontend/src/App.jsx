@@ -35,6 +35,7 @@ import PolicyIntelligence from "./pages/PolicyIntelligence";
 import PolicyIntelligencePreviewPage from "./pages/PolicyIntelligencePreviewPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
+import ClientsPage from "./pages/ClientsPage";
 import IulFollowUpWorklistPage from "./pages/IulFollowUpWorklistPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import Prospect from "./pages/Prospect";
@@ -146,6 +147,8 @@ export default function App() {
         <Route path="conversations" element={<ConversationsPage />} />
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="follow-ups" element={<FollowUpsPage />} />
+        <Route path="clients" element={<ClientsPage />} />
+        <Route path="clients/:clientId" element={<ClientsPage />} />
         <Route path="iul-follow-up-worklist" element={<IulFollowUpWorklistPage />} />
         <Route
           path="analytics"
@@ -207,6 +210,7 @@ export default function App() {
       <Route path="/conversations" element={<Navigate to="/app/conversations" replace />} />
       <Route path="/appointments" element={<Navigate to="/app/appointments" replace />} />
       <Route path="/follow-ups" element={<Navigate to="/app/follow-ups" replace />} />
+      <Route path="/clients" element={<Navigate to="/app/clients" replace />} />
       <Route path="/analytics" element={<Navigate to="/app/analytics" replace />} />
       <Route path="/settings/whatsapp" element={<Navigate to="/app/settings/whatsapp" replace />} />
       <Route path="/settings" element={<Navigate to="/app/settings" replace />} />

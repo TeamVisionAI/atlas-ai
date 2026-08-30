@@ -1,0 +1,249 @@
+.clients-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.clients-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clients-page__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.clients-page__subtitle,
+.clients-page__status,
+.clients-page__hint {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.clients-page__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.clients-page__back,
+.clients-profile__actions button,
+.clients-card__actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.clients-page__scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clients-page__filter {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.clients-page__filter.is-active {
+  border-color: #1e3a8a;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.clients-page__search-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.clients-page__search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.clients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clients-card,
+.clients-profile,
+.clients-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 16px;
+}
+
+.clients-card__main {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.clients-card__header,
+.clients-profile__details,
+.clients-card__details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.clients-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.clients-card__header h2,
+.clients-section h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.clients-card__details dt,
+.clients-profile__details dt {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.clients-card__details dd,
+.clients-profile__details dd {
+  margin: 0;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.clients-card__actions,
+.clients-profile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.clients-history {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.clients-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 16px;
+}
+
+.clients-dialog {
+  width: min(480px, 100%);
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.clients-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.clients-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.clients-dialog input,
+.clients-dialog select,
+.clients-dialog textarea {
+  font-weight: 400;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.clients-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.clients-dialog__primary {
+  border: 0;
+  border-radius: 8px;
+  background: #1e3a8a;
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.clients-dialog__secondary {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+@media (min-width: 720px) {
+  .clients-card__details,
+  .clients-profile__details {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

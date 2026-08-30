@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { supabase } = require("../services/supabaseService");
+const { CLIENT_STATUSES } = require("../core/clients/constants");
 
 function rowToAgendaClient(row) {
   if (!row) return null;
@@ -14,6 +15,8 @@ function rowToAgendaClient(row) {
     preferredLanguage: row.preferred_language || null,
     source: row.source || null,
     notes: row.notes || null,
+    status: row.status || CLIENT_STATUSES.ACTIVE,
+    history: Array.isArray(row.history) ? row.history : [],
     createdBy: row.created_by || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -32,6 +35,8 @@ function agendaClientToRow(client) {
     preferred_language: client.preferredLanguage || null,
     source: client.source || null,
     notes: client.notes || null,
+    status: client.status || CLIENT_STATUSES.ACTIVE,
+    history: client.history || [],
     created_by: client.createdBy || null,
     created_at: client.createdAt || new Date().toISOString(),
     updated_at: client.updatedAt || new Date().toISOString()
@@ -69,10 +74,24 @@ async function findByAgendaContactId(agendaContactId, organizationId) {
   return rowToAgendaClient(data);
 }
 
+async function listForOwners({ organizationId, ownerUserIds }) {
+  if (!organizationId) return [];
+  let query = supabase.from("atlas_agenda_clients").select("*").eq("organization_id", organizationId);
+  if (ownerUserIds?.length === 1) {
+    query = query.eq("owner_user_id", ownerUserIds[0]);
+  } else if (ownerUserIds?.length > 1) {
+    query = query.in("owner_user_id", ownerUserIds);
+  }
+  const { data, error } = await query.order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map(rowToAgendaClient);
+}
+
 module.exports = {
   rowToAgendaClient,
   agendaClientToRow,
   save,
   findById,
-  findByAgendaContactId
+  findByAgendaContactId,
+  listForOwners
 };

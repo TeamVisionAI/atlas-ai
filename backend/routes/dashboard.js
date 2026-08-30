@@ -92,11 +92,31 @@ router.get("/", operationalControlPlaneEmpty(emptyDashboard), async (req, res) =
       dashboard.followUpsDue = followUpSummary.followUpsDue;
       dashboard.followUpsOverdue = followUpSummary.followUpsOverdue;
       dashboard.nextFollowUps = followUpSummary.nextFollowUps;
+      try {
+        const clientWorkspaceApplicationService = require("../application/clientWorkspaceApplicationService");
+        const clientSummary = await clientWorkspaceApplicationService.summarizeForOwner({
+          organizationId,
+          authContext: {
+            userId: req.tenantContext?.userId || req.authContext?.userId,
+            role: req.authContext?.role,
+            hierarchyMode: req.authContext?.hierarchyMode,
+            hierarchyUserIds: req.authContext?.hierarchyUserIds
+          }
+        });
+        dashboard.myClientsCount = clientSummary.myClientsCount;
+        dashboard.clientFollowUpsDue = clientSummary.clientFollowUpsDue;
+      } catch (clientError) {
+        console.error("[dashboard] client summary error:", clientError.message);
+        dashboard.myClientsCount = 0;
+        dashboard.clientFollowUpsDue = 0;
+      }
     } catch (followUpError) {
       console.error("[dashboard] follow-up summary error:", followUpError.message);
       dashboard.followUpsDue = dashboard.followUpsDue || 0;
       dashboard.followUpsOverdue = 0;
       dashboard.nextFollowUps = [];
+      dashboard.myClientsCount = dashboard.myClientsCount || 0;
+      dashboard.clientFollowUpsDue = dashboard.clientFollowUpsDue || 0;
     }
 
     return res.json(dashboard);

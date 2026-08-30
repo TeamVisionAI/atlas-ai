@@ -150,7 +150,8 @@ export function AppointmentDetailsPanel({
   onCancel,
   onComplete,
   onPromoteRecruit,
-  onPromoteClient
+  onPromoteClient,
+  onOpenClient
 }) {
   const { translate } = useLanguage();
   const standaloneAgenda = appointment?.metadata?.standaloneAgenda === true;
@@ -227,7 +228,11 @@ export function AppointmentDetailsPanel({
               <AtlasButton variant="secondary" size="sm" onClick={() => onPromoteClient?.(appointment)}>
                 {translate("agendaPromoteClient")}
               </AtlasButton>
-            ) : null}
+            ) : (
+              <AtlasButton variant="secondary" size="sm" onClick={() => onOpenClient?.(appointment)}>
+                {translate("agendaOpenClient")}
+              </AtlasButton>
+            )}
           </section>
         ) : null}
 

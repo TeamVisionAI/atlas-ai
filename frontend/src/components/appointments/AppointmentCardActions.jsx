@@ -20,7 +20,8 @@ export default function AppointmentCardActions({
   onCancel,
   onComplete,
   onPromoteRecruit,
-  onPromoteClient
+  onPromoteClient,
+  onOpenClient
 }) {
   const plan = resolveAppointmentCardActionPlan(appointment);
   const standaloneAgenda = appointment?.metadata?.standaloneAgenda === true;
@@ -96,7 +97,11 @@ export default function AppointmentCardActions({
           <AtlasButton variant="secondary" size="sm" onClick={onPromoteClient}>
             {translate("agendaPromoteClient")}
           </AtlasButton>
-        ) : null}
+        ) : (
+          <AtlasButton variant="secondary" size="sm" onClick={onOpenClient}>
+            {translate("agendaOpenClient")}
+          </AtlasButton>
+        )}
       </div>
     );
   }

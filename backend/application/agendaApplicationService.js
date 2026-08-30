@@ -622,6 +622,7 @@ async function promoteToClient(appointmentId, input, context) {
       created: false,
       clientId: contact.promotedClientId,
       client: existing,
+      workspacePath: `/app/clients/${contact.promotedClientId}`,
       contact: await presentAgendaContact(contact),
       appointment
     };
@@ -643,6 +644,7 @@ async function promoteToClient(appointmentId, input, context) {
       created: false,
       clientId: existingByContact.id,
       client: existingByContact,
+      workspacePath: `/app/clients/${existingByContact.id}`,
       contact: await presentAgendaContact(savedContact),
       appointment
     };
@@ -661,7 +663,16 @@ async function promoteToClient(appointmentId, input, context) {
     preferredLanguage: contactLanguage(contact),
     source: contactSource(contact, AGENDA_SOURCE),
     notes,
-    createdBy: actor
+    status: "ACTIVE",
+    createdBy: actor,
+    history: [
+      {
+        type: "promoted",
+        actor: actor || "agent",
+        at: now,
+        summary: "Promoted to Client"
+      }
+    ]
   });
 
   const savedContact = await agendaContactRepository.save({
@@ -695,6 +706,7 @@ async function promoteToClient(appointmentId, input, context) {
     created: true,
     clientId: client.id,
     client,
+    workspacePath: `/app/clients/${client.id}`,
     contact: await presentAgendaContact(savedContact),
     appointment: savedAppointment
   };

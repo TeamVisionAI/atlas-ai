@@ -263,8 +263,12 @@ export default function FollowUpsPage() {
       navigate(`${appPath("appointments")}?appointmentId=${encodeURIComponent(item.appointmentId || item.entityId)}`);
       return;
     }
-    if (item.entityType === "agenda_contact" || item.entityType === "client") {
-      navigate(appPath("agenda"));
+    if (item.entityType === "client" && item.entityId) {
+      navigate(appPath(`clients/${item.entityId}`));
+      return;
+    }
+    if (item.entityType === "agenda_contact") {
+      navigate(appPath("appointments"));
       return;
     }
     if (item.phone) {
