@@ -31,6 +31,7 @@ const {
   presentAppointment,
   presentFollowUpItem,
   presentServiceCaseItem,
+  presentDocumentRequestItem,
   presentNewLead,
   presentNotification,
   compareTodayItems
@@ -98,6 +99,14 @@ async function defaultListServiceCases(options) {
   return clientServiceApplicationService.listServiceCases(options);
 }
 
+async function defaultListDocumentRequests(options) {
+  if (process.env.NODE_ENV === "test" || process.env.NODE_TEST_CONTEXT) {
+    return { items: [] };
+  }
+  const clientDocumentsApplicationService = require("./clientDocumentsApplicationService");
+  return clientDocumentsApplicationService.listDocumentRequests(options);
+}
+
 function isFollowUpActionable(item) {
   return (
     isFollowUpDueOrOverdue(item) || item.status === FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE
@@ -129,14 +138,21 @@ async function getToday({
   const listNotifications =
     resolved.listNotifications || agentNotificationService.listMyNotifications;
   const listServiceCases = resolved.listServiceCases || defaultListServiceCases;
+  const listDocumentRequests = resolved.listDocumentRequests || defaultListDocumentRequests;
 
   const authForProspects = {
     ...authContext,
     organizationId: organizationId || authContext?.organizationId || null
   };
 
-  const [prospectsRaw, appointmentsRaw, followUpsPayload, notificationsRaw, servicePayload] =
-    await Promise.all([
+  const [
+    prospectsRaw,
+    appointmentsRaw,
+    followUpsPayload,
+    notificationsRaw,
+    servicePayload,
+    documentRequestPayload
+  ] = await Promise.all([
       loadProspects(organizationId),
       loadAppointments({ organizationId, reference: now }),
       listFollowUps({
@@ -153,6 +169,12 @@ async function getToday({
         limit: NOTIFICATION_LIMIT
       }),
       listServiceCases({
+        organizationId,
+        authContext,
+        scope: ownerFilter.scope,
+        reference: now
+      }),
+      listDocumentRequests({
         organizationId,
         authContext,
         scope: ownerFilter.scope,
@@ -203,6 +225,7 @@ async function getToday({
     });
 
   const { toTodayItem } = require("./clientServiceApplicationService");
+  const { toTodayItem: toDocumentRequestTodayItem } = require("./clientDocumentsApplicationService");
   const followUps = (followUpsPayload.items || [])
     .filter(isFollowUpActionable)
     .map((item) => presentFollowUpItem(item, { timeZone: timeZoneResolution.timeZone }));
@@ -210,7 +233,11 @@ async function getToday({
     .map((item) => toTodayItem(item))
     .filter(Boolean)
     .map((item) => presentServiceCaseItem(item));
-  followUps.push(...serviceItems);
+  const documentRequestItems = (documentRequestPayload?.items || [])
+    .map((item) => toDocumentRequestTodayItem(item))
+    .filter(Boolean)
+    .map((item) => presentDocumentRequestItem(item));
+  followUps.push(...serviceItems, ...documentRequestItems);
   followUps.sort(compareTodayItems);
 
   const newLeads = visibleProspects

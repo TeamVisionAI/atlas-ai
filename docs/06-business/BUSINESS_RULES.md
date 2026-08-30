@@ -2794,6 +2794,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-183 — Client Documents & Secure Document Requests V1
+
+**Implements:** A global, tenant-safe document layer so agents can request, receive, track, and organize client documents for service and policy-review work without OCR or automated analysis.  
+**Domain:** Clients / service / documents  
+**Depends on:** BR-179 Client Workspace; BR-182 Service; BR-181 Production; BR-178 follow-ups; BR-180 Today  
+**Related:** BR-052 private storage pattern  
+**Status:** V1 implemented — metadata + request workflow only  
+**Engine target:** `clientDocuments/*`; `clientDocumentsApplicationService`; `/api/documents`; `/api/document-requests`  
+**Tests:** `backend/test/clientDocumentsBr183.test.js`; `frontend/src/pages/clientDocumentsBr183.test.js`  
+**Docs:** `docs/06-business/BR-183-client-documents.md`
+
+### Rules
+
+1. **Durable SoT** — `atlas_client_documents` holds metadata. `atlas_client_document_requests` tracks what the agent is waiting for. Binary objects stay in the private `client-documents` bucket. Do not store files in Postgres or on recruiting prospects.
+2. **Types / statuses** — Types are manual: POLICY_DOCUMENT, APPLICATION, STATEMENT, IDENTIFICATION, BENEFICIARY_FORM, SERVICE_FORM, OTHER. Document statuses: RECEIVED, REVIEW_PENDING, REVIEWED, REJECTED, ARCHIVED. Request statuses: OPEN, RECEIVED, COMPLETED, CANCELLED. No OCR or AI classification.
+3. **Upload security** — Authenticated, tenant-bound, client-authorized. Random storage keys. PDF/JPEG/PNG only, 10 MB max, sanitized filename, magic-byte check. Authorized API download only. Never expose storage keys or public bucket URLs.
+4. **Fulfillment** — Link a document to a request only when the user supplies the request id. Do not auto-match on filename. Fulfillment is idempotent.
+5. **Workspace** — Client profile shows requested and received documents. Service-case cards show linked documents and open requests. Do not change BR-182 service SoT.
+6. **Today / follow-ups** — Add only overdue and due-today **open** requests to the existing Today follow-ups section. Needs Date stays on the client profile. Manual BR-178 client follow-ups only. No WhatsApp.
+7. **Permissions** — Own documents/requests by default. Wrong-org and unauthorized peer IDs fail closed (404). Super Admin control-plane empty. Support Mode tenant-bound. No phone-based tenant identity.
+8. **Recruiting separation** — Documents and requests do not create recruiting prospects, enter Recruit AI, or change Mission Control / IUL routing.
+9. **Boundaries** — Do not implement OCR, PDF parsing, policy extraction, AI summaries, replacement analysis, or carrier comparison. Do not change Recruit AI, semantic apply, WhatsApp, campaign intake, BR-176, or BR-178–182 sources of truth. No Team Vision-specific code.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  
