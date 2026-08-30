@@ -12,6 +12,10 @@
   color: var(--public-text);
 }
 
+.public-section__text + .public-section__text {
+  margin-top: 1rem;
+}
+
 .public-section__intro {
   margin-bottom: 2rem;
 }
@@ -126,6 +130,13 @@
 .public-section__form-note {
   margin: 0;
   font-size: 0.8125rem;
+  color: var(--public-muted);
+}
+
+.public-section__consent {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
   color: var(--public-muted);
 }
 

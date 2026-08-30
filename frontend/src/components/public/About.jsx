@@ -15,6 +15,12 @@ export default function About() {
             one-size-fits-all products. Our mission is to help families protect what matters and
             plan with confidence.
           </p>
+          <p className="public-section__text">
+            We provide financial education, life insurance-related services, retirement-related
+            education and guidance, appointment scheduling, and related customer support. Where a
+            product or service requires a license, it is offered through appropriately licensed
+            professionals.
+          </p>
         </div>
 
         <div className="public-section__cards">
