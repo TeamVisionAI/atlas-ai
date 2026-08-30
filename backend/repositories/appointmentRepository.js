@@ -187,6 +187,12 @@ async function search(filters = {}) {
       query = query.eq("prospect_phone", filters.prospectPhone);
     }
 
+    if (filters.agendaContactId) {
+      query = query.eq("agenda_contact_id", filters.agendaContactId);
+    } else if (filters.agendaContactIds?.length) {
+      query = query.in("agenda_contact_id", filters.agendaContactIds);
+    }
+
     if (filters.status) {
       if (Array.isArray(filters.status)) {
         query = query.in("status", filters.status);
@@ -249,6 +255,13 @@ async function search(filters = {}) {
 
   if (filters.prospectPhone) {
     rows = rows.filter((row) => row.prospect_phone === filters.prospectPhone);
+  }
+
+  if (filters.agendaContactId) {
+    rows = rows.filter((row) => row.agenda_contact_id === filters.agendaContactId);
+  } else if (filters.agendaContactIds?.length) {
+    const allowed = new Set(filters.agendaContactIds.map(String));
+    rows = rows.filter((row) => allowed.has(String(row.agenda_contact_id)));
   }
 
   if (filters.status) {

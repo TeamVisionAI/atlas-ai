@@ -15,6 +15,7 @@ import {
   normalizeAppointmentList
 } from "../services/appointmentService";
 import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
+import { appPath } from "../config/appRoutes";
 import RescheduleAppointmentDialog from "../components/appointments/RescheduleAppointmentDialog";
 import CancelAppointmentDialog from "../components/appointments/CancelAppointmentDialog";
 import CompleteAppointmentDialog from "../components/appointments/CompleteAppointmentDialog";
@@ -507,6 +508,10 @@ export default function AppointmentsPage() {
                       onComplete={() => openDialog("complete", appointment)}
                       onPromoteRecruit={() => openDialog("promote-recruit", appointment)}
                       onPromoteClient={() => openDialog("promote-client", appointment)}
+                      onOpenClient={() => {
+                        const id = appointment.metadata?.promotedClientId;
+                        if (id) navigate(appPath(`clients/${id}`));
+                      }}
                     />
                   </li>
                 );
@@ -525,6 +530,10 @@ export default function AppointmentsPage() {
             onComplete={(item) => openDialog("complete", item)}
             onPromoteRecruit={(item) => openDialog("promote-recruit", item)}
             onPromoteClient={(item) => openDialog("promote-client", item)}
+            onOpenClient={(item) => {
+              const id = item?.metadata?.promotedClientId;
+              if (id) navigate(appPath(`clients/${id}`));
+            }}
           />
         ) : null}
       </div>
@@ -571,14 +580,17 @@ export default function AppointmentsPage() {
         mode="client"
         appointment={dialog?.appointment}
         onClose={closeDialog}
-        onSuccess={(result) =>
+        onSuccess={(result) => {
           handleActionSuccess(
             result?.alreadyPromoted
               ? translate("agendaPromoteClientExisting")
               : translate("agendaPromoteClientSuccess"),
             result?.appointment
-          )
-        }
+          );
+          if (result?.clientId) {
+            navigate(appPath(`clients/${result.clientId}`));
+          }
+        }}
       />
       <ResolveHumanAssistDialog
         open={dialog?.type === "resolve"}

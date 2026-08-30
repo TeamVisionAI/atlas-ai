@@ -10,7 +10,7 @@ Unpromoted Agenda contacts are not prospects.
 
 ## Client-model decision
 
-Atlas has no canonical Client CRM entity. V1 persists `atlas_agenda_clients` as a durable, tenant-scoped client promotion record linked to `atlas_agenda_contacts`. This is not a Client workspace, pipeline, or billing model.
+V1 persists `atlas_agenda_clients` as the durable, tenant-scoped client entity linked to `atlas_agenda_contacts`. BR-179 adds the Client Workspace on that same table. Do not create a recruiting prospect to represent a client.
 
 Do not create a recruiting prospect to represent a client.
 
@@ -31,6 +31,7 @@ Do not create a recruiting prospect to represent a client.
 2. If `promoted_client_id` already exists, return that link.
 3. Else insert one `atlas_agenda_clients` row and store the id on the Agenda contact.
 4. No prospect row is written.
+5. The response includes `workspacePath` `/app/clients/:id` so the operator lands in the BR-179 Client Workspace.
 
 ## Notifications
 

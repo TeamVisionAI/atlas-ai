@@ -63,6 +63,8 @@ function emptyDashboard() {
     followUpsDue: 0,
     followUpsOverdue: 0,
     nextFollowUps: [],
+    myClientsCount: 0,
+    clientFollowUpsDue: 0,
     appointments: 0,
     prospects: [],
     prioritizedWorkflowQueue: []
@@ -184,6 +186,31 @@ function emptyAgenda() {
   };
 }
 
+function emptyClients() {
+  return {
+    generatedAt: new Date().toISOString(),
+    controlPlane: true,
+    organizationId: null,
+    scope: "mine",
+    teamAvailable: false,
+    totalCount: 0,
+    filteredCount: 0,
+    search: "",
+    items: []
+  };
+}
+
+function emptyClientDetail() {
+  return {
+    controlPlane: true,
+    organizationId: null,
+    client: null,
+    contact: null,
+    appointments: [],
+    followUps: []
+  };
+}
+
 function emptyIulWorklist() {
   return {
     controlPlane: true,
@@ -247,6 +274,8 @@ module.exports = {
   emptyProspectCenter,
   emptyProspectReport,
   emptyFollowUps,
+  emptyClients,
+  emptyClientDetail,
   emptyMissionControlSummary,
   emptyMissionControlReadModel,
   emptyConversations,

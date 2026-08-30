@@ -2647,7 +2647,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 3. **Reschedule** — Same appointment ID; move the same calendar event where supported; keep owner/interviewer unless intentionally changed; remake reminders; no duplicate appointments. BR-176 emits `APPOINTMENT_RESCHEDULED` from the appointment service only. UI picks a real availability slot.
 4. **Cancel** — Reuse canonical cancel: history, calendar, stop reminders. BR-176 emits `APPOINTMENT_CANCELLED` from the appointment service only. Reason optional.
 5. **Promote to Recruit** — Explicit only. Create or link one same-org prospect; preserve `organization_id`, `owner_user_id`, name, phone, language, source/notes; link appointment/history. Phone required. Entry method is `AGENDA_PROMOTION` (not QR / CTWA / Quick Capture). Persist Agenda email as the canonical `EMAIL:` notes token — do not write `prospects.email` (live schema has no such column). Second promote returns the existing link. Do not start Recruit AI unless existing eligibility rules already allow it.
-6. **Promote to Client** — Explicit only. Persist `atlas_agenda_clients` as the smallest durable client foundation. Do not invent a recruiting prospect to represent a client. Full Client CRM workspace remains a documented gap.
+6. **Promote to Client** — Explicit only. Persist `atlas_agenda_clients` as the smallest durable client foundation and land in the BR-179 Client Workspace. Do not invent a recruiting prospect to represent a client.
 7. **Workspace separation** — Unpromoted Agenda contacts stay out of Prospect Center, Mission Control recruiting metrics, Recruit AI queues, and recruiting conversion metrics. Client promotion enters only the Agenda client record.
 8. **Contact details** — `atlas_agenda_contacts` is source of truth for name, phone, email, preferred language, owner, source, and notes. Phone must display when stored.
 9. **Lifecycle views** — Today, Upcoming, Pending Confirmation, Human Assist, Completed, Cancelled stay consistent. Deep-linked `appointmentId` still opens off-tab.
@@ -2681,6 +2681,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 9. **Dedup** — Outcome retries, API retries, and duplicate UI submits reuse `organization_id + dedup_key`.
 10. **Permissions** — Users manage only authorized follow-ups. Wrong-org IDs fail closed (404). Super Admin control-plane sees none unless Support Mode (tenant-bound).
 11. **Boundaries** — Do not change Recruit AI qualification, semantic apply, AI Quality, WhatsApp eligibility, campaign intake, ownership, or appointment scheduling rules. No Team Vision-specific code.
+
+---
+
+## BR-179 — Client Workspace V1
+
+**Implements:** A global, tenant-safe Client Workspace so Agenda Contact → Appointment → Client → Follow-ups is an operational path, without mixing clients into recruiting prospects or Recruit AI.  
+**Domain:** Clients / Agenda / appointments / follow-ups  
+**Depends on:** BR-177 Agenda client foundation; BR-178 follow-ups; BR-168 Unified Agenda; BR-160 control plane; BR-176 notifications  
+**Related:** BR-043 appointments; BR-080 ownership (unchanged)  
+**Status:** V1 implemented — workspace only; FNA / Policy Review / production tracking remain later  
+**Engine target:** `clients/*`; `clientWorkspaceApplicationService`; `/api/clients`; `/app/clients`  
+**Tests:** `backend/test/clientWorkspaceBr179.test.js`; `frontend/src/engines/clientsViewModel.test.js`  
+**Docs:** `docs/06-business/BR-179-client-workspace-v1.md`
+
+### Rules
+
+1. **Durable SoT** — `atlas_agenda_clients` is the canonical V1 client entity. Do not create a second client table. Do not represent a client as a recruiting prospect.
+2. **Workspace** — `/app/clients` defaults to My Clients. Team Clients only when existing hierarchy permissions already allow it. Search by name, phone, or email.
+3. **Profile** — Detail shows contact, owner, source, notes, linked Agenda contact, appointments/outcomes, BR-178 follow-ups, promoted timestamp, and friendly actor names. No raw UUIDs in normal UI.
+4. **Promotion** — BR-177 Promote to Client is idempotent (one client per Agenda contact) and links to `/app/clients/:id`. Preserve org, owner, name, phone, email, language, source, notes, and appointment/contact linkage.
+5. **Follow-ups** — Reuse BR-178 with `entityType=client`. Authorized users may create, complete, reschedule, or cancel from the client profile. Client follow-ups appear in `/app/follow-ups` under the same owner/isolation rules.
+6. **Appointments** — Show linked appointments and reuse canonical appointment dialogs/routes. Do not duplicate scheduling logic.
+7. **Status** — Optional manual statuses only: ACTIVE, FOLLOW_UP, INACTIVE. Do not auto-advance from incomplete assumptions. Do not invent insurance/policy statuses.
+8. **Notes** — Tenant-scoped, actor/timestamp history. Do not store sensitive policy/health data in generic notes.
+9. **Permissions** — Own clients by default. Wrong-org IDs fail closed (404). Super Admin control-plane sees none unless Support Mode (tenant-bound). No phone-based tenant identity.
+10. **Recruiting separation** — Clients do not appear in Prospect Center, recruiting Mission Control metrics, Recruit AI queues, or recruiting conversion metrics.
+11. **Dashboard** — Lightweight My Clients count and client follow-ups due only. Do not redesign dashboards.
+12. **Boundaries** — Do not change Recruit AI, semantic apply, AI Quality, WhatsApp eligibility, campaign intake, ownership semantics, or appointment scheduling rules. No Team Vision-specific code. FNA, Policy Review, Policy Intelligence, production/premium tracking, and household relationships stay out of V1.
 
 ---
 

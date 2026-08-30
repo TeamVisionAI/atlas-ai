@@ -169,6 +169,12 @@ const NAV_ITEM_DEFS = Object.freeze({
     labelKey: "navFollowUps",
     permission: PERMISSIONS.PROSPECT_READ
   },
+  clients: {
+    id: "clients",
+    path: appPath("clients"),
+    labelKey: "navClients",
+    permission: PERMISSIONS.PROSPECT_READ
+  },
   production: {
     id: "production",
     path: appPath("production"),
@@ -262,6 +268,7 @@ const BUSINESS_CORE_NAV_ORDER = Object.freeze([
   "conversations",
   "appointments",
   "followUps",
+  "clients",
   "knowledge",
   "policyIntelligence"
 ]);
@@ -356,6 +363,7 @@ export const ROUTE_ACCESS = Object.freeze({
   conversations: { permission: PERMISSIONS.PROSPECT_COMMUNICATE },
   appointments: { permission: PERMISSIONS.PROSPECT_READ },
   "follow-ups": { permission: PERMISSIONS.PROSPECT_READ },
+  clients: { permission: PERMISSIONS.PROSPECT_READ },
   production: {
     workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.DASHBOARD_EXECUTIVE

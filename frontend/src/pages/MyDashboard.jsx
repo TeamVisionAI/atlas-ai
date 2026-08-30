@@ -116,6 +116,14 @@ export default function MyDashboard() {
               <span>{translate("myDashboardMetricFollowUpsOverdue")}</span>
               <strong>{dashboard?.followUpsOverdue ?? 0}</strong>
             </article>
+            <article className="workspace-dashboard__metric">
+              <span>{translate("myDashboardMetricClients")}</span>
+              <strong>{dashboard?.myClientsCount ?? 0}</strong>
+            </article>
+            <article className="workspace-dashboard__metric">
+              <span>{translate("myDashboardMetricClientFollowUps")}</span>
+              <strong>{dashboard?.clientFollowUpsDue ?? 0}</strong>
+            </article>
           </section>
 
           <section className="workspace-dashboard__panel">
@@ -141,6 +149,18 @@ export default function MyDashboard() {
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className="workspace-dashboard__panel">
+            <div className="workspace-dashboard__panel-head">
+              <h2>{translate("clientsTitle")}</h2>
+              <Link to={appPath("clients")}>{translate("clientsOpen")}</Link>
+            </div>
+            <p>
+              {translate("myDashboardClientsSummary")
+                .replace("{count}", String(dashboard?.myClientsCount ?? 0))
+                .replace("{due}", String(dashboard?.clientFollowUpsDue ?? 0))}
+            </p>
           </section>
 
           <section className="workspace-dashboard__panel">
