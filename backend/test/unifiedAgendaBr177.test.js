@@ -301,6 +301,9 @@ test("BR-177 promote recruit is explicit, idempotent, and does not duplicate", a
     assert.equal(inserts[0].organization_id, ORG_A);
     assert.equal(inserts[0].owner_user_id, USER_A);
     assert.equal(inserts[0].entry_method, "AGENDA_PROMOTION");
+    assert.equal(Object.hasOwn(inserts[0], "email"), false);
+    assert.match(String(inserts[0].notes), /EMAIL:warm@example\.com/);
+    assert.match(String(inserts[0].notes), /Met at church/);
     assert.equal(appointment.prospectId, PROSPECT_ID);
     assert.equal(appointment.id, APPT_ID);
     assert.equal(contact.promotedProspectId, PROSPECT_ID);
@@ -413,6 +416,155 @@ test("BR-177 get contact is organization-scoped", async () => {
     );
   } finally {
     contactRepo.findById = originalFindContact;
+    delete require.cache[agendaServicePath];
+  }
+});
+
+test("BR-177 promote recruit insert matches live prospects schema and keeps email in notes", async () => {
+  // Live production prospects columns observed 2026-08-30 (no email column).
+  const liveProspectColumns = new Set([
+    "id",
+    "phone",
+    "name",
+    "current_step",
+    "status",
+    "last_message",
+    "created_at",
+    "updated_at",
+    "city",
+    "state",
+    "work_authorized",
+    "occupation",
+    "language",
+    "appointment_type",
+    "appointment_date",
+    "notes",
+    "interview_type",
+    "interview_time",
+    "calendar_event_id",
+    "workflow_state",
+    "first_name",
+    "last_name",
+    "normalized_phone",
+    "communication_language",
+    "entry_method",
+    "source",
+    "owner_user_id",
+    "created_by_user_id",
+    "prospect_number",
+    "preferred_communication_channel",
+    "organization_id",
+    "assigned_division_id",
+    "assigned_rvp_id",
+    "preferred_language",
+    "assignment_status",
+    "assignment_source",
+    "attention_status",
+    "acknowledged_at",
+    "acknowledged_by_user_id",
+    "human_attention_reason",
+    "new_lead_received_at",
+    "escalation_level",
+    "last_escalated_at",
+    "whatsapp_sender_id",
+    "whatsapp_username"
+  ]);
+
+  const contactRepo = require(contactRepoPath);
+  const appointmentRepo = require(appointmentRepoPath);
+  const supabaseService = require(supabasePath);
+  const originalFindAppointment = appointmentRepo.findById;
+  const originalSaveAppointment = appointmentRepo.save;
+  const originalFindContact = contactRepo.findById;
+  const originalSaveContact = contactRepo.save;
+  const originalFindByPhone = supabaseService.findProspectByNormalizedPhoneInOrganization;
+  const originalFindInOrg = supabaseService.findProspectInOrganization;
+  const originalFrom = supabaseService.supabase.from;
+
+  let contact = agendaContact({
+    email: "warm@example.com",
+    notes: "Met at church"
+  });
+  const appointment = standaloneAppointment();
+  const inserts = [];
+  appointmentRepo.findById = async (id, organizationId) =>
+    id === APPT_ID && organizationId === ORG_A ? appointment : null;
+  appointmentRepo.save = async (row) => {
+    Object.assign(appointment, row);
+    return appointment;
+  };
+  contactRepo.findById = async (id, organizationId) =>
+    id === CONTACT_ID && organizationId === ORG_A ? contact : null;
+  contactRepo.save = async (row) => {
+    contact = { ...contact, ...row };
+    return contact;
+  };
+  supabaseService.findProspectByNormalizedPhoneInOrganization = async () => null;
+  supabaseService.findProspectInOrganization = async () =>
+    contact.promotedProspectId ? { id: PROSPECT_ID, notes: inserts[0]?.notes } : null;
+  supabaseService.supabase.from = (table) => {
+    assert.equal(table, "prospects");
+    return {
+      insert(row) {
+        if (Object.hasOwn(row, "email")) {
+          return {
+            select() {
+              return {
+                async single() {
+                  return {
+                    data: null,
+                    error: {
+                      code: "PGRST204",
+                      message: "Could not find the 'email' column of 'prospects' in the schema cache"
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+        inserts.push(row);
+        return {
+          select() {
+            return {
+              async single() {
+                return { data: { id: PROSPECT_ID, ...row }, error: null };
+              }
+            };
+          }
+        };
+      }
+    };
+  };
+
+  try {
+    const { promoteToRecruit, AGENDA_ENTRY_METHOD } = loadAgendaService();
+    const first = await promoteToRecruit(APPT_ID, {}, { organizationId: ORG_A, userId: USER_A });
+    assert.equal(first.created, true);
+    assert.equal(inserts.length, 1);
+    assert.equal(AGENDA_ENTRY_METHOD, "AGENDA_PROMOTION");
+    assert.equal(inserts[0].entry_method, "AGENDA_PROMOTION");
+    assert.equal(Object.hasOwn(inserts[0], "email"), false);
+    for (const column of Object.keys(inserts[0])) {
+      assert.ok(
+        liveProspectColumns.has(column),
+        `unexpected prospects column: ${column}`
+      );
+    }
+    assert.match(String(inserts[0].notes), /EMAIL:warm@example\.com/);
+    assert.doesNotMatch(JSON.stringify(inserts[0]), /PGRST204/);
+
+    const second = await promoteToRecruit(APPT_ID, {}, { organizationId: ORG_A, userId: USER_A });
+    assert.equal(second.alreadyPromoted, true);
+    assert.equal(inserts.length, 1);
+  } finally {
+    appointmentRepo.findById = originalFindAppointment;
+    appointmentRepo.save = originalSaveAppointment;
+    contactRepo.findById = originalFindContact;
+    contactRepo.save = originalSaveContact;
+    supabaseService.findProspectByNormalizedPhoneInOrganization = originalFindByPhone;
+    supabaseService.findProspectInOrganization = originalFindInOrg;
+    supabaseService.supabase.from = originalFrom;
     delete require.cache[agendaServicePath];
   }
 });

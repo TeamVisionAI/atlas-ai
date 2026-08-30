@@ -21,7 +21,7 @@ Do not create a recruiting prospect to represent a client.
 1. Requires an explicit Promote to Recruit action.
 2. If `promoted_prospect_id` already exists, return that link (no duplicate).
 3. Else look up the same-org prospect by normalized phone and link it.
-4. Else insert one prospect with `entry_method=AGENDA_PROMOTION`, preserving organization, owner, name, phone, email, language, source, and notes.
+4. Else insert one prospect with `entry_method=AGENDA_PROMOTION`, preserving organization, owner, name, phone, language, source, and notes. Live `prospects` has no `email` column; Agenda contact email is stored as the canonical `EMAIL:` notes token (same as Quick Capture / appointment enrichment). Do not add a `prospects.email` column for this rule.
 5. Phone is required. Recruit AI inbox eligibility stays closed unless existing origin rules already allow it.
 6. Appointment `prospect_id` / `prospect_phone` are linked after promotion. `standaloneAgenda` remains true so the meeting does not become a recruiting interview.
 
