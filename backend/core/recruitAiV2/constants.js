@@ -449,7 +449,19 @@ const FEATURE_FLAGS = Object.freeze({
   /** Exact atlas_users.id allowlist for live authoring canary (BR-114). */
   LIVE_AUTHORING_USER_IDS_ENV: "RECRUIT_AI_V2_LIVE_AUTHORING_USER_IDS",
   /** Optional timeout (ms) for live authoring before legacy CE fall-through. */
-  LIVE_AUTHORING_TIMEOUT_MS_ENV: "RECRUIT_AI_V2_LIVE_AUTHORING_TIMEOUT_MS"
+  LIVE_AUTHORING_TIMEOUT_MS_ENV: "RECRUIT_AI_V2_LIVE_AUTHORING_TIMEOUT_MS",
+  /**
+   * BR-174 — semantic interpreter shadow compare (default false).
+   * Never changes customer replies or persisted facts while apply is off.
+   */
+  SEMANTIC_SHADOW_ENABLED_ENV: "RECRUIT_AI_V2_SEMANTIC_SHADOW_ENABLED",
+  /** Reserved canary for later apply. This sprint never applies semantic output. */
+  SEMANTIC_CANARY_ENABLED_ENV: "RECRUIT_AI_V2_SEMANTIC_CANARY_ENABLED",
+  SEMANTIC_ORGANIZATION_IDS_ENV: "RECRUIT_AI_V2_SEMANTIC_ORGANIZATION_IDS",
+  SEMANTIC_USER_IDS_ENV: "RECRUIT_AI_V2_SEMANTIC_USER_IDS",
+  SEMANTIC_PROVIDER_ENV: "RECRUIT_AI_V2_SEMANTIC_PROVIDER",
+  SEMANTIC_MODEL_ENV: "RECRUIT_AI_V2_SEMANTIC_MODEL",
+  SEMANTIC_TIMEOUT_MS_ENV: "RECRUIT_AI_V2_SEMANTIC_TIMEOUT_MS"
 });
 
 /** BR-111 — only these mutation types may be authorized for the first canary. */
