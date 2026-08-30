@@ -2718,7 +2718,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Domain:** Operations / Needs Attention / appointments / follow-ups / notifications  
 **Depends on:** BR-079 org-local dates; BR-080 acknowledgement; BR-160 control plane; BR-176 notifications; BR-178 follow-ups; BR-179 clients  
 **Related:** BR-043 appointments; BR-034/080 human attention (unchanged)  
-**Status:** V1 implemented — read model only; no new operational table  
+**Status:** V1 implemented — superseded for daily list/filters/dedup by BR-184  
 **Engine target:** `today/*`; `todayActionCenterApplicationService`; `GET /api/today`; `/app/today`  
 **Tests:** `backend/test/todayActionCenterBr180.test.js`; `frontend/src/pages/todayPageBr180.test.js`  
 **Docs:** `docs/06-business/BR-180-today-action-center.md`
@@ -2786,7 +2786,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Due dates** — Nullable. Classify Needs Date / Due Today / Overdue / Upcoming / closed. Never invent a date.
 5. **Workspace** — Client profile shows a Service section. `/app/service` defaults to My Service. Team Service only when existing hierarchy permissions already allow it.
 6. **Follow-ups / appointments** — Manual BR-178 client follow-ups only. Optional link to an existing Atlas appointment. No second reminder engine and no duplicate scheduling.
-7. **Today** — Add only overdue, due-today, and Needs Date open cases to the existing Today read model. Do not list every open case. Do not change existing Today priorities.
+7. **Today** — Add only overdue and due-today open cases to the BR-184 Today read model. Needs Date and upcoming cases stay on the service workspace. Do not list every open case.
 8. **History** — Append created, status/due/title/notes changes, appointment linked/unlinked, completed, and cancelled. Store actor id; present a friendly name.
 9. **Permissions** — Own cases by default. Wrong-org and unauthorized peer IDs fail closed (404). Super Admin control-plane empty. Support Mode tenant-bound. No phone-based tenant identity.
 10. **Recruiting separation** — Service cases do not create recruiting prospects, enter Recruit AI, or change recruiting Mission Control / conversion metrics. IUL Review funnel stays unchanged.
@@ -2812,10 +2812,36 @@ Production outside-window messaging requires firm-approved Meta templates config
 3. **Upload security** — Authenticated, tenant-bound, client-authorized. Random storage keys. PDF/JPEG/PNG only, 10 MB max, sanitized filename, magic-byte check. Authorized API download only. Never expose storage keys or public bucket URLs.
 4. **Fulfillment** — Link a document to a request only when the user supplies the request id. Do not auto-match on filename. Fulfillment is idempotent.
 5. **Workspace** — Client profile shows requested and received documents. Service-case cards show linked documents and open requests. Do not change BR-182 service SoT.
-6. **Today / follow-ups** — Add only overdue and due-today **open** requests to the existing Today follow-ups section. Needs Date stays on the client profile. Manual BR-178 client follow-ups only. No WhatsApp.
+6. **Today / follow-ups** — Add only overdue and due-today **open** requests to the BR-184 Today list. Needs Date stays on the client profile. Manual BR-178 client follow-ups only. No WhatsApp.
 7. **Permissions** — Own documents/requests by default. Wrong-org and unauthorized peer IDs fail closed (404). Super Admin control-plane empty. Support Mode tenant-bound. No phone-based tenant identity.
 8. **Recruiting separation** — Documents and requests do not create recruiting prospects, enter Recruit AI, or change Mission Control / IUL routing.
 9. **Boundaries** — Do not implement OCR, PDF parsing, policy extraction, AI summaries, replacement analysis, or carrier comparison. Do not change Recruit AI, semantic apply, WhatsApp, campaign intake, BR-176, or BR-178–182 sources of truth. No Team Vision-specific code.
+
+---
+
+## BR-184 — Today / Action Center
+
+**Implements:** A global, tenant-safe daily operations screen that aggregates existing canonical obligations into one prioritized, actionable list.  
+**Domain:** Operations / appointments / follow-ups / conversations / documents / service  
+**Depends on:** BR-079 org-local dates; BR-080 acknowledgement; BR-160 control plane; BR-176 notifications; BR-178 follow-ups; BR-179 clients; BR-180 Today foundation; BR-182 service; BR-183 documents  
+**Related:** BR-043 appointments  
+**Status:** V1 implemented — read model only; no new operational table  
+**Engine target:** `today/*`; `todayActionCenterApplicationService`; `GET /api/today`; `/app/today`  
+**Tests:** `backend/test/todayActionCenterBr184.test.js`; `frontend/src/pages/todayPageBr184.test.js`  
+**Docs:** `docs/06-business/BR-184-today-action-center.md`
+
+### Rules
+
+1. **Aggregation only** — `/app/today` is a presentation read model. Do not create parallel obligation tables. Canonical source records remain SoT.
+2. **Sources** — Appointments today; overdue and due-today follow-ups; real Needs Attention conversations; distinct `HUMAN_TAKEOVER_REQUESTED` when not already on Today; overdue and due-today open document requests; overdue and due-today open service cases. Do not invent urgency for undated / Needs Date items.
+3. **Dedup** — One underlying obligation appears once. Prefer the canonical item over a notification, and do not use notifications as a second SoT.
+4. **Priority** — Overdue → Needs Attention / human takeover → due now / due today → upcoming later today. Then due time/date, then stable created timestamp.
+5. **Scope and filters** — Default My. Team only when existing hierarchy already allows it. V1 filters: All, Overdue, Needs Attention, Due Today, Appointments, Follow-ups, Documents.
+6. **Actions** — Reuse existing authorized appointment, follow-up, conversation, client, and document routes. Refresh Today immediately after a mutation.
+7. **Refresh** — Fetch on entry, My/Team change, filter change, after mutations, and optional stale window focus. No blind short-interval page polling. NotificationBell polling stays separate.
+8. **Permissions** — Org isolation, mine-only default, hierarchy-authorized Team, Support Mode tenant-bound, Super Admin control-plane empty. Wrong-org entities fail closed. No phone-based tenant identity. No Team Vision-specific code.
+9. **Recruiting / client separation** — Today may show both, but must preserve entity identity. Do not convert clients into prospects or document requests into Recruit AI activity.
+10. **Boundaries** — Do not change Recruit AI, semantic shadow/apply, AI Quality, WhatsApp eligibility/routing, campaign intake, BR-178 SoT, BR-183 storage rules, or appointment scheduling rules.
 
 ---
 

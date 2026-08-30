@@ -611,19 +611,17 @@ async function createClientFollowUp(id, input, authContext) {
 function toTodayItem(item) {
   const dueStatus = item.dueStatus;
   if (CLOSED_SET.has(item.status)) return null;
+  // Implements BR-184 — Needs Date is not a Today obligation. Do not invent urgency.
   if (
     dueStatus !== SERVICE_DUE_STATUSES.OVERDUE &&
-    dueStatus !== SERVICE_DUE_STATUSES.DUE_TODAY &&
-    dueStatus !== SERVICE_DUE_STATUSES.NEEDS_DATE
+    dueStatus !== SERVICE_DUE_STATUSES.DUE_TODAY
   ) {
     return null;
   }
   const viewStatus =
     dueStatus === SERVICE_DUE_STATUSES.OVERDUE
       ? FOLLOW_UP_VIEW_STATUSES.OVERDUE
-      : dueStatus === SERVICE_DUE_STATUSES.DUE_TODAY
-        ? FOLLOW_UP_VIEW_STATUSES.DUE_TODAY
-        : FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE;
+      : FOLLOW_UP_VIEW_STATUSES.DUE_TODAY;
   return {
     id: item.id,
     kind: "service_case",

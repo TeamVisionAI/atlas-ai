@@ -177,8 +177,11 @@ test("empty Today is caught up and counts are zero", async () => {
   assert.equal(payload.counts.needsAttention, 0);
   assert.equal(payload.counts.appointmentsToday, 0);
   assert.equal(payload.counts.followUpsDueOverdue, 0);
+  assert.equal(payload.counts.overdue, 0);
+  assert.equal(payload.counts.dueToday, 0);
   assert.equal(payload.counts.newActionable, 0);
   assert.equal(payload.sections.needsAttention.length, 0);
+  assert.equal(payload.items.length, 0);
   assert.equal(payload.today, "2026-08-30");
   assert.equal(payload.timeZone, "America/New_York");
 });
@@ -346,7 +349,7 @@ test("overdue and due-today durable follow-ups classify correctly", async () => 
   assert.ok(payload.sections.followUps.find((item) => item.source?.id === overdue.followUp.id));
 });
 
-test("legacy undated BR-178 follow-up appears as Needs Date, not Overdue", async () => {
+test("legacy undated BR-178 follow-up is not on Today and is not overdue", async () => {
   const legacyNeedsDate = br178LegacyNeedsDate();
   todayService.setSourcesForTests({
     listFollowUps: async (args) => {
@@ -362,16 +365,11 @@ test("legacy undated BR-178 follow-up appears as Needs Date, not Overdue", async
   });
 
   const payload = await loadToday();
-  const needsDate = payload.sections.followUps.find((item) => item.status === "needs-date");
-  assert.ok(needsDate);
-  assert.equal(needsDate.source?.source, "legacy");
-  assert.equal(needsDate.source?.dueDate, null);
-  assert.equal(needsDate.displayPriority, 60);
+  assert.equal(payload.sections.followUps.length, 0);
+  assert.equal(payload.items.length, 0);
+  assert.equal(payload.counts.overdue, 0);
   assert.equal(payload.counts.followUpsDueOverdue, 0);
-  assert.equal(
-    payload.sections.followUps.some((item) => item.status === "overdue"),
-    false
-  );
+  assert.equal(payload.caughtUp, true);
 });
 
 test("client follow-up appears and links to the client workspace", async () => {
@@ -580,8 +578,20 @@ test("completing a follow-up updates Today items and counts", async () => {
   assert.equal(after.sections.followUps.length, 0);
 });
 
-test("unread BR-176 notifications appear without a second notification system", async () => {
+test("unread BR-176 notifications do not become a second Today source of truth", async () => {
   useRealNotifications();
+  todayService.setSourcesForTests({
+    loadProspects: async () => [
+      prospect({
+        id: PROSPECT_NA,
+        name: "Takeover Case",
+        phone: "+15550001001",
+        attention_status: "human_required",
+        human_attention_reason: "provider_send_failed",
+        needs_human_attention: true
+      })
+    ]
+  });
   await agentNotificationService.notifyOperationalEvent({
     eventType: EVENT_TYPES.NEEDS_ATTENTION,
     organizationId: ORG_A,
@@ -594,8 +604,9 @@ test("unread BR-176 notifications appear without a second notification system", 
   });
 
   const payload = await loadToday();
-  assert.equal(payload.sections.notifications.length, 1);
-  assert.match(payload.sections.notifications[0].href, /conversations/);
+  assert.equal(payload.sections.notifications.length, 0);
+  assert.equal(payload.items.filter((item) => item.kind === "needs_attention").length, 1);
+  assert.equal(payload.items.some((item) => item.id?.startsWith("nt:")), false);
 });
 
 test("BR-180 routes, refresh, and source boundaries stay aggregation-only", () => {
@@ -616,6 +627,7 @@ test("BR-180 routes, refresh, and source boundaries stay aggregation-only", () =
   assert.match(routes, /getTenantOrganizationId/);
   assert.match(service, /Read model only/);
   assert.match(page, /todayCaughtUp/);
+  assert.match(page, /filter: activeFilter/);
   assert.doesNotMatch(page, /setInterval/);
   assert.match(nav, /path: appPath\("today"\)/);
   assert.match(app, /path="today"/);

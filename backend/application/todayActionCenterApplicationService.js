@@ -1,5 +1,5 @@
 /**
- * BR-180 — Today / Action Center aggregation.
+ * BR-184 — Today / Action Center aggregation.
  * Read model only. Reuses existing operational sources; does not persist new work.
  */
 
@@ -17,8 +17,12 @@ const agentNotificationService = require("../services/agentNotificationService")
 const { filterProspectsForAuthContext } = require("../security/authorizationService");
 const {
   TODAY_SCOPES,
+  TODAY_FILTERS,
+  TODAY_KINDS,
+  TODAY_PRIORITIES,
   NOTIFICATION_LIMIT,
-  emptyToday
+  emptyToday,
+  normalizeTodayFilter
 } = require("../core/today/todayConstants");
 const {
   ownerIdOfProspect,
@@ -33,8 +37,13 @@ const {
   presentServiceCaseItem,
   presentDocumentRequestItem,
   presentNewLead,
-  presentNotification,
-  compareTodayItems
+  presentHumanTakeoverNotification,
+  collectDedupKeys,
+  notificationDedupKeys,
+  dedupeTodayItems,
+  compareTodayItems,
+  matchesTodayFilter,
+  isDistinctTakeoverNotification
 } = require("../core/today/todayPresentation");
 
 let sourcesOverride = null;
@@ -53,7 +62,7 @@ function resolveSources(sources = {}) {
 
 async function defaultLoadProspects(organizationId) {
   const { loadProductionProspects } = require("../core/executiveDashboardReadModel");
-  // Implements BR-180 — load persisted org prospects, then classify attention.
+  // Implements BR-184 — load persisted org prospects, then classify attention.
   // Do not require BR-159 operational-pipeline membership before NA / New.
   // Still exclude simulators and BR-136 TEST/CANARY/QA via the shared loader.
   return loadProductionProspects(organizationId, {
@@ -91,6 +100,10 @@ function isFollowUpDueOrOverdue(item) {
   );
 }
 
+function isDatedTodayObligation(item) {
+  return isFollowUpDueOrOverdue(item);
+}
+
 async function defaultListServiceCases(options) {
   if (process.env.NODE_ENV === "test" || process.env.NODE_TEST_CONTEXT) {
     return { items: [] };
@@ -107,21 +120,90 @@ async function defaultListDocumentRequests(options) {
   return clientDocumentsApplicationService.listDocumentRequests(options);
 }
 
-function isFollowUpActionable(item) {
-  return (
-    isFollowUpDueOrOverdue(item) || item.status === FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE
+function buildCounts(items) {
+  const overdue = items.filter((item) => item.priority === TODAY_PRIORITIES.OVERDUE);
+  const needsAttention = items.filter(
+    (item) =>
+      item.kind === TODAY_KINDS.NEEDS_ATTENTION ||
+      item.kind === TODAY_KINDS.HUMAN_TAKEOVER ||
+      item.kind === TODAY_KINDS.NEW_LEAD
   );
+  const dueToday = items.filter(
+    (item) => item.priority === TODAY_PRIORITIES.DUE_TODAY && item.kind !== TODAY_KINDS.APPOINTMENT
+  );
+  const appointmentsToday = items.filter((item) => item.kind === TODAY_KINDS.APPOINTMENT);
+  const followUpLike = items.filter(
+    (item) =>
+      item.kind === TODAY_KINDS.FOLLOW_UP ||
+      item.kind === TODAY_KINDS.SERVICE_CASE ||
+      item.kind === TODAY_KINDS.DOCUMENT_REQUEST
+  );
+  return {
+    overdue: overdue.length,
+    needsAttention: needsAttention.length,
+    dueToday: dueToday.length,
+    appointmentsToday: appointmentsToday.length,
+    followUpsDueOverdue: followUpLike.filter(isFollowUpDueOrOverdue).length,
+    newActionable: items.filter((item) => item.kind === TODAY_KINDS.NEW_LEAD).length
+  };
+}
+
+function buildSections(items) {
+  return {
+    needsAttention: items.filter(
+      (item) => item.kind === TODAY_KINDS.NEEDS_ATTENTION || item.kind === TODAY_KINDS.HUMAN_TAKEOVER
+    ),
+    appointmentsToday: items.filter((item) => item.kind === TODAY_KINDS.APPOINTMENT),
+    followUps: items.filter(
+      (item) =>
+        item.kind === TODAY_KINDS.FOLLOW_UP ||
+        item.kind === TODAY_KINDS.SERVICE_CASE ||
+        item.kind === TODAY_KINDS.DOCUMENT_REQUEST
+    ),
+    newLeads: items.filter((item) => item.kind === TODAY_KINDS.NEW_LEAD),
+    notifications: []
+  };
+}
+
+function appendDistinctTakeovers(items, notifications) {
+  const seen = new Set();
+  for (const item of items) {
+    for (const key of collectDedupKeys(item)) {
+      seen.add(key);
+    }
+  }
+  const extras = [];
+  for (const notification of notifications || []) {
+    if (!isDistinctTakeoverNotification(notification)) {
+      continue;
+    }
+    const keys = notificationDedupKeys(notification);
+    let duplicate = false;
+    for (const key of keys) {
+      if (seen.has(key)) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (duplicate) {
+      continue;
+    }
+    extras.push(presentHumanTakeoverNotification(notification));
+  }
+  return extras;
 }
 
 async function getToday({
   organizationId,
   authContext,
   scope,
+  filter,
   reference,
   sources
 } = {}) {
   const now = reference instanceof Date ? reference : new Date(reference || Date.now());
   const resolved = resolveSources(sources);
+  const resolvedFilter = normalizeTodayFilter(filter);
   const timeZoneResolution = loadOrganizationTimezone(organizationId, resolved.timezoneDeps || {});
   const todayWindow = getOrganizationDateWindow({
     organizationId,
@@ -202,43 +284,33 @@ async function getToday({
 
   const needsAttention = visibleProspects
     .filter(isRealNeedsAttention)
-    .map((prospect) => presentNeedsAttention(prospect))
-    .sort(compareTodayItems);
+    .map((prospect) => presentNeedsAttention(prospect));
 
   const needsAttentionKeys = new Set(
     needsAttention.map((item) => item.entityId || item.phone).filter(Boolean)
   );
 
-  const appointmentsToday = visibleAppointments
-    .map((appointment) =>
-      presentAppointment(appointment, {
-        timeZone: timeZoneResolution.timeZone,
-        reference: now
-      })
-    )
-    .sort((left, right) => {
-      const priority = compareTodayItems(left, right);
-      if (priority !== 0) {
-        return priority;
-      }
-      return String(left.whenLabel || "").localeCompare(String(right.whenLabel || ""));
-    });
-
   const { toTodayItem } = require("./clientServiceApplicationService");
   const { toTodayItem: toDocumentRequestTodayItem } = require("./clientDocumentsApplicationService");
   const followUps = (followUpsPayload.items || [])
-    .filter(isFollowUpActionable)
+    .filter(isDatedTodayObligation)
     .map((item) => presentFollowUpItem(item, { timeZone: timeZoneResolution.timeZone }));
   const serviceItems = (servicePayload?.items || [])
     .map((item) => toTodayItem(item))
     .filter(Boolean)
-    .map((item) => presentServiceCaseItem(item));
+    .map((item) => presentServiceCaseItem(item, { timeZone: timeZoneResolution.timeZone }))
+    .filter(Boolean);
   const documentRequestItems = (documentRequestPayload?.items || [])
     .map((item) => toDocumentRequestTodayItem(item))
     .filter(Boolean)
-    .map((item) => presentDocumentRequestItem(item));
-  followUps.push(...serviceItems, ...documentRequestItems);
-  followUps.sort(compareTodayItems);
+    .map((item) => presentDocumentRequestItem(item, { timeZone: timeZoneResolution.timeZone }));
+
+  const appointmentsToday = visibleAppointments.map((appointment) =>
+    presentAppointment(appointment, {
+      timeZone: timeZoneResolution.timeZone,
+      reference: now
+    })
+  );
 
   const newLeads = visibleProspects
     .filter(isActionableNewLead)
@@ -246,51 +318,37 @@ async function getToday({
       const key = prospect.id || prospect.phone;
       return !key || !needsAttentionKeys.has(key);
     })
-    .map((prospect) => presentNewLead(prospect))
-    .sort(compareTodayItems);
+    .map((prospect) => presentNewLead(prospect));
 
-  const notifications = (notificationsRaw || [])
-    .filter((item) => !item.readAt && !item.dismissedAt)
-    .slice(0, NOTIFICATION_LIMIT)
-    .map(presentNotification);
+  const canonicalItems = dedupeTodayItems(
+    [...followUps, ...serviceItems, ...documentRequestItems, ...needsAttention, ...newLeads, ...appointmentsToday]
+  );
+  const takeoverExtras = appendDistinctTakeovers(canonicalItems, notificationsRaw);
+  const items = dedupeTodayItems([...canonicalItems, ...takeoverExtras]).sort(compareTodayItems);
 
-  const counts = {
-    needsAttention: needsAttention.length,
-    appointmentsToday: appointmentsToday.length,
-    followUpsDueOverdue: followUps.filter((item) => isFollowUpDueOrOverdue(item)).length,
-    newActionable: newLeads.length
-  };
-
-  const caughtUp =
-    needsAttention.length +
-      appointmentsToday.length +
-      followUps.length +
-      newLeads.length +
-      notifications.length ===
-    0;
+  const counts = buildCounts(items);
+  const sections = buildSections(items);
+  const filteredItems = items.filter((item) => matchesTodayFilter(item, resolvedFilter));
 
   return emptyToday({
     generatedAt: new Date().toISOString(),
     controlPlane: false,
     organizationId,
     scope: ownerFilter.scope,
+    filter: resolvedFilter,
     teamAvailable,
     timeZone: timeZoneResolution.timeZone,
     today: String(todayWindow.localStart || "").slice(0, 10),
-    caughtUp,
+    caughtUp: items.length === 0,
     counts,
-    sections: {
-      needsAttention,
-      appointmentsToday,
-      followUps,
-      newLeads,
-      notifications
-    }
+    items: filteredItems,
+    sections
   });
 }
 
 module.exports = {
   setSourcesForTests,
   getToday,
-  TODAY_SCOPES
+  TODAY_SCOPES,
+  TODAY_FILTERS
 };

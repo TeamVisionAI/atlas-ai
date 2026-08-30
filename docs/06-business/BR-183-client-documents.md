@@ -62,7 +62,7 @@ A request is fulfilled only when the user supplies `requestId` on upload or expl
 
 ## Today / follow-ups
 
-Today includes only **open** overdue and due-today requests as `kind=document_request` in the existing follow-ups section. Needs Date stays on the client profile. Documents themselves never appear on Today. No automatic follow-ups or WhatsApp.
+Today includes only **open** overdue and due-today requests as `kind=document_request` on the BR-184 list. Needs Date stays on the client profile. Documents themselves never appear on Today. No automatic follow-ups or WhatsApp.
 
 ## Out of scope
 

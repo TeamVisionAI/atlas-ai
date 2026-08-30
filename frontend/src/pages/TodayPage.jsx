@@ -13,9 +13,18 @@ import {
   rescheduleFollowUp,
   FollowUpsError
 } from "../services/followUpsService";
-import { markAgentNotificationRead } from "../services/agentNotificationService";
 import { buildFollowUpDueDate, buildFollowUpStatusLabel } from "../engines/followUpsViewModel";
 import "./TodayPage.css";
+
+const TODAY_FILTERS = [
+  ["all", "todayFilterAll"],
+  ["overdue", "todayFilterOverdue"],
+  ["needs_attention", "todayFilterNeedsAttention"],
+  ["due_today", "todayFilterDueToday"],
+  ["appointments", "todayFilterAppointments"],
+  ["follow_ups", "todayFilterFollowUps"],
+  ["documents", "todayFilterDocuments"]
+];
 
 function statusVariant(status) {
   switch (String(status || "")) {
@@ -31,6 +40,25 @@ function statusVariant(status) {
       return "info";
     default:
       return "neutral";
+  }
+}
+
+function kindLabelKey(kind) {
+  switch (String(kind || "")) {
+    case "human_takeover":
+      return "todayKindHumanTakeover";
+    case "appointment":
+      return "todayKindAppointment";
+    case "follow_up":
+      return "todayKindFollowUp";
+    case "new_lead":
+      return "todayKindNeedsAttention";
+    case "service_case":
+      return "todayKindService";
+    case "document_request":
+      return "todayKindDocument";
+    default:
+      return "todayKindNeedsAttention";
   }
 }
 
@@ -67,26 +95,32 @@ function TodayRow({ item, translate, locale, onOpen, onFollowUpAction }) {
   const statusLabel = followUp ? buildFollowUpStatusLabel(followUp, translate) : item.status;
   const canManageFollowUp = item.kind === "follow_up" && item.actions?.includes("complete");
   const canSetDate = item.kind === "follow_up" && item.actions?.includes("set-date");
-  const appointmentActions = item.kind === "appointment";
+  const primaryLabel =
+    item.kind === "appointment"
+      ? translate("todayOpenAppointment")
+      : item.kind === "document_request"
+        ? translate("todayOpenDocument")
+        : item.kind === "follow_up" && item.entityType === "client"
+          ? translate("todayOpenClient")
+          : item.kind === "needs_attention" || item.kind === "human_takeover" || item.kind === "new_lead"
+            ? translate("todayOpenConversation")
+            : translate("todayOpen");
 
   return (
     <article className="today-row">
       <button type="button" className="today-row__main" onClick={() => onOpen(item)}>
         <div className="today-row__header">
-          <h3 className="today-row__title">{item.title}</h3>
+          <div className="today-row__heading">
+            <span className="today-row__kind">{translate(kindLabelKey(item.kind))}</span>
+            <h3 className="today-row__title">{item.personName || item.title}</h3>
+          </div>
           {statusLabel ? <StatusBadge variant={statusVariant(item.status)}>{statusLabel}</StatusBadge> : null}
         </div>
         <dl className="today-row__details">
           {item.whenLabel || dueLabel ? (
             <div>
               <dt>{translate("todayColumnWhen")}</dt>
-              <dd>{item.whenLabel || dueLabel || translate("followUpsStatusNeedsDate")}</dd>
-            </div>
-          ) : null}
-          {item.subtitle ? (
-            <div>
-              <dt>{translate("todayColumnDetail")}</dt>
-              <dd>{item.subtitle}</dd>
+              <dd>{item.whenLabel || dueLabel}</dd>
             </div>
           ) : null}
           {item.ownerName ? (
@@ -95,35 +129,37 @@ function TodayRow({ item, translate, locale, onOpen, onFollowUpAction }) {
               <dd>{item.ownerName}</dd>
             </div>
           ) : null}
+          {item.sourceKind || item.subtitle ? (
+            <div>
+              <dt>{translate("todayColumnSource")}</dt>
+              <dd>{item.subtitle || item.sourceKind}</dd>
+            </div>
+          ) : null}
         </dl>
       </button>
-      {canSetDate ? (
-        <div className="today-row__actions">
+      <div className="today-row__actions">
+        <button type="button" onClick={() => onOpen(item)}>
+          {primaryLabel}
+        </button>
+        {canSetDate ? (
           <button type="button" onClick={() => onFollowUpAction("set-date", item)}>
             {translate("followUpsSetDate")}
           </button>
-        </div>
-      ) : null}
-      {canManageFollowUp ? (
-        <div className="today-row__actions">
-          <button type="button" onClick={() => onFollowUpAction("complete", item)}>
-            {translate("followUpsComplete")}
-          </button>
-          <button type="button" onClick={() => onFollowUpAction("reschedule", item)}>
-            {translate("followUpsReschedule")}
-          </button>
-          <button type="button" onClick={() => onFollowUpAction("cancel", item)}>
-            {translate("followUpsCancel")}
-          </button>
-        </div>
-      ) : null}
-      {appointmentActions ? (
-        <div className="today-row__actions">
-          <button type="button" onClick={() => onOpen(item)}>
-            {translate("todayOpenAppointment")}
-          </button>
-        </div>
-      ) : null}
+        ) : null}
+        {canManageFollowUp ? (
+          <>
+            <button type="button" onClick={() => onFollowUpAction("complete", item)}>
+              {translate("followUpsComplete")}
+            </button>
+            <button type="button" onClick={() => onFollowUpAction("reschedule", item)}>
+              {translate("followUpsReschedule")}
+            </button>
+            <button type="button" onClick={() => onFollowUpAction("cancel", item)}>
+              {translate("followUpsCancel")}
+            </button>
+          </>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -136,6 +172,7 @@ export default function TodayPage() {
   const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const locale = language === "es" ? "es-US" : "en-US";
   const activeScope = searchParams.get("scope") || "mine";
+  const activeFilter = searchParams.get("filter") || "all";
 
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -158,7 +195,7 @@ export default function TodayPage() {
       }
       setError(null);
       try {
-        const data = await getToday({ scope: activeScope });
+        const data = await getToday({ scope: activeScope, filter: activeFilter });
         setPayload(data);
         lastFetchedAtRef.current = Date.now();
       } catch (err) {
@@ -169,7 +206,7 @@ export default function TodayPage() {
         }
       }
     },
-    [activeScope, translate, controlPlane]
+    [activeScope, activeFilter, translate, controlPlane]
   );
 
   useEffect(() => {
@@ -196,26 +233,35 @@ export default function TodayPage() {
     };
   }, [loadToday]);
 
-  function setScope(scope) {
+  function replaceParams(mutator) {
     const next = new URLSearchParams(searchParams);
-    if (scope === "mine") {
-      next.delete("scope");
-    } else {
-      next.set("scope", scope);
-    }
+    mutator(next);
     setSearchParams(next, { replace: true });
   }
 
-  async function handleOpen(item) {
-    if (item.kind === "notification" && item.source?.notificationId) {
-      try {
-        await markAgentNotificationRead(item.source.notificationId);
-      } catch {
-        // Existing notification read is best-effort; still open the deep link.
+  function setScope(scope) {
+    replaceParams((next) => {
+      if (scope === "mine") {
+        next.delete("scope");
+      } else {
+        next.set("scope", scope);
       }
-    }
-    if (item.href) {
-      navigate(item.href);
+    });
+  }
+
+  function setFilter(filter) {
+    replaceParams((next) => {
+      if (filter === "all") {
+        next.delete("filter");
+      } else {
+        next.set("filter", filter);
+      }
+    });
+  }
+
+  function handleOpen(item) {
+    if (item.openPath || item.href) {
+      navigate(item.openPath || item.href);
     }
   }
 
@@ -264,19 +310,13 @@ export default function TodayPage() {
   }
 
   const counts = payload?.counts || {
+    overdue: 0,
     needsAttention: 0,
-    appointmentsToday: 0,
-    followUpsDueOverdue: 0,
-    newActionable: 0
+    dueToday: 0,
+    appointmentsToday: 0
   };
-  const sections = payload?.sections || {};
-  const sectionOrder = [
-    ["needsAttention", "todaySectionNeedsAttention"],
-    ["appointmentsToday", "todaySectionAppointments"],
-    ["followUps", "todaySectionFollowUps"],
-    ["newLeads", "todaySectionNewLeads"],
-    ["notifications", "todaySectionNotifications"]
-  ];
+  const items = payload?.items || [];
+  const filterEmpty = !loading && !payload?.caughtUp && items.length === 0;
 
   return (
     <div className="today-page">
@@ -306,21 +346,34 @@ export default function TodayPage() {
 
       <div className="today-page__counts" aria-label={translate("todayCountsLabel")}>
         <span className="today-page__chip">
+          {translate("todayCountOverdue")}
+          <span className="today-page__count">{counts.overdue || 0}</span>
+        </span>
+        <span className="today-page__chip">
           {translate("todayCountNeedsAttention")}
           <span className="today-page__count">{counts.needsAttention}</span>
+        </span>
+        <span className="today-page__chip">
+          {translate("todayCountDueToday")}
+          <span className="today-page__count">{counts.dueToday || 0}</span>
         </span>
         <span className="today-page__chip">
           {translate("todayCountAppointments")}
           <span className="today-page__count">{counts.appointmentsToday}</span>
         </span>
-        <span className="today-page__chip">
-          {translate("todayCountFollowUps")}
-          <span className="today-page__count">{counts.followUpsDueOverdue}</span>
-        </span>
-        <span className="today-page__chip">
-          {translate("todayCountNewActionable")}
-          <span className="today-page__count">{counts.newActionable}</span>
-        </span>
+      </div>
+
+      <div className="today-page__filters" role="tablist" aria-label={translate("todayFiltersLabel")}>
+        {TODAY_FILTERS.map(([value, labelKey]) => (
+          <button
+            key={value}
+            type="button"
+            className={`today-page__scope-btn${activeFilter === value ? " is-active" : ""}`}
+            onClick={() => setFilter(value)}
+          >
+            {translate(labelKey)}
+          </button>
+        ))}
       </div>
 
       {error ? <p className="today-page__error">{error}</p> : null}
@@ -330,38 +383,31 @@ export default function TodayPage() {
         <p className="today-page__empty">{translate("todayCaughtUp")}</p>
       ) : null}
 
-      {!loading && !payload?.caughtUp
-        ? sectionOrder.map(([key, labelKey]) => {
-            const items = sections[key] || [];
-            if (!items.length) {
-              return null;
-            }
-            return (
-              <section key={key} className="today-page__section">
-                <h2 className="today-page__section-title">{translate(labelKey)}</h2>
-                <div className="today-page__list">
-                  {items.map((item) => (
-                    <TodayRow
-                      key={item.id}
-                      item={item}
-                      translate={translate}
-                      locale={locale}
-                      onOpen={handleOpen}
-                      onFollowUpAction={(type, row) => {
-                        const followUp = row.source || {};
-                        setForm({
-                          notes: "",
-                          dueDate: followUp.dueDate || followUp.followUpDate || "",
-                          dueTime: followUp.dueTime || followUp.followUpTime || ""
-                        });
-                        setDialog({ type, item: row });
-                      }}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })
+      {filterEmpty ? <p className="today-page__status">{translate("todayFilterEmpty")}</p> : null}
+
+      {!loading && items.length
+        ? (
+          <div className="today-page__list">
+            {items.map((item) => (
+              <TodayRow
+                key={item.id}
+                item={item}
+                translate={translate}
+                locale={locale}
+                onOpen={handleOpen}
+                onFollowUpAction={(type, row) => {
+                  const followUp = row.source || {};
+                  setForm({
+                    notes: "",
+                    dueDate: followUp.dueDate || followUp.followUpDate || "",
+                    dueTime: followUp.dueTime || followUp.followUpTime || ""
+                  });
+                  setDialog({ type, item: row });
+                }}
+              />
+            ))}
+          </div>
+        )
         : null}
 
       {dialog?.type === "complete" ? (

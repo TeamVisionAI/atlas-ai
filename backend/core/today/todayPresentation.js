@@ -1,6 +1,6 @@
 /**
- * BR-180 — Today / Action Center presentation.
- * Aggregation only. Does not persist workflow, follow-up, or notification state.
+ * BR-184 — Today / Action Center presentation.
+ * Aggregation/presentation only. Canonical source records remain SoT.
  */
 
 const {
@@ -10,9 +10,12 @@ const {
 } = require("../newLeadAttentionEngine");
 const { isOperationalProspectRecord } = require("../prospectPromotionEligibility");
 const { FOLLOW_UP_VIEW_STATUSES } = require("../followUps");
+const { EVENT_TYPES, TAKEOVER_REQUEST_REASONS } = require("../agentNotifications/constants");
 const {
   DISPLAY_PRIORITY,
+  TODAY_FILTERS,
   TODAY_KINDS,
+  TODAY_PRIORITIES,
   APPOINTMENT_SOON_MS
 } = require("./todayConstants");
 
@@ -77,6 +80,11 @@ function isHealedBr080Stale(prospect = {}) {
   return false;
 }
 
+function isHumanTakeoverReason(reason) {
+  const normalized = String(reason || "").trim();
+  return TAKEOVER_REQUEST_REASONS.includes(normalized);
+}
+
 function isRealNeedsAttention(prospect = {}) {
   if (isHealedBr080Stale(prospect)) {
     return false;
@@ -130,6 +138,41 @@ function formatFriendlyTime(iso, timeZone, locale = "en-US") {
   }
 }
 
+function formatFriendlyDate(value, timeZone, locale = "en-US") {
+  if (!value) {
+    return null;
+  }
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? `${value}T12:00:00.000Z` : value;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) {
+    return String(value);
+  }
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      timeZone: timeZone || "America/New_York",
+      month: "short",
+      day: "numeric"
+    }).format(new Date(ms));
+  } catch {
+    return String(value);
+  }
+}
+
+function parseSortMs(value) {
+  if (value == null || value === "") {
+    return Number.POSITIVE_INFINITY;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    const ms = Date.parse(`${value}T12:00:00.000Z`);
+    return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+  }
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+}
+
 function prospectHref(prospect = {}) {
   if (prospect.phone) {
     return `/app/prospect-workspace/${encodeURIComponent(prospect.phone)}`;
@@ -164,7 +207,7 @@ function followUpHref(item = {}) {
 }
 
 function notificationHref(item = {}) {
-  return item.actionUrl || item.action_url || "/app/notifications";
+  return item.actionUrl || item.action_url || "/app/conversations";
 }
 
 function appointmentPerson(appointment = {}) {
@@ -182,161 +225,316 @@ function appointmentType(appointment = {}) {
   return appointment.purpose || appointment.meetingType || "appointment";
 }
 
+function withPresentation(item) {
+  const openPath = item.openPath || item.href || null;
+  return {
+    personName: item.personName || item.title || null,
+    owner: item.owner || (item.ownerName || item.ownerId
+      ? { id: item.ownerId || null, name: item.ownerName || null }
+      : null),
+    dueAt: item.dueAt || null,
+    priority: item.priority || TODAY_PRIORITIES.DUE_TODAY,
+    sourceKind: item.sourceKind || item.kind,
+    openPath,
+    href: openPath,
+    createdAt: item.createdAt || null,
+    ...item,
+    openPath,
+    href: openPath
+  };
+}
+
 function presentNeedsAttention(prospect, { ownerName = null } = {}) {
   const reason = prospect.human_attention_reason || prospect.humanAttentionReason || "needs_attention";
-  return {
-    id: `na:${prospect.id || prospect.phone}`,
-    kind: TODAY_KINDS.NEEDS_ATTENTION,
+  const takeover = isHumanTakeoverReason(reason);
+  const personName = prospect.name || prospect.phone || "Needs attention";
+  const openPath = prospectHref(prospect);
+  return withPresentation({
+    id: `${takeover ? "takeover" : "na"}:${prospect.id || prospect.phone}`,
+    kind: takeover ? TODAY_KINDS.HUMAN_TAKEOVER : TODAY_KINDS.NEEDS_ATTENTION,
     displayPriority: DISPLAY_PRIORITY.NEEDS_ATTENTION,
-    title: prospect.name || prospect.phone || "Needs attention",
+    priority: TODAY_PRIORITIES.NEEDS_ATTENTION,
+    title: personName,
+    personName,
     subtitle: reason,
     whenLabel: null,
     status: prospect.attention_status || "human_required",
+    ownerId: ownerIdOfProspect(prospect),
     ownerName,
-    href: prospectHref(prospect),
+    openPath,
     entityType: "prospect",
     entityId: prospect.id || null,
     phone: prospect.phone || null,
-    actions: ["open"],
-    source: null
-  };
+    actions: ["open", "open-conversation"],
+    sourceKind: takeover ? "human_takeover" : "conversation",
+    source: null,
+    createdAt: prospect.created_at || prospect.createdAt || prospect.new_lead_received_at || null
+  });
 }
 
 function presentAppointment(appointment, { timeZone, reference, ownerName = null } = {}) {
   const startMs = Date.parse(appointment.startDateTime);
   const refMs = reference instanceof Date ? reference.getTime() : Date.parse(reference || Date.now());
   const soon = Number.isFinite(startMs) && startMs - refMs >= 0 && startMs - refMs <= APPOINTMENT_SOON_MS;
-  return {
+  const personName = appointmentPerson(appointment);
+  const openPath = appointmentHref(appointment);
+  return withPresentation({
     id: `appt:${appointment.id}`,
     kind: TODAY_KINDS.APPOINTMENT,
-    displayPriority: soon ? DISPLAY_PRIORITY.APPOINTMENT_SOON : DISPLAY_PRIORITY.APPOINTMENT_TODAY,
-    title: appointmentPerson(appointment),
+    displayPriority: soon ? DISPLAY_PRIORITY.DUE_TODAY : DISPLAY_PRIORITY.UPCOMING_TODAY,
+    priority: soon ? TODAY_PRIORITIES.DUE_TODAY : TODAY_PRIORITIES.UPCOMING_TODAY,
+    title: personName,
+    personName,
     subtitle: appointmentType(appointment),
     whenLabel: formatFriendlyTime(appointment.startDateTime, timeZone),
+    dueAt: appointment.startDateTime || null,
     status: appointment.status || "scheduled",
+    ownerId: ownerIdOfAppointment(appointment),
     ownerName: ownerName || appointment.agentName || null,
-    href: appointmentHref(appointment),
+    openPath,
     entityType: appointment.agendaContactId && !appointment.prospectId ? "client_appointment" : "appointment",
     entityId: appointment.id || null,
     phone: appointment.prospectPhone || null,
-    actions: ["open", "reschedule", "cancel", "outcome"],
+    actions: ["open", "open-appointment", "reschedule", "cancel"],
+    sourceKind: "appointment",
     source: {
       appointmentId: appointment.id,
       purpose: appointment.purpose || null,
       meetingType: appointment.meetingType || null
-    }
-  };
+    },
+    createdAt: appointment.createdAt || appointment.created_at || appointment.startDateTime || null
+  });
 }
 
-function followUpPriority(status) {
+function datedObligationPriority(status) {
   if (status === FOLLOW_UP_VIEW_STATUSES.OVERDUE) {
-    return DISPLAY_PRIORITY.FOLLOW_UP_OVERDUE;
+    return { displayPriority: DISPLAY_PRIORITY.OVERDUE, priority: TODAY_PRIORITIES.OVERDUE };
   }
-  if (status === FOLLOW_UP_VIEW_STATUSES.DUE_TODAY) {
-    return DISPLAY_PRIORITY.FOLLOW_UP_DUE_TODAY;
-  }
-  return DISPLAY_PRIORITY.FOLLOW_UP_NEEDS_DATE;
+  return { displayPriority: DISPLAY_PRIORITY.DUE_TODAY, priority: TODAY_PRIORITIES.DUE_TODAY };
 }
 
-function presentDocumentRequestItem(item) {
-  return {
+function presentDocumentRequestItem(item, { timeZone } = {}) {
+  const ranked = datedObligationPriority(item.status);
+  const personName = item.name || item.title || "Document request";
+  const openPath = item.href || (item.entityId ? `/app/clients/${item.entityId}` : "/app/clients");
+  return withPresentation({
     id: `docreq:${item.id}`,
     kind: TODAY_KINDS.DOCUMENT_REQUEST,
-    displayPriority: followUpPriority(item.status),
-    title: item.title || item.name || "Document request",
+    displayPriority: ranked.displayPriority,
+    priority: ranked.priority,
+    title: item.title || personName,
+    personName,
     subtitle: item.name && item.name !== item.title ? item.name : item.source?.documentType || null,
-    whenLabel: item.dueDate || null,
+    whenLabel: formatFriendlyDate(item.dueDate, timeZone) || item.dueDate || null,
+    dueAt: item.dueDate || null,
     status: item.status,
+    ownerId: item.ownerUserId || null,
     ownerName: item.ownerName || null,
-    href: item.href || (item.entityId ? `/app/clients/${item.entityId}` : "/app/clients"),
+    openPath,
     entityType: "document_request",
     entityId: item.id,
     phone: null,
-    actions: ["open"],
-    source: item.source || item
-  };
+    actions: ["open", "open-document-request", "open-client"],
+    sourceKind: "document_request",
+    source: item.source || item,
+    createdAt: item.createdAt || item.created_at || null
+  });
 }
 
-function presentServiceCaseItem(item) {
-  return {
+function presentServiceCaseItem(item, { timeZone } = {}) {
+  if (item.status === FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE) {
+    return null;
+  }
+  const ranked = datedObligationPriority(item.status);
+  const personName = item.name || item.title || "Service case";
+  const openPath = item.href || (item.entityId ? `/app/clients/${item.entityId}` : "/app/service");
+  return withPresentation({
     id: `svc:${item.id}`,
     kind: TODAY_KINDS.SERVICE_CASE,
-    displayPriority: followUpPriority(item.status),
-    title: item.title || item.name || "Service case",
+    displayPriority: ranked.displayPriority,
+    priority: ranked.priority,
+    title: item.title || personName,
+    personName,
     subtitle: item.name && item.name !== item.title ? item.name : item.source?.serviceType || null,
-    whenLabel: item.dueDate || null,
+    whenLabel: formatFriendlyDate(item.dueDate, timeZone) || item.dueDate || null,
+    dueAt: item.dueDate || null,
     status: item.status,
+    ownerId: item.ownerUserId || null,
     ownerName: item.ownerName || null,
-    href: item.href || (item.entityId ? `/app/clients/${item.entityId}` : "/app/service"),
+    openPath,
     entityType: "service_case",
     entityId: item.id,
     phone: null,
-    actions: ["open"],
-    source: item.source || item
-  };
+    actions: ["open", "open-client"],
+    sourceKind: "service_case",
+    source: item.source || item,
+    createdAt: item.createdAt || item.created_at || null
+  });
 }
 
 function presentFollowUpItem(item, { timeZone } = {}) {
+  const ranked = datedObligationPriority(item.status);
+  const personName = item.name || item.title || "Follow-up";
   const whenLabel = item.dueTime
     ? formatFriendlyTime(item.dueAt, timeZone) || item.dueTime
-    : item.dueDate || null;
-  return {
+    : formatFriendlyDate(item.dueDate, timeZone) || item.dueDate || null;
+  const openPath = followUpHref(item);
+  return withPresentation({
     id: `fu:${item.id}`,
     kind: TODAY_KINDS.FOLLOW_UP,
-    displayPriority: followUpPriority(item.status),
-    title: item.name || item.title || "Follow-up",
+    displayPriority: ranked.displayPriority,
+    priority: ranked.priority,
+    title: item.title || personName,
+    personName,
     subtitle: item.followUpReason || item.title || null,
     whenLabel,
+    dueAt: item.dueAt || item.dueDate || null,
     status: item.status,
+    ownerId: item.representativeId || item.ownerUserId || null,
     ownerName: item.representativeName || null,
-    href: followUpHref(item),
+    openPath,
     entityType: item.entityType || "prospect",
     entityId: item.entityId || null,
     phone: item.phone || null,
     actions: item.source === "legacy" ? ["open", "set-date"] : ["open", "complete", "reschedule", "cancel"],
-    source: item
-  };
+    sourceKind: "follow_up",
+    source: item,
+    createdAt: item.createdAt || item.created_at || null
+  });
 }
 
 function presentNewLead(prospect, { ownerName = null } = {}) {
-  return {
+  const personName = prospect.name || prospect.phone || "New conversation";
+  const openPath = prospectHref(prospect);
+  return withPresentation({
     id: `lead:${prospect.id || prospect.phone}`,
     kind: TODAY_KINDS.NEW_LEAD,
-    displayPriority: DISPLAY_PRIORITY.NEW_LEAD,
-    title: prospect.name || prospect.phone || "New conversation",
-    subtitle: "new_actionable",
+    displayPriority: DISPLAY_PRIORITY.NEEDS_ATTENTION,
+    priority: TODAY_PRIORITIES.NEEDS_ATTENTION,
+    title: personName,
+    personName,
+    subtitle: "unanswered",
     whenLabel: null,
     status: prospect.attention_status || "new",
+    ownerId: ownerIdOfProspect(prospect),
     ownerName,
-    href: prospectHref(prospect),
+    openPath,
     entityType: "prospect",
     entityId: prospect.id || null,
     phone: prospect.phone || null,
-    actions: ["open"],
-    source: null
-  };
+    actions: ["open", "open-conversation"],
+    sourceKind: "conversation",
+    source: null,
+    createdAt: prospect.new_lead_received_at || prospect.created_at || prospect.createdAt || null
+  });
 }
 
-function presentNotification(item) {
-  return {
-    id: `nt:${item.id}`,
-    kind: TODAY_KINDS.NOTIFICATION,
-    displayPriority: DISPLAY_PRIORITY.NOTIFICATION,
-    title: item.title || "Notification",
-    subtitle: item.body || item.eventType || null,
+function presentHumanTakeoverNotification(item) {
+  const personName = item.title || "Human takeover";
+  const openPath = notificationHref(item);
+  return withPresentation({
+    id: `takeover-nt:${item.id}`,
+    kind: TODAY_KINDS.HUMAN_TAKEOVER,
+    displayPriority: DISPLAY_PRIORITY.NEEDS_ATTENTION,
+    priority: TODAY_PRIORITIES.NEEDS_ATTENTION,
+    title: personName,
+    personName,
+    subtitle: item.eventType || "HUMAN_TAKEOVER_REQUESTED",
     whenLabel: null,
-    status: item.readAt ? "read" : "unread",
+    status: "human_required",
+    ownerId: item.ownerUserId || item.recipientUserId || null,
     ownerName: null,
-    href: notificationHref(item),
-    entityType: item.entityType || null,
+    openPath,
+    entityType: item.entityType || "prospect",
     entityId: item.entityId || null,
     phone: null,
-    actions: ["open"],
+    actions: ["open", "open-conversation"],
+    sourceKind: "human_takeover",
     source: {
       notificationId: item.id,
-      eventType: item.eventType || null
+      eventType: item.eventType || EVENT_TYPES.HUMAN_TAKEOVER_REQUESTED
+    },
+    createdAt: item.createdAt || item.created_at || null
+  });
+}
+
+function collectDedupKeys(item = {}) {
+  const keys = new Set();
+  if (item.id) {
+    keys.add(`id:${item.id}`);
+  }
+  if (item.kind && item.entityId) {
+    keys.add(`kind:${item.kind}:${item.entityId}`);
+  }
+  if (item.source?.appointmentId) {
+    keys.add(`appointment:${item.source.appointmentId}`);
+  }
+  if (item.kind === TODAY_KINDS.APPOINTMENT && (item.entityId || item.source?.appointmentId)) {
+    keys.add(`appointment:${item.entityId || item.source.appointmentId}`);
+  }
+  if (item.kind === TODAY_KINDS.FOLLOW_UP && item.source?.id) {
+    keys.add(`follow_up:${item.source.id}`);
+  }
+  if (item.kind === TODAY_KINDS.DOCUMENT_REQUEST && (item.entityId || item.source?.id)) {
+    keys.add(`document_request:${item.entityId || item.source.id}`);
+  }
+  if (item.kind === TODAY_KINDS.SERVICE_CASE && (item.entityId || item.source?.id)) {
+    keys.add(`service_case:${item.entityId || item.source.id}`);
+  }
+  if (
+    (item.kind === TODAY_KINDS.NEEDS_ATTENTION ||
+      item.kind === TODAY_KINDS.HUMAN_TAKEOVER ||
+      item.kind === TODAY_KINDS.NEW_LEAD) &&
+    (item.entityId || item.phone)
+  ) {
+    keys.add(`conversation:${item.entityId || item.phone}`);
+  }
+  return keys;
+}
+
+function notificationDedupKeys(notification = {}) {
+  const keys = new Set();
+  const entityType = String(notification.entityType || notification.entity_type || "").toLowerCase();
+  const entityId = notification.entityId || notification.entity_id || null;
+  if (!entityId) {
+    return keys;
+  }
+  if (entityType === "follow_up") {
+    keys.add(`follow_up:${entityId}`);
+  } else if (entityType === "appointment") {
+    keys.add(`appointment:${entityId}`);
+  } else if (entityType === "document_request") {
+    keys.add(`document_request:${entityId}`);
+  } else if (entityType === "service_case") {
+    keys.add(`service_case:${entityId}`);
+  } else {
+    keys.add(`conversation:${entityId}`);
+  }
+  return keys;
+}
+
+function isDuplicateAgainst(item, seenKeys) {
+  for (const key of collectDedupKeys(item)) {
+    if (seenKeys.has(key)) {
+      return true;
     }
-  };
+  }
+  return false;
+}
+
+function dedupeTodayItems(items = []) {
+  const seen = new Set();
+  const unique = [];
+  for (const item of items) {
+    if (!item || isDuplicateAgainst(item, seen)) {
+      continue;
+    }
+    for (const key of collectDedupKeys(item)) {
+      seen.add(key);
+    }
+    unique.push(item);
+  }
+  return unique;
 }
 
 function compareTodayItems(left, right) {
@@ -344,7 +542,53 @@ function compareTodayItems(left, right) {
   if (priority !== 0) {
     return priority;
   }
-  return String(left.title || "").localeCompare(String(right.title || ""));
+  const due = parseSortMs(left.dueAt) - parseSortMs(right.dueAt);
+  if (due !== 0) {
+    return due;
+  }
+  const created = parseSortMs(left.createdAt) - parseSortMs(right.createdAt);
+  if (created !== 0) {
+    return created;
+  }
+  return String(left.id || left.title || "").localeCompare(String(right.id || right.title || ""));
+}
+
+function matchesTodayFilter(item, filter) {
+  const resolved = filter || TODAY_FILTERS.ALL;
+  if (resolved === TODAY_FILTERS.ALL) {
+    return true;
+  }
+  if (resolved === TODAY_FILTERS.OVERDUE) {
+    return item.priority === TODAY_PRIORITIES.OVERDUE;
+  }
+  if (resolved === TODAY_FILTERS.NEEDS_ATTENTION) {
+    return (
+      item.kind === TODAY_KINDS.NEEDS_ATTENTION ||
+      item.kind === TODAY_KINDS.HUMAN_TAKEOVER ||
+      item.kind === TODAY_KINDS.NEW_LEAD
+    );
+  }
+  if (resolved === TODAY_FILTERS.DUE_TODAY) {
+    return item.priority === TODAY_PRIORITIES.DUE_TODAY && item.kind !== TODAY_KINDS.APPOINTMENT;
+  }
+  if (resolved === TODAY_FILTERS.APPOINTMENTS) {
+    return item.kind === TODAY_KINDS.APPOINTMENT;
+  }
+  if (resolved === TODAY_FILTERS.FOLLOW_UPS) {
+    return item.kind === TODAY_KINDS.FOLLOW_UP || item.kind === TODAY_KINDS.SERVICE_CASE;
+  }
+  if (resolved === TODAY_FILTERS.DOCUMENTS) {
+    return item.kind === TODAY_KINDS.DOCUMENT_REQUEST;
+  }
+  return true;
+}
+
+function isDistinctTakeoverNotification(notification = {}) {
+  return (
+    String(notification.eventType || notification.event_type || "") === EVENT_TYPES.HUMAN_TAKEOVER_REQUESTED &&
+    !notification.readAt &&
+    !notification.dismissedAt
+  );
 }
 
 module.exports = {
@@ -354,9 +598,11 @@ module.exports = {
   hasTodayAttentionSignal,
   isTodayProspectCandidate,
   isHealedBr080Stale,
+  isHumanTakeoverReason,
   isRealNeedsAttention,
   isActionableNewLead,
   formatFriendlyTime,
+  formatFriendlyDate,
   prospectHref,
   appointmentHref,
   followUpHref,
@@ -367,6 +613,11 @@ module.exports = {
   presentServiceCaseItem,
   presentDocumentRequestItem,
   presentNewLead,
-  presentNotification,
-  compareTodayItems
+  presentHumanTakeoverNotification,
+  collectDedupKeys,
+  notificationDedupKeys,
+  dedupeTodayItems,
+  compareTodayItems,
+  matchesTodayFilter,
+  isDistinctTakeoverNotification
 };
