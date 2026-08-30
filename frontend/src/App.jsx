@@ -23,6 +23,7 @@ import AdminUsers from "./pages/identity/AdminUsers";
 import PlatformTenantsPage from "./pages/platform/PlatformTenantsPage";
 import AiQualityPage from "./pages/platform/AiQualityPage";
 import MyAccount from "./pages/identity/MyAccount";
+import NotificationsPage from "./pages/NotificationsPage";
 import SetupWizard from "./pages/identity/SetupWizard";
 import RequireSetupComplete from "./components/RequireSetupComplete";
 import RequireAuth from "./components/RequireAuth";
@@ -191,6 +192,7 @@ export default function App() {
         <Route path="knowledge" element={<KnowledgeHub />} />
         <Route path="policy-intelligence" element={<PolicyIntelligence />} />
         <Route path="my-account" element={<MyAccount />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="admin/users" element={<AdminUsers />} />
         <Route path="platform/tenants" element={<PlatformTenantsPage />} />
         <Route path="platform/ai-quality" element={<AiQualityPage />} />

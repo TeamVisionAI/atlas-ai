@@ -270,7 +270,9 @@ async function markHumanAttentionRequired(prospect, reason, actor = {}) {
     },
     {
       organizationId: prospect.organization_id || null,
-      prospectId: prospect.id || null
+      prospectId: prospect.id || null,
+      prospect,
+      ownerUserId: prospect.owner_user_id || null
     }
   );
 
@@ -566,7 +568,9 @@ async function applyEscalation(prospect, decision) {
         },
         {
           organizationId: prospect.organization_id || null,
-          prospectId: prospect.id || null
+          prospectId: prospect.id || null,
+          prospect,
+          ownerUserId: prospect.owner_user_id || null
         }
       );
     }
