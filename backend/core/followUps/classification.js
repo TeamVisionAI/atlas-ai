@@ -92,11 +92,18 @@ function classifyPersistedFollowUp(row, { today } = {}) {
 
   const dueDate = normalizeDueDate(row?.dueDate || row?.due_date);
   const todayDate = normalizeDueDate(today);
-  if (!dueDate || !todayDate) {
+  if (!dueDate) {
     return {
       persistedStatus: FOLLOW_UP_STATUSES.OPEN,
-      status: FOLLOW_UP_STATUSES.OVERDUE,
-      viewStatus: FOLLOW_UP_VIEW_STATUSES.OVERDUE
+      status: FOLLOW_UP_STATUSES.OPEN,
+      viewStatus: FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE
+    };
+  }
+  if (!todayDate) {
+    return {
+      persistedStatus: FOLLOW_UP_STATUSES.OPEN,
+      status: FOLLOW_UP_STATUSES.OPEN,
+      viewStatus: FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE
     };
   }
   if (dueDate < todayDate) {

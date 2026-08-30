@@ -4,6 +4,7 @@
 
 export const FOLLOW_UP_FILTERS = Object.freeze({
   ALL: "all",
+  NEEDS_DATE: "needs-date",
   DUE_TODAY: "due-today",
   OVERDUE: "overdue",
   UPCOMING: "upcoming",
@@ -17,6 +18,7 @@ export const FOLLOW_UP_SORT_OPTIONS = Object.freeze({
 });
 
 const STATUS_LABEL_KEYS = Object.freeze({
+  "needs-date": "followUpsStatusNeedsDate",
   "due-today": "followUpsStatusDueToday",
   overdue: "followUpsStatusOverdue",
   upcoming: "followUpsStatusUpcoming",
@@ -25,6 +27,7 @@ const STATUS_LABEL_KEYS = Object.freeze({
 
 const FILTER_LABEL_KEYS = Object.freeze({
   all: "followUpsFilterAll",
+  "needs-date": "followUpsFilterNeedsDate",
   "due-today": "followUpsFilterDueToday",
   overdue: "followUpsFilterOverdue",
   upcoming: "followUpsFilterUpcoming",
@@ -92,6 +95,10 @@ export function buildFollowUpDueDate(followUpDate, followUpTime, locale) {
 }
 
 export function buildFollowUpPriorityLabel(item, translate) {
+  if (item?.status === "needs-date") {
+    return translate("followUpsPriorityNeedsDate");
+  }
+
   if (item?.status === "overdue") {
     return translate("followUpsPriorityOverdue");
   }

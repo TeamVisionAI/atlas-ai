@@ -195,6 +195,10 @@
   color: #b91c1c;
 }
 
+.follow-ups-row__priority--needs-date {
+  color: #b45309;
+}
+
 .follow-ups-row__priority--due-today {
   color: #b45309;
 }

@@ -15,14 +15,14 @@ test("parseFollowUpAtMs parses date and time", () => {
   assert.equal(new Date(ms).getHours(), 14);
 });
 
-test("classifyFollowUpStatus marks overdue follow-ups without date", () => {
+test("classifyFollowUpStatus marks undated follow-ups as needs-date, never overdue", () => {
   assert.equal(
     classifyFollowUpStatus({
       canonicalMilestone: MILESTONES.FOLLOW_UP,
       followUpAtMs: null,
       priorityTier: "FOLLOW_UP_DUE"
     }),
-    "overdue"
+    "needs-date"
   );
 });
 

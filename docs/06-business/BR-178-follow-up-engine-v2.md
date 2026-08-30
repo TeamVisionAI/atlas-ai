@@ -16,6 +16,26 @@ V1 does not silently send WhatsApp, SMS, or email.
 
 Leftover agentState-only items without a matching durable row may appear as read-only `source=legacy` rows. There is no silent production backfill.
 
+### Queue classification
+
+| Condition | View status |
+|---|---|
+| Follow-up exists, no due date | `needs-date` |
+| Due date is today (org-local) | `due-today` |
+| Due date in the past | `overdue` |
+| Due date in the future | `upcoming` |
+| Completed / cancelled | `completed` |
+
+Never classify Overdue without an actual due date. Priority must not show “Urgent — overdue” when the date is missing.
+
+### Set date (legacy conversion)
+
+`POST /api/follow-ups` with `legacyConversion: true` creates or updates one durable obligation (`dedup_key` = `legacy:{entityType}:{entityId}`). After that row exists, merge hides the derived legacy row for the same phone/entity. Classification is read-time — existing undated rows self-correct to Needs Date on deploy without a data migration.
+
+### Follow-ups page refresh
+
+Fetch on entry, filter/tab/scope/search change, and after mutations. Optional stale refresh on window/tab focus. No `setInterval` on `FollowUpsPage`. BR-176 NotificationBell polling is unchanged.
+
 ## Outcome mapping
 
 | Outcome | Follow-up |

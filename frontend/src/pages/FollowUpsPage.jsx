@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import AtlasSelect from "../components/ui/AtlasSelect";
@@ -40,6 +40,8 @@ function statusVariant(status) {
   switch (status) {
     case "overdue":
       return "danger";
+    case "needs-date":
+      return "warning";
     case "due-today":
       return "warning";
     case "upcoming":
@@ -76,13 +78,14 @@ function FollowUpDialog({ title, children, onClose, onConfirm, confirmLabel, can
   );
 }
 
-function FollowUpRow({ item, translate, locale, onOpen, onComplete, onReschedule, onCancel }) {
+function FollowUpRow({ item, translate, locale, onOpen, onComplete, onReschedule, onCancel, onSetDate }) {
   const dueLabel = buildFollowUpDueDate(item.followUpDate || item.dueDate, item.followUpTime || item.dueTime, locale);
   const statusLabel = buildFollowUpStatusLabel(item, translate);
   const reasonLabel = buildFollowUpReasonLabel(item, translate);
   const priorityLabel = buildFollowUpPriorityLabel(item, translate);
   const representativeLabel = buildFollowUpRepresentativeLabel(item, translate);
   const canManage = item.canManage !== false && item.source !== "legacy" && item.status !== "completed";
+  const canSetDate = item.source === "legacy" && item.status === "needs-date";
 
   return (
     <article className="follow-ups-row">
@@ -104,7 +107,7 @@ function FollowUpRow({ item, translate, locale, onOpen, onComplete, onReschedule
           </div>
           <div className="follow-ups-row__detail">
             <dt>{translate("followUpsColumnDue")}</dt>
-            <dd>{dueLabel || translate("followUpsDueNotSet")}</dd>
+            <dd>{dueLabel || translate("followUpsStatusNeedsDate")}</dd>
           </div>
           <div className="follow-ups-row__detail">
             <dt>{translate("followUpsColumnRepresentative")}</dt>
@@ -120,6 +123,13 @@ function FollowUpRow({ item, translate, locale, onOpen, onComplete, onReschedule
           </div>
         </dl>
       </button>
+      {canSetDate ? (
+        <div className="follow-ups-row__actions">
+          <button type="button" onClick={() => onSetDate(item)}>
+            {translate("followUpsSetDate")}
+          </button>
+        </div>
+      ) : null}
       {canManage ? (
         <div className="follow-ups-row__actions">
           <button type="button" onClick={() => onComplete(item)}>
@@ -157,15 +167,18 @@ export default function FollowUpsPage() {
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const lastFetchedAtRef = useRef(0);
 
-  const loadFollowUps = useCallback(async () => {
+  const loadFollowUps = useCallback(async ({ silent = false } = {}) => {
     if (controlPlane) {
       setPayload(null);
       setError(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -176,11 +189,14 @@ export default function FollowUpsPage() {
         scope: activeScope
       });
       setPayload(data);
+      lastFetchedAtRef.current = Date.now();
     } catch (err) {
       console.error(err);
       setError(err instanceof FollowUpsError ? translate("followUpsLoadError") : err.message);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [activeFilter, activeSort, activeScope, searchQuery, translate, controlPlane]);
 
@@ -189,21 +205,24 @@ export default function FollowUpsPage() {
   }, [loadFollowUps]);
 
   useEffect(() => {
-    const refreshLiveQueue = () => {
-      if (document.visibilityState !== "visible" || loading) {
+    function refreshIfStale() {
+      if (document.visibilityState !== "visible") {
         return;
       }
-      loadFollowUps().catch((err) => {
+      if (Date.now() - lastFetchedAtRef.current < 60000) {
+        return;
+      }
+      loadFollowUps({ silent: true }).catch((err) => {
         console.error(err);
       });
-    };
-    const intervalId = window.setInterval(refreshLiveQueue, 20000);
-    window.addEventListener("focus", refreshLiveQueue);
+    }
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
     return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshLiveQueue);
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
     };
-  }, [loadFollowUps, loading]);
+  }, [loadFollowUps]);
 
   useEffect(() => {
     setSearchInput(searchQuery);
@@ -278,6 +297,19 @@ export default function FollowUpsPage() {
           dueDate: form.dueDate,
           dueTime: form.dueTime || null,
           notes: form.notes
+        });
+      } else if (dialog.type === "set-date") {
+        await createFollowUp({
+          entityType: dialog.item.entityType || "prospect",
+          entityId: dialog.item.entityId || dialog.item.phone,
+          subjectLabel: dialog.item.name || dialog.item.title,
+          title: dialog.item.title || dialog.item.followUpReason || translate("followUpsTitle"),
+          dueDate: form.dueDate,
+          dueTime: form.dueTime || null,
+          notes: dialog.item.followUpReason || dialog.item.notes || null,
+          ownerUserId: dialog.item.representativeId || dialog.item.ownerUserId || null,
+          subjectPhone: dialog.item.phone || null,
+          legacyConversion: true
         });
       } else if (dialog.type === "complete") {
         await completeFollowUp(dialog.item.id, { completionNote: form.notes });
@@ -430,6 +462,10 @@ export default function FollowUpsPage() {
                 setForm({ notes: "" });
                 setDialog({ type: "cancel", item: row });
               }}
+              onSetDate={(row) => {
+                setForm({ dueDate: "", dueTime: "" });
+                setDialog({ type: "set-date", item: row });
+              }}
             />
           ))}
         </div>
@@ -523,9 +559,9 @@ export default function FollowUpsPage() {
         </FollowUpDialog>
       ) : null}
 
-      {dialog?.type === "reschedule" ? (
+      {dialog?.type === "reschedule" || dialog?.type === "set-date" ? (
         <FollowUpDialog
-          title={translate("followUpsReschedule")}
+          title={dialog.type === "set-date" ? translate("followUpsSetDate") : translate("followUpsReschedule")}
           confirmLabel={translate("followUpsSave")}
           cancelLabel={translate("followUpsDialogClose")}
           loading={saving}

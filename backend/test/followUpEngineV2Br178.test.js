@@ -16,11 +16,15 @@ const path = require("node:path");
 const {
   planFollowUpFromOutcome,
   buildOutcomeDedupKey,
+  buildLegacyConversionDedupKey,
   classifyPersistedFollowUp,
+  isLegacyCoveredByDurable,
   FOLLOW_UP_STATUSES,
   FOLLOW_UP_SURFACES,
   createMemoryFollowUpStore
 } = require("../core/followUps");
+const { classifyFollowUpStatus } = require("../core/followUpsQueueEngine");
+const { MILESTONES } = require("../core/workflowConstants");
 const followUpApplicationService = require("../application/followUpApplicationService");
 const agentNotificationService = require("../services/agentNotificationService");
 const { createMemoryNotificationStore, EVENT_TYPES } = require("../core/agentNotifications");
@@ -202,6 +206,112 @@ test("due / upcoming / overdue classification uses the calendar date", () => {
     classifyPersistedFollowUp({ status: "COMPLETED", dueDate: TODAY }, { today: TODAY }).viewStatus,
     "completed"
   );
+  assert.equal(
+    classifyPersistedFollowUp({ status: "OPEN", dueDate: null }, { today: TODAY }).viewStatus,
+    "needs-date"
+  );
+});
+
+test("undated completed-interview follow-up is needs-date, never overdue", () => {
+  assert.equal(
+    classifyFollowUpStatus({
+      canonicalMilestone: MILESTONES.FOLLOW_UP,
+      followUpAtMs: null,
+      priorityTier: "FOLLOW_UP_DUE"
+    }),
+    "needs-date"
+  );
+});
+
+test("Set date converts undated legacy into one durable obligation and covers the legacy row", async () => {
+  const converted = await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_A,
+      entityType: "prospect",
+      entityId: "+15550001111",
+      subjectLabel: "Alex Recruit",
+      subjectPhone: "+15550001111",
+      title: "Thinking About It",
+      notes: "Thinking About It",
+      dueDate: "2026-08-29",
+      ownerUserId: USER_A,
+      legacyConversion: true
+    },
+    auth()
+  );
+  assert.equal(converted.created, true);
+  assert.equal(converted.followUp.sourceEvent, "legacy");
+  assert.equal(converted.followUp.ownerUserId, USER_A);
+  assert.equal(converted.followUp.organizationId, ORG_A);
+  assert.equal(converted.followUp.subjectPhone, "+15550001111");
+  assert.equal(converted.followUp.notes, "Thinking About It");
+  assert.equal(
+    converted.followUp.dedupKey,
+    buildLegacyConversionDedupKey({ entityType: "prospect", entityId: "+15550001111" })
+  );
+
+  const again = await followUpApplicationService.createManualFollowUp(
+    {
+      organizationId: ORG_A,
+      entityType: "prospect",
+      entityId: "+15550001111",
+      dueDate: "2026-09-12",
+      ownerUserId: USER_A,
+      legacyConversion: true
+    },
+    auth()
+  );
+  assert.equal(again.created, false);
+  assert.equal(again.followUp.id, converted.followUp.id);
+  assert.equal(again.followUp.dueDate, "2026-09-12");
+
+  const listed = await followUpApplicationService.listFollowUps({
+    organizationId: ORG_A,
+    authContext: auth(),
+    includeLegacy: false,
+    reference: new Date("2026-08-30T16:00:00.000Z")
+  });
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].source, "durable");
+  assert.equal(listed.items[0].status, "upcoming");
+
+  const past = classifyPersistedFollowUp(
+    { status: "OPEN", dueDate: "2026-08-29" },
+    { today: TODAY }
+  );
+  const today = classifyPersistedFollowUp({ status: "OPEN", dueDate: TODAY }, { today: TODAY });
+  const future = classifyPersistedFollowUp(
+    { status: "OPEN", dueDate: "2026-09-12" },
+    { today: TODAY }
+  );
+  assert.equal(past.viewStatus, "overdue");
+  assert.equal(today.viewStatus, "due-today");
+  assert.equal(future.viewStatus, "upcoming");
+
+  assert.equal(
+    isLegacyCoveredByDurable(
+      [{ phone: "+15550001111", dueDate: "2026-09-12" }],
+      { phone: "+15550001111", followUpDate: null }
+    ),
+    true
+  );
+  assert.equal(
+    isLegacyCoveredByDurable([{ phone: "+15550002222" }], { phone: "+15550001111" }),
+    false
+  );
+});
+
+test("Follow-ups page has no periodic poll; NotificationBell polling stays", () => {
+  const page = fs.readFileSync(path.join(__dirname, "../../frontend/src/pages/FollowUpsPage.jsx"), "utf8");
+  const bell = fs.readFileSync(
+    path.join(__dirname, "../../frontend/src/components/layout/NotificationBell.jsx"),
+    "utf8"
+  );
+  assert.doesNotMatch(page, /setInterval\s*\(/);
+  assert.match(page, /lastFetchedAtRef/);
+  assert.match(page, /visibilitychange/);
+  assert.match(page, /legacyConversion:\s*true/);
+  assert.match(bell, /setInterval\s*\(/);
 });
 
 test("complete, reschedule, and cancel are durable and do not change entity type", async () => {

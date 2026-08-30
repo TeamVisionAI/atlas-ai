@@ -13,6 +13,7 @@ const FOLLOW_UP_STATUSES = Object.freeze({
 });
 
 const FOLLOW_UP_VIEW_STATUSES = Object.freeze({
+  NEEDS_DATE: "needs-date",
   DUE_TODAY: "due-today",
   OVERDUE: "overdue",
   UPCOMING: "upcoming",

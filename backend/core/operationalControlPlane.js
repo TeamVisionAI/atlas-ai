@@ -111,6 +111,7 @@ function emptyFollowUps() {
     sort: "due-date",
     filters: [
       { id: FOLLOW_UP_FILTERS.ALL, count: 0 },
+      { id: FOLLOW_UP_FILTERS.NEEDS_DATE, count: 0 },
       { id: FOLLOW_UP_FILTERS.DUE_TODAY, count: 0 },
       { id: FOLLOW_UP_FILTERS.OVERDUE, count: 0 },
       { id: FOLLOW_UP_FILTERS.UPCOMING, count: 0 },

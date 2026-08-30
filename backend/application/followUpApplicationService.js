@@ -22,6 +22,8 @@ const {
   planFollowUpFromOutcome,
   buildOutcomeDedupKey,
   buildManualDedupKey,
+  buildLegacyConversionDedupKey,
+  isLegacyCoveredByDurable,
   createMemoryFollowUpStore
 } = require("../core/followUps");
 const { loadOrganizationTimezone } = require("../core/organizationDateWindow");
@@ -422,15 +424,40 @@ async function createManualFollowUp(input, authContext) {
   const ownerUserId = input.ownerUserId || authContext.userId;
   const today = todayIsoDate(organizationId, input.reference || new Date());
   const timeZone = loadOrganizationTimezone(organizationId).timeZone;
-  const dedupKey = buildManualDedupKey({
-    entityType,
-    entityId,
-    dueDate,
-    notes: input.notes
-  });
+  const dedupKey = input.legacyConversion
+    ? buildLegacyConversionDedupKey({ entityType, entityId })
+    : buildManualDedupKey({
+        entityType,
+        entityId,
+        dueDate,
+        notes: input.notes
+      });
   const existing = await store.findByDedupKey(organizationId, dedupKey);
-  if (existing && existing.status === FOLLOW_UP_STATUSES.OPEN) {
+  if (existing && existing.status === FOLLOW_UP_STATUSES.OPEN && !input.legacyConversion) {
     return { created: false, followUp: existing };
+  }
+  if (existing && existing.status === FOLLOW_UP_STATUSES.OPEN && input.legacyConversion) {
+    const saved = await saveFollowUp(store, {
+      ...existing,
+      dueDate,
+      dueTime,
+      dueAt: resolveDueAt({ dueDate, dueTime, timeZone }),
+      title: input.title || existing.title,
+      notes: input.notes || existing.notes,
+      subjectLabel: input.subjectLabel || existing.subjectLabel,
+      subjectPhone: input.subjectPhone || existing.subjectPhone || null,
+      ownerUserId: existing.ownerUserId || ownerUserId,
+      updatedAt: new Date().toISOString(),
+      history: appendHistory(existing, {
+        type: "rescheduled",
+        actor: authContext.userId,
+        summary: "Legacy follow-up date set",
+        oldValues: { dueDate: existing.dueDate, dueTime: existing.dueTime },
+        newValues: { dueDate, dueTime }
+      })
+    });
+    await notifyDueIfNeeded(saved, { today, organizationId });
+    return { created: false, followUp: saved };
   }
   const now = new Date().toISOString();
   const row = {
@@ -441,7 +468,7 @@ async function createManualFollowUp(input, authContext) {
     entityId,
     subjectLabel: input.subjectLabel || input.title || "Follow-up",
     subjectPhone: input.subjectPhone || null,
-    sourceEvent: "manual",
+    sourceEvent: input.legacyConversion ? "legacy" : "manual",
     appointmentId: input.appointmentId || null,
     title: input.title || "Follow-up",
     notes: input.notes || null,
@@ -458,7 +485,7 @@ async function createManualFollowUp(input, authContext) {
       type: "created",
       actor: authContext.userId,
       at: now,
-      summary: "Manual follow-up created",
+      summary: input.legacyConversion ? "Legacy follow-up date set" : "Manual follow-up created",
       newValues: { dueDate, dueTime, entityType, entityId }
     })
   };
@@ -567,6 +594,11 @@ function matchesSearch(item, query) {
 }
 
 function compareItems(a, b) {
+  const needsDateA = a.status === FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE ? 0 : 1;
+  const needsDateB = b.status === FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE ? 0 : 1;
+  if (needsDateA !== needsDateB) {
+    return needsDateA - needsDateB;
+  }
   const dueA = a.followUpAtMs ?? Number.MAX_SAFE_INTEGER;
   const dueB = b.followUpAtMs ?? Number.MAX_SAFE_INTEGER;
   if (dueA !== dueB) {
@@ -578,6 +610,7 @@ function compareItems(a, b) {
 function buildFilterCounts(items) {
   const counts = {
     [FOLLOW_UP_FILTERS.ALL]: 0,
+    [FOLLOW_UP_FILTERS.NEEDS_DATE]: 0,
     [FOLLOW_UP_FILTERS.DUE_TODAY]: 0,
     [FOLLOW_UP_FILTERS.OVERDUE]: 0,
     [FOLLOW_UP_FILTERS.UPCOMING]: 0,
@@ -588,7 +621,9 @@ function buildFilterCounts(items) {
       counts[FOLLOW_UP_FILTERS.COMPLETED] += 1;
     } else {
       counts[FOLLOW_UP_FILTERS.ALL] += 1;
-      if (item.status === FOLLOW_UP_VIEW_STATUSES.DUE_TODAY) {
+      if (item.status === FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE) {
+        counts[FOLLOW_UP_FILTERS.NEEDS_DATE] += 1;
+      } else if (item.status === FOLLOW_UP_VIEW_STATUSES.DUE_TODAY) {
         counts[FOLLOW_UP_FILTERS.DUE_TODAY] += 1;
       } else if (item.status === FOLLOW_UP_VIEW_STATUSES.OVERDUE) {
         counts[FOLLOW_UP_FILTERS.OVERDUE] += 1;
@@ -608,18 +643,10 @@ async function mergeLegacyItems(durableItems, { organizationId, ownerUserIds, re
       organizationId,
       reference
     });
-    const covered = new Set(
-      durableItems
-        .filter((item) => item.entityType === FOLLOW_UP_ENTITY_TYPES.PROSPECT)
-        .flatMap((item) => [
-          `${item.phone || ""}:${item.dueDate || ""}`,
-          `${item.entityId}:${item.dueDate || ""}`
-        ])
-    );
     const allowedOwners = ownerUserIds ? new Set(ownerUserIds.map(String)) : null;
     return (legacy.items || [])
       .filter((item) => !allowedOwners || allowedOwners.has(String(item.representativeId)))
-      .filter((item) => !covered.has(`${item.phone || ""}:${item.followUpDate || ""}`))
+      .filter((item) => !isLegacyCoveredByDurable(durableItems, item))
       .map((item) => ({
         ...item,
         id: `legacy:${item.phone}:${item.followUpDate || "none"}`,
@@ -630,14 +657,17 @@ async function mergeLegacyItems(durableItems, { organizationId, ownerUserIds, re
         dueDate: item.followUpDate,
         dueTime: item.followUpTime,
         canManage: false,
+        canSetDate: !item.followUpDate,
         obligationStatus:
           item.status === "overdue"
             ? FOLLOW_UP_STATUSES.OVERDUE
             : item.status === "due-today"
               ? FOLLOW_UP_STATUSES.DUE
-              : item.status === "completed"
-                ? FOLLOW_UP_STATUSES.COMPLETED
-                : FOLLOW_UP_STATUSES.OPEN
+              : item.status === "needs-date"
+                ? FOLLOW_UP_STATUSES.OPEN
+                : item.status === "completed"
+                  ? FOLLOW_UP_STATUSES.COMPLETED
+                  : FOLLOW_UP_STATUSES.OPEN
       }));
   } catch {
     return [];
