@@ -7,12 +7,14 @@ const {
 } = require("../core/tenantOperationalIdentity");
 const recruitingConfigRoutes = require("./recruitingConfig");
 const organizationBillingRoutes = require("./organizationBilling");
+const organizationAiQualityRoutes = require("./organizationAiQuality");
 
 const router = express.Router();
 
 router.use(...protectedRoute());
 router.use(recruitingConfigRoutes);
 router.use(organizationBillingRoutes);
+router.use(organizationAiQualityRoutes);
 
 router.get("/settings", async (req, res) => {
   try {

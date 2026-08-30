@@ -12,6 +12,7 @@ const {
 } = require("../core/effectiveOrganizationContext");
 
 const platformBillingRoutes = require("./platformBilling");
+const platformAiQualityRoutes = require("./platformAiQuality");
 
 const router = express.Router();
 
@@ -299,5 +300,7 @@ router.get("/whatsapp-inbound-webhooks", async (req, res) => {
     });
   }
 });
+
+router.use("/ai-quality", platformAiQualityRoutes);
 
 module.exports = router;

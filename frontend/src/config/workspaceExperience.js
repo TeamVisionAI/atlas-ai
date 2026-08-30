@@ -240,6 +240,13 @@ const NAV_ITEM_DEFS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
     requiresSuperAdmin: true
   },
+  platformAiQuality: {
+    id: "platform-ai-quality",
+    path: appPath("platform/ai-quality"),
+    labelKey: "navAiQuality",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR],
+    requiresSuperAdmin: true
+  },
   whatsapp: {
     id: "whatsapp",
     path: appPath("settings/whatsapp"),
@@ -274,7 +281,13 @@ const LEADERSHIP_EXTENSION_NAV = Object.freeze({
 
 /** Administration surfaces — configuration and platform operations. */
 const ADMINISTRATION_NAV = Object.freeze({
-  [WORKSPACE_TYPES.ADMINISTRATOR]: ["settings", "adminUsers", "operationsCenter", "platformTenants"],
+  [WORKSPACE_TYPES.ADMINISTRATOR]: [
+    "settings",
+    "adminUsers",
+    "operationsCenter",
+    "platformTenants",
+    "platformAiQuality"
+  ],
   [WORKSPACE_TYPES.MANAGEMENT]: ["settings", "adminUsers"],
   [WORKSPACE_TYPES.REPRESENTATIVE]: ["settings"]
 });
@@ -438,6 +451,9 @@ export const ROUTE_ACCESS = Object.freeze({
   "platform/tenants": {
     requiresSuperAdmin: true
   },
+  "platform/ai-quality": {
+    requiresSuperAdmin: true
+  },
   "my-account": {}
 });
 
@@ -535,6 +551,10 @@ export function resolveRouteKey(pathname) {
 
   if (normalized[0] === "platform" && normalized[1] === "tenants") {
     return "platform/tenants";
+  }
+
+  if (normalized[0] === "platform" && normalized[1] === "ai-quality") {
+    return "platform/ai-quality";
   }
 
   if (normalized[0] === "prospect-workspace") {

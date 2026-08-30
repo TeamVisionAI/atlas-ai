@@ -122,3 +122,56 @@ export async function markTenantPaid(id, payload) {
     body: JSON.stringify(payload)
   });
 }
+
+export async function getAiQualitySettings() {
+  return apiFetch("/api/platform/ai-quality/settings");
+}
+
+export async function getAiQualityOverview(query = {}) {
+  const params = new URLSearchParams();
+  if (query.organizationId) {
+    params.set("organizationId", query.organizationId);
+  }
+  const suffix = params.toString() ? `?${params}` : "";
+  return apiFetch(`/api/platform/ai-quality/overview${suffix}`);
+}
+
+export async function listAiQualityCases(query = {}) {
+  const params = new URLSearchParams();
+  if (query.organizationId) {
+    params.set("organizationId", query.organizationId);
+  }
+  if (query.tab) {
+    params.set("tab", query.tab);
+  }
+  if (query.signalType) {
+    params.set("signalType", query.signalType);
+  }
+  const suffix = params.toString() ? `?${params}` : "";
+  return apiFetch(`/api/platform/ai-quality/cases${suffix}`);
+}
+
+export async function getAiQualityCase(id) {
+  return apiFetch(`/api/platform/ai-quality/cases/${id}`);
+}
+
+export async function reviewAiQualityCase(id, payload) {
+  return apiFetch(`/api/platform/ai-quality/cases/${id}/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function listAiQualityRegressions(query = {}) {
+  const params = new URLSearchParams();
+  if (query.organizationId) {
+    params.set("organizationId", query.organizationId);
+  }
+  const suffix = params.toString() ? `?${params}` : "";
+  return apiFetch(`/api/platform/ai-quality/regressions${suffix}`);
+}
+
+export async function getAiQualityRegressionSpec(id) {
+  return apiFetch(`/api/platform/ai-quality/regressions/${id}/spec`);
+}

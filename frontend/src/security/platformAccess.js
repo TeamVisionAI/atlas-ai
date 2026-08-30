@@ -18,6 +18,10 @@ export function canAccessPlatformTenantsPage(user) {
   return isSuperAdminUser(user);
 }
 
+export function canAccessAiQualityPage(user) {
+  return isSuperAdminUser(user);
+}
+
 export function isTenantSuspended(tenant) {
   return String(tenant?.lifecycleStatus || tenant?.status || "")
     .trim()

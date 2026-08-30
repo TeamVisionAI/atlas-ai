@@ -189,6 +189,8 @@ describe("app shell wiring", () => {
   it("registers /app/platform/tenants", () => {
     assert.match(appSource, /path="platform\/tenants"/);
     assert.match(appSource, /PlatformTenantsPage/);
+    assert.match(appSource, /path="platform\/ai-quality"/);
+    assert.match(appSource, /AiQualityPage/);
   });
 
   it("renders tenant list fields and create/status/admin/support actions", () => {
