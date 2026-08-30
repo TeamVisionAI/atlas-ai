@@ -26,6 +26,7 @@ import {
 } from "../engines/knowledgeHubAccess";
 import { exitSupportMode, getSupportMode } from "../services/platformService";
 import { isSuperAdminUser } from "../security/isSuperAdminUser";
+import NotificationBell from "../components/layout/NotificationBell";
 import {
   conversationsAccessAllowsNav,
   resolveConversationsAccessStateFromPayload
@@ -124,6 +125,7 @@ function SidebarNav({
                 ×
               </button>
             ) : null}
+            <NotificationBell enabled={Boolean(currentUser)} />
           </div>
         </div>
 
@@ -630,6 +632,7 @@ export default function MainLayout() {
               ☰
             </button>
             <span className="atlas-layout__header-title">{translate("layoutAppTitle")}</span>
+            <NotificationBell enabled={Boolean(currentUser)} />
           </header>
 
           <main className="atlas-layout__main">

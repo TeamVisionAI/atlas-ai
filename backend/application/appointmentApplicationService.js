@@ -97,6 +97,26 @@ const {
   resolveCanonicalOfficeAddress
 } = require("../core/officeAddressResolver");
 
+function notifyAppointmentLifecycle(eventType, appointment, extras = {}) {
+  // Implements BR-176 — fail-open; never changes scheduling.
+  Promise.resolve()
+    .then(() => {
+      const { notifyOperationalEvent } = require("../services/agentNotificationService");
+      const { EVENT_TYPES, ENTITY_TYPES } = require("../core/agentNotifications/constants");
+      return notifyOperationalEvent({
+        eventType: EVENT_TYPES[eventType] || eventType,
+        organizationId: appointment?.organizationId || extras.organizationId || null,
+        appointment,
+        entityType: ENTITY_TYPES.APPOINTMENT,
+        entityId: appointment?.id || null,
+        startDateTime: appointment?.startDateTime || extras.startDateTime || null,
+        actionUrl: "/app/appointments",
+        recipientUserId: extras.recipientUserId || null
+      });
+    })
+    .catch(() => {});
+}
+
 async function resolveOwnerRepId(agentId) {
   const user = await findUserById(agentId);
   return user?.rep_id || null;
@@ -699,6 +719,7 @@ async function createAppointment(input, context = {}) {
   const appointment = scheduledResult.appointment;
 
   const saved = await appointmentRepository.save(appointment);
+  notifyAppointmentLifecycle("NEW_APPOINTMENT", saved);
 
   // Implements BR-172 — release temporary TAKE OVER after any successful create.
   // Fail-open: a booking must not roll back if ownership write fails.
@@ -948,6 +969,9 @@ async function persistRescheduledAppointment(appointment, input, context = {}) {
   };
 
   const saved = await appointmentRepository.save(updated);
+  notifyAppointmentLifecycle("APPOINTMENT_RESCHEDULED", saved, {
+    startDateTime: saved.startDateTime
+  });
   const reminderResult = await appointmentReminderEngine.replaceReminders(saved);
 
   await appointmentRepository.save({
@@ -1053,6 +1077,7 @@ async function cancelAppointment(id, input, context = {}) {
     calendarEventId: null,
     reminderStatus: REMINDER_STATUSES.CANCELLED
   });
+  notifyAppointmentLifecycle("APPOINTMENT_CANCELLED", saved);
 
   await updateProspectInOrganization(
     appointment.prospectPhone,
@@ -1153,6 +1178,9 @@ async function requestHumanAssist(id, input, context = {}) {
       }
     },
     updatedAt: nowIso()
+  });
+  notifyAppointmentLifecycle("HUMAN_TAKEOVER_REQUESTED", saved, {
+    recipientUserId: saved.interviewerUserId || saved.agentId || agentId || null
   });
 
   await emitAppointmentEvent(

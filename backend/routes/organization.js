@@ -8,6 +8,7 @@ const {
 const recruitingConfigRoutes = require("./recruitingConfig");
 const organizationBillingRoutes = require("./organizationBilling");
 const organizationAiQualityRoutes = require("./organizationAiQuality");
+const agentNotificationRoutes = require("./agentNotifications");
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.use(...protectedRoute());
 router.use(recruitingConfigRoutes);
 router.use(organizationBillingRoutes);
 router.use(organizationAiQualityRoutes);
+router.use(agentNotificationRoutes);
 
 router.get("/settings", async (req, res) => {
   try {

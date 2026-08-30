@@ -454,7 +454,8 @@ export const ROUTE_ACCESS = Object.freeze({
   "platform/ai-quality": {
     requiresSuperAdmin: true
   },
-  "my-account": {}
+  "my-account": {},
+  notifications: {}
 });
 
 function canSeeNavItem(def, user, workspaceType, operationsAllowed) {

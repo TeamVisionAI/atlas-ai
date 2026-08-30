@@ -2603,6 +2603,32 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-176 — Agent Notifications Foundation
+
+**Implements:** Durable, tenant-safe in-app notifications so the responsible Atlas user is told when an important operational event happens, without watching Mission Control continuously.  
+**Domain:** Notifications / operational events / workspace shell  
+**Depends on:** BR-080, BR-135, appointment application services, workflow state persistence  
+**Related:** BR-049, BR-160, BR-172  
+**Status:** V1 implemented — in-app channel only; sound default OFF  
+**Engine target:** `agentNotifications/*`; `agentNotificationService`; `/api/organization/notifications`; NotificationBell; `/app/notifications`  
+**Tests:** `backend/test/agentNotificationsBr176.test.js`; `frontend/src/engines/agentNotificationSound.test.js`
+
+### Rules
+
+1. **V1 events** — `NEW_APPOINTMENT`, `APPOINTMENT_RESCHEDULED`, `APPOINTMENT_CANCELLED`, `NEEDS_ATTENTION`, `HUMAN_TAKEOVER_REQUESTED`.
+2. **Durable + deduped** — Persist tenant-scoped rows (`organization_id`, `recipient_user_id`, `event_type`, copy, entity, `action_url`, `severity`, `read_at`, `dismissed_at`, `dedup_key`). Deterministic `dedup_key` prevents the same operational event from spamming.
+3. **Route to one responsible user** — Appointments → interviewer / assigned agent / creator. Needs Attention and takeover request → current owner / assigned agent. Never broadcast tenant-wide. Never route by phone alone. No recipient → persist nothing.
+4. **Own feed only** — A user may read/update only their notifications. Tenant Admin does not see another user’s personal feed. Super Admin control-plane (`controlPlaneOnly`) returns an empty feed. No cross-tenant leakage.
+5. **Canonical hooks only** — Create/reschedule/cancel and `requestHumanAssist` notify from `appointmentApplicationService` after persist. Needs Attention notifies on `workflowStateStore.savePersistedWorkflowState` enter-edge only (including `explicit_human_request` / `recruiter_escalation` as takeover request). Do not hook Recruit AI decision/semantic apply, UI routes, or pollers.
+6. **Needs Attention enter, not poll** — Notify when state meaningfully enters Needs Attention. Do not notify on every read. A genuinely new episode may create a new notification. Sticky TAKE OVER (`manualAgentOwnership` + `humanTakenOverAt`) is not an enter.
+7. **In-app V1** — Bell with unread badge, recent list, unread/read, mark read / mark all read, click → `action_url`. Full page `/app/notifications`. Optional browser chime for new unread high-value events; default sound OFF; no loop; no sound for historical/already-read; respect autoplay.
+8. **Preferences** — Per-user `atlas_users.notification_preferences.agentNotifications`: `inAppEnabled` (default ON), `soundEnabled` (default OFF), event toggles. Merge only that namespace so urgent-WhatsApp keys survive. Sound preference must not affect persistence.
+9. **Channels stay separate** — Operational event → routing → channel delivery. V1 channel is in-app. Do not couple creation to WhatsApp, email, FCM, or APNs.
+10. **Audit** — Audit preference updates only. Do not write `atlas_audit_log` for every read.
+11. **Boundaries** — Do not change Recruit AI qualification, semantic apply, AI Quality capture, appointment scheduling rules, or ownership semantics. Do not send real external notifications from tests.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

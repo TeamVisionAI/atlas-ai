@@ -12,6 +12,10 @@ import {
   updateAccountProfile,
   uploadAccountPhoto
 } from "../../services/accountService";
+import {
+  getAgentNotificationPreferences,
+  updateAgentNotificationPreferences
+} from "../../services/agentNotificationService";
 import { logoutAtlasSession, storeSessionToken } from "../../services/atlasAuthService";
 import ProfilePhotoEditor from "../../components/ui/ProfilePhotoEditor";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
@@ -32,6 +36,7 @@ export default function MyAccount() {
     newPassword: ""
   });
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState(null);
 
   async function loadProfile() {
     const result = await fetchAccountProfile();
@@ -45,6 +50,9 @@ export default function MyAccount() {
 
   useEffect(() => {
     loadProfile().catch((loadError) => setError(loadError.message));
+    getAgentNotificationPreferences()
+      .then((result) => setNotificationPrefs(result.preferences || null))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -214,6 +222,49 @@ export default function MyAccount() {
               Save Profile
             </button>
           </form>
+          {notificationPrefs ? (
+            <form
+              className="identity-form"
+              style={{ marginTop: "1.5rem" }}
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const result = await updateAgentNotificationPreferences(notificationPrefs);
+                setNotificationPrefs(result.preferences);
+                setMessage("Notification preferences updated.");
+              }}
+            >
+              <h3>Notifications</h3>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={Boolean(notificationPrefs.inAppEnabled)}
+                  onChange={(event) =>
+                    setNotificationPrefs({
+                      ...notificationPrefs,
+                      inAppEnabled: event.target.checked
+                    })
+                  }
+                />
+                In-app notifications
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={Boolean(notificationPrefs.soundEnabled)}
+                  onChange={(event) =>
+                    setNotificationPrefs({
+                      ...notificationPrefs,
+                      soundEnabled: event.target.checked
+                    })
+                  }
+                />
+                Notification sound
+              </label>
+              <button type="submit" className="identity-button-secondary">
+                Save notification preferences
+              </button>
+            </form>
+          ) : null}
         </div>
       ) : null}
 

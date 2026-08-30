@@ -495,6 +495,41 @@ async function loadPersistedWorkflowState(phone, options = {}) {
  * @param {object} patch
  * @param {{ organizationId?: string, prospectId?: string, backend?: string }} [options]
  */
+async function notifyNeedsAttentionEnter(previous, next, options = {}) {
+  // Implements BR-176 — edge-detect only; fail-open.
+  try {
+    const {
+      enteredNeedsAttention,
+      classifyAttentionEvent
+    } = require("./agentNotifications/routing");
+    if (!enteredNeedsAttention(previous, next)) {
+      return;
+    }
+    const { notifyOperationalEvent } = require("../services/agentNotificationService");
+    const { ENTITY_TYPES } = require("./agentNotifications/constants");
+    const eventType = classifyAttentionEvent(next.handoffReason || options.handoffReason);
+    await notifyOperationalEvent({
+      eventType,
+      organizationId: options.organizationId || next.organizationId || null,
+      recipientUserId:
+        options.ownerUserId ||
+        options.assignedUserId ||
+        next.ownerUserId ||
+        options.prospect?.owner_user_id ||
+        options.prospect?.ownerUserId ||
+        null,
+      entityType: ENTITY_TYPES.CONVERSATION,
+      entityId: options.prospectId || next.prospectId || null,
+      episodeKey: next.stallEpisodeKey || null,
+      workflow: next,
+      prospect: options.prospect || null,
+      actionUrl: "/app/conversations"
+    });
+  } catch {
+    // ignore
+  }
+}
+
 async function savePersistedWorkflowState(phone, patch, options = {}) {
   if (!phone) {
     return defaultWorkflowRecord();
@@ -511,13 +546,19 @@ async function savePersistedWorkflowState(phone, patch, options = {}) {
     next = preserveDurableRuntimeFields(latest, cleanPatch, next);
     next = normalizeRecord(next);
     if (backend === "memory") {
-      return saveToMemory(phone, next);
+      const saved = await saveToMemory(phone, next);
+      await notifyNeedsAttentionEnter(current, saved, options);
+      return saved;
     }
-    return saveToFile(phone, next);
+    const saved = await saveToFile(phone, next);
+    await notifyNeedsAttentionEnter(current, saved, options);
+    return saved;
   }
 
   if (backend === "database") {
-    return saveToDatabase(phone, next, { ...options, _cleanPatch: cleanPatch });
+    const saved = await saveToDatabase(phone, next, { ...options, _cleanPatch: cleanPatch });
+    await notifyNeedsAttentionEnter(current, saved, options);
+    return saved;
   }
 
   const error = new Error(`Unknown workflow state backend: ${backend}`);
