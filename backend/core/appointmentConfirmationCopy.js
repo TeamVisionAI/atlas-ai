@@ -54,9 +54,9 @@ function resolveAppointmentTimezone(appointment = {}) {
   return appointment.timezone || appointment.timeZone || "America/New_York";
 }
 
-function formatAppointmentWhen(appointment = {}, languageCode = "en") {
+function formatZonedAppointmentWhen(appointment = {}, languageCode = "en", options = {}) {
   const startIso = resolveAppointmentStartIso(appointment);
-  const timezone = resolveAppointmentTimezone(appointment);
+  const timezone = options.timeZone || resolveAppointmentTimezone(appointment);
 
   if (!startIso) {
     return "";
@@ -66,7 +66,7 @@ function formatAppointmentWhen(appointment = {}, languageCode = "en") {
 
   try {
     return new Date(startIso).toLocaleString(locale, {
-      weekday: "long",
+      weekday: options.weekday,
       month: "short",
       day: "numeric",
       hour: "numeric",
@@ -74,8 +74,20 @@ function formatAppointmentWhen(appointment = {}, languageCode = "en") {
       timeZone: timezone
     });
   } catch {
-    return String(startIso);
+    return options.failClosed ? "" : String(startIso);
   }
+}
+
+function formatAppointmentWhen(appointment = {}, languageCode = "en") {
+  return formatZonedAppointmentWhen(appointment, languageCode, { weekday: "long" });
+}
+
+/** In-app friendly wall clock, e.g. "Aug 29, 8:30 PM". UTC storage stays unchanged. */
+function formatAppointmentWhenShort(appointment = {}, languageCode = "en", timeZone = null) {
+  return formatZonedAppointmentWhen(appointment, languageCode, {
+    timeZone,
+    failClosed: true
+  });
 }
 
 function resolveOfficeAddress(appointment = {}) {
@@ -144,5 +156,7 @@ module.exports = {
   buildAppointmentConfirmationIdempotencyKey,
   buildPersistedAppointmentConfirmation,
   formatAppointmentWhen,
+  formatAppointmentWhenShort,
+  resolveAppointmentTimezone,
   isVirtualMeeting
 };
