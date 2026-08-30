@@ -60,7 +60,9 @@ const {
   normalizeStateToken,
   looksLikeLocationCorrection,
   proposeStateFromCity,
-  isCompleteCityStatePhrase
+  isCompleteCityStatePhrase,
+  canonicalizeCityName,
+  isStateNameNotCity
 } = require("./locationFacts");
 const { extractExplicitEmailFromText } = require("./prospectContactFactSync");
 const {
@@ -673,11 +675,22 @@ function lastQuestionImpliesLocation(context) {
   return /ciudad|estado|city and state|which state|florida\?/.test(lastOut);
 }
 
-/** City is missing or not yet a usable fact (BR-102 location-pending). */
+/** City is missing, unknown, or a misclassified state name (BR-102 / BR-173). */
 function isCityUnresolved(context) {
   const city = context?.knownFacts?.city;
   const certainty = String(context?.knownFacts?.cityCertainty || "unknown").toLowerCase();
-  return !city || certainty === "unknown";
+  if (!city || certainty === "unknown") {
+    return true;
+  }
+  return isStateNameNotCity(city);
+}
+
+function usableKnownCity(context) {
+  const city = context?.knownFacts?.city;
+  if (!city || isStateNameNotCity(city)) {
+    return null;
+  }
+  return canonicalizeCityName(city) || city;
 }
 
 /** Confirmed state must not be replaced by a later state-only token (BR-102). */
@@ -1410,9 +1423,11 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.completeness = "partial";
   } else {
     const location = parseLocationAnswer(text);
+    // Implements BR-173 — ignore a prior "city" that is actually a state name.
+    const knownCity = usableKnownCity(context);
     const awaitingState =
       locationCtx &&
-      context?.knownFacts?.city &&
+      knownCity &&
       (!context?.knownFacts?.state ||
         context?.knownFacts?.stateCertainty === "partial" ||
         context?.knownFacts?.stateCertainty === "proposed" ||
@@ -1420,10 +1435,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     const isCorrection =
       Boolean(location?.correction) || looksLikeLocationCorrection(text);
 
-    if (location?.completeness === "state_only" && (awaitingState || context?.knownFacts?.city)) {
+    if (location?.completeness === "state_only" && (awaitingState || knownCity)) {
       intent = INTENTS.PROVIDE_LOCATION;
       confidence = 0.9;
-      entities.city = context?.knownFacts?.city || null;
+      entities.city = knownCity;
       entities.state = retainResolvedState(context, location.state);
       entities.completeness = "complete";
       entities.requiresClarification = false;
@@ -1443,7 +1458,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     } else if (location?.completeness === "complete") {
       intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
       confidence = 0.9;
-      entities.city = location.city;
+      entities.city = canonicalizeCityName(location.city) || location.city;
       entities.state = location.state;
       entities.completeness = "complete";
       entities.requiresClarification = false;
@@ -1454,12 +1469,14 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       const priorStateCertainty = context?.knownFacts?.stateCertainty || null;
       const priorStateOk =
         priorStateCertainty === "confirmed" && priorState;
-      // BR-102 — city after retained state-only partial completes Miami + Florida.
+      // BR-102 / BR-173 — city after retained state-only partial completes the pair.
       const priorStatePartial =
         Boolean(priorState) &&
         (priorStateCertainty === "partial" ||
+          priorStateCertainty === "confirmed" ||
           context?.conversation?.lastQuestionAsked === "ask_city");
-      const proposed = location.proposedState || proposeStateFromCity(location.city);
+      const resolvedCity = canonicalizeCityName(location.city) || location.city;
+      const proposed = location.proposedState || proposeStateFromCity(resolvedCity);
       if (
         (isCorrection && priorStateOk && proposed && proposed === priorState) ||
         (priorStatePartial &&
@@ -1467,7 +1484,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       ) {
         intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
         confidence = 0.9;
-        entities.city = location.city;
+        entities.city = resolvedCity;
         entities.state = priorState;
         entities.completeness = "complete";
         entities.requiresClarification = false;
@@ -1476,7 +1493,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       } else {
         intent = isCorrection ? INTENTS.CORRECT_LOCATION : INTENTS.PROVIDE_LOCATION;
         confidence = 0.86;
-        entities.city = location.city;
+        entities.city = resolvedCity;
         entities.state = null;
         entities.proposedState = location.proposedState;
         entities.completeness = "partial";

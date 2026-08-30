@@ -1,7 +1,9 @@
 /**
- * Recruit AI v2 — location facts (BR-082 / BR-094).
+ * Recruit AI v2 — location facts (BR-082 / BR-094 / BR-173).
  * City-only answers are partial. City + recognized state abbrev/name → confirmed.
  * Implements BR-094 — U.S. postal abbreviation / informal city-state normalization.
+ * Implements BR-173 — Spanish/English state aliases, safe city-typo canonicalization,
+ * and order-independent merge of city-then-state or state-then-city.
  * Uses BR-095 inbound normalization for case/punctuation/whitespace tolerance.
  */
 
@@ -114,28 +116,98 @@ const AMBIGUOUS_US_CITIES = new Set([
   "ashland"
 ]);
 
-/** Alias → canonical lookup key in CITY_TO_PROPOSED_STATE. */
+/** Alias → canonical lookup key in CITY_TO_PROPOSED_STATE / CANONICAL_CITY_KEYS. */
 const CITY_LOOKUP_ALIASES = Object.freeze({
   wpb: "west palm beach",
   "ft lauderdale": "fort lauderdale",
   "ft. lauderdale": "fort lauderdale",
   "sunny isles": "sunny isles beach",
-  pompano: "pompano beach"
+  pompano: "pompano beach",
+  bluftton: "bluffton"
 });
 
-function normalizeCityLookupKey(raw) {
-  const folded = String(raw || "")
+/**
+ * Known city spellings that may canonicalize even when state is not proposed.
+ * Bluffton is nationally ambiguous (SC/IN/OH) — spelling only, no auto-state.
+ */
+const CANONICAL_CITY_KEYS = new Set([
+  ...Object.keys(CITY_TO_PROPOSED_STATE),
+  "bluffton"
+]);
+
+function foldLocationToken(value) {
+  return String(value || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[.,]+/g, " ")
+    .replace(/\./g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function levenshteinDistance(a, b) {
+  const left = String(a || "");
+  const right = String(b || "");
+  const rows = left.length;
+  const cols = right.length;
+  const dp = Array.from({ length: rows + 1 }, () => new Array(cols + 1).fill(0));
+  for (let i = 0; i <= rows; i += 1) {
+    dp[i][0] = i;
+  }
+  for (let j = 0; j <= cols; j += 1) {
+    dp[0][j] = j;
+  }
+  for (let i = 1; i <= rows; i += 1) {
+    for (let j = 1; j <= cols; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[rows][cols];
+}
+
+function normalizeCityLookupKey(raw) {
+  const folded = foldLocationToken(raw).replace(/[.,]+/g, " ").replace(/\s+/g, " ").trim();
   if (!folded) {
     return "";
   }
   return CITY_LOOKUP_ALIASES[folded] || folded;
+}
+
+function resolveCanonicalCityKey(raw) {
+  const aliased = normalizeCityLookupKey(raw);
+  if (!aliased) {
+    return "";
+  }
+  if (CANONICAL_CITY_KEYS.has(aliased)) {
+    return aliased;
+  }
+  if (/\s/.test(aliased) || aliased.length < 6) {
+    return aliased;
+  }
+  const matches = [];
+  for (const candidate of CANONICAL_CITY_KEYS) {
+    if (/\s/.test(candidate) || candidate.length < 6) {
+      continue;
+    }
+    if (Math.abs(candidate.length - aliased.length) > 1) {
+      continue;
+    }
+    if (levenshteinDistance(aliased, candidate) === 1) {
+      matches.push(candidate);
+    }
+  }
+  return matches.length === 1 ? matches[0] : aliased;
+}
+
+function canonicalizeCityName(raw) {
+  const key = resolveCanonicalCityKey(raw);
+  return key ? titleCaseCity(key) : null;
 }
 
 function isHighConfidenceFloridaCity(city) {
@@ -223,16 +295,23 @@ const US_STATE_NAME_TO_ABBR = Object.freeze({
   nevada: "NV",
   nv: "NV",
   "new hampshire": "NH",
+  "nueva hampshire": "NH",
   nh: "NH",
   "new jersey": "NJ",
+  "nueva jersey": "NJ",
   nj: "NJ",
   "new mexico": "NM",
+  "nuevo mexico": "NM",
   nm: "NM",
   "new york": "NY",
+  "nueva york": "NY",
   ny: "NY",
   "north carolina": "NC",
+  "norte carolina": "NC",
+  "carolina del norte": "NC",
   nc: "NC",
   "north dakota": "ND",
+  "dakota del norte": "ND",
   nd: "ND",
   ohio: "OH",
   oh: "OH",
@@ -245,8 +324,11 @@ const US_STATE_NAME_TO_ABBR = Object.freeze({
   "rhode island": "RI",
   ri: "RI",
   "south carolina": "SC",
+  "sur carolina": "SC",
+  "carolina del sur": "SC",
   sc: "SC",
   "south dakota": "SD",
+  "dakota del sur": "SD",
   sd: "SD",
   tennessee: "TN",
   tn: "TN",
@@ -261,6 +343,7 @@ const US_STATE_NAME_TO_ABBR = Object.freeze({
   washington: "WA",
   wa: "WA",
   "west virginia": "WV",
+  "virginia occidental": "WV",
   wv: "WV",
   wisconsin: "WI",
   wi: "WI",
@@ -275,8 +358,9 @@ const US_POSTAL_ABBREVIATIONS = new Set(Object.values(US_STATE_NAME_TO_ABBR));
 /** @deprecated use US_STATE_NAME_TO_ABBR — kept for existing importers */
 const STATE_NAMES = US_STATE_NAME_TO_ABBR;
 
+// "south/north carolina" are U.S. states (BR-173), not regional city phrases.
 const REGIONAL_PHRASE_RE =
-  /^(south|north|central)\s+(florida|texas|california|carolina)$/i;
+  /^(south|north|central)\s+(florida|texas|california)$/i;
 const REGION_ONLY_CITY_RE = /^(south|north|central|east|west)$/i;
 const LOCATION_HEDGE_RE =
   /\b(maybe|perhaps|i think|not sure|quiz[aá]s|creo que|no s[eé]|posiblemente)\b/i;
@@ -300,10 +384,7 @@ function titleCaseCity(raw) {
  * Only known postal codes / state names — never arbitrary two-letter scraps (BR-094).
  */
 function normalizeStateToken(value) {
-  const text = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\./g, "");
+  const text = foldLocationToken(value);
   if (!text) {
     return null;
   }
@@ -312,6 +393,14 @@ function normalizeStateToken(value) {
     return US_POSTAL_ABBREVIATIONS.has(upper) ? upper : null;
   }
   return US_STATE_NAME_TO_ABBR[text] || null;
+}
+
+/** True when text is a US state/territory name and not a known city (e.g. New York). */
+function isStateNameNotCity(raw) {
+  if (!normalizeStateToken(raw)) {
+    return false;
+  }
+  return !CITY_TO_PROPOSED_STATE[normalizeCityLookupKey(raw)];
 }
 
 function proposeStateFromCity(city) {
@@ -398,9 +487,9 @@ function isPlausibleCityName(city) {
   if (looksLikeConversationalProseCity(t)) {
     return false;
   }
-  // Reject bare state tokens as cities ("Florida", "FL").
-  // Allow multi-word places that share a state name (e.g. city "New York" + state NY).
-  if (!/\s/.test(t) && normalizeStateToken(t)) {
+  // Reject bare / multi-word state tokens as cities ("Florida", "Sur Carolina").
+  // Keep real cities that share a region name (e.g. city "New York").
+  if (isStateNameNotCity(t)) {
     return false;
   }
   return true;
@@ -733,7 +822,7 @@ function parseLocationAnswerCore(raw) {
   const stateOnly = normalizeStateToken(working);
   if (
     stateOnly &&
-    working.split(/\s+/).length <= 2 &&
+    working.split(/\s+/).length <= 4 &&
     !isFalsePositiveStateToken(working)
   ) {
     return {
@@ -746,8 +835,8 @@ function parseLocationAnswerCore(raw) {
   }
 
   // Known city-only — high-confidence Florida cities resolve complete (no state ask).
-  const cityKey = normalizeCityLookupKey(working);
-  const highConfidenceFl = !hedged ? buildHighConfidenceFloridaLocation(working) : null;
+  const cityKey = resolveCanonicalCityKey(working);
+  const highConfidenceFl = !hedged ? buildHighConfidenceFloridaLocation(cityKey || working) : null;
   if (highConfidenceFl) {
     return highConfidenceFl;
   }
@@ -780,14 +869,14 @@ function parseLocationAnswerCore(raw) {
         requiresClarification: false
       };
     }
-    const city = titleCaseCity(working);
+    const city = titleCaseCity(cityKey || working);
     if (!isPlausibleCityName(city)) {
       return null;
     }
     return {
       city,
       state: null,
-      proposedState: null,
+      proposedState: proposeStateFromCity(city),
       completeness: "partial",
       requiresClarification: true
     };
@@ -808,7 +897,7 @@ function parseLocationAnswerCore(raw) {
       if (multiWordFl) {
         return multiWordFl;
       }
-      const city = titleCaseCity(working);
+      const city = titleCaseCity(cityKey || working);
       if (!isPlausibleCityName(city)) {
         return null;
       }
@@ -892,6 +981,9 @@ module.exports = {
   proposeStateFromCity,
   normalizeStateToken,
   titleCaseCity,
+  canonicalizeCityName,
+  resolveCanonicalCityKey,
+  isStateNameNotCity,
   isCompleteCityStatePhrase,
   hasLocationHedge,
   stateDisplayName

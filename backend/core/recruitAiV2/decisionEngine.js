@@ -65,7 +65,11 @@ const {
 const { READ_STATUS } = require("./schedulingAvailabilityReader");
 const { mergeSchedulingConstraints } = require("../sharedScheduling/schedulingNegotiationState");
 const { applyIulAdDecision } = require("./iulAdConversation");
-const { parseLocationAnswer } = require("./locationFacts");
+const {
+  parseLocationAnswer,
+  canonicalizeCityName,
+  isStateNameNotCity
+} = require("./locationFacts");
 
 function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
   if (!Array.isArray(offeredSlots) || offeredSlots.length === 0) {
@@ -646,7 +650,10 @@ function applyStateOnlyAskCity(structured, context, interpretation, state) {
 function isCityUnresolvedForStateOnly(context) {
   const city = context?.knownFacts?.city;
   const certainty = String(context?.knownFacts?.cityCertainty || "unknown").toLowerCase();
-  return !city || certainty === "unknown";
+  if (!city || certainty === "unknown") {
+    return true;
+  }
+  return isStateNameNotCity(city);
 }
 
 function mergeConversationMetaReset(context) {
@@ -2179,8 +2186,22 @@ function decideConversationTurnCore({
 
   if (intent === INTENTS.PROVIDE_LOCATION) {
     const completeness = interpretation.entities?.completeness;
-    const city = interpretation.entities?.city || context.knownFacts?.city;
-    const state = interpretation.entities?.state;
+    const rawCity = interpretation.entities?.city || context.knownFacts?.city;
+    const city =
+      rawCity && !isStateNameNotCity(rawCity)
+        ? canonicalizeCityName(rawCity) || rawCity
+        : null;
+    const priorState = context.knownFacts?.state || null;
+    const priorStateCertainty = String(
+      context.knownFacts?.stateCertainty || ""
+    ).toLowerCase();
+    // Implements BR-173 — a later city must keep a previously resolved state.
+    const retainableState =
+      Boolean(priorState) &&
+      (priorStateCertainty === "confirmed" || priorStateCertainty === "partial");
+    const state =
+      interpretation.entities?.state ||
+      (completeness === "partial" && retainableState ? priorState : null);
     const proposedState =
       interpretation.entities?.proposedState || context.knownFacts?.proposedState;
 
@@ -2189,7 +2210,7 @@ function decideConversationTurnCore({
       return applyStateOnlyAskCity(structured, context, interpretation, state);
     }
 
-    if (completeness === "partial" || (city && !state)) {
+    if ((completeness === "partial" || (city && !state)) && !state) {
       structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_LOCATION;
       structured.reasonCodes.push(REASON_CODES.PARTIAL_LOCATION);
       structured.reasonCodes.push(REASON_CODES.LOCATION_STATE_UNCONFIRMED);
