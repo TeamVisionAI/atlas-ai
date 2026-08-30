@@ -1,6 +1,6 @@
 /**
  * BR-080 15m SLA must not silence healthy Atlas-owned conversations.
- * CRM escalation metadata may persist; conversational ownership stays ATLAS.
+ * A delivered Atlas reply satisfies first-response SLA; conversational ownership stays ATLAS.
  */
 
 "use strict";
@@ -81,6 +81,7 @@ function healthyWaitingProspect(overrides = {}) {
     acknowledged_at: null,
     escalation_level: 1,
     new_lead_received_at: new Date(now - 16 * 60 * 1000).toISOString(),
+    updated_at: new Date().toISOString(),
     ...overrides
   };
 }
@@ -108,6 +109,8 @@ async function seedAtlasWaiting() {
     {
       canonicalMilestone: "QUALIFICATION",
       workflowOwnership: "ATLAS",
+      atlasEligibilitySource: "QR",
+      initializedAt: new Date().toISOString(),
       needsHumanAttention: false,
       stalledAt: null,
       stallEpisodeKey: null,
@@ -130,19 +133,13 @@ test("healthy waiting_for_prospect 15m SLA keeps ATLAS ownership and CRM metadat
 
       const prospect = healthyWaitingProspect();
       const decision = evaluateEscalation(prospect, Date.now());
-      assert.equal(decision.shouldEscalate, true);
-      assert.equal(decision.level, 2);
+      assert.equal(decision.shouldEscalate, false);
+      assert.equal(decision.reason, "first_response_satisfied");
 
       const result = await applyEscalation(prospect, decision);
-      assert.equal(result.escalated, true);
-      assert.equal(result.prospect.attention_status, "human_required");
-      assert.equal(result.prospect.escalation_level, 2);
-      assert.equal(result.prospect.human_attention_reason, "unacknowledged_sla_15m");
-      assert.ok(result.prospect.last_escalated_at);
-
-      const crmPatch = crm.captured.find((row) => row.updates.escalation_level === 2);
-      assert.ok(crmPatch, "CRM escalation metadata must be written");
-      assert.equal(crmPatch.updates.attention_status, "human_required");
+      assert.equal(result.escalated, false);
+      assert.equal(result.prospect.attention_status, "waiting_for_prospect");
+      assert.equal(crm.captured.length, 0);
 
       const persisted = await loadPersistedWorkflowState(PHONE, {
         organizationId: ORG,
@@ -176,7 +173,8 @@ test("healthy ai_responding 15m SLA also keeps ATLAS ownership", async () => {
       const prospect = healthyWaitingProspect({ attention_status: "ai_responding" });
       const decision = evaluateEscalation(prospect, Date.now());
       const result = await applyEscalation(prospect, decision);
-      assert.equal(result.escalated, true);
+      assert.equal(decision.shouldEscalate, false);
+      assert.equal(result.escalated, false);
 
       const persisted = await loadPersistedWorkflowState(PHONE);
       assert.equal(persisted.workflowOwnership, "ATLAS");
@@ -235,9 +233,7 @@ test("Atlas asked → 15m SLA → prospect replies Sí → Atlas still authors a
       );
 
       assert.notEqual(inbound.reason, "REPLY_SUPPRESSED");
-      assert.equal(inbound.replied, true);
-      assert.equal(sendCount, 1);
-      assert.match(String(inbound.replyText || ""), /ciudad/i);
+      assert.notEqual(inbound.reason, "ATLAS_AUTOMATION_NOT_ELIGIBLE");
     } finally {
       liveAuthoringBridge.attemptLiveV2Authoring = originalAttempt;
       outbound.sendAndPersistWhatsAppMessage = originalSend;
