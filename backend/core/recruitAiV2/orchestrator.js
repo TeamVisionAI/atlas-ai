@@ -41,6 +41,7 @@ const {
   decideNonTextMediaTurn
 } = require("./nonTextMedia");
 const { INTENTS } = require("./constants");
+const { observeSemanticInterpretation } = require("./semantic");
 
 /**
  * BR-118 — short-circuit non-text media before text interpretation.
@@ -495,6 +496,19 @@ async function processRecruitAiV2Turn({
     options
   });
 
+  // Implements BR-174 — shadow semantic observation only. Never applied.
+  let semanticShadow = null;
+  try {
+    semanticShadow = await observeSemanticInterpretation({
+      message,
+      context: loaded,
+      legacyInterpretation: interpretation,
+      options
+    });
+  } catch {
+    semanticShadow = null;
+  }
+
   // Implements BR-107 — read-only availability injection (never writes).
   let resolvedAvailability = availability;
   if (!options.forceSafeFailure && resolvedAvailability == null) {
@@ -730,6 +744,7 @@ async function processRecruitAiV2Turn({
     context: loaded,
     nextContext,
     interpretation,
+    semanticShadow,
     structuredDecision,
     responsePlan,
     rendered,

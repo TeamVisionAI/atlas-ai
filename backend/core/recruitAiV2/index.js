@@ -19,6 +19,12 @@ const {
   extractOfferedSlotsFromText
 } = require("./contextLoader");
 const { interpretInboundMessage } = require("./interpreter");
+const {
+  observeSemanticInterpretation,
+  resolveSemanticInterpreterConfig,
+  validateSemanticInterpretation,
+  projectLegacyInterpretation
+} = require("./semantic");
 const { decideConversationTurn, decideSafeFailure } = require("./decisionEngine");
 const { buildResponsePlan } = require("./responsePlan");
 const { renderCustomerReply } = require("./responseRenderer");
@@ -132,6 +138,10 @@ module.exports = {
   loadContextFromReplayFixture,
   extractOfferedSlotsFromText,
   interpretInboundMessage,
+  observeSemanticInterpretation,
+  resolveSemanticInterpreterConfig,
+  validateSemanticInterpretation,
+  projectLegacyInterpretation,
   decideConversationTurn,
   decideSafeFailure,
   buildResponsePlan,

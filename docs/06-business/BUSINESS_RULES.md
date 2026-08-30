@@ -2555,6 +2555,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-174 — Recruit AI v2 Provider-Neutral Semantic Understanding Layer
+
+**Implements:** Inbound meaning is extracted through a provider-neutral `SemanticInterpretation` contract. Atlas deterministic rules, ownership, scheduling, tenant isolation, execution authorization, BR-166 coherence, and TAKE OVER remain outside the model. The model interprets; Atlas persists. Production behavior stays on the current regex interpreter until a later apply canary.  
+**Domain:** Recruit AI / Conversation understanding  
+**Depends on:** BR-049, BR-081, BR-083, BR-094, BR-102, BR-166, BR-170, BR-171, BR-173  
+**Related:** BR-114 (live authoring unchanged), BR-141 (STT remains a separate OpenAI transcription path)  
+**Status:** Foundation implemented — shadow/observe only  
+**Engine target:** `recruitAiV2/semantic/*`; orchestrator observation hook  
+**Tests:** `backend/test/recruitAiV2SemanticInterpreterBr174.test.js`
+
+### Rules
+
+1. **Contract** — Providers return JSON that is validated into `SemanticInterpretation` (`intent`, `language`, `confidence`, `facts`, `corrections`, `objections`, `schedulingIntent`, date/time/day-part, `meetingPreference`, clarification, safety/privacy). Decision engine never reads provider-specific fields.
+2. **Provider router** — `semanticInterpreter` → `providerRouter` → OpenAI adapter first. Anthropic/Google adapters may be added later without changing Atlas rules.
+3. **Shadow first** — `RECRUIT_AI_V2_SEMANTIC_SHADOW_ENABLED` compares semantic vs legacy and logs disagreements. It must not change replies, context, CRM, ownership, or appointments.
+4. **Apply stays off** — `applyEnabled` is false in this foundation. A later canary may apply accepted high-confidence facts through existing merge/certainty rules only.
+5. **Persistence** — Atlas writes durable facts. The model is not memory. A confirmed fact cannot disappear because a later message omits it. Overwrite only on explicit correction (existing BR-170 / location overwrite guards).
+6. **Fail safe** — Timeout, invalid JSON, low confidence, or missing API key leaves context unchanged and falls back to the deterministic interpreter.
+7. **Minimal context** — Send inbound text, pending question, structured known facts, and appointment status only. Do not send full conversation history.
+8. **Boundaries** — Do not enable live apply, do not change BR-114/111/166/TAKE OVER, do not reuse STT `gpt-transcribe` for chat, do not special-case a phone or tenant.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  
