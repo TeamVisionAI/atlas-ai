@@ -3,9 +3,18 @@
  */
 
 const { EVENT_TYPES, SEVERITIES } = require("./constants");
+const { formatAppointmentWhenShort } = require("../appointmentConfirmationCopy");
 
-function appointmentWhen(appointment = {}) {
-  return appointment.startDateTime || appointment.start_date_time || "";
+function appointmentWhen(event = {}) {
+  const appointment = event.appointment || {};
+  return formatAppointmentWhenShort(
+    {
+      ...appointment,
+      startDateTime: appointment.startDateTime || appointment.start_date_time || event.startDateTime
+    },
+    "en",
+    event.recipientTimezone || null
+  );
 }
 
 function buildNotificationCopy(event = {}) {
@@ -13,8 +22,8 @@ function buildNotificationCopy(event = {}) {
   if (type === EVENT_TYPES.NEW_APPOINTMENT) {
     return {
       title: "New appointment",
-      body: appointmentWhen(event.appointment)
-        ? `An appointment was scheduled for ${appointmentWhen(event.appointment)}.`
+      body: appointmentWhen(event)
+        ? `An appointment was scheduled for ${appointmentWhen(event)}.`
         : "An appointment was scheduled.",
       severity: SEVERITIES.HIGH,
       actionUrl: event.actionUrl || `/app/appointments`
@@ -23,8 +32,8 @@ function buildNotificationCopy(event = {}) {
   if (type === EVENT_TYPES.APPOINTMENT_RESCHEDULED) {
     return {
       title: "Appointment rescheduled",
-      body: appointmentWhen(event.appointment)
-        ? `The appointment was moved to ${appointmentWhen(event.appointment)}.`
+      body: appointmentWhen(event)
+        ? `The appointment was moved to ${appointmentWhen(event)}.`
         : "An appointment was rescheduled.",
       severity: SEVERITIES.HIGH,
       actionUrl: event.actionUrl || `/app/appointments`

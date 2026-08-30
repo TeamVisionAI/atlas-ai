@@ -63,12 +63,16 @@ const {
 } = require("../core/emailNormalization");
 const { getOrganizationSettings } = require("../core/organizationSettingsEngine");
 const { buildIsoTimestamp } = require("../services/availabilityService");
-const { recordHistoryEvent } = require("../core/appointmentHistory");
+const { recordHistoryEvent, presentAppointmentHistory } = require("../core/appointmentHistory");
 const appointmentDomainService = require("../modules/appointments/application/appointmentDomainService");
 const {
   emitAppointmentLifecycleEvent
 } = require("../modules/appointments/application/appointmentEventAdapter");
-const { findUserById } = require("../services/atlasUserService");
+const {
+  findUserById,
+  listOrganizationUsers,
+  resolveUserDisplayName
+} = require("../services/atlasUserService");
 const {
   resolveInterviewAssignmentForSchedule
 } = require("../core/interviewAssignmentEngine");
@@ -250,6 +254,31 @@ async function enrichWithProspect(appointment) {
   };
 }
 
+async function loadOrgActorNameMap(organizationId) {
+  if (!organizationId) {
+    return new Map();
+  }
+
+  try {
+    const users = await listOrganizationUsers(organizationId);
+    return new Map(
+      (users || [])
+        .map((user) => [String(user.id), resolveUserDisplayName(user)])
+        .filter((entry) => entry[0] && entry[1])
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+async function enrichHistoryActors(appointment, nameById = null) {
+  const map = nameById || (await loadOrgActorNameMap(appointment?.organizationId));
+  return {
+    ...appointment,
+    history: presentAppointmentHistory(appointment.history || [], map)
+  };
+}
+
 async function emitAppointmentEvent(phone, eventType, payload = {}, summary) {
   // Implements BR-120 — org-scoped core lookup when organizationId is known.
   const prospectId = await findCoreProspectIdByPhone(
@@ -322,17 +351,18 @@ async function getAppointment(id, organizationId) {
     throw buildError("NOT_FOUND", "Appointment not found.", 404);
   }
 
-  return enrichWithProspect(appointment);
+  return enrichHistoryActors(await enrichWithProspect(appointment));
 }
 
 async function listAppointments(filters) {
   const { listPersistedAppointments } = require("../services/appointmentListService");
   const result = await listPersistedAppointments(filters);
+  const actorNames = await loadOrgActorNameMap(filters.organizationId);
   const items = [];
 
   for (const appointment of result.items) {
     try {
-      items.push(await enrichWithProspect(appointment));
+      items.push(await enrichHistoryActors(await enrichWithProspect(appointment), actorNames));
     } catch (error) {
       console.error("[appointments] enrich failed:", error.message);
       items.push({

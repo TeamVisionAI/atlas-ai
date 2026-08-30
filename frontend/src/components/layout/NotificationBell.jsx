@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { appPath } from "../../config/appRoutes";
 import { resolveAgentNotificationPath } from "../../engines/agentNotificationPath";
 import { resolveNotificationPanelPlacement } from "../../engines/notificationBellPlacement";
+import { presentNotificationBody } from "../../engines/agentNotificationPresentation";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useLanguage } from "../../i18n/LanguageContext";
 import {
   listAgentNotifications,
@@ -19,8 +21,11 @@ import {
 import "./NotificationBell.css";
 
 export default function NotificationBell({ enabled = true }) {
-  const { translate } = useLanguage();
+  const { translate, language } = useLanguage();
+  const { user } = useWorkspace();
   const navigate = useNavigate();
+  const timeZone = user?.timezone || "America/New_York";
+  const dateLocale = language === "es" ? "es-US" : "en-US";
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -189,7 +194,9 @@ export default function NotificationBell({ enabled = true }) {
                         onClick={() => openNotification(item)}
                       >
                         <span className="notification-bell__item-title">{item.title}</span>
-                        <span className="notification-bell__item-body">{item.body}</span>
+                        <span className="notification-bell__item-body">
+                          {presentNotificationBody(item.body, { timeZone, locale: dateLocale })}
+                        </span>
                       </button>
                     </li>
                   ))

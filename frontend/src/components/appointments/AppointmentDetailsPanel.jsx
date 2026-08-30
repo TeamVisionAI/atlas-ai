@@ -1,6 +1,7 @@
 import { useLanguage } from "../../i18n/LanguageContext";
 import AtlasButton from "../ui/AtlasButton";
 import { buildProspectWorkspacePath } from "../../utils/prospectRoutes";
+import { presentHistoryActorLabel } from "../../engines/agentNotificationPresentation";
 import { Link } from "react-router-dom";
 
 export function HumanAssistPanel({ appointment, onReschedule, onResolve, translate: translateProp }) {
@@ -61,7 +62,11 @@ export function AppointmentHistoryPanel({ appointment, locale }) {
               {event.at ? new Date(event.at).toLocaleString(locale) : "—"}
             </time>
           </div>
-          {event.actor ? <p className="appointment-history__actor">{translate("appointmentsHistoryActor")}: {event.actor}</p> : null}
+          {presentHistoryActorLabel(event.actor, event.actorName) ? (
+            <p className="appointment-history__actor">
+              {translate("appointmentsHistoryActor")}: {presentHistoryActorLabel(event.actor, event.actorName)}
+            </p>
+          ) : null}
           {event.reason ? <p className="appointment-history__reason">{translate("appointmentsHistoryReason")}: {event.reason}</p> : null}
           {event.summary ? <p>{event.summary}</p> : null}
         </li>

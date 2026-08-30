@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveAgentNotificationPath } from "../engines/agentNotificationPath";
+import { presentNotificationBody } from "../engines/agentNotificationPresentation";
+import { useWorkspace } from "../contexts/WorkspaceContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import {
   listAgentNotifications,
@@ -10,8 +12,11 @@ import {
 import "../pages/identity/identity.css";
 
 export default function NotificationsPage() {
-  const { translate } = useLanguage();
+  const { translate, language } = useLanguage();
+  const { user } = useWorkspace();
   const navigate = useNavigate();
+  const timeZone = user?.timezone || "America/New_York";
+  const dateLocale = language === "es" ? "es-US" : "en-US";
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
 
@@ -55,7 +60,10 @@ export default function NotificationsPage() {
                 onClick={() => openItem(item)}
               >
                 <strong>{item.title}</strong>
-                <span> {item.body}</span>
+                <span>
+                  {" "}
+                  {presentNotificationBody(item.body, { timeZone, locale: dateLocale })}
+                </span>
               </button>
             </li>
           ))}
