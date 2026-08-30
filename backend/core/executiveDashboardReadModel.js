@@ -150,6 +150,8 @@ async function loadProductionProspects(organizationId, options = {}) {
   );
 
   // Implements BR-159 — Dashboard / MC / Prospect Center / KPIs are operational-only.
+  // BR-180 Today passes includeNonOperationalContacts and then applies its own
+  // attention-candidate filter. Do not change this default for other surfaces.
   if (options.includeNonOperationalContacts === true) {
     return production;
   }

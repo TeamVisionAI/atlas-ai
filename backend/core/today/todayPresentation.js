@@ -8,6 +8,7 @@ const {
   isFirstResponseSlaReason,
   needsManualAcknowledge
 } = require("../newLeadAttentionEngine");
+const { isOperationalProspectRecord } = require("../prospectPromotionEligibility");
 const { FOLLOW_UP_VIEW_STATUSES } = require("../followUps");
 const {
   DISPLAY_PRIORITY,
@@ -36,6 +37,31 @@ function matchesOwnerFilter(ownerId, ownerFilter = {}) {
     return false;
   }
   return ownerFilter.ownerUserIds.map(String).includes(String(ownerId));
+}
+
+/**
+ * Durable CRM attention / inbound clock. Independent of BR-159 pipeline membership.
+ * Implements BR-180 — persisted human_required / new inbound must reach Today.
+ */
+function hasTodayAttentionSignal(prospect = {}) {
+  const attention = String(prospect.attention_status || prospect.attentionStatus || "").toLowerCase();
+  if (attention === "human_required" || attention === "new") {
+    return true;
+  }
+  if (prospect.needs_human_attention === true || prospect.needsHumanAttention === true) {
+    return true;
+  }
+  return Boolean(prospect.new_lead_received_at || prospect.newLeadReceivedAt);
+}
+
+function isTodayProspectCandidate(prospect = {}) {
+  if (!prospect) {
+    return false;
+  }
+  if (hasTodayAttentionSignal(prospect)) {
+    return true;
+  }
+  return isOperationalProspectRecord(prospect);
 }
 
 function isHealedBr080Stale(prospect = {}) {
@@ -68,7 +94,20 @@ function isRealNeedsAttention(prospect = {}) {
 }
 
 function isActionableNewLead(prospect = {}) {
-  return needsManualAcknowledge(prospect);
+  if (!needsManualAcknowledge(prospect)) {
+    return false;
+  }
+  const attention = String(prospect.attention_status || prospect.attentionStatus || "").toLowerCase();
+  if (attention === "human_required") {
+    return false;
+  }
+  if (attention === "new") {
+    return true;
+  }
+  if (!attention) {
+    return Boolean(prospect.new_lead_received_at || prospect.newLeadReceivedAt);
+  }
+  return false;
 }
 
 function formatFriendlyTime(iso, timeZone, locale = "en-US") {
@@ -274,6 +313,8 @@ module.exports = {
   ownerIdOfProspect,
   ownerIdOfAppointment,
   matchesOwnerFilter,
+  hasTodayAttentionSignal,
+  isTodayProspectCandidate,
   isHealedBr080Stale,
   isRealNeedsAttention,
   isActionableNewLead,

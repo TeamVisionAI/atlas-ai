@@ -2727,7 +2727,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Aggregation only** — `/app/today` is a read model. Do not duplicate Needs Attention, appointments, follow-ups, leads, or notifications into a new operational table.
 2. **Default My Today** — Team Today only when existing hierarchy permissions already allow team visibility. Preserve org isolation, owner/subtree rules, Support Mode tenant binding, and Super Admin control-plane empty.
-3. **Sections** — Needs Attention (real cases only; no healed BR-080 SLA false positives), today’s appointments (org-local today), follow-ups due (Due Today / Overdue / Needs Date, recruiting and client), new actionable inbound conversations, unread BR-176 notifications.
+3. **Sections** — Needs Attention (real cases only, including persisted CRM `human_required` / takeover that is not yet a BR-159 pipeline member; no healed BR-080 SLA false positives), today’s appointments (org-local today), follow-ups due (Due Today / Overdue / Needs Date from BR-178 `listFollowUps` including legacy undated coverage; recruiting and client), new actionable inbound conversations, unread BR-176 notifications. My Today stays owner-scoped.
 4. **Display priority** — Human takeover / real NA → overdue follow-ups → appointment soon/today → due-today follow-ups → needs-date → new actionable conversations → notifications. Do not mutate underlying priority/state because an item appears on Today.
 5. **Timezone** — “Today” is the resolved operational timezone (BR-079), not server UTC. Friendly times only in UI.
 6. **Actions** — Reuse existing appointment, follow-up, acknowledgement, and notification-read services/routes. Refresh only Today data after mutations.
