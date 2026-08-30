@@ -57,6 +57,7 @@ Display order only:
 - **Team Today** only when existing hierarchy already allows team visibility (same helper as BR-178)
 - Org isolation, owner/subtree rules, Support Mode tenant binding
 - Super Admin control-plane empty
+- Prospect sections use the canonical `req.authContext` from `buildAuthContext` (including active `status`) so `canAccessProspect` / `isActiveContext` do not fail closed for signed-in users
 
 ## Refresh
 

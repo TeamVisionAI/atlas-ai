@@ -15,6 +15,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const todayService = require("../application/todayActionCenterApplicationService");
+const { actorContext } = require("../routes/today");
 const followUpApplicationService = require("../application/followUpApplicationService");
 const agentNotificationService = require("../services/agentNotificationService");
 const { createMemoryFollowUpStore } = require("../core/followUps");
@@ -626,4 +627,80 @@ test("BR-180 routes, refresh, and source boundaries stay aggregation-only", () =
   assert.match(service, /isTodayProspectCandidate/);
   assert.doesNotMatch(service, /due_date\s+IS\s+NULL|ALTER TABLE atlas_follow_ups/i);
   assert.doesNotMatch(service, /nullable.*due_date|due_date.*nullable/i);
+  assert.match(routes, /\.\.\.context/);
+  assert.match(routes, /req\.authContext/);
+  assert.doesNotMatch(routes, /status:\s*["']active["']/);
+});
+
+test("Today actorContext forwards canonical status; omitting it empties prospect sections", async () => {
+  const persistedNa = persistedAttentionProspect({
+    id: PROSPECT_NA,
+    name: "Persisted Takeover",
+    phone: "+15550001021",
+    attention_status: "human_required",
+    human_attention_reason: "provider_send_failed",
+    needs_human_attention: true
+  });
+  todayService.setSourcesForTests({
+    loadProspects: async () => [persistedNa],
+    loadAppointments: async () => []
+  });
+
+  const reqActive = {
+    authContext: auth(USER_A),
+    tenantContext: { userId: USER_A, organizationId: ORG_A }
+  };
+  const fromRoute = actorContext(reqActive);
+  assert.equal(fromRoute.status, "active");
+  assert.equal(fromRoute.userId, USER_A);
+  assert.equal(fromRoute.organizationId, ORG_A);
+
+  const withStatus = await loadToday({ authContext: fromRoute });
+  assert.equal(withStatus.counts.needsAttention, 1);
+  assert.equal(withStatus.sections.needsAttention[0].entityId, PROSPECT_NA);
+
+  const { status, ...withoutStatus } = auth(USER_A);
+  void status;
+  const missingStatus = actorContext({
+    authContext: withoutStatus,
+    tenantContext: { userId: USER_A, organizationId: ORG_A }
+  });
+  assert.equal(missingStatus.status, undefined);
+
+  const stripped = await loadToday({ authContext: missingStatus });
+  assert.equal(stripped.counts.needsAttention, 0);
+  assert.equal(stripped.counts.newActionable, 0);
+});
+
+test("inactive actor fails closed on prospect sections", async () => {
+  todayService.setSourcesForTests({
+    loadProspects: async () => [
+      persistedAttentionProspect({
+        id: PROSPECT_NA,
+        name: "Persisted Takeover",
+        phone: "+15550001022",
+        attention_status: "human_required",
+        human_attention_reason: "provider_send_failed",
+        needs_human_attention: true
+      }),
+      persistedAttentionProspect({
+        id: PROSPECT_NEW,
+        name: "Unhandled Lead",
+        phone: "+15550001023",
+        attention_status: "new",
+        new_lead_received_at: "2026-08-30T12:00:00.000Z"
+      })
+    ],
+    loadAppointments: async () => []
+  });
+
+  const inactive = await loadToday({
+    authContext: actorContext({
+      authContext: auth(USER_A, { status: "suspended" }),
+      tenantContext: { userId: USER_A, organizationId: ORG_A }
+    })
+  });
+  assert.equal(inactive.counts.needsAttention, 0);
+  assert.equal(inactive.counts.newActionable, 0);
+  assert.equal(inactive.caughtUp, true);
 });
