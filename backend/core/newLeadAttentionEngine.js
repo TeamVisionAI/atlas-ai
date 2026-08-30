@@ -121,6 +121,51 @@ function isFirstResponseSlaSatisfied(prospect = {}, extras = {}) {
   return extras.deliveredAutomatedOutbound === true;
 }
 
+function isLifecycleNew(prospect = {}) {
+  const step = String(prospect.current_step || prospect.status || "").toUpperCase();
+  return step === "NEW";
+}
+
+/**
+ * Atlas or human has already responded. New lifecycle may remain.
+ * Uses durable CRM attention / acknowledgement — not transcript inference.
+ */
+function isOperationallyAcknowledged(prospect = {}, extras = {}) {
+  if (isAcknowledged(prospect)) {
+    return true;
+  }
+  if (isFirstResponseSlaSatisfied(prospect, extras)) {
+    return true;
+  }
+  return extras.humanResponded === true;
+}
+
+/**
+ * Manual Acknowledge / Claim & Acknowledge only for truly unattended leads.
+ */
+function needsManualAcknowledge(prospect = {}, extras = {}) {
+  if (isOperationallyAcknowledged(prospect, extras)) {
+    return false;
+  }
+
+  const step = String(prospect.current_step || prospect.status || "").toUpperCase();
+  if (["CLOSED", "DO_NOT_CONTACT", "RECRUITED"].includes(step)) {
+    return false;
+  }
+  if (prospect.attention_status === ATTENTION_STATUS.RESOLVED) {
+    return false;
+  }
+
+  const attention = prospect.attention_status;
+  if (attention === ATTENTION_STATUS.HUMAN_REQUIRED) {
+    return true;
+  }
+  if (attention === ATTENTION_STATUS.NEW || !attention) {
+    return Boolean(prospect.new_lead_received_at || prospect.created_at || true);
+  }
+  return false;
+}
+
 async function resolveBr080WorkflowState(prospect = {}, workflowState = null) {
   if (workflowState && typeof workflowState === "object") {
     return workflowState;
@@ -847,6 +892,9 @@ module.exports = {
   isAcknowledged,
   isUnassigned,
   isNewLeadAttentionOpen,
+  isLifecycleNew,
+  isOperationallyAcknowledged,
+  needsManualAcknowledge,
   isFirstResponseSlaSatisfied,
   isFirstResponseSlaReason,
   markAiResponding,

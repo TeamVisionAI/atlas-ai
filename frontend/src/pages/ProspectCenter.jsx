@@ -55,6 +55,9 @@ function ProspectRow({
   const location = buildProspectLocationLabel(item);
   const interviewWhen = formatProspectInterviewWhen(item.interviewAt, locale);
   const badges = item.badges || {};
+  const needsAck =
+    badges.needsManualAcknowledge === true ||
+    (badges.needsManualAcknowledge == null && Boolean(badges.new));
   const busy = actionBusyPhone === item.phone;
 
   return (
@@ -135,7 +138,7 @@ function ProspectRow({
       </button>
 
       <div className="prospect-center-row__actions">
-        {badges.unassigned ? (
+        {badges.unassigned && needsAck ? (
           <button
             type="button"
             className="prospect-center-row__action prospect-center-row__action--primary"
@@ -147,7 +150,7 @@ function ProspectRow({
               : translate("prospectCenterClaimAcknowledge")}
           </button>
         ) : null}
-        {badges.new && !badges.unassigned ? (
+        {needsAck && !badges.unassigned ? (
           <button
             type="button"
             className="prospect-center-row__action prospect-center-row__action--primary"

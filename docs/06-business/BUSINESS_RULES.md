@@ -3363,7 +3363,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Status:** Implemented  
 **Engine target:** `newLeadAssignmentEngine.js`, `newLeadAttentionEngine.js`, WhatsApp/Quick Capture create paths, Mission `NewLeadAttention`, Prospect Center badges/filters, escalation poller  
 **Migration:** `031_br080_new_lead_attention.sql` (additive; no ownership backfill)  
-**Tests:** `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/newLeadAssignmentAttentionAudit.test.js`, `backend/test/br080SlaMustNotSilenceHealthyAtlas.test.js`, `backend/test/br080FirstResponseSlaSatisfied.test.js`
+**Tests:** `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/newLeadAssignmentAttentionAudit.test.js`, `backend/test/br080SlaMustNotSilenceHealthyAtlas.test.js`, `backend/test/br080FirstResponseSlaSatisfied.test.js`, `backend/test/br080OperationalAcknowledgePresentation.test.js`
 
 ### Rules
 
@@ -3389,7 +3389,9 @@ Only these clear New:
 
 Not automatic in v1: page open, AI reply, prospect inbound, mission list render, Mission Control / dashboard / Prospect Center / Follow-ups / queue reads, schedule booking (booking may stamp owner if null but does not acknowledge).
 
-A delivered Atlas reply **satisfies first-response SLA only**. It does not call `acknowledgeLead` and does not clear the New mission.
+A delivered Atlas reply **satisfies first-response SLA only**. It does not call `acknowledgeLead` and does not clear the New lifecycle.
+
+**Operational acknowledgement (Prospect Center):** If Atlas or a human has already successfully responded (`attention_status` is `ai_responding` / `waiting_for_prospect`, or `acknowledged_at` is set), the lead is operationally acknowledged. Prospect Center must hide Acknowledge / Claim & Acknowledge. Lifecycle may remain New. Manual Acknowledge stays only for truly unattended leads (`attention_status=new` or real `human_required` failure). Provider send failure is not operationally acknowledged.
 
 ---
 
