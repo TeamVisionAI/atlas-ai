@@ -78,6 +78,27 @@ router.get("/", operationalControlPlaneEmpty(emptyDashboard), async (req, res) =
       dashboard.prioritizedWorkflowQueue = [];
     }
 
+    try {
+      const followUpApplicationService = require("../application/followUpApplicationService");
+      const followUpSummary = await followUpApplicationService.summarizeForOwner({
+        organizationId,
+        authContext: {
+          userId: req.tenantContext?.userId || req.authContext?.userId,
+          role: req.authContext?.role,
+          hierarchyMode: req.authContext?.hierarchyMode,
+          hierarchyUserIds: req.authContext?.hierarchyUserIds
+        }
+      });
+      dashboard.followUpsDue = followUpSummary.followUpsDue;
+      dashboard.followUpsOverdue = followUpSummary.followUpsOverdue;
+      dashboard.nextFollowUps = followUpSummary.nextFollowUps;
+    } catch (followUpError) {
+      console.error("[dashboard] follow-up summary error:", followUpError.message);
+      dashboard.followUpsDue = dashboard.followUpsDue || 0;
+      dashboard.followUpsOverdue = 0;
+      dashboard.nextFollowUps = [];
+    }
+
     return res.json(dashboard);
   } catch (error) {
     console.error("[dashboard] error:", error.message);

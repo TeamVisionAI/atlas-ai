@@ -55,6 +55,22 @@ function buildNotificationCopy(event = {}) {
       actionUrl: event.actionUrl || `/app/conversations`
     };
   }
+  if (type === EVENT_TYPES.FOLLOW_UP_DUE) {
+    return {
+      title: "Follow-up due today",
+      body: event.title ? `${event.title} is due today.` : "A follow-up is due today.",
+      severity: SEVERITIES.HIGH,
+      actionUrl: event.actionUrl || `/app/follow-ups`
+    };
+  }
+  if (type === EVENT_TYPES.FOLLOW_UP_OVERDUE) {
+    return {
+      title: "Follow-up overdue",
+      body: event.title ? `${event.title} is overdue.` : "A follow-up is overdue.",
+      severity: SEVERITIES.HIGH,
+      actionUrl: event.actionUrl || `/app/follow-ups`
+    };
+  }
   return {
     title: "Needs attention",
     body: "A conversation entered Needs Attention.",

@@ -271,6 +271,33 @@ async function recordInterviewOutcome({
     state: updatedProspect?.state || prospect.state
   });
 
+  // Implements BR-178 — durable follow-up from canonical interview outcome. No external send.
+  try {
+    const followUpApplicationService = require("./followUpApplicationService");
+    await followUpApplicationService.syncFromOperationalOutcome({
+      organizationId,
+      actorUserId: agentId,
+      surface: "interview",
+      outcome: outcomeId,
+      entityType: "prospect",
+      entityId: updatedProspect?.id || prospect.id || phone,
+      subjectLabel: updatedProspect?.name || prospect.name,
+      subjectPhone: phone,
+      ownerUserId: updatedProspect?.owner_user_id || prospect.owner_user_id || agentId,
+      dueDate:
+        advancePayload.capturedFields.followUpDate ||
+        fields.followUpDate ||
+        fields.futureReminder ||
+        resolvedFollowUpRecommendation?.recommendedFollowUpDate,
+      dueTime: advancePayload.capturedFields.followUpTime || fields.followUpTime,
+      futureReminder: fields.futureReminder || advancePayload.capturedFields.futureReminder,
+      notes: interactionNotes || fields.notes || null,
+      appointmentId: savedAppointment?.id || appointmentId || null
+    });
+  } catch (followUpError) {
+    console.warn("[interview-outcome] follow-up sync failed", followUpError.message);
+  }
+
   return {
     success: true,
     status: 200,
@@ -290,14 +317,20 @@ async function recordInterviewOutcomeFromAppointmentSlug({
   outcomeSlug,
   outcomeNotes = null,
   organizationId,
-  agentId
+  agentId,
+  fields = {}
 }) {
   const outcomeId = mapAppointmentSlugToOutcomeId(outcomeSlug);
 
   return recordInterviewOutcome({
     phone,
     outcome: outcomeId,
-    fields: { notes: outcomeNotes },
+    fields: {
+      notes: outcomeNotes,
+      followUpDate: fields.followUpDate,
+      followUpTime: fields.followUpTime,
+      futureReminder: fields.futureReminder
+    },
     interactionNotes: outcomeNotes,
     appointmentId,
     organizationId,

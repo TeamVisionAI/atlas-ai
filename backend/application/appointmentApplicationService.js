@@ -1183,7 +1183,12 @@ async function completeAppointment(id, input, context = {}) {
     outcomeSlug: outcome,
     outcomeNotes: input.outcomeNotes || null,
     organizationId,
-    agentId
+    agentId,
+    fields: {
+      followUpDate: input.followUpDate,
+      followUpTime: input.followUpTime,
+      futureReminder: input.futureReminder
+    }
   });
 
   if (!result.success) {

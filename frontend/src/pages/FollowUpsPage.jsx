@@ -3,7 +3,14 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
-import { getFollowUps, FollowUpsError } from "../services/followUpsService";
+import {
+  getFollowUps,
+  createFollowUp,
+  completeFollowUp,
+  rescheduleFollowUp,
+  cancelFollowUp,
+  FollowUpsError
+} from "../services/followUpsService";
 import {
   buildFollowUpDueDate,
   buildFollowUpPriorityLabel,
@@ -15,10 +22,19 @@ import {
   getFollowUpSortOptions
 } from "../engines/followUpsViewModel";
 import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
+import { appPath } from "../config/appRoutes";
 import { useWorkspace } from "../contexts/WorkspaceContext";
 import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
 import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import "./FollowUpsPage.css";
+
+const ENTITY_OPTIONS = [
+  "prospect",
+  "conversation",
+  "appointment",
+  "agenda_contact",
+  "client"
+];
 
 function statusVariant(status) {
   switch (status) {
@@ -35,23 +51,45 @@ function statusVariant(status) {
   }
 }
 
-function FollowUpRow({ item, translate, locale, onOpenWorkspace }) {
-  const dueLabel = buildFollowUpDueDate(item.followUpDate, item.followUpTime, locale);
+function FollowUpDialog({ title, children, onClose, onConfirm, confirmLabel, cancelLabel, loading }) {
+  return (
+    <div className="follow-ups-dialog-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="follow-ups-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2>{title}</h2>
+        {children}
+        <div className="follow-ups-dialog__actions">
+          <button type="button" className="follow-ups-dialog__secondary" onClick={onClose}>
+            {cancelLabel}
+          </button>
+          <button type="button" className="follow-ups-dialog__primary" onClick={onConfirm} disabled={loading}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FollowUpRow({ item, translate, locale, onOpen, onComplete, onReschedule, onCancel }) {
+  const dueLabel = buildFollowUpDueDate(item.followUpDate || item.dueDate, item.followUpTime || item.dueTime, locale);
   const statusLabel = buildFollowUpStatusLabel(item, translate);
   const reasonLabel = buildFollowUpReasonLabel(item, translate);
   const priorityLabel = buildFollowUpPriorityLabel(item, translate);
   const representativeLabel = buildFollowUpRepresentativeLabel(item, translate);
+  const canManage = item.canManage !== false && item.source !== "legacy" && item.status !== "completed";
 
   return (
     <article className="follow-ups-row">
-      <button
-        type="button"
-        className="follow-ups-row__main"
-        onClick={() => onOpenWorkspace(item.phone)}
-      >
+      <button type="button" className="follow-ups-row__main" onClick={() => onOpen(item)}>
         <div className="follow-ups-row__header">
           <div className="follow-ups-row__identity">
-            <h3 className="follow-ups-row__name">{item.name || item.phone}</h3>
+            <h3 className="follow-ups-row__name">{item.name || item.title || item.phone}</h3>
             {item.prospectNumber ? (
               <span className="follow-ups-row__number">{item.prospectNumber}</span>
             ) : null}
@@ -75,15 +113,26 @@ function FollowUpRow({ item, translate, locale, onOpenWorkspace }) {
           <div className="follow-ups-row__detail">
             <dt>{translate("followUpsColumnPriority")}</dt>
             <dd>
-              <span
-                className={`follow-ups-row__priority follow-ups-row__priority--${item.status}`}
-              >
+              <span className={`follow-ups-row__priority follow-ups-row__priority--${item.status}`}>
                 {priorityLabel}
               </span>
             </dd>
           </div>
         </dl>
       </button>
+      {canManage ? (
+        <div className="follow-ups-row__actions">
+          <button type="button" onClick={() => onComplete(item)}>
+            {translate("followUpsComplete")}
+          </button>
+          <button type="button" onClick={() => onReschedule(item)}>
+            {translate("followUpsReschedule")}
+          </button>
+          <button type="button" onClick={() => onCancel(item)}>
+            {translate("followUpsCancel")}
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -99,11 +148,15 @@ export default function FollowUpsPage() {
   const activeFilter = searchParams.get("filter") || "all";
   const searchQuery = searchParams.get("q") || "";
   const activeSort = searchParams.get("sort") || "due-date";
+  const activeScope = searchParams.get("scope") || "mine";
 
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dialog, setDialog] = useState(null);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const loadFollowUps = useCallback(async () => {
     if (controlPlane) {
@@ -119,18 +172,17 @@ export default function FollowUpsPage() {
       const data = await getFollowUps({
         filter: activeFilter,
         search: searchQuery,
-        sort: activeSort
+        sort: activeSort,
+        scope: activeScope
       });
       setPayload(data);
     } catch (err) {
       console.error(err);
-      setError(
-        err instanceof FollowUpsError ? translate("followUpsLoadError") : err.message
-      );
+      setError(err instanceof FollowUpsError ? translate("followUpsLoadError") : err.message);
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, activeSort, searchQuery, translate, controlPlane]);
+  }, [activeFilter, activeSort, activeScope, searchQuery, translate, controlPlane]);
 
   useEffect(() => {
     loadFollowUps();
@@ -141,15 +193,12 @@ export default function FollowUpsPage() {
       if (document.visibilityState !== "visible" || loading) {
         return;
       }
-
       loadFollowUps().catch((err) => {
         console.error(err);
       });
     };
-
     const intervalId = window.setInterval(refreshLiveQueue, 20000);
     window.addEventListener("focus", refreshLiveQueue);
-
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", refreshLiveQueue);
@@ -163,22 +212,17 @@ export default function FollowUpsPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const trimmed = searchInput.trim();
-
       if (trimmed === searchQuery.trim()) {
         return;
       }
-
       const nextParams = new URLSearchParams(searchParams);
-
       if (trimmed) {
         nextParams.set("q", trimmed);
       } else {
         nextParams.delete("q");
       }
-
       setSearchParams(nextParams, { replace: true });
     }, 300);
-
     return () => window.clearTimeout(timer);
   }, [searchInput, searchQuery, searchParams, setSearchParams]);
 
@@ -186,40 +230,72 @@ export default function FollowUpsPage() {
     () => getFollowUpFilterOptions(payload?.filters || [], translate),
     [payload?.filters, translate]
   );
-
   const sortOptions = useMemo(() => getFollowUpSortOptions(translate), [translate]);
+  const summary = useMemo(() => buildFollowUpsSummary(payload, translate), [payload, translate]);
 
-  const summary = useMemo(
-    () => buildFollowUpsSummary(payload, translate),
-    [payload, translate]
-  );
-
-  function handleFilterChange(filterId) {
+  function patchParams(mutator) {
     const nextParams = new URLSearchParams(searchParams);
-
-    if (filterId === "all") {
-      nextParams.delete("filter");
-    } else {
-      nextParams.set("filter", filterId);
-    }
-
+    mutator(nextParams);
     setSearchParams(nextParams, { replace: true });
   }
 
-  function handleSortChange(sortId) {
-    const nextParams = new URLSearchParams(searchParams);
-
-    if (sortId === "due-date") {
-      nextParams.delete("sort");
-    } else {
-      nextParams.set("sort", sortId);
+  function handleOpen(item) {
+    if (item.entityType === "appointment" && (item.appointmentId || item.entityId)) {
+      navigate(`${appPath("appointments")}?appointmentId=${encodeURIComponent(item.appointmentId || item.entityId)}`);
+      return;
     }
-
-    setSearchParams(nextParams, { replace: true });
+    if (item.entityType === "agenda_contact" || item.entityType === "client") {
+      navigate(appPath("agenda"));
+      return;
+    }
+    if (item.phone) {
+      navigateToProspectWorkspace(navigate, item.phone);
+    }
   }
 
-  function handleOpenWorkspace(phone) {
-    navigateToProspectWorkspace(navigate, phone);
+  function openCreate() {
+    setForm({
+      entityType: searchParams.get("entityType") || "prospect",
+      entityId: searchParams.get("entityId") || "",
+      subjectLabel: searchParams.get("name") || "",
+      dueDate: "",
+      dueTime: "",
+      notes: ""
+    });
+    setDialog({ type: "create" });
+  }
+
+  async function submitDialog() {
+    setSaving(true);
+    setError(null);
+    try {
+      if (dialog.type === "create") {
+        await createFollowUp({
+          entityType: form.entityType,
+          entityId: form.entityId || `manual:${Date.now()}`,
+          subjectLabel: form.subjectLabel,
+          title: form.subjectLabel || translate("followUpsTitle"),
+          dueDate: form.dueDate,
+          dueTime: form.dueTime || null,
+          notes: form.notes
+        });
+      } else if (dialog.type === "complete") {
+        await completeFollowUp(dialog.item.id, { completionNote: form.notes });
+      } else if (dialog.type === "reschedule") {
+        await rescheduleFollowUp(dialog.item.id, {
+          dueDate: form.dueDate,
+          dueTime: form.dueTime || null
+        });
+      } else if (dialog.type === "cancel") {
+        await cancelFollowUp(dialog.item.id, { notes: form.notes });
+      }
+      setDialog(null);
+      await loadFollowUps();
+    } catch (err) {
+      setError(err instanceof FollowUpsError ? err.message : err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (controlPlane) {
@@ -233,7 +309,37 @@ export default function FollowUpsPage() {
           <h1 className="follow-ups-page__title">{translate("followUpsTitle")}</h1>
           <p className="follow-ups-page__subtitle">{translate("followUpsSubtitle")}</p>
         </div>
+        <button type="button" className="follow-ups-page__create" onClick={openCreate}>
+          {translate("followUpsCreate")}
+        </button>
       </header>
+
+      <div className="follow-ups-page__scope" role="tablist" aria-label={translate("followUpsScopeLabel")}>
+        <button
+          type="button"
+          className={`follow-ups-page__filter${activeScope === "mine" ? " is-active" : ""}`}
+          onClick={() =>
+            patchParams((params) => {
+              params.delete("scope");
+            })
+          }
+        >
+          {translate("followUpsScopeMine")}
+        </button>
+        {payload?.teamAvailable ? (
+          <button
+            type="button"
+            className={`follow-ups-page__filter${activeScope === "team" ? " is-active" : ""}`}
+            onClick={() =>
+              patchParams((params) => {
+                params.set("scope", "team");
+              })
+            }
+          >
+            {translate("followUpsScopeTeam")}
+          </button>
+        ) : null}
+      </div>
 
       <div className="follow-ups-page__toolbar">
         <label className="follow-ups-page__search-label" htmlFor="follow-ups-search">
@@ -259,16 +365,20 @@ export default function FollowUpsPage() {
               value: option.id,
               label: option.label
             }))}
-            onChange={handleSortChange}
+            onChange={(sortId) =>
+              patchParams((params) => {
+                if (sortId === "due-date") {
+                  params.delete("sort");
+                } else {
+                  params.set("sort", sortId);
+                }
+              })
+            }
           />
         </div>
       </div>
 
-      <div
-        className="follow-ups-page__filters"
-        role="tablist"
-        aria-label={translate("followUpsFiltersLabel")}
-      >
+      <div className="follow-ups-page__filters" role="tablist" aria-label={translate("followUpsFiltersLabel")}>
         {filterOptions.map((option) => (
           <button
             key={option.id}
@@ -276,7 +386,15 @@ export default function FollowUpsPage() {
             role="tab"
             aria-selected={activeFilter === option.id}
             className={`follow-ups-page__filter${activeFilter === option.id ? " is-active" : ""}`}
-            onClick={() => handleFilterChange(option.id)}
+            onClick={() =>
+              patchParams((params) => {
+                if (option.id === "all") {
+                  params.delete("filter");
+                } else {
+                  params.set("filter", option.id);
+                }
+              })
+            }
           >
             {option.label}
             <span className="follow-ups-page__filter-count">{option.count}</span>
@@ -284,16 +402,9 @@ export default function FollowUpsPage() {
         ))}
       </div>
 
-      {!loading && payload ? (
-        <p className="follow-ups-page__summary">{summary}</p>
-      ) : null}
-
+      {!loading && payload ? <p className="follow-ups-page__summary">{summary}</p> : null}
       {error ? <p className="follow-ups-page__error">{error}</p> : null}
-
-      {loading ? (
-        <p className="follow-ups-page__status">{translate("followUpsLoading")}</p>
-      ) : null}
-
+      {loading ? <p className="follow-ups-page__status">{translate("followUpsLoading")}</p> : null}
       {!loading && !payload?.items?.length ? (
         <p className="follow-ups-page__status">{translate("followUpsEmpty")}</p>
       ) : null}
@@ -302,11 +413,23 @@ export default function FollowUpsPage() {
         <div className="follow-ups-page__list">
           {payload.items.map((item) => (
             <FollowUpRow
-              key={item.phone}
+              key={item.id || `${item.phone}:${item.followUpDate}`}
               item={item}
               translate={translate}
               locale={locale}
-              onOpenWorkspace={handleOpenWorkspace}
+              onOpen={handleOpen}
+              onComplete={(row) => {
+                setForm({ notes: "" });
+                setDialog({ type: "complete", item: row });
+              }}
+              onReschedule={(row) => {
+                setForm({ dueDate: row.dueDate || row.followUpDate || "", dueTime: row.dueTime || row.followUpTime || "" });
+                setDialog({ type: "reschedule", item: row });
+              }}
+              onCancel={(row) => {
+                setForm({ notes: "" });
+                setDialog({ type: "cancel", item: row });
+              }}
             />
           ))}
         </div>
@@ -314,6 +437,139 @@ export default function FollowUpsPage() {
 
       {!loading && payload?.filteredCount ? (
         <p className="follow-ups-page__footer-hint">{translate("followUpsFooterHint")}</p>
+      ) : null}
+
+      {dialog?.type === "create" ? (
+        <FollowUpDialog
+          title={translate("followUpsCreate")}
+          confirmLabel={translate("followUpsSave")}
+          cancelLabel={translate("followUpsDialogClose")}
+          loading={saving}
+          onClose={() => setDialog(null)}
+          onConfirm={submitDialog}
+        >
+          <label>
+            {translate("followUpsSubjectType")}
+            <select
+              value={form.entityType}
+              onChange={(event) => setForm((current) => ({ ...current, entityType: event.target.value }))}
+            >
+              {ENTITY_OPTIONS.map((value) => (
+                <option key={value} value={value}>
+                  {translate(`followUpsEntity_${value}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {translate("followUpsSubjectId")}
+            <input
+              value={form.entityId}
+              onChange={(event) => setForm((current) => ({ ...current, entityId: event.target.value }))}
+            />
+          </label>
+          <label>
+            {translate("followUpsSubjectName")}
+            <input
+              value={form.subjectLabel}
+              onChange={(event) => setForm((current) => ({ ...current, subjectLabel: event.target.value }))}
+            />
+          </label>
+          <label>
+            {translate("followUpsDate")}
+            <input
+              type="date"
+              required
+              value={form.dueDate}
+              onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
+            />
+          </label>
+          <label>
+            {translate("followUpsTimeOptional")}
+            <input
+              type="time"
+              value={form.dueTime}
+              onChange={(event) => setForm((current) => ({ ...current, dueTime: event.target.value }))}
+            />
+          </label>
+          <label>
+            {translate("followUpsNote")}
+            <textarea
+              rows={3}
+              value={form.notes}
+              onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+            />
+          </label>
+        </FollowUpDialog>
+      ) : null}
+
+      {dialog?.type === "complete" ? (
+        <FollowUpDialog
+          title={translate("followUpsComplete")}
+          confirmLabel={translate("followUpsSave")}
+          cancelLabel={translate("followUpsDialogClose")}
+          loading={saving}
+          onClose={() => setDialog(null)}
+          onConfirm={submitDialog}
+        >
+          <label>
+            {translate("followUpsCompletionNote")}
+            <textarea
+              rows={3}
+              value={form.notes}
+              onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+            />
+          </label>
+        </FollowUpDialog>
+      ) : null}
+
+      {dialog?.type === "reschedule" ? (
+        <FollowUpDialog
+          title={translate("followUpsReschedule")}
+          confirmLabel={translate("followUpsSave")}
+          cancelLabel={translate("followUpsDialogClose")}
+          loading={saving}
+          onClose={() => setDialog(null)}
+          onConfirm={submitDialog}
+        >
+          <label>
+            {translate("followUpsDate")}
+            <input
+              type="date"
+              required
+              value={form.dueDate}
+              onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
+            />
+          </label>
+          <label>
+            {translate("followUpsTimeOptional")}
+            <input
+              type="time"
+              value={form.dueTime}
+              onChange={(event) => setForm((current) => ({ ...current, dueTime: event.target.value }))}
+            />
+          </label>
+        </FollowUpDialog>
+      ) : null}
+
+      {dialog?.type === "cancel" ? (
+        <FollowUpDialog
+          title={translate("followUpsCancel")}
+          confirmLabel={translate("followUpsSave")}
+          cancelLabel={translate("followUpsDialogClose")}
+          loading={saving}
+          onClose={() => setDialog(null)}
+          onConfirm={submitDialog}
+        >
+          <label>
+            {translate("followUpsNote")}
+            <textarea
+              rows={3}
+              value={form.notes}
+              onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+            />
+          </label>
+        </FollowUpDialog>
       ) : null}
     </div>
   );

@@ -15,6 +15,8 @@ const APPOINTMENT_EVENTS = new Set([
 ]);
 
 const CONVERSATION_EVENTS = new Set(["NEEDS_ATTENTION", "HUMAN_TAKEOVER_REQUESTED"]);
+const FOLLOW_UP_EVENTS = new Set(["FOLLOW_UP_DUE", "FOLLOW_UP_OVERDUE"]);
+const FOLLOW_UPS_PATH = "/app/follow-ups";
 
 function entityIdOf(item = {}) {
   return String(item.entityId || item.entity_id || "").trim();
@@ -46,6 +48,10 @@ export function resolveAgentNotificationPath(item = {}) {
       entityType === "conversation")
   ) {
     return `${CONVERSATIONS_PATH}?prospectId=${encodeURIComponent(entityId)}`;
+  }
+
+  if (FOLLOW_UP_EVENTS.has(eventType) || entityType === "follow_up") {
+    return item.actionUrl || item.action_url || FOLLOW_UPS_PATH;
   }
 
   return item.actionUrl || item.action_url || NOTIFICATIONS_PATH;

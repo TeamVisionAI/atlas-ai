@@ -224,3 +224,106 @@
     align-items: flex-start;
   }
 }
+
+.follow-ups-page__create {
+  border: 0;
+  border-radius: 8px;
+  background: #1e3a8a;
+  color: #fff;
+  font-weight: 600;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.follow-ups-page__scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.follow-ups-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.follow-ups-row__actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.follow-ups-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 16px;
+}
+
+.follow-ups-dialog {
+  width: min(480px, 100%);
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.follow-ups-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.follow-ups-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.follow-ups-dialog input,
+.follow-ups-dialog select,
+.follow-ups-dialog textarea {
+  font-weight: 400;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.follow-ups-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.follow-ups-dialog__primary,
+.follow-ups-dialog__secondary {
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.follow-ups-dialog__primary {
+  border: 0;
+  background: #1e3a8a;
+  color: #fff;
+}
+
+.follow-ups-dialog__secondary {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}

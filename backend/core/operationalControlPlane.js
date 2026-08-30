@@ -60,6 +60,9 @@ function emptyDashboard() {
     hotProspects: 0,
     newProspects: 0,
     followUps: 0,
+    followUpsDue: 0,
+    followUpsOverdue: 0,
+    nextFollowUps: [],
     appointments: 0,
     prospects: [],
     prioritizedWorkflowQueue: []
@@ -99,6 +102,8 @@ function emptyFollowUps() {
     generatedAt: new Date().toISOString(),
     controlPlane: true,
     organizationId: null,
+    scope: "mine",
+    teamAvailable: false,
     totalCount: 0,
     filteredCount: 0,
     activeFilter: FOLLOW_UP_FILTERS.ALL,

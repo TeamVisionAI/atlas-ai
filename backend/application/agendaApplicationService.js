@@ -433,6 +433,38 @@ async function recordStandaloneOutcome(appointmentId, input, context) {
     },
     updatedAt: now
   });
+
+  // Implements BR-178 — durable follow-up from canonical Agenda outcome. No external send.
+  // Agenda contacts stay Agenda contacts; this does not promote or convert entity type.
+  try {
+    const followUpApplicationService = require("./followUpApplicationService");
+    const isStandalone = Boolean(saved.metadata?.standaloneAgenda) && !saved.prospectId;
+    await followUpApplicationService.syncFromOperationalOutcome({
+      organizationId: context.organizationId,
+      actorUserId: actor,
+      surface: "agenda",
+      outcome,
+      entityType: isStandalone
+        ? "agenda_contact"
+        : saved.prospectId
+          ? "prospect"
+          : "appointment",
+      entityId:
+        (isStandalone ? saved.agendaContactId || appointment.agendaContactId : saved.prospectId) ||
+        saved.id,
+      subjectLabel: saved.metadata?.agendaContactName || saved.prospectName || null,
+      subjectPhone: saved.metadata?.agendaContactPhone || saved.prospectPhone || null,
+      ownerUserId: saved.agentId || saved.interviewerUserId || actor,
+      dueDate: input.followUpDate || input.futureReminder,
+      dueTime: input.followUpTime,
+      futureReminder: input.futureReminder,
+      notes,
+      appointmentId: saved.id
+    });
+  } catch (followUpError) {
+    console.warn("[agenda] follow-up sync failed", followUpError.message);
+  }
+
   return saved;
 }
 
