@@ -8,7 +8,12 @@ import AtlasButton from "../components/ui/AtlasButton";
 import AtlasSelect from "../components/ui/AtlasSelect";
 import StatusBadge from "../components/ui/StatusBadge";
 import Spinner from "../components/ui/Spinner";
-import { fetchAppointments, getAppointmentIdentityKey, normalizeAppointmentList } from "../services/appointmentService";
+import {
+  fetchAppointment,
+  fetchAppointments,
+  getAppointmentIdentityKey,
+  normalizeAppointmentList
+} from "../services/appointmentService";
 import { navigateToProspectWorkspace } from "../utils/prospectRoutes";
 import RescheduleAppointmentDialog from "../components/appointments/RescheduleAppointmentDialog";
 import CancelAppointmentDialog from "../components/appointments/CancelAppointmentDialog";
@@ -101,6 +106,7 @@ export default function AppointmentsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeView = searchParams.get("view") || "today";
+  const focusAppointmentId = searchParams.get("appointmentId") || "";
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -204,8 +210,35 @@ export default function AppointmentsPage() {
   );
 
   function setView(view) {
-    setSearchParams({ view });
+    const next = new URLSearchParams(searchParams);
+    next.set("view", view);
+    setSearchParams(next);
   }
+
+  useEffect(() => {
+    if (!focusAppointmentId || controlPlane) {
+      return undefined;
+    }
+
+    const fromList = appointments.find((item) => String(item.id) === String(focusAppointmentId));
+    if (fromList) {
+      setSelectedAppointment(fromList);
+      return undefined;
+    }
+
+    let cancelled = false;
+    fetchAppointment(focusAppointmentId)
+      .then((appointment) => {
+        if (!cancelled && appointment?.id) {
+          setSelectedAppointment(appointment);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appointments, controlPlane, focusAppointmentId]);
 
   function openDialog(type, appointment) {
     setDialog({ type, appointment });

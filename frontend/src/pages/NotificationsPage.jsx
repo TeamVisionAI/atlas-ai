@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { appPath } from "../config/appRoutes";
+import { resolveAgentNotificationPath } from "../engines/agentNotificationPath";
 import { useLanguage } from "../i18n/LanguageContext";
 import {
   listAgentNotifications,
@@ -28,7 +28,7 @@ export default function NotificationsPage() {
     if (!item.readAt) {
       await markAgentNotificationRead(item.id).catch(() => {});
     }
-    navigate(item.actionUrl || appPath("conversations"));
+    navigate(resolveAgentNotificationPath(item));
   }
 
   return (
