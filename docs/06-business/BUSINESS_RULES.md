@@ -2767,6 +2767,33 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-182 — Client Service / Policy Review Workspace
+
+**Implements:** A global, tenant-safe client service workspace so Atlas can track policy reviews, annual reviews, document requests, and other service work separately from production and recruiting.  
+**Domain:** Clients / service / appointments / follow-ups  
+**Depends on:** BR-179 Client Workspace; BR-181 Production; BR-178 follow-ups; BR-180 Today  
+**Related:** BR-043 appointments  
+**Status:** V1 implemented — manual cases only; POLICY_REVIEW is a service case, not policy analysis  
+**Engine target:** `clientService/*`; `clientServiceApplicationService`; `/api/service-cases`; `/app/service`  
+**Tests:** `backend/test/clientServiceBr182.test.js`; `frontend/src/pages/servicePageBr182.test.js`  
+**Docs:** `docs/06-business/BR-182-client-service.md`
+
+### Rules
+
+1. **Durable SoT** — `atlas_client_service_cases` is the canonical V1 service-case entity, linked to `atlas_agenda_clients`, owning user, organization, and optionally a production record. Do not store service work on generic notes, recruiting prospects, or production statuses.
+2. **Types** — POLICY_REVIEW, ANNUAL_REVIEW, BENEFICIARY_UPDATE, DOCUMENT_REQUEST, SERVICE_FOLLOW_UP, GENERAL_SERVICE, OTHER. POLICY_REVIEW tracks requested / scheduled / waiting / completed service work only. Do not analyze policy values or recommend replacement.
+3. **Statuses** — Manual only: OPEN, WAITING_ON_CLIENT, WAITING_ON_AGENT, SCHEDULED, COMPLETED, CANCELLED. Do not infer status from WhatsApp or appointments.
+4. **Due dates** — Nullable. Classify Needs Date / Due Today / Overdue / Upcoming / closed. Never invent a date.
+5. **Workspace** — Client profile shows a Service section. `/app/service` defaults to My Service. Team Service only when existing hierarchy permissions already allow it.
+6. **Follow-ups / appointments** — Manual BR-178 client follow-ups only. Optional link to an existing Atlas appointment. No second reminder engine and no duplicate scheduling.
+7. **Today** — Add only overdue, due-today, and Needs Date open cases to the existing Today read model. Do not list every open case. Do not change existing Today priorities.
+8. **History** — Append created, status/due/title/notes changes, appointment linked/unlinked, completed, and cancelled. Store actor id; present a friendly name.
+9. **Permissions** — Own cases by default. Wrong-org and unauthorized peer IDs fail closed (404). Super Admin control-plane empty. Support Mode tenant-bound. No phone-based tenant identity.
+10. **Recruiting separation** — Service cases do not create recruiting prospects, enter Recruit AI, or change recruiting Mission Control / conversion metrics. IUL Review funnel stays unchanged.
+11. **Boundaries** — Do not change Recruit AI, semantic apply, WhatsApp eligibility, campaign intake, BR-176, BR-178 SoT, BR-179 client SoT, or BR-181 production SoT. No Team Vision-specific code. Policy ingestion, OCR, replacement analysis, carrier APIs, and commissions stay out of V1.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

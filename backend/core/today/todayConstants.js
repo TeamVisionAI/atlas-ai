@@ -13,7 +13,8 @@ const TODAY_KINDS = Object.freeze({
   APPOINTMENT: "appointment",
   FOLLOW_UP: "follow_up",
   NEW_LEAD: "new_lead",
-  NOTIFICATION: "notification"
+  NOTIFICATION: "notification",
+  SERVICE_CASE: "service_case"
 });
 
 const TODAY_SECTIONS = Object.freeze({
