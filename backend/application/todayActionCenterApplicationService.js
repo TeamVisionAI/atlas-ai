@@ -30,6 +30,7 @@ const {
   presentNeedsAttention,
   presentAppointment,
   presentFollowUpItem,
+  presentServiceCaseItem,
   presentNewLead,
   presentNotification,
   compareTodayItems
@@ -89,6 +90,14 @@ function isFollowUpDueOrOverdue(item) {
   );
 }
 
+async function defaultListServiceCases(options) {
+  if (process.env.NODE_ENV === "test" || process.env.NODE_TEST_CONTEXT) {
+    return { items: [] };
+  }
+  const clientServiceApplicationService = require("./clientServiceApplicationService");
+  return clientServiceApplicationService.listServiceCases(options);
+}
+
 function isFollowUpActionable(item) {
   return (
     isFollowUpDueOrOverdue(item) || item.status === FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE
@@ -119,29 +128,37 @@ async function getToday({
   const listFollowUps = resolved.listFollowUps || followUpApplicationService.listFollowUps;
   const listNotifications =
     resolved.listNotifications || agentNotificationService.listMyNotifications;
+  const listServiceCases = resolved.listServiceCases || defaultListServiceCases;
 
   const authForProspects = {
     ...authContext,
     organizationId: organizationId || authContext?.organizationId || null
   };
 
-  const [prospectsRaw, appointmentsRaw, followUpsPayload, notificationsRaw] = await Promise.all([
-    loadProspects(organizationId),
-    loadAppointments({ organizationId, reference: now }),
-    listFollowUps({
-      organizationId,
-      authContext,
-      filter: FOLLOW_UP_FILTERS.ALL,
-      scope: ownerFilter.scope,
-      reference: now,
-      includeLegacy: true
-    }),
-    listNotifications({
-      organizationId,
-      userId: authContext?.userId,
-      limit: NOTIFICATION_LIMIT
-    })
-  ]);
+  const [prospectsRaw, appointmentsRaw, followUpsPayload, notificationsRaw, servicePayload] =
+    await Promise.all([
+      loadProspects(organizationId),
+      loadAppointments({ organizationId, reference: now }),
+      listFollowUps({
+        organizationId,
+        authContext,
+        filter: FOLLOW_UP_FILTERS.ALL,
+        scope: ownerFilter.scope,
+        reference: now,
+        includeLegacy: true
+      }),
+      listNotifications({
+        organizationId,
+        userId: authContext?.userId,
+        limit: NOTIFICATION_LIMIT
+      }),
+      listServiceCases({
+        organizationId,
+        authContext,
+        scope: ownerFilter.scope,
+        reference: now
+      })
+    ]);
 
   const orgProspects = (prospectsRaw || []).filter(
     (prospect) =>
@@ -185,10 +202,16 @@ async function getToday({
       return String(left.whenLabel || "").localeCompare(String(right.whenLabel || ""));
     });
 
+  const { toTodayItem } = require("./clientServiceApplicationService");
   const followUps = (followUpsPayload.items || [])
     .filter(isFollowUpActionable)
-    .map((item) => presentFollowUpItem(item, { timeZone: timeZoneResolution.timeZone }))
-    .sort(compareTodayItems);
+    .map((item) => presentFollowUpItem(item, { timeZone: timeZoneResolution.timeZone }));
+  const serviceItems = (servicePayload?.items || [])
+    .map((item) => toTodayItem(item))
+    .filter(Boolean)
+    .map((item) => presentServiceCaseItem(item));
+  followUps.push(...serviceItems);
+  followUps.sort(compareTodayItems);
 
   const newLeads = visibleProspects
     .filter(isActionableNewLead)

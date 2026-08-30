@@ -31,6 +31,16 @@ import {
 import { emptyProductionForm } from "../engines/productionViewModel";
 import { ProductionDialogs, ProductionRecordCard } from "./ProductionRecordsBlock";
 import {
+  createServiceCase,
+  createServiceFollowUp,
+  getServiceCases,
+  ServiceCasesError,
+  updateServiceCase,
+  updateServiceCaseStatus
+} from "../services/serviceCasesService";
+import { emptyServiceForm } from "../engines/serviceViewModel";
+import { ServiceCaseCard, ServiceDialogs } from "./ServiceRecordsBlock";
+import {
   buildClientStatusLabel,
   formatClientTimestamp,
   presentClientHistoryEvent
@@ -91,6 +101,7 @@ export default function ClientsPage() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [production, setProduction] = useState(null);
+  const [service, setService] = useState(null);
 
   const loadList = useCallback(async () => {
     if (controlPlane) {
@@ -117,20 +128,23 @@ export default function ClientsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [clientDetail, productionPayload] = await Promise.all([
+      const [clientDetail, productionPayload, servicePayload] = await Promise.all([
         getClient(clientId),
-        getProductionList({ clientId })
+        getProductionList({ clientId }),
+        getServiceCases({ clientId })
       ]);
       setDetail(clientDetail);
       setProduction(productionPayload);
+      setService(servicePayload);
     } catch (err) {
       setError(
-        err instanceof ClientsError || err instanceof ProductionError
+        err instanceof ClientsError || err instanceof ProductionError || err instanceof ServiceCasesError
           ? translate("clientsLoadError")
           : err.message
       );
       setDetail(null);
       setProduction(null);
+      setService(null);
     } finally {
       setLoading(false);
     }
@@ -220,6 +234,31 @@ export default function ClientsPage() {
         await updateProductionStatus(dialog.item.id, { status: form.status });
       } else if (dialog?.type === "production-follow-up") {
         await createProductionFollowUp(dialog.item.id, {
+          dueDate: form.dueDate,
+          dueTime: form.dueTime || null,
+          notes: form.notes || null
+        });
+      } else if (dialog?.type === "service-create") {
+        await createServiceCase({
+          clientId,
+          serviceType: form.serviceType,
+          title: form.title,
+          notes: form.notes || null,
+          dueDate: form.dueDate || null,
+          scheduledAppointmentId: form.scheduledAppointmentId || null
+        });
+      } else if (dialog?.type === "service-edit") {
+        await updateServiceCase(dialog.item.id, {
+          serviceType: form.serviceType,
+          title: form.title,
+          notes: form.notes || null,
+          dueDate: form.dueDate || null,
+          scheduledAppointmentId: form.scheduledAppointmentId || null
+        });
+      } else if (dialog?.type === "service-status") {
+        await updateServiceCaseStatus(dialog.item.id, { status: form.status });
+      } else if (dialog?.type === "service-follow-up") {
+        await createServiceFollowUp(dialog.item.id, {
           dueDate: form.dueDate,
           dueTime: form.dueTime || null,
           notes: form.notes || null
@@ -384,6 +423,56 @@ export default function ClientsPage() {
             </section>
 
             <section className="clients-section">
+              <h2>{translate("serviceSectionTitle")}</h2>
+              <div className="clients-profile__actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm(emptyServiceForm());
+                    setDialog({ type: "service-create" });
+                  }}
+                >
+                  {translate("serviceAdd")}
+                </button>
+              </div>
+              {(service?.items || []).length === 0 ? (
+                <p className="clients-page__status">{translate("serviceEmptyClient")}</p>
+              ) : (
+                <ul className="clients-list">
+                  {(service?.items || []).map((item) => (
+                    <ServiceCaseCard
+                      key={item.id}
+                      item={item}
+                      translate={translate}
+                      locale={locale}
+                      showClient={false}
+                      onEdit={(record) => {
+                        setForm(
+                          emptyServiceForm({
+                            serviceType: record.serviceType,
+                            title: record.title || "",
+                            notes: record.notes || "",
+                            dueDate: record.dueDate || "",
+                            scheduledAppointmentId: record.scheduledAppointmentId || ""
+                          })
+                        );
+                        setDialog({ type: "service-edit", item: record });
+                      }}
+                      onStatus={(record) => {
+                        setForm(emptyServiceForm({ status: record.status }));
+                        setDialog({ type: "service-status", item: record });
+                      }}
+                      onFollowUp={(record) => {
+                        setForm(emptyServiceForm({ title: record.title }));
+                        setDialog({ type: "service-follow-up", item: record });
+                      }}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="clients-section">
               <h2>{translate("clientsFollowUps")}</h2>
               {(detail.followUps || []).length === 0 ? (
                 <p className="clients-page__status">{translate("clientsNoFollowUps")}</p>
@@ -492,6 +581,27 @@ export default function ClientsPage() {
             </label>
           </ClientDialog>
         ) : null}
+
+        <ServiceDialogs
+          dialog={
+            dialog?.type === "service-status"
+              ? { ...dialog, type: "status" }
+              : dialog?.type === "service-follow-up"
+                ? { ...dialog, type: "follow-up" }
+                : dialog?.type === "service-create"
+                  ? { ...dialog, type: "create" }
+                  : dialog?.type === "service-edit"
+                    ? { ...dialog, type: "edit" }
+                    : null
+          }
+          form={form}
+          setForm={setForm}
+          translate={translate}
+          saving={saving}
+          appointments={detail?.appointments || []}
+          onClose={() => setDialog(null)}
+          onConfirm={submitDialog}
+        />
 
         <ProductionDialogs
           dialog={

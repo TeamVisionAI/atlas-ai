@@ -238,6 +238,25 @@ function followUpPriority(status) {
   return DISPLAY_PRIORITY.FOLLOW_UP_NEEDS_DATE;
 }
 
+function presentServiceCaseItem(item) {
+  return {
+    id: `svc:${item.id}`,
+    kind: TODAY_KINDS.SERVICE_CASE,
+    displayPriority: followUpPriority(item.status),
+    title: item.title || item.name || "Service case",
+    subtitle: item.name && item.name !== item.title ? item.name : item.source?.serviceType || null,
+    whenLabel: item.dueDate || null,
+    status: item.status,
+    ownerName: item.ownerName || null,
+    href: item.href || (item.entityId ? `/app/clients/${item.entityId}` : "/app/service"),
+    entityType: "service_case",
+    entityId: item.id,
+    phone: null,
+    actions: ["open"],
+    source: item.source || item
+  };
+}
+
 function presentFollowUpItem(item, { timeZone } = {}) {
   const whenLabel = item.dueTime
     ? formatFriendlyTime(item.dueAt, timeZone) || item.dueTime
@@ -326,6 +345,7 @@ module.exports = {
   presentNeedsAttention,
   presentAppointment,
   presentFollowUpItem,
+  presentServiceCaseItem,
   presentNewLead,
   presentNotification,
   compareTodayItems
