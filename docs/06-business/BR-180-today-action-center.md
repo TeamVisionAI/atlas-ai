@@ -12,11 +12,13 @@ Give each user one place to answer: **What needs my attention today?**
 
 | Section | Canonical source |
 | --- | --- |
-| Needs Attention | Prospect attention + BR-080 acknowledgement. Real `human_required` / takeover only. Healed first-response SLA leftovers (`waiting_for_prospect` / `ai_responding` + `unacknowledged_sla_15m`) are excluded. |
+| Needs Attention | Prospect attention + BR-080 acknowledgement. Real `human_required` / takeover only, including persisted CRM rows that are not yet BR-159 operational-pipeline members. Healed first-response SLA leftovers (`waiting_for_prospect` / `ai_responding` + `unacknowledged_sla_15m`) are excluded. |
 | Today’s Appointments | Persisted `atlas_appointments` filtered by BR-079 organization-local today. |
-| Follow-ups Due | BR-178 `listFollowUps` — Due Today, Overdue, Needs Date. Recruiting and client (`entityType=client`). |
+| Follow-ups Due | BR-178 `listFollowUps` (`includeLegacy: true`) — Due Today, Overdue, Needs Date. Needs Date comes from that canonical list (durable dated rows or legacy undated coverage). Do not require a nullable `atlas_follow_ups.due_date`. Recruiting and client (`entityType=client`). |
 | New Leads / Conversations | `needsManualAcknowledge` / operational acknowledgement. Atlas-answered New is not actionable. |
 | Notifications | BR-176 `listMyNotifications` unread rows. No second notification system. |
+
+Today loads persisted org prospects (simulator / BR-136 TEST-CANARY excluded) and then keeps rows with a durable attention/inbound signal **or** BR-159 operational membership. My Today still owner-scopes; unowned rows do not leak into My Today.
 
 Clients participate only through real items: appointment today, follow-up due/overdue/needs-date, or a relevant notification. They are not added to recruiting metrics.
 

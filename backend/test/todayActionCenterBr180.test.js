@@ -20,7 +20,15 @@ const agentNotificationService = require("../services/agentNotificationService")
 const { createMemoryFollowUpStore } = require("../core/followUps");
 const { createMemoryNotificationStore, EVENT_TYPES } = require("../core/agentNotifications");
 const { emptyToday } = require("../core/operationalControlPlane");
-const { isHealedBr080Stale, isRealNeedsAttention, isActionableNewLead } = require("../core/today/todayPresentation");
+const {
+  isHealedBr080Stale,
+  isRealNeedsAttention,
+  isActionableNewLead,
+  isTodayProspectCandidate,
+  hasTodayAttentionSignal
+} = require("../core/today/todayPresentation");
+const { isOperationalProspectRecord } = require("../core/prospectPromotionEligibility");
+const { FOLLOW_UP_VIEW_STATUSES } = require("../core/followUps");
 const { HIERARCHY_MODES } = require("../core/hierarchyScopeEngine");
 
 const ORG_A = "21000000-0000-4000-8000-000000000001";
@@ -60,6 +68,42 @@ function prospect(overrides = {}) {
     attention_status: "new",
     acknowledged_at: null,
     needs_human_attention: false,
+    ...overrides
+  };
+}
+
+/** Persisted CRM shape without BR-159 promotion / lifecycle evidence. */
+function persistedAttentionProspect(overrides = {}) {
+  return prospect({
+    source: "manual",
+    entry_method: "manual",
+    current_step: "NEW",
+    status: "NEW",
+    workflow_state: null,
+    ...overrides
+  });
+}
+
+function br178LegacyNeedsDate(overrides = {}) {
+  return {
+    id: "legacy:+15550001999:none",
+    source: "legacy",
+    status: FOLLOW_UP_VIEW_STATUSES.NEEDS_DATE,
+    dueDate: null,
+    dueTime: null,
+    followUpDate: null,
+    followUpTime: null,
+    followUpAtMs: null,
+    name: "Undated Follow-up",
+    title: "Needs More Time",
+    followUpReason: "Needs More Time",
+    entityType: "prospect",
+    entityId: PROSPECT_ANSWERED,
+    phone: "+15550001999",
+    ownerUserId: USER_A,
+    representativeId: USER_A,
+    canManage: false,
+    canSetDate: true,
     ...overrides
   };
 }
@@ -175,6 +219,75 @@ test("real Needs Attention appears and healed BR-080 stale case does not", async
   );
 });
 
+test("persisted owned human_required appears even without BR-159 pipeline evidence", async () => {
+  const persistedNa = persistedAttentionProspect({
+    id: PROSPECT_NA,
+    name: "Persisted Takeover",
+    phone: "+15550001011",
+    attention_status: "human_required",
+    human_attention_reason: "provider_send_failed",
+    needs_human_attention: true
+  });
+  const noSignal = persistedAttentionProspect({
+    id: "51000000-0000-4000-8000-000000000088",
+    name: "No Attention Signal",
+    phone: "+15550001018",
+    attention_status: null,
+    new_lead_received_at: null,
+    needs_human_attention: false
+  });
+
+  assert.equal(isOperationalProspectRecord(persistedNa), false);
+  assert.equal(hasTodayAttentionSignal(persistedNa), true);
+  assert.equal(isTodayProspectCandidate(persistedNa), true);
+  assert.equal(isTodayProspectCandidate(noSignal), false);
+  assert.equal(isRealNeedsAttention(persistedNa), true);
+
+  todayService.setSourcesForTests({
+    loadProspects: async () => [persistedNa, noSignal],
+    loadAppointments: async () => []
+  });
+
+  const payload = await loadToday();
+  assert.equal(payload.counts.needsAttention, 1);
+  assert.equal(payload.sections.needsAttention[0].entityId, PROSPECT_NA);
+  assert.equal(
+    payload.sections.newLeads.some((item) => item.entityId === noSignal.id),
+    false
+  );
+});
+
+test("unowned persisted attention prospect is excluded from My Today", async () => {
+  todayService.setSourcesForTests({
+    loadProspects: async () => [
+      persistedAttentionProspect({
+        id: PROSPECT_NA,
+        name: "Unowned NA",
+        phone: "+15550001012",
+        owner_user_id: null,
+        attention_status: "human_required",
+        human_attention_reason: "provider_send_failed",
+        needs_human_attention: true
+      }),
+      persistedAttentionProspect({
+        id: PROSPECT_NEW,
+        name: "Unowned New",
+        phone: "+15550001013",
+        owner_user_id: null,
+        attention_status: "new",
+        new_lead_received_at: "2026-08-30T12:00:00.000Z"
+      })
+    ],
+    loadAppointments: async () => []
+  });
+
+  const payload = await loadToday({ authContext: auth(USER_A), scope: "mine" });
+  assert.equal(payload.scope, "mine");
+  assert.equal(payload.counts.needsAttention, 0);
+  assert.equal(payload.counts.newActionable, 0);
+  assert.equal(payload.caughtUp, true);
+});
+
 test("today appointment appears in org timezone and tomorrow does not", async () => {
   todayService.setSourcesForTests({
     loadProspects: async () => [],
@@ -196,10 +309,8 @@ test("today appointment appears in org timezone and tomorrow does not", async ()
   assert.equal(payload.sections.appointmentsToday[0].href, `/app/appointments?appointmentId=${APPT_TODAY}`);
 });
 
-test("overdue, due-today, and needs-date follow-ups classify correctly", async () => {
+test("overdue and due-today durable follow-ups classify correctly", async () => {
   useRealFollowUps();
-  const store = createMemoryFollowUpStore();
-  followUpApplicationService.setStoreForTests(store);
 
   const dueToday = await followUpApplicationService.createManualFollowUp(
     {
@@ -225,29 +336,41 @@ test("overdue, due-today, and needs-date follow-ups classify correctly", async (
     },
     auth()
   );
-  await store.upsert({
-    id: "fu-needs-date",
-    organizationId: ORG_A,
-    ownerUserId: USER_A,
-    entityType: "prospect",
-    entityId: PROSPECT_ANSWERED,
-    subjectLabel: "Needs Date Prospect",
-    title: "Set a date",
-    dueDate: null,
-    status: "OPEN",
-    dedupKey: "needs-date-1",
-    source: "durable",
-    createdAt: "2026-08-30T12:00:00.000Z",
-    updatedAt: "2026-08-30T12:00:00.000Z",
-    history: []
-  });
 
   const payload = await loadToday();
   const statuses = payload.sections.followUps.map((item) => item.status).sort();
-  assert.deepEqual(statuses, ["due-today", "needs-date", "overdue"]);
+  assert.deepEqual(statuses, ["due-today", "overdue"]);
   assert.equal(payload.counts.followUpsDueOverdue, 2);
   assert.ok(payload.sections.followUps.find((item) => item.source?.id === dueToday.followUp.id));
   assert.ok(payload.sections.followUps.find((item) => item.source?.id === overdue.followUp.id));
+});
+
+test("legacy undated BR-178 follow-up appears as Needs Date, not Overdue", async () => {
+  const legacyNeedsDate = br178LegacyNeedsDate();
+  todayService.setSourcesForTests({
+    listFollowUps: async (args) => {
+      const payload = await followUpApplicationService.listFollowUps({
+        ...args,
+        includeLegacy: true
+      });
+      return {
+        ...payload,
+        items: [...(payload.items || []), legacyNeedsDate]
+      };
+    }
+  });
+
+  const payload = await loadToday();
+  const needsDate = payload.sections.followUps.find((item) => item.status === "needs-date");
+  assert.ok(needsDate);
+  assert.equal(needsDate.source?.source, "legacy");
+  assert.equal(needsDate.source?.dueDate, null);
+  assert.equal(needsDate.displayPriority, 60);
+  assert.equal(payload.counts.followUpsDueOverdue, 0);
+  assert.equal(
+    payload.sections.followUps.some((item) => item.status === "overdue"),
+    false
+  );
 });
 
 test("client follow-up appears and links to the client workspace", async () => {
@@ -272,17 +395,19 @@ test("client follow-up appears and links to the client workspace", async () => {
 });
 
 test("Atlas-answered New lead is not actionable; true unhandled lead is", async () => {
-  const answered = prospect({
+  const answered = persistedAttentionProspect({
     id: PROSPECT_ANSWERED,
     name: "Atlas Answered",
     phone: "+15550001003",
-    attention_status: "waiting_for_prospect"
+    attention_status: "waiting_for_prospect",
+    new_lead_received_at: "2026-08-30T12:00:00.000Z"
   });
-  const unhandled = prospect({
+  const unhandled = persistedAttentionProspect({
     id: PROSPECT_NEW,
     name: "Unhandled Lead",
     phone: "+15550001004",
-    attention_status: "new"
+    attention_status: "new",
+    new_lead_received_at: "2026-08-30T12:00:00.000Z"
   });
 
   assert.equal(isActionableNewLead(answered), false);
@@ -496,4 +621,9 @@ test("BR-180 routes, refresh, and source boundaries stay aggregation-only", () =
   assert.doesNotMatch(recruitDecision, /todayActionCenterApplicationService/);
   assert.doesNotMatch(notifications, /todayActionCenterApplicationService/);
   assert.match(followUps, /resolveOwnerFilter/);
+  assert.match(service, /includeNonOperationalContacts:\s*true/);
+  assert.match(service, /includeLegacy:\s*true/);
+  assert.match(service, /isTodayProspectCandidate/);
+  assert.doesNotMatch(service, /due_date\s+IS\s+NULL|ALTER TABLE atlas_follow_ups/i);
+  assert.doesNotMatch(service, /nullable.*due_date|due_date.*nullable/i);
 });

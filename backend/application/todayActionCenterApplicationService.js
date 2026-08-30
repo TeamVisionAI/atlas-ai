@@ -24,6 +24,7 @@ const {
   ownerIdOfProspect,
   ownerIdOfAppointment,
   matchesOwnerFilter,
+  isTodayProspectCandidate,
   isRealNeedsAttention,
   isActionableNewLead,
   presentNeedsAttention,
@@ -49,12 +50,13 @@ function resolveSources(sources = {}) {
 }
 
 async function defaultLoadProspects(organizationId) {
-  try {
-    const { loadProductionProspects } = require("../core/executiveDashboardReadModel");
-    return await loadProductionProspects(organizationId);
-  } catch {
-    return [];
-  }
+  const { loadProductionProspects } = require("../core/executiveDashboardReadModel");
+  // Implements BR-180 — load persisted org prospects, then classify attention.
+  // Do not require BR-159 operational-pipeline membership before NA / New.
+  // Still exclude simulators and BR-136 TEST/CANARY/QA via the shared loader.
+  return loadProductionProspects(organizationId, {
+    includeNonOperationalContacts: true
+  });
 }
 
 async function defaultLoadAppointments({ organizationId, reference }) {
@@ -145,8 +147,9 @@ async function getToday({
     (prospect) =>
       String(prospect.organization_id || prospect.organizationId || "") === String(organizationId)
   );
+  const attentionProspects = orgProspects.filter(isTodayProspectCandidate);
   const visibleProspects = filterOwned(
-    filterProspectsForAuthContext(authForProspects, orgProspects),
+    filterProspectsForAuthContext(authForProspects, attentionProspects),
     ownerIdOfProspect,
     ownerFilter
   );
