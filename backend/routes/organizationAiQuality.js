@@ -3,15 +3,14 @@
  */
 
 const express = require("express");
-const { requireAtlasUser } = require("../middleware/requireAtlasUser");
 const { requireOrgAdmin } = require("../middleware/requireOrgAdmin");
 const { isSuperAdmin } = require("../security/saasRoles");
 const aiQualityService = require("../services/aiQualityService");
 
 const router = express.Router();
 
-router.use(requireAtlasUser);
-router.use(requireOrgAdmin);
+// Parent /api/organization already authenticates. Apply org-admin per route
+// so sibling paths (/branding, /settings, /notifications) stay reachable.
 
 function sendError(res, error) {
   return res.status(error.statusCode || 500).json({
@@ -45,7 +44,7 @@ function denyIfNoTenant(req, res) {
   return organizationId;
 }
 
-router.get("/ai-quality/settings", async (req, res) => {
+router.get("/ai-quality/settings", requireOrgAdmin, async (req, res) => {
   const organizationId = denyIfNoTenant(req, res);
   if (!organizationId) {
     return undefined;
@@ -67,7 +66,7 @@ router.get("/ai-quality/settings", async (req, res) => {
   }
 });
 
-router.patch("/ai-quality/settings", async (req, res) => {
+router.patch("/ai-quality/settings", requireOrgAdmin, async (req, res) => {
   const organizationId = denyIfNoTenant(req, res);
   if (!organizationId) {
     return undefined;
@@ -86,7 +85,7 @@ router.patch("/ai-quality/settings", async (req, res) => {
   }
 });
 
-router.get("/ai-quality/cases", async (req, res) => {
+router.get("/ai-quality/cases", requireOrgAdmin, async (req, res) => {
   const organizationId = denyIfNoTenant(req, res);
   if (!organizationId) {
     return undefined;
@@ -103,7 +102,7 @@ router.get("/ai-quality/cases", async (req, res) => {
   }
 });
 
-router.get("/ai-quality/cases/:id", async (req, res) => {
+router.get("/ai-quality/cases/:id", requireOrgAdmin, async (req, res) => {
   const organizationId = denyIfNoTenant(req, res);
   if (!organizationId) {
     return undefined;
@@ -123,7 +122,7 @@ router.get("/ai-quality/cases/:id", async (req, res) => {
   }
 });
 
-router.post("/ai-quality/cases/:id/review", async (req, res) => {
+router.post("/ai-quality/cases/:id/review", requireOrgAdmin, async (req, res) => {
   const organizationId = denyIfNoTenant(req, res);
   if (!organizationId) {
     return undefined;
