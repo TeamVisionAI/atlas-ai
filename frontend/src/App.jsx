@@ -39,6 +39,7 @@ import TodayPage from "./pages/TodayPage";
 import ClientsPage from "./pages/ClientsPage";
 import ProductionPage from "./pages/ProductionPage";
 import ServicePage from "./pages/ServicePage";
+import PolicyReviewsPage from "./pages/PolicyReviewsPage";
 import IulFollowUpWorklistPage from "./pages/IulFollowUpWorklistPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import Prospect from "./pages/Prospect";
@@ -165,6 +166,7 @@ export default function App() {
         />
         <Route path="production" element={<ProductionPage />} />
         <Route path="service" element={<ServicePage />} />
+        <Route path="policy-reviews" element={<PolicyReviewsPage />} />
         <Route
           path="recruiting"
           element={

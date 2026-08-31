@@ -2868,6 +2868,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-186 — IUL / Policy Review Pipeline V2
+
+**Implements:** A dedicated, measurable IUL / policy-review operating layer separate from recruiting, with explicit stages, attribution, production, and estimated commission.  
+**Domain:** Clients / service / production / revenue operations  
+**Depends on:** BR-179 clients; BR-181 production; BR-182 service cases; BR-183 documents; BR-178 follow-ups; BR-184 Today  
+**Related:** BR-132 (scheduling policy_review ≠ Policy Intelligence); BR-160 control plane  
+**Status:** V1 foundation implemented  
+**Engine target:** `policyReviewPipeline`; `policyReviewPipelineApplicationService`  
+**Tests:** `backend/test/policyReviewPipelineBr186.test.js`; `frontend/src/pages/policyReviewsPageBr186.test.js`  
+**Docs:** `docs/06-business/BR-186-policy-review-pipeline.md`
+
+### Rules
+
+1. **Source of truth** — `atlas_policy_review_pipeline` is the canonical pipeline. Link clients, service cases, appointments, document requests, and production. Do not duplicate client identity. Do not use Policy Intelligence `atlas_policy_reviews`. Do not overload BR-182 statuses with application/placed.
+2. **Stages** — Explicit human transitions only. Replacement opportunity is recorded only after review completed. Do not auto-classify replacement from incomplete information. No automated policy analysis or replacement recommendation.
+3. **Attribution** — Preserve org, owner, client/contact, language, state, source, campaign, ad/adset/creative, campaign intake code, created and stage timestamps. No phone-based tenant identity.
+4. **Production / commission** — APPLICATION_SUBMITTED / PLACED capture carrier/product, monthly premium, annualized premium, dates, owner, source/campaign. Estimated take-home = AP × (level% / 100) × (advance% / 100) from tenant/user/record config. Label Estimated unless actual paid is recorded. Do not hardcode 110% or 75%.
+5. **Visibility** — Own reviews by default. Leadership hierarchy roll-up. Super Admin control plane empty. Support Mode tenant-bound. Wrong-org 404. Super Admin controls the platform. Hierarchy controls the business.
+6. **Recruiting separation** — Must not enter Prospect Center, Recruit AI, recruiting conversion metrics, or recruiting campaign routing. Same person may exist as recruit and client/review with linked but separate contexts.
+7. **Today** — Reuse BR-184 / BR-178 / BR-183. Do not add a duplicate Today source for pipeline rows.
+8. **Boundaries** — Do not change Recruit AI semantic apply, AI Quality, WhatsApp routing, recruiting eligibility, BR-178 SoT, BR-183 storage/security, or appointment scheduling rules.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

@@ -272,6 +272,43 @@ function emptyServiceCaseDetail() {
   };
 }
 
+function emptyPolicyReviews() {
+  return {
+    generatedAt: new Date().toISOString(),
+    controlPlane: true,
+    organizationId: null,
+    scope: "mine",
+    teamAvailable: false,
+    search: "",
+    totalCount: 0,
+    filteredCount: 0,
+    metrics: {
+      newLeads: 0,
+      qualified: 0,
+      appointmentsBooked: 0,
+      documentsPending: 0,
+      reviewsCompleted: 0,
+      replacementOpportunities: 0,
+      applicationsSubmitted: 0,
+      placed: 0,
+      monthlyPremium: 0,
+      annualizedPremium: 0,
+      estimatedCommission: 0
+    },
+    items: []
+  };
+}
+
+function emptyPolicyReviewDetail() {
+  return {
+    controlPlane: true,
+    organizationId: null,
+    id: null,
+    clientId: null,
+    history: []
+  };
+}
+
 function emptyDocumentRequests() {
   return {
     generatedAt: new Date().toISOString(),
@@ -388,6 +425,8 @@ module.exports = {
   emptyProductionDetail,
   emptyServiceCases,
   emptyServiceCaseDetail,
+  emptyPolicyReviews,
+  emptyPolicyReviewDetail,
   emptyDocumentRequests,
   emptyDocumentRequestDetail,
   emptyDocuments,
