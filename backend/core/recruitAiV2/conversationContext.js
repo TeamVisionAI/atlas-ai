@@ -46,6 +46,11 @@ function emptyKnownFacts() {
     name: null,
     /** Invitation/contact enrichment — optional for booking (BR-117). */
     email: null,
+    /**
+     * BR-187 — bilingual | english | spanish | null.
+     * Independent of preferredLanguage (conversation language).
+     */
+    languageAbility: null,
     /** BR-090 — fixed | null */
     employmentPreference: null,
     /** BR-090 — exploring | not_now | null */

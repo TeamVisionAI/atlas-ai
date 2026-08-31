@@ -581,10 +581,12 @@ async function ownConfirmableProposalAfterAuthoringLoss({
 
   const lateFailed = Boolean(late?.execution?.attempted && !late?.execution?.success);
   const lateFailedReply = extractAuthoredReplyText(late);
-  const templateKey =
-    lateFailed || allowExecution
-      ? "appointment_create_failed"
-      : "appointment_confirm_deferred";
+  // Implements BR-187 / BR-126 — own the turn on authoring loss, but do not
+  // emit create-failed copy unless booking was actually attempted and failed.
+  // allowExecution alone is not a provider failure.
+  const templateKey = lateFailed
+    ? "appointment_create_failed"
+    : "appointment_confirm_deferred";
 
   let replyText = "";
   if (lateFailed && lateFailedReply) {

@@ -1562,7 +1562,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Deferred preserves proposal** — `appointment_confirm_deferred` keeps `appointment.status=proposed`, exact `proposedDate`/`proposedTime`, `lastQuestionAsked=confirm_slot`, `lastProspectIntent=schedule_confirm`, and `lastOfferMade=appointment_confirm_deferred` (plus outbound text when authored).
 2. **Later affirmative resumes create** — With that durable state, bare `Si`/`Yes` classifies as `schedule_confirm` and decides `create_appointment` (execution still env-gated).
-3. **No CE fallthrough on confirmable proposed** — Authoring timeout/empty/technical failure or cancelled create rollback must not hand the turn to legacy CE while a confirmable proposal remains; V2 owns soft failure (`appointment_create_failed`) or successful reclaim (BR-125) instead.
+3. **No CE fallthrough on confirmable proposed** — Authoring timeout/empty/technical failure or cancelled create rollback must not hand the turn to legacy CE while a confirmable proposal remains. V2 owns the reply: successful reclaim (BR-125); **real** create/reschedule attempt that failed → `appointment_create_failed`; timeout/loss **without** an attempted+failed execution → `appointment_confirm_deferred` (BR-187). `allowExecution` alone is not a booking failure.
 4. **Affirmatives are not cities** — Location extractors must not treat bare affirmatives as city names while confirmation is pending. Soft-acks (`ok` / `okay`) while availability is pending remain `soft_acknowledgement` — they must not be forced into `schedule_confirm` solely because appointment status is `proposed`.
 5. **Exact slot authoritative** — Do not invent a different slot; reuse the proposed offered slot.
 6. **Execution OFF** — Deferred path still creates zero appointments / Calendar events.
@@ -2889,6 +2889,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 6. **Recruiting separation** — Must not enter Prospect Center, Recruit AI, recruiting conversion metrics, or recruiting campaign routing. Same person may exist as recruit and client/review with linked but separate contexts.
 7. **Today** — Reuse BR-184 / BR-178 / BR-183. Do not add a duplicate Today source for pipeline rows.
 8. **Boundaries** — Do not change Recruit AI semantic apply, AI Quality, WhatsApp routing, recruiting eligibility, BR-178 SoT, BR-183 storage/security, or appointment scheduling rules.
+
+---
+
+## BR-187 — Confirmed Fact Stability + Language Ability ≠ Location
+
+**Implements:** A confirmed Recruit AI qualification fact cannot disappear or be replaced because a later message does not mention it. Language-ability statements (`Soy bilingüe`) are not cities. Final `Si` after a confirmable slot must book unless a real booking/provider failure occurs.  
+**Domain:** Recruit AI v2 qualification + live confirmation  
+**Depends on:** BR-081, BR-082, BR-103, BR-111, BR-114, BR-126  
+**Related:** BR-094 (location parse), BR-096 (citizenship/auth), BR-185 (lead time unchanged)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/locationFacts.js`, `recruitAiV2/interpreter.js`, `recruitAiV2/decisionEngine.js`, `recruitAiV2/contextTurnUpdate.js`, `recruitAiV2/liveAuthoringBridge.js`  
+**Tests:** `backend/test/recruitAiV2BilingualLocationSiConfirmBr187.test.js`
+
+### Rules
+
+1. **Confirmed facts persist** — A confirmed `city`/`state` pair is not replaced by an unrelated later *partial* phrase completed onto the prior state (not a correction). Explicit correction (`digo` / `actually` / `vivo en` / `no …`) may replace it. Persistence still blocks weaker overwrites of a confirmed pair.
+2. **Language ability is independent** — `Soy bilingüe` / `I am bilingual` / `hablo inglés y español` capture `knownFacts.languageAbility=bilingual` when present. They must not parse as a city and must not requalify location. `preferredLanguage` (conversation language) is unchanged.
+3. **Reply uses confirmed place** — If a location overwrite is blocked, customer copy must speak the confirmed city, not this-turn junk entities.
+4. **Final Si books** — After a confirmable proposed slot and `confirm_slot` / `Responde SI`, bare `Si`/`Yes` is `schedule_confirm` → `create_appointment`. Human handoff copy (`appointment_create_failed` / `safe_failure_escalate`) is reserved for an attempted booking that failed, or a true safe-failure. Authoring timeout with `allowExecution=true` and no failed execution stays `appointment_confirm_deferred`.
+5. **Boundaries** — Do not change tenant isolation, Recruit AI eligibility, BR-185 lead time, semantic shadow/apply, or WhatsApp routing. Existing persisted `Soy Bilingue` cities are not rewritten on load; only future inbound turns are corrected.
 
 ---
 
