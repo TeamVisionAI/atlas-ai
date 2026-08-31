@@ -302,8 +302,8 @@ export default function PolicyReviewsPage() {
   }
 
   return (
-    <div className="clients-page">
-      <header className="clients-page__header">
+    <div className="clients-page clients-page--policy-reviews">
+      <header className="clients-page__header policy-review-header">
         <div>
           <h1 className="clients-page__title">{translate("policyReviewTitle")}</h1>
           <p className="clients-page__subtitle">{translate("policyReviewSubtitle")}</p>
@@ -320,56 +320,56 @@ export default function PolicyReviewsPage() {
         </button>
       </header>
 
-      <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewViewLabel")}>
-        <button
-          type="button"
-          className={`clients-page__filter${activeView === POLICY_REVIEW_VIEWS.DASHBOARD ? " is-active" : ""}`}
-          onClick={() => patchParams({ view: POLICY_REVIEW_VIEWS.DASHBOARD })}
-        >
-          {translate("policyReviewViewDashboard")}
-        </button>
-        <button
-          type="button"
-          className={`clients-page__filter${activeView === POLICY_REVIEW_VIEWS.PIPELINE ? " is-active" : ""}`}
-          onClick={() => patchParams({ view: POLICY_REVIEW_VIEWS.PIPELINE })}
-        >
-          {translate("policyReviewViewPipeline")}
-        </button>
-      </div>
-
-      <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewScopeLabel")}>
-        <button
-          type="button"
-          className={`clients-page__filter${activeScope === "mine" ? " is-active" : ""}`}
-          onClick={() => patchParams({ scope: "mine" })}
-        >
-          {translate("policyReviewScopeMine")}
-        </button>
-        {(payload?.teamAvailable || dashboard?.teamAvailable) ? (
+      <div className="policy-review-toolbar">
+        <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewViewLabel")}>
           <button
             type="button"
-            className={`clients-page__filter${activeScope === "team" ? " is-active" : ""}`}
-            onClick={() => patchParams({ scope: "team" })}
+            className={`clients-page__filter${activeView === POLICY_REVIEW_VIEWS.DASHBOARD ? " is-active" : ""}`}
+            onClick={() => patchParams({ view: POLICY_REVIEW_VIEWS.DASHBOARD })}
           >
-            {translate("policyReviewScopeTeam")}
+            {translate("policyReviewViewDashboard")}
           </button>
-        ) : null}
-      </div>
-
-      <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewRangeLabel")}>
-        {POLICY_REVIEW_DATE_PRESETS.map(([value, labelKey]) => (
           <button
-            key={value}
             type="button"
-            className={`clients-page__filter${rangeFilter === value ? " is-active" : ""}`}
-            onClick={() => patchParams({ range: value })}
+            className={`clients-page__filter${activeView === POLICY_REVIEW_VIEWS.PIPELINE ? " is-active" : ""}`}
+            onClick={() => patchParams({ view: POLICY_REVIEW_VIEWS.PIPELINE })}
           >
-            {translate(labelKey)}
+            {translate("policyReviewViewPipeline")}
           </button>
-        ))}
+        </div>
+        <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewScopeLabel")}>
+          <button
+            type="button"
+            className={`clients-page__filter${activeScope === "mine" ? " is-active" : ""}`}
+            onClick={() => patchParams({ scope: "mine" })}
+          >
+            {translate("policyReviewScopeMine")}
+          </button>
+          {(payload?.teamAvailable || dashboard?.teamAvailable) ? (
+            <button
+              type="button"
+              className={`clients-page__filter${activeScope === "team" ? " is-active" : ""}`}
+              onClick={() => patchParams({ scope: "team" })}
+            >
+              {translate("policyReviewScopeTeam")}
+            </button>
+          ) : null}
+        </div>
+        <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewRangeLabel")}>
+          {POLICY_REVIEW_DATE_PRESETS.map(([value, labelKey]) => (
+            <button
+              key={value}
+              type="button"
+              className={`clients-page__filter${rangeFilter === value ? " is-active" : ""}`}
+              onClick={() => patchParams({ range: value })}
+            >
+              {translate(labelKey)}
+            </button>
+          ))}
+        </div>
       </div>
       {rangeFilter === "custom" ? (
-        <div className="clients-page__scope" aria-label={translate("policyReviewRangeCustom")}>
+        <div className="policy-review-toolbar policy-review-toolbar--custom" aria-label={translate("policyReviewRangeCustom")}>
           <label className="clients-page__search-label">
             {translate("policyReviewRangeFrom")}
             <input type="date" value={fromFilter} onChange={(event) => patchParams({ from: event.target.value, range: "custom" })} />
@@ -381,55 +381,58 @@ export default function PolicyReviewsPage() {
         </div>
       ) : null}
 
-      <div className="clients-page__scope" aria-label={translate("policyReviewFilters")}>
-        <label className="clients-page__search-label">
-          {translate("policyReviewStage")}
-          <select value={stageFilter} onChange={(event) => patchParams({ stage: event.target.value })}>
-            <option value="">{translate("policyReviewFilterAll")}</option>
-            {Object.values(POLICY_REVIEW_STAGES).map((stage) => (
-              <option key={stage} value={stage}>
-                {buildPolicyReviewStageLabel(stage, translate)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="clients-page__search-label">
-          {translate("policyReviewFilterPlatform")}
-          <input
-            value={platformFilter}
-            onChange={(event) => patchParams({ platform: event.target.value })}
-            placeholder={translate("policyReviewPlatform")}
-          />
-        </label>
-        <label className="clients-page__search-label">
-          {translate("policyReviewFilterCampaign")}
-          <input
-            value={campaignFilter}
-            onChange={(event) => patchParams({ campaign: event.target.value })}
-            placeholder={translate("policyReviewCampaign")}
-          />
-        </label>
-        <label className="clients-page__search-label">
-          {translate("policyReviewFilterSource")}
-          <input
-            value={sourceFilter}
-            onChange={(event) => patchParams({ source: event.target.value })}
-            placeholder={translate("policyReviewSource")}
-          />
-        </label>
-      </div>
-
-      <label className="clients-page__search-label" htmlFor="policy-review-search">
-        {translate("policyReviewSearchLabel")}
-        <input
-          id="policy-review-search"
-          type="search"
-          className="clients-page__search"
-          value={searchInput}
-          placeholder={translate("policyReviewSearchPlaceholder")}
-          onChange={(event) => setSearchInput(event.target.value)}
-        />
-      </label>
+      {showPipeline ? (
+        <>
+          <div className="policy-review-toolbar policy-review-toolbar--filters" aria-label={translate("policyReviewFilters")}>
+            <label className="clients-page__search-label">
+              {translate("policyReviewStage")}
+              <select value={stageFilter} onChange={(event) => patchParams({ stage: event.target.value })}>
+                <option value="">{translate("policyReviewFilterAll")}</option>
+                {Object.values(POLICY_REVIEW_STAGES).map((stage) => (
+                  <option key={stage} value={stage}>
+                    {buildPolicyReviewStageLabel(stage, translate)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="clients-page__search-label">
+              {translate("policyReviewFilterPlatform")}
+              <input
+                value={platformFilter}
+                onChange={(event) => patchParams({ platform: event.target.value })}
+                placeholder={translate("policyReviewPlatform")}
+              />
+            </label>
+            <label className="clients-page__search-label">
+              {translate("policyReviewFilterCampaign")}
+              <input
+                value={campaignFilter}
+                onChange={(event) => patchParams({ campaign: event.target.value })}
+                placeholder={translate("policyReviewCampaign")}
+              />
+            </label>
+            <label className="clients-page__search-label">
+              {translate("policyReviewFilterSource")}
+              <input
+                value={sourceFilter}
+                onChange={(event) => patchParams({ source: event.target.value })}
+                placeholder={translate("policyReviewSource")}
+              />
+            </label>
+          </div>
+          <label className="clients-page__search-label" htmlFor="policy-review-search">
+            {translate("policyReviewSearchLabel")}
+            <input
+              id="policy-review-search"
+              type="search"
+              className="clients-page__search"
+              value={searchInput}
+              placeholder={translate("policyReviewSearchPlaceholder")}
+              onChange={(event) => setSearchInput(event.target.value)}
+            />
+          </label>
+        </>
+      ) : null}
 
       {showDashboard ? (
         <>

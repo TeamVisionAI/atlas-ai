@@ -3,6 +3,8 @@
  * Drill-down stays on /app/policy-reviews pipeline filters.
  */
 
+import EmptyState from "../components/ui/EmptyState";
+import StatusBadge from "../components/ui/StatusBadge";
 import {
   POLICY_REVIEW_ATTRIBUTION_GROUPS,
   POLICY_REVIEW_DASHBOARD_KPIS,
@@ -13,6 +15,16 @@ import {
   formatPolicyReviewMoney,
   kpiStageFilter
 } from "../engines/policyReviewViewModel";
+
+const EMPHASIS_KPI_KEYS = new Set(["placed", "annualizedPremium", "estimatedCommission"]);
+const PIPELINE_KPI_KEYS = new Set([
+  "newReviewLeads",
+  "qualified",
+  "appointmentsBooked",
+  "reviewsCompleted",
+  "replacementOpportunities",
+  "applicationsSubmitted"
+]);
 
 const ATTRIBUTION_COLUMNS = [
   ["reviewLeads", "policyReviewMetricNewLeads", false],
@@ -40,48 +52,77 @@ export default function PolicyReviewsDashboardBlock({
   const groups = dashboard?.attribution?.groups || [];
   const needsAction = dashboard?.needsAction || [];
   const empty = !loading && Number(kpis?.newReviewLeads || 0) === 0;
+  const funnelBase = Number(funnel[0]?.count) || 0;
+  const pipelineKpis = POLICY_REVIEW_DASHBOARD_KPIS.filter(([key]) => PIPELINE_KPI_KEYS.has(key));
+  const outcomeKpis = POLICY_REVIEW_DASHBOARD_KPIS.filter(([key]) => !PIPELINE_KPI_KEYS.has(key));
+
+  function renderKpiCard([key, labelKey, money]) {
+    const emphasized = EMPHASIS_KPI_KEYS.has(key);
+    return (
+      <button
+        key={key}
+        type="button"
+        role="listitem"
+        className={`policy-review-kpi${emphasized ? " policy-review-kpi--emphasis" : ""}`}
+        onClick={() => onDrilldown({ stage: kpiStageFilter(key) })}
+      >
+        <span>{translate(labelKey)}</span>
+        <strong>
+          {money ? formatPolicyReviewMoney(kpis?.[key], locale) : kpis?.[key] || 0}
+        </strong>
+      </button>
+    );
+  }
 
   return (
     <section className="policy-review-dashboard" aria-label={translate("policyReviewDashboardTitle")}>
-      <div className="policy-review-kpi-grid" role="list">
-        {POLICY_REVIEW_DASHBOARD_KPIS.map(([key, labelKey, money]) => (
-          <button
-            key={key}
-            type="button"
-            role="listitem"
-            className="policy-review-kpi"
-            onClick={() => onDrilldown({ stage: kpiStageFilter(key) })}
-          >
-            <span>{translate(labelKey)}</span>
-            <strong>
-              {money ? formatPolicyReviewMoney(kpis?.[key], locale) : kpis?.[key] || 0}
-            </strong>
-          </button>
-        ))}
+      <div className="policy-review-kpi-groups">
+        <div className="policy-review-kpi-group" role="list" aria-label={translate("policyReviewKpiGroupPipeline")}>
+          <p className="policy-review-kpi-group__label">{translate("policyReviewKpiGroupPipeline")}</p>
+          <div className="policy-review-kpi-grid policy-review-kpi-grid--pipeline">
+            {pipelineKpis.map(renderKpiCard)}
+          </div>
+        </div>
+        <div className="policy-review-kpi-group" role="list" aria-label={translate("policyReviewKpiGroupRevenue")}>
+          <p className="policy-review-kpi-group__label">{translate("policyReviewKpiGroupRevenue")}</p>
+          <div className="policy-review-kpi-grid policy-review-kpi-grid--revenue">
+            {outcomeKpis.map(renderKpiCard)}
+          </div>
+        </div>
       </div>
 
-      {empty ? <p className="clients-page__status">{translate("policyReviewDashboardEmpty")}</p> : null}
+      {empty ? (
+        <EmptyState title={translate("policyReviewDashboardTitle")} body={translate("policyReviewDashboardEmpty")} />
+      ) : null}
 
       <div className="policy-review-dashboard__panels">
         <section className="clients-card" aria-label={translate("policyReviewFunnelTitle")}>
           <h2>{translate("policyReviewFunnelTitle")}</h2>
           <ol className="policy-review-funnel">
-            {funnel.map((step) => (
-              <li key={step.stage}>
-                <button type="button" onClick={() => onDrilldown({ stage: step.stage })}>
-                  <span>{buildPolicyReviewStageLabel(step.stage, translate)}</span>
-                  <strong>{step.count || 0}</strong>
-                  <em>
-                    {step.conversionFromPrevious == null
-                      ? translate("policyReviewFunnelStart")
-                      : translate("policyReviewFunnelConversion").replace(
-                          "{pct}",
-                          formatPolicyReviewConversion(step.conversionFromPrevious)
-                        )}
-                  </em>
-                </button>
-              </li>
-            ))}
+            {funnel.map((step) => {
+              const count = Number(step.count) || 0;
+              const fill = funnelBase > 0 ? Math.max(0, Math.min(100, Math.round((count / funnelBase) * 100))) : 0;
+              const conversion =
+                step.conversionFromPrevious == null
+                  ? translate("policyReviewFunnelStart")
+                  : formatPolicyReviewConversion(step.conversionFromPrevious);
+              return (
+                <li key={step.stage}>
+                  <button type="button" onClick={() => onDrilldown({ stage: step.stage })}>
+                    <span className="policy-review-funnel__meta">
+                      <span className="policy-review-funnel__name">
+                        {buildPolicyReviewStageLabel(step.stage, translate)}
+                      </span>
+                      <strong className="policy-review-funnel__count">{count}</strong>
+                      <em className="policy-review-funnel__conversion">{conversion}</em>
+                    </span>
+                    <span className="policy-review-funnel__track" aria-hidden="true">
+                      <span className="policy-review-funnel__bar" style={{ width: `${fill}%` }} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         </section>
 
@@ -90,11 +131,12 @@ export default function PolicyReviewsDashboardBlock({
           <ul className="policy-review-needs">
             {needsAction.map((row) => {
               const label = POLICY_REVIEW_NEEDS_ACTION.find(([key]) => key === row.key)?.[1];
+              const count = Number(row.count) || 0;
               return (
                 <li key={row.key}>
                   <button type="button" onClick={() => onDrilldown({ stage: row.stage || "" })}>
                     <span>{translate(label || row.key)}</span>
-                    <strong>{row.count || 0}</strong>
+                    <StatusBadge variant={count > 0 ? "info" : "neutral"}>{count}</StatusBadge>
                   </button>
                 </li>
               );

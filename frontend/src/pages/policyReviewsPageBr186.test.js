@@ -40,6 +40,12 @@ test("Policy Reviews is routed separately from recruiting and Policy Intelligenc
   assert.match(page, /getPolicyReviewDashboard/);
   assert.match(page, /policyReviewViewDashboard/);
   assert.match(page, /PolicyReviewsDashboardBlock/);
+  assert.match(page, /policy-review-toolbar/);
+  const dashboard = fs.readFileSync(path.join(here, "PolicyReviewsDashboardBlock.jsx"), "utf8");
+  assert.match(dashboard, /policy-review-kpi--emphasis/);
+  assert.match(dashboard, /policy-review-funnel__bar/);
+  assert.match(dashboard, /StatusBadge/);
+  assert.match(dashboard, /EmptyState/);
   assert.doesNotMatch(page, /navigateToProspectWorkspace|recruitAiV2|\/api\/prospects/);
   assert.doesNotMatch(page, /policy-intelligence|PolicyIntelligence/);
   assert.doesNotMatch(nav, /IUL Dashboard|Revenue Dashboard|Acquisition Dashboard/);
