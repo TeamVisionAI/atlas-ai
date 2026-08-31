@@ -56,6 +56,10 @@ import {
   MISSION_CONTROL_QUERY_KEYS,
   resolveMissionControlFocusPhone
 } from "../engines/executiveFilterEngine";
+import {
+  planMissionControlBootstrap,
+  shouldHoldMissionControlSplash
+} from "../engines/missionControlBootstrapEngine";
 import { useLanguage } from "../i18n/LanguageContext";
 import { subscribeProspectProfileUpdated } from "../utils/prospectRefreshBus";
 import { usePromptDialog } from "../hooks/usePromptDialog";
@@ -273,79 +277,131 @@ export default function Dashboard() {
       return undefined;
     }
 
+    const bootstrap = planMissionControlBootstrap({ deepLinkPhone });
+    let cancelled = false;
+
+    async function hydrateQueueAndMaybeWorkspace(openedFromDeepLink, options = {}) {
+      const dashboardData = await getDashboard();
+      const orgSettings = options.skipOrgSettings
+        ? null
+        : await getOrganizationSettings().catch((error) => {
+            console.error(error);
+            return null;
+          });
+      if (cancelled) {
+        return;
+      }
+
+      const workflowQueue = dashboardData.prioritizedWorkflowQueue || [];
+      const fullQueue = buildQueueFromBackendWorkflowQueue(
+        workflowQueue,
+        dashboardData.prospects
+      );
+      const filteredQueue = executiveFilter
+        ? filterQueueForExecutiveFilter(
+            fullQueue,
+            executiveFilter,
+            workflowQueue,
+            dashboardData.prospects
+          )
+        : fullQueue;
+      const sortedQueue = filteredQueue.length ? filteredQueue : fullQueue;
+      const focusPhone = resolveMissionControlFocusPhone({
+        phone: deepLinkPhone,
+        prospectId: deepLinkProspectId,
+        prospects: dashboardData.prospects
+      });
+      let queueForLoad = sortedQueue;
+      let preferredIndex = 0;
+      if (focusPhone) {
+        preferredIndex = findQueueIndex(sortedQueue, focusPhone);
+        const sortedMatch = sortedQueue[preferredIndex]?.phone === focusPhone;
+        if (!sortedMatch) {
+          const fullIndex = findQueueIndex(fullQueue, focusPhone);
+          if (fullQueue[fullIndex]?.phone === focusPhone) {
+            queueForLoad = fullQueue;
+            preferredIndex = fullIndex;
+          }
+        }
+      }
+
+      setDashboard(dashboardData);
+      if (orgSettings) {
+        setOrganizationSettings(orgSettings);
+      }
+      setQueue(queueForLoad);
+
+      if (openedFromDeepLink) {
+        setCurrentIndex(preferredIndex);
+        return;
+      }
+
+      if (!queueForLoad.length) {
+        const filterLabelKey = EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter];
+        setLoadError(
+          executiveFilter
+            ? {
+                key: "missionControlNoProspectsForFilter",
+                params: {
+                  filter: filterLabelKey
+                    ? translate(filterLabelKey)
+                    : executiveFilter
+                }
+              }
+            : { key: "missionControlNoQueue" }
+        );
+        return;
+      }
+
+      const loaded = await loadWorkspaceAtQueueIndex(
+        queueForLoad,
+        dashboardData,
+        preferredIndex
+      );
+      if (cancelled) {
+        return;
+      }
+
+      if (!loaded) {
+        setLoadError({ key: "missionControlNoQueue" });
+        return;
+      }
+
+      setWorkspace(loaded.adapted);
+      setCurrentIndex(loaded.index);
+    }
+
     async function loadDashboard() {
       try {
-        const [dashboardData, orgSettings] = await Promise.all([
-          getDashboard(),
-          getOrganizationSettings()
-        ]);
-        const workflowQueue = dashboardData.prioritizedWorkflowQueue || [];
-        const fullQueue = buildQueueFromBackendWorkflowQueue(
-          workflowQueue,
-          dashboardData.prospects
-        );
-        const filteredQueue = executiveFilter
-          ? filterQueueForExecutiveFilter(
-              fullQueue,
-              executiveFilter,
-              workflowQueue,
-              dashboardData.prospects
-            )
-          : fullQueue;
-        const sortedQueue = filteredQueue.length ? filteredQueue : fullQueue;
-        const focusPhone = resolveMissionControlFocusPhone({
-          phone: deepLinkPhone,
-          prospectId: deepLinkProspectId,
-          prospects: dashboardData.prospects
-        });
-        let queueForLoad = sortedQueue;
-        let preferredIndex = 0;
-        if (focusPhone) {
-          preferredIndex = findQueueIndex(sortedQueue, focusPhone);
-          const sortedMatch = sortedQueue[preferredIndex]?.phone === focusPhone;
-          if (!sortedMatch) {
-            const fullIndex = findQueueIndex(fullQueue, focusPhone);
-            if (fullQueue[fullIndex]?.phone === focusPhone) {
-              queueForLoad = fullQueue;
-              preferredIndex = fullIndex;
-            }
+        if (bootstrap.mode === "deep_link") {
+          const [missionControl, orgSettings] = await Promise.all([
+            getMissionControl(bootstrap.focusPhone),
+            getOrganizationSettings().catch((error) => {
+              console.error(error);
+              return {};
+            })
+          ]);
+          if (cancelled) {
+            return;
+          }
+
+          setOrganizationSettings(orgSettings || {});
+
+          if (missionControl) {
+            setWorkspace(
+              adaptMissionControlResponse(
+                missionControl,
+                { phone: bootstrap.focusPhone, id: deepLinkProspectId },
+                { isLive: true }
+              )
+            );
+            setInitialLoading(false);
+            await hydrateQueueAndMaybeWorkspace(true, { skipOrgSettings: true });
+            return;
           }
         }
 
-        setDashboard(dashboardData);
-        setOrganizationSettings(orgSettings);
-        setQueue(queueForLoad);
-
-        if (!queueForLoad.length) {
-          const filterLabelKey = EXECUTIVE_FILTER_LABEL_KEYS[executiveFilter];
-          setLoadError(
-            executiveFilter
-              ? {
-                  key: "missionControlNoProspectsForFilter",
-                  params: {
-                    filter: filterLabelKey
-                      ? translate(filterLabelKey)
-                      : executiveFilter
-                  }
-                }
-              : { key: "missionControlNoQueue" }
-          );
-          return;
-        }
-
-        const loaded = await loadWorkspaceAtQueueIndex(
-          queueForLoad,
-          dashboardData,
-          preferredIndex
-        );
-
-        if (!loaded) {
-          setLoadError({ key: "missionControlNoQueue" });
-          return;
-        }
-
-        setWorkspace(loaded.adapted);
-        setCurrentIndex(loaded.index);
+        await hydrateQueueAndMaybeWorkspace(false);
       } catch (err) {
         if (isMissionControlAccessDenied(err)) {
           setLoadError({ key: "missionControlLoadError" });
@@ -355,16 +411,20 @@ export default function Dashboard() {
         console.error(err);
         setLoadError({ key: "missionControlWorkspaceError" });
       } finally {
-        setInitialLoading(false);
+        if (!cancelled) {
+          setInitialLoading(false);
+        }
       }
     }
 
     loadDashboard();
+    return () => {
+      cancelled = true;
+    };
   }, [
     executiveFilter,
     deepLinkPhone,
     deepLinkProspectId,
-    translate,
     supportMode?.active,
     supportMode?.organizationId,
     controlPlane
@@ -1155,7 +1215,7 @@ export default function Dashboard() {
   }, [workspace]);
 
   const workspaceContext = useMemo(() => {
-    if (!workspace || !organizationSettings) {
+    if (!workspace) {
       return null;
     }
 
@@ -1213,7 +1273,7 @@ export default function Dashboard() {
     return <ControlPlaneEmptyState translate={translate} />;
   }
 
-  if (initialLoading) {
+  if (shouldHoldMissionControlSplash({ initialLoading, workspace })) {
     return <h2>🚀 {translate("missionControlLoading")}</h2>;
   }
 
@@ -1223,10 +1283,6 @@ export default function Dashboard() {
         <p>{renderLoadError(loadError)}</p>
       </div>
     );
-  }
-
-  if (!dashboard) {
-    return <h2>🚀 {translate("missionControlLoading")}</h2>;
   }
 
   if (!workspace || !workspaceContext) {
