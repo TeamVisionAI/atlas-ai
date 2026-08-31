@@ -1769,10 +1769,10 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Fail closed** — Auto-reply only with a positive signal. Do not infer eligibility from message text (`Hi`, `Hola`, …), contact name, or “someone texted 7338”.
-2. **Eligible origins** — Click-to-WhatsApp Meta ad referral (`referral.source_type=ad` or `ctwa_clid`); trusted QR pending-inbound match (BR-129); stored QR / `car_magnet` / `FACEBOOK_LEAD_ADS` / `QUICK_CAPTURE` written by those verified events; durable `atlasEligibilitySource` from a verified event; or explicit `atlasAutomationEnabled=true`. `FACEBOOK` / `CLICK_TO_WHATSAPP` labels alone are **not** proof. An existing Recruit AI session / qualification step does **not** override a fail-closed inbound.
+2. **Eligible origins** — Click-to-WhatsApp Meta ad referral (`referral.source_type=ad` or `ctwa_clid`); trusted QR pending-inbound match (BR-129); stored QR / `car_magnet` / `FACEBOOK_LEAD_ADS` / `QUICK_CAPTURE` written by those verified events; durable `atlasEligibilitySource` from a verified event; explicit `atlasAutomationEnabled=true`; or BR-193 Meta Ad Destination fallback on a connection explicitly marked for Meta ad automation. `FACEBOOK` / `CLICK_TO_WHATSAPP` labels alone are **not** proof. An existing Recruit AI session / qualification step does **not** override a fail-closed inbound.
 3. **Unknown inbound** — May persist the message and conversation/audit history. Must **not** create or promote an operational prospect (BR-159). Must not live-author, run CE for a customer reply, or send automated WhatsApp. Must not stamp FACEBOOK / CLICK_TO_WHATSAPP by default.
 4. **Explicit enable** — Operators may set `atlasAutomationEnabled` so a previously silent contact starts receiving Atlas replies. Explicit `false` keeps Atlas silent.
-5. **Boundaries** — Does not change TAKE OVER / RETURN TO ATLAS, BR-075, QR matching, or execution flags. Does not guess CTWA from greetings. Does not rewrite historical production rows.
+5. **Boundaries** — Does not change TAKE OVER / RETURN TO ATLAS, BR-075, QR matching, or execution flags. Does not guess CTWA from greetings. Does not rewrite historical production rows. BR-193 is an explicit per-connection fallback, not a global weakening of this rule.
 
 ---
 
@@ -2084,7 +2084,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ### Rules
 
-1. **Fail closed** — A contact becomes a prospect only after an explicit valid signal: verified CTWA/ad referral; trusted QR pending-inbound; valid campaign intake (recruiting or IUL); Facebook Lead Ads intake; Quick Capture explicit create; explicit manual convert/create; stored verified lead-origin evidence; or explicit `atlasAutomationEnabled=true`.
+1. **Fail closed** — A contact becomes a prospect only after an explicit valid signal: verified CTWA/ad referral; trusted QR pending-inbound; valid campaign intake (recruiting or IUL); Facebook Lead Ads intake; Quick Capture explicit create; explicit manual convert/create; stored verified lead-origin evidence; explicit `atlasAutomationEnabled=true`; or BR-193 Meta Ad Destination connection fallback.
 2. **Not enough** — Receiving, syncing, or seeing a WhatsApp contact is not promotion. Message text, contact name, and “someone texted the business number” are not promotion.
 3. **Operational surfaces** — Personal/unknown contacts must not appear in Team Dashboard prospect lists/priorities, Mission Control queues, Prospect Center, or New/Hot/Follow-up/Appointment prospect KPIs. They must not enter Recruit AI or IUL workflow, must not trigger Atlas auto-reply (BR-142), and must not receive prospect lifecycle/status merely from contact creation.
 4. **Persistence** — Conversation logs, WhatsApp archive, and audit history may remain as contact/conversation records.
@@ -3003,6 +3003,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Reopen** — Reactivating a prospect does not recreate the cancelled follow-up unless an existing rule explicitly creates a new one.
 8. **Active query** — Follow-ups Active / Due Today is OPEN + org-local due date. CANCELLED and COMPLETED are excluded. Do not treat due date alone as active when status is cancelled.
 9. **Boundaries** — Do not cancel agenda-contact or client follow-ups. Do not send WhatsApp/SMS/email.
+
+---
+
+## BR-193 — Meta Ad Destination fallback eligibility
+
+**Implements:** When Meta omits `message.referral` and `ctwa_clid` on a legitimate Click-to-WhatsApp lead, Atlas may promote and auto-reply only if the exact receiving WhatsApp connection is CONNECTED and explicitly marked as a Meta ad destination.  
+**Domain:** WhatsApp inbound / Recruit AI / Meta ads  
+**Depends on:** BR-142, BR-159, BR-165 / BR-165A  
+**Related:** BR-147 (intake-code fallback remains a higher-priority proof)  
+**Status:** Implemented  
+**Engine target:** `metaAdDestinationFallback.js`; `atlasInboundAutomationEligibility.js`; `prospectPromotionEligibility.js`; `whatsappProspectResolver.js`; `whatsappInboundPipeline.js`  
+**Tests:** `backend/test/metaAdDestinationFallbackBr193.test.js`  
+**Docs:** `docs/06-business/BR-193-meta-ad-destination-fallback.md`
+
+### Rules
+
+1. **Explicit setting** — Per WhatsApp connection: `metaAdDestinationAutomationEnabled` / `meta_ad_destination_automation_enabled`. Default **false** for every existing connection. Ordinary personal inbound stays silent.
+2. **Priority** — 1) positive CTWA referral / `ctwa_clid`; 2) QR / pending inbound match; 3) valid campaign intake code; 4) stored Atlas automation origin / existing eligible prospect; 5) this fallback; 6) fail closed.
+3. **Fallback proof** — Connection CONNECTED; inbound `phone_number_id` exactly matches that connection; setting explicitly true; `owner_user_id` from the connection owner; organization from the same connection. Brand-new unknown senders may be promoted and assigned to that owner.
+4. **No inference** — Greeting text, WhatsApp UI copy, `from_user_id`, and personal-connection routing are not proof. Do not invent `ctwa_clid` or Meta `referral`. Provenance is `META_AD_DESTINATION`.
+5. **Isolation** — Tenant and user isolation stay intact. Cross-tenant connections cannot promote. Outbound uses the same personal connection token/`phone_number_id`. Do not route through org token/phone or fall back to RVP.
+6. **Observability** — Record `eligibilityReason = AD_DESTINATION_FALLBACK_NO_CTWA_METADATA`.
+7. **UI** — Admin/User WhatsApp connection control: “Use this number for Meta ad automation”. Warn that ON means new unknown inbound may be treated as an Atlas lead.
+8. **Boundaries** — Does not globally weaken BR-142/159/165. Does not make all personal-agent inbound eligible.
 
 ---
 

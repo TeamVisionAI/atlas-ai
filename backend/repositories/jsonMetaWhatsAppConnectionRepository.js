@@ -141,7 +141,12 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
       connected_at: record.connected_at || existing?.connected_at || now,
       last_sync_at: record.last_sync_at || now,
       created_at: existing?.created_at || now,
-      updated_at: now
+      updated_at: now,
+      meta_ad_destination_automation_enabled:
+        record.metaAdDestinationAutomationEnabled === true ||
+        record.meta_ad_destination_automation_enabled === true ||
+        existing?.meta_ad_destination_automation_enabled === true ||
+        existing?.metaAdDestinationAutomationEnabled === true
     };
 
     const storeKey = connection.user_id
@@ -173,7 +178,12 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
 
   async function updateConnection(organizationId, patch = {}) {
     const store = readRawStore();
-    const existing = normalizeStoredConnection(store.connections?.[organizationId]);
+    const ownerUserId = patch.user_id || patch.userId || null;
+    const storeKey = ownerUserId ? `${organizationId}::${ownerUserId}` : organizationId;
+    const existing =
+      normalizeStoredConnection(store.connections?.[storeKey]) ||
+      (ownerUserId ? await getUserConnection(organizationId, ownerUserId) : null) ||
+      normalizeStoredConnection(store.connections?.[organizationId]);
 
     if (!existing) {
       return null;
@@ -188,11 +198,31 @@ function createJsonMetaWhatsAppConnectionRepository(options = {}) {
       last_sync_at: patch.last_sync_at || now
     };
 
-    delete updated.access_token;
+    if (
+      Object.prototype.hasOwnProperty.call(patch, "metaAdDestinationAutomationEnabled") ||
+      Object.prototype.hasOwnProperty.call(patch, "meta_ad_destination_automation_enabled")
+    ) {
+      updated.meta_ad_destination_automation_enabled =
+        patch.metaAdDestinationAutomationEnabled === true ||
+        patch.meta_ad_destination_automation_enabled === true;
+      updated.metaAdDestinationAutomationEnabled =
+        updated.meta_ad_destination_automation_enabled;
+    }
 
-    store.connections[organizationId] = updated;
+    delete updated.access_token;
+    delete updated.userId;
+    delete updated.metaAdDestinationAutomationEnabled;
+
+    const persistedKey = updated.user_id
+      ? `${organizationId}::${updated.user_id}`
+      : organizationId;
+    store.connections[persistedKey] = updated;
     writeRawStore(store.connections);
-    return updated;
+    return {
+      ...updated,
+      metaAdDestinationAutomationEnabled:
+        updated.meta_ad_destination_automation_enabled === true
+    };
   }
 
   async function disconnectConnection(organizationId, userId = null) {

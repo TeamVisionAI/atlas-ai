@@ -68,6 +68,20 @@ export async function disconnectWhatsAppIntegration({ ownership = "personal" } =
   });
 }
 
+export async function updateWhatsAppMetaAdDestinationAutomation({
+  enabled,
+  ownership = "personal"
+} = {}) {
+  return apiFetch("/api/meta/embedded-signup/ad-destination-automation", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      enabled: enabled === true,
+      ownership
+    })
+  });
+}
+
 /**
  * Fire-and-forget structured stage log (no secrets).
  */

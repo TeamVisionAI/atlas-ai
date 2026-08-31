@@ -23,7 +23,10 @@ function toSafeConnection(connection) {
     healthCheckedAt: connection.last_health_checked_at || null,
     connectedAt: connection.connected_at || connection.created_at || null,
     lastSyncAt: connection.last_sync_at || connection.updated_at || null,
-    updatedAt: connection.updated_at || null
+    updatedAt: connection.updated_at || null,
+    metaAdDestinationAutomationEnabled:
+      connection.metaAdDestinationAutomationEnabled === true ||
+      connection.meta_ad_destination_automation_enabled === true
   };
 }
 

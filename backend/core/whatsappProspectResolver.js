@@ -49,6 +49,10 @@ const {
   isPersonalWhatsAppConnection
 } = require("./atlasInboundAutomationEligibility");
 const {
+  isMetaAdDestinationFallbackEligible,
+  buildWhatsAppConnectionEligibilityContext
+} = require("./metaAdDestinationFallback");
+const {
   evaluateProspectPromotion
 } = require("./prospectPromotionEligibility");
 const {
@@ -178,6 +182,23 @@ function resolveCreateSourceFields(qrTouch, origin = {}) {
       entryMethod: WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
       campaignAgentId: null,
       assignmentSourceHint: WHATSAPP_SOURCE.FACEBOOK,
+      whatsappOwnerUserId: origin.whatsappConnectionOwnerUserId || null
+    };
+  }
+
+  // Implements BR-193 — explicit Meta Ad Destination after CTWA / QR / intake.
+  if (
+    isMetaAdDestinationFallbackEligible({
+      whatsappConnection: origin.whatsappConnection || null,
+      inboundPhoneNumberId: origin.inboundPhoneNumberId || null,
+      expectedOrganizationId: origin.expectedOrganizationId || null
+    })
+  ) {
+    return {
+      source: WHATSAPP_SOURCE.META_AD_DESTINATION,
+      entryMethod: WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION,
+      campaignAgentId: null,
+      assignmentSourceHint: "personal_whatsapp",
       whatsappOwnerUserId: origin.whatsappConnectionOwnerUserId || null
     };
   }
@@ -380,7 +401,9 @@ async function emitProspectLifecycleEvents(
     sourceFields = null,
     ctwaReferral = null,
     campaignIntakeMatch = null,
-    whatsappConnectionSource = null
+    whatsappConnectionSource = null,
+    whatsappConnection = null,
+    inboundPhoneNumberId = null
   }
 ) {
   const resolved =
@@ -388,7 +411,10 @@ async function emitProspectLifecycleEvents(
     resolveCreateSourceFields(qrTouch, {
       ctwaReferral,
       campaignIntakeMatch,
-      whatsappConnectionSource
+      whatsappConnectionSource,
+      whatsappConnection,
+      inboundPhoneNumberId,
+      expectedOrganizationId: organizationId
     });
   const source = resolved.source || WHATSAPP_SOURCE.UNKNOWN;
   const entryMethod = resolved.entryMethod || WHATSAPP_ENTRY_METHOD.UNATTRIBUTED;
@@ -397,7 +423,10 @@ async function emitProspectLifecycleEvents(
     ctwaReferral,
     sourceFields: resolved,
     campaignIntakeMatch,
-    whatsappConnectionSource
+    whatsappConnectionSource,
+    whatsappConnection,
+    inboundPhoneNumberId,
+    expectedOrganizationId: organizationId
   });
 
   if (created) {
@@ -507,7 +536,8 @@ async function locateOrCreateWhatsAppProspect({
   campaignIntakeMatch = null,
   senderIdentity = null,
   whatsappConnectionOwnerUserId = null,
-  whatsappConnectionSource = null
+  whatsappConnectionSource = null,
+  whatsappConnection = null
 } = {}) {
   const resolvedIdentity =
     senderIdentity ||
@@ -525,7 +555,8 @@ async function locateOrCreateWhatsAppProspect({
   const {
     organizationId,
     source: organizationSource,
-    ownerUserId: resolvedOwnerUserId = null
+    ownerUserId: resolvedOwnerUserId = null,
+    connection: resolvedWhatsAppConnection = null
   } =
     await whatsappInboundOrganizationResolver.resolveWhatsAppInboundOrganizationId({
       phoneNumberId,
@@ -535,6 +566,9 @@ async function locateOrCreateWhatsAppProspect({
   const connectionOwnerUserId =
     resolvedOwnerUserId || whatsappConnectionOwnerUserId || null;
   const connectionSource = organizationSource || whatsappConnectionSource || null;
+  const resolvedAdDestinationConnection =
+    whatsappConnection ||
+    buildWhatsAppConnectionEligibilityContext(resolvedWhatsAppConnection);
 
   // Phase 2 — match QR pending_inbound BEFORE create-time assignment.
   const attribution = getAttributionService();
@@ -598,7 +632,10 @@ async function locateOrCreateWhatsAppProspect({
       ? resolvedCampaignIntakeMatch
       : null,
     whatsappConnectionOwnerUserId: connectionOwnerUserId,
-    whatsappConnectionSource: connectionSource
+    whatsappConnectionSource: connectionSource,
+    whatsappConnection: resolvedAdDestinationConnection,
+    inboundPhoneNumberId: phoneNumberId || null,
+    expectedOrganizationId: organizationId
   };
 
   const sourceFields = resolveCreateSourceFields(qrTouch, origin);
@@ -609,14 +646,18 @@ async function locateOrCreateWhatsAppProspect({
     campaignIntakeMatch: origin.campaignIntakeMatch,
     intakeSource: origin.intakeSource,
     sourceFields,
-    whatsappConnectionSource: origin.whatsappConnectionSource
+    whatsappConnectionSource: origin.whatsappConnectionSource,
+    whatsappConnection: origin.whatsappConnection,
+    inboundPhoneNumberId: origin.inboundPhoneNumberId,
+    expectedOrganizationId: organizationId
   });
 
   if (created && !promotion.promote) {
     logWhatsAppStage("prospect_promotion_denied", {
       phone: storagePhone,
       organizationId,
-      reason: promotion.reason
+      reason: promotion.reason,
+      eligibilityReason: promotion.reason
     });
     return {
       prospect: null,
@@ -631,6 +672,12 @@ async function locateOrCreateWhatsAppProspect({
   }
 
   if (created) {
+    logWhatsAppStage("prospect_promoted", {
+      phone: storagePhone,
+      organizationId,
+      reason: promotion.reason,
+      eligibilityReason: promotion.reason
+    });
     prospect = await insertWhatsAppProspectRow({
       storagePhone,
       normalizedPhone,
@@ -682,7 +729,9 @@ async function locateOrCreateWhatsAppProspect({
     sourceFields,
     ctwaReferral: origin.ctwaReferral,
     campaignIntakeMatch: origin.campaignIntakeMatch,
-    whatsappConnectionSource: origin.whatsappConnectionSource
+    whatsappConnectionSource: origin.whatsappConnectionSource,
+    whatsappConnection: origin.whatsappConnection,
+    inboundPhoneNumberId: origin.inboundPhoneNumberId
   });
 
   if (!created) {
@@ -692,7 +741,10 @@ async function locateOrCreateWhatsAppProspect({
       intakeSource: origin.intakeSource,
       sourceFields,
       campaignIntakeMatch: origin.campaignIntakeMatch,
-      whatsappConnectionSource: origin.whatsappConnectionSource
+      whatsappConnectionSource: origin.whatsappConnectionSource,
+      whatsappConnection: origin.whatsappConnection,
+      inboundPhoneNumberId: origin.inboundPhoneNumberId,
+      expectedOrganizationId: organizationId
     });
     if (eligibilitySource) {
       await persistVerifiedAtlasEligibilitySource(

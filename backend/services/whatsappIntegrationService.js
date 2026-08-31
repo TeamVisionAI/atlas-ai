@@ -131,11 +131,85 @@ async function disconnectIntegration(authContext, auditMeta = {}, req = null, op
   };
 }
 
+/**
+ * BR-193 — explicit Meta Ad Destination automation toggle. Default remains false.
+ */
+async function updateMetaAdDestinationAutomation(
+  authContext,
+  { enabled, ownership = "personal" } = {},
+  req = null,
+  auditMeta = {}
+) {
+  const organizationId = await resolveOrganizationId(authContext, req);
+  const isOrganization =
+    ownership === "organization" || ownership === "organizationChannel";
+
+  if (isOrganization) {
+    if (!hasPermission(authContext, PERMISSIONS.ORG_WRITE)) {
+      const error = new Error("Organization WhatsApp settings require org:write.");
+      error.statusCode = 403;
+      error.publicCode = "WHATSAPP_ORG_SETTINGS_FORBIDDEN";
+      throw error;
+    }
+  } else if (!hasPermission(authContext, PERMISSIONS.INTEGRATIONS_SELF)) {
+    const error = new Error("Personal WhatsApp settings require integrations:self.");
+    error.statusCode = 403;
+    error.publicCode = "WHATSAPP_PERSONAL_SETTINGS_FORBIDDEN";
+    throw error;
+  }
+
+  const flag = enabled === true;
+  const patch = {
+    meta_ad_destination_automation_enabled: flag,
+    ...(isOrganization ? {} : { user_id: authContext.userId })
+  };
+
+  const updated = await repository.updateConnection(organizationId, patch);
+  if (!updated) {
+    const error = new Error(
+      isOrganization
+        ? "No organization WhatsApp integration found."
+        : "No personal WhatsApp integration found for this user."
+    );
+    error.statusCode = 404;
+    error.publicCode = "WHATSAPP_NOT_CONNECTED";
+    throw error;
+  }
+
+  await writeAuditLog({
+    organizationId,
+    userId: authContext.userId,
+    userEmail: authContext.email,
+    action: isOrganization
+      ? "whatsapp.organization_ad_destination_updated"
+      : "whatsapp.personal_ad_destination_updated",
+    targetType: "whatsapp_integration",
+    targetId: updated.id || organizationId,
+    ipAddress: auditMeta.ipAddress,
+    userAgent: auditMeta.userAgent,
+    metadata: { metaAdDestinationAutomationEnabled: flag }
+  });
+
+  metaLogger.info("whatsapp_ad_destination_updated", {
+    organizationId,
+    userId: authContext.userId || null,
+    ownership: isOrganization ? "organization" : "personal",
+    metaAdDestinationAutomationEnabled: flag
+  });
+
+  return {
+    success: true,
+    ownership: isOrganization ? "organization" : "personal",
+    connection: toSafeConnection(updated)
+  };
+}
+
 module.exports = {
   resolveOrganizationId,
   getIntegrationStatus,
   getIntegrationStatusForOrganization,
   getPersonalIntegrationStatusForOrganization,
   disconnectIntegration,
+  updateMetaAdDestinationAutomation,
   presentIntegrationStatus
 };

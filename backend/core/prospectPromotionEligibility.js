@@ -12,6 +12,9 @@ const {
   hasFreshIulCampaignIntakeMatch,
   isOrdinaryPersonalWhatsAppContact
 } = require("./atlasInboundAutomationEligibility");
+const {
+  evaluateMetaAdDestinationFallback
+} = require("./metaAdDestinationFallback");
 const { MILESTONES } = require("./workflowConstants");
 const { isIulWorkflowProspect } = require("./iulWorkflowConstants");
 
@@ -22,6 +25,7 @@ const VERIFIED_PROMOTION_ENTRY_METHODS = Object.freeze(
     WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
+    WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION,
     "QUICK_CAPTURE",
     "MANUAL_CONVERT",
     "MANUAL_CREATE"
@@ -164,7 +168,11 @@ function evaluateProspectPromotion({
   sourceFields = null,
   explicitPromote = false,
   atlasAutomationEnabled = null,
-  whatsappConnectionSource = null
+  whatsappConnectionSource = null,
+  whatsappConnection = null,
+  inboundPhoneNumberId = null,
+  expectedOrganizationId = null,
+  inbound = null
 } = {}) {
   if (existingProspect) {
     return { promote: true, reason: "EXISTING_PROSPECT" };
@@ -201,6 +209,19 @@ function evaluateProspectPromotion({
   if (hasFreshQuickCaptureOrigin({ intakeSource, sourceFields, explicitPromote })) {
     return { promote: true, reason: "EXPLICIT_PROSPECT_CREATE" };
   }
+
+  // Implements BR-193 — explicit Meta Ad Destination after higher-priority signals.
+  const fallback = evaluateMetaAdDestinationFallback({
+    inbound,
+    whatsappConnection,
+    inboundPhoneNumberId,
+    expectedOrganizationId
+  });
+  if (fallback.eligible) {
+    return { promote: true, reason: fallback.reason };
+  }
+
+  void whatsappConnectionSource;
 
   // Implements BR-159 / BR-165 — personal connection is routing/ownership only.
   return { promote: false, reason: "NO_VALID_PROMOTION_SIGNAL" };

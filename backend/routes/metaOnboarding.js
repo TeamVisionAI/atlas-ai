@@ -125,6 +125,34 @@ router.post(
   }
 );
 
+router.patch(
+  "/embedded-signup/ad-destination-automation",
+  requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
+  async (req, res) => {
+    try {
+      const ownership =
+        req.body?.ownership === "organization" || req.body?.ownershipMode === "organization"
+          ? "organization"
+          : "personal";
+      const result = await whatsappIntegrationService.updateMetaAdDestinationAutomation(
+        req.authContext,
+        {
+          enabled: req.body?.enabled === true || req.body?.metaAdDestinationAutomationEnabled === true,
+          ownership
+        },
+        req,
+        auditMeta(req)
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        error: error.publicCode || "AD_DESTINATION_UPDATE_FAILED",
+        message: error.message || "Unable to update Meta ad destination setting."
+      });
+    }
+  }
+);
+
 router.post("/embedded-signup/telemetry", async (req, res) => {
   try {
     const stage = String(req.body?.stage || "").trim();
