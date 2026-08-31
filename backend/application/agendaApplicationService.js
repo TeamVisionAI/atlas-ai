@@ -26,6 +26,7 @@ const {
   isValidOutcome
 } = require("../core/configuration/appointmentDomain");
 const { recordHistoryEvent } = require("../core/appointmentHistory");
+const appointmentReminderEngine = require("../services/appointmentReminderEngine");
 const { normalizePhoneNumber, formatPhoneForStorage } = require("../core/phoneNormalizer");
 const { normalizePreferredLanguage } = require("../core/prospectLanguage");
 const {
@@ -362,6 +363,20 @@ async function createStandaloneAppointment(input, context) {
       organizationId
     }).catch(() => {});
     throw saveError;
+  }
+
+  // Implements BR-191 — same reminder engine as AI / Mission Control / Prospect Center.
+  try {
+    const reminderResult = await appointmentReminderEngine.scheduleReminders(appointment);
+    appointment = await appointmentRepository.save({
+      ...appointment,
+      reminderStatus: reminderResult.status,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (reminderError) {
+    console.warn("[agenda] reminder schedule failed", reminderError.message, {
+      appointmentId: appointment.id
+    });
   }
 
   return { contact: await presentAgendaContact(contact), appointment };

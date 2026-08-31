@@ -82,17 +82,25 @@ function createMemoryAppointmentReminderRepository() {
       return next.map(clone);
     },
 
-    async cancelAllForAppointment(appointmentId, { cancelledAt, cancelReason } = {}) {
+    async cancelAllForAppointment(
+      appointmentId,
+      { cancelledAt, cancelReason, onlyScheduled = false } = {}
+    ) {
       const key = String(appointmentId);
       const current = byAppointment.get(key) || [];
       const stamp = cancelledAt || new Date().toISOString();
-      const next = current.map((entry) => ({
-        ...entry,
-        status: REMINDER_STATUSES.CANCELLED,
-        cancelledAt: stamp,
-        cancelReason: cancelReason || entry.cancelReason || null,
-        updatedAt: stamp
-      }));
+      const next = current.map((entry) => {
+        if (onlyScheduled && entry.status !== REMINDER_STATUSES.SCHEDULED) {
+          return entry;
+        }
+        return {
+          ...entry,
+          status: REMINDER_STATUSES.CANCELLED,
+          cancelledAt: stamp,
+          cancelReason: cancelReason || entry.cancelReason || null,
+          updatedAt: stamp
+        };
+      });
       byAppointment.set(key, next);
       return next.map(clone);
     },
@@ -251,7 +259,10 @@ function createSupabaseAppointmentReminderRepository() {
       return (data || []).map(rowToReminder);
     },
 
-    async cancelAllForAppointment(appointmentId, { cancelledAt, cancelReason } = {}) {
+    async cancelAllForAppointment(
+      appointmentId,
+      { cancelledAt, cancelReason, onlyScheduled = false } = {}
+    ) {
       const stamp = cancelledAt || new Date().toISOString();
       const patch = {
         status: REMINDER_STATUSES.CANCELLED,
@@ -263,11 +274,14 @@ function createSupabaseAppointmentReminderRepository() {
         patch.cancel_reason = cancelReason;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from(TABLE)
         .update(patch)
-        .eq("appointment_id", appointmentId)
-        .select("*");
+        .eq("appointment_id", appointmentId);
+      if (onlyScheduled) {
+        query = query.eq("status", REMINDER_STATUSES.SCHEDULED);
+      }
+      const { data, error } = await query.select("*");
 
       if (error) {
         throw error;

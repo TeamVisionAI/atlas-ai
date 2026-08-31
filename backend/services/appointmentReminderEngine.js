@@ -25,23 +25,15 @@ const {
   NEUTRAL_ATLAS_DISPLAY_NAME,
   loadTenantOperationalIdentity
 } = require("../core/tenantOperationalIdentity");
+const {
+  REMINDER_TYPES,
+  resolveAppointmentReminderSchedule,
+  resolveReminderRecipientPhone
+} = require("../core/appointmentReminderSchedule");
 
-const REMINDER_TYPES = Object.freeze({
-  // Immediate booking confirmation is owned by appointment persistence → Conversation
-  // reply with idempotency key appointment-confirmation:{id}. Do not send a second one.
-  CONFIRMATION: "confirmation",
-  REMINDER_24H: "reminder_24h",
-  REMINDER_1H: "reminder_1h",
-  REMINDER_30M: "reminder_30m",
-  // Legacy — no longer scheduled. Kept so pending store rows can migrate/suppress safely.
-  REMINDER_15M: "reminder_15m"
-});
-
-const REMINDER_SCHEDULE = Object.freeze([
-  { type: REMINDER_TYPES.REMINDER_24H, offsetMinutes: 24 * 60 },
-  { type: REMINDER_TYPES.REMINDER_1H, offsetMinutes: 60 },
-  { type: REMINDER_TYPES.REMINDER_30M, offsetMinutes: 30 }
-]);
+// Immediate booking confirmation is owned by appointment persistence → Conversation
+// reply with idempotency key appointment-confirmation:{id}. Do not send a second one.
+const REMINDER_SCHEDULE = resolveAppointmentReminderSchedule();
 
 function formatWhen(iso, timezone = "America/New_York", languageCode = "en") {
   return formatAppointmentWhen(
@@ -116,11 +108,13 @@ function buildReminderMessage(appointment, reminderType, prospect, identity = {}
   }
 }
 
-function buildReminderEntries(appointment) {
+function buildReminderEntries(appointment, settings = null) {
   const startMs = new Date(appointment.startDateTime).getTime();
   const now = Date.now();
+  const recipientPhone = resolveReminderRecipientPhone(appointment);
+  const schedule = resolveAppointmentReminderSchedule(settings);
 
-  return REMINDER_SCHEDULE.map((rule) => {
+  return schedule.map((rule) => {
     const scheduledFor =
       rule.immediate || rule.offsetMinutes === 0
         ? new Date(now + 5000).toISOString()
@@ -130,7 +124,7 @@ function buildReminderEntries(appointment) {
       id: crypto.randomUUID(),
       appointmentId: appointment.id,
       organizationId: appointment.organizationId,
-      prospectPhone: appointment.prospectPhone,
+      prospectPhone: recipientPhone,
       reminderType: rule.type,
       scheduledFor,
       offsetMinutes: rule.offsetMinutes,
@@ -158,34 +152,118 @@ function enrichEntriesWithAppointment(appointment, entries) {
   }));
 }
 
-async function scheduleReminders(appointment) {
-  const repository = await resolveAppointmentReminderRepository();
-  const entries = enrichEntriesWithAppointment(
-    appointment,
-    buildReminderEntries(appointment)
-  );
+function hasBlockingReminder(existing, desired) {
+  return existing.some((row) => {
+    if (row.reminderType !== desired.reminderType) {
+      return false;
+    }
+    if (row.status === REMINDER_STATUSES.SCHEDULED) {
+      return true;
+    }
+    if (row.status === REMINDER_STATUSES.SENT) {
+      const sameStart =
+        row.appointmentStart &&
+        desired.appointmentStart &&
+        String(row.appointmentStart) === String(desired.appointmentStart);
+      return sameStart;
+    }
+    return false;
+  });
+}
 
-  const saved = await repository.replaceAllForAppointment(appointment.id, entries);
+async function scheduleReminders(appointment, options = {}) {
+  const repository = await resolveAppointmentReminderRepository();
+  const desired = enrichEntriesWithAppointment(
+    appointment,
+    buildReminderEntries(appointment, options.settings || null)
+  );
+  const existing = await repository.listByAppointmentId(appointment.id);
+  const created = [];
+
+  for (const entry of desired) {
+    if (hasBlockingReminder(existing, entry)) {
+      continue;
+    }
+    const saved = await repository.saveEntry(entry);
+    created.push(saved);
+    existing.push(saved);
+  }
+
+  const active = existing.filter((row) => row.status === REMINDER_STATUSES.SCHEDULED);
 
   return {
     status: REMINDER_STATUSES.SCHEDULED,
-    count: saved.length,
-    entries: saved
+    count: active.length,
+    createdCount: created.length,
+    entries: active
   };
 }
 
 async function cancelReminders(appointmentId) {
   const repository = await resolveAppointmentReminderRepository();
   await repository.cancelAllForAppointment(appointmentId, {
-    cancelledAt: new Date().toISOString()
+    cancelledAt: new Date().toISOString(),
+    onlyScheduled: true,
+    cancelReason: "appointment_cancelled_or_replaced"
   });
 
   return { status: REMINDER_STATUSES.CANCELLED };
 }
 
-async function replaceReminders(appointment) {
+async function replaceReminders(appointment, options = {}) {
   await cancelReminders(appointment.id);
-  return scheduleReminders(appointment);
+  return scheduleReminders(appointment, options);
+}
+
+/**
+ * Repair missing future reminder jobs for one persisted appointment.
+ * Never creates a job whose send time has already passed.
+ * Never duplicates an existing scheduled/sent job for the current start.
+ */
+async function repairMissingRemindersForAppointment(appointment, options = {}) {
+  if (!appointment?.id) {
+    return { status: REMINDER_STATUSES.CANCELLED, count: 0, createdCount: 0, entries: [] };
+  }
+  const startMs = Date.parse(appointment.startDateTime);
+  if (!Number.isFinite(startMs) || startMs <= Date.now()) {
+    return { status: REMINDER_STATUSES.SCHEDULED, count: 0, createdCount: 0, entries: [] };
+  }
+  const status = String(appointment.status || "").toLowerCase();
+  if (["cancelled", "completed", "no_show"].includes(status)) {
+    return { status: REMINDER_STATUSES.CANCELLED, count: 0, createdCount: 0, entries: [] };
+  }
+  return scheduleReminders(appointment, options);
+}
+
+async function repairMissingReminders({ organizationId, now = new Date(), settings = null } = {}) {
+  if (!organizationId) {
+    const error = new Error("organizationId is required");
+    error.code = "TENANT_SCOPE_REQUIRED";
+    throw error;
+  }
+  const appointmentRepository = require("../repositories/appointmentRepository");
+  const { items } = await appointmentRepository.search({
+    organizationId,
+    status: ["scheduled", "confirmed", "rescheduled", "pending_confirmation"],
+    from: now.toISOString()
+  });
+
+  const results = [];
+  for (const appointment of items) {
+    const repaired = await repairMissingRemindersForAppointment(appointment, { settings });
+    results.push({
+      appointmentId: appointment.id,
+      createdCount: repaired.createdCount || 0,
+      count: repaired.count || 0
+    });
+  }
+
+  return {
+    organizationId,
+    scanned: items.length,
+    repaired: results.filter((row) => row.createdCount > 0).length,
+    results
+  };
 }
 
 function buildReminderTemplateVariables(appointment, prospect) {
@@ -394,10 +472,15 @@ async function deliverReminder(entry, appointment) {
     };
   }
 
-  const prospect = await findProspectInOrganization(
-    entry.prospectPhone,
-    entry.organizationId
-  );
+  const recipientPhone =
+    resolveReminderRecipientPhone({
+      prospectPhone: entry.prospectPhone,
+      metadata: appointment.metadata
+    }) || entry.prospectPhone;
+
+  const prospect = recipientPhone
+    ? await findProspectInOrganization(recipientPhone, entry.organizationId)
+    : null;
 
   let identity = {};
   if (entry.organizationId) {
@@ -421,7 +504,17 @@ async function deliverReminder(entry, appointment) {
   const idempotencyKey = `reminder:${entry.appointmentId || appointment.id}:${entry.reminderType}`;
 
   // Always authorize through the canonical WhatsApp gate (including mocked provider sends).
-  const result = await sendTextMessage(entry.prospectPhone, message, {
+  if (!recipientPhone) {
+    return {
+      delivered: false,
+      reason: "REMINDER_PHONE_MISSING",
+      status: REMINDER_STATUSES.FAILED,
+      retryable: false,
+      delivery: null
+    };
+  }
+
+  const result = await sendTextMessage(recipientPhone, message, {
     intent: "APPOINTMENT_REMINDER",
     actor: "ATLAS",
     organizationId: entry.organizationId,
@@ -442,7 +535,7 @@ async function deliverReminder(entry, appointment) {
 
   // REMINDER_SENT only after successful authorized delivery (freeform or approved template).
   await recordBusinessEvent({
-    phone: entry.prospectPhone,
+    phone: recipientPhone,
     eventType: APPOINTMENT_EVENTS.REMINDER_SENT,
     actor: "ATLAS",
     channel: "whatsapp",
@@ -568,10 +661,14 @@ module.exports = {
   scheduleReminders,
   cancelReminders,
   replaceReminders,
+  repairMissingRemindersForAppointment,
+  repairMissingReminders,
   processDueReminders,
   buildReminderMessage,
   deliverReminder,
   migratePendingFifteenMinuteReminders,
   startReminderPoller,
-  stopReminderPoller
+  stopReminderPoller,
+  resolveReminderRecipientPhone,
+  resolveAppointmentReminderSchedule
 };

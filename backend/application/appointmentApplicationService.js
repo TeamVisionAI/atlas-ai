@@ -1472,5 +1472,6 @@ module.exports = {
   findActiveAppointmentForProspect,
   findPersistedAppointmentForProspect: findActiveAppointmentForProspect,
   listUrgentHandoffs,
-  acknowledgeUrgentHandoff
+  acknowledgeUrgentHandoff,
+  repairMissingReminders: appointmentReminderEngine.repairMissingReminders
 };
