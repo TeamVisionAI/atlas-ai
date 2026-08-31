@@ -59,12 +59,18 @@ async function resolveAppointmentMilestoneTruth({
   phone,
   organizationId,
   milestone,
-  prospect = null
+  prospect = null,
+  activeAppointment: preloadedActive
 }) {
   const orgId = organizationId || prospect?.organization_id || null;
-  let activeAppointment = null;
+  let activeAppointment = preloadedActive === undefined ? null : preloadedActive;
 
-  if (phone && orgId && claimsScheduledInterview(milestone)) {
+  if (
+    preloadedActive === undefined &&
+    phone &&
+    orgId &&
+    claimsScheduledInterview(milestone)
+  ) {
     activeAppointment = await findActiveAppointmentForProspect(phone, orgId).catch(
       () => null
     );

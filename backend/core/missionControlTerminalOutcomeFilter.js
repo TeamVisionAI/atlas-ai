@@ -12,6 +12,7 @@ const { MILESTONES } = require("./workflowConstants");
 const { isMetaReviewDemoProspect } = require("./missionControlOperationalTestFilter");
 const { loadAgentState } = require("./agentActionState");
 const { APPOINTMENT_OUTCOMES } = require("./configuration/appointmentDomain");
+const { lookupByPhone } = require("./missionControlQueueBatch");
 
 /** Representative closed outcomes (BR-044 selector + catalog closes). */
 const TERMINAL_CLOSED_INTERVIEW_OUTCOMES = Object.freeze(
@@ -174,7 +175,9 @@ async function filterOutTerminalClosedForMissionControl(
         milestone === MILESTONES.INTERVIEW_SCHEDULED ||
         milestone === MILESTONES.INTERVIEW_DUE);
 
-    if (needsApptLookup && prospect) {
+    if (options.latestAppointmentByPhone) {
+      appointment = lookupByPhone(options.latestAppointmentByPhone, summary.phone) || null;
+    } else if (needsApptLookup && prospect) {
       appointment = await findLatestAppointment(
         summary.phone,
         prospect.organization_id || options.organizationId || null
