@@ -195,6 +195,7 @@ test("BR-177 cancelled outcome reuses cancel reminders and stays tenant-scoped",
   const agendaSource = fs.readFileSync(agendaServicePath, "utf8");
   const appointmentSource = fs.readFileSync(appointmentServicePath, "utf8");
   assert.match(agendaSource, /cancelAppointment/);
+  assert.match(agendaSource, /appointmentReminderEngine\.scheduleReminders/);
   assert.match(appointmentSource, /appointmentReminderEngine\.cancelReminders/);
 
   const appointmentRepo = require(appointmentRepoPath);

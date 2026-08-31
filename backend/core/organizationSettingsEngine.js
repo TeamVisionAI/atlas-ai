@@ -56,7 +56,9 @@ function getOrganizationSettings() {
       mapsUrl: buildMapsUrl(office.fullAddress)
     },
     businessHours: null,
-    templates: {}
+    templates: {},
+    // Optional override for BR-191 reminder cadence. Null = global 24h / 1h / 30m.
+    appointmentReminderOffsetsMinutes: null
   };
 }
 

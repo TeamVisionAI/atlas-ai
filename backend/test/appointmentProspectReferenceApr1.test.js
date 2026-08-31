@@ -103,7 +103,8 @@ test("9. reminder personalization uses org+phone (not dangling prospect FK)", ()
     path.join(__dirname, "../services/appointmentReminderEngine.js"),
     "utf8"
   );
-  assert.match(engine, /findProspectInOrganization\(\s*entry\.prospectPhone/);
+  assert.match(engine, /findProspectInOrganization\(/);
+  assert.match(engine, /resolveReminderRecipientPhone/);
 });
 
 test("10. Google sync does not key off appointment.prospect_id", () => {
