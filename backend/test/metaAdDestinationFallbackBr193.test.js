@@ -369,5 +369,6 @@ test("migration defaults existing connections to false", () => {
     "utf8"
   );
   assert.match(sql, /meta_ad_destination_automation_enabled BOOLEAN NOT NULL DEFAULT false/);
-  assert.match(sql, /SET meta_ad_destination_automation_enabled = false/);
+  assert.match(sql, /COMMENT ON COLUMN whatsapp_integrations.meta_ad_destination_automation_enabled/);
+  assert.doesNotMatch(sql, /UPDATE whatsapp_integrations/);
 });

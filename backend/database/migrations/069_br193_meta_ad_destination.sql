@@ -10,8 +10,4 @@ ALTER TABLE whatsapp_integrations
 COMMENT ON COLUMN whatsapp_integrations.meta_ad_destination_automation_enabled IS
   'BR-193. When true, unknown inbound on this CONNECTED phone_number_id may be promoted if Meta omitted CTWA metadata. Default false.';
 
-UPDATE whatsapp_integrations
-SET meta_ad_destination_automation_enabled = false
-WHERE meta_ad_destination_automation_enabled IS DISTINCT FROM false;
-
 COMMIT;
