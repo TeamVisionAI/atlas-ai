@@ -20,6 +20,8 @@ import RescheduleAppointmentDialog from "../components/appointments/RescheduleAp
 import CancelAppointmentDialog from "../components/appointments/CancelAppointmentDialog";
 import CompleteAppointmentDialog from "../components/appointments/CompleteAppointmentDialog";
 import PromoteAgendaContactDialog from "../components/agenda/PromoteAgendaContactDialog";
+import ClientConversionPremiumDialog from "../components/agenda/ClientConversionPremiumDialog";
+import { isAgendaClientConversionIncomplete } from "../engines/agendaClientConversion";
 import ResolveHumanAssistDialog from "../components/appointments/ResolveHumanAssistDialog";
 import {
   AppointmentDetailsPanel,
@@ -466,7 +468,8 @@ export default function AppointmentsPage() {
                       ) : null}
                       {(appointment.rescheduleCount > 0 ||
                         appointment.emailStatus === "missing" ||
-                        appointment.humanAssistRequired) && (
+                        appointment.humanAssistRequired ||
+                        isAgendaClientConversionIncomplete(appointment)) && (
                         <div className="appointments-page__flags">
                           {appointment.humanAssistRequired ? (
                             <span className="appointments-page__flag appointments-page__flag--assist">
@@ -481,6 +484,11 @@ export default function AppointmentsPage() {
                           {appointment.rescheduleCount > 0 ? (
                             <span className="appointments-page__flag">
                               {translate("appointmentsRescheduleCount")}: {appointment.rescheduleCount}
+                            </span>
+                          ) : null}
+                          {isAgendaClientConversionIncomplete(appointment) ? (
+                            <span className="appointments-page__flag appointments-page__flag--assist">
+                              {translate("agendaClientConversionIncomplete")}
                             </span>
                           ) : null}
                         </div>
@@ -507,7 +515,7 @@ export default function AppointmentsPage() {
                       onCancel={() => openDialog("cancel", appointment)}
                       onComplete={() => openDialog("complete", appointment)}
                       onPromoteRecruit={() => openDialog("promote-recruit", appointment)}
-                      onPromoteClient={() => openDialog("promote-client", appointment)}
+                      onPromoteClient={() => openDialog("client-premium", appointment)}
                       onOpenClient={() => {
                         const id = appointment.metadata?.promotedClientId;
                         if (id) navigate(appPath(`clients/${id}`));
@@ -529,7 +537,7 @@ export default function AppointmentsPage() {
             onCancel={(item) => openDialog("cancel", item)}
             onComplete={(item) => openDialog("complete", item)}
             onPromoteRecruit={(item) => openDialog("promote-recruit", item)}
-            onPromoteClient={(item) => openDialog("promote-client", item)}
+            onPromoteClient={(item) => openDialog("client-premium", item)}
             onOpenClient={(item) => {
               const id = item?.metadata?.promotedClientId;
               if (id) navigate(appPath(`clients/${id}`));
@@ -558,8 +566,17 @@ export default function AppointmentsPage() {
         appointment={dialog?.appointment}
         onClose={closeDialog}
         onSuccess={(updatedAppointment) =>
-          handleActionSuccess(translate("appointmentsCompleted"), updatedAppointment)
+          handleActionSuccess(
+            updatedAppointment?.metadata?.clientConversionStatus === "incomplete"
+              ? translate("agendaClientConversionIncomplete")
+              : translate("appointmentsCompleted"),
+            updatedAppointment
+          )
         }
+        onClientConversionRequired={(updatedAppointment) => {
+          setView("completed");
+          openDialog("client-premium", updatedAppointment);
+        }}
       />
       <PromoteAgendaContactDialog
         open={dialog?.type === "promote-recruit"}
@@ -575,18 +592,12 @@ export default function AppointmentsPage() {
           )
         }
       />
-      <PromoteAgendaContactDialog
-        open={dialog?.type === "promote-client"}
-        mode="client"
+      <ClientConversionPremiumDialog
+        open={dialog?.type === "client-premium"}
         appointment={dialog?.appointment}
         onClose={closeDialog}
         onSuccess={(result) => {
-          handleActionSuccess(
-            result?.alreadyPromoted
-              ? translate("agendaPromoteClientExisting")
-              : translate("agendaPromoteClientSuccess"),
-            result?.appointment
-          );
+          handleActionSuccess(translate("agendaClientConversionComplete"), result?.appointment);
           if (result?.clientId) {
             navigate(appPath(`clients/${result.clientId}`));
           }

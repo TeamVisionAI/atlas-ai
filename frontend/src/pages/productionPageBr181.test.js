@@ -7,7 +7,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "path";
 import { fileURLToPath } from "node:url";
-import { formatProductionAmount, presentProductionHistoryEvent } from "../engines/productionViewModel.js";
+import {
+  formatProductionAmount,
+  presentProductionHistoryEvent,
+  presentProductionKpiMoney
+} from "../engines/productionViewModel.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,6 +20,28 @@ test("production amount formatter never invents a value", () => {
   assert.equal(formatProductionAmount(""), null);
   assert.equal(formatProductionAmount("not-a-number"), null);
   assert.match(formatProductionAmount(150, "en-US"), /150/);
+  assert.match(formatProductionAmount(150, "en-US", "CAD"), /CA/);
+});
+
+test("mixed-currency KPI presentation does not format one USD total", () => {
+  const mixed = presentProductionKpiMoney(
+    {
+      mixedCurrency: true,
+      personalProduction: null,
+      averagePremium: null,
+      monetaryByCurrency: {
+        USD: { production: 100, averagePremium: 100, premiumCount: 1 },
+        CAD: { production: 300, averagePremium: 300, premiumCount: 1 }
+      }
+    },
+    "en-US"
+  );
+  assert.equal(mixed.length, 2);
+  assert.equal(mixed[0].currency, "USD");
+  assert.equal(mixed[1].currency, "CAD");
+  assert.match(mixed[0].productionLabel, /100/);
+  assert.match(mixed[1].productionLabel, /300/);
+  assert.doesNotMatch(JSON.stringify(mixed), /400/);
 });
 
 test("history presentation never shows a raw actor UUID", () => {
@@ -45,6 +71,9 @@ test("Production is routed next to Clients and Client Workspace loads production
   assert.match(nav, /permission: PERMISSIONS.PROSPECT_READ/);
   assert.match(page, /getProductionList\(/);
   assert.match(page, /productionScopeMine/);
+  assert.match(page, /presentProductionKpiMoney/);
+  assert.match(page, /productionScopeOrganization/);
+  assert.doesNotMatch(page, /district|regional|productionScopeRvp/);
   assert.doesNotMatch(page, /navigateToProspectWorkspace|recruitAiV2|\/api\/prospects/);
   assert.match(clients, /getProductionList\(\{ clientId/);
   assert.match(clients, /productionSectionTitle/);

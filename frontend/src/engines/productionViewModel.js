@@ -68,11 +68,38 @@ export function productionStatusVariant(status) {
   }
 }
 
-export function formatProductionAmount(amount, locale = "en-US") {
+export function formatProductionAmount(amount, locale = "en-US", currency = "USD") {
   if (amount == null || amount === "") return null;
   const value = Number(amount);
   if (!Number.isFinite(value)) return null;
-  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(value);
+  const code = /^[A-Z]{3}$/.test(String(currency || "").trim().toUpperCase())
+    ? String(currency).trim().toUpperCase()
+    : "USD";
+  return new Intl.NumberFormat(locale, { style: "currency", currency: code }).format(value);
+}
+
+export function presentProductionKpiMoney(kpis, locale = "en-US") {
+  const byCurrency = kpis?.monetaryByCurrency || {};
+  const currencies = Object.keys(byCurrency);
+  if (kpis?.mixedCurrency || currencies.length > 1) {
+    return currencies.map((currency) => {
+      const row = byCurrency[currency];
+      return {
+        currency,
+        productionLabel: formatProductionAmount(row.production, locale, currency),
+        averageLabel: formatProductionAmount(row.averagePremium, locale, currency)
+      };
+    });
+  }
+  const currency = kpis?.currency || currencies[0] || "USD";
+  const production = kpis?.personalProduction;
+  return [
+    {
+      currency,
+      productionLabel: formatProductionAmount(production, locale, currency),
+      averageLabel: formatProductionAmount(kpis?.averagePremium, locale, currency)
+    }
+  ];
 }
 
 export function formatProductionTimestamp(value, locale = "en-US") {

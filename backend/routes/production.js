@@ -26,8 +26,11 @@ function actorContext(req) {
     userId: req.tenantContext?.userId || req.authContext?.userId,
     organizationId: getTenantOrganizationId(req),
     role: req.authContext?.role,
+    saasRole: req.authContext?.saasRole,
     hierarchyMode: req.authContext?.hierarchyMode,
-    hierarchyUserIds: req.authContext?.hierarchyUserIds
+    hierarchyUserIds: req.authContext?.hierarchyUserIds,
+    controlPlaneOnly: req.controlPlaneOnly === true,
+    supportModeOrganizationId: req.supportContext?.organizationId || null
   };
 }
 
@@ -37,6 +40,22 @@ function sendError(res, error) {
     message: error.message
   });
 }
+
+router.get("/kpis", operationalControlPlaneEmpty(emptyProduction), async (req, res) => {
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const payload = await clientProductionApplicationService.summarizeProductionKpis({
+      organizationId,
+      authContext: actorContext(req),
+      scope: req.query.scope,
+      from: req.query.from,
+      to: req.query.to
+    });
+    res.json(payload);
+  } catch (error) {
+    sendError(res, error);
+  }
+});
 
 router.get("/", operationalControlPlaneEmpty(emptyProduction), async (req, res) => {
   try {

@@ -25,7 +25,8 @@ import {
   buildProductionStatusLabel,
   buildProductionTypeLabel,
   emptyProductionForm,
-  formatProductionAmount
+  formatProductionAmount,
+  presentProductionKpiMoney
 } from "../engines/productionViewModel";
 import { ProductionDialogs, ProductionRecordCard } from "./ProductionRecordsBlock";
 import "./ClientsPage.css";
@@ -196,6 +197,15 @@ export default function ProductionPage() {
             {translate("productionScopeTeam")}
           </button>
         ) : null}
+        {payload?.organizationAvailable ? (
+          <button
+            type="button"
+            className={`clients-page__filter${activeScope === "organization" ? " is-active" : ""}`}
+            onClick={() => patchParams({ scope: "organization" })}
+          >
+            {translate("productionScopeOrganization")}
+          </button>
+        ) : null}
       </div>
 
       <div className="clients-page__scope" aria-label={translate("productionFilters")}>
@@ -245,12 +255,50 @@ export default function ProductionPage() {
 
       {payload ? (
         <dl className="clients-card__details">
+          {presentProductionKpiMoney(payload.kpis, locale).map((row) => (
+            <div key={`premium-${row.currency}`}>
+              <dt>
+                {translate("productionKpiPremium")}
+                {payload.kpis?.mixedCurrency ? ` (${row.currency})` : ""}
+              </dt>
+              <dd>{row.productionLabel || "—"}</dd>
+            </div>
+          ))}
+          <div>
+            <dt>{translate("productionKpiClients")}</dt>
+            <dd>{payload.kpis?.clientCount || 0}</dd>
+          </div>
+          {presentProductionKpiMoney(payload.kpis, locale).map((row) => (
+            <div key={`average-${row.currency}`}>
+              <dt>
+                {translate("productionKpiAverage")}
+                {payload.kpis?.mixedCurrency ? ` (${row.currency})` : ""}
+              </dt>
+              <dd>{row.averageLabel || "—"}</dd>
+            </div>
+          ))}
+          <div>
+            <dt>{translate("productionKpiConversions")}</dt>
+            <dd>{payload.kpis?.appointmentToClientConversions || 0}</dd>
+          </div>
+          {payload.kpis?.mixedCurrency ? (
+            <div>
+              <dt>{translate("productionKpiMixedCurrency")}</dt>
+              <dd>{translate("productionKpiMixedCurrencyBody")}</dd>
+            </div>
+          ) : null}
           {["submitted", "pending", "issued", "paid"].map((key) => (
             <div key={key}>
               <dt>{translate(`productionMetric${key[0].toUpperCase()}${key.slice(1)}`)}</dt>
               <dd>
                 {payload.counts?.[key] || 0}
-                {payload.amounts?.[key] != null ? ` · ${formatProductionAmount(payload.amounts[key], locale)}` : ""}
+                {!payload.kpis?.mixedCurrency && payload.amounts?.[key] != null
+                  ? ` · ${formatProductionAmount(
+                      payload.amounts[key],
+                      locale,
+                      payload.kpis?.currency || "USD"
+                    )}`
+                  : ""}
               </dd>
             </div>
           ))}

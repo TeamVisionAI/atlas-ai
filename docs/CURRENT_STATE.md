@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-08-31:** **BR-194** — Agenda CLIENT outcome captures premium, promotes a Client, and writes one canonical `atlas_client_production` row. Hidden `promotionPending` is replaced by a visible incomplete conversion + Resume action. KPIs read that table only, group money by currency, and support Mine / Team / Organization (not fake District/Division/Regional/RVP totals).
 - **2026-08-31:** **BR-192** — Terminal prospect close (Not Interested / Disqualified / DNC) cancels OPEN follow-ups in domain logic. History kept. No UI-only hide.
 - **2026-08-31:** **BR-189** — Policy Review dashboard lives on `/app/policy-reviews` (Dashboard | Pipeline). Reuses BR-186/188; no new sidebar item; spend/CPL/ROAS stay null.
 - **2026-08-13:** **Conversations unread + latest-message-first** — Unread is prospect inbound WhatsApp vs `conversationsLastReadInboundAt` (not BR-080 / NEEDS_ATTENTION). List sorts by `lastCommunicationAt` from real WhatsApp. Open thread anchors above sticky composer; poll ~12s; scrolled-up live inbound shows “New message ↓”.

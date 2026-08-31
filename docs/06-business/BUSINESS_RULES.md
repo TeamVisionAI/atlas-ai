@@ -2634,7 +2634,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Turn Agenda from a read-only appointment list into an operational workflow: Agenda Contact → Appointment → Outcome → explicit Promote to Recruit or Client, without treating unpromoted Agenda contacts as prospects.  
 **Domain:** Agenda / appointments / promotion  
 **Depends on:** BR-168 Unified Agenda V1; appointment application services; BR-176 notification hooks  
-**Related:** BR-043, BR-045, BR-080, BR-142, BR-160, BR-176  
+**Related:** BR-043, BR-045, BR-080, BR-142, BR-160, BR-176, BR-194 (CLIENT premium + canonical production)  
 **Status:** V1 implemented  
 **Engine target:** `agendaApplicationService`; `/api/agenda`; existing `/api/appointments` reschedule/cancel/complete  
 **Tests:** `backend/test/unifiedAgendaBr177.test.js`; `frontend/src/engines/appointmentCardPresentation.test.js`  
@@ -2745,7 +2745,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** A global, tenant-safe production/activity record so Atlas can answer what client business was submitted, issued, paid, pending, or closed — and who owns it — without mixing that work into recruiting prospects or Recruit AI.  
 **Domain:** Clients / production / activity  
 **Depends on:** BR-179 Client Workspace; BR-178 follow-ups; BR-160 control plane  
-**Related:** BR-180 Today (unchanged — no automatic production items)  
+**Related:** BR-180 Today (unchanged — no automatic production items); BR-194 Agenda CLIENT conversion writes the same `atlas_client_production` table  
 **Status:** V1 implemented — manual records only; no carrier APIs, commissions, or inferred status  
 **Engine target:** `clientProduction/*`; `clientProductionApplicationService`; `/api/production`; `/app/production`  
 **Tests:** `backend/test/clientProductionBr181.test.js`; `frontend/src/pages/productionPageBr181.test.js`  
@@ -3003,6 +3003,32 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Reopen** — Reactivating a prospect does not recreate the cancelled follow-up unless an existing rule explicitly creates a new one.
 8. **Active query** — Follow-ups Active / Due Today is OPEN + org-local due date. CANCELLED and COMPLETED are excluded. Do not treat due date alone as active when status is cancelled.
 9. **Boundaries** — Do not cancel agenda-contact or client follow-ups. Do not send WhatsApp/SMS/email.
+
+---
+
+## BR-194 — Agenda CLIENT conversion with premium and KPI rollup
+
+**Implements:** Agenda outcome = CLIENT must not stay in a hidden promotion-pending state. Atlas records an explicit incomplete conversion, captures premium, promotes the contact to a Client, and writes one canonical production event that all KPI rollups read.  
+**Domain:** Agenda / Clients / Production / KPIs  
+**Depends on:** BR-177 Agenda promotion; BR-179 Client Workspace; BR-181 client production  
+**Related:** BR-168 unified Agenda; BR-160 Super Admin control plane stays empty unless platform KPI is explicitly authorized  
+**Status:** Implemented  
+**Engine target:** `agendaApplicationService.completeAgendaClientConversion`; `clientProductionApplicationService.upsertAppointmentProduction`; `clientProduction/productionKpiEngine.js`  
+**Tests:** `backend/test/agendaClientConversionBr194.test.js`  
+**Docs:** `docs/06-business/BR-194-agenda-client-premium-conversion.md`
+
+### Rules
+
+1. **CLIENT intent first** — Selecting outcome = CLIENT records the appointment outcome and `clientConversionStatus=incomplete`. It does not create production or a client by itself. RECRUITED still uses `promotionPending` and is unchanged.
+2. **Premium required to finish** — Atlas immediately prompts for premium (numeric, >= 0), currency (default USD), and production/submitted date. Product type and carrier are optional. Notes are not the premium store.
+3. **Canonical production** — Completing setup promotes/creates the Client, then creates or updates one `atlas_client_production` row keyed by `organization_id` + `appointment_id`. Editing premium updates that row. Duplicate submit does not create a second row.
+4. **Visible incomplete** — Cancelling the premium modal leaves “Client conversion incomplete” plus Resume / Complete Client Setup. Do not hide the appointment.
+5. **One KPI source** — Personal production, client count, average premium, appointment→client conversion, team, organization, and permission-gated platform totals all read `atlas_client_production`. Do not compute premium in Clients, dashboards, or widgets separately.
+6. **Currency-safe money** — KPI monetary totals and averages group by `currency`. A single-currency set may populate top-level `personalProduction` / `teamProduction` / `averagePremium`. Mixed currencies must not produce one combined number. No FX conversion.
+7. **Hierarchy scopes now** — Supported rollups are Mine, Team (reports_to subtree via `hierarchyUserIds`), and Organization. Atlas hierarchy is org / subtree / self only. District / Division / Regional / RVP named groups are not claimed and must not return the org-wide total. Unsupported scope names fall back to Mine.
+8. **Tenant isolation** — Every production row has `organization_id`. Hierarchy rollups are organization-scoped. One tenant cannot read or affect another tenant’s production.
+9. **Platform analytics** — Global/platform totals require a platform SUPER_ADMIN role and stay permission-gated. Support Mode remains tenant-bound. Monetary platform totals stay currency-safe. Do not expose another tenant’s production to a tenant user.
+10. **Boundaries** — Do not change Recruit AI, WhatsApp, or non-CLIENT Agenda outcomes. Manual BR-181 production remains compatible.
 
 ---
 

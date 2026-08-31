@@ -7,6 +7,7 @@ import {
   presentHistoryActorLabel
 } from "../../engines/agentNotificationPresentation";
 import { shouldShowLifecycleActions } from "../../engines/appointmentCardPresentation";
+import { isAgendaClientConversionIncomplete } from "../../engines/agendaClientConversion";
 import { fetchAgendaContact } from "../../services/agendaService";
 import { Link } from "react-router-dom";
 
@@ -165,6 +166,7 @@ export function AppointmentDetailsPanel({
   const canMutate = shouldShowLifecycleActions(appointment);
   const promotedRecruit = Boolean(appointment?.metadata?.promotedToRecruit || appointment?.prospectId);
   const promotedClient = Boolean(appointment?.metadata?.promotedToClient);
+  const conversionIncomplete = isAgendaClientConversionIncomplete(appointment);
   const [contact, setContact] = useState(null);
 
   useEffect(() => {
@@ -231,15 +233,15 @@ export function AppointmentDetailsPanel({
                 {translate("agendaPromoteRecruit")}
               </AtlasButton>
             ) : null}
-            {!promotedClient ? (
-              <AtlasButton variant="secondary" size="sm" onClick={() => onPromoteClient?.(appointment)}>
-                {translate("agendaPromoteClient")}
+            {conversionIncomplete ? (
+              <AtlasButton variant="primary" size="sm" onClick={() => onPromoteClient?.(appointment)}>
+                {translate("agendaResumeClientSetup")}
               </AtlasButton>
-            ) : (
+            ) : promotedClient ? (
               <AtlasButton variant="secondary" size="sm" onClick={() => onOpenClient?.(appointment)}>
                 {translate("agendaOpenClient")}
               </AtlasButton>
-            )}
+            ) : null}
           </section>
         ) : null}
 

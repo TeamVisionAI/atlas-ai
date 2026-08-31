@@ -28,13 +28,29 @@ function createMemoryProductionStore(seed = []) {
       return clone(row);
     },
 
+    async findByAppointmentId(appointmentId, organizationId) {
+      if (!appointmentId) return null;
+      return (
+        [...rows.values()].find(
+          (item) =>
+            String(item.appointmentId) === String(appointmentId) &&
+            (!organizationId || item.organizationId === organizationId)
+        ) || null
+      );
+    },
+
     async listForOwners({ organizationId, ownerUserIds, clientId } = {}) {
+      if (!organizationId) return [];
       const owners = ownerUserIds == null ? null : new Set(ownerUserIds.map((id) => String(id)));
       return [...rows.values()]
         .filter((item) => item.organizationId === organizationId)
         .filter((item) => !clientId || String(item.clientId) === String(clientId))
         .filter((item) => !owners || owners.has(String(item.ownerUserId)))
         .map(clone);
+    },
+
+    async listAllForPlatform() {
+      return [...rows.values()].map(clone);
     }
   };
 }

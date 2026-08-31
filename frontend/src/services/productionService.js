@@ -17,6 +17,19 @@ function wrap(error, fallback) {
   throw new ProductionError(fallback, match ? Number(match[1]) : undefined);
 }
 
+export async function getProductionKpis(options = {}) {
+  const params = new URLSearchParams();
+  if (options.scope) params.set("scope", options.scope);
+  if (options.from) params.set("from", options.from);
+  if (options.to) params.set("to", options.to);
+  const query = params.toString();
+  try {
+    return await apiFetch(`/api/production/kpis${query ? `?${query}` : ""}`);
+  } catch (error) {
+    wrap(error, "Failed to load production KPIs");
+  }
+}
+
 export async function getProductionList(options = {}) {
   const params = new URLSearchParams();
   if (options.search) params.set("q", options.search);
