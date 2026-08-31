@@ -2981,6 +2981,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-192 — Terminal Prospect Close Cancels Follow-ups
+
+**Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  
+**Domain:** Follow-ups / prospect lifecycle / Mission Control  
+**Depends on:** BR-178 follow-up SoT; BR-035 human advancement; BR-044 terminal outcomes  
+**Related:** BR-176 notifications (due events stop once cancelled)  
+**Status:** V1 implemented  
+**Engine target:** `followUps/prospectClosePolicy`; `followUpApplicationService.cancelOpenFollowUpsForClosedProspect`; `humanAdvancementEngine.advanceProspectWorkflow`  
+**Tests:** `backend/test/followUpProspectCloseBr192.test.js`  
+**Docs:** `docs/06-business/BR-192-terminal-close-cancels-followups.md`
+
+### Rules
+
+1. **Shared close path** — Cancel OPEN prospect-linked follow-ups in backend/domain logic when the prospect lands on `CLOSED` or `DO_NOT_CONTACT` (Mission Control Not Interested, interview Not Qualified / other terminal closes, DNC). Do not implement this only as a Follow-ups UI filter.
+2. **Preserve history** — Set status `CANCELLED`. Do not delete completed or previously cancelled rows. Store a machine-readable reason (`prospect_closed_not_interested`, `prospect_closed_disqualified`, `prospect_closed_do_not_contact`, `prospect_closed_unsubscribe`, …).
+3. **Idempotent** — Repeating the same close does not write a second cancel history entry.
+4. **Tenant isolation** — Only the closing organization is updated.
+5. **Non-terminal stays** — Do not cancel for Follow-up, Interview Scheduled, awaiting response, reschedule, Recruited/Orientation, or other non-terminal milestones.
+6. **BR-178 recycle exception** — Interview `not_interested` with an explicit future date still creates a *new* recycle obligation after existing OPEN rows are cancelled. Mission Control Close — Not Interested does not pass a recycle date, so no new obligation is created.
+7. **Reopen** — Reactivating a prospect does not recreate the cancelled follow-up unless an existing rule explicitly creates a new one.
+8. **Active query** — Follow-ups Active / Due Today is OPEN + org-local due date. CANCELLED and COMPLETED are excluded. Do not treat due date alone as active when status is cancelled.
+9. **Boundaries** — Do not cancel agenda-contact or client follow-ups. Do not send WhatsApp/SMS/email.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

@@ -113,6 +113,47 @@ async function listOpenByAppointment(organizationId, appointmentId) {
   return (data || []).map(rowToFollowUp);
 }
 
+async function listOpenForProspect(organizationId, { prospectId = null, subjectPhone = null } = {}) {
+  const { isProspectLinkedFollowUp } = require("../core/followUps/prospectClosePolicy");
+  const keys = [...new Set([prospectId, subjectPhone].filter(Boolean).map(String))];
+  if (!organizationId || !keys.length) {
+    return [];
+  }
+
+  const byEntity = await supabase
+    .from("atlas_follow_ups")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("status", "OPEN")
+    .in("entity_id", keys);
+
+  if (byEntity.error) {
+    throw byEntity.error;
+  }
+
+  let byPhone = { data: [] };
+  if (subjectPhone) {
+    byPhone = await supabase
+      .from("atlas_follow_ups")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("status", "OPEN")
+      .eq("subject_phone", subjectPhone);
+    if (byPhone.error) {
+      throw byPhone.error;
+    }
+  }
+
+  const merged = new Map();
+  for (const row of [...(byEntity.data || []), ...(byPhone.data || [])]) {
+    const followUp = rowToFollowUp(row);
+    if (followUp && isProspectLinkedFollowUp(followUp, { prospectId, subjectPhone })) {
+      merged.set(followUp.id, followUp);
+    }
+  }
+  return [...merged.values()];
+}
+
 async function listForOwners({ organizationId, ownerUserIds, statuses }) {
   let query = supabase.from("atlas_follow_ups").select("*").eq("organization_id", organizationId);
   if (ownerUserIds?.length === 1) {
@@ -137,5 +178,6 @@ module.exports = {
   findById,
   findByDedupKey,
   listOpenByAppointment,
+  listOpenForProspect,
   listForOwners
 };

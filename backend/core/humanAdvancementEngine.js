@@ -399,6 +399,26 @@ async function advanceProspectWorkflow(phone, payload = {}) {
     agentState: loadAgentState(phone)
   });
 
+  // Implements BR-192 — terminal close cancels open follow-ups. Fail-soft.
+  if (
+    targetMilestone === MILESTONES.CLOSED ||
+    targetMilestone === MILESTONES.DO_NOT_CONTACT
+  ) {
+    try {
+      const followUpApplicationService = require("../application/followUpApplicationService");
+      await followUpApplicationService.cancelOpenFollowUpsForClosedProspect({
+        organizationId,
+        prospectId: prospect.id || updatedProspect?.id || null,
+        subjectPhone: phone,
+        actorUserId: payload.actorUserId || payload.agentId || "system",
+        targetMilestone,
+        outcome: capturedFields.outcome || updatedAgentState.outcome || null
+      });
+    } catch (error) {
+      console.warn("[follow-ups] cancel on terminal close failed", error.message);
+    }
+  }
+
   return {
     success: true,
     action: "workflow_advance",

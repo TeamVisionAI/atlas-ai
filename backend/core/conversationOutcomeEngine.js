@@ -1304,6 +1304,7 @@ module.exports = {
   getQualificationFormGaps,
   resolveExplicitProfileFields,
   resolveRequiredInformationTargetMilestone,
+  resolveTargetMilestone,
   saveRequiredInformation,
   saveConversationOutcome
 };

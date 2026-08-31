@@ -42,7 +42,7 @@ Fetch on entry, filter/tab/scope/search change, and after mutations. Optional st
 |---|---|
 | `follow_up` / Follow Up Needed | Create/update. Date required or default +3 days, 10:00 (existing interview config). |
 | `no_show` | Retry obligation. Existing default +7 days, 10:00. Not an aggressive cadence. |
-| `not_interested` | Only if a recycle / future date is provided. |
+| `not_interested` | Only if a recycle / future date is provided. Terminal close first cancels existing OPEN follow-ups (BR-192). |
 | `recruited` | IBA / onboarding check-in (+3 days). Canonical next step already exists. |
 | Interview `Became Client` | 2-day service check-in from existing interview config. |
 | Agenda `client` | None. No Client CRM workflow. |

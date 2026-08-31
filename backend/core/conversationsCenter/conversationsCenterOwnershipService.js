@@ -251,6 +251,26 @@ async function closeConversation(
     },
     scope
   );
+
+  // Implements BR-192 — operator DNC / Not Interested inbox close cancels open follow-ups.
+  if (
+    closeReason === INBOX_CLOSE_REASONS.DO_NOT_CONTACT ||
+    closeReason === INBOX_CLOSE_REASONS.NOT_INTERESTED
+  ) {
+    try {
+      const followUpApplicationService = require("../../application/followUpApplicationService");
+      await followUpApplicationService.cancelOpenFollowUpsForClosedProspect({
+        organizationId: scope.organizationId,
+        prospectId: scope.prospectId || previous.prospectId || null,
+        subjectPhone: phone,
+        actorUserId: scope.ownerUserId || "system",
+        inboxCloseReason: closeReason
+      });
+    } catch (error) {
+      console.warn("[follow-ups] cancel on conversation close failed", error.message);
+    }
+  }
+
   return {
     previous,
     next,
