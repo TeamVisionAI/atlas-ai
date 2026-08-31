@@ -422,10 +422,52 @@ function toBooleanWorkAuthorization(status) {
   return null;
 }
 
+const LANGUAGE_ABILITY = Object.freeze({
+  BILINGUAL: "bilingual",
+  ENGLISH: "english",
+  SPANISH: "spanish"
+});
+
+/**
+ * Language-ability statements are independent of city/state (BR-187).
+ * Does not change preferredLanguage (conversation language).
+ */
+function parseLanguageAbilityStatement(text) {
+  const t = String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return null;
+  }
+  if (
+    /^(yo\s+)?(soy|somos|i am|i'm|im)\s+(bilingue|bilingual)s?$/.test(t) ||
+    /\b(bilingue|bilingual)s?\b/.test(t) &&
+      /^(yo\s+)?(soy|somos|i am|i'm|im)\b/.test(t) ||
+    /\b(hablo|speak)\b.{0,40}\b(ingles|english).{0,20}\b(y|and)\b.{0,20}\b(espanol|spanish)\b/.test(
+      t
+    ) ||
+    /\b(hablo|speak)\b.{0,40}\b(espanol|spanish).{0,20}\b(y|and)\b.{0,20}\b(ingles|english)\b/.test(
+      t
+    ) ||
+    /^(english and spanish|spanish and english|ingles y espanol|espanol e ingles)$/.test(
+      t
+    )
+  ) {
+    return LANGUAGE_ABILITY.BILINGUAL;
+  }
+  return null;
+}
+
 module.exports = {
   WORK_AUTHORIZATION,
   FINANCIAL_LICENSE_STATUS,
   FINANCIAL_LICENSE_TYPES,
+  LANGUAGE_ABILITY,
   mentionsLicense,
   mentionsWorkAuthorization,
   looksLikeDriversLicense,
@@ -435,6 +477,7 @@ module.exports = {
   looksLikeAmbiguousLicenseFragment,
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
+  parseLanguageAbilityStatement,
   looksLikeSsnPrivacyObjection,
   toBooleanWorkAuthorization,
   looksLikePuertoRicoOriginStatement

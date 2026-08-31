@@ -2249,6 +2249,16 @@ function decideConversationTurnCore({
       structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
       structured.customerReplyPlan.templateKey =
         resume.templateKey || "continue_qualification_after_location";
+      // Implements BR-187 — speak the confirmed city, not this-turn junk entities.
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        ...(resume.entities || {}),
+        city: context.knownFacts?.city || resume.entities?.city || null,
+        state: context.knownFacts?.state || null,
+        coverage:
+          context.knownFacts?.coverage || resume.entities?.coverage || null,
+        preferredMeetingType: context.knownFacts?.preferredMeetingType || null
+      };
       structured.contextPatch = {
         conversation: {
           clarificationCount: 0,
@@ -2283,6 +2293,43 @@ function decideConversationTurnCore({
         confirmedFields: Array.from(
           new Set([...(context.conversation?.confirmedFields || []), "city", "state"])
         )
+      }
+    };
+    return structured;
+  }
+
+  if (intent === INTENTS.PROVIDE_LANGUAGE_ABILITY) {
+    const ability = interpretation.entities?.languageAbility || "bilingual";
+    const resume = resolveQualificationResume({
+      ...context,
+      knownFacts: {
+        ...context.knownFacts,
+        languageAbility: ability
+      }
+    });
+    structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey = resume.templateKey;
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      ...(resume.entities || {}),
+      city: context.knownFacts?.city || resume.entities?.city || null,
+      state: context.knownFacts?.state || null,
+      coverage: context.knownFacts?.coverage || resume.entities?.coverage || null,
+      preferredMeetingType: context.knownFacts?.preferredMeetingType || null,
+      languageAbility: ability
+    };
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      knownFacts: {
+        languageAbility: ability
+      },
+      conversation: {
+        lastQuestionAsked: resume.lastQuestionAsked,
+        lastProspectIntent: INTENTS.PROVIDE_LANGUAGE_ABILITY,
+        clarificationCount: 0,
+        pendingClarification: null
       }
     };
     return structured;

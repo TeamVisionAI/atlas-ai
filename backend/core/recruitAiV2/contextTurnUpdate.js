@@ -203,6 +203,16 @@ function buildNextContextFromInterpretation({
     };
   }
 
+  if (
+    interpretation.intent === "provide_language_ability" &&
+    interpretation.entities?.languageAbility
+  ) {
+    nextContext.knownFacts = {
+      ...nextContext.knownFacts,
+      languageAbility: interpretation.entities.languageAbility
+    };
+  }
+
   if (interpretation.intent === "provide_name" && interpretation.entities?.name) {
     nextContext.knownFacts = {
       ...nextContext.knownFacts,

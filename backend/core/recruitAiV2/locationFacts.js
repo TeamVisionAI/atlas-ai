@@ -555,10 +555,54 @@ function isNonLocationPhrase(folded) {
     /^(mejor|thanks|thank you|got it|sounds good)$/.test(t) ||
     // Bare Spanish pronoun / conversational "me" is never Maine.
     /^(me)$/.test(t) ||
+    looksLikeLanguageOrIdentitySelfDescription(t) ||
     /\bdonde trabaj/.test(t) ||
     /\bwhere (would|do|will) i work\b/.test(t) ||
     /\bwhat is the work\b/.test(t)
   );
+}
+
+/**
+ * Implements BR-187 — first-person identity / language-ability copulas are
+ * never cities ("Soy bilingüe", "soy ciudadana", "I am bilingual").
+ */
+function looksLikeLanguageOrIdentitySelfDescription(text) {
+  const t = String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return false;
+  }
+  if (
+    /^(yo\s+)?(soy|somos|i am|i'm|im)\s+(bilingue|bilingual|ciudadan[oa]s?|residente)s?(\s+american[oa]s?)?$/.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(bilingue|bilingual|ciudadan[oa]|residente|idioma|language ability)\b/.test(t) &&
+    /^(yo\s+)?(soy|somos|i am|i'm|im)\b/.test(t) &&
+    !/\b(de|en|in)\b/.test(t)
+  ) {
+    return true;
+  }
+  if (
+    /\b(hablo|speak)\b.{0,40}\b(ingles|english).{0,20}\b(y|and)\b.{0,20}\b(espanol|spanish)\b/.test(
+      t
+    ) ||
+    /\b(hablo|speak)\b.{0,40}\b(espanol|spanish).{0,20}\b(y|and)\b.{0,20}\b(ingles|english)\b/.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function isFalsePositiveStateToken(token) {
@@ -709,6 +753,12 @@ function parseLocationAnswerCore(raw) {
   if (looksLikeConversationalProseCity(raw) || looksLikeConversationalProseCity(folded)) {
     return null;
   }
+  if (
+    looksLikeLanguageOrIdentitySelfDescription(raw) ||
+    looksLikeLanguageOrIdentitySelfDescription(folded)
+  ) {
+    return null;
+  }
 
   // Never invent cities from company-identity / info-request / FAQ phrasing.
   if (
@@ -730,7 +780,7 @@ function parseLocationAnswerCore(raw) {
 
   // Never invent cities from license / authorization / FAQ phrasing (BR-083/098/099).
   if (
-    /\b(licen[cs]ia|license|permiso|autoriz|seguro|seguros|driver|conducir|215|214|experiencia|experience|necesito|comision|comisión|salario|sueldo|ganar|dinero|pagan|pago|vender|vendiendo|vendedor|vendedora|ventas|selling|sales|salesperson|conozco|contactos|clientes|network)\b/i.test(
+    /\b(licen[cs]ia|license|permiso|autoriz|seguro|seguros|driver|conducir|215|214|experiencia|experience|necesito|comision|comisión|salario|sueldo|ganar|dinero|pagan|pago|vender|vendiendo|vendedor|vendedora|ventas|selling|sales|salesperson|conozco|contactos|clientes|network|bilingue|bilingual|ciudadan|idioma)\b/i.test(
       raw
     )
   ) {
@@ -976,6 +1026,7 @@ module.exports = {
   buildHighConfidenceFloridaLocation,
   isNonLocationPhrase,
   isFalsePositiveStateToken,
+  looksLikeLanguageOrIdentitySelfDescription,
   looksLikeConversationalProseCity,
   looksLikeLocationCorrection,
   proposeStateFromCity,

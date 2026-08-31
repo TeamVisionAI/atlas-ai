@@ -73,6 +73,8 @@ const INTENTS = Object.freeze({
   PROVIDE_LOCATION: "provide_location",
   CORRECT_LOCATION: "correct_location",
   PROVIDE_AUTHORIZATION: "provide_authorization",
+  /** BR-187 — bilingual / language-ability is independent of location. */
+  PROVIDE_LANGUAGE_ABILITY: "provide_language_ability",
   /** BR-170 — SSN / Social Security must not be requested over WhatsApp. */
   SSN_PRIVACY_OBJECTION: "ssn_privacy_objection",
   AMBIGUOUS_LICENSE_STATEMENT: "ambiguous_license_statement",

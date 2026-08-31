@@ -73,6 +73,7 @@ const { looksLikeRescheduleRequest } = require("./rescheduleRequestFacts");
 const {
   parseLicenseStatement,
   parseWorkAuthorizationAnswer,
+  parseLanguageAbilityStatement,
   looksLikeSsnPrivacyObjection,
   looksLikeDriversLicense,
   looksLikeFinancialLicense,
@@ -1234,6 +1235,14 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     if (looksLikePuertoRicoOriginStatement(text)) {
       entities.puertoRicoOrigin = true;
     }
+  } else if (parseLanguageAbilityStatement(text) || parseLanguageAbilityStatement(originalText)) {
+    // Implements BR-187 — bilingual / language ability is not a city.
+    intent = INTENTS.PROVIDE_LANGUAGE_ABILITY;
+    confidence = 0.93;
+    entities.languageAbility =
+      parseLanguageAbilityStatement(text) ||
+      parseLanguageAbilityStatement(originalText);
+    entities.requiresClarification = false;
   } else if (
     looksLikeRescheduleRequest(text, context) ||
     looksLikeRescheduleRequest(originalText, context)
@@ -1422,9 +1431,34 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.requiresClarification = true;
     entities.completeness = "partial";
   } else {
-    const location = parseLocationAnswer(text);
+    const locationRaw = parseLocationAnswer(text);
     // Implements BR-173 — ignore a prior "city" that is actually a state name.
     const knownCity = usableKnownCity(context);
+    const confirmedPair =
+      Boolean(knownCity && context?.knownFacts?.state) &&
+      String(context?.knownFacts?.cityCertainty || "").toLowerCase() ===
+        "confirmed" &&
+      String(context?.knownFacts?.stateCertainty || "").toLowerCase() ===
+        "confirmed";
+    const incomingParsedCity = locationRaw?.city
+      ? canonicalizeCityName(locationRaw.city) || locationRaw.city
+      : null;
+    const differentIncomingCity =
+      confirmedPair &&
+      incomingParsedCity &&
+      String(knownCity).toLowerCase() !== String(incomingParsedCity).toLowerCase();
+    const correctionSignal =
+      Boolean(locationRaw?.correction) || looksLikeLocationCorrection(text);
+    // Implements BR-187 — do not complete an unrelated *partial* phrase onto a
+    // confirmed state (e.g. "Soy bilingüe" → Soy Bilingue, FL). Complete
+    // city parses (Doral / Orlando) remain provide_location; overwrite
+    // persistence is still gated by shouldBlockLocationOverwrite.
+    const location =
+      differentIncomingCity &&
+      !correctionSignal &&
+      locationRaw?.completeness === "partial"
+        ? null
+        : locationRaw;
     const awaitingState =
       locationCtx &&
       knownCity &&
@@ -1432,8 +1466,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
         context?.knownFacts?.stateCertainty === "partial" ||
         context?.knownFacts?.stateCertainty === "proposed" ||
         context?.knownFacts?.stateCertainty === "unknown");
-    const isCorrection =
-      Boolean(location?.correction) || looksLikeLocationCorrection(text);
+    const isCorrection = Boolean(location) && correctionSignal;
 
     if (location?.completeness === "state_only" && (awaitingState || knownCity)) {
       intent = INTENTS.PROVIDE_LOCATION;
