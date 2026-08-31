@@ -62,6 +62,20 @@ async function findById(id, organizationId) {
   return rowToAgendaClient(data);
 }
 
+async function findByPhone(phone, organizationId) {
+  if (!phone || !organizationId) return null;
+  const { data, error } = await supabase
+    .from("atlas_agenda_clients")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("phone", phone)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return rowToAgendaClient(data);
+}
+
 async function findByAgendaContactId(agendaContactId, organizationId) {
   if (!agendaContactId) return null;
   let query = supabase
@@ -105,6 +119,7 @@ module.exports = {
   agendaClientToRow,
   save,
   findById,
+  findByPhone,
   findByAgendaContactId,
   listByIds,
   listForOwners

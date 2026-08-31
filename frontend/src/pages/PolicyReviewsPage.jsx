@@ -28,9 +28,11 @@ import {
 import {
   POLICY_REVIEW_OUTCOMES,
   POLICY_REVIEW_STAGES,
+  buildPolicyReviewSourceLabel,
   buildPolicyReviewStageLabel,
   emptyPolicyReviewForm,
-  formatPolicyReviewMoney
+  formatPolicyReviewMoney,
+  formatPolicyReviewTouch
 } from "../engines/policyReviewViewModel";
 import "./ClientsPage.css";
 
@@ -80,8 +82,12 @@ export default function PolicyReviewsPage() {
   const searchQuery = searchParams.get("q") || "";
   const stageFilter = searchParams.get("stage") || "";
   const clientFilter = searchParams.get("clientId") || "";
+  const platformFilter = searchParams.get("platform") || "";
+  const campaignFilter = searchParams.get("campaign") || "";
+  const sourceFilter = searchParams.get("source") || "";
 
   const [searchInput, setSearchInput] = useState(searchQuery);
+  const [selectedId, setSelectedId] = useState(null);
   const [payload, setPayload] = useState(null);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +110,10 @@ export default function PolicyReviewsPage() {
           search: searchQuery,
           scope: activeScope,
           stage: stageFilter,
-          clientId: clientFilter
+          clientId: clientFilter,
+          platform: platformFilter,
+          campaign: campaignFilter,
+          source: sourceFilter
         }),
         getClients({ scope: activeScope })
       ]);
@@ -115,7 +124,17 @@ export default function PolicyReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeScope, clientFilter, controlPlane, searchQuery, stageFilter, translate]);
+  }, [
+    activeScope,
+    campaignFilter,
+    clientFilter,
+    controlPlane,
+    platformFilter,
+    searchQuery,
+    sourceFilter,
+    stageFilter,
+    translate
+  ]);
 
   useEffect(() => {
     loadList();
@@ -257,6 +276,30 @@ export default function PolicyReviewsPage() {
             ))}
           </select>
         </label>
+        <label className="clients-page__search-label">
+          {translate("policyReviewFilterPlatform")}
+          <input
+            value={platformFilter}
+            onChange={(event) => patchParams({ platform: event.target.value })}
+            placeholder={translate("policyReviewPlatform")}
+          />
+        </label>
+        <label className="clients-page__search-label">
+          {translate("policyReviewFilterCampaign")}
+          <input
+            value={campaignFilter}
+            onChange={(event) => patchParams({ campaign: event.target.value })}
+            placeholder={translate("policyReviewCampaign")}
+          />
+        </label>
+        <label className="clients-page__search-label">
+          {translate("policyReviewFilterSource")}
+          <input
+            value={sourceFilter}
+            onChange={(event) => patchParams({ source: event.target.value })}
+            placeholder={translate("policyReviewSource")}
+          />
+        </label>
       </div>
 
       <label className="clients-page__search-label" htmlFor="policy-review-search">
@@ -293,14 +336,43 @@ export default function PolicyReviewsPage() {
       {!loading && payload?.items?.length ? (
         <ul className="clients-list">
           {payload.items.map((item) => (
-            <li key={item.id} className="clients-card">
+            <li
+              key={item.id}
+              className={`clients-card${selectedId === item.id ? " is-selected" : ""}`}
+              onClick={() => setSelectedId((current) => (current === item.id ? null : item.id))}
+            >
               <div>
                 <strong>{item.clientName || translate("policyReviewClient")}</strong>
                 <span>{buildPolicyReviewStageLabel(item.stage, translate)}</span>
-                <span>
-                  {[item.source, item.campaign, item.language, item.state].filter(Boolean).join(" · ") ||
-                    translate("policyReviewNoAttribution")}
+                <span className="policy-review-source-badge">
+                  {buildPolicyReviewSourceLabel(item, translate)}
                 </span>
+                <span>
+                  {[item.campaignName || item.campaign, item.adLabel, item.creativeLabel, item.language, item.state]
+                    .filter(Boolean)
+                    .join(" · ") || translate("policyReviewNoAttribution")}
+                </span>
+                {selectedId === item.id ? (
+                  <section className="policy-review-acquisition" aria-label={translate("policyReviewAcquisition")}>
+                    <h3>{translate("policyReviewAcquisition")}</h3>
+                    {["firstTouch", "latestTouch"].map((key) => {
+                      const touch = formatPolicyReviewTouch(item.acquisition?.[key]);
+                      return (
+                        <p key={key}>
+                          <strong>
+                            {translate(key === "firstTouch" ? "policyReviewFirstTouch" : "policyReviewLatestTouch")}
+                          </strong>
+                          {": "}
+                          {touch
+                            ? [touch.source, touch.campaign, touch.ad, touch.creative, touch.intakeCode]
+                                .filter(Boolean)
+                                .join(" · ")
+                            : translate("policyReviewNoAttribution")}
+                        </p>
+                      );
+                    })}
+                  </section>
+                ) : null}
                 <span>
                   {translate("policyReviewMetricMonthly")}: {formatPolicyReviewMoney(item.monthlyPremium, locale)} ·{" "}
                   {translate("policyReviewMetricAnnualized")}: {formatPolicyReviewMoney(item.annualizedPremium, locale)}
@@ -312,7 +384,7 @@ export default function PolicyReviewsPage() {
                   : {formatPolicyReviewMoney(item.commissionAmount, locale)}
                 </span>
               </div>
-              <div className="clients-card__actions">
+              <div className="clients-card__actions" onClick={(event) => event.stopPropagation()}>
                 <button type="button" onClick={() => navigate(appPath(`clients/${item.clientId}`))}>
                   {translate("policyReviewOpenClient")}
                 </button>

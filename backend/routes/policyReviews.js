@@ -10,7 +10,8 @@ const { getTenantOrganizationId } = require("../services/tenantContextService");
 const {
   operationalControlPlaneEmpty,
   emptyPolicyReviews,
-  emptyPolicyReviewDetail
+  emptyPolicyReviewDetail,
+  emptyPolicyReviewAcquisitionMetrics
 } = require("../core/operationalControlPlane");
 const policyReviewPipelineApplicationService = require("../application/policyReviewPipelineApplicationService");
 
@@ -47,7 +48,13 @@ router.get("/", operationalControlPlaneEmpty(emptyPolicyReviews), async (req, re
       search: req.query.q,
       stage: req.query.stage,
       clientId: req.query.clientId,
-      ownerUserId: req.query.ownerUserId
+      ownerUserId: req.query.ownerUserId,
+      platform: req.query.platform,
+      campaign: req.query.campaign,
+      source: req.query.source,
+      intakeCode: req.query.intakeCode,
+      language: req.query.language,
+      state: req.query.state
     });
     res.json(payload);
   } catch (error) {
@@ -55,6 +62,32 @@ router.get("/", operationalControlPlaneEmpty(emptyPolicyReviews), async (req, re
     sendError(res, error);
   }
 });
+
+router.get(
+  "/acquisition-metrics",
+  operationalControlPlaneEmpty(emptyPolicyReviewAcquisitionMetrics),
+  async (req, res) => {
+    try {
+      const organizationId = getTenantOrganizationId(req);
+      const payload = await policyReviewPipelineApplicationService.getAcquisitionMetrics({
+        organizationId,
+        authContext: actorContext(req),
+        scope: req.query.scope,
+        groupBy: req.query.groupBy,
+        platform: req.query.platform,
+        campaign: req.query.campaign,
+        source: req.query.source,
+        intakeCode: req.query.intakeCode,
+        language: req.query.language,
+        state: req.query.state,
+        ownerUserId: req.query.ownerUserId
+      });
+      res.json(payload);
+    } catch (error) {
+      sendError(res, error);
+    }
+  }
+);
 
 router.get(
   "/commission-defaults",

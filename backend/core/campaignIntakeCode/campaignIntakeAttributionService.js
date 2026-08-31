@@ -67,6 +67,12 @@ function createCampaignIntakeAttributionService(options = {}) {
   } = require("./campaignIntakeCodeRepository");
   const repository =
     options.repository || createCampaignIntakeCodeRepository(options);
+  const linkPolicyReviewFromIulIntake =
+    options.linkPolicyReviewFromIulIntake ||
+    (async (payload) => {
+      const pipeline = require("../../application/policyReviewPipelineApplicationService");
+      return pipeline.ensurePolicyReviewFromIulIntake(payload);
+    });
 
   async function lookupInboundMatch({
     organizationId,
@@ -164,7 +170,10 @@ function createCampaignIntakeAttributionService(options = {}) {
     workflowState = null,
     providerMessageId = null,
     phoneNumberId = null,
-    organizationId = null
+    organizationId = null,
+    ctwaReferral = null,
+    utm = null,
+    landingFormSource = null
   } = {}) {
     if (!match?.matched) {
       return { ok: false, reason: match?.reason || "NO_MATCH" };
@@ -201,7 +210,9 @@ function createCampaignIntakeAttributionService(options = {}) {
         eligibility_decision: eligibilityDecision,
         metadata: {
           episodeReason: episode.reason,
-          recruitingEligible
+          recruitingEligible,
+          iulReviewEligible: isIulReviewPurpose(match) && episode.allowed,
+          ctwaReferral: ctwaReferral || null
         }
       });
       attribution = result.row;
@@ -247,7 +258,16 @@ function createCampaignIntakeAttributionService(options = {}) {
           conversationGoal: IUL_CONVERSATION_GOAL,
           campaignKind: IUL_CAMPAIGN_KIND,
           iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD,
-          workflowOwnership: OWNERSHIP.ATLAS
+          workflowOwnership: OWNERSHIP.ATLAS,
+          policyReviewAcquisition: {
+            intakeCode: match.code,
+            campaignName: match.campaignName,
+            campaignIntakeCodeId: match.campaignIntakeCodeId,
+            purpose: match.purpose,
+            ctwaReferral: ctwaReferral || null,
+            utm: utm || null,
+            landingFormSource: landingFormSource || null
+          }
         },
         scope
       ).catch(() => null);
@@ -256,6 +276,25 @@ function createCampaignIntakeAttributionService(options = {}) {
         VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_IUL,
         scope
       ).catch(() => null);
+      const policyReviewLink = await linkPolicyReviewFromIulIntake({
+        organizationId: scope.organizationId,
+        ownerUserId: match.ownerUserId,
+        prospect,
+        match,
+        ctwaReferral,
+        utm,
+        landingFormSource,
+        language: match.language
+      }).catch(() => null);
+      return {
+        ok: true,
+        recruitingEligible: false,
+        iulReviewEligible: true,
+        eligibilityDecision,
+        episode,
+        attribution,
+        policyReviewLink
+      };
     }
 
     return {

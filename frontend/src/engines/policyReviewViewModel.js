@@ -71,6 +71,33 @@ export function buildPolicyReviewStageLabel(stage, translate) {
   return key ? translate(key) : stage;
 }
 
+export function buildPolicyReviewSourceLabel(item, translate) {
+  return (
+    item?.sourceLabel ||
+    item?.acquisition?.sourceLabel ||
+    item?.campaignName ||
+    item?.campaign ||
+    item?.campaignIntakeCode ||
+    item?.source ||
+    translate("policyReviewNoAttribution")
+  );
+}
+
+export function formatPolicyReviewTouch(touch) {
+  if (!touch || (!touch.at && !touch.sourceLabel && !touch.campaignLabel && !touch.intakeCode)) {
+    return null;
+  }
+  return {
+    at: touch.at || null,
+    source: touch.sourceLabel || touch.platformLabel || touch.platform || null,
+    campaign: touch.campaignLabel || touch.campaignName || touch.campaignId || null,
+    ad: touch.adLabel || touch.adName || touch.adId || null,
+    creative: touch.creativeLabel || touch.creativeName || touch.creativeId || null,
+    intakeCode: touch.intakeCode || null,
+    utmSource: touch.utmSource || null
+  };
+}
+
 export function formatPolicyReviewMoney(value, locale) {
   if (value === undefined || value === null || value === "") return "—";
   const number = Number(value);

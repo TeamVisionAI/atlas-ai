@@ -7,7 +7,8 @@ function clone(row) {
   return {
     ...row,
     history: [...(row.history || [])],
-    stageTimestamps: { ...(row.stageTimestamps || {}) }
+    stageTimestamps: { ...(row.stageTimestamps || {}) },
+    acquisition: row.acquisition ? JSON.parse(JSON.stringify(row.acquisition)) : { firstTouch: {}, latestTouch: {} }
   };
 }
 
@@ -42,6 +43,16 @@ function createMemoryPolicyReviewStore(seed = []) {
         .filter((item) => !clientId || String(item.clientId) === String(clientId))
         .filter((item) => !owners || owners.has(String(item.ownerUserId)))
         .map(clone);
+    },
+
+    async findByLinkedProspectId(linkedProspectId, organizationId) {
+      if (!linkedProspectId) return null;
+      const row = [...rows.values()].find(
+        (item) =>
+          String(item.linkedProspectId) === String(linkedProspectId) &&
+          (!organizationId || item.organizationId === organizationId)
+      );
+      return clone(row);
     },
 
     async saveCommissionDefault(record) {

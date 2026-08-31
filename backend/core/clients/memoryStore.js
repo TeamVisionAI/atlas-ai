@@ -29,6 +29,16 @@ function createMemoryClientStore(seed = []) {
       return clone(row);
     },
 
+    async findByPhone(phone, organizationId) {
+      if (!phone) return null;
+      const row = [...rows.values()].find(
+        (item) =>
+          String(item.phone) === String(phone) &&
+          (!organizationId || item.organizationId === organizationId)
+      );
+      return clone(row);
+    },
+
     async findByAgendaContactId(agendaContactId, organizationId) {
       if (!agendaContactId) return null;
       const row = [...rows.values()].find(

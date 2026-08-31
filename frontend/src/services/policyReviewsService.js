@@ -24,11 +24,34 @@ export async function getPolicyReviews(options = {}) {
   if (options.stage) params.set("stage", options.stage);
   if (options.clientId) params.set("clientId", options.clientId);
   if (options.ownerUserId) params.set("ownerUserId", options.ownerUserId);
+  if (options.platform) params.set("platform", options.platform);
+  if (options.campaign) params.set("campaign", options.campaign);
+  if (options.source) params.set("source", options.source);
+  if (options.intakeCode) params.set("intakeCode", options.intakeCode);
+  if (options.language) params.set("language", options.language);
+  if (options.state) params.set("state", options.state);
   const query = params.toString();
   try {
     return await apiFetch(`/api/policy-reviews${query ? `?${query}` : ""}`);
   } catch (error) {
     wrap(error, "Failed to load policy reviews");
+  }
+}
+
+export async function getPolicyReviewAcquisitionMetrics(options = {}) {
+  const params = new URLSearchParams();
+  if (options.scope && options.scope !== "mine") params.set("scope", options.scope);
+  if (options.groupBy) params.set("groupBy", options.groupBy);
+  if (options.platform) params.set("platform", options.platform);
+  if (options.campaign) params.set("campaign", options.campaign);
+  if (options.source) params.set("source", options.source);
+  if (options.intakeCode) params.set("intakeCode", options.intakeCode);
+  if (options.ownerUserId) params.set("ownerUserId", options.ownerUserId);
+  const query = params.toString();
+  try {
+    return await apiFetch(`/api/policy-reviews/acquisition-metrics${query ? `?${query}` : ""}`);
+  } catch (error) {
+    wrap(error, "Failed to load acquisition metrics");
   }
 }
 

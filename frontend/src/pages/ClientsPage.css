@@ -241,6 +241,37 @@
   padding: 8px 12px;
 }
 
+.clients-card.is-selected {
+  border-color: #1e3a8a;
+}
+
+.policy-review-source-badge {
+  display: inline-block;
+  margin: 4px 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.policy-review-acquisition {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.policy-review-acquisition h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.policy-review-acquisition p {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
 @media (min-width: 720px) {
   .clients-card__details,
   .clients-profile__details {

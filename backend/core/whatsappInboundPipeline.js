@@ -520,7 +520,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       workflowState,
       providerMessageId: inbound.providerMessageId || null,
       phoneNumberId,
-      organizationId: organizationId || claimedOrganizationId
+      organizationId: organizationId || claimedOrganizationId,
+      ctwaReferral: inbound.ctwaReferral || null
     });
 
     if (
