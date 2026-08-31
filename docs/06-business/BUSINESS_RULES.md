@@ -2936,6 +2936,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-189 — IUL / Policy Review Dashboard V1
+
+**Implements:** Operational and revenue dashboard for Policy Reviews using the BR-186 pipeline and BR-188 attribution. Answers which campaigns/sources/agents produce reviews, appointments, applications, placed cases, and estimated commission.  
+**Domain:** Clients / policy-review pipeline / dashboard  
+**Depends on:** BR-186 (pipeline); BR-188 (attribution/metrics); BR-160 (control plane); BR-079 (tenant timezone)  
+**Related:** BR-184 Today; BR-178 Follow-ups; BR-181 Production; BR-183 documents  
+**Status:** V1 implemented  
+**Engine target:** `policyReviewDashboard`; `policyReviewPipelineApplicationService.getPolicyReviewDashboard`  
+**Tests:** `backend/test/policyReviewDashboardBr189.test.js`; `frontend/src/pages/policyReviewsPageBr186.test.js`  
+**Docs:** `docs/06-business/BR-189-iul-policy-review-dashboard.md`
+
+### Rules
+
+1. **Ownership** — Live on existing `/app/policy-reviews` (Dashboard | Pipeline). Do not add a sidebar item named IUL Dashboard, Revenue Dashboard, IUL Leads, or Acquisition Dashboard.
+2. **SoT** — Reuse `atlas_policy_review_pipeline` and BR-188 acquisition metrics. Do not create a second revenue table or duplicate commission math. Estimated commission uses existing BR-186 resolution.
+3. **Funnel** — NEW_REVIEW_LEAD → QUALIFIED → APPOINTMENT_BOOKED → REVIEW_COMPLETED → REPLACEMENT_OPPORTUNITY → APPLICATION_SUBMITTED → PLACED, with counts and conversion % from the previous stage. KEEP_CURRENT / ADJUST_CURRENT / NOT_PROCEEDING are not replacement opportunities.
+4. **Needs action** — Compact current-stage queues only. Reuse Today / Follow-ups / Appointments / Documents links. Do not create a second task engine.
+5. **Time** — Today / 7 days / 30 days / this month / last month / custom / all, interpreted in tenant timezone (BR-079). Never trust a client-supplied timezone.
+6. **Visibility** — My = owner pipeline/revenue. Team = authorized hierarchy/subtree. Super Admin control plane = empty. Support Mode = selected tenant only. Wrong-org / unauthorized peer fail closed.
+7. **Spend** — `adSpend` / CPL / ROAS stay null and hidden until a later spend BR. Do not fabricate them.
+8. **Performance** — Server-side aggregation. Dashboard reads do not wait on client-name resolution or the pipeline list. No N+1 per row. No blind polling.
+9. **Boundaries** — No recruiting changes, WhatsApp routing, OCR/policy analysis, automatic replacement recommendation, or ad-spend ingestion.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

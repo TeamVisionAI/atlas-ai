@@ -272,9 +272,124 @@
   font-size: 13px;
 }
 
+.policy-review-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.policy-review-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.policy-review-kpi {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.policy-review-kpi span {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.policy-review-kpi strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.policy-review-dashboard__panels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.policy-review-funnel,
+.policy-review-needs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.policy-review-funnel button,
+.policy-review-needs button,
+.policy-review-attribution-table button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.policy-review-funnel li,
+.policy-review-needs li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.policy-review-funnel em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.policy-review-attribution-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.policy-review-attribution-table-wrap {
+  overflow-x: auto;
+}
+
+.policy-review-attribution-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.policy-review-attribution-table th,
+.policy-review-attribution-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  white-space: nowrap;
+}
+
 @media (min-width: 720px) {
   .clients-card__details,
   .clients-profile__details {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .policy-review-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .policy-review-dashboard__panels {
+    grid-template-columns: 1.2fr 0.8fr;
   }
 }

@@ -11,7 +11,8 @@ const {
   operationalControlPlaneEmpty,
   emptyPolicyReviews,
   emptyPolicyReviewDetail,
-  emptyPolicyReviewAcquisitionMetrics
+  emptyPolicyReviewAcquisitionMetrics,
+  emptyPolicyReviewDashboard
 } = require("../core/operationalControlPlane");
 const policyReviewPipelineApplicationService = require("../application/policyReviewPipelineApplicationService");
 
@@ -54,7 +55,10 @@ router.get("/", operationalControlPlaneEmpty(emptyPolicyReviews), async (req, re
       source: req.query.source,
       intakeCode: req.query.intakeCode,
       language: req.query.language,
-      state: req.query.state
+      state: req.query.state,
+      range: req.query.range,
+      from: req.query.from,
+      to: req.query.to
     });
     res.json(payload);
   } catch (error) {
@@ -80,7 +84,39 @@ router.get(
         intakeCode: req.query.intakeCode,
         language: req.query.language,
         state: req.query.state,
-        ownerUserId: req.query.ownerUserId
+        ownerUserId: req.query.ownerUserId,
+        range: req.query.range,
+        from: req.query.from,
+        to: req.query.to
+      });
+      res.json(payload);
+    } catch (error) {
+      sendError(res, error);
+    }
+  }
+);
+
+router.get(
+  "/dashboard",
+  operationalControlPlaneEmpty(emptyPolicyReviewDashboard),
+  async (req, res) => {
+    try {
+      const organizationId = getTenantOrganizationId(req);
+      const payload = await policyReviewPipelineApplicationService.getPolicyReviewDashboard({
+        organizationId,
+        authContext: actorContext(req),
+        scope: req.query.scope,
+        groupBy: req.query.groupBy,
+        platform: req.query.platform,
+        campaign: req.query.campaign,
+        source: req.query.source,
+        intakeCode: req.query.intakeCode,
+        language: req.query.language,
+        state: req.query.state,
+        ownerUserId: req.query.ownerUserId,
+        range: req.query.range,
+        from: req.query.from,
+        to: req.query.to
       });
       res.json(payload);
     } catch (error) {
