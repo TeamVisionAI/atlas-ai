@@ -41,6 +41,15 @@ import {
 import { emptyServiceForm } from "../engines/serviceViewModel";
 import { ServiceCaseCard, ServiceDialogs } from "./ServiceRecordsBlock";
 import {
+  createPolicyReview,
+  getPolicyReviews,
+  PolicyReviewsError
+} from "../services/policyReviewsService";
+import {
+  buildPolicyReviewStageLabel,
+  emptyPolicyReviewForm
+} from "../engines/policyReviewViewModel";
+import {
   createDocumentRequest,
   createDocumentRequestFollowUp,
   downloadDocument,
@@ -121,6 +130,7 @@ export default function ClientsPage() {
   const [service, setService] = useState(null);
   const [documentRequests, setDocumentRequests] = useState(null);
   const [documents, setDocuments] = useState(null);
+  const [policyReviews, setPolicyReviews] = useState(null);
 
   const loadList = useCallback(async () => {
     if (controlPlane) {
@@ -147,25 +157,28 @@ export default function ClientsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [clientDetail, productionPayload, servicePayload, requestPayload, documentPayload] =
+      const [clientDetail, productionPayload, servicePayload, requestPayload, documentPayload, reviewPayload] =
         await Promise.all([
           getClient(clientId),
           getProductionList({ clientId }),
           getServiceCases({ clientId }),
           getDocumentRequests({ clientId }),
-          getDocuments({ clientId })
+          getDocuments({ clientId }),
+          getPolicyReviews({ clientId })
         ]);
       setDetail(clientDetail);
       setProduction(productionPayload);
       setService(servicePayload);
       setDocumentRequests(requestPayload);
       setDocuments(documentPayload);
+      setPolicyReviews(reviewPayload);
     } catch (err) {
       setError(
         err instanceof ClientsError ||
         err instanceof ProductionError ||
         err instanceof ServiceCasesError ||
-        err instanceof ClientDocumentsError
+        err instanceof ClientDocumentsError ||
+        err instanceof PolicyReviewsError
           ? translate("clientsLoadError")
           : err.message
       );
@@ -174,6 +187,7 @@ export default function ClientsPage() {
       setService(null);
       setDocumentRequests(null);
       setDocuments(null);
+      setPolicyReviews(null);
     } finally {
       setLoading(false);
     }
@@ -266,6 +280,14 @@ export default function ClientsPage() {
           dueDate: form.dueDate,
           dueTime: form.dueTime || null,
           notes: form.notes || null
+        });
+      } else if (dialog?.type === "policy-review-create") {
+        await createPolicyReview({
+          clientId,
+          language: form.language || null,
+          state: form.state || null,
+          source: form.source || null,
+          campaign: form.campaign || null
         });
       } else if (dialog?.type === "service-create") {
         await createServiceCase({
@@ -628,6 +650,41 @@ export default function ClientsPage() {
             </section>
 
             <section className="clients-section">
+              <h2>{translate("policyReviewSectionTitle")}</h2>
+              <div className="clients-profile__actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm(emptyPolicyReviewForm());
+                    setDialog({ type: "policy-review-create" });
+                  }}
+                >
+                  {translate("policyReviewAdd")}
+                </button>
+                <button type="button" onClick={() => navigate(appPath(`policy-reviews?clientId=${clientId}`))}>
+                  {translate("policyReviewTitle")}
+                </button>
+              </div>
+              {(policyReviews?.items || []).length === 0 ? (
+                <p className="clients-page__status">{translate("policyReviewEmptyClient")}</p>
+              ) : (
+                <ul className="clients-list">
+                  {(policyReviews?.items || []).map((item) => (
+                    <li key={item.id} className="clients-card">
+                      <div>
+                        <strong>{buildPolicyReviewStageLabel(item.stage, translate)}</strong>
+                        <span>
+                          {[item.source, item.campaign, item.language, item.state].filter(Boolean).join(" · ") ||
+                            translate("policyReviewNoAttribution")}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="clients-section">
               <h2>{translate("clientsFollowUps")}</h2>
               {(detail.followUps || []).length === 0 ? (
                 <p className="clients-page__status">{translate("clientsNoFollowUps")}</p>
@@ -733,6 +790,34 @@ export default function ClientsPage() {
             <label>
               {translate("followUpsTimeOptional")}
               <input type="time" value={form.dueTime} onChange={(event) => setForm((current) => ({ ...current, dueTime: event.target.value }))} />
+            </label>
+          </ClientDialog>
+        ) : null}
+
+        {dialog?.type === "policy-review-create" ? (
+          <ClientDialog
+            title={translate("policyReviewAdd")}
+            confirmLabel={translate("followUpsSave")}
+            cancelLabel={translate("followUpsDialogClose")}
+            loading={saving}
+            onClose={() => setDialog(null)}
+            onConfirm={submitDialog}
+          >
+            <label>
+              {translate("policyReviewSource")}
+              <input value={form.source || ""} onChange={(event) => setForm((current) => ({ ...current, source: event.target.value }))} />
+            </label>
+            <label>
+              {translate("policyReviewCampaign")}
+              <input value={form.campaign || ""} onChange={(event) => setForm((current) => ({ ...current, campaign: event.target.value }))} />
+            </label>
+            <label>
+              {translate("policyReviewLanguage")}
+              <input value={form.language || ""} onChange={(event) => setForm((current) => ({ ...current, language: event.target.value }))} />
+            </label>
+            <label>
+              {translate("policyReviewState")}
+              <input value={form.state || ""} onChange={(event) => setForm((current) => ({ ...current, state: event.target.value }))} />
             </label>
           </ClientDialog>
         ) : null}

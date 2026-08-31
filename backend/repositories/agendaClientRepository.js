@@ -74,6 +74,19 @@ async function findByAgendaContactId(agendaContactId, organizationId) {
   return rowToAgendaClient(data);
 }
 
+async function listByIds(ids, organizationId) {
+  if (!organizationId || !Array.isArray(ids) || ids.length === 0) return [];
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return [];
+  const { data, error } = await supabase
+    .from("atlas_agenda_clients")
+    .select("id, organization_id, owner_user_id, agenda_contact_id, name, phone, email, preferred_language, source, notes, status, history, created_by, created_at, updated_at")
+    .eq("organization_id", organizationId)
+    .in("id", unique);
+  if (error) throw error;
+  return (data || []).map(rowToAgendaClient);
+}
+
 async function listForOwners({ organizationId, ownerUserIds }) {
   if (!organizationId) return [];
   let query = supabase.from("atlas_agenda_clients").select("*").eq("organization_id", organizationId);
@@ -93,5 +106,6 @@ module.exports = {
   save,
   findById,
   findByAgendaContactId,
+  listByIds,
   listForOwners
 };
