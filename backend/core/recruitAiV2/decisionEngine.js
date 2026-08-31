@@ -504,6 +504,7 @@ function tryApplyAvailabilityOffer({
       slotB: alternatives[1]?.time || null,
       rollingSearch: rolling,
       nearestAlternatives: isNearest,
+      todayUnavailableAfterLead: Boolean(availability.todayUnavailableAfterLead),
       now: context._testNow || null,
       timezone: context.timezone || alternatives[0]?.timezone || null
     };

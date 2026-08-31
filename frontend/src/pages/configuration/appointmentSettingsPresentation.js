@@ -19,6 +19,7 @@ export const APPOINTMENT_TIMEZONES = Object.freeze([
 
 export const DURATION_OPTIONS = Object.freeze([15, 30, 45, 60, 90]);
 export const BUFFER_OPTIONS = Object.freeze([0, 5, 10, 15, 30, 45, 60]);
+export const LEAD_TIME_OPTIONS = Object.freeze([60, 90, 120, 180, 240]);
 
 export function resolveCalendarSources(payload = {}) {
   const google = payload.calendarSources?.google || null;

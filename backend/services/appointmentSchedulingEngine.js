@@ -35,6 +35,10 @@ const {
   mergePooledSlots,
   resolveAssignmentMode
 } = require("../core/interviewerPoolEngine");
+const {
+  resolveMinimumBookingLeadMinutes,
+  isSlotBookableByLeadTime
+} = require("../core/schedulingLeadTime");
 
 function parseTimeKey(timeKey) {
   const [hour, minute] = String(timeKey).split(":").map(Number);
@@ -199,6 +203,10 @@ async function getAvailableSlots({
     durationMinutes || resolveDurationForPurpose(profile, purpose);
   const bufferBefore = profile.defaults.bufferBeforeMinutes || 0;
   const bufferAfter = profile.defaults.bufferAfterMinutes || 0;
+  // Implements BR-185 — automated offers require minimum notice from timezone-aware now.
+  const leadMinutes = resolveMinimumBookingLeadMinutes(
+    dependencies.minimumBookingLeadMinutes ?? profile.defaults?.minimumBookingLeadMinutes
+  );
 
   const startDate = resolveDateInput(date);
   const endDate = dateEnd ? resolveDateInput(dateEnd) : startDate;
@@ -389,7 +397,7 @@ async function getAvailableSlots({
         const slotStartMs = new Date(startTimeISO).getTime();
         const slotEndMs = slotStartMs + duration * 60 * 1000;
 
-        if (slotStartMs < now) {
+        if (!isSlotBookableByLeadTime(slotStartMs, now, leadMinutes)) {
           continue;
         }
 

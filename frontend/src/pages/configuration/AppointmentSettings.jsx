@@ -25,6 +25,7 @@ import {
   APPOINTMENT_TIMEZONES,
   BUFFER_OPTIONS,
   DURATION_OPTIONS,
+  LEAD_TIME_OPTIONS,
   buildAppointmentSettingsSavePayload,
   buildAppointmentSettingsSnapshot,
   calendarStatusLabel,
@@ -378,6 +379,12 @@ export default function AppointmentSettings() {
             value={String(appointmentProfile.defaults.bufferAfterMinutes)}
             options={numberOptions(BUFFER_OPTIONS, durationSuffix)}
             onChange={(value) => updateDefaults("bufferAfterMinutes", Number(value))}
+          />
+          <AtlasSelect
+            label={translate("appointmentsMinimumLead")}
+            value={String(appointmentProfile.defaults.minimumBookingLeadMinutes ?? 120)}
+            options={numberOptions(LEAD_TIME_OPTIONS, durationSuffix)}
+            onChange={(value) => updateDefaults("minimumBookingLeadMinutes", Number(value))}
           />
           <label>
             {translate("configurationTimezone")}

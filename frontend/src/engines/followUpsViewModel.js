@@ -67,7 +67,7 @@ export function buildFollowUpReasonLabel(item, translate) {
   return translated === key ? item.followUpReason : translated;
 }
 
-export function buildFollowUpDueDate(followUpDate, followUpTime, locale) {
+export function buildFollowUpDueDate(followUpDate, followUpTime, locale, timeZone) {
   if (!followUpDate) {
     return null;
   }
@@ -79,7 +79,7 @@ export function buildFollowUpDueDate(followUpDate, followUpTime, locale) {
     return followUpDate;
   }
 
-  return new Date(parsed).toLocaleString(locale, hasTime
+  const options = hasTime
     ? {
         weekday: "short",
         month: "short",
@@ -91,7 +91,12 @@ export function buildFollowUpDueDate(followUpDate, followUpTime, locale) {
         weekday: "short",
         month: "short",
         day: "numeric"
-      });
+      };
+  if (hasTime && timeZone) {
+    options.timeZone = timeZone;
+  }
+
+  return new Date(parsed).toLocaleString(locale, options);
 }
 
 export function buildFollowUpPriorityLabel(item, translate) {

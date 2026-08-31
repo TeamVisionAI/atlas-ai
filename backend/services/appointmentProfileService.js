@@ -12,6 +12,7 @@ const {
   COMMON_SCHEDULE_PRESETS,
   APPOINTMENT_PURPOSES
 } = require("../core/configuration/appointmentDomain");
+const { resolveMinimumBookingLeadMinutes } = require("../core/schedulingLeadTime");
 
 const DEFAULT_WORKING_DAY = Object.freeze({
   dayOfWeek: 1,
@@ -38,6 +39,7 @@ const DEFAULT_APPOINTMENT_PROFILE = Object.freeze({
     recruitingInterviewDurationMinutes: 30,
     bufferBeforeMinutes: 0,
     bufferAfterMinutes: 15,
+    minimumBookingLeadMinutes: 120,
     timezone: "America/New_York",
     preferredLanguage: "es"
   },
@@ -125,7 +127,11 @@ function normalizeAppointmentProfile(raw = {}, userTimezone = "America/New_York"
     defaults: {
       ...DEFAULT_APPOINTMENT_PROFILE.defaults,
       ...(source.defaults || {}),
-      timezone: source.defaults?.timezone || userTimezone
+      timezone: source.defaults?.timezone || userTimezone,
+      minimumBookingLeadMinutes: resolveMinimumBookingLeadMinutes(
+        source.defaults?.minimumBookingLeadMinutes ??
+          DEFAULT_APPOINTMENT_PROFILE.defaults.minimumBookingLeadMinutes
+      )
     },
     virtualMeeting: {
       ...DEFAULT_APPOINTMENT_PROFILE.virtualMeeting,

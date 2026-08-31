@@ -36,6 +36,7 @@ test("1. page uses Atlas form styles and labeled fields", () => {
   assert.match(page, /appointmentsRecruitingDuration/);
   assert.match(page, /appointmentsBufferBefore/);
   assert.match(page, /appointmentsBufferAfter/);
+  assert.match(page, /appointmentsMinimumLead/);
   assert.match(page, /configurationTimezone/);
   assert.match(css, /\.appointment-settings\.configuration-form/);
   assert.match(css, /\.configuration-form textarea/);

@@ -120,6 +120,7 @@ function engineDeps({ appointments = [], googleBusy = [], durationMinutes = 30 }
           recruitingInterviewDurationMinutes: durationMinutes,
           bufferBeforeMinutes: 0,
           bufferAfterMinutes: 0,
+          minimumBookingLeadMinutes: 0,
           timezone: TZ
         }
       },
