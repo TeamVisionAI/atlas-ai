@@ -44,7 +44,7 @@ export function ProductionRecordCard({
   onFollowUp,
   onOpenClient
 }) {
-  const amountLabel = formatProductionAmount(item.amount, locale);
+  const amountLabel = formatProductionAmount(item.amount, locale, item.currency || "USD");
   return (
     <li className="clients-card">
       <div>

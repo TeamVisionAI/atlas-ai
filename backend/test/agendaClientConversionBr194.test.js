@@ -373,10 +373,31 @@ test("hierarchy rollups stay organization-scoped and platform requires permissio
       role: "division_leader",
       hierarchyUserIds: [USER_A, USER_B]
     },
-    scope: PRODUCTION_KPI_SCOPES.DIVISION
+    scope: PRODUCTION_KPI_SCOPES.TEAM
   });
   assert.equal(team.organizationScoped, true);
   assert.deepEqual(team.ownerUserIds, [USER_A, USER_B]);
+
+  const rvpTeam = resolveKpiOwnerFilter({
+    authContext: { userId: USER_A, role: "rvp", hierarchyMode: "organization" },
+    scope: PRODUCTION_KPI_SCOPES.TEAM
+  });
+  assert.deepEqual(rvpTeam.ownerUserIds, [USER_A]);
+  assert.equal(rvpTeam.scope, PRODUCTION_KPI_SCOPES.TEAM);
+
+  const rvpDistrict = resolveKpiOwnerFilter({
+    authContext: { userId: USER_A, role: "rvp", hierarchyMode: "organization" },
+    scope: "district"
+  });
+  assert.equal(rvpDistrict.scope, PRODUCTION_KPI_SCOPES.MINE);
+  assert.deepEqual(rvpDistrict.ownerUserIds, [USER_A]);
+
+  const org = resolveKpiOwnerFilter({
+    authContext: { userId: USER_A, role: "rvp", hierarchyMode: "organization" },
+    scope: PRODUCTION_KPI_SCOPES.ORGANIZATION
+  });
+  assert.equal(org.ownerUserIds, null);
+  assert.equal(org.organizationScoped, true);
 
   assert.throws(
     () =>
@@ -401,6 +422,10 @@ test("hierarchy rollups stay organization-scoped and platform requires permissio
     scope: PRODUCTION_KPI_SCOPES.PLATFORM
   });
   assert.equal(platform.organizationScoped, false);
+  assert.equal(PRODUCTION_KPI_SCOPES.DISTRICT, undefined);
+  assert.equal(PRODUCTION_KPI_SCOPES.DIVISION, undefined);
+  assert.equal(PRODUCTION_KPI_SCOPES.REGIONAL, undefined);
+  assert.equal(PRODUCTION_KPI_SCOPES.RVP, undefined);
 });
 
 test("platform KPI does not leak tenant rows to a non-platform role", async () => {
@@ -446,6 +471,7 @@ test("platform KPI does not leak tenant rows to a non-platform role", async () =
   });
   assert.equal(orgA.personalProduction, 1111);
   assert.equal(orgA.clientCount, 1);
+  assert.equal(orgA.currency, "USD");
 
   const platform = await clientProductionApplicationService.summarizeProductionKpis({
     authContext: { userId: USER_A, saasRole: "SUPER_ADMIN" },
@@ -453,6 +479,8 @@ test("platform KPI does not leak tenant rows to a non-platform role", async () =
   });
   assert.equal(platform.recordCount, 2);
   assert.equal(platform.organizations.length, 2);
+  assert.equal(platform.currency, "USD");
+  assert.equal(platform.personalProduction, 3333);
 });
 
 test("KPI summary uses one canonical record set", () => {
@@ -462,6 +490,7 @@ test("KPI summary uses one canonical record set", () => {
       clientId: "c1",
       status: "SUBMITTED",
       amount: 100,
+      currency: "USD",
       source: PRODUCTION_SOURCES.AGENDA_CLIENT_CONVERSION,
       appointmentId: "a1"
     },
@@ -482,7 +511,142 @@ test("KPI summary uses one canonical record set", () => {
   assert.equal(summary.clientCount, 2);
   assert.equal(summary.personalProduction, 400);
   assert.equal(summary.averagePremium, 200);
+  assert.equal(summary.currency, "USD");
+  assert.equal(summary.mixedCurrency, false);
+  assert.equal(summary.monetaryByCurrency.USD.production, 400);
   assert.equal(summary.appointmentToClientConversions, 1);
+});
+
+test("USD and CAD premiums are not summed together", () => {
+  const summary = summarizeRecords([
+    {
+      organizationId: ORG_A,
+      clientId: "c1",
+      status: "SUBMITTED",
+      amount: 100,
+      currency: "USD"
+    },
+    {
+      organizationId: ORG_A,
+      clientId: "c2",
+      status: "PAID",
+      amount: 300,
+      currency: "CAD"
+    }
+  ]);
+  assert.equal(summary.personalProduction, null);
+  assert.equal(summary.teamProduction, null);
+  assert.equal(summary.averagePremium, null);
+  assert.equal(summary.mixedCurrency, true);
+  assert.equal(summary.currency, null);
+  assert.equal(summary.monetaryByCurrency.USD.production, 100);
+  assert.equal(summary.monetaryByCurrency.USD.averagePremium, 100);
+  assert.equal(summary.monetaryByCurrency.CAD.production, 300);
+  assert.equal(summary.monetaryByCurrency.CAD.averagePremium, 300);
+  assert.equal(summary.clientCount, 2);
+});
+
+test("average premium is currency-safe", () => {
+  const summary = summarizeRecords([
+    { status: "SUBMITTED", amount: 100, currency: "USD", clientId: "a" },
+    { status: "PAID", amount: 300, currency: "USD", clientId: "b" },
+    { status: "ISSUED", amount: 50, currency: "CAD", clientId: "c" }
+  ]);
+  assert.equal(summary.monetaryByCurrency.USD.averagePremium, 200);
+  assert.equal(summary.monetaryByCurrency.CAD.averagePremium, 50);
+  assert.equal(summary.averagePremium, null);
+});
+
+test("platform aggregation is currency-safe", async () => {
+  const production = createMemoryProductionStore([
+    {
+      id: "prod-usd",
+      organizationId: ORG_A,
+      clientId: CLIENT_ID,
+      ownerUserId: USER_A,
+      activityType: "LIFE",
+      status: "SUBMITTED",
+      amount: 100,
+      currency: "USD"
+    },
+    {
+      id: "prod-cad",
+      organizationId: ORG_B,
+      clientId: "other-client",
+      ownerUserId: USER_B,
+      activityType: "LIFE",
+      status: "PAID",
+      amount: 250,
+      currency: "CAD"
+    }
+  ]);
+  clientProductionApplicationService.setStoresForTests({
+    production,
+    findClient: async () => null
+  });
+  const platform = await clientProductionApplicationService.summarizeProductionKpis({
+    authContext: { userId: USER_A, saasRole: "SUPER_ADMIN" },
+    scope: "platform"
+  });
+  assert.equal(platform.mixedCurrency, true);
+  assert.equal(platform.personalProduction, null);
+  assert.equal(platform.monetaryByCurrency.USD.production, 100);
+  assert.equal(platform.monetaryByCurrency.CAD.production, 250);
+  const orgA = platform.organizations.find((row) => row.organizationId === ORG_A);
+  const orgB = platform.organizations.find((row) => row.organizationId === ORG_B);
+  assert.equal(orgA.personalProduction, 100);
+  assert.equal(orgA.currency, "USD");
+  assert.equal(orgB.personalProduction, 250);
+  assert.equal(orgB.currency, "CAD");
+});
+
+test("team subtree and organization stay distinct for an RVP", async () => {
+  const production = createMemoryProductionStore([
+    {
+      id: "mine",
+      organizationId: ORG_A,
+      clientId: "c-mine",
+      ownerUserId: USER_A,
+      activityType: "LIFE",
+      status: "SUBMITTED",
+      amount: 100,
+      currency: "USD"
+    },
+    {
+      id: "report",
+      organizationId: ORG_A,
+      clientId: "c-report",
+      ownerUserId: USER_B,
+      activityType: "LIFE",
+      status: "SUBMITTED",
+      amount: 400,
+      currency: "USD"
+    }
+  ]);
+  clientProductionApplicationService.setStoresForTests({
+    production,
+    findClient: async () => null
+  });
+  const team = await clientProductionApplicationService.summarizeProductionKpis({
+    organizationId: ORG_A,
+    authContext: {
+      userId: USER_A,
+      role: "rvp",
+      hierarchyMode: "organization",
+      hierarchyUserIds: [USER_A]
+    },
+    scope: "team"
+  });
+  assert.equal(team.personalProduction, 100);
+  assert.equal(team.scope, "team");
+
+  const organization = await clientProductionApplicationService.summarizeProductionKpis({
+    organizationId: ORG_A,
+    authContext: { userId: USER_A, role: "rvp", hierarchyMode: "organization" },
+    scope: "organization"
+  });
+  assert.equal(organization.personalProduction, 500);
+  assert.equal(organization.scope, "organization");
 });
 
 test("migration adds appointment-linked production without replacing BR-181", () => {

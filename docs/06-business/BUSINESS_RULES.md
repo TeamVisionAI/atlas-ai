@@ -3023,10 +3023,12 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **Premium required to finish** — Atlas immediately prompts for premium (numeric, >= 0), currency (default USD), and production/submitted date. Product type and carrier are optional. Notes are not the premium store.
 3. **Canonical production** — Completing setup promotes/creates the Client, then creates or updates one `atlas_client_production` row keyed by `organization_id` + `appointment_id`. Editing premium updates that row. Duplicate submit does not create a second row.
 4. **Visible incomplete** — Cancelling the premium modal leaves “Client conversion incomplete” plus Resume / Complete Client Setup. Do not hide the appointment.
-5. **One KPI source** — Personal production, client count, average premium, appointment→client conversion, team / District / Division / Regional / RVP / organization totals all read `atlas_client_production`. Do not compute premium in Clients, dashboards, or widgets separately.
-6. **Tenant isolation** — Every production row has `organization_id`. Hierarchy rollups are organization-scoped. One tenant cannot read or affect another tenant’s production.
-7. **Platform analytics** — Global/platform totals require a platform SUPER_ADMIN role and stay permission-gated. Support Mode remains tenant-bound. Do not expose another tenant’s production to a tenant user.
-8. **Boundaries** — Do not change Recruit AI, WhatsApp, or non-CLIENT Agenda outcomes. Manual BR-181 production remains compatible.
+5. **One KPI source** — Personal production, client count, average premium, appointment→client conversion, team, organization, and permission-gated platform totals all read `atlas_client_production`. Do not compute premium in Clients, dashboards, or widgets separately.
+6. **Currency-safe money** — KPI monetary totals and averages group by `currency`. A single-currency set may populate top-level `personalProduction` / `teamProduction` / `averagePremium`. Mixed currencies must not produce one combined number. No FX conversion.
+7. **Hierarchy scopes now** — Supported rollups are Mine, Team (reports_to subtree via `hierarchyUserIds`), and Organization. Atlas hierarchy is org / subtree / self only. District / Division / Regional / RVP named groups are not claimed and must not return the org-wide total. Unsupported scope names fall back to Mine.
+8. **Tenant isolation** — Every production row has `organization_id`. Hierarchy rollups are organization-scoped. One tenant cannot read or affect another tenant’s production.
+9. **Platform analytics** — Global/platform totals require a platform SUPER_ADMIN role and stay permission-gated. Support Mode remains tenant-bound. Monetary platform totals stay currency-safe. Do not expose another tenant’s production to a tenant user.
+10. **Boundaries** — Do not change Recruit AI, WhatsApp, or non-CLIENT Agenda outcomes. Manual BR-181 production remains compatible.
 
 ---
 

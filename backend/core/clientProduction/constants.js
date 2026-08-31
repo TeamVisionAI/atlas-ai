@@ -35,10 +35,6 @@ const PRODUCTION_SOURCES = Object.freeze({
 const PRODUCTION_KPI_SCOPES = Object.freeze({
   MINE: "mine",
   TEAM: "team",
-  DISTRICT: "district",
-  DIVISION: "division",
-  REGIONAL: "regional",
-  RVP: "rvp",
   ORGANIZATION: "organization",
   PLATFORM: "platform"
 });

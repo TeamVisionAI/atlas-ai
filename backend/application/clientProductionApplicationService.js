@@ -84,20 +84,30 @@ function canViewTeamProduction(authContext) {
   return followUpApplicationService.canViewTeamFollowUps(authContext);
 }
 
+function canViewOrgProduction(authContext) {
+  return (
+    authContext?.hierarchyMode === HIERARCHY_MODES.ORGANIZATION ||
+    authContext?.role === ROLES.ADMINISTRATOR ||
+    authContext?.role === ROLES.RVP
+  );
+}
+
 function resolveOwnerFilter({ authContext, scope }) {
   const userId = authContext?.userId;
   const requested = String(scope || PRODUCTION_SCOPES.MINE).toLowerCase();
+  if (requested === PRODUCTION_KPI_SCOPES.ORGANIZATION && canViewOrgProduction(authContext)) {
+    return { scope: PRODUCTION_KPI_SCOPES.ORGANIZATION, ownerUserIds: null };
+  }
   if (requested === PRODUCTION_SCOPES.TEAM && canViewTeamProduction(authContext)) {
-    if (
-      authContext.hierarchyMode === HIERARCHY_MODES.ORGANIZATION ||
-      authContext.role === ROLES.ADMINISTRATOR ||
-      authContext.role === ROLES.RVP
-    ) {
-      return { scope: PRODUCTION_SCOPES.TEAM, ownerUserIds: null };
+    if (Array.isArray(authContext.hierarchyUserIds) && authContext.hierarchyUserIds.length > 0) {
+      return {
+        scope: PRODUCTION_SCOPES.TEAM,
+        ownerUserIds: authContext.hierarchyUserIds
+      };
     }
     return {
       scope: PRODUCTION_SCOPES.TEAM,
-      ownerUserIds: authContext.hierarchyUserIds || [userId]
+      ownerUserIds: userId ? [userId] : []
     };
   }
   return { scope: PRODUCTION_SCOPES.MINE, ownerUserIds: userId ? [userId] : [] };
@@ -433,6 +443,7 @@ async function listProduction({
       organizationId,
       scope: PRODUCTION_SCOPES.MINE,
       teamAvailable: canViewTeamProduction(authContext),
+      organizationAvailable: canViewOrgProduction(authContext),
       search: search || "",
       totalCount: 0,
       filteredCount: 0,
@@ -476,6 +487,7 @@ async function listProduction({
     organizationId,
     scope: ownerFilter.scope,
     teamAvailable: canViewTeamProduction(authContext),
+    organizationAvailable: canViewOrgProduction(authContext),
     search: search || "",
     totalCount: items.length,
     filteredCount: items.length,

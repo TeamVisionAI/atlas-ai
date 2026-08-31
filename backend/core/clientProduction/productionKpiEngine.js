@@ -1,7 +1,9 @@
 /**
  * BR-194 — KPI rollups from canonical atlas_client_production only.
  * Never compute premium in Clients, dashboards, or widgets separately.
- * Every tenant rollup is organization-scoped.
+ * Monetary totals are currency-safe. Hierarchy scopes are Mine / Team / Organization
+ * (plus permission-gated platform). District / Division / Regional / RVP named
+ * groups are not claimed — Atlas hierarchy is org / subtree / self only.
  */
 
 const {
@@ -29,6 +31,13 @@ function numericAmount(item) {
   return Number.isFinite(value) ? value : null;
 }
 
+function resolveCurrency(item) {
+  const raw = String(item?.currency || "USD")
+    .trim()
+    .toUpperCase();
+  return /^[A-Z]{3}$/.test(raw) ? raw : "USD";
+}
+
 function isAgendaConversion(item) {
   return (
     String(item?.source || "") === PRODUCTION_SOURCES.AGENDA_CLIENT_CONVERSION ||
@@ -36,28 +45,48 @@ function isAgendaConversion(item) {
   );
 }
 
+function emptyMoneyBucket() {
+  return { production: 0, averagePremium: null, premiumCount: 0 };
+}
+
 function summarizeRecords(items = []) {
   const countable = (items || []).filter(isCountable);
   const clientIds = new Set();
-  let premiumSum = 0;
-  let premiumCount = 0;
+  const monetaryByCurrency = {};
   let conversions = 0;
 
   for (const item of countable) {
     if (item.clientId) clientIds.add(String(item.clientId));
     const amount = numericAmount(item);
     if (amount != null) {
-      premiumSum += amount;
-      premiumCount += 1;
+      const currency = resolveCurrency(item);
+      if (!monetaryByCurrency[currency]) {
+        monetaryByCurrency[currency] = emptyMoneyBucket();
+      }
+      monetaryByCurrency[currency].production += amount;
+      monetaryByCurrency[currency].premiumCount += 1;
     }
     if (isAgendaConversion(item)) conversions += 1;
   }
 
+  for (const bucket of Object.values(monetaryByCurrency)) {
+    bucket.averagePremium =
+      bucket.premiumCount > 0 ? bucket.production / bucket.premiumCount : null;
+  }
+
+  const currencies = Object.keys(monetaryByCurrency);
+  const singleCurrency = currencies.length === 1;
+  const emptyMoney = currencies.length === 0;
+  const single = singleCurrency ? monetaryByCurrency[currencies[0]] : null;
+
   return {
-    personalProduction: premiumSum,
-    teamProduction: premiumSum,
+    personalProduction: emptyMoney ? 0 : single ? single.production : null,
+    teamProduction: emptyMoney ? 0 : single ? single.production : null,
+    averagePremium: single ? single.averagePremium : null,
+    currency: singleCurrency ? currencies[0] : null,
+    mixedCurrency: currencies.length > 1,
+    monetaryByCurrency,
     clientCount: clientIds.size,
-    averagePremium: premiumCount > 0 ? premiumSum / premiumCount : null,
     appointmentToClientConversions: conversions,
     recordCount: countable.length
   };
@@ -98,7 +127,21 @@ function canViewPlatformProduction(authContext) {
 }
 
 /**
- * Resolve owner filter for a KPI rollup. Always organization-scoped except platform.
+ * Team is the actor's reports_to subtree (hierarchyUserIds).
+ * It is never silently expanded to the whole organization.
+ */
+function resolveTeamOwnerIds(authContext) {
+  const userId = authContext?.userId || null;
+  if (Array.isArray(authContext?.hierarchyUserIds) && authContext.hierarchyUserIds.length > 0) {
+    return authContext.hierarchyUserIds.map(String);
+  }
+  return userId ? [String(userId)] : [];
+}
+
+/**
+ * Resolve owner filter for a KPI rollup.
+ * Supported: mine | team | organization | platform.
+ * Unsupported names (district/division/regional/rvp) fall back to mine — not org-wide.
  */
 function resolveKpiOwnerFilter({ authContext, scope } = {}) {
   const requested = resolveRequestedKpiScope(scope);
@@ -115,10 +158,7 @@ function resolveKpiOwnerFilter({ authContext, scope } = {}) {
     return { scope: requested, organizationScoped: false, ownerUserIds: null };
   }
 
-  if (
-    requested === PRODUCTION_KPI_SCOPES.ORGANIZATION ||
-    requested === PRODUCTION_KPI_SCOPES.RVP
-  ) {
+  if (requested === PRODUCTION_KPI_SCOPES.ORGANIZATION) {
     if (!canViewOrgProduction(authContext)) {
       const error = new Error("Organization production rollup is not permitted.");
       error.code = "PRODUCTION_ROLLUP_FORBIDDEN";
@@ -129,12 +169,7 @@ function resolveKpiOwnerFilter({ authContext, scope } = {}) {
     return { scope: requested, organizationScoped: true, ownerUserIds: null };
   }
 
-  if (
-    requested === PRODUCTION_KPI_SCOPES.TEAM ||
-    requested === PRODUCTION_KPI_SCOPES.DISTRICT ||
-    requested === PRODUCTION_KPI_SCOPES.DIVISION ||
-    requested === PRODUCTION_KPI_SCOPES.REGIONAL
-  ) {
+  if (requested === PRODUCTION_KPI_SCOPES.TEAM) {
     if (!canViewTeamProduction(authContext)) {
       return {
         scope: PRODUCTION_KPI_SCOPES.MINE,
@@ -142,13 +177,10 @@ function resolveKpiOwnerFilter({ authContext, scope } = {}) {
         ownerUserIds: userId ? [userId] : []
       };
     }
-    if (canViewOrgProduction(authContext)) {
-      return { scope: requested, organizationScoped: true, ownerUserIds: null };
-    }
     return {
-      scope: requested,
+      scope: PRODUCTION_KPI_SCOPES.TEAM,
       organizationScoped: true,
-      ownerUserIds: authContext.hierarchyUserIds || (userId ? [userId] : [])
+      ownerUserIds: resolveTeamOwnerIds(authContext)
     };
   }
 
@@ -167,9 +199,11 @@ function assertTenantIsolation(items, organizationId) {
 module.exports = {
   summarizeRecords,
   resolveKpiOwnerFilter,
+  resolveTeamOwnerIds,
   canViewPlatformProduction,
   canViewOrgProduction,
   canViewTeamProduction,
   assertTenantIsolation,
-  isAgendaConversion
+  isAgendaConversion,
+  resolveCurrency
 };

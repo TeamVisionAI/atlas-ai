@@ -30,4 +30,8 @@ Outcome selection alone does not create production.
 
 Migration `070_br194_agenda_client_production.sql` adds `appointment_id`, `currency`, and `source` to `atlas_client_production`. Manual BR-181 rows stay compatible (`appointment_id` null, `source=MANUAL`). Unique `(organization_id, appointment_id)` prevents duplicates.
 
-KPI engine: `backend/core/clientProduction/productionKpiEngine.js`. Hierarchy rollups are always organization-scoped. Platform/global totals require SUPER_ADMIN and never run for a tenant role.
+KPI engine: `backend/core/clientProduction/productionKpiEngine.js`.
+
+Monetary KPIs group by currency (`monetaryByCurrency`). Single-currency sets keep top-level totals; mixed currencies leave those totals null. No FX conversion.
+
+Supported hierarchy scopes: Mine, Team (`hierarchyUserIds` subtree), Organization. District / Division / Regional / RVP named rollups are deferred — the Atlas hierarchy engine cannot distinguish those levels without relabeling the same org total. Platform/global totals require SUPER_ADMIN and stay currency-safe.
