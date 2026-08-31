@@ -96,6 +96,11 @@ function classifyFollowUpStatus({
 }
 
 function isFollowUpQueueCandidate(summary, agentState) {
+  const milestone = String(summary?.canonicalMilestone || "").toUpperCase();
+  if (milestone === MILESTONES.CLOSED || milestone === MILESTONES.DO_NOT_CONTACT) {
+    return false;
+  }
+
   if (isActiveFollowUp(summary.canonicalMilestone, summary.missionControlPriorityTier)) {
     return true;
   }

@@ -52,6 +52,18 @@ function createMemoryFollowUpStore(seed = []) {
         .map((item) => ({ ...item, history: [...(item.history || [])] }));
     },
 
+    async listOpenForProspect(organizationId, { prospectId = null, subjectPhone = null } = {}) {
+      const { isProspectLinkedFollowUp } = require("./prospectClosePolicy");
+      return [...rows.values()]
+        .filter(
+          (item) =>
+            item.organizationId === organizationId &&
+            item.status === "OPEN" &&
+            isProspectLinkedFollowUp(item, { prospectId, subjectPhone })
+        )
+        .map((item) => ({ ...item, history: [...(item.history || [])] }));
+    },
+
     async listForOwners({ organizationId, ownerUserIds, statuses }) {
       const owners = new Set((ownerUserIds || []).map((id) => String(id)));
       return [...rows.values()]

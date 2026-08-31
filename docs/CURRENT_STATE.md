@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-08-31:** **BR-192** — Terminal prospect close (Not Interested / Disqualified / DNC) cancels OPEN follow-ups in domain logic. History kept. No UI-only hide.
 - **2026-08-31:** **BR-189** — Policy Review dashboard lives on `/app/policy-reviews` (Dashboard | Pipeline). Reuses BR-186/188; no new sidebar item; spend/CPL/ROAS stay null.
 - **2026-08-13:** **Conversations unread + latest-message-first** — Unread is prospect inbound WhatsApp vs `conversationsLastReadInboundAt` (not BR-080 / NEEDS_ATTENTION). List sorts by `lastCommunicationAt` from real WhatsApp. Open thread anchors above sticky composer; poll ~12s; scrolled-up live inbound shows “New message ↓”.
 - **2026-08-13:** **BR-131 first-turn resume guard** — Brand-new info asks (e.g. “Hello! Can I get more info on this?”) must use canonical overview + city/state, not `clarify_once`. Resume/`clarify_once` requires conversation evidence (`lastAtlasOutboundText` / V2 ask-key), not `current_step` / missingFields.

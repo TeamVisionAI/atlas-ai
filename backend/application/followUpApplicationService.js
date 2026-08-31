@@ -2,6 +2,7 @@
  * BR-178 — Follow-up Engine V2.
  * Durable obligations + owner queue. Does not send WhatsApp, SMS, or email.
  * Completing a follow-up does not change prospect outcome.
+ * Terminal prospect close cancels OPEN follow-ups (BR-192).
  */
 
 const crypto = require("crypto");
@@ -24,7 +25,10 @@ const {
   buildManualDedupKey,
   buildLegacyConversionDedupKey,
   isLegacyCoveredByDurable,
-  createMemoryFollowUpStore
+  createMemoryFollowUpStore,
+  resolveFollowUpCloseReason,
+  isTerminalFollowUpMilestone,
+  isProspectLinkedFollowUp
 } = require("../core/followUps");
 const { loadOrganizationTimezone } = require("../core/organizationDateWindow");
 const { presentHistoryActorLabel } = require("../core/appointmentHistory");
@@ -583,6 +587,86 @@ async function cancelFollowUp(id, input, authContext) {
   });
 }
 
+/**
+ * Implements BR-192 — cancel OPEN prospect-linked follow-ups when the prospect
+ * reaches a terminal close. Completed/cancelled history is preserved. Idempotent.
+ */
+async function cancelOpenFollowUpsForClosedProspect({
+  organizationId,
+  prospectId = null,
+  subjectPhone = null,
+  actorUserId = "system",
+  closeReason = null,
+  targetMilestone = null,
+  outcome = null,
+  inboxCloseReason = null
+} = {}) {
+  const resolvedReason = resolveFollowUpCloseReason({
+    closeReason,
+    targetMilestone,
+    outcome,
+    inboxCloseReason
+  });
+  if (!organizationId || !resolvedReason) {
+    return { cancelledCount: 0, skippedCount: 0, reason: "NOT_TERMINAL", closeReason: resolvedReason };
+  }
+  if (!prospectId && !subjectPhone) {
+    return { cancelledCount: 0, skippedCount: 0, reason: "PROSPECT_REQUIRED", closeReason: resolvedReason };
+  }
+
+  const store = getStore();
+  if (!store || typeof store.listOpenForProspect !== "function") {
+    return { cancelledCount: 0, skippedCount: 0, reason: "STORE_UNAVAILABLE", closeReason: resolvedReason };
+  }
+
+  const open = await store.listOpenForProspect(organizationId, { prospectId, subjectPhone });
+  const now = new Date().toISOString();
+  let cancelledCount = 0;
+  let skippedCount = 0;
+  const cancelledIds = [];
+
+  for (const item of open) {
+    if (item.status !== FOLLOW_UP_STATUSES.OPEN) {
+      skippedCount += 1;
+      continue;
+    }
+    if (!isProspectLinkedFollowUp(item, { prospectId, subjectPhone })) {
+      skippedCount += 1;
+      continue;
+    }
+    const alreadyClosedForReason = (item.history || []).some(
+      (entry) =>
+        entry?.type === "cancelled" &&
+        entry?.reason === resolvedReason
+    );
+    if (alreadyClosedForReason && item.status !== FOLLOW_UP_STATUSES.OPEN) {
+      skippedCount += 1;
+      continue;
+    }
+    await saveFollowUp(store, {
+      ...item,
+      status: FOLLOW_UP_STATUSES.CANCELLED,
+      updatedAt: now,
+      history: appendHistory(item, {
+        type: "cancelled",
+        actor: actorUserId || "system",
+        at: now,
+        summary: "Cancelled because the prospect was closed",
+        reason: resolvedReason
+      })
+    });
+    cancelledCount += 1;
+    cancelledIds.push(item.id);
+  }
+
+  return {
+    cancelledCount,
+    skippedCount,
+    closeReason: resolvedReason,
+    cancelledIds
+  };
+}
+
 function matchesSearch(item, query) {
   if (!query) {
     return true;
@@ -725,6 +809,9 @@ async function listFollowUps({ organizationId, authContext, filter, search, sort
   const filters = buildFilterCounts(items);
   const activeFilter = filter && filter !== FOLLOW_UP_FILTERS.ALL ? filter : FOLLOW_UP_FILTERS.ALL;
 
+  // Active queue is OPEN obligations classified by due date. CANCELLED/COMPLETED
+  // share the completed view and are excluded here. Prospect terminal status is
+  // enforced at write time (BR-192), not by hiding leftover OPEN recycle rows.
   if (activeFilter === FOLLOW_UP_FILTERS.COMPLETED) {
     items = items.filter((item) => item.status === FOLLOW_UP_VIEW_STATUSES.COMPLETED);
   } else if (activeFilter !== FOLLOW_UP_FILTERS.ALL) {
@@ -781,6 +868,9 @@ module.exports = {
   completeFollowUp,
   rescheduleFollowUp,
   cancelFollowUp,
+  cancelOpenFollowUpsForClosedProspect,
+  resolveFollowUpCloseReason,
+  isTerminalFollowUpMilestone,
   getAuthorizedFollowUp,
   listFollowUps,
   summarizeForOwner,
