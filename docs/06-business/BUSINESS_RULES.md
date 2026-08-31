@@ -2961,6 +2961,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-190 — Confirm-selected slot stays confirmable through final Si
+
+**Implements:** After Atlas asks the prospect to reply SI for a concrete date+time (`confirm_selected_slot` / “Responde SI para confirmar”), `lastQuestionAsked` must remain `confirm_slot`. Bare `Si`/`Yes` must be `schedule_confirm` → `create_appointment`. It must never silently answer a generic “Perfecto.” while leaving no appointment.  
+**Domain:** Recruit AI v2 scheduling confirmation  
+**Depends on:** BR-103, BR-111, BR-116, BR-164, BR-187  
+**Related:** BR-126 (deferred create), BR-185 (lead time unchanged)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/decisionEngine.js` (exact-time confirm must not relabel `offer_time_choices`); `recruitAiV2/schedulingConfirmation.js`; `recruitAiV2/interpreter.js`  
+**Tests:** `backend/test/recruitAiV2ConfirmSelectedSlotSiBr190.test.js`
+
+### Rules
+
+1. **Exact requested time** — When availability confirms the requested clock on the proposed day and Atlas emits `confirm_selected_slot`, persist `lastQuestionAsked=confirm_slot`. Do not overwrite that label back to `offer_time_choices`.
+2. **SI-ask is confirmable** — A single concrete proposed date+time plus SI-confirm copy (or an equivalent one-slot selected state) is a confirmable proposal even if `lastQuestionAsked` was left as `offer_time_choices`. Multi-option menus stay non-confirmable until the prospect picks a time.
+3. **Final Si** — Bare `Si`/`Yes` after that ask creates the appointment (or returns an explicit real booking/provider failure). Generic `acknowledge_preference_awaiting_availability` (“Perfecto.”) is not an acceptable outcome.
+4. **One confirmation** — Successful create persists the appointment, marks scheduling complete, and sends one confirmation with the actual slot. Do not emit a second generic Perfecto for the same Si.
+5. **Boundaries** — Do not change tenant isolation, BR-185 lead time, WhatsApp routing, semantic settings, authoring/execution allowlists, or existing multi-slot menu rules.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

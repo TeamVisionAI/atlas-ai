@@ -3588,6 +3588,11 @@ function decideConversationTurnCore({
           );
         }
         // Keep user's preferred time even when alternatives are offered.
+        // Implements BR-190 — exact requested time already asked SI
+        // (confirm_slot). Do not relabel that as a multi-choice menu.
+        const alreadyConfirmSlot =
+          String(offeredNow.contextPatch?.conversation?.lastQuestionAsked || "") ===
+          "confirm_slot";
         offeredNow.contextPatch = {
           ...offeredNow.contextPatch,
           appointment: {
@@ -3601,8 +3606,13 @@ function decideConversationTurnCore({
           conversation: {
             ...(offeredNow.contextPatch?.conversation || {}),
             lastCounterofferTime: requestedTime,
-            lastQuestionAsked: "offer_time_choices",
-            lastProspectIntent: INTENTS.SCHEDULING_COUNTEROFFER
+            lastQuestionAsked: alreadyConfirmSlot
+              ? "confirm_slot"
+              : "offer_time_choices",
+            lastProspectIntent: alreadyConfirmSlot
+              ? offeredNow.contextPatch?.conversation?.lastProspectIntent ||
+                INTENTS.SCHEDULING_COUNTEROFFER
+              : INTENTS.SCHEDULING_COUNTEROFFER
           }
         };
         offeredNow.customerReplyPlan.entities = {

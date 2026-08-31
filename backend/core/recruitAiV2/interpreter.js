@@ -1386,7 +1386,9 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     !isSoftAcknowledgement(text) &&
     (String(context?.conversation?.lastQuestionAsked || "") === "confirm_slot" ||
       String(context?.conversation?.lastOfferMade || "") ===
-        "appointment_confirm_deferred")
+        "appointment_confirm_deferred" ||
+      String(context?.conversation?.lastOfferMade || "") ===
+        "confirm_selected_slot")
   ) {
     intent = INTENTS.SCHEDULE_CONFIRM;
     confidence = 0.9;
