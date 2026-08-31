@@ -31,6 +31,15 @@ const {
   acquisitionFromIntake,
   hasValidAcquisition
 } = require("../core/policyReviewPipeline");
+const {
+  resolveDashboardDateRange,
+  itemInDateRange,
+  buildFunnel,
+  classifyNeedsAction,
+  buildNeedsActionRows,
+  buildDashboardKpis,
+  emptyPolicyReviewDashboard
+} = require("../core/policyReviewDashboard");
 const { presentHistoryActorLabel } = require("../core/appointmentHistory");
 const { HIERARCHY_MODES } = require("../core/hierarchyScopeEngine");
 const { ROLES } = require("../security/roles");
@@ -360,13 +369,14 @@ async function loadClientNameMap(rows, organizationId) {
   return new Map((clients || []).map((client) => [String(client.id), client]));
 }
 
-function emptyList(organizationId, authContext, scope, search) {
+function emptyList(organizationId, authContext, scope, search, dateRange = null) {
   return {
     generatedAt: new Date().toISOString(),
     organizationId,
     scope: scope || POLICY_REVIEW_SCOPES.MINE,
     teamAvailable: canViewTeamPipeline(authContext),
     search: search || "",
+    range: dateRange,
     totalCount: 0,
     filteredCount: 0,
     metrics: emptyDashboardMetrics(),
@@ -615,7 +625,7 @@ async function getPolicyReview(id, { organizationId, authContext, nameById } = {
   });
 }
 
-async function listPolicyReviews({
+async function collectScopedPipelineItems({
   organizationId,
   authContext,
   scope,
@@ -629,28 +639,53 @@ async function listPolicyReviews({
   intakeCode,
   language,
   state,
-  nameById
+  range,
+  from,
+  to,
+  nameById,
+  includeClientNames = true,
+  includeOwnerNames = true,
+  timezoneDeps
 } = {}) {
   const store = getStore();
-  if (!store) return emptyList(organizationId, authContext, scope, search);
-  const ownerFilter = resolveOwnerFilter({ authContext, scope });
-  const rows = await store.listForOwners({
+  const dateRange = resolveDashboardDateRange({
     organizationId,
-    ownerUserIds: ownerFilter.ownerUserIds,
-    clientId: clientId || null
+    range,
+    from,
+    to,
+    timezoneDeps
   });
-  const names = nameById || (await loadActorNames(organizationId));
+  if (!store) {
+    return {
+      store: null,
+      ownerFilter: resolveOwnerFilter({ authContext, scope }),
+      items: [],
+      dateRange,
+      generatedAt: new Date().toISOString()
+    };
+  }
+  const ownerFilter = resolveOwnerFilter({ authContext, scope });
+  const [rows, defaultsList] = await Promise.all([
+    store.listForOwners({
+      organizationId,
+      ownerUserIds: ownerFilter.ownerUserIds,
+      clientId: clientId || null
+    }),
+    loadDefaultsMap(store, organizationId)
+  ]);
+  const names =
+    includeOwnerNames || nameById ? nameById || (await loadActorNames(organizationId)) : new Map();
   const ownerCache = new Map(names);
-  const clients = await loadClientNameMap(rows, organizationId);
-  const defaultsList = await loadDefaultsMap(store, organizationId);
+  const clients = includeClientNames ? await loadClientNameMap(rows, organizationId) : new Map();
   const items = [];
   for (const row of rows) {
     if (stage && String(row.stage) !== String(stage).toUpperCase()) continue;
     if (ownerUserId && String(row.ownerUserId) !== String(ownerUserId)) continue;
+    if (!itemInDateRange(row, dateRange)) continue;
     const defaults = pickDefaults(defaultsList, row.ownerUserId);
     const presented = presentRecord(row, {
       nameById: names,
-      ownerName: await resolveOwnerName(row.ownerUserId, ownerCache),
+      ownerName: includeOwnerNames ? await resolveOwnerName(row.ownerUserId, ownerCache) : null,
       clientName: clients.get(String(row.clientId))?.name || null,
       defaults
     });
@@ -671,15 +706,68 @@ async function listPolicyReviews({
   }
   items.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
   return {
-    generatedAt: new Date().toISOString(),
+    store,
+    ownerFilter,
+    items,
+    dateRange,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+async function listPolicyReviews({
+  organizationId,
+  authContext,
+  scope,
+  search,
+  stage,
+  clientId,
+  ownerUserId,
+  platform,
+  campaign,
+  source,
+  intakeCode,
+  language,
+  state,
+  range,
+  from,
+  to,
+  nameById,
+  timezoneDeps
+} = {}) {
+  const collected = await collectScopedPipelineItems({
     organizationId,
-    scope: ownerFilter.scope,
+    authContext,
+    scope,
+    search,
+    stage,
+    clientId,
+    ownerUserId,
+    platform,
+    campaign,
+    source,
+    intakeCode,
+    language,
+    state,
+    range,
+    from,
+    to,
+    nameById,
+    includeClientNames: true,
+    includeOwnerNames: true,
+    timezoneDeps
+  });
+  if (!collected.store) return emptyList(organizationId, authContext, scope, search, collected.dateRange);
+  return {
+    generatedAt: collected.generatedAt,
+    organizationId,
+    scope: collected.ownerFilter.scope,
     teamAvailable: canViewTeamPipeline(authContext),
     search: search || "",
-    totalCount: items.length,
-    filteredCount: items.length,
-    metrics: aggregateDashboardMetrics(items),
-    items
+    range: collected.dateRange,
+    totalCount: collected.items.length,
+    filteredCount: collected.items.length,
+    metrics: aggregateDashboardMetrics(collected.items),
+    items: collected.items
   };
 }
 
@@ -1024,9 +1112,15 @@ async function getAcquisitionMetrics({
   intakeCode,
   language,
   state,
-  ownerUserId
+  ownerUserId,
+  range,
+  from,
+  to,
+  nameById,
+  timezoneDeps
 } = {}) {
-  const listed = await listPolicyReviews({
+  const resolvedGroup = ACQUISITION_GROUP_BY.includes(groupBy) ? groupBy : "campaign";
+  const collected = await collectScopedPipelineItems({
     organizationId,
     authContext,
     scope,
@@ -1036,19 +1130,109 @@ async function getAcquisitionMetrics({
     intakeCode,
     language,
     state,
-    ownerUserId
+    ownerUserId,
+    range,
+    from,
+    to,
+    nameById,
+    includeClientNames: false,
+    includeOwnerNames: resolvedGroup === "owner",
+    timezoneDeps
   });
-  const resolvedGroup = ACQUISITION_GROUP_BY.includes(groupBy) ? groupBy : "campaign";
-  const aggregated = aggregateAcquisitionMetrics(listed.items, { groupBy: resolvedGroup });
+  const aggregated = aggregateAcquisitionMetrics(collected.items, { groupBy: resolvedGroup });
   return {
-    generatedAt: listed.generatedAt,
-    organizationId: listed.organizationId,
-    scope: listed.scope,
-    teamAvailable: listed.teamAvailable,
+    generatedAt: collected.generatedAt,
+    organizationId,
+    scope: collected.ownerFilter.scope,
+    teamAvailable: canViewTeamPipeline(authContext),
     groupBy: aggregated.groupBy,
-    filters: { platform: platform || null, campaign: campaign || null, source: source || null, intakeCode: intakeCode || null },
+    range: collected.dateRange,
+    filters: {
+      platform: platform || null,
+      campaign: campaign || null,
+      source: source || null,
+      intakeCode: intakeCode || null,
+      language: language || null,
+      state: state || null
+    },
     totals: aggregated.totals,
     groups: aggregated.groups
+  };
+}
+
+async function getPolicyReviewDashboard({
+  organizationId,
+  authContext,
+  scope,
+  groupBy,
+  platform,
+  campaign,
+  source,
+  intakeCode,
+  language,
+  state,
+  ownerUserId,
+  range,
+  from,
+  to,
+  nameById,
+  timezoneDeps
+} = {}) {
+  const resolvedGroup = ACQUISITION_GROUP_BY.includes(groupBy) ? groupBy : "campaign";
+  const collected = await collectScopedPipelineItems({
+    organizationId,
+    authContext,
+    scope,
+    platform,
+    campaign,
+    source,
+    intakeCode,
+    language,
+    state,
+    ownerUserId,
+    range: range || (from || to ? "custom" : "30d"),
+    from,
+    to,
+    nameById,
+    includeClientNames: false,
+    includeOwnerNames: resolvedGroup === "owner",
+    timezoneDeps
+  });
+  if (!collected.store) {
+    return {
+      ...emptyPolicyReviewDashboard(),
+      generatedAt: collected.generatedAt,
+      organizationId,
+      scope: collected.ownerFilter.scope,
+      teamAvailable: canViewTeamPipeline(authContext),
+      range: collected.dateRange,
+      groupBy: resolvedGroup
+    };
+  }
+  const aggregated = aggregateAcquisitionMetrics(collected.items, { groupBy: resolvedGroup });
+  return {
+    generatedAt: collected.generatedAt,
+    organizationId,
+    scope: collected.ownerFilter.scope,
+    teamAvailable: canViewTeamPipeline(authContext),
+    range: collected.dateRange,
+    groupBy: aggregated.groupBy,
+    filters: {
+      platform: platform || null,
+      campaign: campaign || null,
+      source: source || null,
+      intakeCode: intakeCode || null,
+      language: language || null,
+      state: state || null
+    },
+    kpis: buildDashboardKpis(aggregated.totals),
+    funnel: buildFunnel(aggregated.totals),
+    attribution: {
+      groupBy: aggregated.groupBy,
+      totals: aggregated.totals,
+      groups: aggregated.groups
+    },
+    needsAction: buildNeedsActionRows(classifyNeedsAction(collected.items))
   };
 }
 
@@ -1194,6 +1378,7 @@ module.exports = {
   createClientFollowUp,
   applyAcquisitionToReview,
   getAcquisitionMetrics,
+  getPolicyReviewDashboard,
   ensurePolicyReviewFromIulIntake,
   emptyAcquisitionMetrics,
   getCommissionDefaults,

@@ -15,6 +15,7 @@ import {
   completePolicyReview,
   createPolicyReview,
   createPolicyReviewFollowUp,
+  getPolicyReviewDashboard,
   getPolicyReviews,
   linkPolicyReviewAppointment,
   markPolicyReviewDocumentsReceived,
@@ -26,14 +27,17 @@ import {
   transitionPolicyReviewStage
 } from "../services/policyReviewsService";
 import {
+  POLICY_REVIEW_DATE_PRESETS,
   POLICY_REVIEW_OUTCOMES,
   POLICY_REVIEW_STAGES,
+  POLICY_REVIEW_VIEWS,
   buildPolicyReviewSourceLabel,
   buildPolicyReviewStageLabel,
   emptyPolicyReviewForm,
   formatPolicyReviewMoney,
   formatPolicyReviewTouch
 } from "../engines/policyReviewViewModel";
+import PolicyReviewsDashboardBlock from "./PolicyReviewsDashboardBlock";
 import "./ClientsPage.css";
 
 const METRICS = [
@@ -85,20 +89,82 @@ export default function PolicyReviewsPage() {
   const platformFilter = searchParams.get("platform") || "";
   const campaignFilter = searchParams.get("campaign") || "";
   const sourceFilter = searchParams.get("source") || "";
+  const intakeCodeFilter = searchParams.get("intakeCode") || "";
+  const languageFilter = searchParams.get("language") || "";
+  const stateFilter = searchParams.get("state") || "";
+  const ownerFilter = searchParams.get("ownerUserId") || "";
+  const rangeFilter = searchParams.get("range") || "30d";
+  const fromFilter = searchParams.get("from") || "";
+  const toFilter = searchParams.get("to") || "";
+  const groupBy = searchParams.get("groupBy") || "campaign";
+  const activeView = searchParams.get("view") || POLICY_REVIEW_VIEWS.DASHBOARD;
+  const showDashboard = activeView !== POLICY_REVIEW_VIEWS.PIPELINE;
+  const showPipeline = activeView !== POLICY_REVIEW_VIEWS.DASHBOARD;
 
   const [searchInput, setSearchInput] = useState(searchQuery);
   const [selectedId, setSelectedId] = useState(null);
   const [payload, setPayload] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState(emptyPolicyReviewForm());
   const [saving, setSaving] = useState(false);
 
+  const sharedFilters = {
+    scope: activeScope,
+    platform: platformFilter,
+    campaign: campaignFilter,
+    source: sourceFilter,
+    intakeCode: intakeCodeFilter,
+    language: languageFilter,
+    state: stateFilter,
+    ownerUserId: ownerFilter,
+    range: rangeFilter,
+    from: rangeFilter === "custom" ? fromFilter : "",
+    to: rangeFilter === "custom" ? toFilter : ""
+  };
+
+  const loadDashboard = useCallback(async () => {
+    if (controlPlane || !showDashboard) {
+      setDashboardLoading(false);
+      return;
+    }
+    setDashboardLoading(true);
+    setError(null);
+    try {
+      const next = await getPolicyReviewDashboard({
+        ...sharedFilters,
+        groupBy
+      });
+      setDashboard(next);
+    } catch (err) {
+      setError(err instanceof PolicyReviewsError ? translate("policyReviewDashboardLoadError") : err.message);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [
+    activeScope,
+    campaignFilter,
+    controlPlane,
+    fromFilter,
+    groupBy,
+    intakeCodeFilter,
+    languageFilter,
+    ownerFilter,
+    platformFilter,
+    rangeFilter,
+    showDashboard,
+    sourceFilter,
+    stateFilter,
+    toFilter,
+    translate
+  ]);
+
   const loadList = useCallback(async () => {
-    if (controlPlane) {
-      setPayload(null);
+    if (controlPlane || !showPipeline) {
       setLoading(false);
       return;
     }
@@ -107,13 +173,10 @@ export default function PolicyReviewsPage() {
     try {
       const [reviews, clientPayload] = await Promise.all([
         getPolicyReviews({
+          ...sharedFilters,
           search: searchQuery,
-          scope: activeScope,
           stage: stageFilter,
-          clientId: clientFilter,
-          platform: platformFilter,
-          campaign: campaignFilter,
-          source: sourceFilter
+          clientId: clientFilter
         }),
         getClients({ scope: activeScope })
       ]);
@@ -129,12 +192,24 @@ export default function PolicyReviewsPage() {
     campaignFilter,
     clientFilter,
     controlPlane,
+    fromFilter,
+    intakeCodeFilter,
+    languageFilter,
+    ownerFilter,
     platformFilter,
+    rangeFilter,
     searchQuery,
+    showPipeline,
     sourceFilter,
     stageFilter,
+    stateFilter,
+    toFilter,
     translate
   ]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
   useEffect(() => {
     loadList();
@@ -214,7 +289,7 @@ export default function PolicyReviewsPage() {
         });
       }
       setDialog(null);
-      await loadList();
+      await Promise.all([loadDashboard(), loadList()]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -227,8 +302,8 @@ export default function PolicyReviewsPage() {
   }
 
   return (
-    <div className="clients-page">
-      <header className="clients-page__header">
+    <div className="clients-page clients-page--policy-reviews">
+      <header className="clients-page__header policy-review-header">
         <div>
           <h1 className="clients-page__title">{translate("policyReviewTitle")}</h1>
           <p className="clients-page__subtitle">{translate("policyReviewSubtitle")}</p>
@@ -245,76 +320,140 @@ export default function PolicyReviewsPage() {
         </button>
       </header>
 
-      <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewScopeLabel")}>
-        <button
-          type="button"
-          className={`clients-page__filter${activeScope === "mine" ? " is-active" : ""}`}
-          onClick={() => patchParams({ scope: "mine" })}
-        >
-          {translate("policyReviewScopeMine")}
-        </button>
-        {payload?.teamAvailable ? (
+      <div className="policy-review-toolbar">
+        <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewViewLabel")}>
           <button
             type="button"
-            className={`clients-page__filter${activeScope === "team" ? " is-active" : ""}`}
-            onClick={() => patchParams({ scope: "team" })}
+            className={`clients-page__filter${activeView === POLICY_REVIEW_VIEWS.DASHBOARD ? " is-active" : ""}`}
+            onClick={() => patchParams({ view: POLICY_REVIEW_VIEWS.DASHBOARD })}
           >
-            {translate("policyReviewScopeTeam")}
+            {translate("policyReviewViewDashboard")}
           </button>
-        ) : null}
+          <button
+            type="button"
+            className={`clients-page__filter${activeView === POLICY_REVIEW_VIEWS.PIPELINE ? " is-active" : ""}`}
+            onClick={() => patchParams({ view: POLICY_REVIEW_VIEWS.PIPELINE })}
+          >
+            {translate("policyReviewViewPipeline")}
+          </button>
+        </div>
+        <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewScopeLabel")}>
+          <button
+            type="button"
+            className={`clients-page__filter${activeScope === "mine" ? " is-active" : ""}`}
+            onClick={() => patchParams({ scope: "mine" })}
+          >
+            {translate("policyReviewScopeMine")}
+          </button>
+          {(payload?.teamAvailable || dashboard?.teamAvailable) ? (
+            <button
+              type="button"
+              className={`clients-page__filter${activeScope === "team" ? " is-active" : ""}`}
+              onClick={() => patchParams({ scope: "team" })}
+            >
+              {translate("policyReviewScopeTeam")}
+            </button>
+          ) : null}
+        </div>
+        <div className="clients-page__scope" role="tablist" aria-label={translate("policyReviewRangeLabel")}>
+          {POLICY_REVIEW_DATE_PRESETS.map(([value, labelKey]) => (
+            <button
+              key={value}
+              type="button"
+              className={`clients-page__filter${rangeFilter === value ? " is-active" : ""}`}
+              onClick={() => patchParams({ range: value })}
+            >
+              {translate(labelKey)}
+            </button>
+          ))}
+        </div>
       </div>
+      {rangeFilter === "custom" ? (
+        <div className="policy-review-toolbar policy-review-toolbar--custom" aria-label={translate("policyReviewRangeCustom")}>
+          <label className="clients-page__search-label">
+            {translate("policyReviewRangeFrom")}
+            <input type="date" value={fromFilter} onChange={(event) => patchParams({ from: event.target.value, range: "custom" })} />
+          </label>
+          <label className="clients-page__search-label">
+            {translate("policyReviewRangeTo")}
+            <input type="date" value={toFilter} onChange={(event) => patchParams({ to: event.target.value, range: "custom" })} />
+          </label>
+        </div>
+      ) : null}
 
-      <div className="clients-page__scope" aria-label={translate("policyReviewFilters")}>
-        <label className="clients-page__search-label">
-          {translate("policyReviewStage")}
-          <select value={stageFilter} onChange={(event) => patchParams({ stage: event.target.value })}>
-            <option value="">{translate("policyReviewFilterAll")}</option>
-            {Object.values(POLICY_REVIEW_STAGES).map((stage) => (
-              <option key={stage} value={stage}>
-                {buildPolicyReviewStageLabel(stage, translate)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="clients-page__search-label">
-          {translate("policyReviewFilterPlatform")}
-          <input
-            value={platformFilter}
-            onChange={(event) => patchParams({ platform: event.target.value })}
-            placeholder={translate("policyReviewPlatform")}
-          />
-        </label>
-        <label className="clients-page__search-label">
-          {translate("policyReviewFilterCampaign")}
-          <input
-            value={campaignFilter}
-            onChange={(event) => patchParams({ campaign: event.target.value })}
-            placeholder={translate("policyReviewCampaign")}
-          />
-        </label>
-        <label className="clients-page__search-label">
-          {translate("policyReviewFilterSource")}
-          <input
-            value={sourceFilter}
-            onChange={(event) => patchParams({ source: event.target.value })}
-            placeholder={translate("policyReviewSource")}
-          />
-        </label>
-      </div>
+      {showPipeline ? (
+        <>
+          <div className="policy-review-toolbar policy-review-toolbar--filters" aria-label={translate("policyReviewFilters")}>
+            <label className="clients-page__search-label">
+              {translate("policyReviewStage")}
+              <select value={stageFilter} onChange={(event) => patchParams({ stage: event.target.value })}>
+                <option value="">{translate("policyReviewFilterAll")}</option>
+                {Object.values(POLICY_REVIEW_STAGES).map((stage) => (
+                  <option key={stage} value={stage}>
+                    {buildPolicyReviewStageLabel(stage, translate)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="clients-page__search-label">
+              {translate("policyReviewFilterPlatform")}
+              <input
+                value={platformFilter}
+                onChange={(event) => patchParams({ platform: event.target.value })}
+                placeholder={translate("policyReviewPlatform")}
+              />
+            </label>
+            <label className="clients-page__search-label">
+              {translate("policyReviewFilterCampaign")}
+              <input
+                value={campaignFilter}
+                onChange={(event) => patchParams({ campaign: event.target.value })}
+                placeholder={translate("policyReviewCampaign")}
+              />
+            </label>
+            <label className="clients-page__search-label">
+              {translate("policyReviewFilterSource")}
+              <input
+                value={sourceFilter}
+                onChange={(event) => patchParams({ source: event.target.value })}
+                placeholder={translate("policyReviewSource")}
+              />
+            </label>
+          </div>
+          <label className="clients-page__search-label" htmlFor="policy-review-search">
+            {translate("policyReviewSearchLabel")}
+            <input
+              id="policy-review-search"
+              type="search"
+              className="clients-page__search"
+              value={searchInput}
+              placeholder={translate("policyReviewSearchPlaceholder")}
+              onChange={(event) => setSearchInput(event.target.value)}
+            />
+          </label>
+        </>
+      ) : null}
 
-      <label className="clients-page__search-label" htmlFor="policy-review-search">
-        {translate("policyReviewSearchLabel")}
-        <input
-          id="policy-review-search"
-          type="search"
-          className="clients-page__search"
-          value={searchInput}
-          placeholder={translate("policyReviewSearchPlaceholder")}
-          onChange={(event) => setSearchInput(event.target.value)}
-        />
-      </label>
+      {showDashboard ? (
+        <>
+          {dashboardLoading ? <p className="clients-page__status">{translate("policyReviewDashboardLoading")}</p> : null}
+          <PolicyReviewsDashboardBlock
+            dashboard={dashboard}
+            loading={dashboardLoading}
+            locale={locale}
+            groupBy={groupBy}
+            translate={translate}
+            onDrilldown={(updates, options = {}) =>
+              patchParams({
+                view: options.stayOnDashboard ? POLICY_REVIEW_VIEWS.DASHBOARD : POLICY_REVIEW_VIEWS.PIPELINE,
+                ...updates
+              })
+            }
+          />
+        </>
+      ) : null}
 
-      {payload ? (
+      {showPipeline && payload ? (
         <dl className="clients-card__details">
           {METRICS.map(([key, labelKey]) => (
             <div key={key}>
@@ -330,10 +469,10 @@ export default function PolicyReviewsPage() {
       ) : null}
 
       {error ? <p className="clients-page__error">{error}</p> : null}
-      {loading ? <p className="clients-page__status">{translate("policyReviewLoading")}</p> : null}
-      {!loading && !payload?.items?.length ? <p className="clients-page__status">{translate("policyReviewEmpty")}</p> : null}
+      {showPipeline && loading ? <p className="clients-page__status">{translate("policyReviewLoading")}</p> : null}
+      {showPipeline && !loading && !payload?.items?.length ? <p className="clients-page__status">{translate("policyReviewEmpty")}</p> : null}
 
-      {!loading && payload?.items?.length ? (
+      {showPipeline && !loading && payload?.items?.length ? (
         <ul className="clients-list">
           {payload.items.map((item) => (
             <li

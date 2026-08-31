@@ -338,6 +338,15 @@ function emptyPolicyReviewAcquisitionMetrics() {
   };
 }
 
+function emptyPolicyReviewDashboard() {
+  const { emptyPolicyReviewDashboard: emptyDashboard } = require("./policyReviewDashboard");
+  return {
+    ...emptyDashboard(),
+    controlPlane: true,
+    organizationId: null
+  };
+}
+
 function emptyDocumentRequests() {
   return {
     generatedAt: new Date().toISOString(),
@@ -457,6 +466,7 @@ module.exports = {
   emptyPolicyReviews,
   emptyPolicyReviewDetail,
   emptyPolicyReviewAcquisitionMetrics,
+  emptyPolicyReviewDashboard,
   emptyDocumentRequests,
   emptyDocumentRequestDetail,
   emptyDocuments,
