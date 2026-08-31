@@ -49,7 +49,8 @@ function connectionResolution(connection) {
     ownerUserId: connection.user_id ? String(connection.user_id) : null,
     source: connection.user_id
       ? "whatsapp_personal_connection"
-      : "whatsapp_organization_connection"
+      : "whatsapp_organization_connection",
+    connection
   };
 }
 
@@ -157,7 +158,8 @@ async function resolveWhatsAppInboundOrganizationId(input = {}) {
           ownerUserId: connection.user_id ? String(connection.user_id) : null,
           source: connection.user_id
             ? "whatsapp_personal_connection"
-            : "whatsapp_connection"
+            : "whatsapp_connection",
+          connection
         };
       }
     } catch (error) {

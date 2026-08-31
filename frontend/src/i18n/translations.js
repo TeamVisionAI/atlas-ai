@@ -2508,6 +2508,11 @@ export const translations = {
     whatsappIntegrationDisconnected: "WhatsApp Business desconectado.",
     whatsappIntegrationDisconnectFailed:
       "No se pudo desconectar WhatsApp Business. Inténtalo de nuevo.",
+    whatsappMetaAdDestinationLabel: "Usar este número para automatización de anuncios de Meta",
+    whatsappMetaAdDestinationWarning:
+      "Si también usas este WhatsApp para amigos, familia o mensajes personales, activarlo significa que un remitente desconocido nuevo puede tratarse como un lead de Atlas.",
+    whatsappMetaAdDestinationSaveFailed:
+      "No se pudo guardar la configuración de automatización de anuncios de Meta.",
     configurationIntegrationsIntro:
       "Conecta los servicios que tu organización usa para comunicarse y agendar con prospectos.",
     configurationIntegrationsIntroPersonal:
@@ -5039,6 +5044,10 @@ export const translations = {
     whatsappIntegrationDisconnect: "Disconnect",
     whatsappIntegrationDisconnected: "WhatsApp Business disconnected.",
     whatsappIntegrationDisconnectFailed: "Unable to disconnect WhatsApp Business. Please try again.",
+    whatsappMetaAdDestinationLabel: "Use this number for Meta ad automation",
+    whatsappMetaAdDestinationWarning:
+      "If you also use this WhatsApp number for friends, family, or general messages, turning this on means a new unknown inbound may be treated as an Atlas lead.",
+    whatsappMetaAdDestinationSaveFailed: "Unable to save the Meta ad automation setting.",
     configurationIntegrationsIntro:
       "Connect the services your organization uses to communicate and schedule with prospects.",
     configurationIntegrationsIntroPersonal:

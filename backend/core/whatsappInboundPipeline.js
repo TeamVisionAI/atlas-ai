@@ -48,6 +48,9 @@ const {
   maybeCreateUnsupportedInboundReview,
   markPendingReviewsRecoveredAutomatically
 } = require("./unsupportedWhatsAppInboundReview/unsupportedWhatsAppInboundReviewService");
+const {
+  buildWhatsAppConnectionEligibilityContext
+} = require("./metaAdDestinationFallback");
 
 function duplicateSkipResult(correlationId, providerMessageId, phone) {
   logWhatsAppStage("message_duplicate_skipped", {
@@ -315,11 +318,13 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   const {
     organizationId: claimedOrganizationId,
     source: organizationSource = null,
-    ownerUserId: claimedOwnerUserId = null
+    ownerUserId: claimedOwnerUserId = null,
+    connection: resolvedWhatsAppConnection = null
   } = await resolveOrg({
     phoneNumberId:
       inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null,
-    wabaId: inbound.wabaId || null
+    wabaId: inbound.wabaId || null,
+    connectionRepository: dependencies.connectionRepository
   });
 
   const claim = await claimInbound({
@@ -356,6 +361,9 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   const body = inbound.body || `[${inbound.messageType} message]`;
   const phoneNumberId =
     inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null;
+  const inboundWhatsAppConnection = buildWhatsAppConnectionEligibilityContext(
+    resolvedWhatsAppConnection
+  );
   const senderIdentity = resolveWhatsAppSenderIdentityFromInbound(inbound);
 
   if (!senderIdentity?.isUsable) {
@@ -416,7 +424,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null,
       senderIdentity,
       whatsappConnectionOwnerUserId: claimedOwnerUserId,
-      whatsappConnectionSource: organizationSource
+      whatsappConnectionSource: organizationSource,
+      whatsappConnection: inboundWhatsAppConnection
     });
 
   // Implements BR-159 — unknown/personal inbound is logged, not promoted.
@@ -461,6 +470,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       phone: storagePhone || inboundWithIdentity.phone,
       organizationId: organizationId || claimedOrganizationId || null,
       reason: promotionDeniedReason || "NO_VALID_PROMOTION_SIGNAL",
+      eligibilityReason: promotionDeniedReason || "NO_VALID_PROMOTION_SIGNAL",
       conversationLogId: logResult.log?.id || null
     });
 
@@ -550,7 +560,10 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     body: semanticBody,
     campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : null,
     whatsappConnectionSource: organizationSource,
-    whatsappConnectionOwnerUserId: claimedOwnerUserId
+    whatsappConnectionOwnerUserId: claimedOwnerUserId,
+    whatsappConnection: inboundWhatsAppConnection,
+    organizationId: organizationId || claimedOrganizationId || null,
+    phoneNumberId
   };
 
   logWhatsAppStage("inbound_prospect_ready", {

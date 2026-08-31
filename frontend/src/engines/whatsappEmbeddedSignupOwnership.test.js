@@ -199,6 +199,9 @@ test("org Integrations card and WhatsAppConnect wire organization ownership", ()
 
   assert.match(orgPage, /ownershipMode="organization"/);
   assert.match(card, /reconnectTo/);
+  assert.match(card, /whatsappMetaAdDestinationLabel/);
+  assert.match(card, /whatsappMetaAdDestinationWarning/);
+  assert.match(card, /whatsapp-meta-ad-destination-toggle/);
   assert.match(connect, /resolveWhatsAppSignupOwnership/);
   assert.match(connect, /ownershipMode/);
   assert.doesNotMatch(

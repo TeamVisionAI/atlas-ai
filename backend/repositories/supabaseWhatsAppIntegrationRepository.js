@@ -43,8 +43,31 @@ function rowToRecord(row) {
     connected_at: row.connected_at,
     last_sync_at: row.last_sync_at,
     created_at: row.created_at,
-    updated_at: row.updated_at
+    updated_at: row.updated_at,
+    meta_ad_destination_automation_enabled:
+      row.meta_ad_destination_automation_enabled === true,
+    metaAdDestinationAutomationEnabled:
+      row.meta_ad_destination_automation_enabled === true
   };
+}
+
+function resolveMetaAdDestinationFlag(record, existing) {
+  if (
+    record &&
+    Object.prototype.hasOwnProperty.call(record, "metaAdDestinationAutomationEnabled")
+  ) {
+    return record.metaAdDestinationAutomationEnabled === true;
+  }
+  if (
+    record &&
+    Object.prototype.hasOwnProperty.call(record, "meta_ad_destination_automation_enabled")
+  ) {
+    return record.meta_ad_destination_automation_enabled === true;
+  }
+  return (
+    existing?.metaAdDestinationAutomationEnabled === true ||
+    existing?.meta_ad_destination_automation_enabled === true
+  );
 }
 
 function createSupabaseWhatsAppIntegrationRepository(options = {}) {
@@ -156,7 +179,11 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
       last_health_checked_at: record.last_health_checked_at || now,
       connected_at: record.connected_at || existing?.connected_at || now,
       last_sync_at: record.last_sync_at || now,
-      updated_at: now
+      updated_at: now,
+      meta_ad_destination_automation_enabled: resolveMetaAdDestinationFlag(
+        record,
+        existing
+      )
     };
 
     let data;
@@ -222,9 +249,20 @@ function createSupabaseWhatsAppIntegrationRepository(options = {}) {
       last_sync_at: patch.last_sync_at || now
     };
 
+    if (
+      Object.prototype.hasOwnProperty.call(patch, "metaAdDestinationAutomationEnabled") ||
+      Object.prototype.hasOwnProperty.call(patch, "meta_ad_destination_automation_enabled")
+    ) {
+      payload.meta_ad_destination_automation_enabled = resolveMetaAdDestinationFlag(
+        patch,
+        existing
+      );
+    }
+
     delete payload.access_token;
     delete payload.organization_id;
     delete payload.userId;
+    delete payload.metaAdDestinationAutomationEnabled;
 
     const { data, error } = await supabase
       .from("whatsapp_integrations")

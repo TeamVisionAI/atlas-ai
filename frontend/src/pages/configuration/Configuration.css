@@ -605,6 +605,21 @@
   box-sizing: border-box;
 }
 
+.integration-card__ad-destination {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--config-border);
+}
+
+.integration-card__ad-destination-warning {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--config-text-muted, #64748b);
+}
+
 .integration-card__technical-toggle {
   appearance: none;
   border: none;

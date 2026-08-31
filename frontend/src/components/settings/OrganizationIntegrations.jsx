@@ -339,6 +339,9 @@ export default function OrganizationIntegrations() {
             busy={whatsappBusy}
             disconnecting={busyAction === "whatsapp-disconnect"}
             onDisconnect={handleDisconnectWhatsApp}
+            onConnectionUpdated={() => {
+              load().catch(() => {});
+            }}
           />
         ) : integrations.organizationLeadChannel?.managedByOrganization ? (
           <article className="integration-card integration-card--info" data-testid="org-lead-channel-info">
@@ -533,6 +536,9 @@ export default function OrganizationIntegrations() {
             connection={orgChannel.whatsapp?.connection || {}}
             busy={false}
             disconnecting={busyAction === "org-whatsapp-disconnect"}
+            onConnectionUpdated={() => {
+              load().catch(() => {});
+            }}
             onDisconnect={async () => {
               setBusyAction("org-whatsapp-disconnect");
               try {

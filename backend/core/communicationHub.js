@@ -111,11 +111,16 @@ async function shouldDeliverAutomatedReply(prospect, options = {}) {
   if (!eligibility.eligible) {
     logWhatsAppStage("automated_reply_suppressed_not_eligible", {
       phone: prospect.phone || null,
-      reason: eligibility.reason
+      reason: eligibility.reason,
+      eligibilityReason: eligibility.reason
     });
     return false;
   }
 
+  logWhatsAppStage("atlas_automation_eligible", {
+    phone: prospect.phone || null,
+    eligibilityReason: eligibility.reason
+  });
   return true;
 }
 
@@ -402,6 +407,7 @@ async function processNormalizedInboundMessage(
     logWhatsAppStage("atlas_automation_not_eligible", {
       phone: normalized.phone,
       reason: eligibility.reason,
+      eligibilityReason: eligibility.reason,
       providerMessageId: normalized.providerMessageId || null
     });
     return {
@@ -411,6 +417,12 @@ async function processNormalizedInboundMessage(
       eligibilityReason: eligibility.reason
     };
   }
+
+  logWhatsAppStage("atlas_automation_eligible", {
+    phone: normalized.phone,
+    eligibilityReason: eligibility.reason,
+    providerMessageId: normalized.providerMessageId || null
+  });
 
   // Implements BR-114 — one-user live authoring canary before legacy CE.
   // Shadow/advisory never enter this path. Successful v2 reply skips CE entirely.

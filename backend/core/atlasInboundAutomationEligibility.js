@@ -17,6 +17,11 @@ const {
 const { REOPENED_INACTIVITY_MS } = require("./whatsappConstants");
 const { isIulWorkflowProspect } = require("./iulWorkflowConstants");
 const { INTAKE_CODE_STATUS } = require("./campaignIntakeCode/constants");
+const {
+  AD_DESTINATION_FALLBACK_REASON,
+  META_AD_DESTINATION_ELIGIBILITY_SOURCE,
+  evaluateMetaAdDestinationFallback
+} = require("./metaAdDestinationFallback");
 
 /** Durable proof that Atlas eligibility was earned from a verified event. */
 const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
@@ -28,7 +33,9 @@ const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
   /** BR-147 — validated ACTIVE IUL campaign intake (policy_review lane only). */
   CAMPAIGN_INTAKE_IUL: "CAMPAIGN_INTAKE_IUL",
   /** Historical BR-165 marker only. Personal connection is NOT verified eligibility. */
-  PERSONAL_WHATSAPP: "PERSONAL_WHATSAPP"
+  PERSONAL_WHATSAPP: "PERSONAL_WHATSAPP",
+  /** BR-193 — explicit Meta Ad Destination connection fallback. */
+  META_AD_DESTINATION: META_AD_DESTINATION_ELIGIBILITY_SOURCE
 });
 
 const VERIFIED_SOURCE_SET = Object.freeze(
@@ -45,6 +52,7 @@ const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
     WHATSAPP_ENTRY_METHOD.QR,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
+    WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION,
     "QUICK_CAPTURE"
   ])
 );
@@ -135,7 +143,10 @@ function resolveVerifiedAtlasEligibilitySource({
   intakeSource = null,
   sourceFields = null,
   campaignIntakeMatch = null,
-  whatsappConnectionSource = null
+  whatsappConnectionSource = null,
+  whatsappConnection = null,
+  inboundPhoneNumberId = null,
+  expectedOrganizationId = null
 } = {}) {
   if (qrTouch || qrAttributed) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
@@ -162,6 +173,23 @@ function resolveVerifiedAtlasEligibilitySource({
   }
   if (upper(sourceFields?.source) === upper(WHATSAPP_SOURCE.CAR_MAGNET)) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
+  }
+
+  if (
+    evaluateMetaAdDestinationFallback({
+      whatsappConnection,
+      inboundPhoneNumberId,
+      expectedOrganizationId
+    }).eligible
+  ) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION;
+  }
+
+  if (
+    entry === WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION ||
+    upper(sourceFields?.source) === WHATSAPP_SOURCE.META_AD_DESTINATION
+  ) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION;
   }
 
   // BR-165A — a personal WhatsApp connection establishes owner/routing only.
@@ -309,27 +337,51 @@ function evaluateAtlasInboundAutomationEligibility({
   // Legitimate personal-number leads continue below only if they previously earned
   // a verified CTWA/QR/intake source or automation was explicitly enabled.
   const continuation = resolveContinuationProvenance({ prospect, workflowState });
-  if (!continuation.proven) {
-    return { eligible: false, reason: continuation.reason };
-  }
-
-  if (
-    upper(workflowState?.atlasEligibilitySource) ===
-    VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_IUL
-  ) {
-    const iulSession = evaluateIulReviewSessionActive({ prospect, workflowState });
-    if (!iulSession.active) {
-      return { eligible: false, reason: iulSession.reason };
+  if (continuation.proven) {
+    if (
+      upper(workflowState?.atlasEligibilitySource) ===
+      VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_IUL
+    ) {
+      const iulSession = evaluateIulReviewSessionActive({ prospect, workflowState });
+      if (!iulSession.active) {
+        return { eligible: false, reason: iulSession.reason };
+      }
+      return { eligible: true, reason: continuation.reason };
     }
+
+    const session = evaluateRecruitingSessionActive({ prospect, workflowState });
+    if (!session.active) {
+      return { eligible: false, reason: session.reason };
+    }
+
+    if (
+      upper(workflowState?.atlasEligibilitySource) ===
+        VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION ||
+      upper(prospect?.entry_method) === WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION
+    ) {
+      return { eligible: true, reason: AD_DESTINATION_FALLBACK_REASON };
+    }
+
     return { eligible: true, reason: continuation.reason };
   }
 
-  const session = evaluateRecruitingSessionActive({ prospect, workflowState });
-  if (!session.active) {
-    return { eligible: false, reason: session.reason };
+  // Implements BR-193 — explicit Meta Ad Destination connection after higher-priority proofs.
+  const fallback = evaluateMetaAdDestinationFallback({
+    inbound,
+    whatsappConnection: inbound?.whatsappConnection || null,
+    inboundPhoneNumberId: inbound?.phoneNumberId || inbound?.phone_number_id || null,
+    expectedOrganizationId:
+      inbound?.organizationId ||
+      inbound?.organization_id ||
+      prospect?.organization_id ||
+      prospect?.organizationId ||
+      null
+  });
+  if (fallback.eligible) {
+    return { eligible: true, reason: fallback.reason };
   }
 
-  return { eligible: true, reason: continuation.reason };
+  return { eligible: false, reason: continuation.reason };
 }
 
 async function resolveAtlasInboundAutomationEligibility(input = {}) {
@@ -388,6 +440,7 @@ module.exports = {
   evaluateIulReviewSessionActive,
   persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
+  evaluateMetaAdDestinationFallback,
   isPersonalWhatsAppConnection,
   isPersonalWhatsAppOriginMarker,
   hasAtlasBusinessEligibilityEvidence,
