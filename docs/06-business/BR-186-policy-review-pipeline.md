@@ -23,7 +23,7 @@ Do **not** use Policy Intelligence `atlas_policy_reviews`. Scheduling `purpose=p
 
 Do **not** overload BR-182 service-case statuses with `APPLICATION_SUBMITTED` / `PLACED`.
 
-Apply `backend/database/migrations/067_br186_policy_review_pipeline.sql` after merge. No Railway variables. No data backfill. No phone-based tenant identity.
+Apply `backend/database/migrations/067_br186_policy_review_pipeline.sql` after merge. Attribution first/latest-touch fields are added by BR-188 (`068_br188_policy_review_acquisition.sql`). No Railway variables. No data backfill. No phone-based tenant identity.
 
 ## Stages
 

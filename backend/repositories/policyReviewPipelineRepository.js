@@ -25,11 +25,26 @@ function rowToRecord(row) {
     language: row.language || null,
     state: row.state || null,
     source: row.source || null,
+    sourcePlatform: row.source_platform || null,
     campaign: row.campaign || null,
+    campaignId: row.campaign_id || null,
+    campaignName: row.campaign_name || null,
     adId: row.ad_id || null,
+    adName: row.ad_name || null,
     adsetId: row.adset_id || null,
+    adSetName: row.adset_name || null,
     creativeId: row.creative_id || null,
+    creativeName: row.creative_name || null,
     campaignIntakeCode: row.campaign_intake_code || null,
+    landingFormSource: row.landing_form_source || null,
+    utmSource: row.utm_source || null,
+    utmMedium: row.utm_medium || null,
+    utmCampaign: row.utm_campaign || null,
+    utmContent: row.utm_content || null,
+    utmTerm: row.utm_term || null,
+    firstTouchAt: row.first_touch_at || null,
+    latestTouchAt: row.latest_touch_at || null,
+    acquisition: row.acquisition && typeof row.acquisition === "object" ? row.acquisition : {},
     stageTimestamps: row.stage_timestamps && typeof row.stage_timestamps === "object" ? row.stage_timestamps : {},
     carrierProductLabel: row.carrier_product_label || null,
     monthlyPremium: row.monthly_premium == null ? null : Number(row.monthly_premium),
@@ -63,11 +78,26 @@ function recordToRow(record) {
     language: record.language || null,
     state: record.state || null,
     source: record.source || null,
+    source_platform: record.sourcePlatform || null,
     campaign: record.campaign || null,
+    campaign_id: record.campaignId || null,
+    campaign_name: record.campaignName || null,
     ad_id: record.adId || null,
+    ad_name: record.adName || null,
     adset_id: record.adsetId || null,
+    adset_name: record.adSetName || null,
     creative_id: record.creativeId || null,
+    creative_name: record.creativeName || null,
     campaign_intake_code: record.campaignIntakeCode || null,
+    landing_form_source: record.landingFormSource || null,
+    utm_source: record.utmSource || null,
+    utm_medium: record.utmMedium || null,
+    utm_campaign: record.utmCampaign || null,
+    utm_content: record.utmContent || null,
+    utm_term: record.utmTerm || null,
+    first_touch_at: record.firstTouchAt || null,
+    latest_touch_at: record.latestTouchAt || null,
+    acquisition: record.acquisition || {},
     stage_timestamps: record.stageTimestamps || {},
     carrier_product_label: record.carrierProductLabel || null,
     monthly_premium: record.monthlyPremium,
@@ -112,6 +142,20 @@ async function findById(id, organizationId) {
   let query = supabase.from("atlas_policy_review_pipeline").select("*").eq("id", id);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return rowToRecord(data);
+}
+
+async function findByLinkedProspectId(linkedProspectId, organizationId) {
+  if (!linkedProspectId || !organizationId) return null;
+  const { data, error } = await supabase
+    .from("atlas_policy_review_pipeline")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("linked_prospect_id", linkedProspectId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
   if (error) throw error;
   return rowToRecord(data);
 }
@@ -167,6 +211,7 @@ async function listCommissionDefaults(organizationId) {
 module.exports = {
   save,
   findById,
+  findByLinkedProspectId,
   listForOwners,
   saveCommissionDefault,
   listCommissionDefaults

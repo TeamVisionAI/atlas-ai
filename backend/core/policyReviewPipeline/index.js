@@ -1,5 +1,6 @@
 const constants = require("./constants");
 const calculations = require("./calculations");
+const attribution = require("../policyReviewAttribution");
 const { createMemoryPolicyReviewStore } = require("./memoryStore");
 
 function canTransitionStage(fromStage, toStage) {
@@ -25,6 +26,7 @@ function stampStage(stageTimestamps, stage, at) {
 module.exports = {
   ...constants,
   ...calculations,
+  ...attribution,
   canTransitionStage,
   isExplicitOutcome,
   isReplacementStage,

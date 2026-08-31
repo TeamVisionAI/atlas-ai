@@ -21,7 +21,15 @@ const {
   resolveCommissionPresentation,
   emptyDashboardMetrics,
   aggregateDashboardMetrics,
-  createMemoryPolicyReviewStore
+  createMemoryPolicyReviewStore,
+  applyAcquisitionToRecord,
+  presentAcquisition,
+  emptyAcquisition,
+  emptyAcquisitionMetrics,
+  aggregateAcquisitionMetrics,
+  ACQUISITION_GROUP_BY,
+  acquisitionFromIntake,
+  hasValidAcquisition
 } = require("../core/policyReviewPipeline");
 const { presentHistoryActorLabel } = require("../core/appointmentHistory");
 const { HIERARCHY_MODES } = require("../core/hierarchyScopeEngine");
@@ -38,6 +46,8 @@ const OUTCOME_SET = new Set(Object.values(POLICY_REVIEW_OUTCOMES));
 let storeOverride = null;
 let clientFindOverride = null;
 let clientBatchOverride = null;
+let clientByPhoneOverride = null;
+let createClientOverride = null;
 let appointmentFindOverride = null;
 let documentRequestFindOverride = null;
 let createServiceCaseOverride = null;
@@ -68,6 +78,20 @@ function getClientBatchFinder() {
   return (ids, organizationId) => clients.listByIds(ids, organizationId);
 }
 
+function getClientByPhoneFinder() {
+  if (clientByPhoneOverride) return clientByPhoneOverride;
+  if (isAutomatedTestRuntime()) return async () => null;
+  const clients = require("../repositories/agendaClientRepository");
+  return (phone, organizationId) => clients.findByPhone(phone, organizationId);
+}
+
+function getClientCreator() {
+  if (createClientOverride) return createClientOverride;
+  if (isAutomatedTestRuntime()) return null;
+  const clients = require("../repositories/agendaClientRepository");
+  return (record) => clients.save(record);
+}
+
 function getAppointmentFinder() {
   if (appointmentFindOverride) return appointmentFindOverride;
   if (isAutomatedTestRuntime()) return async () => null;
@@ -87,6 +111,8 @@ function setStoresForTests({
   pipeline = null,
   findClient = null,
   listClientsByIds = null,
+  findClientByPhone = null,
+  createClient = null,
   findAppointment = null,
   findDocumentRequest = null,
   createServiceCase = null,
@@ -96,6 +122,8 @@ function setStoresForTests({
   storeOverride = pipeline || null;
   clientFindOverride = findClient || null;
   clientBatchOverride = listClientsByIds || null;
+  clientByPhoneOverride = findClientByPhone || null;
+  createClientOverride = createClient || null;
   appointmentFindOverride = findAppointment || null;
   documentRequestFindOverride = findDocumentRequest || null;
   createServiceCaseOverride = createServiceCase || null;
@@ -236,6 +264,7 @@ function applyCommission(row, defaults = {}) {
 
 function presentRecord(row, { nameById, ownerName = null, clientName = null, defaults } = {}) {
   const withCommission = applyCommission(row, defaults);
+  const acquisition = presentAcquisition(withCommission.acquisition || emptyAcquisition());
   return {
     id: withCommission.id,
     organizationId: withCommission.organizationId,
@@ -253,11 +282,29 @@ function presentRecord(row, { nameById, ownerName = null, clientName = null, def
     language: withCommission.language || null,
     state: withCommission.state || null,
     source: withCommission.source || null,
-    campaign: withCommission.campaign || null,
+    sourcePlatform: withCommission.sourcePlatform || acquisition.firstTouch.platform || null,
+    sourceLabel: acquisition.sourceLabel,
+    campaign: withCommission.campaign || acquisition.campaignLabel || null,
+    campaignId: withCommission.campaignId || null,
+    campaignName: withCommission.campaignName || acquisition.campaignLabel || null,
     adId: withCommission.adId || null,
+    adName: withCommission.adName || null,
+    adLabel: acquisition.adLabel,
     adsetId: withCommission.adsetId || null,
+    adSetName: withCommission.adSetName || null,
     creativeId: withCommission.creativeId || null,
+    creativeName: withCommission.creativeName || null,
+    creativeLabel: acquisition.creativeLabel,
     campaignIntakeCode: withCommission.campaignIntakeCode || null,
+    landingFormSource: withCommission.landingFormSource || null,
+    utmSource: withCommission.utmSource || null,
+    utmMedium: withCommission.utmMedium || null,
+    utmCampaign: withCommission.utmCampaign || null,
+    utmContent: withCommission.utmContent || null,
+    utmTerm: withCommission.utmTerm || null,
+    firstTouchAt: withCommission.firstTouchAt || acquisition.firstTouch.at || null,
+    latestTouchAt: withCommission.latestTouchAt || acquisition.latestTouch.at || null,
+    acquisition,
     stageTimestamps: withCommission.stageTimestamps || {},
     carrierProductLabel: withCommission.carrierProductLabel || null,
     monthlyPremium: withCommission.monthlyPremium,
@@ -331,9 +378,56 @@ function matchesSearch(item, query) {
   if (!query) return true;
   const needle = String(query).trim().toLowerCase();
   if (!needle) return true;
-  return [item.clientName, item.stage, item.source, item.campaign, item.state, item.language]
+  return [
+    item.clientName,
+    item.stage,
+    item.source,
+    item.sourceLabel,
+    item.sourcePlatform,
+    item.campaign,
+    item.campaignName,
+    item.campaignIntakeCode,
+    item.adLabel,
+    item.creativeLabel,
+    item.state,
+    item.language
+  ]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(needle));
+}
+
+function matchesAcquisitionFilters(item, filters = {}) {
+  const first = item.acquisition?.firstTouch || {};
+  if (filters.platform) {
+    const platform = String(filters.platform).trim().toLowerCase();
+    const actual = String(item.sourcePlatform || first.platform || "").toLowerCase();
+    if (actual !== platform) return false;
+  }
+  if (filters.campaign) {
+    const campaign = String(filters.campaign).trim().toLowerCase();
+    const haystack = [item.campaign, item.campaignName, item.campaignId, first.campaignName, first.campaignId]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+    if (!haystack.includes(campaign) && !haystack.some((value) => value.includes(campaign))) return false;
+  }
+  if (filters.source) {
+    const source = String(filters.source).trim().toLowerCase();
+    const haystack = [item.source, item.sourceLabel, item.sourcePlatform, first.source]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+    if (!haystack.includes(source) && !haystack.some((value) => value.includes(source))) return false;
+  }
+  if (filters.intakeCode) {
+    const code = String(filters.intakeCode).trim().toUpperCase();
+    if (String(item.campaignIntakeCode || first.intakeCode || "").toUpperCase() !== code) return false;
+  }
+  if (filters.language && String(item.language || "").toLowerCase() !== String(filters.language).toLowerCase()) {
+    return false;
+  }
+  if (filters.state && String(item.state || "").toUpperCase() !== String(filters.state).toUpperCase()) {
+    return false;
+  }
+  return true;
 }
 
 async function maybeCreateServiceCase(input, authContext, client) {
@@ -363,24 +457,27 @@ async function maybeCreateServiceCase(input, authContext, client) {
 
 function applyAttribution(row, input) {
   const next = { ...row };
-  const fields = [
-    ["language", "language"],
-    ["state", "state"],
-    ["source", "source"],
-    ["campaign", "campaign"],
-    ["adId", "adId"],
-    ["adsetId", "adsetId"],
-    ["creativeId", "creativeId"],
-    ["campaignIntakeCode", "campaignIntakeCode"],
-    ["contactId", "contactId"],
-    ["linkedProspectId", "linkedProspectId"]
-  ];
-  for (const [inputKey, rowKey] of fields) {
-    if (input[inputKey] !== undefined) {
-      next[rowKey] = input[inputKey] ? String(input[inputKey]).trim() : null;
+  if (input.language !== undefined) next.language = input.language ? String(input.language).trim() : null;
+  if (input.state !== undefined) next.state = input.state ? String(input.state).trim() : null;
+  if (input.contactId !== undefined) next.contactId = input.contactId || null;
+  if (input.linkedProspectId !== undefined) next.linkedProspectId = input.linkedProspectId || null;
+  const stamped = applyAcquisitionToRecord(next, input);
+  if (!hasValidAcquisition(stamped.acquisition?.firstTouch) && !hasValidAcquisition(stamped.acquisition?.latestTouch)) {
+    const fields = [
+      ["source", "source"],
+      ["campaign", "campaign"],
+      ["adId", "adId"],
+      ["adsetId", "adsetId"],
+      ["creativeId", "creativeId"],
+      ["campaignIntakeCode", "campaignIntakeCode"]
+    ];
+    for (const [inputKey, rowKey] of fields) {
+      if (input[inputKey] !== undefined) {
+        stamped[rowKey] = input[inputKey] ? String(input[inputKey]).trim() : null;
+      }
     }
   }
-  return next;
+  return stamped;
 }
 
 function applyProductionFields(row, input) {
@@ -446,11 +543,26 @@ async function createPolicyReview(input, authContext) {
         language: input.language || client.preferredLanguage || null,
         state: input.state || null,
         source: input.source || client.source || null,
+        sourcePlatform: input.sourcePlatform || null,
         campaign: input.campaign || null,
+        campaignId: input.campaignId || null,
+        campaignName: input.campaignName || input.campaign || null,
         adId: input.adId || null,
+        adName: input.adName || null,
         adsetId: input.adsetId || null,
+        adSetName: input.adSetName || null,
         creativeId: input.creativeId || null,
+        creativeName: input.creativeName || null,
         campaignIntakeCode: input.campaignIntakeCode || null,
+        landingFormSource: input.landingFormSource || null,
+        utmSource: input.utmSource || null,
+        utmMedium: input.utmMedium || null,
+        utmCampaign: input.utmCampaign || null,
+        utmContent: input.utmContent || null,
+        utmTerm: input.utmTerm || null,
+        firstTouchAt: null,
+        latestTouchAt: null,
+        acquisition: input.acquisition || emptyAcquisition(),
         stageTimestamps: stampStage({}, stage, now),
         carrierProductLabel: null,
         monthlyPremium: null,
@@ -511,6 +623,12 @@ async function listPolicyReviews({
   stage,
   clientId,
   ownerUserId,
+  platform,
+  campaign,
+  source,
+  intakeCode,
+  language,
+  state,
   nameById
 } = {}) {
   const store = getStore();
@@ -537,6 +655,18 @@ async function listPolicyReviews({
       defaults
     });
     if (!matchesSearch(presented, search)) continue;
+    if (
+      !matchesAcquisitionFilters(presented, {
+        platform,
+        campaign,
+        source,
+        intakeCode,
+        language,
+        state
+      })
+    ) {
+      continue;
+    }
     items.push(presented);
   }
   items.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
@@ -848,6 +978,185 @@ async function getCommissionDefaults({ organizationId, authContext, userId } = {
   };
 }
 
+async function applyAcquisitionToReview(id, input, authContext) {
+  const { store, row } = await getAuthorizedRecord(id, input.organizationId, authContext);
+  const now = input.at || new Date().toISOString();
+  const next = applyAttribution(
+    { ...row, updatedAt: now },
+    { ...input, acquisitionEvent: input.acquisitionEvent || input }
+  );
+  if (JSON.stringify(next.acquisition) === JSON.stringify(row.acquisition || {})) {
+    return presentRecord(row, {
+      nameById: await loadActorNames(row.organizationId),
+      ownerName: await resolveOwnerName(row.ownerUserId, new Map()),
+      defaults: pickDefaults(await loadDefaultsMap(store, row.organizationId), row.ownerUserId)
+    });
+  }
+  next.history = appendHistory(row, {
+    type: POLICY_REVIEW_HISTORY_TYPES.ATTRIBUTION_SET,
+    at: now,
+    actor: authContext.userId,
+    summary: "Acquisition touch recorded",
+    newValues: {
+      firstTouch: next.acquisition?.firstTouch?.campaignName || next.campaign,
+      latestTouch: next.acquisition?.latestTouch?.campaignName || next.acquisition?.latestTouch?.intakeCode
+    }
+  });
+  const saved = await store.save(next);
+  const names = await loadActorNames(row.organizationId);
+  const client = await loadClientOrThrow(saved.clientId, saved.organizationId).catch(() => null);
+  return presentRecord(saved, {
+    nameById: names,
+    ownerName: await resolveOwnerName(saved.ownerUserId, new Map(names)),
+    clientName: client?.name || null,
+    defaults: pickDefaults(await loadDefaultsMap(store, saved.organizationId), saved.ownerUserId)
+  });
+}
+
+async function getAcquisitionMetrics({
+  organizationId,
+  authContext,
+  scope,
+  groupBy,
+  platform,
+  campaign,
+  source,
+  intakeCode,
+  language,
+  state,
+  ownerUserId
+} = {}) {
+  const listed = await listPolicyReviews({
+    organizationId,
+    authContext,
+    scope,
+    platform,
+    campaign,
+    source,
+    intakeCode,
+    language,
+    state,
+    ownerUserId
+  });
+  const resolvedGroup = ACQUISITION_GROUP_BY.includes(groupBy) ? groupBy : "campaign";
+  const aggregated = aggregateAcquisitionMetrics(listed.items, { groupBy: resolvedGroup });
+  return {
+    generatedAt: listed.generatedAt,
+    organizationId: listed.organizationId,
+    scope: listed.scope,
+    teamAvailable: listed.teamAvailable,
+    groupBy: aggregated.groupBy,
+    filters: { platform: platform || null, campaign: campaign || null, source: source || null, intakeCode: intakeCode || null },
+    totals: aggregated.totals,
+    groups: aggregated.groups
+  };
+}
+
+async function ensurePolicyReviewFromIulIntake(input = {}) {
+  const organizationId = input.organizationId;
+  const ownerUserId = input.ownerUserId || input.match?.ownerUserId;
+  if (!organizationId) {
+    return { ok: false, reason: "NO_ORGANIZATION", recruitingEligible: false };
+  }
+  const event =
+    input.acquisitionEvent ||
+    acquisitionFromIntake({
+      match: input.match,
+      ctwaReferral: input.ctwaReferral || null,
+      utm: input.utm || null,
+      landingFormSource: input.landingFormSource || null,
+      at: input.at
+    });
+  const store = getStore();
+  if (!store) {
+    return { ok: true, pending: true, acquisition: event, recruitingEligible: false, reason: "STORE_UNAVAILABLE" };
+  }
+
+  let existing = null;
+  if (input.prospect?.id && store.findByLinkedProspectId) {
+    existing = await store.findByLinkedProspectId(input.prospect.id, organizationId);
+  }
+  if (!existing && input.clientId) {
+    const rows = await store.listForOwners({
+      organizationId,
+      ownerUserIds: ownerUserId ? [ownerUserId] : null,
+      clientId: input.clientId
+    });
+    existing = rows[0] || null;
+  }
+  if (existing) {
+    const actor = { userId: ownerUserId || existing.ownerUserId, role: "agent" };
+    const record = await applyAcquisitionToReview(
+      existing.id,
+      { organizationId, acquisitionEvent: event, at: input.at },
+      actor
+    );
+    return {
+      ok: true,
+      linked: true,
+      created: false,
+      reviewId: record.id,
+      acquisition: record.acquisition,
+      recruitingEligible: false
+    };
+  }
+
+  let client = input.client || null;
+  if (!client && input.clientId) {
+    client = await getClientFinder()(input.clientId, organizationId);
+  }
+  if (!client && input.prospect?.phone) {
+    client = await getClientByPhoneFinder()(input.prospect.phone, organizationId);
+  }
+  if (!client && ownerUserId) {
+    const creator = getClientCreator();
+    if (creator) {
+      client = await creator({
+        organizationId,
+        ownerUserId,
+        name: input.prospect?.name || input.prospect?.phone || "Policy review",
+        phone: input.prospect?.phone || null,
+        preferredLanguage: input.match?.language || input.language || null,
+        source: event.platform || "campaign_intake",
+        createdBy: ownerUserId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }
+  if (!client || !ownerUserId) {
+    return {
+      ok: true,
+      pending: true,
+      acquisition: event,
+      recruitingEligible: false,
+      reason: client ? "NO_OWNER" : "NO_CLIENT"
+    };
+  }
+
+  const record = await createPolicyReview(
+    {
+      organizationId,
+      clientId: client.id,
+      ownerUserId,
+      linkedProspectId: input.prospect?.id || null,
+      language: input.match?.language || input.language || client.preferredLanguage || null,
+      acquisitionEvent: event,
+      nameById: input.nameById
+    },
+    { userId: ownerUserId, role: "agent" }
+  );
+  return {
+    ok: true,
+    created: true,
+    linked: true,
+    reviewId: record.id,
+    clientId: client.id,
+    acquisition: record.acquisition,
+    recruitingEligible: false
+  };
+}
+
 async function saveCommissionDefaults(input, authContext) {
   const store = getStore();
   if (!store) throw buildError("STORE_UNAVAILABLE", "Policy review store is unavailable.", 503);
@@ -883,6 +1192,10 @@ module.exports = {
   submitApplication,
   markPlaced,
   createClientFollowUp,
+  applyAcquisitionToReview,
+  getAcquisitionMetrics,
+  ensurePolicyReviewFromIulIntake,
+  emptyAcquisitionMetrics,
   getCommissionDefaults,
   saveCommissionDefaults,
   POLICY_REVIEW_STAGES,

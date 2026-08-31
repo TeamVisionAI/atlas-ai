@@ -674,8 +674,9 @@ export default function ClientsPage() {
                       <div>
                         <strong>{buildPolicyReviewStageLabel(item.stage, translate)}</strong>
                         <span>
-                          {[item.source, item.campaign, item.language, item.state].filter(Boolean).join(" · ") ||
-                            translate("policyReviewNoAttribution")}
+                          {[item.sourceLabel || item.source, item.campaignName || item.campaign, item.language, item.state]
+                            .filter(Boolean)
+                            .join(" · ") || translate("policyReviewNoAttribution")}
                         </span>
                       </div>
                     </li>

@@ -32,6 +32,9 @@ test("Policy Reviews is routed separately from recruiting and Policy Intelligenc
   assert.match(page, /getPolicyReviews\(/);
   assert.match(page, /policyReviewScopeMine/);
   assert.match(page, /policyReviewMetricReplacement/);
+  assert.match(page, /policyReviewAcquisition/);
+  assert.match(page, /policyReviewFilterPlatform/);
+  assert.match(page, /policy-review-source-badge/);
   assert.doesNotMatch(page, /navigateToProspectWorkspace|recruitAiV2|\/api\/prospects/);
   assert.doesNotMatch(page, /policy-intelligence|PolicyIntelligence/);
   assert.match(clients, /getPolicyReviews\(\{ clientId/);

@@ -2912,6 +2912,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-188 — IUL Acquisition Attribution V1
+
+**Implements:** Connect a policy-review lead to its marketing source so Atlas can report which campaign/ad/creative produced the review, appointment, application, placed case, and estimated commission.  
+**Domain:** Clients / policy-review pipeline / campaign intake  
+**Depends on:** BR-186 (pipeline); BR-147 (campaign intake codes); BR-142 (IUL ≠ recruiting)  
+**Related:** BR-129 (QR first-touch pattern, complementary); BR-160 control plane  
+**Status:** V1 implemented  
+**Engine target:** `policyReviewAttribution`; `policyReviewPipelineApplicationService`; campaign intake IUL linker  
+**Tests:** `backend/test/policyReviewAttributionBr188.test.js`; `frontend/src/pages/policyReviewsPageBr186.test.js`  
+**Docs:** `docs/06-business/BR-188-iul-acquisition-attribution.md`
+
+### Rules
+
+1. **First / latest touch** — First valid acquisition source locks first touch. Later acquisition/contact sources update latest touch only. A later event that omits attribution must not erase a confirmed source. Intake code is valid evidence even without Meta CTWA.
+2. **Storage** — Attribution lives on `atlas_policy_review_pipeline` (denormalized first-touch columns + `acquisition` JSONB). Do not duplicate into recruiting `lead_source` or unrelated canonical tables.
+3. **Funnel** — Attribution remains attached through NEW_REVIEW_LEAD → qualified → appointment → review completed → explicit replacement → application → placed → estimated commission.
+4. **Intake** — Existing IUL / `IUL_REVIEW` Campaign Intake Codes create or link policy-review context, preserve tenant/owner/campaign/source metadata, and never enter Recruit AI.
+5. **Metrics** — Server read model groups by platform, campaign, ad, creative, intake code, owner, language, state. Counts review leads, qualified reviews, appointments, completed reviews, replacement opportunities, applications, placed policies, monthly/annualized premium, estimated commission. Do not fabricate CPL/ROAS; `adSpend` stays null until a later spend BR.
+6. **Visibility** — My = own attribution/revenue. Team = authorized hierarchy/subtree. Super Admin control plane = no tenant revenue. Support Mode = selected tenant only. Wrong-org / unauthorized peer fail closed.
+7. **Recruiting separation** — Same person may have recruiting and IUL contexts independently. IUL attribution must never route the person into Recruit AI or change recruiting prospect/context counts.
+8. **Boundaries** — No Meta/TikTok Ads spend import, automatic ad creation, CRM replacement, marketing calendar, OCR/policy analysis, automatic replacement recommendations, or recruiting changes.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

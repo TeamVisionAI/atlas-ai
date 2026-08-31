@@ -305,7 +305,36 @@ function emptyPolicyReviewDetail() {
     organizationId: null,
     id: null,
     clientId: null,
-    history: []
+    history: [],
+    acquisition: { firstTouch: {}, latestTouch: {} }
+  };
+}
+
+function emptyPolicyReviewAcquisitionMetrics() {
+  return {
+    generatedAt: new Date().toISOString(),
+    controlPlane: true,
+    organizationId: null,
+    scope: "mine",
+    teamAvailable: false,
+    groupBy: "campaign",
+    filters: {},
+    totals: {
+      reviewLeads: 0,
+      qualifiedReviews: 0,
+      appointmentsBooked: 0,
+      reviewsCompleted: 0,
+      replacementOpportunities: 0,
+      applicationsSubmitted: 0,
+      placedPolicies: 0,
+      monthlyPremium: 0,
+      annualizedPremium: 0,
+      estimatedCommission: 0,
+      adSpend: null,
+      costPerLead: null,
+      roas: null
+    },
+    groups: []
   };
 }
 
@@ -427,6 +456,7 @@ module.exports = {
   emptyServiceCaseDetail,
   emptyPolicyReviews,
   emptyPolicyReviewDetail,
+  emptyPolicyReviewAcquisitionMetrics,
   emptyDocumentRequests,
   emptyDocumentRequestDetail,
   emptyDocuments,
