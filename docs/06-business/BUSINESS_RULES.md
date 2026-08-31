@@ -2845,6 +2845,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-185 — Timezone Consistency + Minimum Booking Lead Time
+
+**Implements:** One canonical operational timezone resolution (BR-079) and a tenant-configurable minimum booking lead time so automated slots are never offered or booked less than 120 minutes from now.  
+**Domain:** Scheduling / timezone / appointment settings  
+**Depends on:** BR-079 org-local dates; BR-050 wall-clock→UTC; Sprint 22 appointment profile  
+**Related:** BR-107 / BR-108 availability reads  
+**Status:** V1 implemented  
+**Engine target:** `schedulingLeadTime`; `appointmentSchedulingEngine.getAvailableSlots`; `schedulingAvailabilityReader`; `appointmentProfile.defaults.minimumBookingLeadMinutes`  
+**Tests:** `backend/test/schedulingLeadTimeBr185.test.js`; `frontend/src/pages/configuration/appointmentLeadTimeBr185.test.js`  
+**Docs:** `docs/06-business/BR-185-timezone-lead-time.md`
+
+### Rules
+
+1. **Canonical timezone** — Operational date/time uses BR-079 order: organization settings → organization/appointment profile → Atlas default (`America/New_York`) → UTC only if all IANA values are invalid. Scheduling “now” is an instant compared after profile-timezone wall-clock conversion. Do not invent a second timezone system.
+2. **Lead time** — `minimumBookingLeadMinutes` defaults to 120. Automated initial offers, reschedule offers, and booking confirmation require `slotStart >= now + lead`. Comparison is timezone-aware (zoned wall clock → UTC instant).
+3. **Empty today** — If no valid remaining slot today after the lead filter, treat today as unavailable and continue to the next valid day. Do not tell the prospect suppressed slots existed.
+4. **Manual override** — Human/admin `existingBooking` and `skipSlotValidation` paths may keep an explicitly selected slot. Do not silently replace it.
+5. **Config** — Store on the existing appointment profile defaults JSON. No migration. Tenants without a persisted value receive 120 on read.
+6. **Rendering** — User-facing timestamps use the resolved operational timezone. Date-only due dates stay date-only. Stored UTC instants stay UTC.
+7. **Boundaries** — Do not change Recruit AI intent logic, semantic shadow/apply, AI Quality classification, WhatsApp routing, campaign intake, BR-178 SoT, or BR-183 storage/security.
+
+---
+
 ## BR-110 — Management Self Appointment Settings + Configured Playground Schedule Bind
 
 **Implements:** MANAGEMENT recruiters (RVP / Division Leader / Regional Leader) may open Settings → Appointments to edit their **own** Sprint 22 `appointmentProfile`. Playground auto-bind may only select agents with a **persisted/configured** appointment profile — engine default Mon–Fri 09:00–17:00 is not treated as configured.  

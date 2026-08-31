@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import AtlasButton from "../ui/AtlasButton";
 import { buildProspectWorkspacePath } from "../../utils/prospectRoutes";
-import { presentHistoryActorLabel } from "../../engines/agentNotificationPresentation";
+import {
+  formatFriendlyAppointmentWhen,
+  presentHistoryActorLabel
+} from "../../engines/agentNotificationPresentation";
 import { shouldShowLifecycleActions } from "../../engines/appointmentCardPresentation";
 import { fetchAgendaContact } from "../../services/agendaService";
 import { Link } from "react-router-dom";
@@ -68,7 +71,11 @@ export function AppointmentHistoryPanel({ appointment, locale }) {
             <strong>{translate(`appointmentsHistory_${event.type}`) || event.type}</strong>
             <time dateTime={event.at || event.timestamp}>
               {event.at || event.timestamp
-                ? new Date(event.at || event.timestamp).toLocaleString(locale)
+                ? formatFriendlyAppointmentWhen(
+                    event.at || event.timestamp,
+                    appointment.timezone || "America/New_York",
+                    locale
+                  )
                 : "—"}
             </time>
           </div>

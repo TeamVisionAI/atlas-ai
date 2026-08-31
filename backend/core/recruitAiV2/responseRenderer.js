@@ -949,7 +949,18 @@ function renderCustomerReply(responsePlan) {
             : `I don't have availability after ${earliestLabel}. The closest I have is `
         : "";
 
-    if (offered.length >= 2) {
+    if (entities.todayUnavailableAfterLead && offered.length >= 1) {
+      const nextPhrase =
+        offered.length >= 2 && multiDate
+          ? language === LANGUAGES.SPANISH
+            ? `${formatOfferedSlotPhrase(offered[0], language, dayOptions)} y ${formatOfferedSlotPhrase(offered[1], language, dayOptions)}`
+            : `${formatOfferedSlotPhrase(offered[0], language, dayOptions)} and ${formatOfferedSlotPhrase(offered[1], language, dayOptions)}`
+          : formatOfferedSlotPhrase(offered[0], language, dayOptions);
+      template =
+        language === LANGUAGES.SPANISH
+          ? `Ya no tengo horarios disponibles para hoy, pero puedo ofrecerle ${nextPhrase}. ¿Le funciona?`
+          : `I no longer have availability today, but I can offer ${nextPhrase}. Does that work for you?`;
+    } else if (offered.length >= 2) {
       if (multiDate) {
         const phraseA = formatOfferedSlotPhrase(offered[0], language, dayOptions);
         const phraseB = formatOfferedSlotPhrase(offered[1], language, dayOptions);

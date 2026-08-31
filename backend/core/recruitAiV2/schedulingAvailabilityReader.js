@@ -22,6 +22,10 @@ const {
   logSchedulingDiagnostics
 } = require("../sharedScheduling/schedulingObservability");
 const { buildNegotiationState } = require("../sharedScheduling/schedulingNegotiationState");
+const {
+  resolveMinimumBookingLeadMinutes,
+  isSlotBookableByLeadTime
+} = require("../schedulingLeadTime");
 
 const DEFAULT_MAX_CANDIDATES = 2;
 const DEFAULT_TIMEZONE = ATLAS_DEFAULT_TIMEZONE || "America/New_York";
@@ -372,12 +376,21 @@ function slotStartMs(slot, timeZone = DEFAULT_TIMEZONE) {
   return zonedTimeToUtcMs(y, m, d, hh, mm || 0, 0, 0, timeZone);
 }
 
-/** Drop slots at/before now (org-local wall clock via ISO/zoned conversion). */
-function filterFutureSlots(slots, nowMs, timeZone = DEFAULT_TIMEZONE) {
+/** Drop past slots, and slots inside an explicit BR-185 lead window. */
+function filterFutureSlots(
+  slots,
+  nowMs,
+  timeZone = DEFAULT_TIMEZONE,
+  leadMinutes = 0
+) {
   const now = Number(nowMs) || Date.now();
+  // null/undefined keep the historical past-only filter. The engine is SoT for
+  // tenant lead time; callers must pass a lead to apply one here.
+  const lead =
+    leadMinutes == null ? 0 : resolveMinimumBookingLeadMinutes(leadMinutes);
   return (slots || []).filter((slot) => {
     const start = slotStartMs(slot, timeZone);
-    return start != null && start > now;
+    return start != null && isSlotBookableByLeadTime(start, now, lead);
   });
 }
 
@@ -527,6 +540,7 @@ function toDecisionAvailability(readResult) {
     rolling: Boolean(readResult.rolling),
     searchMeta: readResult.searchMeta || null,
     alternativeToConstraint: Boolean(readResult.alternativeToConstraint),
+    todayUnavailableAfterLead: Boolean(readResult.todayUnavailableAfterLead),
     readResult
   };
 }
@@ -580,7 +594,9 @@ async function readCandidateSlots({
   rejectTimes = [],
   fixtureSlots = null,
   getSlots = null,
-  maxResults = 24
+  maxResults = 24,
+  now = null,
+  minimumBookingLeadMinutes = null
 } = {}) {
   if (!date) {
     return buildUnavailableResult({
@@ -651,7 +667,17 @@ async function readCandidateSlots({
     });
   }
 
-  const unconstrainedFutureSlots = rawSlots;
+  const nowMs = now ? new Date(now).getTime() : null;
+  // Engine slots already honor the tenant profile lead. Re-filter with 0 unless
+  // a caller/fixture explicitly passed a lead so a lower tenant value is not
+  // overridden by the helper default (BR-185).
+  const readerLeadMinutes = Array.isArray(fixtureSlots)
+    ? minimumBookingLeadMinutes
+    : minimumBookingLeadMinutes ?? 0;
+  const unconstrainedFutureSlots =
+    Number.isFinite(nowMs)
+      ? filterFutureSlots(rawSlots, nowMs, resolvedTimezone, readerLeadMinutes)
+      : rawSlots;
   const filtered = filterSlotsByConstraints(unconstrainedFutureSlots, constraints);
   const offered = selectCandidateSlots(filtered, {
     maxCandidates,
@@ -879,7 +905,13 @@ async function readRollingCandidateSlots({
     const normalized = (rawSlots || [])
       .map((slot) => normalizeSlot(slot, tz))
       .filter(Boolean);
-    const future = filterFutureSlots(normalized, nowMs, tz);
+    const future = filterFutureSlots(
+      normalized,
+      nowMs,
+      tz,
+      constraints.minimumBookingLeadMinutes ??
+        (Array.isArray(fixtureSlots) ? null : 0)
+    );
     const qualifying = filterSlotsByConstraints(future, constraints);
     return { future, qualifying };
   };
@@ -1319,6 +1351,9 @@ async function resolveAvailabilityForTurn({
   }
 
   // BR-107 — concrete date → single-day read.
+  // BR-185 — if that date is org-local today and lead time cleared it, roll to the next valid day.
+  const nowMs = now ? new Date(now).getTime() : Date.now();
+  const todayKey = dateKeyInZone(nowMs, timezone);
   const readResult = await readCandidateSlots({
     organizationId,
     agentId,
@@ -1330,8 +1365,53 @@ async function resolveAvailabilityForTurn({
     fixtureSlots,
     getSlots: options.getSlots || null,
     rejectTimes,
-    maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES
+    maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
+    now,
+    minimumBookingLeadMinutes: options.minimumBookingLeadMinutes
   });
+
+  if (
+    date === todayKey &&
+    (readResult.offeredSlots || []).length === 0 &&
+    (readResult.unconstrainedFutureSlots || []).length === 0 &&
+    readResult.status !== READ_STATUS.UNAVAILABLE
+  ) {
+    const rolling = await readRollingCandidateSlots({
+      organizationId,
+      agentId,
+      agentResolutionSource,
+      timezone,
+      constraints,
+      purpose: schedulingConfig.purpose,
+      fixtureSlots,
+      getSlots: options.getSlots || null,
+      rejectIds,
+      maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
+      now
+    });
+    if ((rolling.offeredSlots || []).length > 0) {
+      const rolled = enrichAvailabilityForRequestedTime(
+        toDecisionAvailability({
+          ...rolling,
+          todayUnavailableAfterLead: true
+        }),
+        interpretation?.entities?.requestedTime || null,
+        null
+      );
+      logSchedulingDiagnostics("shared_scheduling_availability_read", {
+        ...buildSchedulingDiagnostics({
+          workflowConfig: schedulingConfig,
+          negotiationState,
+          availability: rolled
+        }),
+        organizationId,
+        agentId,
+        date,
+        todayUnavailableAfterLead: true
+      });
+      return rolled;
+    }
+  }
 
   const resolvedAvailability = enrichAvailabilityForRequestedTime(
     toDecisionAvailability(readResult),

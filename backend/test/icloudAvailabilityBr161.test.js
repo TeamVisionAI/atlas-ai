@@ -48,6 +48,7 @@ function profileFor(enabledDay, start, end, timezone = "America/New_York") {
         recruitingInterviewDurationMinutes: 30,
         bufferBeforeMinutes: 0,
         bufferAfterMinutes: 0,
+        minimumBookingLeadMinutes: 0,
         timezone
       }
     },

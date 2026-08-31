@@ -37,6 +37,7 @@ import {
   formatAppointmentMetaLabel
 } from "../engines/appointmentCardPresentation";
 import { resolveAppointmentDisplayStatus } from "../engines/interviewWorkflowPresentationEngine";
+import { formatFriendlyAppointmentWhen } from "../engines/agentNotificationPresentation";
 import "../styles/atlas-ui.css";
 import "./AppointmentsPage.css";
 
@@ -51,18 +52,15 @@ const VIEWS = [
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function formatWhen(iso, locale) {
+function formatWhen(iso, locale, timeZone) {
   if (!iso) {
     return "—";
   }
 
-  return new Date(iso).toLocaleString(locale, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
+  return (
+    formatFriendlyAppointmentWhen(iso, timeZone || "America/New_York", locale) ||
+    "—"
+  );
 }
 
 function purposeLabel(purpose, translate) {
@@ -441,7 +439,9 @@ export default function AppointmentsPage() {
                         contact={contactModel}
                         translate={translate}
                       />
-                      <p className="appointments-page__when">{formatWhen(appointment.startDateTime, locale)}</p>
+                      <p className="appointments-page__when">
+                        {formatWhen(appointment.startDateTime, locale, appointment.timezone)}
+                      </p>
                       <p className="appointments-page__meta">
                         {formatAppointmentMetaLabel(
                           appointment,
