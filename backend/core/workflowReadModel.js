@@ -114,13 +114,15 @@ async function evaluateWorkflowState({
   brain,
   agentState,
   messageHints,
-  persistTransitions = false
+  persistTransitions = false,
+  persisted: persistedInput = null,
+  activeAppointment
 }) {
   const scope = {
     organizationId: prospect?.organization_id || null,
     prospectId: prospect?.id || null
   };
-  const persisted = await loadPersistedWorkflowState(phone, scope);
+  const persisted = persistedInput || (await loadPersistedWorkflowState(phone, scope));
 
   const mergedAgentState = {
     ...agentState,
@@ -147,7 +149,8 @@ async function evaluateWorkflowState({
     computedOwnership: workflowOwnership,
     prospect,
     agentState: mergedAgentState,
-    persist: persistTransitions === true
+    persist: persistTransitions === true,
+    persisted
   });
 
   const effectiveMilestone = reconciliation.milestone;
@@ -250,7 +253,8 @@ async function evaluateWorkflowState({
     phone,
     organizationId: prospect?.organization_id || null,
     milestone: resolved.canonicalMilestone,
-    prospect
+    prospect,
+    activeAppointment
   });
 
   let canonicalMilestoneOut = appointmentTruth.milestone;

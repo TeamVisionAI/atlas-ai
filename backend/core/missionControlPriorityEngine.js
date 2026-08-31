@@ -5,35 +5,50 @@
 
 const { buildQualificationBrain } = require("./informationModel");
 const { loadAgentState } = require("./agentActionState");
-const { evaluateWorkflowState, fetchMessageHints } = require("./workflowReadModel");
+const { evaluateWorkflowState } = require("./workflowReadModel");
+const { workflowStateFromProspectRow } = require("./workflowStateStore");
+const {
+  loadMissionControlQueueBatch,
+  lookupByPhone,
+  messageHintsFromLogs
+} = require("./missionControlQueueBatch");
 
-async function buildWorkflowSummaryForProspect(prospect) {
-  if (!prospect?.phone) {
-    return null;
-  }
-
-  const channel = "whatsapp";
-  const lastMessage = prospect.last_message || "";
+function brainForProspect(prospect) {
   const qualification = buildQualificationBrain(prospect, {
-    channel,
-    message: lastMessage
+    channel: "whatsapp",
+    message: prospect?.last_message || ""
   });
-
-  const brain = {
+  return {
     currentStep: qualification.currentStep,
     nextField: qualification.nextField,
     missingFields: qualification.missingFields
   };
+}
 
+async function buildWorkflowSummaryForProspect(prospect, options = {}) {
+  if (!prospect?.phone) {
+    return null;
+  }
+
+  const brain = brainForProspect(prospect);
   const agentState = loadAgentState(prospect.phone);
-  const messageHints = await fetchMessageHints(prospect.phone);
+  const logs = options.logs || [];
+  const messageHints = options.messageHints || messageHintsFromLogs(logs);
+  const persisted =
+    options.persisted ||
+    (prospect.id && prospect.organization_id
+      ? workflowStateFromProspectRow(prospect)
+      : null);
 
   const workflow = await evaluateWorkflowState({
     phone: prospect.phone,
     prospect,
     brain,
     agentState,
-    messageHints
+    messageHints,
+    persistTransitions: false,
+    persisted,
+    activeAppointment: options.activeAppointment
   });
 
   return {
@@ -49,31 +64,8 @@ async function buildWorkflowSummaryForProspect(prospect) {
   };
 }
 
-/**
- * Returns prospects sorted by missionControlPriority (rank 1 = highest).
- * Implements BR-136 — excludes operational TEST/CANARY/QA (not META_REVIEW demos).
- * Implements BR-044 — excludes terminal closed interview outcomes from default queue.
- */
-async function buildPrioritizedWorkflowQueue(prospects = []) {
-  const {
-    filterOutOperationalTestProspects
-  } = require("./missionControlOperationalTestFilter");
-  const {
-    filterOutTerminalClosedForMissionControl
-  } = require("./missionControlTerminalOutcomeFilter");
-
-  const eligible = filterOutOperationalTestProspects(prospects);
-
-  const summaries = await Promise.all(
-    eligible.map((prospect) => buildWorkflowSummaryForProspect(prospect))
-  );
-
-  const openWork = await filterOutTerminalClosedForMissionControl(
-    eligible,
-    summaries.filter(Boolean)
-  );
-
-  return openWork.sort((left, right) => {
+function sortWorkflowQueue(items = []) {
+  return [...items].sort((left, right) => {
     if (left.missionControlPriority !== right.missionControlPriority) {
       return left.missionControlPriority - right.missionControlPriority;
     }
@@ -89,7 +81,60 @@ async function buildPrioritizedWorkflowQueue(prospects = []) {
   });
 }
 
+/**
+ * Returns prospects sorted by missionControlPriority (rank 1 = highest).
+ * Implements BR-136 — excludes operational TEST/CANARY/QA (not META_REVIEW demos).
+ * Implements BR-044 — excludes terminal closed interview outcomes from default queue.
+ */
+async function buildPrioritizedWorkflowQueue(prospects = [], options = {}) {
+  const {
+    filterOutOperationalTestProspects
+  } = require("./missionControlOperationalTestFilter");
+  const {
+    filterOutTerminalClosedForMissionControl
+  } = require("./missionControlTerminalOutcomeFilter");
+
+  const eligible = filterOutOperationalTestProspects(prospects);
+  const organizationId = options.organizationId || eligible[0]?.organization_id || null;
+  const batch = await loadMissionControlQueueBatch(eligible, {
+    organizationId,
+    fetchConversationLogsFn: options.fetchConversationLogsFn,
+    listAppointmentsFn: options.listAppointmentsFn,
+    loadProspectPhoneOrgIndexFn: options.loadProspectPhoneOrgIndexFn,
+    onQuery: options.onQuery,
+    supabase: options.supabase
+  });
+
+  const summaries = await Promise.all(
+    eligible.map((prospect) =>
+      buildWorkflowSummaryForProspect(prospect, {
+        logs: lookupByPhone(batch.logsByPhone, prospect.phone) || [],
+        persisted: workflowStateFromProspectRow(prospect),
+        activeAppointment: lookupByPhone(batch.activeByPhone, prospect.phone) ?? null
+      })
+    )
+  );
+
+  const openWork = await filterOutTerminalClosedForMissionControl(
+    eligible,
+    summaries.filter(Boolean),
+    {
+      organizationId,
+      latestAppointmentByPhone: batch.latestByPhone
+    }
+  );
+
+  const sorted = sortWorkflowQueue(openWork);
+  if (options.stats) {
+    options.stats.queries = batch.stats;
+    options.stats.eligible = eligible.length;
+    options.stats.returned = sorted.length;
+  }
+  return sorted;
+}
+
 module.exports = {
   buildPrioritizedWorkflowQueue,
-  buildWorkflowSummaryForProspect
+  buildWorkflowSummaryForProspect,
+  sortWorkflowQueue
 };

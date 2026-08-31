@@ -149,13 +149,14 @@ async function applyTimeBasedReconciliation({
   computedOwnership,
   prospect,
   agentState = {},
-  persist = true
+  persist = true,
+  persisted: persistedInput = null
 }) {
   const scope = {
     organizationId: prospect?.organization_id || null,
     prospectId: prospect?.id || null
   };
-  const persisted = await loadPersistedWorkflowState(phone, scope);
+  const persisted = persistedInput || (await loadPersistedWorkflowState(phone, scope));
 
   if (
     !shouldReconcile({

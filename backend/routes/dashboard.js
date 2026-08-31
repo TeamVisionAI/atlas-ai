@@ -71,53 +71,42 @@ router.get("/", operationalControlPlaneEmpty(emptyDashboard), async (req, res) =
       prospects
     };
 
-    try {
-      dashboard.prioritizedWorkflowQueue = await buildPrioritizedWorkflowQueue(prospects);
-    } catch (queueError) {
-      console.error("[dashboard] prioritizedWorkflowQueue error:", queueError.message);
-      dashboard.prioritizedWorkflowQueue = [];
-    }
+    const ownerAuth = {
+      userId: req.tenantContext?.userId || req.authContext?.userId,
+      role: req.authContext?.role,
+      hierarchyMode: req.authContext?.hierarchyMode,
+      hierarchyUserIds: req.authContext?.hierarchyUserIds
+    };
 
-    try {
-      const followUpApplicationService = require("../application/followUpApplicationService");
-      const followUpSummary = await followUpApplicationService.summarizeForOwner({
-        organizationId,
-        authContext: {
-          userId: req.tenantContext?.userId || req.authContext?.userId,
-          role: req.authContext?.role,
-          hierarchyMode: req.authContext?.hierarchyMode,
-          hierarchyUserIds: req.authContext?.hierarchyUserIds
-        }
-      });
-      dashboard.followUpsDue = followUpSummary.followUpsDue;
-      dashboard.followUpsOverdue = followUpSummary.followUpsOverdue;
-      dashboard.nextFollowUps = followUpSummary.nextFollowUps;
-      try {
-        const clientWorkspaceApplicationService = require("../application/clientWorkspaceApplicationService");
-        const clientSummary = await clientWorkspaceApplicationService.summarizeForOwner({
-          organizationId,
-          authContext: {
-            userId: req.tenantContext?.userId || req.authContext?.userId,
-            role: req.authContext?.role,
-            hierarchyMode: req.authContext?.hierarchyMode,
-            hierarchyUserIds: req.authContext?.hierarchyUserIds
-          }
-        });
-        dashboard.myClientsCount = clientSummary.myClientsCount;
-        dashboard.clientFollowUpsDue = clientSummary.clientFollowUpsDue;
-      } catch (clientError) {
-        console.error("[dashboard] client summary error:", clientError.message);
-        dashboard.myClientsCount = 0;
-        dashboard.clientFollowUpsDue = 0;
-      }
-    } catch (followUpError) {
-      console.error("[dashboard] follow-up summary error:", followUpError.message);
-      dashboard.followUpsDue = dashboard.followUpsDue || 0;
-      dashboard.followUpsOverdue = 0;
-      dashboard.nextFollowUps = [];
-      dashboard.myClientsCount = dashboard.myClientsCount || 0;
-      dashboard.clientFollowUpsDue = dashboard.clientFollowUpsDue || 0;
-    }
+    const [queue, followUpSummary, clientSummary] = await Promise.all([
+      buildPrioritizedWorkflowQueue(prospects, { organizationId }).catch((queueError) => {
+        console.error("[dashboard] prioritizedWorkflowQueue error:", queueError.message);
+        return [];
+      }),
+      require("../application/followUpApplicationService")
+        .summarizeForOwner({ organizationId, authContext: ownerAuth })
+        .catch((followUpError) => {
+          console.error("[dashboard] follow-up summary error:", followUpError.message);
+          return {
+            followUpsDue: 0,
+            followUpsOverdue: 0,
+            nextFollowUps: []
+          };
+        }),
+      require("../application/clientWorkspaceApplicationService")
+        .summarizeForOwner({ organizationId, authContext: ownerAuth })
+        .catch((clientError) => {
+          console.error("[dashboard] client summary error:", clientError.message);
+          return { myClientsCount: 0, clientFollowUpsDue: 0 };
+        })
+    ]);
+
+    dashboard.prioritizedWorkflowQueue = queue;
+    dashboard.followUpsDue = followUpSummary.followUpsDue;
+    dashboard.followUpsOverdue = followUpSummary.followUpsOverdue;
+    dashboard.nextFollowUps = followUpSummary.nextFollowUps;
+    dashboard.myClientsCount = clientSummary.myClientsCount;
+    dashboard.clientFollowUpsDue = clientSummary.clientFollowUpsDue;
 
     return res.json(dashboard);
   } catch (error) {
