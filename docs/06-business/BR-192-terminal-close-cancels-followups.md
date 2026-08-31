@@ -20,7 +20,8 @@ Terminal milestones: `CLOSED`, `DO_NOT_CONTACT`.
 
 Close reasons:
 
-- `prospect_closed_not_interested`
+- `prospect_closed` — generic `CLOSED` with no specific outcome
+- `prospect_closed_not_interested` — explicit Not Interested
 - `prospect_closed_disqualified`
 - `prospect_closed_do_not_contact`
 - `prospect_closed_unsubscribe`

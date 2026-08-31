@@ -94,12 +94,11 @@ function resolveFollowUpCloseReason({
   if (outcomeSlug === "unable_to_contact") {
     return FOLLOW_UP_CLOSE_REASONS.UNABLE_TO_CONTACT;
   }
-  if (
-    outcomeSlug === "not_interested" ||
-    inbox === "not_interested" ||
-    milestone === MILESTONES.CLOSED
-  ) {
+  if (outcomeSlug === "not_interested" || inbox === "not_interested") {
     return FOLLOW_UP_CLOSE_REASONS.NOT_INTERESTED;
+  }
+  if (milestone === MILESTONES.CLOSED) {
+    return FOLLOW_UP_CLOSE_REASONS.CLOSED;
   }
 
   return null;

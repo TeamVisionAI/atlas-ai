@@ -2995,7 +2995,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Shared close path** — Cancel OPEN prospect-linked follow-ups in backend/domain logic when the prospect lands on `CLOSED` or `DO_NOT_CONTACT` (Mission Control Not Interested, interview Not Qualified / other terminal closes, DNC). Do not implement this only as a Follow-ups UI filter.
-2. **Preserve history** — Set status `CANCELLED`. Do not delete completed or previously cancelled rows. Store a machine-readable reason (`prospect_closed_not_interested`, `prospect_closed_disqualified`, `prospect_closed_do_not_contact`, `prospect_closed_unsubscribe`, …).
+2. **Preserve history** — Set status `CANCELLED`. Do not delete completed or previously cancelled rows. Store a machine-readable reason. Generic `CLOSED` with no outcome is `prospect_closed`. Explicit Not Interested is `prospect_closed_not_interested`. Other reasons include `prospect_closed_disqualified`, `prospect_closed_do_not_contact`, and `prospect_closed_unsubscribe`.
 3. **Idempotent** — Repeating the same close does not write a second cancel history entry.
 4. **Tenant isolation** — Only the closing organization is updated.
 5. **Non-terminal stays** — Do not cancel for Follow-up, Interview Scheduled, awaiting response, reschedule, Recruited/Orientation, or other non-terminal milestones.

@@ -316,7 +316,24 @@ test("agenda/client follow-ups are not cancelled when a prospect is closed", asy
   assert.equal(active.items[0].entityType, "agenda_contact");
 });
 
+test("generic CLOSED is prospect_closed; explicit Not Interested stays not_interested", () => {
+  assert.equal(
+    resolveFollowUpCloseReason({ targetMilestone: MILESTONES.CLOSED }),
+    FOLLOW_UP_CLOSE_REASONS.CLOSED
+  );
+  assert.equal(FOLLOW_UP_CLOSE_REASONS.CLOSED, "prospect_closed");
+  assert.equal(
+    resolveFollowUpCloseReason({ targetMilestone: MILESTONES.CLOSED, outcome: "Not Interested" }),
+    FOLLOW_UP_CLOSE_REASONS.NOT_INTERESTED
+  );
+  assert.equal(FOLLOW_UP_CLOSE_REASONS.NOT_INTERESTED, "prospect_closed_not_interested");
+});
+
 test("close-reason mapping covers Atlas terminal statuses", () => {
+  assert.equal(
+    resolveFollowUpCloseReason({ targetMilestone: MILESTONES.CLOSED }),
+    FOLLOW_UP_CLOSE_REASONS.CLOSED
+  );
   assert.equal(
     resolveFollowUpCloseReason({ targetMilestone: MILESTONES.CLOSED, outcome: "Not Interested" }),
     FOLLOW_UP_CLOSE_REASONS.NOT_INTERESTED
