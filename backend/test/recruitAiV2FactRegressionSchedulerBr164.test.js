@@ -257,6 +257,7 @@ test("5. exact time available → confirm only that time", () => {
   const offered = nextContext.appointment.previouslyOfferedSlots || [];
   assert.equal(offered.length, 1);
   assert.equal(offered[0].time || offered[0].timeKey, "15:00");
+  assert.equal(nextContext.conversation.lastQuestionAsked, "confirm_slot");
   assert.doesNotMatch(
     renderCustomerReply(structuredDecision.customerReplyPlan).text,
     /12:00/

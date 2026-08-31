@@ -53,9 +53,22 @@ function hasConfirmableAppointmentProposal(context = {}) {
   }
 
   if (lastQ === "offer_time_choices") {
+    const single = offered.length === 1 ? offered[0] : null;
+    const singleTime = single?.time || single?.timeKey || null;
+    const singleDate = single?.date || single?.dateKey || proposedDate;
     const asksSingleConfirm =
-      /\b(te funciona|le funciona|does that work|does this work)\b/i.test(lastOut);
-    if (offered.length === 1 && asksSingleConfirm) {
+      /\b(te funciona|le funciona|does that work|does this work|reply yes to confirm|responde si|confirm(a|as|amos)?|confirmar)\b/i.test(
+        lastOut
+      );
+    // Implements BR-190 — one concrete selected slot is confirmable even when
+    // lastQuestionAsked was left as offer_time_choices after Atlas already
+    // asked SI for that exact date+time.
+    const concreteSelectedSlot =
+      Boolean(single) &&
+      Boolean(proposedTime) &&
+      Boolean(singleDate) &&
+      (!singleTime || String(singleTime) === String(proposedTime));
+    if (concreteSelectedSlot || (offered.length === 1 && asksSingleConfirm)) {
       return true;
     }
     return false;
