@@ -27,6 +27,27 @@ const PRODUCTION_SCOPES = Object.freeze({
   TEAM: "team"
 });
 
+const PRODUCTION_SOURCES = Object.freeze({
+  MANUAL: "MANUAL",
+  AGENDA_CLIENT_CONVERSION: "AGENDA_CLIENT_CONVERSION"
+});
+
+const PRODUCTION_KPI_SCOPES = Object.freeze({
+  MINE: "mine",
+  TEAM: "team",
+  DISTRICT: "district",
+  DIVISION: "division",
+  REGIONAL: "regional",
+  RVP: "rvp",
+  ORGANIZATION: "organization",
+  PLATFORM: "platform"
+});
+
+const CLIENT_CONVERSION_STATUSES = Object.freeze({
+  INCOMPLETE: "incomplete",
+  COMPLETE: "complete"
+});
+
 const PRODUCTION_HISTORY_TYPES = Object.freeze({
   CREATED: "created",
   STATUS_CHANGED: "status_changed",
@@ -46,6 +67,9 @@ module.exports = {
   PRODUCTION_ACTIVITY_TYPES,
   PRODUCTION_STATUSES,
   PRODUCTION_SCOPES,
+  PRODUCTION_SOURCES,
+  PRODUCTION_KPI_SCOPES,
+  CLIENT_CONVERSION_STATUSES,
   PRODUCTION_HISTORY_TYPES,
   PRODUCTION_METRIC_STATUSES
 };

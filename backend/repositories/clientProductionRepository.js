@@ -19,6 +19,9 @@ function rowToProduction(row) {
     carrier: row.carrier || null,
     productType: row.product_type || null,
     amount: row.amount == null ? null : Number(row.amount),
+    currency: row.currency || "USD",
+    appointmentId: row.appointment_id || null,
+    source: row.source || "MANUAL",
     submittedAt: row.submitted_at || null,
     issuedAt: row.issued_at || null,
     paidAt: row.paid_at || null,
@@ -42,6 +45,9 @@ function productionToRow(record) {
     carrier: record.carrier || null,
     product_type: record.productType || null,
     amount: record.amount == null ? null : record.amount,
+    currency: record.currency || "USD",
+    appointment_id: record.appointmentId || null,
+    source: record.source || "MANUAL",
     submitted_at: record.submittedAt || null,
     issued_at: record.issuedAt || null,
     paid_at: record.paidAt || null,
@@ -89,8 +95,29 @@ async function listForOwners({ organizationId, ownerUserIds, clientId } = {}) {
   return (data || []).map(rowToProduction);
 }
 
+async function findByAppointmentId(appointmentId, organizationId) {
+  const id = String(appointmentId || "").trim();
+  if (!id || !organizationId) return null;
+  const { data, error } = await supabase
+    .from("atlas_client_production")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("appointment_id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return rowToProduction(data);
+}
+
+async function listAllForPlatform() {
+  const { data, error } = await supabase.from("atlas_client_production").select("*");
+  if (error) throw error;
+  return (data || []).map(rowToProduction);
+}
+
 module.exports = {
   save,
   findById,
-  listForOwners
+  listForOwners,
+  findByAppointmentId,
+  listAllForPlatform
 };

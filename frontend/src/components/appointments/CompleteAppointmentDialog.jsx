@@ -16,7 +16,13 @@ const OUTCOMES = [
   "other"
 ];
 
-export default function CompleteAppointmentDialog({ open, appointment, onClose, onSuccess }) {
+export default function CompleteAppointmentDialog({
+  open,
+  appointment,
+  onClose,
+  onSuccess,
+  onClientConversionRequired
+}) {
   const { translate } = useLanguage();
   const [outcome, setOutcome] = useState("follow_up");
   const [outcomeNotes, setOutcomeNotes] = useState("");
@@ -51,7 +57,17 @@ export default function CompleteAppointmentDialog({ open, appointment, onClose, 
         followUpTime: followUpTime || undefined,
         futureReminder: outcome === "not_interested" ? followUpDate || undefined : undefined
       });
-      onSuccess?.(result?.appointment);
+      const saved = result?.appointment || result;
+      if (
+        outcome === "client" &&
+        saved?.metadata?.standaloneAgenda === true &&
+        saved?.metadata?.clientConversionStatus !== "complete"
+      ) {
+        onSuccess?.(saved);
+        onClientConversionRequired?.(saved);
+        return;
+      }
+      onSuccess?.(saved);
       onClose();
     } catch (requestError) {
       setError(captureAppointmentError("complete", requestError, translate));

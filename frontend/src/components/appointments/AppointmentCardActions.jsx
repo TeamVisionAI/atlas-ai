@@ -3,6 +3,7 @@ import AtlasButton from "../ui/AtlasButton";
 import UniversalNoteButton from "../notes/UniversalNoteButton";
 import { resolveAppointmentCardActionPlan } from "../../engines/interviewWorkflowPresentationEngine";
 import { shouldShowLifecycleActions } from "../../engines/appointmentCardPresentation";
+import { isAgendaClientConversionIncomplete } from "../../engines/agendaClientConversion";
 import { buildProspectWorkspaceCommunicationHistoryPath } from "../../utils/prospectRoutes";
 import "./AppointmentCardActions.css";
 
@@ -30,6 +31,7 @@ export default function AppointmentCardActions({
     appointment?.metadata?.promotedToRecruit || appointment?.prospectId
   );
   const promotedClient = Boolean(appointment?.metadata?.promotedToClient);
+  const conversionIncomplete = isAgendaClientConversionIncomplete(appointment);
 
   function handleJoinZoom() {
     const url = String(appointment.virtualMeetingUrl || "").trim();
@@ -93,15 +95,15 @@ export default function AppointmentCardActions({
           </AtlasButton>
         )}
 
-        {!promotedClient ? (
-          <AtlasButton variant="secondary" size="sm" onClick={onPromoteClient}>
-            {translate("agendaPromoteClient")}
+        {conversionIncomplete ? (
+          <AtlasButton variant="primary" size="sm" onClick={onPromoteClient}>
+            {translate("agendaResumeClientSetup")}
           </AtlasButton>
-        ) : (
+        ) : promotedClient ? (
           <AtlasButton variant="secondary" size="sm" onClick={onOpenClient}>
             {translate("agendaOpenClient")}
           </AtlasButton>
-        )}
+        ) : null}
       </div>
     );
   }

@@ -27,11 +27,11 @@ Do not create a recruiting prospect to represent a client.
 
 ### Client
 
-1. Requires an explicit Promote to Client action.
+1. Outcome = CLIENT no longer uses hidden `promotionPending`. BR-194 records `clientConversionStatus=incomplete`, captures premium, then promotes.
 2. If `promoted_client_id` already exists, return that link.
 3. Else insert one `atlas_agenda_clients` row and store the id on the Agenda contact.
 4. No prospect row is written.
-5. The response includes `workspacePath` `/app/clients/:id` so the operator lands in the BR-179 Client Workspace.
+5. Completing BR-194 also writes one `atlas_client_production` row and lands in the BR-179 Client Workspace.
 
 ## Notifications
 

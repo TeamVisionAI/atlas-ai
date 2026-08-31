@@ -32,6 +32,17 @@ export async function promoteAgendaToRecruit(appointmentId, payload = {}) {
   });
 }
 
+export async function completeAgendaClientConversion(appointmentId, payload = {}) {
+  return apiFetch(
+    `/api/agenda/appointments/${encodeURIComponent(appointmentId)}/complete-client-conversion`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
 export async function promoteAgendaToClient(appointmentId, payload = {}) {
   return apiFetch(`/api/agenda/appointments/${encodeURIComponent(appointmentId)}/promote-client`, {
     method: "POST",

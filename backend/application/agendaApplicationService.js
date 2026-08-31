@@ -36,6 +36,10 @@ const {
 } = require("../core/emailNormalization");
 const { generateNextProspectNumber } = require("../services/prospectNumberService");
 const {
+  CLIENT_CONVERSION_STATUSES,
+  PRODUCTION_ACTIVITY_TYPES
+} = require("../core/clientProduction");
+const {
   supabase,
   findProspectByNormalizedPhoneInOrganization,
   findProspectInOrganization
@@ -443,8 +447,10 @@ async function recordStandaloneOutcome(appointmentId, input, context) {
     metadata: {
       ...(appointment.metadata || {}),
       lifecycleState: resolveOutcomeLifecycle(outcome, appointment.metadata?.lifecycleState),
-      // Recruited/client outcomes stay pending until an explicit promote action.
-      promotionPending: outcome === APPOINTMENT_OUTCOMES.RECRUITED || outcome === APPOINTMENT_OUTCOMES.CLIENT
+      // Implements BR-177 — Recruited stays pending until explicit promote.
+      promotionPending: outcome === APPOINTMENT_OUTCOMES.RECRUITED,
+      // Implements BR-194 — CLIENT is an explicit incomplete conversion, not a hidden pending state.
+      ...buildClientConversionMetadata(outcome, appointment.metadata || {})
     },
     updatedAt: now
   });
@@ -481,6 +487,108 @@ async function recordStandaloneOutcome(appointmentId, input, context) {
   }
 
   return saved;
+}
+
+function buildClientConversionMetadata(outcome, metadata = {}) {
+  if (outcome !== APPOINTMENT_OUTCOMES.CLIENT) {
+    return {};
+  }
+  if (metadata.clientConversionStatus === CLIENT_CONVERSION_STATUSES.COMPLETE || metadata.promotedToClient) {
+    return {
+      clientConversionStatus: CLIENT_CONVERSION_STATUSES.COMPLETE,
+      clientConversionIncomplete: false
+    };
+  }
+  return {
+    clientConversionStatus: CLIENT_CONVERSION_STATUSES.INCOMPLETE,
+    clientConversionIncomplete: true
+  };
+}
+
+/**
+ * BR-194 — collect premium, promote client, write/update canonical production, mark complete.
+ * Outcome selection alone does not create production.
+ */
+async function completeAgendaClientConversion(appointmentId, input, context) {
+  const premium = require("./clientProductionApplicationService").parseRequiredPremium(
+    input?.amount ?? input?.premium
+  );
+  let appointment = await loadStandaloneAppointment(appointmentId, context);
+  if (appointment.outcome !== APPOINTMENT_OUTCOMES.CLIENT) {
+    appointment = await recordStandaloneOutcome(
+      appointmentId,
+      {
+        outcome: APPOINTMENT_OUTCOMES.CLIENT,
+        outcomeNotes: input?.outcomeNotes || input?.notes
+      },
+      context
+    );
+  }
+
+  const promoted = await promoteToClient(appointmentId, input, context);
+  appointment = promoted.appointment || appointment;
+  const client = promoted.client;
+  if (!client?.id) {
+    throw error("CLIENT_PROMOTION_FAILED", "Unable to promote the Agenda contact to a client.");
+  }
+
+  const production = await require("./clientProductionApplicationService").upsertAppointmentProduction(
+    {
+      organizationId: context.organizationId,
+      clientId: client.id,
+      appointmentId,
+      ownerUserId: client.ownerUserId || appointment.agentId || context.userId,
+      amount: premium,
+      currency: input?.currency,
+      submittedAt: input?.submittedAt || input?.productionDate || new Date().toISOString(),
+      activityType: input?.activityType || PRODUCTION_ACTIVITY_TYPES.LIFE,
+      carrier: input?.carrier,
+      productType: input?.productType,
+      notes: input?.notes,
+      nameById: input?.nameById
+    },
+    {
+      userId: context.userId || context.agentId,
+      role: context.role,
+      hierarchyMode: context.hierarchyMode,
+      hierarchyUserIds: context.hierarchyUserIds
+    }
+  );
+
+  const now = new Date().toISOString();
+  const actor = resolveActorId(context);
+  const savedAppointment = await appointmentRepository.save({
+    ...appointment,
+    history: recordHistoryEvent(appointment, {
+      type: "agenda_client_conversion_completed",
+      actor: actor || "agent",
+      at: now,
+      summary: "Agenda CLIENT conversion completed",
+      newValues: { clientId: client.id, productionId: production.id, amount: production.amount }
+    }),
+    metadata: {
+      ...(appointment.metadata || {}),
+      standaloneAgenda: true,
+      noRecruitAi: true,
+      promotedToClient: true,
+      promotedClientId: client.id,
+      promotionPending: false,
+      clientConversionStatus: CLIENT_CONVERSION_STATUSES.COMPLETE,
+      clientConversionIncomplete: false,
+      productionId: production.id
+    },
+    updatedAt: now
+  });
+
+  return {
+    appointment: savedAppointment,
+    client,
+    clientId: client.id,
+    production,
+    workspacePath: `/app/clients/${client.id}`,
+    alreadyPromoted: promoted.alreadyPromoted === true,
+    created: promoted.created === true
+  };
 }
 
 async function insertPromotedRecruitProspect({ contact, context, storagePhone, normalizedPhone }) {
@@ -737,6 +845,7 @@ module.exports = {
   presentAgendaContact,
   createStandaloneAppointment,
   recordStandaloneOutcome,
+  completeAgendaClientConversion,
   promoteToRecruit,
   promoteToClient
 };

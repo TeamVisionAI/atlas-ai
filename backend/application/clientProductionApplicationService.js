@@ -9,10 +9,17 @@ const {
   PRODUCTION_ACTIVITY_TYPES,
   PRODUCTION_STATUSES,
   PRODUCTION_SCOPES,
+  PRODUCTION_SOURCES,
+  PRODUCTION_KPI_SCOPES,
   PRODUCTION_HISTORY_TYPES,
   PRODUCTION_METRIC_STATUSES,
   createMemoryProductionStore
 } = require("../core/clientProduction");
+const {
+  summarizeRecords,
+  resolveKpiOwnerFilter,
+  assertTenantIsolation
+} = require("../core/clientProduction/productionKpiEngine");
 const { presentHistoryActorLabel } = require("../core/appointmentHistory");
 const { HIERARCHY_MODES } = require("../core/hierarchyScopeEngine");
 const { ROLES } = require("../security/roles");
@@ -117,6 +124,27 @@ function parseAmount(value) {
     throw buildError("VALIDATION_ERROR", "Amount must be a real number or empty.");
   }
   return amount;
+}
+
+function parseRequiredPremium(value) {
+  const amount = parseAmount(value);
+  if (amount == null) {
+    throw buildError("VALIDATION_ERROR", "Premium amount is required.");
+  }
+  if (amount < 0) {
+    throw buildError("VALIDATION_ERROR", "Premium amount must be zero or greater.");
+  }
+  return amount;
+}
+
+function parseCurrency(value) {
+  const currency = String(value || "USD")
+    .trim()
+    .toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    throw buildError("VALIDATION_ERROR", "Currency must be a 3-letter code.");
+  }
+  return currency;
 }
 
 function parseOptionalIso(value) {
@@ -273,6 +301,9 @@ async function presentRecord(row, { nameById, ownerCache, clientName = null } = 
     carrier: row.carrier,
     productType: row.productType,
     amount: row.amount,
+    currency: row.currency || "USD",
+    appointmentId: row.appointmentId || null,
+    source: row.source || PRODUCTION_SOURCES.MANUAL,
     submittedAt: row.submittedAt,
     issuedAt: row.issuedAt,
     paidAt: row.paidAt,
@@ -328,6 +359,9 @@ async function createProduction(input, authContext) {
   }
   const now = new Date().toISOString();
   const amount = parseAmount(input.amount);
+  if (amount != null && amount < 0) {
+    throw buildError("VALIDATION_ERROR", "Premium amount must be zero or greater.");
+  }
   let row = {
     id: crypto.randomUUID(),
     organizationId,
@@ -338,6 +372,9 @@ async function createProduction(input, authContext) {
     carrier: input.carrier ? String(input.carrier).trim().slice(0, 160) : null,
     productType: input.productType ? String(input.productType).trim().slice(0, 160) : null,
     amount,
+    currency: parseCurrency(input.currency),
+    appointmentId: input.appointmentId || null,
+    source: input.source || PRODUCTION_SOURCES.MANUAL,
     submittedAt: null,
     issuedAt: null,
     paidAt: null,
@@ -401,6 +438,7 @@ async function listProduction({
       filteredCount: 0,
       counts: emptyCounts(),
       amounts: emptyAmounts(),
+      kpis: summarizeRecords([]),
       items: []
     };
   }
@@ -432,6 +470,7 @@ async function listProduction({
   }
   items.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
   const metrics = buildMetrics(items);
+  const kpis = summarizeRecords(items);
   return {
     generatedAt: new Date().toISOString(),
     organizationId,
@@ -441,6 +480,7 @@ async function listProduction({
     totalCount: items.length,
     filteredCount: items.length,
     ...metrics,
+    kpis,
     items
   };
 }
@@ -484,8 +524,14 @@ async function updateProduction(id, input, authContext) {
       });
     }
   }
+  if (Object.prototype.hasOwnProperty.call(input, "currency")) {
+    next.currency = parseCurrency(input.currency);
+  }
   if (Object.prototype.hasOwnProperty.call(input, "amount")) {
     const amount = parseAmount(input.amount);
+    if (amount != null && amount < 0) {
+      throw buildError("VALIDATION_ERROR", "Premium amount must be zero or greater.");
+    }
     if (amount !== row.amount) {
       next.amount = amount;
       next.history = appendHistory(next, {
@@ -559,6 +605,122 @@ async function updateStatus(id, input, authContext) {
   return presentRecord(saved, { nameById: names, ownerCache: new Map(names), clientName: client?.name || null });
 }
 
+async function upsertAppointmentProduction(input, authContext) {
+  const store = getStore();
+  if (!store) throw buildError("STORE_UNAVAILABLE", "Production store is unavailable.", 503);
+  const organizationId = input.organizationId;
+  const appointmentId = String(input.appointmentId || "").trim();
+  if (!organizationId || !appointmentId) {
+    throw buildError("VALIDATION_ERROR", "Appointment and organization are required.");
+  }
+  const amount = parseRequiredPremium(input.amount);
+  const existing =
+    typeof store.findByAppointmentId === "function"
+      ? await store.findByAppointmentId(appointmentId, organizationId)
+      : null;
+  if (existing) {
+    if (!sameId(existing.organizationId, organizationId)) {
+      throw notFound();
+    }
+    return updateProduction(
+      existing.id,
+      {
+        organizationId,
+        amount,
+        currency: input.currency,
+        activityType: input.activityType,
+        carrier: input.carrier,
+        productType: input.productType,
+        submittedAt: input.submittedAt,
+        status: existing.status || PRODUCTION_STATUSES.SUBMITTED,
+        nameById: input.nameById
+      },
+      authContext
+    );
+  }
+  return createProduction(
+    {
+      organizationId,
+      clientId: input.clientId,
+      ownerUserId: input.ownerUserId,
+      activityType: input.activityType || PRODUCTION_ACTIVITY_TYPES.LIFE,
+      status: PRODUCTION_STATUSES.SUBMITTED,
+      amount,
+      currency: input.currency,
+      appointmentId,
+      source: PRODUCTION_SOURCES.AGENDA_CLIENT_CONVERSION,
+      carrier: input.carrier,
+      productType: input.productType,
+      submittedAt: input.submittedAt,
+      notes: input.notes,
+      nameById: input.nameById
+    },
+    authContext
+  );
+}
+
+function sameId(left, right) {
+  return Boolean(left && right && String(left) === String(right));
+}
+
+async function summarizeProductionKpis({
+  organizationId,
+  authContext,
+  scope,
+  from,
+  to
+} = {}) {
+  const store = getStore();
+  const filter = resolveKpiOwnerFilter({ authContext, scope });
+  if (!store) {
+    return {
+      generatedAt: new Date().toISOString(),
+      organizationId: organizationId || null,
+      scope: filter.scope,
+      ...summarizeRecords([])
+    };
+  }
+
+  if (filter.scope === PRODUCTION_KPI_SCOPES.PLATFORM) {
+    const all =
+      typeof store.listAllForPlatform === "function" ? await store.listAllForPlatform() : [];
+    const byOrg = new Map();
+    for (const row of all) {
+      const orgId = String(row.organizationId || "");
+      if (!orgId) continue;
+      if (!byOrg.has(orgId)) byOrg.set(orgId, []);
+      byOrg.get(orgId).push(row);
+    }
+    const organizations = [...byOrg.entries()].map(([orgId, rows]) => ({
+      organizationId: orgId,
+      ...summarizeRecords(rows)
+    }));
+    return {
+      generatedAt: new Date().toISOString(),
+      scope: PRODUCTION_KPI_SCOPES.PLATFORM,
+      ...summarizeRecords(all),
+      organizations
+    };
+  }
+
+  if (!organizationId) {
+    throw buildError("TENANT_CONTEXT_REQUIRED", "Tenant context is required.", 403);
+  }
+  const rows = await store.listForOwners({
+    organizationId,
+    ownerUserIds: filter.ownerUserIds
+  });
+  const isolated = assertTenantIsolation(rows, organizationId).filter((item) =>
+    inDateRange(item, from, to)
+  );
+  return {
+    generatedAt: new Date().toISOString(),
+    organizationId,
+    scope: filter.scope,
+    ...summarizeRecords(isolated)
+  };
+}
+
 async function createClientFollowUp(id, input, authContext) {
   const { row } = await getAuthorizedRecord(id, input.organizationId, authContext);
   const client = await loadClientOrThrow(row.clientId, input.organizationId);
@@ -589,9 +751,14 @@ module.exports = {
   listProduction,
   updateProduction,
   updateStatus,
+  upsertAppointmentProduction,
+  summarizeProductionKpis,
+  parseRequiredPremium,
   createClientFollowUp,
   PRODUCTION_ACTIVITY_TYPES,
   PRODUCTION_STATUSES,
   PRODUCTION_SCOPES,
+  PRODUCTION_SOURCES,
+  PRODUCTION_KPI_SCOPES,
   PRODUCTION_METRIC_STATUSES
 };

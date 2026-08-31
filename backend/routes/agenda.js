@@ -12,6 +12,7 @@ const {
   getAgendaContact,
   createStandaloneAppointment,
   recordStandaloneOutcome,
+  completeAgendaClientConversion,
   promoteToRecruit,
   promoteToClient
 } = require("../application/agendaApplicationService");
@@ -30,7 +31,13 @@ function context(req) {
     error.code = "TENANT_CONTEXT_REQUIRED";
     throw error;
   }
-  return { organizationId, userId };
+  return {
+    organizationId,
+    userId,
+    role: req.authContext?.role,
+    hierarchyMode: req.authContext?.hierarchyMode,
+    hierarchyUserIds: req.authContext?.hierarchyUserIds
+  };
 }
 
 function sendError(res, error) {
@@ -120,6 +127,23 @@ router.post(
   async (req, res) => {
     try {
       const result = await promoteToRecruit(req.params.id, req.body || {}, context(req));
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+);
+
+router.post(
+  "/appointments/:id/complete-client-conversion",
+  requireAnyPermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      const result = await completeAgendaClientConversion(
+        req.params.id,
+        req.body || {},
+        context(req)
+      );
       return res.json({ success: true, ...result });
     } catch (error) {
       return sendError(res, error);

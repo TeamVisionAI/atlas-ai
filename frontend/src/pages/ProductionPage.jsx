@@ -245,6 +245,26 @@ export default function ProductionPage() {
 
       {payload ? (
         <dl className="clients-card__details">
+          <div>
+            <dt>{translate("productionKpiPremium")}</dt>
+            <dd>{formatProductionAmount(payload.kpis?.personalProduction || 0, locale)}</dd>
+          </div>
+          <div>
+            <dt>{translate("productionKpiClients")}</dt>
+            <dd>{payload.kpis?.clientCount || 0}</dd>
+          </div>
+          <div>
+            <dt>{translate("productionKpiAverage")}</dt>
+            <dd>
+              {payload.kpis?.averagePremium != null
+                ? formatProductionAmount(payload.kpis.averagePremium, locale)
+                : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt>{translate("productionKpiConversions")}</dt>
+            <dd>{payload.kpis?.appointmentToClientConversions || 0}</dd>
+          </div>
           {["submitted", "pending", "issued", "paid"].map((key) => (
             <div key={key}>
               <dt>{translate(`productionMetric${key[0].toUpperCase()}${key.slice(1)}`)}</dt>
