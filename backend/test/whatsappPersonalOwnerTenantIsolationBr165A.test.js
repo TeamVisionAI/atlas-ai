@@ -37,11 +37,13 @@ test("BR-165A explicit tenant scope preserves exact personal WhatsApp owner", as
     })
   });
 
-  assert.deepEqual(result, {
-    organizationId: ORG_A,
-    ownerUserId: OWNER_A,
-    source: "whatsapp_personal_connection"
-  });
+  assert.equal(result.organizationId, ORG_A);
+  assert.equal(result.ownerUserId, OWNER_A);
+  assert.equal(result.source, "whatsapp_personal_connection");
+  assert.equal(result.connection.phone_number_id, PHONE_ID);
+  assert.equal(result.connection.organization_id, ORG_A);
+  assert.equal(result.connection.user_id, OWNER_A);
+  assert.equal(result.connection.status, "connected");
 });
 
 test("BR-165A personal WhatsApp asset cannot cross tenant boundary", async () => {
@@ -79,9 +81,11 @@ test("organization-owned WhatsApp asset resolves tenant without inventing an age
     })
   });
 
-  assert.deepEqual(result, {
-    organizationId: ORG_A,
-    ownerUserId: null,
-    source: "whatsapp_organization_connection"
-  });
+  assert.equal(result.organizationId, ORG_A);
+  assert.equal(result.ownerUserId, null);
+  assert.equal(result.source, "whatsapp_organization_connection");
+  assert.equal(result.connection.phone_number_id, PHONE_ID);
+  assert.equal(result.connection.organization_id, ORG_A);
+  assert.equal(result.connection.user_id, null);
+  assert.equal(result.connection.status, "connected");
 });
