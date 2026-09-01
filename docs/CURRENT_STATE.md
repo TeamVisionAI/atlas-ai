@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-09-01:** **BR-208** — IUL Policy Review is not ready for increased ad spend. Intake/CTWA routing is certified in tests; production has no Zoom bookings or pipeline rows. IUL now wins over an active recruiting session, confirmation copy waits for create, and policy-review reminders use IUL language. Live canary not run.
 - **2026-09-01:** **BR-207** — Authenticated sidebar groups operational pages (Pipeline, People & Outcomes, Intelligence, Growth) without changing routes or permissions. Recruits is reserved until a dedicated page exists.
 - **2026-09-01:** **BR-206** — Manual Agenda recovery uses client/recruit/production evidence. Recruiter credit is explicit (not appointment owner). Dual RECRUITED + CLIENT is allowed. No silent prospect create. Production splits cannot exceed policy premium.
 - **2026-09-01:** **BR-204** — Recorded appointment/interview outcomes are canonical across Appointments, Today’s Agenda, Prospect Workspace, Follow Up, and dashboard pending counts. FOLLOW_UP_NEEDED completes the appointment.

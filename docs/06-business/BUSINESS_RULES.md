@@ -3219,6 +3219,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-208 — IUL End-to-End Production Readiness Audit + Canary
+
+**Implements:** Certify the IUL Policy Review funnel (Meta ad → WhatsApp → qualification → Zoom booking) before increasing IUL ad spend. Narrow routing/session/confirmation/reminder fixes only.  
+**Domain:** IUL Policy Review / WhatsApp inbound / scheduling  
+**Depends on:** BR-142, BR-147, BR-156, BR-157, BR-190, BR-191, BR-200, BR-201  
+**Related:** BR-132 (purpose-scoped workflow), BR-186 / BR-189 (Policy Reviews), BR-193 (META_AD_DESTINATION is not IUL proof)  
+**Status:** Implemented — regressions + narrow production-readiness fixes; live canary not run  
+**Engine target:** `iulAdConversation`; `campaignIntakeAttributionService`; `atlasInboundAutomationEligibility`; `sideEffectAuthorizer`; `appointmentReminderEngine`  
+**Tests:** `backend/test/iulEndToEndReadinessBr208.test.js`
+
+### Rules
+
+1. **IUL-only scope** — Do not change recruiting behavior unless an IUL-routing conflict requires a narrowly scoped fix. Do not weaken BR-142 / BR-200 / BR-201.
+2. **Positive IUL inbound** — Eligible via CTWA (`ctwa_clid` and/or `referral.source_type=ad`) and/or a valid ACTIVE IUL intake code. `META_AD_DESTINATION` alone is not IUL eligibility. Personal inbound stays silent. Meta `type=unsupported` / 131060 is not eligibility (BR-156).
+3. **Routing invariant** — Once inbound is identified as IUL, the current session enters IUL Review. It must not enter Recruit AI, ask recruiting city/state or job questions, or switch back to Recruit AI because the sender previously existed as a recruit. Historical recruiting rows stay intact; campaign/session context wins.
+4. **Session continuity** — Preserve IUL purpose and gathered facts across FAQ/interruption. An existing recruiting prospect who sends a valid IUL intake starts an IUL Review session (`IUL_REVIEW_WINS_ACTIVE_RECRUITING_SESSION`). HUMAN_OWNED / closed inbox still block a new episode.
+5. **Confirmation after create** — BR-190 applies to IUL Zoom Review. Atlas must not say the review is confirmed until create succeeds. Deferred copy is reservation language only. `IUL_CREATE_REVIEW_APPOINTMENT` is authorized as `CREATE_APPOINTMENT` and remains fail-closed without execution flags + configured profile.
+6. **Reminders** — `purpose=policy_review` reminder copy is IUL Policy Review / Zoom, not recruiting “entrevista”. Cadence stays BR-191 (24h / 1h / 30m). Do not invent a 15-minute IUL-only reminder.
+7. **Wait state** — Unanswered IUL qualification stays Atlas-owned with `lastQuestionAsked`. There is no `AWAITING_RESPONSE` status. `NEEDS_ATTENTION` is only for stall/system conditions.
+8. **Canary** — Use the currently ACTIVE production IUL code; do not invent a new code. Do not run or fake a live WhatsApp canary until this change is deployed and a designated test phone is authorized. Do not merge without explicit authorization.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

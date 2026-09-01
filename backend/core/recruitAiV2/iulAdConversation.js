@@ -684,8 +684,8 @@ function copy(language) {
       ? "Por ahora no veo un horario disponible en ese rango. ¿Le funciona mejor otro día u horario?"
       : "I don't see an available time in that range right now. Would another day or time work better?",
     confirmDeferred: es
-      ? "Perfecto. Confirmo la revisión por Zoom en ese horario."
-      : "Perfect. I'll confirm the Zoom review at that time.",
+      ? "Un momento. Estoy reservando la revisión por Zoom en ese horario. Le confirmo cuando quede agendada."
+      : "One moment. I'm booking the Zoom review for that time. I'll confirm once it is scheduled.",
     clarify: es
       ? "Para seguir con claridad: ¿cuál describe su situación?"
       : "To keep this clear: which describes your situation?"

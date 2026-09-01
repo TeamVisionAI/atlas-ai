@@ -14,7 +14,7 @@
  * Role / being RVP never authorizes. Tenant allowlist alone never authorizes.
  */
 
-const { FEATURE_FLAGS, REASON_CODES, V2_EXECUTABLE_ACTIONS } = require("./constants");
+const { FEATURE_FLAGS, NEXT_ACTIONS, REASON_CODES, V2_EXECUTABLE_ACTIONS } = require("./constants");
 const {
   resolveExecutionConfig,
   isEligibleForExecution,
@@ -66,7 +66,10 @@ function collectProposedMutationTypes(structuredDecision, responsePlan) {
   const alsoCancel = Boolean(structuredDecision?.entities?.alsoCancelAppointment);
   const alsoWithdraw = Boolean(structuredDecision?.entities?.alsoWithdraw);
 
-  if (nextAction === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT) {
+  if (
+    nextAction === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT ||
+    nextAction === NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT
+  ) {
     types.push(V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT);
   }
 
@@ -181,7 +184,8 @@ function authorizeSideEffects({
 
   // mayCreate / mayReschedule / nextAction are proposal signals only — never permission.
   const decisionProposesCreate =
-    structuredDecision?.decision?.nextAction === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT;
+    structuredDecision?.decision?.nextAction === V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT ||
+    structuredDecision?.decision?.nextAction === NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT;
   const decisionMayCreate = structuredDecision?.decision?.mayCreateAppointment === true;
   const decisionProposesReschedule =
     structuredDecision?.decision?.nextAction === V2_EXECUTABLE_ACTIONS.RESCHEDULE_APPOINTMENT;

@@ -15,7 +15,7 @@ const {
   resolveLastRecruitingActivityMs
 } = require("./recruitingSessionGuard");
 const { REOPENED_INACTIVITY_MS } = require("./whatsappConstants");
-const { isIulWorkflowProspect } = require("./iulWorkflowConstants");
+const { isIulReviewPurpose, isIulWorkflowProspect } = require("./iulWorkflowConstants");
 const { INTAKE_CODE_STATUS } = require("./campaignIntakeCode/constants");
 const {
   AD_DESTINATION_FALLBACK_REASON,
@@ -327,7 +327,7 @@ function hasFreshIulCampaignIntakeMatch(inbound) {
   const match = inbound?.campaignIntakeMatch;
   return Boolean(
     match?.matched === true &&
-      String(match.purpose || "").toUpperCase() === "IUL" &&
+      isIulReviewPurpose(match) &&
       upper(match.status) === INTAKE_CODE_STATUS.ACTIVE &&
       match.iulReviewEligible === true &&
       match.recruitingEligible !== true

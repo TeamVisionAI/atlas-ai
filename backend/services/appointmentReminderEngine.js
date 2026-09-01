@@ -42,6 +42,11 @@ function formatWhen(iso, timezone = "America/New_York", languageCode = "en") {
   );
 }
 
+function isPolicyReviewAppointment(appointment = {}) {
+  const purpose = String(appointment.purpose || appointment.metadata?.purpose || "").toLowerCase();
+  return purpose === "policy_review";
+}
+
 function buildReminderMessage(appointment, reminderType, prospect, identity = {}) {
   const preferred = resolveProspectPreferredLanguage(prospect);
   const language = preferredLanguageToCommunicationCode(preferred);
@@ -49,6 +54,7 @@ function buildReminderMessage(appointment, reminderType, prospect, identity = {}
   const first = name ? String(name).trim().split(/\s+/)[0] : "";
   const when = formatWhen(appointment.startDateTime, appointment.timezone, language);
   const virtual = isVirtualMeeting(appointment);
+  const policyReview = isPolicyReviewAppointment(appointment);
   const meetLink = appointment.virtualMeetingUrl
     ? language === "es"
       ? `\nEnlace: ${appointment.virtualMeetingUrl}`
@@ -62,6 +68,13 @@ function buildReminderMessage(appointment, reminderType, prospect, identity = {}
       : virtual
         ? "via Zoom"
         : "at our office";
+  const eventNoun = policyReview
+    ? language === "es"
+      ? "revisión de póliza IUL"
+      : "IUL Policy Review"
+    : language === "es"
+      ? "entrevista"
+      : "interview";
   const signature =
     String(
       identity.handoffDisplayName ||
@@ -72,39 +85,42 @@ function buildReminderMessage(appointment, reminderType, prospect, identity = {}
 
   if (language === "es") {
     const greeting = first ? `Hola ${first},` : "Hola,";
+    const poss = policyReview ? "su" : "tu";
+    const haveTomorrow = policyReview ? "tiene" : "tienes";
+    const remind = policyReview ? "le recordamos" : "te recordamos";
     switch (reminderType) {
       case REMINDER_TYPES.CONFIRMATION:
         // Kept for backwards-compatible delivery of legacy queued confirmation rows only.
-        return `${greeting} tu entrevista ${channelLabel} quedó confirmada para ${when}.${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} quedó confirmada para ${when}.${meetLink}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_24H:
-        return `${greeting} te recordamos que mañana tienes tu entrevista ${channelLabel} (${when}).${meetLink}\n\n${signature}`;
+        return `${greeting} ${remind} que mañana ${haveTomorrow} ${poss} ${eventNoun} ${channelLabel} (${when}).${meetLink}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_1H:
-        return `${greeting} tu entrevista ${channelLabel} es en 1 hora (${when}).${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} es en 1 hora (${when}).${meetLink}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_30M:
-        return `${greeting} tu entrevista ${channelLabel} comienza en 30 minutos.${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} comienza en 30 minutos.${meetLink}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_15M:
         // Legacy queued rows only — no longer scheduled.
-        return `${greeting} tu entrevista ${channelLabel} comienza en 15 minutos.${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} comienza en 15 minutos.${meetLink}\n\n${signature}`;
       default:
-        return `${greeting} recordatorio de entrevista: ${when}.${meetLink}\n\n${signature}`;
+        return `${greeting} recordatorio de ${eventNoun}: ${when}.${meetLink}\n\n${signature}`;
     }
   }
 
   const greeting = first ? `Hi ${first},` : "Hi,";
   switch (reminderType) {
     case REMINDER_TYPES.CONFIRMATION:
-      return `${greeting} your interview ${channelLabel} is confirmed for ${when}.${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} is confirmed for ${when}.${meetLink}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_24H:
-      return `${greeting} reminder: your interview ${channelLabel} is tomorrow (${when}).${meetLink}\n\n${signature}`;
+      return `${greeting} reminder: your ${eventNoun} ${channelLabel} is tomorrow (${when}).${meetLink}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_1H:
-      return `${greeting} your interview ${channelLabel} is in 1 hour (${when}).${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} is in 1 hour (${when}).${meetLink}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_30M:
-      return `${greeting} your interview ${channelLabel} starts in 30 minutes.${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} starts in 30 minutes.${meetLink}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_15M:
       // Legacy queued rows only — no longer scheduled.
-      return `${greeting} your interview ${channelLabel} starts in 15 minutes.${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} starts in 15 minutes.${meetLink}\n\n${signature}`;
     default:
-      return `${greeting} interview reminder: ${when}.${meetLink}\n\n${signature}`;
+      return `${greeting} ${eventNoun} reminder: ${when}.${meetLink}\n\n${signature}`;
   }
 }
 
