@@ -116,6 +116,15 @@ function resolveAppointmentViewFilters(view, reference = new Date(), options = {
       return {
         status: COMPLETED_VIEW_STATUSES
       };
+    case "past_unresolved":
+      // Implements BR-206 — past manual Agenda stays recoverable after BR-197 today window.
+      return {
+        to: todayWindow.utcStart,
+        status: SCHEDULED_VIEW_STATUSES,
+        standaloneAgendaOnly: true,
+        requireUnresolved: true,
+        timeZone: todayWindow.timeZone
+      };
     case "cancelled":
       return {
         status: APPOINTMENT_STATUSES.CANCELLED
@@ -358,6 +367,14 @@ function matchesListFilters(record, filters = {}, reference = new Date()) {
   const recordStatus = resolveAppointmentListStatus(record);
 
   if (!statusMatches(recordStatus, allowedStatuses)) {
+    return false;
+  }
+
+  if (filters.standaloneAgendaOnly && record.metadata?.standaloneAgenda !== true) {
+    return false;
+  }
+
+  if (filters.requireUnresolved && hasCanonicalRecordedOutcome(record)) {
     return false;
   }
 

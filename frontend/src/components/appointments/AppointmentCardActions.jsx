@@ -21,6 +21,7 @@ export default function AppointmentCardActions({
   onComplete,
   onPromoteRecruit,
   onPromoteClient,
+  onRecoverRecruitAndClient,
   onOpenClient
 }) {
   const plan = resolveAppointmentCardActionPlan(appointment);
@@ -102,6 +103,12 @@ export default function AppointmentCardActions({
             {translate("agendaOpenClient")}
           </AtlasButton>
         )}
+
+        {onRecoverRecruitAndClient ? (
+          <AtlasButton variant="secondary" size="sm" onClick={onRecoverRecruitAndClient}>
+            {translate("agendaRecoverRecruitAndClient")}
+          </AtlasButton>
+        ) : null}
       </div>
     );
   }
