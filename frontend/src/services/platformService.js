@@ -175,3 +175,20 @@ export async function listAiQualityRegressions(query = {}) {
 export async function getAiQualityRegressionSpec(id) {
   return apiFetch(`/api/platform/ai-quality/regressions/${id}/spec`);
 }
+
+export async function getAiQualityLearningReport(query = {}) {
+  const params = new URLSearchParams();
+  if (query.organizationId) {
+    params.set("organizationId", query.organizationId);
+  }
+  const suffix = params.toString() ? `?${params}` : "";
+  return apiFetch(`/api/platform/ai-quality/learning-report${suffix}`);
+}
+
+export async function applyAiQualityLearningAction(id, payload) {
+  return apiFetch(`/api/platform/ai-quality/cases/${id}/learning-actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}

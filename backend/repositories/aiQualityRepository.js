@@ -47,6 +47,8 @@ function mapCaseRow(row) {
     reviewNotes: row.review_notes,
     expectedBehavior: row.expected_behavior,
     regressionCandidateId: row.regression_candidate_id,
+    learningProposalId: row.learning_proposal_id || null,
+    implementationId: row.implementation_id || null,
     inboundTextStored: false
   };
 }
@@ -79,6 +81,73 @@ function toInsertPayload(row) {
     review_notes: row.reviewNotes,
     expected_behavior: row.expectedBehavior,
     regression_candidate_id: row.regressionCandidateId
+  };
+}
+
+function mapRegressionRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    caseId: row.case_id,
+    status: row.status,
+    spec: row.spec,
+    markdown: row.markdown,
+    createdByUserId: row.created_by_user_id,
+    reviewerUserId: row.reviewer_user_id || null,
+    riskLevel: row.risk_level || row.spec?.riskLevel || null,
+    approvedAt: row.approved_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || row.created_at,
+    mutatesSourceCode: false,
+    mutatesTests: false,
+    implementationAuthorized: Boolean(row.implementation_authorized)
+  };
+}
+
+function mapProposalRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    caseId: row.case_id,
+    status: row.status,
+    proposal: row.proposal,
+    riskLevel: row.risk_level,
+    confidence: row.confidence == null ? null : Number(row.confidence),
+    recommendedAction: row.recommended_action,
+    generatedBy: row.generated_by,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapImplementationRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    caseId: row.case_id,
+    regressionId: row.regression_id,
+    proposalId: row.proposal_id,
+    status: row.status,
+    spec: row.spec,
+    markdown: row.markdown,
+    authorizedByUserId: row.authorized_by_user_id,
+    authorizedAt: row.authorized_at,
+    mutatesSourceCode: false,
+    mutatesTests: false,
+    linkedBr: row.linked_br,
+    linkedPr: row.linked_pr,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -212,6 +281,12 @@ function createSupabaseStore() {
       if (patch.regressionCandidateId != null) {
         payload.regression_candidate_id = patch.regressionCandidateId;
       }
+      if (patch.learningProposalId != null) {
+        payload.learning_proposal_id = patch.learningProposalId;
+      }
+      if (patch.implementationId != null) {
+        payload.implementation_id = patch.implementationId;
+      }
       payload.updated_at = new Date().toISOString();
       const { data, error } = await supabase
         .from("ai_quality_cases")
@@ -234,25 +309,40 @@ function createSupabaseStore() {
           status: row.status,
           spec: row.spec,
           markdown: row.markdown,
-          created_by_user_id: row.createdByUserId
+          created_by_user_id: row.createdByUserId,
+          reviewer_user_id: row.reviewerUserId || row.createdByUserId || null,
+          risk_level: row.riskLevel || null,
+          approved_at: row.approvedAt || null,
+          implementation_authorized: Boolean(row.implementationAuthorized)
         })
         .select("*")
         .single();
       if (error) {
         throw error;
       }
-      return {
-        id: data.id,
-        organizationId: data.organization_id,
-        caseId: data.case_id,
-        status: data.status,
-        spec: data.spec,
-        markdown: data.markdown,
-        createdByUserId: data.created_by_user_id,
-        createdAt: data.created_at,
-        mutatesSourceCode: false,
-        mutatesTests: false
-      };
+      return mapRegressionRow(data);
+    },
+    async updateRegression(id, patch) {
+      const payload = { updated_at: new Date().toISOString() };
+      if (patch.status != null) payload.status = patch.status;
+      if (patch.spec != null) payload.spec = patch.spec;
+      if (patch.markdown != null) payload.markdown = patch.markdown;
+      if (patch.reviewerUserId != null) payload.reviewer_user_id = patch.reviewerUserId;
+      if (patch.riskLevel != null) payload.risk_level = patch.riskLevel;
+      if (patch.approvedAt != null) payload.approved_at = patch.approvedAt;
+      if (patch.implementationAuthorized != null) {
+        payload.implementation_authorized = Boolean(patch.implementationAuthorized);
+      }
+      const { data, error } = await supabase
+        .from("ai_quality_regression_candidates")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      return mapRegressionRow(data);
     },
     async listRegressions({ organizationId = null } = {}) {
       let query = supabase
@@ -269,18 +359,7 @@ function createSupabaseStore() {
         }
         throw error;
       }
-      return (data || []).map((row) => ({
-        id: row.id,
-        organizationId: row.organization_id,
-        caseId: row.case_id,
-        status: row.status,
-        spec: row.spec,
-        markdown: row.markdown,
-        createdByUserId: row.created_by_user_id,
-        createdAt: row.created_at,
-        mutatesSourceCode: false,
-        mutatesTests: false
-      }));
+      return (data || []).map(mapRegressionRow);
     },
     async getRegression(id) {
       const { data, error } = await supabase
@@ -294,21 +373,253 @@ function createSupabaseStore() {
         }
         throw error;
       }
-      if (!data) {
-        return null;
+      return mapRegressionRow(data);
+    },
+    async getRegressionByCase(caseId) {
+      const { data, error } = await supabase
+        .from("ai_quality_regression_candidates")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        if (isTableMissing(error)) {
+          return null;
+        }
+        throw error;
+      }
+      return mapRegressionRow(data);
+    },
+    async upsertProposal(row) {
+      const payload = {
+        id: row.id,
+        organization_id: row.organizationId,
+        case_id: row.caseId,
+        status: row.status,
+        proposal: row.proposal,
+        risk_level: row.riskLevel,
+        confidence: row.confidence,
+        recommended_action: row.recommendedAction,
+        generated_by: row.generatedBy || "atlas_deterministic",
+        created_by_user_id: row.createdByUserId || null,
+        updated_at: row.updatedAt || new Date().toISOString()
+      };
+      const { data, error } = await supabase
+        .from("ai_quality_learning_proposals")
+        .upsert(payload, { onConflict: "id" })
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      return mapProposalRow(data);
+    },
+    async updateProposal(id, patch) {
+      const payload = { updated_at: new Date().toISOString() };
+      if (patch.status != null) payload.status = patch.status;
+      if (patch.proposal != null) payload.proposal = patch.proposal;
+      const { data, error } = await supabase
+        .from("ai_quality_learning_proposals")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      return mapProposalRow(data);
+    },
+    async getProposal(id) {
+      const { data, error } = await supabase
+        .from("ai_quality_learning_proposals")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) {
+        if (isTableMissing(error)) {
+          return null;
+        }
+        throw error;
+      }
+      return mapProposalRow(data);
+    },
+    async getProposalByCase(caseId) {
+      const { data, error } = await supabase
+        .from("ai_quality_learning_proposals")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        if (isTableMissing(error)) {
+          return null;
+        }
+        throw error;
+      }
+      return mapProposalRow(data);
+    },
+    async listProposals({ organizationId = null } = {}) {
+      let query = supabase.from("ai_quality_learning_proposals").select("*").order("updated_at", { ascending: false });
+      if (organizationId) {
+        query = query.eq("organization_id", organizationId);
+      }
+      const { data, error } = await query;
+      if (error) {
+        if (isTableMissing(error)) {
+          return [];
+        }
+        throw error;
+      }
+      return (data || []).map(mapProposalRow);
+    },
+    async upsertImplementation(row) {
+      const payload = {
+        id: row.id,
+        organization_id: row.organizationId,
+        case_id: row.caseId,
+        regression_id: row.regressionId,
+        proposal_id: row.proposalId,
+        status: row.status,
+        spec: row.spec,
+        markdown: row.markdown,
+        authorized_by_user_id: row.authorizedByUserId || null,
+        authorized_at: row.authorizedAt || null,
+        mutates_source_code: false,
+        mutates_tests: false,
+        linked_br: row.linkedBr || null,
+        linked_pr: row.linkedPr || null,
+        updated_at: row.updatedAt || new Date().toISOString()
+      };
+      const { data, error } = await supabase
+        .from("ai_quality_implementation_proposals")
+        .upsert(payload, { onConflict: "id" })
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      return mapImplementationRow(data);
+    },
+    async updateImplementation(id, patch) {
+      const payload = { updated_at: new Date().toISOString() };
+      if (patch.status != null) payload.status = patch.status;
+      if (patch.spec != null) payload.spec = patch.spec;
+      if (patch.markdown != null) payload.markdown = patch.markdown;
+      if (patch.authorizedByUserId != null) payload.authorized_by_user_id = patch.authorizedByUserId;
+      if (patch.authorizedAt != null) payload.authorized_at = patch.authorizedAt;
+      if (patch.linkedBr != null) payload.linked_br = patch.linkedBr;
+      if (patch.linkedPr != null) payload.linked_pr = patch.linkedPr;
+      payload.mutates_source_code = false;
+      payload.mutates_tests = false;
+      const { data, error } = await supabase
+        .from("ai_quality_implementation_proposals")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      return mapImplementationRow(data);
+    },
+    async getImplementationByCase(caseId) {
+      const { data, error } = await supabase
+        .from("ai_quality_implementation_proposals")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        if (isTableMissing(error)) {
+          return null;
+        }
+        throw error;
+      }
+      return mapImplementationRow(data);
+    },
+    async listImplementations({ organizationId = null } = {}) {
+      let query = supabase
+        .from("ai_quality_implementation_proposals")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      if (organizationId) {
+        query = query.eq("organization_id", organizationId);
+      }
+      const { data, error } = await query;
+      if (error) {
+        if (isTableMissing(error)) {
+          return [];
+        }
+        throw error;
+      }
+      return (data || []).map(mapImplementationRow);
+    },
+    async insertLearningAction(row) {
+      const payload = {
+        id: row.id,
+        organization_id: row.organizationId,
+        case_id: row.caseId || null,
+        proposal_id: row.proposalId || null,
+        regression_id: row.regressionId || null,
+        implementation_id: row.implementationId || null,
+        action: row.action,
+        actor_user_id: row.actorUserId || null,
+        result: row.result || "success",
+        metadata: row.metadata || {},
+        created_at: row.createdAt || new Date().toISOString()
+      };
+      const { data, error } = await supabase.from("ai_quality_learning_actions").insert(payload).select("*").single();
+      if (error) {
+        if (isTableMissing(error)) {
+          return row;
+        }
+        throw error;
       }
       return {
         id: data.id,
         organizationId: data.organization_id,
         caseId: data.case_id,
-        status: data.status,
-        spec: data.spec,
-        markdown: data.markdown,
-        createdByUserId: data.created_by_user_id,
-        createdAt: data.created_at,
-        mutatesSourceCode: false,
-        mutatesTests: false
+        proposalId: data.proposal_id,
+        regressionId: data.regression_id,
+        implementationId: data.implementation_id,
+        action: data.action,
+        actorUserId: data.actor_user_id,
+        result: data.result,
+        metadata: data.metadata,
+        createdAt: data.created_at
       };
+    },
+    async listLearningActions({ organizationId = null, caseId = null } = {}) {
+      let query = supabase.from("ai_quality_learning_actions").select("*").order("created_at", { ascending: false });
+      if (organizationId) {
+        query = query.eq("organization_id", organizationId);
+      }
+      if (caseId) {
+        query = query.eq("case_id", caseId);
+      }
+      const { data, error } = await query;
+      if (error) {
+        if (isTableMissing(error)) {
+          return [];
+        }
+        throw error;
+      }
+      return (data || []).map((row) => ({
+        id: row.id,
+        organizationId: row.organization_id,
+        caseId: row.case_id,
+        proposalId: row.proposal_id,
+        regressionId: row.regression_id,
+        implementationId: row.implementation_id,
+        action: row.action,
+        actorUserId: row.actor_user_id,
+        result: row.result,
+        metadata: row.metadata,
+        createdAt: row.created_at
+      }));
     }
   };
 }

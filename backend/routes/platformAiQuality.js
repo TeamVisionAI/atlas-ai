@@ -56,6 +56,37 @@ router.get("/cases/:id", async (req, res) => {
   }
 });
 
+router.get("/learning-report", async (req, res) => {
+  try {
+    const report = await aiQualityService.getLearningReportForScope({
+      organizationId: req.query.organizationId || null
+    });
+    res.json({ report });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+router.post("/cases/:id/learning-actions", async (req, res) => {
+  try {
+    const result = await aiQualityService.applyLearningCaseAction({
+      caseId: req.params.id,
+      action: req.body?.action,
+      notes: req.body?.notes || null,
+      expectedBehavior: req.body?.expectedBehavior || {},
+      linkedPr: req.body?.linkedPr || null,
+      linkedBr: req.body?.linkedBr || null,
+      actorUserId: req.authContext?.userId || null,
+      preAuthorize: req.body?.preAuthorize,
+      skipAuthorization: req.body?.skipAuthorization,
+      autoAuthorize: req.body?.autoAuthorize
+    });
+    res.json(result);
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
 router.post("/cases/:id/review", async (req, res) => {
   try {
     const result = await aiQualityService.reviewCase({

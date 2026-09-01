@@ -3,7 +3,24 @@ export const AI_QUALITY_TABS = Object.freeze([
   { id: "disagreements", label: "Disagreements" },
   { id: "attention", label: "Attention Cases" },
   { id: "regressions", label: "Regression Library" },
+  { id: "learning", label: "Learning & Improvements" },
   { id: "cost", label: "Cost & Latency" }
+]);
+
+export const LEARNING_ACTIONS = Object.freeze([
+  { id: "generate_proposal", label: "Generate Proposal" },
+  { id: "approve_regression", label: "Approve Regression" },
+  { id: "reject_proposal", label: "Reject Proposal" },
+  { id: "request_revision", label: "Request Revision" },
+  { id: "authorize_implementation", label: "Authorize Implementation" }
+]);
+
+export const LEARNING_FOLLOW_UP_ACTIONS = Object.freeze([
+  { id: "propose_implementation", label: "Propose Implementation" },
+  { id: "reject_implementation", label: "Reject Implementation" },
+  { id: "mark_implemented", label: "Mark implemented" },
+  { id: "mark_verified", label: "Mark verified" },
+  { id: "reopen", label: "Reopen" }
 ]);
 
 export const REVIEW_ACTIONS = Object.freeze([
