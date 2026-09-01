@@ -21,6 +21,10 @@ const {
   evaluateAtlasInboundAutomationEligibility,
   resolveAtlasInboundAutomationEligibility
 } = require("./atlasInboundAutomationEligibility");
+const {
+  evaluateAutomationOutboundEligibility,
+  emitAutomatedOutboundSuppression
+} = require("./automationOutboundEligibility");
 
 function extractReplyText(engineResult) {
   if (!engineResult) {
@@ -113,6 +117,28 @@ async function shouldDeliverAutomatedReply(prospect, options = {}) {
       phone: prospect.phone || null,
       reason: eligibility.reason,
       eligibilityReason: eligibility.reason
+    });
+    return false;
+  }
+
+  // Implements BR-200 — outbound still requires positive lead provenance.
+  // BR-193 connection fallback / META_AD_DESTINATION stamp is not enough.
+  const outboundEligibility = evaluateAutomationOutboundEligibility({
+    organizationId: prospect.organization_id || prospect.organizationId || null,
+    prospect,
+    inboundEvent: options.inbound || null,
+    workflowState: persisted,
+    actor: "ATLAS",
+    qrAttributed: options.qrAttributed === true,
+    source: "communicationHub.shouldDeliverAutomatedReply"
+  });
+  if (!outboundEligibility.eligible) {
+    emitAutomatedOutboundSuppression({
+      eligibility: outboundEligibility,
+      prospect,
+      inboundEvent: options.inbound || null,
+      handlerPath: "communicationHub.shouldDeliverAutomatedReply",
+      attemptedSend: false
     });
     return false;
   }
@@ -259,7 +285,10 @@ async function deliverWhatsAppReply({
       templateVariables,
       inboundPhoneNumberId: normalized.phoneNumberId || null,
       interactive: replyEntities.whatsappInteractive || null,
-      interactiveFallbackText: replyEntities.interactiveFallbackText || replyText
+      interactiveFallbackText: replyEntities.interactiveFallbackText || replyText,
+      inboundEvent: normalized,
+      handlerPath: "communicationHub.deliverWhatsAppReply",
+      prospectOverride: prospect
   });
 
   const isV2Owned =
@@ -403,18 +432,38 @@ async function processNormalizedInboundMessage(
     inbound: normalized,
     qrAttributed
   });
-  if (!eligibility.eligible) {
+  // Implements BR-200 — do not generate automated copy without lead provenance.
+  const outboundEligibility = evaluateAutomationOutboundEligibility({
+    organizationId: prospect?.organization_id || prospect?.organizationId || null,
+    connection: normalized.whatsappConnection || null,
+    prospect,
+    inboundEvent: normalized,
+    actor: "ATLAS",
+    qrAttributed,
+    source: "communicationHub.processNormalizedInboundMessage"
+  });
+  if (!eligibility.eligible || !outboundEligibility.eligible) {
+    const reason = !eligibility.eligible ? eligibility.reason : outboundEligibility.reason;
+    if (eligibility.eligible && !outboundEligibility.eligible) {
+      emitAutomatedOutboundSuppression({
+        eligibility: outboundEligibility,
+        prospect,
+        inboundEvent: normalized,
+        handlerPath: "communicationHub.processNormalizedInboundMessage",
+        attemptedSend: false
+      });
+    }
     logWhatsAppStage("atlas_automation_not_eligible", {
       phone: normalized.phone,
-      reason: eligibility.reason,
-      eligibilityReason: eligibility.reason,
+      reason,
+      eligibilityReason: reason,
       providerMessageId: normalized.providerMessageId || null
     });
     return {
       success: true,
       replied: false,
       reason: "ATLAS_AUTOMATION_NOT_ELIGIBLE",
-      eligibilityReason: eligibility.reason
+      eligibilityReason: reason
     };
   }
 

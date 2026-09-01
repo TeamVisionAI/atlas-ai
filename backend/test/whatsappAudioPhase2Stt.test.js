@@ -67,6 +67,9 @@ function spanishProspect(overrides = {}) {
     organization_id: ORG,
     current_step: "NEW",
     preferred_language: "spanish",
+    source: "car_magnet",
+    entry_method: "QR",
+    workflow_state: { atlasEligibilitySource: "QR" },
     ...overrides
   };
 }

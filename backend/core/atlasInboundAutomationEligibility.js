@@ -106,6 +106,25 @@ function hasStoredCtwaProvenance(prospect = {}, workflowState = {}) {
   return hasPositiveCtwaReferral(readStoredCtwaReferral(prospect, wf));
 }
 
+/** Real CTWA proof only — not a META_AD_DESTINATION connection stamp. */
+function hasRealStoredCtwaEvidence(prospect = {}, workflowState = {}) {
+  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  if (upper(wf.atlasEligibilitySource) === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL) {
+    return true;
+  }
+  const clid =
+    prospect.ctwa_clid ||
+    prospect.ctwaClid ||
+    wf.ctwa_clid ||
+    wf.ctwaClid ||
+    prospect.metadata?.ctwa_clid ||
+    prospect.metadata?.ctwaClid;
+  if (String(clid || "").trim()) {
+    return true;
+  }
+  return hasPositiveCtwaReferral(readStoredCtwaReferral(prospect, wf));
+}
+
 /**
  * BR-142 / BR-165 / BR-199 — positive Atlas lead provenance for operational views.
  * FACEBOOK / CLICK_TO_WHATSAPP labels, HUMAN/ATLAS ownership, and lifecycle
@@ -522,6 +541,7 @@ module.exports = {
   hasAtlasBusinessEligibilityEvidence,
   isOrdinaryPersonalWhatsAppContact,
   hasStoredCtwaProvenance,
+  hasRealStoredCtwaEvidence,
   evaluatePositiveAtlasLeadProvenance,
   hasPositiveAtlasLeadProvenance,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES,

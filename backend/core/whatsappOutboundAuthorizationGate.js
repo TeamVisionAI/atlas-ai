@@ -17,7 +17,8 @@ const DELIVERY_STATUSES = Object.freeze({
   BLOCKED_STAGING_OUTBOUND: "blocked_staging_outbound",
   RETRY_REQUIRED: "retry_required",
   PROVIDER_FAILED: "provider_failed",
-  DUPLICATE_SUPPRESSED: "duplicate_suppressed"
+  DUPLICATE_SUPPRESSED: "duplicate_suppressed",
+  BLOCKED_NOT_ELIGIBLE: "blocked_not_eligible"
 });
 
 function buildDeliveryResult({
