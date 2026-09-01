@@ -46,6 +46,15 @@ const VERIFIED_SOURCE_SET = Object.freeze(
   )
 );
 
+/** BR-201 — connection-only META_AD_DESTINATION is not inbound-specific proof. */
+const POSITIVE_LEAD_PROVENANCE_SOURCE_SET = Object.freeze(
+  new Set(
+    [...VERIFIED_SOURCE_SET].filter(
+      (source) => source !== VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION
+    )
+  )
+);
+
 /** Stored origins that are only written by a verified intake path (not default CTWA). */
 const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
   new Set([
@@ -84,28 +93,6 @@ function readStoredCtwaReferral(prospect = {}, workflowState = {}) {
   );
 }
 
-function hasStoredCtwaProvenance(prospect = {}, workflowState = {}) {
-  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
-  const source = upper(wf.atlasEligibilitySource);
-  if (
-    source === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL ||
-    source === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION
-  ) {
-    return true;
-  }
-  const clid =
-    prospect.ctwa_clid ||
-    prospect.ctwaClid ||
-    wf.ctwa_clid ||
-    wf.ctwaClid ||
-    prospect.metadata?.ctwa_clid ||
-    prospect.metadata?.ctwaClid;
-  if (String(clid || "").trim()) {
-    return true;
-  }
-  return hasPositiveCtwaReferral(readStoredCtwaReferral(prospect, wf));
-}
-
 /** Real CTWA proof only — not a META_AD_DESTINATION connection stamp. */
 function hasRealStoredCtwaEvidence(prospect = {}, workflowState = {}) {
   const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
@@ -125,10 +112,25 @@ function hasRealStoredCtwaEvidence(prospect = {}, workflowState = {}) {
   return hasPositiveCtwaReferral(readStoredCtwaReferral(prospect, wf));
 }
 
+function hasStoredCtwaProvenance(prospect = {}, workflowState = {}) {
+  // Implements BR-201 — META_AD_DESTINATION stamp is not CTWA proof.
+  return hasRealStoredCtwaEvidence(prospect, workflowState);
+}
+
+function isMetaAdDestinationStamp(prospect = {}, workflowState = {}) {
+  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  return (
+    upper(wf.atlasEligibilitySource) === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION ||
+    upper(prospect?.entry_method) === WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION ||
+    upper(prospect?.source) === upper(WHATSAPP_SOURCE.META_AD_DESTINATION)
+  );
+}
+
 /**
- * BR-142 / BR-165 / BR-199 — positive Atlas lead provenance for operational views.
- * FACEBOOK / CLICK_TO_WHATSAPP labels, HUMAN/ATLAS ownership, and lifecycle
- * progress are not provenance.
+ * BR-142 / BR-165 / BR-199 / BR-201 — positive Atlas lead provenance for
+ * operational views. FACEBOOK / CLICK_TO_WHATSAPP labels, HUMAN/ATLAS
+ * ownership, lifecycle progress, and connection-only META_AD_DESTINATION
+ * stamps are not provenance.
  */
 function evaluatePositiveAtlasLeadProvenance(prospect = {}, workflowState = {}) {
   if (!prospect) {
@@ -138,7 +140,8 @@ function evaluatePositiveAtlasLeadProvenance(prospect = {}, workflowState = {}) 
   if (wf.atlasAutomationEnabled === true) {
     return { eligible: true, reason: "EXPLICITLY_ENABLED" };
   }
-  if (VERIFIED_SOURCE_SET.has(upper(wf.atlasEligibilitySource))) {
+  // Implements BR-201 — META_AD_DESTINATION is not an unconditional verified source.
+  if (POSITIVE_LEAD_PROVENANCE_SOURCE_SET.has(upper(wf.atlasEligibilitySource))) {
     return { eligible: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
   }
   if (hasQrOrigin({ prospect })) {
@@ -155,9 +158,6 @@ function evaluatePositiveAtlasLeadProvenance(prospect = {}, workflowState = {}) 
   if (entry === WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS || entry === "FACEBOOK_LEAD") {
     return { eligible: true, reason: "FACEBOOK_LEAD_ADS" };
   }
-  if (entry === WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION) {
-    return { eligible: true, reason: "META_AD_DESTINATION" };
-  }
   if (
     entry === "QUICK_CAPTURE" ||
     entry === "MANUAL_CREATE" ||
@@ -166,11 +166,14 @@ function evaluatePositiveAtlasLeadProvenance(prospect = {}, workflowState = {}) 
   ) {
     return { eligible: true, reason: "EXPLICIT_PROSPECT_CREATE" };
   }
-  if (hasStoredCtwaProvenance(prospect, wf)) {
+  if (hasRealStoredCtwaEvidence(prospect, wf)) {
     return { eligible: true, reason: "CTWA_PROVENANCE" };
   }
   if (isIulWorkflowProspect(wf, {})) {
     return { eligible: true, reason: "IUL_CAMPAIGN_WORKFLOW" };
+  }
+  if (isMetaAdDestinationStamp(prospect, wf)) {
+    return { eligible: false, reason: "LEGACY_AMBIGUOUS" };
   }
   return { eligible: false, reason: "NO_POSITIVE_LEAD_PROVENANCE" };
 }
@@ -544,6 +547,8 @@ module.exports = {
   hasRealStoredCtwaEvidence,
   evaluatePositiveAtlasLeadProvenance,
   hasPositiveAtlasLeadProvenance,
+  isMetaAdDestinationStamp,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
-  VERIFIED_SOURCE_SET
+  VERIFIED_SOURCE_SET,
+  POSITIVE_LEAD_PROVENANCE_SOURCE_SET
 };
