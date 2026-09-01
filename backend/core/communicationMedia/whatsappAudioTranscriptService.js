@@ -190,6 +190,32 @@ async function sendTranscriptOutbound({
   if (!prospect?.phone || !text) {
     return { success: false, replied: false, reason: "NO_PROSPECT_OR_TEXT" };
   }
+  const {
+    evaluateAutomationOutboundEligibility,
+    emitAutomatedOutboundSuppression
+  } = require("../automationOutboundEligibility");
+  const outboundEligibility = evaluateAutomationOutboundEligibility({
+    organizationId: prospect.organization_id || row?.organization_id || null,
+    prospect,
+    inboundEvent: { messageType: "audio", text },
+    actor: "ATLAS",
+    source: "whatsappAudioTranscriptService"
+  });
+  if (!outboundEligibility.eligible) {
+    emitAutomatedOutboundSuppression({
+      eligibility: outboundEligibility,
+      prospect,
+      inboundEvent: { messageType: "audio" },
+      handlerPath: "whatsappAudioTranscriptService.sendTranscriptOutbound",
+      attemptedSend: false
+    });
+    return {
+      success: true,
+      replied: false,
+      reason: "ATLAS_AUTOMATION_NOT_ELIGIBLE",
+      eligibilityReason: outboundEligibility.reason
+    };
+  }
   const deliver = dependencies.deliverWhatsAppReply || require("../communicationHub").deliverWhatsAppReply;
   return deliver({
     normalized: {
@@ -220,6 +246,33 @@ async function processWhatsAppAudioTranscriptTurn({
 } = {}) {
   const mediaId = row?.id;
   const turnId = buildTranscriptTurnId(mediaId);
+  const {
+    evaluateAutomationOutboundEligibility,
+    emitAutomatedOutboundSuppression
+  } = require("../automationOutboundEligibility");
+  const outboundEligibility = evaluateAutomationOutboundEligibility({
+    organizationId: prospect?.organization_id || row?.organization_id || null,
+    prospect,
+    inboundEvent: { messageType: "audio", text: transcriptText },
+    actor: "ATLAS",
+    source: "whatsappAudioTranscriptService.processTurn"
+  });
+  if (!outboundEligibility.eligible) {
+    emitAutomatedOutboundSuppression({
+      eligibility: outboundEligibility,
+      prospect,
+      inboundEvent: { messageType: "audio" },
+      handlerPath: "whatsappAudioTranscriptService.processWhatsAppAudioTranscriptTurn",
+      attemptedSend: false
+    });
+    return {
+      success: true,
+      replied: false,
+      reason: "ATLAS_AUTOMATION_NOT_ELIGIBLE",
+      turnId,
+      eligibilityReason: outboundEligibility.reason
+    };
+  }
   const env = {
     ...(dependencies.env || process.env),
     RECRUIT_AI_V2_EXECUTION_ENABLED: "false",

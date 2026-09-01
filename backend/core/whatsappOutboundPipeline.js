@@ -34,6 +34,11 @@ const { COMMUNICATION_EVENTS } = require("../modules/business-events/domain/Even
 const {
   normalizeZoomDynamicUrlButtonParameter
 } = require("./whatsappTemplateVariableBuilder");
+const {
+  evaluateAutomationOutboundEligibility,
+  isManualOutboundActor,
+  emitAutomatedOutboundSuppression
+} = require("./automationOutboundEligibility");
 
 function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
@@ -288,7 +293,10 @@ async function sendAndPersistWhatsAppMessage({
   idempotencyKey = null,
   pipeline = null,
   now = new Date(),
-  inboundPhoneNumberId = null
+  inboundPhoneNumberId = null,
+  inboundEvent = null,
+  handlerPath = null,
+  prospectOverride = null
 } = {}) {
   if (!to) {
     return {
@@ -299,12 +307,61 @@ async function sendAndPersistWhatsAppMessage({
     };
   }
 
-  const prospectRecord = await resolveProspectForOutbound(to, organizationId);
+  const prospectRecord =
+    prospectOverride && typeof prospectOverride === "object"
+      ? prospectOverride
+      : await resolveProspectForOutbound(to, organizationId);
   const metaTo = resolveOutboundMetaRecipient(to, prospectRecord);
   const storagePhone =
     prospectRecord?.phone || resolveStoragePhone(to) || String(to || "").trim();
   const prospect = prospectRecord || {};
   const resolvedOrgId = organizationId || prospectRecord?.organization_id || null;
+
+  // Implements BR-200 — last-line automated outbound guard. HUMAN/AGENT skip.
+  if (!isManualOutboundActor(actor) && prospectRecord && (prospectRecord.id || prospectRecord.phone)) {
+    const outboundEligibility = evaluateAutomationOutboundEligibility({
+      organizationId: resolvedOrgId,
+      prospect: prospectRecord,
+      inboundEvent,
+      actor,
+      source: handlerPath || "whatsappOutboundPipeline.sendAndPersistWhatsAppMessage"
+    });
+    if (!outboundEligibility.eligible) {
+      emitAutomatedOutboundSuppression({
+        eligibility: outboundEligibility,
+        prospect: prospectRecord,
+        inboundEvent,
+        handlerPath: handlerPath || "whatsappOutboundPipeline.sendAndPersistWhatsAppMessage",
+        attemptedSend: true
+      });
+      const blockedAuth = {
+        status: DELIVERY_STATUSES.BLOCKED_NOT_ELIGIBLE,
+        reason: outboundEligibility.reason,
+        retryable: false,
+        permittedDeliveryMode: null
+      };
+      await persistBlockedOrFailedAttempt({
+        prospect: prospectRecord,
+        storagePhone,
+        organizationId: resolvedOrgId,
+        intent,
+        actor,
+        authorization: blockedAuth,
+        status: blockedAuth.status,
+        idempotencyKey
+      });
+      return {
+        success: false,
+        status: blockedAuth.status,
+        error: outboundEligibility.reason,
+        retryable: false,
+        reason: outboundEligibility.reason,
+        delivery: blockedAuth,
+        providerMessageId: null,
+        conversationLogId: null
+      };
+    }
+  }
 
   if (idempotencyKey) {
     const existing = await findSuccessfulDeliveryByIdempotencyKey({

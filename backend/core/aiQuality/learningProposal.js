@@ -67,6 +67,15 @@ const CATALOG = Object.freeze({
     suggested_fix_area: "compliance",
     recommended_action: LEARNING_ACTIONS.APPROVE_REGRESSION
   },
+  [SIGNAL_TYPES.AUTOMATED_OUTBOUND_ELIGIBILITY_BYPASS]: {
+    problem_summary: "An automated WhatsApp send was attempted for a contact without positive Atlas lead provenance.",
+    likely_root_cause: "An outbound path skipped the BR-200 eligibility guard or treated a label/connection as proof.",
+    expected_behavior: "Suppress automated outbound, log the reason, and leave HUMAN reply available.",
+    proposed_regression: "Personal or ambiguous inbound must not produce Atlas-generated WhatsApp.",
+    forbidden_behavior: ["auto-ack media without provenance", "treat CLICK_TO_WHATSAPP labels as eligibility"],
+    suggested_fix_area: "lead_eligibility",
+    recommended_action: LEARNING_ACTIONS.APPROVE_REGRESSION
+  },
   [SIGNAL_TYPES.SEMANTIC_DISAGREEMENT]: {
     problem_summary: "Semantic and legacy interpretations disagreed on intent or facts.",
     likely_root_cause: "Legacy matcher missed a resolvable phrase or fact.",

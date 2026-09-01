@@ -1304,7 +1304,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Structured type first** — Classify from normalized WhatsApp `messageType`. Placeholder text `/^\[type message\]$/` is defensive fallback only.
 2. **Intent `non_text_media`** — Media is not prospect language; never invent `unknown` → `clarify_once` from the placeholder alone.
-3. **Soft ack** — Locale-aware short acknowledgment (e.g. “Recibí el archivo…”) may send; transport may still persist the inbound event.
+3. **Soft ack** — Locale-aware short acknowledgment (e.g. “Recibí el archivo…”) may send **only when BR-200 / BR-142 eligibility is already true**; transport may still persist the inbound event. Ineligible personal/media inbound stays silent.
 4. **State preserved** — Do not change `proposedDate` / `proposedTime` / offered slots, `lastQuestionAsked`, `lastOfferMade`, `lastProspectIntent`, `pendingClarification`, or `clarificationCount`.
 5. **Post-confirm / deferred** — When `lastOfferMade=appointment_confirm_deferred` (or equivalent confirmed proposed slot under execution-off handoff), media must not reopen scheduling or imply a missing field.
 6. **Pre-confirm** — Soft-ack and keep the pending question/state; do not bump ambiguity as if free-form unknown text arrived.
@@ -1761,7 +1761,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** The production WhatsApp Cloud API number may also be a personal/business line. Atlas may auto-reply (live authoring, Conversation Engine, automated outbound) only when the sender is **positively eligible**. Unknown and personal inbound default to silence.
 **Domain:** WhatsApp inbound / Recruit AI / Conversation Engine
 **Depends on:** BR-075, BR-114, BR-129, BR-135, BR-138
-**Related:** BR-080 (unknown inbound may persist; silence is not a BR-080 AI failure), BR-049, BR-165 (user-owned WhatsApp is eligible)
+**Related:** BR-080 (unknown inbound may persist; silence is not a BR-080 AI failure), BR-049, BR-165 (user-owned WhatsApp is eligible), BR-200 (automated outbound guard)
 **Status:** Implemented
 **Engine target:** `atlasInboundAutomationEligibility.js`, `communicationHub.js` (before live authoring and `shouldDeliverAutomatedReply`), `whatsappProspectResolver.resolveCreateSourceFields`, `whatsappWebhookParser.extractClickToWhatsAppReferral`
 **Tests:** `backend/test/atlasInboundAutomationEligibility.test.js`
@@ -2213,7 +2213,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Inbound to a user-owned WhatsApp connection is assigned to that user. The personal connection is routing/ownership metadata only — it is not prospect promotion, Conversations inbox membership, or Recruit AI eligibility. Default Conversations My Prospects / Prospect Center lists are `owner_user_id` = signed-in user only.
 **Domain:** WhatsApp inbound / assignment / workspace lists / Recruit AI eligibility
 **Depends on:** BR-080, BR-142, BR-147 (personal workspace), BR-148, BR-159
-**Related:** BR-129 (tenant isolation), BR-149 (team/oversight views), BR-199 (eligibility-first lists)  
+**Related:** BR-129 (tenant isolation), BR-149 (team/oversight views), BR-199 (eligibility-first lists), BR-200 (automated outbound)  
 **Status:** Implemented
 **Engine target:** `whatsappInboundOrganizationResolver`, `whatsappProspectResolver`, `newLeadAssignmentEngine`, `atlasInboundAutomationEligibility`, `prospectPromotionEligibility`, `authorizationService.resolveWorkspaceListScope`, `loadProductionProspects`, `whatsappLastInboundAsset`, `conversationsCenterHumanReplyService`, `whatsappSendCredentials`
 **Tests:** `backend/test/personalWhatsAppWorkspaceBr165.test.js`, `backend/test/personalWhatsAppPrivacySurfaces.test.js`, `backend/test/conversationsCenterOwnershipUx.test.js`, `backend/test/conversationsCenterTabExclusivity.test.js`, `frontend/src/engines/conversationsWorkspaceScope.test.js`, `backend/test/atlasInboundAutomationEligibility.test.js`, `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/whatsappSendCredentialsCutoverPin.test.js`, `backend/test/conversationsCenterHumanReplyAssetRouting.test.js`
@@ -3085,6 +3085,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **UNKNOWN person is not ineligible provenance** — A valid ad/QR/campaign lead whose display name/classification is UNKNOWN remains included.
 5. **Cache identity** — Conversations My Prospects list cache includes the current user id so same-org user switches cannot reuse another user’s mine list. Cache is not a substitute for backend filtering.
 6. **Boundaries** — Do not weaken BR-142 fail-closed auto-reply. Do not change first outbound, WhatsApp routing, tenant isolation, ownership assignment, or AI Quality APPLY.
+
+---
+
+## BR-200 — Eligibility Gate Before Any Automated Outbound
+
+**Implements:** Atlas must not generate or send any automated WhatsApp outbound unless the contact/event has positive Atlas lead provenance. Applies to text, image/document/audio acknowledgments, FAQ, qualification, scheduling, follow-ups, and other Atlas-originated WhatsApp. Manual HUMAN / AGENT messages stay allowed.  
+**Domain:** WhatsApp outbound / Recruit AI / Conversation Engine / follow-ups  
+**Depends on:** BR-142, BR-199, BR-118, BR-165, BR-193  
+**Related:** BR-075, BR-159, BR-175  
+**Status:** Implemented  
+**Engine target:** `automationOutboundEligibility.evaluateAutomationOutboundEligibility`; `communicationHub` (before live authoring / CE); `whatsappOutboundPipeline.sendAndPersistWhatsAppMessage` (last-line ATLAS guard)  
+**Tests:** `backend/test/automationOutboundEligibilityBr200.test.js`; `backend/test/atlasInboundAutomationEligibility.test.js`; `backend/test/operationalLeadEligibilityBr199.test.js`
+
+### Rules
+
+1. **Filter order** — Before generating or sending automated outbound: (1) tenant isolation (2) BR-142 inbound eligibility (3) BR-200 positive lead provenance. HUMAN/ATLAS ownership is not proof.
+2. **Fail closed** — Personal WhatsApp inbound, `FACEBOOK` / `CLICK_TO_WHATSAPP` labels, greeting text, lifecycle, and connection-only BR-193 `META_AD_DESTINATION` stamps are not enough to auto-reply. Require this-inbound CTWA (`source_type=ad` / `ctwa_clid`), QR / campaign, stored verified source backed by real evidence, explicit create, IUL campaign workflow, or `atlasAutomationEnabled=true`.
+3. **Do not generate copy** — Ineligible inbound must not enter live authoring or Conversation Engine. Do not send “Recibí el archivo…”, FAQ, qualification, or scheduling language. Do not mutate qualification or appointment state as if a reply occurred.
+4. **Manual remains open** — HUMAN composer, native human outbound, takeover, and agent-initiated sends are not gated.
+5. **Last-line send guard** — `sendAndPersistWhatsAppMessage` with actor ATLAS/SYSTEM requires eligible=true when a prospect row is present. A blocked send emits observability and `AUTOMATED_OUTBOUND_ELIGIBILITY_BYPASS` (not SEMANTIC_DISAGREEMENT). APPLY stays OFF.
+6. **Boundaries** — Do not delete personal-contact rows. Do not rewrite `owner_user_id`. Do not weaken BR-142 session/IUL rules. Do not change tenant isolation or WhatsApp routing.
 
 ---
 
