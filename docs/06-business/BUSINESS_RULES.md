@@ -3128,6 +3128,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-203 — Persist HUMAN WhatsApp Business App echoes for contact-only conversations
+
+**Implements:** Native WhatsApp Business app / `smb_message_echoes` HUMAN and AGENT replies persist even when no prospect row exists (contact-only inbound, including first-touch 131060). Delivery lifecycle can attach to the stored wamid.  
+**Domain:** WhatsApp human outbound / conversation logs / delivery observability  
+**Depends on:** BR-159, BR-142, BR-200  
+**Related:** BR-156, BR-201  
+**Status:** Implemented  
+**Engine target:** `whatsappHumanOutboundPipeline.processHumanWhatsAppOutboundEcho`; `whatsappOutboundDeliveryRepository.applyMetaDeliveryStatusEvent`  
+**Tests:** `backend/test/humanEchoContactOnlyBr203.test.js`; `backend/test/whatsappHumanOutboundSync.test.js`
+
+### Rules
+
+1. **HUMAN/AGENT only** — Persist native WhatsApp Business app echoes for HUMAN and AGENT. Do not persist or authorize ATLAS / SYSTEM automation through this path.
+2. **Contact-only persist** — If no prospect exists, resolve org + connection + phone identity, write outgoing `HUMAN_WHATSAPP_BUSINESS_APP_REPLY`, and write `whatsapp_outbound_deliveries` `sent_native_human` with the provider wamid. Do not create a prospect. Do not rewrite `owner_user_id`. Do not set `atlasAutomationEnabled` or `atlasEligibilitySource`.
+3. **Lifecycle** — Later Meta sent / delivered / read / failed callbacks attach by wamid. `prospect_id` is not required.
+4. **Prospect path unchanged** — When a prospect exists, existing echo persist + HUMAN ownership seal stay the same.
+5. **Boundaries** — 131060, `from_user_id`, and `META_AD_DESTINATION` are not lead proof. Do not grant BR-142 eligibility. Do not promote a contact-only row into operational prospects.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

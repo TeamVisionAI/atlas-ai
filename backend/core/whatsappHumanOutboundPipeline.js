@@ -1,6 +1,7 @@
 /**
  * Native WhatsApp Business app outbound sync (smb_message_echoes).
  * Persists human-authored messages, seals sticky HUMAN ownership, dedupes Atlas-originated wamids.
+ * Implements BR-203 — contact-only echoes persist without creating a prospect.
  */
 
 const workflowEventService = require("../services/workflowEventService");
@@ -24,6 +25,32 @@ const {
   findDeliveryByProviderMessageId,
   recordOutboundDelivery
 } = require("../repositories/whatsappOutboundDeliveryRepository");
+
+const AUTOMATED_ECHO_ACTORS = Object.freeze(new Set(["ATLAS", "SYSTEM"]));
+const HUMAN_ECHO_ACTORS = Object.freeze(new Set(["HUMAN", "AGENT"]));
+
+function resolveHumanEchoActor(echo = {}) {
+  const actor = String(echo.actor || "").trim().toUpperCase();
+  if (AUTOMATED_ECHO_ACTORS.has(actor)) {
+    return { allowed: false, actor };
+  }
+  if (HUMAN_ECHO_ACTORS.has(actor)) {
+    return { allowed: true, actor };
+  }
+  return { allowed: true, actor: "AGENT" };
+}
+
+function resolveEchoContactName(echo = {}, prospect = null) {
+  if (prospect?.name) {
+    return prospect.name;
+  }
+  return (
+    echo.contactName ||
+    echo.rawValue?.contacts?.[0]?.profile?.name ||
+    echo.rawMessage?.profile?.name ||
+    null
+  );
+}
 
 function duplicateSkipResult(correlationId, providerMessageId, phone, reason) {
   logWhatsAppStage("human_echo_duplicate_skipped", {
@@ -76,6 +103,20 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
       success: false,
       skipped: false,
       error: "MISSING_PROVIDER_MESSAGE_ID"
+    };
+  }
+
+  const echoActor = resolveHumanEchoActor(echo);
+  if (!echoActor.allowed) {
+    logWhatsAppStage("human_echo_automated_actor_blocked", {
+      providerMessageId,
+      actor: echoActor.actor
+    });
+    return {
+      success: false,
+      skipped: false,
+      error: "AUTOMATED_ACTOR_NOT_ALLOWED",
+      actor: echoActor.actor
     };
   }
 
@@ -157,59 +198,50 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
     (await findProspect(echo.phone, organizationId)) ||
     null;
 
-  if (!prospect?.phone) {
-    logWhatsAppStage("human_echo_prospect_not_found", {
-      providerMessageId,
-      phone: storagePhone,
-      organizationId,
-      level: "warn"
-    });
-    return {
-      success: false,
-      skipped: false,
-      error: "PROSPECT_NOT_FOUND",
-      correlationId,
-      organizationId
-    };
-  }
-
+  const contactOnly = !prospect?.phone;
+  const persistPhone = contactOnly ? storagePhone : prospect.phone;
   const body = echo.body || `[${echo.messageType || "unknown"} message]`;
+  const webhookPayload = {
+    message: echo.rawMessage,
+    valueMetadata: {
+      messaging_product: echo.rawValue?.messaging_product || "whatsapp",
+      metadata: echo.rawValue?.metadata || null,
+      changeField: echo.changeField || "smb_message_echoes"
+    }
+  };
 
+  // Implements BR-203 — persist native human/agent echoes without promoting a contact.
   const logResult = await persistLog({
-    phone: prospect.phone,
-    name: prospect.name || null,
+    phone: persistPhone,
+    name: resolveEchoContactName(echo, prospect),
     direction: "outgoing",
     message: body,
     intent: HUMAN_WHATSAPP_BUSINESS_APP_REPLY_INTENT,
-    pipeline: prospect.current_step || "NEW",
-    currentStep: prospect.current_step || "NEW",
-    language: resolveProspectCommunicationCode(prospect),
-    city: prospect.city || null,
-    state: prospect.state || null,
-    actorOverride: "AGENT",
+    pipeline: contactOnly ? "CONTACT" : prospect.current_step || "NEW",
+    currentStep: contactOnly ? "CONTACT" : prospect.current_step || "NEW",
+    language: contactOnly ? null : resolveProspectCommunicationCode(prospect),
+    city: contactOnly ? null : prospect.city || null,
+    state: contactOnly ? null : prospect.state || null,
+    ...(contactOnly ? { organizationId } : {}),
+    actorOverride: echoActor.actor,
     eventCorrelationId: correlationId,
     providerMessageId,
-    rawWebhookPayload: {
-      message: echo.rawMessage,
-      valueMetadata: {
-        messaging_product: echo.rawValue?.messaging_product || "whatsapp",
-        metadata: echo.rawValue?.metadata || null,
-        changeField: echo.changeField || "smb_message_echoes"
-      }
-    }
+    rawWebhookPayload: webhookPayload
   });
 
   if (!logResult.success) {
     logWhatsAppStage("human_echo_persist_failed", {
       providerMessageId,
-      phone: prospect.phone,
+      phone: persistPhone,
+      contactOnly,
       level: "error",
       error: logResult.error?.message || "unknown"
     });
     return {
       success: false,
       error: "MESSAGE_PERSIST_FAILED",
-      correlationId
+      correlationId,
+      contactOnly
     };
   }
 
@@ -217,7 +249,7 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
     dependencies.recordOutboundDelivery || recordOutboundDelivery;
   await recordDelivery({
     organizationId,
-    prospectPhone: prospect.phone,
+    prospectPhone: persistPhone,
     intent: "WHATSAPP_BUSINESS_APP_OUTBOUND",
     status: "sent_native_human",
     deliveryMode: "native_app",
@@ -226,7 +258,9 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
     metadata: {
       source: "whatsapp_business_app_echo",
       ownerUserId,
-      changeField: echo.changeField || "smb_message_echoes"
+      changeField: echo.changeField || "smb_message_echoes",
+      contactOnly,
+      prospectId: prospect?.id || null
     }
   }).catch((deliveryError) => {
     logWhatsAppStage("human_echo_delivery_record_failed", {
@@ -236,28 +270,33 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
     });
   });
 
-  const ownership = await sealHumanOwnership(prospect.phone, {
-    organizationId,
-    prospectId: prospect.id || null,
-    prospect,
-    reason: HANDOFF_REASONS.WHATSAPP_BUSINESS_APP
-  });
+  let ownership = null;
+  if (!contactOnly) {
+    ownership = await sealHumanOwnership(prospect.phone, {
+      organizationId,
+      prospectId: prospect.id || null,
+      prospect,
+      reason: HANDOFF_REASONS.WHATSAPP_BUSINESS_APP
+    });
+  }
 
   logWhatsAppStage("human_echo_persisted", {
     providerMessageId,
-    phone: prospect.phone,
+    phone: persistPhone,
     conversationLogId: logResult.log?.id || null,
-    ownershipState: ownership.ownershipState || null
+    contactOnly,
+    ownershipState: ownership?.ownershipState || null
   });
 
   return {
     success: true,
     skipped: false,
-    phone: prospect.phone,
+    contactOnly,
+    phone: persistPhone,
     correlationId,
     conversationLogId: logResult.log?.id || null,
     organizationId,
-    prospectId: prospect.id || null,
+    prospectId: prospect?.id || null,
     ownerUserId,
     ownership
   };
@@ -266,5 +305,6 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
 module.exports = {
   processHumanWhatsAppOutboundEcho,
   isAtlasOriginatedOutbound,
-  buildHumanEchoCorrelationId
+  buildHumanEchoCorrelationId,
+  resolveHumanEchoActor
 };
