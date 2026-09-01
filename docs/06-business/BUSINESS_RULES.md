@@ -3196,6 +3196,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-207 — Sidebar Information Architecture / Collapsible Navigation Groups
+
+**Implements:** Reorganize the authenticated left sidebar into collapsible operational groups without changing routes, permissions, page components, or backend behavior.  
+**Domain:** Workspace navigation / authenticated shell  
+**Depends on:** BR-149 (dashboard landing), BR-153 (Knowledge Hub tenant gate), BR-181 (Production), BR-186 (Policy Reviews)  
+**Related:** BR-206 (recruit evidence; no dedicated Recruits page yet)  
+**Status:** Implemented — presentation only  
+**Engine target:** `sidebarNavigation`; `MainLayout` sidebar  
+**Tests:** `frontend/src/engines/sidebarNavigationBr207.test.js`
+
+### Rules
+
+1. **Presentation only** — Grouping, collapse, and label hierarchy may change. Route paths, page components, deep links, bookmarks, and RBAC stay unchanged.
+2. **Top-level frequent tools** — Executive Dashboard, Team Dashboard, and Quick Capture stay ungrouped near the top. My Dashboard remains for representative workspaces.
+3. **Operational groups** — Pipeline (Mission Control, Prospect Center, Conversations, Today, Appointments, Follow-ups); People & Outcomes (Clients, Production, Service); Intelligence (Knowledge Hub, Policy Intelligence, Policy Reviews); Growth (Recruiting). Do not add Marketing until that module exists.
+4. **Recruits** — Do not invent `/app/recruits` until a dedicated Recruits page exists. Recommended future location is People & Outcomes, backed by `atlas_agenda_recruits`. `/app/recruiting` stays Growth.
+5. **Collapse** — Groups are collapsible with a chevron. The active route’s group auto-expands on load. Child clicks do not collapse the group. Remember expanded/collapsed state per browser. A collapsed group that contains the active route still shows an active header treatment.
+6. **Visibility** — Existing permission and tenant gates still decide which items appear. Hide a group when it has no visible children. Do not expose a route a role could not already see.
+7. **Layout** — Keep the 250px sidebar width. Nav scrolls independently. Brand header stays at the top and the user/profile block stays at the bottom.
+8. **Boundaries** — Do not change backend APIs, appointment outcomes, production attribution, or WhatsApp routing.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

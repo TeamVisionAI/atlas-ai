@@ -6,6 +6,14 @@ import {
   getDefaultLandingPath,
   resolveWorkspaceType
 } from "../config/workspaceExperience";
+import {
+  buildSidebarNavModel,
+  expandActiveSidebarGroup,
+  isGroupActive,
+  readSidebarGroupState,
+  toggleSidebarGroupState,
+  writeSidebarGroupState
+} from "../engines/sidebarNavigation";
 import { isStagingUi } from "../config/atlasUiEnv";
 import { WorkspaceContext } from "../contexts/WorkspaceContext";
 import RequireWorkspaceAccess from "../components/RequireWorkspaceAccess";
@@ -82,6 +90,26 @@ function getLayoutMode() {
   return "desktop";
 }
 
+function SidebarNavLink({ item, translate, conversationsAttentionCount, onNavigate, child }) {
+  return (
+    <NavLink
+      to={item.path}
+      end={item.end}
+      className={({ isActive }) =>
+        `atlas-layout__nav-link${child ? " atlas-layout__nav-link--child" : ""}${isActive ? " is-active" : ""}`
+      }
+      onClick={onNavigate}
+    >
+      <span>{translate(item.labelKey)}</span>
+      {item.path.includes("/conversations") && conversationsAttentionCount > 0 ? (
+        <span className="atlas-layout__nav-badge" aria-label={`${conversationsAttentionCount} needing attention`}>
+          {conversationsAttentionCount}
+        </span>
+      ) : null}
+    </NavLink>
+  );
+}
+
 function SidebarNav({
   translate,
   language,
@@ -97,8 +125,33 @@ function SidebarNav({
   organizationName = "",
   brandTitle = ""
 }) {
+  const location = useLocation();
   const title = String(brandTitle || "").trim() || translate("layoutAppTitle");
   const brandName = String(organizationName || "").trim() || translate("layoutBrandSubtitleFallback");
+  const navModel = useMemo(() => buildSidebarNavModel(navItems), [navItems]);
+  const [groupOpen, setGroupOpen] = useState(() =>
+    readSidebarGroupState(typeof window === "undefined" ? null : window.localStorage)
+  );
+
+  useEffect(() => {
+    setGroupOpen((current) => {
+      const next = expandActiveSidebarGroup(current, location.pathname, navModel);
+      if (JSON.stringify(next) === JSON.stringify(current)) {
+        return current;
+      }
+      writeSidebarGroupState(next, typeof window === "undefined" ? null : window.localStorage);
+      return next;
+    });
+  }, [location.pathname, navModel]);
+
+  const handleToggleGroup = useCallback((groupId) => {
+    setGroupOpen((current) => {
+      const next = toggleSidebarGroupState(current, groupId);
+      writeSidebarGroupState(next, typeof window === "undefined" ? null : window.localStorage);
+      return next;
+    });
+  }, []);
+
   return (
     <>
       <div className="atlas-layout__sidebar-header">
@@ -137,24 +190,71 @@ function SidebarNav({
       </div>
 
       <nav className="atlas-layout__nav" aria-label={translate("layoutNavLabel")}>
-        {navItems.map((item) => (
-          <NavLink
+        {navModel.topLevel.map((item) => (
+          <SidebarNavLink
             key={item.path}
-            to={item.path}
-            end={item.end}
-            className={({ isActive }) =>
-              `atlas-layout__nav-link${isActive ? " is-active" : ""}`
-            }
-            onClick={onNavigate}
-          >
-            <span>{translate(item.labelKey)}</span>
-            {item.path.includes("/conversations") && conversationsAttentionCount > 0 ? (
-              <span className="atlas-layout__nav-badge" aria-label={`${conversationsAttentionCount} needing attention`}>
-                {conversationsAttentionCount}
-              </span>
-            ) : null}
-          </NavLink>
+            item={item}
+            translate={translate}
+            conversationsAttentionCount={conversationsAttentionCount}
+            onNavigate={onNavigate}
+          />
         ))}
+
+        {navModel.groups.map((group) => {
+          const expanded = groupOpen[group.id] !== false;
+          const groupHasActive = isGroupActive(group, location.pathname);
+          const panelId = `atlas-nav-group-${group.id}`;
+          return (
+            <div
+              key={group.id}
+              className={`atlas-layout__nav-group${groupHasActive ? " is-active" : ""}`}
+            >
+              <button
+                type="button"
+                className={`atlas-layout__nav-group-toggle${groupHasActive ? " is-active" : ""}`}
+                aria-expanded={expanded}
+                aria-controls={panelId}
+                onClick={() => handleToggleGroup(group.id)}
+              >
+                <span>{translate(group.labelKey)}</span>
+                <span className={`atlas-layout__nav-group-chevron${expanded ? " is-open" : ""}`} aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+              <div
+                id={panelId}
+                className={`atlas-layout__nav-group-panel${expanded ? " is-open" : ""}`}
+              >
+                <div className="atlas-layout__nav-group-panel-inner">
+                  {group.children.map((item) => (
+                    <SidebarNavLink
+                      key={item.path}
+                      item={item}
+                      child
+                      translate={translate}
+                      conversationsAttentionCount={conversationsAttentionCount}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {navModel.trailing.length ? (
+          <div className="atlas-layout__nav-trailing">
+            {navModel.trailing.map((item) => (
+              <SidebarNavLink
+                key={item.path}
+                item={item}
+                translate={translate}
+                conversationsAttentionCount={conversationsAttentionCount}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        ) : null}
       </nav>
 
       <div className="atlas-layout__sidebar-footer">

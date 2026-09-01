@@ -59,6 +59,10 @@ export const translations = {
     navService: "Service",
     navPolicyReviews: "Revisiones de póliza",
     navRecruiting: "Recruiting",
+    navGroupPipeline: "Pipeline",
+    navGroupPeopleOutcomes: "Personas y resultados",
+    navGroupIntelligence: "Inteligencia",
+    navGroupGrowth: "Crecimiento",
 
     policyIntelligenceEyebrow: "Analítica e inteligencia",
     policyIntelligenceTitle: "Inteligencia de Pólizas",
@@ -2617,6 +2621,10 @@ export const translations = {
     navService: "Service",
     navPolicyReviews: "Policy Reviews",
     navRecruiting: "Recruiting",
+    navGroupPipeline: "Pipeline",
+    navGroupPeopleOutcomes: "People & Outcomes",
+    navGroupIntelligence: "Intelligence",
+    navGroupGrowth: "Growth",
 
     policyIntelligenceEyebrow: "Analytics & Intelligence",
     policyIntelligenceTitle: "Policy Intelligence",

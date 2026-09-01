@@ -277,7 +277,7 @@ const NAV_ITEM_DEFS = Object.freeze({
   }
 });
 
-/** Core Business capabilities — visible when the user has the module permission. */
+/** Core Business capabilities — visible when the user has the module permission. BR-207 presentation order. */
 const BUSINESS_CORE_NAV_ORDER = Object.freeze([
   "quickCapture",
   "missionControl",
@@ -289,9 +289,9 @@ const BUSINESS_CORE_NAV_ORDER = Object.freeze([
   "clients",
   "production",
   "service",
-  "policyReviews",
   "knowledge",
-  "policyIntelligence"
+  "policyIntelligence",
+  "policyReviews"
 ]);
 
 const WORKSPACE_LANDING_NAV = Object.freeze({
