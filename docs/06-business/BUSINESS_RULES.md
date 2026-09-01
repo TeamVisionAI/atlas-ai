@@ -3072,7 +3072,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Conversations, Prospect Center, Mission Control, and dashboard prospect counts filter Atlas lead eligibility/provenance first, then workspace ownership, then status/lifecycle tabs. HUMAN or ATLAS ownership is not enough to make a personal contact a prospect.  
 **Domain:** Conversations / Prospect Center / Mission Control / operational KPIs  
 **Depends on:** BR-142, BR-159, BR-165  
-**Related:** BR-147, BR-193  
+**Related:** BR-147, BR-193, BR-201  
 **Status:** Implemented  
 **Engine target:** `atlasInboundAutomationEligibility.evaluatePositiveAtlasLeadProvenance`; `evaluateRecruitingInboxEligibility`; `evaluateOperationalProspectRecord`; `conversationsCenterReadModel`; Conversations list cache identity  
 **Tests:** `backend/test/operationalLeadEligibilityBr199.test.js`; `frontend/src/engines/conversationsWorkspaceScope.test.js`
@@ -3081,7 +3081,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 1. **Filter order** — (1) tenant isolation (2) positive Atlas lead provenance (3) workspace ownership (`mine` / oversight) (4) Active / Needs attention / Atlas / Human / Archived / Test. HUMAN is a status filter only after eligibility.
 2. **Personal inbound is not a prospect** — Personal WhatsApp inbound without CTWA / QR / campaign / explicit create / explicit `atlasAutomationEnabled` is excluded from operational views and counts, including HUMAN-owned and ATLAS-state rows. Do not delete the row. Do not reassign `owner_user_id` to hide it.
-3. **Labels are not provenance** — `FACEBOOK` / `CLICK_TO_WHATSAPP` / historical `PERSONAL_WHATSAPP` are not enough. Require `atlasEligibilitySource` in the verified set, stored `ctwa_clid` / referral `source_type=ad`, QR / `car_magnet`, campaign intake, Facebook Lead Ads / Quick Capture / manual create, Meta Ad Destination, or explicit enable.
+3. **Labels are not provenance** — `FACEBOOK` / `CLICK_TO_WHATSAPP` / historical `PERSONAL_WHATSAPP` are not enough. Require `atlasEligibilitySource` in the positive-lead verified set (not connection-only `META_AD_DESTINATION`), stored `ctwa_clid` / referral `source_type=ad`, QR / `car_magnet`, campaign intake, Facebook Lead Ads / Quick Capture / manual create, or explicit enable. See BR-201.
 4. **UNKNOWN person is not ineligible provenance** — A valid ad/QR/campaign lead whose display name/classification is UNKNOWN remains included.
 5. **Cache identity** — Conversations My Prospects list cache includes the current user id so same-org user switches cannot reuse another user’s mine list. Cache is not a substitute for backend filtering.
 6. **Boundaries** — Do not weaken BR-142 fail-closed auto-reply. Do not change first outbound, WhatsApp routing, tenant isolation, ownership assignment, or AI Quality APPLY.
@@ -3093,7 +3093,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Atlas must not generate or send any automated WhatsApp outbound unless the contact/event has positive Atlas lead provenance. Applies to text, image/document/audio acknowledgments, FAQ, qualification, scheduling, follow-ups, and other Atlas-originated WhatsApp. Manual HUMAN / AGENT messages stay allowed.  
 **Domain:** WhatsApp outbound / Recruit AI / Conversation Engine / follow-ups  
 **Depends on:** BR-142, BR-199, BR-118, BR-165, BR-193  
-**Related:** BR-075, BR-159, BR-175  
+**Related:** BR-075, BR-159, BR-175, BR-201  
 **Status:** Implemented  
 **Engine target:** `automationOutboundEligibility.evaluateAutomationOutboundEligibility`; `communicationHub` (before live authoring / CE); `whatsappOutboundPipeline.sendAndPersistWhatsAppMessage` (last-line ATLAS guard)  
 **Tests:** `backend/test/automationOutboundEligibilityBr200.test.js`; `backend/test/atlasInboundAutomationEligibility.test.js`; `backend/test/operationalLeadEligibilityBr199.test.js`
@@ -3106,6 +3106,25 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Manual remains open** — HUMAN composer, native human outbound, takeover, and agent-initiated sends are not gated.
 5. **Last-line send guard** — `sendAndPersistWhatsAppMessage` with actor ATLAS/SYSTEM requires eligible=true when a prospect row is present. A blocked send emits observability and `AUTOMATED_OUTBOUND_ELIGIBILITY_BYPASS` (not SEMANTIC_DISAGREEMENT). APPLY stays OFF.
 6. **Boundaries** — Do not delete personal-contact rows. Do not rewrite `owner_user_id`. Do not weaken BR-142 session/IUL rules. Do not change tenant isolation or WhatsApp routing.
+
+---
+
+## BR-201 — Tighten Operational Provenance for META_AD_DESTINATION
+
+**Implements:** Connection-only BR-193 `META_AD_DESTINATION` is not positive Atlas lead provenance for operational views. Aligns Conversations / Prospect Center / Mission Control / dashboard membership with BR-200 outbound eligibility.  
+**Domain:** Conversations / Prospect Center / Mission Control / operational KPIs  
+**Depends on:** BR-142, BR-199, BR-200, BR-193  
+**Related:** BR-159, BR-165  
+**Status:** Implemented  
+**Engine target:** `atlasInboundAutomationEligibility.evaluatePositiveAtlasLeadProvenance`  
+**Tests:** `backend/test/operationalLeadProvenanceBr201.test.js`; `backend/test/operationalLeadEligibilityBr199.test.js`; `backend/test/automationOutboundEligibilityBr200.test.js`
+
+### Rules
+
+1. **META_AD_DESTINATION alone is not proof** — `workflow_state.atlasEligibilitySource=META_AD_DESTINATION` or `entry_method=META_AD_DESTINATION` without inbound-specific evidence is `LEGACY_AMBIGUOUS` / not eligible. Do not admit that row to My Prospects, Team Prospects, Prospect Center, Mission Control, or dashboard prospect counts.
+2. **Inbound-specific proof still admits** — Eligible when backed by stored `ctwa_clid`, referral `source_type=ad`, `CTWA_REFERRAL`, QR / `car_magnet`, campaign intake, Facebook Lead Ads, Quick Capture / manual create / agenda promotion, IUL campaign workflow, or explicit `atlasAutomationEnabled=true`.
+3. **Do not rewrite history** — Do not delete rows, backfill stamps, or change `owner_user_id`. The connection stamp may remain stored; it is simply not list membership.
+4. **Boundaries** — BR-200 outbound fail-closed for META-only stays unchanged. HUMAN / AGENT messaging stays open. Do not weaken BR-142 this-inbound CTWA / QR / session / IUL rules. Do not change WhatsApp routing, tenant isolation, or AI Quality APPLY.
 
 ---
 
