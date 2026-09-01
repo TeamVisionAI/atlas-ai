@@ -129,8 +129,33 @@ function formatInterviewLocation(interviewType, translate) {
   return translate("executiveV2LocationUnspecified");
 }
 
+function localDateKey(iso, timeZone) {
+  if (!iso) {
+    return null;
+  }
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timeZone || "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(new Date(iso));
+  } catch {
+    return String(iso).slice(0, 10);
+  }
+}
+
+function isInstantInLocalToday(iso, timeZone, reference = new Date()) {
+  const when = localDateKey(iso, timeZone);
+  const today = localDateKey(reference.toISOString(), timeZone);
+  return Boolean(when && today && when === today);
+}
+
 function buildTodayAgenda(executive, prospectsByPhone, translate, timeZone) {
-  const appointments = executive?.calendar?.appointments || [];
+  const reference = executive?.generatedAt ? new Date(executive.generatedAt) : new Date();
+  const appointments = (executive?.calendar?.appointments || []).filter((entry) =>
+    isInstantInLocalToday(entry.time, timeZone, reference)
+  );
   const queue = executive?.prioritizedWorkflowQueue || [];
 
   return appointments.slice(0, AGENDA_LIMIT).map((entry) => {
@@ -417,6 +442,7 @@ export function buildExecutiveDashboardV2ViewModel({
 export {
   AGENDA_LIMIT,
   ACTIVITY_LIMIT,
+  isInstantInLocalToday,
   buildKpiCards,
   buildTodayAgenda,
   buildPriorities,

@@ -587,7 +587,9 @@ test("BR-177 UI reuses appointment dialogs and shows Agenda contact phone", () =
     path.join(__dirname, "../../frontend/src/engines/appointmentCardPresentation.js"),
     "utf8"
   );
-  assert.match(actions, /agendaRecordOutcome/);
+  assert.match(actions, /agendaMarkComplete/);
+  assert.match(actions, /agendaEditItem/);
+  assert.match(actions, /agendaRemoveFromAgenda/);
   assert.match(actions, /agendaPromoteRecruit/);
   assert.match(details, /agendaContactPhone/);
   assert.match(page, /PromoteAgendaContactDialog/);

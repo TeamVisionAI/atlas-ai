@@ -8,6 +8,7 @@ const {
   isConversationalScheduleFlexibilityEnabled
 } = require("../scheduleLanguageParser");
 const { INTENTS, LANGUAGES } = require("./constants");
+const { isBareConversationalYes } = require("../languageLibrary");
 const {
   looksLikeLicensePathDetailQuestion
 } = require("../teamVisionWorkflowCopy");
@@ -151,25 +152,12 @@ function formatTimeEntity(schedule) {
 }
 
 function isAffirmative(text) {
-  // Normalize accents: JS \b treats í as non-word, so "sí\b" fails.
-  const t = String(text || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[!?.]+$/g, "");
-  if (!t) {
+  // Implements BR-195 — courtesy-form yes ("sí señor") while still rejecting
+  // "sí soy ciudadano" / license statements (BR-100 / BR-102).
+  if (mentionsLicense(text)) {
     return false;
   }
-  // Do not treat "sí tengo licencia/permiso…" as bare affirmation.
-  if (mentionsLicense(t) || /\b(tengo|have|permiso|autoriz)/i.test(t)) {
-    return false;
-  }
-  // Bare affirmations only — "si soy ciudadano" / "yes I'm a citizen" must not
-  // classify as schedule_confirm via a leading si/yes (BR-100 / BR-102).
-  return /^(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro|por supuesto)$/i.test(
-    t
-  );
+  return isBareConversationalYes(text);
 }
 
 function isOptionSelection(text) {

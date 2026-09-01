@@ -62,13 +62,13 @@ export default function AppointmentCardActions({
 
         {canMutate ? (
           <AtlasButton variant="secondary" size="sm" onClick={onComplete}>
-            {translate("agendaRecordOutcome")}
+            {translate("agendaMarkComplete")}
           </AtlasButton>
         ) : null}
 
         {canMutate ? (
           <AtlasButton variant="secondary" size="sm" onClick={onReschedule}>
-            {translate("appointmentsRescheduleInterview")}
+            {translate("agendaEditItem")}
           </AtlasButton>
         ) : null}
 
@@ -79,7 +79,7 @@ export default function AppointmentCardActions({
             className="appointment-card-actions__danger"
             onClick={onCancel}
           >
-            {translate("appointmentsCancel")}
+            {translate("agendaRemoveFromAgenda")}
           </AtlasButton>
         ) : null}
 

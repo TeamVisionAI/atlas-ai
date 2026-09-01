@@ -97,6 +97,7 @@ async function captureFromSemanticShadow({
   context = null,
   interpretation = null,
   structuredDecision = null,
+  execution = null,
   tenantSettings = null,
   store,
   env,
@@ -117,7 +118,8 @@ async function captureFromSemanticShadow({
     inboundText,
     context,
     interpretation,
-    structuredDecision
+    structuredDecision,
+    execution
   });
   if (!signals.length) {
     return { captured: false, reason: "NO_QUALITY_SIGNAL", caseIds: [] };

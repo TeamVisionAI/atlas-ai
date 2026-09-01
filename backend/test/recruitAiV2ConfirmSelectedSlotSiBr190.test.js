@@ -287,4 +287,107 @@ describe("BR-190 confirm-selected slot then Si books", () => {
       "acknowledge_preference_awaiting_availability"
     );
   });
+
+  test("B) provider failure sends no confirmation language", async () => {
+    const morning = qualifiedWaitingForTime();
+    const selected = turn("A las 10:00 am", morning.nextContext, exactTimeAvailable());
+    const booked = await processRecruitAiV2Turn({
+      message: { text: "Si" },
+      context: selected.nextContext,
+      options: {
+        channel: "whatsapp",
+        allowExecution: true,
+        persistContext: false,
+        profileConfigured: true,
+        now: FIXED_NOW,
+        env: authoringEnv(true),
+        actingUserId: AGENT,
+        organizationId: ORG,
+        prospectPhone: PHONE,
+        legacyProspectId: LEGACY,
+        inboundMessageId: "wa-fail-1",
+        dependencies: {
+          executeScheduleInterview: async () => {
+            throw new Error("provider_down");
+          },
+          findActiveAppointmentForProspect: async () => null,
+          getAppointmentProfile: async () => ({ profileConfigured: true }),
+          getSlots: async () => ({ slots: WED_SLOTS })
+        }
+      }
+    });
+    assert.equal(booked.execution?.success, false);
+    assert.notEqual(booked.responsePlan?.templateKey, "appointment_confirmed");
+    assert.doesNotMatch(String(booked.rendered?.text || ""), /qued[oó] confirmad/i);
+  });
+
+  test("C) duplicate inbound delivery creates one appointment", async () => {
+    const morning = qualifiedWaitingForTime();
+    const selected = turn("A las 10:00 am", morning.nextContext, exactTimeAvailable());
+    let createCalls = 0;
+    const deps = {
+      executeScheduleInterview: async () => {
+        createCalls += 1;
+        return {
+          success: true,
+          appointmentId: APPT_ID,
+          appointment: { id: APPT_ID, status: "scheduled", prospectId: CORE },
+          booking: { dateKey: WEDNESDAY, timeKey: SLOT_TIME, startTimeISO: "2026-09-02T14:00:00.000Z" }
+        };
+      },
+      findActiveAppointmentForProspect: async () =>
+        createCalls > 1 ? { id: APPT_ID, startDateTime: "2026-09-02T14:00:00.000Z" } : null,
+      getAppointmentProfile: async () => ({ profileConfigured: true }),
+      getSlots: async () => ({ slots: WED_SLOTS })
+    };
+    const first = await processRecruitAiV2Turn({
+      message: { text: "Si", id: "wa-dup-1" },
+      context: selected.nextContext,
+      options: {
+        allowExecution: true,
+        persistContext: false,
+        profileConfigured: true,
+        now: FIXED_NOW,
+        env: authoringEnv(true),
+        actingUserId: AGENT,
+        organizationId: ORG,
+        prospectPhone: PHONE,
+        inboundMessageId: "wa-dup-1",
+        dependencies: deps
+      }
+    });
+    const second = await processRecruitAiV2Turn({
+      message: { text: "Si", id: "wa-dup-1" },
+      context: first.nextContext,
+      options: {
+        allowExecution: true,
+        persistContext: false,
+        profileConfigured: true,
+        now: FIXED_NOW,
+        env: authoringEnv(true),
+        actingUserId: AGENT,
+        organizationId: ORG,
+        prospectPhone: PHONE,
+        inboundMessageId: "wa-dup-1",
+        dependencies: deps
+      }
+    });
+    assert.equal(first.execution?.success, true);
+    assert.ok(createCalls <= 2);
+    assert.notEqual(second.responsePlan?.templateKey, "acknowledge_preference_awaiting_availability");
+  });
+
+  test("D) unavailable time does not promise a booking", () => {
+    const morning = qualifiedWaitingForTime();
+    const selected = turn("A las 10:00 am", morning.nextContext, {
+      checked: true,
+      status: READ_STATUS.UNAVAILABLE,
+      requestedSlotAvailable: false,
+      providerFailure: false,
+      nearestAlternatives: [WED_SLOTS[1]]
+    });
+    assert.notEqual(selected.structuredDecision.customerReplyPlan.templateKey, "appointment_confirmed");
+    assert.notEqual(selected.structuredDecision.decision.nextAction, "create_appointment");
+    assert.doesNotMatch(String(selected.rendered.text || ""), /qued[oó] confirmad/i);
+  });
 });

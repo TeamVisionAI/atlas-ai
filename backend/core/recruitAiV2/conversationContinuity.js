@@ -142,7 +142,11 @@ function looksLikeJobOverviewQuestion(text) {
 
   return (
     /\bwhat is this about\b/.test(t) ||
+    /\bwhat is the (job|role|opportunity|work)\b/.test(t) ||
     /\bhow does this work\b/.test(t) ||
+    /\bme (puedes|puede|podrias) explicar de que se trata\b/.test(t) ||
+    /\bde que es la oportunidad\b/.test(t) ||
+    /\bque es el (trabajo|empleo|rol)\b/.test(t) ||
     /\bde que se trata\b/.test(t) ||
     /\bde que trata\b/.test(t) ||
     /\bde q(ue)? (se )?trata\b/.test(t) ||
@@ -282,7 +286,15 @@ function looksLikeConversationClarificationRequest(text) {
     /\bwhat are you asking( me)?\b/.test(t) ||
     /\bwhat do you need to know\b/.test(t) ||
     /\bi'?m confused\b/.test(t) ||
-    /\bim confused\b/.test(t)
+    /\bim confused\b/.test(t) ||
+    // Implements BR-195 — recoverable misunderstanding, not a handoff.
+    /\bdisculp(ame|a)? (cual|que) dato\b/.test(t) ||
+    /\b(cual|que) dato\b/.test(t) ||
+    /\bque dato (necesitas|falta|quieres)\b/.test(t) ||
+    /\bno (te )?entendi\b/.test(t) ||
+    /\bwhat (data|detail) (do you need|are you asking)\b/.test(t) ||
+    /\bwhich (data|detail)\b/.test(t) ||
+    /\bwhat did you (just )?ask\b/.test(t)
   );
 }
 

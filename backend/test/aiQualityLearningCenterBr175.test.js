@@ -186,6 +186,33 @@ test("classifySignals covers frustration and human-required automation", () => {
   assert.ok(types.includes(SIGNAL_TYPES.HUMAN_REQUIRED_THEN_QUALIFICATION));
 });
 
+test("operational quality signals are not semantic disagreement", () => {
+  const faq = classifySignals({
+    inboundText: "de que se trata",
+    interpretation: { intent: "job_opportunity_question" },
+    context: { conversation: { lastQuestionAsked: "ask_authorization" } },
+    structuredDecision: { customerReplyPlan: { templateKey: "safe_uncertain_escalate" } }
+  });
+  assert.ok(faq.some((item) => item.type === SIGNAL_TYPES.FAQ_INTERRUPT_MISAPPLIED));
+  assert.equal(faq.some((item) => item.type === SIGNAL_TYPES.SEMANTIC_DISAGREEMENT), false);
+
+  const handoff = classifySignals({
+    inboundText: "Discúlpame cual dato",
+    interpretation: { intent: "conversation_clarification_request" },
+    structuredDecision: { customerReplyPlan: { templateKey: "safe_uncertain_escalate" } }
+  });
+  assert.ok(handoff.some((item) => item.type === SIGNAL_TYPES.PREMATURE_HANDOFF));
+
+  const mismatch = classifySignals({
+    interpretation: { intent: "schedule_confirm" },
+    structuredDecision: {
+      decision: { nextAction: "create_appointment" },
+      customerReplyPlan: { templateKey: "acknowledge_preference_awaiting_availability" }
+    }
+  });
+  assert.ok(mismatch.some((item) => item.type === SIGNAL_TYPES.APPOINTMENT_CONFIRMATION_MISMATCH));
+});
+
 test("tenant isolation keeps other-org cases hidden", async () => {
   const store = createMemoryStore(syntheticCases());
   const own = await store.listCases({ organizationId: SYNTHETIC_ORG });

@@ -2594,7 +2594,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **Fail-closed master switch** — `ATLAS_AI_QUALITY_CAPTURE_ENABLED` must be exact `"true"` and `ATLAS_AI_QUALITY_MODE` must be `OBSERVE` or `REVIEW`. Missing/malformed/OFF captures nothing. Tenant settings cannot override platform OFF.
 3. **New tenants default off** — `ai_quality_tenant_settings.participation_enabled` defaults false. Capture requires platform on + tenant participation.
 4. **Modes** — `OFF`, `OBSERVE`, `REVIEW`. Do not implement autonomous APPLY. Semantic apply remains hard-off (BR-174).
-5. **Capture** — Persist structured cases from semantic vs legacy disagreement, low-confidence/timeout/invalid JSON, missed high-confidence objections, repeated-question, frustration phrases, HUMAN_REQUIRED-then-qualification, and unacted reschedule/cancel. Deduplicate open cases per organization + episode key. Do not copy raw WhatsApp bodies into quality tables.
+5. **Capture** — Persist structured cases from semantic vs legacy disagreement, low-confidence/timeout/invalid JSON, missed high-confidence objections, repeated-question, frustration phrases, HUMAN_REQUIRED-then-qualification, unacted reschedule/cancel, FAQ-interrupt misapplied, premature handoff after a recoverable clarification, and appointment-confirmation/action mismatch. Appointment execution failures are `APPOINTMENT_CONFIRMATION_MISMATCH`, not `SEMANTIC_DISAGREEMENT`. Deduplicate open cases per organization + episode key. Do not copy raw WhatsApp bodies into quality tables.
 6. **Review** — Humans mark semantic correct, legacy correct, both wrong, expected behavior, ignore, or promote a regression candidate. Promotion is mandatory before a case enters the regression library.
 7. **Regression library** — An approved case becomes a copyable spec (input turns, prior facts, expected intent/facts/action, forbidden behavior, source/future BR, proposed/implemented/verified). Do not auto-edit source or tests.
 8. **Access** — Super Admin sees cross-tenant platform quality. Tenant Admin sees only their organization. Normal agents have no quality console. Support Mode keeps Super Admin operationally bound to one tenant on tenant APIs.
@@ -2978,6 +2978,68 @@ Production outside-window messaging requires firm-approved Meta templates config
 3. **Final Si** — Bare `Si`/`Yes` after that ask creates the appointment (or returns an explicit real booking/provider failure). Generic `acknowledge_preference_awaiting_availability` (“Perfecto.”) is not an acceptable outcome.
 4. **One confirmation** — Successful create persists the appointment, marks scheduling complete, and sends one confirmation with the actual slot. Do not emit a second generic Perfecto for the same Si.
 5. **Boundaries** — Do not change tenant isolation, BR-185 lead time, WhatsApp routing, semantic settings, authoring/execution allowlists, or existing multi-slot menu rules.
+
+---
+
+## BR-195 — Pending yes/no courtesy-form recognition
+
+**Implements:** When Atlas is asking a pending yes/no qualification question (especially work authorization), common Spanish affirmatives including courtesy forms (`sí señor`, `si señor`, `claro que sí`, `así es`) resolve YES, persist the fact, and advance exactly once. Recoverable misunderstandings (`Discúlpame cual dato`) restates the pending question and must not hand off.  
+**Domain:** Recruit AI / Qualification  
+**Depends on:** BR-096, BR-100, BR-170  
+**Related:** BR-166 (no re-ask of durable facts)  
+**Status:** Implemented  
+**Engine target:** `languageLibrary.isBareConversationalYes`; `qualificationFacts.parseWorkAuthorizationAnswer`; `conversationContinuity.looksLikeConversationClarificationRequest`; interpreter; decisionEngine; responseRenderer  
+**Tests:** `backend/test/recruitAiV2SpanishBooleanResumeBr195.test.js`
+
+### Rules
+
+1. **Pending-context only** — Courtesy-form yes is evaluated against the pending question. Do not invent authorization from a stray `claro` outside `ask_authorization`.
+2. **Accepted YES forms** — At minimum: `sí`, `si`, `sí señor`, `si señor`, `claro`, `claro que sí`, `correcto`, `por supuesto`, `así es`, plus English `yes` / `yeah` / `of course` / `affirmative` when mixed-language.
+3. **Advance once** — Persist `workAuthorization=true` and ask the next qualification step. Do not immediately re-ask the fact just answered.
+4. **One acknowledgement** — One inbound event yields one outbound. Do not stack duplicate `Perfecto` / `Excelente` acknowledgements.
+5. **Clarify, don't hand off** — `Discúlpame cual dato` and close variants restate the pending question (`explain_pending_*`). Do not escalate to HUMAN_REQUIRED on the first recoverable misunderstanding.
+6. **Boundaries** — Do not change first outbound, WhatsApp eligibility, ownership, or IUL routing.
+
+---
+
+## BR-196 — Explicit job FAQ during qualification
+
+**Implements:** After qualification has started, an explicit “what is the job/opportunity?” question receives the approved transparent answer (including sales and licensing) and then resumes the exact pending step. The first Recruit AI outbound for a new lead stays the lightweight qualification start and must not become this FAQ.  
+**Domain:** Recruit AI / Conversation / FAQ  
+**Depends on:** BR-097, BR-088, BR-131  
+**Related:** BR-090  
+**Status:** Implemented  
+**Engine target:** `teamVisionWorkflowCopy.getExplicitJobFaqAnswer`; `responseRenderer.composeJobOverviewThenResume`; `conversationContinuity.looksLikeJobOverviewQuestion`  
+**Tests:** `backend/test/recruitAiV2ExplicitJobFaqBr196.test.js`
+
+### Rules
+
+1. **First outbound unchanged** — New-lead Spanish first touch remains the lightweight welcome + city/state ask. Do not open with the job-role explanation.
+2. **Explicit asks only** — Fire the role FAQ for `¿De qué se trata?`, `¿Qué es el trabajo?`, `¿Qué hacen?`, `¿De qué es la oportunidad?`, `¿Me puedes explicar de qué se trata?`, `What is the job?`, `What is this about?` (and close variants) after a pending qualification question exists.
+3. **Approved Spanish content** — Financial-services opportunity; family education/protection/planning; client service and follow-up; **sales of financial products**; training; licenses as required by the functions.
+4. **Resume, don't restart** — After the answer, ask the exact pending qualification step. Do not restart from location.
+5. **Boundaries** — Do not hide the sales component. Do not change WhatsApp eligibility, ownership, or first-turn BR-131 English/Spanish info-request routing.
+
+---
+
+## BR-197 — Today's Agenda local day + manual agenda lifecycle
+
+**Implements:** Dashboard Today's Agenda is a tenant-local calendar day only. Manual Add-to-Agenda items are not recruiting appointments; they can be edited, marked complete, or removed without changing appointment history, and unfinished items do not roll into later days.  
+**Domain:** Executive Dashboard / Unified Agenda  
+**Depends on:** BR-079, BR-168  
+**Related:** BR-177  
+**Status:** Implemented  
+**Engine target:** `appointmentListService.listPersistedAppointments` (`view=today`); `executiveDashboardV2ViewModel`; Agenda outcome APIs; Today Agenda card  
+**Tests:** `backend/test/agendaTodayWindowBr197.test.js`; `frontend/src/engines/executiveDashboardV2ViewModel.test.js`
+
+### Rules
+
+1. **Today window** — Include an item only when `startDateTime` is `>= startOfToday` and `< startOfTomorrow` in the organization/appointment IANA timezone. Do not compare naive UTC calendar dates.
+2. **Today only** — Yesterday, future, arbitrary recent, and stale manual entries do not appear on Today's Agenda. Full history stays on Appointments / View all.
+3. **Sort** — Chronological by scheduled time.
+4. **Manual lifecycle** — Standalone agenda items support Edit, Mark complete, and Remove from agenda. Completing/removing must not alter recruiting appointment history. Do not auto-roll unfinished items to a future date.
+5. **Delete** — Hard-delete only where already authorized for unpromoted manually created records; otherwise cancel/remove preserves audit history.
+6. **Boundaries** — Do not change Recruit AI, WhatsApp, or prospect ownership.
 
 ---
 

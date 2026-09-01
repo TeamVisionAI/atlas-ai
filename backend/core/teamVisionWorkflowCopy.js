@@ -147,6 +147,16 @@ function getJobOverviewFaqAnswer(language) {
 }
 
 /**
+ * BR-196 — explicit job/opportunity FAQ during qualification (not first outbound).
+ * Do not hide the sales component. Resume the pending question after this answer.
+ */
+function getExplicitJobFaqAnswer(language) {
+  return language === "es"
+    ? "Es una oportunidad en el área de servicios financieros. Ayudamos a familias con educación financiera, protección de ingresos y planificación para sus metas. El rol incluye atención y seguimiento a clientes, así como ventas de productos financieros. Se ofrece capacitación y, dependiendo de las funciones, es necesario obtener las licencias correspondientes."
+    : "It's an opportunity in financial services. We help families with financial education, income protection, and planning for their goals. The role includes client service and follow-up, as well as selling financial products. Training is provided, and depending on the functions, the corresponding licenses are required.";
+}
+
+/**
  * Copy-only Spanish ad-lead first touch (BR-131). English unchanged.
  * Used when the next ask is still location; does not change qualification logic.
  */
@@ -498,6 +508,7 @@ module.exports = {
   getHandoffMessage,
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
+  getExplicitJobFaqAnswer,
   getAdLeadFirstTouchMessage,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,

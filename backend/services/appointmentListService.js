@@ -10,18 +10,37 @@ const {
   buildPersistedScopeFilters,
   isPersistedAppointment,
   matchesListFilters,
+  resolveAppointmentViewFilters,
   selectActivePersistedAppointmentForProspect
 } = require("../core/appointmentListQuery");
+
+function expandListFilters(filters = {}, reference = new Date()) {
+  if (!filters.view) {
+    return filters;
+  }
+  const viewFilters = resolveAppointmentViewFilters(filters.view, reference, {
+    organizationId: filters.organizationId || null
+  });
+  return {
+    ...viewFilters,
+    ...filters,
+    from: filters.from || viewFilters.from,
+    to: filters.to || viewFilters.to,
+    status: filters.status || viewFilters.status,
+    timeZone: filters.timeZone || viewFilters.timeZone
+  };
+}
 
 /**
  * Persisted atlas_appointments only — canonical list path for the Appointments module.
  */
 async function listPersistedAppointments(filters = {}, options = {}) {
   const reference = options.reference || new Date();
-  const result = await appointmentRepository.search(buildPersistedScopeFilters(filters));
+  const expanded = expandListFilters(filters, reference);
+  const result = await appointmentRepository.search(buildPersistedScopeFilters(expanded));
   const items = (result.items || [])
     .filter(isPersistedAppointment)
-    .filter((appointment) => matchesListFilters(appointment, filters, reference));
+    .filter((appointment) => matchesListFilters(appointment, expanded, reference));
 
   return {
     items,
