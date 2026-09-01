@@ -706,7 +706,8 @@ async function promoteToClient(appointmentId, input, context) {
       standaloneAgenda: true,
       noRecruitAi: true,
       promotedToClient: true,
-      promotedClientId: client.id
+      promotedClientId: client.id,
+      promotionPending: false
     },
     updatedAt: now
   });

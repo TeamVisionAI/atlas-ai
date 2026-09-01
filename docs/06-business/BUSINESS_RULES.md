@@ -3171,6 +3171,31 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-206 — Manual Agenda Outcome Recovery + Evidence Attribution
+
+**Implements:** Recover past manual Add-to-Agenda outcomes with durable client/recruit/production evidence. Appointment owner, recruiter/sponsor, and production participants stay separate. Dual RECRUITED + CLIENT is allowed. Do not fabricate prospects.  
+**Domain:** Agenda / Clients / Recruiting attribution / Production  
+**Depends on:** BR-177, BR-179, BR-181, BR-197, BR-204  
+**Related:** BR-168, BR-178  
+**Status:** Implemented — recovery writes stay dry-run unless explicitly executed  
+**Engine target:** `agendaOutcomeEvidence`; `agendaOutcomeRecoveryApplicationService`; `atlas_agenda_recruits`; `atlas_client_production_attributions`  
+**Tests:** `backend/test/agendaOutcomeRecoveryBr206.test.js`; `backend/test/agendaTodayWindowBr197.test.js`; `backend/test/appointmentOutcomeSyncBr204.test.js`; `frontend/src/engines/agendaOutcomeRecoveryBr206.test.js`
+
+### Rules
+
+1. **Eligibility** — Recovery applies to standalone manual Agenda appointments by id after the local day passes. BR-197 Today’s Agenda stays today-only. Past unresolved items appear on Appointments `past_unresolved` and `GET /api/agenda/recoverable`.
+2. **Evidence, not buttons** — Client KPI counts `atlas_agenda_clients`. Recruit KPI counts `atlas_agenda_recruits` with explicit recruiter/sponsor. Production KPI counts parent `atlas_client_production.amount` once; attribution rows do not inflate the total. Appointment KPI stays on appointment evidence.
+3. **Dual outcome** — One appointment may result in both RECRUITED and CLIENT. Primary `appointment.outcome` remains a single resolution field (`client`, `recruited`, or `completed` for both). Resulting relationships live in evidence tables + `metadata.resultingOutcomes`.
+4. **Recruiter attribution** — Recruiter/sponsor is required for recruit recovery and is never inferred from appointment owner/trainer. A field recruit (Agenda contact / client) may be the sponsor.
+5. **No fabricated prospect** — Recruit evidence does not require a phone or a prospect. Existing prospects are linked and left unchanged. `promoteToRecruit` remains the explicit prospect-create path.
+6. **Client recovery** — Reuse `atlas_agenda_clients`. Clear `promotionPending` only after client evidence exists. Do not create a recruiting prospect to represent a client.
+7. **Production splits** — Optional later. `atlas_client_production_attributions` stores percent and/or credited amount. `sum(percent) <= 100` and `sum(credited) <= total premium`. Do not invent premium or splits.
+8. **Idempotent** — Repeating Record Client / Record Recruit / Record Recruit + Client reuses existing rows.
+9. **Dry-run first** — `/api/agenda/appointments/:id/recover` defaults to `dryRun: true`.
+10. **Boundaries** — Do not weaken BR-197, BR-204, tenant isolation, or WhatsApp routing. AI Quality APPLY stays OFF.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

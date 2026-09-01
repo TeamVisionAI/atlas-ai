@@ -158,6 +158,7 @@ export function AppointmentDetailsPanel({
   onComplete,
   onPromoteRecruit,
   onPromoteClient,
+  onRecoverRecruitAndClient,
   onOpenClient
 }) {
   const { translate } = useLanguage();
@@ -240,6 +241,11 @@ export function AppointmentDetailsPanel({
                 {translate("agendaOpenClient")}
               </AtlasButton>
             )}
+            {onRecoverRecruitAndClient ? (
+              <AtlasButton variant="secondary" size="sm" onClick={() => onRecoverRecruitAndClient(appointment)}>
+                {translate("agendaRecoverRecruitAndClient")}
+              </AtlasButton>
+            ) : null}
           </section>
         ) : null}
 

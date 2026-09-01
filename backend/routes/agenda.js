@@ -15,6 +15,10 @@ const {
   promoteToRecruit,
   promoteToClient
 } = require("../application/agendaApplicationService");
+const {
+  planRecovery,
+  recoverAgendaOutcome
+} = require("../application/agendaOutcomeRecoveryApplicationService");
 
 const router = express.Router();
 router.use(requireAtlasUser);
@@ -40,6 +44,20 @@ function sendError(res, error) {
     message: error.message
   });
 }
+
+router.get("/recoverable", operationalControlPlaneEmpty(emptyAgenda), async (req, res) => {
+  try {
+    const scope = context(req);
+    const result = await listPersistedAppointments({
+      organizationId: scope.organizationId,
+      agentId: scope.userId,
+      view: "past_unresolved"
+    });
+    return res.json({ items: result.items || [], total: result.total || 0 });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
 
 router.get("/today", operationalControlPlaneEmpty(emptyAgenda), async (req, res) => {
   try {
@@ -134,6 +152,57 @@ router.post(
     try {
       const result = await promoteToClient(req.params.id, req.body || {}, context(req));
       return res.json({ success: true, ...result });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+);
+
+router.post(
+  "/appointments/:id/recover",
+  requireAnyPermission(PERMISSIONS.PROSPECT_WRITE),
+  async (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = await recoverAgendaOutcome(
+        req.params.id,
+        {
+          action: body.action,
+          recruiter: body.recruiter || null,
+          displayName: body.displayName || null,
+          production: body.production || null,
+          notes: body.notes || null,
+          dryRun: body.dryRun !== false
+        },
+        context(req)
+      );
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+);
+
+router.get(
+  "/appointments/:id/recover/plan",
+  operationalControlPlaneEmpty(emptyAgenda),
+  async (req, res) => {
+    try {
+      const plan = await planRecovery(
+        req.params.id,
+        {
+          action: req.query.action,
+          recruiter: {
+            userId: req.query.recruiterUserId || null,
+            agendaContactId: req.query.recruiterAgendaContactId || null,
+            clientId: req.query.recruiterClientId || null,
+            displayName: req.query.recruiterDisplayName || null
+          },
+          displayName: req.query.displayName || null
+        },
+        context(req)
+      );
+      return res.json({ success: true, dryRun: true, plan });
     } catch (error) {
       return sendError(res, error);
     }

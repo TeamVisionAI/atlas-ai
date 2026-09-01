@@ -20,6 +20,7 @@ import RescheduleAppointmentDialog from "../components/appointments/RescheduleAp
 import CancelAppointmentDialog from "../components/appointments/CancelAppointmentDialog";
 import CompleteAppointmentDialog from "../components/appointments/CompleteAppointmentDialog";
 import PromoteAgendaContactDialog from "../components/agenda/PromoteAgendaContactDialog";
+import RecoverAgendaOutcomeDialog from "../components/agenda/RecoverAgendaOutcomeDialog";
 import ResolveHumanAssistDialog from "../components/appointments/ResolveHumanAssistDialog";
 import {
   AppointmentDetailsPanel,
@@ -47,6 +48,7 @@ const VIEWS = [
   "pending_confirmation",
   "human_assist",
   "completed",
+  "past_unresolved",
   "cancelled"
 ];
 
@@ -508,6 +510,7 @@ export default function AppointmentsPage() {
                       onComplete={() => openDialog("complete", appointment)}
                       onPromoteRecruit={() => openDialog("promote-recruit", appointment)}
                       onPromoteClient={() => openDialog("promote-client", appointment)}
+                      onRecoverRecruitAndClient={() => openDialog("recover-dual", appointment)}
                       onOpenClient={() => {
                         const id = appointment.metadata?.promotedClientId;
                         if (id) navigate(appPath(`clients/${id}`));
@@ -530,6 +533,7 @@ export default function AppointmentsPage() {
             onComplete={(item) => openDialog("complete", item)}
             onPromoteRecruit={(item) => openDialog("promote-recruit", item)}
             onPromoteClient={(item) => openDialog("promote-client", item)}
+            onRecoverRecruitAndClient={(item) => openDialog("recover-dual", item)}
             onOpenClient={(item) => {
               const id = item?.metadata?.promotedClientId;
               if (id) navigate(appPath(`clients/${id}`));
@@ -591,6 +595,13 @@ export default function AppointmentsPage() {
             navigate(appPath(`clients/${result.clientId}`));
           }
         }}
+      />
+      <RecoverAgendaOutcomeDialog
+        open={dialog?.type === "recover-dual"}
+        appointment={dialog?.appointment}
+        defaultAction="RECORD_RECRUIT_AND_CLIENT"
+        onClose={closeDialog}
+        onSuccess={() => handleActionSuccess(translate("agendaRecoverSuccess"))}
       />
       <ResolveHumanAssistDialog
         open={dialog?.type === "resolve"}

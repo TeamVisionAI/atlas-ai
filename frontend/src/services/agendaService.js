@@ -39,3 +39,11 @@ export async function promoteAgendaToClient(appointmentId, payload = {}) {
     body: JSON.stringify(payload)
   });
 }
+
+export async function recoverAgendaOutcome(appointmentId, payload = {}) {
+  return apiFetch(`/api/agenda/appointments/${encodeURIComponent(appointmentId)}/recover`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dryRun: true, ...payload })
+  });
+}
