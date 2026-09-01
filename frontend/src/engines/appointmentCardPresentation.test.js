@@ -94,6 +94,17 @@ test("phone unavailable fallback when no phone or username", () => {
   assert.equal(contact.contactLabel, "Phone unavailable");
 });
 
+test("FOLLOW_UP_NEEDED appointment hides lifecycle actions", () => {
+  assert.equal(
+    shouldShowLifecycleActions({
+      status: "scheduled",
+      outcome: "follow_up",
+      metadata: { lifecycleState: "scheduled", standaloneAgenda: true }
+    }),
+    false
+  );
+});
+
 test("Zoom appointment shows Join Zoom when url and mode match", () => {
   assert.equal(
     shouldShowJoinZoomAction({

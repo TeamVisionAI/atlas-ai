@@ -11,6 +11,11 @@ const { listProspectActivityPreview } = require("./prospectActivityFeedReadModel
 const { buildProspectEditorProfile } = require("./prospectWorkspaceProfileEngine");
 const { resolvePersistedAppointmentId } = require("./appointmentListQuery");
 const {
+  hasCanonicalRecordedOutcome,
+  resolveCanonicalAppointmentOutcome
+} = require("./appointmentOutcomeState");
+const { mapAppointmentSlugToOutcomeId } = require("./interviewOutcomeSlugMap");
+const {
   findPersistedAppointmentForProspect,
   findLatestPersistedAppointmentForProspect
 } = require("../services/appointmentListService");
@@ -80,15 +85,19 @@ function buildInterviewBlock(
   }
 
   const now = Date.now();
+  const recordedOutcome = hasCanonicalRecordedOutcome(lifecycleAppointment);
+  const appointmentOutcomeLabel = recordedOutcome
+    ? mapAppointmentSlugToOutcomeId(resolveCanonicalAppointmentOutcome(lifecycleAppointment))
+    : null;
 
   return {
     datetime: interviewMs ? new Date(interviewMs).toISOString() : null,
     type: activeAppointment?.meetingType || prospect?.interview_type || null,
     isPast: interviewMs !== null && interviewMs < now,
-    outcome: agentState?.outcome || null,
+    outcome: agentState?.outcome || appointmentOutcomeLabel || null,
     calendarEventId: activeAppointment?.calendarEventId || prospect?.calendar_event_id || null,
-    gateActive: Boolean(workflowGate?.active),
-    appointmentId: resolvePersistedAppointmentId(activeAppointment),
+    gateActive: Boolean(workflowGate?.active) && !recordedOutcome,
+    appointmentId: resolvePersistedAppointmentId(activeAppointment || lifecycleAppointment),
     lifecycleState,
     appointmentStatus,
     ownerRepId: activeAppointment?.ownerRepId || null,

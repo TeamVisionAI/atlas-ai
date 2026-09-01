@@ -4,6 +4,7 @@
  */
 
 const { APPOINTMENT_STATUSES, APPOINTMENT_OUTCOMES } = require("../../../core/configuration/appointmentDomain");
+const { hasCanonicalRecordedOutcome, resolveCanonicalAppointmentOutcome } = require("../../../core/appointmentOutcomeState");
 
 const APPOINTMENT_LIFECYCLE_STATES = Object.freeze({
   SCHEDULED: "scheduled",
@@ -129,9 +130,27 @@ function resolveLifecycleState(appointment = {}) {
 
   if (
     lifecycleFromMetadata &&
-    Object.values(APPOINTMENT_LIFECYCLE_STATES).includes(lifecycleFromMetadata)
+    Object.values(APPOINTMENT_LIFECYCLE_STATES).includes(lifecycleFromMetadata) &&
+    !hasCanonicalRecordedOutcome(appointment)
   ) {
     return lifecycleFromMetadata;
+  }
+
+  if (hasCanonicalRecordedOutcome(appointment)) {
+    const slug = resolveCanonicalAppointmentOutcome(appointment);
+    if (slug === APPOINTMENT_OUTCOMES.NO_SHOW) {
+      return APPOINTMENT_LIFECYCLE_STATES.NO_SHOW;
+    }
+    if (slug === APPOINTMENT_OUTCOMES.CANCELLED) {
+      return APPOINTMENT_LIFECYCLE_STATES.CANCELLED;
+    }
+    if (slug === APPOINTMENT_OUTCOMES.RECRUITED) {
+      return APPOINTMENT_LIFECYCLE_STATES.RECRUITED;
+    }
+    if (slug === APPOINTMENT_OUTCOMES.CLIENT) {
+      return APPOINTMENT_LIFECYCLE_STATES.BECAME_CLIENT;
+    }
+    return APPOINTMENT_LIFECYCLE_STATES.COMPLETED;
   }
 
   if (appointment.status === APPOINTMENT_STATUSES.CANCELLED) {

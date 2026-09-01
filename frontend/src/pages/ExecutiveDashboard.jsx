@@ -9,6 +9,10 @@ import {
   buildExecutiveDashboardV2ViewModel,
   isInstantInLocalToday
 } from "../engines/executiveDashboardV2ViewModel";
+import {
+  hasCanonicalRecordedOutcome,
+  resolveOutcomeCompleteDisplayStatus
+} from "../engines/appointmentOutcomeState";
 import { recordAgendaOutcome } from "../services/agendaService";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import { useExecutiveDashboardV2Data } from "../hooks/useExecutiveDashboardV2Data";
@@ -51,7 +55,8 @@ function standaloneAgendaItem(appointment, translate, timeZone) {
     `appointmentsMeetingType_${meetingType}`,
     String(meetingType).replace(/_/g, " ")
   );
-  const status = appointment.status || "scheduled";
+  const recordedStatus = resolveOutcomeCompleteDisplayStatus(appointment);
+  const status = recordedStatus || appointment.status || "scheduled";
   const statusLabel = translatedOrFallback(
     translate,
     `appointmentsStatus_${status}`,
@@ -88,7 +93,9 @@ function standaloneAgendaItem(appointment, translate, timeZone) {
     to: "/app/appointments",
     standalone: true,
     appointmentId: appointment.id,
-    canManage: !["completed", "cancelled", "no_show"].includes(String(status))
+    canManage:
+      !hasCanonicalRecordedOutcome(appointment) &&
+      !["completed", "cancelled", "no_show"].includes(String(status))
   };
 }
 
@@ -170,6 +177,7 @@ export default function ExecutiveDashboard() {
     const zone = executive?.timeZone;
     const standalone = (standaloneAgenda || [])
       .filter((appointment) => isInstantInLocalToday(appointment.startDateTime, zone))
+      .filter((appointment) => !hasCanonicalRecordedOutcome(appointment))
       .map((appointment) => standaloneAgendaItem(appointment, translate, zone));
     return [...base, ...standalone]
       .sort((left, right) => Date.parse(left.time || 0) - Date.parse(right.time || 0))

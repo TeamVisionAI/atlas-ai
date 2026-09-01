@@ -7,6 +7,11 @@
 const { APPOINTMENT_STATUSES, APPOINTMENT_PURPOSES } = require("./configuration/appointmentDomain");
 const { parseInterviewDatetime } = require("./parseInterviewDatetime");
 const {
+  hasCanonicalRecordedOutcome,
+  resolveOutcomeCompleteListStatus,
+  maybeEmitOutcomeStateMismatch
+} = require("./appointmentOutcomeState");
+const {
   RELATIVE_PERIODS,
   getOrganizationDateWindow,
   isTimestampInWindow
@@ -212,6 +217,13 @@ function prospectMatchesAgent(prospect, agentId) {
 }
 
 function resolveAppointmentListStatus(appointment = {}) {
+  // Implements BR-204 — recorded outcome outranks stale scheduled status/lifecycle.
+  const outcomeStatus = resolveOutcomeCompleteListStatus(appointment);
+  if (outcomeStatus) {
+    maybeEmitOutcomeStateMismatch(appointment);
+    return outcomeStatus;
+  }
+
   const lifecycleState = appointment.metadata?.lifecycleState;
 
   if (lifecycleState === "recruited" || lifecycleState === "became_client") {
@@ -246,6 +258,10 @@ function resolveAppointmentListStatus(appointment = {}) {
 }
 
 function isActiveAppointmentForList(appointment = {}) {
+  if (hasCanonicalRecordedOutcome(appointment)) {
+    return false;
+  }
+
   const lifecycleState = appointment.metadata?.lifecycleState;
 
   if (lifecycleState && TERMINAL_LIFECYCLE_STATES.includes(lifecycleState)) {
@@ -256,6 +272,10 @@ function isActiveAppointmentForList(appointment = {}) {
 }
 
 function isCompletedAppointmentForList(appointment = {}) {
+  if (hasCanonicalRecordedOutcome(appointment)) {
+    return resolveAppointmentListStatus(appointment) !== APPOINTMENT_STATUSES.CANCELLED;
+  }
+
   const lifecycleState = appointment.metadata?.lifecycleState;
 
   if (lifecycleState === "recruited" || lifecycleState === "became_client") {

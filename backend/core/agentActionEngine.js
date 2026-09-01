@@ -4,6 +4,7 @@ const { MILESTONES: WORKFLOW_MILESTONES } = require("./workflowConstants");
 const {
   isQualificationCompleteByCanonicalMilestone
 } = require("./missionControlMilestoneProjection");
+const { isRecordedInterviewOutcomeValue } = require("./appointmentOutcomeState");
 
 const MILESTONES = {
   NEW_LEAD: "New Lead",
@@ -103,7 +104,7 @@ function getInterviewTimingPhase(prospect) {
 }
 
 function isWorkflowGateActive(prospect, agentState) {
-  if (agentState.outcome && RECORDED_INTERVIEW_OUTCOMES.has(agentState.outcome)) {
+  if (agentState.outcome && (RECORDED_INTERVIEW_OUTCOMES.has(agentState.outcome) || isRecordedInterviewOutcomeValue(agentState.outcome))) {
     return false;
   }
 

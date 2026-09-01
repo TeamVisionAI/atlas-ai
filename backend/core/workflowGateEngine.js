@@ -5,8 +5,13 @@
 
 const { isWorkflowGateActive } = require("./agentActionEngine");
 const { buildInterviewOutcomeReadModel } = require("./interviewOutcomeMappings");
+const { hasCanonicalRecordedOutcome } = require("./appointmentOutcomeState");
 
-function buildWorkflowGateDescriptor(prospect, agentState) {
+function buildWorkflowGateDescriptor(prospect, agentState, appointment = null) {
+  if (hasCanonicalRecordedOutcome(appointment)) {
+    return { active: false };
+  }
+
   const active = isWorkflowGateActive(prospect, agentState);
 
   if (!active) {

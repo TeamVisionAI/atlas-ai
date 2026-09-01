@@ -3148,6 +3148,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-204 — Appointment Outcome State Synchronization
+
+**Implements:** Once an appointment/interview outcome is recorded anywhere, every Atlas surface consumes the same canonical outcome. Follow-up needed completes the appointment; it does not leave the appointment unresolved.  
+**Domain:** Appointments / Today’s Agenda / Prospect Workspace / Follow-ups / dashboard counts  
+**Depends on:** BR-044 interview outcomes; BR-177 Agenda outcomes; BR-178 follow-up sync; BR-197 Today’s Agenda  
+**Related:** BR-039 reschedule; BR-045 interview presentation; BR-190 confirm-selected slot  
+**Status:** Implemented  
+**Engine target:** `appointmentOutcomeState`; `appointmentListQuery`; `agendaApplicationService.recordStandaloneOutcome`; Prospect Workspace interview block; executive today-focus counts  
+**Tests:** `backend/test/appointmentOutcomeSyncBr204.test.js`; `backend/test/appointmentListQuery.test.js`; `backend/test/agendaTodayWindowBr197.test.js`; `backend/test/recruitAiV2ConfirmSelectedSlotSiBr190.test.js`
+
+### Rules
+
+1. **Canonical field** — `appointment.outcome` is the recorded outcome. Do not infer independently from appointment status, `current_step`, follow-up existence, or agenda presence.
+2. **FOLLOW_UP_NEEDED** — Interview decision is recorded. Appointment is outcome-complete. Follow-up workflow may stay active. Do not keep the appointment in unresolved / pending / Outcome Required queues.
+3. **All recorded outcomes** — RECRUITED, BECAME_CLIENT, RESCHEDULED (original), NO_SHOW, FOLLOW_UP_NEEDED, and NOT_INTERESTED leave unresolved appointment lists. Completed/history may show the outcome.
+4. **RESCHEDULED** — Recording reschedule completes the original unresolved row. The live moved appointment (`status=rescheduled`, no recorded complete outcome) remains the single active appointment.
+5. **Manual agenda** — Add-to-Agenda items follow the same outcome sync rules as scheduled interviews. Do not leave stale standalone rows scheduled after an outcome.
+6. **Idempotent** — Recording the same outcome twice does not duplicate follow-ups, appointments, or agenda rows.
+7. **Observability** — `OUTCOME_STATE_MISMATCH` when a canonical outcome exists and a read model still reports pending/unresolved. Not SEMANTIC_DISAGREEMENT. AI Quality APPLY stays OFF.
+8. **Boundaries** — Do not redesign recruit/client dual relationship. Do not weaken BR-190, BR-197, tenant isolation, or WhatsApp routing.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

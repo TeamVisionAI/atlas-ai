@@ -382,21 +382,16 @@ async function createStandaloneAppointment(input, context) {
   return { contact: await presentAgendaContact(contact), appointment };
 }
 
-function resolveOutcomeStatus(outcome, currentStatus) {
+function resolveOutcomeStatus(outcome) {
+  // Implements BR-204 — FOLLOW_UP_NEEDED / RESCHEDULED complete the original appointment.
   if (outcome === APPOINTMENT_OUTCOMES.CANCELLED) return "cancelled";
   if (outcome === APPOINTMENT_OUTCOMES.NO_SHOW) return "no_show";
-  if (outcome === APPOINTMENT_OUTCOMES.FOLLOW_UP || outcome === APPOINTMENT_OUTCOMES.RESCHEDULED) {
-    return currentStatus;
-  }
   return "completed";
 }
 
-function resolveOutcomeLifecycle(outcome, currentLifecycle) {
+function resolveOutcomeLifecycle(outcome) {
   if (outcome === APPOINTMENT_OUTCOMES.CANCELLED) return "cancelled";
   if (outcome === APPOINTMENT_OUTCOMES.NO_SHOW) return "no_show";
-  if (outcome === APPOINTMENT_OUTCOMES.FOLLOW_UP || outcome === APPOINTMENT_OUTCOMES.RESCHEDULED) {
-    return currentLifecycle || "scheduled";
-  }
   return "completed";
 }
 
@@ -428,7 +423,7 @@ async function recordStandaloneOutcome(appointmentId, input, context) {
   const now = new Date().toISOString();
   const saved = await appointmentRepository.save({
     ...appointment,
-    status: resolveOutcomeStatus(outcome, appointment.status),
+    status: resolveOutcomeStatus(outcome),
     outcome,
     outcomeNotes: notes || appointment.outcomeNotes || null,
     history: recordHistoryEvent(appointment, {
@@ -442,7 +437,7 @@ async function recordStandaloneOutcome(appointmentId, input, context) {
     }),
     metadata: {
       ...(appointment.metadata || {}),
-      lifecycleState: resolveOutcomeLifecycle(outcome, appointment.metadata?.lifecycleState),
+      lifecycleState: resolveOutcomeLifecycle(outcome),
       // Recruited/client outcomes stay pending until an explicit promote action.
       promotionPending: outcome === APPOINTMENT_OUTCOMES.RECRUITED || outcome === APPOINTMENT_OUTCOMES.CLIENT
     },

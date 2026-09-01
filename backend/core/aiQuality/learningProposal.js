@@ -49,6 +49,15 @@ const CATALOG = Object.freeze({
     suggested_fix_area: "recruitAiV2.conversationContinuity / decisionEngine",
     recommended_action: LEARNING_ACTIONS.APPROVE_REGRESSION
   },
+  [SIGNAL_TYPES.OUTCOME_STATE_MISMATCH]: {
+    problem_summary: "A recorded appointment outcome exists but a read model still treats the appointment as unresolved.",
+    likely_root_cause: "A surface inferred pending from status, milestone, or agenda presence instead of the canonical outcome.",
+    expected_behavior: "Once an outcome is recorded, every surface shows that outcome and stops prompting for a second decision.",
+    proposed_regression: "FOLLOW_UP_NEEDED leaves Follow Up visible and removes the appointment from unresolved queues.",
+    forbidden_behavior: ["treat follow-up needed as appointment pending", "second Outcome Required prompt"],
+    suggested_fix_area: "appointment_execution / lifecycle_state",
+    recommended_action: LEARNING_ACTIONS.APPROVE_REGRESSION
+  },
   [SIGNAL_TYPES.APPOINTMENT_CONFIRMATION_MISMATCH]: {
     problem_summary: "Atlas used confirmation language without a successful appointment create.",
     likely_root_cause: "Reply template fired before create succeeded, or the selected slot was not confirmable.",
