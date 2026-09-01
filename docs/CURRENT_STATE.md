@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-09-01:** **BR-205** — Conversation Performance uses operational eligibility + Conversations ownership (sticky HUMAN wins). Average response time stays “—”. Legend counts no longer clip.
 - **2026-09-01:** **BR-204** — Recorded appointment/interview outcomes are canonical across Appointments, Today’s Agenda, Prospect Workspace, Follow Up, and dashboard pending counts. FOLLOW_UP_NEEDED completes the appointment.
 - **2026-09-01:** **BR-203** — Native WhatsApp Business app HUMAN/AGENT echoes persist for contact-only conversations so delivery lifecycle can attach. No prospect create and no eligibility mutation.
 - **2026-09-01:** **BR-201** — Connection-only `META_AD_DESTINATION` is not operational lead provenance. Lists require inbound-specific CTWA / QR / campaign / explicit create. No row delete or owner rewrite.
