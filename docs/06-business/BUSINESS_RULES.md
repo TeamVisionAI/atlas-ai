@@ -2583,7 +2583,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** A global Atlas platform capability that turns production quality signals into a human-reviewed queue and approved regression candidates. Atlas never autonomously modifies production business rules or prompts from this system.  
 **Domain:** Platform / AI quality / learning loop  
 **Depends on:** BR-160, BR-169, BR-174  
-**Related:** BR-049, BR-081, BR-114, BR-146  
+**Related:** BR-049, BR-081, BR-114, BR-146, BR-198  
 **Status:** V1 implemented — capture default off, observe/review only  
 **Engine target:** `aiQuality/*`; `aiQualityService`; platform `/ai-quality` routes; Super Admin AI Quality page  
 **Tests:** `backend/test/aiQualityLearningCenterBr175.test.js`; `frontend/src/pages/platform/aiQualityHelpers.test.js`
@@ -3040,6 +3040,30 @@ Production outside-window messaging requires firm-approved Meta templates config
 4. **Manual lifecycle** — Standalone agenda items support Edit, Mark complete, and Remove from agenda. Completing/removing must not alter recruiting appointment history. Do not auto-roll unfinished items to a future date.
 5. **Delete** — Hard-delete only where already authorized for unpromoted manually created records; otherwise cancel/remove preserves audit history.
 6. **Boundaries** — Do not change Recruit AI, WhatsApp, or prospect ownership.
+
+---
+
+## BR-198 — AI Quality Authorized Learning Actions
+
+**Implements:** Extend BR-175 so Atlas can generate review-safe learning proposals and regression/implementation specs from quality cases, but cannot change production behavior, prompts, or source without a separate human authorization. Semantic APPLY stays OFF.  
+**Domain:** Platform / AI quality / learning loop  
+**Depends on:** BR-175  
+**Related:** BR-174, BR-195, BR-196, BR-197  
+**Status:** V1 implemented — proposal + authorization only; no autonomous code mutation, merge, or deploy  
+**Engine target:** `aiQuality/learningProposal`; `learningActions`; `learningReport`; platform `/ai-quality` learning routes; Super Admin Learning & Improvements tab  
+**Tests:** `backend/test/aiQualityAuthorizedLearningBr198.test.js`; `frontend/src/pages/platform/aiQualityHelpers.test.js`
+
+### Rules
+
+1. **Proposal, not APPLY** — A quality case may receive a deterministic learning proposal (`problem_summary`, `likely_root_cause`, `expected_behavior`, `proposed_regression`, `forbidden_behavior`, `suggested_fix_area`, `risk_level`, `confidence`, `recommended_action`). Do not store chain-of-thought or hidden reasoning.
+2. **Authorization ladder** — Generate Proposal → Human review → Approve Regression → Regression Library → Implementation proposed → Authorize Implementation → reviewable spec/PR → Test → Verified. Approving a regression must not authorize code changes.
+3. **Regression library** — Approve Regression creates/updates a BR-175 library entry (`proposed` / `approved` / `implemented` / `verified` / `rejected`) with source case, allowed input turns, prior facts, expected intent/facts/action/reply, forbidden behavior, risk, reviewer, timestamps. Do not auto-edit tests.
+4. **Implementation proposal** — After regression approval, Atlas may generate a documentation-only spec (files/engine, current vs proposed behavior, tests, risks, migration/cleanup flags). No source mutation at this stage.
+5. **Authorize Implementation** — Separate explicit action. V1 emits a Cursor/Codex/GitHub PR task spec. Do not auto-merge or auto-deploy. PRs stay reviewable.
+6. **Risk** — LOW: phrase/language variants, synonyms, repeated-question, continuity. MEDIUM: qualification transitions, FAQ, scheduling language, handoff. HIGH: eligibility, ownership/routing, compliance, financial disclosures, appointment execution, calendar writes, lifecycle, tenant isolation, WhatsApp routing, destructive data. HIGH always requires explicit implementation authorization. No autonomous pre-authorization in V1.
+7. **Learning & Improvements** — Super Admin tab answers “what mistakes did Atlas find, and what improved?” with counts and per-issue lifecycle (signal, tenant, detected count, risk, review/regression/implementation/verification, linked BR/PR).
+8. **Audit** — Persist every learning action with actor user ID and timestamp: proposal generated/rejected, revision requested, regression approved, implementation proposed/authorized/rejected, verified, reopened.
+9. **Boundaries** — Do not enable semantic APPLY, auto-edit Recruit AI behavior/prompts/code, auto-merge, auto-deploy, weaken tenant isolation, store raw WhatsApp bodies, or bypass BR-175 review controls.
 
 ---
 

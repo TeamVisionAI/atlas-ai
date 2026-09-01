@@ -8,12 +8,28 @@ function createMemoryStore(seedCases = []) {
   const cases = new Map(seedCases.map((row) => [row.id, { ...row }]));
   const settings = new Map();
   const regressions = new Map();
+  const proposals = new Map();
+  const implementations = new Map();
+  const learningActions = [];
   const audits = [];
+
+  function mergeById(collection, id, patch) {
+    const current = collection.get(id);
+    if (!current) {
+      return null;
+    }
+    const next = { ...current, ...patch, updatedAt: patch.updatedAt || new Date().toISOString() };
+    collection.set(id, next);
+    return next;
+  }
 
   return {
     cases,
     settings,
     regressions,
+    proposals,
+    implementations,
+    learningActions,
     audits,
     async getTenantSettings(organizationId) {
       return settings.get(String(organizationId)) || null;
@@ -76,6 +92,9 @@ function createMemoryStore(seedCases = []) {
       regressions.set(row.id, row);
       return row;
     },
+    async updateRegression(id, patch) {
+      return mergeById(regressions, id, patch);
+    },
     async listRegressions({ organizationId = null } = {}) {
       let rows = [...regressions.values()];
       if (organizationId) {
@@ -85,6 +104,68 @@ function createMemoryStore(seedCases = []) {
     },
     async getRegression(id) {
       return regressions.get(id) || null;
+    },
+    async getRegressionByCase(caseId) {
+      return [...regressions.values()].find((row) => row.caseId === caseId) || null;
+    },
+    async upsertProposal(row) {
+      const current = proposals.get(row.id);
+      const next = { ...(current || {}), ...row };
+      proposals.set(row.id, next);
+      return next;
+    },
+    async updateProposal(id, patch) {
+      return mergeById(proposals, id, patch);
+    },
+    async getProposal(id) {
+      return proposals.get(id) || null;
+    },
+    async getProposalByCase(caseId) {
+      return [...proposals.values()].find((row) => row.caseId === caseId) || null;
+    },
+    async listProposals({ organizationId = null } = {}) {
+      let rows = [...proposals.values()];
+      if (organizationId) {
+        rows = rows.filter((row) => row.organizationId === organizationId);
+      }
+      return rows;
+    },
+    async upsertImplementation(row) {
+      const current = implementations.get(row.id);
+      const next = { ...(current || {}), ...row };
+      implementations.set(row.id, next);
+      return next;
+    },
+    async updateImplementation(id, patch) {
+      return mergeById(implementations, id, patch);
+    },
+    async getImplementation(id) {
+      return implementations.get(id) || null;
+    },
+    async getImplementationByCase(caseId) {
+      return [...implementations.values()].find((row) => row.caseId === caseId) || null;
+    },
+    async listImplementations({ organizationId = null } = {}) {
+      let rows = [...implementations.values()];
+      if (organizationId) {
+        rows = rows.filter((row) => row.organizationId === organizationId);
+      }
+      return rows;
+    },
+    async insertLearningAction(row) {
+      learningActions.push(row);
+      return row;
+    },
+    async listLearningActions({ organizationId = null, caseId = null } = {}) {
+      return learningActions.filter((row) => {
+        if (organizationId && row.organizationId !== organizationId) {
+          return false;
+        }
+        if (caseId && row.caseId !== caseId) {
+          return false;
+        }
+        return true;
+      });
     },
     recordAudit(entry) {
       audits.push(entry);

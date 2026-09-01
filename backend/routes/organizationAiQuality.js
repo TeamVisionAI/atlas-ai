@@ -122,6 +122,44 @@ router.get("/ai-quality/cases/:id", requireOrgAdmin, async (req, res) => {
   }
 });
 
+router.get("/ai-quality/learning-report", requireOrgAdmin, async (req, res) => {
+  const organizationId = denyIfNoTenant(req, res);
+  if (!organizationId) {
+    return undefined;
+  }
+  try {
+    const report = await aiQualityService.getLearningReportForScope({ organizationId });
+    res.json({ report });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+router.post("/ai-quality/cases/:id/learning-actions", requireOrgAdmin, async (req, res) => {
+  const organizationId = denyIfNoTenant(req, res);
+  if (!organizationId) {
+    return undefined;
+  }
+  try {
+    const result = await aiQualityService.applyLearningCaseAction({
+      caseId: req.params.id,
+      organizationId,
+      action: req.body?.action,
+      notes: req.body?.notes || null,
+      expectedBehavior: req.body?.expectedBehavior || {},
+      linkedPr: req.body?.linkedPr || null,
+      linkedBr: req.body?.linkedBr || null,
+      actorUserId: req.authContext?.userId || null,
+      preAuthorize: req.body?.preAuthorize,
+      skipAuthorization: req.body?.skipAuthorization,
+      autoAuthorize: req.body?.autoAuthorize
+    });
+    res.json(result);
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
 router.post("/ai-quality/cases/:id/review", requireOrgAdmin, async (req, res) => {
   const organizationId = denyIfNoTenant(req, res);
   if (!organizationId) {

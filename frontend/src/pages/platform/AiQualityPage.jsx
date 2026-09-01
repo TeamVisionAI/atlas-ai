@@ -10,11 +10,15 @@ import {
   reviewAiQualityCase,
   getAiQualitySettings,
   listAiQualityRegressions,
-  getAiQualityRegressionSpec
+  getAiQualityRegressionSpec,
+  getAiQualityLearningReport,
+  applyAiQualityLearningAction
 } from "../../services/platformService";
 import {
   AI_QUALITY_TABS,
   REVIEW_ACTIONS,
+  LEARNING_ACTIONS,
+  LEARNING_FOLLOW_UP_ACTIONS,
   casesForTab,
   formatPercent,
   formatUsd
@@ -42,6 +46,7 @@ export default function AiQualityPage() {
   const [regressions, setRegressions] = useState([]);
   const [selected, setSelected] = useState(null);
   const [spec, setSpec] = useState("");
+  const [learningReport, setLearningReport] = useState(null);
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [expectedIntent, setExpectedIntent] = useState("");
@@ -54,16 +59,18 @@ export default function AiQualityPage() {
 
   async function refresh() {
     try {
-      const [settingsResult, overviewResult, casesResult, regressionsResult] = await Promise.all([
+      const [settingsResult, overviewResult, casesResult, regressionsResult, learningResult] = await Promise.all([
         getAiQualitySettings(),
         getAiQualityOverview(),
-        listAiQualityCases({ tab: tab === "overview" || tab === "cost" ? undefined : tab }),
-        listAiQualityRegressions()
+        listAiQualityCases({ tab: tab === "overview" || tab === "cost" || tab === "learning" ? undefined : tab }),
+        listAiQualityRegressions(),
+        getAiQualityLearningReport()
       ]);
       setSettings(settingsResult.settings || settingsResult);
       setOverview(overviewResult.overview || overviewResult);
       setCases(casesResult.cases || []);
       setRegressions(regressionsResult.regressions || []);
+      setLearningReport(learningResult.report || learningResult);
       setError("");
     } catch (err) {
       setError(err.message || "Unable to load AI Quality.");
@@ -100,6 +107,32 @@ export default function AiQualityPage() {
     await refresh();
   }
 
+  async function runLearningAction(action) {
+    if (!selected?.id) {
+      return;
+    }
+    const result = await applyAiQualityLearningAction(selected.id, {
+      action,
+      notes,
+      expectedBehavior: expectedIntent ? { expectedIntent } : {}
+    });
+    setSelected(result.qualityCase || selected);
+    if (result.proposal) {
+      setSelected((current) => ({
+        ...(result.qualityCase || current),
+        learningProposal: result.proposal,
+        implementationProposal: result.implementation || current?.implementationProposal,
+        regression: result.regression || current?.regression
+      }));
+    }
+    if (result.implementation?.markdown) {
+      setSpec(result.implementation.markdown);
+    } else if (result.regression?.markdown) {
+      setSpec(result.regression.markdown);
+    }
+    await refresh();
+  }
+
   async function openRegression(id) {
     const result = await getAiQualityRegressionSpec(id);
     setSpec(result.markdown || JSON.stringify(result.spec, null, 2));
@@ -115,8 +148,9 @@ export default function AiQualityPage() {
         <div>
           <h1>AI Quality</h1>
           <p className="ai-quality-page__lede">
-            Review misunderstandings and promote approved cases into regression
-            specs. Capture is off by default. Semantic apply stays off.
+            Review misunderstandings, generate learning proposals, and promote
+            approved regressions. Implementation stays unauthorized until an
+            explicit action. Capture is off by default. Semantic apply stays off.
           </p>
         </div>
       </header>
@@ -165,6 +199,66 @@ export default function AiQualityPage() {
         </div>
       ) : null}
 
+      {tab === "learning" && learningReport ? (
+        <div className="identity-card">
+          <h2>Learning & Improvements</h2>
+          <p className="ai-quality-page__lede">
+            What mistakes did Atlas find, and what has Atlas improved because of them?
+          </p>
+          <div className="ai-quality-metrics">
+            <Metric label="Cases detected" value={learningReport.casesDetected ?? 0} />
+            <Metric label="Proposals generated" value={learningReport.proposalsGenerated ?? 0} />
+            <Metric label="Cases reviewed" value={learningReport.casesReviewed ?? 0} />
+            <Metric label="Regressions approved" value={learningReport.regressionsApproved ?? 0} />
+            <Metric label="Improvements implemented" value={learningReport.improvementsImplemented ?? 0} />
+            <Metric label="Improvements verified" value={learningReport.improvementsVerified ?? 0} />
+            <Metric label="Open items" value={learningReport.openItems ?? 0} />
+            <Metric label="Blocked items" value={learningReport.blockedItems ?? 0} />
+          </div>
+          <table className="ai-quality-table">
+            <thead>
+              <tr>
+                <th>Issue</th>
+                <th>Signal</th>
+                <th>Tenant</th>
+                <th>Count</th>
+                <th>Risk</th>
+                <th>Review</th>
+                <th>Regression</th>
+                <th>Implementation</th>
+                <th>Verification</th>
+                <th>BR / PR</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(learningReport.rows || []).map((row) => (
+                <tr key={row.groupKey}>
+                  <td>{row.issue}</td>
+                  <td>{row.signalType}</td>
+                  <td>{row.tenant}</td>
+                  <td>{row.detectedCount}</td>
+                  <td>
+                    <span className={`ai-quality-risk ai-quality-risk--${String(row.risk || "").toLowerCase()}`}>
+                      {row.risk || "—"}
+                    </span>
+                  </td>
+                  <td>{row.reviewStatus || "—"}</td>
+                  <td>{row.regressionStatus || "—"}</td>
+                  <td>{row.implementationStatus || "—"}</td>
+                  <td>{row.verificationStatus || "—"}</td>
+                  <td>
+                    {row.linkedBr || "—"}
+                    {row.linkedPr ? ` / ${row.linkedPr}` : ""}
+                  </td>
+                  <td>{row.lastUpdated ? String(row.lastUpdated).slice(0, 10) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       {tab === "regressions" ? (
         <div className="identity-card">
           <h2>Regression library</h2>
@@ -193,7 +287,7 @@ export default function AiQualityPage() {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : tab === "learning" ? null : (
         <div className="identity-card">
           <h2>Cases</h2>
           <table className="ai-quality-table">
@@ -248,6 +342,27 @@ export default function AiQualityPage() {
             <strong>Conversation turns</strong>
             <pre>{JSON.stringify(selected.conversationTurns || [], null, 2)}</pre>
           </div>
+          {selected.learningProposal ? (
+            <div>
+              <strong>Learning proposal</strong>
+              <p>
+                Status {selected.learningProposal.status} · risk {selected.learningProposal.riskLevel}
+                {" · "}implementation unauthorized until explicit action
+              </p>
+              <pre>{JSON.stringify(selected.learningProposal.proposal, null, 2)}</pre>
+            </div>
+          ) : null}
+          {selected.implementationProposal ? (
+            <div>
+              <strong>Implementation proposal</strong>
+              <p>
+                Status {selected.implementationProposal.status}
+                {selected.implementationProposal.authorizedAt
+                  ? ` · authorized ${String(selected.implementationProposal.authorizedAt).slice(0, 10)}`
+                  : " · not authorized"}
+              </p>
+            </div>
+          ) : null}
           <label>
             Review notes
             <textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -259,6 +374,20 @@ export default function AiQualityPage() {
               onChange={(event) => setExpectedIntent(event.target.value)}
             />
           </label>
+          <div className="ai-quality-actions">
+            {LEARNING_ACTIONS.map((item) => (
+              <button key={item.id} type="button" onClick={() => runLearningAction(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="ai-quality-actions">
+            {LEARNING_FOLLOW_UP_ACTIONS.map((item) => (
+              <button key={item.id} type="button" onClick={() => runLearningAction(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
           <div className="ai-quality-actions">
             {REVIEW_ACTIONS.map((item) => (
               <button key={item.id} type="button" onClick={() => runReview(item.id)}>

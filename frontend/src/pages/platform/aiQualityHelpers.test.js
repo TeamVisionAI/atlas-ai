@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  AI_QUALITY_TABS,
+  LEARNING_ACTIONS,
   casesForTab,
   doesNotExposeChainOfThought,
   formatPercent,
@@ -24,6 +26,23 @@ test("helpers format metrics and filter tabs", () => {
   assert.equal(casesForTab(rows, "disagreements").length, 2);
   assert.equal(casesForTab(rows, "attention").length, 1);
   assert.equal(casesForTab(rows, "regressions").length, 1);
+});
+
+test("Learning & Improvements tab is registered", () => {
+  assert.equal(
+    AI_QUALITY_TABS.some((item) => item.id === "learning"),
+    true
+  );
+  assert.equal(
+    LEARNING_ACTIONS.some((item) => item.id === "authorize_implementation"),
+    true
+  );
+  const page = fs.readFileSync(path.join(here, "AiQualityPage.jsx"), "utf8");
+  assert.match(page, /Learning & Improvements/);
+  assert.match(page, /LEARNING_ACTIONS/);
+  assert.match(page, /runLearningAction/);
+  assert.match(page, /Semantic apply stays off/);
+  assert.doesNotMatch(page, /chainOfThought/);
 });
 
 test("case payloads must not expose hidden reasoning", () => {

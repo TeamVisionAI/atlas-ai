@@ -135,6 +135,23 @@ function syntheticCases() {
       label: "HUMAN_REQUIRED followed by attempted automation"
     },
     {
+      id: "qa-appointment-confirm-mismatch",
+      organizationId: SYNTHETIC_ORG,
+      prospectId: null,
+      ownerUserId: null,
+      sourceEngine: SOURCE_ENGINES.RECRUIT_AI_V2,
+      signalType: SIGNAL_TYPES.APPOINTMENT_CONFIRMATION_MISMATCH,
+      status: CASE_STATUSES.NEW,
+      severity: SEVERITIES.HIGH,
+      confidence: 0.93,
+      legacyInterpretation: { intent: "schedule_confirm" },
+      semanticInterpretation: { intent: "schedule_confirm" },
+      knownFactsBefore: { city: "Miami", state: "FL", workAuthorization: true },
+      knownFactsAfter: { city: "Miami", state: "FL", workAuthorization: true },
+      atlasAction: "acknowledge_preference_awaiting_availability",
+      label: "confirmation language without appointment create"
+    },
+    {
       id: "qa-other-tenant",
       organizationId: OTHER_ORG,
       prospectId: null,

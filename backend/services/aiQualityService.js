@@ -6,6 +6,8 @@ const { writeAuditLog } = require("../security/auditLogService");
 const { createSupabaseStore } = require("../repositories/aiQualityRepository");
 const { captureFromSemanticShadow } = require("../core/aiQuality/captureService");
 const { applyReviewAction, computeOverview } = require("../core/aiQuality/reviewService");
+const { applyLearningAction } = require("../core/aiQuality/learningActions");
+const { buildLearningReport } = require("../core/aiQuality/learningReport");
 const { resolvePlatformCaptureConfig, parseMode, clampSampleRate } = require("../core/aiQuality/captureConfig");
 const { AUDIT_ACTIONS, MODES } = require("../core/aiQuality/constants");
 const { supabase } = require("./supabaseService");
@@ -80,11 +82,27 @@ async function getCaseForScope({ caseId, organizationId = null, store, includeTu
   if (organizationId && qualityCase.organizationId !== organizationId) {
     return null;
   }
+  const resolved = getStore(store);
+  const [proposal, implementation, regression] = await Promise.all([
+    resolved.getProposalByCase ? resolved.getProposalByCase(qualityCase.id) : null,
+    resolved.getImplementationByCase ? resolved.getImplementationByCase(qualityCase.id) : null,
+    qualityCase.regressionCandidateId && resolved.getRegression
+      ? resolved.getRegression(qualityCase.regressionCandidateId)
+      : resolved.getRegressionByCase
+        ? resolved.getRegressionByCase(qualityCase.id)
+        : null
+  ]);
+  const withLearning = {
+    ...qualityCase,
+    learningProposal: proposal,
+    implementationProposal: implementation,
+    regression
+  };
   if (!includeTurns) {
-    return qualityCase;
+    return withLearning;
   }
   const turns = await loadConversationTurns(qualityCase.prospectId, qualityCase.organizationId);
-  return { ...qualityCase, conversationTurns: turns };
+  return { ...withLearning, conversationTurns: turns };
 }
 
 async function reviewCase({
@@ -114,6 +132,56 @@ async function reviewCase({
   });
   await writeAuditLog(result.auditEntry);
   return result;
+}
+
+async function applyLearningCaseAction({
+  caseId,
+  organizationId = null,
+  action,
+  notes,
+  expectedBehavior,
+  linkedPr,
+  linkedBr,
+  actorUserId,
+  preAuthorize,
+  skipAuthorization,
+  autoAuthorize,
+  store
+} = {}) {
+  const resolved = getStore(store);
+  const qualityCase = await getCaseForScope({ caseId, organizationId, store: resolved });
+  if (!qualityCase) {
+    const error = new Error("QUALITY_CASE_NOT_FOUND");
+    error.statusCode = 404;
+    error.publicCode = "QUALITY_CASE_NOT_FOUND";
+    throw error;
+  }
+  const result = await applyLearningAction({
+    qualityCase,
+    action,
+    notes,
+    expectedBehavior,
+    linkedPr,
+    linkedBr,
+    actorUserId,
+    preAuthorize,
+    skipAuthorization,
+    autoAuthorize,
+    store: resolved
+  });
+  await writeAuditLog(result.auditEntry);
+  return result;
+}
+
+async function getLearningReportForScope({ organizationId = null, store } = {}) {
+  const resolved = getStore(store);
+  const [cases, proposals, regressions, implementations] = await Promise.all([
+    resolved.listCases({ organizationId }),
+    resolved.listProposals({ organizationId }),
+    resolved.listRegressions({ organizationId }),
+    resolved.listImplementations({ organizationId })
+  ]);
+  return buildLearningReport({ cases, proposals, regressions, implementations });
 }
 
 async function updateTenantParticipation({
@@ -169,6 +237,8 @@ module.exports = {
   listCasesForScope,
   getCaseForScope,
   reviewCase,
+  applyLearningCaseAction,
+  getLearningReportForScope,
   updateTenantParticipation,
   presentPlatformSettings,
   computeOverview,

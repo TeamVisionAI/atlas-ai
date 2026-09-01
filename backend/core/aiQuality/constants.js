@@ -91,8 +91,44 @@ const REVIEW_ACTIONS = Object.freeze({
 
 const REGRESSION_STATUSES = Object.freeze({
   PROPOSED: "proposed",
+  APPROVED: "approved",
   IMPLEMENTED: "implemented",
-  VERIFIED: "verified"
+  VERIFIED: "verified",
+  REJECTED: "rejected"
+});
+
+const PROPOSAL_STATUSES = Object.freeze({
+  GENERATED: "GENERATED",
+  REJECTED: "REJECTED",
+  REVISION_REQUESTED: "REVISION_REQUESTED",
+  REGRESSION_APPROVED: "REGRESSION_APPROVED"
+});
+
+const IMPLEMENTATION_STATUSES = Object.freeze({
+  PROPOSED: "PROPOSED",
+  AUTHORIZED: "AUTHORIZED",
+  REJECTED: "REJECTED",
+  IMPLEMENTED: "IMPLEMENTED",
+  VERIFIED: "VERIFIED"
+});
+
+const LEARNING_ACTIONS = Object.freeze({
+  GENERATE_PROPOSAL: "generate_proposal",
+  REJECT_PROPOSAL: "reject_proposal",
+  REQUEST_REVISION: "request_revision",
+  APPROVE_REGRESSION: "approve_regression",
+  PROPOSE_IMPLEMENTATION: "propose_implementation",
+  AUTHORIZE_IMPLEMENTATION: "authorize_implementation",
+  REJECT_IMPLEMENTATION: "reject_implementation",
+  MARK_IMPLEMENTED: "mark_implemented",
+  MARK_VERIFIED: "mark_verified",
+  REOPEN: "reopen"
+});
+
+const RISK_LEVELS = Object.freeze({
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH"
 });
 
 const AUDIT_ACTIONS = Object.freeze({
@@ -102,8 +138,30 @@ const AUDIT_ACTIONS = Object.freeze({
   EXPECTED_BEHAVIOR_DEFINED: "ai_quality.expected_behavior_defined",
   REGRESSION_PROMOTED: "ai_quality.regression_promoted",
   CASE_IGNORED: "ai_quality.case_ignored",
-  CASE_RESOLVED: "ai_quality.case_resolved"
+  CASE_RESOLVED: "ai_quality.case_resolved",
+  PROPOSAL_GENERATED: "ai_quality.proposal_generated",
+  PROPOSAL_REJECTED: "ai_quality.proposal_rejected",
+  REVISION_REQUESTED: "ai_quality.revision_requested",
+  REGRESSION_APPROVED: "ai_quality.regression_approved",
+  IMPLEMENTATION_PROPOSED: "ai_quality.implementation_proposed",
+  IMPLEMENTATION_AUTHORIZED: "ai_quality.implementation_authorized",
+  IMPLEMENTATION_REJECTED: "ai_quality.implementation_rejected",
+  IMPLEMENTATION_IMPLEMENTED: "ai_quality.implementation_implemented",
+  LEARNING_VERIFIED: "ai_quality.verified",
+  LEARNING_REOPENED: "ai_quality.reopened"
 });
+
+const HIDDEN_REASONING_KEYS = Object.freeze([
+  "chainOfThought",
+  "chain_of_thought",
+  "hiddenReasoning",
+  "hidden_reasoning",
+  "reasoning",
+  "thinking",
+  "scratchpad",
+  "privateAnalysis",
+  "private_analysis"
+]);
 
 const LOW_CONFIDENCE_THRESHOLD = 0.7;
 
@@ -118,6 +176,11 @@ module.exports = {
   SOURCE_ENGINES,
   REVIEW_ACTIONS,
   REGRESSION_STATUSES,
+  PROPOSAL_STATUSES,
+  IMPLEMENTATION_STATUSES,
+  LEARNING_ACTIONS,
+  RISK_LEVELS,
   AUDIT_ACTIONS,
+  HIDDEN_REASONING_KEYS,
   LOW_CONFIDENCE_THRESHOLD
 };
