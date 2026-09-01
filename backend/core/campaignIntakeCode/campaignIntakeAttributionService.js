@@ -37,7 +37,7 @@ function isRecruitingPurpose(match) {
   return upper(match?.purpose) === "RECRUITING";
 }
 
-function evaluateFreshIntakeEpisode({ prospect, workflowState, created }) {
+function evaluateFreshIntakeEpisode({ prospect, workflowState, created, purpose = null } = {}) {
   if (created) {
     return { allowed: true, reason: "NEW_PROSPECT" };
   }
@@ -55,6 +55,11 @@ function evaluateFreshIntakeEpisode({ prospect, workflowState, created }) {
 
   const session = evaluateRecruitingSessionActive({ prospect, workflowState: wf });
   if (session.active) {
+    // BR-208 — IUL review may start on an existing recruiting prospect.
+    // Do not overwrite historical recruiting rows; current session context wins.
+    if (isIulReviewPurpose(purpose)) {
+      return { allowed: true, reason: "IUL_REVIEW_WINS_ACTIVE_RECRUITING_SESSION" };
+    }
     return { allowed: false, reason: "ACTIVE_SESSION_EXISTS" };
   }
 
@@ -136,7 +141,8 @@ function createCampaignIntakeAttributionService(options = {}) {
         const episode = evaluateFreshIntakeEpisode({
           prospect,
           workflowState,
-          created: false
+          created: false,
+          purpose: lookup.purpose
         });
         recruitingEligible = episode.allowed;
       }
@@ -150,7 +156,8 @@ function createCampaignIntakeAttributionService(options = {}) {
         const episode = evaluateFreshIntakeEpisode({
           prospect,
           workflowState,
-          created: false
+          created: false,
+          purpose: lookup.purpose
         });
         iulReviewEligible = episode.allowed;
       }
@@ -182,7 +189,8 @@ function createCampaignIntakeAttributionService(options = {}) {
     const episode = evaluateFreshIntakeEpisode({
       prospect,
       workflowState,
-      created
+      created,
+      purpose: match.purpose
     });
 
     const recruitingEligible =
