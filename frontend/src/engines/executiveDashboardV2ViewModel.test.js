@@ -4,6 +4,7 @@ import {
   buildExecutiveDashboardV2ViewModel,
   buildKpiCards,
   buildPriorities,
+  isInstantInLocalToday,
   AGENDA_LIMIT,
   ACTIVITY_LIMIT
 } from "../engines/executiveDashboardV2ViewModel.js";
@@ -233,4 +234,41 @@ test("zero-state agenda and activity render empty-safe models", () => {
   assert.equal(model.agenda.length, 0);
   assert.equal(model.recentActivity.length, 0);
   assert.equal(model.trend.length, 0);
+});
+
+test("Aug 28 manual agenda item is not in Today's Agenda on Sep 1", () => {
+  const reference = new Date("2026-09-01T15:00:00.000-04:00");
+  assert.equal(
+    isInstantInLocalToday("2026-08-28T15:00:00.000-04:00", "America/New_York", reference),
+    false
+  );
+  assert.equal(
+    isInstantInLocalToday("2026-09-01T10:00:00.000-04:00", "America/New_York", reference),
+    true
+  );
+
+  const model = buildExecutiveDashboardV2ViewModel({
+    executive: {
+      ...executiveFixture,
+      timeZone: "America/New_York",
+      generatedAt: "2026-09-01T15:00:00.000Z",
+      calendar: {
+        appointments: [
+          {
+            phone: "+15550009999",
+            name: "Juanito",
+            time: "2026-08-28T15:00:00.000-04:00",
+            type: "interview",
+            interviewType: "zoom"
+          }
+        ]
+      }
+    },
+    alphaBrief: null,
+    prospects: [],
+    user: null,
+    organizationName: "Team Vision",
+    translate
+  });
+  assert.equal(model.agenda.some((item) => item.name === "Juanito"), false);
 });

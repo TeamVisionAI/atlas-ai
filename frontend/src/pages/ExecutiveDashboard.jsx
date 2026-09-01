@@ -5,7 +5,11 @@ import { useWorkspace } from "../contexts/WorkspaceContext";
 import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
 import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import NewAgendaAppointmentDialog from "../components/agenda/NewAgendaAppointmentDialog";
-import { buildExecutiveDashboardV2ViewModel } from "../engines/executiveDashboardV2ViewModel";
+import {
+  buildExecutiveDashboardV2ViewModel,
+  isInstantInLocalToday
+} from "../engines/executiveDashboardV2ViewModel";
+import { recordAgendaOutcome } from "../services/agendaService";
 import { buildMissionControlPath } from "../engines/executiveFilterEngine";
 import { useExecutiveDashboardV2Data } from "../hooks/useExecutiveDashboardV2Data";
 import {
@@ -81,7 +85,10 @@ function standaloneAgendaItem(appointment, translate, timeZone) {
     status,
     statusLabel,
     phone: appointment.metadata?.agendaContactPhone || appointment.prospectPhone || null,
-    to: "/app/appointments"
+    to: "/app/appointments",
+    standalone: true,
+    appointmentId: appointment.id,
+    canManage: !["completed", "cancelled", "no_show"].includes(String(status))
   };
 }
 
@@ -160,9 +167,10 @@ export default function ExecutiveDashboard() {
 
   const unifiedAgenda = useMemo(() => {
     const base = viewModel?.agenda || [];
-    const standalone = (standaloneAgenda || []).map((appointment) =>
-      standaloneAgendaItem(appointment, translate, executive?.timeZone)
-    );
+    const zone = executive?.timeZone;
+    const standalone = (standaloneAgenda || [])
+      .filter((appointment) => isInstantInLocalToday(appointment.startDateTime, zone))
+      .map((appointment) => standaloneAgendaItem(appointment, translate, zone));
     return [...base, ...standalone]
       .sort((left, right) => Date.parse(left.time || 0) - Date.parse(right.time || 0))
       .slice(0, 5);
@@ -174,6 +182,18 @@ export default function ExecutiveDashboard() {
 
   function openMissionControl(path) {
     navigate(path || buildMissionControlPath());
+  }
+
+  async function handleStandaloneAgendaAction(item, outcome) {
+    if (!item?.appointmentId) {
+      return;
+    }
+    try {
+      await recordAgendaOutcome(item.appointmentId, { outcome });
+      reload();
+    } catch {
+      reload();
+    }
   }
 
   if (controlPlane) {
@@ -239,7 +259,12 @@ export default function ExecutiveDashboard() {
             loading={loadingExecutive}
             onOpen={() => openMissionControl(viewModel?.interviewsToday?.to)}
           />
-          <TodayAgendaCard agenda={unifiedAgenda} loading={loadingExecutive} />
+          <TodayAgendaCard
+            agenda={unifiedAgenda}
+            loading={loadingExecutive}
+            onComplete={(item) => handleStandaloneAgendaAction(item, "completed")}
+            onRemove={(item) => handleStandaloneAgendaAction(item, "cancelled")}
+          />
           <MorningSummaryCard summary={viewModel?.morningSummary} loading={phase < 2} />
         </div>
       </section>

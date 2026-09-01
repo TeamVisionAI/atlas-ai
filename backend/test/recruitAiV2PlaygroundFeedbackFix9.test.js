@@ -76,7 +76,7 @@ function dayPartPendingContext(overrides = {}) {
 }
 
 const OVEREXPLAIN_RE =
-  /asalariado|por hora garantizado|no se requiere experiencia|no experience is required|advisory and distribution|asesor[ií]a y distribuci[oó]n|2-14|2-15|licencia|license course|comisi[oó]n|commission structure/i;
+  /asalariado|por hora garantizado|no se requiere experiencia|no experience is required|advisory and distribution|asesor[ií]a y distribuci[oó]n|2-14|2-15|license course|comisi[oó]n|commission structure/i;
 
 test("1. de que se trata → short overview", () => {
   assert.equal(looksLikeJobOverviewQuestion("de que se trata"), true);
@@ -84,17 +84,16 @@ test("1. de que se trata → short overview", () => {
   const r = turn("de que se trata", dayPartPendingContext());
   assert.equal(r.interpretation.intent, "job_opportunity_question");
   assert.equal(r.interpretation.entities.jobFaqDetailLevel, "overview");
-  assert.match(
-    r.rendered.text,
-    /oportunidad en servicios financieros/i
-  );
+  assert.match(r.rendered.text, /oportunidad en el área de servicios financieros/i);
   assert.doesNotMatch(r.rendered.text, OVEREXPLAIN_RE);
 });
 
-test("2. ¿de qué se trata? → short overview", () => {
+test("2. ¿de qué se trata? → explicit role FAQ then resume", () => {
   const r = turn("¿de qué se trata?", dayPartPendingContext());
   assert.equal(r.interpretation.entities.jobFaqDetailLevel, "overview");
   assert.match(r.rendered.text, /servicios financieros/i);
+  assert.match(r.rendered.text, /ventas de productos financieros/i);
+  assert.match(r.rendered.text, /mañana|tarde/i);
   assert.doesNotMatch(r.rendered.text, OVEREXPLAIN_RE);
 });
 
@@ -113,18 +112,16 @@ test("4. what is this about → short English overview", () => {
     dayPartPendingContext({ preferredLanguage: "english" })
   );
   assert.equal(r.interpretation.entities.jobFaqDetailLevel, "overview");
-  assert.match(
-    r.rendered.text,
-    /opportunity in financial services/i
-  );
-  assert.match(r.rendered.text, /details during the interview/i);
+  assert.match(r.rendered.text, /opportunity in financial services/i);
+  assert.match(r.rendered.text, /selling financial products/i);
+  assert.match(r.rendered.text, /morning|afternoon/i);
   assert.doesNotMatch(r.rendered.text, OVEREXPLAIN_RE);
 });
 
-test("5. short response only — no caveat stack", () => {
+test("5. explicit FAQ resumes pending step — no caveat stack", () => {
   const r = turn("de que se trata", dayPartPendingContext());
-  const text = r.rendered.text;
-  assert.ok(text.length < 220, `expected concise reply, got length ${text.length}: ${text}`);
+  assert.match(r.rendered.text, /ventas de productos financieros/i);
+  assert.match(r.rendered.text, /mañana|tarde/i);
   assert.equal(
     r.structuredDecision.customerReplyPlan.templateKey,
     "job_overview_faq_then_resume"
@@ -151,9 +148,10 @@ test("7. no experience copy unless experience asked", () => {
   assert.doesNotMatch(overview.rendered.text, /no se requiere experiencia|no experience/i);
 });
 
-test("8. no licensing copy unless license asked", () => {
+test("8. overview may mention licenses generally; 2-14/2-15 stay license-FAQ only", () => {
   const overview = turn("de que se trata", dayPartPendingContext());
-  assert.doesNotMatch(overview.rendered.text, /licencia|license|2-14|2-15/i);
+  assert.match(overview.rendered.text, /licencias correspondientes/i);
+  assert.doesNotMatch(overview.rendered.text, /2-14|2-15/i);
   const license = turn("¿Necesito licencia?", dayPartPendingContext());
   assert.equal(license.interpretation.intent, "license_requirement_question");
   assert.match(license.rendered.text, /licencia|license/i);

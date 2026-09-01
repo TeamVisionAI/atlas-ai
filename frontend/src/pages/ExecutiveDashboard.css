@@ -892,6 +892,13 @@
   color: var(--exec-text);
 }
 
+.executive-v2__agenda-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 12px;
+}
+
 .executive-v2__status {
   flex-shrink: 0;
   font-size: 11px;

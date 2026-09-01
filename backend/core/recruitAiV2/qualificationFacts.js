@@ -10,6 +10,7 @@
 const {
   looksLikePuertoRicoOriginStatement
 } = require("./employmentFit");
+const { isBareConversationalYes } = require("../languageLibrary");
 
 const WORK_AUTHORIZATION = Object.freeze({
   AUTHORIZED: "authorized",
@@ -360,7 +361,7 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
   const yesShort =
     pendingAuth &&
     !mentionsLicense(raw) &&
-    (/^(si|yes|yep|yeah|claro|por supuesto)([.!]?)$/i.test(t) ||
+    (isBareConversationalYes(raw) ||
       yesTengoShorthand ||
       (/^(si|yes).{0,40}\b(tengo|have|cuento con)\b/i.test(raw) &&
         mentionsWorkAuthorization(raw)));

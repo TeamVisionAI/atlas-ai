@@ -12,6 +12,7 @@ const { stateDisplayName } = require("./locationFacts");
 const {
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
+  getExplicitJobFaqAnswer,
   getAdLeadFirstTouchMessage,
   getJobOpportunityFaqAnswer,
   getInsuranceFaqAnswer,
@@ -643,17 +644,22 @@ function composeJobOpportunityThenResume(language, entities = {}) {
   );
 }
 
-/** BR-097 — short first-level overview + pending question, no caveat stack. */
+/** BR-097 first-turn short overview; BR-196 explicit job FAQ mid-qualification. */
 function composeJobOverviewThenResume(language, entities = {}) {
   const lang = localeCode(language);
   const firstTouch = getAdLeadFirstTouchMessage(lang, entities);
   if (firstTouch) {
     return firstTouch;
   }
-  const faqText =
-    entities.jobFaqDetailLevel === "company_identity"
-      ? getCanonicalFaqAnswer(lang)
-      : getJobOverviewFaqAnswer(lang);
+  if (entities.jobFaqDetailLevel === "company_identity") {
+    return composeFaqThenResume(getCanonicalFaqAnswer(lang), language, entities, {
+      omitBridge: true
+    });
+  }
+  const midQualification = Boolean(entities.city || entities.state);
+  const faqText = midQualification
+    ? getExplicitJobFaqAnswer(lang)
+    : getJobOverviewFaqAnswer(lang);
   return composeFaqThenResume(faqText, language, entities, { omitBridge: true });
 }
 
@@ -808,12 +814,19 @@ function renderCustomerReply(responsePlan) {
       String(entities.coverage || "").toUpperCase() === "OUTSIDE" ||
       String(entities.preferredMeetingType || "").toLowerCase() === "zoom" ||
       String(entities.meetingType || "").toLowerCase() === "zoom";
-    template = forceZoom
-      ? `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`
-      : `${ack} ${getLocalOfficeDayPartMessage(lang)}`;
+    const resume = forceZoom
+      ? getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)
+      : getLocalOfficeDayPartMessage(lang);
+    // Implements BR-195 — one acknowledgement per inbound (resume already has Excelente/Perfecto).
+    template = /^(perfecto|excelente|perfect|excellent)\b/i.test(String(resume || "").trim())
+      ? resume
+      : `${ack} ${resume}`.trim();
   } else if (key === "outside_zoom_day_part") {
     const ack = language === LANGUAGES.SPANISH ? "Perfecto." : "Perfect.";
-    template = `${ack} ${getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)}`;
+    const resume = getOutsideZoomDayPartMessage(city === "there" ? null : city, lang);
+    template = /^(perfecto|excelente|perfect|excellent)\b/i.test(String(resume || "").trim())
+      ? resume
+      : `${ack} ${resume}`.trim();
   } else if (key === "clarify_license_type") {
     template = getClarifyLicenseTypeMessage(lang);
   } else if (key === "clarify_work_auth_after_license") {

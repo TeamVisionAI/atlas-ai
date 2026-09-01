@@ -57,7 +57,8 @@ function classifySignals({
   inboundText = "",
   context = null,
   interpretation = null,
-  structuredDecision = null
+  structuredDecision = null,
+  execution = null
 } = {}) {
   const signals = [];
   const semantic = observation?.semantic || null;
@@ -119,6 +120,36 @@ function classifySignals({
     !/reschedule|cancel/i.test(String(nextAction))
   ) {
     signals.push({ type: SIGNAL_TYPES.RESCHEDULE_NOT_ACTED, severity: SEVERITIES.HIGH });
+  }
+
+  const templateKey = String(structuredDecision?.customerReplyPlan?.templateKey || "");
+  const intent = String(interpretation?.intent || "");
+  const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+  if (
+    /job_opportunity|opportunity_question/i.test(intent) &&
+    (/safe_uncertain_escalate|human_required/i.test(templateKey) ||
+      (lastQ &&
+        lastQ !== "ask_location" &&
+        /ask_location/i.test(String(nextAction || templateKey))))
+  ) {
+    signals.push({ type: SIGNAL_TYPES.FAQ_INTERRUPT_MISAPPLIED, severity: SEVERITIES.HIGH });
+  }
+  if (
+    (intent === "conversation_clarification_request" ||
+      /disculp|cual dato|which data/i.test(inboundText)) &&
+    /safe_uncertain_escalate|human_required/i.test(`${templateKey} ${nextAction || ""}`)
+  ) {
+    signals.push({ type: SIGNAL_TYPES.PREMATURE_HANDOFF, severity: SEVERITIES.HIGH });
+  }
+  if (
+    (/create_appointment|schedule_confirm/i.test(String(nextAction || intent)) &&
+      templateKey === "acknowledge_preference_awaiting_availability") ||
+    (templateKey === "appointment_confirmed" && execution && execution.success !== true)
+  ) {
+    signals.push({
+      type: SIGNAL_TYPES.APPOINTMENT_CONFIRMATION_MISMATCH,
+      severity: SEVERITIES.HIGH
+    });
   }
 
   const unique = [];

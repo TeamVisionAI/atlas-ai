@@ -65,6 +65,7 @@ const APPOINTMENT_OUTCOMES = Object.freeze({
   CANCELLED: "cancelled",
   NOT_INTERESTED: "not_interested",
   RESCHEDULED: "rescheduled",
+  COMPLETED: "completed",
   OTHER: "other"
 });
 

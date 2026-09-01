@@ -300,6 +300,24 @@ function applyExecutionOutcomeToReply({
   execution
 }) {
   if (!execution?.attempted) {
+    const prematureKey = responsePlan?.templateKey;
+    if (prematureKey === "appointment_confirmed" || prematureKey === "appointment_rescheduled") {
+      const plan = {
+        ...responsePlan,
+        templateKey: "appointment_confirm_deferred"
+      };
+      return {
+        structuredDecision: {
+          ...structuredDecision,
+          customerReplyPlan: {
+            ...structuredDecision.customerReplyPlan,
+            templateKey: "appointment_confirm_deferred"
+          }
+        },
+        responsePlan: plan,
+        rendered: renderCustomerReply(plan)
+      };
+    }
     return { structuredDecision, responsePlan, rendered };
   }
 
@@ -348,11 +366,16 @@ function applyExecutionOutcomeToReply({
   }
 
   const failedType = execution.failed?.[0]?.type || execution.performed?.[0]?.type;
+  const staleUnavailable = /SLOT_STALE|unavailable|stale/i.test(
+    String(execution.failed?.[0]?.reason || execution.reason || "")
+  );
   const failKey =
     failedType === "reschedule_appointment" ||
     structuredDecision?.decision?.nextAction === "reschedule_appointment"
       ? "appointment_reschedule_failed"
-      : "appointment_create_failed";
+      : staleUnavailable
+        ? "offer_alternatives_no_handoff"
+        : "appointment_create_failed";
   const plan = {
     ...responsePlan,
     templateKey: failKey,
@@ -757,6 +780,7 @@ async function processRecruitAiV2Turn({
       context: loaded,
       interpretation,
       structuredDecision,
+      execution,
       env: options.env || process.env
     });
   } catch {

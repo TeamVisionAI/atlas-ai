@@ -96,6 +96,27 @@ function isYes(text) {
   return matchesAny(text, YES_PATTERNS);
 }
 
+/**
+ * Bare conversational yes — pending yes/no questions only.
+ * Courtesy titles ("sí señor") count; "sí soy ciudadano" / "si tengo licencia" do not.
+ * Implements BR-195. Do not use this to invent authorization outside a pending ask.
+ */
+function isBareConversationalYes(text) {
+  const t = toAsciiLower(text)
+    .replace(/[¡!¿?,.;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return false;
+  }
+  if (/\b(tengo|have|permiso|autoriz|licen|ciudadan|residente|papeles)\b/.test(t)) {
+    return false;
+  }
+  return /^(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro( que si)?|por supuesto|correcto|asi es|afirmativo|of course|thats right|that is right|affirmative)(\s+(senor|senora|senorita|senores|sir|maam|ma am|please))?$/.test(
+    t
+  );
+}
+
 function isNo(text) {
   return matchesAny(text, NO_PATTERNS);
 }
@@ -139,6 +160,7 @@ module.exports = {
   UNEMPLOYED_PATTERNS,
   SCHEDULE_CONFIRMATION_PATTERNS,
   isYes,
+  isBareConversationalYes,
   isNo,
   isUnemployed,
   isScheduleConfirmation,

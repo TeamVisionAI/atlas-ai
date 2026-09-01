@@ -132,7 +132,7 @@ export function InterviewsTodayCard({ interviews, loading, onOpen }) {
   );
 }
 
-export function TodayAgendaCard({ agenda = [], loading }) {
+export function TodayAgendaCard({ agenda = [], loading, onComplete, onRemove }) {
   const { translate } = useLanguage();
 
   return (
@@ -141,7 +141,7 @@ export function TodayAgendaCard({ agenda = [], loading }) {
       className="executive-v2__card--agenda"
       loading={loading}
       action={
-        <Link className="executive-v2__link-button" to="/app/mission-control">
+        <Link className="executive-v2__link-button" to="/app/appointments">
           {translate("executiveV2ViewAllAppointments")}
         </Link>
       }
@@ -162,6 +162,27 @@ export function TodayAgendaCard({ agenda = [], loading }) {
                   {item.statusLabel}
                 </span>
               </Link>
+              {item.standalone && item.canManage ? (
+                <div className="executive-v2__agenda-actions">
+                  <Link className="executive-v2__link-button" to="/app/appointments">
+                    {translate("agendaEditItem")}
+                  </Link>
+                  <button
+                    type="button"
+                    className="executive-v2__link-button"
+                    onClick={() => onComplete?.(item)}
+                  >
+                    {translate("agendaMarkComplete")}
+                  </button>
+                  <button
+                    type="button"
+                    className="executive-v2__link-button"
+                    onClick={() => onRemove?.(item)}
+                  >
+                    {translate("agendaRemoveFromAgenda")}
+                  </button>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
