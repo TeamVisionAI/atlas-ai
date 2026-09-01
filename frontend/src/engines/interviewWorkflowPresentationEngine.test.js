@@ -17,6 +17,17 @@ test("resolveInterviewWorkflowUiStateFromInterview maps gate to result pending",
   );
 });
 
+test("recorded FOLLOW_UP_NEEDED outranks a stale result-pending gate", () => {
+  assert.equal(
+    resolveInterviewWorkflowUiStateFromInterview({
+      gateActive: true,
+      outcome: "Follow Up Needed",
+      datetime: "2026-09-01T19:30:00.000Z"
+    }),
+    INTERVIEW_WORKFLOW_UI_STATES.COMPLETED
+  );
+});
+
 test("resolveInterviewWorkflowUiStateFromInterview maps scheduled interview", () => {
   assert.equal(
     resolveInterviewWorkflowUiStateFromInterview({

@@ -6,6 +6,7 @@
 const appointmentRepository = require("../repositories/appointmentRepository");
 const { resolvePersistedAppointmentId, isPersistedAppointment } = require("./appointmentListQuery");
 const { findPersistedAppointmentForProspect } = require("../services/appointmentListService");
+const { hasCanonicalRecordedOutcome } = require("./appointmentOutcomeState");
 
 const ACTIVE_APPOINTMENT_STATUSES = new Set([
   "draft",
@@ -26,6 +27,10 @@ const TERMINAL_APPOINTMENT_LIFECYCLE_STATES = new Set([
 ]);
 
 function isActiveAppointment(appointment = {}) {
+  if (hasCanonicalRecordedOutcome(appointment)) {
+    return false;
+  }
+
   const lifecycleState = appointment.metadata?.lifecycleState;
 
   if (lifecycleState && TERMINAL_APPOINTMENT_LIFECYCLE_STATES.has(lifecycleState)) {

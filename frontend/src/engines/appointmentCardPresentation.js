@@ -4,6 +4,7 @@
  */
 
 import { buildConversationHeaderModel } from "./conversationsCenterPresentation.js";
+import { hasCanonicalRecordedOutcome } from "./appointmentOutcomeState.js";
 
 const TERMINAL_APPOINTMENT_STATUSES = new Set(["cancelled", "completed"]);
 const SYNTHETIC_BSUID_PREFIX = "wa:bsuid:";
@@ -14,6 +15,7 @@ function isTerminalAppointmentStatus(appointment = {}) {
   const lifecycle = String(appointment.metadata?.lifecycleState || "").toLowerCase();
 
   return (
+    hasCanonicalRecordedOutcome(appointment) ||
     TERMINAL_APPOINTMENT_STATUSES.has(status) ||
     lifecycle === "cancelled" ||
     lifecycle === "completed" ||

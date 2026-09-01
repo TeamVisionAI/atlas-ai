@@ -30,6 +30,7 @@ const {
 const {
   listPersistedAppointments
 } = require("../services/appointmentListService");
+const { hasCanonicalRecordedOutcome } = require("./appointmentOutcomeState");
 
 /**
  * Scope appointments to the same prospect set the dashboard already loaded
@@ -47,6 +48,16 @@ function filterAppointmentsForProspects(appointments, prospects) {
   return (appointments || []).filter((appointment) =>
     phones.has(appointment.prospectPhone)
   );
+}
+
+function phonesWithRecordedAppointmentOutcome(appointments = []) {
+  const phones = new Set();
+  for (const appointment of appointments || []) {
+    if (hasCanonicalRecordedOutcome(appointment) && appointment.prospectPhone) {
+      phones.add(appointment.prospectPhone);
+    }
+  }
+  return phones;
 }
 
 const EXECUTIVE_FILTERS = Object.freeze({
@@ -172,17 +183,26 @@ function buildTodayFocus(prospects, queue, context = {}) {
       reference: context.reference || new Date()
     });
 
+  const outcomeCompletePhones = phonesWithRecordedAppointmentOutcome(context.appointments);
+
   const interviewsToday = queue.filter((summary) => {
+    if (outcomeCompletePhones.has(summary.phone)) {
+      return false;
+    }
     const prospect = findProspectByPhone(prospects, summary.phone);
     const at = parseInterviewDatetime(prospect);
     return Boolean(at && isTimestampInWindow(at, todayWindow));
   });
 
-  const pendingOutcomes = queue.filter(
-    (summary) =>
+  const pendingOutcomes = queue.filter((summary) => {
+    if (outcomeCompletePhones.has(summary.phone)) {
+      return false;
+    }
+    return (
       summary.missionControlPriorityTier === "PENDING_INTERVIEW_RESULTS" ||
       summary.canonicalMilestone === MILESTONES.INTERVIEW_RESULT_PENDING
-  );
+    );
+  });
 
   const highPriority = queue.filter(
     (summary) => summary.missionControlPriority <= PRIORITY_TIERS.HUMAN_ESCALATION
@@ -293,7 +313,12 @@ function buildTodayCalendar(prospects, queue, context = {}) {
   const training = [];
   const appointments = [];
 
+  const outcomeCompletePhones = phonesWithRecordedAppointmentOutcome(context.appointments);
+
   queue.forEach((summary) => {
+    if (outcomeCompletePhones.has(summary.phone)) {
+      return;
+    }
     const prospect = findProspectByPhone(prospects, summary.phone);
     const at = parseInterviewDatetime(prospect);
 
@@ -506,14 +531,6 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
     relativePeriod: RELATIVE_PERIODS.YESTERDAY,
     reference
   });
-  const context = {
-    organizationId,
-    reference,
-    todayWindow,
-    weekWindow,
-    yesterdayWindow
-  };
-
   // BR-149 — callers may pass hierarchy-scoped prospects (Team Dashboard); default remains org load.
   const prospects = Array.isArray(options.prospects)
     ? options.prospects
@@ -528,6 +545,15 @@ async function buildExecutiveDashboard(organizationId, options = {}) {
     appointmentList.items || [],
     prospects
   );
+
+  const context = {
+    organizationId,
+    reference,
+    todayWindow,
+    weekWindow,
+    yesterdayWindow,
+    appointments
+  };
 
   const todayFocus = buildTodayFocus(prospects, queue, context);
   const productionSnapshot = buildProductionSnapshot(prospects, queue, context);

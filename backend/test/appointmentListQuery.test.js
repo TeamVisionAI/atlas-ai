@@ -266,6 +266,32 @@ describe("appointmentListQuery", () => {
     );
   });
 
+  it("FOLLOW_UP_NEEDED outcome is completed, not today's unresolved list", () => {
+    const reference = new Date("2026-07-30T12:00:00");
+    const todayFilters = {
+      organizationId: "org-1",
+      agentId: "agent-1",
+      ...resolveAppointmentViewFilters("today", reference)
+    };
+    const completedFilters = {
+      organizationId: "org-1",
+      ...resolveAppointmentViewFilters("completed")
+    };
+    const followUp = {
+      organizationId: "org-1",
+      agentId: "agent-1",
+      status: "scheduled",
+      outcome: "follow_up",
+      startDateTime: "2026-07-30T15:00:00.000Z",
+      metadata: { lifecycleState: "scheduled", standaloneAgenda: true }
+    };
+
+    assert.equal(matchesListFilters(followUp, todayFilters, reference), false);
+    assert.equal(isActiveAppointmentForList(followUp), false);
+    assert.equal(matchesListFilters(followUp, completedFilters), true);
+    assert.equal(isCompletedAppointmentForList(followUp), true);
+  });
+
   it("completed view includes recruited and became_client lifecycle outcomes", () => {
     const completedFilters = {
       organizationId: "org-1",

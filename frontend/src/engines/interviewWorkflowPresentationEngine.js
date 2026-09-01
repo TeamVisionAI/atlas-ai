@@ -8,6 +8,11 @@ import {
   shouldShowLifecycleActions
 } from "./appointmentCardPresentation.js";
 import { resolvePersistedAppointmentId } from "./appointmentIdEngine.js";
+import {
+  hasCanonicalRecordedOutcome,
+  resolveCanonicalAppointmentOutcome,
+  resolveOutcomeCompleteDisplayStatus
+} from "./appointmentOutcomeState.js";
 
 export const INTERVIEW_WORKFLOW_UI_STATES = Object.freeze({
   NONE: "none",
@@ -50,10 +55,6 @@ export function resolveInterviewWorkflowUiStateFromInterview(interview = {}) {
     return INTERVIEW_WORKFLOW_UI_STATES.CANCELLED;
   }
 
-  if (interview.gateActive) {
-    return INTERVIEW_WORKFLOW_UI_STATES.RESULT_PENDING;
-  }
-
   if (interview.outcome) {
     const normalized = String(interview.outcome).toLowerCase();
 
@@ -66,6 +67,10 @@ export function resolveInterviewWorkflowUiStateFromInterview(interview = {}) {
     }
 
     return INTERVIEW_WORKFLOW_UI_STATES.COMPLETED;
+  }
+
+  if (interview.gateActive) {
+    return INTERVIEW_WORKFLOW_UI_STATES.RESULT_PENDING;
   }
 
   if (interview.isPast && interview.datetime) {
@@ -82,6 +87,24 @@ export function resolveInterviewWorkflowUiStateFromInterview(interview = {}) {
 export function resolveInterviewWorkflowUiStateFromAppointment(appointment = {}) {
   const status = String(appointment.status || "").toLowerCase();
   const lifecycle = String(appointment.metadata?.lifecycleState || "").toLowerCase();
+  const recordedStatus = resolveOutcomeCompleteDisplayStatus(appointment);
+
+  if (hasCanonicalRecordedOutcome(appointment) && recordedStatus) {
+    if (recordedStatus === "cancelled") {
+      return INTERVIEW_WORKFLOW_UI_STATES.CANCELLED;
+    }
+    if (recordedStatus === "no_show") {
+      return INTERVIEW_WORKFLOW_UI_STATES.NO_SHOW;
+    }
+    if (recordedStatus === "rescheduled") {
+      return INTERVIEW_WORKFLOW_UI_STATES.RESCHEDULED;
+    }
+    const slug = resolveCanonicalAppointmentOutcome(appointment);
+    if (slug === "follow_up" || slug === "recruited" || slug === "client" || slug === "not_interested" || slug === "completed" || slug === "other") {
+      return INTERVIEW_WORKFLOW_UI_STATES.COMPLETED;
+    }
+    return INTERVIEW_WORKFLOW_UI_STATES.COMPLETED;
+  }
 
   if (status === "cancelled" || lifecycle === "cancelled") {
     return INTERVIEW_WORKFLOW_UI_STATES.CANCELLED;

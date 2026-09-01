@@ -662,7 +662,7 @@ async function getMissionControlWithActions(phone, options = {}) {
         timestamp: null
       }
     ),
-    Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState))
+    Promise.resolve(buildWorkflowGateDescriptor(prospect, agentState, latestAppointment))
   ]);
 
   const interview = buildInterviewBlock(
