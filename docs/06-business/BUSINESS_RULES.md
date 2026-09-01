@@ -3242,6 +3242,29 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-209 — IUL Daypart Availability Recovery + Spanish Daypart Wording
+
+**Implements:** Fix the IUL Zoom daypart step: unambiguous Spanish labels, live availability reads, and no daypart-button loop when a window is empty.  
+**Domain:** IUL Policy Review / scheduling  
+**Depends on:** BR-157, BR-190, BR-208  
+**Related:** BR-107 / BR-108 (rolling availability), BR-164 (daypart windows)  
+**Status:** Implemented — live canary not re-run  
+**Engine target:** `iulAdConversation`; `iulPolicyReviewScheduling`; `schedulingAvailabilityReader`  
+**Tests:** `backend/test/iulDaypartAvailabilityBr209.test.js`
+
+### Rules
+
+1. **Labels** — Visible IUL daypart buttons are “En la mañana” / “En la tarde”. Never use bare “Mañana” as a daypart label. Logical values stay `morning` / `afternoon`.
+2. **Question** — Ask time of day: “¿Qué horario prefiere para su revisión por Zoom?”
+3. **Live read** — Daypart selection uses the shared rolling availability reader (`policy_review`, acting-user `appointmentProfile`). Do not use the fixture-only sync reader in production. Do not fabricate slots.
+4. **Empty daypart** — Search the configured horizon for later matching slots. If none, offer nearest real slots in another daypart and explain. If none exist at all, recoverable `iul_scheduling_unavailable` — no daypart-button loop, no false confirmation.
+5. **Weekend** — If the prospect asked for weekend, search weekend slots in the selected daypart first. If none, offer the nearest real alternative and say so.
+6. **Loop protection** — After a valid daypart answer, persist selected daypart, search attempted, fallback attempted, and last offered slots. Do not re-ask the same daypart question unless the user changes preference or the session is reset.
+7. **FAQ resume** — After interruption, resume the current scheduling stage (offered slots or unavailable), not a fresh daypart ask.
+8. **BR-190** — Create still succeeds before Atlas confirms.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

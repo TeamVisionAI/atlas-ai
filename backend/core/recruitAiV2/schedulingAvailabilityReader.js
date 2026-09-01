@@ -739,6 +739,15 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.PROVIDE_DAY_PART &&
     Boolean(constraints.dayPart || interpretation?.entities?.dayPart);
 
+  // Implements BR-209 — IUL Zoom daypart uses the same live rolling reader.
+  const iulDayPartNeedsSlots =
+    intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART &&
+    Boolean(
+      constraints.dayPart ||
+        interpretation?.entities?.dayPart ||
+        interpretation?.entities?.iulReviewDayPart
+    );
+
   // Implements BR-119 Case D — leave the offered set for later alternatives.
   const laterAlternatives =
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL &&
@@ -760,6 +769,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     !constraints.latestTime &&
     !counterofferNeedsSlots &&
     !dayPartNeedsSlots &&
+    !iulDayPartNeedsSlots &&
     !laterAlternatives &&
     !datedDayPartSearch &&
     !rescheduleDatedSearch
@@ -772,6 +782,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL ||
     intent === INTENTS.REASSERT_KNOWN_FACT ||
     intent === INTENTS.PROVIDE_DAY_PART ||
+    intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART ||
     intent === INTENTS.RESCHEDULE_REQUEST ||
     counterofferNeedsSlots ||
     datedDayPartSearch ||
@@ -786,6 +797,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     Boolean(date) ||
     intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT ||
     dayPartNeedsSlots ||
+    iulDayPartNeedsSlots ||
     counterofferNeedsSlots
   );
 }

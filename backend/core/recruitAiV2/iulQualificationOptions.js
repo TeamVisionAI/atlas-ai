@@ -37,8 +37,8 @@ const IUL_OPTION_LABELS = Object.freeze({
   [IUL_OPTION_IDS.REVIEW_HOW]: "Cómo funciona",
   [IUL_OPTION_IDS.POLICY_IN_HAND_YES]: "Tengo la póliza",
   [IUL_OPTION_IDS.POLICY_IN_HAND_NO]: "No la tengo a mano",
-  [IUL_OPTION_IDS.DAY_MORNING]: "Mañana",
-  [IUL_OPTION_IDS.DAY_AFTERNOON]: "Tarde"
+  [IUL_OPTION_IDS.DAY_MORNING]: "En la mañana",
+  [IUL_OPTION_IDS.DAY_AFTERNOON]: "En la tarde"
 });
 
 /** Titles that fit Meta reply-button 20-char limit. */
@@ -54,8 +54,8 @@ const IUL_BUTTON_TITLES = Object.freeze({
   [IUL_OPTION_IDS.REVIEW_HOW]: "Cómo funciona",
   [IUL_OPTION_IDS.POLICY_IN_HAND_YES]: "Tengo la póliza",
   [IUL_OPTION_IDS.POLICY_IN_HAND_NO]: "No la tengo a mano",
-  [IUL_OPTION_IDS.DAY_MORNING]: "Mañana",
-  [IUL_OPTION_IDS.DAY_AFTERNOON]: "Tarde"
+  [IUL_OPTION_IDS.DAY_MORNING]: "En la mañana",
+  [IUL_OPTION_IDS.DAY_AFTERNOON]: "En la tarde"
 });
 
 function option(id) {

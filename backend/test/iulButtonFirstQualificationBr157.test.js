@@ -163,7 +163,7 @@ test("review-intent selection advances toward scheduling without a hard-coded ti
     rendered.text,
     /Lo ideal es revisar su póliza con usted y explicarle exactamente lo que tiene/
   );
-  assert.match(rendered.text, /¿Qué horario le funciona mejor\?/);
+  assert.match(rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
   assert.doesNotMatch(rendered.text, /10:00|18:00|2099/);
   assert.deepEqual(interactiveIds(decision), [
     IUL_OPTION_IDS.DAY_MORNING,
@@ -200,7 +200,7 @@ test("Otro accepts free text then resumes toward Zoom", () => {
     freeText.decision.contextPatch.knownFacts.iulOtherDetail,
     "Quiero entender los cargos internos"
   );
-  assert.match(freeText.rendered.text, /¿Qué horario le funciona mejor\?/);
+  assert.match(freeText.rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
 });
 
 test("interactive button payloads normalize by ID, not label", () => {
@@ -332,7 +332,7 @@ test("research path answers briefly then continues to the Zoom transition", () =
     ctx
   );
   assert.match(rendered.text, /seguro de vida con valor en efectivo/i);
-  assert.match(rendered.text, /¿Qué horario le funciona mejor\?/);
+  assert.match(rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
   assert.doesNotMatch(rendered.text, /reemplaz|cancel|garantiz|impuesto/i);
   assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY_PART);
 });
@@ -353,7 +353,7 @@ test("unsure + policy in hand goes to Zoom without pretending attachments are in
       knownFacts: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_UNSURE }
     })
   );
-  assert.match(inHand.rendered.text, /¿Qué horario le funciona mejor\?/);
+  assert.match(inHand.rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
   assert.doesNotMatch(inHand.rendered.text, /envíeme|adjunte|subir/i);
 });
 
@@ -420,6 +420,8 @@ test("formal Spanish is consistent in Atlas IUL copy; no tú / tu póliza / te",
     "iul_review_cost_then_continue",
     "iul_review_day_part_ack",
     "iul_offer_review_slots",
+    "iul_offer_nearest_review_slots",
+    "iul_no_review_availability",
     "iul_zero_review_slots"
   ];
   for (const key of keys) {

@@ -1256,7 +1256,12 @@ function decideConversationTurnCore({
     };
   }
 
-  const iulDecision = applyIulAdDecision({ structured, context, interpretation });
+  const iulDecision = applyIulAdDecision({
+    structured,
+    context,
+    interpretation,
+    availability
+  });
   if (iulDecision) {
     return iulDecision;
   }
