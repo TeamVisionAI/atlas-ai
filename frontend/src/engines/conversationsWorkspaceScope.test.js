@@ -60,4 +60,21 @@ test("Conversations page wires My / Team tabs and always sends resolved scope", 
   assert.match(page, /canSeeConversationsTeamProspects/);
   assert.match(page, /workspaceScope,/);
   assert.match(page, /unauthorizedTeam/);
+  assert.match(page, /userId: listUserId/);
+});
+
+test("I) My Prospects cache cannot leak between users in the same org", () => {
+  const service = fs.readFileSync(
+    path.join(here, "../services/conversationsCenterService.js"),
+    "utf8"
+  );
+  const page = fs.readFileSync(path.join(here, "../pages/ConversationsPage.jsx"), "utf8");
+  assert.match(service, /userId \|\| "anon"/);
+  assert.match(service, /userId/);
+  assert.match(page, /userId: listUserId/);
+  assert.match(page, /listUserId/);
+  assert.doesNotMatch(
+    service,
+    /return `\$\{organizationId \|\| "none"\}::\$\{filter\}::\$\{search\}::\$\{view\}::\$\{workspaceScope \|\| "mine"\}`/
+  );
 });

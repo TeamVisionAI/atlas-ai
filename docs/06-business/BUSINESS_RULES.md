@@ -2213,7 +2213,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** Inbound to a user-owned WhatsApp connection is assigned to that user. The personal connection is routing/ownership metadata only — it is not prospect promotion, Conversations inbox membership, or Recruit AI eligibility. Default Conversations My Prospects / Prospect Center lists are `owner_user_id` = signed-in user only.
 **Domain:** WhatsApp inbound / assignment / workspace lists / Recruit AI eligibility
 **Depends on:** BR-080, BR-142, BR-147 (personal workspace), BR-148, BR-159
-**Related:** BR-129 (tenant isolation), BR-149 (team/oversight views)
+**Related:** BR-129 (tenant isolation), BR-149 (team/oversight views), BR-199 (eligibility-first lists)  
 **Status:** Implemented
 **Engine target:** `whatsappInboundOrganizationResolver`, `whatsappProspectResolver`, `newLeadAssignmentEngine`, `atlasInboundAutomationEligibility`, `prospectPromotionEligibility`, `authorizationService.resolveWorkspaceListScope`, `loadProductionProspects`, `whatsappLastInboundAsset`, `conversationsCenterHumanReplyService`, `whatsappSendCredentials`
 **Tests:** `backend/test/personalWhatsAppWorkspaceBr165.test.js`, `backend/test/personalWhatsAppPrivacySurfaces.test.js`, `backend/test/conversationsCenterOwnershipUx.test.js`, `backend/test/conversationsCenterTabExclusivity.test.js`, `frontend/src/engines/conversationsWorkspaceScope.test.js`, `backend/test/atlasInboundAutomationEligibility.test.js`, `backend/test/br080NewLeadAssignmentAttention.test.js`, `backend/test/whatsappSendCredentialsCutoverPin.test.js`, `backend/test/conversationsCenterHumanReplyAssetRouting.test.js`
@@ -3064,6 +3064,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 7. **Learning & Improvements** — Super Admin tab answers “what mistakes did Atlas find, and what improved?” with counts and per-issue lifecycle (signal, tenant, detected count, risk, review/regression/implementation/verification, linked BR/PR).
 8. **Audit** — Persist every learning action with actor user ID and timestamp: proposal generated/rejected, revision requested, regression approved, implementation proposed/authorized/rejected, verified, reopened.
 9. **Boundaries** — Do not enable semantic APPLY, auto-edit Recruit AI behavior/prompts/code, auto-merge, auto-deploy, weaken tenant isolation, store raw WhatsApp bodies, or bypass BR-175 review controls.
+
+---
+
+## BR-199 — Eligibility-first operational prospect views
+
+**Implements:** Conversations, Prospect Center, Mission Control, and dashboard prospect counts filter Atlas lead eligibility/provenance first, then workspace ownership, then status/lifecycle tabs. HUMAN or ATLAS ownership is not enough to make a personal contact a prospect.  
+**Domain:** Conversations / Prospect Center / Mission Control / operational KPIs  
+**Depends on:** BR-142, BR-159, BR-165  
+**Related:** BR-147, BR-193  
+**Status:** Implemented  
+**Engine target:** `atlasInboundAutomationEligibility.evaluatePositiveAtlasLeadProvenance`; `evaluateRecruitingInboxEligibility`; `evaluateOperationalProspectRecord`; `conversationsCenterReadModel`; Conversations list cache identity  
+**Tests:** `backend/test/operationalLeadEligibilityBr199.test.js`; `frontend/src/engines/conversationsWorkspaceScope.test.js`
+
+### Rules
+
+1. **Filter order** — (1) tenant isolation (2) positive Atlas lead provenance (3) workspace ownership (`mine` / oversight) (4) Active / Needs attention / Atlas / Human / Archived / Test. HUMAN is a status filter only after eligibility.
+2. **Personal inbound is not a prospect** — Personal WhatsApp inbound without CTWA / QR / campaign / explicit create / explicit `atlasAutomationEnabled` is excluded from operational views and counts, including HUMAN-owned and ATLAS-state rows. Do not delete the row. Do not reassign `owner_user_id` to hide it.
+3. **Labels are not provenance** — `FACEBOOK` / `CLICK_TO_WHATSAPP` / historical `PERSONAL_WHATSAPP` are not enough. Require `atlasEligibilitySource` in the verified set, stored `ctwa_clid` / referral `source_type=ad`, QR / `car_magnet`, campaign intake, Facebook Lead Ads / Quick Capture / manual create, Meta Ad Destination, or explicit enable.
+4. **UNKNOWN person is not ineligible provenance** — A valid ad/QR/campaign lead whose display name/classification is UNKNOWN remains included.
+5. **Cache identity** — Conversations My Prospects list cache includes the current user id so same-org user switches cannot reuse another user’s mine list. Cache is not a substitute for backend filtering.
+6. **Boundaries** — Do not weaken BR-142 fail-closed auto-reply. Do not change first outbound, WhatsApp routing, tenant isolation, ownership assignment, or AI Quality APPLY.
 
 ---
 

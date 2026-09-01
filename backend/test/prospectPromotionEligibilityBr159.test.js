@@ -54,6 +54,7 @@ function unknownContact(overrides = {}) {
 }
 
 function ctwaProspect(organizationId, overrides = {}) {
+  const { workflow_state: workflowState, ...rest } = overrides;
   return {
     id: "ctwa-1",
     phone: "+17865551002",
@@ -63,8 +64,12 @@ function ctwaProspect(organizationId, overrides = {}) {
     entry_method: WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     current_step: "NEW",
     status: "NEW",
-    prospect_number: overrides.prospect_number,
-    ...overrides
+    prospect_number: rest.prospect_number,
+    workflow_state: {
+      atlasEligibilitySource: "CTWA_REFERRAL",
+      ...(workflowState || {})
+    },
+    ...rest
   };
 }
 
@@ -266,13 +271,13 @@ test("depromoted rows stay off operational surfaces even with leftover NEW statu
   assert.equal(filterProductionProspects([row], { operationalOnly: true }).length, 0);
 });
 
-test("genuine lifecycle evidence is preserved when source labels are missing", () => {
+test("lifecycle progress without provenance is not an operational prospect", () => {
   const scheduled = unknownContact({
     name: "Interviewed",
     current_step: "INTERVIEW_SCHEDULED",
     workflow_state: { canonicalMilestone: "INTERVIEW_SCHEDULED" }
   });
-  assert.equal(isOperationalProspectRecord(scheduled), true);
+  assert.equal(isOperationalProspectRecord(scheduled), false);
 });
 
 test("locateOrCreate logs-only path does not insert an unknown inbound prospect", async () => {
