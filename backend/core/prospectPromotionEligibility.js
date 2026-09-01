@@ -10,7 +10,8 @@ const {
   hasPositiveCtwaReferral,
   hasFreshRecruitingCampaignIntakeMatch,
   hasFreshIulCampaignIntakeMatch,
-  isOrdinaryPersonalWhatsAppContact
+  isOrdinaryPersonalWhatsAppContact,
+  evaluatePositiveAtlasLeadProvenance
 } = require("./atlasInboundAutomationEligibility");
 const {
   evaluateMetaAdDestinationFallback
@@ -22,13 +23,13 @@ const { isIulWorkflowProspect } = require("./iulWorkflowConstants");
 const VERIFIED_PROMOTION_ENTRY_METHODS = Object.freeze(
   new Set([
     WHATSAPP_ENTRY_METHOD.QR,
-    WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
     WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION,
     "QUICK_CAPTURE",
     "MANUAL_CONVERT",
-    "MANUAL_CREATE"
+    "MANUAL_CREATE",
+    "AGENDA_PROMOTION"
   ])
 );
 
@@ -256,19 +257,12 @@ function evaluateOperationalProspectRecord(prospect = null, workflowState = null
     return { operational: true, reason: "EXPLICITLY_ENABLED" };
   }
 
-  if (hasVerifiedEligibilitySource(wf)) {
-    return { operational: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
+  const provenance = evaluatePositiveAtlasLeadProvenance(prospect, wf);
+  if (provenance.eligible) {
+    return { operational: true, reason: provenance.reason };
   }
 
-  if (hasQrStoredOrigin(prospect) || hasVerifiedStoredPromotionOrigin(prospect)) {
-    return { operational: true, reason: "VERIFIED_STORED_ORIGIN" };
-  }
-
-  if (hasGenuineLifecycleEvidence(prospect, wf)) {
-    return { operational: true, reason: "GENUINE_LIFECYCLE_EVIDENCE" };
-  }
-
-  return { operational: false, reason: "NO_VALID_PROMOTION_SIGNAL" };
+  return { operational: false, reason: provenance.reason || "NO_VALID_PROMOTION_SIGNAL" };
 }
 
 function isOperationalProspectRecord(prospect, workflowState = null) {

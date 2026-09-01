@@ -149,8 +149,8 @@ function conversationsTenantKey({ user, supportMode, controlPlane }) {
   return supportMode?.organizationId || user?.organizationId || "none";
 }
 
-function inboxCacheKey(filter, organizationId, workspaceScope = "") {
-  return `${organizationId || "none"}::${filter || "active"}::::summary::${workspaceScope || "mine"}`;
+function inboxCacheKey(filter, organizationId, workspaceScope = "", userId = "") {
+  return `${organizationId || "none"}::${userId || "anon"}::${filter || "active"}::::summary::${workspaceScope || "mine"}`;
 }
 
 function ConversationListSkeleton() {
@@ -245,11 +245,12 @@ export default function ConversationsPage() {
   });
   const workspaceScope = workspaceTab.workspaceScope;
 
+  const listUserId = user?.id || user?.userId || "";
   const [payload, setPayload] = useState(() =>
-    readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope))
+    readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope, listUserId))
   );
   const [listLoading, setListLoading] = useState(
-    () => !readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope))
+    () => !readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope, listUserId))
   );
   const [listError, setListError] = useState(null);
   const [error, setError] = useState(null);
@@ -281,7 +282,7 @@ export default function ConversationsPage() {
       setListError(null);
       return;
     }
-    const cacheKey = inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope);
+    const cacheKey = inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope, listUserId);
     if (!quiet && !payload) {
       const cached = readConversationsListCache(cacheKey);
       if (cached) {
@@ -306,6 +307,7 @@ export default function ConversationsPage() {
         filter: activeFilter,
         view: "summary",
         workspaceScope,
+        userId: listUserId,
         force
       });
       setPayload(data);
@@ -344,7 +346,7 @@ export default function ConversationsPage() {
         setListLoading(false);
       }
     }
-  }, [activeFilter, workspaceScope, translate, controlPlane, tenantCacheKey]);
+  }, [activeFilter, workspaceScope, translate, controlPlane, tenantCacheKey, listUserId]);
   loadListRef.current = loadList;
 
   useEffect(() => {

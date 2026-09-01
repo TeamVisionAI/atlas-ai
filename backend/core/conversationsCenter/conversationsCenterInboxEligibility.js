@@ -7,17 +7,17 @@
 const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("../whatsappConstants");
 const { loadPersistedWorkflowState } = require("../workflowStateStore");
 const {
-  VERIFIED_SOURCE_SET,
-  isOrdinaryPersonalWhatsAppContact
+  evaluatePositiveAtlasLeadProvenance,
+  isOrdinaryPersonalWhatsAppContact,
+  VERIFIED_SOURCE_SET
 } = require("../atlasInboundAutomationEligibility");
 
 const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
   new Set([
     WHATSAPP_ENTRY_METHOD.QR,
-    // Written only when webhook carried positive CTWA referral at create (BR-142).
-    WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP,
     WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS,
     WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE,
+    WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION,
     "QUICK_CAPTURE"
   ])
 );
@@ -64,29 +64,17 @@ function evaluateRecruitingInboxEligibility(prospect = null, workflowState = nul
 
   const wf = workflowState || resolveEmbeddedWorkflowState(prospect);
 
-  // Implements BR-159 / BR-165 — ordinary personal WhatsApp contacts stay out of Conversations.
+  // Implements BR-159 / BR-165 / BR-199 — personal inbound is not a prospect.
   if (isOrdinaryPersonalWhatsAppContact(prospect, wf)) {
     return { eligible: false, reason: "PERSONAL_WHATSAPP_NOT_ELIGIBLE" };
   }
 
-  if (wf.atlasAutomationEnabled === true) {
-    return { eligible: true, reason: "EXPLICITLY_ENABLED" };
+  const provenance = evaluatePositiveAtlasLeadProvenance(prospect, wf);
+  if (provenance.eligible) {
+    return provenance;
   }
 
-  const storedProof = upper(wf.atlasEligibilitySource);
-  if (VERIFIED_SOURCE_SET.has(storedProof)) {
-    return { eligible: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
-  }
-
-  if (hasQrStoredOrigin(prospect)) {
-    return { eligible: true, reason: "QR_ATTRIBUTION" };
-  }
-
-  if (hasVerifiedStoredIntakeOrigin(prospect)) {
-    return { eligible: true, reason: "VERIFIED_STORED_ORIGIN" };
-  }
-
-  return { eligible: false, reason: "NOT_RECRUITING_ORIGIN" };
+  return { eligible: false, reason: provenance.reason || "NOT_RECRUITING_ORIGIN" };
 }
 
 function isRecruitingConversationEligibleForInbox(prospect, workflowState = null) {

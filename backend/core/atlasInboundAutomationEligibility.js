@@ -70,22 +70,98 @@ function isPersonalWhatsAppOriginMarker(prospect = {}, workflowState = {}) {
   );
 }
 
-function hasAtlasBusinessEligibilityEvidence(prospect = {}, workflowState = {}) {
+function readStoredCtwaReferral(prospect = {}, workflowState = {}) {
+  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  const meta = prospect?.metadata && typeof prospect.metadata === "object" ? prospect.metadata : {};
+  return (
+    wf.ctwaReferral ||
+    wf.referral ||
+    meta.ctwaReferral ||
+    meta.referral ||
+    prospect.ctwaReferral ||
+    prospect.referral ||
+    null
+  );
+}
+
+function hasStoredCtwaProvenance(prospect = {}, workflowState = {}) {
+  const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
+  const source = upper(wf.atlasEligibilitySource);
+  if (
+    source === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL ||
+    source === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION
+  ) {
+    return true;
+  }
+  const clid =
+    prospect.ctwa_clid ||
+    prospect.ctwaClid ||
+    wf.ctwa_clid ||
+    wf.ctwaClid ||
+    prospect.metadata?.ctwa_clid ||
+    prospect.metadata?.ctwaClid;
+  if (String(clid || "").trim()) {
+    return true;
+  }
+  return hasPositiveCtwaReferral(readStoredCtwaReferral(prospect, wf));
+}
+
+/**
+ * BR-142 / BR-165 / BR-199 — positive Atlas lead provenance for operational views.
+ * FACEBOOK / CLICK_TO_WHATSAPP labels, HUMAN/ATLAS ownership, and lifecycle
+ * progress are not provenance.
+ */
+function evaluatePositiveAtlasLeadProvenance(prospect = {}, workflowState = {}) {
+  if (!prospect) {
+    return { eligible: false, reason: "MISSING_PROSPECT" };
+  }
   const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
   if (wf.atlasAutomationEnabled === true) {
-    return true;
+    return { eligible: true, reason: "EXPLICITLY_ENABLED" };
   }
   if (VERIFIED_SOURCE_SET.has(upper(wf.atlasEligibilitySource))) {
-    return true;
+    return { eligible: true, reason: "VERIFIED_ELIGIBILITY_SOURCE" };
   }
   if (hasQrOrigin({ prospect })) {
-    return true;
+    return { eligible: true, reason: "QR_ATTRIBUTION" };
   }
-  const entry = upper(prospect?.entry_method);
-  return (
-    entry === WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP ||
-    hasVerifiedStoredIntakeOrigin(prospect)
-  );
+  const entry = upper(prospect.entry_method);
+  const source = upper(prospect.source);
+  if (
+    entry === WHATSAPP_ENTRY_METHOD.CAMPAIGN_INTAKE_CODE ||
+    source === upper(WHATSAPP_SOURCE.CAMPAIGN_INTAKE)
+  ) {
+    return { eligible: true, reason: "CAMPAIGN_INTAKE" };
+  }
+  if (entry === WHATSAPP_ENTRY_METHOD.FACEBOOK_LEAD_ADS || entry === "FACEBOOK_LEAD") {
+    return { eligible: true, reason: "FACEBOOK_LEAD_ADS" };
+  }
+  if (entry === WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION) {
+    return { eligible: true, reason: "META_AD_DESTINATION" };
+  }
+  if (
+    entry === "QUICK_CAPTURE" ||
+    entry === "MANUAL_CREATE" ||
+    entry === "MANUAL_CONVERT" ||
+    entry === "AGENDA_PROMOTION"
+  ) {
+    return { eligible: true, reason: "EXPLICIT_PROSPECT_CREATE" };
+  }
+  if (hasStoredCtwaProvenance(prospect, wf)) {
+    return { eligible: true, reason: "CTWA_PROVENANCE" };
+  }
+  if (isIulWorkflowProspect(wf, {})) {
+    return { eligible: true, reason: "IUL_CAMPAIGN_WORKFLOW" };
+  }
+  return { eligible: false, reason: "NO_POSITIVE_LEAD_PROVENANCE" };
+}
+
+function hasPositiveAtlasLeadProvenance(prospect = {}, workflowState = {}) {
+  return evaluatePositiveAtlasLeadProvenance(prospect, workflowState).eligible;
+}
+
+function hasAtlasBusinessEligibilityEvidence(prospect = {}, workflowState = {}) {
+  return hasPositiveAtlasLeadProvenance(prospect, workflowState);
 }
 
 /** Personal connection / historical PERSONAL_WHATSAPP marker without a real Atlas origin. */
@@ -445,6 +521,9 @@ module.exports = {
   isPersonalWhatsAppOriginMarker,
   hasAtlasBusinessEligibilityEvidence,
   isOrdinaryPersonalWhatsAppContact,
+  hasStoredCtwaProvenance,
+  evaluatePositiveAtlasLeadProvenance,
+  hasPositiveAtlasLeadProvenance,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
   VERIFIED_SOURCE_SET
 };

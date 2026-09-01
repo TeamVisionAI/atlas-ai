@@ -43,9 +43,10 @@ function listCacheKey({
   filter = "active",
   search = "",
   view = "summary",
-  workspaceScope = ""
+  workspaceScope = "",
+  userId = ""
 } = {}) {
-  return `${organizationId || "none"}::${filter}::${search}::${view}::${workspaceScope || "mine"}`;
+  return `${organizationId || "none"}::${userId || "anon"}::${filter}::${search}::${view}::${workspaceScope || "mine"}`;
 }
 
 export function conversationsListCacheKey(options = {}) {
@@ -94,9 +95,17 @@ export async function getConversations({
   search = "",
   view = "summary",
   workspaceScope = "",
+  userId = "",
   force = false
 } = {}) {
-  const cacheKey = listCacheKey({ organizationId, filter, search, view, workspaceScope });
+  const cacheKey = listCacheKey({
+    organizationId,
+    filter,
+    search,
+    view,
+    workspaceScope,
+    userId
+  });
 
   if (!force) {
     const cached = readConversationsListCache(cacheKey);

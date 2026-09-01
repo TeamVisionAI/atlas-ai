@@ -134,7 +134,7 @@ test("evaluateRecruitingInboxEligibility: UNKNOWN + UNATTRIBUTED => not eligible
     {}
   );
   assert.equal(result.eligible, false);
-  assert.equal(result.reason, "NOT_RECRUITING_ORIGIN");
+  assert.equal(result.reason, "NO_POSITIVE_LEAD_PROVENANCE");
 });
 
 test("evaluateRecruitingInboxEligibility: durable atlasEligibilitySource QR => eligible", () => {
@@ -166,7 +166,7 @@ test("evaluateRecruitingInboxEligibility: stored entry_method QR => eligible", (
   assert.equal(result.reason, "QR_ATTRIBUTION");
 });
 
-test("evaluateRecruitingInboxEligibility: stored entry_method CLICK_TO_WHATSAPP => eligible", () => {
+test("evaluateRecruitingInboxEligibility: CLICK_TO_WHATSAPP label alone is not eligible", () => {
   const {
     evaluateRecruitingInboxEligibility
   } = require("../core/conversationsCenter/conversationsCenterInboxEligibility");
@@ -179,8 +179,8 @@ test("evaluateRecruitingInboxEligibility: stored entry_method CLICK_TO_WHATSAPP 
     }),
     {}
   );
-  assert.equal(result.eligible, true);
-  assert.equal(result.reason, "VERIFIED_STORED_ORIGIN");
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "NO_POSITIVE_LEAD_PROVENANCE");
 });
 
 test("evaluateRecruitingInboxEligibility: CTWA durable source => eligible", () => {

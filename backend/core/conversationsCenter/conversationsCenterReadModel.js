@@ -429,21 +429,13 @@ async function buildConversationsCenterReadModel(options = {}) {
 
   const useEmbeddedWorkflow = !options.prospects;
 
-  const tenantScoped = prospects.filter((prospect) => {
-    if (!isProspectInConversationsTenantScope(prospect, organizationId)) {
-      return false;
-    }
-    if (!authContext) {
-      return true;
-    }
-    if (listScope) {
-      return isProspectInWorkspaceListScope(prospect, listScope);
-    }
-    return isProspectInConversationsUserScope(prospect, organizationId, authContext);
-  });
-  const scoped = (
+  const tenantOnly = prospects.filter((prospect) =>
+    isProspectInConversationsTenantScope(prospect, organizationId)
+  );
+  // BR-199 — eligibility/provenance first, then workspace ownership, then tabs.
+  const eligible = (
     await Promise.all(
-      tenantScoped.map(async (prospect) => {
+      tenantOnly.map(async (prospect) => {
         if (useEmbeddedWorkflow) {
           const workflowState = workflowStateFromProspectRow(prospect);
           return evaluateRecruitingInboxEligibility(prospect, workflowState).eligible
@@ -456,6 +448,15 @@ async function buildConversationsCenterReadModel(options = {}) {
       })
     )
   ).filter(Boolean);
+  const scoped = eligible.filter((prospect) => {
+    if (!authContext) {
+      return true;
+    }
+    if (listScope) {
+      return isProspectInWorkspaceListScope(prospect, listScope);
+    }
+    return isProspectInConversationsUserScope(prospect, organizationId, authContext);
+  });
   const injectedLogs =
     options.conversationLogsByPhone !== undefined
       ? options.conversationLogsByPhone
