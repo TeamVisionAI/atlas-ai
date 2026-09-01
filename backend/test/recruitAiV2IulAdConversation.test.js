@@ -129,7 +129,7 @@ test("day-part answer captures window and proposes review scheduling", () => {
   });
   const { decision, interpretation } = renderTurn("en la tarde/noche", ctx);
   assert.equal(interpretation.intent, INTENTS.IUL_CHOOSE_REVIEW_DAY_PART);
-  assert.equal(decision.contextPatch.knownFacts.reviewPreferredDayPart, "evening");
+  assert.equal(decision.contextPatch.knownFacts.reviewPreferredDayPart, "afternoon");
   assert.equal(decision.decision.nextAction, "iul_offer_review_slots");
 });
 

@@ -235,7 +235,7 @@ test("SCHEDULING 12-14: enough facts transitions to Zoom scheduling ask", () => 
   assert.match(rendered.text, /revisar su póliza|horario le funciona/i);
   assert.match(
     decision.customerReplyPlan.entities.interactiveFallbackText || rendered.text,
-    /Mañana|Tarde/i
+    /En la mañana|En la tarde/i
   );
   assert.equal(
     decision.contextPatch.knownFacts.reviewMeetingType || decision.contextPatch.knownFacts.reviewMeetingType,

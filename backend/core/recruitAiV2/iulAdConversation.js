@@ -19,7 +19,10 @@ const {
 } = require("./iulDiscoveryFacts");
 const {
   readPolicyReviewAvailabilitySync,
-  READ_STATUS
+  READ_STATUS,
+  normalizeIulDayPart,
+  dayPartConstraints,
+  enrichIulDaypartAvailability
 } = require("./iulPolicyReviewScheduling");
 const { IUL_STAGES, IUL_REVIEW_MEETING_TYPE } = require("../iulWorkflowConstants");
 const {
@@ -41,6 +44,7 @@ const ASK = Object.freeze({
   SCHEDULING_DAY_PART: "iul_ask_scheduling_day_part",
   OFFER_SLOTS: "iul_offer_review_slots",
   CONFIRM_SLOT: "iul_confirm_review_slot",
+  SCHEDULING_UNAVAILABLE: "iul_scheduling_unavailable",
   /** Legacy keys kept for in-flight threads */
   POLICY_ACTIVE: "iul_ask_policy_active",
   REVIEW_TOPIC: "iul_ask_review_topic",
@@ -232,16 +236,26 @@ function looksLikeReviewCostQuestion(text) {
   );
 }
 
+function looksLikeWeekendPreference(text) {
+  const t = fold(text);
+  return (
+    /\bfin de semana\b/.test(t) ||
+    /\bfinde\b/.test(t) ||
+    /\bsabado\b/.test(t) ||
+    /\bdomingo\b/.test(t) ||
+    /\bweekend\b/.test(t) ||
+    /\bsaturday\b/.test(t) ||
+    /\bsunday\b/.test(t)
+  );
+}
+
 function parseIulReviewDayPart(text) {
   const t = fold(text);
-  if (
-    /\btarde\b/.test(t) ||
-    /\bnoche\b/.test(t) ||
-    /\bafternoon\b/.test(t) ||
-    /\bevening\b/.test(t) ||
-    /\bnight\b/.test(t)
-  ) {
+  if (/\bnoche\b/.test(t) || /\bevening\b/.test(t) || /\bnight\b/.test(t)) {
     return "evening";
+  }
+  if (/\btarde\b/.test(t) || /\bafternoon\b/.test(t)) {
+    return "afternoon";
   }
   if (
     /\bdia\b/.test(t) ||
@@ -250,9 +264,79 @@ function parseIulReviewDayPart(text) {
     /\bduring the day\b/.test(t) ||
     /\bdaytime\b/.test(t)
   ) {
-    return "day";
+    return "morning";
   }
   return null;
+}
+
+function formatIulClock(timeKey) {
+  const [hRaw, mRaw] = String(timeKey || "").split(":");
+  const hour = Number(hRaw);
+  const minute = Number(mRaw || 0);
+  if (!Number.isFinite(hour)) {
+    return String(timeKey || "");
+  }
+  const meridiem = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${meridiem}`;
+}
+
+function formatIulSlotLine(slot, language) {
+  const { WEEKDAY_LABELS } = require("./dateResolution");
+  const dateKey = String(slot?.date || slot?.dateKey || "");
+  const time = formatIulClock(slot?.time || slot?.timeKey);
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const weekdayIndex = y && m && d ? new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).getUTCDay() : null;
+  const weekday =
+    weekdayIndex == null
+      ? ""
+      : language === LANGUAGES.ENGLISH
+        ? WEEKDAY_LABELS.en[weekdayIndex]
+        : WEEKDAY_LABELS.es[weekdayIndex];
+  if (!weekday) {
+    return time;
+  }
+  return language === LANGUAGES.ENGLISH ? `${weekday} ${time}` : `${weekday} ${time}`;
+}
+
+function formatIulSlotLines(slots, language) {
+  return (slots || [])
+    .map((slot) => formatIulSlotLine(slot, language))
+    .filter(Boolean)
+    .map((line) => `- ${line}`)
+    .join("\n");
+}
+
+function iulDayPartEntities(dayPart, { preferredWeekend = false } = {}) {
+  const part = normalizeIulDayPart(dayPart);
+  const constraints = dayPartConstraints(part);
+  return {
+    dayPart: part,
+    iulReviewDayPart: part,
+    reviewPreferredDayPart: part,
+    preferredDayPart: part,
+    availabilityConstraint: constraints.dayPart
+      ? {
+          type: "day_part",
+          dayPart: constraints.dayPart,
+          earliestTime: constraints.earliestTime || null,
+          latestTime: constraints.latestTime || null
+        }
+      : null,
+    preferredWeekend: preferredWeekend || undefined
+  };
+}
+
+function dayPartPhrase(dayPart, language) {
+  const part = normalizeIulDayPart(dayPart);
+  if (language === LANGUAGES.ENGLISH || language === "en") {
+    if (part === "afternoon") return "afternoon";
+    if (part === "evening") return "evening";
+    return "morning";
+  }
+  if (part === "afternoon") return "en la tarde";
+  if (part === "evening") return "en la noche";
+  return "en la mañana";
 }
 
 function parseOfferedSlotSelection(text, context) {
@@ -424,19 +508,20 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
   }
 
   if (lastAsk === ASK.SCHEDULING_DAY_PART || lastAsk === ASK.REVIEW_DAY_PART) {
+    const weekend = looksLikeWeekendPreference(text);
     const day = matchQualificationInput("dayPart", { text, interactiveReply });
     if (day?.id === IUL_OPTION_IDS.DAY_MORNING) {
       return {
         intent: INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
         confidence: 0.95,
-        entities: { iulReviewDayPart: "day", reviewPreferredDayPart: "day" }
+        entities: iulDayPartEntities("morning", { preferredWeekend: weekend })
       };
     }
     if (day?.id === IUL_OPTION_IDS.DAY_AFTERNOON) {
       return {
         intent: INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
         confidence: 0.95,
-        entities: { iulReviewDayPart: "evening", reviewPreferredDayPart: "evening" }
+        entities: iulDayPartEntities("afternoon", { preferredWeekend: weekend })
       };
     }
   }
@@ -489,7 +574,9 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
       return {
         intent: INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
         confidence: 0.93,
-        entities: { iulReviewDayPart: dayPart, reviewPreferredDayPart: dayPart }
+        entities: iulDayPartEntities(dayPart, {
+          preferredWeekend: looksLikeWeekendPreference(text)
+        })
       };
     }
   }
@@ -651,8 +738,8 @@ function copy(language) {
       ? "¿Tiene a mano una ilustración reciente, estado de cuenta o resumen de la póliza?"
       : "Do you have a recent illustration, statement, or policy summary handy?",
     schedulingTransition: es
-      ? "Gracias. Con eso ya tengo una mejor idea. Lo ideal es revisar su póliza con usted y explicarle exactamente lo que tiene. ¿Qué horario le funciona mejor?"
-      : "Thank you. That gives me a better idea. The best next step is to review your policy with you and explain exactly what you have. What time of day works best?",
+      ? "Gracias. Con eso ya tengo una mejor idea. Lo ideal es revisar su póliza con usted y explicarle exactamente lo que tiene. ¿Qué horario prefiere para su revisión por Zoom?"
+      : "Thank you. That gives me a better idea. The best next step is to review your policy with you and explain exactly what you have. What time of day do you prefer for your Zoom review?",
     policyIsBadSafe: es
       ? "Eso no se puede determinar correctamente sin revisar los detalles de la póliza. Podemos verla con usted y explicarle cómo está funcionando."
       : "That can't be determined correctly without reviewing the policy details. We can look at it with you and explain how it's working.",
@@ -680,6 +767,15 @@ function copy(language) {
     offerSlots: es
       ? "Tengo estos horarios disponibles para la revisión por Zoom. ¿Cuál le funciona mejor?"
       : "I have these times available for the Zoom review. Which works best for you?",
+    nearestDaypart: es
+      ? "No tengo disponibilidad {dayPartPhrase} en los próximos días. Tengo disponibilidad:"
+      : "I don't have {dayPartPhrase} availability in the coming days. I do have:",
+    nearestWeekend: es
+      ? "No tengo disponibilidad de fin de semana {dayPartPhrase}. Tengo estos horarios:"
+      : "I don't have weekend {dayPartPhrase} availability. I do have these times:",
+    noAvailability: es
+      ? "Por ahora no tengo horarios disponibles para la revisión por Zoom. Un asesor le contactará para coordinar."
+      : "I don't have Zoom review times available right now. An advisor will contact you to coordinate.",
     zeroSlots: es
       ? "Por ahora no veo un horario disponible en ese rango. ¿Le funciona mejor otro día u horario?"
       : "I don't see an available time in that range right now. Would another day or time work better?",
@@ -726,14 +822,27 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_review_cost_then_continue: `${c.cost} ${c.schedulingTransition}`,
     iul_review_day_part_ack: c.dayPartAck,
     iul_offer_review_slots: c.offerSlots,
+    iul_offer_nearest_review_slots: c.nearestDaypart,
+    iul_offer_weekend_fallback_slots: c.nearestWeekend,
     iul_zero_review_slots: c.zeroSlots,
+    iul_no_review_availability: c.noAvailability,
     iul_confirm_review_deferred: c.confirmDeferred,
     iul_clarify_policy_type: c.clarify
   };
-  return String(map[templateKey] || c.qualificationAsk).replace(
-    /\{firstNameGreeting\}/g,
-    firstNameGreeting
-  );
+  const phrase = dayPartPhrase(entities.fallbackDayPart || entities.dayPart, language);
+  const slotLines = formatIulSlotLines(entities.offeredSlots, language);
+  let text = String(map[templateKey] || c.qualificationAsk)
+    .replace(/\{firstNameGreeting\}/g, firstNameGreeting)
+    .replace(/\{dayPartPhrase\}/g, phrase);
+  if (
+    slotLines &&
+    (templateKey === "iul_offer_review_slots" ||
+      templateKey === "iul_offer_nearest_review_slots" ||
+      templateKey === "iul_offer_weekend_fallback_slots")
+  ) {
+    text = `${text}\n${slotLines}`;
+  }
+  return text;
 }
 
 function iulContextPatch(context, {
@@ -828,9 +937,15 @@ function finishIulDecision(structured, context, {
   });
   const firstName = resolveIulFirstName(context);
   const catalog = interactiveCatalogForAsk(lastQuestionAsked);
-  const body = renderIulAdReply(templateKey, structured.preferredLanguage, { firstName });
+  const priorEntities = structured.customerReplyPlan.entities || {};
+  const body = renderIulAdReply(templateKey, structured.preferredLanguage, {
+    firstName,
+    offeredSlots: priorEntities.offeredSlots,
+    fallbackDayPart: priorEntities.fallbackDayPart,
+    dayPart: priorEntities.dayPart
+  });
   structured.customerReplyPlan.entities = {
-    ...(structured.customerReplyPlan.entities || {}),
+    ...priorEntities,
     firstName
   };
   if (catalog) {
@@ -872,7 +987,9 @@ function discoveryTemplateForAsk(ask) {
     [ASK.POLICY_AGE]: "iul_ask_policy_age",
     [ASK.REVIEW_REASON]: "iul_ask_review_reason",
     [ASK.DOCUMENTS]: "iul_ask_documents",
-    [ASK.SCHEDULING_DAY_PART]: "iul_scheduling_transition"
+    [ASK.SCHEDULING_DAY_PART]: "iul_scheduling_transition",
+    [ASK.OFFER_SLOTS]: "iul_offer_review_slots",
+    [ASK.SCHEDULING_UNAVAILABLE]: "iul_no_review_availability"
   };
   return map[ask] || "iul_ad_opener";
 }
@@ -886,7 +1003,9 @@ function discoveryNextActionForAsk(ask) {
     [ASK.POLICY_AGE]: NEXT_ACTIONS.IUL_ASK_POLICY_AGE,
     [ASK.REVIEW_REASON]: NEXT_ACTIONS.IUL_ASK_REVIEW_REASON,
     [ASK.DOCUMENTS]: NEXT_ACTIONS.IUL_ASK_DOCUMENTS,
-    [ASK.SCHEDULING_DAY_PART]: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE
+    [ASK.SCHEDULING_DAY_PART]: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+    [ASK.OFFER_SLOTS]: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+    [ASK.SCHEDULING_UNAVAILABLE]: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE
   };
   return map[ask] || NEXT_ACTIONS.IUL_ASK_POLICY_TYPE;
 }
@@ -922,7 +1041,50 @@ function advanceDiscovery(structured, context, {
   });
 }
 
-function applySlotOfferDecision(structured, context, availability) {
+function resolveIulSchedulingResume(context = {}) {
+  const facts = context.knownFacts || {};
+  const offered = context.appointment?.previouslyOfferedSlots || [];
+  if (offered.length && (facts.iulDaypartSearchAttempted || facts.iulSelectedDayPart)) {
+    return {
+      ask: ASK.OFFER_SLOTS,
+      templateKey: facts.iulDaypartFallbackAttempted
+        ? "iul_offer_nearest_review_slots"
+        : "iul_offer_review_slots",
+      nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS
+    };
+  }
+  if (facts.iulSchedulingUnavailable) {
+    return {
+      ask: ASK.SCHEDULING_UNAVAILABLE,
+      templateKey: "iul_no_review_availability",
+      nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE
+    };
+  }
+  return {
+    ask: ASK.SCHEDULING_DAY_PART,
+    templateKey: "iul_scheduling_transition",
+    nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE
+  };
+}
+
+function resumeIulAfterFaq(structured, context, { templateKey, reasonCodes }) {
+  const resume = resolveIulSchedulingResume(context);
+  if (resume.ask === ASK.OFFER_SLOTS) {
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      offeredSlots: context.appointment?.previouslyOfferedSlots || [],
+      fallbackDayPart: context.knownFacts?.iulSelectedDayPart || null
+    };
+  }
+  return finishIulDecision(structured, context, {
+    templateKey,
+    nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
+    lastQuestionAsked: resume.ask,
+    reasonCodes
+  });
+}
+
+function applySlotOfferDecision(structured, context, availability, extras = {}) {
   const offered =
     availability?.offeredSlots ||
     availability?.nearestAlternatives ||
@@ -932,26 +1094,47 @@ function applySlotOfferDecision(structured, context, availability) {
     availability?.status ||
     availability?.readResult?.status ||
     null;
+  const dayPart = extras.dayPart || context.knownFacts?.iulSelectedDayPart || null;
+  const preferredWeekend = extras.preferredWeekend === true;
+  const searchFacts = {
+    iulSelectedDayPart: dayPart,
+    reviewPreferredDayPart: dayPart,
+    preferredDayPart: dayPart,
+    preferredWeekend: preferredWeekend || context.knownFacts?.preferredWeekend || false,
+    iulDaypartSearchAttempted: true,
+    iulLastAvailabilityStatus: status || null,
+    reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
+    iulWorkflowStage: IUL_STAGES.REVIEW_READY
+  };
   if (status === READ_STATUS.AVAILABLE && offered.length > 0) {
     const isNearest = Boolean(availability?.alternativeToConstraint);
+    const weekendFallback = availability?.fallbackKind === "WEEKEND_EMPTY_NEAREST";
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
       offeredSlots: offered,
       slotA: offered[0]?.time || null,
       slotB: offered[1]?.time || null,
-      nearestAlternatives: isNearest
+      nearestAlternatives: isNearest,
+      fallbackDayPart: dayPart,
+      dayPart
     };
     return finishIulDecision(structured, context, {
-      templateKey: isNearest ? "iul_offer_nearest_review_slots" : "iul_offer_review_slots",
+      templateKey: weekendFallback
+        ? "iul_offer_weekend_fallback_slots"
+        : isNearest
+          ? "iul_offer_nearest_review_slots"
+          : "iul_offer_review_slots",
       nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
       lastQuestionAsked: ASK.OFFER_SLOTS,
       knownFacts: {
-        reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
-        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+        ...searchFacts,
+        iulDaypartFallbackAttempted: isNearest,
+        iulSchedulingUnavailable: false
       },
       reasonCodes: [
         REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
-        REASON_CODES.AVAILABLE_SLOTS_OFFERED
+        REASON_CODES.AVAILABLE_SLOTS_OFFERED,
+        ...(isNearest ? [REASON_CODES.IUL_DAYPART_FALLBACK_OFFERED] : [])
       ],
       appointmentPatch: {
         status: APPOINTMENT_STATUS.PROPOSED,
@@ -962,10 +1145,19 @@ function applySlotOfferDecision(structured, context, availability) {
     });
   }
   return finishIulDecision(structured, context, {
-    templateKey: "iul_zero_review_slots",
-    nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
-    lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
-    reasonCodes: [REASON_CODES.ZERO_QUALIFYING_SLOTS, REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING]
+    templateKey: "iul_no_review_availability",
+    nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE,
+    lastQuestionAsked: ASK.SCHEDULING_UNAVAILABLE,
+    knownFacts: {
+      ...searchFacts,
+      iulDaypartFallbackAttempted: true,
+      iulSchedulingUnavailable: true
+    },
+    reasonCodes: [
+      REASON_CODES.ZERO_QUALIFYING_SLOTS,
+      REASON_CODES.IUL_NO_AVAILABILITY,
+      REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING
+    ]
   });
 }
 
@@ -1007,7 +1199,7 @@ function briefTemplateForIntent(intentId) {
   return "iul_scheduling_transition";
 }
 
-function applyIulAdDecision({ structured, context, interpretation } = {}) {
+function applyIulAdDecision({ structured, context, interpretation, availability = null } = {}) {
   const intent = interpretation?.intent;
   if (SAFETY_INTENTS.has(intent)) {
     return null;
@@ -1199,26 +1391,20 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
   }
 
   if (intent === INTENTS.IUL_INFO_ONLY) {
-    return finishIulDecision(structured, context, {
+    return resumeIulAfterFaq(structured, context, {
       templateKey: "iul_info_only_then_review",
-      nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_INFO_THEN_REVIEW, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
   if (intent === INTENTS.IUL_NO_REPLACE) {
-    return finishIulDecision(structured, context, {
+    return resumeIulAfterFaq(structured, context, {
       templateKey: "iul_no_replace_then_review",
-      nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_NO_OBLIGATION, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
   if (intent === INTENTS.IUL_AGENT_SAID_INVESTMENT) {
-    return finishIulDecision(structured, context, {
+    return resumeIulAfterFaq(structured, context, {
       templateKey: "iul_agent_investment_then_review",
-      nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [
         REASON_CODES.IUL_NOT_JUST_INVESTMENT,
         REASON_CODES.IUL_NO_AGENT_ARGUMENT,
@@ -1227,10 +1413,8 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     });
   }
   if (intent === INTENTS.IUL_SEND_INFO_HERE) {
-    return finishIulDecision(structured, context, {
+    return resumeIulAfterFaq(structured, context, {
       templateKey: "iul_send_info_then_review",
-      nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [
         REASON_CODES.IUL_WHATSAPP_BASICS_ONLY,
         REASON_CODES.IUL_SOFT_APPOINTMENT_ASK
@@ -1238,18 +1422,14 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
     });
   }
   if (intent === INTENTS.IUL_PRIMERICA_QUESTION) {
-    return finishIulDecision(structured, context, {
+    return resumeIulAfterFaq(structured, context, {
       templateKey: "iul_primerica_then_continue",
-      nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_PRIMERICA_TRANSPARENT, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
   if (intent === INTENTS.IUL_REVIEW_COST_QUESTION) {
-    return finishIulDecision(structured, context, {
+    return resumeIulAfterFaq(structured, context, {
       templateKey: "iul_review_cost_then_continue",
-      nextAction: NEXT_ACTIONS.IUL_ANSWER_THEN_REVIEW,
-      lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
       reasonCodes: [REASON_CODES.IUL_REVIEW_IS_FREE, REASON_CODES.IUL_SOFT_APPOINTMENT_ASK]
     });
   }
@@ -1316,27 +1496,76 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
   }
 
   if (intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART) {
-    const dayPart = interpretation.entities?.iulReviewDayPart || null;
+    const dayPart = normalizeIulDayPart(
+      interpretation.entities?.iulReviewDayPart ||
+        interpretation.entities?.dayPart ||
+        null
+    );
+    const preferredWeekend = Boolean(
+      interpretation.entities?.preferredWeekend || context.knownFacts?.preferredWeekend
+    );
+    const priorDayPart = normalizeIulDayPart(context.knownFacts?.iulSelectedDayPart);
+    const priorOffered = context.appointment?.previouslyOfferedSlots || [];
+    if (
+      dayPart &&
+      dayPart === priorDayPart &&
+      context.knownFacts?.iulDaypartSearchAttempted &&
+      priorOffered.length
+    ) {
+      return applySlotOfferDecision(
+        structured,
+        context,
+        {
+          status: READ_STATUS.AVAILABLE,
+          offeredSlots: priorOffered,
+          alternativeToConstraint: Boolean(context.knownFacts?.iulDaypartFallbackAttempted)
+        },
+        { dayPart, preferredWeekend }
+      );
+    }
+    if (
+      dayPart &&
+      dayPart === priorDayPart &&
+      context.knownFacts?.iulSchedulingUnavailable
+    ) {
+      return applySlotOfferDecision(
+        structured,
+        context,
+        { status: READ_STATUS.ZERO_SLOTS, offeredSlots: [], fallbackKind: "NO_AVAILABILITY" },
+        { dayPart, preferredWeekend }
+      );
+    }
     const mergedFacts = {
       iulReviewDayPart: dayPart,
       reviewPreferredDayPart: dayPart,
-      preferredDayPart: dayPart === "day" ? "morning" : dayPart,
+      preferredDayPart: dayPart,
+      preferredWeekend,
       reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
     };
     const schedulingContext = {
       ...context,
       knownFacts: { ...(context.knownFacts || {}), ...mergedFacts }
     };
-    const availability = readPolicyReviewAvailabilitySync({
-      context: schedulingContext,
-      interpretation,
-      options: {
-        availabilityFixture: context._availabilityFixture,
-        organizationId: context.organizationId || null
-      }
-    });
+    const liveAvailability = enrichIulDaypartAvailability(
+      availability && availability.status
+        ? availability
+        : readPolicyReviewAvailabilitySync({
+            context: schedulingContext,
+            interpretation,
+            options: {
+              availabilityFixture: context._availabilityFixture,
+              organizationId: context.organizationId || null,
+              preferredWeekend,
+              now: context._testNow || null
+            }
+          }),
+      { preferredWeekend }
+    );
     structured.customerReplyPlan.templateKey = "iul_review_day_part_ack";
-    return applySlotOfferDecision(structured, schedulingContext, availability);
+    return applySlotOfferDecision(structured, schedulingContext, liveAvailability, {
+      dayPart,
+      preferredWeekend
+    });
   }
 
   if (intent === INTENTS.IUL_SELECT_OFFERED_SLOT) {
@@ -1466,6 +1695,8 @@ function applyIulAdDecision({ structured, context, interpretation } = {}) {
                   ? ASK.SCHEDULING_DAY_PART
                   : pending === ASK.OFFER_SLOTS
                     ? ASK.OFFER_SLOTS
+                    : pending === ASK.SCHEDULING_UNAVAILABLE
+                      ? ASK.SCHEDULING_UNAVAILABLE
                     : nextDiscoveryAsk(context.knownFacts || {});
     return finishIulDecision(structured, context, {
       templateKey: discoveryTemplateForAsk(replayAsk),
@@ -1553,5 +1784,8 @@ module.exports = {
   looksLikeSendInfoHere,
   looksLikePrimericaQuestion,
   looksLikeReviewCostQuestion,
-  looksLikePolicyIsBadQuestion
+  looksLikePolicyIsBadQuestion,
+  looksLikeWeekendPreference,
+  parseIulReviewDayPart,
+  normalizeIulDayPart
 };
