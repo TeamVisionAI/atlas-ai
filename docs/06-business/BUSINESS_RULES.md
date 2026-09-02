@@ -3287,6 +3287,26 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-211 — IUL Interactive Slot Delivery Trace + Fix
+
+**Implements:** Deliver IUL Zoom slot choices as WhatsApp interactive options on every offer path, including replay/resume. Do not send the offer body as text-only.  
+**Domain:** IUL Policy Review / WhatsApp scheduling UX  
+**Depends on:** BR-210, BR-157, BR-190, BR-209  
+**Status:** Implemented — live canary not re-run  
+**Engine target:** `iulAdConversation.finishIulDecision`; `communicationHub.resolveWhatsAppReplyEntities`; `whatsappOutboundPipeline` interactive failure recovery  
+**Tests:** `backend/test/iulInteractiveSlotDeliveryBr211.test.js`
+
+### Rules
+
+1. **Always attach** — Any outbound whose last question is `iul_offer_review_slots` must include `whatsappInteractive` when slots exist on the decision or the session’s previously offered slots. Replay/FAQ resume must not send body-only text.
+2. **Opaque IDs** — If stored slots lack `selectionId`, attach `IUL_SLOT_*` before building buttons/list and persist them on the session.
+3. **Daypart while offering** — “En la mañana” / “En la tarde” during an active slot offer is a daypart preference change, not a discarded free-text replay.
+4. **Hub merge** — Transport merges `customerReplyPlan.entities` with `responsePlan.entities`. An empty `responsePlan.entities` object must not drop interactive.
+5. **Provider failure** — If Graph rejects interactive, do not silently send numbered or hyphen date/time text. Persist the provider error and send a non-misleading recovery line. “Confirmado” still waits for create (BR-190).
+6. **BR-209 / BR-210 unchanged** — Availability resolution and create-before-confirm stay as written.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

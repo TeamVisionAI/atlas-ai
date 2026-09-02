@@ -502,7 +502,7 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     }
   }
 
-  if (lastAsk === ASK.SCHEDULING_DAY_PART || lastAsk === ASK.REVIEW_DAY_PART) {
+  if (isIulDayPartAnswerContext(lastAsk)) {
     const weekend = looksLikeWeekendPreference(text);
     const day = matchQualificationInput("dayPart", { text, interactiveReply });
     if (day?.id === IUL_OPTION_IDS.DAY_MORNING) {
@@ -591,7 +591,7 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     }
   }
 
-  if (lastAsk === ASK.SCHEDULING_DAY_PART || lastAsk === ASK.REVIEW_DAY_PART) {
+  if (isIulDayPartAnswerContext(lastAsk)) {
     const dayPart = parseIulReviewDayPart(text);
     if (dayPart) {
       return {
@@ -920,6 +920,23 @@ function interactiveCatalogForAsk(lastQuestionAsked) {
   return null;
 }
 
+function isIulDayPartAnswerContext(lastAsk) {
+  return (
+    lastAsk === ASK.SCHEDULING_DAY_PART ||
+    lastAsk === ASK.REVIEW_DAY_PART ||
+    lastAsk === ASK.OFFER_SLOTS ||
+    lastAsk === ASK.CONFIRM_SLOT ||
+    lastAsk === ASK.SCHEDULING_UNAVAILABLE
+  );
+}
+
+function resolveOfferedSlotsForInteractive(priorEntities, context) {
+  if (Array.isArray(priorEntities?.offeredSlots) && priorEntities.offeredSlots.length) {
+    return priorEntities.offeredSlots;
+  }
+  return context?.appointment?.previouslyOfferedSlots || [];
+}
+
 function finishIulDecision(structured, context, {
   templateKey,
   nextAction,
@@ -951,37 +968,48 @@ function finishIulDecision(structured, context, {
   const firstName = resolveIulFirstName(context);
   const catalog = interactiveCatalogForAsk(lastQuestionAsked);
   const priorEntities = structured.customerReplyPlan.entities || {};
+  const offeredSlots = attachIulSlotSelectionIds(
+    resolveOfferedSlotsForInteractive(priorEntities, context)
+  );
+  const includeMoreSlots =
+    priorEntities.includeMoreSlots === true ||
+    (lastQuestionAsked === ASK.OFFER_SLOTS && offeredSlots.length === 2);
   const body = renderIulAdReply(templateKey, structured.preferredLanguage, {
     firstName,
-    offeredSlots: priorEntities.offeredSlots,
+    offeredSlots,
     fallbackDayPart: priorEntities.fallbackDayPart,
     dayPart: priorEntities.dayPart
   });
   structured.customerReplyPlan.entities = {
     ...priorEntities,
-    firstName
+    firstName,
+    ...(lastQuestionAsked === ASK.OFFER_SLOTS && offeredSlots.length
+      ? { offeredSlots, includeMoreSlots }
+      : {})
   };
   if (catalog) {
     const built = buildIulInteractive(catalog, body);
     structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
     structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
-  } else if (
-    lastQuestionAsked === ASK.OFFER_SLOTS &&
-    Array.isArray(priorEntities.offeredSlots) &&
-    priorEntities.offeredSlots.length
-  ) {
+  } else if (lastQuestionAsked === ASK.OFFER_SLOTS && offeredSlots.length) {
     const language =
       structured.preferredLanguage === LANGUAGES.ENGLISH ||
       structured.preferredLanguage === "english" ||
       structured.preferredLanguage === "en"
         ? "en"
         : "es";
-    const built = buildIulSlotInteractive(priorEntities.offeredSlots, body, {
-      includeMore: priorEntities.includeMoreSlots === true,
+    const built = buildIulSlotInteractive(offeredSlots, body, {
+      includeMore: includeMoreSlots,
       language
     });
     structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
     structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
+    structured.customerReplyPlan.entities.offeredSlots = offeredSlots;
+    structured.contextPatch.appointment = {
+      ...(structured.contextPatch.appointment || context.appointment || {}),
+      previouslyOfferedSlots: offeredSlots,
+      meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+    };
   }
   return structured;
 }

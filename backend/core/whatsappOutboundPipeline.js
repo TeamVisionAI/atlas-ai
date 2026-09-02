@@ -18,6 +18,9 @@ const { WHATSAPP_CORRELATION_PREFIX } = require("./whatsappConstants");
 const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const { resolveWhatsAppSendCredentials } = require("./whatsappSendCredentials");
 const { onMessageSent } = require("./recruitingWorkflowHooks");
+const {
+  resolveInteractiveProviderFailureText
+} = require("./whatsappInteractiveMessage");
 const { resolveProspectCommunicationCode } = require("./prospectLanguage");
 const {
   authorizeWhatsAppOutbound,
@@ -509,19 +512,30 @@ async function sendAndPersistWhatsAppMessage({
         if (!interactive || mode !== "freeform") {
           throw interactiveError;
         }
-        logWhatsAppStage("outbound_interactive_fallback_text", {
+        const providerError =
+          interactiveError.response?.data?.error?.message ||
+          interactiveError.message ||
+          "INTERACTIVE_SEND_FAILED";
+        const recoveryText = resolveInteractiveProviderFailureText({
+          interactive,
+          interactiveFallbackText,
+          message: authorization.message || message,
+          language: /[¿áéíóúñ]/i.test(String(authorization.message || message || ""))
+            ? "es"
+            : "en"
+        });
+        logWhatsAppStage("outbound_interactive_send_failed", {
           to,
-          level: "warn",
-          error:
-            interactiveError.response?.data?.error?.message ||
-            interactiveError.message ||
-            "INTERACTIVE_SEND_FAILED"
+          level: "error",
+          error: providerError,
+          graphMessageType: "interactive",
+          recoveredWithoutAppointmentTimes: true
         });
         graphResult = await sendViaGraphApi({
           credentials,
           metaTo,
           mode,
-          text: interactiveFallbackText || authorization.message || message,
+          text: recoveryText,
           metaTemplateName: authorization.metaTemplateName,
           languageCode: authorization.languageCode,
           expectedVariableKeys: authorization.expectedVariableKeys || [],
@@ -530,6 +544,9 @@ async function sendAndPersistWhatsAppMessage({
           buttonVariables: authorization.buttonVariables || templateButtonVariables,
           interactive: null
         });
+        graphResult.interactiveFailed = true;
+        graphResult.interactiveError = providerError;
+        graphResult.interactiveRecoveryText = recoveryText;
       }
 
       sendResult = {
@@ -537,7 +554,10 @@ async function sendAndPersistWhatsAppMessage({
         simulated: false,
         providerMessageId: graphResult.providerMessageId || providerMessageIdSeed,
         credentialSource: graphResult.credentialSource,
-        outboundPhoneNumberId: credentials.phoneNumberId || null
+        outboundPhoneNumberId: credentials.phoneNumberId || null,
+        interactiveFailed: Boolean(graphResult.interactiveFailed),
+        interactiveError: graphResult.interactiveError || null,
+        interactiveRecoveryText: graphResult.interactiveRecoveryText || null
       };
 
       logWhatsAppStage("outbound_delivery_sent", {
@@ -545,7 +565,11 @@ async function sendAndPersistWhatsAppMessage({
         mode,
         providerMessageId: sendResult.providerMessageId,
         credentialSource: sendResult.credentialSource,
-        outboundPhoneNumberId: sendResult.outboundPhoneNumberId || null
+        outboundPhoneNumberId: sendResult.outboundPhoneNumberId || null,
+        graphMessageType:
+          interactive && !sendResult.interactiveFailed ? "interactive" : "text",
+        interactiveType: interactive?.type || null,
+        interactiveFailed: sendResult.interactiveFailed || false
       });
     } catch (error) {
       const safeReason = error.response?.data?.error?.message || error.message || "PROVIDER_FAILED";
@@ -599,7 +623,12 @@ async function sendAndPersistWhatsAppMessage({
     sanitized: true,
     credentialSource: sendResult.credentialSource || null,
     inboundPhoneNumberId: inboundPhoneNumberId || null,
-    outboundPhoneNumberId: sendResult.outboundPhoneNumberId || null
+    outboundPhoneNumberId: sendResult.outboundPhoneNumberId || null,
+    graphMessageType:
+      interactive && !sendResult.interactiveFailed ? "interactive" : "text",
+    interactiveType: interactive?.type || null,
+    interactiveFailed: Boolean(sendResult.interactiveFailed),
+    interactiveError: sendResult.interactiveError || null
   };
 
   // A — Persist delivery SoR immediately after wamid so Meta status webhooks can match.
@@ -642,7 +671,11 @@ async function sendAndPersistWhatsAppMessage({
     mode === "template"
       ? `[whatsapp_template:${authorization.metaTemplateName}] intent=${intent}`
       : String(
-          authorization.message || message || interactiveFallbackText || ""
+          sendResult.interactiveRecoveryText ||
+            authorization.message ||
+            message ||
+            interactiveFallbackText ||
+            ""
         ).trim();
 
   const logResult = await logConversation({
