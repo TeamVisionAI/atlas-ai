@@ -52,7 +52,12 @@ function appointment(overrides = {}) {
 test("buildConversationOwnership uses ATLAS / HUMAN / NEEDS_ATTENTION semantics", () => {
   const result = buildConversationOwnership([
     summary({ workflowOwnership: "ATLAS" }),
-    summary({ phone: "+15550002222", workflowOwnership: "HUMAN" }),
+    summary({
+      phone: "+15550002222",
+      workflowOwnership: "AGENT",
+      manualAgentOwnership: true,
+      humanTakenOverAt: "2026-09-01T12:00:00.000Z"
+    }),
     summary({ phone: "+15550003333", needsHumanAttention: true })
   ]);
 

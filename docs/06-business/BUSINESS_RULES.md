@@ -3128,6 +3128,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-205 — Conversation Performance Reconciliation + Card Layout
+
+**Implements:** Executive Dashboard Conversation Performance counts the same operationally eligible Active conversations as Conversations / Prospect Center / Mission Control, using Conversations ownership states. Legend counts stay fully visible.  
+**Domain:** Executive Dashboard / Conversations  
+**Depends on:** BR-199, BR-201, BR-159  
+**Related:** BR-080, BR-135  
+**Status:** Implemented  
+**Engine target:** `conversationPerformanceEngine`; `executiveDashboardV2Metrics.buildConversationOwnership`; Conversation Performance card CSS  
+**Tests:** `backend/test/conversationPerformanceBr205.test.js`; `backend/test/operationalLeadEligibilityBr199.test.js`; `backend/test/operationalLeadProvenanceBr201.test.js`; `frontend/src/engines/conversationPerformanceLayout.test.js`
+
+### Rules
+
+1. **Eligibility first** — Tenant → operational eligibility (`evaluateOperationalProspectRecord` + `evaluateRecruitingInboxEligibility`) → dashboard scope → Atlas / Human / Needs Attention. Do not count personal contacts, contact-only / 131060 rows, META_AD_DESTINATION-only, legacy ambiguous, raw logs, or archived / test / closed / scheduled inbox rows.
+2. **Exclusive status** — After eligibility, classify with `resolveConversationOwnershipState`: sticky TAKE OVER (`manualAgentOwnership` + `humanTakenOverAt`) is HUMAN; else `needsHumanAttention` is NEEDS_ATTENTION; else ATLAS. Do not use `workflowOwnership === "HUMAN"` (not a product ownership value). Provenance is not a status.
+3. **Reconciliation** — `total = Atlas + Human + Needs Attention`. That total is the Active Conversations inbox for the same tenant/scope. It is not the unfiltered Mission Control queue. Difference vs all operational prospects: archived, closed, scheduled, and test inbox rows are excluded.
+4. **Average response time** — Leave “—”. There is no durable first-response aggregation. Do not invent a number.
+5. **Layout** — Legend uses a wrapping label column and a `min-content` count column so 1–4 digit values stay visible. Do not clip counts. Do not shrink type to hide overflow.
+6. **Boundaries** — Do not weaken BR-199 / BR-201. Do not delete rows or rewrite `owner_user_id`. AI Quality APPLY stays OFF.
+
+---
+
 ## BR-203 — Persist HUMAN WhatsApp Business App echoes for contact-only conversations
 
 **Implements:** Native WhatsApp Business app / `smb_message_echoes` HUMAN and AGENT replies persist even when no prospect row exists (contact-only inbound, including first-touch 131060). Delivery lifecycle can attach to the stored wamid.  

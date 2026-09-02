@@ -51,8 +51,8 @@ export function ConversationDonut({ segments = [], total = 0 }) {
         {segments.map((segment) => (
           <li key={segment.key}>
             <span className="executive-v2__legend-swatch" style={{ background: segment.color }} />
-            <span>{segment.label}</span>
-            <strong>{segment.value}</strong>
+            <span className="executive-v2__donut-legend-label">{segment.label}</span>
+            <strong className="executive-v2__donut-legend-count">{segment.value}</strong>
           </li>
         ))}
       </ul>

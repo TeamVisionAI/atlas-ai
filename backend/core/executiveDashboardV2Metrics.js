@@ -1,7 +1,7 @@
 /**
  * Executive Dashboard v2 — derived metrics from existing prospect + queue data.
  * Completed KPI uses canonical atlas_appointments completion (Appointments page SoT).
- * No new business rules; presentation aggregates only.
+ * Conversation Performance uses BR-205 (Conversations Active ownership), not the MC queue.
  */
 
 const { MILESTONES } = require("./workflowConstants");
@@ -12,6 +12,13 @@ const {
   getOrganizationDateWindow,
   isTimestampInWindow
 } = require("./organizationDateWindow");
+const {
+  buildConversationPerformanceCounts,
+  classifyQueueSummary
+} = require("./conversationPerformanceEngine");
+const {
+  CONVERSATION_OWNERSHIP_STATE
+} = require("./conversationsCenter/constants");
 
 function prospectByPhone(prospects) {
   return new Map((prospects || []).map((row) => [row.phone, row]));
@@ -195,16 +202,38 @@ function buildRecruitmentFunnel(queue, prospects, appointments = []) {
   };
 }
 
-function buildConversationOwnership(queue) {
+function buildConversationOwnership(queue, prospects = []) {
+  // Implements BR-205 — eligible Active conversations, Conversations ownership states.
+  if (Array.isArray(prospects) && prospects.length > 0) {
+    const counted = buildConversationPerformanceCounts(prospects);
+    return {
+      atlas: counted.atlas,
+      human: counted.human,
+      needsAttention: counted.needsAttention,
+      total: counted.total,
+      averageResponseTimeMs: null
+    };
+  }
+
   let atlas = 0;
   let human = 0;
   let needsAttention = 0;
+  const seen = new Set();
 
   for (const summary of queue || []) {
-    if (summary.needsHumanAttention) {
-      needsAttention += 1;
-    } else if (String(summary.workflowOwnership || "").toUpperCase() === "HUMAN") {
+    const key = String(summary.phone || summary.id || "").trim();
+    if (key) {
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+    }
+
+    const status = classifyQueueSummary(summary);
+    if (status === CONVERSATION_OWNERSHIP_STATE.HUMAN) {
       human += 1;
+    } else if (status === CONVERSATION_OWNERSHIP_STATE.NEEDS_ATTENTION) {
+      needsAttention += 1;
     } else {
       atlas += 1;
     }
@@ -214,7 +243,7 @@ function buildConversationOwnership(queue) {
     atlas,
     human,
     needsAttention,
-    total: (queue || []).length,
+    total: atlas + human + needsAttention,
     averageResponseTimeMs: null
   };
 }
@@ -306,7 +335,7 @@ function buildExecutiveDashboardV2Metrics(prospects, queue, context = {}) {
   return {
     kpi: buildKpiMetrics(prospects, queue, metricsContext),
     funnel: buildRecruitmentFunnel(queue, prospects, metricsContext.appointments),
-    conversationOwnership: buildConversationOwnership(queue),
+    conversationOwnership: buildConversationOwnership(queue, prospects),
     trend7Day: buildSevenDayAppointmentTrend(prospects, queue, metricsContext)
   };
 }
