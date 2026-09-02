@@ -1341,6 +1341,50 @@ async function ensurePolicyReviewFromIulIntake(input = {}) {
   };
 }
 
+async function linkAppointmentForProspect(input = {}, authContext = {}) {
+  const organizationId = input.organizationId;
+  const appointmentId = input.appointmentId;
+  const linkedProspectId = input.linkedProspectId;
+  if (!organizationId || !appointmentId) {
+    return { ok: false, reason: "MISSING_SCOPE" };
+  }
+  const store = getStore();
+  if (!store) {
+    return { ok: false, pending: true, reason: "STORE_UNAVAILABLE" };
+  }
+  let row = null;
+  if (linkedProspectId && store.findByLinkedProspectId) {
+    row = await store.findByLinkedProspectId(linkedProspectId, organizationId);
+  }
+  if (!row) {
+    const ensured = await ensurePolicyReviewFromIulIntake({
+      organizationId,
+      ownerUserId: authContext.userId || input.ownerUserId || null,
+      prospect: {
+        id: linkedProspectId || null,
+        phone: input.phone || null,
+        name: input.prospectName || null
+      }
+    });
+    if (ensured?.reviewId) {
+      row = { id: ensured.reviewId, ownerUserId: authContext.userId || input.ownerUserId };
+    }
+  }
+  if (!row?.id) {
+    return { ok: false, pending: true, reason: "NO_PIPELINE_ROW" };
+  }
+  const actor = {
+    userId: authContext.userId || input.ownerUserId || row.ownerUserId,
+    role: authContext.role || "agent"
+  };
+  await linkAppointment(
+    row.id,
+    { organizationId, appointmentId },
+    actor
+  );
+  return { ok: true, reviewId: row.id, appointmentId };
+}
+
 async function saveCommissionDefaults(input, authContext) {
   const store = getStore();
   if (!store) throw buildError("STORE_UNAVAILABLE", "Policy review store is unavailable.", 503);
@@ -1380,6 +1424,7 @@ module.exports = {
   getAcquisitionMetrics,
   getPolicyReviewDashboard,
   ensurePolicyReviewFromIulIntake,
+  linkAppointmentForProspect,
   emptyAcquisitionMetrics,
   getCommissionDefaults,
   saveCommissionDefaults,

@@ -60,6 +60,19 @@ function buildReminderMessage(appointment, reminderType, prospect, identity = {}
       ? `\nEnlace: ${appointment.virtualMeetingUrl}`
       : `\nLink: ${appointment.virtualMeetingUrl}`
     : "";
+  const officeAddress = String(
+    appointment.meetingAddress ||
+      appointment.meeting_address ||
+      appointment.metadata?.officeAddress ||
+      appointment.metadata?.meetingAddress ||
+      ""
+  ).trim();
+  const officeLine =
+    !virtual && officeAddress
+      ? language === "es"
+        ? `\nDirección: ${officeAddress}`
+        : `\nAddress: ${officeAddress}`
+      : "";
   const channelLabel =
     language === "es"
       ? virtual
@@ -91,36 +104,36 @@ function buildReminderMessage(appointment, reminderType, prospect, identity = {}
     switch (reminderType) {
       case REMINDER_TYPES.CONFIRMATION:
         // Kept for backwards-compatible delivery of legacy queued confirmation rows only.
-        return `${greeting} ${poss} ${eventNoun} ${channelLabel} quedó confirmada para ${when}.${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} quedó confirmada para ${when}.${meetLink}${officeLine}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_24H:
-        return `${greeting} ${remind} que mañana ${haveTomorrow} ${poss} ${eventNoun} ${channelLabel} (${when}).${meetLink}\n\n${signature}`;
+        return `${greeting} ${remind} que mañana ${haveTomorrow} ${poss} ${eventNoun} ${channelLabel} (${when}).${meetLink}${officeLine}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_1H:
-        return `${greeting} ${poss} ${eventNoun} ${channelLabel} es en 1 hora (${when}).${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} es en 1 hora (${when}).${meetLink}${officeLine}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_30M:
-        return `${greeting} ${poss} ${eventNoun} ${channelLabel} comienza en 30 minutos.${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} comienza en 30 minutos.${meetLink}${officeLine}\n\n${signature}`;
       case REMINDER_TYPES.REMINDER_15M:
         // Legacy queued rows only — no longer scheduled.
-        return `${greeting} ${poss} ${eventNoun} ${channelLabel} comienza en 15 minutos.${meetLink}\n\n${signature}`;
+        return `${greeting} ${poss} ${eventNoun} ${channelLabel} comienza en 15 minutos.${meetLink}${officeLine}\n\n${signature}`;
       default:
-        return `${greeting} recordatorio de ${eventNoun}: ${when}.${meetLink}\n\n${signature}`;
+        return `${greeting} recordatorio de ${eventNoun}: ${when}.${meetLink}${officeLine}\n\n${signature}`;
     }
   }
 
   const greeting = first ? `Hi ${first},` : "Hi,";
   switch (reminderType) {
     case REMINDER_TYPES.CONFIRMATION:
-      return `${greeting} your ${eventNoun} ${channelLabel} is confirmed for ${when}.${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} is confirmed for ${when}.${meetLink}${officeLine}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_24H:
-      return `${greeting} reminder: your ${eventNoun} ${channelLabel} is tomorrow (${when}).${meetLink}\n\n${signature}`;
+      return `${greeting} reminder: your ${eventNoun} ${channelLabel} is tomorrow (${when}).${meetLink}${officeLine}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_1H:
-      return `${greeting} your ${eventNoun} ${channelLabel} is in 1 hour (${when}).${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} is in 1 hour (${when}).${meetLink}${officeLine}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_30M:
-      return `${greeting} your ${eventNoun} ${channelLabel} starts in 30 minutes.${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} starts in 30 minutes.${meetLink}${officeLine}\n\n${signature}`;
     case REMINDER_TYPES.REMINDER_15M:
       // Legacy queued rows only — no longer scheduled.
-      return `${greeting} your ${eventNoun} ${channelLabel} starts in 15 minutes.${meetLink}\n\n${signature}`;
+      return `${greeting} your ${eventNoun} ${channelLabel} starts in 15 minutes.${meetLink}${officeLine}\n\n${signature}`;
     default:
-      return `${greeting} ${eventNoun} reminder: ${when}.${meetLink}\n\n${signature}`;
+      return `${greeting} ${eventNoun} reminder: ${when}.${meetLink}${officeLine}\n\n${signature}`;
   }
 }
 

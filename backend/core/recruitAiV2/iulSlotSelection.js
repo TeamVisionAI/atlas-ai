@@ -246,6 +246,61 @@ function excludeRejectedSlots(slots = [], rejectIds = []) {
   });
 }
 
+/**
+ * BR-213 — More pages unused real slots across dates.
+ * Strategy: earliest unused, then earliest unused on each later date,
+ * then remaining chronological only if the page is still short.
+ * Never re-picks a previously shown identity. Does not monopolize one
+ * date when later valid dates exist.
+ */
+function selectIulCrossDatePage(slots = [], { maxCandidates = 2, rejectIds = [] } = {}) {
+  const unused = excludeRejectedSlots(slots, rejectIds);
+  const ordered = [...unused].sort((a, b) => {
+    const dateCmp = String(a.date || a.dateKey || "").localeCompare(
+      String(b.date || b.dateKey || "")
+    );
+    if (dateCmp !== 0) {
+      return dateCmp;
+    }
+    return String(a.time || a.timeKey || "").localeCompare(String(b.time || b.timeKey || ""));
+  });
+  if (!ordered.length) {
+    return [];
+  }
+  const limit = Math.max(1, Number(maxCandidates) || 2);
+  const picked = [];
+  const seen = new Set();
+  const push = (slot) => {
+    const id = slotIdentity(slot);
+    if (!id || id === "|" || seen.has(id) || picked.length >= limit) {
+      return;
+    }
+    seen.add(id);
+    picked.push(slot);
+  };
+
+  push(ordered[0]);
+  const firstDate = String(ordered[0].date || ordered[0].dateKey || "");
+  const dates = [];
+  for (const slot of ordered) {
+    const date = String(slot.date || slot.dateKey || "");
+    if (date && !dates.includes(date)) {
+      dates.push(date);
+    }
+  }
+  for (const date of dates) {
+    if (date === firstDate) {
+      continue;
+    }
+    const next = ordered.find((slot) => String(slot.date || slot.dateKey || "") === date);
+    push(next);
+  }
+  for (const slot of ordered) {
+    push(slot);
+  }
+  return picked;
+}
+
 module.exports = {
   IUL_SLOT_ID_PREFIX,
   IUL_SLOT_MORE_ID,
@@ -262,5 +317,6 @@ module.exports = {
   isIulSlotExpired,
   parseIulFreeTextSlot,
   rejectIdsForShown,
-  excludeRejectedSlots
+  excludeRejectedSlots,
+  selectIulCrossDatePage
 };

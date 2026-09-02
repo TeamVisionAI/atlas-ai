@@ -126,7 +126,7 @@ test("B) 2 slots → interactive reply buttons", () => {
   ]);
   assert.equal(interactive(decision).type, "button");
   assert.equal(optionIds(decision).filter((id) => id !== IUL_SLOT_MORE_ID).length, 2);
-  assert.ok(optionIds(decision).includes(IUL_SLOT_MORE_ID));
+  assert.equal(optionIds(decision).includes(IUL_SLOT_MORE_ID), false);
   assert.doesNotMatch(rendered.text, /09:00|12:00/);
   assert.ok(optionTitles(decision).some((title) => /9:00 AM/.test(title)));
   assert.ok(optionTitles(decision).some((title) => /12:00 PM/.test(title)));

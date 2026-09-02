@@ -30,7 +30,10 @@ const { shouldMockExternalComms } = require("../dev/simulatorGuard");
 const { buildIsoTimestamp } = require("../services/availabilityService");
 const meetingManagementService = require("../services/meetingManagementService");
 const appointmentApplicationService = require("./appointmentApplicationService");
-const { APPOINTMENT_SOURCES } = require("../core/configuration/appointmentDomain");
+const {
+  APPOINTMENT_SOURCES,
+  APPOINTMENT_PURPOSES
+} = require("../core/configuration/appointmentDomain");
 const {
   extractEmailFromNotes,
   deriveDayPartFromTimeKey,
@@ -111,7 +114,7 @@ async function createPersistedScheduleAppointment({
       organizationId,
       agentId,
       prospectPhone: phone,
-      purpose: "recruiting_interview",
+      purpose: payload.purpose || "recruiting_interview",
       dateKey: payload.dateKey,
       timeKey: payload.timeKey,
       source: APPOINTMENT_SOURCES.MISSION_CONTROL,
@@ -404,6 +407,11 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
 
   const interviewType = normalizeInterviewType(payload.interviewType);
   const duration = Number(payload.duration) || 30;
+  const appointmentPurpose =
+    String(payload.purpose || "").toLowerCase() === APPOINTMENT_PURPOSES.POLICY_REVIEW
+      ? APPOINTMENT_PURPOSES.POLICY_REVIEW
+      : APPOINTMENT_PURPOSES.RECRUITING_INTERVIEW;
+  const isPolicyReview = appointmentPurpose === APPOINTMENT_PURPOSES.POLICY_REVIEW;
   const isZoom = interviewType === "Zoom";
   const isPublicLocation = interviewType === "Public Location";
   const attendeeEmail = resolveProspectEmail(prospect, payload);
@@ -563,7 +571,7 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     agentId: scheduleAgentId,
     organizationId,
     date: payload.dateKey,
-    purpose: "recruiting_interview",
+    purpose: appointmentPurpose,
     durationMinutes: duration,
     assignmentMode,
     interviewerUserId: assignmentMode === "explicit" ? effectiveInterviewerUserId : null,
@@ -607,7 +615,8 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   payload = {
     ...payload,
     interviewerUserId: assignedInterviewerUserId,
-    assignmentMode
+    assignmentMode,
+    purpose: appointmentPurpose
   };
 
   let bookingResult;
@@ -752,9 +761,11 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     calendar_event_id: bookingResult.googleCalendarEventId,
     appointment_date: bookingResult.startTimeISO,
     interview_time: bookingResult.startTimeISO,
-    interview_type: interviewType,
-    current_step: "CONFIRMED"
+    interview_type: interviewType
   };
+  if (!isPolicyReview) {
+    prospectUpdates.current_step = "CONFIRMED";
+  }
 
   let nextNotes = prospect.notes || null;
   const derivedDayPart = deriveDayPartFromTimeKey(payload.timeKey);
@@ -825,13 +836,15 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     advanceCapturedFields = sync.capturedFields;
   }
 
-  const advanceResult = await advanceWorkflow(phone, {
-    targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
-    organizationId,
-    capturedFields: advanceCapturedFields,
-    interactionNotes: payload.notes || null,
-    interactionType: "agent_schedule"
-  });
+  const advanceResult = isPolicyReview
+    ? { success: true, workflow: null, skipped: "policy_review" }
+    : await advanceWorkflow(phone, {
+        targetMilestone: MILESTONES.INTERVIEW_SCHEDULED,
+        organizationId,
+        capturedFields: advanceCapturedFields,
+        interactionNotes: payload.notes || null,
+        interactionType: "agent_schedule"
+      });
 
   if (!advanceResult.success) {
     await rollbackBooking(bookingResult, organizationId, prospect, {
@@ -900,28 +913,32 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
 
   const updatedProspect = (await resolveTenantProspect(phone, options)) || prospect;
 
-  await onInterviewScheduled({
-    phone,
-    prospect: updatedProspect,
-    profile: {
-      appointmentDate: payload.dateKey,
-      interviewType,
-      preferredTime: payload.timeKey,
-      email: attendeeEmail || null
-    },
-    calendarEvent: {
-      id: bookingResult.googleCalendarEventId,
-      zoomLink: bookingResult.zoomLink || bookingResult.meetingUrl || meetingUrl,
-      meetingUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl
-    }
-  }).catch((error) => {
-    console.warn("[missionExecution] onInterviewScheduled failed:", error.message);
-  });
+  if (!isPolicyReview) {
+    await onInterviewScheduled({
+      phone,
+      prospect: updatedProspect,
+      profile: {
+        appointmentDate: payload.dateKey,
+        interviewType,
+        preferredTime: payload.timeKey,
+        email: attendeeEmail || null
+      },
+      calendarEvent: {
+        id: bookingResult.googleCalendarEventId,
+        zoomLink: bookingResult.zoomLink || bookingResult.meetingUrl || meetingUrl,
+        meetingUrl: bookingResult.meetingUrl || bookingResult.zoomLink || meetingUrl
+      }
+    }).catch((error) => {
+      console.warn("[missionExecution] onInterviewScheduled failed:", error.message);
+    });
+  }
 
   await logAgentTimeline(
     updatedProspect,
     buildAgentActionTimelineMessage(
-      `Interview scheduled for ${payload.dateKey} at ${payload.timeKey} (${interviewType})`
+      isPolicyReview
+        ? `Policy review scheduled for ${payload.dateKey} at ${payload.timeKey} (${interviewType})`
+        : `Interview scheduled for ${payload.dateKey} at ${payload.timeKey} (${interviewType})`
     )
   );
 

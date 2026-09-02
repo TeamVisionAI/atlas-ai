@@ -49,7 +49,8 @@ const RECOMMENDED_FOLLOW_UP_CHANNEL = Object.freeze({
 });
 
 const IUL_REVIEW_MEETING_TYPE = Object.freeze({
-  ZOOM: "ZOOM"
+  ZOOM: "ZOOM",
+  IN_PERSON: "in_person"
 });
 
 const IUL_CONVERSATION_GOAL = "policy_review";

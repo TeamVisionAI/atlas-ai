@@ -141,8 +141,17 @@ test("A) Spanish labels are En la mañana / En la tarde", () => {
       knownFacts: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_ACTIVE }
     })
   );
-  assert.match(rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
-  assert.deepEqual(interactiveIds(decision), [
+  assert.match(rendered.text, /¿Cómo prefiere hacer su revisión de póliza\?/);
+  assert.ok(interactiveIds(decision).includes(IUL_OPTION_IDS.MEET_ZOOM));
+  const dayPart = turn(
+    { text: "Por Zoom", interactiveReply: { id: IUL_OPTION_IDS.MEET_ZOOM, title: "Por Zoom" } },
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.MEETING_MODE },
+      knownFacts: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_ACTIVE }
+    })
+  );
+  assert.match(dayPart.rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
+  assert.deepEqual(interactiveIds(dayPart.decision), [
     IUL_OPTION_IDS.DAY_MORNING,
     IUL_OPTION_IDS.DAY_AFTERNOON
   ]);

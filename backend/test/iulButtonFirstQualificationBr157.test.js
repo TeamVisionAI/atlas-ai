@@ -158,17 +158,15 @@ test("review-intent selection advances toward scheduling without a hard-coded ti
   );
   assert.equal(interpretation.intent, INTENTS.IUL_REVIEW_INTENT);
   assert.equal(decision.contextPatch.knownFacts.iulReviewIntent, IUL_OPTION_IDS.REVIEW_COSTS);
-  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY_PART);
+  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.MEETING_MODE);
   assert.match(
     rendered.text,
     /Lo ideal es revisar su póliza con usted y explicarle exactamente lo que tiene/
   );
-  assert.match(rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
+  assert.match(rendered.text, /¿Cómo prefiere hacer su revisión de póliza\?/);
   assert.doesNotMatch(rendered.text, /10:00|18:00|2099/);
-  assert.deepEqual(interactiveIds(decision), [
-    IUL_OPTION_IDS.DAY_MORNING,
-    IUL_OPTION_IDS.DAY_AFTERNOON
-  ]);
+  assert.ok(interactiveIds(decision).includes(IUL_OPTION_IDS.MEET_ZOOM));
+  assert.ok(!interactiveIds(decision).includes(IUL_OPTION_IDS.DAY_MORNING));
   assert.equal(plan.entities.whatsappInteractive.type, "button");
 });
 
@@ -200,7 +198,7 @@ test("Otro accepts free text then resumes toward Zoom", () => {
     freeText.decision.contextPatch.knownFacts.iulOtherDetail,
     "Quiero entender los cargos internos"
   );
-  assert.match(freeText.rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
+  assert.match(freeText.rendered.text, /¿Cómo prefiere hacer su revisión de póliza\?/);
 });
 
 test("interactive button payloads normalize by ID, not label", () => {
@@ -332,9 +330,9 @@ test("research path answers briefly then continues to the Zoom transition", () =
     ctx
   );
   assert.match(rendered.text, /seguro de vida con valor en efectivo/i);
-  assert.match(rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
+  assert.match(rendered.text, /¿Cómo prefiere hacer su revisión de póliza\?/);
   assert.doesNotMatch(rendered.text, /reemplaz|cancel|garantiz|impuesto/i);
-  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY_PART);
+  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.MEETING_MODE);
 });
 
 test("unsure + policy in hand goes to Zoom without pretending attachments are ingested", () => {
@@ -353,7 +351,7 @@ test("unsure + policy in hand goes to Zoom without pretending attachments are in
       knownFacts: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_UNSURE }
     })
   );
-  assert.match(inHand.rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
+  assert.match(inHand.rendered.text, /¿Cómo prefiere hacer su revisión de póliza\?/);
   assert.doesNotMatch(inHand.rendered.text, /envíeme|adjunte|subir/i);
 });
 

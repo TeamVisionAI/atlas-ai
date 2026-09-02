@@ -233,13 +233,10 @@ test("H) qualified IUL lead moves to Zoom scheduling, not recruiting interview",
       knownFacts: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_ACTIVE }
     })
   );
-  assert.match(afterIntent.rendered.text, /póliza|horario/i);
+  assert.match(afterIntent.rendered.text, /póliza|prefiere/i);
   assert.doesNotMatch(afterIntent.rendered.text, /entrevista de reclutamiento|ciudad y estado/i);
-  assert.equal(
-    afterIntent.decision.contextPatch.knownFacts.reviewMeetingType ||
-      afterIntent.decision.contextPatch.appointment?.meetingType,
-    "ZOOM"
-  );
+  assert.equal(afterIntent.decision.contextPatch.conversation.lastQuestionAsked, ASK.MEETING_MODE);
+  assert.doesNotMatch(afterIntent.rendered.text, /¿Qué horario prefiere/);
 });
 
 test("I) slot selection does not send a confirmed appointment message", () => {
