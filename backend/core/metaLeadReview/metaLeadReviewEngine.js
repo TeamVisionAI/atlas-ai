@@ -13,7 +13,6 @@ const {
 const { buildDepromotionPatch } = require("../prospectPromotionEligibility");
 const { savePersistedWorkflowState, loadPersistedWorkflowState } = require("../workflowStateStore");
 const { AD_DESTINATION_FALLBACK_REASON } = require("../metaAdDestinationFallback");
-const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("../whatsappConstants");
 const workflowEventService = require("../../services/workflowEventService");
 const {
   SUSPECTED_META_LEAD_REVIEW,
@@ -21,6 +20,10 @@ const {
   META_LEAD_REVIEW_STATUSES,
   META_LEAD_REVIEW_AUDIT
 } = require("./constants");
+const {
+  isProspectCreatedEvent,
+  resolveCreateTimeProvenance
+} = require("./createTimeProvenance");
 
 function upper(value) {
   return String(value || "").trim().toUpperCase();
@@ -65,38 +68,22 @@ function isOwnerOfProspect(prospect, userId) {
   );
 }
 
-const LEGACY_NON_BR193_SOURCES = Object.freeze(
-  new Set([
-    upper(WHATSAPP_SOURCE.UNKNOWN),
-    upper(WHATSAPP_SOURCE.PERSONAL_WHATSAPP),
-    "FACEBOOK",
-    "CLICK_TO_WHATSAPP"
-  ])
-);
-
-const LEGACY_NON_BR193_ENTRY_METHODS = Object.freeze(
-  new Set([
-    WHATSAPP_ENTRY_METHOD.UNATTRIBUTED,
-    WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
-    WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP
-  ])
-);
-
 /**
  * Durable create-time origin that is not a BR-193 promotion.
  * A later META_AD_DESTINATION continuation stamp is not enough.
- * Null source/entry (Brenda / Armando / Maria) is the BR-193 create pattern.
+ * Null source/entry alone is ambiguous — not proof of a BR-193 create.
  */
-function hasLegacyNonBr193CreateOrigin(prospect = {}) {
-  const source = upper(prospect?.source);
-  const entry = upper(prospect?.entry_method);
-  if (
-    source === upper(WHATSAPP_SOURCE.META_AD_DESTINATION) ||
-    entry === WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION
-  ) {
-    return false;
-  }
-  return LEGACY_NON_BR193_SOURCES.has(source) || LEGACY_NON_BR193_ENTRY_METHODS.has(entry);
+function hasLegacyNonBr193CreateOrigin(prospect = {}, workflowState = null, options = {}) {
+  const createTime = resolveCreateTimeProvenance(
+    prospect,
+    resolveWorkflow(prospect, workflowState),
+    options
+  );
+  return (
+    createTime.reviewEligible === false &&
+    (createTime.reason === "LEGACY_NON_BR193_CREATE_ORIGIN" ||
+      createTime.reason === "HISTORICAL_PROVEN_CTWA_CREATE_ORIGIN")
+  );
 }
 
 function isKnownPersonalOrLegacyNonLeadContact(prospect = {}, workflowState = null) {
@@ -104,14 +91,46 @@ function isKnownPersonalOrLegacyNonLeadContact(prospect = {}, workflowState = nu
   if (isOrdinaryPersonalWhatsAppContact(prospect, wf)) {
     return true;
   }
-  return hasLegacyNonBr193CreateOrigin(prospect);
+  return hasLegacyNonBr193CreateOrigin(prospect, wf);
+}
+
+async function loadCreateEventForProspect(prospect = {}) {
+  if (!prospect?.phone) {
+    return null;
+  }
+  try {
+    const events = await workflowEventService.listWorkflowEvents(prospect.phone, 80);
+    return (events || []).find((event) => isProspectCreatedEvent(event)) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function evaluateSuspectedMetaLeadReviewWithCreateEvent(
+  prospect,
+  workflowState,
+  options = {}
+) {
+  const first = evaluateSuspectedMetaLeadReview(prospect, workflowState, options);
+  if (first.review === true || first.reason !== "NO_BR193_CREATE_TIME_EVIDENCE") {
+    return first;
+  }
+  const createEvent =
+    options.createEvent || (await loadCreateEventForProspect(prospect));
+  if (!createEvent) {
+    return first;
+  }
+  return evaluateSuspectedMetaLeadReview(prospect, workflowState, {
+    ...options,
+    createEvent
+  });
 }
 
 /**
  * Derived review membership. No production write required.
- * 131060 is not consulted.
+ * 131060 is not consulted. Requires durable BR-193 create-time evidence.
  */
-function evaluateSuspectedMetaLeadReview(prospect = null, workflowState = null) {
+function evaluateSuspectedMetaLeadReview(prospect = null, workflowState = null, options = {}) {
   if (!prospect) {
     return { review: false, reason: "MISSING_PROSPECT" };
   }
@@ -138,9 +157,17 @@ function evaluateSuspectedMetaLeadReview(prospect = null, workflowState = null) 
   if (isOrdinaryPersonalWhatsAppContact(prospect, wf)) {
     return { review: false, reason: "PERSONAL_WHATSAPP_NOT_ELIGIBLE" };
   }
-  if (hasLegacyNonBr193CreateOrigin(prospect)) {
-    return { review: false, reason: "LEGACY_NON_BR193_CREATE_ORIGIN" };
+
+  const createTime = resolveCreateTimeProvenance(prospect, wf, options);
+  if (!createTime.reviewEligible) {
+    return {
+      review: false,
+      reason: createTime.reason,
+      createOrigin: createTime.createOrigin || null,
+      evidence: createTime.evidence || null
+    };
   }
+
   if (wf.prospectPromotion?.operational === false) {
     return { review: false, reason: "EXPLICITLY_DEPROMOTED" };
   }
@@ -156,17 +183,24 @@ function evaluateSuspectedMetaLeadReview(prospect = null, workflowState = null) 
     reason: SUSPECTED_META_LEAD_REVIEW,
     ownerUserId: prospect.owner_user_id || null,
     originalFallbackReason:
-      review.originalFallbackReason || AD_DESTINATION_FALLBACK_REASON
+      review.originalFallbackReason || AD_DESTINATION_FALLBACK_REASON,
+    createOrigin: createTime.createOrigin || "META_AD_DESTINATION",
+    evidence: createTime.evidence || null
   };
 }
 
-function isSuspectedMetaLeadReview(prospect, workflowState = null) {
-  return evaluateSuspectedMetaLeadReview(prospect, workflowState).review === true;
+function isSuspectedMetaLeadReview(prospect, workflowState = null, options = {}) {
+  return evaluateSuspectedMetaLeadReview(prospect, workflowState, options).review === true;
 }
 
-function isOwnerVisibleSuspectedMetaLead(prospect, viewerUserId, workflowState = null) {
+function isOwnerVisibleSuspectedMetaLead(
+  prospect,
+  viewerUserId,
+  workflowState = null,
+  options = {}
+) {
   return (
-    isSuspectedMetaLeadReview(prospect, workflowState) &&
+    isSuspectedMetaLeadReview(prospect, workflowState, options) &&
     isOwnerOfProspect(prospect, viewerUserId)
   );
 }
@@ -252,7 +286,7 @@ async function confirmMetaLead({
     return { ok: true, alreadyResolved: true, source: existing?.atlasEligibilitySource || "CTWA_REFERRAL" };
   }
 
-  const decision = evaluateSuspectedMetaLeadReview(prospect, existing);
+  const decision = await evaluateSuspectedMetaLeadReviewWithCreateEvent(prospect, existing);
   if (!decision.review && decision.reason !== "ALREADY_CONFIRMED") {
     return { ok: false, reason: decision.reason, status: 409 };
   }
@@ -324,8 +358,12 @@ async function dismissMetaLeadAsPersonal({
   if (hasRealStoredCtwaEvidence(prospect, existing)) {
     return { ok: false, reason: "STRONGER_VERIFIED_PROVENANCE", status: 409 };
   }
+  const reviewDecision = await evaluateSuspectedMetaLeadReviewWithCreateEvent(
+    prospect,
+    existing
+  );
   const canDismiss =
-    evaluateSuspectedMetaLeadReview(prospect, existing).review === true ||
+    reviewDecision.review === true ||
     upper(existing?.atlasEligibilitySource) === HUMAN_VERIFIED_META_LEAD ||
     isMetaAdDestinationStamp(prospect, existing);
   if (!canDismiss) {
@@ -366,6 +404,9 @@ module.exports = {
   isOwnerOfProspect,
   hasLegacyNonBr193CreateOrigin,
   isKnownPersonalOrLegacyNonLeadContact,
+  resolveCreateTimeProvenance,
+  loadCreateEventForProspect,
+  evaluateSuspectedMetaLeadReviewWithCreateEvent,
   buildHumanVerifiedMetaLeadPatch,
   buildDismissedPersonalPatch,
   confirmMetaLead,
