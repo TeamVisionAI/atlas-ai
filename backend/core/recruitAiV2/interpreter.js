@@ -1483,6 +1483,7 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       confidence = 0.9;
       entities.city = canonicalizeCityName(location.city) || location.city;
       entities.state = location.state;
+      entities.zip = location.zip || null;
       entities.completeness = "complete";
       entities.requiresClarification = false;
       entities.correction = isCorrection;

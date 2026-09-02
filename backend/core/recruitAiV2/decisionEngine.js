@@ -1967,6 +1967,7 @@ function decideConversationTurnCore({
         ...context.knownFacts,
         city,
         state,
+        zip: interpretation.entities?.zip || context.knownFacts?.zip || null,
         cityCertainty: "confirmed",
         stateCertainty: "confirmed",
         proposedState: null,
@@ -2006,6 +2007,7 @@ function decideConversationTurnCore({
         knownFacts: {
           city,
           state,
+          zip: interpretation.entities?.zip || context.knownFacts?.zip || null,
           cityCertainty: "confirmed",
           stateCertainty: "confirmed",
           proposedState: null,
@@ -2283,6 +2285,7 @@ function decideConversationTurnCore({
       knownFacts: {
         city: city || null,
         state: state || null,
+        zip: interpretation.entities?.zip || context.knownFacts?.zip || null,
         cityCertainty: "confirmed",
         stateCertainty: "confirmed",
         proposedState: null,

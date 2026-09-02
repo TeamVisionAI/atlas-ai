@@ -13,6 +13,8 @@ function emptyKnownFacts() {
   return {
     city: null,
     state: null,
+    /** BR-217 — optional US ZIP; never required for qualification. */
+    zip: null,
     /** confirmed | proposed | partial | unknown — BR-082 */
     cityCertainty: "unknown",
     stateCertainty: "unknown",
