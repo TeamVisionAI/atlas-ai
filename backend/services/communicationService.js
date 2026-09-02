@@ -20,11 +20,12 @@ const {
   resolveInterviewDetailsTemplate,
   resolveInterviewReminderTemplate,
   resolveZoomInvitationTemplate,
-  resolveOfficeLocationTemplate
+  resolveOfficeLocationTemplate,
+  resolveRecruiterDisplayName,
+  resolveInterviewTypeFromAppointment
 } = require("../core/whatsappCommunicationEngine");
 const { payloadsMatchForSend } = require("../core/communicationOutboundPayloadEngine");
 const { logInterviewerTrace } = require("../dev/interviewerTrace");
-const { resolveRecruiterDisplayName } = require("../core/whatsappCommunicationEngine");
 const { evaluateCustomerCareWindow } = require("../core/whatsappCustomerCareWindow");
 const { sendTextMessage } = require("./whatsappService");
 const {
@@ -33,6 +34,12 @@ const {
   buildZoomInvitationVariables
 } = require("../core/whatsappTemplateVariableBuilder");
 const { findProspectInOrganization } = require("./supabaseService");
+const {
+  buildManualCommunicationFallback,
+  MANUAL_COMMUNICATION_PURPOSES
+} = require("../core/manualInterviewReminderFallback");
+const { resolveProspectCommunicationCode } = require("../core/prospectLanguage");
+const { resolveCanonicalOfficeAddress, isCompleteOfficeAddress } = require("../core/officeAddressResolver");
 
 const NATIVE_TEMPLATE_SOURCE_ACTIONS = new Set([
   "resend_interview_details",
@@ -195,15 +202,49 @@ async function prepareOfficeLocationCommunication(appointmentId, context = {}) {
 
 /**
  * Preview-only — same payload assembly as send, without recording delivery.
+ * Implements BR-214: assembly failure returns a deterministic HUMAN fallback.
  */
-async function previewInterviewDetailsCommunication(appointmentId, context = {}) {
-  const prepared = await prepareInterviewDetailsCommunication(appointmentId, context);
-
-  if (!prepared?.success) {
-    return prepared;
+async function previewAppointmentCommunicationWithFallback(
+  appointmentId,
+  context,
+  { prepareFn, purpose, successMessage, fallbackMessage }
+) {
+  let prepared = null;
+  try {
+    prepared = await prepareFn(appointmentId, context);
+  } catch (error) {
+    prepared = buildError(
+      error?.code || "PREVIEW_ASSEMBLY_FAILED",
+      error?.message || "Could not assemble the communication preview."
+    );
   }
 
-  return buildSuccess("Interview invitation preview ready.", prepared);
+  if (prepared?.success && prepared.message) {
+    return buildSuccess(successMessage, prepared);
+  }
+
+  try {
+    const fallback = await assembleManualCommunicationFallback(appointmentId, context, purpose);
+    if (fallback?.success && fallback.message) {
+      return buildSuccess(fallbackMessage, {
+        ...fallback,
+        previewError: prepared?.error || prepared?.message || null
+      });
+    }
+  } catch {
+    // Fall through to the original prepare failure.
+  }
+
+  return prepared;
+}
+
+async function previewInterviewDetailsCommunication(appointmentId, context = {}) {
+  return previewAppointmentCommunicationWithFallback(appointmentId, context, {
+    prepareFn: prepareInterviewDetailsCommunication,
+    purpose: MANUAL_COMMUNICATION_PURPOSES.INVITATION,
+    successMessage: "Interview invitation preview ready.",
+    fallbackMessage: "Interview invitation fallback ready."
+  });
 }
 
 async function sendNativeApprovedTemplate({
@@ -407,37 +448,128 @@ async function sendInterviewDetails(appointmentId, context = {}) {
   });
 }
 
-/**
- * Preview-only — interview reminder uses the same payload assembly as send.
- */
-async function previewInterviewReminderCommunication(appointmentId, context = {}) {
-  const prepared = await prepareInterviewReminderCommunication(appointmentId, context);
-
-  if (!prepared?.success) {
-    return prepared;
+async function assembleManualCommunicationFallback(
+  appointmentId,
+  context = {},
+  purpose = MANUAL_COMMUNICATION_PURPOSES.REMINDER
+) {
+  const organizationId = requireTenantOrganizationId(context.organizationId);
+  const appointment = await appointmentApplicationService.getAppointment(
+    appointmentId,
+    organizationId
+  );
+  const phone = appointment?.prospectPhone || null;
+  if (!phone) {
+    return buildError("APPOINTMENT_NOT_FOUND", "Appointment not found.");
   }
 
-  return buildSuccess("Interview reminder preview ready.", prepared);
+  let prospect = null;
+  try {
+    prospect = await findProspectInOrganization(phone, organizationId);
+  } catch {
+    prospect = null;
+  }
+
+  const language = resolveProspectCommunicationCode(prospect) || "es";
+  const meetingType = resolveInterviewTypeFromAppointment(appointment, prospect);
+  const inPerson = meetingType === "office" || purpose === MANUAL_COMMUNICATION_PURPOSES.OFFICE;
+  let officeAddress = appointment.meetingAddress || appointment.meeting_address || null;
+  if (inPerson && !isCompleteOfficeAddress(officeAddress)) {
+    try {
+      const resolved = await resolveCanonicalOfficeAddress({
+        organizationId,
+        meetingType: "in_person",
+        persistedAppointment: appointment
+      });
+      officeAddress = resolved?.address || null;
+    } catch {
+      officeAddress = officeAddress || null;
+    }
+  }
+
+  const templateByPurpose = {
+    [MANUAL_COMMUNICATION_PURPOSES.INVITATION]: "interview_details",
+    [MANUAL_COMMUNICATION_PURPOSES.REMINDER]: "interview_reminder",
+    [MANUAL_COMMUNICATION_PURPOSES.ZOOM]: "zoom_invitation",
+    [MANUAL_COMMUNICATION_PURPOSES.OFFICE]: "office_location"
+  };
+  const template = templateByPurpose[purpose] || "interview_reminder";
+  const message = buildManualCommunicationFallback({
+    purpose,
+    prospectName: prospect?.name || appointment.metadata?.prospectName || "",
+    startIso: appointment.startDateTime || appointment.start_date_time || null,
+    timezone: appointment.timezone || "America/New_York",
+    meetingMode: inPerson ? "in_person" : "zoom",
+    officeAddress,
+    language
+  });
+
+  let customerCareWindow = null;
+  try {
+    customerCareWindow = await loadCustomerCareWindow(phone, organizationId);
+  } catch {
+    customerCareWindow = null;
+  }
+
+  return {
+    success: true,
+    phone,
+    channel: "whatsapp",
+    template,
+    message,
+    language,
+    zoomUrl: null,
+    fallbackUsed: true,
+    customerCareWindow,
+    outboundPayload: {
+      message,
+      template,
+      language,
+      phone,
+      missingContent: [],
+      fallbackUsed: true
+    }
+  };
+}
+
+async function assembleManualInterviewReminderFallback(appointmentId, context = {}) {
+  return assembleManualCommunicationFallback(
+    appointmentId,
+    context,
+    MANUAL_COMMUNICATION_PURPOSES.REMINDER
+  );
+}
+
+/**
+ * Preview-only — interview reminder uses the same payload assembly as send.
+ * Implements BR-214: if assembly fails, return a deterministic HUMAN fallback
+ * so Mission Control / Prospect Workspace can still compose and send.
+ */
+async function previewInterviewReminderCommunication(appointmentId, context = {}) {
+  return previewAppointmentCommunicationWithFallback(appointmentId, context, {
+    prepareFn: prepareInterviewReminderCommunication,
+    purpose: MANUAL_COMMUNICATION_PURPOSES.REMINDER,
+    successMessage: "Interview reminder preview ready.",
+    fallbackMessage: "Interview reminder fallback ready."
+  });
 }
 
 async function previewZoomInvitationCommunication(appointmentId, context = {}) {
-  const prepared = await prepareZoomInvitationCommunication(appointmentId, context);
-
-  if (!prepared?.success) {
-    return prepared;
-  }
-
-  return buildSuccess("Zoom invitation preview ready.", prepared);
+  return previewAppointmentCommunicationWithFallback(appointmentId, context, {
+    prepareFn: prepareZoomInvitationCommunication,
+    purpose: MANUAL_COMMUNICATION_PURPOSES.ZOOM,
+    successMessage: "Zoom invitation preview ready.",
+    fallbackMessage: "Zoom invitation fallback ready."
+  });
 }
 
 async function previewOfficeLocationCommunication(appointmentId, context = {}) {
-  const prepared = await prepareOfficeLocationCommunication(appointmentId, context);
-
-  if (!prepared?.success) {
-    return prepared;
-  }
-
-  return buildSuccess("Office location preview ready.", prepared);
+  return previewAppointmentCommunicationWithFallback(appointmentId, context, {
+    prepareFn: prepareOfficeLocationCommunication,
+    purpose: MANUAL_COMMUNICATION_PURPOSES.OFFICE,
+    successMessage: "Office location preview ready.",
+    fallbackMessage: "Office location fallback ready."
+  });
 }
 
 /**
@@ -499,6 +631,8 @@ module.exports = {
   prepareOfficeLocationCommunication,
   previewInterviewDetailsCommunication,
   previewInterviewReminderCommunication,
+  assembleManualCommunicationFallback,
+  assembleManualInterviewReminderFallback,
   previewZoomInvitationCommunication,
   previewOfficeLocationCommunication,
   sendInterviewDetails,

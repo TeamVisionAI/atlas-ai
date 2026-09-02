@@ -10,6 +10,7 @@ import {
   shouldUseSharedComposerForInterviewAction
 } from "../engines/nativeInterviewWhatsAppActions.js";
 import { extractOutboundPayload } from "../engines/communicationPreviewEngine.js";
+import { resolveManualCommunicationPreviewOrFallback } from "../engines/manualInterviewReminderFallback.js";
 import { fetchAppointmentCommunicationPreviewByPurpose } from "../services/communicationPreviewService";
 import {
   sendInterviewDetails,
@@ -27,6 +28,8 @@ const SEND_BY_PURPOSE = Object.freeze({
 /**
  * Routes interview WhatsApp actions to shared composer (inside 24h) or
  * approved Meta template confirm (outside 24h). Never opens wa.me.
+ * Preview failure for any native interview action uses BR-214 deterministic
+ * fallback + HUMAN composer.
  */
 export function useNativeInterviewWhatsApp({
   translate,
@@ -70,14 +73,38 @@ export function useNativeInterviewWhatsApp({
       setTemplateSession(null);
 
       try {
-        const preview = await fetchAppointmentCommunicationPreviewByPurpose(
-          persistedId,
-          purpose
-        );
+        let preview = null;
+        try {
+          preview = await fetchAppointmentCommunicationPreviewByPurpose(
+            persistedId,
+            purpose
+          );
+        } catch (requestError) {
+          console.error(requestError);
+          preview = { success: false };
+        }
 
-        if (!preview?.success) {
-          const message =
-            preview?.message || translate("communicationPreviewLoadFailed");
+        const resolved = resolveManualCommunicationPreviewOrFallback({
+          purpose,
+          preview,
+          workspace,
+          phone
+        });
+        if (resolved.ok && resolved.fallbackUsed) {
+          setComposerSession({
+            ...buildInterviewComposerPrefill({
+              actionId,
+              previewMessage: resolved.message,
+              phone: resolved.phone || phone || workspace?.phone || null,
+              appointmentId: persistedId
+            }),
+            fallbackUsed: true,
+            titleKey: resolved.titleKey
+          });
+          return { handled: true, success: true, mode: "freeform_composer", fallbackUsed: true };
+        }
+        if (!resolved.ok) {
+          const message = translate("communicationPreviewLoadFailed");
           setError(message);
           showToast?.showError?.(message);
           return { handled: true, success: false };
@@ -134,6 +161,25 @@ export function useNativeInterviewWhatsApp({
         return { handled: true, success: true, mode: "approved_template" };
       } catch (requestError) {
         console.error(requestError);
+        const resolved = resolveManualCommunicationPreviewOrFallback({
+          purpose,
+          preview: { success: false },
+          workspace,
+          phone
+        });
+        if (resolved.ok && resolved.message) {
+          setComposerSession({
+            ...buildInterviewComposerPrefill({
+              actionId,
+              previewMessage: resolved.message,
+              phone: resolved.phone || phone || workspace?.phone || null,
+              appointmentId: persistedId
+            }),
+            fallbackUsed: true,
+            titleKey: resolved.titleKey
+          });
+          return { handled: true, success: true, mode: "freeform_composer", fallbackUsed: true };
+        }
         const message = translate("communicationPreviewLoadFailed");
         setError(message);
         showToast?.showError?.(message);
