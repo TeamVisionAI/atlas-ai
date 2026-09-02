@@ -17,6 +17,7 @@ const {
   isOwnerVisibleSuspectedMetaLead,
   confirmMetaLead,
   dismissMetaLeadAsPersonal,
+  hasLegacyNonBr193CreateOrigin,
   SUSPECTED_META_LEAD_REVIEW,
   HUMAN_VERIFIED_META_LEAD
 } = require("../core/metaLeadReview");
@@ -54,6 +55,7 @@ const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("../core/whatsappCons
 const ORG = "00000000-0000-4000-8000-000000000001";
 const OWNER = "d8d75c0e-d93e-42c9-950e-004fbfabdc8d";
 const OTHER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const NIOVEL = "33ad243a-9d00-4a4d-810b-df2762c0f076";
 const PHONE = "+17864039802";
 
 function ownerAuth() {
@@ -73,6 +75,17 @@ function otherAuth() {
     userId: OTHER,
     role: ROLES.AGENT,
     permissions: permissionsForRole(ROLES.AGENT)
+  };
+}
+
+function rvpAuth() {
+  return {
+    userId: NIOVEL,
+    role: ROLES.RVP,
+    organizationId: ORG,
+    status: "active",
+    permissions: permissionsForRole(ROLES.RVP),
+    hierarchyMode: HIERARCHY_MODES.ORGANIZATION
   };
 }
 
@@ -126,17 +139,39 @@ async function withMemoryState(run) {
   }
 }
 
-async function inbox(prospects, authContext) {
+async function inbox(prospects, authContext, workspaceScope = "mine", organizationId = ORG) {
   return buildConversationsCenterReadModel({
-    organizationId: ORG,
+    organizationId,
     authContext,
-    workspaceScope: "mine",
+    workspaceScope,
     filter: "active",
     prospects,
     conversationLogsByPhone: new Map(),
     persistWindowArchive: false,
     view: "full"
   });
+}
+
+function yaidelShapedProspect() {
+  return {
+    id: "61c235c8-c52b-40cd-9c90-dbff21c3e4f4",
+    organization_id: ORG,
+    owner_user_id: NIOVEL,
+    phone: "+17253061932",
+    name: "Yaidel",
+    source: WHATSAPP_SOURCE.UNKNOWN,
+    entry_method: WHATSAPP_ENTRY_METHOD.UNATTRIBUTED,
+    current_step: "NEW",
+    created_at: "2026-08-25T23:32:17.425Z",
+    updated_at: "2026-09-02T18:23:49.265Z",
+    workflow_state: {
+      atlasEligibilitySource: VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION,
+      handoffReason: "whatsapp_business_app",
+      humanTakenOverAt: "2026-09-02T14:54:14.578Z",
+      workflowOwnership: "AGENT",
+      manualAgentOwnership: true
+    }
+  };
 }
 
 test("docs: BR-215 documented and META stays out of positive provenance", () => {
@@ -349,6 +384,70 @@ test("K) later real CTWA upgrades automatically through monotonic persist", asyn
       "CTWA_REFERRAL"
     );
   });
+});
+
+test("A-leak) known personal + META_AD_DESTINATION is not a review candidate", () => {
+  const personalWithMeta = metaFallbackProspect({
+    source: WHATSAPP_SOURCE.PERSONAL_WHATSAPP,
+    entry_method: WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
+    workflow_state: {
+      atlasEligibilitySource: VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION
+    }
+  });
+  const decision = evaluateSuspectedMetaLeadReview(
+    personalWithMeta,
+    personalWithMeta.workflow_state
+  );
+  assert.equal(decision.review, false);
+  assert.ok(
+    decision.reason === "PERSONAL_WHATSAPP_NOT_ELIGIBLE" ||
+      decision.reason === "LEGACY_NON_BR193_CREATE_ORIGIN"
+  );
+});
+
+test("A-leak) UNKNOWN/UNATTRIBUTED continuation META stamp is not a review candidate", async () => {
+  const yaidel = yaidelShapedProspect();
+  assert.equal(hasLegacyNonBr193CreateOrigin(yaidel), true);
+  const decision = evaluateSuspectedMetaLeadReview(yaidel, yaidel.workflow_state);
+  assert.equal(decision.review, false);
+  assert.equal(decision.reason, "LEGACY_NON_BR193_CREATE_ORIGIN");
+  const model = await inbox([yaidel], rvpAuth());
+  assert.equal(model.items.length, 0);
+  assert.equal(model.metaLeadsAwaitingVerification, 0);
+});
+
+test("B-leak) ordinary unknown META fallback remains a review candidate", () => {
+  const prospect = metaFallbackProspect();
+  assert.equal(hasLegacyNonBr193CreateOrigin(prospect), false);
+  assert.equal(evaluateSuspectedMetaLeadReview(prospect, prospect.workflow_state).review, true);
+});
+
+test("C-leak) review is visible only to the exact owner", async () => {
+  const prospect = metaFallbackProspect();
+  const ownerModel = await inbox([prospect], ownerAuth(), "mine");
+  assert.equal(ownerModel.items.length, 1);
+  assert.equal(isOwnerVisibleSuspectedMetaLead(prospect, OWNER), true);
+});
+
+test("D-leak) RVP cannot see a subordinate agent's review candidate", async () => {
+  const prospect = metaFallbackProspect();
+  assert.equal(isOwnerVisibleSuspectedMetaLead(prospect, NIOVEL), false);
+  const model = await inbox([prospect], rvpAuth(), "oversight");
+  assert.equal(model.items.length, 0);
+});
+
+test("E-leak) other org cannot see the review candidate", async () => {
+  const otherOrg = "11111111-1111-4111-8111-111111111111";
+  const prospect = metaFallbackProspect({ organization_id: otherOrg });
+  const model = await inbox(
+    [prospect],
+    { ...ownerAuth(), organizationId: otherOrg },
+    "mine",
+    otherOrg
+  );
+  assert.equal(model.items.length, 1);
+  const crossTenant = await inbox([prospect], ownerAuth(), "mine", ORG);
+  assert.equal(crossTenant.items.length, 0);
 });
 
 test("O) other users cannot confirm or dismiss", async () => {
