@@ -1,10 +1,15 @@
 /**
- * BR-074 — Explicit user-permission resolver (no role/admin wildcards).
- * Used only for narrowly scoped permissions such as securities:verify.
+ * Explicit user-permission resolver (no role/admin wildcards).
+ * BR-074 securities:verify and BR-218 conversations:support only.
  */
 
 const { supabase } = require("../services/supabaseService");
 const { SECURITIES_VERIFY_PERMISSION } = require("./securitiesAccessConstants");
+const { PERMISSIONS } = require("./permissions");
+
+const EXPLICIT_ONLY_PERMISSIONS = Object.freeze(
+  new Set([SECURITIES_VERIFY_PERMISSION, PERMISSIONS.CONVERSATIONS_SUPPORT])
+);
 
 /**
  * Evaluate only organization-scoped user_permissions rows.
@@ -25,8 +30,7 @@ async function hasExplicitUserPermission({
     return false;
   }
 
-  // Only securities:verify is authorized through this path in v1.
-  if (permissionCode !== SECURITIES_VERIFY_PERMISSION) {
+  if (!EXPLICIT_ONLY_PERMISSIONS.has(permissionCode)) {
     return false;
   }
 

@@ -46,7 +46,7 @@ const TV_PROSPECT = {
   phone: "+17865551001",
   name: "Vision Lead",
   organization_id: ORG_TV,
-  owner_user_id: "admin-tv",
+  owner_user_id: "admin-00000000",
   current_step: "QUALIFICATION",
   source: "car_magnet",
   entry_method: "QR",
@@ -60,7 +60,7 @@ const TL_PROSPECT = {
   phone: "+17865553001",
   name: "Legacy Lead",
   organization_id: ORG_TL,
-  owner_user_id: "admin-tl",
+  owner_user_id: "admin-af8fb707",
   current_step: "QUALIFICATION",
   source: "car_magnet",
   entry_method: "QR",
@@ -257,10 +257,13 @@ test("11. Conversations cache keys include tenant and MainLayout is not hardcode
   assert.match(layout, /fetchOrganizationBranding/);
 });
 
-test("12. Normal tenant ADMIN/RVP behavior unchanged", () => {
+test("12. Tenant ADMIN still has CRM access but not subordinate conversations", () => {
   const admin = tenantAdmin(ORG_TV);
   assert.equal(isProspectInConversationsUserScope(TV_PROSPECT, ORG_TV, admin), true);
   assert.equal(canAccessProspect(admin, TV_PROSPECT), true);
+  const subordinate = { ...TV_PROSPECT, id: "tv-sub", owner_user_id: "agent-tv" };
+  assert.equal(isProspectInConversationsUserScope(subordinate, ORG_TV, admin), false);
+  assert.equal(canAccessProspect(admin, subordinate), true);
   assert.equal(resolveEffectiveOrganizationId(admin, { organizationId: ORG_TL }), ORG_TV);
   assert.equal(isGlobalSuperAdminControlPlane(admin, null), false);
 });

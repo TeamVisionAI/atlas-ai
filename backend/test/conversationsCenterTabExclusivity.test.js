@@ -124,7 +124,7 @@ test("mine-only tab is current user Atlas prospects", async () => {
   assert.deepEqual(model.items.map((item) => item.id).sort(), ["arays", "elizabeth"]);
 });
 
-test("team-only tab excludes the current user", async () => {
+test("Conversations oversight is coerced to mine and hides subordinates", async () => {
   const context = auth(ROLES.RVP, USER_LEADER);
   const team = resolveWorkspaceListScope(context, "oversight");
   assert.equal(team.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
@@ -137,10 +137,12 @@ test("team-only tab excludes the current user", async () => {
     workspaceScope: "oversight",
     prospects: catalog
   });
-  assert.deepEqual(model.items.map((item) => item.id), ["claudia"]);
+  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
+  assert.deepEqual(model.items.map((item) => item.id).sort(), ["arays", "elizabeth"]);
+  assert.equal(model.items.some((item) => item.id === "claudia"), false);
 });
 
-test("downstream prospect is visible in Team Prospects", async () => {
+test("downstream prospect is not visible in Conversations for SRL/RL", async () => {
   const dl = auth(ROLES.DIVISION_LEADER, USER_LEADER, {
     hierarchyMode: HIERARCHY_MODES.SUBTREE,
     hierarchyUserIds: [USER_LEADER, USER_DOWNSTREAM]
@@ -150,11 +152,11 @@ test("downstream prospect is visible in Team Prospects", async () => {
     workspaceScope: "oversight",
     prospects: catalog
   });
-  assert.equal(model.items.some((item) => item.id === "claudia"), true);
-  assert.equal(model.items.some((item) => item.id === "arays"), false);
+  assert.equal(model.items.some((item) => item.id === "claudia"), false);
+  assert.equal(model.items.some((item) => item.id === "arays"), true);
 });
 
-test("same prospect never appears in both tabs", async () => {
+test("Conversations has a single mine list; oversight equals mine", async () => {
   const context = auth(ROLES.RVP, USER_LEADER);
   const mine = await loadInbox({
     authContext: context,
@@ -166,9 +168,12 @@ test("same prospect never appears in both tabs", async () => {
     workspaceScope: "oversight",
     prospects: catalog
   });
-  const mineIds = new Set(mine.items.map((item) => item.id));
-  const overlap = team.items.filter((item) => mineIds.has(item.id));
-  assert.deepEqual(overlap, []);
+  assert.deepEqual(
+    team.items.map((item) => item.id).sort(),
+    mine.items.map((item) => item.id).sort()
+  );
+  assert.equal(team.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
+  assert.equal(mine.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
 });
 
 test("tenant isolation preserved on Team Prospects", async () => {

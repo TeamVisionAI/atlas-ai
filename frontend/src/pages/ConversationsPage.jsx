@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useWorkspace } from "../contexts/WorkspaceContext";
-import { isGlobalSuperAdminControlPlane } from "../security/isGlobalSuperAdminControlPlane";
+import {
+  isGlobalSuperAdminControlPlane,
+  isSupportModeActive
+} from "../security/isGlobalSuperAdminControlPlane";
+import { isSuperAdminUser } from "../security/isSuperAdminUser";
 import ControlPlaneEmptyState from "../components/layout/ControlPlaneEmptyState";
 import AtlasButton from "../components/ui/AtlasButton";
 import AtlasSelect from "../components/ui/AtlasSelect";
@@ -44,6 +48,11 @@ import { invalidateProspectCommunicationsCache } from "../services/communication
 import {
   getConversations,
   getConversation,
+  getConversationsCenterAccess,
+  getConversationsCenterSupportTargets,
+  enterConversationsSupportAccess,
+  enterConversationsSupportMode,
+  exitConversationsSupportMode,
   takeOverConversation,
   returnConversationToAtlas,
   confirmMetaLead,
@@ -63,8 +72,9 @@ import {
   resolveConversationsAccessStateFromError
 } from "../engines/conversationsCenterAccess";
 import {
-  CONVERSATIONS_WORKSPACE_TABS,
-  canSeeConversationsTeamProspects,
+  canOpenConversationsSupportView,
+  conversationsSupportMutationsAllowed,
+  resolveConversationsSupportView,
   resolveConversationsWorkspaceTab
 } from "../engines/conversationsWorkspaceScope";
 import "./ConversationsPage.css";
@@ -152,8 +162,8 @@ function conversationsTenantKey({ user, supportMode, controlPlane }) {
   return supportMode?.organizationId || user?.organizationId || "none";
 }
 
-function inboxCacheKey(filter, organizationId, workspaceScope = "", userId = "") {
-  return `${organizationId || "none"}::${userId || "anon"}::${filter || "active"}::::summary::${workspaceScope || "mine"}`;
+function inboxCacheKey(filter, organizationId, supportScope = "mine", userId = "") {
+  return `${organizationId || "none"}::${userId || "anon"}::${filter || "active"}::::summary::${supportScope || "mine"}`;
 }
 
 function ConversationListSkeleton() {
@@ -247,19 +257,35 @@ export default function ConversationsPage() {
   const activeFilter = searchParams.get("filter") || "active";
   const deepLinkProspectId = searchParams.get("prospectId") || "";
   const deepLinkPhone = searchParams.get("phone") || "";
-  const canSeeTeamProspects = canSeeConversationsTeamProspects(user);
   const workspaceTab = resolveConversationsWorkspaceTab({
-    workspaceScopeParam: searchParams.get("workspaceScope") || "",
-    canSeeTeam: canSeeTeamProspects
+    workspaceScopeParam: searchParams.get("workspaceScope") || ""
   });
-  const workspaceScope = workspaceTab.workspaceScope;
+  const [canUseConversationsSupport, setCanUseConversationsSupport] = useState(false);
+  const [accessSupportModeActive, setAccessSupportModeActive] = useState(false);
+  const [supportTargets, setSupportTargets] = useState([]);
+  const supportModeActive =
+    isSupportModeActive(supportMode) || accessSupportModeActive === true;
+  const canOpenSupport = canOpenConversationsSupportView({
+    canUseConversationsSupport,
+    supportModeActive
+  });
+  const supportView = resolveConversationsSupportView({
+    supportUserId: searchParams.get("supportUserId") || "",
+    canOpenSupport,
+    currentUserId: user?.id || user?.userId || ""
+  });
+  const supportReadOnly = supportView.active === true && supportView.readOnly === true;
+  const supportScopeKey = supportView.active ? `support:${supportView.supportUserId}` : "mine";
+  const supportRequest = supportView.active
+    ? { supportUserId: supportView.supportUserId }
+    : { supportUserId: "" };
 
   const listUserId = user?.id || user?.userId || "";
   const [payload, setPayload] = useState(() =>
-    readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope, listUserId))
+    readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, supportScopeKey, listUserId))
   );
   const [listLoading, setListLoading] = useState(
-    () => !readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope, listUserId))
+    () => !readConversationsListCache(inboxCacheKey(activeFilter, tenantCacheKey, supportScopeKey, listUserId))
   );
   const [listError, setListError] = useState(null);
   const [error, setError] = useState(null);
@@ -291,7 +317,7 @@ export default function ConversationsPage() {
       setListError(null);
       return;
     }
-    const cacheKey = inboxCacheKey(activeFilter, tenantCacheKey, workspaceScope, listUserId);
+    const cacheKey = inboxCacheKey(activeFilter, tenantCacheKey, supportScopeKey, listUserId);
     if (!quiet && !payload) {
       const cached = readConversationsListCache(cacheKey);
       if (cached) {
@@ -315,8 +341,8 @@ export default function ConversationsPage() {
         organizationId: tenantCacheKey,
         filter: activeFilter,
         view: "summary",
-        workspaceScope,
         userId: listUserId,
+        ...supportRequest,
         force
       });
       setPayload(data);
@@ -355,7 +381,7 @@ export default function ConversationsPage() {
         setListLoading(false);
       }
     }
-  }, [activeFilter, workspaceScope, translate, controlPlane, tenantCacheKey, listUserId]);
+  }, [activeFilter, supportScopeKey, supportRequest.supportUserId, translate, controlPlane, tenantCacheKey, listUserId]);
   loadListRef.current = loadList;
 
   useEffect(() => {
@@ -366,6 +392,55 @@ export default function ConversationsPage() {
     next.delete("workspaceScope");
     setSearchParams(next, { replace: true });
   }, [workspaceTab.unauthorizedTeam, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (controlPlane) {
+      setCanUseConversationsSupport(false);
+      setAccessSupportModeActive(false);
+      setSupportTargets([]);
+      return;
+    }
+    let cancelled = false;
+    getConversationsCenterAccess()
+      .then((access) => {
+        if (cancelled) {
+          return;
+        }
+        setCanUseConversationsSupport(access?.canUseConversationsSupportAccess === true);
+        setAccessSupportModeActive(access?.supportModeActive === true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCanUseConversationsSupport(false);
+          setAccessSupportModeActive(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [controlPlane, tenantCacheKey, supportMode?.active]);
+
+  useEffect(() => {
+    if (!canOpenSupport || controlPlane) {
+      setSupportTargets([]);
+      return;
+    }
+    let cancelled = false;
+    getConversationsCenterSupportTargets()
+      .then((result) => {
+        if (!cancelled) {
+          setSupportTargets(Array.isArray(result?.items) ? result.items : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSupportTargets([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canOpenSupport, controlPlane, tenantCacheKey]);
 
   useEffect(() => {
     clearConversationsCaches();
@@ -386,7 +461,7 @@ export default function ConversationsPage() {
       loadListRef.current?.({ quiet: true, force: true });
     }, CONVERSATIONS_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [activeFilter, workspaceScope, tenantCacheKey]);
+  }, [activeFilter, supportScopeKey, tenantCacheKey]);
 
   const loadDetail = useCallback(
     async (phone, { force = false } = {}) => {
@@ -398,7 +473,11 @@ export default function ConversationsPage() {
       const ownershipRevisionAtStart = ownershipRevisionRef.current;
       setDetailLoading(true);
       try {
-        const data = await getConversation(phone, { organizationId: tenantCacheKey, force });
+        const data = await getConversation(phone, {
+          organizationId: tenantCacheKey,
+          force,
+          ...supportRequest
+        });
         // Stale async guard — rapid A→B must never keep A's detail under B.
         if (
           !shouldCommitConversationDetail({
@@ -454,7 +533,7 @@ export default function ConversationsPage() {
         }
       }
     },
-    [translate, tenantCacheKey]
+    [translate, tenantCacheKey, supportRequest.supportUserId]
   );
 
   function applyOwnershipMutationResult(phone, result) {
@@ -605,9 +684,11 @@ export default function ConversationsPage() {
       nextInbound > previousInbound
     ) {
       window.requestAnimationFrame(() => scrollTranscriptToLatest());
-      markConversationRead(selectedPhoneRef.current)
-        .then(() => loadListRef.current?.({ quiet: true }))
-        .catch(() => {});
+      if (!supportReadOnly) {
+        markConversationRead(selectedPhoneRef.current, supportBody())
+          .then(() => loadListRef.current?.({ quiet: true }))
+          .catch(() => {});
+      }
     }
   }, []);
 
@@ -627,11 +708,13 @@ export default function ConversationsPage() {
         )
       };
     });
-    markConversationRead(row.phone, {
-      lastReadInboundAt: new Date().toISOString()
-    })
-      .then(() => loadListRef.current?.({ quiet: true }))
-      .catch(() => {});
+    if (!supportReadOnly) {
+      markConversationRead(row.phone, supportBody({
+        lastReadInboundAt: new Date().toISOString()
+      }))
+        .then(() => loadListRef.current?.({ quiet: true }))
+        .catch(() => {});
+    }
   }
 
   async function onJumpToLatest() {
@@ -640,9 +723,11 @@ export default function ConversationsPage() {
       return;
     }
     try {
-      await markConversationRead(selectedPhoneRef.current, {
-        lastReadInboundAt: new Date().toISOString()
-      });
+      if (!supportReadOnly) {
+        await markConversationRead(selectedPhoneRef.current, supportBody({
+          lastReadInboundAt: new Date().toISOString()
+        }));
+      }
       await loadListRef.current?.({ quiet: true });
     } catch {
       /* ignore */
@@ -703,21 +788,64 @@ export default function ConversationsPage() {
     setSearchParams(next);
   }
 
-  function setWorkspaceListTab(tab) {
+  function setSupportTargetUser(userId) {
     const next = new URLSearchParams(searchParams);
-    if (tab === CONVERSATIONS_WORKSPACE_TABS.TEAM && canSeeTeamProspects) {
-      next.set("workspaceScope", "oversight");
+    next.delete("workspaceScope");
+    next.delete("conversationsSupport");
+    if (userId) {
+      next.set("supportUserId", userId);
     } else {
-      next.delete("workspaceScope");
+      next.delete("supportUserId");
     }
     setSearchParams(next);
+    if (userId && supportModeActive) {
+      enterConversationsSupportAccess({
+        supportUserId: userId
+      }).catch(() => {
+        /* audit is best-effort; list/detail still enforce server-side */
+      });
+    }
+    setPayload(null);
+    setDetail(null);
+    setSelectedPhone(null);
+  }
+
+  async function onEnterAdminSupportMode() {
+    try {
+      await enterConversationsSupportMode();
+      const access = await getConversationsCenterAccess();
+      setCanUseConversationsSupport(access?.canUseConversationsSupportAccess === true);
+      setAccessSupportModeActive(access?.supportModeActive === true);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function onExitAdminSupportMode() {
+    try {
+      await exitConversationsSupportMode();
+      setAccessSupportModeActive(false);
+      setSupportTargetUser("");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function supportBody(extra = {}) {
+    if (!supportView.active) {
+      return extra;
+    }
+    return {
+      ...extra,
+      supportUserId: supportView.supportUserId
+    };
   }
 
   async function onTakeOver() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      const result = await takeOverConversation(selectedPhone);
+      const result = await takeOverConversation(selectedPhone, supportBody());
       applyOwnershipMutationResult(selectedPhone, result);
       await loadList({ force: true });
       setRefreshSignal((n) => n + 1);
@@ -730,10 +858,10 @@ export default function ConversationsPage() {
   }
 
   async function onConfirmMetaLead() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      await confirmMetaLead(selectedPhone);
+      await confirmMetaLead(selectedPhone, supportBody());
       await loadList({ force: true });
       setRefreshSignal((n) => n + 1);
       loadDetail(selectedPhone, { force: true });
@@ -745,10 +873,10 @@ export default function ConversationsPage() {
   }
 
   async function onMarkNotLead() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      await markConversationNotLead(selectedPhone);
+      await markConversationNotLead(selectedPhone, supportBody());
       await loadList({ force: true });
       setRefreshSignal((n) => n + 1);
       loadDetail(selectedPhone, { force: true });
@@ -760,10 +888,10 @@ export default function ConversationsPage() {
   }
 
   async function onReturnToAtlas() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      const result = await returnConversationToAtlas(selectedPhone);
+      const result = await returnConversationToAtlas(selectedPhone, supportBody());
       applyOwnershipMutationResult(selectedPhone, result);
       await loadList({ force: true });
       setRefreshSignal((n) => n + 1);
@@ -776,10 +904,10 @@ export default function ConversationsPage() {
   }
 
   async function onArchive() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      await archiveConversation(selectedPhone);
+      await archiveConversation(selectedPhone, supportBody());
       await loadList();
       setRefreshSignal((n) => n + 1);
     } catch (err) {
@@ -790,10 +918,10 @@ export default function ConversationsPage() {
   }
 
   async function onRestore() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      await restoreConversation(selectedPhone);
+      await restoreConversation(selectedPhone, supportBody());
       await loadList();
       setRefreshSignal((n) => n + 1);
     } catch (err) {
@@ -804,10 +932,10 @@ export default function ConversationsPage() {
   }
 
   async function onMarkTest() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      await markConversationAsTest(selectedPhone);
+      await markConversationAsTest(selectedPhone, supportBody());
       await loadList();
       setRefreshSignal((n) => n + 1);
     } catch (err) {
@@ -818,10 +946,10 @@ export default function ConversationsPage() {
   }
 
   async function onClose(reason) {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
-      await closeConversation(selectedPhone, reason);
+      await closeConversation(selectedPhone, reason, supportBody());
       await loadList();
       setRefreshSignal((n) => n + 1);
     } catch (err) {
@@ -877,8 +1005,9 @@ export default function ConversationsPage() {
   );
   // Sticky HUMAN remains HUMAN for controls; stall attention is a separate badge.
   const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
-  const showTakeOver = canTakeOverConversation(effectiveOwnership);
-  const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
+  const allowSupportMutations = conversationsSupportMutationsAllowed(supportView);
+  const showTakeOver = allowSupportMutations && canTakeOverConversation(effectiveOwnership);
+  const showReturnToAtlas = allowSupportMutations && canReturnConversationToAtlas(effectiveOwnership);
   const showAttentionWarning = shouldShowAttentionWarning({
     ownershipState,
     needsHumanAttention
@@ -956,7 +1085,13 @@ export default function ConversationsPage() {
       <header className="conversations-page__header">
         <div>
           <h1 className="conversations-page__title">{translate("conversationsTitle")}</h1>
-          <p className="conversations-page__subtitle">{translate("conversationsSubtitle")}</p>
+          <p className="conversations-page__subtitle">
+            {supportReadOnly
+              ? translate("conversationsSupportReadOnlySubtitle")
+              : supportView.active
+                ? translate("conversationsSupportSubtitle")
+                : translate("conversationsSubtitle")}
+          </p>
         </div>
         {counts.needs_attention > 0 ? (
           <StatusBadge variant="danger">
@@ -968,34 +1103,49 @@ export default function ConversationsPage() {
         ) : null}
       </header>
 
-      {canSeeTeamProspects ? (
+      {canUseConversationsSupport && !supportModeActive && !isSuperAdminUser(user) ? (
+        <div className="conversations-page__support" data-testid="conversations-support-enter">
+          <strong className="conversations-page__support-label">
+            {translate("conversationsSupportIdleLabel")}
+          </strong>
+          <AtlasButton type="button" variant="secondary" onClick={onEnterAdminSupportMode}>
+            {translate("conversationsSupportEnter")}
+          </AtlasButton>
+        </div>
+      ) : null}
+
+      {canOpenSupport ? (
         <div
-          className="conversations-page__workspace-tabs"
-          role="tablist"
-          aria-label={translate("conversationsWorkspaceTabsLabel")}
+          className={`conversations-page__support${supportReadOnly ? " is-readonly" : supportView.active ? " is-active" : ""}`}
+          data-testid="conversations-support-mode"
         >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.MINE}
-            className={`conversations-page__workspace-tab${
-              workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.MINE ? " is-active" : ""
-            }`}
-            onClick={() => setWorkspaceListTab(CONVERSATIONS_WORKSPACE_TABS.MINE)}
-          >
-            {translate("conversationsMyProspects")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.TEAM}
-            className={`conversations-page__workspace-tab${
-              workspaceTab.tab === CONVERSATIONS_WORKSPACE_TABS.TEAM ? " is-active" : ""
-            }`}
-            onClick={() => setWorkspaceListTab(CONVERSATIONS_WORKSPACE_TABS.TEAM)}
-          >
-            {translate("conversationsTeamProspects")}
-          </button>
+          <strong className="conversations-page__support-label">
+            {supportReadOnly
+              ? translate("conversationsSupportReadOnlyLabel")
+              : supportView.active
+                ? translate("conversationsSupportActiveLabel")
+                : translate("conversationsSupportIdleLabel")}
+          </strong>
+          <AtlasSelect
+            label={translate("conversationsSupportSelectUser")}
+            value={supportView.supportUserId || ""}
+            placeholder={translate("conversationsSupportSelectPlaceholder")}
+            options={supportTargets.map((target) => ({
+              value: target.id,
+              label: target.name || target.email || target.id
+            }))}
+            onChange={(userId) => setSupportTargetUser(userId)}
+          />
+          {supportView.active ? (
+            <AtlasButton type="button" variant="secondary" onClick={() => setSupportTargetUser("")}>
+              {translate("conversationsSupportExit")}
+            </AtlasButton>
+          ) : null}
+          {!isSuperAdminUser(user) ? (
+            <AtlasButton type="button" variant="secondary" onClick={onExitAdminSupportMode}>
+              {translate("conversationsSupportExitMode")}
+            </AtlasButton>
+          ) : null}
         </div>
       ) : null}
 
@@ -1161,7 +1311,7 @@ export default function ConversationsPage() {
                       }
                       data-thread-actions={threadActionIds.join(",")}
                     >
-                      {threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
+                      {allowSupportMutations && threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
                         <AtlasButton
                           variant="primary"
                           data-testid="conversations-take-over"
@@ -1171,7 +1321,7 @@ export default function ConversationsPage() {
                           {translate("conversationsTakeOver")}
                         </AtlasButton>
                       ) : null}
-                      {threadActionIds.includes("CONFIRM_META_LEAD") ? (
+                      {allowSupportMutations && threadActionIds.includes("CONFIRM_META_LEAD") ? (
                         <AtlasButton
                           variant="primary"
                           data-testid="conversations-confirm-meta-lead"
@@ -1181,7 +1331,7 @@ export default function ConversationsPage() {
                           {translate("conversationsConfirmMetaLead")}
                         </AtlasButton>
                       ) : null}
-                      {threadActionIds.includes("MARK_NOT_LEAD") ? (
+                      {allowSupportMutations && threadActionIds.includes("MARK_NOT_LEAD") ? (
                         <AtlasButton
                           variant="secondary"
                           data-testid="conversations-mark-not-lead"
@@ -1191,7 +1341,7 @@ export default function ConversationsPage() {
                           {translate("conversationsMarkNotLead")}
                         </AtlasButton>
                       ) : null}
-                      {threadActionIds.includes("RETURN_TO_ATLAS") &&
+                      {allowSupportMutations && threadActionIds.includes("RETURN_TO_ATLAS") &&
                       showReturnToAtlas ? (
                         <AtlasButton
                           variant="secondary"
@@ -1214,7 +1364,7 @@ export default function ConversationsPage() {
                           {translate("conversationsOpenInMissionControl")}
                         </Link>
                       ) : null}
-                      {lifecycleActionIds.includes("ARCHIVE") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("ARCHIVE") ? (
                         <AtlasButton
                           variant="secondary"
                           data-testid="conversations-archive"
@@ -1224,7 +1374,7 @@ export default function ConversationsPage() {
                           {translate("conversationsArchive")}
                         </AtlasButton>
                       ) : null}
-                      {lifecycleActionIds.includes("CLOSE") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("CLOSE") ? (
                         <div
                           className={`conversations-thread__close${
                             actionBusy ? " is-disabled" : ""
@@ -1246,7 +1396,7 @@ export default function ConversationsPage() {
                           />
                         </div>
                       ) : null}
-                      {lifecycleActionIds.includes("MARK_TEST") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("MARK_TEST") ? (
                         <AtlasButton
                           variant="secondary"
                           data-testid="conversations-mark-test"
@@ -1256,7 +1406,7 @@ export default function ConversationsPage() {
                           {translate("conversationsMarkTest")}
                         </AtlasButton>
                       ) : null}
-                      {lifecycleActionIds.includes("RESTORE") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("RESTORE") ? (
                         <AtlasButton
                           variant="primary"
                           data-testid="conversations-restore"
@@ -1308,6 +1458,7 @@ export default function ConversationsPage() {
                   ) : null}
                 </div>
 
+                {allowSupportMutations ? (
                 <div
                   className="conversations-thread__composer-sticky"
                   data-testid="conversations-composer-sticky"
@@ -1325,6 +1476,11 @@ export default function ConversationsPage() {
                     onSent={onComposerSent}
                   />
                 </div>
+                ) : (
+                  <p className="conversations-page__support-readonly-note" data-testid="conversations-support-readonly">
+                    {translate("conversationsSupportReadOnlyLabel")}
+                  </p>
+                )}
               </div>
             </>
           )}

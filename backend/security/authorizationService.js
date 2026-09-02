@@ -221,13 +221,14 @@ function canUseOversightWorkspaceList(context) {
     return true;
   }
 
-  // dashboard:team is Team Dashboard (BR-149), including agents — not Conversations Team Prospects.
+  // dashboard:team is Team Dashboard (BR-149), including agents — not Conversations access (BR-218).
   return hasPermission(context, "dashboard:executive");
 }
 
 /**
  * BR-165 — default My Prospects lists are owner_user_id = signed-in user.
- * Same-org visibility is not ownership. Team Prospects / oversight is explicit.
+ * Same-org visibility is not ownership. Prospect Center Team / oversight is explicit.
+ * Conversations lists never use this helper (BR-218).
  */
 function resolveWorkspaceListScope(context, workspaceScope = null) {
   if (!isActiveContext(context)) {

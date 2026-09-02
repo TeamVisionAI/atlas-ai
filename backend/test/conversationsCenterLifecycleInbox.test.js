@@ -100,9 +100,9 @@ test("A–C Active: ATLAS / NEEDS_ATTENTION / HUMAN stay Active", async () => {
       organizationId: TEAM_VISION,
       filter: "active",
       prospects: [
-        prospect({ phone: "+17865551001", name: "Atlas" }),
-        prospect({ phone: "+17865551002", name: "Attention" }),
-        prospect({ phone: "+17865551003", name: "Human" })
+        prospect({ id: "life-atlas", phone: "+17865551001", name: "Atlas" }),
+        prospect({ id: "life-attention", phone: "+17865551002", name: "Attention" }),
+        prospect({ id: "life-human", phone: "+17865551003", name: "Human" })
       ]
     });
 

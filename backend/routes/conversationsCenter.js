@@ -43,6 +43,15 @@ const { findProspectInOrganization } = require("../services/supabaseService");
 const {
   INBOX_CLOSE_REASONS
 } = require("../core/conversationsCenter/conversationsCenterLifecycle");
+const {
+  canUseConversationsSupportAccess,
+  readConversationsSupportRequest,
+  withConversationsSupportCapability,
+  resolveConversationsListScope,
+  shouldAuditConversationsSupportAccess,
+  denyConversationsSupportMutation
+} = require("../core/conversationsPrivacyEngine");
+const { auditFromRequest } = require("../security/auditLogService");
 
 const router = express.Router();
 
@@ -67,6 +76,49 @@ async function requireConversationsAccess(req, res) {
   }
 }
 
+async function conversationsPrivacyContext(req) {
+  const supportRequest = readConversationsSupportRequest(req);
+  const authContext = await withConversationsSupportCapability(req.authContext);
+  return {
+    authContext,
+    supportRequest,
+    listScope: resolveConversationsListScope(authContext, supportRequest)
+  };
+}
+
+function conversationsSupportOptions(supportRequest) {
+  return {
+    supportUserId: supportRequest.supportUserId,
+    supportModeActive: supportRequest.supportModeActive
+  };
+}
+
+function rejectSupportMutation(res, listScope, authContext) {
+  const denied = denyConversationsSupportMutation(listScope, authContext);
+  if (!denied) {
+    return false;
+  }
+
+  res.status(denied.statusCode).json({
+    error: denied.code,
+    message: denied.message
+  });
+  return true;
+}
+
+async function requireConversationsWrite(req, res) {
+  if (!(await requireConversationsAccess(req, res))) {
+    return null;
+  }
+
+  const privacy = await conversationsPrivacyContext(req);
+  if (rejectSupportMutation(res, privacy.listScope, privacy.authContext)) {
+    return null;
+  }
+
+  return privacy;
+}
+
 router.get("/access", operationalControlPlaneEmpty(() => ({
   allowed: false,
   organizationId: null,
@@ -82,13 +134,16 @@ router.get("/access", operationalControlPlaneEmpty(() => ({
       organizationId,
       authContext: req.authContext
     });
+    const privacyAuth = await withConversationsSupportCapability(req.authContext);
     res.json({
       allowed: result.allowed === true,
       organizationId,
       reason: result.reason || null,
       code: result.code || null,
       featureEnabled: result.feature?.enabled === true,
-      globalEnabled: result.feature?.global?.enabled !== false
+      globalEnabled: result.feature?.global?.enabled !== false,
+      canUseConversationsSupportAccess: canUseConversationsSupportAccess(privacyAuth),
+      supportModeActive: Boolean(req.supportContext?.organizationId)
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({
@@ -108,11 +163,13 @@ router.get("/attention-count", operationalControlPlaneEmpty(() => ({
 
   try {
     const organizationId = getTenantOrganizationId(req);
+    const { authContext, supportRequest } = await conversationsPrivacyContext(req);
     const payload = await getConversationsAttentionCount(
       organizationId,
       undefined,
-      req.authContext,
-      req.query.workspaceScope
+      authContext,
+      req.query.workspaceScope,
+      conversationsSupportOptions(supportRequest)
     );
     res.json(payload);
   } catch (error) {
@@ -131,13 +188,15 @@ router.get("/", operationalControlPlaneEmpty(emptyConversations), async (req, re
 
   try {
     const organizationId = getTenantOrganizationId(req);
+    const { authContext, supportRequest } = await conversationsPrivacyContext(req);
     const payload = await buildConversationsCenterReadModel({
       organizationId,
       filter: req.query.filter,
       search: req.query.q,
       view: req.query.view,
-      authContext: req.authContext,
-      workspaceScope: req.query.workspaceScope
+      authContext,
+      workspaceScope: req.query.workspaceScope,
+      ...conversationsSupportOptions(supportRequest)
     });
     res.json(payload);
   } catch (error) {
@@ -149,7 +208,7 @@ router.get("/", operationalControlPlaneEmpty(emptyConversations), async (req, re
   }
 });
 
-async function loadScopedProspect(phone, organizationId, authContext = null) {
+async function loadScopedProspect(phone, organizationId, authContext = null, supportOptions = {}) {
   if (!phone || !organizationId) {
     return null;
   }
@@ -161,7 +220,14 @@ async function loadScopedProspect(phone, organizationId, authContext = null) {
   }
 
   if (authContext) {
-    if (!isProspectInConversationsUserScope(prospect, organizationId, authContext)) {
+    if (
+      !isProspectInConversationsUserScope(
+        prospect,
+        organizationId,
+        authContext,
+        supportOptions
+      )
+    ) {
       return null;
     }
   } else if (!isProspectInConversationsTenantScope(prospect, organizationId)) {
@@ -182,8 +248,205 @@ async function loadScopedProspect(phone, organizationId, authContext = null) {
   return prospect;
 }
 
-async function humanReplyHandler(req, res) {
+async function loadRequestScopedProspect(req, phone) {
+  const organizationId = getTenantOrganizationId(req);
+  const { authContext, supportRequest } = await conversationsPrivacyContext(req);
+  return loadScopedProspect(
+    phone,
+    organizationId,
+    authContext,
+    conversationsSupportOptions(supportRequest)
+  );
+}
+
+async function listConversationsSupportTargets(organizationId) {
+  const { supabase } = require("../services/supabaseService");
+  const { data, error } = await supabase
+    .from("atlas_users")
+    .select("id, email, first_name, last_name, display_name, role, status")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .order("first_name", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    if (error.code === "42P01") {
+      return [];
+    }
+    throw error;
+  }
+
+  return (data || []).map((user) => ({
+    id: user.id,
+    email: user.email || null,
+    role: user.role || null,
+    name:
+      user.display_name ||
+      [user.first_name, user.last_name].filter(Boolean).join(" ") ||
+      user.email ||
+      user.id
+  }));
+}
+
+async function requireConversationsSupportAccess(req, res) {
   if (!(await requireConversationsAccess(req, res))) {
+    return null;
+  }
+
+  const { authContext, supportRequest, listScope } = await conversationsPrivacyContext(req);
+  if (!canUseConversationsSupportAccess(authContext)) {
+    res.status(403).json({
+      error: "CONVERSATIONS_SUPPORT_FORBIDDEN",
+      message: "Conversations Support Mode requires Super Admin or explicit support permission"
+    });
+    return null;
+  }
+
+  return { authContext, supportRequest, listScope };
+}
+
+router.post("/support-mode/enter", async (req, res) => {
+  const privacy = await requireConversationsSupportAccess(req, res);
+  if (!privacy) {
+    return;
+  }
+
+  try {
+    const supportModeService = require("../services/supportModeService");
+    const organizationId = getTenantOrganizationId(req);
+    if (!organizationId) {
+      return res.status(403).json({
+        error: "CONVERSATIONS_SUPPORT_CONTEXT_REQUIRED",
+        message: "Support Mode requires an organization context"
+      });
+    }
+
+    const support = await supportModeService.enterSupportMode(
+      req.authContext.userId,
+      organizationId,
+      req.authSessionId,
+      {
+        userEmail: req.authContext.email,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      }
+    );
+
+    res.json({
+      ok: true,
+      supportModeActive: true,
+      organizationId: support.organizationId,
+      enteredAt: support.enteredAt
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "CONVERSATIONS_SUPPORT_MODE_FAILED",
+      message: error.message || "Unable to enter Support Mode"
+    });
+  }
+});
+
+router.post("/support-mode/exit", async (req, res) => {
+  if (!(await requireConversationsAccess(req, res))) {
+    return;
+  }
+
+  try {
+    const supportModeService = require("../services/supportModeService");
+    const result = await supportModeService.exitSupportMode(
+      req.authContext.userId,
+      req.authSessionId,
+      {
+        userEmail: req.authContext.email,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      }
+    );
+    res.json({
+      ok: true,
+      supportModeActive: false,
+      exited: result.exited === true
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "CONVERSATIONS_SUPPORT_MODE_FAILED",
+      message: error.message || "Unable to exit Support Mode"
+    });
+  }
+});
+
+router.get("/support-targets", operationalControlPlaneEmpty(() => ({
+  items: [],
+  supportModeActive: false
+})), async (req, res) => {
+  const privacy = await requireConversationsSupportAccess(req, res);
+  if (!privacy) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const items = await listConversationsSupportTargets(organizationId);
+    res.json({
+      items,
+      supportModeActive: privacy.supportRequest.supportModeActive,
+      canUseConversationsSupportAccess: true
+    });
+  } catch (error) {
+    console.error("[conversations-center] support-targets", error.message);
+    res.status(error.statusCode || 500).json({
+      error: "CONVERSATIONS_SUPPORT_TARGETS_FAILED",
+      message: "Failed to load support conversation targets"
+    });
+  }
+});
+
+router.post("/support-access", operationalControlPlaneEmpty(() => ({
+  ok: false,
+  reason: "CONTROL_PLANE_NO_TENANT"
+})), async (req, res) => {
+  const privacy = await requireConversationsSupportAccess(req, res);
+  if (!privacy) {
+    return;
+  }
+
+  const supportUserId = privacy.supportRequest.supportUserId;
+  if (!supportUserId) {
+    return res.status(400).json({
+      error: "SUPPORT_USER_REQUIRED",
+      message: "Select a target user before opening Support Mode conversations"
+    });
+  }
+
+  if (!privacy.listScope?.supportAccess) {
+    return res.status(403).json({
+      error: "CONVERSATIONS_SUPPORT_CONTEXT_REQUIRED",
+      message: "Support Mode conversations require explicit support context and a target user"
+    });
+  }
+
+  await auditFromRequest(req, {
+    action: "conversations.support_access",
+    targetType: "user",
+    targetId: supportUserId,
+    metadata: {
+      supportMode: true,
+      supportTargetUserId: supportUserId,
+      supportOrganizationId: getTenantOrganizationId(req),
+      surface: "conversations"
+    }
+  });
+
+  res.json({
+    ok: true,
+    supportAccess: true,
+    supportTargetUserId: supportUserId,
+    workspaceScope: "support"
+  });
+});
+
+async function humanReplyHandler(req, res) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
@@ -226,14 +489,14 @@ async function humanReplyHandler(req, res) {
 }
 
 async function takeOverHandler(req, res) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
+    const prospect = await loadRequestScopedProspect(req, phone);
 
     if (!prospect) {
       return res.status(404).json({
@@ -291,14 +554,14 @@ async function takeOverHandler(req, res) {
 }
 
 async function returnToAtlasHandler(req, res) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
+    const prospect = await loadRequestScopedProspect(req, phone);
 
     if (!prospect) {
       return res.status(404).json({
@@ -371,14 +634,14 @@ router.post("/take-over", takeOverHandler);
 router.post("/return-to-atlas", returnToAtlasHandler);
 
 async function scopedLifecycleAction(req, res, actionName, run) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
+    const prospect = await loadRequestScopedProspect(req, phone);
 
     if (!prospect) {
       return res.status(404).json({
@@ -444,14 +707,14 @@ router.post("/mark-test", (req, res) =>
 );
 
 async function metaLeadReviewAction(req, res, actionName) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
+    const prospect = await loadRequestScopedProspect(req, phone);
     if (!prospect) {
       return res.status(404).json({
         error: "CONVERSATION_NOT_FOUND",
@@ -526,14 +789,14 @@ router.post("/mark-not-lead", (req, res) =>
  * or change inbox lifecycle.
  */
 router.post("/mark-read", async (req, res) => {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
   try {
     const organizationId = getTenantOrganizationId(req);
     const phone = req.body?.phone || req.params.phone;
-    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
+    const prospect = await loadRequestScopedProspect(req, phone);
 
     if (!prospect) {
       return res.status(404).json({
@@ -587,12 +850,27 @@ router.get("/:phone", async (req, res) => {
 
   try {
     const organizationId = getTenantOrganizationId(req);
-    const prospect = await loadScopedProspect(req.params.phone, organizationId, req.authContext);
+    const { listScope } = await conversationsPrivacyContext(req);
+    const prospect = await loadRequestScopedProspect(req, req.params.phone);
 
     if (!prospect) {
       return res.status(404).json({
         error: "CONVERSATION_NOT_FOUND",
         message: "Conversation not found in Conversations Center scope"
+      });
+    }
+
+    if (shouldAuditConversationsSupportAccess(listScope)) {
+      await auditFromRequest(req, {
+        action: "conversations.support_read",
+        targetType: "conversation",
+        targetId: prospect.id || prospect.phone,
+        metadata: {
+          supportMode: true,
+          supportTargetUserId: listScope.supportTargetUserId,
+          phone: prospect.phone || null,
+          surface: "detail"
+        }
       });
     }
 
