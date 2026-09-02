@@ -18,6 +18,7 @@ const {
   confirmMetaLead,
   dismissMetaLeadAsPersonal,
   hasLegacyNonBr193CreateOrigin,
+  resolveCreateTimeProvenance,
   SUSPECTED_META_LEAD_REVIEW,
   HUMAN_VERIFIED_META_LEAD
 } = require("../core/metaLeadReview");
@@ -350,6 +351,7 @@ test("J) 131060 alone is not proof of a Meta lead", () => {
   const withFallback = metaFallbackProspect({
     workflow_state: {
       atlasEligibilitySource: VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION,
+      eligibilityReason: "AD_DESTINATION_FALLBACK_NO_CTWA_METADATA",
       lastInboundError: { code: 131060 }
     }
   });
@@ -468,4 +470,216 @@ test("O) other users cannot confirm or dismiss", async () => {
     assert.equal(dismiss.ok, false);
     assert.equal(dismiss.reason, "OWNER_ONLY");
   });
+});
+
+function javierShapedProspect() {
+  return {
+    id: "ef1ef057-56ce-4743-9953-1f79f2a63b9b",
+    organization_id: ORG,
+    owner_user_id: NIOVEL,
+    phone: "+17863061884",
+    name: "Javier Jimenez",
+    source: null,
+    entry_method: null,
+    current_step: "NEW",
+    created_at: "2026-08-28T21:13:44.954Z",
+    updated_at: "2026-09-01T19:39:27.000Z",
+    workflow_state: {
+      atlasEligibilitySource: VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION
+    }
+  };
+}
+
+function prospectCreated(source, entryMethod) {
+  return {
+    event_type: "ProspectCreated",
+    payload: {
+      source,
+      entry_method: entryMethod
+    }
+  };
+}
+
+function brendaShapedProspect() {
+  return {
+    id: "54e7e172-522b-4650-9474-fe57523b8993",
+    organization_id: ORG,
+    owner_user_id: OWNER,
+    phone: "+19048881952",
+    name: "Brenda Lizvillegas",
+    source: null,
+    entry_method: null,
+    current_step: "NEW",
+    created_at: "2026-08-29T00:00:00.000Z",
+    workflow_state: {
+      atlasEligibilitySource: VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION
+    }
+  };
+}
+
+test("A) ProspectCreated FACEBOOK / CLICK_TO_WHATSAPP + later META stamp is not review", async () => {
+  const javier = javierShapedProspect();
+  const createEvent = prospectCreated(
+    WHATSAPP_SOURCE.FACEBOOK,
+    WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP
+  );
+  const decision = evaluateSuspectedMetaLeadReview(javier, javier.workflow_state, {
+    createEvent
+  });
+  assert.equal(decision.review, false);
+  assert.equal(decision.reason, "HISTORICAL_PROVEN_CTWA_CREATE_ORIGIN");
+  assert.equal(hasLegacyNonBr193CreateOrigin(javier, javier.workflow_state, { createEvent }), true);
+  const model = await inbox(
+    [{ ...javier, workflow_state: { ...javier.workflow_state, prospectCreated: createEvent } }],
+    rvpAuth()
+  );
+  assert.equal(model.items.length, 0);
+  assert.equal(model.metaLeadsAwaitingVerification, 0);
+});
+
+test("B) ProspectCreated CTWA_REFERRAL + later META stamp is not review", () => {
+  const javier = javierShapedProspect();
+  const createEvent = prospectCreated("CTWA_REFERRAL", WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP);
+  const decision = evaluateSuspectedMetaLeadReview(javier, javier.workflow_state, {
+    createEvent
+  });
+  assert.equal(decision.review, false);
+  assert.equal(decision.reason, "HISTORICAL_PROVEN_CTWA_CREATE_ORIGIN");
+});
+
+test("C) historical create with durable referral/ctwa evidence is not review", () => {
+  const historical = javierShapedProspect();
+  historical.workflow_state = {
+    atlasEligibilitySource: VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION,
+    ctwa_clid: "clid-create-time",
+    ctwaReferral: { source_type: "ad", ctwa_clid: "clid-create-time" }
+  };
+  const decision = evaluateSuspectedMetaLeadReview(historical, historical.workflow_state);
+  assert.equal(decision.review, false);
+  assert.equal(decision.reason, "STORED_CTWA_EVIDENCE");
+});
+
+test("D) true BR-193 META create remains review — Brenda / Armando / Maria", () => {
+  const maria = metaFallbackProspect();
+  assert.equal(evaluateSuspectedMetaLeadReview(maria, maria.workflow_state).review, true);
+
+  const brenda = brendaShapedProspect();
+  const createEvent = prospectCreated(
+    VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION,
+    WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION
+  );
+  const brendaDecision = evaluateSuspectedMetaLeadReview(brenda, brenda.workflow_state, {
+    createEvent
+  });
+  assert.equal(brendaDecision.review, true);
+  assert.equal(brendaDecision.reason, SUSPECTED_META_LEAD_REVIEW);
+  assert.equal(brendaDecision.evidence, "PROSPECT_CREATED");
+
+  const armando = metaFallbackProspect({
+    id: "a392e2ff-26f3-41bf-9f97-0ccc17495695",
+    phone: "+14079247164",
+    name: "Armando Astaco Roblesi",
+    source: null,
+    entry_method: null
+  });
+  assert.equal(evaluateSuspectedMetaLeadReview(armando, armando.workflow_state).review, true);
+});
+
+test("E) UNKNOWN/UNATTRIBUTED + later META is not review", () => {
+  const yaidel = yaidelShapedProspect();
+  const decision = evaluateSuspectedMetaLeadReview(yaidel, yaidel.workflow_state, {
+    createEvent: prospectCreated(WHATSAPP_SOURCE.UNKNOWN, WHATSAPP_ENTRY_METHOD.UNATTRIBUTED)
+  });
+  assert.equal(decision.review, false);
+  assert.equal(decision.reason, "LEGACY_NON_BR193_CREATE_ORIGIN");
+});
+
+test("F) PERSONAL_WHATSAPP + META is not review", () => {
+  const personal = personalProspect();
+  personal.workflow_state = {
+    atlasEligibilitySource: VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION
+  };
+  const decision = evaluateSuspectedMetaLeadReview(personal, personal.workflow_state, {
+    createEvent: prospectCreated(
+      WHATSAPP_SOURCE.PERSONAL_WHATSAPP,
+      WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP
+    )
+  });
+  assert.equal(decision.review, false);
+  assert.ok(
+    decision.reason === "PERSONAL_WHATSAPP_NOT_ELIGIBLE" ||
+      decision.reason === "LEGACY_NON_BR193_CREATE_ORIGIN"
+  );
+});
+
+test("G) owner-only review behavior is unchanged", async () => {
+  const prospect = metaFallbackProspect();
+  assert.equal(isOwnerVisibleSuspectedMetaLead(prospect, OWNER), true);
+  assert.equal(isOwnerVisibleSuspectedMetaLead(prospect, NIOVEL), false);
+  const ownerModel = await inbox([prospect], ownerAuth(), "mine");
+  assert.equal(ownerModel.items.length, 1);
+  const rvpModel = await inbox([prospect], rvpAuth(), "oversight");
+  assert.equal(rvpModel.items.length, 0);
+});
+
+test("H) BR-200 remains denied before human confirm", () => {
+  const javier = javierShapedProspect();
+  const outbound = evaluateAutomationOutboundEligibility({
+    prospect: javier,
+    workflowState: javier.workflow_state,
+    inboundEvent: { messageType: "text", body: "Hola" },
+    actor: "ATLAS"
+  });
+  assert.equal(outbound.eligible, false);
+  assert.equal(outbound.reason, OUTBOUND_REASONS.LEGACY_AMBIGUOUS);
+  assert.equal(
+    evaluateSuspectedMetaLeadReview(javier, javier.workflow_state).review,
+    false
+  );
+
+  const maria = metaFallbackProspect();
+  const mariaOutbound = evaluateAutomationOutboundEligibility({
+    prospect: maria,
+    workflowState: maria.workflow_state,
+    inboundEvent: { messageType: "text", body: "Hola" },
+    actor: "ATLAS"
+  });
+  assert.equal(mariaOutbound.eligible, false);
+  assert.equal(evaluateSuspectedMetaLeadReview(maria, maria.workflow_state).review, true);
+});
+
+test("I) later real CTWA upgrade via monotonic persist still works", async () => {
+  await withMemoryState(async () => {
+    const phone = "+17863061884";
+    await persistVerifiedAtlasEligibilitySource(
+      phone,
+      VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION,
+      { organizationId: ORG }
+    );
+    await persistVerifiedAtlasEligibilitySource(
+      phone,
+      VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL,
+      {
+        organizationId: ORG,
+        ctwaReferral: { source_type: "ad", ctwa_clid: "clid-later-javier" }
+      }
+    );
+    const state = await loadPersistedWorkflowState(phone, { organizationId: ORG });
+    assert.equal(state.atlasEligibilitySource, "CTWA_REFERRAL");
+    assert.equal(state.ctwa_clid, "clid-later-javier");
+    assert.equal(
+      resolveMonotonicVerifiedEligibilitySource("META_AD_DESTINATION", "CTWA_REFERRAL"),
+      "CTWA_REFERRAL"
+    );
+  });
+});
+
+test("ambiguous META stamp + null columns without create-time BR-193 is not review", () => {
+  const javier = javierShapedProspect();
+  const decision = evaluateSuspectedMetaLeadReview(javier, javier.workflow_state);
+  assert.equal(decision.review, false);
+  assert.equal(decision.reason, "NO_BR193_CREATE_TIME_EVIDENCE");
+  const createTime = resolveCreateTimeProvenance(javier, javier.workflow_state);
+  assert.equal(createTime.reviewEligible, false);
+  assert.equal(createTime.evidence, "AMBIGUOUS_CURRENT_ROW");
 });

@@ -21,6 +21,7 @@ const {
   isOwnerVisibleSuspectedMetaLead,
   SUSPECTED_META_LEAD_REVIEW
 } = require("./metaLeadReview");
+const workflowEventService = require("../services/workflowEventService");
 
 function buildProspectCenterItem(prospect, summary, options = {}) {
   const interviewMs = parseInterviewDatetime(prospect);
@@ -214,10 +215,32 @@ async function buildProspectCenterReadModel(options = {}) {
 
   const reviewProspects = options.reviewProspects || [];
   const viewerUserId = options.authContext?.userId || options.viewerUserId || null;
+  let createEventsByPhone = options.createEventsByPhone || new Map();
+  if (
+    !options.createEventsByPhone &&
+    options.skipCreateEventLoad !== true &&
+    reviewProspects.length > 0
+  ) {
+    try {
+      createEventsByPhone = await workflowEventService.listProspectCreatedEventsByPhones(
+        reviewProspects.map((prospect) => prospect.phone).filter(Boolean),
+        options.organizationId
+      );
+    } catch {
+      createEventsByPhone = new Map();
+    }
+  }
   const existingPhones = new Set(items.map((item) => item.phone));
   let reviewCount = 0;
   for (const prospect of reviewProspects) {
-    if (!isOwnerVisibleSuspectedMetaLead(prospect, viewerUserId)) {
+    if (
+      !isOwnerVisibleSuspectedMetaLead(
+        prospect,
+        viewerUserId,
+        prospect.workflow_state || null,
+        { createEventsByPhone }
+      )
+    ) {
       continue;
     }
     if (existingPhones.has(prospect.phone)) {

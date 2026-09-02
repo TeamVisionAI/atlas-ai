@@ -343,6 +343,52 @@ async function listRecentWorkflowEvents(limit = 50, organizationId = null) {
   return data || [];
 }
 
+/**
+ * Earliest ProspectCreated payload per phone. Used by BR-215 create-time review.
+ * Does not write events. Degrades to an empty map when the table is unavailable.
+ */
+async function listProspectCreatedEventsByPhones(phones = [], organizationId = null) {
+  const map = new Map();
+  const unique = [...new Set((phones || []).map((phone) => String(phone || "").trim()).filter(Boolean))];
+  if (!unique.length || !workflowEventsTableAvailable) {
+    return map;
+  }
+
+  const chunkSize = 100;
+  for (let index = 0; index < unique.length; index += chunkSize) {
+    const chunk = unique.slice(index, index + chunkSize);
+    let query = supabase
+      .from("workflow_events")
+      .select("prospect_phone, event_type, payload, created_at, id")
+      .eq("event_type", EVENT_TYPES.PROSPECT_CREATED)
+      .in("prospect_phone", chunk)
+      .order("created_at", { ascending: true });
+
+    if (organizationId) {
+      query = query.eq("organization_id", organizationId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      if (error.code === "42P01" || error.message?.includes("workflow_events")) {
+        workflowEventsTableAvailable = false;
+        return map;
+      }
+      throw error;
+    }
+
+    for (const row of data || []) {
+      const phone = String(row.prospect_phone || "").trim();
+      if (!phone || map.has(phone)) {
+        continue;
+      }
+      map.set(phone, row);
+    }
+  }
+
+  return map;
+}
+
 module.exports = {
   insertWorkflowEvent,
   findWorkflowEventByCorrelationId,
@@ -351,5 +397,6 @@ module.exports = {
   claimWhatsAppHumanEchoCorrelation,
   claimFirstReplyRecovery,
   listWorkflowEvents,
-  listRecentWorkflowEvents
+  listRecentWorkflowEvents,
+  listProspectCreatedEventsByPhones
 };

@@ -24,6 +24,7 @@ const {
   isSuspectedMetaLeadReview,
   SUSPECTED_META_LEAD_REVIEW
 } = require("../metaLeadReview");
+const workflowEventService = require("../../services/workflowEventService");
 const {
   INBOX_LIFECYCLE,
   resolveInboxLifecycle,
@@ -305,12 +306,33 @@ async function buildConversationListItem(prospect, options = {}) {
     inboxClosedAt: persisted.inboxClosedAt || null,
     inboxWindowExpiredAt: persisted.inboxWindowExpiredAt || null,
     customerCareWindow,
-    ...buildMetaLeadReviewPresentation(prospect, persisted)
+    ...buildMetaLeadReviewPresentation(
+      prospect,
+      persisted,
+      reviewOptionsFor(options.createEventsByPhone)
+    )
   };
 }
 
-function buildMetaLeadReviewPresentation(prospect, persisted) {
-  const decision = evaluateSuspectedMetaLeadReview(prospect, persisted);
+async function loadCreateEventsByPhoneSafe(prospects, organizationId) {
+  try {
+    return await workflowEventService.listProspectCreatedEventsByPhones(
+      (prospects || []).map((prospect) => prospect.phone).filter(Boolean),
+      organizationId
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function reviewOptionsFor(createEventsByPhone) {
+  return createEventsByPhone && createEventsByPhone.size
+    ? { createEventsByPhone }
+    : {};
+}
+
+function buildMetaLeadReviewPresentation(prospect, persisted, options = {}) {
+  const decision = evaluateSuspectedMetaLeadReview(prospect, persisted, options);
   if (!decision.review) {
     const status = persisted?.metaLeadReview?.status || null;
     return {
@@ -504,11 +526,22 @@ async function buildConversationsCenterReadModel(options = {}) {
     )
   ).filter(Boolean);
   const viewerUserId = authContext?.userId || null;
+  const createEventsByPhone =
+    options.createEventsByPhone ||
+    (options.prospects && options.loadCreateEvents !== true
+      ? new Map()
+      : await loadCreateEventsByPhoneSafe(tenantOnly, organizationId));
+  const reviewOptions = reviewOptionsFor(createEventsByPhone);
   const ownerReviews = tenantOnly.filter((prospect) => {
     const workflowState = useEmbeddedWorkflow
       ? workflowStateFromProspectRow(prospect)
       : prospect.workflow_state || null;
-    return isOwnerVisibleSuspectedMetaLead(prospect, viewerUserId, workflowState);
+    return isOwnerVisibleSuspectedMetaLead(
+      prospect,
+      viewerUserId,
+      workflowState,
+      reviewOptions
+    );
   });
   const admitted = [];
   const seen = new Set();
@@ -524,7 +557,7 @@ async function buildConversationsCenterReadModel(options = {}) {
     const workflowState = useEmbeddedWorkflow
       ? workflowStateFromProspectRow(prospect)
       : prospect.workflow_state || null;
-    if (isSuspectedMetaLeadReview(prospect, workflowState)) {
+    if (isSuspectedMetaLeadReview(prospect, workflowState, reviewOptions)) {
       // Implements BR-215 — review rows never follow RVP/team/oversight list scope.
       return isOwnerOfProspect(prospect, viewerUserId);
     }
@@ -556,7 +589,8 @@ async function buildConversationsCenterReadModel(options = {}) {
             ? workflowStateFromProspectRow(prospect)
             : undefined,
           logs: logsForPhone(logsByPhone, prospect.phone),
-          now: options.now
+          now: options.now,
+          createEventsByPhone
         })
       )
     )

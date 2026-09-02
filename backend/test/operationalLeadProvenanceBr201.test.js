@@ -112,10 +112,20 @@ test("canary META_AD_DESTINATION-only is not operational", async () => {
     false
   );
   const model = await inbox([prospect]);
-  // BR-215 — owner-only review visibility; not operational / not recruiting-inbox eligible.
-  assert.equal(model.items.length, 1);
-  assert.equal(model.items[0].suspectedMetaLead, true);
+  // BR-215 — a later META stamp + null columns is not create-time BR-193 evidence.
+  assert.equal(model.items.length, 0);
   assert.equal(filterOperationalProspects([prospect]).length, 0);
+
+  const br193 = canary({
+    workflow_state: {
+      atlasEligibilitySource: "META_AD_DESTINATION",
+      eligibilityReason: "AD_DESTINATION_FALLBACK_NO_CTWA_METADATA"
+    }
+  });
+  assert.equal(isOperationalProspectRecord(br193), false);
+  const reviewModel = await inbox([br193]);
+  assert.equal(reviewModel.items.length, 1);
+  assert.equal(reviewModel.items[0].suspectedMetaLead, true);
 });
 
 test("META_AD_DESTINATION + ctwa_clid remains eligible", () => {
