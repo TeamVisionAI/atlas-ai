@@ -107,7 +107,7 @@ export default function MissionActionCenter({
   return (
     <section className="mission-action-center" aria-busy={busy || submitting || undefined}>
       <h3 className="mission-action-center__title">{translate("missionControlMissionActions")}</h3>
-      <div className="mission-action-center__list">
+      <div className="mission-action-center__grid">
         {actions.map((action, index) => {
           const formType = resolvesToInlineForm(action.id, mission);
           const expanded = expandedActionId === action.id;
