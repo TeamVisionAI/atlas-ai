@@ -390,7 +390,7 @@ async function restoreStalledFirstReplyRecruitingState({
     await persistVerifiedAtlasEligibilitySource(
       prospect.phone,
       VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL,
-      scope
+      { ...scope, ctwaReferral }
     ).catch(() => null);
 
     await savePersistedWorkflowState(

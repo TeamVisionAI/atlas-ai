@@ -3117,14 +3117,15 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Related:** BR-159, BR-165  
 **Status:** Implemented  
 **Engine target:** `atlasInboundAutomationEligibility.evaluatePositiveAtlasLeadProvenance`  
-**Tests:** `backend/test/operationalLeadProvenanceBr201.test.js`; `backend/test/operationalLeadEligibilityBr199.test.js`; `backend/test/automationOutboundEligibilityBr200.test.js`
+**Tests:** `backend/test/operationalLeadProvenanceBr201.test.js`; `backend/test/operationalLeadEligibilityBr199.test.js`; `backend/test/automationOutboundEligibilityBr200.test.js`; `backend/test/ctwaEligibilityContinuationPreserve.test.js`
 
 ### Rules
 
 1. **META_AD_DESTINATION alone is not proof** — `workflow_state.atlasEligibilitySource=META_AD_DESTINATION` or `entry_method=META_AD_DESTINATION` without inbound-specific evidence is `LEGACY_AMBIGUOUS` / not eligible. Do not admit that row to My Prospects, Team Prospects, Prospect Center, Mission Control, or dashboard prospect counts.
-2. **Inbound-specific proof still admits** — Eligible when backed by stored `ctwa_clid`, referral `source_type=ad`, `CTWA_REFERRAL`, QR / `car_magnet`, campaign intake, Facebook Lead Ads, Quick Capture / manual create / agenda promotion, IUL campaign workflow, or explicit `atlasAutomationEnabled=true`.
+2. **Inbound-specific proof still admits** — Eligible when backed by stored `ctwa_clid`, referral `source_type=ad`, `CTWA_REFERRAL`, QR / `car_magnet`, campaign intake, Facebook Lead Ads, Quick Capture / manual create / agenda promotion, IUL campaign workflow, or explicit `atlasAutomationEnabled=true`. Persist that CTWA evidence on `workflow_state` when the first inbound has it.
 3. **Do not rewrite history** — Do not delete rows, backfill stamps, or change `owner_user_id`. The connection stamp may remain stored; it is simply not list membership.
-4. **Boundaries** — BR-200 outbound fail-closed for META-only stays unchanged. HUMAN / AGENT messaging stays open. Do not weaken BR-142 this-inbound CTWA / QR / session / IUL rules. Do not change WhatsApp routing, tenant isolation, or AI Quality APPLY.
+4. **Monotonic persist** — Continuation inbound without referral must not overwrite a stronger stored verified source (`CTWA_REFERRAL`, QR, campaign intake, Facebook Lead Ads, Quick Capture) with `META_AD_DESTINATION`. Recover `message.referral` from the raw payload before falling back. Do not infer CTWA from the connection toggle.
+5. **Boundaries** — BR-200 outbound fail-closed for META-only stays unchanged. HUMAN / AGENT messaging stays open. Do not weaken BR-142 this-inbound CTWA / QR / session / IUL rules. Do not change WhatsApp routing, tenant isolation, or AI Quality APPLY. Do not make META-only rows operational (that is BR-215, not this rule).
 
 ---
 
@@ -3443,7 +3444,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 ### Rules
 
 1. **Explicit setting** — Per WhatsApp connection: `metaAdDestinationAutomationEnabled` / `meta_ad_destination_automation_enabled`. Default **false** for every existing connection. Ordinary personal inbound stays silent.
-2. **Priority** — 1) positive CTWA referral / `ctwa_clid`; 2) QR / pending inbound match; 3) valid campaign intake code; 4) stored Atlas automation origin / existing eligible prospect; 5) this fallback; 6) fail closed.
+2. **Priority** — 1) positive CTWA referral / `ctwa_clid`; 2) QR / pending inbound match; 3) valid campaign intake code; 4) stored Atlas automation origin / existing eligible prospect; 5) this fallback; 6) fail closed. Continuation inbound without referral must not persist this fallback over a stronger stored source.
 3. **Fallback proof** — Connection CONNECTED; inbound `phone_number_id` exactly matches that connection; setting explicitly true; `owner_user_id` from the connection owner; organization from the same connection. Brand-new unknown senders may be promoted and assigned to that owner.
 4. **No inference** — Greeting text, WhatsApp UI copy, `from_user_id`, and personal-connection routing are not proof. Do not invent `ctwa_clid` or Meta `referral`. Provenance is `META_AD_DESTINATION`.
 5. **Isolation** — Tenant and user isolation stay intact. Cross-tenant connections cannot promote. Outbound uses the same personal connection token/`phone_number_id`. Do not route through org token/phone or fall back to RVP.

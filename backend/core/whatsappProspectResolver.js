@@ -46,6 +46,8 @@ const {
   hasFreshIulCampaignIntakeMatch,
   resolveVerifiedAtlasEligibilitySource,
   persistVerifiedAtlasEligibilitySource,
+  resolveInboundCtwaReferral,
+  buildDurableCtwaEvidence,
   isPersonalWhatsAppConnection
 } = require("./atlasInboundAutomationEligibility");
 const {
@@ -440,6 +442,9 @@ async function emitProspectLifecycleEvents(
         doNotContact: false,
         ...(atlasEligibilitySource
           ? { atlasEligibilitySource }
+          : {}),
+        ...(hasPositiveCtwaReferral(ctwaReferral)
+          ? buildDurableCtwaEvidence(ctwaReferral) || {}
           : {})
       },
       {
@@ -532,6 +537,8 @@ async function locateOrCreateWhatsAppProspect({
   organizationId: explicitOrganizationId = null,
   providerMessageId = null,
   ctwaReferral = null,
+  rawMessage = null,
+  rawWebhookPayload = null,
   intakeSource = null,
   campaignIntakeMatch = null,
   senderIdentity = null,
@@ -626,7 +633,13 @@ async function locateOrCreateWhatsAppProspect({
   }
 
   const origin = {
-    ctwaReferral: ctwaReferral || null,
+    ctwaReferral: resolveInboundCtwaReferral({
+      ctwaReferral,
+      rawMessage,
+      rawWebhookPayload
+    }),
+    rawMessage: rawMessage || null,
+    rawWebhookPayload: rawWebhookPayload || null,
     intakeSource: intakeSource || null,
     campaignIntakeMatch: resolvedCampaignIntakeMatch?.matched
       ? resolvedCampaignIntakeMatch
@@ -735,16 +748,24 @@ async function locateOrCreateWhatsAppProspect({
   });
 
   if (!created) {
+    const existingWorkflowState = await loadPersistedWorkflowState(prospect.phone, {
+      organizationId,
+      prospectId: prospect.id || null
+    }).catch(() => null);
     const eligibilitySource = resolveVerifiedAtlasEligibilitySource({
       qrTouch,
       ctwaReferral: origin.ctwaReferral,
+      rawMessage: origin.rawMessage,
+      rawWebhookPayload: origin.rawWebhookPayload,
       intakeSource: origin.intakeSource,
       sourceFields,
       campaignIntakeMatch: origin.campaignIntakeMatch,
       whatsappConnectionSource: origin.whatsappConnectionSource,
       whatsappConnection: origin.whatsappConnection,
       inboundPhoneNumberId: origin.inboundPhoneNumberId,
-      expectedOrganizationId: organizationId
+      expectedOrganizationId: organizationId,
+      prospect,
+      workflowState: existingWorkflowState
     });
     if (eligibilitySource) {
       await persistVerifiedAtlasEligibilitySource(
@@ -752,7 +773,9 @@ async function locateOrCreateWhatsAppProspect({
         eligibilitySource,
         {
           organizationId,
-          prospectId: prospect.id || null
+          prospectId: prospect.id || null,
+          workflowState: existingWorkflowState,
+          ctwaReferral: origin.ctwaReferral
         }
       ).catch((error) => {
         console.warn(
