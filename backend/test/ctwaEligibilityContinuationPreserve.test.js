@@ -1,7 +1,7 @@
 /**
  * Continuation must not downgrade CTWA_REFERRAL to META_AD_DESTINATION.
  * Implements BR-142 / BR-193 priority and BR-201 inbound-specific proof.
- * Does not implement BR-215 (META-only stays LEGACY_AMBIGUOUS).
+ * META-only stays LEGACY_AMBIGUOUS for operational provenance (BR-215 is review-only).
  */
 
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -252,7 +252,7 @@ test("J) ordinary personal inbound remains silent and unpromoted", () => {
   assert.equal(promotion.promote, false);
 });
 
-test("K) META-only remains LEGACY_AMBIGUOUS — BR-215 not implemented", () => {
+test("K) META-only remains LEGACY_AMBIGUOUS for operational provenance", () => {
   const row = prospect({
     source: WHATSAPP_SOURCE.META_AD_DESTINATION,
     entry_method: WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION,

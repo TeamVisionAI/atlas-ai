@@ -221,18 +221,29 @@ export function canReturnConversationToAtlas(effectiveOwnership) {
 
 /**
  * Single source of truth for header action buttons.
- * @returns {("TAKE_OVER"|"RETURN_TO_ATLAS")[]}
+ * @returns {("TAKE_OVER"|"RETURN_TO_ATLAS"|"CONFIRM_META_LEAD"|"MARK_NOT_LEAD")[]}
  */
 export function resolveThreadActionIds({
   ownershipState = null,
-  effectiveOwnership = null
+  effectiveOwnership = null,
+  suspectedMetaLead = false
 } = {}) {
   const effective =
     effectiveOwnership || resolveEffectiveOwnership(ownershipState);
-  if (effective === "HUMAN") {
-    return ["RETURN_TO_ATLAS"];
+  const actions =
+    effective === "HUMAN" ? ["RETURN_TO_ATLAS"] : ["TAKE_OVER"];
+  if (suspectedMetaLead) {
+    actions.push("CONFIRM_META_LEAD", "MARK_NOT_LEAD");
   }
-  return ["TAKE_OVER"];
+  return actions;
+}
+
+export function isSuspectedMetaLeadItem(item = {}) {
+  return (
+    item?.suspectedMetaLead === true ||
+    item?.metaLeadReview?.reviewOnly === true ||
+    String(item?.metaLeadReview?.status || "").toUpperCase() === "PENDING"
+  );
 }
 
 /**

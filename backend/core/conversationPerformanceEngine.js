@@ -23,6 +23,10 @@ const {
   INBOX_LIFECYCLE
 } = require("./conversationsCenter/conversationsCenterLifecycle");
 const { workflowStateFromProspectRow } = require("./workflowStateStore");
+const {
+  isSuspectedMetaLeadReview,
+  SUSPECTED_META_LEAD_REVIEW
+} = require("./metaLeadReview");
 
 function emptyCounts() {
   return {
@@ -58,6 +62,10 @@ function evaluateConversationPerformanceEligibility(prospect = null) {
   }
 
   const persisted = persistedFromProspect(prospect);
+  // Implements BR-215 — review candidates are not Conversation Performance members.
+  if (isSuspectedMetaLeadReview(prospect, persisted)) {
+    return { eligible: false, reason: SUSPECTED_META_LEAD_REVIEW };
+  }
   const operational = evaluateOperationalProspectRecord(prospect, persisted);
   if (!operational.operational) {
     return { eligible: false, reason: operational.reason || "NOT_OPERATIONAL" };

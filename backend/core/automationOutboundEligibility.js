@@ -12,6 +12,7 @@ const {
   isOrdinaryPersonalWhatsAppContact,
   isPersonalWhatsAppOriginMarker,
   hasRealStoredCtwaEvidence,
+  POSITIVE_LEAD_PROVENANCE_SOURCE_SET,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES
 } = require("./atlasInboundAutomationEligibility");
 const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("./whatsappConstants");
@@ -134,6 +135,10 @@ function isMetaAdDestinationOnly(prospect = {}, workflowState = {}, stored = {})
     return false;
   }
   if (hasRealStoredCtwaEvidence(prospect, workflowState)) {
+    return false;
+  }
+  // Implements BR-215 — human-verified Meta lead is not META-only.
+  if (POSITIVE_LEAD_PROVENANCE_SOURCE_SET.has(source)) {
     return false;
   }
   return true;

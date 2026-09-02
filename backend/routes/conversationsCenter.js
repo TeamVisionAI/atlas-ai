@@ -168,6 +168,17 @@ async function loadScopedProspect(phone, organizationId, authContext = null) {
     return null;
   }
 
+  const {
+    isSuspectedMetaLeadReview,
+    isOwnerOfProspect
+  } = require("../core/metaLeadReview");
+  if (
+    isSuspectedMetaLeadReview(prospect) &&
+    !isOwnerOfProspect(prospect, authContext?.userId)
+  ) {
+    return null;
+  }
+
   return prospect;
 }
 
@@ -430,6 +441,84 @@ router.post("/mark-test", (req, res) =>
   scopedLifecycleAction(req, res, "MARK_TEST", (phone, _body, scope) =>
     markConversationAsTest(phone, scope)
   )
+);
+
+async function metaLeadReviewAction(req, res, actionName) {
+  if (!(await requireConversationsAccess(req, res))) {
+    return;
+  }
+
+  try {
+    const organizationId = getTenantOrganizationId(req);
+    const phone = req.body?.phone || req.params.phone;
+    const prospect = await loadScopedProspect(phone, organizationId, req.authContext);
+    if (!prospect) {
+      return res.status(404).json({
+        error: "CONVERSATION_NOT_FOUND",
+        message: "Conversation not found in Conversations Center scope"
+      });
+    }
+
+    const {
+      confirmMetaLead,
+      dismissMetaLeadAsPersonal
+    } = require("../core/metaLeadReview");
+    const result =
+      actionName === "CONFIRM_META_LEAD"
+        ? await confirmMetaLead({
+            prospect,
+            organizationId: prospect.organization_id || organizationId,
+            authContext: req.authContext,
+            connectionId: req.body?.connectionId || null,
+            phoneNumberId: req.body?.phoneNumberId || null
+          })
+        : await dismissMetaLeadAsPersonal({
+            prospect,
+            organizationId: prospect.organization_id || organizationId,
+            authContext: req.authContext
+          });
+
+    if (!result.ok) {
+      return res.status(result.status || 409).json({
+        error: `CONVERSATIONS_CENTER_${actionName}_DENIED`,
+        reason: result.reason,
+        message:
+          result.reason === "OWNER_ONLY"
+            ? "Only the connection owner can review this suspected Meta lead"
+            : "This conversation is not eligible for Meta lead review"
+      });
+    }
+
+    const {
+      buildConversationListItem
+    } = require("../core/conversationsCenter/conversationsCenterReadModel");
+    const refreshed = await findProspectInOrganization(
+      prospect.phone,
+      prospect.organization_id || organizationId
+    );
+
+    res.json({
+      success: true,
+      action: actionName,
+      phone: prospect.phone,
+      atlasEligibilitySource: result.source || null,
+      alreadyResolved: Boolean(result.alreadyResolved),
+      conversation: await buildConversationListItem(refreshed || prospect)
+    });
+  } catch (error) {
+    console.error(`[conversations-center] ${actionName}`, error.message);
+    res.status(500).json({
+      error: `CONVERSATIONS_CENTER_${actionName}_FAILED`,
+      message: `Failed to ${String(actionName).toLowerCase().replace(/_/g, " ")}`
+    });
+  }
+}
+
+router.post("/confirm-meta-lead", (req, res) =>
+  metaLeadReviewAction(req, res, "CONFIRM_META_LEAD")
+);
+router.post("/mark-not-lead", (req, res) =>
+  metaLeadReviewAction(req, res, "MARK_NOT_LEAD")
 );
 
 /**

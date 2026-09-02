@@ -261,6 +261,22 @@ export async function takeOverConversation(phone, body = {}) {
   });
 }
 
+export async function confirmMetaLead(phone, body = {}) {
+  return wrap(`/api/conversations/confirm-meta-lead`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, phone })
+  });
+}
+
+export async function markConversationNotLead(phone) {
+  return wrap(`/api/conversations/mark-not-lead`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone })
+  });
+}
+
 export async function returnConversationToAtlas(phone) {
   return wrap(`/api/conversations/return-to-atlas`, {
     method: "POST",

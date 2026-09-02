@@ -18,6 +18,13 @@ const {
   resolveRecruitingInboxEligibility
 } = require("./conversationsCenterInboxEligibility");
 const {
+  evaluateSuspectedMetaLeadReview,
+  isOwnerVisibleSuspectedMetaLead,
+  isOwnerOfProspect,
+  isSuspectedMetaLeadReview,
+  SUSPECTED_META_LEAD_REVIEW
+} = require("../metaLeadReview");
+const {
   INBOX_LIFECYCLE,
   resolveInboxLifecycle,
   isActiveInboxLifecycle,
@@ -188,20 +195,34 @@ function activityMs(row) {
   });
 }
 
+function mergeWorkflowOverlay(base = {}, overlay = {}) {
+  const merged = { ...(base || {}) };
+  for (const [key, value] of Object.entries(overlay || {})) {
+    if (value != null) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
 async function buildConversationListItem(prospect, options = {}) {
+  const embedded = workflowStateFromProspectRow(prospect);
   let persisted = options.persisted || null;
 
   if (!persisted) {
     if (options.preloadedProspectRow) {
-      persisted = workflowStateFromProspectRow(prospect);
+      persisted = embedded;
     } else if (prospect?.phone) {
-      persisted = await loadPersistedWorkflowState(prospect.phone, {
+      const loaded = await loadPersistedWorkflowState(prospect.phone, {
         organizationId: prospect.organization_id || null,
         prospectId: prospect.id || null
       });
+      persisted = mergeWorkflowOverlay(embedded, loaded);
     } else {
-      persisted = workflowStateFromProspectRow(prospect);
+      persisted = embedded;
     }
+  } else {
+    persisted = mergeWorkflowOverlay(embedded, persisted);
   }
 
   const ownershipState = resolveConversationOwnershipState(persisted);
@@ -283,7 +304,34 @@ async function buildConversationListItem(prospect, options = {}) {
     inboxArchivedAt: persisted.inboxArchivedAt || null,
     inboxClosedAt: persisted.inboxClosedAt || null,
     inboxWindowExpiredAt: persisted.inboxWindowExpiredAt || null,
-    customerCareWindow
+    customerCareWindow,
+    ...buildMetaLeadReviewPresentation(prospect, persisted)
+  };
+}
+
+function buildMetaLeadReviewPresentation(prospect, persisted) {
+  const decision = evaluateSuspectedMetaLeadReview(prospect, persisted);
+  if (!decision.review) {
+    const status = persisted?.metaLeadReview?.status || null;
+    return {
+      metaLeadReview: status
+        ? {
+            status,
+            reviewOnly: false,
+            reason: decision.reason
+          }
+        : null,
+      suspectedMetaLead: false
+    };
+  }
+  return {
+    metaLeadReview: {
+      status: "PENDING",
+      reviewOnly: true,
+      reason: SUSPECTED_META_LEAD_REVIEW,
+      label: "Possible Meta Lead — Verify"
+    },
+    suspectedMetaLead: true
   };
 }
 
@@ -308,7 +356,9 @@ function summarizeConversationListItem(item = {}) {
     conversationGoal: item.conversationGoal || null,
     ownershipState: item.ownershipState,
     needsHumanAttention: Boolean(item.needsHumanAttention),
-    inboxLifecycle: item.inboxLifecycle || null
+    inboxLifecycle: item.inboxLifecycle || null,
+    suspectedMetaLead: Boolean(item.suspectedMetaLead),
+    metaLeadReview: item.metaLeadReview || null
   };
 }
 
@@ -398,6 +448,8 @@ function buildFilterCounts(items) {
     archived: items.filter((item) => isArchivedInboxBucket(item.inboxLifecycle))
       .length,
     test: items.filter((item) => item.inboxLifecycle === INBOX_LIFECYCLE.TEST)
+      .length,
+    metaLeadsAwaitingVerification: items.filter((item) => item.suspectedMetaLead === true)
       .length
   };
 }
@@ -433,11 +485,14 @@ async function buildConversationsCenterReadModel(options = {}) {
     isProspectInConversationsTenantScope(prospect, organizationId)
   );
   // BR-199 — eligibility/provenance first, then workspace ownership, then tabs.
+  // BR-215 — owner-only review admission is separate from recruiting inbox eligibility.
   const eligible = (
     await Promise.all(
       tenantOnly.map(async (prospect) => {
+        const workflowState = useEmbeddedWorkflow
+          ? workflowStateFromProspectRow(prospect)
+          : null;
         if (useEmbeddedWorkflow) {
-          const workflowState = workflowStateFromProspectRow(prospect);
           return evaluateRecruitingInboxEligibility(prospect, workflowState).eligible
             ? prospect
             : null;
@@ -448,7 +503,30 @@ async function buildConversationsCenterReadModel(options = {}) {
       })
     )
   ).filter(Boolean);
-  const scoped = eligible.filter((prospect) => {
+  const viewerUserId = authContext?.userId || null;
+  const ownerReviews = tenantOnly.filter((prospect) => {
+    const workflowState = useEmbeddedWorkflow
+      ? workflowStateFromProspectRow(prospect)
+      : prospect.workflow_state || null;
+    return isOwnerVisibleSuspectedMetaLead(prospect, viewerUserId, workflowState);
+  });
+  const admitted = [];
+  const seen = new Set();
+  for (const prospect of [...eligible, ...ownerReviews]) {
+    const key = String(prospect.id || prospect.phone || "");
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    admitted.push(prospect);
+  }
+  const scoped = admitted.filter((prospect) => {
+    const workflowState = useEmbeddedWorkflow
+      ? workflowStateFromProspectRow(prospect)
+      : prospect.workflow_state || null;
+    if (isSuspectedMetaLeadReview(prospect, workflowState)) {
+      return isOwnerOfProspect(prospect, viewerUserId);
+    }
     if (!authContext) {
       return true;
     }
@@ -517,6 +595,7 @@ async function buildConversationsCenterReadModel(options = {}) {
     workspaceScope: listScope?.workspaceScope || null,
     counts,
     needsAttentionCount: counts.needs_attention,
+    metaLeadsAwaitingVerification: counts.metaLeadsAwaitingVerification || 0,
     items
   };
 }
