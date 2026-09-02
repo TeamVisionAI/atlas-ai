@@ -3427,6 +3427,34 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-217 — ZIP-Tolerant Recruiting Location Parsing
+
+**Implements:** A trailing U.S. ZIP or ZIP+4 must not prevent city/state extraction. Common city typos such as Hialiah still canonicalize to Hialeah via existing BR-173 logic. After a complete city+state parse, Atlas advances to work authorization instead of generic `clarify_once`.
+**Domain:** Recruit AI / Qualification location
+**Depends on:** BR-082, BR-094, BR-095, BR-173
+**Related:** BR-164 (facts persist); BR-166 (coherence)
+**Status:** Implemented
+**Engine target:** `recruitAiV2/locationFacts.js`; interpreter; `contextTurnUpdate`; `decisionEngine`
+**Tests:** `backend/test/recruitAiV2ZipTolerantLocationBr217.test.js`
+**Docs:** `docs/03-engineering/recruit-ai-v2/38_ZIP_TOLERANT_LOCATION.md`
+
+### Rules
+
+1. **Trailing ZIP is not a state** — Strip `12345` / `12345-6789` from the end of the inbound before city/state splitting. Keep the ZIP on the parsed result and, when present, on `knownFacts.zip`.
+2. **ZIP is optional** — City + recognized state remain sufficient for a complete location. Do not require ZIP to qualify or to ask work authorization.
+3. **Same typo fold** — The city+state complete path uses existing `resolveCanonicalCityKey` (BR-173). Do not add a second typo dictionary. `Hialiah florida 33010` → Hialeah, FL, 33010.
+4. **ZIP alone is not a location** — Bare ZIP / ZIP+4 / arbitrary numeric text must not invent a city or state.
+5. **Decision** — A complete city+state parse must not emit `clarify_once`. Use the normal location-complete transition (work authorization when that is the next unresolved fact).
+6. **No migration** — Persist ZIP only in V2 `knownFacts` / conversation context. Do not add a prospect ZIP column.
+7. **Global** — Same parser for every V2 conversation. No prospect, phone, tenant, or campaign special-case.
+8. **Boundaries** — Do not change ownership, WhatsApp eligibility, BR-215 / BR-216, work-authorization rules, scheduling, or IUL routing.
+
+### Recommended next audit (out of scope)
+
+Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96bb53-b57c-43ba-b3c2-f0b7267d88ac` (not a live prospect row). BR-217 does not depend on that identity bug. Audit reconstructed-context prospect binding separately.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

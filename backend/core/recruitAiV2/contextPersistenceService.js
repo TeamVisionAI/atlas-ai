@@ -211,6 +211,9 @@ function protectResolvedQualificationFacts(previousContext, nextContext) {
       nextFacts.proposedState = prevFacts.proposedState;
     }
   }
+  if (prevFacts.zip && !nextFacts.zip) {
+    nextFacts.zip = prevFacts.zip;
+  }
   if (isResolvedAuthorization(prevFacts) && !isResolvedAuthorization(nextFacts)) {
     nextFacts.workAuthorization = prevFacts.workAuthorization;
     nextFacts.workAuthorizationStatus = prevFacts.workAuthorizationStatus;

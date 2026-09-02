@@ -132,6 +132,7 @@ function buildNextContextFromInterpretation({
         ...nextContext.knownFacts,
         city,
         state,
+        zip: interpretation.entities?.zip || nextContext.knownFacts?.zip || null,
         cityCertainty: FACT_CERTAINTY.CONFIRMED,
         stateCertainty: FACT_CERTAINTY.CONFIRMED,
         proposedState: null

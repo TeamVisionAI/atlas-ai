@@ -495,12 +495,47 @@ function isPlausibleCityName(city) {
   return true;
 }
 
+const US_ZIP_TRAILING_RE = /(?:^|\s)(\d{5}(?:-\d{4})?)\s*$/;
+
+/**
+ * BR-217 — trailing US ZIP / ZIP+4 is not a state token.
+ * ZIP alone is not a location.
+ */
+function extractTrailingUsZip(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return { text: "", zip: null };
+  }
+  const match = text.match(US_ZIP_TRAILING_RE);
+  if (!match) {
+    return { text, zip: null };
+  }
+  const zip = match[1];
+  const remainder = text.slice(0, match.index).replace(/[,\s]+$/g, "").trim();
+  return { text: remainder, zip };
+}
+
+function attachZip(parsed, zip) {
+  if (!parsed) {
+    return null;
+  }
+  if (!zip && parsed.zip == null) {
+    return parsed;
+  }
+  return {
+    ...parsed,
+    zip: zip || parsed.zip || null
+  };
+}
+
 /**
  * Parse "City ST" / "City, ST" / "City StateName" including multi-word cities (BR-094).
  * Also accepts state-first natural order: "Florida Jacksonville", "FL Jacksonville".
+ * Implements BR-217 — strip trailing ZIP before treating the last token as state.
  */
 function parseCityStatePhrase(raw) {
-  const cleaned = String(raw || "")
+  const { text: withoutZip, zip } = extractTrailingUsZip(raw);
+  const cleaned = String(withoutZip || "")
     .replace(/,/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -519,7 +554,7 @@ function parseCityStatePhrase(raw) {
   if (!parsed) {
     parsed = splitStateThenCity(parts);
   }
-  return parsed;
+  return attachZip(parsed, zip);
 }
 
 function buildCompleteLocation(cityParts, state) {
@@ -527,7 +562,8 @@ function buildCompleteLocation(cityParts, state) {
     return null;
   }
   const joined = cityParts.join(" ");
-  const canonicalKey = normalizeCityLookupKey(joined);
+  // Implements BR-217 / BR-173 — same typo fold as the bare-city path.
+  const canonicalKey = resolveCanonicalCityKey(joined);
   const city = titleCaseCity(canonicalKey || joined);
   if (!isPlausibleCityName(city)) {
     return null;
@@ -737,8 +773,18 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
+  // Implements BR-217 — ZIP is supporting evidence, never the state token.
+  const stripped = extractTrailingUsZip(raw);
+  if (stripped.zip && !stripped.text) {
+    return null;
+  }
+  const source = stripped.text || String(raw || "").trim();
+  if (!source) {
+    return null;
+  }
+
   // Never invent cities from company-identity / info-request / FAQ phrasing.
-  const folded = String(raw || "")
+  const folded = String(source || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
@@ -750,11 +796,11 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
-  if (looksLikeConversationalProseCity(raw) || looksLikeConversationalProseCity(folded)) {
+  if (looksLikeConversationalProseCity(source) || looksLikeConversationalProseCity(folded)) {
     return null;
   }
   if (
-    looksLikeLanguageOrIdentitySelfDescription(raw) ||
+    looksLikeLanguageOrIdentitySelfDescription(source) ||
     looksLikeLanguageOrIdentitySelfDescription(folded)
   ) {
     return null;
@@ -781,7 +827,7 @@ function parseLocationAnswerCore(raw) {
   // Never invent cities from license / authorization / FAQ phrasing (BR-083/098/099).
   if (
     /\b(licen[cs]ia|license|permiso|autoriz|seguro|seguros|driver|conducir|215|214|experiencia|experience|necesito|comision|comisión|salario|sueldo|ganar|dinero|pagan|pago|vender|vendiendo|vendedor|vendedora|ventas|selling|sales|salesperson|conozco|contactos|clientes|network|bilingue|bilingual|ciudadan|idioma)\b/i.test(
-      raw
+      source
     )
   ) {
     return null;
@@ -790,17 +836,17 @@ function parseLocationAnswerCore(raw) {
   // Day-part preference fragments are not locations ("Tarde mejor", "Mañana mejor").
   if (
     /^(tarde|mañana|manana|morning|afternoon|evening|noche)(\s+(mejor|better|por\s+favor|prefiero))?$/i.test(
-      String(raw || "").trim()
+      String(source || "").trim()
     ) ||
     /^(mejor|better)\s+(tarde|mañana|manana|morning|afternoon|evening|noche)$/i.test(
-      String(raw || "").trim()
+      String(source || "").trim()
     )
   ) {
     return null;
   }
 
   // Scheduling-relative day / referential slot phrases are not cities.
-  const schedNorm = String(raw || "")
+  const schedNorm = String(source || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
@@ -821,34 +867,35 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
-  const hedged = hasLocationHedge(raw);
-  const working = hedged ? stripLocationHedge(raw) : raw;
+  const hedged = hasLocationHedge(source);
+  const working = hedged ? stripLocationHedge(source) : source;
   if (!working) {
     return null;
   }
+  const finish = (parsed) => attachZip(parsed, stripped.zip);
 
-  // Comma form: "Miami, FL" / "Miami, Florida"
+  // Comma form: "Miami, FL" / "Miami, Florida" / "Hialeah, FL 33010" after ZIP strip.
   const comma = working.match(/^([^,]+),\s*(.+)$/);
   if (comma) {
-    const city = titleCaseCity(comma[1]);
+    const city = canonicalizeCityName(comma[1]) || titleCaseCity(comma[1]);
     const state = normalizeStateToken(comma[2]);
     if (city && state && isPlausibleCityName(city)) {
       if (hedged) {
-        return {
+        return finish({
           city,
           state: null,
           proposedState: state,
           completeness: "partial",
           requiresClarification: true
-        };
+        });
       }
-      return {
+      return finish({
         city,
         state,
         proposedState: null,
         completeness: "complete",
         requiresClarification: false
-      };
+      });
     }
   }
 
@@ -856,15 +903,15 @@ function parseLocationAnswerCore(raw) {
   const phrase = parseCityStatePhrase(working);
   if (phrase) {
     if (hedged) {
-      return {
+      return finish({
         city: phrase.city,
         state: null,
         proposedState: phrase.state,
         completeness: "partial",
         requiresClarification: true
-      };
+      });
     }
-    return phrase;
+    return finish(phrase);
   }
 
   // State-only confirmation when city already known is handled by caller.
@@ -875,30 +922,30 @@ function parseLocationAnswerCore(raw) {
     working.split(/\s+/).length <= 4 &&
     !isFalsePositiveStateToken(working)
   ) {
-    return {
+    return finish({
       city: null,
       state: stateOnly,
       proposedState: null,
       completeness: "state_only",
       requiresClarification: false
-    };
+    });
   }
 
   // Known city-only — high-confidence Florida cities resolve complete (no state ask).
   const cityKey = resolveCanonicalCityKey(working);
   const highConfidenceFl = !hedged ? buildHighConfidenceFloridaLocation(cityKey || working) : null;
   if (highConfidenceFl) {
-    return highConfidenceFl;
+    return finish(highConfidenceFl);
   }
   if (CITY_TO_PROPOSED_STATE[cityKey]) {
     const city = titleCaseCity(cityKey);
-    return {
+    return finish({
       city,
       state: null,
       proposedState: proposeStateFromCity(city),
       completeness: "partial",
       requiresClarification: true
-    };
+    });
   }
 
   // Single-token alphabetic city candidate (unknown city → ask state, no invent).
@@ -911,25 +958,25 @@ function parseLocationAnswerCore(raw) {
       return null;
     }
     if (normalizeStateToken(working)) {
-      return {
+      return finish({
         city: null,
         state: normalizeStateToken(working),
         proposedState: null,
         completeness: "state_only",
         requiresClarification: false
-      };
+      });
     }
     const city = titleCaseCity(cityKey || working);
     if (!isPlausibleCityName(city)) {
       return null;
     }
-    return {
+    return finish({
       city,
       state: null,
       proposedState: proposeStateFromCity(city),
       completeness: "partial",
       requiresClarification: true
-    };
+    });
   }
 
   // Multi-word known-style cities without state (e.g. "New York", "Fort Lauderdale").
@@ -945,19 +992,19 @@ function parseLocationAnswerCore(raw) {
       }
       const multiWordFl = !hedged ? buildHighConfidenceFloridaLocation(working) : null;
       if (multiWordFl) {
-        return multiWordFl;
+        return finish(multiWordFl);
       }
       const city = titleCaseCity(cityKey || working);
       if (!isPlausibleCityName(city)) {
         return null;
       }
-      return {
+      return finish({
         city,
         state: null,
         proposedState: proposeStateFromCity(city),
         completeness: "partial",
         requiresClarification: true
-      };
+      });
     }
   }
 
@@ -1020,6 +1067,7 @@ module.exports = {
   parseLocationAnswer,
   parseLocationAnswerCore,
   parseCityStatePhrase,
+  extractTrailingUsZip,
   extractLocationCandidateText,
   normalizeCityLookupKey,
   isHighConfidenceFloridaCity,
