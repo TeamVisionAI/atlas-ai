@@ -1,0 +1,23 @@
+/**
+ * BR-215 — Mixed-use WhatsApp suspected Meta lead review.
+ * Not CTWA. Not BR-200 proof until HUMAN_VERIFIED_META_LEAD.
+ */
+
+const SUSPECTED_META_LEAD_REVIEW = "SUSPECTED_META_LEAD_REVIEW";
+const HUMAN_VERIFIED_META_LEAD = "HUMAN_VERIFIED_META_LEAD";
+const META_LEAD_REVIEW_STATUSES = Object.freeze({
+  PENDING: "PENDING",
+  CONFIRMED: "CONFIRMED",
+  DISMISSED_PERSONAL: "DISMISSED_PERSONAL"
+});
+const META_LEAD_REVIEW_AUDIT = Object.freeze({
+  CONFIRMED: "meta_lead_human_verified",
+  DISMISSED: "meta_lead_marked_personal"
+});
+
+module.exports = {
+  SUSPECTED_META_LEAD_REVIEW,
+  HUMAN_VERIFIED_META_LEAD,
+  META_LEAD_REVIEW_STATUSES,
+  META_LEAD_REVIEW_AUDIT
+};

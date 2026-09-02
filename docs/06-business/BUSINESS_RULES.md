@@ -3125,7 +3125,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **Inbound-specific proof still admits** — Eligible when backed by stored `ctwa_clid`, referral `source_type=ad`, `CTWA_REFERRAL`, QR / `car_magnet`, campaign intake, Facebook Lead Ads, Quick Capture / manual create / agenda promotion, IUL campaign workflow, or explicit `atlasAutomationEnabled=true`. Persist that CTWA evidence on `workflow_state` when the first inbound has it.
 3. **Do not rewrite history** — Do not delete rows, backfill stamps, or change `owner_user_id`. The connection stamp may remain stored; it is simply not list membership.
 4. **Monotonic persist** — Continuation inbound without referral must not overwrite a stronger stored verified source (`CTWA_REFERRAL`, QR, campaign intake, Facebook Lead Ads, Quick Capture) with `META_AD_DESTINATION`. Recover `message.referral` from the raw payload before falling back. Do not infer CTWA from the connection toggle.
-5. **Boundaries** — BR-200 outbound fail-closed for META-only stays unchanged. HUMAN / AGENT messaging stays open. Do not weaken BR-142 this-inbound CTWA / QR / session / IUL rules. Do not change WhatsApp routing, tenant isolation, or AI Quality APPLY. Do not make META-only rows operational (that is BR-215, not this rule).
+5. **Boundaries** — BR-200 outbound fail-closed for META-only stays unchanged. HUMAN / AGENT messaging stays open. Do not weaken BR-142 this-inbound CTWA / QR / session / IUL rules. Do not change WhatsApp routing, tenant isolation, or AI Quality APPLY. Do not make META-only rows operational or BR-200 eligible (owner-only review visibility is BR-215).
 
 ---
 
@@ -3405,6 +3405,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-215 — Mixed-Use WhatsApp Suspected Meta Lead Review
+
+**Implements:** BR-193 `META_AD_DESTINATION` fallback prospects (no Cloud API `referral.source_type=ad` / `ctwa_clid`) become owner-only review-visible so the connection owner can confirm or mark personal. They are not verified CTWA and must not satisfy BR-200 until an explicit human confirmation writes `HUMAN_VERIFIED_META_LEAD`.  
+**Domain:** WhatsApp inbound / Conversations / Prospect Center / automation eligibility  
+**Depends on:** BR-193, BR-200, BR-201, BR-199, BR-142, BR-159  
+**Related:** BR-156 (131060 review is a different trigger; 131060 is not ad proof)  
+**Status:** Implemented  
+**Engine target:** `metaLeadReview/`; `atlasInboundAutomationEligibility.js`; `automationOutboundEligibility.js`; `conversationsCenterReadModel.js`; `prospectCenterReadModel.js`  
+**Tests:** `backend/test/metaLeadReviewBr215.test.js`
+
+### Rules
+
+1. **Review state** — Derive `SUSPECTED_META_LEAD_REVIEW` when the prospect was created/promoted through BR-193 (`AD_DESTINATION_FALLBACK_NO_CTWA_METADATA` / `META_AD_DESTINATION` stamp), the receiving connection is the Meta ad destination, `owner_user_id` is that connection owner, tenant matches, no stronger verified provenance exists, and the row is not a known personal contact. Do not persist a production backfill. Existing META-only rows qualify by derivation after deploy.
+2. **Not CTWA** — This state is not `CTWA_REFERRAL`. Do not invent `ctwa_clid` or Meta `referral`. Meta error 131060 (unavailable message) may coexist but is not proof of ad origin.
+3. **Visibility** — Owner-only. Surface in Conversations and Prospect Center for the connection owner with label “Possible Meta Lead — Verify”. Do not expose org-wide / team / oversight. Do not count as a verified Atlas/CTWA lead, Atlas-owned active conversation, or recruiting conversion. Optional separate count: Meta leads awaiting verification.
+4. **Confirm Meta Lead** — Owner action persists `HUMAN_VERIFIED_META_LEAD` plus audit (`confirming user_id`, timestamp, original BR-193 reason, connection id / `phone_number_id`). After confirmation the row is operationally eligible; Atlas automation may resume only if all other BR-200 checks pass. Ownership stays the connection owner.
+5. **Not a Lead / Personal Contact** — Owner action depromotes the row as personal/non-operational. Atlas stays silent. Hide from operational lead views. Preserve logs. Do not delete the conversation.
+6. **Automation** — Before confirmation, BR-200 automated outbound remains DENIED. HUMAN / AGENT manual reply remains allowed. After confirmation, BR-200 may pass via `HUMAN_VERIFIED_META_LEAD` (not fabricated CTWA). Later real `referral.source_type=ad` / `ctwa_clid` still upgrades monotonically (BR-201 rule 4).
+7. **Boundaries** — Do not weaken BR-200. Do not treat `META_AD_DESTINATION` as verified CTWA. Do not auto-reply to review rows. Do not silently backfill Brenda / Armando / Maria in this change. Production transition of those rows requires explicit authorization.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  
@@ -3435,7 +3457,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Implements:** When Meta omits `message.referral` and `ctwa_clid` on a legitimate Click-to-WhatsApp lead, Atlas may promote and auto-reply only if the exact receiving WhatsApp connection is CONNECTED and explicitly marked as a Meta ad destination.  
 **Domain:** WhatsApp inbound / Recruit AI / Meta ads  
 **Depends on:** BR-142, BR-159, BR-165 / BR-165A  
-**Related:** BR-147 (intake-code fallback remains a higher-priority proof)  
+**Related:** BR-147 (intake-code fallback remains a higher-priority proof); BR-215 (owner-only review when Cloud API CTWA is missing)  
 **Status:** Implemented  
 **Engine target:** `metaAdDestinationFallback.js`; `atlasInboundAutomationEligibility.js`; `prospectPromotionEligibility.js`; `whatsappProspectResolver.js`; `whatsappInboundPipeline.js`  
 **Tests:** `backend/test/metaAdDestinationFallbackBr193.test.js`  

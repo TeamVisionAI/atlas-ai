@@ -17,6 +17,10 @@ const {
   isLifecycleNew,
   needsManualAcknowledge
 } = require("./newLeadAttentionEngine");
+const {
+  isOwnerVisibleSuspectedMetaLead,
+  SUSPECTED_META_LEAD_REVIEW
+} = require("./metaLeadReview");
 
 function buildProspectCenterItem(prospect, summary, options = {}) {
   const interviewMs = parseInterviewDatetime(prospect);
@@ -81,7 +85,59 @@ function buildProspectCenterItem(prospect, summary, options = {}) {
       unassigned,
       humanAttention:
         summary.needsHumanAttention || attentionStatus === "human_required",
-      aiResponding: attentionStatus === "ai_responding"
+      aiResponding: attentionStatus === "ai_responding",
+      suspectedMetaLead: false
+    }
+  };
+}
+
+function buildSuspectedMetaLeadProspectCenterItem(prospect) {
+  return {
+    phone: prospect.phone,
+    name: prospect.name || null,
+    prospectNumber: prospect.prospect_number || null,
+    canonicalMilestone: "NEW",
+    currentStep: prospect.current_step || "NEW",
+    missionControlPriority: "review",
+    missionControlPriorityTier: "review",
+    interviewAt: null,
+    interviewType: null,
+    city: prospect.city || null,
+    state: prospect.state || null,
+    stalledAt: null,
+    needsHumanAttention: false,
+    workflowOwnership: null,
+    communicationLanguage: prospect.communication_language || null,
+    lastMessagePreview: prospect.last_message
+      ? String(prospect.last_message).slice(0, 120)
+      : null,
+    appointmentMissing: false,
+    ownerUserId: prospect.owner_user_id || null,
+    assignmentStatus: prospect.owner_user_id ? "assigned" : "unassigned",
+    attentionStatus: "review",
+    acknowledgedAt: null,
+    newLeadReceivedAt: prospect.new_lead_received_at || prospect.created_at || null,
+    escalationLevel: 0,
+    source: prospect.source || "META_AD_DESTINATION",
+    entryMethod: prospect.entry_method || null,
+    isUnassigned: !prospect.owner_user_id,
+    isNew: true,
+    isNewUnacknowledged: false,
+    needsManualAcknowledge: false,
+    isHumanAttentionRequired: false,
+    suspectedMetaLead: true,
+    metaLeadReview: {
+      status: "PENDING",
+      reviewOnly: true,
+      reason: SUSPECTED_META_LEAD_REVIEW
+    },
+    badges: {
+      new: true,
+      needsManualAcknowledge: false,
+      unassigned: !prospect.owner_user_id,
+      humanAttention: false,
+      aiResponding: false,
+      suspectedMetaLead: true
     }
   };
 }
@@ -156,6 +212,22 @@ async function buildProspectCenterReadModel(options = {}) {
     items = items.filter((item) => allowedPhones.has(item.phone));
   }
 
+  const reviewProspects = options.reviewProspects || [];
+  const viewerUserId = options.authContext?.userId || options.viewerUserId || null;
+  const existingPhones = new Set(items.map((item) => item.phone));
+  let reviewCount = 0;
+  for (const prospect of reviewProspects) {
+    if (!isOwnerVisibleSuspectedMetaLead(prospect, viewerUserId)) {
+      continue;
+    }
+    if (existingPhones.has(prospect.phone)) {
+      continue;
+    }
+    existingPhones.add(prospect.phone);
+    items.push(buildSuspectedMetaLeadProspectCenterItem(prospect));
+    reviewCount += 1;
+  }
+
   if (search) {
     items = items.filter((item) => matchesSearch(item, search));
   }
@@ -166,6 +238,7 @@ async function buildProspectCenterReadModel(options = {}) {
     filteredCount: items.length,
     activeFilter,
     search,
+    metaLeadsAwaitingVerification: reviewCount,
     filters: buildExecutiveFilterCounts(prospects, queue, dateOptions),
     items
   };
@@ -174,5 +247,6 @@ async function buildProspectCenterReadModel(options = {}) {
 module.exports = {
   buildProspectCenterReadModel,
   buildProspectCenterItem,
+  buildSuspectedMetaLeadProspectCenterItem,
   matchesSearch
 };

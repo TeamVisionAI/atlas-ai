@@ -17,6 +17,7 @@ import {
   canReturnConversationToAtlas,
   resolveThreadActionIds,
   resolveLifecycleActionIds,
+  isSuspectedMetaLeadItem,
   shouldShowAttentionWarning,
   isUserFacingConversationGoal,
   conversationsThreadHeaderRegionOrder,
@@ -45,6 +46,8 @@ import {
   getConversation,
   takeOverConversation,
   returnConversationToAtlas,
+  confirmMetaLead,
+  markConversationNotLead,
   archiveConversation,
   restoreConversation,
   closeConversation,
@@ -198,9 +201,15 @@ function ConversationRow({ item, selected, onSelect, translate, locale }) {
             </span>
           ) : null}
         </div>
-        <StatusBadge variant={ownershipVariant(item.ownershipState)}>
-          {ownershipLabel(item.ownershipState, translate)}
-        </StatusBadge>
+        {isSuspectedMetaLeadItem(item) ? (
+          <StatusBadge variant="warning" data-testid="conversations-suspected-meta-lead">
+            {translate("possibleMetaLeadVerify")}
+          </StatusBadge>
+        ) : (
+          <StatusBadge variant={ownershipVariant(item.ownershipState)}>
+            {ownershipLabel(item.ownershipState, translate)}
+          </StatusBadge>
+        )}
       </div>
       <div className="conversations-row__phone">{conversationPhoneLabel(item)}</div>
       {item.inboxLifecycle && item.inboxLifecycle !== "ACTIVE" ? (
@@ -720,6 +729,36 @@ export default function ConversationsPage() {
     }
   }
 
+  async function onConfirmMetaLead() {
+    if (!selectedPhone || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await confirmMetaLead(selectedPhone);
+      await loadList({ force: true });
+      setRefreshSignal((n) => n + 1);
+      loadDetail(selectedPhone, { force: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function onMarkNotLead() {
+    if (!selectedPhone || actionBusy) return;
+    setActionBusy(true);
+    try {
+      await markConversationNotLead(selectedPhone);
+      await loadList({ force: true });
+      setRefreshSignal((n) => n + 1);
+      loadDetail(selectedPhone, { force: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
   async function onReturnToAtlas() {
     if (!selectedPhone || actionBusy) return;
     setActionBusy(true);
@@ -845,9 +884,20 @@ export default function ConversationsPage() {
     needsHumanAttention
   });
   // Defense in depth: one action list from effectiveOwnership.
+  const suspectedMetaLead = isSuspectedMetaLeadItem({
+    ...selectedItem,
+    ...matchedDetail?.conversation,
+    suspectedMetaLead:
+      selectedItem?.suspectedMetaLead ||
+      matchedDetail?.conversation?.suspectedMetaLead,
+    metaLeadReview:
+      selectedItem?.metaLeadReview ||
+      matchedDetail?.conversation?.metaLeadReview
+  });
   const threadActionIds = resolveThreadActionIds({
     ownershipState,
-    effectiveOwnership
+    effectiveOwnership,
+    suspectedMetaLead
   });
   const headerRegions = conversationsThreadHeaderRegionOrder();
   const threadRegions = conversationsThreadRegionOrder();
@@ -1060,9 +1110,18 @@ export default function ConversationsPage() {
                         className="conversations-thread__status"
                         data-testid="conversations-thread-badges"
                       >
-                        <StatusBadge variant={ownershipVariant(ownershipState)}>
-                          {ownershipLabel(ownershipState, translate)}
-                        </StatusBadge>
+                        {suspectedMetaLead ? (
+                          <StatusBadge
+                            variant="warning"
+                            data-testid="conversations-thread-suspected-meta-lead"
+                          >
+                            {translate("possibleMetaLeadVerify")}
+                          </StatusBadge>
+                        ) : (
+                          <StatusBadge variant={ownershipVariant(ownershipState)}>
+                            {ownershipLabel(ownershipState, translate)}
+                          </StatusBadge>
+                        )}
                         {showAttentionWarning && ownershipState === "HUMAN" ? (
                           <StatusBadge
                             variant="danger"
@@ -1110,6 +1169,26 @@ export default function ConversationsPage() {
                           onClick={onTakeOver}
                         >
                           {translate("conversationsTakeOver")}
+                        </AtlasButton>
+                      ) : null}
+                      {threadActionIds.includes("CONFIRM_META_LEAD") ? (
+                        <AtlasButton
+                          variant="primary"
+                          data-testid="conversations-confirm-meta-lead"
+                          disabled={actionBusy}
+                          onClick={onConfirmMetaLead}
+                        >
+                          {translate("conversationsConfirmMetaLead")}
+                        </AtlasButton>
+                      ) : null}
+                      {threadActionIds.includes("MARK_NOT_LEAD") ? (
+                        <AtlasButton
+                          variant="secondary"
+                          data-testid="conversations-mark-not-lead"
+                          disabled={actionBusy}
+                          onClick={onMarkNotLead}
+                        >
+                          {translate("conversationsMarkNotLead")}
                         </AtlasButton>
                       ) : null}
                       {threadActionIds.includes("RETURN_TO_ATLAS") &&

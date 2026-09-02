@@ -47,12 +47,22 @@ router.get("/", operationalControlPlaneEmpty(emptyProspectCenter), async (req, r
     const prospects = productionProspects.filter((prospect) =>
       isProspectInWorkspaceListScope(prospect, listScope)
     );
+    const reviewPool = await loadProductionProspects(organizationId, {
+      listScope,
+      includeNonOperationalContacts: true
+    });
+    const reviewProspects = reviewPool.filter(
+      (prospect) =>
+        String(prospect.owner_user_id || "") === String(req.authContext?.userId || "")
+    );
 
     const payload = await buildProspectCenterReadModel({
       filter: req.query.filter,
       search: req.query.q,
       organizationId,
-      prospects
+      prospects,
+      reviewProspects,
+      authContext: req.authContext
     });
 
     res.json(payload);

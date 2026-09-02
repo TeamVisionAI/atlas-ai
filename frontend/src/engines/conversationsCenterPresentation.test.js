@@ -91,6 +91,17 @@ test("HUMAN + stall attention warning coexists; RETURN only; composer on", () =>
   );
 });
 
+test("suspected Meta lead adds confirm and mark-not-lead actions", () => {
+  assert.deepEqual(
+    resolveThreadActionIds({
+      ownershipState: "ATLAS",
+      effectiveOwnership: "ATLAS",
+      suspectedMetaLead: true
+    }),
+    ["TAKE_OVER", "CONFIRM_META_LEAD", "MARK_NOT_LEAD"]
+  );
+});
+
 test("ATLAS → TAKE OVER only", () => {
   const effective = resolveEffectiveOwnership("ATLAS");
   assert.equal(canTakeOverConversation(effective), true);

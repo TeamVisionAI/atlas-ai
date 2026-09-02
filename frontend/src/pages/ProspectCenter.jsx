@@ -99,6 +99,14 @@ function ProspectRow({
                   {translate("prospectCenterBadgeAi")}
                 </span>
               ) : null}
+              {badges.suspectedMetaLead || item.suspectedMetaLead ? (
+                <span
+                  className="prospect-center-badge prospect-center-badge--review"
+                  data-testid="prospect-center-suspected-meta-lead"
+                >
+                  {translate("prospectCenterBadgeSuspectedMetaLead")}
+                </span>
+              ) : null}
             </div>
           </div>
           <span className={`prospect-center-row__priority priority-${item.missionControlPriority}`}>

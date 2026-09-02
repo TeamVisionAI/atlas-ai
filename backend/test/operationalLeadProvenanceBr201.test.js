@@ -112,7 +112,9 @@ test("canary META_AD_DESTINATION-only is not operational", async () => {
     false
   );
   const model = await inbox([prospect]);
-  assert.equal(model.items.length, 0);
+  // BR-215 — owner-only review visibility; not operational / not recruiting-inbox eligible.
+  assert.equal(model.items.length, 1);
+  assert.equal(model.items[0].suspectedMetaLead, true);
   assert.equal(filterOperationalProspects([prospect]).length, 0);
 });
 
