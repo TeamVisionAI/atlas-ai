@@ -309,6 +309,7 @@ test("J) FAQ interruption resumes exact scheduling stage", () => {
     })
   );
   assert.equal(faq.decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
-  assert.deepEqual(interactiveIds(faq.decision), []);
+  assert.ok(interactiveIds(faq.decision).every((id) => String(id).startsWith("IUL_SLOT_")));
+  assert.ok(interactiveIds(faq.decision).length > 0);
   assert.doesNotMatch(faq.rendered.text, /En la mañana|En la tarde/);
 });

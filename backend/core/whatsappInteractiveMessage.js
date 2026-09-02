@@ -171,6 +171,79 @@ function parseNumericFallback(text, options = []) {
   return options[index] || null;
 }
 
+function collectInteractiveOptionParts(interactive = {}) {
+  if (interactive?.type === "button") {
+    return (interactive.action?.buttons || []).map((row) => ({
+      id: row?.reply?.id || "",
+      title: row?.reply?.title || ""
+    }));
+  }
+  if (interactive?.type === "list") {
+    return (interactive.action?.sections || []).flatMap((section) =>
+      (section.rows || []).map((row) => ({
+        id: row?.id || "",
+        title: row?.title || ""
+      }))
+    );
+  }
+  return [];
+}
+
+function interactiveContainsAppointmentTimes(interactive) {
+  const parts = collectInteractiveOptionParts(interactive);
+  if (!parts.length) {
+    return false;
+  }
+  return parts.some((part) => {
+    const id = String(part.id || "");
+    const title = String(part.title || "");
+    return (
+      id.startsWith("IUL_SLOT_") ||
+      /\d{1,2}:\d{2}/.test(title) ||
+      /\b\d{1,2}\s*(am|pm)\b/i.test(title)
+    );
+  });
+}
+
+function recoveryTextForInteractiveFailure(interactive, language = "es") {
+  if (interactiveContainsAppointmentTimes(interactive)) {
+    return language === "en"
+      ? "I could not display the time options just now. An advisor will contact you to coordinate your Zoom review."
+      : "No pude mostrar las opciones de horario en este momento. Un asesor le contactará para coordinar su revisión por Zoom.";
+  }
+  return null;
+}
+
+function looksLikeTappableAppointmentText(text) {
+  const value = String(text || "");
+  return (
+    /IUL_SLOT_/.test(value) ||
+    /^\s*[-•]\s+.+\d{1,2}(?::\d{2})?\s*(AM|PM)?/m.test(value) ||
+    /^\s*\d+\.\s+.+\d{1,2}(?::\d{2})?\s*(AM|PM)?/m.test(value)
+  );
+}
+
+function resolveInteractiveProviderFailureText({
+  interactive,
+  interactiveFallbackText,
+  message,
+  language = "es"
+} = {}) {
+  const recovery = recoveryTextForInteractiveFailure(interactive, language);
+  if (recovery) {
+    return recovery;
+  }
+  const fallback = String(interactiveFallbackText || "").trim();
+  if (fallback && !looksLikeTappableAppointmentText(fallback)) {
+    return fallback;
+  }
+  const body = String(message || "").trim();
+  if (body && !looksLikeTappableAppointmentText(body)) {
+    return body;
+  }
+  return recoveryTextForInteractiveFailure({ type: "button", action: { buttons: [{ reply: { id: "IUL_SLOT_0", title: "9:00 AM" } }] } }, language);
+}
+
 module.exports = {
   REPLY_BUTTON_MAX,
   REPLY_BUTTON_TITLE_MAX,
@@ -181,5 +254,10 @@ module.exports = {
   buildInteractiveFromOptions,
   formatNumberedFallback,
   parseNumericFallback,
+  collectInteractiveOptionParts,
+  interactiveContainsAppointmentTimes,
+  recoveryTextForInteractiveFailure,
+  looksLikeTappableAppointmentText,
+  resolveInteractiveProviderFailureText,
   clip
 };

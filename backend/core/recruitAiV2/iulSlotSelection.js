@@ -110,8 +110,8 @@ function chooseIulSlotPresentation(pool = []) {
 }
 
 function buildIulSlotOptions(shown, { includeMore = false, language = "es" } = {}) {
-  const options = (shown || []).map((slot) => ({
-    id: slot.selectionId,
+  const options = (shown || []).map((slot, index) => ({
+    id: slot.selectionId || `${IUL_SLOT_ID_PREFIX}${index}`,
     title: formatIulSlotButtonTitle(slot, language),
     label: formatIulSlotButtonTitle(slot, language)
   }));

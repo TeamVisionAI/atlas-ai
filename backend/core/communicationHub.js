@@ -38,6 +38,13 @@ function extractReplyText(engineResult) {
   return String(engineResult.reply || "").trim();
 }
 
+function resolveWhatsAppReplyEntities(engineResult) {
+  const fromDecision =
+    engineResult?.v2Result?.structuredDecision?.customerReplyPlan?.entities || {};
+  const fromPlan = engineResult?.v2Result?.responsePlan?.entities || {};
+  return { ...fromDecision, ...fromPlan };
+}
+
 /**
  * Business-rules gate before automated outbound delivery (BR-034 human ownership, workflow gate).
  * BR-124 — optional allowHandoffAck delivers genuine V2 escalate / schedule-recovery replies
@@ -269,10 +276,7 @@ async function deliverWhatsAppReply({
     );
   }
 
-  const replyEntities =
-    engineResult?.v2Result?.responsePlan?.entities ||
-    engineResult?.v2Result?.structuredDecision?.customerReplyPlan?.entities ||
-    {};
+  const replyEntities = resolveWhatsAppReplyEntities(engineResult);
 
   const delivery = await whatsappOutboundPipeline.sendAndPersistWhatsAppMessage({
       to: normalized.phone,
@@ -719,5 +723,6 @@ module.exports = {
   deliverWhatsAppReply,
   processNormalizedInboundMessage,
   processConversationAfterInbound,
-  extractReplyText
+  extractReplyText,
+  resolveWhatsAppReplyEntities
 };
