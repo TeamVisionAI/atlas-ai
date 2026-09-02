@@ -13,20 +13,18 @@
   color: #64748b;
 }
 
-.mission-action-center__list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 .mission-action-center__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
 .mission-action-center__grid .action-card {
   min-height: 96px;
+}
+
+.mission-action-center__grid .mission-action-card--expanded {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 767px) {
@@ -37,11 +35,5 @@
   .mission-action-center__grid .action-card {
     min-height: auto;
     padding: 14px 16px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .mission-action-center__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
