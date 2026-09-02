@@ -525,6 +525,7 @@ async function buildConversationsCenterReadModel(options = {}) {
       ? workflowStateFromProspectRow(prospect)
       : prospect.workflow_state || null;
     if (isSuspectedMetaLeadReview(prospect, workflowState)) {
+      // Implements BR-215 — review rows never follow RVP/team/oversight list scope.
       return isOwnerOfProspect(prospect, viewerUserId);
     }
     if (!authContext) {

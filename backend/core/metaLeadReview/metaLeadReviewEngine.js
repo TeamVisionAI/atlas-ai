@@ -13,6 +13,7 @@ const {
 const { buildDepromotionPatch } = require("../prospectPromotionEligibility");
 const { savePersistedWorkflowState, loadPersistedWorkflowState } = require("../workflowStateStore");
 const { AD_DESTINATION_FALLBACK_REASON } = require("../metaAdDestinationFallback");
+const { WHATSAPP_ENTRY_METHOD, WHATSAPP_SOURCE } = require("../whatsappConstants");
 const workflowEventService = require("../../services/workflowEventService");
 const {
   SUSPECTED_META_LEAD_REVIEW,
@@ -64,6 +65,48 @@ function isOwnerOfProspect(prospect, userId) {
   );
 }
 
+const LEGACY_NON_BR193_SOURCES = Object.freeze(
+  new Set([
+    upper(WHATSAPP_SOURCE.UNKNOWN),
+    upper(WHATSAPP_SOURCE.PERSONAL_WHATSAPP),
+    "FACEBOOK",
+    "CLICK_TO_WHATSAPP"
+  ])
+);
+
+const LEGACY_NON_BR193_ENTRY_METHODS = Object.freeze(
+  new Set([
+    WHATSAPP_ENTRY_METHOD.UNATTRIBUTED,
+    WHATSAPP_ENTRY_METHOD.PERSONAL_WHATSAPP,
+    WHATSAPP_ENTRY_METHOD.CLICK_TO_WHATSAPP
+  ])
+);
+
+/**
+ * Durable create-time origin that is not a BR-193 promotion.
+ * A later META_AD_DESTINATION continuation stamp is not enough.
+ * Null source/entry (Brenda / Armando / Maria) is the BR-193 create pattern.
+ */
+function hasLegacyNonBr193CreateOrigin(prospect = {}) {
+  const source = upper(prospect?.source);
+  const entry = upper(prospect?.entry_method);
+  if (
+    source === upper(WHATSAPP_SOURCE.META_AD_DESTINATION) ||
+    entry === WHATSAPP_ENTRY_METHOD.META_AD_DESTINATION
+  ) {
+    return false;
+  }
+  return LEGACY_NON_BR193_SOURCES.has(source) || LEGACY_NON_BR193_ENTRY_METHODS.has(entry);
+}
+
+function isKnownPersonalOrLegacyNonLeadContact(prospect = {}, workflowState = null) {
+  const wf = resolveWorkflow(prospect, workflowState);
+  if (isOrdinaryPersonalWhatsAppContact(prospect, wf)) {
+    return true;
+  }
+  return hasLegacyNonBr193CreateOrigin(prospect);
+}
+
 /**
  * Derived review membership. No production write required.
  * 131060 is not consulted.
@@ -94,6 +137,9 @@ function evaluateSuspectedMetaLeadReview(prospect = null, workflowState = null) 
   }
   if (isOrdinaryPersonalWhatsAppContact(prospect, wf)) {
     return { review: false, reason: "PERSONAL_WHATSAPP_NOT_ELIGIBLE" };
+  }
+  if (hasLegacyNonBr193CreateOrigin(prospect)) {
+    return { review: false, reason: "LEGACY_NON_BR193_CREATE_ORIGIN" };
   }
   if (wf.prospectPromotion?.operational === false) {
     return { review: false, reason: "EXPLICITLY_DEPROMOTED" };
@@ -318,6 +364,8 @@ module.exports = {
   isSuspectedMetaLeadReview,
   isOwnerVisibleSuspectedMetaLead,
   isOwnerOfProspect,
+  hasLegacyNonBr193CreateOrigin,
+  isKnownPersonalOrLegacyNonLeadContact,
   buildHumanVerifiedMetaLeadPatch,
   buildDismissedPersonalPatch,
   confirmMetaLead,
