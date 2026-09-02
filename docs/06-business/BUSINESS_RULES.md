@@ -3307,6 +3307,27 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-212 — IUL Slot Pagination + Selected-Slot Booking Transition
+
+**Implements:** “Ver más horarios” must page unused real slots, and a valid `IUL_SLOT_*` tap must enter the existing IUL create path instead of generic human handoff.  
+**Domain:** IUL Policy Review / WhatsApp scheduling UX  
+**Depends on:** BR-211, BR-210, BR-209, BR-190, BR-157  
+**Status:** Implemented — live canary not re-run  
+**Engine target:** `iulPolicyReviewScheduling.enrichIulDaypartAvailability`; `iulAdConversation` More/select/confirm; `sideEffectExecutor.resolveConfirmedSlot`; `orchestrator.applyExecutionOutcomeToReply`  
+**Tests:** `backend/test/iulSlotPaginationBookingBr212.test.js`
+
+### Rules
+
+1. **More excludes shown identities** — `IUL_SLOT_MORE` builds `rejectIds` from every previously displayed real slot and passes them through the rolling read and daypart enrich. Already-shown slots must not be re-offered.
+2. **No unused slots** — Do not show “Ver más horarios” again. Say the current times are all that exist and re-present those valid slots. Do not fabricate times.
+3. **Slot tap books** — A valid active-session `IUL_SLOT_*` selection is authoritative. Transition is `OFFER_SLOTS` → `iul_confirm_review_slot` / create-proposed → `IUL_CREATE_REVIEW_APPOINTMENT` → calendar/Zoom → final confirmation only after create succeeds (BR-190).
+4. **No generic handoff** — Do not route a valid selection to recruiting `appointment_create_failed` / “Un compañero de Team Vision te contactará” merely because the tap is an interactive ID with no free-text intent. Recover with IUL copy unless the failure is an unrecoverable provider/config/system error.
+5. **Create reads this turn’s slot** — `resolveConfirmedSlot` must use the selected slot from the current decision patch/entities, not only pre-turn `appointment.proposed*`.
+6. **State after selection** — After a valid selection, `lastQuestionAsked` is not `OFFER_SLOTS` unless booking failed and slots are intentionally re-offered. Later “Ok” retries the selected slot; it must not replay a stale two-button offer.
+7. **BR-211 / BR-209 / BR-190 unchanged** — Interactive delivery, daypart windows, and create-before-confirm stay as written.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

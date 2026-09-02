@@ -31,17 +31,18 @@ const {
   buildIulInteractive
 } = require("./iulQualificationOptions");
 const {
-  IUL_SLOT_MORE_ID,
   attachIulSlotSelectionIds,
   collectIulSlotPool,
   chooseIulSlotPresentation,
   buildIulSlotInteractive,
   resolveIulSlotBySelectionId,
   isIulSlotMoreId,
+  isIulSlotMoreLabel,
   isIulSlotSelectionId,
   isIulSlotExpired,
   parseIulFreeTextSlot,
-  rejectIdsForShown
+  rejectIdsForShown,
+  excludeRejectedSlots
 } = require("./iulSlotSelection");
 
 const CAMPAIGN_KIND = "iul_review_ad";
@@ -356,6 +357,60 @@ function parseOfferedSlotSelection(text, context) {
   return parseIulFreeTextSlot(text, context.appointment?.previouslyOfferedSlots || []);
 }
 
+function resolveSelectedIulSlot(context, interpretation = {}) {
+  const offered = context.appointment?.previouslyOfferedSlots || [];
+  const selected = interpretation.entities?.selectedSlot || null;
+  if (selected) {
+    return selected;
+  }
+  const dateKey =
+    interpretation.entities?.reviewProposedDate ||
+    context.appointment?.proposedDate ||
+    context.knownFacts?.reviewProposedDate ||
+    null;
+  const timeKey =
+    interpretation.entities?.reviewProposedTime ||
+    context.appointment?.proposedTime ||
+    context.knownFacts?.reviewProposedTime ||
+    null;
+  if (dateKey && timeKey) {
+    const match = offered.find(
+      (row) =>
+        String(row.date || row.dateKey || "") === String(dateKey) &&
+        String(row.time || row.timeKey || "") === String(timeKey)
+    );
+    if (match) {
+      return match;
+    }
+    return { date: dateKey, time: timeKey, dateKey, timeKey };
+  }
+  if (offered.length === 1) {
+    return offered[0];
+  }
+  return null;
+}
+
+function seedIulCreateEntities(structured, slot) {
+  const dateKey = slot?.date || slot?.dateKey || null;
+  const timeKey = slot?.time || slot?.timeKey || null;
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    selectedSlot: slot,
+    requestedDate: dateKey,
+    requestedTime: timeKey,
+    reviewProposedDate: dateKey,
+    reviewProposedTime: timeKey
+  };
+  structured.entities = {
+    ...(structured.entities || {}),
+    selectedSlot: slot,
+    requestedDate: dateKey,
+    requestedTime: timeKey,
+    reviewProposedDate: dateKey,
+    reviewProposedTime: timeKey
+  };
+}
+
 function isCampaignIntakeIulFirstTurn(context = {}) {
   const purpose = String(context.campaignIntakePurpose || "").toUpperCase();
   if (purpose !== "IUL" && purpose !== "IUL_REVIEW") {
@@ -502,6 +557,43 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     }
   }
 
+  if (lastAsk === ASK.OFFER_SLOTS || lastAsk === ASK.CONFIRM_SLOT) {
+    if (
+      isIulSlotMoreId(interactiveReply?.id) ||
+      isIulSlotMoreLabel(interactiveReply?.title) ||
+      isIulSlotMoreLabel(text)
+    ) {
+      return {
+        intent: INTENTS.IUL_REQUEST_MORE_SLOTS,
+        confidence: 0.96,
+        entities: { iulRequestMoreSlots: true }
+      };
+    }
+    if (isIulSlotSelectionId(interactiveReply?.id)) {
+      const offered = context.appointment?.previouslyOfferedSlots || [];
+      const slot = resolveIulSlotBySelectionId(interactiveReply.id, offered);
+      if (!slot || isIulSlotExpired(slot, context._testNow)) {
+        return {
+          intent: INTENTS.IUL_STALE_SLOT_SELECTION,
+          confidence: 0.96,
+          entities: { staleSlotSelectionId: interactiveReply.id }
+        };
+      }
+      return {
+        intent: INTENTS.IUL_SELECT_OFFERED_SLOT,
+        confidence: 0.97,
+        entities: {
+          selectedSlot: slot,
+          reviewProposedDate: slot.date || slot.dateKey || null,
+          reviewProposedTime: slot.time || slot.timeKey || null,
+          iulSlotSelectionId: slot.selectionId,
+          requestedDate: slot.date || slot.dateKey || null,
+          requestedTime: slot.time || slot.timeKey || null
+        }
+      };
+    }
+  }
+
   if (isIulDayPartAnswerContext(lastAsk)) {
     const weekend = looksLikeWeekendPreference(text);
     const day = matchQualificationInput("dayPart", { text, interactiveReply });
@@ -542,34 +634,6 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
   }
 
   if (lastAsk === ASK.OFFER_SLOTS || lastAsk === ASK.CONFIRM_SLOT) {
-    if (isIulSlotMoreId(interactiveReply?.id)) {
-      return {
-        intent: INTENTS.IUL_REQUEST_MORE_SLOTS,
-        confidence: 0.96,
-        entities: { iulRequestMoreSlots: true }
-      };
-    }
-    if (isIulSlotSelectionId(interactiveReply?.id)) {
-      const offered = context.appointment?.previouslyOfferedSlots || [];
-      const slot = resolveIulSlotBySelectionId(interactiveReply.id, offered);
-      if (!slot || isIulSlotExpired(slot, context._testNow)) {
-        return {
-          intent: INTENTS.IUL_STALE_SLOT_SELECTION,
-          confidence: 0.96,
-          entities: { staleSlotSelectionId: interactiveReply.id }
-        };
-      }
-      return {
-        intent: INTENTS.IUL_SELECT_OFFERED_SLOT,
-        confidence: 0.97,
-        entities: {
-          selectedSlot: slot,
-          reviewProposedDate: slot.date || slot.dateKey || null,
-          reviewProposedTime: slot.time || slot.timeKey || null,
-          iulSlotSelectionId: slot.selectionId
-        }
-      };
-    }
     const slot = parseOfferedSlotSelection(text, context);
     if (slot) {
       return {
@@ -578,7 +642,9 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
         entities: {
           selectedSlot: slot,
           reviewProposedDate: slot.date || slot.dateKey || null,
-          reviewProposedTime: slot.time || slot.timeKey || null
+          reviewProposedTime: slot.time || slot.timeKey || null,
+          requestedDate: slot.date || slot.dateKey || null,
+          requestedTime: slot.time || slot.timeKey || null
         }
       };
     }
@@ -796,6 +862,12 @@ function copy(language) {
     nearestWeekend: es
       ? "No tengo disponibilidad de fin de semana {dayPartPhrase}. Tengo estos horarios:"
       : "I don't have weekend {dayPartPhrase} availability. I do have these times:",
+    noMoreSlots: es
+      ? "Esos son los horarios disponibles que tengo por ahora. ¿Desea elegir uno de ellos?"
+      : "Those are the available times I have for now. Would you like to choose one of them?",
+    createFailed: es
+      ? "No pude reservar ese horario ahora. Si desea, confirme de nuevo o elija otro de los horarios disponibles."
+      : "I could not book that time just now. Please confirm again or choose another available time.",
     noAvailability: es
       ? "Por ahora no tengo horarios disponibles para la revisión por Zoom. Un asesor le contactará para coordinar."
       : "I don't have Zoom review times available right now. An advisor will contact you to coordinate.",
@@ -845,6 +917,8 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_review_cost_then_continue: `${c.cost} ${c.schedulingTransition}`,
     iul_review_day_part_ack: c.dayPartAck,
     iul_offer_review_slots: c.offerSlots,
+    iul_no_more_review_slots: c.noMoreSlots,
+    iul_review_create_failed: c.createFailed,
     iul_offer_nearest_review_slots: c.nearestDaypart,
     iul_offer_weekend_fallback_slots: c.nearestWeekend,
     iul_zero_review_slots: c.zeroSlots,
@@ -973,7 +1047,10 @@ function finishIulDecision(structured, context, {
   );
   const includeMoreSlots =
     priorEntities.includeMoreSlots === true ||
-    (lastQuestionAsked === ASK.OFFER_SLOTS && offeredSlots.length === 2);
+    (lastQuestionAsked === ASK.OFFER_SLOTS &&
+      offeredSlots.length === 2 &&
+      priorEntities.includeMoreSlots !== false &&
+      context.knownFacts?.iulIncludeMoreSlots !== false);
   const body = renderIulAdReply(templateKey, structured.preferredLanguage, {
     firstName,
     offeredSlots,
@@ -1142,12 +1219,48 @@ function resumeIulAfterFaq(structured, context, { templateKey, reasonCodes }) {
   });
 }
 
+function reofferExistingIulSlots(structured, context, shown, extras = {}) {
+  const attached = attachIulSlotSelectionIds(shown);
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    offeredSlots: attached,
+    includeMoreSlots: false
+  };
+  return finishIulDecision(structured, context, {
+    templateKey: extras.templateKey || "iul_no_more_review_slots",
+    nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+    lastQuestionAsked: ASK.OFFER_SLOTS,
+    knownFacts: {
+      iulIncludeMoreSlots: false,
+      reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+    },
+    reasonCodes: extras.reasonCodes || [REASON_CODES.IUL_MORE_SLOTS_EXHAUSTED],
+    appointmentPatch: {
+      previouslyOfferedSlots: attached,
+      meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+    }
+  });
+}
+
 function applySlotOfferDecision(structured, context, availability, extras = {}) {
-  const offered =
+  const priorShown = extras.rejectPriorShown
+    ? context.appointment?.previouslyOfferedSlots || []
+    : [];
+  const rejectIds = extras.rejectPriorShown
+    ? [
+        ...new Set([
+          ...(context.knownFacts?.iulShownSlotKeys || []),
+          ...rejectIdsForShown(priorShown)
+        ])
+      ]
+    : [];
+  const offered = excludeRejectedSlots(
     availability?.offeredSlots ||
-    availability?.nearestAlternatives ||
-    availability?.alternatives ||
-    [];
+      availability?.nearestAlternatives ||
+      availability?.alternatives ||
+      [],
+    rejectIds
+  );
   const status =
     availability?.status ||
     availability?.readResult?.status ||
@@ -1164,15 +1277,15 @@ function applySlotOfferDecision(structured, context, availability, extras = {}) 
     reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
     iulWorkflowStage: IUL_STAGES.REVIEW_READY
   };
+  if (extras.rejectPriorShown && !offered.length && priorShown.length) {
+    return reofferExistingIulSlots(structured, context, priorShown);
+  }
   if (status === READ_STATUS.AVAILABLE && offered.length > 0) {
     const isNearest = Boolean(availability?.alternativeToConstraint);
     const weekendFallback = availability?.fallbackKind === "WEEKEND_EMPTY_NEAREST";
-    const pool = collectIulSlotPool(availability, offered);
+    const pool = excludeRejectedSlots(collectIulSlotPool(availability, offered), rejectIds);
     const presentation = chooseIulSlotPresentation(pool.length > 3 ? pool : offered);
     const shown = presentation.shown.length ? presentation.shown : attachIulSlotSelectionIds(offered);
-    const priorShown = extras.rejectPriorShown
-      ? context.appointment?.previouslyOfferedSlots || []
-      : [];
     const includeMore = presentation.mode === "button" && shown.length === 2;
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
@@ -1197,6 +1310,7 @@ function applySlotOfferDecision(structured, context, availability, extras = {}) 
         iulDaypartFallbackAttempted: isNearest,
         iulSchedulingUnavailable: false,
         iulSlotPool: pool,
+        iulIncludeMoreSlots: includeMore,
         iulShownSlotKeys: [
           ...((context.knownFacts?.iulShownSlotKeys || []).concat(rejectIdsForShown(priorShown))),
           ...rejectIdsForShown(shown)
@@ -1681,23 +1795,12 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
         rejectIds
       }
     });
-    const moreOffered =
-      moreAvailability?.offeredSlots || moreAvailability?.nearestAlternatives || [];
+    const moreOffered = excludeRejectedSlots(
+      moreAvailability?.offeredSlots || moreAvailability?.nearestAlternatives || [],
+      rejectIds
+    );
     if (!moreOffered.length) {
-      structured.customerReplyPlan.entities = {
-        ...structured.customerReplyPlan.entities,
-        offeredSlots: attachIulSlotSelectionIds(shown),
-        includeMoreSlots: false
-      };
-      return finishIulDecision(structured, context, {
-        templateKey: "iul_offer_review_slots",
-        nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
-        lastQuestionAsked: ASK.OFFER_SLOTS,
-        appointmentPatch: {
-          previouslyOfferedSlots: attachIulSlotSelectionIds(shown),
-          meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
-        }
-      });
+      return reofferExistingIulSlots(structured, context, shown);
     }
     return applySlotOfferDecision(structured, context, moreAvailability, {
       dayPart: context.knownFacts?.iulSelectedDayPart,
@@ -1752,6 +1855,7 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
         preferredWeekend: Boolean(context.knownFacts?.preferredWeekend)
       });
     }
+    seedIulCreateEntities(structured, slot);
     return finishIulDecision(structured, context, {
       templateKey: "iul_confirm_review_deferred",
       nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
@@ -1788,15 +1892,21 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
   }
 
   if (intent === INTENTS.IUL_SCHEDULE_CONFIRM) {
-    const offered = context.appointment?.previouslyOfferedSlots || [];
-    const slot = offered.length === 1 ? offered[0] : null;
-    if (!slot) {
+    const slot = resolveSelectedIulSlot(context, interpretation);
+    if (!slot || isIulSlotExpired(slot, context._testNow)) {
+      if (context.appointment?.previouslyOfferedSlots?.length) {
+        return reofferExistingIulSlots(structured, context, context.appointment.previouslyOfferedSlots, {
+          templateKey: "iul_offer_review_slots",
+          reasonCodes: []
+        });
+      }
       return finishIulDecision(structured, context, {
         templateKey: "iul_offer_review_slots",
         nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
         lastQuestionAsked: ASK.OFFER_SLOTS
       });
     }
+    seedIulCreateEntities(structured, slot);
     return finishIulDecision(structured, context, {
       templateKey: "iul_confirm_review_deferred",
       nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,

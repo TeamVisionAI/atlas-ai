@@ -40,7 +40,7 @@ const {
   buildNonTextMediaInterpretation,
   decideNonTextMediaTurn
 } = require("./nonTextMedia");
-const { INTENTS } = require("./constants");
+const { INTENTS, NEXT_ACTIONS, REASON_CODES } = require("./constants");
 const { observeSemanticInterpretation } = require("./semantic");
 
 /**
@@ -369,13 +369,19 @@ function applyExecutionOutcomeToReply({
   const staleUnavailable = /SLOT_STALE|unavailable|stale/i.test(
     String(execution.failed?.[0]?.reason || execution.reason || "")
   );
+  const iulCreate =
+    structuredDecision?.decision?.nextAction === NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT ||
+    responsePlan?.templateKey === "iul_confirm_review_deferred" ||
+    (structuredDecision?.reasonCodes || []).includes(REASON_CODES.IUL_AD_CONVERSATION);
   const failKey =
     failedType === "reschedule_appointment" ||
     structuredDecision?.decision?.nextAction === "reschedule_appointment"
       ? "appointment_reschedule_failed"
       : staleUnavailable
         ? "offer_alternatives_no_handoff"
-        : "appointment_create_failed";
+        : iulCreate
+          ? "iul_review_create_failed"
+          : "appointment_create_failed";
   const plan = {
     ...responsePlan,
     templateKey: failKey,
@@ -384,6 +390,9 @@ function applyExecutionOutcomeToReply({
   return {
     structuredDecision: {
       ...structuredDecision,
+      reasonCodes: iulCreate
+        ? [...(structuredDecision.reasonCodes || []), REASON_CODES.IUL_CREATE_FAILED_NO_HANDOFF]
+        : structuredDecision.reasonCodes,
       customerReplyPlan: {
         ...structuredDecision.customerReplyPlan,
         templateKey: failKey
