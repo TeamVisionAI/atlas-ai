@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-09-01:** **BR-213** — IUL asks Zoom vs office before daypart; More pages unused real slots across dates; selected slot renders once then create-before-confirm. Office address comes from Meeting Management / Team Vision seed, never hardcoded. Live canary not re-run; do not increase IUL spend until Zoom canary passes.
 - **2026-09-01:** **BR-212** — IUL “Ver más horarios” pages unused real slots; a valid `IUL_SLOT_*` tap enters create instead of generic companion handoff. Create-before-confirm (BR-190) unchanged. Live canary not re-run; do not increase IUL spend yet.
 - **2026-09-01:** **BR-211** — IUL slot offers that replay/resume must send WhatsApp interactive buttons, not body-only text. Graph interactive failures do not fall back to tappable times. Live canary not re-run; do not increase IUL spend yet.
 - **2026-09-01:** **BR-210** — IUL Zoom slots are WhatsApp interactive buttons/lists (`IUL_SLOT_*` IDs), not hyphen-bullet times. Taps must stay in Atlas, not open the phone calendar. Live canary not re-run; do not increase IUL spend yet.

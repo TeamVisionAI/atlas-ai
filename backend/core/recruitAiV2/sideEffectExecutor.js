@@ -92,7 +92,10 @@ function resolveConfirmedSlot({ context, structuredDecision } = {}) {
 
 function resolveInterviewType(context = {}) {
   const preferred = String(
-    context?.knownFacts?.preferredMeetingType ||
+    context?.knownFacts?.meetingMode ||
+      context?.knownFacts?.reviewMeetingMode ||
+      context?.knownFacts?.preferredMeetingType ||
+      context?.knownFacts?.reviewMeetingType ||
       context?.appointment?.meetingType ||
       "zoom"
   ).toLowerCase();
@@ -103,6 +106,41 @@ function resolveInterviewType(context = {}) {
     return "Public Location";
   }
   return "Zoom";
+}
+
+async function linkIulPolicyReviewPipeline({
+  organizationId,
+  prospectId,
+  appointmentId,
+  agentId,
+  phone,
+  prospectName
+} = {}) {
+  if (!organizationId || !appointmentId) {
+    return { ok: false, reason: "MISSING_SCOPE" };
+  }
+  try {
+    const pipeline = require("../../application/policyReviewPipelineApplicationService");
+    if (typeof pipeline.linkAppointmentForProspect === "function") {
+      return await pipeline.linkAppointmentForProspect(
+        {
+          organizationId,
+          linkedProspectId: prospectId || null,
+          appointmentId,
+          ownerUserId: agentId || null,
+          phone: phone || null,
+          prospectName: prospectName || null
+        },
+        { userId: agentId || null, role: "agent" }
+      );
+    }
+  } catch (error) {
+    console.warn(
+      "[sideEffectExecutor] IUL pipeline link failed:",
+      error?.message || error
+    );
+  }
+  return { ok: false, reason: "PIPELINE_LINK_FAILED" };
 }
 
 function slotsInclude(slots, dateKey, timeKey) {
@@ -845,7 +883,9 @@ async function executeAuthorizedSideEffects({
         dateKey,
         timeKey,
         interviewType: resolveInterviewType(context),
-        timezone: context?.timezone || "America/New_York"
+        timezone: context?.timezone || "America/New_York",
+        purpose: schedulingConfig.purpose,
+        officeLocation: context?.knownFacts?.reviewOfficeAddress || undefined
       },
       {
         organizationId,
@@ -975,6 +1015,24 @@ async function executeAuthorizedSideEffects({
     dateKey,
     timeKey
   });
+
+  if (schedulingConfig.purpose === "policy_review" && appointmentId) {
+    const pipelineLink = await linkIulPolicyReviewPipeline({
+      organizationId,
+      prospectId: context?.prospectId || options.prospectId || null,
+      appointmentId,
+      agentId,
+      phone,
+      prospectName: context?.name || context?.knownFacts?.name || null
+    });
+    if (pipelineLink?.ok) {
+      performed.push({
+        type: "policy_review_pipeline_link",
+        reviewId: pipelineLink.reviewId || null,
+        appointmentId
+      });
+    }
+  }
 
   // Non-create proposals remain skipped (no v2 WhatsApp / cancel / withdraw path).
   for (const proposal of authorization.proposals || []) {

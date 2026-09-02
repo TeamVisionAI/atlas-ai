@@ -3328,6 +3328,39 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-213 — IUL Cross-Date Pagination + Meeting Location Choice + Booking Completion
+
+**Implements:** After IUL qualification, ask Zoom vs office before daypart. “Ver más horarios” pages unused real availability across dates. A selected slot renders once, then create-before-confirm books Zoom or in-person.  
+**Domain:** IUL Policy Review / WhatsApp scheduling UX  
+**Depends on:** BR-212, BR-211, BR-210, BR-209, BR-190, BR-157, BR-077  
+**Status:** Implemented — live canary not re-run  
+**Engine target:** `iulAdConversation` meeting-mode ask; `iulSlotSelection.selectIulCrossDatePage`; `sideEffectExecutor` / `missionExecutionApplicationService` purpose-aware create; `orchestrator.applyExecutionOutcomeToReply`; `appointmentReminderEngine`  
+**Tests:** `backend/test/iulMeetingModeCrossDateBr213.test.js`
+
+### Meeting location
+
+1. After qualification (status → intent), ask “¿Cómo prefiere hacer su revisión de póliza?” with opaque IDs `IUL_MEET_ZOOM` / `IUL_MEET_OFFICE`. Do not infer from free text unless the existing interpreter already matches those IDs/labels.
+2. Persist `meetingMode = zoom | in_person`, `reviewMeetingType`, and configured office address when in-person.
+3. **Office config source (do not hardcode in conversation):** offer “En la oficina” only when a complete address exists from test fixture / knownFacts, or Team Vision seed `getOfficeLocation()` (BR-018 / BR-077). Create uses Meeting Management `resolveInterviewLocation` / BR-077 `resolveCanonicalOfficeAddress` (persisted → request → Meeting Management `officeAddress` → Team Vision org profile only). If none: omit the office button or return `iul_office_unavailable` and re-ask Zoom.
+4. Zoom path and office path both continue: daypart → real availability → interactive slots → create → calendar → confirmation after success. Zoom creates a Zoom meeting; office uses the configured address. Purpose is always `policy_review`.
+5. In-flight threads already on daypart without `meetingMode` stay on daypart and default to Zoom. Do not reset a valid selected slot back to location/daypart without a real recovery reason.
+
+### Cross-date More strategy
+
+6. First offer keeps same-day earliest + latest (BR-164 / BR-209, two buttons + More when unused remain).
+7. **More (`selectIulCrossDatePage`):** chronological unused real slots. Pick the earliest unused, then the earliest unused on each later date, then fill remaining chronological slots only if the page is still short (max 2). Never re-offer a previously shown identity. Do not fill a page with one date when later valid dates exist.
+8. If no unused slots remain: omit More and say the current times are all that exist.
+
+### Selected slot + booking
+
+9. A tap is authoritative once. Do not re-attach slot buttons or echo the button title (`Mié 3:00 PM`). Send one deferred line with the full weekday, e.g. “Perfecto. Estoy reservando su revisión por Zoom para el miércoles a las 3:00 PM…”
+10. **BR-190:** validate → create appointment (`purpose=policy_review`) → calendar → Zoom if zoom mode → persist → then confirmed copy (`iul_review_confirmed_zoom` / `iul_review_confirmed_office`). Office confirmation includes the configured address when available. Create failure: no “confirmado”, recover with IUL copy.
+11. Do not advance recruiting `INTERVIEW_SCHEDULED` / `onInterviewScheduled` / `current_step=CONFIRMED` for policy-review creates.
+12. After create, link `atlas_policy_review_pipeline` by `linkedProspectId` (ensure-from-intake if missing). Link failure must not fail the booking.
+13. Reminders keep the current cadence. Zoom says Zoom; office says En la oficina and includes the configured address when available. No recruiting interview wording.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

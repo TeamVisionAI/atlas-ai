@@ -15,6 +15,7 @@ const {
   resolveAvailabilityAgentAsync
 } = require("./schedulingAvailabilityReader");
 const { IUL_REVIEW_MEETING_TYPE } = require("../iulWorkflowConstants");
+const { selectIulCrossDatePage } = require("./iulSlotSelection");
 const { resolveSchedulingConfig, WORKFLOW_TYPES } = require("../sharedScheduling/sharedSchedulingConfig");
 const {
   mapSlotsForDecision,
@@ -95,8 +96,14 @@ function excludeRejected(slots, rejectIds = []) {
   });
 }
 
-function pickIulSlots(pool, { preferredWeekend = false } = {}) {
-  const list = Array.isArray(pool) ? pool : [];
+function pickIulSlots(pool, { preferredWeekend = false, rejectIds = [], crossDatePage = false } = {}) {
+  const list = excludeRejected(Array.isArray(pool) ? pool : [], rejectIds);
+  if (crossDatePage) {
+    return {
+      slots: selectIulCrossDatePage(list, { maxCandidates: 2 }),
+      weekendMatched: false
+    };
+  }
   if (preferredWeekend) {
     const weekend = list.filter(isWeekendSlot);
     if (weekend.length) {
@@ -112,7 +119,7 @@ function pickIulSlots(pool, { preferredWeekend = false } = {}) {
  * 2) else nearest real slots in any daypart
  * 3) else zero / no fabrications
  */
-function enrichIulDaypartAvailability(availability, { preferredWeekend = false, rejectIds = [] } = {}) {
+function enrichIulDaypartAvailability(availability, { preferredWeekend = false, rejectIds = [], crossDatePage = false } = {}) {
   if (
     (availability?.fallbackKind != null || availability?.alternativeToConstraint === true) &&
     !(rejectIds || []).length
@@ -143,10 +150,44 @@ function enrichIulDaypartAvailability(availability, { preferredWeekend = false, 
     availability.timezone ||
     availability.readResult?.timezone ||
     null;
-  const qualifyingPick = pickIulSlots(
-    excludeRejected(collectQualifyingSlots(availability), rejectIds),
-    { preferredWeekend }
-  );
+  if (crossDatePage) {
+    const combined = [];
+    const seen = new Set();
+    const push = (slot) => {
+      const id = slotIdentity(slot);
+      if (!id || id === "|" || seen.has(id)) {
+        return;
+      }
+      seen.add(id);
+      combined.push(slot);
+    };
+    collectQualifyingSlots(availability).forEach(push);
+    collectUnconstrainedSlots(availability).forEach(push);
+    (availability?.readResult?.slots || []).forEach(push);
+    const page = pickIulSlots(combined, { preferredWeekend, rejectIds, crossDatePage: true });
+    if (page.slots.length) {
+      const offered = mapSlotsForDecision(
+        page.slots,
+        availability.timezone || availability.readResult?.timezone || null
+      );
+      return {
+        ...availability,
+        checked: true,
+        status: READ_STATUS.AVAILABLE,
+        offeredSlots: offered,
+        nearestAlternatives: offered,
+        alternativeToConstraint: false,
+        fallbackKind: null,
+        weekendMatched: page.weekendMatched
+      };
+    }
+  }
+
+  const qualifyingPick = pickIulSlots(collectQualifyingSlots(availability), {
+    preferredWeekend,
+    rejectIds,
+    crossDatePage
+  });
   if (qualifyingPick.slots.length) {
     const offered = mapSlotsForDecision(qualifyingPick.slots, timezone);
     return {
@@ -161,10 +202,11 @@ function enrichIulDaypartAvailability(availability, { preferredWeekend = false, 
     };
   }
 
-  const unconstrainedPick = pickIulSlots(
-    excludeRejected(collectUnconstrainedSlots(availability), rejectIds),
-    { preferredWeekend }
-  );
+  const unconstrainedPick = pickIulSlots(collectUnconstrainedSlots(availability), {
+    preferredWeekend,
+    rejectIds,
+    crossDatePage
+  });
   if (unconstrainedPick.slots.length) {
     const offered = mapSlotsForDecision(unconstrainedPick.slots, timezone);
     return {
@@ -200,6 +242,18 @@ function buildPolicyReviewSchedulingContext(context = {}, knownFacts = {}) {
       null
   );
   const constraints = dayPartConstraints(dayPart);
+  const meetingMode = String(
+    knownFacts.meetingMode ||
+      knownFacts.reviewMeetingMode ||
+      context.knownFacts?.meetingMode ||
+      ""
+  ).toLowerCase();
+  const meetingType =
+    meetingMode === "in_person" ||
+    knownFacts.preferredMeetingType === IUL_REVIEW_MEETING_TYPE.IN_PERSON ||
+    knownFacts.reviewMeetingType === IUL_REVIEW_MEETING_TYPE.IN_PERSON
+      ? IUL_REVIEW_MEETING_TYPE.IN_PERSON
+      : IUL_REVIEW_MEETING_TYPE.ZOOM;
   return {
     ...context,
     conversationGoal: "policy_review",
@@ -207,8 +261,8 @@ function buildPolicyReviewSchedulingContext(context = {}, knownFacts = {}) {
     knownFacts: {
       ...(context.knownFacts || {}),
       ...knownFacts,
-      preferredMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
-      reviewMeetingType: IUL_REVIEW_MEETING_TYPE.ZOOM,
+      preferredMeetingType: meetingType,
+      reviewMeetingType: meetingType,
       preferredDayPart: dayPart || context.knownFacts?.preferredDayPart || null,
       availabilityConstraint: constraints.dayPart
         ? {
@@ -242,7 +296,8 @@ function wrapReadResult(readResult, schedulingContext, schedulingConfig, options
     },
     {
       preferredWeekend: options.preferredWeekend === true,
-      rejectIds: options.rejectIds || []
+      rejectIds: options.rejectIds || [],
+      crossDatePage: options.crossDatePage === true
     }
   );
 }
@@ -313,7 +368,8 @@ async function readPolicyReviewAvailability({ context, interpretation, options }
   });
   return wrapReadResult(readResult, params.schedulingContext, params.schedulingConfig, {
     preferredWeekend: params.preferredWeekend,
-    rejectIds: options?.rejectIds || []
+    rejectIds: options?.rejectIds || [],
+    crossDatePage: options?.crossDatePage === true
   });
 }
 
@@ -333,7 +389,8 @@ function readPolicyReviewAvailabilitySync({ context, interpretation, options } =
   });
   return wrapReadResult(readResult, params.schedulingContext, params.schedulingConfig, {
     preferredWeekend: params.preferredWeekend,
-    rejectIds: options?.rejectIds || []
+    rejectIds: options?.rejectIds || [],
+    crossDatePage: options?.crossDatePage === true
   });
 }
 

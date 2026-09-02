@@ -22,7 +22,9 @@ const IUL_OPTION_IDS = Object.freeze({
   POLICY_IN_HAND_YES: "IUL_POLICY_IN_HAND_YES",
   POLICY_IN_HAND_NO: "IUL_POLICY_IN_HAND_NO",
   DAY_MORNING: "IUL_DAY_MORNING",
-  DAY_AFTERNOON: "IUL_DAY_AFTERNOON"
+  DAY_AFTERNOON: "IUL_DAY_AFTERNOON",
+  MEET_ZOOM: "IUL_MEET_ZOOM",
+  MEET_OFFICE: "IUL_MEET_OFFICE"
 });
 
 const IUL_OPTION_LABELS = Object.freeze({
@@ -38,7 +40,9 @@ const IUL_OPTION_LABELS = Object.freeze({
   [IUL_OPTION_IDS.POLICY_IN_HAND_YES]: "Tengo la póliza",
   [IUL_OPTION_IDS.POLICY_IN_HAND_NO]: "No la tengo a mano",
   [IUL_OPTION_IDS.DAY_MORNING]: "En la mañana",
-  [IUL_OPTION_IDS.DAY_AFTERNOON]: "En la tarde"
+  [IUL_OPTION_IDS.DAY_AFTERNOON]: "En la tarde",
+  [IUL_OPTION_IDS.MEET_ZOOM]: "Por Zoom",
+  [IUL_OPTION_IDS.MEET_OFFICE]: "En la oficina"
 });
 
 /** Titles that fit Meta reply-button 20-char limit. */
@@ -55,7 +59,9 @@ const IUL_BUTTON_TITLES = Object.freeze({
   [IUL_OPTION_IDS.POLICY_IN_HAND_YES]: "Tengo la póliza",
   [IUL_OPTION_IDS.POLICY_IN_HAND_NO]: "No la tengo a mano",
   [IUL_OPTION_IDS.DAY_MORNING]: "En la mañana",
-  [IUL_OPTION_IDS.DAY_AFTERNOON]: "En la tarde"
+  [IUL_OPTION_IDS.DAY_AFTERNOON]: "En la tarde",
+  [IUL_OPTION_IDS.MEET_ZOOM]: "Por Zoom",
+  [IUL_OPTION_IDS.MEET_OFFICE]: "En la oficina"
 });
 
 function option(id) {
@@ -99,12 +105,18 @@ const DAY_PART_OPTIONS = Object.freeze([
   option(IUL_OPTION_IDS.DAY_AFTERNOON)
 ]);
 
+const MEETING_MODE_OPTIONS = Object.freeze([
+  option(IUL_OPTION_IDS.MEET_ZOOM),
+  option(IUL_OPTION_IDS.MEET_OFFICE)
+]);
+
 const CATALOGS = Object.freeze({
   status: STATUS_OPTIONS,
   reviewIntent: REVIEW_INTENT_OPTIONS,
   researchIntent: RESEARCH_INTENT_OPTIONS,
   policyInHand: POLICY_IN_HAND_OPTIONS,
-  dayPart: DAY_PART_OPTIONS
+  dayPart: DAY_PART_OPTIONS,
+  meetingMode: MEETING_MODE_OPTIONS
 });
 
 function fold(value) {
@@ -178,6 +190,7 @@ module.exports = {
   RESEARCH_INTENT_OPTIONS,
   POLICY_IN_HAND_OPTIONS,
   DAY_PART_OPTIONS,
+  MEETING_MODE_OPTIONS,
   resolveIulOption,
   historyLabelForId,
   buildIulInteractive

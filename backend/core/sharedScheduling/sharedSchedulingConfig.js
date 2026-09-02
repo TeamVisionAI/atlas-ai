@@ -39,7 +39,7 @@ const WORKFLOW_SCHEDULING_CONFIGS = Object.freeze({
     durationMinutes: null,
     defaultMeetingMode: IUL_REVIEW_MEETING_TYPE.ZOOM,
     defaultVirtualProvider: VIRTUAL_PROVIDERS.ZOOM,
-    allowedMeetingModes: [IUL_REVIEW_MEETING_TYPE.ZOOM],
+    allowedMeetingModes: [IUL_REVIEW_MEETING_TYPE.ZOOM, IUL_REVIEW_MEETING_TYPE.IN_PERSON],
     schedulingCopyNamespace: "iul_policy_review"
   })
 });

@@ -332,13 +332,33 @@ function applyExecutionOutcomeToReply({
     const rescheduled =
       performed.type === "reschedule_appointment" ||
       structuredDecision?.decision?.nextAction === "reschedule_appointment";
-    const successKey = rescheduled ? "appointment_rescheduled" : "appointment_confirmed";
+    const iulCreateSuccess =
+      structuredDecision?.decision?.nextAction === NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT ||
+      responsePlan?.templateKey === "iul_confirm_review_deferred" ||
+      (structuredDecision?.reasonCodes || []).includes(REASON_CODES.IUL_AD_CONVERSATION);
+    const inPerson =
+      String(entities.meetingMode || entities.reviewMeetingMode || entities.preferredMeetingType || "")
+        .toLowerCase() === "in_person" ||
+      String(entities.reviewMeetingType || "").toLowerCase() === "in_person";
+    const successKey = rescheduled
+      ? "appointment_rescheduled"
+      : iulCreateSuccess
+        ? inPerson
+          ? "iul_review_confirmed_office"
+          : "iul_review_confirmed_zoom"
+        : "appointment_confirmed";
     if (performed.dateKey && !entities.dateLabel && !entities.requestedDateLabel) {
       entities.dateLabel = performed.dateKey;
       entities.requestedDate = performed.dateKey;
     }
     if (performed.timeKey && !entities.requestedTime) {
       entities.requestedTime = performed.timeKey;
+    }
+    if (iulCreateSuccess && !entities.officeAddress) {
+      entities.officeAddress =
+        structuredDecision?.contextPatch?.knownFacts?.reviewOfficeAddress ||
+        structuredDecision?.customerReplyPlan?.entities?.officeAddress ||
+        null;
     }
     const plan = {
       ...responsePlan,

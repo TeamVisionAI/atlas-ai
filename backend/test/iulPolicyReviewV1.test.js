@@ -222,7 +222,7 @@ test("DISCOVERY 11: discovery completes in order A→G", () => {
   facts = { ...facts, reviewReason: "PERFORMANCE" };
   assert.equal(nextDiscoveryAsk(facts), ASK.DOCUMENTS);
   facts = { ...facts, documentsAvailable: "NO" };
-  assert.equal(nextDiscoveryAsk(facts), ASK.SCHEDULING_DAY_PART);
+  assert.equal(nextDiscoveryAsk(facts), ASK.MEETING_MODE);
   assert.equal(isDiscoveryComplete(facts), true);
 });
 
@@ -232,16 +232,12 @@ test("SCHEDULING 12-14: enough facts transitions to Zoom scheduling ask", () => 
     conversation: { lastQuestionAsked: ASK.DOCUMENTS }
   });
   const { rendered, decision } = renderTurn("no", ctx);
-  assert.match(rendered.text, /revisar su póliza|horario le funciona/i);
+  assert.match(rendered.text, /revisar su póliza|cómo prefiere/i);
   assert.match(
     decision.customerReplyPlan.entities.interactiveFallbackText || rendered.text,
-    /En la mañana|En la tarde/i
+    /Por Zoom|En la oficina/i
   );
-  assert.equal(
-    decision.contextPatch.knownFacts.reviewMeetingType || decision.contextPatch.knownFacts.reviewMeetingType,
-    "ZOOM"
-  );
-  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY_PART);
+  assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.MEETING_MODE);
 });
 
 test("SAFETY 21-22: bad policy question stays safe", () => {
