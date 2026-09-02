@@ -38,3 +38,26 @@ test("mission action cards use the shared 2-column action-card grid", () => {
   assert.match(centerCss, /mission-action-card--expanded/);
   assert.match(centerCss, /grid-column:\s*1\s*\/\s*-1/);
 });
+
+test("collapsed expandable mission cards do not show wrapper chrome under the dark card", () => {
+  const expandableCss = fs.readFileSync(
+    path.join(root, "components/mission-control/ExpandableMissionActionCard.css"),
+    "utf8"
+  );
+  const expandableJsx = fs.readFileSync(
+    path.join(root, "components/mission-control/ExpandableMissionActionCard.jsx"),
+    "utf8"
+  );
+
+  assert.match(expandableJsx, /mission-action-card--expanded/);
+  assert.match(expandableJsx, /expanded \? \(/);
+  assert.match(expandableCss, /\.mission-action-card\s*\{[^}]*background:\s*transparent/);
+  assert.match(expandableCss, /\.mission-action-card\s*\{[^}]*border:\s*none/);
+  assert.match(expandableCss, /\.mission-action-card\s*\{[^}]*height:\s*100%/);
+  assert.match(expandableCss, /\.mission-action-card__header\s*\{[^}]*height:\s*100%/);
+  assert.match(expandableCss, /\.mission-action-card--expanded\s*\{[^}]*background:\s*#ffffff/);
+  assert.doesNotMatch(
+    expandableCss,
+    /\.mission-action-card\s*\{[^}]*background:\s*#ffffff/
+  );
+});
