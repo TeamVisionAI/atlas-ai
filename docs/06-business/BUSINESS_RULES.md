@@ -3265,6 +3265,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-210 — IUL Interactive Slot Selection for WhatsApp
+
+**Implements:** Send real IUL Zoom availability as WhatsApp interactive options so a tap stays in Atlas and does not open the phone calendar.  
+**Domain:** IUL Policy Review / WhatsApp scheduling UX  
+**Depends on:** BR-157 (Cloud API buttons/lists), BR-190 (create-before-confirm), BR-209 (daypart availability)  
+**Related:** BR-208 (IUL routing/readiness)  
+**Status:** Implemented — live canary not re-run  
+**Engine target:** `iulSlotSelection`; `iulAdConversation`; existing `whatsappInteractiveMessage` / outbound Graph interactive / webhook `button_reply`/`list_reply`  
+**Tests:** `backend/test/iulInteractiveSlotSelectionBr210.test.js`
+
+### Rules
+
+1. **Interactive primary** — Offered IUL slots are WhatsApp reply buttons (≤3 actionable options) or an interactive list (>3 slots). Do not embed hyphen-bullet date/time text when interactive options are available.
+2. **Opaque IDs** — Visible labels are short (`Mié 9:00 AM`). Selection resolves by `IUL_SLOT_*` ID against the session’s previously offered slots. Do not infer the appointment solely from visible text. Do not show internal IDs to the user.
+3. **More times** — When two slots are shown as buttons, include “Ver más horarios”. That tap fetches the next real unused slots and keeps interactive selection. Lists of more than three slots do not need this extra row.
+4. **Stale clicks** — Unknown, expired, or out-of-session IDs are rejected. Re-offer fresh real availability. Do not create.
+5. **Free-text fallback** — Natural-language picks such as “el de las 9” remain allowed against the currently offered slots. Do not loosen validation.
+6. **BR-209 unchanged** — Daypart windows, live availability reads, weekend preference, and empty-window recovery stay as BR-209.
+7. **BR-190 unchanged** — Slot tap records the selection and proposes create. “Confirmado” is sent only after create succeeds.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

@@ -30,6 +30,19 @@ const {
   resolveIulOption,
   buildIulInteractive
 } = require("./iulQualificationOptions");
+const {
+  IUL_SLOT_MORE_ID,
+  attachIulSlotSelectionIds,
+  collectIulSlotPool,
+  chooseIulSlotPresentation,
+  buildIulSlotInteractive,
+  resolveIulSlotBySelectionId,
+  isIulSlotMoreId,
+  isIulSlotSelectionId,
+  isIulSlotExpired,
+  parseIulFreeTextSlot,
+  rejectIdsForShown
+} = require("./iulSlotSelection");
 
 const CAMPAIGN_KIND = "iul_review_ad";
 const CONVERSATION_GOAL = "policy_review";
@@ -340,25 +353,7 @@ function dayPartPhrase(dayPart, language) {
 }
 
 function parseOfferedSlotSelection(text, context) {
-  const offered = context.appointment?.previouslyOfferedSlots || [];
-  if (!offered.length) {
-    return null;
-  }
-  const t = fold(text);
-  if (/^(si|yes|ok|okay|claro|perfecto|perfect)$/.test(t) && offered.length === 1) {
-    return offered[0];
-  }
-  for (const slot of offered) {
-    const time = String(slot.time || slot.timeKey || "");
-    const date = String(slot.date || slot.dateKey || "");
-    if (time && t.includes(fold(time))) {
-      return slot;
-    }
-    if (date && t.includes(fold(date))) {
-      return slot;
-    }
-  }
-  return null;
+  return parseIulFreeTextSlot(text, context.appointment?.previouslyOfferedSlots || []);
 }
 
 function isCampaignIntakeIulFirstTurn(context = {}) {
@@ -547,6 +542,34 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
   }
 
   if (lastAsk === ASK.OFFER_SLOTS || lastAsk === ASK.CONFIRM_SLOT) {
+    if (isIulSlotMoreId(interactiveReply?.id)) {
+      return {
+        intent: INTENTS.IUL_REQUEST_MORE_SLOTS,
+        confidence: 0.96,
+        entities: { iulRequestMoreSlots: true }
+      };
+    }
+    if (isIulSlotSelectionId(interactiveReply?.id)) {
+      const offered = context.appointment?.previouslyOfferedSlots || [];
+      const slot = resolveIulSlotBySelectionId(interactiveReply.id, offered);
+      if (!slot || isIulSlotExpired(slot, context._testNow)) {
+        return {
+          intent: INTENTS.IUL_STALE_SLOT_SELECTION,
+          confidence: 0.96,
+          entities: { staleSlotSelectionId: interactiveReply.id }
+        };
+      }
+      return {
+        intent: INTENTS.IUL_SELECT_OFFERED_SLOT,
+        confidence: 0.97,
+        entities: {
+          selectedSlot: slot,
+          reviewProposedDate: slot.date || slot.dateKey || null,
+          reviewProposedTime: slot.time || slot.timeKey || null,
+          iulSlotSelectionId: slot.selectionId
+        }
+      };
+    }
     const slot = parseOfferedSlotSelection(text, context);
     if (slot) {
       return {
@@ -765,8 +788,8 @@ function copy(language) {
       ? "Perfecto. Le comparto opciones para la revisión por Zoom."
       : "Perfect. I'll share options for the Zoom review.",
     offerSlots: es
-      ? "Tengo estos horarios disponibles para la revisión por Zoom. ¿Cuál le funciona mejor?"
-      : "I have these times available for the Zoom review. Which works best for you?",
+      ? "Tengo estos horarios disponibles para su revisión por Zoom. ¿Cuál le funciona mejor?"
+      : "I have these times available for your Zoom review. Which works best for you?",
     nearestDaypart: es
       ? "No tengo disponibilidad {dayPartPhrase} en los próximos días. Tengo disponibilidad:"
       : "I don't have {dayPartPhrase} availability in the coming days. I do have:",
@@ -830,19 +853,9 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_clarify_policy_type: c.clarify
   };
   const phrase = dayPartPhrase(entities.fallbackDayPart || entities.dayPart, language);
-  const slotLines = formatIulSlotLines(entities.offeredSlots, language);
-  let text = String(map[templateKey] || c.qualificationAsk)
+  return String(map[templateKey] || c.qualificationAsk)
     .replace(/\{firstNameGreeting\}/g, firstNameGreeting)
     .replace(/\{dayPartPhrase\}/g, phrase);
-  if (
-    slotLines &&
-    (templateKey === "iul_offer_review_slots" ||
-      templateKey === "iul_offer_nearest_review_slots" ||
-      templateKey === "iul_offer_weekend_fallback_slots")
-  ) {
-    text = `${text}\n${slotLines}`;
-  }
-  return text;
 }
 
 function iulContextPatch(context, {
@@ -950,6 +963,23 @@ function finishIulDecision(structured, context, {
   };
   if (catalog) {
     const built = buildIulInteractive(catalog, body);
+    structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
+    structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
+  } else if (
+    lastQuestionAsked === ASK.OFFER_SLOTS &&
+    Array.isArray(priorEntities.offeredSlots) &&
+    priorEntities.offeredSlots.length
+  ) {
+    const language =
+      structured.preferredLanguage === LANGUAGES.ENGLISH ||
+      structured.preferredLanguage === "english" ||
+      structured.preferredLanguage === "en"
+        ? "en"
+        : "es";
+    const built = buildIulSlotInteractive(priorEntities.offeredSlots, body, {
+      includeMore: priorEntities.includeMoreSlots === true,
+      language
+    });
     structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
     structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
   }
@@ -1109,11 +1139,19 @@ function applySlotOfferDecision(structured, context, availability, extras = {}) 
   if (status === READ_STATUS.AVAILABLE && offered.length > 0) {
     const isNearest = Boolean(availability?.alternativeToConstraint);
     const weekendFallback = availability?.fallbackKind === "WEEKEND_EMPTY_NEAREST";
+    const pool = collectIulSlotPool(availability, offered);
+    const presentation = chooseIulSlotPresentation(pool.length > 3 ? pool : offered);
+    const shown = presentation.shown.length ? presentation.shown : attachIulSlotSelectionIds(offered);
+    const priorShown = extras.rejectPriorShown
+      ? context.appointment?.previouslyOfferedSlots || []
+      : [];
+    const includeMore = presentation.mode === "button" && shown.length === 2;
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
-      offeredSlots: offered,
-      slotA: offered[0]?.time || null,
-      slotB: offered[1]?.time || null,
+      offeredSlots: shown,
+      includeMoreSlots: includeMore,
+      slotA: shown[0]?.time || null,
+      slotB: shown[1]?.time || null,
       nearestAlternatives: isNearest,
       fallbackDayPart: dayPart,
       dayPart
@@ -1129,16 +1167,22 @@ function applySlotOfferDecision(structured, context, availability, extras = {}) 
       knownFacts: {
         ...searchFacts,
         iulDaypartFallbackAttempted: isNearest,
-        iulSchedulingUnavailable: false
+        iulSchedulingUnavailable: false,
+        iulSlotPool: pool,
+        iulShownSlotKeys: [
+          ...((context.knownFacts?.iulShownSlotKeys || []).concat(rejectIdsForShown(priorShown))),
+          ...rejectIdsForShown(shown)
+        ]
       },
       reasonCodes: [
         REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
         REASON_CODES.AVAILABLE_SLOTS_OFFERED,
+        REASON_CODES.IUL_SLOT_INTERACTIVE_OFFERED,
         ...(isNearest ? [REASON_CODES.IUL_DAYPART_FALLBACK_OFFERED] : [])
       ],
       appointmentPatch: {
         status: APPOINTMENT_STATUS.PROPOSED,
-        previouslyOfferedSlots: offered,
+        previouslyOfferedSlots: shown,
         meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
       },
       iulWorkflowStage: IUL_STAGES.REVIEW_READY
@@ -1221,6 +1265,8 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     INTENTS.IUL_POLICY_IS_BAD_QUESTION,
     INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
     INTENTS.IUL_SELECT_OFFERED_SLOT,
+    INTENTS.IUL_REQUEST_MORE_SLOTS,
+    INTENTS.IUL_STALE_SLOT_SELECTION,
     INTENTS.IUL_SCHEDULE_CONFIRM,
     INTENTS.IUL_INFO_ONLY,
     INTENTS.IUL_NO_REPLACE,
@@ -1568,8 +1614,116 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     });
   }
 
+  if (intent === INTENTS.IUL_REQUEST_MORE_SLOTS) {
+    const shown = context.appointment?.previouslyOfferedSlots || [];
+    const rejectIds = [
+      ...new Set([
+        ...(context.knownFacts?.iulShownSlotKeys || []),
+        ...rejectIdsForShown(shown)
+      ])
+    ];
+    const unused = (context.knownFacts?.iulSlotPool || []).filter((slot) => {
+      const id = rejectIdsForShown([slot])[0];
+      return id && !rejectIds.includes(id);
+    });
+    if (unused.length) {
+      return applySlotOfferDecision(
+        structured,
+        context,
+        {
+          status: READ_STATUS.AVAILABLE,
+          offeredSlots: unused,
+          readResult: { slots: unused, unconstrainedFutureSlots: unused }
+        },
+        {
+          dayPart: context.knownFacts?.iulSelectedDayPart,
+          preferredWeekend: Boolean(context.knownFacts?.preferredWeekend),
+          rejectPriorShown: true
+        }
+      );
+    }
+    const moreAvailability = readPolicyReviewAvailabilitySync({
+      context,
+      interpretation,
+      options: {
+        availabilityFixture: context._availabilityFixture,
+        organizationId: context.organizationId || null,
+        preferredWeekend: Boolean(context.knownFacts?.preferredWeekend),
+        now: context._testNow || null,
+        rejectIds
+      }
+    });
+    const moreOffered =
+      moreAvailability?.offeredSlots || moreAvailability?.nearestAlternatives || [];
+    if (!moreOffered.length) {
+      structured.customerReplyPlan.entities = {
+        ...structured.customerReplyPlan.entities,
+        offeredSlots: attachIulSlotSelectionIds(shown),
+        includeMoreSlots: false
+      };
+      return finishIulDecision(structured, context, {
+        templateKey: "iul_offer_review_slots",
+        nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+        lastQuestionAsked: ASK.OFFER_SLOTS,
+        appointmentPatch: {
+          previouslyOfferedSlots: attachIulSlotSelectionIds(shown),
+          meetingType: IUL_REVIEW_MEETING_TYPE.ZOOM
+        }
+      });
+    }
+    return applySlotOfferDecision(structured, context, moreAvailability, {
+      dayPart: context.knownFacts?.iulSelectedDayPart,
+      preferredWeekend: Boolean(context.knownFacts?.preferredWeekend),
+      rejectPriorShown: true
+    });
+  }
+
+  if (intent === INTENTS.IUL_STALE_SLOT_SELECTION) {
+    const fresh = readPolicyReviewAvailabilitySync({
+      context,
+      interpretation,
+      options: {
+        availabilityFixture: context._availabilityFixture,
+        organizationId: context.organizationId || null,
+        preferredWeekend: Boolean(context.knownFacts?.preferredWeekend),
+        now: context._testNow || null
+      }
+    });
+    structured.reasonCodes.push(REASON_CODES.IUL_STALE_SLOT_REJECTED);
+    return applySlotOfferDecision(structured, context, fresh, {
+      dayPart: context.knownFacts?.iulSelectedDayPart,
+      preferredWeekend: Boolean(context.knownFacts?.preferredWeekend)
+    });
+  }
+
   if (intent === INTENTS.IUL_SELECT_OFFERED_SLOT) {
     const slot = interpretation.entities?.selectedSlot || null;
+    const offered = context.appointment?.previouslyOfferedSlots || [];
+    const stillOffered =
+      slot &&
+      offered.some(
+        (row) =>
+          (row.selectionId && row.selectionId === slot.selectionId) ||
+          (`${row.date || row.dateKey}|${row.time || row.timeKey}` ===
+            `${slot.date || slot.dateKey}|${slot.time || slot.timeKey}`)
+      );
+    if (!slot || !stillOffered || isIulSlotExpired(slot, context._testNow)) {
+      structured.reasonCodes.push(REASON_CODES.IUL_STALE_SLOT_REJECTED);
+      const fresh = readPolicyReviewAvailabilitySync({
+        context,
+        interpretation,
+        options: {
+          availabilityFixture: context._availabilityFixture,
+          organizationId: context.organizationId || null,
+          preferredWeekend: Boolean(context.knownFacts?.preferredWeekend),
+          now: context._testNow || null
+        }
+      });
+      return applySlotOfferDecision(structured, context, fresh, {
+        dayPart: context.knownFacts?.iulSelectedDayPart,
+        preferredWeekend: Boolean(context.knownFacts?.preferredWeekend)
+      });
+    }
     return finishIulDecision(structured, context, {
       templateKey: "iul_confirm_review_deferred",
       nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
@@ -1591,7 +1745,8 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
       },
       reasonCodes: [
         REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
-        REASON_CODES.APPOINTMENT_CREATE_PROPOSED
+        REASON_CODES.APPOINTMENT_CREATE_PROPOSED,
+        REASON_CODES.IUL_SLOT_REVALIDATED
       ],
       appointmentPatch: {
         status: APPOINTMENT_STATUS.PROPOSED,

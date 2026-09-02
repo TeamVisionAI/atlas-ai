@@ -76,6 +76,7 @@ Facebook Lead
 
 ## Recent Decisions
 
+- **2026-09-01:** **BR-210** — IUL Zoom slots are WhatsApp interactive buttons/lists (`IUL_SLOT_*` IDs), not hyphen-bullet times. Taps must stay in Atlas, not open the phone calendar. Live canary not re-run; do not increase IUL spend yet.
 - **2026-09-01:** **BR-209** — IUL daypart buttons are “En la mañana / En la tarde”. Empty daypart searches the rolling horizon, then nearest real alternatives, then a recoverable no-slot state. Live canary not re-run; do not increase IUL spend yet.
 - **2026-09-01:** **BR-208** — IUL Policy Review is not ready for increased ad spend. Intake/CTWA routing is certified in tests; production has no Zoom bookings or pipeline rows. IUL now wins over an active recruiting session, confirmation copy waits for create, and policy-review reminders use IUL language. Live canary not run.
 - **2026-09-01:** **BR-207** — Authenticated sidebar groups operational pages (Pipeline, People & Outcomes, Intelligence, Growth) without changing routes or permissions. Recruits is reserved until a dedicated page exists.
