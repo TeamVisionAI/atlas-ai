@@ -29,32 +29,27 @@
   line-height: 1.5;
 }
 
-.conversations-page__workspace-tabs {
-  display: inline-flex;
-  align-items: stretch;
+.conversations-page__support {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  overflow: hidden;
-  width: fit-content;
+  background: #f8fafc;
 }
 
-.conversations-page__workspace-tab {
-  border: 0;
-  background: #fff;
-  color: #334155;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 8px 16px;
-  cursor: pointer;
+.conversations-page__support.is-active {
+  border-color: #b45309;
+  background: #fffbeb;
 }
 
-.conversations-page__workspace-tab + .conversations-page__workspace-tab {
-  border-left: 1px solid #cbd5e1;
-}
-
-.conversations-page__workspace-tab.is-active {
-  background: #0f766e;
-  color: #fff;
+.conversations-page__support-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #92400e;
+  min-width: 160px;
 }
 
 .conversations-page__filters {

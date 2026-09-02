@@ -489,12 +489,17 @@ async function buildConversationsCenterReadModel(options = {}) {
   }
 
   const authContext = options.authContext || null;
+  const { isProspectInWorkspaceListScope } = require("../../security/authorizationService");
   const {
-    resolveWorkspaceListScope,
-    isProspectInWorkspaceListScope
-  } = require("../../security/authorizationService");
+    resolveConversationsListScope
+  } = require("../conversationsPrivacyEngine");
+  // Implements BR-218 — Conversations never use hierarchy/oversight list scope.
   const listScope = authContext
-    ? resolveWorkspaceListScope(authContext, options.workspaceScope)
+    ? resolveConversationsListScope(authContext, {
+        supportUserId: options.supportUserId,
+        conversationsSupport: options.conversationsSupport,
+        supportModeActive: options.supportModeActive
+      })
     : null;
 
   const prospects =
@@ -567,7 +572,16 @@ async function buildConversationsCenterReadModel(options = {}) {
     if (listScope) {
       return isProspectInWorkspaceListScope(prospect, listScope);
     }
-    return isProspectInConversationsUserScope(prospect, organizationId, authContext);
+    return isProspectInConversationsUserScope(
+      prospect,
+      organizationId,
+      authContext,
+      {
+        supportUserId: options.supportUserId,
+        conversationsSupport: options.conversationsSupport,
+        supportModeActive: options.supportModeActive
+      }
+    );
   });
   const injectedLogs =
     options.conversationLogsByPhone !== undefined
@@ -628,6 +642,8 @@ async function buildConversationsCenterReadModel(options = {}) {
     search: search || null,
     view: useSummaryView ? "summary" : "full",
     workspaceScope: listScope?.workspaceScope || null,
+    supportAccess: listScope?.supportAccess === true,
+    supportTargetUserId: listScope?.supportTargetUserId || null,
     counts,
     needsAttentionCount: counts.needs_attention,
     metaLeadsAwaitingVerification: counts.metaLeadsAwaitingVerification || 0,
@@ -681,14 +697,16 @@ async function getConversationsAttentionCount(
   organizationId,
   prospects,
   authContext = null,
-  workspaceScope = null
+  workspaceScope = null,
+  supportOptions = {}
 ) {
   const model = await buildConversationsCenterReadModel({
     organizationId,
     prospects,
     filter: CONVERSATION_FILTERS.ACTIVE,
     authContext,
-    workspaceScope
+    workspaceScope,
+    ...supportOptions
   });
 
   return {

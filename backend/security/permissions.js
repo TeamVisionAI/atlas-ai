@@ -24,12 +24,17 @@ const PERMISSIONS = Object.freeze({
   INTEGRATIONS_SELF: "integrations:self",
   // BR-074 — catalog constant only. Never grant via ROLE_PERMISSIONS / admin wildcard path.
   // Evaluate exclusively through hasExplicitUserPermission / canVerifySecuritiesAuthorization.
-  SECURITIES_VERIFY: "securities:verify"
+  SECURITIES_VERIFY: "securities:verify",
+  // BR-218 — catalog constant only. Never grant via ROLE_PERMISSIONS / admin wildcard path.
+  CONVERSATIONS_SUPPORT: "conversations:support"
 });
 
-/** BR-074 — securities:verify must never appear in role matrices (explicit user grant only). */
+/** Explicit-only permissions must never appear in role matrices. */
 const ROLE_GRANTABLE_PERMISSIONS = Object.freeze(
-  Object.values(PERMISSIONS).filter((code) => code !== PERMISSIONS.SECURITIES_VERIFY)
+  Object.values(PERMISSIONS).filter(
+    (code) =>
+      code !== PERMISSIONS.SECURITIES_VERIFY && code !== PERMISSIONS.CONVERSATIONS_SUPPORT
+  )
 );
 
 const ROLE_PERMISSIONS = Object.freeze({

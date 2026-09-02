@@ -189,7 +189,7 @@ test("F) My Prospects remains owner-only", async () => {
   assert.deepEqual(model.items.map((item) => item.id), ["mine"]);
 });
 
-test("G) Team Prospects oversight still works", async () => {
+test("G) Conversations oversight is owner-only; Prospect Center team scope remains", async () => {
   const ownedByAgent = row({
     id: "team-lead",
     owner_user_id: MISLEISYS,
@@ -198,10 +198,14 @@ test("G) Team Prospects oversight still works", async () => {
     entry_method: "QR"
   });
   const model = await inbox([ownedByAgent], { userId: NIOVEL, workspaceScope: "oversight" });
-  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
-  assert.deepEqual(model.items.map((item) => item.id), ["team-lead"]);
+  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
+  assert.deepEqual(model.items.map((item) => item.id), []);
   const mine = await inbox([ownedByAgent], { userId: NIOVEL, workspaceScope: "mine" });
   assert.equal(mine.items.length, 0);
+
+  const prospectCenterScope = resolveWorkspaceListScope(auth(ROLES.RVP, NIOVEL), "oversight");
+  assert.equal(prospectCenterScope.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
+  assert.equal(isProspectInWorkspaceListScope(ownedByAgent, prospectCenterScope), true);
 });
 
 test("H) counts exclude personal non-leads", async () => {

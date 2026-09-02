@@ -130,7 +130,7 @@ test("other user excluded from My Prospects even when assigned_agent_id matches"
   assert.equal(model.items.length, 0);
 });
 
-test("authorized leader sees downstream user under Team Prospects", async () => {
+test("authorized leader cannot list downstream conversations via Team Prospects", async () => {
   const dlContext = auth(ROLES.DIVISION_LEADER, USER_DL, {
     hierarchyMode: HIERARCHY_MODES.SUBTREE,
     hierarchyUserIds: [USER_DL, USER_AGENT]
@@ -164,12 +164,9 @@ test("authorized leader sees downstream user under Team Prospects", async () => 
     ]
   });
 
-  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
+  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
   const ids = model.items.map((item) => item.id).sort();
-  assert.deepEqual(ids, ["downstream"]);
-  assert.ok(
-    model.items.every((item) => item.ownershipState === "ATLAS" || item.ownershipState === "HUMAN")
-  );
+  assert.deepEqual(ids, ["dl-own"]);
 });
 
 test("unauthorized user cannot access Team Prospects", async () => {
@@ -235,8 +232,6 @@ test("tenant isolation preserved on mine and Team Prospects", async () => {
     ]
   });
 
-  assert.deepEqual(
-    model.items.map((item) => item.id),
-    ["tv-other"]
-  );
+  assert.deepEqual(model.items.map((item) => item.id), []);
+  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
 });

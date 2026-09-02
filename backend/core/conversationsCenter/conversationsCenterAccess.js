@@ -198,10 +198,15 @@ function isProspectInConversationsTenantScope(prospect, organizationId) {
 }
 
 /**
- * Conversations visibility = tenant org ∩ prospect hierarchy/user scope.
- * Fail closed when authContext cannot authorize the prospect.
+ * Implements BR-218 — Conversations visibility is tenant ∩ owner/servicing-user,
+ * or explicit Support Mode target. Hierarchy / canAccessProspect never grants content.
  */
-function isProspectInConversationsUserScope(prospect, organizationId, authContext = null) {
+function isProspectInConversationsUserScope(
+  prospect,
+  organizationId,
+  authContext = null,
+  options = {}
+) {
   if (!isProspectInConversationsTenantScope(prospect, organizationId)) {
     return false;
   }
@@ -210,8 +215,15 @@ function isProspectInConversationsUserScope(prospect, organizationId, authContex
     return false;
   }
 
-  const { canAccessProspect } = require("../../security/authorizationService");
-  return canAccessProspect(authContext, prospect);
+  const {
+    isProspectInConversationsPrivacyScope
+  } = require("../conversationsPrivacyEngine");
+  return isProspectInConversationsPrivacyScope(
+    prospect,
+    organizationId,
+    authContext,
+    options
+  );
 }
 
 /** @deprecated Use isProspectInConversationsTenantScope with effective organizationId. */

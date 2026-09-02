@@ -1,9 +1,8 @@
 /**
- * Conversations My Prospects / Team Prospects tab + list scope.
- * Mirrors BR-165: default is owner_user_id = current user; Team is explicit oversight.
+ * BR-218 — Conversations are owner/servicing-user only.
+ * Team Prospects / hierarchy oversight is removed from Conversations.
+ * Support view is explicit and never mixed into My Conversations.
  */
-
-import { ROLES, PERMISSIONS, normalizeRole, roleHasPermission } from "../security/workspacePermissions.js";
 
 export const CONVERSATIONS_WORKSPACE_TABS = Object.freeze({
   MINE: "mine",
@@ -12,44 +11,59 @@ export const CONVERSATIONS_WORKSPACE_TABS = Object.freeze({
 
 export const CONVERSATIONS_WORKSPACE_SCOPES = Object.freeze({
   MINE: "mine",
-  OVERSIGHT: "oversight"
+  OVERSIGHT: "oversight",
+  SUPPORT: "support"
 });
 
-export function canSeeConversationsTeamProspects(user) {
-  const role = normalizeRole(user?.role);
-  if (
-    role === ROLES.ADMINISTRATOR ||
-    role === ROLES.RVP ||
-    role === ROLES.DIVISION_LEADER
-  ) {
-    return true;
-  }
-  return roleHasPermission(role, PERMISSIONS.DASHBOARD_EXECUTIVE);
+/** Implements BR-218 — Team Prospects is never shown in Conversations. */
+export function canSeeConversationsTeamProspects() {
+  return false;
 }
 
-export function resolveConversationsWorkspaceTab({
-  workspaceScopeParam = "",
-  canSeeTeam = false
-} = {}) {
+export function resolveConversationsWorkspaceTab({ workspaceScopeParam = "" } = {}) {
   const requested = String(workspaceScopeParam || "").trim().toLowerCase();
-  if (requested === CONVERSATIONS_WORKSPACE_SCOPES.OVERSIGHT) {
-    if (canSeeTeam) {
-      return {
-        tab: CONVERSATIONS_WORKSPACE_TABS.TEAM,
-        workspaceScope: CONVERSATIONS_WORKSPACE_SCOPES.OVERSIGHT,
-        unauthorizedTeam: false
-      };
-    }
-    return {
-      tab: CONVERSATIONS_WORKSPACE_TABS.MINE,
-      workspaceScope: CONVERSATIONS_WORKSPACE_SCOPES.MINE,
-      unauthorizedTeam: true
-    };
-  }
+  const requestedTeam = requested === CONVERSATIONS_WORKSPACE_SCOPES.OVERSIGHT;
 
   return {
     tab: CONVERSATIONS_WORKSPACE_TABS.MINE,
     workspaceScope: CONVERSATIONS_WORKSPACE_SCOPES.MINE,
-    unauthorizedTeam: false
+    unauthorizedTeam: requestedTeam
+  };
+}
+
+export function canOpenConversationsSupportView({
+  canUseConversationsSupport = false,
+  isSuperAdmin = false,
+  supportModeActive = false
+} = {}) {
+  if (canUseConversationsSupport !== true) {
+    return false;
+  }
+  if (isSuperAdmin) {
+    return supportModeActive === true;
+  }
+  return true;
+}
+
+export function resolveConversationsSupportView({
+  supportUserId = "",
+  conversationsSupport = false,
+  canOpenSupport = false
+} = {}) {
+  const targetUserId = String(supportUserId || "").trim();
+  const explicit = conversationsSupport === true || conversationsSupport === "1";
+
+  if (!canOpenSupport || !explicit || !targetUserId) {
+    return {
+      active: false,
+      supportUserId: null,
+      workspaceScope: CONVERSATIONS_WORKSPACE_SCOPES.MINE
+    };
+  }
+
+  return {
+    active: true,
+    supportUserId: targetUserId,
+    workspaceScope: CONVERSATIONS_WORKSPACE_SCOPES.SUPPORT
   };
 }

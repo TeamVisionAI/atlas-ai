@@ -200,11 +200,8 @@ test("ordinary downstream personal contact is hidden from leader Team Prospects"
       })
     ]
   });
-  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.OVERSIGHT);
-  assert.deepEqual(
-    model.items.map((item) => item.id),
-    ["downstream-qr"]
-  );
+  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
+  assert.deepEqual(model.items.map((item) => item.id), []);
 });
 
 test("valid ad/intake personal-channel lead remains visible", async () => {
@@ -252,7 +249,7 @@ test("valid ad/intake personal-channel lead remains visible", async () => {
   );
 });
 
-test("Team Prospects is hierarchy-only valid Atlas leads", async () => {
+test("Conversations never lists hierarchy Atlas leads for an upline", async () => {
   const dl = auth(ROLES.DIVISION_LEADER, USER_LEADER_A, {
     hierarchyMode: HIERARCHY_MODES.SUBTREE,
     hierarchyUserIds: [USER_LEADER_A, USER_AGENT_A]
@@ -279,10 +276,7 @@ test("Team Prospects is hierarchy-only valid Atlas leads", async () => {
       })
     ]
   });
-  assert.deepEqual(
-    model.items.map((item) => item.id),
-    ["in-tree"]
-  );
+  assert.deepEqual(model.items.map((item) => item.id), []);
 });
 
 test("tenant isolation preserved for personal and Atlas rows", async () => {
@@ -323,8 +317,6 @@ test("tenant isolation preserved for personal and Atlas rows", async () => {
       })
     ]
   });
-  assert.deepEqual(
-    model.items.map((item) => item.id),
-    ["tv-ad"]
-  );
+  assert.deepEqual(model.items.map((item) => item.id), []);
+  assert.equal(model.workspaceScope, WORKSPACE_LIST_SCOPES.MINE);
 });

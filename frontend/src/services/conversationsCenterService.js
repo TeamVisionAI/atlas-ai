@@ -18,8 +18,8 @@ const listCache = new Map();
 const listInFlight = new Map();
 const detailCache = new Map();
 
-function detailCacheKey(organizationId, phone) {
-  return `${organizationId || "none"}::${String(phone)}`;
+function detailCacheKey(organizationId, phone, supportUserId = "") {
+  return `${organizationId || "none"}::${supportUserId || "mine"}::${String(phone)}`;
 }
 
 async function wrap(path, options) {
@@ -38,15 +38,44 @@ async function wrap(path, options) {
   }
 }
 
+function supportScopeKey({ supportUserId = "", conversationsSupport = false } = {}) {
+  if (supportUserId && (conversationsSupport === true || conversationsSupport === "1")) {
+    return `support:${supportUserId}`;
+  }
+  return "mine";
+}
+
+function appendConversationsSupportParams(params, { supportUserId = "", conversationsSupport = false } = {}) {
+  if (supportUserId) {
+    params.set("supportUserId", supportUserId);
+  }
+  if (conversationsSupport === true || conversationsSupport === "1") {
+    params.set("conversationsSupport", "1");
+  }
+}
+
+function withConversationsSupportBody(body = {}, { supportUserId = "", conversationsSupport = false } = {}) {
+  const next = { ...body };
+  if (supportUserId) {
+    next.supportUserId = supportUserId;
+  }
+  if (conversationsSupport === true || conversationsSupport === "1") {
+    next.conversationsSupport = true;
+  }
+  return next;
+}
+
 function listCacheKey({
   organizationId = "",
   filter = "active",
   search = "",
   view = "summary",
   workspaceScope = "",
-  userId = ""
+  userId = "",
+  supportUserId = "",
+  conversationsSupport = false
 } = {}) {
-  return `${organizationId || "none"}::${userId || "anon"}::${filter}::${search}::${view}::${workspaceScope || "mine"}`;
+  return `${organizationId || "none"}::${userId || "anon"}::${filter}::${search}::${view}::${supportScopeKey({ supportUserId, conversationsSupport, workspaceScope })}`;
 }
 
 export function conversationsListCacheKey(options = {}) {
@@ -96,6 +125,8 @@ export async function getConversations({
   view = "summary",
   workspaceScope = "",
   userId = "",
+  supportUserId = "",
+  conversationsSupport = false,
   force = false
 } = {}) {
   const cacheKey = listCacheKey({
@@ -104,7 +135,9 @@ export async function getConversations({
     search,
     view,
     workspaceScope,
-    userId
+    userId,
+    supportUserId,
+    conversationsSupport
   });
 
   if (!force) {
@@ -128,9 +161,7 @@ export async function getConversations({
   if (view && view !== "full") {
     params.set("view", view);
   }
-  if (workspaceScope) {
-    params.set("workspaceScope", workspaceScope);
-  }
+  appendConversationsSupportParams(params, { supportUserId, conversationsSupport });
   const query = params.toString();
 
   const pending = wrap(`/api/conversations${query ? `?${query}` : ""}`)
@@ -146,21 +177,39 @@ export async function getConversations({
   return pending;
 }
 
-export async function getConversationsAttentionCount({ workspaceScope = "" } = {}) {
+export async function getConversationsAttentionCount({
+  supportUserId = "",
+  conversationsSupport = false
+} = {}) {
   const params = new URLSearchParams();
-  if (workspaceScope) {
-    params.set("workspaceScope", workspaceScope);
-  }
+  appendConversationsSupportParams(params, { supportUserId, conversationsSupport });
   const query = params.toString();
   return wrap(`/api/conversations/attention-count${query ? `?${query}` : ""}`);
 }
 
-export async function getConversation(phone, { organizationId = "", force = false } = {}) {
+export async function getConversationsCenterSupportTargets() {
+  return wrap("/api/conversations/support-targets");
+}
+
+export async function enterConversationsSupportAccess({ supportUserId, conversationsSupport = true } = {}) {
+  return wrap("/api/conversations/support-access", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      withConversationsSupportBody({}, { supportUserId, conversationsSupport })
+    )
+  });
+}
+
+export async function getConversation(
+  phone,
+  { organizationId = "", force = false, supportUserId = "", conversationsSupport = false } = {}
+) {
   if (!phone) {
     throw new ConversationsCenterError("Phone is required.", 400);
   }
 
-  const cacheKey = detailCacheKey(organizationId, phone);
+  const cacheKey = detailCacheKey(organizationId, phone, supportUserId);
   if (!force) {
     const cached = detailCache.get(cacheKey);
     if (cached && Date.now() - cached.at < LIST_CACHE_TTL_MS) {
@@ -168,7 +217,12 @@ export async function getConversation(phone, { organizationId = "", force = fals
     }
   }
 
-  const data = await wrap(`/api/conversations/${encodeURIComponent(phone)}`);
+  const params = new URLSearchParams();
+  appendConversationsSupportParams(params, { supportUserId, conversationsSupport });
+  const query = params.toString();
+  const data = await wrap(
+    `/api/conversations/${encodeURIComponent(phone)}${query ? `?${query}` : ""}`
+  );
   detailCache.set(cacheKey, { at: Date.now(), data });
   return data;
 }
@@ -269,19 +323,19 @@ export async function confirmMetaLead(phone, body = {}) {
   });
 }
 
-export async function markConversationNotLead(phone) {
+export async function markConversationNotLead(phone, body = {}) {
   return wrap(`/api/conversations/mark-not-lead`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone })
+    body: JSON.stringify({ ...body, phone })
   });
 }
 
-export async function returnConversationToAtlas(phone) {
+export async function returnConversationToAtlas(phone, body = {}) {
   return wrap(`/api/conversations/return-to-atlas`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone })
+    body: JSON.stringify({ ...body, phone })
   });
 }
 
@@ -293,35 +347,35 @@ export async function sendHumanConversationReply(phone, { message, clientRequest
   });
 }
 
-export async function archiveConversation(phone) {
+export async function archiveConversation(phone, body = {}) {
   return wrap(`/api/conversations/archive`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone })
+    body: JSON.stringify({ ...body, phone })
   });
 }
 
-export async function restoreConversation(phone) {
+export async function restoreConversation(phone, body = {}) {
   return wrap(`/api/conversations/restore`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone })
+    body: JSON.stringify({ ...body, phone })
   });
 }
 
-export async function closeConversation(phone, reason = "OTHER") {
+export async function closeConversation(phone, reason = "OTHER", body = {}) {
   return wrap(`/api/conversations/close`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, reason })
+    body: JSON.stringify({ ...body, phone, reason })
   });
 }
 
-export async function markConversationAsTest(phone) {
+export async function markConversationAsTest(phone, body = {}) {
   return wrap(`/api/conversations/mark-test`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone })
+    body: JSON.stringify({ ...body, phone })
   });
 }
 
@@ -331,6 +385,7 @@ export async function markConversationRead(phone, body = {}) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      ...body,
       phone,
       lastReadInboundAt: body.lastReadInboundAt || null,
       lastSeenInboundMessageId: body.lastSeenInboundMessageId || null
