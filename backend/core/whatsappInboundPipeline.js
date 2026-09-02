@@ -421,6 +421,7 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
       wabaId: inbound.wabaId || null,
       providerMessageId: inbound.providerMessageId || null,
       ctwaReferral: inbound.ctwaReferral || null,
+      rawMessage: inbound.rawMessage || null,
       campaignIntakeMatch: intakeLookup?.matched ? intakeLookup : null,
       senderIdentity,
       whatsappConnectionOwnerUserId: claimedOwnerUserId,

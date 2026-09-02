@@ -22,6 +22,7 @@ const {
   META_AD_DESTINATION_ELIGIBILITY_SOURCE,
   evaluateMetaAdDestinationFallback
 } = require("./metaAdDestinationFallback");
+const { extractClickToWhatsAppReferral } = require("../services/whatsappWebhookParser");
 
 /** Durable proof that Atlas eligibility was earned from a verified event. */
 const VERIFIED_ATLAS_ELIGIBILITY_SOURCES = Object.freeze({
@@ -54,6 +55,21 @@ const POSITIVE_LEAD_PROVENANCE_SOURCE_SET = Object.freeze(
     )
   )
 );
+
+/**
+ * Higher rank wins. META_AD_DESTINATION is the weak BR-193 connection fallback.
+ * Implements BR-142 / BR-193 priority: this-inbound CTWA and first-party verified
+ * origins outrank connection-only META on continuation persist.
+ */
+const VERIFIED_ELIGIBILITY_SOURCE_RANK = Object.freeze({
+  [VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL]: 50,
+  [VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_CODE]: 40,
+  [VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CAMPAIGN_INTAKE_IUL]: 40,
+  [VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR]: 40,
+  [VERIFIED_ATLAS_ELIGIBILITY_SOURCES.FACEBOOK_LEAD_ADS]: 40,
+  [VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QUICK_CAPTURE]: 40,
+  [VERIFIED_ATLAS_ELIGIBILITY_SOURCES.META_AD_DESTINATION]: 10
+});
 
 /** Stored origins that are only written by a verified intake path (not default CTWA). */
 const VERIFIED_STORED_ENTRY_METHODS = Object.freeze(
@@ -95,21 +111,22 @@ function readStoredCtwaReferral(prospect = {}, workflowState = {}) {
 
 /** Real CTWA proof only — not a META_AD_DESTINATION connection stamp. */
 function hasRealStoredCtwaEvidence(prospect = {}, workflowState = {}) {
+  const row = prospect && typeof prospect === "object" ? prospect : {};
   const wf = workflowState && typeof workflowState === "object" ? workflowState : {};
   if (upper(wf.atlasEligibilitySource) === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL) {
     return true;
   }
   const clid =
-    prospect.ctwa_clid ||
-    prospect.ctwaClid ||
+    row.ctwa_clid ||
+    row.ctwaClid ||
     wf.ctwa_clid ||
     wf.ctwaClid ||
-    prospect.metadata?.ctwa_clid ||
-    prospect.metadata?.ctwaClid;
+    row.metadata?.ctwa_clid ||
+    row.metadata?.ctwaClid;
   if (String(clid || "").trim()) {
     return true;
   }
-  return hasPositiveCtwaReferral(readStoredCtwaReferral(prospect, wf));
+  return hasPositiveCtwaReferral(readStoredCtwaReferral(row, wf));
 }
 
 function hasStoredCtwaProvenance(prospect = {}, workflowState = {}) {
@@ -217,6 +234,105 @@ function hasPositiveCtwaReferral(referral) {
   return Boolean(referral.ctwaClid || referral.ctwa_clid);
 }
 
+function verifiedEligibilitySourceRank(source) {
+  const key = upper(source);
+  return Number(VERIFIED_ELIGIBILITY_SOURCE_RANK[key] || 0);
+}
+
+/**
+ * Existing strong sources must not be overwritten by a weaker incoming source.
+ * Same or higher rank may replace. Unknown incoming yields existing.
+ */
+function resolveMonotonicVerifiedEligibilitySource(existingSource, incomingSource) {
+  const incoming = upper(incomingSource);
+  const existing = upper(existingSource);
+  if (!incoming || !VERIFIED_SOURCE_SET.has(incoming)) {
+    return existing || null;
+  }
+  if (!existing || !VERIFIED_SOURCE_SET.has(existing)) {
+    return incoming;
+  }
+  if (verifiedEligibilitySourceRank(incoming) >= verifiedEligibilitySourceRank(existing)) {
+    return incoming;
+  }
+  return existing;
+}
+
+function normalizeDurableCtwaReferral(referral) {
+  if (!hasPositiveCtwaReferral(referral)) {
+    return null;
+  }
+  const ctwaClid = referral.ctwaClid || referral.ctwa_clid
+    ? String(referral.ctwaClid || referral.ctwa_clid)
+    : null;
+  return {
+    sourceType: referral.sourceType || referral.source_type
+      ? String(referral.sourceType || referral.source_type)
+      : null,
+    sourceId: referral.sourceId || referral.source_id
+      ? String(referral.sourceId || referral.source_id)
+      : null,
+    ctwaClid,
+    sourceUrl: referral.sourceUrl || referral.source_url
+      ? String(referral.sourceUrl || referral.source_url)
+      : null,
+    headline: referral.headline ? String(referral.headline) : null
+  };
+}
+
+function extractReferralFromRawMessage(rawMessage) {
+  if (!rawMessage || typeof rawMessage !== "object") {
+    return null;
+  }
+  return (
+    extractClickToWhatsAppReferral(rawMessage) ||
+    extractClickToWhatsAppReferral({ referral: rawMessage.referral }) ||
+    normalizeDurableCtwaReferral(rawMessage.referral || rawMessage)
+  );
+}
+
+/**
+ * Recover this-inbound CTWA before BR-193 META fallback.
+ * Order: parsed inbound → rawMessage.referral → raw webhook message.
+ * Does not invent CTWA from the connection toggle.
+ */
+function resolveInboundCtwaReferral(input = {}) {
+  const candidates = [
+    input.ctwaReferral,
+    input.inbound?.ctwaReferral,
+    input.inbound?.referral,
+    extractReferralFromRawMessage(input.rawMessage),
+    extractReferralFromRawMessage(input.inbound?.rawMessage),
+    extractReferralFromRawMessage(input.rawWebhookPayload?.message),
+    extractReferralFromRawMessage(input.inbound?.rawWebhookPayload?.message),
+    extractReferralFromRawMessage(
+      input.rawWebhookPayload?.value?.messages?.[0] ||
+        input.inbound?.rawValue?.messages?.[0] ||
+        input.inbound?.rawWebhookPayload?.value?.messages?.[0]
+    )
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeDurableCtwaReferral(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return null;
+}
+
+function buildDurableCtwaEvidence(referral, at = new Date()) {
+  const normalized = normalizeDurableCtwaReferral(referral);
+  if (!normalized) {
+    return null;
+  }
+  return {
+    ctwaReferral: normalized,
+    ctwa_clid: normalized.ctwaClid || null,
+    ctwaEvidencePersistedAt:
+      at instanceof Date ? at.toISOString() : String(at || new Date().toISOString())
+  };
+}
+
 function hasQrOrigin({ prospect, qrAttributed, qrTouch } = {}) {
   if (qrAttributed || qrTouch) {
     return true;
@@ -238,18 +354,28 @@ function resolveVerifiedAtlasEligibilitySource({
   qrTouch = null,
   qrAttributed = false,
   ctwaReferral = null,
+  rawMessage = null,
+  rawWebhookPayload = null,
   intakeSource = null,
   sourceFields = null,
   campaignIntakeMatch = null,
   whatsappConnectionSource = null,
   whatsappConnection = null,
   inboundPhoneNumberId = null,
-  expectedOrganizationId = null
+  expectedOrganizationId = null,
+  prospect = null,
+  workflowState = null
 } = {}) {
+  const resolvedReferral = resolveInboundCtwaReferral({
+    ctwaReferral,
+    rawMessage,
+    rawWebhookPayload
+  });
+
   if (qrTouch || qrAttributed) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
   }
-  if (hasPositiveCtwaReferral(ctwaReferral)) {
+  if (hasPositiveCtwaReferral(resolvedReferral)) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL;
   }
   if (
@@ -271,6 +397,15 @@ function resolveVerifiedAtlasEligibilitySource({
   }
   if (upper(sourceFields?.source) === upper(WHATSAPP_SOURCE.CAR_MAGNET)) {
     return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.QR;
+  }
+
+  // Stored inbound-specific CTWA / other strong verified sources beat BR-193 META.
+  if (hasRealStoredCtwaEvidence(prospect, workflowState)) {
+    return VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL;
+  }
+  const storedSource = upper(workflowState?.atlasEligibilitySource);
+  if (POSITIVE_LEAD_PROVENANCE_SOURCE_SET.has(storedSource)) {
+    return storedSource;
   }
 
   if (
@@ -505,15 +640,42 @@ async function resolveAtlasInboundAutomationEligibility(input = {}) {
 }
 
 async function persistVerifiedAtlasEligibilitySource(phone, source, options = {}) {
-  const eligibilitySource = upper(source);
-  if (!phone || !VERIFIED_SOURCE_SET.has(eligibilitySource)) {
+  const incoming = upper(source);
+  if (!phone || !VERIFIED_SOURCE_SET.has(incoming)) {
     return null;
   }
-  return savePersistedWorkflowState(
-    phone,
-    { atlasEligibilitySource: eligibilitySource },
-    options
+
+  let existingState = options.workflowState || null;
+  if (!existingState) {
+    try {
+      existingState = await loadPersistedWorkflowState(phone, {
+        organizationId: options.organizationId || null,
+        prospectId: options.prospectId || null
+      });
+    } catch {
+      existingState = null;
+    }
+  }
+
+  const nextSource = resolveMonotonicVerifiedEligibilitySource(
+    existingState?.atlasEligibilitySource,
+    incoming
   );
+  if (!nextSource) {
+    return existingState;
+  }
+
+  const patch = { atlasEligibilitySource: nextSource };
+  const incomingEvidence = buildDurableCtwaEvidence(options.ctwaReferral);
+  if (
+    incomingEvidence &&
+    (nextSource === VERIFIED_ATLAS_ELIGIBILITY_SOURCES.CTWA_REFERRAL ||
+      !hasRealStoredCtwaEvidence({}, existingState))
+  ) {
+    Object.assign(patch, incomingEvidence);
+  }
+
+  return savePersistedWorkflowState(phone, patch, options);
 }
 
 async function setAtlasAutomationEnabled(phone, enabled, options = {}) {
@@ -538,6 +700,9 @@ module.exports = {
   evaluateIulReviewSessionActive,
   persistVerifiedAtlasEligibilitySource,
   setAtlasAutomationEnabled,
+  resolveInboundCtwaReferral,
+  resolveMonotonicVerifiedEligibilitySource,
+  buildDurableCtwaEvidence,
   evaluateMetaAdDestinationFallback,
   isPersonalWhatsAppConnection,
   isPersonalWhatsAppOriginMarker,
@@ -550,5 +715,6 @@ module.exports = {
   isMetaAdDestinationStamp,
   VERIFIED_ATLAS_ELIGIBILITY_SOURCES,
   VERIFIED_SOURCE_SET,
-  POSITIVE_LEAD_PROVENANCE_SOURCE_SET
+  POSITIVE_LEAD_PROVENANCE_SOURCE_SET,
+  VERIFIED_ELIGIBILITY_SOURCE_RANK
 };

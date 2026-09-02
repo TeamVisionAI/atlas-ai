@@ -57,7 +57,10 @@ const DURABLE_RUNTIME_FIELDS = Object.freeze([
   "returnToAtlasResumeLastError",
   "returnToAtlasResumeLastAttemptAt",
   "atlasAutomationEnabled",
-  "atlasEligibilitySource"
+  "atlasEligibilitySource",
+  "ctwaReferral",
+  "ctwa_clid",
+  "ctwaEvidencePersistedAt"
 ]);
 
 /** In-memory backend for tests / restart simulation. */
@@ -120,7 +123,10 @@ function defaultWorkflowRecord() {
     conversationsLastReadInboundAt: null,
     conversationsLastSeenInboundMessageId: null,
     atlasAutomationEnabled: null,
-    atlasEligibilitySource: null
+    atlasEligibilitySource: null,
+    ctwaReferral: null,
+    ctwa_clid: null,
+    ctwaEvidencePersistedAt: null
   };
 }
 
