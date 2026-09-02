@@ -139,7 +139,9 @@ export function useWorkspaceActions({
           type: "appointment",
           purpose,
           actionId,
-          appointmentId
+          appointmentId,
+          phone: workspace.phone,
+          workspace
         });
 
         if (previewOpened) {

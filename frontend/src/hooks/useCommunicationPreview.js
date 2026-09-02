@@ -24,6 +24,8 @@ import {
   APPOINTMENT_COMMUNICATION_PURPOSES,
   resolveAppointmentCommunicationPurpose
 } from "../engines/appointmentCommunicationEngine.js";
+import { sendHumanConversationReply } from "../services/conversationsCenterService";
+import { resolveManualCommunicationPreviewOrFallback } from "../engines/manualInterviewReminderFallback.js";
 
 const APPOINTMENT_SEND_BY_PURPOSE = Object.freeze({
   [APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION]: sendInterviewDetails,
@@ -40,6 +42,7 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
   const [sending, setSending] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [composerSession, setComposerSession] = useState(null);
 
   const closePreview = useCallback(() => {
     if (sending) {
@@ -50,7 +53,24 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
     setPayload(null);
     setError(null);
     setPendingAction(null);
+    setComposerSession(null);
   }, [sending]);
+
+  const closeComposer = useCallback(() => {
+    setComposerSession(null);
+  }, []);
+
+  const applyFallbackComposer = useCallback((resolved) => {
+    setOpen(false);
+    setError(null);
+    setPayload(null);
+    setComposerSession({
+      message: resolved.message,
+      phone: resolved.phone || null,
+      titleKey: resolved.titleKey,
+      fallbackUsed: true
+    });
+  }, []);
 
   const openPreview = useCallback(async (action) => {
     setOpen(true);
@@ -61,15 +81,27 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
 
     try {
       let result;
+      const purpose =
+        action.type === "appointment"
+          ? action.purpose ||
+            resolveAppointmentCommunicationPurpose(action.actionId) ||
+            APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION
+          : null;
 
       if (action.type === "appointment") {
         const appointmentId = resolvePersistedAppointmentId(action.appointmentId);
-        const purpose =
-          action.purpose ||
-          resolveAppointmentCommunicationPurpose(action.actionId) ||
-          APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION;
 
         if (!appointmentId) {
+          const resolved = resolveManualCommunicationPreviewOrFallback({
+            purpose,
+            preview: { success: false },
+            workspace: action.workspace || null,
+            phone: action.phone || null
+          });
+          if (resolved.ok && resolved.message) {
+            applyFallbackComposer(resolved);
+            return;
+          }
           setError(translate("communicationPreviewLoadFailed"));
           return;
         }
@@ -80,9 +112,46 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
           sourceAction: action.sourceAction,
           template: action.template
         });
+        if (!result?.success) {
+          const resolved = resolveManualCommunicationPreviewOrFallback({
+            purpose: "custom",
+            preview: { success: false },
+            workspace: action.workspace || null,
+            phone: action.phone || null
+          });
+          if (resolved.ok && resolved.message) {
+            applyFallbackComposer(resolved);
+            return;
+          }
+        }
+      }
+
+      if (purpose) {
+        const resolved = resolveManualCommunicationPreviewOrFallback({
+          preview: result,
+          purpose,
+          workspace: action.workspace || null,
+          phone: action.phone || null
+        });
+        if (resolved.ok && resolved.fallbackUsed && resolved.message) {
+          applyFallbackComposer(resolved);
+          return;
+        }
       }
 
       if (!result?.success) {
+        if (purpose) {
+          const resolved = resolveManualCommunicationPreviewOrFallback({
+            purpose,
+            preview: { success: false },
+            workspace: action.workspace || null,
+            phone: action.phone || null
+          });
+          if (resolved.ok && resolved.message) {
+            applyFallbackComposer(resolved);
+            return;
+          }
+        }
         setError(result?.message || translate("communicationPreviewLoadFailed"));
         return;
       }
@@ -90,6 +159,18 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
       const outboundPayload = extractOutboundPayload(result);
 
       if (!outboundPayload?.message) {
+        if (purpose) {
+          const resolved = resolveManualCommunicationPreviewOrFallback({
+            purpose,
+            preview: { success: false },
+            workspace: action.workspace || null,
+            phone: action.phone || null
+          });
+          if (resolved.ok && resolved.message) {
+            applyFallbackComposer(resolved);
+            return;
+          }
+        }
         setError(translate("communicationPreviewLoadFailed"));
         return;
       }
@@ -97,11 +178,29 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
       setPayload(outboundPayload);
     } catch (requestError) {
       console.error(requestError);
+      const failedPurpose =
+        action.type === "appointment"
+          ? action.purpose ||
+            resolveAppointmentCommunicationPurpose(action.actionId) ||
+            APPOINTMENT_COMMUNICATION_PURPOSES.INVITATION
+          : null;
+      if (failedPurpose) {
+        const resolved = resolveManualCommunicationPreviewOrFallback({
+          purpose: failedPurpose,
+          preview: { success: false },
+          workspace: action.workspace || null,
+          phone: action.phone || null
+        });
+        if (resolved.ok && resolved.message) {
+          applyFallbackComposer(resolved);
+          return;
+        }
+      }
       setError(translate("communicationPreviewLoadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [translate]);
+  }, [applyFallbackComposer, translate]);
 
   const requestPreviewIfEnabled = useCallback(
     async (action) => {
@@ -168,6 +267,21 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
     setError(null);
 
     try {
+      if (payload.fallbackUsed) {
+        if (!payload.phone || !payload.message) {
+          setError(translate("communicationPreviewLoadFailed"));
+          showToast?.showError(translate("communicationPreviewLoadFailed"));
+          return;
+        }
+        await sendHumanConversationReply(payload.phone, {
+          message: payload.message
+        });
+        closePreview();
+        showToast?.showSuccess(translate("conversationsComposerSent"));
+        await onRecorded?.({ success: true, fallbackUsed: true });
+        return;
+      }
+
       if (pendingAction.type === "appointment") {
         const appointmentId = resolvePersistedAppointmentId(pendingAction.appointmentId);
         const purpose =
@@ -229,7 +343,7 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
     } finally {
       setSending(false);
     }
-  }, [closePreview, deliverWhatsAppPayload, payload, pendingAction, showToast, translate]);
+  }, [closePreview, deliverWhatsAppPayload, onRecorded, payload, pendingAction, showToast, translate]);
 
   return {
     open,
@@ -239,6 +353,8 @@ export function useCommunicationPreview({ translate, showToast, onRecorded }) {
     sending,
     copyBusy,
     closePreview,
+    closeComposer,
+    composerSession,
     openPreview,
     requestPreviewIfEnabled,
     copyPreviewMessage,

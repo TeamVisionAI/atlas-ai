@@ -102,7 +102,14 @@ function buildInterviewBlock(
     appointmentStatus,
     ownerRepId: activeAppointment?.ownerRepId || null,
     interviewerUserId: activeAppointment?.interviewerUserId || null,
-    interviewerName: activeAppointment?.interviewerName || null
+    interviewerName: activeAppointment?.interviewerName || null,
+    timezone: activeAppointment?.timezone || lifecycleAppointment?.timezone || null,
+    meetingAddress:
+      activeAppointment?.meetingAddress ||
+      activeAppointment?.meeting_address ||
+      lifecycleAppointment?.meetingAddress ||
+      lifecycleAppointment?.meeting_address ||
+      null
   };
 }
 

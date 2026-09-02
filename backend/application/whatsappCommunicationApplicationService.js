@@ -137,8 +137,7 @@ async function buildMessageContext(prospect, template, options = {}) {
 
   const needsZoomUrl =
     template === WHATSAPP_TEMPLATES.ZOOM_INVITATION ||
-    (template === WHATSAPP_TEMPLATES.INTERVIEW_DETAILS && isZoomInterview) ||
-    (template === WHATSAPP_TEMPLATES.INTERVIEW_REMINDER && isZoomInterview);
+    (template === WHATSAPP_TEMPLATES.INTERVIEW_DETAILS && isZoomInterview);
 
   if (needsZoomUrl) {
     let zoomUrl = appointment?.virtualMeetingUrl || null;

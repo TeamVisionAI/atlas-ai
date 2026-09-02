@@ -283,10 +283,16 @@ export default function ProspectWorkspacePage() {
           await refreshWorkspace();
           setActivityRefreshSignal((n) => n + 1);
         }}
-        interviewComposerSession={nativeInterviewWhatsApp.composerSession}
-        onCloseInterviewComposer={nativeInterviewWhatsApp.closeComposer}
+        interviewComposerSession={
+          nativeInterviewWhatsApp.composerSession || communicationPreview.composerSession
+        }
+        onCloseInterviewComposer={() => {
+          nativeInterviewWhatsApp.closeComposer();
+          communicationPreview.closeComposer();
+        }}
         onInterviewComposerSent={async () => {
           nativeInterviewWhatsApp.closeComposer();
+          communicationPreview.closeComposer();
           await refreshWorkspace();
           setActivityRefreshSignal((n) => n + 1);
         }}

@@ -894,7 +894,9 @@ export default function Dashboard() {
             type: "appointment",
             purpose: resolveAppointmentCommunicationPurpose(actionId),
             actionId,
-            appointmentId
+            appointmentId,
+            phone,
+            workspace
           });
 
           if (previewOpened) {
@@ -1414,6 +1416,24 @@ export default function Dashboard() {
                 onErrorToast={showError}
                 onSent={async () => {
                   nativeInterviewWhatsApp.closeComposer();
+                  await refreshMissionControlProspect();
+                }}
+              />
+            ) : null}
+
+            {communicationPreview.composerSession ? (
+              <HumanWhatsAppComposer
+                phone={communicationPreview.composerSession.phone || phone}
+                workspace={workspace}
+                initialMessage={communicationPreview.composerSession.message}
+                variant="inline"
+                titleKey={communicationPreview.composerSession.titleKey}
+                testId="mc-preview-fallback-whatsapp-composer"
+                onClose={communicationPreview.closeComposer}
+                onSuccessToast={showSuccess}
+                onErrorToast={showError}
+                onSent={async () => {
+                  communicationPreview.closeComposer();
                   await refreshMissionControlProspect();
                 }}
               />

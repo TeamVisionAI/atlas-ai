@@ -3361,6 +3361,28 @@ Production outside-window messaging requires firm-approved Meta templates config
 
 ---
 
+## BR-214 — Manual Communication Survives Preview Failure
+
+**Implements:** Mission Control / Prospect Workspace manual communication actions remain usable when communication preview assembly fails.  
+**Domain:** Communications / Mission Control / Prospect Workspace  
+**Depends on:** BR-075, BR-077, BR-078  
+**Related:** BR-027 (representative identity for assembled preview); BR-200 (eligibility unchanged)  
+**Status:** Implemented  
+**Engine target:** `manualInterviewReminderFallback.js`; `communicationService` appointment preview fallbacks; `useNativeInterviewWhatsApp`; `useCommunicationPreview`  
+**Tests:** `backend/test/manualInterviewReminderFallback.test.js`, `frontend/src/engines/manualInterviewReminderFallback.test.js`
+
+### Rules
+
+1. **Preview first** — Manual communication actions still load the assembled preview when that path succeeds. Existing WhatsApp composer / preview UX is unchanged on success.
+2. **Fallback on failure** — If preview assembly or load fails for any manual MC/PW communication action, Atlas must not block the operator with “Could not load the communication preview.” Build a deterministic body from appointment/workspace facts (no AI/model) and keep HUMAN compose/send available.
+3. **Covered actions** — Custom WhatsApp Message (opens composer; no preview required), Resend Interview Details, Send Office Address, Send Zoom Invitation, and Send Interview Reminder.
+4. **Fallback facts** — Body includes prospect first name, scheduled weekday/date/time in the appointment/tenant timezone when relevant, meeting mode, and contact name **Ana Perez**. In-person/office includes the configured office address when complete (BR-077). Zoom wording must not include the office address.
+5. **HUMAN / manual send** — Fallback send stays the operator HUMAN composer path. Do not convert these actions into automated Atlas outreach. Do not change reminder cadence, appointment ownership, prospect ownership, BR-142, or BR-200 eligibility.
+6. **Zoom URL is not required for reminder preview** — Missing Zoom join URL must not fail interview-reminder preview. Invitation/Zoom-link assembled previews may still require a URL; fallback still opens composer without a URL.
+7. **Boundaries** — Does not change approved-template catalog, automated reminder delivery, or lead eligibility.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  
