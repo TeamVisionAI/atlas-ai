@@ -288,6 +288,7 @@ async function readPolicyReviewAvailability({ context, interpretation, options }
     purpose: params.schedulingConfig.purpose,
     fixtureSlots: params.fixtureSlots,
     getSlots: options?.getSlots || null,
+    rejectIds: options?.rejectIds || [],
     now: options?.now || params.schedulingContext._testNow || null
   });
   return wrapReadResult(readResult, params.schedulingContext, params.schedulingConfig, {
@@ -306,6 +307,7 @@ function readPolicyReviewAvailabilitySync({ context, interpretation, options } =
     purpose: params.schedulingConfig.purpose,
     fixtureSlots: params.fixtureSlots,
     getSlotsSync: options?.getSlotsSync || null,
+    rejectIds: options?.rejectIds || [],
     now: options?.now || params.schedulingContext._testNow || null
   });
   return wrapReadResult(readResult, params.schedulingContext, params.schedulingConfig, {

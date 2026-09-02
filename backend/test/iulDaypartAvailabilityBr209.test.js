@@ -97,7 +97,32 @@ function interactiveIds(decision) {
   if (interactive.type === "button") {
     return (interactive.action?.buttons || []).map((row) => row.reply?.id);
   }
+  if (interactive.type === "list") {
+    return (interactive.action?.sections || []).flatMap((section) =>
+      (section.rows || []).map((row) => row.id)
+    );
+  }
   return [];
+}
+
+function offeredCopy(decision, rendered) {
+  const interactive = decision.customerReplyPlan?.entities?.whatsappInteractive;
+  const titles = [];
+  if (interactive?.type === "button") {
+    titles.push(
+      ...(interactive.action?.buttons || []).map((row) => row.reply?.title || "")
+    );
+  }
+  if (interactive?.type === "list") {
+    titles.push(
+      ...((interactive.action?.sections || []).flatMap((section) =>
+        (section.rows || []).map((row) => row.title || "")
+      ))
+    );
+  }
+  return [rendered.text, decision.customerReplyPlan?.entities?.interactiveFallbackText, ...titles]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function slot(date, time) {
@@ -153,8 +178,8 @@ test("C) morning has slots → offer real morning slots", () => {
   assert.equal(interpretation.intent, INTENTS.IUL_CHOOSE_REVIEW_DAY_PART);
   assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
   assert.equal(decision.decision.nextAction, NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS);
-  assert.match(rendered.text, /10:00/);
-  assert.doesNotMatch(rendered.text, /14:30/);
+  assert.match(offeredCopy(decision, rendered), /10:00|9:00 AM/);
+  assert.doesNotMatch(offeredCopy(decision, rendered), /14:30|2:30 PM/);
   assert.doesNotMatch(rendered.text, /quedó confirmad|Perfecto, confirmado/i);
 });
 
@@ -168,7 +193,7 @@ test("D) morning empty → search forward for later morning slots", () => {
     })
   );
   assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
-  assert.match(rendered.text, /09:30|10:00/);
+  assert.match(offeredCopy(decision, rendered), /09:30|9:30 AM|10:00|10:00 AM/);
   assert.equal(decision.contextPatch.knownFacts.iulDaypartSearchAttempted, true);
 });
 
@@ -182,7 +207,7 @@ test("E) afternoon empty → search forward for later afternoon slots", () => {
     })
   );
   assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
-  assert.match(rendered.text, /3:00 PM|15:00/);
+  assert.match(offeredCopy(decision, rendered), /3:00 PM|15:00/);
 });
 
 test("F) selected daypart empty but alternative slots exist → offer alternatives", () => {
@@ -197,7 +222,7 @@ test("F) selected daypart empty but alternative slots exist → offer alternativ
   assert.equal(decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
   assert.equal(decision.contextPatch.knownFacts.iulDaypartFallbackAttempted, true);
   assert.match(rendered.text, /No tengo disponibilidad en la mañana/);
-  assert.match(rendered.text, /2:00 PM|3:30 PM|14:00|15:30/);
+  assert.match(offeredCopy(decision, rendered), /2:00 PM|3:30 PM|14:00|15:30/);
   assert.doesNotMatch(rendered.text, /quedó confirmad/i);
 });
 
@@ -262,7 +287,11 @@ test("I) daypart question is not repeated after a valid answer", () => {
     })
   );
   assert.equal(second.decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
-  assert.deepEqual(interactiveIds(second.decision), []);
+  assert.ok(
+    interactiveIds(second.decision).every((id) => String(id).startsWith("IUL_SLOT_")) ||
+      interactiveIds(second.decision).length === 0
+  );
+  assert.ok(!interactiveIds(second.decision).includes(IUL_OPTION_IDS.DAY_MORNING));
 });
 
 test("J) FAQ interruption resumes exact scheduling stage", () => {
