@@ -40,16 +40,33 @@ function resolveConfirmedSlot({ context, structuredDecision } = {}) {
     : [];
   const entities = structuredDecision?.entities || {};
   const replyEntities = structuredDecision?.customerReplyPlan?.entities || {};
+  const patchAppt = structuredDecision?.contextPatch?.appointment || {};
+  const patchFacts = structuredDecision?.contextPatch?.knownFacts || {};
+  const selected = entities.selectedSlot || replyEntities.selectedSlot || null;
 
   let dateKey =
-    context?.appointment?.proposedDate ||
+    patchAppt.proposedDate ||
+    patchFacts.reviewProposedDate ||
+    entities.reviewProposedDate ||
+    replyEntities.reviewProposedDate ||
+    selected?.date ||
+    selected?.dateKey ||
     entities.requestedDate ||
     replyEntities.requestedDate ||
+    context?.appointment?.proposedDate ||
+    context?.knownFacts?.reviewProposedDate ||
     null;
   let timeKey =
-    context?.appointment?.proposedTime ||
+    patchAppt.proposedTime ||
+    patchFacts.reviewProposedTime ||
+    entities.reviewProposedTime ||
+    replyEntities.reviewProposedTime ||
+    selected?.time ||
+    selected?.timeKey ||
     entities.requestedTime ||
     replyEntities.requestedTime ||
+    context?.appointment?.proposedTime ||
+    context?.knownFacts?.reviewProposedTime ||
     null;
 
   // Single offered slot confirm (BR-108) may leave proposed* sparsely seeded.

@@ -139,7 +139,14 @@ function resolveIulOption(catalog, { id = null, title = null, text = null } = {}
     options.find((row) => fold(row.id) === folded) ||
     options.find((row) => fold(row.label) === folded) ||
     options.find((row) => fold(row.title) === folded) ||
-    options.find((row) => folded.includes(fold(row.label)) || fold(row.label).includes(folded)) ||
+    options.find((row) => {
+      if (folded.length < 3) {
+        return false;
+      }
+      const label = fold(row.label);
+      const title = fold(row.title);
+      return folded.includes(label) || label.includes(folded) || folded.includes(title) || title.includes(folded);
+    }) ||
     null
   );
 }

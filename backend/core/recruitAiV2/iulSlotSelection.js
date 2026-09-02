@@ -153,6 +153,11 @@ function isIulSlotMoreId(selectionId) {
   return String(selectionId || "").trim() === IUL_SLOT_MORE_ID;
 }
 
+function isIulSlotMoreLabel(value) {
+  const t = fold(value);
+  return t === "ver mas horarios" || t === "more times";
+}
+
 function isIulSlotSelectionId(selectionId) {
   const id = String(selectionId || "").trim();
   return id.startsWith(IUL_SLOT_ID_PREFIX) && id !== IUL_SLOT_MORE_ID;
@@ -230,6 +235,17 @@ function rejectIdsForShown(shown = []) {
   return (shown || []).map((slot) => slotIdentity(slot)).filter((id) => id && id !== "|");
 }
 
+function excludeRejectedSlots(slots = [], rejectIds = []) {
+  const rejected = new Set((rejectIds || []).map((id) => String(id)));
+  if (!rejected.size) {
+    return Array.isArray(slots) ? slots : [];
+  }
+  return (slots || []).filter((slot) => {
+    const id = slotIdentity(slot);
+    return id && id !== "|" && !rejected.has(id);
+  });
+}
+
 module.exports = {
   IUL_SLOT_ID_PREFIX,
   IUL_SLOT_MORE_ID,
@@ -241,8 +257,10 @@ module.exports = {
   buildIulSlotInteractive,
   resolveIulSlotBySelectionId,
   isIulSlotMoreId,
+  isIulSlotMoreLabel,
   isIulSlotSelectionId,
   isIulSlotExpired,
   parseIulFreeTextSlot,
-  rejectIdsForShown
+  rejectIdsForShown,
+  excludeRejectedSlots
 };
