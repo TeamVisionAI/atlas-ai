@@ -1,5 +1,5 @@
 /**
- * BR-218 — Conversations are mine-only; Team Prospects is gone.
+ * BR-218 — Conversations are mine-only; Support Mode is explicit and read-only.
  */
 
 import assert from "node:assert/strict";
@@ -12,6 +12,7 @@ import {
   CONVERSATIONS_WORKSPACE_TABS,
   canOpenConversationsSupportView,
   canSeeConversationsTeamProspects,
+  conversationsSupportMutationsAllowed,
   resolveConversationsSupportView,
   resolveConversationsWorkspaceTab
 } from "./conversationsWorkspaceScope.js";
@@ -34,11 +35,10 @@ test("oversight query is coerced to My Conversations", () => {
   assert.equal(resolved.unauthorizedTeam, true);
 });
 
-test("Super Admin Support view requires Support Mode plus a target user", () => {
+test("Support view requires active Support Mode, not a query flag", () => {
   assert.equal(
     canOpenConversationsSupportView({
       canUseConversationsSupport: true,
-      isSuperAdmin: true,
       supportModeActive: false
     }),
     false
@@ -46,25 +46,23 @@ test("Super Admin Support view requires Support Mode plus a target user", () => 
   assert.equal(
     canOpenConversationsSupportView({
       canUseConversationsSupport: true,
-      isSuperAdmin: true,
       supportModeActive: true
     }),
     true
   );
   const inactive = resolveConversationsSupportView({
     supportUserId: "agent-1",
-    conversationsSupport: true,
     canOpenSupport: false
   });
   assert.equal(inactive.active, false);
   const active = resolveConversationsSupportView({
     supportUserId: "agent-1",
-    conversationsSupport: true,
-    canOpenSupport: true
+    canOpenSupport: true,
+    currentUserId: "admin-1"
   });
   assert.equal(active.active, true);
-  assert.equal(active.supportUserId, "agent-1");
-  assert.equal(active.workspaceScope, CONVERSATIONS_WORKSPACE_SCOPES.SUPPORT);
+  assert.equal(active.readOnly, true);
+  assert.equal(conversationsSupportMutationsAllowed(active), false);
 });
 
 test("Conversations page no longer wires Team Prospects tabs", () => {
@@ -72,8 +70,8 @@ test("Conversations page no longer wires Team Prospects tabs", () => {
   assert.doesNotMatch(page, /conversationsTeamProspects/);
   assert.doesNotMatch(page, /canSeeConversationsTeamProspects/);
   assert.doesNotMatch(page, /CONVERSATIONS_WORKSPACE_TABS\.TEAM/);
-  assert.match(page, /conversationsSupport/);
   assert.match(page, /supportUserId/);
+  assert.match(page, /READ-ONLY SUPPORT MODE|conversationsSupportReadOnlyLabel/);
 });
 
 test("I) My Conversations cache cannot leak between users in the same org", () => {

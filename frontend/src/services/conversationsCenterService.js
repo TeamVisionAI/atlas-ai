@@ -191,13 +191,27 @@ export async function getConversationsCenterSupportTargets() {
   return wrap("/api/conversations/support-targets");
 }
 
-export async function enterConversationsSupportAccess({ supportUserId, conversationsSupport = true } = {}) {
+export async function enterConversationsSupportAccess({ supportUserId } = {}) {
   return wrap("/api/conversations/support-access", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      withConversationsSupportBody({}, { supportUserId, conversationsSupport })
-    )
+    body: JSON.stringify(withConversationsSupportBody({}, { supportUserId }))
+  });
+}
+
+export async function enterConversationsSupportMode() {
+  return wrap("/api/conversations/support-mode/enter", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({})
+  });
+}
+
+export async function exitConversationsSupportMode() {
+  return wrap("/api/conversations/support-mode/exit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({})
   });
 }
 

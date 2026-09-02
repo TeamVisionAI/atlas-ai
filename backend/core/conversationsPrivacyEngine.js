@@ -24,16 +24,6 @@ const UPLINE_ROLES_WITHOUT_CONVERSATION_ACCESS = Object.freeze([
   "rl"
 ]);
 
-function truthyFlag(value) {
-  if (value === true || value === 1) {
-    return true;
-  }
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase();
-  return normalized === "1" || normalized === "true" || normalized === "yes";
-}
-
 function sameId(left, right) {
   return Boolean(left) && Boolean(right) && String(left) === String(right);
 }
@@ -87,19 +77,24 @@ function canUseConversationsSupportAccess(authContext) {
   return hasInjectedConversationsSupportGrant(authContext);
 }
 
+function isSupportModeSessionActive(authContext, options = {}) {
+  return (
+    options.supportModeActive === true ||
+    Boolean(authContext?.supportMode?.active) ||
+    Boolean(authContext?.supportContext?.organizationId)
+  );
+}
+
+/**
+ * Implements BR-218 — cross-user access requires authenticated Support Mode
+ * session context. Query/body flags never authorize.
+ */
 function isExplicitConversationsSupportContext(authContext, options = {}) {
   if (!canUseConversationsSupportAccess(authContext)) {
     return false;
   }
 
-  const supportModeActive =
-    options.supportModeActive === true || Boolean(authContext?.supportMode?.active);
-
-  if (isSuperAdmin(authContext.saasRole || authContext.role)) {
-    return supportModeActive === true;
-  }
-
-  return truthyFlag(options.conversationsSupport);
+  return isSupportModeSessionActive(authContext, options);
 }
 
 function normalizeSupportTargetUserId(value) {
@@ -173,11 +168,27 @@ function readConversationsSupportRequest(req = {}) {
     supportUserId: normalizeSupportTargetUserId(
       query.supportUserId || query.support_user_id || body.supportUserId || body.support_user_id
     ),
-    conversationsSupport: truthyFlag(
-      query.conversationsSupport || query.conversations_support || body.conversationsSupport
-    ),
     supportModeActive: Boolean(req.supportContext?.organizationId)
   };
+}
+
+function isConversationsSupportReadOnly(listScope, authContext) {
+  if (!listScope?.supportAccess || !listScope.supportTargetUserId || !authContext?.userId) {
+    return false;
+  }
+
+  return !sameId(listScope.supportTargetUserId, authContext.userId);
+}
+
+function denyConversationsSupportMutation(listScope, authContext) {
+  if (!isConversationsSupportReadOnly(listScope, authContext)) {
+    return null;
+  }
+
+  const error = new Error("Support Mode is read-only for another user's conversations");
+  error.statusCode = 403;
+  error.code = "CONVERSATIONS_SUPPORT_READ_ONLY";
+  return error;
 }
 
 async function resolveConversationsSupportCapability(authContext, options = {}) {
@@ -228,6 +239,9 @@ module.exports = {
   resolveConversationsListScope,
   isProspectInConversationsPrivacyScope,
   isOwnerOfConversation,
+  isSupportModeSessionActive,
+  isConversationsSupportReadOnly,
+  denyConversationsSupportMutation,
   readConversationsSupportRequest,
   resolveConversationsSupportCapability,
   withConversationsSupportCapability,

@@ -149,9 +149,10 @@ async function authenticate(req, res, next) {
       sessionToken: token
     });
 
-    const supportContext = isSuperAdmin(authContext.saasRole)
-      ? await supportModeService.loadSupportContextForRequest(user.id, authSessionId)
-      : null;
+    const supportContext = await supportModeService.loadSupportContextForRequest(
+      user.id,
+      authSessionId
+    );
     const effectiveOrganizationId = resolveEffectiveOrganizationId(authContext, supportContext);
 
     req.atlasUser = user;

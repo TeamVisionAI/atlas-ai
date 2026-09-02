@@ -40,9 +40,18 @@
   background: #f8fafc;
 }
 
-.conversations-page__support.is-active {
+.conversations-page__support.is-active,
+.conversations-page__support.is-readonly {
   border-color: #b45309;
   background: #fffbeb;
+}
+
+.conversations-page__support-readonly-note {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #92400e;
 }
 
 .conversations-page__support-label {

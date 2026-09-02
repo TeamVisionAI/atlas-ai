@@ -1,7 +1,7 @@
 /**
  * BR-218 — Conversations are owner/servicing-user only.
  * Team Prospects / hierarchy oversight is removed from Conversations.
- * Support view is explicit and never mixed into My Conversations.
+ * Support view is explicit Support Mode, read-only for another user.
  */
 
 export const CONVERSATIONS_WORKSPACE_TABS = Object.freeze({
@@ -33,37 +33,36 @@ export function resolveConversationsWorkspaceTab({ workspaceScopeParam = "" } = 
 
 export function canOpenConversationsSupportView({
   canUseConversationsSupport = false,
-  isSuperAdmin = false,
   supportModeActive = false
 } = {}) {
-  if (canUseConversationsSupport !== true) {
-    return false;
-  }
-  if (isSuperAdmin) {
-    return supportModeActive === true;
-  }
-  return true;
+  return canUseConversationsSupport === true && supportModeActive === true;
 }
 
 export function resolveConversationsSupportView({
   supportUserId = "",
-  conversationsSupport = false,
-  canOpenSupport = false
+  canOpenSupport = false,
+  currentUserId = ""
 } = {}) {
   const targetUserId = String(supportUserId || "").trim();
-  const explicit = conversationsSupport === true || conversationsSupport === "1";
 
-  if (!canOpenSupport || !explicit || !targetUserId) {
+  if (!canOpenSupport || !targetUserId) {
     return {
       active: false,
+      readOnly: false,
       supportUserId: null,
       workspaceScope: CONVERSATIONS_WORKSPACE_SCOPES.MINE
     };
   }
 
+  const viewerId = String(currentUserId || "").trim();
   return {
     active: true,
+    readOnly: !viewerId || viewerId !== targetUserId,
     supportUserId: targetUserId,
     workspaceScope: CONVERSATIONS_WORKSPACE_SCOPES.SUPPORT
   };
+}
+
+export function conversationsSupportMutationsAllowed(supportView) {
+  return supportView?.active !== true || supportView.readOnly !== true;
 }

@@ -48,7 +48,8 @@ const {
   readConversationsSupportRequest,
   withConversationsSupportCapability,
   resolveConversationsListScope,
-  shouldAuditConversationsSupportAccess
+  shouldAuditConversationsSupportAccess,
+  denyConversationsSupportMutation
 } = require("../core/conversationsPrivacyEngine");
 const { auditFromRequest } = require("../security/auditLogService");
 
@@ -88,9 +89,34 @@ async function conversationsPrivacyContext(req) {
 function conversationsSupportOptions(supportRequest) {
   return {
     supportUserId: supportRequest.supportUserId,
-    conversationsSupport: supportRequest.conversationsSupport,
     supportModeActive: supportRequest.supportModeActive
   };
+}
+
+function rejectSupportMutation(res, listScope, authContext) {
+  const denied = denyConversationsSupportMutation(listScope, authContext);
+  if (!denied) {
+    return false;
+  }
+
+  res.status(denied.statusCode).json({
+    error: denied.code,
+    message: denied.message
+  });
+  return true;
+}
+
+async function requireConversationsWrite(req, res) {
+  if (!(await requireConversationsAccess(req, res))) {
+    return null;
+  }
+
+  const privacy = await conversationsPrivacyContext(req);
+  if (rejectSupportMutation(res, privacy.listScope, privacy.authContext)) {
+    return null;
+  }
+
+  return privacy;
 }
 
 router.get("/access", operationalControlPlaneEmpty(() => ({
@@ -279,6 +305,76 @@ async function requireConversationsSupportAccess(req, res) {
   return { authContext, supportRequest, listScope };
 }
 
+router.post("/support-mode/enter", async (req, res) => {
+  const privacy = await requireConversationsSupportAccess(req, res);
+  if (!privacy) {
+    return;
+  }
+
+  try {
+    const supportModeService = require("../services/supportModeService");
+    const organizationId = getTenantOrganizationId(req);
+    if (!organizationId) {
+      return res.status(403).json({
+        error: "CONVERSATIONS_SUPPORT_CONTEXT_REQUIRED",
+        message: "Support Mode requires an organization context"
+      });
+    }
+
+    const support = await supportModeService.enterSupportMode(
+      req.authContext.userId,
+      organizationId,
+      req.authSessionId,
+      {
+        userEmail: req.authContext.email,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      }
+    );
+
+    res.json({
+      ok: true,
+      supportModeActive: true,
+      organizationId: support.organizationId,
+      enteredAt: support.enteredAt
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "CONVERSATIONS_SUPPORT_MODE_FAILED",
+      message: error.message || "Unable to enter Support Mode"
+    });
+  }
+});
+
+router.post("/support-mode/exit", async (req, res) => {
+  if (!(await requireConversationsAccess(req, res))) {
+    return;
+  }
+
+  try {
+    const supportModeService = require("../services/supportModeService");
+    const result = await supportModeService.exitSupportMode(
+      req.authContext.userId,
+      req.authSessionId,
+      {
+        userEmail: req.authContext.email,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      }
+    );
+    res.json({
+      ok: true,
+      supportModeActive: false,
+      exited: result.exited === true
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || "CONVERSATIONS_SUPPORT_MODE_FAILED",
+      message: error.message || "Unable to exit Support Mode"
+    });
+  }
+});
+
 router.get("/support-targets", operationalControlPlaneEmpty(() => ({
   items: [],
   supportModeActive: false
@@ -350,7 +446,7 @@ router.post("/support-access", operationalControlPlaneEmpty(() => ({
 });
 
 async function humanReplyHandler(req, res) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
@@ -393,7 +489,7 @@ async function humanReplyHandler(req, res) {
 }
 
 async function takeOverHandler(req, res) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
@@ -458,7 +554,7 @@ async function takeOverHandler(req, res) {
 }
 
 async function returnToAtlasHandler(req, res) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
@@ -538,7 +634,7 @@ router.post("/take-over", takeOverHandler);
 router.post("/return-to-atlas", returnToAtlasHandler);
 
 async function scopedLifecycleAction(req, res, actionName, run) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
@@ -611,7 +707,7 @@ router.post("/mark-test", (req, res) =>
 );
 
 async function metaLeadReviewAction(req, res, actionName) {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 
@@ -693,7 +789,7 @@ router.post("/mark-not-lead", (req, res) =>
  * or change inbox lifecycle.
  */
 router.post("/mark-read", async (req, res) => {
-  if (!(await requireConversationsAccess(req, res))) {
+  if (!(await requireConversationsWrite(req, res))) {
     return;
   }
 

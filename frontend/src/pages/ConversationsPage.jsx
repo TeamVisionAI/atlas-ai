@@ -51,6 +51,8 @@ import {
   getConversationsCenterAccess,
   getConversationsCenterSupportTargets,
   enterConversationsSupportAccess,
+  enterConversationsSupportMode,
+  exitConversationsSupportMode,
   takeOverConversation,
   returnConversationToAtlas,
   confirmMetaLead,
@@ -71,6 +73,7 @@ import {
 } from "../engines/conversationsCenterAccess";
 import {
   canOpenConversationsSupportView,
+  conversationsSupportMutationsAllowed,
   resolveConversationsSupportView,
   resolveConversationsWorkspaceTab
 } from "../engines/conversationsWorkspaceScope";
@@ -258,21 +261,24 @@ export default function ConversationsPage() {
     workspaceScopeParam: searchParams.get("workspaceScope") || ""
   });
   const [canUseConversationsSupport, setCanUseConversationsSupport] = useState(false);
+  const [accessSupportModeActive, setAccessSupportModeActive] = useState(false);
   const [supportTargets, setSupportTargets] = useState([]);
+  const supportModeActive =
+    isSupportModeActive(supportMode) || accessSupportModeActive === true;
   const canOpenSupport = canOpenConversationsSupportView({
     canUseConversationsSupport,
-    isSuperAdmin: isSuperAdminUser(user),
-    supportModeActive: isSupportModeActive(supportMode)
+    supportModeActive
   });
   const supportView = resolveConversationsSupportView({
     supportUserId: searchParams.get("supportUserId") || "",
-    conversationsSupport: searchParams.get("conversationsSupport") || "",
-    canOpenSupport
+    canOpenSupport,
+    currentUserId: user?.id || user?.userId || ""
   });
+  const supportReadOnly = supportView.active === true && supportView.readOnly === true;
   const supportScopeKey = supportView.active ? `support:${supportView.supportUserId}` : "mine";
   const supportRequest = supportView.active
-    ? { supportUserId: supportView.supportUserId, conversationsSupport: true }
-    : { supportUserId: "", conversationsSupport: false };
+    ? { supportUserId: supportView.supportUserId }
+    : { supportUserId: "" };
 
   const listUserId = user?.id || user?.userId || "";
   const [payload, setPayload] = useState(() =>
@@ -375,7 +381,7 @@ export default function ConversationsPage() {
         setListLoading(false);
       }
     }
-  }, [activeFilter, supportScopeKey, supportRequest.supportUserId, supportRequest.conversationsSupport, translate, controlPlane, tenantCacheKey, listUserId]);
+  }, [activeFilter, supportScopeKey, supportRequest.supportUserId, translate, controlPlane, tenantCacheKey, listUserId]);
   loadListRef.current = loadList;
 
   useEffect(() => {
@@ -390,6 +396,7 @@ export default function ConversationsPage() {
   useEffect(() => {
     if (controlPlane) {
       setCanUseConversationsSupport(false);
+      setAccessSupportModeActive(false);
       setSupportTargets([]);
       return;
     }
@@ -400,10 +407,12 @@ export default function ConversationsPage() {
           return;
         }
         setCanUseConversationsSupport(access?.canUseConversationsSupportAccess === true);
+        setAccessSupportModeActive(access?.supportModeActive === true);
       })
       .catch(() => {
         if (!cancelled) {
           setCanUseConversationsSupport(false);
+          setAccessSupportModeActive(false);
         }
       });
     return () => {
@@ -524,7 +533,7 @@ export default function ConversationsPage() {
         }
       }
     },
-    [translate, tenantCacheKey, supportRequest.supportUserId, supportRequest.conversationsSupport]
+    [translate, tenantCacheKey, supportRequest.supportUserId]
   );
 
   function applyOwnershipMutationResult(phone, result) {
@@ -675,9 +684,11 @@ export default function ConversationsPage() {
       nextInbound > previousInbound
     ) {
       window.requestAnimationFrame(() => scrollTranscriptToLatest());
-      markConversationRead(selectedPhoneRef.current, supportBody())
-        .then(() => loadListRef.current?.({ quiet: true }))
-        .catch(() => {});
+      if (!supportReadOnly) {
+        markConversationRead(selectedPhoneRef.current, supportBody())
+          .then(() => loadListRef.current?.({ quiet: true }))
+          .catch(() => {});
+      }
     }
   }, []);
 
@@ -697,11 +708,13 @@ export default function ConversationsPage() {
         )
       };
     });
-    markConversationRead(row.phone, supportBody({
-      lastReadInboundAt: new Date().toISOString()
-    }))
-      .then(() => loadListRef.current?.({ quiet: true }))
-      .catch(() => {});
+    if (!supportReadOnly) {
+      markConversationRead(row.phone, supportBody({
+        lastReadInboundAt: new Date().toISOString()
+      }))
+        .then(() => loadListRef.current?.({ quiet: true }))
+        .catch(() => {});
+    }
   }
 
   async function onJumpToLatest() {
@@ -710,9 +723,11 @@ export default function ConversationsPage() {
       return;
     }
     try {
-      await markConversationRead(selectedPhoneRef.current, supportBody({
-        lastReadInboundAt: new Date().toISOString()
-      }));
+      if (!supportReadOnly) {
+        await markConversationRead(selectedPhoneRef.current, supportBody({
+          lastReadInboundAt: new Date().toISOString()
+        }));
+      }
       await loadListRef.current?.({ quiet: true });
     } catch {
       /* ignore */
@@ -776,18 +791,16 @@ export default function ConversationsPage() {
   function setSupportTargetUser(userId) {
     const next = new URLSearchParams(searchParams);
     next.delete("workspaceScope");
+    next.delete("conversationsSupport");
     if (userId) {
-      next.set("conversationsSupport", "1");
       next.set("supportUserId", userId);
     } else {
-      next.delete("conversationsSupport");
       next.delete("supportUserId");
     }
     setSearchParams(next);
-    if (userId) {
+    if (userId && supportModeActive) {
       enterConversationsSupportAccess({
-        supportUserId: userId,
-        conversationsSupport: true
+        supportUserId: userId
       }).catch(() => {
         /* audit is best-effort; list/detail still enforce server-side */
       });
@@ -797,19 +810,39 @@ export default function ConversationsPage() {
     setSelectedPhone(null);
   }
 
+  async function onEnterAdminSupportMode() {
+    try {
+      await enterConversationsSupportMode();
+      const access = await getConversationsCenterAccess();
+      setCanUseConversationsSupport(access?.canUseConversationsSupportAccess === true);
+      setAccessSupportModeActive(access?.supportModeActive === true);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function onExitAdminSupportMode() {
+    try {
+      await exitConversationsSupportMode();
+      setAccessSupportModeActive(false);
+      setSupportTargetUser("");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   function supportBody(extra = {}) {
     if (!supportView.active) {
       return extra;
     }
     return {
       ...extra,
-      supportUserId: supportView.supportUserId,
-      conversationsSupport: true
+      supportUserId: supportView.supportUserId
     };
   }
 
   async function onTakeOver() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       const result = await takeOverConversation(selectedPhone, supportBody());
@@ -825,7 +858,7 @@ export default function ConversationsPage() {
   }
 
   async function onConfirmMetaLead() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       await confirmMetaLead(selectedPhone, supportBody());
@@ -840,7 +873,7 @@ export default function ConversationsPage() {
   }
 
   async function onMarkNotLead() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       await markConversationNotLead(selectedPhone, supportBody());
@@ -855,7 +888,7 @@ export default function ConversationsPage() {
   }
 
   async function onReturnToAtlas() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       const result = await returnConversationToAtlas(selectedPhone, supportBody());
@@ -871,7 +904,7 @@ export default function ConversationsPage() {
   }
 
   async function onArchive() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       await archiveConversation(selectedPhone, supportBody());
@@ -885,7 +918,7 @@ export default function ConversationsPage() {
   }
 
   async function onRestore() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       await restoreConversation(selectedPhone, supportBody());
@@ -899,7 +932,7 @@ export default function ConversationsPage() {
   }
 
   async function onMarkTest() {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       await markConversationAsTest(selectedPhone, supportBody());
@@ -913,7 +946,7 @@ export default function ConversationsPage() {
   }
 
   async function onClose(reason) {
-    if (!selectedPhone || actionBusy) return;
+    if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
     try {
       await closeConversation(selectedPhone, reason, supportBody());
@@ -972,8 +1005,9 @@ export default function ConversationsPage() {
   );
   // Sticky HUMAN remains HUMAN for controls; stall attention is a separate badge.
   const effectiveOwnership = resolveEffectiveOwnership(ownershipState);
-  const showTakeOver = canTakeOverConversation(effectiveOwnership);
-  const showReturnToAtlas = canReturnConversationToAtlas(effectiveOwnership);
+  const allowSupportMutations = conversationsSupportMutationsAllowed(supportView);
+  const showTakeOver = allowSupportMutations && canTakeOverConversation(effectiveOwnership);
+  const showReturnToAtlas = allowSupportMutations && canReturnConversationToAtlas(effectiveOwnership);
   const showAttentionWarning = shouldShowAttentionWarning({
     ownershipState,
     needsHumanAttention
@@ -1052,9 +1086,11 @@ export default function ConversationsPage() {
         <div>
           <h1 className="conversations-page__title">{translate("conversationsTitle")}</h1>
           <p className="conversations-page__subtitle">
-            {supportView.active
-              ? translate("conversationsSupportSubtitle")
-              : translate("conversationsSubtitle")}
+            {supportReadOnly
+              ? translate("conversationsSupportReadOnlySubtitle")
+              : supportView.active
+                ? translate("conversationsSupportSubtitle")
+                : translate("conversationsSubtitle")}
           </p>
         </div>
         {counts.needs_attention > 0 ? (
@@ -1067,15 +1103,28 @@ export default function ConversationsPage() {
         ) : null}
       </header>
 
+      {canUseConversationsSupport && !supportModeActive && !isSuperAdminUser(user) ? (
+        <div className="conversations-page__support" data-testid="conversations-support-enter">
+          <strong className="conversations-page__support-label">
+            {translate("conversationsSupportIdleLabel")}
+          </strong>
+          <AtlasButton type="button" variant="secondary" onClick={onEnterAdminSupportMode}>
+            {translate("conversationsSupportEnter")}
+          </AtlasButton>
+        </div>
+      ) : null}
+
       {canOpenSupport ? (
         <div
-          className={`conversations-page__support${supportView.active ? " is-active" : ""}`}
+          className={`conversations-page__support${supportReadOnly ? " is-readonly" : supportView.active ? " is-active" : ""}`}
           data-testid="conversations-support-mode"
         >
           <strong className="conversations-page__support-label">
-            {supportView.active
-              ? translate("conversationsSupportActiveLabel")
-              : translate("conversationsSupportIdleLabel")}
+            {supportReadOnly
+              ? translate("conversationsSupportReadOnlyLabel")
+              : supportView.active
+                ? translate("conversationsSupportActiveLabel")
+                : translate("conversationsSupportIdleLabel")}
           </strong>
           <AtlasSelect
             label={translate("conversationsSupportSelectUser")}
@@ -1090,6 +1139,11 @@ export default function ConversationsPage() {
           {supportView.active ? (
             <AtlasButton type="button" variant="secondary" onClick={() => setSupportTargetUser("")}>
               {translate("conversationsSupportExit")}
+            </AtlasButton>
+          ) : null}
+          {!isSuperAdminUser(user) ? (
+            <AtlasButton type="button" variant="secondary" onClick={onExitAdminSupportMode}>
+              {translate("conversationsSupportExitMode")}
             </AtlasButton>
           ) : null}
         </div>
@@ -1257,7 +1311,7 @@ export default function ConversationsPage() {
                       }
                       data-thread-actions={threadActionIds.join(",")}
                     >
-                      {threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
+                      {allowSupportMutations && threadActionIds.includes("TAKE_OVER") && showTakeOver ? (
                         <AtlasButton
                           variant="primary"
                           data-testid="conversations-take-over"
@@ -1267,7 +1321,7 @@ export default function ConversationsPage() {
                           {translate("conversationsTakeOver")}
                         </AtlasButton>
                       ) : null}
-                      {threadActionIds.includes("CONFIRM_META_LEAD") ? (
+                      {allowSupportMutations && threadActionIds.includes("CONFIRM_META_LEAD") ? (
                         <AtlasButton
                           variant="primary"
                           data-testid="conversations-confirm-meta-lead"
@@ -1277,7 +1331,7 @@ export default function ConversationsPage() {
                           {translate("conversationsConfirmMetaLead")}
                         </AtlasButton>
                       ) : null}
-                      {threadActionIds.includes("MARK_NOT_LEAD") ? (
+                      {allowSupportMutations && threadActionIds.includes("MARK_NOT_LEAD") ? (
                         <AtlasButton
                           variant="secondary"
                           data-testid="conversations-mark-not-lead"
@@ -1287,7 +1341,7 @@ export default function ConversationsPage() {
                           {translate("conversationsMarkNotLead")}
                         </AtlasButton>
                       ) : null}
-                      {threadActionIds.includes("RETURN_TO_ATLAS") &&
+                      {allowSupportMutations && threadActionIds.includes("RETURN_TO_ATLAS") &&
                       showReturnToAtlas ? (
                         <AtlasButton
                           variant="secondary"
@@ -1310,7 +1364,7 @@ export default function ConversationsPage() {
                           {translate("conversationsOpenInMissionControl")}
                         </Link>
                       ) : null}
-                      {lifecycleActionIds.includes("ARCHIVE") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("ARCHIVE") ? (
                         <AtlasButton
                           variant="secondary"
                           data-testid="conversations-archive"
@@ -1320,7 +1374,7 @@ export default function ConversationsPage() {
                           {translate("conversationsArchive")}
                         </AtlasButton>
                       ) : null}
-                      {lifecycleActionIds.includes("CLOSE") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("CLOSE") ? (
                         <div
                           className={`conversations-thread__close${
                             actionBusy ? " is-disabled" : ""
@@ -1342,7 +1396,7 @@ export default function ConversationsPage() {
                           />
                         </div>
                       ) : null}
-                      {lifecycleActionIds.includes("MARK_TEST") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("MARK_TEST") ? (
                         <AtlasButton
                           variant="secondary"
                           data-testid="conversations-mark-test"
@@ -1352,7 +1406,7 @@ export default function ConversationsPage() {
                           {translate("conversationsMarkTest")}
                         </AtlasButton>
                       ) : null}
-                      {lifecycleActionIds.includes("RESTORE") ? (
+                      {allowSupportMutations && lifecycleActionIds.includes("RESTORE") ? (
                         <AtlasButton
                           variant="primary"
                           data-testid="conversations-restore"
@@ -1404,6 +1458,7 @@ export default function ConversationsPage() {
                   ) : null}
                 </div>
 
+                {allowSupportMutations ? (
                 <div
                   className="conversations-thread__composer-sticky"
                   data-testid="conversations-composer-sticky"
@@ -1421,6 +1476,11 @@ export default function ConversationsPage() {
                     onSent={onComposerSent}
                   />
                 </div>
+                ) : (
+                  <p className="conversations-page__support-readonly-note" data-testid="conversations-support-readonly">
+                    {translate("conversationsSupportReadOnlyLabel")}
+                  </p>
+                )}
               </div>
             </>
           )}

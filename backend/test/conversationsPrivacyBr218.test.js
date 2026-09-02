@@ -25,6 +25,8 @@ const {
   resolveConversationsListScope,
   isProspectInConversationsPrivacyScope,
   shouldAuditConversationsSupportAccess,
+  denyConversationsSupportMutation,
+  isConversationsSupportReadOnly,
   withConversationsSupportCapability
 } = require("../core/conversationsPrivacyEngine");
 const {
@@ -364,14 +366,19 @@ test("5) Super Admin in explicit Support Mode can access target user", async () 
   assert.equal(model.items.some((item) => item.id === "rvp-own"), false);
 });
 
-test("6) authorized Admin in Support Mode can access target user", async () => {
+test("6) authorized Admin needs Support Mode session, not a query flag", async () => {
   const admin = orgAdminAuth({ explicitConversationsSupport: true });
   assert.equal(canUseConversationsSupportAccess(admin), true);
-  const denied = await inbox(admin, catalog, { supportUserId: AGENT });
-  assert.equal(denied.supportAccess, false);
-  const allowed = await inbox(admin, catalog, {
+  const flagOnly = await inbox(admin, catalog, {
     supportUserId: AGENT,
     conversationsSupport: true
+  });
+  assert.equal(flagOnly.supportAccess, false);
+  assert.equal(flagOnly.items.some((item) => item.id === "agent-ctwa"), false);
+
+  const allowed = await inbox(admin, catalog, {
+    supportUserId: AGENT,
+    supportModeActive: true
   });
   assert.equal(allowed.supportAccess, true);
   assert.ok(allowed.items.some((item) => item.id === "agent-ctwa"));
@@ -419,6 +426,119 @@ test("explicit conversations:support grant is loaded without role wildcards", as
     ]
   });
   assert.equal(denied.explicitConversationsSupport, false);
+});
+
+test("A) RVP cannot read subordinate conversation", () => {
+  assert.equal(isProspectInConversationsUserScope(agentCtwa, ORG, rvpAuth()), false);
+  assert.equal(
+    isProspectInConversationsUserScope(agentCtwa, ORG, rvpAuth(), {
+      supportUserId: AGENT,
+      supportModeActive: false
+    }),
+    false
+  );
+});
+
+test("B) Admin with conversations:support but NOT Support Mode cannot read it", async () => {
+  const admin = orgAdminAuth({ explicitConversationsSupport: true });
+  const model = await inbox(admin, [agentCtwa], {
+    supportUserId: AGENT,
+    conversationsSupport: true
+  });
+  assert.equal(model.supportAccess, false);
+  assert.equal(model.items.length, 0);
+  assert.equal(
+    isProspectInConversationsUserScope(agentCtwa, ORG, admin, {
+      supportUserId: AGENT,
+      conversationsSupport: true
+    }),
+    false
+  );
+});
+
+test("C) Admin with permission + active Support Mode + target can read", async () => {
+  const admin = orgAdminAuth({ explicitConversationsSupport: true });
+  const model = await inbox(admin, [agentCtwa], {
+    supportUserId: AGENT,
+    supportModeActive: true
+  });
+  assert.equal(model.supportAccess, true);
+  assert.deepEqual(model.items.map((item) => item.id), ["agent-ctwa"]);
+});
+
+test("D) Super Admin normal mode cannot read", async () => {
+  const model = await inbox(superAdminAuth(), [agentCtwa], {
+    supportUserId: AGENT,
+    conversationsSupport: true
+  });
+  assert.equal(model.supportAccess, false);
+  assert.equal(model.items.length, 0);
+});
+
+test("E) Super Admin active Support Mode can read", async () => {
+  const model = await inbox(superAdminAuth(), [agentCtwa], {
+    supportUserId: AGENT,
+    supportModeActive: true
+  });
+  assert.equal(model.supportAccess, true);
+  assert.deepEqual(model.items.map((item) => item.id), ["agent-ctwa"]);
+});
+
+test("F–K) Support view mutations fail closed for another user", () => {
+  const admin = orgAdminAuth({ explicitConversationsSupport: true });
+  const supportScope = resolveConversationsListScope(admin, {
+    supportUserId: AGENT,
+    supportModeActive: true
+  });
+  assert.equal(isConversationsSupportReadOnly(supportScope, admin), true);
+  const denied = denyConversationsSupportMutation(supportScope, admin);
+  assert.equal(denied?.code, "CONVERSATIONS_SUPPORT_READ_ONLY");
+  assert.equal(denied.statusCode, 403);
+
+  const flagOnly = resolveConversationsListScope(admin, {
+    supportUserId: AGENT,
+    conversationsSupport: true
+  });
+  assert.equal(flagOnly.supportAccess, false);
+  assert.equal(denyConversationsSupportMutation(flagOnly, admin), null);
+
+  const routes = fs.readFileSync(
+    path.join(__dirname, "../routes/conversationsCenter.js"),
+    "utf8"
+  );
+  assert.match(routes, /requireConversationsWrite/);
+  assert.match(routes, /denyConversationsSupportMutation/);
+  assert.match(routes, /humanReplyHandler/);
+  assert.match(routes, /takeOverHandler/);
+  assert.match(routes, /returnToAtlasHandler/);
+  assert.match(routes, /metaLeadReviewAction/);
+  assert.match(routes, /scopedLifecycleAction/);
+  assert.match(routes, /mark-read/);
+});
+
+test("L) normal owner retains all existing actions", () => {
+  const owner = agentAuth();
+  const mine = resolveConversationsListScope(owner, {});
+  assert.equal(mine.workspaceScope, CONVERSATIONS_LIST_SCOPES.MINE);
+  assert.equal(isConversationsSupportReadOnly(mine, owner), false);
+  assert.equal(denyConversationsSupportMutation(mine, owner), null);
+  assert.equal(isProspectInConversationsUserScope(agentCtwa, ORG, owner), true);
+});
+
+test("M) Prospect Center / Mission Control unchanged", () => {
+  const center = fs.readFileSync(
+    path.join(__dirname, "../routes/prospectCenter.js"),
+    "utf8"
+  );
+  const mission = fs.readFileSync(
+    path.join(__dirname, "../core/prospectReportReadModel.js"),
+    "utf8"
+  );
+  assert.match(center, /resolveWorkspaceListScope/);
+  assert.doesNotMatch(center, /resolveConversationsListScope/);
+  assert.doesNotMatch(mission, /resolveConversationsListScope/);
+  const teamScope = resolveWorkspaceListScope(rvpAuth(), "oversight");
+  assert.equal(isProspectInWorkspaceListScope(agentCtwa, teamScope), true);
 });
 
 test("UI and routes no longer expose Team Conversations", () => {
