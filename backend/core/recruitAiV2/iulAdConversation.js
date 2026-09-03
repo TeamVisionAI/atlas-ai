@@ -28,12 +28,14 @@ const { IUL_STAGES, IUL_REVIEW_MEETING_TYPE } = require("../iulWorkflowConstants
 const {
   IUL_OPTION_IDS,
   MEETING_MODE_OPTIONS,
+  DAY_PART_OPTIONS,
   resolveIulOption,
   buildIulInteractive
 } = require("./iulQualificationOptions");
 const {
   buildInteractiveFromOptions,
-  formatNumberedFallback
+  formatNumberedFallback,
+  parseNumericFallback
 } = require("../whatsappInteractiveMessage");
 const {
   attachIulSlotSelectionIds,
@@ -50,6 +52,31 @@ const {
   excludeRejectedSlots,
   selectIulCrossDatePage
 } = require("./iulSlotSelection");
+const {
+  IUL_DAY_MORE_ID,
+  isIulDaySelectionId,
+  isIulDayMoreId,
+  isIulDayMoreLabel,
+  isIulDayChangeId,
+  isIulDaypartChangeId,
+  parseIulDaySelectionId,
+  selectIulDayPage,
+  formatIulWeekdayPhrase,
+  formatIulDayPartForSlots,
+  collectAvailableDays,
+  dayPartsOnDate,
+  filterSlotsByDate,
+  filterSlotsByDayPart,
+  selectIulCompactTimePage,
+  selectIulMoreTimesPage,
+  buildIulDayInteractive,
+  buildIulExhaustedInteractive,
+  parseIulDayFromText,
+  looksLikeChangeDay,
+  looksLikeChangeDayPart,
+  collectHorizonSlots,
+  resetIulDayFirstFacts
+} = require("./iulDayFirstScheduling");
 const { isCompleteOfficeAddress } = require("../officeAddressResolver");
 const { getOfficeLocation } = require("../businessRulesEngine");
 const { isTeamVisionSeedTenant } = require("../teamVisionSeedTenant");
@@ -65,6 +92,7 @@ const ASK = Object.freeze({
   REVIEW_REASON: "iul_ask_review_reason",
   DOCUMENTS: "iul_ask_documents",
   MEETING_MODE: "iul_ask_meeting_mode",
+  SCHEDULING_DAY: "iul_ask_review_day",
   SCHEDULING_DAY_PART: "iul_ask_scheduling_day_part",
   OFFER_SLOTS: "iul_offer_review_slots",
   CONFIRM_SLOT: "iul_confirm_review_slot",
@@ -595,6 +623,105 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     }
   }
 
+  if (
+    lastAsk === ASK.SCHEDULING_DAY ||
+    lastAsk === ASK.OFFER_SLOTS ||
+    lastAsk === ASK.SCHEDULING_DAY_PART ||
+    schedulingOwned
+  ) {
+    if (
+      isIulDayMoreId(interactiveReply?.id) ||
+      isIulDayMoreLabel(interactiveReply?.title) ||
+      isIulDayMoreLabel(text)
+    ) {
+      return {
+        intent: INTENTS.IUL_REQUEST_MORE_DAYS,
+        confidence: 0.96,
+        entities: { iulRequestMoreDays: true }
+      };
+    }
+    if (isIulDayChangeId(interactiveReply?.id) || looksLikeChangeDay(text) || looksLikeChangeDay(interactiveReply?.title)) {
+      return {
+        intent: INTENTS.IUL_CHOOSE_REVIEW_DAY,
+        confidence: 0.96,
+        entities: { changeReviewDay: true }
+      };
+    }
+    if (isIulDaypartChangeId(interactiveReply?.id) || looksLikeChangeDayPart(text) || looksLikeChangeDayPart(interactiveReply?.title)) {
+      return {
+        intent: INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
+        confidence: 0.96,
+        entities: { changeReviewDayPart: true }
+      };
+    }
+    if (isIulDaySelectionId(interactiveReply?.id)) {
+      const dateKey = parseIulDaySelectionId(interactiveReply.id);
+      return {
+        intent: INTENTS.IUL_CHOOSE_REVIEW_DAY,
+        confidence: 0.97,
+        entities: {
+          iulSelectedDate: dateKey,
+          reviewProposedDate: dateKey
+        }
+      };
+    }
+    if (lastAsk === ASK.SCHEDULING_DAY) {
+      const offered = context.knownFacts?.iulOfferedDays || [];
+      const includeMore = context.knownFacts?.iulIncludeMoreDays === true;
+      const language =
+        context.preferredLanguage === LANGUAGES.ENGLISH ||
+        context.preferredLanguage === "english" ||
+        context.preferredLanguage === "en"
+          ? "en"
+          : "es";
+      const pageOptions = [];
+      for (const day of offered) {
+        pageOptions.push({
+          id: day.selectionId || `IUL_DAY_${day.dateKey}`,
+          title: day.title || day.dateKey,
+          label: day.title || day.dateKey
+        });
+      }
+      if (includeMore) {
+        pageOptions.push({
+          id: IUL_DAY_MORE_ID,
+          title: language === "en" ? "More days" : "Más días",
+          label: language === "en" ? "More days" : "Más días"
+        });
+      }
+      const numeric = parseNumericFallback(text, pageOptions);
+      if (numeric && isIulDayMoreId(numeric.id)) {
+        return {
+          intent: INTENTS.IUL_REQUEST_MORE_DAYS,
+          confidence: 0.95,
+          entities: { iulRequestMoreDays: true }
+        };
+      }
+      if (numeric && isIulDaySelectionId(numeric.id)) {
+        const dateKey = parseIulDaySelectionId(numeric.id);
+        return {
+          intent: INTENTS.IUL_CHOOSE_REVIEW_DAY,
+          confidence: 0.95,
+          entities: {
+            iulSelectedDate: dateKey,
+            reviewProposedDate: dateKey
+          }
+        };
+      }
+      const matched = parseIulDayFromText(text || interactiveReply?.title, offered);
+      if (matched?.dateKey) {
+        return {
+          intent: INTENTS.IUL_CHOOSE_REVIEW_DAY,
+          confidence: 0.93,
+          entities: {
+            iulSelectedDate: matched.dateKey,
+            reviewProposedDate: matched.dateKey
+          }
+        };
+      }
+    }
+  }
+
   if (lastAsk === ASK.OFFER_SLOTS || lastAsk === ASK.CONFIRM_SLOT || schedulingOwned) {
     if (
       isIulSlotMoreId(interactiveReply?.id) ||
@@ -887,9 +1014,15 @@ function copy(language) {
     meetingModeAsk: es
       ? "¿Cómo prefiere hacer su revisión de póliza?"
       : "How would you prefer to do your policy review?",
+    dayAsk: es
+      ? "Perfecto. ¿Qué día le funciona mejor?"
+      : "Perfect. Which day works best for you?",
     dayPartAsk: es
       ? "¿Qué horario prefiere para su revisión {modePhrase}?"
       : "What time of day do you prefer for your {modePhrase} review?",
+    dayPartAskForDay: es
+      ? "¿Qué horario prefiere para {weekdayPhrase}?"
+      : "What time of day do you prefer for {weekdayPhrase}?",
     officeUnavailable: es
       ? "Por ahora no tengo una dirección de oficina configurada. Podemos hacer la revisión por Zoom."
       : "I don't have a configured office address right now. We can do the review on Zoom.",
@@ -920,6 +1053,12 @@ function copy(language) {
     offerSlots: es
       ? "Tengo estos horarios disponibles para su revisión {modePhrase}. ¿Cuál le funciona mejor?"
       : "I have these times available for your {modePhrase} review. Which works best for you?",
+    offerSlotsForDay: es
+      ? "Horarios disponibles para {weekdayPhrase} {dayPartForSlots}:"
+      : "Available times for {weekdayPhrase} {dayPartForSlots}:",
+    moreExhausted: es
+      ? "Esos son los horarios de ese período. ¿Desea elegir otro día o cambiar la mañana/tarde?"
+      : "Those are the times for that period. Would you like another day or a different morning/afternoon?",
     nearestDaypart: es
       ? "No tengo disponibilidad {dayPartPhrase} en los próximos días. Tengo disponibilidad:"
       : "I don't have {dayPartPhrase} availability in the coming days. I do have:",
@@ -987,7 +1126,9 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_ask_documents: c.documentsAsk,
     iul_scheduling_transition: c.schedulingTransition,
     iul_ask_meeting_mode: c.meetingModeAsk,
-    iul_ask_scheduling_day_part: c.dayPartAsk,
+    iul_ask_review_day: c.dayAsk,
+    iul_ask_scheduling_day_part: entities.weekdayPhrase ? c.dayPartAskForDay : c.dayPartAsk,
+    iul_ask_day_part_for_day: c.dayPartAskForDay,
     iul_office_unavailable: `${c.officeUnavailable} ${c.meetingModeAsk}`,
     iul_policy_is_bad_safe: c.policyIsBadSafe,
     iul_info_only_then_review: `${c.infoOnly} ${c.schedulingTransition}`,
@@ -997,7 +1138,9 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_primerica_then_continue: `${c.primerica} ${c.schedulingTransition}`,
     iul_review_cost_then_continue: `${c.cost} ${c.schedulingTransition}`,
     iul_review_day_part_ack: c.dayPartAck,
-    iul_offer_review_slots: c.offerSlots,
+    iul_offer_review_slots: entities.weekdayPhrase ? c.offerSlotsForDay : c.offerSlots,
+    iul_offer_day_slots: c.offerSlotsForDay,
+    iul_more_slots_exhausted: c.moreExhausted,
     iul_no_more_review_slots: c.noMoreSlots,
     iul_review_create_failed: c.createFailed,
     iul_offer_nearest_review_slots: c.nearestDaypart,
@@ -1011,6 +1154,13 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_clarify_policy_type: c.clarify
   };
   const phrase = dayPartPhrase(entities.fallbackDayPart || entities.dayPart, language);
+  const languageCode = localeCode(language) === "en" ? "en" : "es";
+  const weekdayPhrase =
+    entities.weekdayPhrase ||
+    (entities.iulSelectedDate ? formatIulWeekdayPhrase(entities.iulSelectedDate, languageCode) : "");
+  const dayPartForSlots =
+    entities.dayPartForSlots ||
+    formatIulDayPartForSlots(entities.dayPart || entities.fallbackDayPart, languageCode);
   const officeAddress = String(entities.officeAddress || "").trim();
   const officeAddressLine = officeAddress
     ? localeCode(language) === "en"
@@ -1020,6 +1170,8 @@ function renderIulAdReply(templateKey, language, entities = {}) {
   return String(map[templateKey] || c.qualificationAsk)
     .replace(/\{firstNameGreeting\}/g, firstNameGreeting)
     .replace(/\{dayPartPhrase\}/g, phrase)
+    .replace(/\{dayPartForSlots\}/g, dayPartForSlots)
+    .replace(/\{weekdayPhrase\}/g, weekdayPhrase)
     .replace(/\{modePhrase\}/g, iulModePhrase(entities, language))
     .replace(/\{slotLabel\}/g, String(entities.slotLabel || entities.requestedTime || "ese horario"))
     .replace(/\{officeAddressLine\}/g, officeAddressLine)
@@ -1131,6 +1283,9 @@ function interactiveCatalogForAsk(lastQuestionAsked) {
   if (lastQuestionAsked === ASK.MEETING_MODE) {
     return "meetingMode";
   }
+  if (lastQuestionAsked === ASK.SCHEDULING_DAY) {
+    return "reviewDay";
+  }
   if (
     lastQuestionAsked === ASK.SCHEDULING_DAY_PART ||
     lastQuestionAsked === ASK.REVIEW_DAY_PART
@@ -1216,7 +1371,33 @@ function finishIulDecision(structured, context, {
       priorEntities.officeAddress ||
       knownFacts.reviewOfficeAddress ||
       context.knownFacts?.reviewOfficeAddress ||
-      null
+      null,
+    iulSelectedDate:
+      priorEntities.iulSelectedDate ||
+      knownFacts.iulSelectedDate ||
+      context.knownFacts?.iulSelectedDate ||
+      null,
+    weekdayPhrase:
+      priorEntities.weekdayPhrase ||
+      knownFacts.weekdayPhrase ||
+      (priorEntities.iulSelectedDate ||
+      knownFacts.iulSelectedDate ||
+      context.knownFacts?.iulSelectedDate
+        ? formatIulWeekdayPhrase(
+            priorEntities.iulSelectedDate ||
+              knownFacts.iulSelectedDate ||
+              context.knownFacts?.iulSelectedDate,
+            structured.preferredLanguage === LANGUAGES.ENGLISH ||
+              structured.preferredLanguage === "english" ||
+              structured.preferredLanguage === "en"
+              ? "en"
+              : "es"
+          )
+        : null),
+    dayPartForSlots: priorEntities.dayPartForSlots || null,
+    availableDays: priorEntities.availableDays || knownFacts.iulOfferedDays || [],
+    includeMoreDays:
+      priorEntities.includeMoreDays === true || knownFacts.iulIncludeMoreDays === true
   };
   const body = renderIulAdReply(templateKey, structured.preferredLanguage, {
     firstName,
@@ -1241,6 +1422,12 @@ function finishIulDecision(structured, context, {
     delete structured.customerReplyPlan.entities.interactiveFallbackText;
     delete structured.customerReplyPlan.entities.includeMoreSlots;
   }
+  const replyLanguage =
+    structured.preferredLanguage === LANGUAGES.ENGLISH ||
+    structured.preferredLanguage === "english" ||
+    structured.preferredLanguage === "en"
+      ? "en"
+      : "es";
   if (catalog && lastQuestionAsked === ASK.MEETING_MODE) {
     const office = resolveIulOfficeLocation(context);
     const options = office
@@ -1257,20 +1444,61 @@ function finishIulDecision(structured, context, {
     };
     structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
     structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
+  } else if (lastQuestionAsked === ASK.SCHEDULING_DAY) {
+    const days = modeFacts.availableDays || [];
+    if (days.length) {
+      const built = buildIulDayInteractive(days, body, {
+        language: replyLanguage,
+        includeMore: modeFacts.includeMoreDays === true
+      });
+      structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
+      structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
+    }
+  } else if (catalog === "dayPart") {
+    const selectedDate =
+      modeFacts.iulSelectedDate ||
+      knownFacts.iulSelectedDate ||
+      context.knownFacts?.iulSelectedDate ||
+      null;
+    const allowedParts = selectedDate
+      ? dayPartsOnDate(
+          knownFacts.iulSlotPool ||
+            context.knownFacts?.iulSlotPool ||
+            priorEntities.iulSlotPool ||
+            [],
+          selectedDate
+        )
+      : ["morning", "afternoon"];
+    const options = DAY_PART_OPTIONS.filter((row) => {
+      if (row.id === IUL_OPTION_IDS.DAY_MORNING) {
+        return allowedParts.includes("morning");
+      }
+      if (row.id === IUL_OPTION_IDS.DAY_AFTERNOON) {
+        return allowedParts.includes("afternoon");
+      }
+      return false;
+    });
+    const dayPartOptions = options.length ? options : DAY_PART_OPTIONS;
+    const built = {
+      interactive: buildInteractiveFromOptions({
+        body,
+        options: dayPartOptions,
+        listButtonText: "Ver opciones",
+        listSectionTitle: "Opciones"
+      }),
+      fallbackText: formatNumberedFallback(body, dayPartOptions)
+    };
+    structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
+    structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
   } else if (catalog) {
     const built = buildIulInteractive(catalog, body);
     structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
     structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
   } else if (lastQuestionAsked === ASK.OFFER_SLOTS && offeredSlots.length) {
-    const language =
-      structured.preferredLanguage === LANGUAGES.ENGLISH ||
-      structured.preferredLanguage === "english" ||
-      structured.preferredLanguage === "en"
-        ? "en"
-        : "es";
     const built = buildIulSlotInteractive(offeredSlots, body, {
       includeMore: includeMoreSlots,
-      language
+      language: replyLanguage,
+      includeWeekday: !modeFacts.iulSelectedDate
     });
     structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
     structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
@@ -1411,6 +1639,16 @@ function resolveIulSchedulingResume(context = {}) {
       nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE
     };
   }
+  if (
+    lastAsk === ASK.SCHEDULING_DAY ||
+    (Array.isArray(facts.iulOfferedDays) && facts.iulOfferedDays.length)
+  ) {
+    return {
+      ask: ASK.SCHEDULING_DAY,
+      templateKey: "iul_ask_review_day",
+      nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE
+    };
+  }
   if (facts.iulSelectedDayPart || lastAsk === ASK.SCHEDULING_DAY_PART) {
     return {
       ask: ASK.SCHEDULING_DAY_PART,
@@ -1434,6 +1672,13 @@ function resolveIulSchedulingResume(context = {}) {
 
 function resumeIulAfterFaq(structured, context, { templateKey, reasonCodes }) {
   const resume = resolveIulSchedulingResume(context);
+  if (resume.ask === ASK.SCHEDULING_DAY) {
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      availableDays: context.knownFacts?.iulOfferedDays || [],
+      includeMoreDays: context.knownFacts?.iulIncludeMoreDays === true
+    };
+  }
   if (resume.ask === ASK.OFFER_SLOTS) {
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
@@ -1625,8 +1870,9 @@ function beginDayPartAsk(structured, context, {
   knownFacts = {},
   reasonCodes = []
 } = {}) {
+  const selectedDate = knownFacts.iulSelectedDate || context.knownFacts?.iulSelectedDate || null;
   return finishIulDecision(structured, context, {
-    templateKey: "iul_ask_scheduling_day_part",
+    templateKey: selectedDate ? "iul_ask_day_part_for_day" : "iul_ask_scheduling_day_part",
     nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
     lastQuestionAsked: ASK.SCHEDULING_DAY_PART,
     knownFacts: {
@@ -1635,6 +1881,304 @@ function beginDayPartAsk(structured, context, {
     },
     reasonCodes,
     iulWorkflowStage: IUL_STAGES.REVIEW_READY
+  });
+}
+
+function readIulHorizonAvailability(context, extras = {}) {
+  const schedulingContext = {
+    ...context,
+    knownFacts: {
+      ...(context.knownFacts || {}),
+      iulReviewDayPart: null,
+      reviewPreferredDayPart: null,
+      preferredDayPart: null,
+      availabilityConstraint: null,
+      meetingMode: extras.meetingMode || context.knownFacts?.meetingMode || null
+    }
+  };
+  return readPolicyReviewAvailabilitySync({
+    context: schedulingContext,
+    interpretation: extras.interpretation || { intent: INTENTS.IUL_CHOOSE_REVIEW_DAY },
+    options: {
+      availabilityFixture: context._availabilityFixture,
+      organizationId: context.organizationId || null,
+      now: extras.now || context._testNow || null,
+      expandFullHorizon: true,
+      skipDaypartEnrich: true
+    }
+  });
+}
+
+function beginDayAsk(structured, context, {
+  knownFacts = {},
+  reasonCodes = [],
+  interpretation = null
+} = {}) {
+  const availability = readIulHorizonAvailability(
+    { ...context, knownFacts: { ...(context.knownFacts || {}), ...knownFacts } },
+    { interpretation, meetingMode: knownFacts.meetingMode }
+  );
+  const slots = collectHorizonSlots(availability);
+  const days = collectAvailableDays(slots);
+  const successfulZero =
+    availability?.status === READ_STATUS.ZERO_SLOTS &&
+    availability?.readResult &&
+    !availability.readResult.failureReason;
+  if (successfulZero && !days.length) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_no_review_availability",
+      nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE,
+      lastQuestionAsked: ASK.SCHEDULING_UNAVAILABLE,
+      knownFacts: {
+        ...resetIulDayFirstFacts(knownFacts),
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY,
+        iulSchedulingUnavailable: true
+      },
+      reasonCodes: [...reasonCodes, REASON_CODES.IUL_NO_AVAILABILITY],
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    });
+  }
+  return presentIulDayPage(structured, context, {
+    days,
+    slots,
+    knownFacts,
+    reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_FIRST_OFFERED],
+    resetShown: true
+  });
+}
+
+function presentIulDayPage(structured, context, {
+  days = [],
+  slots = [],
+  knownFacts = {},
+  reasonCodes = [],
+  rejectIds = [],
+  resetShown = false
+} = {}) {
+  const paged = selectIulDayPage(days, { rejectIds: resetShown ? [] : rejectIds });
+  const shownKeys = [
+    ...(resetShown ? [] : rejectIds),
+    ...paged.shown.map((day) => day.dateKey)
+  ].filter(Boolean);
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    availableDays: paged.shown,
+    includeMoreDays: paged.includeMore,
+    iulSelectedDate: null
+  };
+  return finishIulDecision(structured, context, {
+    templateKey: "iul_ask_review_day",
+    nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+    lastQuestionAsked: ASK.SCHEDULING_DAY,
+    knownFacts: {
+      ...(resetShown ? resetIulDayFirstFacts(knownFacts) : knownFacts),
+      iulAvailableDays: days,
+      iulOfferedDays: paged.shown,
+      iulShownDayKeys: shownKeys,
+      iulIncludeMoreDays: paged.includeMore,
+      iulSlotPool: slots,
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    },
+    reasonCodes,
+    appointmentPatch: resetShown
+      ? {
+          status: APPOINTMENT_STATUS.NONE,
+          previouslyOfferedSlots: [],
+          proposedDate: null,
+          proposedTime: null
+        }
+      : undefined,
+    iulWorkflowStage: IUL_STAGES.REVIEW_READY
+  });
+}
+
+function applyCompactDaySlotOffer(structured, context, slots, extras = {}) {
+  const dayPart = extras.dayPart || context.knownFacts?.iulSelectedDayPart || null;
+  const selectedDate = extras.selectedDate || context.knownFacts?.iulSelectedDate || null;
+  const rejectIds = extras.rejectIds || [];
+  const scoped = filterSlotsByDayPart(filterSlotsByDate(slots, selectedDate), dayPart);
+  const paged = extras.morePage
+    ? selectIulMoreTimesPage(scoped, { rejectIds })
+    : selectIulCompactTimePage(scoped, { rejectIds });
+  if (!paged.shown.length && extras.morePage) {
+    const language =
+      structured.preferredLanguage === LANGUAGES.ENGLISH ||
+      structured.preferredLanguage === "en" ||
+      structured.preferredLanguage === "english"
+        ? "en"
+        : "es";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      offeredSlots: [],
+      includeMoreSlots: false,
+      iulSelectedDate: selectedDate,
+      dayPart,
+      weekdayPhrase: formatIulWeekdayPhrase(selectedDate, language)
+    };
+    const finished = finishIulDecision(structured, context, {
+      templateKey: "iul_more_slots_exhausted",
+      nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+      lastQuestionAsked: ASK.OFFER_SLOTS,
+      knownFacts: {
+        iulSelectedDate: selectedDate,
+        iulSelectedDayPart: dayPart,
+        reviewPreferredDayPart: dayPart,
+        preferredDayPart: dayPart,
+        iulDaypartSearchAttempted: true,
+        iulSlotPool: slots,
+        iulIncludeMoreSlots: false,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [
+        REASON_CODES.IUL_MORE_SLOTS_EXHAUSTED,
+        REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING
+      ],
+      appointmentPatch: {
+        previouslyOfferedSlots: []
+      },
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    });
+    const body = renderIulAdReply("iul_more_slots_exhausted", structured.preferredLanguage, {
+      iulSelectedDate: selectedDate,
+      dayPart
+    });
+    const built = buildIulExhaustedInteractive(body, { language });
+    finished.customerReplyPlan.entities.whatsappInteractive = built.interactive;
+    finished.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
+    delete finished.customerReplyPlan.entities.offeredSlots;
+    return finished;
+  }
+  if (!paged.shown.length) {
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_no_review_availability",
+      nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE,
+      lastQuestionAsked: ASK.SCHEDULING_UNAVAILABLE,
+      knownFacts: {
+        iulSelectedDate: selectedDate,
+        iulSelectedDayPart: dayPart,
+        iulSchedulingUnavailable: true,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [REASON_CODES.ZERO_QUALIFYING_SLOTS, REASON_CODES.IUL_NO_AVAILABILITY],
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    });
+  }
+  const shown = attachIulSlotSelectionIds(paged.shown);
+  const language =
+    structured.preferredLanguage === LANGUAGES.ENGLISH ||
+    structured.preferredLanguage === "en" ||
+    structured.preferredLanguage === "english"
+      ? "en"
+      : "es";
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    offeredSlots: shown,
+    includeMoreSlots: paged.includeMore,
+    iulSelectedDate: selectedDate,
+    dayPart,
+    weekdayPhrase: formatIulWeekdayPhrase(selectedDate, language),
+    dayPartForSlots: formatIulDayPartForSlots(dayPart, language)
+  };
+  return finishIulDecision(structured, context, {
+    templateKey: "iul_offer_day_slots",
+    nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+    lastQuestionAsked: ASK.OFFER_SLOTS,
+    knownFacts: {
+      iulSelectedDate: selectedDate,
+      reviewProposedDate: selectedDate,
+      iulSelectedDayPart: dayPart,
+      iulReviewDayPart: dayPart,
+      reviewPreferredDayPart: dayPart,
+      preferredDayPart: dayPart,
+      iulDaypartSearchAttempted: true,
+      iulSchedulingUnavailable: false,
+      iulSlotPool: slots,
+      iulIncludeMoreSlots: paged.includeMore,
+      iulShownSlotKeys: [
+        ...((context.knownFacts?.iulShownSlotKeys || []).concat(rejectIds)),
+        ...rejectIdsForShown(shown)
+      ],
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    },
+    reasonCodes: [
+      REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
+      REASON_CODES.AVAILABLE_SLOTS_OFFERED,
+      REASON_CODES.IUL_SLOT_INTERACTIVE_OFFERED,
+      REASON_CODES.IUL_COMPACT_SLOT_PAGE,
+      ...(extras.morePage ? [REASON_CODES.IUL_SAME_DAY_MORE] : [])
+    ],
+    appointmentPatch: {
+      status: APPOINTMENT_STATUS.PROPOSED,
+      previouslyOfferedSlots: shown,
+      proposedDate: selectedDate,
+      meetingType: iulMeetingTypeFromFacts({
+        ...context.knownFacts,
+        iulSelectedDate: selectedDate,
+        iulSelectedDayPart: dayPart
+      })
+    },
+    iulWorkflowStage: IUL_STAGES.REVIEW_READY
+  });
+}
+
+function continueAfterDaySelection(structured, context, {
+  dateKey,
+  knownFacts = {},
+  reasonCodes = [],
+  interpretation = null
+} = {}) {
+  const pool = Array.isArray(knownFacts.iulSlotPool) && knownFacts.iulSlotPool.length
+    ? knownFacts.iulSlotPool
+    : collectHorizonSlots(
+        readIulHorizonAvailability(
+          { ...context, knownFacts: { ...(context.knownFacts || {}), ...knownFacts } },
+          { interpretation }
+        )
+      );
+  const onDate = filterSlotsByDate(pool, dateKey);
+  if (!onDate.length) {
+    return beginDayAsk(structured, context, {
+      knownFacts: {
+        ...knownFacts,
+        iulSelectedDate: null
+      },
+      reasonCodes: [...reasonCodes, REASON_CODES.IUL_NO_AVAILABILITY],
+      interpretation
+    });
+  }
+  const parts = dayPartsOnDate(onDate, dateKey);
+  const merged = {
+    ...knownFacts,
+    iulSelectedDate: dateKey,
+    reviewProposedDate: dateKey,
+    reviewProposedTime: null,
+    iulSlotPool: pool,
+    iulShownSlotKeys: [],
+    iulSelectedDayPart: null,
+    iulWorkflowStage: IUL_STAGES.REVIEW_READY
+  };
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    iulSelectedDate: dateKey,
+    availableDays: collectAvailableDays(pool),
+    weekdayPhrase: formatIulWeekdayPhrase(
+      dateKey,
+      structured.preferredLanguage === LANGUAGES.ENGLISH ||
+        structured.preferredLanguage === "en" ||
+        structured.preferredLanguage === "english"
+        ? "en"
+        : "es"
+    )
+  };
+  if (parts.length === 1) {
+    return applyCompactDaySlotOffer(structured, { ...context, knownFacts: merged }, pool, {
+      selectedDate: dateKey,
+      dayPart: parts[0]
+    });
+  }
+  return beginDayPartAsk(structured, context, {
+    knownFacts: merged,
+    reasonCodes: [...reasonCodes, REASON_CODES.IUL_REVIEW_DAY_CAPTURED]
   });
 }
 
@@ -1682,6 +2226,8 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     INTENTS.IUL_DOCUMENTS_AVAILABLE,
     INTENTS.IUL_POLICY_IS_BAD_QUESTION,
     INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
+    INTENTS.IUL_CHOOSE_REVIEW_DAY,
+    INTENTS.IUL_REQUEST_MORE_DAYS,
     INTENTS.IUL_CHOOSE_MEETING_MODE,
     INTENTS.IUL_SELECT_OFFERED_SLOT,
     INTENTS.IUL_REQUEST_MORE_SLOTS,
@@ -1989,23 +2535,93 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     const modeSwitch =
       isIulSchedulingOwnedState(context) &&
       isIulQualificationCompleteForScheduling(context);
-    return beginDayPartAsk(structured, context, {
+    return beginDayAsk(structured, context, {
       knownFacts: {
         ...facts,
         iulBookingPending: false
       },
       reasonCodes: modeSwitch
         ? [REASON_CODES.IUL_MEETING_MODE_CAPTURED, REASON_CODES.IUL_MODE_SWITCH_PRESERVED]
-        : [REASON_CODES.IUL_MEETING_MODE_CAPTURED]
+        : [REASON_CODES.IUL_MEETING_MODE_CAPTURED],
+      interpretation
+    });
+  }
+
+  if (intent === INTENTS.IUL_CHOOSE_REVIEW_DAY) {
+    if (interpretation.entities?.changeReviewDay) {
+      return beginDayAsk(structured, context, {
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_DAY_FIRST_OFFERED],
+        interpretation
+      });
+    }
+    const dateKey =
+      interpretation.entities?.iulSelectedDate ||
+      interpretation.entities?.reviewProposedDate ||
+      null;
+    if (!dateKey) {
+      return beginDayAsk(structured, context, {
+        knownFacts: context.knownFacts || {},
+        interpretation
+      });
+    }
+    return continueAfterDaySelection(structured, context, {
+      dateKey,
+      knownFacts: {
+        ...(context.knownFacts || {}),
+        iulSelectedDate: dateKey,
+        reviewProposedDate: dateKey
+      },
+      reasonCodes: [REASON_CODES.IUL_REVIEW_DAY_CAPTURED],
+      interpretation
+    });
+  }
+
+  if (intent === INTENTS.IUL_REQUEST_MORE_DAYS) {
+    const days = context.knownFacts?.iulAvailableDays || [];
+    const shownKeys = context.knownFacts?.iulShownDayKeys || [];
+    const slots = context.knownFacts?.iulSlotPool || [];
+    const remaining = selectIulDayPage(days, { rejectIds: shownKeys });
+    if (!remaining.shown.length) {
+      return presentIulDayPage(structured, context, {
+        days,
+        slots,
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_MORE_DAYS],
+        resetShown: true
+      });
+    }
+    return presentIulDayPage(structured, context, {
+      days,
+      slots,
+      knownFacts: context.knownFacts || {},
+      reasonCodes: [REASON_CODES.IUL_MORE_DAYS],
+      rejectIds: shownKeys
     });
   }
 
   if (intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART) {
+    if (interpretation.entities?.changeReviewDayPart) {
+      return beginDayPartAsk(structured, context, {
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_REVIEW_DAY_CAPTURED]
+      });
+    }
+    const selectedDate = context.knownFacts?.iulSelectedDate || null;
     const dayPart = normalizeIulDayPart(
       interpretation.entities?.iulReviewDayPart ||
         interpretation.entities?.dayPart ||
         null
     );
+    if (selectedDate && dayPart) {
+      const pool = Array.isArray(context.knownFacts?.iulSlotPool) && context.knownFacts.iulSlotPool.length
+        ? context.knownFacts.iulSlotPool
+        : collectHorizonSlots(readIulHorizonAvailability(context, { interpretation }));
+      return applyCompactDaySlotOffer(structured, context, pool, {
+        selectedDate,
+        dayPart
+      });
+    }
     const preferredWeekend = Boolean(
       interpretation.entities?.preferredWeekend || context.knownFacts?.preferredWeekend
     );
@@ -2074,6 +2690,25 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
   }
 
   if (intent === INTENTS.IUL_REQUEST_MORE_SLOTS) {
+    const selectedDate = context.knownFacts?.iulSelectedDate || null;
+    if (selectedDate) {
+      const shown = context.appointment?.previouslyOfferedSlots || [];
+      const rejectIds = [
+        ...new Set([
+          ...(context.knownFacts?.iulShownSlotKeys || []),
+          ...rejectIdsForShown(shown)
+        ])
+      ];
+      const pool = Array.isArray(context.knownFacts?.iulSlotPool) && context.knownFacts.iulSlotPool.length
+        ? context.knownFacts.iulSlotPool
+        : collectHorizonSlots(readIulHorizonAvailability(context, { interpretation }));
+      return applyCompactDaySlotOffer(structured, context, pool, {
+        selectedDate,
+        dayPart: context.knownFacts?.iulSelectedDayPart,
+        rejectIds,
+        morePage: true
+      });
+    }
     const shown = context.appointment?.previouslyOfferedSlots || [];
     const rejectIds = [
       ...new Set([

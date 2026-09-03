@@ -136,7 +136,7 @@ function offeredTimes(decision) {
 
 const FOUR_SLOTS = [
   slot("2026-09-02", "09:00"),
-  slot("2026-09-02", "12:00"),
+  slot("2026-09-02", "11:00"),
   slot("2026-09-02", "14:00"),
   slot("2026-09-03", "09:30")
 ];
@@ -173,7 +173,7 @@ test("B) More excludes previously offered slots", () => {
   assert.equal(more.interpretation.intent, INTENTS.IUL_REQUEST_MORE_SLOTS);
   const next = offeredTimes(more.decision);
   assert.ok(!next.includes("09:00"));
-  assert.ok(!next.includes("12:00"));
+  assert.ok(!next.includes("11:00"));
   assert.ok(next.includes("14:00") || next.includes("09:30"));
 });
 
@@ -197,16 +197,16 @@ test("C) second More never repeats same slots", () => {
 });
 
 test("D) no unused slots → More button omitted", () => {
-  const first = firstOffer([slot("2026-09-02", "09:00"), slot("2026-09-02", "12:00")]);
+  const first = firstOffer([slot("2026-09-02", "09:00"), slot("2026-09-02", "11:00")]);
   const more = turn(
     moreTap(),
-    moreContext(first, [slot("2026-09-02", "09:00"), slot("2026-09-02", "12:00")])
+    moreContext(first, [slot("2026-09-02", "09:00"), slot("2026-09-02", "11:00")])
   );
   assert.equal(more.decision.customerReplyPlan.templateKey, "iul_no_more_review_slots");
   assert.match(more.rendered.text, /Esos son los horarios disponibles que tengo por ahora/);
   assert.equal(optionIds(more.decision).includes(IUL_SLOT_MORE_ID), false);
   assert.ok(offeredTimes(more.decision).includes("09:00"));
-  assert.ok(offeredTimes(more.decision).includes("12:00"));
+  assert.ok(offeredTimes(more.decision).includes("11:00"));
 });
 
 test("E) valid IUL_SLOT_* selection resolves exact stored slot", () => {
@@ -236,7 +236,7 @@ test("G) selection advances state beyond OFFER_SLOTS", () => {
   const next = turn(slotTap(offered, 1), moreContext(first));
   assert.equal(next.decision.contextPatch.conversation.lastQuestionAsked, ASK.CONFIRM_SLOT);
   assert.notEqual(next.decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
-  assert.equal(next.decision.contextPatch.appointment.proposedTime, "12:00");
+  assert.equal(next.decision.contextPatch.appointment.proposedTime, "11:00");
 });
 
 test("H) create path invoked/authorized correctly", () => {
@@ -250,7 +250,7 @@ test("H) create path invoked/authorized correctly", () => {
     structuredDecision: next.decision
   });
   assert.equal(slot.dateKey, "2026-09-02");
-  assert.equal(slot.timeKey, "12:00");
+  assert.equal(slot.timeKey, "11:00");
   const auth = authorizeSideEffects({
     structuredDecision: next.decision,
     responsePlan: next.plan,
@@ -356,7 +356,8 @@ test("N) daypart morning still offers real morning slots first", () => {
   assert.equal(interpretation.intent, INTENTS.IUL_CHOOSE_REVIEW_DAY_PART);
   const times = offeredTimes(decision);
   assert.ok(times.includes("09:00"));
-  assert.ok(times.includes("12:00"));
+  assert.ok(times.includes("11:00"));
+  assert.ok(!times.includes("12:00"));
 });
 
 test("O) IUL create remains CREATE_APPOINTMENT under the authorizer", () => {

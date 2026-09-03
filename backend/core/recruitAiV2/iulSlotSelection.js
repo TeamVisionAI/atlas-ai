@@ -45,7 +45,11 @@ function formatIulSlotClock(timeKey) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${meridiem}`;
 }
 
-function formatIulSlotButtonTitle(slot, language = "es") {
+function formatIulSlotButtonTitle(slot, language = "es", { includeWeekday = true } = {}) {
+  const clock = formatIulSlotClock(slotTimeKey(slot));
+  if (includeWeekday === false) {
+    return clock;
+  }
   const dateKey = slotDateKey(slot);
   const [y, m, d] = dateKey.split("-").map(Number);
   const weekdayIndex =
@@ -56,7 +60,6 @@ function formatIulSlotButtonTitle(slot, language = "es") {
       : language === "en"
         ? WEEKDAY_SHORT_EN[weekdayIndex]
         : WEEKDAY_SHORT_ES[weekdayIndex];
-  const clock = formatIulSlotClock(slotTimeKey(slot));
   return short ? `${short} ${clock}` : clock;
 }
 
@@ -109,17 +112,17 @@ function chooseIulSlotPresentation(pool = []) {
   };
 }
 
-function buildIulSlotOptions(shown, { includeMore = false, language = "es" } = {}) {
+function buildIulSlotOptions(shown, { includeMore = false, language = "es", includeWeekday = true } = {}) {
   const options = (shown || []).map((slot, index) => ({
     id: slot.selectionId || `${IUL_SLOT_ID_PREFIX}${index}`,
-    title: formatIulSlotButtonTitle(slot, language),
-    label: formatIulSlotButtonTitle(slot, language)
+    title: formatIulSlotButtonTitle(slot, language, { includeWeekday }),
+    label: formatIulSlotButtonTitle(slot, language, { includeWeekday })
   }));
   if (includeMore) {
     options.push({
       id: IUL_SLOT_MORE_ID,
-      title: language === "en" ? "More times" : "Ver más horarios",
-      label: language === "en" ? "More times" : "Ver más horarios"
+      title: language === "en" ? "More times" : "Más horarios",
+      label: language === "en" ? "More times" : "Más horarios"
     });
   }
   return options;
@@ -128,7 +131,8 @@ function buildIulSlotOptions(shown, { includeMore = false, language = "es" } = {
 function buildIulSlotInteractive(shown, body, extras = {}) {
   const language = extras.language === "en" ? "en" : "es";
   const includeMore = extras.includeMore === true;
-  const options = buildIulSlotOptions(shown, { includeMore, language });
+  const includeWeekday = extras.includeWeekday !== false;
+  const options = buildIulSlotOptions(shown, { includeMore, language, includeWeekday });
   return {
     interactive: buildInteractiveFromOptions({
       body,
@@ -155,7 +159,7 @@ function isIulSlotMoreId(selectionId) {
 
 function isIulSlotMoreLabel(value) {
   const t = fold(value);
-  return t === "ver mas horarios" || t === "more times";
+  return t === "ver mas horarios" || t === "mas horarios" || t === "more times";
 }
 
 function isIulSlotSelectionId(selectionId) {
@@ -305,6 +309,7 @@ module.exports = {
   IUL_SLOT_ID_PREFIX,
   IUL_SLOT_MORE_ID,
   slotIdentity,
+  formatIulSlotClock,
   formatIulSlotButtonTitle,
   attachIulSlotSelectionIds,
   collectIulSlotPool,
