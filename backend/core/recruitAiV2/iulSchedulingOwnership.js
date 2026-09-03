@@ -412,6 +412,7 @@ module.exports = {
   isIulInformationSeeker,
   isIulReviewReadyForScheduling,
   isIulQualificationCompleteForScheduling,
+  isIulBookingComplete,
   shouldBlockIulDiscovery,
   resolveIulSelectedSlotFromInbound,
   proposedSlotFromContext,

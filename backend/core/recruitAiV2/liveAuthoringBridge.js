@@ -1073,7 +1073,8 @@ async function attemptLiveV2Authoring({
     workflowState,
     campaignIntakePurpose:
       normalized.campaignIntakeMatch?.purpose ||
-      null
+      null,
+    campaignIntakeMatch: normalized.campaignIntakeMatch || null
   });
 
   try {
@@ -1135,7 +1136,8 @@ async function attemptLiveV2Authoring({
           text: String(normalized.text || "").trim(),
           // Implements BR-118 — structured WhatsApp media type for dialogue guard.
           messageType: normalized.messageType || null,
-          interactiveReply: normalized.interactiveReply || null
+          interactiveReply: normalized.interactiveReply || null,
+          campaignIntakeMatch: normalized.campaignIntakeMatch || null
         },
         contextInput,
         persistenceService: persistence,
@@ -1154,6 +1156,7 @@ async function attemptLiveV2Authoring({
           legacyProspectId,
           inboundMessageId: normalized.providerMessageId || null,
           messageType: normalized.messageType || null,
+          campaignIntakeMatch: normalized.campaignIntakeMatch || null,
           dependencies: {
             // Prefer injected getSlots (tests); production uses orchestrator default
             // → appointmentApplicationService.getSlots → Sprint 22 engine.
