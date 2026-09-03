@@ -3533,7 +3533,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** IUL Policy Review / WhatsApp scheduling ownership  
 **Depends on:** BR-220, BR-219, BR-213, BR-157  
 **Related:** BR-208–220 IUL suites; recruiting booking unchanged  
-**Status:** Implemented — not merged  
+**Status:** Implemented  
 **Engine target:** `iulSchedulingOwnership`; `iulAdConversation`; `iulDayFirstScheduling`; `schedulingAvailabilityReader`; `communicationHub` interactive fallback  
 **Tests:** `backend/test/iulSchedulingOwnershipDayPickerBr221.test.js`
 
@@ -3545,6 +3545,26 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 4. **Day-selection recovery** — While `lastQuestionAsked=iul_ask_review_day`, accept interactive `IUL_DAY_YYYY-MM-DD`, numeric fallback, or a unique simple match to one displayed day (“viernes”, “viernes 4”, “el viernes”). Anything else re-offers the current day page. Do not interpret broadly. Do not enter discovery.
 5. **Mode switch** — During scheduling ownership, “Por Zoom” / “En la oficina” updates meeting mode, preserves qualification/information facts, and restarts at day selection. Applies to active-policy, information-seeker, and unsure prospects.
 6. **Boundaries** — Do not change BR-219 timeout/deferred booking, BR-220 compact-slot behavior, IUL qualification questions for fresh incomplete leads, or recruiting booking. No production writes. No migration.
+
+---
+
+## BR-222 — Fresh IUL Intake Episode Reset
+
+**Implements:** A valid fresh IUL campaign intake restarts the IUL conversational episode when the prior episode has no confirmed policy-review appointment. Stale qualification/scheduling state must not resume just because the phone already has an IUL context.  
+**Domain:** IUL Policy Review / campaign intake / conversation context  
+**Depends on:** BR-221, BR-219, BR-147, BR-157  
+**Related:** BR-208–221 IUL suites; recruiting intake unchanged  
+**Status:** Implemented — not merged  
+**Engine target:** `iulFreshIntakeEpisode`; `iulAdConversation`; `orchestrator` load-before-interpret; `liveAuthoringBridge` intake match  
+**Tests:** `backend/test/iulFreshIntakeEpisodeResetBr222.test.js`
+
+### Rules
+
+1. **Fresh intake is a new episode signal** — A validated ACTIVE IUL campaign intake on this inbound (`hasFreshIulCampaignIntakeMatch`) restarts the IUL episode when prior IUL conversational state exists and there is no confirmed policy-review appointment. Ordinary inbound without that intake signal continues the current episode.
+2. **Reset conversational IUL facts only** — Clear qualification, information-seeker/policy-owner facts, meeting mode, day/daypart/slot pools, proposed booking, booking-pending/deferred flags, stale `appointmentId` when no real confirmed appointment exists, last ask/offer/intent, and stale IUL decision codes. Set `iulWorkflowStage=NEW_IUL_LEAD`. Do not delete historical conversation logs.
+3. **Preserve identity and provenance** — Keep organization, owner/agent, prospect/phone/WhatsApp identity, preferred language, campaign/intake provenance, source eligibility, and tenant isolation.
+4. **Confirmed appointments stay owned** — If a real confirmed IUL policy-review appointment exists (`appointmentId` + confirmed status, BR-219 `isIulBookingComplete`), do not reset and do not start a duplicate booking path. Reuse BR-219 `IUL_BOOKING_REHYDRATE`.
+5. **Boundaries** — Do not change BR-219 timeout/deferred booking, BR-220 compact slots, BR-221 scheduling ownership for ordinary continuation, or recruiting intake. No production writes. No migration.
 
 ---
 

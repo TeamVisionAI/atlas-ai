@@ -550,6 +550,43 @@ async function processRecruitAiV2Turn({
     persistenceSource = loaded.persistenceSource || "ephemeral";
   }
 
+  // Implements BR-222 — fresh IUL intake restarts the episode before interpret.
+  try {
+    const {
+      resolveIulFreshIntakeEpisode
+    } = require("./iulFreshIntakeEpisode");
+    const episode = resolveIulFreshIntakeEpisode({
+      context: loaded,
+      campaignIntakeMatch:
+        options.campaignIntakeMatch ||
+        message?.campaignIntakeMatch ||
+        contextInput?.campaignIntakeMatch ||
+        loaded._freshCampaignIntakeMatch ||
+        null,
+      extras: {
+        campaignIntakeMatch:
+          options.campaignIntakeMatch ||
+          message?.campaignIntakeMatch ||
+          contextInput?.campaignIntakeMatch ||
+          null
+      },
+      message
+    });
+    if (episode.reset) {
+      loaded = {
+        ...episode.context,
+        _freshCampaignIntakeMatch: episode.campaignIntakeMatch
+      };
+    } else if (episode.alreadyBooked && episode.campaignIntakeMatch) {
+      loaded = {
+        ...loaded,
+        _freshCampaignIntakeMatch: episode.campaignIntakeMatch
+      };
+    }
+  } catch {
+    // Episode reset must never block the turn.
+  }
+
   // Implements BR-118 — non-text media never enters the text intent/clarification path.
   const media = classifyInboundMedia(message, options);
   if (media.isNonTextMedia && !options.forceSafeFailure) {

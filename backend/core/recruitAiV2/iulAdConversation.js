@@ -450,6 +450,9 @@ function seedIulCreateEntities(structured, slot) {
 }
 
 function isCampaignIntakeIulFirstTurn(context = {}) {
+  if (context._iulFreshEpisode === true) {
+    return true;
+  }
   const purpose = String(context.campaignIntakePurpose || "").toUpperCase();
   if (purpose !== "IUL" && purpose !== "IUL_REVIEW") {
     return false;
@@ -483,7 +486,41 @@ function matchQualificationInput(catalog, { text, interactiveReply } = {}) {
   });
 }
 
-function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
+function classifyIulAdInbound({
+  text,
+  context,
+  interactiveReply = null,
+  campaignIntakeMatch = null
+} = {}) {
+  const {
+    resolveIulFreshIntakeEpisode
+  } = require("./iulFreshIntakeEpisode");
+  const episode = resolveIulFreshIntakeEpisode({
+    context,
+    campaignIntakeMatch,
+    message: { text, campaignIntakeMatch }
+  });
+  if (episode.alreadyBooked) {
+    return {
+      intent: INTENTS.IUL_BOOKING_REHYDRATE,
+      confidence: 0.97,
+      entities: {
+        iulConfirmedAppointmentPreserved: true,
+        campaignIntakeMatch: episode.campaignIntakeMatch
+      }
+    };
+  }
+  if (episode.reset) {
+    return {
+      intent: INTENTS.IUL_GREETING,
+      confidence: 0.97,
+      entities: {
+        iulFreshEpisodeReset: true,
+        campaignIntakeMatch: episode.campaignIntakeMatch
+      }
+    };
+  }
+
   const lastAsk = context?.conversation?.lastQuestionAsked || null;
   const known = context?.knownFacts || {};
 
@@ -1239,6 +1276,7 @@ function iulContextPatch(context, {
   lastQuestionAsked,
   knownFacts = {},
   lastProspectIntent,
+  lastOfferMade = undefined,
   iulWorkflowStage = null,
   appointmentPatch = null
 } = {}) {
@@ -1249,6 +1287,15 @@ function iulContextPatch(context, {
   if (knownFacts.originalPolicyPurpose != null || knownFacts.originalPolicyPurposeRaw) {
     mergedFacts.originalPurposeAsked = true;
   }
+  const conversation = {
+    lastQuestionAsked,
+    lastProspectIntent,
+    pendingClarification: null,
+    clarificationCount: 0
+  };
+  if (lastOfferMade !== undefined) {
+    conversation.lastOfferMade = lastOfferMade;
+  }
   const patch = {
     conversationGoal: CONVERSATION_GOAL,
     campaignKind: CAMPAIGN_KIND,
@@ -1256,12 +1303,7 @@ function iulContextPatch(context, {
     ctwaReferral: context.ctwaReferral || null,
     currentStage: STAGES.QUALIFICATION,
     knownFacts: mergedFacts,
-    conversation: {
-      lastQuestionAsked,
-      lastProspectIntent,
-      pendingClarification: null,
-      clarificationCount: 0
-    }
+    conversation
   };
   if (iulWorkflowStage) {
     patch.knownFacts.iulWorkflowStage = iulWorkflowStage;
@@ -1328,7 +1370,8 @@ function finishIulDecision(structured, context, {
   reasonCodes = [],
   mayCreateAppointment = false,
   iulWorkflowStage = null,
-  appointmentPatch = null
+  appointmentPatch = null,
+  lastOfferMade = undefined
 }) {
   structured.decision.nextAction = nextAction;
   structured.decision.mayCreateAppointment = mayCreateAppointment;
@@ -1345,6 +1388,7 @@ function finishIulDecision(structured, context, {
     lastQuestionAsked,
     knownFacts,
     lastProspectIntent: structured.intent,
+    lastOfferMade,
     iulWorkflowStage,
     appointmentPatch
   });
@@ -2313,7 +2357,7 @@ function briefTemplateForIntent(intentId) {
 }
 
 function applyIulAdDecision({ structured, context, interpretation, availability = null } = {}) {
-  const intent = interpretation?.intent;
+  let intent = interpretation?.intent;
   if (SAFETY_INTENTS.has(intent)) {
     return null;
   }
@@ -2321,6 +2365,25 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     interpretation?.normalization?.trimmedText ||
     interpretation?.normalization?.rawText ||
     "";
+  const {
+    resolveIulFreshIntakeEpisode
+  } = require("./iulFreshIntakeEpisode");
+  const episode = resolveIulFreshIntakeEpisode({
+    context,
+    campaignIntakeMatch:
+      interpretation?.entities?.campaignIntakeMatch ||
+      context._freshCampaignIntakeMatch ||
+      null,
+    text: inboundText
+  });
+  if (episode.alreadyBooked) {
+    intent = INTENTS.IUL_BOOKING_REHYDRATE;
+    structured.reasonCodes.push(REASON_CODES.IUL_CONFIRMED_APPOINTMENT_PRESERVED);
+  } else if (episode.reset) {
+    context = episode.context;
+    intent = INTENTS.IUL_GREETING;
+    structured.reasonCodes.push(REASON_CODES.IUL_FRESH_EPISODE_RESET);
+  }
   const iulIntents = new Set([
     INTENTS.IUL_GREETING,
     INTENTS.IUL_POLICY_ACTIVE_YES,
@@ -3229,16 +3292,21 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
   }
 
   if (isCampaignIntakeIulFirstTurn(context) || !context?.conversation?.lastQuestionAsked) {
+    const { emptyIulEpisodeAppointment } = require("./iulFreshIntakeEpisode");
     return finishIulDecision(structured, context, {
       templateKey: "iul_ask_qualification_status",
       nextAction: NEXT_ACTIONS.IUL_ASK_QUALIFICATION_STATUS,
       lastQuestionAsked: ASK.QUALIFICATION_STATUS,
-      knownFacts: { iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD },
+      knownFacts: context._iulFreshEpisode
+        ? { ...(context.knownFacts || {}), iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD }
+        : { iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD },
       reasonCodes: [
         REASON_CODES.IUL_SPANISH_FIRST_OPENER,
         REASON_CODES.IUL_BUTTON_FIRST_QUALIFICATION
       ],
-      iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD
+      iulWorkflowStage: IUL_STAGES.NEW_IUL_LEAD,
+      appointmentPatch: context._iulFreshEpisode ? emptyIulEpisodeAppointment() : null,
+      lastOfferMade: context._iulFreshEpisode ? null : undefined
     });
   }
 

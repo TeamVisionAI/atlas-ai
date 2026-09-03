@@ -972,7 +972,12 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     const iul = classifyIulAdInbound({
       text: originalText || text,
       context,
-      interactiveReply
+      interactiveReply,
+      campaignIntakeMatch:
+        options.campaignIntakeMatch ||
+        message?.campaignIntakeMatch ||
+        context?._freshCampaignIntakeMatch ||
+        null
     });
     intent = iul.intent;
     confidence = iul.confidence;
