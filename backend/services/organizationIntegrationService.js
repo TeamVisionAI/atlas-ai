@@ -13,7 +13,8 @@ const {
   evaluateAgentWorkspaceReadiness
 } = require("../core/agentCapabilitiesEngine");
 
-async function getIntegrationsStatus(organizationId, authContext = null) {
+async function getIntegrationsStatus(organizationId, authContext = null, options = {}) {
+  const includeOrganizationChannel = options.includeOrganizationChannel !== false;
   const userId = authContext?.userId || null;
   let capabilityUser = authContext?.user || null;
 
@@ -97,7 +98,7 @@ async function getIntegrationsStatus(organizationId, authContext = null) {
       : null
   };
 
-  if (authContext && hasPermission(authContext, PERMISSIONS.ORG_WRITE)) {
+  if (authContext && hasPermission(authContext, PERMISSIONS.ORG_WRITE) && includeOrganizationChannel) {
     const [orgGoogle, orgWhatsApp] = await Promise.all([
       googleCalendarIntegrationService.getIntegrationStatus(organizationId),
       whatsappIntegrationService.getIntegrationStatusForOrganization(organizationId)

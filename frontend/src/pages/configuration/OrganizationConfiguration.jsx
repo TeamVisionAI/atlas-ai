@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../../security/isGlobalSuperAdminControlPlane";
 import { SETTINGS_SECTIONS } from "../../config/settingsProductNames";
 import { PERMISSIONS, roleHasPermission } from "../../security/workspacePermissions";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
+import ControlPlaneEmptyState from "../../components/layout/ControlPlaneEmptyState";
 import AtlasButton from "../../components/ui/AtlasButton";
 import {
   fetchOrganizationConfiguration,
@@ -15,7 +17,8 @@ import MeetingManagement from "../../components/settings/MeetingManagement";
 
 export default function OrganizationConfiguration() {
   const { translate } = useLanguage();
-  const { user } = useWorkspace();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const canEditOrganization = roleHasPermission(user?.role, PERMISSIONS.ORG_WRITE);
   const [organization, setOrganization] = useState(null);
   const [levels, setLevels] = useState([]);
@@ -24,13 +27,21 @@ export default function OrganizationConfiguration() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (controlPlane) {
+      return;
+    }
+
     Promise.all([fetchOrganizationConfiguration(), fetchOrganizationLevels()])
       .then(([orgResult, levelsResult]) => {
         setOrganization(orgResult.organization);
         setLevels(levelsResult.levels || []);
       })
       .catch(() => setError(translate("configurationLoadFailed")));
-  }, []);
+  }, [controlPlane, translate]);
+
+  if (controlPlane) {
+    return <ControlPlaneEmptyState translate={translate} />;
+  }
 
   function updateField(field, value) {
     setOrganization((current) => ({ ...current, [field]: value }));
