@@ -195,12 +195,43 @@ function evaluateExpect(actual, expect = {}) {
   return { pass: failures.length === 0, failures };
 }
 
+function resolveSimulatorOfficeIdentity(seed = {}) {
+  const { TEAM_VISION_ORGANIZATION_ID } = require("../core/teamVisionSeedTenant");
+  const { getOfficeLocation } = require("../core/businessRulesEngine");
+  const organizationId = seed.organizationId || "sim-org-team-vision";
+  if (Object.prototype.hasOwnProperty.call(seed, "officeAddress")) {
+    return {
+      officeAddress: seed.officeAddress || null,
+      officeAddressSource:
+        seed.officeAddressSource || (seed.officeAddress ? "request" : "unavailable")
+    };
+  }
+  if (
+    organizationId === TEAM_VISION_ORGANIZATION_ID ||
+    organizationId === "sim-org-team-vision"
+  ) {
+    return {
+      officeAddress: getOfficeLocation().fullAddress,
+      officeAddressSource: "organization_profile"
+    };
+  }
+  return {
+    officeAddress: null,
+    officeAddressSource: "unavailable"
+  };
+}
+
 function createEphemeralSession(seed = {}) {
   assertSafeSimulatorIdentity(seed);
+  const organizationId = seed.organizationId || "sim-org-team-vision";
+  const office = resolveSimulatorOfficeIdentity({ ...seed, organizationId });
 
   const context = createConversationContext({
     prospectId: seed.prospectId,
-    organizationId: seed.organizationId || "sim-org-team-vision",
+    organizationId,
+    organizationName: seed.organizationName || null,
+    officeAddress: office.officeAddress,
+    officeAddressSource: office.officeAddressSource,
     preferredLanguage: seed.preferredLanguage || "english",
     languageMeta: seed.languageMeta || { source: seed.languageSource || "inferred" },
     timezone: seed.timezone || "America/New_York",

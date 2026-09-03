@@ -74,6 +74,8 @@ function loadConversationContext(input = {}) {
     prospectId = null,
     organizationId = null,
     organizationName = null,
+    officeAddress = null,
+    officeAddressSource = null,
     preferredLanguage = null,
     languageMeta = null,
     timezone = "America/New_York",
@@ -141,6 +143,9 @@ function loadConversationContext(input = {}) {
     organizationId,
     organizationName:
       organizationName || existingContext?.organizationName || null,
+    officeAddress: officeAddress || existingContext?.officeAddress || null,
+    officeAddressSource:
+      officeAddressSource || existingContext?.officeAddressSource || null,
     preferredLanguage: normalizeLanguage(
       preferredLanguage || base.preferredLanguage || LANGUAGES_FALLBACK()
     ),

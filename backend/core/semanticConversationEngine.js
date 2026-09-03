@@ -281,7 +281,11 @@ function buildInterviewFormatQuestion(profile, language) {
   });
 
   if (coverage.coverage === "LOCAL") {
-    return getLocalOfficeDayPartMessage(language);
+    return getLocalOfficeDayPartMessage(language, {
+      organizationId: prospect?.organization_id || prospect?.organizationId || null,
+      officeAddress: prospect?.officeAddress || null,
+      officeAddressSource: prospect?.officeAddressSource || null
+    });
   }
 
   return getRemoteZoomDayPartMessage(language);

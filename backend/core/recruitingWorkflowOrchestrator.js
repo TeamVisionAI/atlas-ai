@@ -40,14 +40,37 @@ async function resolveLegacyProspectInOrganization(phone, organizationId) {
   );
 }
 
-function buildWelcomeMessage({ displayName, language = "es" }) {
+function resolveWelcomeOrganizationLabel({ organizationId = null, organizationName = null } = {}) {
+  const { isTeamVisionSeedTenant } = require("./teamVisionSeedTenant");
+  const { isSafeOrganizationDisplayName } = require("./recruitAiV2/tenantBranding");
+  if (isTeamVisionSeedTenant(organizationId)) {
+    return "Team Vision";
+  }
+  if (isSafeOrganizationDisplayName(organizationName, organizationId)) {
+    return String(organizationName).trim();
+  }
+  return null;
+}
+
+function buildWelcomeMessage({
+  displayName,
+  language = "es",
+  organizationId = null,
+  organizationName = null
+}) {
   const name = displayName?.split(" ")[0] || displayName || "";
+  const orgLabel = resolveWelcomeOrganizationLabel({
+    organizationId,
+    organizationName
+  });
 
   if (language === "en") {
-    return `Hi${name ? ` ${name}` : ""}! I'm Atlas from Team Vision. I received your interest and can help schedule your interview in just a few messages. What city are you in?`;
+    const intro = orgLabel ? `I'm Atlas from ${orgLabel}` : "I'm Atlas";
+    return `Hi${name ? ` ${name}` : ""}! ${intro}. I received your interest and can help schedule your interview in just a few messages. What city are you in?`;
   }
 
-  return `Hola${name ? ` ${name}` : ""}! Soy Atlas de Team Vision. Recibí tu interés y puedo ayudarte a agendar tu entrevista en pocos mensajes. ¿En qué ciudad te encuentras?`;
+  const intro = orgLabel ? `Soy Atlas de ${orgLabel}` : "Soy Atlas";
+  return `Hola${name ? ` ${name}` : ""}! ${intro}. Recibí tu interés y puedo ayudarte a agendar tu entrevista en pocos mensajes. ¿En qué ciudad te encuentras?`;
 }
 
 async function advanceLifecycleTo(prospectId, targetState, actor = "ATLAS", organizationId = null) {
@@ -149,7 +172,26 @@ async function processFacebookLead(input = {}) {
     }
   );
 
-  const welcomeMessage = input.welcomeMessage || buildWelcomeMessage({ displayName, language });
+  let organizationName = input.organizationName || null;
+  if (!organizationName && input.organizationId) {
+    try {
+      const branding = await require("../services/organizationBrandingService").getOrganizationBranding(
+        input.organizationId
+      );
+      organizationName = branding?.name || null;
+    } catch {
+      organizationName = null;
+    }
+  }
+
+  const welcomeMessage =
+    input.welcomeMessage ||
+    buildWelcomeMessage({
+      displayName,
+      language,
+      organizationId: input.organizationId || bridge.organizationId || null,
+      organizationName
+    });
   const { buildLeadWelcomeVariables } = require("./whatsappTemplateVariableBuilder");
   const outbound = await sendAndPersistWhatsAppMessage({
     to: phone,

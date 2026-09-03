@@ -1,14 +1,22 @@
 /**
  * Sprint 21.4 — Canonical Team Vision recruiting workflow copy.
- * Implements BR-018, BR-019, BR-020, BR-021.
- * Office strings always come from BR-018 fullAddress (includes suite) — BR-077.
+ * Implements BR-018, BR-019, BR-020, BR-021, BR-225.
+ * Office strings come from tenant office identity (BR-077 selector).
+ * getOfficeLocation() is Team Vision seed only — never a shared fallback.
  */
 
 const { getOfficeLocation } = require("./businessRulesEngine");
 const { findFAQ } = require("./faqEngine");
+const {
+  selectCustomerFacingOfficeAddress
+} = require("./officeAddressResolver");
 
 function getCanonicalOfficeAddress() {
   return getOfficeLocation().fullAddress;
+}
+
+function getCustomerOfficeAddress(officeIdentity = {}) {
+  return selectCustomerFacingOfficeAddress(officeIdentity).address;
 }
 
 /** @deprecated Prefer getCanonicalOfficeAddress(); kept for call-site compatibility. */
@@ -73,8 +81,11 @@ function getAuthorizationDeniedMessage(language) {
     : "Thank you for your interest. At this time we need current legal authorization to work in the United States. When you have the required documentation, we'd be happy to continue the process.";
 }
 
-function getLocalOfficeDayPartMessage(language) {
-  const officeAddress = getCanonicalOfficeAddress();
+function getLocalOfficeDayPartMessage(language, officeIdentity = {}) {
+  const officeAddress = getCustomerOfficeAddress(officeIdentity);
+  if (!officeAddress) {
+    return getRemoteZoomDayPartMessage(language);
+  }
   return language === "es"
     ? `Excelente. Estamos realizando las entrevistas en nuestras oficinas ubicadas en ${officeAddress}. ¿Prefieres en la mañana o en la tarde?`
     : `Excellent. We're conducting interviews at our offices located at ${officeAddress}. Do you prefer morning or afternoon?`;
@@ -470,28 +481,43 @@ function getOutsideZoomDayPartMessage(city, language) {
     : `Since you're in ${place}, we can do the interview by Zoom. Do you prefer morning or afternoon?`;
 }
 
-function buildBookingConfirmation({ interviewType, slotLabel, language }) {
+function buildBookingConfirmation({
+  interviewType,
+  slotLabel,
+  language,
+  organizationId = null,
+  officeAddress = null,
+  officeAddressSource = null
+} = {}) {
   const isZoom = String(interviewType || "").toLowerCase().includes("zoom");
-  const officeAddress = getCanonicalOfficeAddress();
+  const resolvedAddress = getCustomerOfficeAddress({
+    organizationId,
+    officeAddress,
+    officeAddressSource
+  });
 
   if (language === "es") {
     if (isZoom) {
       return `Listo, quedaste programado para ${slotLabel} por Zoom. Te enviaremos el enlace 30 minutos antes para conectarte.`;
     }
-
-    return `Listo, quedaste programado para ${slotLabel} en nuestras oficinas (${officeAddress}).`;
+    return resolvedAddress
+      ? `Listo, quedaste programado para ${slotLabel} en nuestras oficinas (${resolvedAddress}).`
+      : `Listo, quedaste programado para ${slotLabel} en nuestras oficinas.`;
   }
 
   if (isZoom) {
     return `You're all set for ${slotLabel} via Zoom. We'll send the link 30 minutes before your interview.`;
   }
 
-  return `You're all set for ${slotLabel} at our office (${officeAddress}).`;
+  return resolvedAddress
+    ? `You're all set for ${slotLabel} at our office (${resolvedAddress}).`
+    : `You're all set for ${slotLabel} at our office.`;
 }
 
 module.exports = {
   OFFICE_ADDRESS,
   getCanonicalOfficeAddress,
+  getCustomerOfficeAddress,
   getFirstMessage,
   getNaturalGreetingAck,
   getStateQuestion,

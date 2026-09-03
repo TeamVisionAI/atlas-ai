@@ -1,12 +1,33 @@
 /**
  * Deterministic HUMAN/manual communication fallback.
- * Implements BR-214. Used when communication preview assembly fails. No AI/model.
- * Contact name is product-specified: Ana Perez.
+ * Implements BR-214 / BR-225. Used when communication preview assembly fails.
+ * Assigned interviewer name wins. Ana Perez is Team Vision seed default only.
  */
 
 const { isCompleteOfficeAddress } = require("./officeAddressResolver");
+const { isTeamVisionSeedTenant } = require("./teamVisionSeedTenant");
 
 const MANUAL_REMINDER_CONTACT_NAME = "Ana Perez";
+const NEUTRAL_REMINDER_CONTACT_NAME = Object.freeze({
+  en: "our team",
+  es: "nuestro equipo"
+});
+
+function resolveManualReminderContactName({
+  contactName = null,
+  organizationId = null,
+  language = "es"
+} = {}) {
+  const provided = String(contactName || "").trim();
+  if (provided) {
+    return provided;
+  }
+  if (isTeamVisionSeedTenant(organizationId)) {
+    return MANUAL_REMINDER_CONTACT_NAME;
+  }
+  const lang = language === "en" || language === "english" ? "en" : "es";
+  return NEUTRAL_REMINDER_CONTACT_NAME[lang];
+}
 const MANUAL_COMMUNICATION_PURPOSES = Object.freeze({
   INVITATION: "invitation",
   REMINDER: "reminder",
@@ -75,7 +96,8 @@ function resolveFallbackFacts({
   meetingMode = "zoom",
   officeAddress = null,
   language = "es",
-  contactName = MANUAL_REMINDER_CONTACT_NAME
+  contactName = null,
+  organizationId = null
 } = {}) {
   const firstName = getFirstName(prospectName);
   const lang = language === "en" || language === "english" ? "en" : "es";
@@ -84,7 +106,11 @@ function resolveFallbackFacts({
   const timeLabel = when.time || "";
   const inPerson = isInPersonMeetingMode(meetingMode);
   const address = inPerson ? resolveOfficeAddressForFallback(officeAddress) : "";
-  const contact = String(contactName || MANUAL_REMINDER_CONTACT_NAME).trim() || MANUAL_REMINDER_CONTACT_NAME;
+  const contact = resolveManualReminderContactName({
+    contactName,
+    organizationId,
+    language: lang
+  });
   const hello = lang === "en"
     ? firstName ? `Hi, ${firstName}.` : "Hi."
     : firstName ? `Hola, ${firstName}.` : "Hola.";
@@ -193,6 +219,8 @@ function buildManualCommunicationFallback({ purpose = MANUAL_COMMUNICATION_PURPO
 
 module.exports = {
   MANUAL_REMINDER_CONTACT_NAME,
+  NEUTRAL_REMINDER_CONTACT_NAME,
+  resolveManualReminderContactName,
   MANUAL_COMMUNICATION_PURPOSES,
   buildManualInterviewReminderFallback,
   buildManualInterviewDetailsFallback,

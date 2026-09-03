@@ -14,6 +14,10 @@ const {
   capitalizePhrase
 } = require("./tenantBranding");
 const {
+  selectCustomerFacingOfficeAddress,
+  extractOfficeCity
+} = require("../officeAddressResolver");
+const {
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
   getExplicitJobFaqAnswer,
@@ -136,11 +140,15 @@ const COPY = Object.freeze({
     meeting_preference_in_person_confirm_slot:
       "Perfect. Does {dateLabel} at {requestedTime} still work for an in-person interview?",
     meeting_preference_in_person_office_confirm_slot:
-      "Perfect. That would be at our Doral office. Does {dateLabel} at {requestedTime} work for you?",
+      "Perfect. That would be at our {officeCity} office. Does {dateLabel} at {requestedTime} work for you?",
+    meeting_preference_in_person_office_confirm_slot_neutral:
+      "Perfect. That would be at our office. Does {dateLabel} at {requestedTime} work for you?",
     meeting_preference_in_person_ask_time:
       "Got it — we can do the interview in person. What time works best after {earliestTime}?",
     confirm_in_person_travel_doral:
-      "Of course. Our office is in Doral, at 2500 NW 79th Ave, Suite 189. Does coming to Doral work for you?",
+      "Of course. Our office is in {officeCity}, at {officeAddress}. Does coming to {officeCity} work for you?",
+    confirm_in_person_travel_neutral:
+      "Of course. We can do the interview in person at our office. Does coming to the office work for you?",
     acknowledge_cancel_no_write:
       "Understood — I've noted your cancel request. A teammate will confirm any changes; nothing was changed automatically.",
     acknowledge_withdraw_no_write:
@@ -298,11 +306,15 @@ const COPY = Object.freeze({
     meeting_preference_in_person_confirm_slot:
       "Perfecto. ¿Te funciona el {dateLabel} a las {requestedTime} para la entrevista en persona?",
     meeting_preference_in_person_office_confirm_slot:
-      "Perfecto. Entonces sería en nuestra oficina de Doral. ¿Te funciona el {dateLabel} a las {requestedTime}?",
+      "Perfecto. Entonces sería en nuestra oficina de {officeCity}. ¿Te funciona el {dateLabel} a las {requestedTime}?",
+    meeting_preference_in_person_office_confirm_slot_neutral:
+      "Perfecto. Entonces sería en nuestra oficina. ¿Te funciona el {dateLabel} a las {requestedTime}?",
     meeting_preference_in_person_ask_time:
       "Entendido — podemos hacer la entrevista en persona. ¿Qué hora te funciona después de las {earliestTime}?",
     confirm_in_person_travel_doral:
-      "Claro. Nuestra oficina está en Doral, en 2500 NW 79th Ave, Suite 189. ¿Te funciona venir hasta Doral?",
+      "Claro. Nuestra oficina está en {officeCity}, en {officeAddress}. ¿Te funciona venir hasta {officeCity}?",
+    confirm_in_person_travel_neutral:
+      "Claro. Podemos hacer la entrevista en persona en nuestra oficina. ¿Te funciona venir a la oficina?",
     acknowledge_cancel_no_write:
       "Entendido — anoté tu solicitud de cancelación. Un compañero confirmará cualquier cambio; no se modificó nada automáticamente.",
     acknowledge_withdraw_no_write:
@@ -512,7 +524,16 @@ function localeCode(language) {
   return language === LANGUAGES.SPANISH ? "es" : "en";
 }
 
-function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
+function resolveOfficeIdentity(responsePlan = {}, entities = {}) {
+  return selectCustomerFacingOfficeAddress({
+    organizationId: responsePlan.organizationId || entities.organizationId || null,
+    officeAddress: responsePlan.officeAddress || entities.officeAddress || null,
+    officeAddressSource:
+      responsePlan.officeAddressSource || entities.officeAddressSource || null
+  });
+}
+
+function resolveResumeQuestion(resumeTemplateKey, language, entities = {}, officeIdentity = {}) {
   const lang = localeCode(language);
   const city = entities.city || null;
   const proposed = entities.proposedState || entities.state || null;
@@ -541,7 +562,7 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}) {
         String(entities.meetingType || "").toLowerCase() === "zoom";
       return forceZoom
         ? getOutsideZoomDayPartMessage(entities.city, lang)
-        : getLocalOfficeDayPartMessage(lang);
+        : getLocalOfficeDayPartMessage(lang, officeIdentity);
     }
     case "outside_zoom_day_part":
       return getOutsideZoomDayPartMessage(entities.city, lang);
@@ -678,8 +699,24 @@ function renderCustomerReply(responsePlan) {
   const stateCode = entities.state || entities.proposedState || null;
   const proposed = proposedStateName(stateCode, language);
   const lang = localeCode(language);
+  const office = resolveOfficeIdentity(responsePlan, entities);
+  const officeAddress = office.address || "";
+  const officeCity = extractOfficeCity(office.address) || "";
+  const officeIdentity = {
+    organizationId: responsePlan?.organizationId || entities.organizationId || null,
+    officeAddress: office.address,
+    officeAddressSource: office.source
+  };
 
   let template = pack[key];
+  if (key === "confirm_in_person_travel_doral" && !officeAddress) {
+    template = pack.confirm_in_person_travel_neutral;
+  } else if (
+    key === "meeting_preference_in_person_office_confirm_slot" &&
+    !officeCity
+  ) {
+    template = pack.meeting_preference_in_person_office_confirm_slot_neutral;
+  }
 
   // BR-084/088 — handoff copy only when decision explicitly requires a human.
   // Never remap uncertain escalate → scheduling "time unavailable" (FAQ collision).
@@ -720,7 +757,7 @@ function renderCustomerReply(responsePlan) {
       resumeKey === "continue_qualification_after_authorization" ||
       resumeKey === "outside_zoom_day_part"
         ? getDayPartQuestion(lang)
-        : resolveResumeQuestion(resumeKey, language, entities);
+        : resolveResumeQuestion(resumeKey, language, entities, officeIdentity);
     template = composeAnswerThenOneQuestion(
       getNaturalGreetingAck(lang),
       resume
@@ -820,7 +857,7 @@ function renderCustomerReply(responsePlan) {
       String(entities.meetingType || "").toLowerCase() === "zoom";
     const resume = forceZoom
       ? getOutsideZoomDayPartMessage(city === "there" ? null : city, lang)
-      : getLocalOfficeDayPartMessage(lang);
+      : getLocalOfficeDayPartMessage(lang, officeIdentity);
     // Implements BR-195 — one acknowledgement per inbound (resume already has Excelente/Perfecto).
     template = /^(perfecto|excelente|perfect|excellent)\b/i.test(String(resume || "").trim())
       ? resume
@@ -839,7 +876,8 @@ function renderCustomerReply(responsePlan) {
     const resume = resolveResumeQuestion(
       entities.resumeTemplateKey || "continue_qualification_after_location",
       language,
-      entities
+      entities,
+      officeIdentity
     );
     // Implements BR-109 — brief ack only; do not narrate "anoto"/note-taking.
     const ack =
@@ -867,7 +905,8 @@ function renderCustomerReply(responsePlan) {
       ? ` ${resolveResumeQuestion(
           "continue_qualification_after_authorization",
           language,
-          entities
+          entities,
+          officeIdentity
         )}`
       : "";
     template = `${ssn}${inPerson}${dayPart}`.trim();
@@ -886,7 +925,8 @@ function renderCustomerReply(responsePlan) {
     const resume = resolveResumeQuestion(
       entities.resumeTemplateKey || "continue_qualification_after_location",
       language,
-      entities
+      entities,
+      officeIdentity
     );
     template = `${ack} ${resume}`;
   } else if (key === "authorization_denied") {
@@ -895,7 +935,8 @@ function renderCustomerReply(responsePlan) {
     const resume = resolveResumeQuestion(
       entities.resumeTemplateKey || "continue_qualification_after_location",
       language,
-      entities
+      entities,
+      officeIdentity
     );
     template = (pack.language_switch_resume || "").replace(
       /\{resumeQuestion\}/g,
@@ -905,7 +946,8 @@ function renderCustomerReply(responsePlan) {
     const resume = resolveResumeQuestion(
       entities.resumeTemplateKey || "continue_qualification_after_location",
       language,
-      entities
+      entities,
+      officeIdentity
     );
     template = (pack.acknowledge_location_correction || "")
       .replace(/\{resumeQuestion\}/g, resume);
@@ -1132,7 +1174,9 @@ function renderCustomerReply(responsePlan) {
     forceZoomNoOffice &&
     key !== "confirm_in_person_travel_doral" &&
     key !== "meeting_preference_in_person_office_confirm_slot" &&
-    /2500 NW 79th|oficinas ubicadas|Doral office/i.test(String(template || ""))
+    /2500 NW 79th|oficinas ubicadas|Doral office|\{officeAddress\}|\{officeCity\}/i.test(
+      String(template || "")
+    )
   ) {
     template =
       language === LANGUAGES.SPANISH
@@ -1168,6 +1212,8 @@ function renderCustomerReply(responsePlan) {
     .replace(/\{slotConfirmPhrase\}/g, slotConfirmPhrase)
     .replace(/\{zoomUrl\}/g, zoomUrl)
     .replace(/\{city\}/g, city)
+    .replace(/\{officeAddress\}/g, officeAddress)
+    .replace(/\{officeCity\}/g, officeCity)
     .replace(/\{proposedStateName\}/g, proposed || "your state")
     .replace(/\{proposedState\}/g, entities.proposedState || "")
     .replace(/\{resumeQuestion\}/g, entities.resumeQuestion || "")

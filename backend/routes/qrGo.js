@@ -17,6 +17,9 @@ const {
   renderPhoneBindInterstitial,
   renderSafeErrorPage
 } = require("../core/qrChannel/interstitialHtml");
+const {
+  resolveQrInterstitialBranding
+} = require("../core/qrChannel/qrInterstitialBranding");
 const { REASON_CODES } = require("../core/qrChannel/constants");
 const { emitQrEvent, EVENTS } = require("../core/qrChannel/qrChannelTelemetry");
 
@@ -46,6 +49,25 @@ function isRateLimited(map, ip, max) {
   history.push(now);
   map.set(ip, history);
   return false;
+}
+
+async function resolvePublicQrBranding(campaign = null) {
+  const organizationId = campaign?.org_id || null;
+  let organizationDisplayName = null;
+  if (organizationId) {
+    try {
+      const branding = await require("../services/organizationBrandingService").getOrganizationBranding(
+        organizationId
+      );
+      organizationDisplayName = branding?.name || null;
+    } catch {
+      organizationDisplayName = null;
+    }
+  }
+  return resolveQrInterstitialBranding({
+    organizationId,
+    organizationDisplayName
+  });
 }
 
 function getService() {
@@ -123,11 +145,12 @@ router.get("/:token", async (req, res) => {
       return res.status(copy.status).type("html").send(renderSafeErrorPage(copy));
     }
 
+    const branding = await resolvePublicQrBranding(result.campaign);
     const html = renderPhoneBindInterstitial({
       token: req.params.token,
       scanId: result.scan.id,
       bindMac: result.bindMac,
-      campaignName: "Team Vision"
+      branding
     });
     return res.status(200).type("html").send(html);
   } catch (error) {
@@ -176,11 +199,12 @@ router.post("/:token/bind", express.urlencoded({ extended: false }), async (req,
         const restarted = await service.startPublicEntry(req.params.token);
         if (restarted.ok) {
           const copy = errorCopy(result.reasonCode);
+          const branding = await resolvePublicQrBranding(resolved.campaign);
           const html = renderPhoneBindInterstitial({
             token: req.params.token,
             scanId: restarted.scan.id,
             bindMac: restarted.bindMac,
-            campaignName: "Team Vision",
+            branding,
             errorMessage: copy.body
           });
           return res.status(400).type("html").send(html);

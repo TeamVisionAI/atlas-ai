@@ -62,8 +62,14 @@ function turn(text, context, options = {}) {
   return { interpretation, structuredDecision, nextContext, rendered };
 }
 
+const { TEAM_VISION_ORGANIZATION_ID } = require("../core/teamVisionSeedTenant");
+const TV_OFFICE = "2500 NW 79th Ave, Suite 189, Doral, FL 33122";
+
 function schedulingContext(overrides = {}) {
   return createConversationContext({
+    organizationId: TEAM_VISION_ORGANIZATION_ID,
+    officeAddress: TV_OFFICE,
+    officeAddressSource: "organization_profile",
     preferredLanguage: "spanish",
     languageMeta: { source: "active_conversation" },
     currentStage: "scheduling",

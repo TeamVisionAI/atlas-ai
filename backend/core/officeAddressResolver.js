@@ -6,6 +6,7 @@
 
 const { MEETING_TYPES } = require("./configuration/appointmentDomain");
 const { isTeamVisionSeedTenant } = require("./teamVisionSeedTenant");
+const { getOfficeLocation } = require("./businessRulesEngine");
 
 const OFFICE_ADDRESS_SOURCES = Object.freeze({
   PERSISTED_APPOINTMENT: "persisted_appointment",
@@ -188,6 +189,64 @@ async function resolveCanonicalOfficeAddress(input = {}, deps = {}) {
   });
 }
 
+/**
+ * Sync customer-copy selector over an already-resolved office identity.
+ * Does not fetch settings and is not a second resolver (BR-077 / BR-225).
+ *
+ * Precedence:
+ * 1. complete stamped officeAddress (any tenant)
+ * 2. Team Vision seed BR-018 only
+ * 3. unavailable — never getOfficeLocation() for another tenant
+ *
+ * @param {object} input
+ * @returns {{ address: string|null, status: string, source: string }}
+ */
+function selectCustomerFacingOfficeAddress(input = {}) {
+  const organizationId = input.organizationId || null;
+  const stamped = input.officeAddress || input.address || null;
+
+  if (isCompleteOfficeAddress(stamped)) {
+    return buildResult({
+      address: String(stamped).trim(),
+      status: OFFICE_ADDRESS_STATUSES.CONFIGURED,
+      source: input.officeAddressSource || OFFICE_ADDRESS_SOURCES.REQUEST
+    });
+  }
+
+  if (isTeamVisionSeedTenant(organizationId)) {
+    const seedAddress = getOfficeLocation().fullAddress || null;
+    if (isCompleteOfficeAddress(seedAddress)) {
+      return buildResult({
+        address: seedAddress,
+        status: OFFICE_ADDRESS_STATUSES.CONFIGURED,
+        source: OFFICE_ADDRESS_SOURCES.ORGANIZATION_PROFILE
+      });
+    }
+  }
+
+  return buildResult({
+    address: null,
+    status: OFFICE_ADDRESS_STATUSES.UNAVAILABLE,
+    source: OFFICE_ADDRESS_SOURCES.UNAVAILABLE
+  });
+}
+
+/**
+ * City label from a complete street address, e.g. Doral from BR-018.
+ * Returns null rather than inventing a city.
+ * @param {string|null} address
+ * @returns {string|null}
+ */
+function extractOfficeCity(address) {
+  if (!isCompleteOfficeAddress(address)) {
+    return null;
+  }
+  const match = String(address)
+    .trim()
+    .match(/,\s*([^,]+),\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/);
+  return match ? match[1].trim() : null;
+}
+
 function buildOfficeAddressDiagnostics(resolution = {}) {
   return {
     status: resolution.status || null,
@@ -206,5 +265,7 @@ module.exports = {
   isInPersonMeeting,
   composeOfficeAddressFromOfficeModel,
   resolveCanonicalOfficeAddress,
+  selectCustomerFacingOfficeAddress,
+  extractOfficeCity,
   buildOfficeAddressDiagnostics
 };

@@ -283,7 +283,7 @@ function buildNextContextFromInterpretation({
     nextContext.appointment = {
       ...nextContext.appointment,
       meetingType: "in_person",
-      location: "Doral office"
+      location: nextContext.appointment?.location || "office"
     };
   }
 

@@ -65,8 +65,14 @@ function turn(text, context, options = {}) {
   return { interpretation, structuredDecision, nextContext, rendered };
 }
 
+const { TEAM_VISION_ORGANIZATION_ID } = require("../core/teamVisionSeedTenant");
+const TV_OFFICE = "2500 NW 79th Ave, Suite 189, Doral, FL 33122";
+
 function memoryContext(overrides = {}) {
   return createConversationContext({
+    organizationId: TEAM_VISION_ORGANIZATION_ID,
+    officeAddress: TV_OFFICE,
+    officeAddressSource: "organization_profile",
     preferredLanguage: "spanish",
     languageMeta: { source: "active_conversation" },
     currentStage: "scheduling",
@@ -154,7 +160,7 @@ test("5. Zoom reselection does not reset scheduling", () => {
 test("6. Zoom clears office state", () => {
   const asked = turn("Prefiero en persona", memoryContext());
   const confirmed = turn("Sí, puedo ir a Doral", asked.nextContext);
-  assert.equal(confirmed.nextContext.appointment.location, "Doral office");
+  assert.equal(confirmed.nextContext.appointment.location, "Doral");
   const zoom = turn("Actually, mejor Zoom", confirmed.nextContext);
   assert.equal(zoom.nextContext.knownFacts.preferredMeetingType, "zoom");
   assert.equal(zoom.nextContext.appointment.location, null);

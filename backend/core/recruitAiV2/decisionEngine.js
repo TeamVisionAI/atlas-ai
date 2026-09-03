@@ -47,6 +47,7 @@ const {
   STAGES
 } = require("./conversationContext");
 const { evaluateCoverage } = require("../businessRulesEngine");
+const { extractOfficeCity } = require("../officeAddressResolver");
 const {
   WORK_AUTHORIZATION,
   FINANCIAL_LICENSE_STATUS
@@ -593,7 +594,15 @@ function buildBaseDecision({ context, interpretation }) {
       language: interpretation.preferredLanguage,
       organizationId: context.organizationId || null,
       organizationName: context.organizationName || null,
-      entities: interpretation.entities || {}
+      officeAddress: context.officeAddress || null,
+      officeAddressSource: context.officeAddressSource || null,
+      entities: {
+        ...(interpretation.entities || {}),
+        officeAddress: context.officeAddress || null,
+        officeAddressSource: context.officeAddressSource || null,
+        organizationId: context.organizationId || null,
+        organizationName: context.organizationName || null
+      }
     },
     contextPatch: {}
   };
@@ -2562,7 +2571,12 @@ function decideConversationTurnCore({
       },
       appointment: {
         meetingType,
-        location: meetingType === "zoom" ? null : context.appointment?.location
+        location:
+          meetingType === "zoom"
+            ? null
+            : context.appointment?.location ||
+              extractOfficeCity(context.officeAddress) ||
+              "office"
         // proposedDate / proposedTime preserved via merge
       },
       conversation: {
@@ -2609,7 +2623,7 @@ function decideConversationTurnCore({
       },
       appointment: {
         meetingType: "in_person",
-        location: "Doral office"
+        location: extractOfficeCity(context.officeAddress) || "office"
       },
       conversation: {
         lastProspectIntent: INTENTS.CONFIRM_IN_PERSON_TRAVEL,

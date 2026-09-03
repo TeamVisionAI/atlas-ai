@@ -1,15 +1,18 @@
 /**
  * Public QR phone-bind interstitial branding tokens.
  *
- * Phase A: Team Vision / Atlas defaults (navy + gold).
- * Structure is intentionally tenant-ready — values can later come from
- * organization branding config without changing HTML structure.
+ * Visual chrome is Atlas product navy + gold (not tenant-specific).
+ * organizationDisplayName is tenant-aware (BR-225): Team Vision only for the
+ * seed tenant or an explicit safe override. Shared default is Atlas.
  *
  * Do not hardcode WhatsApp green as a page-dominant color.
  */
 
+const { isTeamVisionSeedTenant } = require("../teamVisionSeedTenant");
+const { isSafeOrganizationDisplayName } = require("../recruitAiV2/tenantBranding");
+
 const DEFAULT_QR_INTERSTITIAL_BRANDING = Object.freeze({
-  organizationDisplayName: "Team Vision",
+  organizationDisplayName: "Atlas",
   productName: "Atlas",
   logoUrl: null,
   colors: Object.freeze({
@@ -33,15 +36,29 @@ const DEFAULT_QR_INTERSTITIAL_BRANDING = Object.freeze({
 /**
  * @param {Partial<typeof DEFAULT_QR_INTERSTITIAL_BRANDING>} [overrides]
  */
+function resolveQrOrganizationDisplayName({
+  organizationId = null,
+  organizationDisplayName = null
+} = {}) {
+  if (isSafeOrganizationDisplayName(organizationDisplayName, organizationId)) {
+    return String(organizationDisplayName).trim();
+  }
+  if (isTeamVisionSeedTenant(organizationId)) {
+    return "Team Vision";
+  }
+  return DEFAULT_QR_INTERSTITIAL_BRANDING.organizationDisplayName;
+}
+
 function resolveQrInterstitialBranding(overrides = {}) {
   const colors = {
     ...DEFAULT_QR_INTERSTITIAL_BRANDING.colors,
     ...(overrides.colors || {})
   };
   return {
-    organizationDisplayName:
-      overrides.organizationDisplayName ||
-      DEFAULT_QR_INTERSTITIAL_BRANDING.organizationDisplayName,
+    organizationDisplayName: resolveQrOrganizationDisplayName({
+      organizationId: overrides.organizationId || null,
+      organizationDisplayName: overrides.organizationDisplayName || null
+    }),
     productName:
       overrides.productName || DEFAULT_QR_INTERSTITIAL_BRANDING.productName,
     logoUrl:
@@ -72,6 +89,7 @@ function brandingCssVariables(branding = DEFAULT_QR_INTERSTITIAL_BRANDING) {
 
 module.exports = {
   DEFAULT_QR_INTERSTITIAL_BRANDING,
+  resolveQrOrganizationDisplayName,
   resolveQrInterstitialBranding,
   brandingCssVariables
 };

@@ -167,6 +167,8 @@ function createConversationContext(overrides = {}) {
     prospectId: null,
     organizationId: null,
     organizationName: null,
+    officeAddress: null,
+    officeAddressSource: null,
     preferredLanguage: LANGUAGES.UNKNOWN,
     languageMeta: emptyLanguageMeta(),
     currentStage: STAGES.GREETING,
