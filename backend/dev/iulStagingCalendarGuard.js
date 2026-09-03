@@ -14,18 +14,14 @@ const {
 const googleCalendarIntegrationService = require("../services/googleCalendarIntegrationService");
 const appointmentProfileService = require("../services/appointmentProfileService");
 const { isApprovedHttpsZoomUrl } = require("../core/virtualMeetingUrlResolver");
-
-const STAGING_CALENDAR_NAME = "Atlas Staging";
-const SIMULATOR_EVENT_TITLE_PREFIX = "[ATLAS IUL SIMULATOR]";
-const STAGING_GUARD_ERROR = "Staging calendar not safely configured.";
-
-function buildGuardError(message = STAGING_GUARD_ERROR, code = "IUL_STAGING_GUARD_FAILED") {
-  const error = new Error(message);
-  error.code = code;
-  error.statusCode = 409;
-  error.publicMessage = STAGING_GUARD_ERROR;
-  return error;
-}
+const {
+  STAGING_CALENDAR_NAME,
+  SIMULATOR_EVENT_TITLE_PREFIX,
+  STAGING_GUARD_ERROR,
+  buildGrantError: buildGuardError,
+  createIulStagingBookingGrant,
+  assertIulStagingBookingGrant
+} = require("./iulStagingBookingGrant");
 
 function assertSuperAdminStagingAccess(req, { explicitStagingMode = false } = {}) {
   if (!explicitStagingMode) {
@@ -144,5 +140,7 @@ module.exports = {
   assertSuperAdminStagingAccess,
   resolveStagingCalendarConfig,
   isStagingCalendarMatch,
-  buildGuardError
+  buildGuardError,
+  createIulStagingBookingGrant,
+  assertIulStagingBookingGrant
 };

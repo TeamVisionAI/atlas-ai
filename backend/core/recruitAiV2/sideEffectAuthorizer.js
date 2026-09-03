@@ -152,14 +152,31 @@ function authorizeSideEffects({
   const denyReasons = [];
   const proposals = [];
 
-  const eligibility = isEligibleForExecution({
-    organizationId: orgId,
-    actingUserId: userId,
-    env,
-    grant: options.v2Grant || options.grant || null
-  });
+  const {
+    tryAssertIulStagingBookingGrant,
+    IUL_STAGING_E2E_INVOCATION_SOURCE
+  } = require("../../dev/iulStagingBookingGrant");
+  const stagingGrant =
+    options.invocationSource === IUL_STAGING_E2E_INVOCATION_SOURCE
+      ? tryAssertIulStagingBookingGrant(options.iulStagingE2EGrant)
+      : null;
+  if (options.iulStagingE2EGrant && !stagingGrant) {
+    denyReasons.push(REASON_CODES.EXECUTION_DENIED);
+  }
 
-  if (!executionEnabled || config.failClosed) {
+  const eligibility = stagingGrant
+    ? { eligible: true, reason: "IUL_STAGING_E2E_GRANT" }
+    : isEligibleForExecution({
+        organizationId: orgId,
+        actingUserId: userId,
+        env,
+        grant: options.v2Grant || options.grant || null
+      });
+
+  if (stagingGrant) {
+    // Implements BR-223 — explicit Super Admin staging E2E grant is the only
+    // simulator path that may authorize create_appointment without env allowlists.
+  } else if (!executionEnabled || config.failClosed) {
     denyReasons.push(
       config.failClosedReason === "MALFORMED_EXECUTION_ENABLED"
         ? REASON_CODES.EXECUTION_DENIED

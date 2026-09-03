@@ -499,6 +499,30 @@ async function processRecruitAiV2Turn({
     options.inboundMessageId ||
     null;
   const env = options.env || process.env;
+  // Implements BR-223 — staging booking grant cannot activate from live inbound.
+  if (options.iulStagingE2EGrant) {
+    const {
+      IUL_STAGING_E2E_INVOCATION_SOURCE,
+      tryAssertIulStagingBookingGrant
+    } = require("../../dev/iulStagingBookingGrant");
+    const liveInbound =
+      options.invocationSource === "live_ce" ||
+      options.invocationSource === "live_whatsapp";
+    const validGrant =
+      !liveInbound &&
+      options.invocationSource === IUL_STAGING_E2E_INVOCATION_SOURCE
+        ? tryAssertIulStagingBookingGrant(options.iulStagingE2EGrant)
+        : null;
+    if (!validGrant) {
+      options = { ...options, iulStagingE2EGrant: null, allowExecution: false };
+    } else {
+      options = {
+        ...options,
+        allowExecution: true,
+        persistContext: false
+      };
+    }
+  }
   if (!options.v2Grant) {
     try {
       const {

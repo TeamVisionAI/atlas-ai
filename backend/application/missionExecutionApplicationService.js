@@ -376,7 +376,12 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     );
   }
 
-  if (!isProductionProspect(phone)) {
+  const {
+    tryAssertIulStagingBookingGrant
+  } = require("../dev/iulStagingBookingGrant");
+  const stagingGrant = tryAssertIulStagingBookingGrant(options.iulStagingE2EGrant);
+
+  if (!stagingGrant && !isProductionProspect(phone)) {
     return buildActionError(ACTION_IDS.SCHEDULE, "PROSPECT_NOT_FOUND", "Prospect not found.");
   }
 
@@ -541,8 +546,9 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
   }
 
   // Implements BR-127 — validate sync plan BEFORE Calendar / appointment mutation.
+  // BR-223 staging E2E skips production qualification sync (no CRM writes).
   let qualificationSyncPlan = null;
-  if (options.recruitAiV2Context) {
+  if (options.recruitAiV2Context && !stagingGrant) {
     qualificationSyncPlan = planQualificationFactSync({
       durableContext: options.recruitAiV2Context,
       prospect,
@@ -593,10 +599,11 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
     matchedSlot.assignedInterviewerUserId || effectiveInterviewerUserId;
 
   if (isZoom) {
-    const {
-      resolveCanonicalVirtualMeetingUrl
-    } = require("../core/virtualMeetingUrlResolver");
-    const interviewerZoom = await resolveCanonicalVirtualMeetingUrl({
+    const resolveZoom =
+      deps.resolveCanonicalVirtualMeetingUrl ||
+      ((args) =>
+        require("../core/virtualMeetingUrlResolver").resolveCanonicalVirtualMeetingUrl(args));
+    const interviewerZoom = await resolveZoom({
       organizationId,
       interviewerUserId: assignedInterviewerUserId,
       meetingType: "virtual",
@@ -630,18 +637,32 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
       duration,
       interviewerUserId: assignedInterviewerUserId,
       metadata: {
-        name: prospect.name,
-        prospectName: prospect.name,
-        phone: prospect.phone,
+        name: stagingGrant ? "Atlas IUL Simulator" : prospect.name,
+        prospectName: stagingGrant ? "Atlas IUL Simulator" : prospect.name,
+        phone: stagingGrant ? null : prospect.phone,
         notes: payload.notes || null,
         interviewType,
         recruiter: payload.recruiter || null,
         location: isZoom ? meetingUrl : location,
         meetingUrl: isZoom ? meetingUrl : null,
         zoomUrl: isZoom ? meetingUrl : null,
-        attendeeEmail,
+        attendeeEmail: stagingGrant ? null : attendeeEmail,
         interviewerUserId: assignedInterviewerUserId,
-        assignedInterviewerUserId
+        assignedInterviewerUserId,
+        ...(stagingGrant
+          ? {
+              stagingCalendarTarget: stagingGrant,
+              eventTitlePrefix: stagingGrant.titlePrefix,
+              eventDescription: require("../dev/iulStagingBookingGrant").buildSimulatorEventDescription({
+                simulatorRunId: stagingGrant.simulatorRunId,
+                scenarioId: stagingGrant.scenarioId,
+                meetingMode: isZoom ? "zoom" : "in_person",
+                slot: { dateKey: payload.dateKey, timeKey: payload.timeKey },
+                timezone: payload.timezone || "America/New_York",
+                environment: stagingGrant.environment
+              })
+            }
+          : {})
       },
       timezone: payload.timezone || "America/New_York"
     });
@@ -755,6 +776,15 @@ async function executeScheduleInterview(phone, payload = {}, options = {}) {
       "APPOINTMENT_PERSISTENCE_FAILED",
       "Unable to persist appointment record."
     );
+  }
+
+  if (stagingGrant) {
+    return buildScheduleExecutionResponse({
+      bookingResult,
+      meetingUrl,
+      appointmentRecord,
+      advanceResult: { success: true, workflow: null, skipped: "iul_staging_e2e" }
+    });
   }
 
   const prospectUpdates = {

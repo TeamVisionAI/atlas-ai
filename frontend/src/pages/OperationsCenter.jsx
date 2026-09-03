@@ -283,8 +283,8 @@ function IulPolicyReviewScenarioResult({ report }) {
           </p>
           {report.mode === "staging_e2e" ? (
             <p className="ops-muted">
-              Calendar: {staging.calendarName} · Meeting: {staging.meetingMode} · Event:{" "}
-              {staging.eventCreated ? staging.eventId : "Failed"} · Zoom:{" "}
+              Booking: {report.bookingPath || "—"} · Calendar: {staging.calendarName} · Meeting:{" "}
+              {staging.meetingMode} · Event: {staging.eventCreated ? staging.eventId : "Failed"} · Zoom:{" "}
               {staging.zoomVerified ? "Verified" : staging.zoomConfigured ? "Missing in reply" : "Not configured"}{" "}
               · Cleanup: {staging.cleanupStatus}
             </p>

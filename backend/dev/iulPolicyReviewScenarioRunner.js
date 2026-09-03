@@ -19,12 +19,18 @@ const { IUL_OPTION_IDS } = require("../core/recruitAiV2/iulQualificationOptions"
 const { evaluateExpect } = require("./recruitAiV2ScenarioRunner");
 const {
   createSimulatorRunId,
-  createStagingSimulatorEvent,
   cleanupStagingSimulatorEvents,
-  getStagingEventByRunId
+  getStagingEventByRunId,
+  createStagingBookingDependencies,
+  certifyIulStagingBooking
 } = require("./iulStagingE2EService");
 const { resolveStagingCalendarConfig } = require("./iulStagingCalendarGuard");
+const {
+  createIulStagingBookingGrant,
+  IUL_STAGING_E2E_INVOCATION_SOURCE
+} = require("./iulStagingBookingGrant");
 const { FRESH_IUL_INTAKE_MATCH, IUL_CODE } = require("./iulSimulatorShared");
+const { REASON_CODES } = require("../core/recruitAiV2/constants");
 
 const SIM_IUL_PREFIX = "sim-iul-";
 const PHONE_LIKE = /\+?\d[\d\s().-]{7,}\d/;
@@ -290,6 +296,7 @@ function runIulSimulatorTurn(session, turn = {}, options = {}) {
     return { ...prior, idempotent: true, contextAdvanced: false, prospectInput: text };
   }
 
+  const stagingBooking = Boolean(options.stagingBooking && options.stagingGrant);
   const forcedEnv = {
     RECRUIT_AI_V2_EXECUTION_ENABLED: "false",
     RECRUIT_AI_V2_SHADOW_ENABLED: "false"
@@ -314,6 +321,8 @@ function runIulSimulatorTurn(session, turn = {}, options = {}) {
   const processOptions = {
     flexible: true,
     env: forcedEnv,
+    persistContext: false,
+    v2Grant: { eligible: false, reason: "IUL_SIMULATOR" },
     ...(session.context?._testNow ? { now: session.context._testNow } : {}),
     ...(turn.campaignIntakeMatch ? { campaignIntakeMatch: turn.campaignIntakeMatch } : {}),
     ...(session.context?._availabilityFixture || session.availabilityFixture
@@ -328,11 +337,25 @@ function runIulSimulatorTurn(session, turn = {}, options = {}) {
     ...(session.context?.prospectOwnerUserId
       ? { ownerUserId: session.context.prospectOwnerUserId }
       : {}),
+    ...(options.getSlots ? { getSlots: options.getSlots } : {}),
     ...(options.stagingConfig
       ? {
           organizationId: options.stagingConfig.organizationId,
           profileConfigured: true,
           actingUserId: options.stagingConfig.userId
+        }
+      : {}),
+    ...(stagingBooking
+      ? {
+          invocationSource: IUL_STAGING_E2E_INVOCATION_SOURCE,
+          iulStagingE2EGrant: options.stagingGrant,
+          allowExecution: true,
+          profileConfigured: true,
+          prospectPhone: options.prospectPhone || session.context.prospectPhone,
+          inboundMessageId,
+          dependencies: options.bookingDependencies || {},
+          organizationId: options.stagingGrant.organizationId,
+          actingUserId: options.stagingGrant.userId
         }
       : {})
   };
@@ -357,7 +380,7 @@ function runIulSimulatorTurn(session, turn = {}, options = {}) {
         options: processOptions
       });
 
-    if (authorization.authorized) {
+    if (authorization.authorized && !stagingBooking) {
       const leak = new Error("IUL simulator side-effect leak");
       leak.code = "SIMULATOR_SIDE_EFFECT_LEAK";
       throw leak;
@@ -390,11 +413,14 @@ function runIulSimulatorTurn(session, turn = {}, options = {}) {
         shadowEvaluationRows: 0
       },
       execution: {
-        attempted: false,
+        attempted: Boolean(result.execution?.attempted),
         whatsapp: false,
-        appointment: false,
-        calendar: false,
-        br080: false
+        appointment: Boolean(stagingBooking && result.execution?.success),
+        calendar: Boolean(stagingBooking && result.execution?.success),
+        br080: false,
+        bookingPath: stagingBooking ? "executeScheduleInterview" : null,
+        appointmentId: result.execution?.appointmentId || null,
+        scheduleResult: result.execution?.scheduleResult || null
       },
       result
     };
@@ -468,9 +494,10 @@ async function runGoldenPathDriver(session, options = {}) {
     }
   ];
 
+  const conversationOptions = { ...options, stagingBooking: false };
   let lastReport = null;
   for (const step of steps) {
-    lastReport = await runIulSimulatorTurn(session, step, options);
+    lastReport = await runIulSimulatorTurn(session, step, conversationOptions);
     turns.push(lastReport);
     if (!lastReport.pass) {
       return { turns, pass: false };
@@ -494,7 +521,7 @@ async function runGoldenPathDriver(session, options = {}) {
       text: dayOption.title,
       interactiveReply: { type: "list_reply", id: dayOption.id, title: dayOption.title }
     },
-    options
+    conversationOptions
   );
   turns.push(lastReport);
   if (!lastReport.pass) {
@@ -519,7 +546,7 @@ async function runGoldenPathDriver(session, options = {}) {
       interactiveReply: { type: "button_reply", id: daypartOption.id, title: daypartOption.title },
       expect: { compactSlotCountMin: 1, compactSlotCountMax: 3 }
     },
-    options
+    conversationOptions
   );
   turns.push(lastReport);
   if (!lastReport.pass) {
@@ -536,19 +563,36 @@ async function runGoldenPathDriver(session, options = {}) {
     return { turns, pass: false };
   }
 
+  const slotInboundMessageId =
+    options.slotInboundMessageId ||
+    `sim-wamid.${session.context.prospectId}.slot`;
+  const preBookingContext = { ...session.context };
   lastReport = await runIulSimulatorTurn(
     session,
     {
       id: "slot",
+      inboundMessageId: slotInboundMessageId,
       text: slotOption.title,
       interactiveReply: { type: "button_reply", id: slotOption.id, title: slotOption.title },
-      expect: { mayCreateAppointment: true }
+      expect: options.stagingBooking
+        ? {}
+        : { mayCreateAppointment: true }
     },
-    options
+    {
+      ...options,
+      stagingBooking: Boolean(options.stagingBooking)
+    }
   );
   turns.push(lastReport);
 
-  return { turns, pass: lastReport.pass };
+  return {
+    turns,
+    pass: lastReport.pass,
+    slotOption,
+    slotInboundMessageId,
+    preBookingContext,
+    bookingTurn: lastReport
+  };
 }
 
 async function runIulDryRunScenario(definition) {
@@ -600,9 +644,16 @@ async function runIulDryRunScenario(definition) {
 }
 
 async function runIulStagingE2EScenario(definition, req, options = {}) {
-  const stagingConfig = await resolveStagingCalendarConfig(req, { explicitStagingMode: true });
-  const simulatorRunId = createSimulatorRunId();
+  const stagingConfig =
+    options.stagingConfig ||
+    (await resolveStagingCalendarConfig(req, { explicitStagingMode: true }));
+  const simulatorRunId = options.simulatorRunId || createSimulatorRunId();
   const meetingMode = definition.meetingMode === "in_person" ? "in_person" : "zoom";
+  const grant = createIulStagingBookingGrant({
+    stagingConfig,
+    simulatorRunId,
+    scenarioId: definition.id
+  });
 
   if (meetingMode === "zoom" && !stagingConfig.personalZoomUrl) {
     return {
@@ -621,12 +672,14 @@ async function runIulStagingE2EScenario(definition, req, options = {}) {
   }
 
   const { defaultIulSeed } = require("./iulSimulatorShared");
+  const prospectId = `${SIM_IUL_PREFIX}${definition.id}-${simulatorRunId.slice(-8)}`;
+  const phone = `sim-iul-${simulatorRunId.slice(-8)}`;
   const seed = defaultIulSeed({
-    prospectId: `${SIM_IUL_PREFIX}${definition.id}-${simulatorRunId.slice(-8)}`,
-    organizationId: stagingConfig.organizationId,
-    agentId: stagingConfig.userId,
-    prospectOwnerUserId: stagingConfig.userId,
-    testNow: new Date().toISOString(),
+    prospectId,
+    organizationId: grant.organizationId,
+    agentId: grant.userId,
+    prospectOwnerUserId: grant.userId,
+    testNow: options.testNow || new Date().toISOString(),
     knownFacts: {},
     _officeLocation: stagingConfig.officeAddress
       ? { fullAddress: stagingConfig.officeAddress }
@@ -634,51 +687,145 @@ async function runIulStagingE2EScenario(definition, req, options = {}) {
   });
 
   const session = createIulEphemeralSession(seed);
+  session.context.prospectPhone = phone;
   session.simulatorRunId = simulatorRunId;
 
-  const driverResult = await runGoldenPathDriver(session, {
-    async: true,
-    stagingConfig,
-    meetingMode
+  const bookingDeps = createStagingBookingDependencies({
+    grant,
+    prospectId,
+    phone,
+    getSlotsImpl: options.getSlots || null,
+    scheduleAppointmentImpl: options.scheduleAppointment || null,
+    resolveCanonicalVirtualMeetingUrl: options.resolveCanonicalVirtualMeetingUrl || null
   });
 
-  let calendarEvent = null;
-  let bookingFailure = null;
-  const lastTurn = driverResult.turns[driverResult.turns.length - 1];
-  const selectedSlot = session.context.knownFacts?.iulSelectedSlot || null;
+  const driverOptions = {
+    async: true,
+    stagingConfig,
+    stagingGrant: grant,
+    stagingBooking: true,
+    meetingMode,
+    getSlots: bookingDeps.getSlots,
+    bookingDependencies: {
+      executeScheduleInterview: bookingDeps.executeScheduleInterview,
+      getSlots: bookingDeps.getSlots,
+      findActiveAppointmentForProspect: bookingDeps.findActiveAppointmentForProspect,
+      findAppointmentById: bookingDeps.findAppointmentById
+    },
+    prospectPhone: phone
+  };
 
-  if (driverResult.pass && selectedSlot) {
-    try {
-      calendarEvent = await createStagingSimulatorEvent({
-        stagingConfig,
-        simulatorRunId,
-        scenarioId: definition.id,
-        meetingMode,
-        slot: selectedSlot,
-        zoomUrl: meetingMode === "zoom" ? stagingConfig.personalZoomUrl : null,
-        officeAddress: meetingMode === "in_person" ? stagingConfig.officeAddress : null
-      });
-      session.stagingEvent = calendarEvent;
-    } catch (error) {
-      bookingFailure = error.message;
-      driverResult.pass = false;
+  const driverResult = await runGoldenPathDriver(session, driverOptions);
+  const lastTurn = driverResult.bookingTurn || driverResult.turns[driverResult.turns.length - 1];
+  const selectedSlot =
+    session.context.knownFacts?.iulSelectedSlot ||
+    lastTurn?.result?.structuredDecision?.entities?.selectedSlot ||
+    null;
+  const bookingExecution = lastTurn?.result?.execution || {};
+  const firstCreateCount = bookingDeps.store.calendarCreateCount;
+
+  let calendarEvent = null;
+  if (typeof options.findCreatedEvent === "function") {
+    calendarEvent = await options.findCreatedEvent({
+      grant,
+      simulatorRunId,
+      bookingExecution
+    });
+  } else if (bookingExecution.scheduleResult?.calendarEventId || bookingExecution.appointmentId) {
+    calendarEvent = await getStagingEventByRunId(stagingConfig, simulatorRunId);
+    if (!calendarEvent) {
+      calendarEvent = {
+        id:
+          bookingExecution.scheduleResult?.calendarEventId ||
+          bookingExecution.scheduleResult?.booking?.googleCalendarEventId ||
+          null,
+        eventId:
+          bookingExecution.scheduleResult?.calendarEventId ||
+          bookingExecution.scheduleResult?.booking?.googleCalendarEventId ||
+          null,
+        location: bookingExecution.scheduleResult?.booking?.location || null
+      };
     }
   }
 
-  const renderedText = lastTurn?.atlasReply || "";
-  const zoomInReply =
-    meetingMode === "zoom" &&
-    stagingConfig.personalZoomUrl &&
-    renderedText.includes(stagingConfig.personalZoomUrl);
-  const zoomVerified =
-    meetingMode === "zoom" ? Boolean(stagingConfig.personalZoomUrl && (zoomInReply || calendarEvent?.zoomUrl)) : null;
+  let replay = { attempted: false, pass: false };
+  if (driverResult.slotInboundMessageId && driverResult.preBookingContext) {
+    const replayResult = await processRecruitAiV2Turn({
+      message: {
+        id: driverResult.slotInboundMessageId,
+        text: driverResult.slotOption?.title,
+        interactiveReply: {
+          type: "button_reply",
+          id: driverResult.slotOption?.id,
+          title: driverResult.slotOption?.title
+        }
+      },
+      context: driverResult.preBookingContext,
+      options: {
+        invocationSource: IUL_STAGING_E2E_INVOCATION_SOURCE,
+        iulStagingE2EGrant: grant,
+        allowExecution: true,
+        persistContext: false,
+        profileConfigured: true,
+        prospectPhone: phone,
+        inboundMessageId: driverResult.slotInboundMessageId,
+        getSlots: bookingDeps.getSlots,
+        actingUserId: grant.userId,
+        organizationId: grant.organizationId,
+        env: {
+          RECRUIT_AI_V2_EXECUTION_ENABLED: "false",
+          RECRUIT_AI_V2_SHADOW_ENABLED: "false"
+        },
+        v2Grant: { eligible: false, reason: "IUL_SIMULATOR" },
+        dependencies: driverOptions.bookingDependencies
+      }
+    });
+    replay = {
+      attempted: true,
+      pass:
+        Boolean(replayResult.execution?.success) &&
+        Boolean(replayResult.execution?.idempotent || replayResult.execution?.appointmentId) &&
+        bookingDeps.store.calendarCreateCount === firstCreateCount,
+      appointmentId: replayResult.execution?.appointmentId || null,
+      calendarCreateCount: bookingDeps.store.calendarCreateCount,
+      idempotent: Boolean(replayResult.execution?.idempotent)
+    };
+  }
 
-  if (meetingMode === "zoom" && !stagingConfig.personalZoomUrl) {
-    driverResult.pass = false;
+  const renderedText = lastTurn?.atlasReply || lastTurn?.result?.rendered?.text || "";
+  const reasonCodes = lastTurn?.diagnostics?.reasonCodes || [];
+  const certification = certifyIulStagingBooking({
+    meetingMode,
+    bookingResult: {
+      success: Boolean(bookingExecution.success),
+      appointmentId: bookingExecution.appointmentId,
+      meetingUrl:
+        bookingExecution.scheduleResult?.meetingUrl ||
+        bookingExecution.scheduleResult?.zoomLink ||
+        null,
+      zoomLink: bookingExecution.scheduleResult?.zoomLink || null,
+      scheduleResult: bookingExecution.scheduleResult
+    },
+    renderedText,
+    reasonCodes,
+    configuredZoomUrl: stagingConfig.personalZoomUrl,
+    officeAddress: stagingConfig.officeAddress,
+    calendarEvent,
+    calendarCreateCount: firstCreateCount,
+    replayCalendarCreateCount: replay.attempted ? replay.calendarCreateCount : firstCreateCount
+  });
+
+  if (meetingMode === "zoom" && !renderedText.includes(stagingConfig.personalZoomUrl || "___missing___")) {
+    certification.failures.push({
+      path: "finalAtlasConfirmation",
+      expected: stagingConfig.personalZoomUrl,
+      actual: renderedText.slice(0, 240)
+    });
+    certification.pass = false;
   }
 
   let cleanup = { status: "pending" };
-  if (options.autoCleanup && calendarEvent?.eventId) {
+  if (options.autoCleanup && (calendarEvent?.id || calendarEvent?.eventId)) {
     cleanup = await cleanupStagingSimulatorEvents({
       req,
       simulatorRunId,
@@ -686,10 +833,22 @@ async function runIulStagingE2EScenario(definition, req, options = {}) {
     });
   }
 
+  const availabilityEvidence = {
+    provider: bookingDeps.evidence.provider,
+    calendarId: grant.calendarId,
+    calendarName: grant.calendarName,
+    offeredDays: lastTurn?.diagnostics?.offeredDays || driverResult.turns.find((t) => t.turn === "mode")?.diagnostics?.offeredDays || [],
+    selectedDay: session.context.knownFacts?.iulSelectedDate || null,
+    offeredSlots: driverResult.turns.find((t) => t.turn === "daypart")?.diagnostics?.offeredSlots || [],
+    selectedSlot
+  };
+
   const pass =
     driverResult.pass &&
-    Boolean(calendarEvent?.eventId) &&
-    (meetingMode !== "zoom" || Boolean(stagingConfig.personalZoomUrl));
+    certification.pass &&
+    Boolean(bookingExecution.attempted && bookingExecution.success) &&
+    lastTurn?.execution?.bookingPath === "executeScheduleInterview" &&
+    (!replay.attempted || replay.pass);
 
   return {
     scenarioId: definition.id,
@@ -698,38 +857,93 @@ async function runIulStagingE2EScenario(definition, req, options = {}) {
     pass,
     simulatorRunId,
     turns: driverResult.turns,
+    bookingPath: "executeScheduleInterview",
+    persistence: {
+      calendar: "real_schedulingService.createCalendarEvent",
+      appointment: "ephemeral_simulator_store",
+      prospect: "none",
+      whatsapp: "none",
+      conversationLogs: "none"
+    },
+    availability: availabilityEvidence,
+    replay,
+    certification,
     staging: {
       calendarName: stagingConfig.calendarName,
       calendarId: stagingConfig.calendarId,
       meetingMode,
       event: calendarEvent
-        ? { created: true, eventId: calendarEvent.eventId, htmlLink: calendarEvent.htmlLink }
-        : { created: false, error: bookingFailure },
+        ? {
+            created: true,
+            eventId: calendarEvent.id || calendarEvent.eventId,
+            htmlLink: calendarEvent.htmlLink || null
+          }
+        : { created: false },
       zoom: {
         configured: Boolean(stagingConfig.personalZoomUrl),
-        verified: zoomVerified,
+        verified:
+          meetingMode === "zoom" &&
+          renderedText.includes(stagingConfig.personalZoomUrl || "") &&
+          !reasonCodes.includes(REASON_CODES.IUL_ZOOM_LINK_MISSING),
         url: meetingMode === "zoom" ? stagingConfig.personalZoomUrl : null
       },
       officeAddress: meetingMode === "in_person" ? stagingConfig.officeAddress : null,
       cleanup
     },
     assertions: {
-      calendarEventCreated: Boolean(calendarEvent?.eventId),
-      slotMatchesEvent: Boolean(selectedSlot && calendarEvent),
-      zoomUrlRequired: meetingMode === "zoom" ? Boolean(stagingConfig.personalZoomUrl) : true,
+      realBookingOrchestration: lastTurn?.execution?.bookingPath === "executeScheduleInterview",
+      calendarEventCreated: Boolean(calendarEvent?.id || calendarEvent?.eventId),
+      zoomUrlInFinalConfirmation:
+        meetingMode !== "zoom" || renderedText.includes(stagingConfig.personalZoomUrl || ""),
       noZoomInOfficeConfirmation:
-        meetingMode === "in_person" ? !renderedText.includes("zoom.us") : true
+        meetingMode === "in_person" ? !/zoom\.us/i.test(renderedText) : true,
+      idempotentReplay: !replay.attempted || replay.pass
     }
   };
 }
 
-async function verifyIdempotentStagingReplay(definition, req, priorRunId) {
-  const stagingConfig = await resolveStagingCalendarConfig(req, { explicitStagingMode: true });
-  const before = await getStagingEventByRunId(stagingConfig, priorRunId);
-  const after = await getStagingEventByRunId(stagingConfig, priorRunId);
+async function verifyIdempotentStagingReplay({
+  preBookingContext,
+  slotOption,
+  inboundMessageId,
+  grant,
+  bookingDependencies,
+  getSlots,
+  prospectPhone
+}) {
+  const firstCount = bookingDependencies?.store?.calendarCreateCount;
+  const replayResult = await processRecruitAiV2Turn({
+    message: {
+      id: inboundMessageId,
+      text: slotOption?.title,
+      interactiveReply: {
+        type: "button_reply",
+        id: slotOption?.id,
+        title: slotOption?.title
+      }
+    },
+    context: preBookingContext,
+    options: {
+      invocationSource: IUL_STAGING_E2E_INVOCATION_SOURCE,
+      iulStagingE2EGrant: grant,
+      allowExecution: true,
+      persistContext: false,
+      profileConfigured: true,
+      prospectPhone,
+      inboundMessageId,
+      getSlots,
+      actingUserId: grant.userId,
+      organizationId: grant.organizationId,
+      dependencies: bookingDependencies
+    }
+  });
   return {
-    pass: Boolean(before) && Boolean(after) && before.id === after.id,
-    eventId: before?.id || null
+    pass:
+      Boolean(replayResult.execution?.success) &&
+      bookingDependencies.store.calendarCreateCount === firstCount,
+    calendarCreateCount: bookingDependencies.store.calendarCreateCount,
+    appointmentId: replayResult.execution?.appointmentId || null,
+    idempotent: Boolean(replayResult.execution?.idempotent)
   };
 }
 
@@ -744,5 +958,7 @@ module.exports = {
   runIulDryRunScenario,
   runIulStagingE2EScenario,
   verifyIdempotentStagingReplay,
-  cleanupStagingSimulatorEvents
+  cleanupStagingSimulatorEvents,
+  certifyIulStagingBooking,
+  IUL_STAGING_E2E_INVOCATION_SOURCE
 };
