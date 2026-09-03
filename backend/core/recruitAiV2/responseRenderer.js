@@ -10,6 +10,10 @@ const { sanitizeCustomerCopy } = require("./sanitize");
 const { collapseRedundantAcknowledgements } = require("./acknowledgementStyle");
 const { stateDisplayName } = require("./locationFacts");
 const {
+  resolveTeamMemberPhrase,
+  capitalizePhrase
+} = require("./tenantBranding");
+const {
   getCanonicalFaqAnswer,
   getJobOverviewFaqAnswer,
   getExplicitJobFaqAnswer,
@@ -192,7 +196,7 @@ const COPY = Object.freeze({
     offer_alternatives_no_handoff:
       "That time may not be available. I can offer nearby options — what other time works for you?",
     escalate_after_counteroffer_mismatch:
-      "Thanks for your patience. I'm looping in a Team Vision teammate to help find a time that works for you.",
+      "Thanks for your patience. I'm looping in {teamMemberPhrase} to help find a time that works for you.",
     offer_reschedule_flow:
       "Your interview is confirmed, and we can reschedule. What day and time work better for you?",
     appointment_confirm_deferred:
@@ -203,14 +207,14 @@ const COPY = Object.freeze({
     appointment_rescheduled:
       "Done — your interview is now scheduled for {dateLabel} at {requestedTime}.",
     appointment_create_failed:
-      "Thanks — I want to make sure this is handled correctly. A Team Vision teammate will follow up with you shortly.",
+      "Thanks — I want to make sure this is handled correctly. {TeamMemberPhrase} will follow up with you shortly.",
     appointment_reschedule_failed:
-      "Thanks — I want to make sure this is handled correctly. A Team Vision teammate will follow up with you shortly.",
+      "Thanks — I want to make sure this is handled correctly. {TeamMemberPhrase} will follow up with you shortly.",
     safe_failure_escalate:
-      "Thanks — I want to make sure this is handled correctly. A Team Vision teammate will follow up with you shortly.",
+      "Thanks — I want to make sure this is handled correctly. {TeamMemberPhrase} will follow up with you shortly.",
     safe_uncertain_escalate:
-      "Thanks — a Team Vision teammate will follow up to help with the next step.",
-    default: "Thanks — a Team Vision teammate will follow up shortly."
+      "Thanks — {teamMemberPhrase} will follow up to help with the next step.",
+    default: "Thanks — {teamMemberPhrase} will follow up shortly."
   },
   spanish: {
     greeting_ask_location:
@@ -355,7 +359,7 @@ const COPY = Object.freeze({
     offer_alternatives_no_handoff:
       "Esa hora puede no estar disponible. Puedo ofrecerte opciones cercanas — ¿qué otra hora te funciona?",
     escalate_after_counteroffer_mismatch:
-      "Gracias por tu paciencia. Voy a conectar a un compañero de Team Vision para ayudarte a encontrar un horario.",
+      "Gracias por tu paciencia. Voy a conectar a {teamMemberPhrase} para ayudarte a encontrar un horario.",
     offer_reschedule_flow:
       "Tu entrevista ya está confirmada y podemos reprogramarla. ¿Qué día y hora te funciona mejor?",
     appointment_confirm_deferred:
@@ -366,14 +370,14 @@ const COPY = Object.freeze({
     appointment_rescheduled:
       "Listo — tu entrevista quedó reprogramada para el {dateLabel} a las {requestedTime}.",
     appointment_create_failed:
-      "Gracias — quiero asegurarme de manejar esto correctamente. Un compañero de Team Vision te contactará pronto.",
+      "Gracias — quiero asegurarme de manejar esto correctamente. {TeamMemberPhrase} te contactará pronto.",
     appointment_reschedule_failed:
-      "Gracias — quiero asegurarme de manejar esto correctamente. Un compañero de Team Vision te contactará pronto.",
+      "Gracias — quiero asegurarme de manejar esto correctamente. {TeamMemberPhrase} te contactará pronto.",
     safe_failure_escalate:
-      "Gracias — quiero asegurarme de manejar esto correctamente. Un compañero de Team Vision te contactará pronto.",
+      "Gracias — quiero asegurarme de manejar esto correctamente. {TeamMemberPhrase} te contactará pronto.",
     safe_uncertain_escalate:
-      "Gracias — un compañero de Team Vision te contactará para el siguiente paso.",
-    default: "Gracias — un compañero de Team Vision te contactará pronto."
+      "Gracias — {teamMemberPhrase} te contactará para el siguiente paso.",
+    default: "Gracias — {teamMemberPhrase} te contactará pronto."
   }
 });
 
@@ -1149,6 +1153,12 @@ function renderCustomerReply(responsePlan) {
   }
 
   const zoomUrl = entities.zoomUrl || "";
+  const teamMemberPhrase = resolveTeamMemberPhrase({
+    organizationId: responsePlan.organizationId || entities.organizationId,
+    organizationName: responsePlan.organizationName || entities.organizationName,
+    language
+  });
+  const TeamMemberPhrase = capitalizePhrase(teamMemberPhrase);
 
   const rendered = String(template)
     .replace(/\{requestedTime\}/g, requestedTime)
@@ -1161,7 +1171,9 @@ function renderCustomerReply(responsePlan) {
     .replace(/\{proposedStateName\}/g, proposed || "your state")
     .replace(/\{proposedState\}/g, entities.proposedState || "")
     .replace(/\{resumeQuestion\}/g, entities.resumeQuestion || "")
-    .replace(/\{firstName\}/g, entities.firstName || "");
+    .replace(/\{firstName\}/g, entities.firstName || "")
+    .replace(/\{teamMemberPhrase\}/g, teamMemberPhrase)
+    .replace(/\{TeamMemberPhrase\}/g, TeamMemberPhrase);
 
   const fallback = pack.safe_failure_escalate || pack.default;
   const sanitized = sanitizeCustomerCopy(rendered, fallback);

@@ -60,6 +60,7 @@ const {
   parseLocationAnswer,
   normalizeStateToken,
   looksLikeLocationCorrection,
+  isNonLocationPhrase,
   proposeStateFromCity,
   isCompleteCityStatePhrase,
   canonicalizeCityName,
@@ -325,6 +326,30 @@ function looksLikeExperienceQuestion(text) {
 function looksLikeWorkAuthorizationAnswer(text, context) {
   const status = parseWorkAuthorizationAnswer(text, context);
   return toBooleanWorkAuthorization(status);
+}
+
+function isPendingAuthorizationAsk(context) {
+  return (
+    String(context?.conversation?.lastQuestionAsked || "") ===
+      "ask_authorization" ||
+    String(context?.conversation?.resumePendingQuestion || "") ===
+      "ask_authorization"
+  );
+}
+
+function isExplicitLocationCorrection(text, locationRaw) {
+  if (!locationRaw?.city) {
+    return false;
+  }
+  const foldedCity = String(locationRaw.city || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (isNonLocationPhrase(foldedCity)) {
+    return false;
+  }
+  return Boolean(locationRaw.correction) || looksLikeLocationCorrection(text);
 }
 
 function looksLikeExplicitLanguageSwitch(text) {
@@ -1427,6 +1452,11 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.completeness = "partial";
   } else {
     const locationRaw = parseLocationAnswer(text);
+    // Implements BR-224 — pending work-auth outranks generic location
+    // unless the prospect is explicitly correcting city/state.
+    const ignoreGenericLocation =
+      isPendingAuthorizationAsk(context) &&
+      !isExplicitLocationCorrection(text, locationRaw);
     // Implements BR-173 — ignore a prior "city" that is actually a state name.
     const knownCity = usableKnownCity(context);
     const confirmedPair =
@@ -1448,10 +1478,11 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     // confirmed state (e.g. "Soy bilingüe" → Soy Bilingue, FL). Complete
     // city parses (Doral / Orlando) remain provide_location; overwrite
     // persistence is still gated by shouldBlockLocationOverwrite.
-    const location =
-      differentIncomingCity &&
-      !correctionSignal &&
-      locationRaw?.completeness === "partial"
+    const location = ignoreGenericLocation
+      ? null
+      : differentIncomingCity &&
+          !correctionSignal &&
+          locationRaw?.completeness === "partial"
         ? null
         : locationRaw;
     const awaitingState =

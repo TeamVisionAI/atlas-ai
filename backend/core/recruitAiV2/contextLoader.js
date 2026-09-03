@@ -73,6 +73,7 @@ function loadConversationContext(input = {}) {
   const {
     prospectId = null,
     organizationId = null,
+    organizationName = null,
     preferredLanguage = null,
     languageMeta = null,
     timezone = "America/New_York",
@@ -138,6 +139,8 @@ function loadConversationContext(input = {}) {
   return mergeConversationContext(base, {
     prospectId,
     organizationId,
+    organizationName:
+      organizationName || existingContext?.organizationName || null,
     preferredLanguage: normalizeLanguage(
       preferredLanguage || base.preferredLanguage || LANGUAGES_FALLBACK()
     ),

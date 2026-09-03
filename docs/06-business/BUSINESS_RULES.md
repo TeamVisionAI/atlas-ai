@@ -3590,6 +3590,28 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-224 — Pending Work-Auth ITIN / Location Immutability / Tenant Handoff Branding
+
+**Implements:** While `ask_authorization` is pending, ITIN-only and clear negatives (`No tengo`, `te dije que no`) are `NOT_AUTHORIZED` and use the existing `authorization_denied` outcome. Confirmed city/state is not overwritten by a stripped `No` + verb remainder. Customer handoff copy is tenant-aware.  
+**Domain:** Recruit AI v2 / qualification / location facts / tenant branding  
+**Depends on:** BR-083, BR-096, BR-100, BR-146, BR-173  
+**Related:** BR-217 location ZIP tolerance; Conversations Center Return-to-Atlas  
+**Status:** Implemented — not merged  
+**Engine target:** `qualificationFacts.parseWorkAuthorizationAnswer`; `locationFacts`; `interpreter`; `factCertainty`; `responseRenderer`; `tenantBranding`  
+**Tests:** `backend/test/recruitAiV2PendingWorkAuthItinBr224.test.js`
+
+### Rules
+
+1. **Pending-auth negatives** — While the last asked question is `ask_authorization`, treat `Solo ITIN` / `only ITIN`, bare `No tengo`, `no tengo documentos`, and `te dije que no` as `WORK_AUTHORIZATION.NOT_AUTHORIZED`. Do not invent a new eligibility policy; use the existing `authorization_denied` path.
+2. **No clarification loop** — A clear pending-auth negative must not emit `clarify_once` or re-ask work authorization.
+3. **Location immutability** — Do not strip a leading `No` when the remainder is a verb or document token (`tengo`, `ITIN`, `documentos`). `No tengo` is never city `Tengo`. Confirmed Lake Nona / Florida (or any confirmed pair) stays unless the prospect explicitly corrects location (`No, Doral`, `vivo en …`).
+4. **Pending auth outranks generic location** — Generic city extraction does not run over a pending work-auth ask unless the turn is an explicit location correction.
+5. **Tenant handoff branding** — Team Vision may say Team Vision. Other tenants use `un miembro de {organizationName}` when the display name is safe, otherwise `un miembro de nuestro equipo` / `a member of our team`. Never fall back to Team Vision for a non-TV tenant, including a spoofed name.
+6. **Ownership unchanged** — HUMAN takeover still silences Atlas until Return-to-Atlas. An Atlas reply after an explicit Return-to-Atlas is valid. Do not treat that sequence as an ownership leak.
+7. **Affirmative auth still advances** — `Sí, tengo permiso de trabajo` (and existing BR-096/100 shorthands) still authorize.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

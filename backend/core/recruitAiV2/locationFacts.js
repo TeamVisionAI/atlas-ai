@@ -437,10 +437,13 @@ function extractLocationCandidateText(text) {
     strippedCorrection = true;
   }
 
-  // "No, Doral" / "No, vivo en ..."
+  // "No, Doral" / "No, vivo en ..." — never strip into a verb/ITIN remainder (BR-224).
   if (/^no[,:]?\s+/i.test(t)) {
-    t = t.replace(/^no[,:]?\s+/i, "").trim();
-    strippedCorrection = true;
+    const remainder = t.replace(/^no[,:]?\s+/i, "").trim();
+    if (!isNonLocationRemainderAfterNo(remainder)) {
+      t = remainder;
+      strippedCorrection = true;
+    }
   }
 
   const live = t.match(
@@ -470,10 +473,38 @@ function looksLikeLocationCorrection(text) {
   if (!raw) {
     return false;
   }
-  if (CORRECTION_OPENER.test(raw) || /^no[,:]?\s+/i.test(raw)) {
+  if (CORRECTION_OPENER.test(raw)) {
     return true;
   }
+  if (/^no[,:]?\s+/i.test(raw)) {
+    const remainder = raw.replace(/^no[,:]?\s+/i, "").trim();
+    if (!isNonLocationRemainderAfterNo(remainder)) {
+      return true;
+    }
+  }
   return /^(vivo en|live in|i live in|estoy en)\b/i.test(raw);
+}
+
+function isNonLocationRemainderAfterNo(remainder) {
+  const t = String(remainder || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) {
+    return true;
+  }
+  return (
+    /^(tengo|tuve|tenia|documentos?|documentacion|itin|papeles|permiso|experiencia|contactos)\b/.test(
+      t
+    ) ||
+    /^(solo|only)\s+(un |an? )?itin\b/.test(t) ||
+    /^te dije\b/.test(t) ||
+    isNonLocationPhrase(t)
+  );
 }
 
 function isPlausibleCityName(city) {
@@ -587,6 +618,10 @@ function isNonLocationPhrase(folded) {
     /^(me gustaria|me gustaria saber|me gustaría|me gustaría saber)$/.test(t) ||
     /^(dime|escribeme|escriba me|escribeme por favor)$/.test(t) ||
     /^(perfecto|gracias|ok|dale|claro|entendido|listo|bueno|bien|si|sí|todo bien)$/.test(t) ||
+    /^(tengo|no tengo)$/.test(t) ||
+    /^(solo |only )?(un |an? )?itin$/.test(t) ||
+    /^(no )?tengo (documentos?|documentacion|papeles|permiso)$/.test(t) ||
+    /^(ya )?te (lo )?dije que no$/.test(t) ||
     /^(mañana|manana|hoy|tarde|noche)$/.test(t) ||
     /^(mejor|thanks|thank you|got it|sounds good)$/.test(t) ||
     // Bare Spanish pronoun / conversational "me" is never Maine.
@@ -1077,6 +1112,7 @@ module.exports = {
   looksLikeLanguageOrIdentitySelfDescription,
   looksLikeConversationalProseCity,
   looksLikeLocationCorrection,
+  isNonLocationRemainderAfterNo,
   proposeStateFromCity,
   normalizeStateToken,
   titleCaseCity,

@@ -166,6 +166,7 @@ function createConversationContext(overrides = {}) {
   const base = {
     prospectId: null,
     organizationId: null,
+    organizationName: null,
     preferredLanguage: LANGUAGES.UNKNOWN,
     languageMeta: emptyLanguageMeta(),
     currentStage: STAGES.GREETING,
