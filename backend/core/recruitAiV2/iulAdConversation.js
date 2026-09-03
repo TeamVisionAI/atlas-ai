@@ -719,6 +719,11 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
           }
         };
       }
+      return {
+        intent: INTENTS.IUL_REOFFER_REVIEW_DAYS,
+        confidence: 0.9,
+        entities: { unmatchedReviewDay: true }
+      };
     }
   }
 
@@ -912,7 +917,10 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     }
   }
 
-  if (lastAsk === ASK.POLICY_TYPE || lastAsk === ASK.POLICY_ACTIVE) {
+  if (
+    (lastAsk === ASK.POLICY_TYPE || lastAsk === ASK.POLICY_ACTIVE) &&
+    !schedulingOwned
+  ) {
     const policyType = classifyPolicyType(text);
     return {
       intent: INTENTS.IUL_POLICY_TYPE,
@@ -1453,6 +1461,9 @@ function finishIulDecision(structured, context, {
       });
       structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
       structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
+      structured.reasonCodes.push(REASON_CODES.IUL_SLOT_INTERACTIVE_OFFERED);
+    } else {
+      structured.reasonCodes.push(REASON_CODES.IUL_DAY_FALLBACK_REQUIRED);
     }
   } else if (catalog === "dayPart") {
     const selectedDate =
@@ -1909,22 +1920,136 @@ function readIulHorizonAvailability(context, extras = {}) {
   });
 }
 
+function resolveDayHorizonSlots(context, extras = {}) {
+  const injected = collectHorizonSlots(extras.availability || null);
+  if (injected.length) {
+    return { slots: injected, availability: extras.availability };
+  }
+  const syncAvailability = readIulHorizonAvailability(
+    { ...context, knownFacts: { ...(context.knownFacts || {}), ...(extras.knownFacts || {}) } },
+    {
+      interpretation: extras.interpretation,
+      meetingMode: extras.knownFacts?.meetingMode || extras.meetingMode
+    }
+  );
+  return {
+    slots: collectHorizonSlots(syncAvailability),
+    availability: syncAvailability
+  };
+}
+
 function beginDayAsk(structured, context, {
   knownFacts = {},
   reasonCodes = [],
-  interpretation = null
+  interpretation = null,
+  availability = null
 } = {}) {
-  const availability = readIulHorizonAvailability(
-    { ...context, knownFacts: { ...(context.knownFacts || {}), ...knownFacts } },
-    { interpretation, meetingMode: knownFacts.meetingMode }
-  );
-  const slots = collectHorizonSlots(availability);
+  const resolved = resolveDayHorizonSlots(context, {
+    knownFacts,
+    interpretation,
+    availability,
+    meetingMode: knownFacts.meetingMode
+  });
+  const slots = resolved.slots;
   const days = collectAvailableDays(slots);
-  const successfulZero =
-    availability?.status === READ_STATUS.ZERO_SLOTS &&
-    availability?.readResult &&
-    !availability.readResult.failureReason;
-  if (successfulZero && !days.length) {
+  if (!days.length) {
+    const failureReason =
+      resolved.availability?.failureReason ||
+      resolved.availability?.readResult?.failureReason ||
+      null;
+    if (failureReason !== "sync_requires_fixture") {
+      return finishIulDecision(structured, context, {
+        templateKey: "iul_no_review_availability",
+        nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE,
+        lastQuestionAsked: ASK.SCHEDULING_UNAVAILABLE,
+        knownFacts: {
+          ...resetIulDayFirstFacts(knownFacts),
+          iulWorkflowStage: IUL_STAGES.REVIEW_READY,
+          iulSchedulingUnavailable: true
+        },
+        reasonCodes: [...reasonCodes, REASON_CODES.IUL_NO_AVAILABILITY],
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      });
+    }
+    structured.reasonCodes.push(REASON_CODES.IUL_DAY_FALLBACK_REQUIRED);
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_ask_review_day",
+      nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+      lastQuestionAsked: ASK.SCHEDULING_DAY,
+      knownFacts: {
+        ...resetIulDayFirstFacts(knownFacts),
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_FIRST_OFFERED],
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    });
+  }
+  return presentIulDayPage(structured, context, {
+    days,
+    slots,
+    knownFacts,
+    reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_FIRST_OFFERED],
+    resetShown: true
+  });
+}
+
+function reofferCurrentIulDayPage(structured, context, {
+  knownFacts = {},
+  reasonCodes = [],
+  interpretation = null,
+  availability = null
+} = {}) {
+  const offered = Array.isArray(context.knownFacts?.iulOfferedDays)
+    ? context.knownFacts.iulOfferedDays
+    : [];
+  const allDays = Array.isArray(context.knownFacts?.iulAvailableDays)
+    ? context.knownFacts.iulAvailableDays
+    : offered;
+  const slots = Array.isArray(context.knownFacts?.iulSlotPool)
+    ? context.knownFacts.iulSlotPool
+    : [];
+  if (offered.length) {
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      availableDays: offered,
+      includeMoreDays: context.knownFacts?.iulIncludeMoreDays === true,
+      iulSelectedDate: null
+    };
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_ask_review_day",
+      nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
+      lastQuestionAsked: ASK.SCHEDULING_DAY,
+      knownFacts: {
+        ...knownFacts,
+        iulAvailableDays: allDays.length ? allDays : offered,
+        iulOfferedDays: offered,
+        iulShownDayKeys: context.knownFacts?.iulShownDayKeys || offered.map((day) => day.dateKey),
+        iulIncludeMoreDays: context.knownFacts?.iulIncludeMoreDays === true,
+        iulSlotPool: slots,
+        iulWorkflowStage: IUL_STAGES.REVIEW_READY
+      },
+      reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_OPTIONS_REOFFERED, REASON_CODES.IUL_SCHEDULING_OWNED],
+      iulWorkflowStage: IUL_STAGES.REVIEW_READY
+    });
+  }
+  return beginDayAsk(structured, context, {
+    knownFacts,
+    reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_OPTIONS_REOFFERED],
+    interpretation,
+    availability
+  });
+}
+
+function presentIulDayPage(structured, context, {
+  days = [],
+  slots = [],
+  knownFacts = {},
+  reasonCodes = [],
+  rejectIds = [],
+  resetShown = false
+} = {}) {
+  const paged = selectIulDayPage(days, { rejectIds: resetShown ? [] : rejectIds });
+  if (!paged.shown.length) {
     return finishIulDecision(structured, context, {
       templateKey: "iul_no_review_availability",
       nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE,
@@ -1938,24 +2063,6 @@ function beginDayAsk(structured, context, {
       iulWorkflowStage: IUL_STAGES.REVIEW_READY
     });
   }
-  return presentIulDayPage(structured, context, {
-    days,
-    slots,
-    knownFacts,
-    reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_FIRST_OFFERED],
-    resetShown: true
-  });
-}
-
-function presentIulDayPage(structured, context, {
-  days = [],
-  slots = [],
-  knownFacts = {},
-  reasonCodes = [],
-  rejectIds = [],
-  resetShown = false
-} = {}) {
-  const paged = selectIulDayPage(days, { rejectIds: resetShown ? [] : rejectIds });
   const shownKeys = [
     ...(resetShown ? [] : rejectIds),
     ...paged.shown.map((day) => day.dateKey)
@@ -2228,6 +2335,7 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
     INTENTS.IUL_CHOOSE_REVIEW_DAY,
     INTENTS.IUL_REQUEST_MORE_DAYS,
+    INTENTS.IUL_REOFFER_REVIEW_DAYS,
     INTENTS.IUL_CHOOSE_MEETING_MODE,
     INTENTS.IUL_SELECT_OFFERED_SLOT,
     INTENTS.IUL_REQUEST_MORE_SLOTS,
@@ -2448,6 +2556,17 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
   }
 
   if (intent === INTENTS.IUL_POLICY_TYPE) {
+    const {
+      shouldBlockIulDiscovery
+    } = require("./iulSchedulingOwnership");
+    if (shouldBlockIulDiscovery(context)) {
+      return reofferCurrentIulDayPage(structured, context, {
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED],
+        interpretation,
+        availability
+      });
+    }
     return advanceDiscovery(structured, context, {
       knownFacts: {
         policyType: interpretation.entities?.policyType || null,
@@ -2459,6 +2578,15 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
   }
 
   if (intent === INTENTS.IUL_CARRIER) {
+    const { shouldBlockIulDiscovery } = require("./iulSchedulingOwnership");
+    if (shouldBlockIulDiscovery(context)) {
+      return reofferCurrentIulDayPage(structured, context, {
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED],
+        interpretation,
+        availability
+      });
+    }
     return advanceDiscovery(structured, context, {
       knownFacts: {
         carrier: interpretation.entities?.carrier ?? null,
@@ -2543,7 +2671,16 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
       reasonCodes: modeSwitch
         ? [REASON_CODES.IUL_MEETING_MODE_CAPTURED, REASON_CODES.IUL_MODE_SWITCH_PRESERVED]
         : [REASON_CODES.IUL_MEETING_MODE_CAPTURED],
-      interpretation
+      interpretation,
+      availability
+    });
+  }
+
+  if (intent === INTENTS.IUL_REOFFER_REVIEW_DAYS) {
+    return reofferCurrentIulDayPage(structured, context, {
+      knownFacts: context.knownFacts || {},
+      interpretation,
+      availability
     });
   }
 
@@ -2552,7 +2689,8 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
       return beginDayAsk(structured, context, {
         knownFacts: context.knownFacts || {},
         reasonCodes: [REASON_CODES.IUL_DAY_FIRST_OFFERED],
-        interpretation
+        interpretation,
+        availability
       });
     }
     const dateKey =
@@ -2560,9 +2698,10 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
       interpretation.entities?.reviewProposedDate ||
       null;
     if (!dateKey) {
-      return beginDayAsk(structured, context, {
+      return reofferCurrentIulDayPage(structured, context, {
         knownFacts: context.knownFacts || {},
-        interpretation
+        interpretation,
+        availability
       });
     }
     return continueAfterDaySelection(structured, context, {
@@ -2977,6 +3116,20 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     pending !== ASK.POLICY_TYPE &&
     pending !== ASK.POLICY_ACTIVE
   ) {
+    if (pending === ASK.SCHEDULING_DAY || pending === ASK.MEETING_MODE) {
+      if (pending === ASK.MEETING_MODE) {
+        return beginMeetingModeAsk(structured, context, {
+          knownFacts: context.knownFacts || {},
+          reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED]
+        });
+      }
+      return reofferCurrentIulDayPage(structured, context, {
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED],
+        interpretation,
+        availability
+      });
+    }
     if (
       pending === ASK.CONFIRM_SLOT ||
       pending === ASK.OFFER_SLOTS ||
@@ -3043,6 +3196,17 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
         nextAction: discoveryNextActionForAsk(pending),
         lastQuestionAsked: pending,
         reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED]
+      });
+    }
+    const {
+      shouldBlockIulDiscovery
+    } = require("./iulSchedulingOwnership");
+    if (shouldBlockIulDiscovery(context)) {
+      return reofferCurrentIulDayPage(structured, context, {
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED],
+        interpretation,
+        availability
       });
     }
     const replayAsk =

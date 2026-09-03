@@ -160,6 +160,32 @@ function isIulConfirmableSchedulingState(context = {}) {
   return isIulBookingPending(context);
 }
 
+function isIulInformationSeeker(context = {}) {
+  return String(context.knownFacts?.iulQualificationStatus || "") === "IUL_STATUS_RESEARCH";
+}
+
+function isIulReviewReadyForScheduling(context = {}) {
+  const facts = context.knownFacts || {};
+  if (facts.iulQualificationStatus && (facts.iulReviewIntent || facts.reviewReason)) {
+    return true;
+  }
+  if (facts.iulPolicyActive && facts.policyType) {
+    return true;
+  }
+  if (
+    String(facts.iulQualificationStatus || "") === "IUL_STATUS_UNSURE" &&
+    facts.iulPolicyInHand != null
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isIulBookingComplete(context = {}) {
+  const appt = context.appointment || {};
+  return Boolean(appt.appointmentId) && fold(appt.status) === "confirmed";
+}
+
 function isIulSchedulingOwnedState(context = {}) {
   if (!isIulPolicyReviewContext(context)) {
     return false;
@@ -170,21 +196,30 @@ function isIulSchedulingOwnedState(context = {}) {
   if (isIulConfirmableSchedulingState(context)) {
     return true;
   }
-  return Boolean(context.knownFacts?.meetingMode && hasProposedIulSlot(context));
+  const facts = context.knownFacts || {};
+  if (
+    !isIulBookingComplete(context) &&
+    (facts.meetingMode || facts.reviewMeetingMode) &&
+    isIulReviewReadyForScheduling(context)
+  ) {
+    return true;
+  }
+  return Boolean(facts.meetingMode && hasProposedIulSlot(context));
 }
 
 function isIulQualificationCompleteForScheduling(context = {}) {
   const facts = context.knownFacts || {};
-  if (facts.iulQualificationStatus && (facts.iulReviewIntent || facts.reviewReason)) {
+  if (isIulReviewReadyForScheduling(context)) {
     return true;
   }
-  if (facts.iulPolicyActive && facts.policyType) {
-    return true;
-  }
-  if (isIulSchedulingOwnedState(context) && facts.meetingMode) {
+  if (isIulSchedulingOwnedAsk(lastAskOf(context)) && facts.meetingMode) {
     return true;
   }
   return false;
+}
+
+function shouldBlockIulDiscovery(context = {}) {
+  return isIulSchedulingOwnedState(context);
 }
 
 function resolveIulSelectedSlotFromInbound(context = {}, { text, interactiveReply } = {}) {
@@ -374,7 +409,10 @@ module.exports = {
   isIulConfirmableSchedulingState,
   weekdayTimeLabel,
   isIulSchedulingOwnedState,
+  isIulInformationSeeker,
+  isIulReviewReadyForScheduling,
   isIulQualificationCompleteForScheduling,
+  shouldBlockIulDiscovery,
   resolveIulSelectedSlotFromInbound,
   proposedSlotFromContext,
   isIulInPerson,

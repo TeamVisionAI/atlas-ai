@@ -375,21 +375,37 @@ function parseIulDayFromText(text, days = []) {
   if (iso) {
     return days.find((day) => day.dateKey === iso[1]) || null;
   }
+  const matches = [];
+  const seen = new Set();
   for (const day of days) {
-    const title = fold(formatIulDayTitle(day.dateKey, "es"));
-    const titleEn = fold(formatIulDayTitle(day.dateKey, "en"));
-    if (folded === title || folded === titleEn || folded.includes(title) || folded.includes(titleEn)) {
-      return day;
+    const dateKey = day.dateKey || dayIdentity(day);
+    if (!dateKey || seen.has(dateKey)) {
+      continue;
     }
-    const weekdayEs = fold(WEEKDAY_LABELS.es[weekdayIndexFromDateKey(day.dateKey)] || "");
-    const weekdayEn = fold(WEEKDAY_LABELS.en[weekdayIndexFromDateKey(day.dateKey)] || "");
-    const dayNum = String(Number(String(day.dateKey).split("-")[2]));
-    if (weekdayEs && folded.includes(weekdayEs) && (!folded.match(/\d/) || folded.includes(dayNum))) {
-      return day;
+    const title = fold(formatIulDayTitle(dateKey, "es"));
+    const titleEn = fold(formatIulDayTitle(dateKey, "en"));
+    const weekdayEs = fold(WEEKDAY_LABELS.es[weekdayIndexFromDateKey(dateKey)] || "");
+    const weekdayEn = fold(WEEKDAY_LABELS.en[weekdayIndexFromDateKey(dateKey)] || "");
+    const dayNum = String(Number(String(dateKey).split("-")[2]));
+    const titleHit =
+      folded === title ||
+      folded === titleEn ||
+      (title && folded.includes(title)) ||
+      (titleEn && folded.includes(titleEn));
+    const weekdayHit =
+      (weekdayEs &&
+        folded.includes(weekdayEs) &&
+        (!folded.match(/\d/) || folded.includes(dayNum))) ||
+      (weekdayEn &&
+        folded.includes(weekdayEn) &&
+        (!folded.match(/\d/) || folded.includes(dayNum)));
+    if (titleHit || weekdayHit) {
+      seen.add(dateKey);
+      matches.push(day.dateKey ? day : { ...day, dateKey });
     }
-    if (weekdayEn && folded.includes(weekdayEn) && (!folded.match(/\d/) || folded.includes(dayNum))) {
-      return day;
-    }
+  }
+  if (matches.length === 1) {
+    return matches[0];
   }
   return null;
 }

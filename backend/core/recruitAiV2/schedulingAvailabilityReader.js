@@ -755,6 +755,14 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
         interpretation?.entities?.iulReviewDayPart
     );
 
+  // Implements BR-221 — Zoom/Office and day-page turns need the live horizon.
+  const iulDayFirstNeedsSlots =
+    intent === INTENTS.IUL_CHOOSE_MEETING_MODE ||
+    intent === INTENTS.IUL_CHOOSE_REVIEW_DAY ||
+    intent === INTENTS.IUL_REQUEST_MORE_DAYS ||
+    intent === INTENTS.IUL_REOFFER_REVIEW_DAYS ||
+    pendingQ === "iul_ask_review_day";
+
   // Implements BR-119 Case D — leave the offered set for later alternatives.
   const laterAlternatives =
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL &&
@@ -777,6 +785,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     !counterofferNeedsSlots &&
     !dayPartNeedsSlots &&
     !iulDayPartNeedsSlots &&
+    !iulDayFirstNeedsSlots &&
     !laterAlternatives &&
     !datedDayPartSearch &&
     !rescheduleDatedSearch
@@ -790,10 +799,15 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.REASSERT_KNOWN_FACT ||
     intent === INTENTS.PROVIDE_DAY_PART ||
     intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART ||
+    intent === INTENTS.IUL_CHOOSE_MEETING_MODE ||
+    intent === INTENTS.IUL_CHOOSE_REVIEW_DAY ||
+    intent === INTENTS.IUL_REQUEST_MORE_DAYS ||
+    intent === INTENTS.IUL_REOFFER_REVIEW_DAYS ||
     intent === INTENTS.RESCHEDULE_REQUEST ||
     counterofferNeedsSlots ||
     datedDayPartSearch ||
-    rescheduleDatedSearch;
+    rescheduleDatedSearch ||
+    iulDayFirstNeedsSlots;
   if (!allowedIntent) {
     return false;
   }
@@ -805,6 +819,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.PROVIDE_AVAILABILITY_CONSTRAINT ||
     dayPartNeedsSlots ||
     iulDayPartNeedsSlots ||
+    iulDayFirstNeedsSlots ||
     counterofferNeedsSlots
   );
 }
@@ -1341,6 +1356,13 @@ async function resolveAvailabilityForTurn({
 
   // BR-108 — no concrete date → bounded rolling multi-date search.
   if (!date) {
+    const { INTENTS } = require("./constants");
+    const iulDayFirstIntent = new Set([
+      INTENTS.IUL_CHOOSE_MEETING_MODE,
+      INTENTS.IUL_CHOOSE_REVIEW_DAY,
+      INTENTS.IUL_REQUEST_MORE_DAYS,
+      INTENTS.IUL_REOFFER_REVIEW_DAYS
+    ]);
     const readResult = await readRollingCandidateSlots({
       organizationId,
       agentId,
@@ -1352,7 +1374,11 @@ async function resolveAvailabilityForTurn({
       getSlots: options.getSlots || null,
       rejectIds,
       maxCandidates: options.maxCandidates || DEFAULT_MAX_CANDIDATES,
-      now
+      now,
+      expandFullHorizon:
+        options.expandFullHorizon === true ||
+        iulDayFirstIntent.has(interpretation?.intent) ||
+        String(context?.conversation?.lastQuestionAsked || "") === "iul_ask_review_day"
     });
     const resolvedAvailability = enrichAvailabilityForRequestedTime(
       toDecisionAvailability(readResult),
