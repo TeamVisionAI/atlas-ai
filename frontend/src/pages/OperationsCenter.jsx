@@ -29,11 +29,18 @@ import {
   summarizeRecruitAiV2ScenarioReport
 } from "../engines/recruitAiV2SimulatorPresentation";
 import {
+  formatIulDiagnosticsRows,
+  summarizeIulScenarioReport,
+  summarizeIulStagingReport
+} from "../engines/iulPolicyReviewSimulatorPresentation";
+import {
   advanceWorkflowSimulator,
+  cleanupIulStagingSimulatorEvent,
   exportRecruitAiV2PlaygroundCandidate,
   fetchBusinessEventById,
   fetchBusinessEvents,
   fetchDiagnostics,
+  fetchIulPolicyReviewSimulatorScenarios,
   fetchOperationsAccess,
   fetchOperationsDashboard,
   fetchProspectTimeline,
@@ -48,8 +55,11 @@ import {
   replaySingleProspect,
   resetProjectionState,
   resetRecruitAiV2PlaygroundSession,
+  runAllIulPolicyReviewSimulatorScenarios,
   runAllSimulatorScenarios,
   runAllRecruitAiV2SimulatorScenarios,
+  runIulPolicyReviewSimulatorScenario,
+  runIulStagingE2ESimulator,
   runRecruitAiV2SimulatorScenario,
   runSimulatorScenario,
   runSmokeTest,
@@ -249,6 +259,84 @@ function RecruitAiV2ScenarioResult({ report, t }) {
         <summary className="ops-muted">{t.opsV2ExpandContext}</summary>
         <pre className="ops-code">{JSON.stringify(report.finalContext || {}, null, 2)}</pre>
       </details>
+    </div>
+  );
+}
+
+function IulPolicyReviewScenarioResult({ report }) {
+  if (!report) {
+    return null;
+  }
+
+  const summary = summarizeIulScenarioReport(report);
+  const staging = summarizeIulStagingReport(report);
+  const turns = Array.isArray(report.turns) ? report.turns : [];
+
+  return (
+    <div className="ops-panel">
+      <div className="ops-panel ops-panel--row" style={{ border: "none", padding: 0 }}>
+        <div>
+          <h3>{summary.scenarioName}</h3>
+          <p className="ops-muted">
+            Mode: {summary.mode} · Turns: {summary.turnCount} · Passed: {summary.passed}/
+            {summary.turnCount}
+          </p>
+          {report.mode === "staging_e2e" ? (
+            <p className="ops-muted">
+              Booking: {report.bookingPath || "—"} · Calendar: {staging.calendarName} · Meeting:{" "}
+              {staging.meetingMode} · Event: {staging.eventCreated ? staging.eventId : "Failed"} · Zoom:{" "}
+              {staging.zoomVerified ? "Verified" : staging.zoomConfigured ? "Missing in reply" : "Not configured"}{" "}
+              · Cleanup: {staging.cleanupStatus}
+            </p>
+          ) : null}
+        </div>
+        <OpsStatusBadge status={summary.pass ? "healthy" : "failure"} label={summary.pass ? "PASS" : "FAIL"} />
+      </div>
+
+      {turns.map((turn) => {
+        const diagRows = formatIulDiagnosticsRows(turn.diagnostics);
+        return (
+          <div key={turn.turn || turn.prospectInput} style={{ marginBottom: "0.85rem" }}>
+            <p>
+              <strong>Inbound:</strong> {turn.prospectInput}
+              {turn.interactiveSelection?.id ? (
+                <code className="ops-code"> ({turn.interactiveSelection.id})</code>
+              ) : null}
+            </p>
+            <p>
+              <strong>Atlas:</strong> {turn.atlasReply || "—"}
+            </p>
+            {turn.interactiveOptions?.length ? (
+              <p className="ops-muted">
+                <strong>Options:</strong>{" "}
+                {turn.interactiveOptions.map((o) => `${o.title} [${o.id}]`).join(" · ")}
+              </p>
+            ) : null}
+            <OpsStatusBadge
+              status={turn.pass ? "healthy" : "failure"}
+              label={turn.pass ? "PASS" : "FAIL"}
+            />
+            <details>
+              <summary className="ops-muted">Diagnostics</summary>
+              <table className="ops-table">
+                <tbody>
+                  {diagRows.map(([key, value]) => (
+                    <tr key={key}>
+                      <td>{key}</td>
+                      <td>
+                        <code className="ops-code">{value == null ? "—" : String(value)}</code>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {turn.failures?.length ? (
+                <pre className="ops-code">{JSON.stringify(turn.failures, null, 2)}</pre>
+              ) : null}
+            </details>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -575,10 +663,15 @@ function RecruitAiV2CustomPlayground({ t }) {
 function WorkflowSimulatorSection({ t }) {
   const [scenarios, setScenarios] = useState([]);
   const [v2Scenarios, setV2Scenarios] = useState([]);
+  const [iulScenarios, setIulScenarios] = useState([]);
   const [activePhone, setActivePhone] = useState("");
   const [workflowState, setWorkflowState] = useState(null);
   const [v2Report, setV2Report] = useState(null);
   const [v2Suite, setV2Suite] = useState(null);
+  const [iulReport, setIulReport] = useState(null);
+  const [iulSuite, setIulSuite] = useState(null);
+  const [iulStagingSuite, setIulStagingSuite] = useState(null);
+  const [cleanupResult, setCleanupResult] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const { tasks, runTask } = useRunningTasks();
@@ -589,6 +682,9 @@ function WorkflowSimulatorSection({ t }) {
       .catch(() => {});
     fetchRecruitAiV2SimulatorScenarios()
       .then((data) => setV2Scenarios(data.scenarios || []))
+      .catch(() => {});
+    fetchIulPolicyReviewSimulatorScenarios()
+      .then((data) => setIulScenarios(data.scenarios || []))
       .catch(() => {});
   }, []);
 
@@ -628,6 +724,42 @@ function WorkflowSimulatorSection({ t }) {
       }
     } catch (actionError) {
       setError(actionError.message);
+    }
+  }
+
+  async function runIulAction(id, label, action) {
+    setError(null);
+    setResult(null);
+    setIulReport(null);
+    setIulSuite(null);
+    setIulStagingSuite(null);
+
+    try {
+      const payload = await runTask(id, label, action);
+      setResult(payload);
+      if (payload.report?.iulPolicyReview) {
+        setIulReport(payload.report);
+      } else if (payload.iulPolicyReview && payload.reports) {
+        if (payload.mode === "staging_e2e") {
+          setIulStagingSuite(payload);
+        } else {
+          setIulSuite(payload);
+        }
+      } else if (payload.report) {
+        setIulReport(payload.report);
+      }
+    } catch (actionError) {
+      setError(actionError.message);
+    }
+  }
+
+  async function runIulCleanup(simulatorRunId) {
+    setCleanupResult(null);
+    try {
+      const payload = await cleanupIulStagingSimulatorEvent(simulatorRunId);
+      setCleanupResult(payload.cleanup || payload);
+    } catch (cleanupError) {
+      setError(cleanupError.message);
     }
   }
 
@@ -732,6 +864,70 @@ function WorkflowSimulatorSection({ t }) {
         </div>
       </div>
 
+      <div className="ops-panel">
+        <div className="ops-panel ops-panel--row" style={{ border: "none", padding: 0, marginBottom: "0.5rem" }}>
+          <div>
+            <h3>IUL POLICY REVIEW</h3>
+            <p className="ops-muted">
+              Dry-run uses fixture availability and the real IUL engine. Staging E2E writes only to
+              Atlas Staging via Super Admin personal integration.
+            </p>
+          </div>
+          <OpsStatusBadge status="warning" label="STAGING CALENDAR WRITE" />
+        </div>
+        <div className="ops-action-row">
+          <button
+            type="button"
+            className="ops-button"
+            onClick={() =>
+              runIulAction("iul-golden-suite", "Run IUL Golden Suite", runAllIulPolicyReviewSimulatorScenarios)
+            }
+          >
+            Run IUL Golden Suite
+          </button>
+          <button
+            type="button"
+            className="ops-button ops-button--secondary"
+            onClick={() =>
+              runIulAction("iul-staging-e2e", "Run IUL Staging E2E", () =>
+                runIulStagingE2ESimulator({ autoCleanup: true })
+              )
+            }
+          >
+            Run IUL Staging E2E
+          </button>
+        </div>
+        <div className="ops-action-row">
+          {iulScenarios
+            .filter((scenario) => scenario.mode !== "staging_e2e")
+            .map((scenario) => (
+              <button
+                key={scenario.id}
+                type="button"
+                className="ops-button ops-button--secondary"
+                onClick={() =>
+                  runIulAction(`iul-${scenario.id}`, scenario.name, () =>
+                    runIulPolicyReviewSimulatorScenario(scenario.id)
+                  )
+                }
+              >
+                {scenario.name}
+              </button>
+            ))}
+        </div>
+        {iulStagingSuite?.reports?.[0]?.simulatorRunId ? (
+          <div className="ops-action-row" style={{ marginTop: "0.5rem" }}>
+            <button
+              type="button"
+              className="ops-button ops-button--secondary"
+              onClick={() => runIulCleanup(iulStagingSuite.reports[0].simulatorRunId)}
+            >
+              Clean up simulator event
+            </button>
+          </div>
+        ) : null}
+      </div>
+
       <RecruitAiV2CustomPlayground t={t} />
 
       {activePhone ? (
@@ -769,6 +965,44 @@ function WorkflowSimulatorSection({ t }) {
       <ActionResult result={result} />
 
       {v2Report ? <RecruitAiV2ScenarioResult report={v2Report} t={t} /> : null}
+
+      {iulReport ? <IulPolicyReviewScenarioResult report={iulReport} /> : null}
+
+      {iulSuite?.reports ? (
+        <div className="ops-panel">
+          <h3>IUL Golden Suite</h3>
+          <p className="ops-muted">
+            {iulSuite.passed}/{iulSuite.total} passed
+          </p>
+          <div className="ops-stack">
+            {iulSuite.reports.map((report) => (
+              <div key={report.scenarioId} className="ops-panel ops-panel--row">
+                <span>{report.scenarioName}</span>
+                <OpsStatusBadge status={report.pass ? "healthy" : "failure"} label={report.pass ? "PASS" : "FAIL"} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {iulStagingSuite?.reports ? (
+        <div className="ops-panel">
+          <h3>IUL Staging E2E</h3>
+          <p className="ops-muted">
+            {iulStagingSuite.passed}/{iulStagingSuite.total} passed · Writes to Atlas Staging calendar only
+          </p>
+          {iulStagingSuite.reports.map((report) => (
+            <IulPolicyReviewScenarioResult key={report.scenarioId} report={report} />
+          ))}
+        </div>
+      ) : null}
+
+      {cleanupResult ? (
+        <div className="ops-panel">
+          <h3>Cleanup</h3>
+          <pre className="ops-code">{JSON.stringify(cleanupResult, null, 2)}</pre>
+        </div>
+      ) : null}
 
       {v2Suite?.reports ? (
         <div className="ops-panel">

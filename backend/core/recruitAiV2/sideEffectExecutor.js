@@ -906,7 +906,9 @@ async function executeAuthorizedSideEffects({
         schedulingAttemptId,
         // Implements BR-127 — pass durable knownFacts for workflow qual sync.
         recruitAiV2Context: context || null,
-        recruitAiV2CoreProspectId: context?.prospectId || options.prospectId || null
+        recruitAiV2CoreProspectId: context?.prospectId || options.prospectId || null,
+        iulStagingE2EGrant: options.iulStagingE2EGrant || null,
+        dependencies: options.dependencies || {}
       }
     );
     bookingTiming.calendarCreateMs = Date.now() - calendarStarted;
@@ -1030,22 +1032,30 @@ async function executeAuthorizedSideEffects({
   });
 
   if (schedulingConfig.purpose === "policy_review" && appointmentId) {
-    const pipelineStarted = Date.now();
-    const pipelineLink = await linkIulPolicyReviewPipeline({
-      organizationId,
-      prospectId: context?.prospectId || options.prospectId || null,
-      appointmentId,
-      agentId,
-      phone,
-      prospectName: context?.name || context?.knownFacts?.name || null
-    });
-    bookingTiming.pipelineMs = Date.now() - pipelineStarted;
-    if (pipelineLink?.ok) {
-      performed.push({
-        type: "policy_review_pipeline_link",
-        reviewId: pipelineLink.reviewId || null,
-        appointmentId
+    const {
+      tryAssertIulStagingBookingGrant
+    } = require("../../dev/iulStagingBookingGrant");
+    if (tryAssertIulStagingBookingGrant(options.iulStagingE2EGrant)) {
+      // Simulator-only persistence — do not write production policy-review rows.
+      bookingTiming.pipelineMs = 0;
+    } else {
+      const pipelineStarted = Date.now();
+      const pipelineLink = await linkIulPolicyReviewPipeline({
+        organizationId,
+        prospectId: context?.prospectId || options.prospectId || null,
+        appointmentId,
+        agentId,
+        phone,
+        prospectName: context?.name || context?.knownFacts?.name || null
       });
+      bookingTiming.pipelineMs = Date.now() - pipelineStarted;
+      if (pipelineLink?.ok) {
+        performed.push({
+          type: "policy_review_pipeline_link",
+          reviewId: pipelineLink.reviewId || null,
+          appointmentId
+        });
+      }
     }
   }
 

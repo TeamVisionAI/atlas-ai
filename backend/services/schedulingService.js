@@ -100,14 +100,17 @@ async function scheduleAppointment({
   if (organizationId) {
     try {
       googleEvent = await googleCalendarIntegrationService.createCalendarEvent(organizationId, {
-        summary: formatAppointmentTitle(appointmentType, metadata),
-        description: buildEventDescription(appointmentType, metadata),
+        summary: metadata.eventTitlePrefix
+          ? `${metadata.eventTitlePrefix} ${formatAppointmentTitle(appointmentType, metadata)}`
+          : formatAppointmentTitle(appointmentType, metadata),
+        description: metadata.eventDescription || buildEventDescription(appointmentType, metadata),
         startTimeISO,
         endTimeISO,
         timezone,
         location: metadata.meetingUrl || metadata.zoomUrl || metadata.location || null,
         attendeeEmail: metadata.attendeeEmail || null,
-        interviewerUserId: interviewerUserId || metadata.interviewerUserId || null
+        interviewerUserId: interviewerUserId || metadata.interviewerUserId || null,
+        stagingCalendarTarget: metadata.stagingCalendarTarget || null
       });
     } catch (calendarError) {
       releaseSlotByIso(startTimeISO, appointmentType);

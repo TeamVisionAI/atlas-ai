@@ -44,6 +44,14 @@ const {
   buildRegressionCandidate,
   listPlaygroundMeta
 } = require("./recruitAiV2CustomPlayground");
+const {
+  listIulPolicyReviewScenarios,
+  runIulPolicyReviewScenarioById,
+  runAllIulDryRunScenarioPack,
+  runIulStagingE2EPack,
+  getIulGoldenSuiteMeta
+} = require("./iulPolicyReviewScenarioPack");
+const { cleanupStagingSimulatorEvents } = require("./iulPolicyReviewScenarioRunner");
 
 const BACKEND_VERSION = "0.4.0";
 const SPRINT_LABEL = "Sprint 17.1";
@@ -764,6 +772,57 @@ function runAllRecruitAiV2SimulatorScenarios() {
   };
 }
 
+function listIulPolicyReviewSimulatorScenarios() {
+  return listIulPolicyReviewScenarios();
+}
+
+async function runIulPolicyReviewSimulatorScenario(scenarioId, req, options = {}) {
+  const report = await runIulPolicyReviewScenarioById(scenarioId, req, options);
+  recordActivity({
+    level: report.pass ? "info" : "error",
+    category: "iul_workflow_simulator",
+    message: `IUL scenario ${scenarioId}`,
+    detail: report.pass ? "PASS" : "FAIL"
+  });
+  return report;
+}
+
+async function runAllIulPolicyReviewSimulatorScenarios() {
+  const suite = await runAllIulDryRunScenarioPack();
+  recordActivity({
+    level: suite.failed === 0 ? "info" : "error",
+    category: "iul_workflow_simulator",
+    message: "IUL Policy Review golden suite",
+    detail: `${suite.passed}/${suite.total} passed`
+  });
+  return {
+    ...suite,
+    goldenSuite: getIulGoldenSuiteMeta()
+  };
+}
+
+async function runIulStagingE2ESimulator(req, options = {}) {
+  const suite = await runIulStagingE2EPack(req, options);
+  recordActivity({
+    level: suite.failed === 0 ? "info" : "error",
+    category: "iul_workflow_simulator",
+    message: "IUL Staging E2E suite",
+    detail: `${suite.passed}/${suite.total} passed`
+  });
+  return suite;
+}
+
+async function cleanupIulStagingSimulatorEvent(req, simulatorRunId) {
+  const result = await cleanupStagingSimulatorEvents({ req, simulatorRunId });
+  recordActivity({
+    level: "info",
+    category: "iul_workflow_simulator",
+    message: "IUL staging simulator cleanup",
+    detail: `${result.deletedCount} deleted for ${simulatorRunId}`
+  });
+  return result;
+}
+
 function getRecruitAiV2PlaygroundMeta() {
   return listPlaygroundMeta();
 }
@@ -1041,6 +1100,11 @@ module.exports = {
   runRecruitAiV2SimulatorScenario,
   runAllRecruitAiV2SimulatorScenarios,
   getRecruitAiV2PlaygroundMeta,
+  listIulPolicyReviewSimulatorScenarios,
+  runIulPolicyReviewSimulatorScenario,
+  runAllIulPolicyReviewSimulatorScenarios,
+  runIulStagingE2ESimulator,
+  cleanupIulStagingSimulatorEvent,
   startRecruitAiV2PlaygroundSession,
   getRecruitAiV2PlaygroundSession,
   resetRecruitAiV2PlaygroundSession,

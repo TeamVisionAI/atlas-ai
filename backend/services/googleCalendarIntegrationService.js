@@ -759,7 +759,13 @@ async function disconnect(organizationId, options = {}) {
 }
 
 async function createCalendarEvent(organizationId, event) {
-  if (shouldMockExternalComms()) {
+  let stagingTarget = null;
+  if (event?.stagingCalendarTarget) {
+    const { assertIulStagingBookingGrant } = require("../dev/iulStagingBookingGrant");
+    stagingTarget = assertIulStagingBookingGrant(event.stagingCalendarTarget);
+  }
+
+  if (shouldMockExternalComms() && !stagingTarget) {
     return {
       id: `sim-gcal-${Date.now()}`,
       htmlLink: event.zoomUrl || null,
@@ -768,18 +774,28 @@ async function createCalendarEvent(organizationId, event) {
   }
 
   // BR-147 — prefer interviewer personal calendar; fall back to org legacy for sync compat.
-  const interviewerUserId = event?.interviewerUserId || event?.userId || null;
+  // BR-223 — staging E2E never falls back to tenant/default calendars.
+  const interviewerUserId = stagingTarget
+    ? stagingTarget.userId
+    : event?.interviewerUserId || event?.userId || null;
   const { oauth2Client, integration } = await getAuthorizedClient(organizationId, {
     userId: interviewerUserId,
-    allowOrgLegacyFallback: true,
-    personalOnly: false
+    allowOrgLegacyFallback: stagingTarget ? false : true,
+    personalOnly: Boolean(stagingTarget)
   });
 
   if (!oauth2Client) {
     return null;
   }
 
-  const calendarId = integration?.config?.calendarId || "primary";
+  const calendarId = stagingTarget
+    ? stagingTarget.calendarId
+    : integration?.config?.calendarId || "primary";
+
+  if (stagingTarget && calendarId !== stagingTarget.calendarId) {
+    const { buildGrantError } = require("../dev/iulStagingBookingGrant");
+    throw buildGrantError("Staging calendar target drifted from the verified Atlas Staging calendar.");
+  }
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
   const requestBody = {
@@ -799,29 +815,31 @@ async function createCalendarEvent(organizationId, event) {
     requestBody.location = event.location;
   }
 
-  if (event.attendeeEmail) {
+  if (event.attendeeEmail && !stagingTarget) {
     requestBody.attendees = [{ email: event.attendeeEmail }];
   }
 
   const response = await calendar.events.insert({
     calendarId,
     conferenceDataVersion: 0,
-    sendUpdates: event.attendeeEmail ? "all" : "none",
+    sendUpdates: event.attendeeEmail && !stagingTarget ? "all" : "none",
     requestBody
   });
 
-  await supabase
-    .from("organization_integrations")
-    .update({
-      config: {
-        ...(integration.config || {}),
-        syncStatus: "synced",
-        lastSync: new Date().toISOString()
-      },
-      updated_at: new Date().toISOString()
-    })
-    .eq("organization_id", organizationId)
-    .eq("provider", PROVIDER);
+  if (!stagingTarget) {
+    await supabase
+      .from("organization_integrations")
+      .update({
+        config: {
+          ...(integration.config || {}),
+          syncStatus: "synced",
+          lastSync: new Date().toISOString()
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq("organization_id", organizationId)
+      .eq("provider", PROVIDER);
+  }
 
   return response.data;
 }

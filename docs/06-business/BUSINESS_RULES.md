@@ -3568,6 +3568,28 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-223 — IUL Workflow Simulator + Staging Calendar E2E
+
+**Implements:** Operations Center Workflow Simulator gains a dedicated **IUL POLICY REVIEW** section with dry-run golden scenarios (A–O) and an explicit **IUL Staging E2E** path (P) that may write only to the Super Admin personal **Atlas Staging** Google Calendar.  
+**Domain:** IUL Policy Review / Workflow Simulator / staging integration  
+**Depends on:** BR-219, BR-220, BR-221, BR-222, BR-160, BR-147  
+**Related:** Recruit AI v2 simulator (unchanged); `docs/03-engineering/WORKFLOW_SIMULATOR_SPEC.md`  
+**Status:** Implemented — not merged  
+**Engine target:** `iulPolicyReviewScenarioRunner`; `iulStagingBookingGrant`; `iulStagingCalendarGuard`; `iulStagingE2EService`; real IUL pipeline + BR-219 `executeAuthorizedSideEffects` → `executeScheduleInterview` → `schedulingService.scheduleAppointment` → `createCalendarEvent`  
+**Tests:** `backend/test/iulPolicyReviewSimulatorBr223.test.js`
+
+### Rules
+
+1. **Dedicated IUL section** — IUL scenarios are separate from recruiting scenarios. UI: **Run IUL Golden Suite**, **Run IUL Staging E2E**, individual scenarios A–P, badge **STAGING CALENDAR WRITE**.
+2. **Dry-run golden suite (default)** — No WhatsApp Graph send, no production DB mutation, no calendar write. Ephemeral `sim-iul-*` context, injected availability fixtures, real IUL engine and WhatsApp interactive IDs. Per-turn diagnostics: intent, reason codes, IUL workflow state, offered days/slots, booking flags.
+3. **Staging E2E (explicit only)** — Before any calendar read/write: require SUPER_ADMIN, explicit staging mode, connected personal Google Calendar, calendar name exactly **Atlas Staging**, control plane (not Support Mode tenant calendar). Fail closed: `Staging calendar not safely configured.` Never fall back to tenant/default/Support Mode calendar. Never send WhatsApp or create production prospect/client/conversation rows.
+4. **Real booking path** — Staging E2E slot selection runs BR-219 booking orchestration (`processRecruitAiV2Turn` + `allowExecution` + `executeScheduleInterview`). Calendar create uses `schedulingService.scheduleAppointment` with a fail-closed `stagingCalendarTarget`. Simulator must not insert the calendar event itself. Appointment persistence is ephemeral; Zoom/Office resolution and idempotency stay on the live booking path.
+5. **Staging booking certification** — Events tagged `[ATLAS IUL SIMULATOR]` with `simulatorRunId`. Zoom PASS requires booking success + staging event + configured Zoom URL in the booking result **and** the final Atlas confirmation, and no `IUL_ZOOM_LINK_MISSING`. Calendar-only Zoom URL is not enough. Office PASS excludes Zoom from confirmation. Same-slot replay through the booking path must not create a second event.
+6. **Cleanup** — Delete only events matching current `simulatorRunId` and `[ATLAS IUL SIMULATOR]` tag; never bulk-delete calendar.
+7. **Regression coverage** — Golden suite asserts BR-219/220/221/222 behaviors in named scenarios. Recruiting simulator unchanged.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  
