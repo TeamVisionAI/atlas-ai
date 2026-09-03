@@ -3478,6 +3478,30 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-219 — IUL Selected-Slot Confirmation Ownership and Timeout-Safe Booking
+
+**Implements:** A selected IUL policy-review slot stays owned by the IUL scheduling flow through live-authoring timeout, deferred acknowledgement, booking completion, failure, replay, and Office↔Zoom mode switch. Customer-facing confirmation waits for successful persistence.  
+**Domain:** IUL Policy Review / WhatsApp scheduling / live authoring recovery  
+**Depends on:** BR-125, BR-126, BR-168, BR-187, BR-190, BR-210, BR-212, BR-213  
+**Related:** BR-208–213 (IUL suites unchanged); recruiting booking stays on BR-125/126/168 unless a shared helper is used  
+**Status:** Implemented  
+**Engine target:** `iulSchedulingOwnership`; `iulBookingFollowUp`; `liveAuthoringBridge`; `iulAdConversation`; `whatsappInteractiveMessage`; `sideEffectExecutor` booking timing  
+**Tests:** `backend/test/iulSlotConfirmationOwnershipBr219.test.js`
+
+### Rules
+
+1. **IUL confirmable scheduling states** — Durable/recovery treats `iul_confirm_review_slot`, `iul_confirm_review_deferred`, and `iul_create_review_appointment` as IUL-owned. A proposed IUL appointment with `conversationGoal=policy_review`, a selected/proposed slot, `meetingMode`, and `appointmentId=null` is owned by IUL scheduling. It must never fall through to `nextDiscoveryAsk` or Conversation Engine discovery/carrier asks.
+2. **Timeout acknowledgement** — If `iul_create_review_appointment` exceeds the live-authoring budget, send an immediate deterministic deferred reply that does **not** claim booking succeeded and does **not** include a Zoom link. Use the canonical selected slot and meeting mode. Office may include the configured office address only when complete and safe. No CE fallthrough.
+3. **Booking outlives authoring wait** — Persist proposed booking state, send the deferred acknowledgement quickly, then finish the already-tracked create. On success send one final confirmation. On failure send `iul_review_create_failed` and re-offer valid availability. Do not start a second create. Idempotent by prospect + selected slot + purpose/booking attempt.
+4. **Success** — Persist `atlas_appointments` with `purpose=policy_review`, correct owner, meeting mode, selected date/time, calendar event, Zoom join information only for Zoom, canonical office data for office, and `atlas_policy_review_pipeline` link. Send one confirmation only after successful persistence. A successful Zoom confirmation must include the exact `zoomJoinUrl` in the customer WhatsApp text. Deferred, pending, failed, and office confirmations must never include a Zoom URL. If create succeeds without a URL, send a safe booked message and do not promise “I will send the link” unless another deterministic delivery path exists. Do not fabricate a URL.
+5. **Failure** — Keep IUL scheduling ownership, qualification facts, and meeting mode unless the user changes it. Re-offer valid availability / selected-day flow. Do not ask carrier/company/discovery.
+6. **Replay** — While durable state is confirm-slot / deferred / create / proposed-without-`appointmentId`, scheduling owns the turn. If the booking result exists, send/rehydrate confirmation. If still pending, acknowledge pending. If failed, re-offer scheduling. If the user explicitly changes mode (`Por Zoom` / `En la oficina`), preserve completed qualification and continue scheduling. Never `nextDiscoveryAsk`.
+7. **Mode switch** — Fresh IUL prospect choosing Zoom before qualification is complete may continue remaining qualification. An already-qualified prospect switching Office↔Zoom must not restart qualification; preserve `knownFacts` and continue scheduling.
+8. **Interactive labels** — IUL list row title is the clock label. Description must not repeat the identical title. Do not change interactive IDs.
+9. **Boundaries** — Do not change IUL qualification rules, interactive slot ID semantics, ownership, BR-215/216/217, or recruiting booking behavior except regression-safe shared helpers. No production writes. No migration.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  

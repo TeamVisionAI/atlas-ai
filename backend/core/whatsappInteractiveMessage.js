@@ -143,11 +143,20 @@ function buildInteractiveFromOptions({
     body,
     buttonText: listButtonText,
     sectionTitle: listSectionTitle,
-    rows: safe.map((option) => ({
-      id: option.id,
-      title: option.title,
-      description: option.description || option.label || undefined
-    }))
+    rows: safe.map((option) => {
+      const title = String(option.title || "").trim();
+      const rawDescription = option.description || option.label || "";
+      // BR-219 — do not repeat the identical clock label as list description.
+      const description =
+        rawDescription && String(rawDescription).trim() !== title
+          ? rawDescription
+          : undefined;
+      return {
+        id: option.id,
+        title: option.title,
+        description
+      };
+    })
   });
 }
 

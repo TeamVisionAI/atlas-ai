@@ -33,6 +33,7 @@ function isSoftAcknowledgement(text) {
  */
 function hasConfirmableAppointmentProposal(context = {}) {
   const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+  const lastOffer = String(context?.conversation?.lastOfferMade || "");
   const lastOut = String(context?.conversation?.lastAtlasOutboundText || "");
   const proposedTime = context?.appointment?.proposedTime || null;
   const proposedDate = context?.appointment?.proposedDate || null;
@@ -92,6 +93,15 @@ function hasConfirmableAppointmentProposal(context = {}) {
   // Explicit confirm ask on confirm_slot — even if proposedTime was sparsely seeded.
   if (lastQ === "confirm_slot" && asksConfirm) {
     return true;
+  }
+
+  // Implements BR-219 — IUL confirmable scheduling state.
+  if (
+    lastQ === "iul_confirm_review_slot" ||
+    lastOffer === "iul_confirm_review_deferred" ||
+    lastOffer === "iul_create_review_appointment"
+  ) {
+    return Boolean(proposedTime || proposedDate || offered.length);
   }
 
   if (!proposedTime) {

@@ -507,6 +507,16 @@ function isConfirmableProposedDurable(context = null) {
   ) {
     return true;
   }
+  try {
+    const {
+      isIulConfirmableSchedulingState
+    } = require("./iulSchedulingOwnership");
+    if (isIulConfirmableSchedulingState(context)) {
+      return true;
+    }
+  } catch {
+    // Ownership helper must never throw into authoring recovery.
+  }
   return false;
 }
 
@@ -554,10 +564,11 @@ async function ownConfirmableProposalAfterAuthoringLoss({
   allowExecution = false,
   persistence = null,
   logStage = null,
-  env = process.env
+  env = process.env,
+  skipLateWait = false
 } = {}) {
   let late = v2Result;
-  if (!late) {
+  if (!late && !skipLateWait) {
     late = (await awaitLateTrackedResult(error, env)).late;
   }
 
@@ -569,7 +580,28 @@ async function ownConfirmableProposalAfterAuthoringLoss({
     late
   });
 
-  if (!isConfirmableProposedDurable(durable)) {
+  const {
+    isIulPolicyReviewContext,
+    isIulConfirmableSchedulingState,
+    isIulDeferredBookingState,
+    resolveIulSelectedSlotFromInbound,
+    buildIulDeferredAcknowledgement,
+    proposedSlotFromContext
+  } = require("./iulSchedulingOwnership");
+  const inboundSelectedSlot = isIulPolicyReviewContext(durable)
+    ? resolveIulSelectedSlotFromInbound(durable, {
+        text: normalized.text,
+        interactiveReply: normalized.interactiveReply
+      })
+    : null;
+  const iulBookingTurn =
+    isIulDeferredBookingState(durable, inboundSelectedSlot) || Boolean(inboundSelectedSlot);
+  // Skip-late IUL path is only for an in-flight selected-slot booking, not
+  // daypart/offer/create-failed timeouts (those stay on BR-168 recovery).
+  if (skipLateWait && !iulBookingTurn) {
+    return null;
+  }
+  if (!isConfirmableProposedDurable(durable) && !inboundSelectedSlot) {
     return null;
   }
 
@@ -584,13 +616,36 @@ async function ownConfirmableProposalAfterAuthoringLoss({
   // Implements BR-187 / BR-126 — own the turn on authoring loss, but do not
   // emit create-failed copy unless booking was actually attempted and failed.
   // allowExecution alone is not a provider failure.
+  const iulOwned =
+    isIulPolicyReviewContext(durable) ||
+    isIulConfirmableSchedulingState(durable) ||
+    Boolean(inboundSelectedSlot);
+  if (iulOwned && !iulBookingTurn && !lateFailed) {
+    return null;
+  }
   const templateKey = lateFailed
-    ? "appointment_create_failed"
-    : "appointment_confirm_deferred";
+    ? iulOwned
+      ? "iul_review_create_failed"
+      : "appointment_create_failed"
+    : iulOwned
+      ? "iul_confirm_review_deferred"
+      : "appointment_confirm_deferred";
 
   let replyText = "";
   if (lateFailed && lateFailedReply) {
     replyText = lateFailedReply;
+  } else if (iulOwned && !lateFailed) {
+    const slot =
+      resolveIulSelectedSlotFromInbound(durable, {
+        text: normalized.text,
+        interactiveReply: normalized.interactiveReply
+      }) || proposedSlotFromContext(durable);
+    replyText = buildIulDeferredAcknowledgement({
+      language: language === "english" || language === "en" ? "en" : "es",
+      slot,
+      context: durable,
+      officeAddress: durable.knownFacts?.reviewOfficeAddress || null
+    });
   } else {
     replyText = extractAuthoredReplyText({
       rendered: renderCustomerReply({
@@ -609,22 +664,56 @@ async function ownConfirmableProposalAfterAuthoringLoss({
     return null;
   }
 
+  const selectedSlot = iulOwned
+    ? resolveIulSelectedSlotFromInbound(durable, {
+        text: normalized.text,
+        interactiveReply: normalized.interactiveReply
+      }) || proposedSlotFromContext(durable)
+    : null;
   const nextContext = {
     ...durable,
     currentStage: durable.currentStage || "proposed",
+    knownFacts: {
+      ...(durable.knownFacts || {}),
+      ...(iulOwned
+        ? {
+            iulBookingPending: !lateFailed,
+            reviewProposedDate:
+              selectedSlot?.date ||
+              selectedSlot?.dateKey ||
+              durable.knownFacts?.reviewProposedDate ||
+              durable.appointment?.proposedDate ||
+              null,
+            reviewProposedTime:
+              selectedSlot?.time ||
+              selectedSlot?.timeKey ||
+              durable.knownFacts?.reviewProposedTime ||
+              durable.appointment?.proposedTime ||
+              null
+          }
+        : {})
+    },
     appointment: {
       ...durable.appointment,
       status: APPOINTMENT_STATUS.PROPOSED,
-      appointmentId: null,
+      appointmentId: lateFailed ? durable.appointment?.appointmentId || null : null,
       confirmedDate: null,
       confirmedTime: null,
-      proposedDate: durable.appointment?.proposedDate || null,
-      proposedTime: durable.appointment?.proposedTime || null
+      proposedDate:
+        selectedSlot?.date ||
+        selectedSlot?.dateKey ||
+        durable.appointment?.proposedDate ||
+        null,
+      proposedTime:
+        selectedSlot?.time ||
+        selectedSlot?.timeKey ||
+        durable.appointment?.proposedTime ||
+        null
     },
     conversation: {
       ...durable.conversation,
-      lastQuestionAsked: "confirm_slot",
-      lastProspectIntent: "schedule_confirm",
+      lastQuestionAsked: iulOwned ? "iul_confirm_review_slot" : "confirm_slot",
+      lastProspectIntent: iulOwned ? "iul_select_offered_slot" : "schedule_confirm",
       lastOfferMade: templateKey,
       lastAtlasOutboundText: replyText,
       pendingClarification: null,
@@ -641,7 +730,9 @@ async function ownConfirmableProposalAfterAuthoringLoss({
         expectedVersion: durable._persistence?.contextVersion || undefined,
         nextContext,
         inboundMessageId: normalized.providerMessageId || null,
-        decisionCode: "create_appointment",
+        decisionCode: iulOwned
+          ? "iul_create_review_appointment"
+          : "create_appointment",
         prospectPhone: prospect.phone || normalized.phone || null,
         legacyProspectId: prospect.id || null,
         ensureCore: true
@@ -672,12 +763,18 @@ async function ownConfirmableProposalAfterAuthoringLoss({
       nextContext,
       responsePlan: { templateKey },
       structuredDecision: {
-        decision: { nextAction: "create_appointment" }
+        decision: {
+          nextAction: iulOwned
+            ? "iul_create_review_appointment"
+            : "create_appointment"
+        }
       }
     },
     actingUserId,
     organizationId,
-    nextAction: "create_appointment",
+    nextAction: iulOwned
+      ? "iul_create_review_appointment"
+      : "create_appointment",
     allowExecution,
     stage: STAGES.OWNED_CONFIRMABLE_PROPOSAL,
     ownershipSource: "confirmable_proposal_guard"
@@ -688,6 +785,15 @@ async function ownConfirmableProposalAfterAuthoringLoss({
  * BR-125 success reclaim, else BR-126 confirmable-proposal guard (no CE).
  */
 async function reclaimOrProtectConfirmableProposal(args = {}) {
+  // Implements BR-219 — IUL selected-slot timeout must send deferred now,
+  // not after the post-timeout grace used by mutation reclaim.
+  const iulImmediate = await ownConfirmableProposalAfterAuthoringLoss({
+    ...args,
+    skipLateWait: true
+  });
+  if (iulImmediate?.authored && iulImmediate.replyText) {
+    return iulImmediate;
+  }
   const reclaimed = await reclaimOwnershipAfterAuthoringLoss(args);
   if (reclaimed?.authored && reclaimed.replyText) {
     return reclaimed;
@@ -1228,7 +1334,99 @@ async function attemptLiveV2Authoring({
       env
     });
     if (protectedReply) {
+      // Implements BR-219 — booking continues after the 8s authoring wait.
+      try {
+        const { isIulPolicyReviewContext } = require("./iulSchedulingOwnership");
+        const held =
+          protectedReply.v2Result?.nextContext ||
+          contextInput ||
+          null;
+        if (
+          reason === "LIVE_AUTHORING_TIMEOUT" &&
+          isIulPolicyReviewContext(held)
+        ) {
+          const { scheduleIulBookingFollowUp } = require("./iulBookingFollowUp");
+          scheduleIulBookingFollowUp({
+            error,
+            prospect,
+            normalized,
+            organizationId,
+            actingUserId,
+            env,
+            logStage,
+            deliverReply: dependencies.deliverIulFollowUp || null
+          });
+        }
+      } catch {
+        // Follow-up scheduling must never block the deferred acknowledgement.
+      }
       return protectedReply;
+    }
+
+    // Implements BR-219 — IUL create timeout sends deferred immediately, no CE.
+    try {
+      const {
+        isIulPolicyReviewContext,
+        isIulSchedulingOwnedState,
+        resolveIulSelectedSlotFromInbound,
+        buildIulDeferredAcknowledgement
+      } = require("./iulSchedulingOwnership");
+      const loadedForIul =
+        (typeof error.getLateResult === "function"
+          ? error.getLateResult()?.nextContext || error.getLateResult()?.context
+          : null) || contextInput;
+      if (
+        reason === "LIVE_AUTHORING_TIMEOUT" &&
+        isIulPolicyReviewContext(loadedForIul) &&
+        (isIulSchedulingOwnedState(loadedForIul) ||
+          normalized.interactiveReply?.id)
+      ) {
+        const slot = resolveIulSelectedSlotFromInbound(loadedForIul, {
+          text: normalized.text,
+          interactiveReply: normalized.interactiveReply
+        });
+        const replyText = buildIulDeferredAcknowledgement({
+          language:
+            loadedForIul.preferredLanguage === "english" ||
+            loadedForIul.preferredLanguage === "en"
+              ? "en"
+              : "es",
+          slot,
+          context: loadedForIul,
+          officeAddress: loadedForIul.knownFacts?.reviewOfficeAddress || null
+        });
+        if (replyText) {
+          const { scheduleIulBookingFollowUp } = require("./iulBookingFollowUp");
+          scheduleIulBookingFollowUp({
+            error,
+            prospect,
+            normalized,
+            organizationId,
+            actingUserId,
+            env,
+            logStage,
+            deliverReply: dependencies.deliverIulFollowUp || null
+          });
+          return {
+            eligible: true,
+            authored: true,
+            fallThrough: false,
+            reason: null,
+            replyText,
+            v2Result: {
+              nextContext: loadedForIul,
+              customerReplyPlan: { templateKey: "iul_confirm_review_deferred" }
+            },
+            actingUserId,
+            organizationId,
+            nextAction: "iul_create_review_appointment",
+            allowExecution,
+            stage: STAGES.OWNED_CONFIRMABLE_PROPOSAL
+          };
+        }
+      }
+    } catch {
+      // Fall through to existing late-recovery / BR-167 handling.
     }
 
     // Implements BR-168 — recover a late-settled safe conversational reply
