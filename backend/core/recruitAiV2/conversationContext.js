@@ -169,6 +169,8 @@ function createConversationContext(overrides = {}) {
     organizationName: null,
     officeAddress: null,
     officeAddressSource: null,
+    localCities: null,
+    coverageCitiesSource: null,
     preferredLanguage: LANGUAGES.UNKNOWN,
     languageMeta: emptyLanguageMeta(),
     currentStage: STAGES.GREETING,

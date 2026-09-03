@@ -1,6 +1,7 @@
 /**
- * Sprint 21.2 — Team Vision local interview area (Miami-Dade / Broward).
- * Single source for local routing in business rules and conversation copy.
+ * Sprint 21.2 — Team Vision seed local interview area (Miami-Dade / Broward).
+ * BR-226: runtime coverage uses recruitingCoverage.resolveCoverageCities.
+ * This list is Team Vision fallback only — never a silent shared tenant default.
  */
 
 const LOCAL_CITIES = [

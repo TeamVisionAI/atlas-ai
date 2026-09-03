@@ -78,6 +78,7 @@ const {
   resolveRecruitFaqAnswer
 } = require("./recruitConversationSequencing");
 const { evaluateCoverage } = require("./businessRulesEngine");
+const { coverageInputFromProfile } = require("./recruitingCoverage");
 const {
   extractInformation,
   detectLocalZoomPreference,
@@ -274,11 +275,8 @@ function buildInformationalWorkflowReply(
   return composeAnswerThenOneQuestion(informationalReply, question);
 }
 
-function buildInterviewFormatQuestion(profile, language) {
-  const coverage = evaluateCoverage({
-    city: profile.city,
-    state: profile.state
-  });
+function buildInterviewFormatQuestion(profile, language, prospect) {
+  const coverage = evaluateCoverage(coverageInputFromProfile(profile, prospect || {}));
 
   if (coverage.coverage === "LOCAL") {
     return getLocalOfficeDayPartMessage(language, {
@@ -307,7 +305,7 @@ function buildQuestionForMissingField(field, profile, language, prospect) {
       return getAuthorizationQuestion(language);
 
     case "interviewType":
-      return buildInterviewFormatQuestion(profile, language);
+      return buildInterviewFormatQuestion(profile, language, prospect);
 
     case "dayPart":
       return getDayPartQuestion(language);
@@ -887,7 +885,7 @@ async function buildSemanticReply({
     captureState.interviewType &&
     (extracted.authorization !== undefined || extracted.interviewType)
   ) {
-    question = buildInterviewFormatQuestion(profile, language);
+    question = buildInterviewFormatQuestion(profile, language, prospect);
   }
 
   if (localZoomSwitch) {
@@ -1280,7 +1278,7 @@ async function handleSemanticMessage({
     return deniedReply;
   }
 
-  const localCoverage = evaluateCoverage({ city: profile.city, state: profile.state });
+  const localCoverage = evaluateCoverage(coverageInputFromProfile(profile, prospect));
   const localZoomSwitch =
     detectLocalZoomPreference(cleanMessage) &&
     localCoverage.coverage === "LOCAL" &&

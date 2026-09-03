@@ -50,6 +50,8 @@ function renderLocalOffice({
   organizationName = null,
   officeAddress = null,
   officeAddressSource = null,
+  localCities = ["miami"],
+  coverageCitiesSource = "recruiting_config",
   language = "spanish"
 } = {}) {
   const context = createConversationContext({
@@ -58,6 +60,8 @@ function renderLocalOffice({
     organizationName,
     officeAddress,
     officeAddressSource,
+    localCities,
+    coverageCitiesSource,
     knownFacts: {
       city: "Miami",
       state: "FL",

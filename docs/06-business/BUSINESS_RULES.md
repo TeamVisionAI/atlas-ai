@@ -3617,7 +3617,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Implements:** Shared Recruit AI customer copy resolves office, Facebook welcome, reminder contact, and QR display name from the acting tenant. Team Vision seed fallbacks stay Team Vision-only.  
 **Domain:** Recruit AI / appointments / communications / QR  
 **Depends on:** BR-018, BR-077, BR-146, BR-214, BR-224  
-**Related:** BR-019–022 coverage geography remains a separate tenant-config problem (recommend BR-226)  
+**Related:** BR-226 tenant-scoped coverage geography  
 **Status:** Implemented — not merged  
 **Engine target:** `officeAddressResolver.selectCustomerFacingOfficeAddress`; `teamVisionWorkflowCopy`; `responseRenderer`; `liveAuthoringBridge`; `recruitingWorkflowOrchestrator`; `manualInterviewReminderFallback`; `qrInterstitialBranding`  
 **Tests:** `backend/test/recruitAiV2TenantOfficeIdentityBr225.test.js`
@@ -3631,7 +3631,31 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 5. **Reminder contact** — Assigned interviewer name wins. Ana Perez is Team Vision seed default only.
 6. **QR interstitial** — Shared `/go` path defaults to Atlas. Team Vision display name only when the campaign org is the seed tenant or a safe override is supplied.
 7. **Resolver ownership** — `tenantBranding.js` = customer team/org naming. `officeAddressResolver` / operational identity = office/location. Assigned recruiter = person naming. `resolveTenantDisplayName` stays operational identity and must not become the WhatsApp branding fallback.
-8. **Boundaries** — Does not redesign `localAreaConfig` / `evaluateCoverage`. Does not change production data, ads, Team Legacy V2 grants, or Railway allowlists.
+8. **Boundaries** — Does not redesign `localAreaConfig` / `evaluateCoverage` (BR-226). Does not change production data, ads, Team Legacy V2 grants, or Railway allowlists.
+
+---
+
+## BR-226 — Tenant-Scoped Recruiting Coverage for Recruit AI
+
+**Implements:** LOCAL / OUTSIDE recruiting coverage is tenant-scoped. Same Recruit AI V2 code for every tenant; only `recruitingConfig.coverage.localCities` changes.  
+**Domain:** Recruit AI / qualification / meeting modality  
+**Depends on:** BR-019–022, BR-083, BR-085, BR-146, BR-224, BR-225  
+**Related:** BR-225 office identity stays separate from coverage geography  
+**Status:** Implemented — not merged  
+**Engine target:** `recruitingCoverage`; `businessRulesEngine.evaluateCoverage`; `decisionEngine.resolveMeetingModalityForLocation`; `liveAuthoringBridge`; `orchestrator`  
+**Tests:** `backend/test/recruitAiV2TenantCoverageBr226.test.js`
+
+### Rules
+
+1. **Canonical source** — Persisted path is `organization_settings.settings.recruiting.coverage.localCities` (API/UI: recruiting configuration). Do not create a second coverage store.
+2. **Resolution order** — 1) explicit/persisted `localCities` (including empty); 2) Team Vision seed list only for the Team Vision seed tenant or unscoped legacy callers with no `organizationId`; 3) no configured local area → fail closed to OUTSIDE.
+3. **DEFAULT_TEMPLATE is not tenant geography** — `getRecruitingConfig()` may clone Team Vision cities when `persisted: false`. Runtime coverage must ignore that clone for non-Team-Vision tenants.
+4. **No silent Miami inheritance** — Non-Team-Vision tenants never inherit Miami-Dade / Broward / Doral from `localAreaConfig`.
+5. **Exact match after normalize** — Trim, lowercase, strip accents via existing `normalizeLocalValue`. `Miami` ≠ `Miami Beach`. No fuzzy matching.
+6. **Office stays separate** — A tenant may have a Doral office, classify Orlando as OUTSIDE, and still use the Doral office only when in-person is explicitly offered (BR-225). `evaluateCoverage.officeLocation` is Team Vision seed only.
+7. **Team Vision compatibility** — Team Vision Miami / Doral / Broward LOCAL behavior remains unchanged via seed fallback when no persisted list is present.
+8. **Provisioning** — New RVP tenants configure `recruitingConfig.coverage.localCities` in Settings → Recruiting. No code change. Do not save the Team Vision default city list unless that tenant actually recruits those cities.
+9. **Boundaries** — Does not change production data, ads, Team Legacy V2 grants, or Railway allowlists. Does not invent Team Legacy cities. Does not duplicate BR-225 office resolution.
 
 ---
 

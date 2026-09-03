@@ -76,6 +76,8 @@ function loadConversationContext(input = {}) {
     organizationName = null,
     officeAddress = null,
     officeAddressSource = null,
+    localCities = null,
+    coverageCitiesSource = null,
     preferredLanguage = null,
     languageMeta = null,
     timezone = "America/New_York",
@@ -146,6 +148,14 @@ function loadConversationContext(input = {}) {
     officeAddress: officeAddress || existingContext?.officeAddress || null,
     officeAddressSource:
       officeAddressSource || existingContext?.officeAddressSource || null,
+    localCities:
+      Array.isArray(localCities)
+        ? localCities
+        : Array.isArray(existingContext?.localCities)
+          ? existingContext.localCities
+          : null,
+    coverageCitiesSource:
+      coverageCitiesSource || existingContext?.coverageCitiesSource || null,
     preferredLanguage: normalizeLanguage(
       preferredLanguage || base.preferredLanguage || LANGUAGES_FALLBACK()
     ),

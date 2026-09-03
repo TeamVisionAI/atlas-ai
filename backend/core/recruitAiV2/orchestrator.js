@@ -593,6 +593,16 @@ async function processRecruitAiV2Turn({
     });
   }
 
+  // BR-226 — tenant coverage cities are resolved at the live edge and must win
+  // over stale durable context. Empty list is an explicit fail-closed stamp.
+  if (contextInput && Object.prototype.hasOwnProperty.call(contextInput, "localCities")) {
+    loaded = mergeConversationContext(loaded, {
+      localCities: contextInput.localCities,
+      coverageCitiesSource:
+        contextInput.coverageCitiesSource || loaded.coverageCitiesSource
+    });
+  }
+
   // Implements BR-222 — fresh IUL intake restarts the episode before interpret.
   try {
     const {
