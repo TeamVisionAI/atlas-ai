@@ -219,6 +219,7 @@ export default function ProspectReportPage() {
       ) : null}
 
       {rows.length ? (
+        <div className="prospect-report__table-wrap">
         <table className="prospect-report__table">
           <thead>
             <tr>
@@ -255,6 +256,7 @@ export default function ProspectReportPage() {
             ))}
           </tbody>
         </table>
+        </div>
       ) : null}
 
       <p className="prospect-report__hint no-print">{translate("prospectReportPageHint")}</p>

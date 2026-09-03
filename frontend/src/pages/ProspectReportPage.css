@@ -5,6 +5,9 @@
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .prospect-report__header {
@@ -92,8 +95,18 @@
   color: #b91c1c;
 }
 
-.prospect-report__table {
+.prospect-report__table-wrap {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prospect-report__table {
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
@@ -104,6 +117,9 @@
   padding: 6px 8px;
   text-align: left;
   vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prospect-report__table thead {
@@ -121,17 +137,33 @@
   }
 
   @page {
-    size: letter;
-    margin: 0.6in 0.5in 0.75in;
+    size: letter landscape;
+    margin: 0.4in 0.35in;
   }
 
   .prospect-report {
     max-width: none;
+    width: 100%;
     gap: 8px;
+    overflow: visible;
+  }
+
+  .prospect-report__table-wrap {
+    overflow: visible;
+    width: 100%;
   }
 
   .prospect-report__table {
-    font-size: 9pt;
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+    table-layout: fixed;
+    font-size: 7.5pt;
+  }
+
+  .prospect-report__table th,
+  .prospect-report__table td {
+    padding: 3px 4px;
   }
 
   .prospect-report__table th {
