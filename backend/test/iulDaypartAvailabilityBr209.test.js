@@ -150,11 +150,8 @@ test("A) Spanish labels are En la mañana / En la tarde", () => {
       knownFacts: { iulQualificationStatus: IUL_OPTION_IDS.STATUS_ACTIVE }
     })
   );
-  assert.match(dayPart.rendered.text, /¿Qué horario prefiere para su revisión por Zoom\?/);
-  assert.deepEqual(interactiveIds(dayPart.decision), [
-    IUL_OPTION_IDS.DAY_MORNING,
-    IUL_OPTION_IDS.DAY_AFTERNOON
-  ]);
+  assert.match(dayPart.rendered.text, /¿Qué día le funciona mejor\?/);
+  assert.equal(dayPart.decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY);
   assert.doesNotMatch(rendered.text, /\bMañana\b/);
 });
 

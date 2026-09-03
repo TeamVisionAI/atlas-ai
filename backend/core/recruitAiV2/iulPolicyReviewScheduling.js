@@ -277,6 +277,28 @@ function buildPolicyReviewSchedulingContext(context = {}, knownFacts = {}) {
 }
 
 function wrapReadResult(readResult, schedulingContext, schedulingConfig, options = {}) {
+  if (options.skipDaypartEnrich === true) {
+    const timezone = readResult?.timezone || schedulingContext.timezone;
+    const raw = (readResult?.slots || []).length
+      ? readResult.slots
+      : readResult?.unconstrainedFutureSlots || [];
+    const offered = mapSlotsForDecision(raw, timezone);
+    return {
+      checked: true,
+      status: offered.length
+        ? READ_STATUS.AVAILABLE
+        : readResult?.status || READ_STATUS.ZERO_SLOTS,
+      nearestAlternatives: offered,
+      offeredSlots: offered,
+      alternativeToConstraint: false,
+      fallbackKind: null,
+      readResult,
+      appointmentPurpose: schedulingConfig.appointmentType,
+      meetingType: schedulingConfig.defaultMeetingMode,
+      schedulingConfig,
+      timezone
+    };
+  }
   const offered = mapSlotsForDecision(
     readResult?.offeredSlots || [],
     readResult?.timezone || schedulingContext.timezone
@@ -364,12 +386,14 @@ async function readPolicyReviewAvailability({ context, interpretation, options }
     fixtureSlots: params.fixtureSlots,
     getSlots: options?.getSlots || null,
     rejectIds: options?.rejectIds || [],
-    now: options?.now || params.schedulingContext._testNow || null
+    now: options?.now || params.schedulingContext._testNow || null,
+    expandFullHorizon: options?.expandFullHorizon === true
   });
   return wrapReadResult(readResult, params.schedulingContext, params.schedulingConfig, {
     preferredWeekend: params.preferredWeekend,
     rejectIds: options?.rejectIds || [],
-    crossDatePage: options?.crossDatePage === true
+    crossDatePage: options?.crossDatePage === true,
+    skipDaypartEnrich: options?.skipDaypartEnrich === true
   });
 }
 
@@ -385,12 +409,14 @@ function readPolicyReviewAvailabilitySync({ context, interpretation, options } =
     fixtureSlots: params.fixtureSlots,
     getSlotsSync: options?.getSlotsSync || null,
     rejectIds: options?.rejectIds || [],
-    now: options?.now || params.schedulingContext._testNow || null
+    now: options?.now || params.schedulingContext._testNow || null,
+    expandFullHorizon: options?.expandFullHorizon === true
   });
   return wrapReadResult(readResult, params.schedulingContext, params.schedulingConfig, {
     preferredWeekend: params.preferredWeekend,
     rejectIds: options?.rejectIds || [],
-    crossDatePage: options?.crossDatePage === true
+    crossDatePage: options?.crossDatePage === true,
+    skipDaypartEnrich: options?.skipDaypartEnrich === true
   });
 }
 

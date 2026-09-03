@@ -892,7 +892,8 @@ async function readRollingCandidateSlots({
   getSlots = null,
   getSlotsSync = null,
   now = null,
-  sync = false
+  sync = false,
+  expandFullHorizon = false
 } = {}) {
   if (!agentId) {
     return buildUnavailableResult({
@@ -970,7 +971,7 @@ async function readRollingCandidateSlots({
       });
       let cursor = addDaysToDateKey(initialEndDateKey, 1);
       while (
-        offeredProbe.length < maxCandidates &&
+        (expandFullHorizon || offeredProbe.length < maxCandidates) &&
         daysBetweenDateKeys(startDateKey, cursor) < MAX_EXPANSION_DAYS &&
         cursor <= maxEndDateKey
       ) {
@@ -1092,7 +1093,8 @@ function readRollingCandidateSlotsSync(params = {}) {
     fixtureSlots = null,
     getSlotsSync = null,
     now = null,
-    purpose = "recruiting_interview"
+    purpose = "recruiting_interview",
+    expandFullHorizon = false
   } = params;
 
   if (!agentId) {
@@ -1204,7 +1206,7 @@ function readRollingCandidateSlotsSync(params = {}) {
     });
     let cursor = addDaysToDateKey(initialEndDateKey, 1);
     while (
-      offered.length < maxCandidates &&
+      (expandFullHorizon || offered.length < maxCandidates) &&
       daysBetweenDateKeys(startDateKey, cursor) < MAX_EXPANSION_DAYS
     ) {
       const dayCollected = collectPair(

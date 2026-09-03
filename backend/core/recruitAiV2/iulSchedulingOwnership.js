@@ -14,6 +14,7 @@ const {
 
 const CONVERSATION_GOAL = "policy_review";
 const ASK = Object.freeze({
+  SCHEDULING_DAY: "iul_ask_review_day",
   SCHEDULING_DAY_PART: "iul_ask_scheduling_day_part",
   REVIEW_DAY_PART: "iul_ask_review_day_part",
   OFFER_SLOTS: "iul_offer_review_slots",
@@ -24,6 +25,7 @@ const ASK = Object.freeze({
 const IUL_CONFIRMABLE_ASKS = Object.freeze([ASK.CONFIRM_SLOT]);
 
 const IUL_SCHEDULING_ASKS = Object.freeze([
+  ASK.SCHEDULING_DAY,
   ASK.SCHEDULING_DAY_PART,
   ASK.REVIEW_DAY_PART,
   ASK.OFFER_SLOTS,

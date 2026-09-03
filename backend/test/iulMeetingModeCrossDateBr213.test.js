@@ -236,8 +236,8 @@ test("B) Zoom choice persists", () => {
   assert.equal(chosen.interpretation.intent, INTENTS.IUL_CHOOSE_MEETING_MODE);
   assert.equal(chosen.decision.contextPatch.knownFacts.meetingMode, "zoom");
   assert.equal(chosen.decision.contextPatch.knownFacts.reviewMeetingType, IUL_REVIEW_MEETING_TYPE.ZOOM);
-  assert.equal(chosen.decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY_PART);
-  assert.match(chosen.rendered.text, /por Zoom/);
+  assert.equal(chosen.decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY);
+  assert.match(chosen.rendered.text, /¿Qué día le funciona mejor\?/);
 });
 
 test("C) office choice persists", () => {
@@ -251,8 +251,8 @@ test("C) office choice persists", () => {
     IUL_REVIEW_MEETING_TYPE.IN_PERSON
   );
   assert.equal(chosen.decision.contextPatch.knownFacts.reviewOfficeAddress, OFFICE_ADDRESS);
-  assert.equal(chosen.decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY_PART);
-  assert.match(chosen.rendered.text, /en la oficina/);
+  assert.equal(chosen.decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY);
+  assert.match(chosen.rendered.text, /¿Qué día le funciona mejor\?/);
 });
 
 test("D) office unavailable/config missing handled safely", () => {

@@ -3502,6 +3502,30 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-220 — IUL Day-First Multi-Day Compact Scheduling UX
+
+**Implements:** After IUL meeting mode, ask for a calendar day first, then morning/afternoon for that day, then 2–3 preferred times with same-day “Más horarios”. Do not dump every 30-minute slot from the first available day.  
+**Domain:** IUL Policy Review / WhatsApp scheduling UX  
+**Depends on:** BR-219, BR-213, BR-212, BR-210, BR-209, BR-190, BR-157, BR-108  
+**Related:** BR-213 rules 6–7 (first-offer same-day earliest+latest and cross-date More) are superseded for the day-first funnel. In-flight threads already on daypart without `iulSelectedDate` keep the prior daypart/More path.  
+**Status:** Implemented — not merged  
+**Engine target:** `iulDayFirstScheduling`; `iulAdConversation` day ask; `schedulingAvailabilityReader` full-horizon expand; `iulSlotSelection` clock-only titles  
+**Tests:** `backend/test/iulDayFirstCompactSchedulingBr220.test.js`
+
+### Rules
+
+1. **Day-first** — After Zoom/Office, ask “Perfecto. ¿Qué día le funciona mejor?” (English equivalent). Build choices from canonical calendar availability across the rolling horizon (`MAX_EXPANSION_DAYS` = 14 inclusive from org-local today; initial getSlots window remains 48h, then day-by-day expansion). Omit days with zero availability. Do not stop after the first date with slots. Respect working days/hours, Zoom vs office, and timezone. IDs are `IUL_DAY_YYYY-MM-DD`. Titles are `Jue 3`, `Vie 4`.
+2. **Then daypart** — “¿Qué horario prefiere para el viernes?” with En la mañana / En la tarde only when that selected date has availability in that period. If only one daypart exists, skip deterministically to times.
+3. **Compact first page** — Calendar stays 30-minute internally. Sort chronological. Prefer `:00` starts. Show at most 3 actual times. Fill with `:30` when fewer than 3 full-hour options exist. Never hide remaining availability permanently.
+4. **More times** — “Más horarios” (`IUL_SLOT_MORE`) pages remaining unused slots for the same selected day + daypart + meeting mode. Do not jump dates. When exhausted, offer another day or change morning/afternoon.
+5. **Slot labels** — Once a day is selected, row titles are clock only (`9:00 AM`). The body carries weekday context. BR-219: description must not duplicate title. Slot IDs stay `IUL_SLOT_*`.
+6. **Ordering** — Always chronological (`09:00`, `09:30`, `10:00`…) before applying the `:00` first-page filter.
+7. **Mode switch** — Qualified Office↔Zoom preserves qualification and restarts scheduling at day selection. Fresh incomplete qualification continues qualification (BR-219).
+8. **Booking** — Time selection reuses BR-219 exactly: proposed state → deferred ack if slow → one create → office/Zoom confirmation. No second booking path.
+9. **Boundaries** — Do not change IUL qualification, BR-219 timeout/deferred architecture, interactive slot ID prefix semantics, or recruiting booking. No production writes. No migration.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  
