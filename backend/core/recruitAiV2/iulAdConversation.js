@@ -34,7 +34,8 @@ const {
 } = require("./iulQualificationOptions");
 const {
   buildInteractiveFromOptions,
-  formatNumberedFallback
+  formatNumberedFallback,
+  parseNumericFallback
 } = require("../whatsappInteractiveMessage");
 const {
   attachIulSlotSelectionIds,
@@ -52,10 +53,14 @@ const {
   selectIulCrossDatePage
 } = require("./iulSlotSelection");
 const {
+  IUL_DAY_MORE_ID,
   isIulDaySelectionId,
+  isIulDayMoreId,
+  isIulDayMoreLabel,
   isIulDayChangeId,
   isIulDaypartChangeId,
   parseIulDaySelectionId,
+  selectIulDayPage,
   formatIulWeekdayPhrase,
   formatIulDayPartForSlots,
   collectAvailableDays,
@@ -624,6 +629,17 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     lastAsk === ASK.SCHEDULING_DAY_PART ||
     schedulingOwned
   ) {
+    if (
+      isIulDayMoreId(interactiveReply?.id) ||
+      isIulDayMoreLabel(interactiveReply?.title) ||
+      isIulDayMoreLabel(text)
+    ) {
+      return {
+        intent: INTENTS.IUL_REQUEST_MORE_DAYS,
+        confidence: 0.96,
+        entities: { iulRequestMoreDays: true }
+      };
+    }
     if (isIulDayChangeId(interactiveReply?.id) || looksLikeChangeDay(text) || looksLikeChangeDay(interactiveReply?.title)) {
       return {
         intent: INTENTS.IUL_CHOOSE_REVIEW_DAY,
@@ -650,8 +666,49 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
       };
     }
     if (lastAsk === ASK.SCHEDULING_DAY) {
-      const days = context.knownFacts?.iulAvailableDays || [];
-      const matched = parseIulDayFromText(text || interactiveReply?.title, days);
+      const offered = context.knownFacts?.iulOfferedDays || [];
+      const includeMore = context.knownFacts?.iulIncludeMoreDays === true;
+      const language =
+        context.preferredLanguage === LANGUAGES.ENGLISH ||
+        context.preferredLanguage === "english" ||
+        context.preferredLanguage === "en"
+          ? "en"
+          : "es";
+      const pageOptions = [];
+      for (const day of offered) {
+        pageOptions.push({
+          id: day.selectionId || `IUL_DAY_${day.dateKey}`,
+          title: day.title || day.dateKey,
+          label: day.title || day.dateKey
+        });
+      }
+      if (includeMore) {
+        pageOptions.push({
+          id: IUL_DAY_MORE_ID,
+          title: language === "en" ? "More days" : "Más días",
+          label: language === "en" ? "More days" : "Más días"
+        });
+      }
+      const numeric = parseNumericFallback(text, pageOptions);
+      if (numeric && isIulDayMoreId(numeric.id)) {
+        return {
+          intent: INTENTS.IUL_REQUEST_MORE_DAYS,
+          confidence: 0.95,
+          entities: { iulRequestMoreDays: true }
+        };
+      }
+      if (numeric && isIulDaySelectionId(numeric.id)) {
+        const dateKey = parseIulDaySelectionId(numeric.id);
+        return {
+          intent: INTENTS.IUL_CHOOSE_REVIEW_DAY,
+          confidence: 0.95,
+          entities: {
+            iulSelectedDate: dateKey,
+            reviewProposedDate: dateKey
+          }
+        };
+      }
+      const matched = parseIulDayFromText(text || interactiveReply?.title, offered);
       if (matched?.dateKey) {
         return {
           intent: INTENTS.IUL_CHOOSE_REVIEW_DAY,
@@ -1338,7 +1395,9 @@ function finishIulDecision(structured, context, {
           )
         : null),
     dayPartForSlots: priorEntities.dayPartForSlots || null,
-    availableDays: priorEntities.availableDays || knownFacts.iulAvailableDays || []
+    availableDays: priorEntities.availableDays || knownFacts.iulOfferedDays || [],
+    includeMoreDays:
+      priorEntities.includeMoreDays === true || knownFacts.iulIncludeMoreDays === true
   };
   const body = renderIulAdReply(templateKey, structured.preferredLanguage, {
     firstName,
@@ -1388,7 +1447,10 @@ function finishIulDecision(structured, context, {
   } else if (lastQuestionAsked === ASK.SCHEDULING_DAY) {
     const days = modeFacts.availableDays || [];
     if (days.length) {
-      const built = buildIulDayInteractive(days, body, { language: replyLanguage });
+      const built = buildIulDayInteractive(days, body, {
+        language: replyLanguage,
+        includeMore: modeFacts.includeMoreDays === true
+      });
       structured.customerReplyPlan.entities.whatsappInteractive = built.interactive;
       structured.customerReplyPlan.entities.interactiveFallbackText = built.fallbackText;
     }
@@ -1577,6 +1639,16 @@ function resolveIulSchedulingResume(context = {}) {
       nextAction: NEXT_ACTIONS.IUL_SCHEDULING_UNAVAILABLE
     };
   }
+  if (
+    lastAsk === ASK.SCHEDULING_DAY ||
+    (Array.isArray(facts.iulOfferedDays) && facts.iulOfferedDays.length)
+  ) {
+    return {
+      ask: ASK.SCHEDULING_DAY,
+      templateKey: "iul_ask_review_day",
+      nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE
+    };
+  }
   if (facts.iulSelectedDayPart || lastAsk === ASK.SCHEDULING_DAY_PART) {
     return {
       ask: ASK.SCHEDULING_DAY_PART,
@@ -1600,6 +1672,13 @@ function resolveIulSchedulingResume(context = {}) {
 
 function resumeIulAfterFaq(structured, context, { templateKey, reasonCodes }) {
   const resume = resolveIulSchedulingResume(context);
+  if (resume.ask === ASK.SCHEDULING_DAY) {
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      availableDays: context.knownFacts?.iulOfferedDays || [],
+      includeMoreDays: context.knownFacts?.iulIncludeMoreDays === true
+    };
+  }
   if (resume.ask === ASK.OFFER_SLOTS) {
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
@@ -1859,9 +1938,32 @@ function beginDayAsk(structured, context, {
       iulWorkflowStage: IUL_STAGES.REVIEW_READY
     });
   }
+  return presentIulDayPage(structured, context, {
+    days,
+    slots,
+    knownFacts,
+    reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_FIRST_OFFERED],
+    resetShown: true
+  });
+}
+
+function presentIulDayPage(structured, context, {
+  days = [],
+  slots = [],
+  knownFacts = {},
+  reasonCodes = [],
+  rejectIds = [],
+  resetShown = false
+} = {}) {
+  const paged = selectIulDayPage(days, { rejectIds: resetShown ? [] : rejectIds });
+  const shownKeys = [
+    ...(resetShown ? [] : rejectIds),
+    ...paged.shown.map((day) => day.dateKey)
+  ].filter(Boolean);
   structured.customerReplyPlan.entities = {
     ...structured.customerReplyPlan.entities,
-    availableDays: days,
+    availableDays: paged.shown,
+    includeMoreDays: paged.includeMore,
     iulSelectedDate: null
   };
   return finishIulDecision(structured, context, {
@@ -1869,18 +1971,23 @@ function beginDayAsk(structured, context, {
     nextAction: NEXT_ACTIONS.IUL_SOFT_REVIEW_INVITE,
     lastQuestionAsked: ASK.SCHEDULING_DAY,
     knownFacts: {
-      ...resetIulDayFirstFacts(knownFacts),
+      ...(resetShown ? resetIulDayFirstFacts(knownFacts) : knownFacts),
       iulAvailableDays: days,
+      iulOfferedDays: paged.shown,
+      iulShownDayKeys: shownKeys,
+      iulIncludeMoreDays: paged.includeMore,
       iulSlotPool: slots,
       iulWorkflowStage: IUL_STAGES.REVIEW_READY
     },
-    reasonCodes: [...reasonCodes, REASON_CODES.IUL_DAY_FIRST_OFFERED],
-    appointmentPatch: {
-      status: APPOINTMENT_STATUS.NONE,
-      previouslyOfferedSlots: [],
-      proposedDate: null,
-      proposedTime: null
-    },
+    reasonCodes,
+    appointmentPatch: resetShown
+      ? {
+          status: APPOINTMENT_STATUS.NONE,
+          previouslyOfferedSlots: [],
+          proposedDate: null,
+          proposedTime: null
+        }
+      : undefined,
     iulWorkflowStage: IUL_STAGES.REVIEW_READY
   });
 }
@@ -2120,6 +2227,7 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     INTENTS.IUL_POLICY_IS_BAD_QUESTION,
     INTENTS.IUL_CHOOSE_REVIEW_DAY_PART,
     INTENTS.IUL_CHOOSE_REVIEW_DAY,
+    INTENTS.IUL_REQUEST_MORE_DAYS,
     INTENTS.IUL_CHOOSE_MEETING_MODE,
     INTENTS.IUL_SELECT_OFFERED_SLOT,
     INTENTS.IUL_REQUEST_MORE_SLOTS,
@@ -2466,6 +2574,29 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
       },
       reasonCodes: [REASON_CODES.IUL_REVIEW_DAY_CAPTURED],
       interpretation
+    });
+  }
+
+  if (intent === INTENTS.IUL_REQUEST_MORE_DAYS) {
+    const days = context.knownFacts?.iulAvailableDays || [];
+    const shownKeys = context.knownFacts?.iulShownDayKeys || [];
+    const slots = context.knownFacts?.iulSlotPool || [];
+    const remaining = selectIulDayPage(days, { rejectIds: shownKeys });
+    if (!remaining.shown.length) {
+      return presentIulDayPage(structured, context, {
+        days,
+        slots,
+        knownFacts: context.knownFacts || {},
+        reasonCodes: [REASON_CODES.IUL_MORE_DAYS],
+        resetShown: true
+      });
+    }
+    return presentIulDayPage(structured, context, {
+      days,
+      slots,
+      knownFacts: context.knownFacts || {},
+      reasonCodes: [REASON_CODES.IUL_MORE_DAYS],
+      rejectIds: shownKeys
     });
   }
 

@@ -15,11 +15,17 @@ const { slotIdentity } = require("../sharedScheduling/sharedSchedulingOffer");
 const { MAX_EXPANSION_DAYS } = require("./schedulingAvailabilityReader");
 
 const IUL_DAY_ID_PREFIX = "IUL_DAY_";
+const IUL_DAY_MORE_ID = "IUL_DAY_MORE";
 const IUL_DAY_CHANGE_ID = "IUL_DAY_CHANGE";
 const IUL_DAYPART_CHANGE_ID = "IUL_DAYPART_CHANGE";
 /** Inclusive calendar days from org-local today; matches the rolling reader cap. */
 const IUL_DAY_QUERY_HORIZON_DAYS = MAX_EXPANSION_DAYS;
 const FIRST_PAGE_MAX_TIMES = 3;
+/** WhatsApp list hard cap. Day pages must never exceed this, including Más días. */
+const WHATSAPP_LIST_ROW_MAX = 10;
+/** First page prefers 7–9 actual days so Más días still fits in the list. */
+const FIRST_DAY_PAGE_SIZE = 7;
+const AFTERNOON_CUTOFF = "17:00";
 const WEEKDAY_SHORT_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const WEEKDAY_SHORT_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -49,6 +55,15 @@ function weekdayIndexFromDateKey(dateKey) {
 
 function isIulDaySelectionId(selectionId) {
   return /^IUL_DAY_\d{4}-\d{2}-\d{2}$/.test(String(selectionId || "").trim());
+}
+
+function isIulDayMoreId(selectionId) {
+  return String(selectionId || "").trim() === IUL_DAY_MORE_ID;
+}
+
+function isIulDayMoreLabel(value) {
+  const t = fold(value);
+  return t === "mas dias" || t === "more days";
 }
 
 function isIulDayChangeId(selectionId) {
@@ -124,13 +139,13 @@ function slotMatchesIulDayPart(slot, dayPart) {
     return true;
   }
   if (part === "morning") {
-    return time >= "09:00" && time <= "12:00";
+    return time >= "09:00" && time < "12:00";
   }
   if (part === "afternoon") {
-    return time >= "12:00" && time <= "17:00";
+    return time >= "12:00" && time < AFTERNOON_CUTOFF;
   }
   if (part === "evening") {
-    return time >= "17:00";
+    return time >= AFTERNOON_CUTOFF;
   }
   return true;
 }
@@ -159,6 +174,39 @@ function filterSlotsByDayPart(slots = [], dayPart) {
     return Array.isArray(slots) ? slots : [];
   }
   return (slots || []).filter((slot) => slotMatchesIulDayPart(slot, part));
+}
+
+function dayIdentity(day) {
+  return String(day?.dateKey || parseIulDaySelectionId(day?.selectionId) || day || "").trim();
+}
+
+/**
+ * Page available days for WhatsApp lists.
+ * If the full set fits in 10 rows, show it all (no Más días).
+ * Otherwise first/next pages prefer 7 actual days + Más días.
+ */
+function selectIulDayPage(days = [], { rejectIds = [], pageSize = FIRST_DAY_PAGE_SIZE } = {}) {
+  const rejected = new Set((rejectIds || []).map((id) => String(id)));
+  const unused = (days || []).filter((day) => {
+    const dateKey = dayIdentity(day);
+    const selectionId = day.selectionId || iulDaySelectionId(dateKey);
+    return dateKey && !rejected.has(dateKey) && !rejected.has(selectionId);
+  });
+  if (unused.length <= WHATSAPP_LIST_ROW_MAX) {
+    return {
+      shown: unused,
+      remaining: [],
+      includeMore: false
+    };
+  }
+  const limit = Math.min(9, Math.max(7, Number(pageSize) || FIRST_DAY_PAGE_SIZE));
+  const shown = unused.slice(0, limit);
+  const remaining = unused.slice(limit);
+  return {
+    shown,
+    remaining,
+    includeMore: remaining.length > 0
+  };
 }
 
 function collectAvailableDays(slots = []) {
@@ -267,17 +315,25 @@ function buildIulDayOptions(days = [], language = "es") {
   });
 }
 
-function buildIulDayInteractive(days, body, { language = "es" } = {}) {
+function buildIulDayInteractive(days, body, { language = "es", includeMore = false } = {}) {
   const options = buildIulDayOptions(days, language);
+  if (includeMore === true) {
+    options.push({
+      id: IUL_DAY_MORE_ID,
+      title: language === "en" ? "More days" : "Más días",
+      label: language === "en" ? "More days" : "Más días"
+    });
+  }
+  const capped = options.slice(0, WHATSAPP_LIST_ROW_MAX);
   return {
     interactive: buildInteractiveFromOptions({
       body,
-      options,
+      options: capped,
       listButtonText: language === "en" ? "View days" : "Ver días",
       listSectionTitle: language === "en" ? "Available days" : "Días"
     }),
-    fallbackText: formatNumberedFallback(body, options),
-    options
+    fallbackText: formatNumberedFallback(body, capped),
+    options: capped
   };
 }
 
@@ -385,6 +441,9 @@ function resetIulDayFirstFacts(knownFacts = {}) {
     iulShownSlotKeys: [],
     iulSlotPool: [],
     iulIncludeMoreSlots: false,
+    iulOfferedDays: [],
+    iulShownDayKeys: [],
+    iulIncludeMoreDays: false,
     iulDaypartSearchAttempted: false,
     iulSchedulingUnavailable: false,
     iulBookingPending: false
@@ -393,11 +452,17 @@ function resetIulDayFirstFacts(knownFacts = {}) {
 
 module.exports = {
   IUL_DAY_ID_PREFIX,
+  IUL_DAY_MORE_ID,
   IUL_DAY_CHANGE_ID,
   IUL_DAYPART_CHANGE_ID,
   IUL_DAY_QUERY_HORIZON_DAYS,
   FIRST_PAGE_MAX_TIMES,
+  FIRST_DAY_PAGE_SIZE,
+  WHATSAPP_LIST_ROW_MAX,
+  AFTERNOON_CUTOFF,
   isIulDaySelectionId,
+  isIulDayMoreId,
+  isIulDayMoreLabel,
   isIulDayChangeId,
   isIulDaypartChangeId,
   parseIulDaySelectionId,
@@ -411,6 +476,8 @@ module.exports = {
   filterSlotsByDate,
   filterSlotsByDayPart,
   collectAvailableDays,
+  selectIulDayPage,
+  dayIdentity,
   dayPartsOnDate,
   isFullHourSlot,
   selectIulCompactTimePage,

@@ -298,8 +298,15 @@ function filterSlotsByConstraints(slots, constraints = {}) {
         return false;
       }
     }
-    if (latest != null && minutes > latest) {
-      return false;
+    if (latest != null) {
+      const latestInclusive = constraints.latestTimeInclusive !== false;
+      if (latestInclusive) {
+        if (minutes > latest) {
+          return false;
+        }
+      } else if (minutes >= latest) {
+        return false;
+      }
     }
     // Day-part window only when no explicit earliest/latest bound.
     if (earliest == null && latest == null && dayPart) {

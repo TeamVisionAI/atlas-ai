@@ -33,6 +33,7 @@ const { IUL_OPTION_IDS } = require("../core/recruitAiV2/iulQualificationOptions"
 const { IUL_SLOT_MORE_ID, formatIulSlotClock } = require("../core/recruitAiV2/iulSlotSelection");
 const {
   IUL_DAY_QUERY_HORIZON_DAYS,
+  IUL_DAY_MORE_ID,
   IUL_DAY_CHANGE_ID,
   IUL_DAYPART_CHANGE_ID,
   iulDaySelectionId,
@@ -40,6 +41,8 @@ const {
   collectAvailableDays,
   selectIulCompactTimePage,
   selectIulMoreTimesPage,
+  selectIulDayPage,
+  slotMatchesIulDayPart,
   sortSlotsChronologically
 } = require("../core/recruitAiV2/iulDayFirstScheduling");
 const {
@@ -66,10 +69,20 @@ const MULTI_DAY_SLOTS = [
   slot("2026-09-03", "11:00"),
   slot("2026-09-03", "11:30"),
   slot("2026-09-04", "09:00"),
+  slot("2026-09-04", "12:00"),
+  slot("2026-09-04", "12:30"),
   slot("2026-09-04", "14:00"),
   slot("2026-09-05", "10:00"),
   slot("2026-09-06", "11:00"),
   slot("2026-09-07", "09:00")
+];
+
+const FOURTEEN_DAY_SLOTS = [
+  slot("2026-09-02", "14:00"),
+  ...Array.from({ length: 13 }, (_, index) => {
+    const day = String(3 + index).padStart(2, "0");
+    return slot(`2026-09-${day}`, "10:00");
+  })
 ];
 
 function qualifiedFacts(mode = "zoom") {
@@ -195,11 +208,20 @@ function offeredTimes(decision) {
   );
 }
 
+function moreDaysTap() {
+  return {
+    text: "Más días",
+    interactiveReply: { type: "list_reply", id: IUL_DAY_MORE_ID, title: "Más días" }
+  };
+}
+
 function afterMode(modeTap, slots = MULTI_DAY_SLOTS) {
+  const meetingMode =
+    modeTap?.interactiveReply?.id === IUL_OPTION_IDS.MEET_OFFICE ? "in_person" : "zoom";
   const chosen = turn(
     modeTap,
     iulContext({
-      knownFacts: qualifiedFacts(modeTap === officeTap() ? "in_person" : "zoom"),
+      knownFacts: qualifiedFacts(meetingMode),
       conversation: { lastQuestionAsked: ASK.MEETING_MODE },
       _availabilityFixture: { slots }
     })
@@ -512,4 +534,179 @@ test("exhausted More offers another day or daypart change", () => {
       IUL_DAY_CHANGE_ID
     ].sort());
   }
+});
+
+test("A-page) 14 available days never generate >10 WhatsApp list rows", () => {
+  const { chosen } = afterMode(zoomTap(), FOURTEEN_DAY_SLOTS);
+  const ids = optionIds(chosen.decision);
+  assert.ok(ids.length <= 10);
+  assert.ok(ids.includes(IUL_DAY_MORE_ID));
+  assert.equal(ids.filter((id) => id !== IUL_DAY_MORE_ID).length, 7);
+  assert.equal((chosen.decision.contextPatch.knownFacts.iulAvailableDays || []).length, 14);
+  assert.equal((chosen.decision.contextPatch.knownFacts.iulOfferedDays || []).length, 7);
+  const fallback = String(chosen.decision.customerReplyPlan.entities.interactiveFallbackText || "");
+  const numbered = fallback.split("\n").filter((line) => /^\d+\./.test(line));
+  assert.ok(numbered.length <= 10);
+  assert.equal(numbered.length, ids.length);
+});
+
+test("B-page) Más días reaches later valid dates in the same horizon", () => {
+  const started = afterMode(zoomTap(), FOURTEEN_DAY_SLOTS);
+  const more = turn(
+    moreDaysTap(),
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.SCHEDULING_DAY },
+      knownFacts: started.chosen.decision.contextPatch.knownFacts,
+      appointment: started.chosen.decision.contextPatch.appointment,
+      _availabilityFixture: { slots: FOURTEEN_DAY_SLOTS }
+    })
+  );
+  assert.equal(more.interpretation.intent, INTENTS.IUL_REQUEST_MORE_DAYS);
+  const ids = optionIds(more.decision);
+  assert.ok(ids.length <= 10);
+  assert.ok(ids.includes("IUL_DAY_2026-09-10"));
+  assert.ok(ids.includes("IUL_DAY_2026-09-11"));
+  assert.ok(!ids.includes("IUL_DAY_2026-09-03"));
+  assert.ok(!ids.includes(IUL_DAY_MORE_ID));
+});
+
+test("C-page) numeric fallback contains only currently displayed day options", () => {
+  const started = afterMode(zoomTap(), FOURTEEN_DAY_SLOTS);
+  const fallback = String(
+    started.chosen.decision.customerReplyPlan.entities.interactiveFallbackText || ""
+  );
+  assert.match(fallback, /1\. /);
+  assert.doesNotMatch(fallback, /2026-09-10|Jue 10/);
+  const numbered = fallback.split("\n").filter((line) => /^\d+\./.test(line));
+  assert.equal(numbered.length, 8);
+  const moreByNumber = turn(
+    "8",
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.SCHEDULING_DAY },
+      knownFacts: started.chosen.decision.contextPatch.knownFacts,
+      _availabilityFixture: { slots: FOURTEEN_DAY_SLOTS }
+    })
+  );
+  assert.equal(moreByNumber.interpretation.intent, INTENTS.IUL_REQUEST_MORE_DAYS);
+  const hidden = turn(
+    "11",
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.SCHEDULING_DAY },
+      knownFacts: started.chosen.decision.contextPatch.knownFacts,
+      _availabilityFixture: { slots: FOURTEEN_DAY_SLOTS }
+    })
+  );
+  assert.notEqual(hidden.interpretation.entities?.iulSelectedDate, "2026-09-11");
+});
+
+test("D-page) selecting a day on page 2 persists the correct ISO date", () => {
+  const started = afterMode(zoomTap(), FOURTEEN_DAY_SLOTS);
+  const more = turn(
+    moreDaysTap(),
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.SCHEDULING_DAY },
+      knownFacts: started.chosen.decision.contextPatch.knownFacts,
+      appointment: started.chosen.decision.contextPatch.appointment,
+      _availabilityFixture: { slots: FOURTEEN_DAY_SLOTS }
+    })
+  );
+  const selected = turn(
+    dayTap("2026-09-10"),
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.SCHEDULING_DAY },
+      knownFacts: more.decision.contextPatch.knownFacts,
+      appointment: more.decision.contextPatch.appointment,
+      _availabilityFixture: { slots: FOURTEEN_DAY_SLOTS }
+    })
+  );
+  assert.equal(selected.interpretation.intent, INTENTS.IUL_CHOOSE_REVIEW_DAY);
+  assert.equal(selected.decision.contextPatch.knownFacts.iulSelectedDate, "2026-09-10");
+  assert.equal(selected.decision.contextPatch.knownFacts.reviewProposedDate, "2026-09-10");
+});
+
+test("E-page) replay of the day page remains deterministic", () => {
+  const started = afterMode(zoomTap(), FOURTEEN_DAY_SLOTS);
+  const firstIds = optionIds(started.chosen.decision);
+  const replay = turn(
+    { text: "¿Cuánto cuesta la revisión?" },
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.SCHEDULING_DAY },
+      knownFacts: started.chosen.decision.contextPatch.knownFacts,
+      appointment: started.chosen.decision.contextPatch.appointment,
+      _availabilityFixture: { slots: FOURTEEN_DAY_SLOTS }
+    })
+  );
+  assert.equal(replay.decision.contextPatch.conversation.lastQuestionAsked, ASK.SCHEDULING_DAY);
+  assert.deepEqual(optionIds(replay.decision), firstIds);
+  assert.deepEqual(
+    (replay.decision.contextPatch.knownFacts.iulOfferedDays || []).map((day) => day.dateKey),
+    (started.chosen.decision.contextPatch.knownFacts.iulOfferedDays || []).map((day) => day.dateKey)
+  );
+});
+
+test("F-page) <=10 available days needs no More-days control", () => {
+  const { chosen } = afterMode(zoomTap(), MULTI_DAY_SLOTS);
+  assert.ok(optionIds(chosen.decision).length <= 10);
+  assert.ok(!optionIds(chosen.decision).includes(IUL_DAY_MORE_ID));
+  const page = selectIulDayPage(collectAvailableDays(MULTI_DAY_SLOTS));
+  assert.equal(page.includeMore, false);
+});
+
+test("G-noon) 12:00 appears only in afternoon", () => {
+  assert.equal(slotMatchesIulDayPart(slot("2026-09-04", "12:00"), "morning"), false);
+  assert.equal(slotMatchesIulDayPart(slot("2026-09-04", "12:00"), "afternoon"), true);
+  const friday = afterDay("2026-09-04", zoomTap(), MULTI_DAY_SLOTS);
+  const morning = turn(morningTap(), friday.context);
+  assert.ok(!offeredTimes(morning.decision).includes("12:00"));
+  const afternoon = turn(
+    {
+      text: "En la tarde",
+      interactiveReply: {
+        type: "button_reply",
+        id: IUL_OPTION_IDS.DAY_AFTERNOON,
+        title: "En la tarde"
+      }
+    },
+    friday.context
+  );
+  assert.ok(offeredTimes(afternoon.decision).includes("12:00"));
+});
+
+test("H-noon) 11:30 remains morning", () => {
+  assert.equal(slotMatchesIulDayPart(slot("2026-09-03", "11:30"), "morning"), true);
+  assert.equal(slotMatchesIulDayPart(slot("2026-09-03", "11:30"), "afternoon"), false);
+  const first = firstCompactOffer();
+  const more = turn(
+    moreTap(),
+    iulContext({
+      conversation: { lastQuestionAsked: ASK.OFFER_SLOTS },
+      knownFacts: first.decision.contextPatch.knownFacts,
+      appointment: first.decision.contextPatch.appointment
+    })
+  );
+  assert.ok(offeredTimes(more.decision).includes("11:30"));
+});
+
+test("I-noon) 12:30 remains afternoon", () => {
+  assert.equal(slotMatchesIulDayPart(slot("2026-09-04", "12:30"), "morning"), false);
+  assert.equal(slotMatchesIulDayPart(slot("2026-09-04", "12:30"), "afternoon"), true);
+  const friday = afterDay("2026-09-04", zoomTap(), MULTI_DAY_SLOTS);
+  const afternoon = turn(
+    {
+      text: "En la tarde",
+      interactiveReply: {
+        type: "button_reply",
+        id: IUL_OPTION_IDS.DAY_AFTERNOON,
+        title: "En la tarde"
+      }
+    },
+    friday.context
+  );
+  assert.ok(offeredTimes(afternoon.decision).includes("12:30"));
+  assert.ok(!offeredTimes(afternoon.decision).includes("09:00"));
+});
+
+test("J-page) compact slot pages still max 3 actual times", () => {
+  const first = firstCompactOffer();
+  assert.ok(offeredTimes(first.decision).length <= 3);
 });

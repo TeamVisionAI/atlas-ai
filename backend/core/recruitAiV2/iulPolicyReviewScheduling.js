@@ -45,10 +45,20 @@ function dayPartConstraints(dayPart) {
     return { earliestTime: "17:00", latestTime: "21:00", dayPart: "evening" };
   }
   if (part === "morning") {
-    return { earliestTime: "09:00", latestTime: "12:00", dayPart: "morning" };
+    return {
+      earliestTime: "09:00",
+      latestTime: "12:00",
+      latestTimeInclusive: false,
+      dayPart: "morning"
+    };
   }
   if (part === "afternoon") {
-    return { earliestTime: "12:00", latestTime: "17:00", dayPart: "afternoon" };
+    return {
+      earliestTime: "12:00",
+      latestTime: "17:00",
+      latestTimeInclusive: false,
+      dayPart: "afternoon"
+    };
   }
   return { dayPart: part || null };
 }
