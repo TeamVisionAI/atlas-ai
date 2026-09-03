@@ -945,8 +945,11 @@ function copy(language) {
       ? "Sigo reservando su cita para el {slotLabel}. Le confirmo en un momento."
       : "I'm still booking your appointment for {slotLabel}. I'll confirm in a moment.",
     confirmedZoom: es
-      ? "Listo. Su revisión por Zoom quedó agendada para el {slotLabel}. Le enviaré el enlace de Zoom."
-      : "Done. Your Zoom review is scheduled for {slotLabel}. I will send the Zoom link.",
+      ? "✅ Su revisión por Zoom quedó confirmada para el {slotLabel}.\n\n🔗 Enlace de Zoom:\n{zoomJoinUrl}"
+      : "✅ Your Zoom review is confirmed for {slotLabel}.\n\n🔗 Zoom link:\n{zoomJoinUrl}",
+    confirmedZoomNoLink: es
+      ? "✅ Su revisión por Zoom quedó confirmada para el {slotLabel}."
+      : "✅ Your Zoom review is confirmed for {slotLabel}.",
     confirmedOffice: es
       ? "Listo. Su revisión en la oficina quedó agendada para el {slotLabel}.{officeAddressLine}"
       : "Done. Your in-office review is scheduled for {slotLabel}.{officeAddressLine}",
@@ -957,9 +960,11 @@ function copy(language) {
 }
 
 function renderIulAdReply(templateKey, language, entities = {}) {
+  const { safeIulZoomJoinUrl } = require("./iulSchedulingOwnership");
   const c = copy(language);
   const firstName = String(entities.firstName || "").trim();
   const firstNameGreeting = firstName ? `, ${firstName}` : "";
+  const zoomJoinUrl = safeIulZoomJoinUrl(entities.zoomJoinUrl);
   const map = {
     iul_ad_opener: c.qualificationAsk,
     iul_intake_opener: c.qualificationAsk,
@@ -1001,7 +1006,7 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_no_review_availability: c.noAvailability,
     iul_confirm_review_deferred: c.confirmDeferred,
     iul_review_booking_pending: c.bookingPending,
-    iul_review_confirmed_zoom: c.confirmedZoom,
+    iul_review_confirmed_zoom: zoomJoinUrl ? c.confirmedZoom : c.confirmedZoomNoLink,
     iul_review_confirmed_office: c.confirmedOffice,
     iul_clarify_policy_type: c.clarify
   };
@@ -1017,7 +1022,8 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     .replace(/\{dayPartPhrase\}/g, phrase)
     .replace(/\{modePhrase\}/g, iulModePhrase(entities, language))
     .replace(/\{slotLabel\}/g, String(entities.slotLabel || entities.requestedTime || "ese horario"))
-    .replace(/\{officeAddressLine\}/g, officeAddressLine);
+    .replace(/\{officeAddressLine\}/g, officeAddressLine)
+    .replace(/\{zoomJoinUrl\}/g, zoomJoinUrl || "");
 }
 
 function isIulInPersonMode(facts = {}) {
@@ -2144,11 +2150,25 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
   if (intent === INTENTS.IUL_BOOKING_REHYDRATE) {
     const slot = resolveSelectedIulSlot(context, interpretation);
     const inPerson = isIulInPersonMode(context.knownFacts || {});
+    const { extractIulZoomJoinUrl } = require("./iulSchedulingOwnership");
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
       slotLabel: slot ? formatIulSlotLine(slot, structured.preferredLanguage) : null,
       meetingMode: context.knownFacts?.meetingMode || (inPerson ? "in_person" : "zoom"),
-      officeAddress: context.knownFacts?.reviewOfficeAddress || null
+      officeAddress: context.knownFacts?.reviewOfficeAddress || null,
+      zoomJoinUrl: inPerson
+        ? null
+        : extractIulZoomJoinUrl(
+            {},
+            {
+              appointment: context.appointment || {},
+              zoomJoinUrl:
+                context.knownFacts?.zoomJoinUrl ||
+                context.appointment?.meetingUrl ||
+                context.appointment?.meeting_url ||
+                null
+            }
+          )
     };
     return finishIulDecision(structured, context, {
       templateKey: inPerson ? "iul_review_confirmed_office" : "iul_review_confirmed_zoom",

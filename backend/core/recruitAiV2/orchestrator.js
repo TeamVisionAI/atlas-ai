@@ -360,6 +360,14 @@ function applyExecutionOutcomeToReply({
         structuredDecision?.customerReplyPlan?.entities?.officeAddress ||
         null;
     }
+    const extraReasons = [];
+    if (iulCreateSuccess) {
+      const { extractIulZoomJoinUrl } = require("./iulSchedulingOwnership");
+      entities.zoomJoinUrl = inPerson ? null : extractIulZoomJoinUrl(execution);
+      if (!inPerson && !entities.zoomJoinUrl) {
+        extraReasons.push(REASON_CODES.IUL_ZOOM_LINK_MISSING);
+      }
+    }
     const plan = {
       ...responsePlan,
       templateKey: successKey,
@@ -367,6 +375,9 @@ function applyExecutionOutcomeToReply({
     };
     const nextDecision = {
       ...structuredDecision,
+      reasonCodes: extraReasons.length
+        ? [...(structuredDecision.reasonCodes || []), ...extraReasons]
+        : structuredDecision.reasonCodes,
       decision: {
         ...structuredDecision.decision,
         executionAuthorized: true,
@@ -402,6 +413,7 @@ function applyExecutionOutcomeToReply({
         : iulCreate
           ? "iul_review_create_failed"
           : "appointment_create_failed";
+  entities.zoomJoinUrl = null;
   const plan = {
     ...responsePlan,
     templateKey: failKey,

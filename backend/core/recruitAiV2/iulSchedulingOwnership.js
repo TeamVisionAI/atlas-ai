@@ -304,6 +304,61 @@ function isIulCreateAction(nextAction) {
   return String(nextAction || "") === NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT;
 }
 
+function safeIulZoomJoinUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return null;
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+function extractIulZoomJoinUrl(execution = {}, extras = {}) {
+  const source = extras.scheduleResult || execution.scheduleResult || {};
+  return safeIulZoomJoinUrl(
+    extras.zoomJoinUrl ||
+      execution.zoomJoinUrl ||
+      source.zoomJoinUrl ||
+      source.zoomLink ||
+      source.meetingUrl ||
+      source.meetLink ||
+      source.calendarEvent?.hangoutLink ||
+      source.appointment?.meeting_url ||
+      source.appointment?.meetingUrl ||
+      source.appointment?.zoomJoinUrl ||
+      extras.appointment?.meeting_url ||
+      extras.appointment?.meetingUrl ||
+      extras.appointment?.zoomJoinUrl
+  );
+}
+
+function buildIulBookingFollowUpIdempotencyKey({
+  inboundMessageId = null,
+  schedulingAttemptId = null,
+  appointmentId = null
+} = {}) {
+  const inbound = String(inboundMessageId || "").trim();
+  if (inbound) {
+    return `iul-booking-follow-up:${inbound}`;
+  }
+  const attempt = String(schedulingAttemptId || "").trim();
+  if (attempt) {
+    return `iul-booking-follow-up:${attempt}`;
+  }
+  const appt = String(appointmentId || "").trim();
+  if (appt) {
+    return `iul-booking-follow-up:appt:${appt}`;
+  }
+  return null;
+}
+
 module.exports = {
   IUL_CONFIRMABLE_ASKS,
   IUL_SCHEDULING_ASKS,
@@ -324,5 +379,8 @@ module.exports = {
   buildIulDeferredAcknowledgement,
   buildIulPendingAck,
   isIulCreateAction,
-  hasProposedIulSlot
+  hasProposedIulSlot,
+  safeIulZoomJoinUrl,
+  extractIulZoomJoinUrl,
+  buildIulBookingFollowUpIdempotencyKey
 };

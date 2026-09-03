@@ -332,9 +332,11 @@ test("D) late successful create follow-up sends confirmation once", async () => 
   });
   assert.equal(first.sent, true);
   assert.equal(first.templateKey, "iul_review_confirmed_office");
+  assert.equal(first.confirmationIdempotencyKey, "iul-booking-follow-up:wamid.follow-1");
   assert.equal(second.sent, false);
   assert.equal(sent.length, 1);
   assert.match(sent[0].replyText, /oficina|agendada|10:00/i);
+  assert.doesNotMatch(sent[0].replyText, /https:\/\//);
 });
 
 test("E) failed create sends failure/re-offer, not discovery", () => {
@@ -500,36 +502,201 @@ test("J) retry/replay does not invent a second create while pending", () => {
   assert.equal(decision.decision.nextAction, NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT);
 });
 
-test("K/L/M) success confirmation keeps office address and Zoom link only on success", () => {
-  const officeText = renderCustomerReply({
-    templateKey: "iul_review_confirmed_office",
-    language: "spanish",
-    entities: {
-      slotLabel: "jueves a las 10:00 AM",
-      meetingMode: "in_person",
-      officeAddress: OFFICE
-    }
-  });
-  assert.match(officeText.text, /oficina|agendada/i);
-  assert.match(officeText.text, /2500 NW 79th Ave/);
-
+test("1) successful Zoom booking includes the exact join URL", () => {
+  const url = "https://zoom.us/j/555111222";
   const zoomSuccess = renderCustomerReply({
     templateKey: "iul_review_confirmed_zoom",
     language: "spanish",
     entities: {
       slotLabel: "jueves a las 10:00 AM",
       meetingMode: "zoom",
-      zoomJoinUrl: "https://zoom.example/j/1"
+      zoomJoinUrl: url
     }
   });
-  assert.match(zoomSuccess.text, /Zoom/);
+  assert.match(zoomSuccess.text, /confirmada/);
+  assert.ok(zoomSuccess.text.includes(url));
+  assert.doesNotMatch(zoomSuccess.text, /Le enviaré el enlace/);
+
+  const applied = applyExecutionOutcomeToReply({
+    structuredDecision: {
+      decision: { nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT },
+      customerReplyPlan: {
+        templateKey: "iul_confirm_review_deferred",
+        entities: { meetingMode: "zoom", slotLabel: "jueves a las 10:00 AM" }
+      },
+      reasonCodes: [REASON_CODES.IUL_AD_CONVERSATION]
+    },
+    responsePlan: {
+      templateKey: "iul_confirm_review_deferred",
+      language: "spanish",
+      entities: { meetingMode: "zoom", slotLabel: "jueves a las 10:00 AM" }
+    },
+    rendered: { text: "deferred" },
+    execution: {
+      attempted: true,
+      success: true,
+      performed: [{ dateKey: "2026-09-03", timeKey: "10:00" }],
+      scheduleResult: { zoomLink: url, meetingUrl: url }
+    }
+  });
+  assert.equal(applied.responsePlan.templateKey, "iul_review_confirmed_zoom");
+  assert.ok(applied.rendered.text.includes(url));
+});
+
+test("2) deferred Zoom acknowledgement contains no URL", () => {
   const deferred = buildIulDeferredAcknowledgement({
     language: "es",
     slot: offeredMorning()[3],
     context: iulContext({ knownFacts: qualifiedFacts("zoom") })
   });
+  assert.match(deferred, /Estoy reservando su cita por Zoom/);
   assert.doesNotMatch(deferred, /https:\/\//);
-  assert.doesNotMatch(deferred, /enlace/);
+  assert.doesNotMatch(deferred, /Enlace de Zoom/);
+  const pending = renderCustomerReply({
+    templateKey: "iul_review_booking_pending",
+    language: "spanish",
+    entities: {
+      slotLabel: "jueves a las 10:00 AM",
+      meetingMode: "zoom",
+      zoomJoinUrl: "https://zoom.us/j/should-not-appear"
+    }
+  });
+  assert.doesNotMatch(pending.text, /https:\/\//);
+});
+
+test("3) failed Zoom create contains no URL", () => {
+  const applied = applyExecutionOutcomeToReply({
+    structuredDecision: {
+      decision: { nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT },
+      customerReplyPlan: {
+        templateKey: "iul_confirm_review_deferred",
+        entities: {
+          meetingMode: "zoom",
+          slotLabel: "jueves a las 10:00 AM",
+          zoomJoinUrl: "https://zoom.us/j/should-not-appear"
+        }
+      }
+    },
+    responsePlan: {
+      templateKey: "iul_confirm_review_deferred",
+      language: "spanish",
+      entities: {
+        meetingMode: "zoom",
+        zoomJoinUrl: "https://zoom.us/j/should-not-appear"
+      }
+    },
+    rendered: { text: "deferred" },
+    execution: {
+      attempted: true,
+      success: false,
+      failed: [{ type: "create_appointment", reason: "EXECUTION_CANONICAL_FAILED" }]
+    }
+  });
+  assert.equal(applied.responsePlan.templateKey, "iul_review_create_failed");
+  assert.doesNotMatch(applied.rendered.text, /https:\/\//);
+  assert.doesNotMatch(applied.rendered.text, /Enlace de Zoom/);
+});
+
+test("4) successful office create includes address and no Zoom URL", () => {
+  const officeText = renderCustomerReply({
+    templateKey: "iul_review_confirmed_office",
+    language: "spanish",
+    entities: {
+      slotLabel: "jueves a las 10:00 AM",
+      meetingMode: "in_person",
+      officeAddress: OFFICE,
+      zoomJoinUrl: "https://zoom.us/j/should-not-appear"
+    }
+  });
+  assert.match(officeText.text, /oficina|agendada/i);
+  assert.match(officeText.text, /2500 NW 79th Ave/);
+  assert.doesNotMatch(officeText.text, /https:\/\//);
+  assert.doesNotMatch(officeText.text, /Enlace de Zoom/);
+});
+
+test("5) Zoom success without a URL is safe and does not fabricate a link", () => {
+  const noLink = renderCustomerReply({
+    templateKey: "iul_review_confirmed_zoom",
+    language: "spanish",
+    entities: {
+      slotLabel: "jueves a las 10:00 AM",
+      meetingMode: "zoom"
+    }
+  });
+  assert.match(noLink.text, /confirmada/);
+  assert.doesNotMatch(noLink.text, /https:\/\//);
+  assert.doesNotMatch(noLink.text, /Le enviaré el enlace/);
+  assert.doesNotMatch(noLink.text, /\{zoomJoinUrl\}/);
+
+  const applied = applyExecutionOutcomeToReply({
+    structuredDecision: {
+      decision: { nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT },
+      customerReplyPlan: {
+        templateKey: "iul_confirm_review_deferred",
+        entities: { meetingMode: "zoom", slotLabel: "jueves a las 10:00 AM" }
+      },
+      reasonCodes: [REASON_CODES.IUL_AD_CONVERSATION]
+    },
+    responsePlan: {
+      templateKey: "iul_confirm_review_deferred",
+      language: "spanish",
+      entities: { meetingMode: "zoom", slotLabel: "jueves a las 10:00 AM" }
+    },
+    rendered: { text: "deferred" },
+    execution: {
+      attempted: true,
+      success: true,
+      performed: [{ dateKey: "2026-09-03", timeKey: "10:00" }]
+    }
+  });
+  assert.equal(applied.responsePlan.templateKey, "iul_review_confirmed_zoom");
+  assert.doesNotMatch(applied.rendered.text, /https:\/\//);
+  assert.doesNotMatch(applied.rendered.text, /Le enviaré el enlace/);
+  assert.ok(
+    (applied.structuredDecision.reasonCodes || []).includes(REASON_CODES.IUL_ZOOM_LINK_MISSING)
+  );
+});
+
+test("follow-up Zoom success includes URL and durable idempotency key", async () => {
+  resetIulBookingFollowUpForTests();
+  const url = "https://us06web.zoom.us/j/999888777";
+  const sent = [];
+  const result = await deliverIulBookingFollowUp({
+    normalized: { providerMessageId: "wamid.zoom-follow", phone: PHONE },
+    prospect: { id: PROSPECT_ID, phone: PHONE },
+    organizationId: ORG,
+    v2Result: {
+      structuredDecision: {
+        decision: { nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT }
+      },
+      execution: {
+        attempted: true,
+        success: true,
+        appointmentId: "appt-zoom-1",
+        performed: [{ type: "create_appointment", dateKey: "2026-09-03", timeKey: "10:00" }],
+        scheduleResult: { zoomLink: url, meetingUrl: url }
+      },
+      nextContext: iulContext({
+        knownFacts: qualifiedFacts("zoom"),
+        conversation: { lastQuestionAsked: ASK.CONFIRM_SLOT },
+        appointment: {
+          status: "proposed",
+          proposedDate: "2026-09-03",
+          proposedTime: "10:00",
+          previouslyOfferedSlots: offeredMorning()
+        }
+      })
+    },
+    deliverReply: async (payload) => {
+      sent.push(payload);
+      return { sent: true };
+    }
+  });
+  assert.equal(result.sent, true);
+  assert.equal(result.templateKey, "iul_review_confirmed_zoom");
+  assert.equal(result.confirmationIdempotencyKey, "iul-booking-follow-up:wamid.zoom-follow");
+  assert.ok(sent[0].replyText.includes(url));
+  assert.equal(sent[0].confirmationIdempotencyKey, "iul-booking-follow-up:wamid.zoom-follow");
 });
 
 test("confirmable durable recognizes IUL proposed state", () => {

@@ -486,7 +486,12 @@ async function processNormalizedInboundMessage(
       env,
       dependencies: {
         ...(authoringDependencies || {}),
-        deliverIulFollowUp: async ({ replyText, v2Result, nextAction }) => {
+        deliverIulFollowUp: async ({
+          replyText,
+          v2Result,
+          nextAction,
+          confirmationIdempotencyKey
+        }) => {
           if (!replyText) {
             return { sent: false };
           }
@@ -500,6 +505,7 @@ async function processNormalizedInboundMessage(
               source: "recruit_ai_v2_iul_booking_follow_up",
               owner: "v2",
               nextAction: nextAction || "iul_create_review_appointment",
+              confirmationIdempotencyKey: confirmationIdempotencyKey || null,
               v2Result
             },
             outboundIntent: "CONVERSATION_ENGINE_REPLY",

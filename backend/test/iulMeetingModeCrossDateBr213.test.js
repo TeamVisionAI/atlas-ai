@@ -464,10 +464,19 @@ test("O) Zoom final confirmation includes Zoom context", () => {
       entities: { meetingMode: "zoom", slotLabel: "miércoles a las 3:00 PM" }
     },
     rendered: { text: "deferred" },
-    execution: { attempted: true, success: true, performed: [{ dateKey: "2026-09-02", timeKey: "15:00" }] }
+    execution: {
+      attempted: true,
+      success: true,
+      performed: [{ dateKey: "2026-09-02", timeKey: "15:00" }],
+      scheduleResult: {
+        zoomLink: "https://zoom.us/j/213000",
+        meetingUrl: "https://zoom.us/j/213000"
+      }
+    }
   });
   assert.equal(applied.responsePlan.templateKey, "iul_review_confirmed_zoom");
   assert.match(applied.rendered.text, /Zoom/);
+  assert.ok(applied.rendered.text.includes("https://zoom.us/j/213000"));
   assert.doesNotMatch(applied.rendered.text, /entrevista/i);
 });
 

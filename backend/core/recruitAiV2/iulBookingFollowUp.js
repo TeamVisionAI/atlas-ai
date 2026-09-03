@@ -11,7 +11,9 @@ const {
   isIulInPerson,
   proposedSlotFromContext,
   isIulCreateAction,
-  weekdayTimeLabel
+  weekdayTimeLabel,
+  extractIulZoomJoinUrl,
+  buildIulBookingFollowUpIdempotencyKey
 } = require("./iulSchedulingOwnership");
 
 const FOLLOW_UP_SENT = new Set();
@@ -53,19 +55,6 @@ function confirmationTemplate(context, entities = {}) {
   return isIulInPerson(context, entities)
     ? "iul_review_confirmed_office"
     : "iul_review_confirmed_zoom";
-}
-
-function extractZoomJoin(execution = {}, scheduleResult = null) {
-  const source = scheduleResult || execution.scheduleResult || {};
-  return (
-    source.zoomJoinUrl ||
-    source.meetingUrl ||
-    source.calendarEvent?.hangoutLink ||
-    source.appointment?.meeting_url ||
-    source.appointment?.zoomJoinUrl ||
-    execution.zoomJoinUrl ||
-    null
-  );
 }
 
 async function deliverIulBookingFollowUp({
@@ -130,12 +119,19 @@ async function deliverIulBookingFollowUp({
     officeAddress: context.knownFacts?.reviewOfficeAddress || null,
     requestedDate: slot?.dateKey || slot?.date || null,
     requestedTime: slot?.timeKey || slot?.time || null,
-    zoomJoinUrl: execution.success ? extractZoomJoin(execution) : null
+    zoomJoinUrl: execution.success && !inPerson ? extractIulZoomJoinUrl(execution) : null
   };
 
   const templateKey = execution.success
     ? confirmationTemplate(context, entities)
     : "iul_review_create_failed";
+  const missingZoomLink =
+    execution.success && !inPerson && templateKey === "iul_review_confirmed_zoom" && !entities.zoomJoinUrl;
+  const confirmationIdempotencyKey = buildIulBookingFollowUpIdempotencyKey({
+    inboundMessageId: inboundId,
+    schedulingAttemptId: execution.schedulingAttemptId || null,
+    appointmentId: execution.appointmentId || null
+  });
 
   const rendered = renderCustomerReply({
     templateKey,
@@ -159,17 +155,22 @@ async function deliverIulBookingFollowUp({
       providerMessageId: inboundId || null,
       templateKey,
       success: Boolean(execution.success),
-      appointmentId: execution.appointmentId || null
+      appointmentId: execution.appointmentId || null,
+      confirmationIdempotencyKey,
+      missingZoomLink
     });
   }
 
-  await deliverReply({
+  const delivery = await deliverReply({
     replyText,
     templateKey,
     v2Result: settled,
     nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
+    confirmationIdempotencyKey,
     reasonCodes: execution.success
-      ? [REASON_CODES.IUL_SLOT_REVALIDATED]
+      ? missingZoomLink
+        ? [REASON_CODES.IUL_SLOT_REVALIDATED, REASON_CODES.IUL_ZOOM_LINK_MISSING]
+        : [REASON_CODES.IUL_SLOT_REVALIDATED]
       : [REASON_CODES.IUL_CREATE_FAILED_NO_HANDOFF]
   });
 
@@ -177,7 +178,10 @@ async function deliverIulBookingFollowUp({
     sent: true,
     templateKey,
     success: Boolean(execution.success),
-    appointmentId: execution.appointmentId || null
+    appointmentId: execution.appointmentId || null,
+    confirmationIdempotencyKey,
+    missingZoomLink,
+    delivery
   };
 }
 
