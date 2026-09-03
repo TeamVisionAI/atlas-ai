@@ -435,6 +435,22 @@ function emptyAppointmentProfile() {
   };
 }
 
+function emptyOrganizationConfiguration() {
+  return {
+    organization: null
+  };
+}
+
+function emptyMeetingManagement() {
+  return {
+    meetingManagement: {
+      personalMeetingUrl: null,
+      officeAddress: null,
+      meetingPreferences: []
+    }
+  };
+}
+
 function operationalControlPlaneEmpty(buildEmpty) {
   return function operationalControlPlaneEmptyMiddleware(req, res, next) {
     if (!isControlPlaneRequest(req) && !isGlobalSuperAdminControlPlane(req.authContext, req.supportContext)) {
@@ -480,5 +496,7 @@ module.exports = {
   emptyMissions,
   emptyProspectList,
   emptyAppointmentProfile,
+  emptyOrganizationConfiguration,
+  emptyMeetingManagement,
   operationalControlPlaneEmpty
 };

@@ -65,11 +65,38 @@ function isControlPlaneRequest(req) {
   );
 }
 
+/**
+ * BR-160 — operational tenant org for org-scoped settings (Support Mode or tenant user).
+ */
+function resolveOperationalOrganizationId(req) {
+  return req?.tenantContext?.organizationId || null;
+}
+
+/**
+ * Personal integration rows are user-scoped but keyed by organization_id.
+ * On the Super Admin control plane, read the signed-in user's home org only
+ * for personal integrations — never for org settings or org channel state.
+ */
+function resolvePersonalIntegrationOrganizationId(req) {
+  const operationalOrgId = resolveOperationalOrganizationId(req);
+  if (operationalOrgId) {
+    return operationalOrgId;
+  }
+
+  if (isControlPlaneRequest(req)) {
+    return req?.tenantContext?.homeOrganizationId || null;
+  }
+
+  return null;
+}
+
 module.exports = {
   resolveEffectiveOrganizationId,
   getEffectiveOrganizationId,
   isSupportModeActive,
   isGlobalSuperAdminControlPlane,
   isControlPlaneRequest,
+  resolveOperationalOrganizationId,
+  resolvePersonalIntegrationOrganizationId,
   resolveSupportOrganizationId
 };

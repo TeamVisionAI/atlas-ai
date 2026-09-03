@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { isGlobalSuperAdminControlPlane } from "../../security/isGlobalSuperAdminControlPlane";
 import ConfigurationSection from "../../components/settings/ConfigurationSection";
 import ConfigurationLoading from "../../components/settings/ConfigurationLoading";
+import ControlPlaneEmptyState from "../../components/layout/ControlPlaneEmptyState";
 import AtlasButton from "../../components/ui/AtlasButton";
 import {
   fetchMeetingManagement,
@@ -16,6 +19,8 @@ const MEETING_PREFERENCE_OPTIONS = Object.freeze({
 
 export default function MeetingManagement() {
   const { translate } = useLanguage();
+  const { user, supportMode } = useWorkspace();
+  const controlPlane = isGlobalSuperAdminControlPlane(user, supportMode);
   const [meetingManagement, setMeetingManagement] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -27,8 +32,19 @@ export default function MeetingManagement() {
   }, []);
 
   useEffect(() => {
+    if (controlPlane) {
+      return;
+    }
     load().catch((loadError) => setError(loadError.message));
-  }, [load]);
+  }, [controlPlane, load]);
+
+  if (controlPlane) {
+    return (
+      <ConfigurationSection title={translate("configurationMeetingManagement")}>
+        <ControlPlaneEmptyState translate={translate} />
+      </ConfigurationSection>
+    );
+  }
 
   function updateField(field, value) {
     setMeetingManagement((current) => ({ ...current, [field]: value }));

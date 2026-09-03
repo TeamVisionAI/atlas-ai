@@ -17,6 +17,15 @@ const { PERMISSIONS } = require("../security/permissions");
 const { ORGANIZATION_LEVEL_VALUES } = require("../core/configuration/organizationLevels");
 const { appPath } = require("../utils/appPathHelper");
 const { resolveFrontendBaseUrl } = require("../config/frontendBaseUrl");
+const {
+  operationalControlPlaneEmpty,
+  emptyOrganizationConfiguration,
+  emptyMeetingManagement
+} = require("../core/operationalControlPlane");
+const {
+  resolveOperationalOrganizationId,
+  resolvePersonalIntegrationOrganizationId
+} = require("../core/effectiveOrganizationContext");
 
 const router = express.Router();
 
@@ -27,6 +36,13 @@ function auditMeta(req) {
     ipAddress: req.ip,
     userAgent: req.get("user-agent")
   };
+}
+
+function integrationOrganizationId(req, { ownershipMode = "personal" } = {}) {
+  if (ownershipMode === "organization") {
+    return resolveOperationalOrganizationId(req);
+  }
+  return resolvePersonalIntegrationOrganizationId(req);
 }
 
 router.get("/scheduling/google/callback", async (req, res) => {
@@ -78,24 +94,30 @@ router.patch("/profile", async (req, res) => {
   }
 });
 
-router.get("/organization", requirePermission(PERMISSIONS.ORG_WRITE), async (req, res) => {
+router.get(
+  "/organization",
+  requirePermission(PERMISSIONS.ORG_WRITE),
+  operationalControlPlaneEmpty(emptyOrganizationConfiguration),
+  async (req, res) => {
   try {
     const organization = await organizationService.getOrganizationConfiguration(
-      req.tenantContext.organizationId
+      resolveOperationalOrganizationId(req)
     );
     res.json({ organization });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message });
   }
-});
+  }
+);
 
 router.patch(
   "/organization",
   requirePermission(PERMISSIONS.ORG_WRITE),
+  operationalControlPlaneEmpty(emptyOrganizationConfiguration),
   async (req, res) => {
     try {
       const organization = await organizationService.updateOrganizationConfiguration(
-        req.tenantContext.organizationId,
+        resolveOperationalOrganizationId(req),
         req.body,
         auditMeta(req)
       );
@@ -180,35 +202,52 @@ router.get(
   requirePermission(PERMISSIONS.INTEGRATIONS_SELF),
   async (req, res) => {
     try {
+      const operationalOrgId = resolveOperationalOrganizationId(req);
+      const personalOrgId = resolvePersonalIntegrationOrganizationId(req);
+      if (!personalOrgId) {
+        return res.status(403).json({
+          error: "TENANT_CONTEXT_REQUIRED",
+          message: "Effective organization is required."
+        });
+      }
       const integrations = await organizationIntegrationService.getIntegrationsStatus(
-        req.tenantContext.organizationId,
-        req.authContext
+        personalOrgId,
+        req.authContext,
+        { includeOrganizationChannel: Boolean(operationalOrgId) }
       );
-      res.json({ integrations });
+      res.json({
+        integrations,
+        controlPlane: req.controlPlaneOnly === true && !operationalOrgId
+      });
     } catch (error) {
       res.status(error.statusCode || 500).json({ error: error.message });
     }
   }
 );
 
-router.get("/organization/meeting-management", async (req, res) => {
+router.get(
+  "/organization/meeting-management",
+  operationalControlPlaneEmpty(emptyMeetingManagement),
+  async (req, res) => {
   try {
     const meetingManagement = await meetingManagementService.getMeetingManagement(
-      req.tenantContext.organizationId
+      resolveOperationalOrganizationId(req)
     );
     res.json({ meetingManagement });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message });
   }
-});
+  }
+);
 
 router.patch(
   "/organization/meeting-management",
   requirePermission(PERMISSIONS.ORG_WRITE),
+  operationalControlPlaneEmpty(emptyMeetingManagement),
   async (req, res) => {
     try {
       const meetingManagement = await meetingManagementService.updateMeetingManagement(
-        req.tenantContext.organizationId,
+        resolveOperationalOrganizationId(req),
         req.body
       );
       res.json({ meetingManagement });
@@ -232,7 +271,7 @@ router.get(
         }
       }
       const payload = googleCalendarIntegrationService.getAuthUrl(
-        req.tenantContext.organizationId,
+        integrationOrganizationId(req, { ownershipMode }),
         req.tenantContext.userId,
         {
           returnPath: req.query.returnPath || "settings/integrations",
@@ -254,7 +293,7 @@ router.get(
       const ownershipMode =
         req.query.ownershipMode === "organization" ? "organization" : "personal";
       const calendars = await googleCalendarIntegrationService.listCalendars(
-        req.tenantContext.organizationId,
+        integrationOrganizationId(req, { ownershipMode }),
         ownershipMode === "personal"
           ? {
               userId: req.tenantContext.userId,
@@ -278,7 +317,7 @@ router.post(
       const ownershipMode =
         req.body?.ownershipMode === "organization" ? "organization" : "personal";
       const config = await googleCalendarIntegrationService.setCalendar(
-        req.tenantContext.organizationId,
+        integrationOrganizationId(req, { ownershipMode }),
         req.body?.calendarId,
         ownershipMode === "personal"
           ? { userId: req.tenantContext.userId, personalOnly: true }
@@ -297,7 +336,7 @@ router.post(
   async (req, res) => {
     try {
       const result = await icloudCalendarIntegrationService.connect({
-        organizationId: req.tenantContext.organizationId,
+        organizationId: integrationOrganizationId(req),
         userId: req.tenantContext.userId,
         appleAccountEmail: req.body?.appleAccountEmail,
         appSpecificPassword: req.body?.appSpecificPassword
@@ -318,7 +357,7 @@ router.get(
   async (req, res) => {
     try {
       const result = await icloudCalendarIntegrationService.listCalendars(
-        req.tenantContext.organizationId,
+        integrationOrganizationId(req),
         req.tenantContext.userId
       );
       res.json(result);
@@ -337,7 +376,7 @@ router.post(
   async (req, res) => {
     try {
       const calendar = await icloudCalendarIntegrationService.selectCalendar(
-        req.tenantContext.organizationId,
+        integrationOrganizationId(req),
         req.tenantContext.userId,
         req.body?.calendarHref,
         req.body?.calendarDisplayName
@@ -358,7 +397,7 @@ router.post(
   async (req, res) => {
     try {
       const result = await icloudCalendarIntegrationService.disconnect(
-        req.tenantContext.organizationId,
+        integrationOrganizationId(req),
         req.tenantContext.userId
       );
       res.json(result);
@@ -386,7 +425,7 @@ router.post(
         }
       }
       const result = await googleCalendarIntegrationService.disconnect(
-        req.tenantContext.organizationId,
+        integrationOrganizationId(req, { ownershipMode }),
         ownershipMode === "personal"
           ? { userId: req.tenantContext.userId, ownershipMode: "personal" }
           : { ownershipMode: "organization" }
