@@ -122,6 +122,41 @@ export async function runRecruitAiV2SimulatorScenario(scenarioId) {
   );
 }
 
+export async function fetchIulPolicyReviewSimulatorScenarios() {
+  return operationsFetch("/simulator/iul-policy-review/scenarios");
+}
+
+export async function runAllIulPolicyReviewSimulatorScenarios() {
+  return operationsFetch("/simulator/iul-policy-review/scenarios/run-all", { method: "POST" });
+}
+
+export async function runIulPolicyReviewSimulatorScenario(scenarioId, payload = {}) {
+  return operationsFetch(
+    `/simulator/iul-policy-review/scenarios/${encodeURIComponent(scenarioId)}/run`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function runIulStagingE2ESimulator(payload = {}) {
+  return operationsFetch("/simulator/iul-policy-review/staging-e2e/run-all", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function cleanupIulStagingSimulatorEvent(simulatorRunId) {
+  return operationsFetch("/simulator/iul-policy-review/staging-e2e/cleanup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ simulatorRunId })
+  });
+}
+
 export async function fetchRecruitAiV2PlaygroundMeta() {
   return operationsFetch("/simulator/recruit-ai-v2/playground/meta");
 }

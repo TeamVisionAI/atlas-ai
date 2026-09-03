@@ -347,6 +347,73 @@ function createOperationsRoutes(deps = {}) {
     }
   });
 
+  router.get("/simulator/iul-policy-review/scenarios", (req, res) => {
+    res.json({
+      success: true,
+      scenarios: operationsCenterService.listIulPolicyReviewSimulatorScenarios()
+    });
+  });
+
+  router.post("/simulator/iul-policy-review/scenarios/run-all", async (req, res) => {
+    try {
+      const report = await operationsCenterService.runAllIulPolicyReviewSimulatorScenarios();
+      res.json({ success: true, ...report });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "IUL_SCENARIO_SUITE_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.post("/simulator/iul-policy-review/scenarios/:scenarioId/run", async (req, res) => {
+    try {
+      const report = await operationsCenterService.runIulPolicyReviewSimulatorScenario(
+        req.params.scenarioId,
+        req,
+        req.body || {}
+      );
+      res.json({ success: true, report });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: error.code || "IUL_SCENARIO_RUN_FAILED",
+        message: error.message
+      });
+    }
+  });
+
+  router.post("/simulator/iul-policy-review/staging-e2e/run-all", async (req, res) => {
+    try {
+      const report = await operationsCenterService.runIulStagingE2ESimulator(req, req.body || {});
+      res.json({ success: true, ...report });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: error.code || "IUL_STAGING_E2E_FAILED",
+        message: error.publicMessage || error.message
+      });
+    }
+  });
+
+  router.post("/simulator/iul-policy-review/staging-e2e/cleanup", async (req, res) => {
+    try {
+      const simulatorRunId = req.body?.simulatorRunId;
+      const result = await operationsCenterService.cleanupIulStagingSimulatorEvent(
+        req,
+        simulatorRunId
+      );
+      res.json({ success: true, cleanup: result });
+    } catch (error) {
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: error.code || "IUL_STAGING_CLEANUP_FAILED",
+        message: error.publicMessage || error.message
+      });
+    }
+  });
+
   router.get("/simulator/recruit-ai-v2/playground/meta", (req, res) => {
     res.json({
       success: true,
