@@ -74,11 +74,18 @@ function buildInsuranceFactsFromExtract(extractedData = {}, { extractionId = nul
   const riders = Array.isArray(source.riders)
     ? source.riders.map((rider) => {
         const economics = createRiderEconomics(rider || {});
+        const schedule = Array.isArray(rider?.deathBenefitSchedule)
+          ? rider.deathBenefitSchedule.map((row) => ({
+              year: asNumber(row?.year),
+              deathBenefit: asNumber(row?.deathBenefit ?? row?.amount)
+            }))
+          : [];
         return {
           ...economics,
           type: mapToAtlasTerm(rider?.type, "rider") || economics.type,
           amount: asNumber(rider?.amount) ?? economics.amount,
-          notes: asString(rider?.notes) || economics.notes
+          notes: asString(rider?.notes) || economics.notes,
+          deathBenefitSchedule: schedule
         };
       })
     : [];
@@ -97,13 +104,25 @@ function buildInsuranceFactsFromExtract(extractedData = {}, { extractionId = nul
     riskClassification,
     tobaccoStatus,
     faceAmount: asNumber(source.faceAmount),
+    initialDeathBenefit: asNumber(source.initialDeathBenefit ?? source.faceAmount),
+    cashValue: asNumber(source.cashValue),
     premium: {
       amount: asNumber(premium.amount),
       currency: asString(premium.currency) || "USD",
-      frequency: asString(premium.frequency)
+      frequency: asString(premium.frequency),
+      annualIfPaidAnnually: asNumber(premium.annualIfPaidAnnually),
+      annualizedCurrentMode: asNumber(premium.annualizedCurrentMode)
     },
     paymentMode: asString(source.paymentMode || premium.frequency || mechanics.paymentMode),
     deathBenefitOption,
+    effectiveDate: asString(source.effectiveDate),
+    expirationDate: asString(source.expirationDate),
+    deathBenefitSchedule: Array.isArray(source.deathBenefitSchedule)
+      ? source.deathBenefitSchedule.map((row) => ({
+          year: asNumber(row?.year),
+          deathBenefit: asNumber(row?.deathBenefit ?? row?.amount)
+        }))
+      : [],
     illustratedRate: asNumber(source.illustratedRate ?? mechanics.illustratedRate),
     guaranteedRate: asNumber(source.guaranteedRate ?? mechanics.guaranteedRate),
     illustratedDuration: asNumber(
@@ -111,6 +130,12 @@ function buildInsuranceFactsFromExtract(extractedData = {}, { extractionId = nul
     ),
     guaranteedDuration: asNumber(
       source.guaranteedDuration ?? mechanics.guaranteedDuration
+    ),
+    coverageExpiresAtAge: asNumber(
+      source.coverageExpiresAtAge ?? mechanics.coverageExpiresAtAge
+    ),
+    policyLoanInterestRate: asNumber(
+      source.policyLoanInterestRate ?? mechanics.policyLoanInterestRate
     ),
     charges,
     riders,

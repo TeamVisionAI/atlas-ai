@@ -15,11 +15,64 @@ const RIDER_CATEGORIES = Object.freeze({
   OTHER: "other"
 });
 
+const ADJUSTMENT_TYPES = Object.freeze({
+  ACTUARIAL_ADJUSTMENT_FACTOR: "ACTUARIAL_ADJUSTMENT_FACTOR"
+});
+
+const ACTUARIAL_ADJUSTMENT_FACTOR_DISPLAY = "Actuarial Adjustment Factor";
+const ACTUARIAL_FACTOR_UNDISCLOSED_NOTE = "Factor/formula not disclosed in policy.";
+
 function freezeIfObject(value) {
   if (!value || typeof value !== "object") {
     return value;
   }
   return Object.freeze(value);
+}
+
+/**
+ * Structured actuarial adjustment metadata for accelerated benefits.
+ * Never invents a factor, formula, or cash payout estimate.
+ */
+function createActuarialAdjustment(input = {}) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const adjustmentType =
+    input.adjustmentType ||
+    (input.applies === true ? ADJUSTMENT_TYPES.ACTUARIAL_ADJUSTMENT_FACTOR : null);
+  if (!adjustmentType) {
+    return null;
+  }
+
+  const factorDisclosed = input.factorDisclosed === true;
+  const formulaDisclosed = input.formulaDisclosed === true;
+  const applies = input.applies !== false;
+  const administrativeCharge =
+    typeof input.administrativeCharge === "number"
+      ? input.administrativeCharge
+      : input.administrativeCharge == null
+        ? null
+        : Number(input.administrativeCharge);
+
+  return Object.freeze({
+    adjustmentType,
+    displayLabel:
+      input.displayLabel ||
+      (adjustmentType === ADJUSTMENT_TYPES.ACTUARIAL_ADJUSTMENT_FACTOR
+        ? ACTUARIAL_ADJUSTMENT_FACTOR_DISPLAY
+        : String(adjustmentType).replace(/_/g, " ")),
+    applies,
+    factorDisclosed,
+    formulaDisclosed,
+    administrativeCharge:
+      Number.isFinite(administrativeCharge) ? administrativeCharge : null,
+    uiNote:
+      input.uiNote ||
+      (!factorDisclosed || !formulaDisclosed
+        ? ACTUARIAL_FACTOR_UNDISCLOSED_NOTE
+        : null)
+  });
 }
 
 function resolveAcceleratedBenefitPayout({
@@ -69,6 +122,34 @@ function createRiderEconomics(input = {}) {
     ? (input.payoutClassification || payout.classification)
     : input.payoutClassification || null;
 
+  const actuarialAdjustment = createActuarialAdjustment(
+    input.actuarialAdjustment ||
+      (input.adjustmentType
+        ? {
+            adjustmentType: input.adjustmentType,
+            displayLabel: input.displayLabel,
+            applies: input.applies,
+            factorDisclosed: input.factorDisclosed,
+            formulaDisclosed: input.formulaDisclosed,
+            administrativeCharge:
+              input.administrativeCharge ??
+              input.administrativeFees?.amount ??
+              input.administrativeFees?.administrativeCharge,
+            uiNote: input.uiNote
+          }
+        : null)
+  );
+
+  let administrativeFees = freezeIfObject(input.administrativeFees) || null;
+  if (
+    !administrativeFees &&
+    actuarialAdjustment?.administrativeCharge != null
+  ) {
+    administrativeFees = Object.freeze({
+      amount: actuarialAdjustment.administrativeCharge
+    });
+  }
+
   return Object.freeze({
     carrier: input.carrier || null,
     issuer: input.issuer || null,
@@ -95,10 +176,15 @@ function createRiderEconomics(input = {}) {
     eventLimits: freezeIfObject(input.eventLimits) || null,
     claimFrequency: input.claimFrequency || null,
     maxClaims: input.maxClaims ?? null,
-    administrativeFees: freezeIfObject(input.administrativeFees) || null,
+    administrativeFees,
     riderCharges: freezeIfObject(input.riderCharges) || null,
-    discountMethodology: input.discountMethodology || null,
+    discountMethodology:
+      input.discountMethodology ||
+      (actuarialAdjustment?.applies
+        ? actuarialAdjustment.adjustmentType
+        : null),
     discountFactor: input.discountFactor ?? null,
+    actuarialAdjustment,
     discountVariables: freezeIfObject(input.discountVariables) || null,
     discountSampleInterestRate: input.discountSampleInterestRate ?? null,
     discountSampleNote: input.discountSampleNote || null,
@@ -170,6 +256,10 @@ function createRiderEconomics(input = {}) {
 
 module.exports = {
   RIDER_CATEGORIES,
+  ADJUSTMENT_TYPES,
+  ACTUARIAL_ADJUSTMENT_FACTOR_DISPLAY,
+  ACTUARIAL_FACTOR_UNDISCLOSED_NOTE,
+  createActuarialAdjustment,
   createRiderEconomics,
   resolveAcceleratedBenefitPayout,
   CARRIER_CALCULATION_REQUIRED_TEXT

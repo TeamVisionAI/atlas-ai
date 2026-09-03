@@ -454,6 +454,240 @@ const PI_010 = defineRule({
   }
 });
 
+function isDecreasingTermProduct(facts) {
+  const productType = String(facts.productType || "").toLowerCase();
+  const product = String(facts.product || "").toLowerCase();
+  const option = String(facts.deathBenefitOption || "").toLowerCase();
+  return (
+    productType.includes("decreasing") ||
+    product.includes("decreasing") ||
+    option.includes("decreasing") ||
+    facts.deathBenefitOption === ATLAS_TERMS.DECREASING_DEATH_BENEFIT ||
+    facts.productType === ATLAS_TERMS.DECREASING_TERM
+  );
+}
+
+function scheduleDeclines(facts) {
+  const schedule = Array.isArray(facts.deathBenefitSchedule) ? facts.deathBenefitSchedule : [];
+  if (schedule.length < 2) {
+    return isDecreasingTermProduct(facts);
+  }
+  const first = Number(schedule[0]?.deathBenefit);
+  const lastPositive = [...schedule]
+    .reverse()
+    .find((row) => Number(row?.deathBenefit) > 0);
+  const later = Number(lastPositive?.deathBenefit);
+  return Number.isFinite(first) && Number.isFinite(later) && later < first;
+}
+
+const PI_011 = defineRule({
+  id: "PI-011",
+  name: "Death Benefit Decreases Over Time",
+  category: RULE_CATEGORIES.POLICY_DESIGN,
+  severity: "Info",
+  inputs: ["productType", "deathBenefitOption", "deathBenefitSchedule"],
+  finding: "DEATH_BENEFIT_DECREASES_OVER_TIME",
+  recommendation: null,
+  explanation:
+    "This policy’s basic death benefit declines by policy year. It is not a level face amount for the full term.",
+  evaluate(facts) {
+    const triggered = scheduleDeclines(facts) || isDecreasingTermProduct(facts);
+    if (!triggered) {
+      return { triggered: false, finding: null };
+    }
+
+    return {
+      triggered: true,
+      finding: createRuleFinding({
+        ruleId: "PI-011",
+        name: "Death Benefit Decreases Over Time",
+        category: RULE_CATEGORIES.POLICY_DESIGN,
+        severity: "Info",
+        finding: "DEATH_BENEFIT_DECREASES_OVER_TIME",
+        recommendation: null,
+        explanation:
+          "This policy’s basic death benefit declines by policy year. It is not a level face amount for the full term.",
+        evidence: {
+          productType: facts.productType,
+          deathBenefitOption: facts.deathBenefitOption,
+          initialDeathBenefit: facts.initialDeathBenefit ?? facts.faceAmount,
+          scheduleYears: Array.isArray(facts.deathBenefitSchedule)
+            ? facts.deathBenefitSchedule.length
+            : null
+        },
+        factRefs: ["productType", "deathBenefitOption", "deathBenefitSchedule"]
+      })
+    };
+  }
+});
+
+const PI_012 = defineRule({
+  id: "PI-012",
+  name: "No Cash Value",
+  category: RULE_CATEGORIES.POLICY_DESIGN,
+  severity: "Info",
+  inputs: ["cashValue", "productType"],
+  finding: "NO_CASH_VALUE",
+  recommendation: null,
+  explanation: "Stated cash value is zero. This design does not accumulate cash value.",
+  evaluate(facts) {
+    if (!(isDecreasingTermProduct(facts) && facts.cashValue === 0)) {
+      return { triggered: false, finding: null };
+    }
+
+    return {
+      triggered: true,
+      finding: createRuleFinding({
+        ruleId: "PI-012",
+        name: "No Cash Value",
+        category: RULE_CATEGORIES.POLICY_DESIGN,
+        severity: "Info",
+        finding: "NO_CASH_VALUE",
+        recommendation: null,
+        explanation: "Stated cash value is zero. This design does not accumulate cash value.",
+        evidence: { cashValue: facts.cashValue, productType: facts.productType },
+        factRefs: ["cashValue", "productType"]
+      })
+    };
+  }
+});
+
+const PI_013 = defineRule({
+  id: "PI-013",
+  name: "Coverage Expires At Age 70",
+  category: RULE_CATEGORIES.POLICY_DESIGN,
+  severity: "Info",
+  inputs: ["coverageExpiresAtAge", "expirationDate", "product"],
+  finding: "COVERAGE_EXPIRES_AT_AGE_70",
+  recommendation: null,
+  explanation: "Coverage is designed to expire at insured age 70 (to-age-70 term).",
+  evaluate(facts) {
+    const expiresAt70 =
+      Number(facts.coverageExpiresAtAge) === 70 ||
+      String(facts.product || "").toLowerCase().includes("to age 70") ||
+      String(facts.product || "").toLowerCase().includes("age 70");
+    if (!expiresAt70) {
+      return { triggered: false, finding: null };
+    }
+
+    return {
+      triggered: true,
+      finding: createRuleFinding({
+        ruleId: "PI-013",
+        name: "Coverage Expires At Age 70",
+        category: RULE_CATEGORIES.POLICY_DESIGN,
+        severity: "Info",
+        finding: "COVERAGE_EXPIRES_AT_AGE_70",
+        recommendation: null,
+        explanation: "Coverage is designed to expire at insured age 70 (to-age-70 term).",
+        evidence: {
+          coverageExpiresAtAge: facts.coverageExpiresAtAge ?? 70,
+          expirationDate: facts.expirationDate,
+          product: facts.product
+        },
+        factRefs: ["coverageExpiresAtAge", "expirationDate", "product"]
+      })
+    };
+  }
+});
+
+const PI_014 = defineRule({
+  id: "PI-014",
+  name: "Monthly Payment Mode Costs More Than Annual Mode",
+  category: RULE_CATEGORIES.POLICY_DESIGN,
+  severity: "Info",
+  inputs: ["premium"],
+  finding: "MONTHLY_PAYMENT_MODE_COSTS_MORE_THAN_ANNUAL_MODE",
+  recommendation: null,
+  explanation:
+    "Annualized cost under the elected monthly payment mode exceeds the annual-payment premium. These are different payment modes, not contradictory quotes.",
+  evaluate(facts) {
+    const annual = Number(facts.premium?.annualIfPaidAnnually);
+    const annualizedMonthly = Number(facts.premium?.annualizedCurrentMode);
+    const triggered =
+      Number.isFinite(annual) &&
+      Number.isFinite(annualizedMonthly) &&
+      annualizedMonthly > annual;
+    if (!triggered) {
+      return { triggered: false, finding: null };
+    }
+
+    return {
+      triggered: true,
+      finding: createRuleFinding({
+        ruleId: "PI-014",
+        name: "Monthly Payment Mode Costs More Than Annual Mode",
+        category: RULE_CATEGORIES.POLICY_DESIGN,
+        severity: "Info",
+        finding: "MONTHLY_PAYMENT_MODE_COSTS_MORE_THAN_ANNUAL_MODE",
+        recommendation: null,
+        explanation:
+          "Annualized cost under the elected monthly payment mode exceeds the annual-payment premium. These are different payment modes, not contradictory quotes.",
+        evidence: {
+          annualPremiumIfPaidAnnually: annual,
+          annualizedCurrentMode: annualizedMonthly,
+          difference: Number((annualizedMonthly - annual).toFixed(2))
+        },
+        factRefs: ["premium"]
+      })
+    };
+  }
+});
+
+const PI_015 = defineRule({
+  id: "PI-015",
+  name: "Spouse Coverage Also Decreases",
+  category: RULE_CATEGORIES.POLICY_DESIGN,
+  severity: "Info",
+  inputs: ["riders"],
+  finding: "SPOUSE_COVERAGE_ALSO_DECREASES",
+  recommendation: null,
+  explanation:
+    "Spouse coverage under the Family Insurance Agreement is also decreasing term, not a level spouse benefit.",
+  evaluate(facts) {
+    const riders = Array.isArray(facts.riders) ? facts.riders : [];
+    const spouseRider = riders.find((rider) => {
+      const type = String(rider?.type || "").toLowerCase();
+      const notes = String(rider?.notes || "").toLowerCase();
+      return type.includes("spouse") || notes.includes("spouse");
+    });
+    if (!spouseRider) {
+      return { triggered: false, finding: null };
+    }
+    const notes = String(spouseRider.notes || "").toLowerCase();
+    const schedule = Array.isArray(spouseRider.deathBenefitSchedule)
+      ? spouseRider.deathBenefitSchedule
+      : [];
+    const declines =
+      notes.includes("decreasing") ||
+      (schedule.length >= 2 &&
+        Number(schedule[schedule.length - 1]?.deathBenefit) < Number(schedule[0]?.deathBenefit));
+    if (!declines) {
+      return { triggered: false, finding: null };
+    }
+
+    return {
+      triggered: true,
+      finding: createRuleFinding({
+        ruleId: "PI-015",
+        name: "Spouse Coverage Also Decreases",
+        category: RULE_CATEGORIES.POLICY_DESIGN,
+        severity: "Info",
+        finding: "SPOUSE_COVERAGE_ALSO_DECREASES",
+        recommendation: null,
+        explanation:
+          "Spouse coverage under the Family Insurance Agreement is also decreasing term, not a level spouse benefit.",
+        evidence: {
+          riderType: spouseRider.type,
+          initialSpouseBenefit: spouseRider.amount,
+          scheduleYears: schedule.length || null
+        },
+        factRefs: ["riders"]
+      })
+    };
+  }
+});
+
 const INITIAL_RULE_LIBRARY = Object.freeze([
   PI_001,
   PI_002,
@@ -464,7 +698,12 @@ const INITIAL_RULE_LIBRARY = Object.freeze([
   PI_007,
   PI_008,
   PI_009,
-  PI_010
+  PI_010,
+  PI_011,
+  PI_012,
+  PI_013,
+  PI_014,
+  PI_015
 ]);
 
 function getRuleById(ruleId) {
@@ -483,5 +722,10 @@ module.exports = {
   PI_007,
   PI_008,
   PI_009,
-  PI_010
+  PI_010,
+  PI_011,
+  PI_012,
+  PI_013,
+  PI_014,
+  PI_015
 };

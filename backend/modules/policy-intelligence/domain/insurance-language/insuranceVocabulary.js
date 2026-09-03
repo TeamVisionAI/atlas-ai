@@ -11,11 +11,13 @@ const ATLAS_TERMS = Object.freeze({
   STANDARD_SMOKER: "Standard Smoker",
   INCREASING_DEATH_BENEFIT: "Increasing Death Benefit",
   LEVEL_DEATH_BENEFIT: "Level Death Benefit",
+  DECREASING_DEATH_BENEFIT: "Decreasing Death Benefit",
   ACCELERATED_DEATH_BENEFIT: "Accelerated Death Benefit",
   COST_OF_INSURANCE: "Cost of Insurance",
   GUIDELINE_PREMIUM_TEST: "Guideline Premium Test",
   CASH_VALUE_ACCUMULATION_TEST: "Cash Value Accumulation Test",
   TERM_LIFE: "Term Life",
+  DECREASING_TERM: "Decreasing Term",
   WHOLE_LIFE: "Whole Life",
   UNIVERSAL_LIFE: "Universal Life",
   INDEXED_UNIVERSAL_LIFE: "Indexed Universal Life",
@@ -65,7 +67,11 @@ const VOCABULARY_MAP = Object.freeze({
     "option-a": ATLAS_TERMS.LEVEL_DEATH_BENEFIT,
     level: ATLAS_TERMS.LEVEL_DEATH_BENEFIT,
     "level db": ATLAS_TERMS.LEVEL_DEATH_BENEFIT,
-    "level death benefit": ATLAS_TERMS.LEVEL_DEATH_BENEFIT
+    "level death benefit": ATLAS_TERMS.LEVEL_DEATH_BENEFIT,
+    decreasing: ATLAS_TERMS.DECREASING_DEATH_BENEFIT,
+    "decreasing db": ATLAS_TERMS.DECREASING_DEATH_BENEFIT,
+    "decreasing death benefit": ATLAS_TERMS.DECREASING_DEATH_BENEFIT,
+    "declining death benefit": ATLAS_TERMS.DECREASING_DEATH_BENEFIT
   }),
   rider: Object.freeze({
     adb: ATLAS_TERMS.ACCELERATED_DEATH_BENEFIT,
@@ -88,6 +94,12 @@ const VOCABULARY_MAP = Object.freeze({
     "cash value accumulation test": ATLAS_TERMS.CASH_VALUE_ACCUMULATION_TEST
   }),
   productType: Object.freeze({
+    // Decreasing-term aliases must be listed before generic "term".
+    decreasing_term: ATLAS_TERMS.DECREASING_TERM,
+    "decreasing term": ATLAS_TERMS.DECREASING_TERM,
+    "decreasing term life": ATLAS_TERMS.DECREASING_TERM,
+    "decreasing-term": ATLAS_TERMS.DECREASING_TERM,
+    "decreasing-term life": ATLAS_TERMS.DECREASING_TERM,
     term: ATLAS_TERMS.TERM_LIFE,
     "term life": ATLAS_TERMS.TERM_LIFE,
     whole: ATLAS_TERMS.WHOLE_LIFE,

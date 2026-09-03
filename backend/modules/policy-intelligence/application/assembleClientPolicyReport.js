@@ -57,7 +57,72 @@ function illustrationTableLabel(metadata = {}) {
 }
 
 function year1Row(timeline = []) {
-  return timeline.find((row) => Number(row.policyYear) === 1) || timeline[0] || null;
+  return (
+    timeline.find((row) => Number(row.policyYear) === 0) ||
+    timeline.find((row) => Number(row.policyYear) === 1) ||
+    timeline[0] ||
+    null
+  );
+}
+
+function isDecreasingTermExtract(extractedData = {}) {
+  const productType = String(extractedData.productType || "").toLowerCase();
+  const option = String(extractedData.deathBenefitOption || "").toLowerCase();
+  return productType.includes("decreasing") || option.includes("decreasing");
+}
+
+function buildSnapshot({ extractedData = {}, metadata = {}, timeline = [] } = {}) {
+  const insured = extractedData.insured || {};
+  const premium = extractedData.premium || {};
+  const mechanics = extractedData.mechanics || {};
+  const first = year1Row(timeline);
+  const decreasing = isDecreasingTermExtract(extractedData);
+  const initialDeathBenefit =
+    extractedData.initialDeathBenefit ??
+    (decreasing ? first?.deathBenefit : null) ??
+    extractedData.faceAmount ??
+    first?.deathBenefit ??
+    null;
+
+  return Object.freeze({
+    carrier: extractedData.carrier || metadata.carrier || null,
+    issuer: mechanics.issuer || metadata.issuer || extractedData.carrier || null,
+    product: extractedData.product || extractedData.productType || metadata.product || null,
+    productType: extractedData.productType || null,
+    formVersion:
+      mechanics.baseForm ||
+      mechanics.formVersion ||
+      metadata.baseForm ||
+      extractedData.formVersion ||
+      null,
+    issueAge: insured.issueAge ?? first?.insuredAge ?? null,
+    gender: insured.gender || null,
+    underwritingClass: insured.underwritingClass || insured.riskClassification || null,
+    tobaccoStatus: insured.tobaccoStatus || null,
+    premiumAmount: premium.amount ?? first?.annualPremium ?? null,
+    premiumFrequency: premium.frequency || extractedData.paymentMode || null,
+    premiumCurrency: premium.currency || "USD",
+    annualPremiumIfPaidAnnually: premium.annualIfPaidAnnually ?? mechanics.premiumModes?.annualIfPaidAnnually ?? null,
+    annualizedCurrentMode:
+      premium.annualizedCurrentMode ?? mechanics.premiumModes?.annualizedCurrentMode ?? null,
+    faceAmount: extractedData.faceAmount ?? initialDeathBenefit ?? null,
+    initialDeathBenefit,
+    deathBenefit: initialDeathBenefit,
+    deathBenefitOption: extractedData.deathBenefitOption || mechanics.deathBenefitOption || null,
+    cashValue: extractedData.cashValue ?? null,
+    effectiveDate: extractedData.effectiveDate || null,
+    expirationDate: extractedData.expirationDate || null,
+    coverageExpiresAtAge: mechanics.coverageExpiresAtAge ?? null,
+    deathBenefitSchedule: Array.isArray(extractedData.deathBenefitSchedule)
+      ? extractedData.deathBenefitSchedule
+      : Array.isArray(timeline) && decreasing
+        ? timeline.map((row) => ({
+            year: row.policyYear,
+            deathBenefit: row.deathBenefit
+          }))
+        : [],
+    benefitDeclinesOverTime: Boolean(mechanics.benefitDeclinesOverTime || decreasing)
+  });
 }
 
 function extraCheckpointYears(timeline = []) {
@@ -201,36 +266,6 @@ function annualChargeDetailUnavailable(economics) {
   }
   const coi = categories.find((category) => category.id === "cost_of_insurance");
   return coi?.display?.classification === VALUE_CLASSIFICATIONS.NOT_AVAILABLE;
-}
-
-function buildSnapshot({ extractedData = {}, metadata = {}, timeline = [] } = {}) {
-  const insured = extractedData.insured || {};
-  const premium = extractedData.premium || {};
-  const mechanics = extractedData.mechanics || {};
-  const first = year1Row(timeline);
-
-  return Object.freeze({
-    carrier: extractedData.carrier || metadata.carrier || null,
-    issuer: mechanics.issuer || metadata.issuer || extractedData.carrier || null,
-    product: extractedData.product || extractedData.productType || metadata.product || null,
-    productType: extractedData.productType || null,
-    formVersion:
-      mechanics.baseForm ||
-      mechanics.formVersion ||
-      metadata.baseForm ||
-      extractedData.formVersion ||
-      null,
-    issueAge: insured.issueAge ?? first?.insuredAge ?? null,
-    gender: insured.gender || null,
-    underwritingClass: insured.underwritingClass || insured.riskClassification || null,
-    tobaccoStatus: insured.tobaccoStatus || null,
-    premiumAmount: premium.amount ?? first?.annualPremium ?? null,
-    premiumFrequency: premium.frequency || extractedData.paymentMode || null,
-    premiumCurrency: premium.currency || "USD",
-    faceAmount: extractedData.faceAmount ?? first?.deathBenefit ?? null,
-    deathBenefit: first?.deathBenefit ?? extractedData.faceAmount ?? null,
-    deathBenefitOption: extractedData.deathBenefitOption || mechanics.deathBenefitOption || null
-  });
 }
 
 function resolveAdapter(metadata = {}, extractedData = {}) {

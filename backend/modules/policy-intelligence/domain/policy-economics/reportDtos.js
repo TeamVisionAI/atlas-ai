@@ -241,6 +241,7 @@ function buildLivingBenefitCard(rider = {}) {
     }),
     discountMethodology: rider.discountMethodology || null,
     discountFactor: rider.discountFactor ?? null,
+    actuarialAdjustment: rider.actuarialAdjustment || null,
     discountVariables: rider.discountVariables || null,
     exactPayout: exactPayoutCalculable
       ? createClassifiedValue({

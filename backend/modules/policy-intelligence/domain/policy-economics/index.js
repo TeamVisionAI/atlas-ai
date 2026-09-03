@@ -9,6 +9,10 @@ const { POLICY_COST_CATEGORIES, POLICY_COST_CATEGORY_ORDER } = require("./policy
 const { createEmptyPolicyCostTerms, overlayAnnualByYear } = require("./policyCostTerms");
 const {
   RIDER_CATEGORIES,
+  ADJUSTMENT_TYPES,
+  ACTUARIAL_ADJUSTMENT_FACTOR_DISPLAY,
+  ACTUARIAL_FACTOR_UNDISCLOSED_NOTE,
+  createActuarialAdjustment,
   createRiderEconomics,
   resolveAcceleratedBenefitPayout
 } = require("./riderEconomics");
@@ -29,6 +33,10 @@ module.exports = {
   createEmptyPolicyCostTerms,
   overlayAnnualByYear,
   RIDER_CATEGORIES,
+  ADJUSTMENT_TYPES,
+  ACTUARIAL_ADJUSTMENT_FACTOR_DISPLAY,
+  ACTUARIAL_FACTOR_UNDISCLOSED_NOTE,
+  createActuarialAdjustment,
   createRiderEconomics,
   resolveAcceleratedBenefitPayout,
   buildPolicyCostCheckpoints,

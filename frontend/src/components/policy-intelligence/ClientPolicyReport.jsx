@@ -6,6 +6,7 @@ import PolicyValuesCheckpointChart, {
   policyValuesSeriesFor
 } from "./PolicyValuesCheckpointChart";
 import LivingBenefitRiderCards from "./LivingBenefitRiderCards";
+import DecreasingTermBenefitSchedule from "./DecreasingTermBenefitSchedule";
 import { formatUsd, TABLE_UNAVAILABLE } from "./classifiedValueDisplay";
 import { buildSourceCatalog, formatSourceLine, footnoteFor } from "./sourceReferences";
 import "./ClientPolicyReport.css";
@@ -33,6 +34,17 @@ function snapshotPremium(snapshot) {
     return TABLE_UNAVAILABLE;
   }
   return snapshot.premiumFrequency ? `${amount} / ${snapshot.premiumFrequency}` : amount;
+}
+
+function isDecreasingTermSnapshot(snapshot = {}) {
+  const productType = String(snapshot.productType || "").toLowerCase();
+  const option = String(snapshot.deathBenefitOption || "").toLowerCase();
+  return (
+    Boolean(snapshot.benefitDeclinesOverTime) ||
+    productType.includes("decreasing") ||
+    option.includes("decreasing") ||
+    (Array.isArray(snapshot.deathBenefitSchedule) && snapshot.deathBenefitSchedule.length > 0)
+  );
 }
 
 function normalizeDisplayName(value) {
@@ -137,6 +149,7 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
     : null;
   const showIssuer = issuerIsDistinct(snapshot);
   const showCoiWarning = chargeScheduleUndisclosed(report);
+  const decreasingTerm = isDecreasingTermSnapshot(snapshot);
   const storedComparisonHorizon = comparisonHorizonYears(financialEvaluation);
   const valuesChartCheckpoints = useDistributionValues
     ? distributionCheckpoints
@@ -183,15 +196,23 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
             variant="hero"
           />
           <Fact
-            label="Face amount"
-            value={formatUsd(snapshot.faceAmount)}
+            label={decreasingTerm ? "Initial Death Benefit" : "Face amount"}
+            value={formatUsd(
+              decreasingTerm
+                ? snapshot.initialDeathBenefit ?? snapshot.faceAmount
+                : snapshot.faceAmount
+            )}
             testId="pi-snapshot-face"
             variant="hero"
           />
           <Fact
-            label="Death benefit"
-            value={formatUsd(snapshot.deathBenefit)}
-            testId="pi-snapshot-db"
+            label={decreasingTerm ? "Policy type" : "Death benefit"}
+            value={
+              decreasingTerm
+                ? "Decreasing Term"
+                : formatUsd(snapshot.deathBenefit)
+            }
+            testId={decreasingTerm ? "pi-snapshot-decreasing-type" : "pi-snapshot-db"}
             variant="hero"
           />
         </dl>
@@ -227,7 +248,49 @@ export default function ClientPolicyReport({ report, financialEvaluation = null 
             testId="pi-snapshot-db-option"
             hideIfEmpty
           />
+          {decreasingTerm ? (
+            <>
+              <Fact
+                label="Annual premium if paid annually"
+                value={formatUsd(snapshot.annualPremiumIfPaidAnnually)}
+                testId="pi-snapshot-annual-mode"
+                hideIfEmpty
+              />
+              <Fact
+                label="Current annualized cost based on monthly payment mode"
+                value={formatUsd(snapshot.annualizedCurrentMode)}
+                testId="pi-snapshot-monthly-annualized"
+                hideIfEmpty
+              />
+              <Fact
+                label="Cash value"
+                value={snapshot.cashValue === 0 ? "$0" : formatUsd(snapshot.cashValue)}
+                testId="pi-snapshot-cash-value"
+                hideIfEmpty
+              />
+              <Fact
+                label="Effective date"
+                value={snapshot.effectiveDate}
+                testId="pi-snapshot-effective"
+                hideIfEmpty
+              />
+              <Fact
+                label="Expiration"
+                value={snapshot.expirationDate}
+                testId="pi-snapshot-expiration"
+                hideIfEmpty
+              />
+            </>
+          ) : null}
         </dl>
+        {decreasingTerm ? (
+          <DecreasingTermBenefitSchedule
+            schedule={snapshot.deathBenefitSchedule}
+            initialDeathBenefit={snapshot.initialDeathBenefit ?? snapshot.faceAmount}
+            expirationDate={snapshot.expirationDate}
+            productType={snapshot.productType}
+          />
+        ) : null}
       </section>
 
       <section className="pi-report-section" data-testid="pi-section-costs">
