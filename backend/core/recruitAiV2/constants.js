@@ -120,6 +120,10 @@ const INTENTS = Object.freeze({
   IUL_SELECT_OFFERED_SLOT: "iul_select_offered_slot",
   IUL_REQUEST_MORE_SLOTS: "iul_request_more_slots",
   IUL_STALE_SLOT_SELECTION: "iul_stale_slot_selection",
+  /** BR-219 — inbound while IUL booking is still pending. */
+  IUL_BOOKING_PENDING: "iul_booking_pending",
+  /** BR-219 — inbound after a confirmed IUL review appointment exists. */
+  IUL_BOOKING_REHYDRATE: "iul_booking_rehydrate",
   IUL_INFO_ONLY: "iul_info_only",
   IUL_NO_REPLACE: "iul_no_replace",
   IUL_AGENT_SAID_INVESTMENT: "iul_agent_said_investment",
@@ -370,6 +374,9 @@ const REASON_CODES = Object.freeze({
   IUL_SLOT_REVALIDATED: "IUL_SLOT_REVALIDATED",
   IUL_MORE_SLOTS_EXHAUSTED: "IUL_MORE_SLOTS_EXHAUSTED",
   IUL_CREATE_FAILED_NO_HANDOFF: "IUL_CREATE_FAILED_NO_HANDOFF",
+  IUL_BOOKING_DEFERRED: "IUL_BOOKING_DEFERRED",
+  IUL_SCHEDULING_OWNED: "IUL_SCHEDULING_OWNED",
+  IUL_MODE_SWITCH_PRESERVED: "IUL_MODE_SWITCH_PRESERVED",
   IUL_MEETING_MODE_CAPTURED: "IUL_MEETING_MODE_CAPTURED",
   IUL_OFFICE_UNAVAILABLE: "IUL_OFFICE_UNAVAILABLE",
   IUL_CROSS_DATE_PAGE: "IUL_CROSS_DATE_PAGE",

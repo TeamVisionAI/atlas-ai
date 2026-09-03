@@ -700,6 +700,13 @@ async function executeAuthorizedSideEffects({
     );
   }
 
+  const bookingTiming = {
+    availabilityMs: null,
+    calendarCreateMs: null,
+    pipelineMs: null,
+    totalStartedAt: Date.now()
+  };
+
   try {
     const { EVENTS, emitRecruitAiV2Signal } = require("./stage1Observability");
     emitRecruitAiV2Signal(EVENTS.CREATE_ATTEMPTED, {
@@ -816,6 +823,7 @@ async function executeAuthorizedSideEffects({
 
   // Stale-slot guard — re-read canonical availability immediately before write.
   try {
+    const availabilityStarted = Date.now();
     const slotResult = await getSlots({
       organizationId,
       agentId,
@@ -825,6 +833,7 @@ async function executeAuthorizedSideEffects({
       timePreference: "any",
       maxResults: 48
     });
+    bookingTiming.availabilityMs = Date.now() - availabilityStarted;
     const available = slotResult?.slots || slotResult?.items || slotResult || [];
     if (!slotsInclude(available, dateKey, timeKey)) {
       failed.push({
@@ -866,6 +875,7 @@ async function executeAuthorizedSideEffects({
   }
 
   let scheduleResult;
+  let calendarStarted = Date.now();
   try {
     logSchedulingDiagnostics("shared_scheduling_booking_attempt", {
       ...buildSchedulingDiagnostics({
@@ -877,6 +887,7 @@ async function executeAuthorizedSideEffects({
       dateKey,
       timeKey
     });
+    calendarStarted = Date.now();
     scheduleResult = await executeScheduleInterview(
       phone,
       {
@@ -898,7 +909,9 @@ async function executeAuthorizedSideEffects({
         recruitAiV2CoreProspectId: context?.prospectId || options.prospectId || null
       }
     );
+    bookingTiming.calendarCreateMs = Date.now() - calendarStarted;
   } catch (error) {
+    bookingTiming.calendarCreateMs = Date.now() - calendarStarted;
     failed.push({
       type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
       reason: REASON_CODES.EXECUTION_CANONICAL_FAILED,
@@ -1017,6 +1030,7 @@ async function executeAuthorizedSideEffects({
   });
 
   if (schedulingConfig.purpose === "policy_review" && appointmentId) {
+    const pipelineStarted = Date.now();
     const pipelineLink = await linkIulPolicyReviewPipeline({
       organizationId,
       prospectId: context?.prospectId || options.prospectId || null,
@@ -1025,6 +1039,7 @@ async function executeAuthorizedSideEffects({
       phone,
       prospectName: context?.name || context?.knownFacts?.name || null
     });
+    bookingTiming.pipelineMs = Date.now() - pipelineStarted;
     if (pipelineLink?.ok) {
       performed.push({
         type: "policy_review_pipeline_link",
@@ -1041,6 +1056,20 @@ async function executeAuthorizedSideEffects({
     }
   }
 
+  bookingTiming.totalMs = Date.now() - bookingTiming.totalStartedAt;
+  try {
+    logSchedulingDiagnostics("shared_scheduling_booking_timing", {
+      organizationId,
+      agentId,
+      dateKey,
+      timeKey,
+      purpose: schedulingConfig.purpose,
+      ...bookingTiming
+    });
+  } catch {
+    // Timing must never affect booking.
+  }
+
   return finishCreateResult(
     {
       attempted: true,
@@ -1051,7 +1080,13 @@ async function executeAuthorizedSideEffects({
       idempotent: false,
       appointmentId,
       scheduleResult,
-      reason: null
+      reason: null,
+      timing: {
+        availabilityMs: bookingTiming.availabilityMs,
+        calendarCreateMs: bookingTiming.calendarCreateMs,
+        pipelineMs: bookingTiming.pipelineMs,
+        totalMs: bookingTiming.totalMs
+      }
     },
     base
   );

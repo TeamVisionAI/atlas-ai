@@ -484,7 +484,29 @@ async function processNormalizedInboundMessage(
       normalized,
       prospect,
       env,
-      dependencies: authoringDependencies || {},
+      dependencies: {
+        ...(authoringDependencies || {}),
+        deliverIulFollowUp: async ({ replyText, v2Result, nextAction }) => {
+          if (!replyText) {
+            return { sent: false };
+          }
+          return deliverWhatsAppReply({
+            normalized,
+            prospect,
+            replyText,
+            engineResult: {
+              reply: replyText,
+              outboundIntent: "CONVERSATION_ENGINE_REPLY",
+              source: "recruit_ai_v2_iul_booking_follow_up",
+              owner: "v2",
+              nextAction: nextAction || "iul_create_review_appointment",
+              v2Result
+            },
+            outboundIntent: "CONVERSATION_ENGINE_REPLY",
+            qrAttributed
+          });
+        }
+      },
       logStage: logWhatsAppStage
     });
 
@@ -513,6 +535,7 @@ async function processNormalizedInboundMessage(
     if (
       authoringAttempt?.fallThrough &&
       (authoringAttempt.nextAction === "create_appointment" ||
+        authoringAttempt.nextAction === "iul_create_review_appointment" ||
         authoringAttempt.reason === "LIVE_AUTHORING_TIMEOUT" ||
         authoringAttempt.reason === "EMPTY_OR_UNSAFE_REPLY" ||
         authoringAttempt.reason === "LIVE_AUTHORING_TECHNICAL_FAILURE")

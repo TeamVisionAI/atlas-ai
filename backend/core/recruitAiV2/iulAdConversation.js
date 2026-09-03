@@ -567,16 +567,26 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     }
   }
 
-  if (lastAsk === ASK.MEETING_MODE) {
+  const {
+    isIulSchedulingOwnedState,
+    isIulQualificationCompleteForScheduling,
+    isIulBookingPending
+  } = require("./iulSchedulingOwnership");
+  const schedulingOwned = isIulSchedulingOwnedState(context);
+
+  if (lastAsk === ASK.MEETING_MODE || schedulingOwned) {
     const picked = matchQualificationInput("meetingMode", { text, interactiveReply });
-    if (picked?.id === IUL_OPTION_IDS.MEET_OFFICE) {
+    const allowMode =
+      lastAsk === ASK.MEETING_MODE ||
+      (schedulingOwned && isIulQualificationCompleteForScheduling(context));
+    if (allowMode && picked?.id === IUL_OPTION_IDS.MEET_OFFICE) {
       return {
         intent: INTENTS.IUL_CHOOSE_MEETING_MODE,
         confidence: 0.96,
         entities: { meetingMode: "in_person" }
       };
     }
-    if (picked?.id === IUL_OPTION_IDS.MEET_ZOOM) {
+    if (allowMode && picked?.id === IUL_OPTION_IDS.MEET_ZOOM) {
       return {
         intent: INTENTS.IUL_CHOOSE_MEETING_MODE,
         confidence: 0.96,
@@ -585,7 +595,7 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
     }
   }
 
-  if (lastAsk === ASK.OFFER_SLOTS || lastAsk === ASK.CONFIRM_SLOT) {
+  if (lastAsk === ASK.OFFER_SLOTS || lastAsk === ASK.CONFIRM_SLOT || schedulingOwned) {
     if (
       isIulSlotMoreId(interactiveReply?.id) ||
       isIulSlotMoreLabel(interactiveReply?.title) ||
@@ -618,6 +628,23 @@ function classifyIulAdInbound({ text, context, interactiveReply = null } = {}) {
           requestedDate: slot.date || slot.dateKey || null,
           requestedTime: slot.time || slot.timeKey || null
         }
+      };
+    }
+    if (
+      context.appointment?.appointmentId &&
+      String(context.appointment?.status || "").toLowerCase() === "confirmed"
+    ) {
+      return {
+        intent: INTENTS.IUL_BOOKING_REHYDRATE,
+        confidence: 0.94,
+        entities: {}
+      };
+    }
+    if (isIulBookingPending(context)) {
+      return {
+        intent: INTENTS.IUL_BOOKING_PENDING,
+        confidence: 0.94,
+        entities: {}
       };
     }
   }
@@ -912,8 +939,11 @@ function copy(language) {
       ? "Por ahora no veo un horario disponible en ese rango. ¿Le funciona mejor otro día u horario?"
       : "I don't see an available time in that range right now. Would another day or time work better?",
     confirmDeferred: es
-      ? "Perfecto. Estoy reservando su revisión {modePhrase} para el {slotLabel}. Le confirmo cuando quede agendada."
-      : "Perfect. I'm booking your {modePhrase} review for {slotLabel}. I'll confirm once it is scheduled.",
+      ? "Estoy reservando su cita {modePhrase} para el {slotLabel}. Le confirmo en un momento."
+      : "I'm booking your {modePhrase} appointment for {slotLabel}. I'll confirm in a moment.",
+    bookingPending: es
+      ? "Sigo reservando su cita para el {slotLabel}. Le confirmo en un momento."
+      : "I'm still booking your appointment for {slotLabel}. I'll confirm in a moment.",
     confirmedZoom: es
       ? "Listo. Su revisión por Zoom quedó agendada para el {slotLabel}. Le enviaré el enlace de Zoom."
       : "Done. Your Zoom review is scheduled for {slotLabel}. I will send the Zoom link.",
@@ -970,6 +1000,7 @@ function renderIulAdReply(templateKey, language, entities = {}) {
     iul_zero_review_slots: c.zeroSlots,
     iul_no_review_availability: c.noAvailability,
     iul_confirm_review_deferred: c.confirmDeferred,
+    iul_review_booking_pending: c.bookingPending,
     iul_review_confirmed_zoom: c.confirmedZoom,
     iul_review_confirmed_office: c.confirmedOffice,
     iul_clarify_policy_type: c.clarify
@@ -1649,6 +1680,8 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     INTENTS.IUL_SELECT_OFFERED_SLOT,
     INTENTS.IUL_REQUEST_MORE_SLOTS,
     INTENTS.IUL_STALE_SLOT_SELECTION,
+    INTENTS.IUL_BOOKING_PENDING,
+    INTENTS.IUL_BOOKING_REHYDRATE,
     INTENTS.IUL_SCHEDULE_CONFIRM,
     INTENTS.IUL_INFO_ONLY,
     INTENTS.IUL_NO_REPLACE,
@@ -1943,9 +1976,21 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
       ...structured.customerReplyPlan.entities,
       ...facts
     };
+    const {
+      isIulQualificationCompleteForScheduling,
+      isIulSchedulingOwnedState
+    } = require("./iulSchedulingOwnership");
+    const modeSwitch =
+      isIulSchedulingOwnedState(context) &&
+      isIulQualificationCompleteForScheduling(context);
     return beginDayPartAsk(structured, context, {
-      knownFacts: facts,
-      reasonCodes: [REASON_CODES.IUL_MEETING_MODE_CAPTURED]
+      knownFacts: {
+        ...facts,
+        iulBookingPending: false
+      },
+      reasonCodes: modeSwitch
+        ? [REASON_CODES.IUL_MEETING_MODE_CAPTURED, REASON_CODES.IUL_MODE_SWITCH_PRESERVED]
+        : [REASON_CODES.IUL_MEETING_MODE_CAPTURED]
     });
   }
 
@@ -2074,6 +2119,46 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     });
   }
 
+  if (intent === INTENTS.IUL_BOOKING_PENDING) {
+    const slot = resolveSelectedIulSlot(context, interpretation);
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      slotLabel: slot ? formatIulSlotLine(slot, structured.preferredLanguage) : null,
+      meetingMode: context.knownFacts?.meetingMode || "zoom"
+    };
+    return finishIulDecision(structured, context, {
+      templateKey: "iul_review_booking_pending",
+      nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
+      lastQuestionAsked: ASK.CONFIRM_SLOT,
+      mayCreateAppointment: false,
+      reasonCodes: [REASON_CODES.IUL_BOOKING_DEFERRED, REASON_CODES.IUL_SCHEDULING_OWNED],
+      appointmentPatch: {
+        status: APPOINTMENT_STATUS.PROPOSED,
+        proposedDate: context.appointment?.proposedDate || null,
+        proposedTime: context.appointment?.proposedTime || null,
+        previouslyOfferedSlots: context.appointment?.previouslyOfferedSlots || []
+      }
+    });
+  }
+
+  if (intent === INTENTS.IUL_BOOKING_REHYDRATE) {
+    const slot = resolveSelectedIulSlot(context, interpretation);
+    const inPerson = isIulInPersonMode(context.knownFacts || {});
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      slotLabel: slot ? formatIulSlotLine(slot, structured.preferredLanguage) : null,
+      meetingMode: context.knownFacts?.meetingMode || (inPerson ? "in_person" : "zoom"),
+      officeAddress: context.knownFacts?.reviewOfficeAddress || null
+    };
+    return finishIulDecision(structured, context, {
+      templateKey: inPerson ? "iul_review_confirmed_office" : "iul_review_confirmed_zoom",
+      nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
+      lastQuestionAsked: ASK.CONFIRM_SLOT,
+      mayCreateAppointment: false,
+      reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED, REASON_CODES.IUL_SLOT_REVALIDATED]
+    });
+  }
+
   if (intent === INTENTS.IUL_SELECT_OFFERED_SLOT) {
     const slot = interpretation.entities?.selectedSlot || null;
     const offered = context.appointment?.previouslyOfferedSlots || [];
@@ -2128,12 +2213,14 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
         reviewMeetingType:
           context.knownFacts?.reviewMeetingType || IUL_REVIEW_MEETING_TYPE.ZOOM,
         meetingMode: context.knownFacts?.meetingMode || "zoom",
-        iulWorkflowStage: IUL_STAGES.REVIEW_SCHEDULED
+        iulWorkflowStage: IUL_STAGES.REVIEW_SCHEDULED,
+        iulBookingPending: true
       },
       reasonCodes: [
         REASON_CODES.IUL_POLICY_REVIEW_SCHEDULING,
         REASON_CODES.APPOINTMENT_CREATE_PROPOSED,
-        REASON_CODES.IUL_SLOT_REVALIDATED
+        REASON_CODES.IUL_SLOT_REVALIDATED,
+        REASON_CODES.IUL_BOOKING_DEFERRED
       ],
       appointmentPatch: {
         status: APPOINTMENT_STATUS.PROPOSED,
@@ -2235,6 +2322,74 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
     pending !== ASK.POLICY_TYPE &&
     pending !== ASK.POLICY_ACTIVE
   ) {
+    if (
+      pending === ASK.CONFIRM_SLOT ||
+      pending === ASK.OFFER_SLOTS ||
+      pending === ASK.SCHEDULING_DAY_PART ||
+      pending === ASK.SCHEDULING_UNAVAILABLE
+    ) {
+      const {
+        isIulBookingPending
+      } = require("./iulSchedulingOwnership");
+      if (isIulBookingPending(context)) {
+        const slot = resolveSelectedIulSlot(context, interpretation);
+        structured.customerReplyPlan.entities = {
+          ...structured.customerReplyPlan.entities,
+          slotLabel: slot ? formatIulSlotLine(slot, structured.preferredLanguage) : null
+        };
+        return finishIulDecision(structured, context, {
+          templateKey: "iul_review_booking_pending",
+          nextAction: NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT,
+          lastQuestionAsked: ASK.CONFIRM_SLOT,
+          mayCreateAppointment: false,
+          reasonCodes: [REASON_CODES.IUL_BOOKING_DEFERRED, REASON_CODES.IUL_SCHEDULING_OWNED]
+        });
+      }
+      if (pending === ASK.OFFER_SLOTS && context.appointment?.previouslyOfferedSlots?.length) {
+        const shown = attachIulSlotSelectionIds(
+          context.appointment.previouslyOfferedSlots
+        );
+        structured.customerReplyPlan.entities = {
+          ...structured.customerReplyPlan.entities,
+          offeredSlots: shown,
+          includeMoreSlots: shown.length === 2
+        };
+        return finishIulDecision(structured, context, {
+          templateKey: "iul_offer_review_slots",
+          nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+          lastQuestionAsked: ASK.OFFER_SLOTS,
+          reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED],
+          appointmentPatch: {
+            previouslyOfferedSlots: shown
+          }
+        });
+      }
+      if (pending === ASK.CONFIRM_SLOT) {
+        if (context.appointment?.previouslyOfferedSlots?.length) {
+          return reofferExistingIulSlots(
+            structured,
+            context,
+            context.appointment.previouslyOfferedSlots,
+            {
+              templateKey: "iul_review_create_failed",
+              reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED]
+            }
+          );
+        }
+        return finishIulDecision(structured, context, {
+          templateKey: "iul_review_create_failed",
+          nextAction: NEXT_ACTIONS.IUL_OFFER_REVIEW_SLOTS,
+          lastQuestionAsked: ASK.OFFER_SLOTS,
+          reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED]
+        });
+      }
+      return finishIulDecision(structured, context, {
+        templateKey: discoveryTemplateForAsk(pending),
+        nextAction: discoveryNextActionForAsk(pending),
+        lastQuestionAsked: pending,
+        reasonCodes: [REASON_CODES.IUL_SCHEDULING_OWNED]
+      });
+    }
     const replayAsk =
       pending === ASK.CARRIER
         ? ASK.CARRIER
@@ -2246,13 +2401,7 @@ function applyIulAdDecision({ structured, context, interpretation, availability 
               ? ASK.REVIEW_REASON
               : pending === ASK.DOCUMENTS
                 ? ASK.DOCUMENTS
-                : pending === ASK.SCHEDULING_DAY_PART
-                  ? ASK.SCHEDULING_DAY_PART
-                  : pending === ASK.OFFER_SLOTS
-                    ? ASK.OFFER_SLOTS
-                    : pending === ASK.SCHEDULING_UNAVAILABLE
-                      ? ASK.SCHEDULING_UNAVAILABLE
-                    : nextDiscoveryAsk(context.knownFacts || {});
+                : nextDiscoveryAsk(context.knownFacts || {});
     return finishIulDecision(structured, context, {
       templateKey: discoveryTemplateForAsk(replayAsk),
       nextAction: discoveryNextActionForAsk(replayAsk),

@@ -338,7 +338,7 @@ test("K) selected slot resolves once", () => {
     selected.decision.contextPatch.appointment.proposedTime,
     offered[0].time
   );
-  assert.match(selected.rendered.text, /Estoy reservando su revisión/);
+  assert.match(selected.rendered.text, /Estoy reservando su cita/);
   assert.match(selected.rendered.text, /a las/);
 });
 

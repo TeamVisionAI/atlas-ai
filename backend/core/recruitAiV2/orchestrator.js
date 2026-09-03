@@ -424,8 +424,17 @@ function applyExecutionOutcomeToReply({
 }
 
 function applyExecutionToContext(nextContext, execution) {
-  if (!execution?.success || !execution.appointmentId) {
+  if (!execution?.attempted) {
     return nextContext;
+  }
+  if (!execution.success || !execution.appointmentId) {
+    return {
+      ...nextContext,
+      knownFacts: {
+        ...(nextContext.knownFacts || {}),
+        iulBookingPending: false
+      }
+    };
   }
   const performed = execution.performed?.[0] || {};
   const confirmedDate = performed.dateKey || nextContext.appointment?.proposedDate || null;
@@ -434,6 +443,10 @@ function applyExecutionToContext(nextContext, execution) {
     ...nextContext,
     timezone: performed.timezone || nextContext.timezone || "America/New_York",
     currentStage: STAGES.CONFIRMED,
+    knownFacts: {
+      ...(nextContext.knownFacts || {}),
+      iulBookingPending: false
+    },
     appointment: {
       ...nextContext.appointment,
       status: APPOINTMENT_STATUS.CONFIRMED,

@@ -293,8 +293,12 @@ test("J) later Ok does not replay stale slot offer", () => {
     _availabilityFixture: { slots: FOUR_SLOTS }
   });
   const ok = turn({ text: "Ok" }, afterSelect);
-  assert.equal(ok.interpretation.intent, INTENTS.IUL_SCHEDULE_CONFIRM);
+  assert.ok(
+    ok.interpretation.intent === INTENTS.IUL_BOOKING_PENDING ||
+      ok.interpretation.intent === INTENTS.IUL_SCHEDULE_CONFIRM
+  );
   assert.equal(ok.decision.decision.nextAction, NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT);
+  assert.equal(ok.decision.decision.mayCreateAppointment, false);
   assert.notEqual(ok.decision.contextPatch.conversation.lastQuestionAsked, ASK.OFFER_SLOTS);
   assert.doesNotMatch(ok.rendered.text, /Tengo estos horarios disponibles/);
 });
