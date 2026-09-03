@@ -13,6 +13,8 @@ function buildResponsePlan(structuredDecision) {
   return {
     language,
     templateKey: replyPlan.templateKey || null,
+    organizationId: replyPlan.organizationId || null,
+    organizationName: replyPlan.organizationName || null,
     acknowledgeRequest: Boolean(replyPlan.acknowledgeRequest),
     forbidInternalDiagnostics: replyPlan.forbidInternalDiagnostics !== false,
     // Proposed / desired action only — never mutation permission (BR-111).

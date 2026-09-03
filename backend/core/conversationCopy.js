@@ -1,9 +1,19 @@
 const { evaluateSchedulingApproach } = require("./businessRulesEngine");
 const { isScheduleComplete } = require("./informationModel");
 const { PHASES } = require("./schedulingEngine");
+const {
+  resolveTeamMemberPhrase,
+  capitalizePhrase
+} = require("./recruitAiV2/tenantBranding");
 
-function buildHumanCoordinatorReply(reason, language) {
+function buildHumanCoordinatorReply(reason, language, branding = {}) {
   const { getHumanAssistReply } = require("./teamVisionAppointmentRules");
+  const teamMemberPhrase = resolveTeamMemberPhrase({
+    organizationId: branding.organizationId || null,
+    organizationName: branding.organizationName || null,
+    language: language === "es" ? "spanish" : "english"
+  });
+  const TeamMemberPhrase = capitalizePhrase(teamMemberPhrase);
 
   if (
     reason === "SPECIAL_MEETING_REQUEST" ||
@@ -16,13 +26,13 @@ function buildHumanCoordinatorReply(reason, language) {
 
   if (reason === "OUTSIDE_SCHEDULING_WINDOW") {
     return language === "es"
-      ? "Ese horario está fuera de nuestro horario habitual (9:00 AM – 8:30 PM). Un agente de Team Vision se comunicará contigo para coordinarlo."
-      : "That time is outside our usual scheduling window (9:00 AM – 8:30 PM). A Team Vision agent will contact you to coordinate it.";
+      ? `Ese horario está fuera de nuestro horario habitual (9:00 AM – 8:30 PM). ${TeamMemberPhrase} se comunicará contigo para coordinarlo.`
+      : `That time is outside our usual scheduling window (9:00 AM – 8:30 PM). ${TeamMemberPhrase} will contact you to coordinate it.`;
   }
 
   return language === "es"
-    ? "Un agente de Team Vision se comunicará contigo para ayudarte con los próximos pasos."
-    : "A Team Vision agent will contact you to help with the next steps.";
+    ? `${TeamMemberPhrase} se comunicará contigo para ayudarte con los próximos pasos.`
+    : `${TeamMemberPhrase} will contact you to help with the next steps.`;
 }
 
 const {
